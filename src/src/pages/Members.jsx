@@ -16,7 +16,12 @@ const ROLES = [
   "Secretariat"
 ];
 
-const STATUSES = ["Pending", "Active", "Suspended", "Inactive"];
+const STATUSES = [
+  "Pending",
+  "Active",
+  "Suspended",
+  "Inactive"
+];
 
 const EMPTY_FORM = {
   fullName: "",
@@ -86,6 +91,8 @@ export default function Members() {
   }
 
   async function changeStatus(member, status) {
+    setError("");
+
     try {
       await updateRecord(COLLECTIONS.members, member.id, {
         status
@@ -258,7 +265,9 @@ export default function Members() {
                 </div>
 
                 {member.committee && (
-                  <div>Committee: {member.committee}</div>
+                  <div>
+                    Committee: {member.committee}
+                  </div>
                 )}
 
                 <div>Status: {member.status}</div>
