@@ -1,3 +1,4 @@
+```jsx
 import React, { useEffect, useState } from "react";
 import Members from "./pages/Members";
 
@@ -12,6 +13,8 @@ import {
   completeMagicLink,
   logout
 } from "./firebase/auth";
+
+import { getAdminProfile } from "./firebase/data";
 
 const NAVIGATION = [
   {
@@ -48,21 +51,60 @@ const NAVIGATION = [
 
 export default function App() {
   const [user, setUser] = useState(null);
+  const [adminProfile, setAdminProfile] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [activeModule, setActiveModule] = useState("Dashboard");
+  const [profileLoading, setProfileLoading] = useState(false);
 
-  const [authMode, setAuthMode] = useState("login");
+  const [activeModule, setActiveModule] =
+    useState("Dashboard");
+
+  const [authMode, setAuthMode] =
+    useState("login");
+
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [password, setPassword] =
+    useState("");
+
+  const [message, setMessage] =
+    useState("");
+
+  const [error, setError] =
+    useState("");
+
+  const [busy, setBusy] =
+    useState(false);
 
   useEffect(() => {
-    const unsubscribe = observeAuthState((currentUser) => {
-      setUser(currentUser);
-      setAuthLoading(false);
-    });
+    const unsubscribe = observeAuthState(
+      async (currentUser) => {
+        setUser(currentUser);
+        setAdminProfile(null);
+
+        if (!currentUser) {
+          setAuthLoading(false);
+          return;
+        }
+
+        setProfileLoading(true);
+
+        try {
+          const profile =
+            await getAdminProfile(
+              currentUser.uid
+            );
+
+          setAdminProfile(profile);
+        } catch (err) {
+          setError(
+            err.message ||
+              "Unable to load administrator profile."
+          );
+        } finally {
+          setProfileLoading(false);
+          setAuthLoading(false);
+        }
+      }
+    );
 
     return unsubscribe;
   }, []);
@@ -72,38 +114,62 @@ export default function App() {
       return;
     }
 
-    const storedEmail = window.localStorage.getItem(
-      "irpaEmailForSignIn"
-    );
+    const storedEmail =
+      window.localStorage.getItem(
+        "irpaEmailForSignIn"
+      );
 
     if (!storedEmail) {
       setMessage(
-        "Magic link detected. Please enter the authorised email address."
+        "Administrator sign-in link detected. Enter the authorised administrator email address."
       );
       return;
     }
 
+    setBusy(true);
+
     completeMagicLink(storedEmail)
       .then(() => {
-        window.localStorage.removeItem("irpaEmailForSignIn");
-        setMessage("Administrator sign-in successful.");
+        window.localStorage.removeItem(
+          "irpaEmailForSignIn"
+        );
+
+        setMessage(
+          "Administrator sign-in successful."
+        );
       })
       .catch((err) => {
-        setError(err.message || "Unable to complete administrator sign-in.");
+        setError(
+          err.message ||
+            "Unable to complete administrator sign-in."
+        );
+      })
+      .finally(() => {
+        setBusy(false);
       });
   }, []);
 
   async function handleLogin(event) {
     event.preventDefault();
+
     setBusy(true);
     setError("");
     setMessage("");
 
     try {
-      await loginWithEmail(email, password);
-      setMessage("Signed in successfully.");
+      await loginWithEmail(
+        email,
+        password
+      );
+
+      setMessage(
+        "Signed in successfully."
+      );
     } catch (err) {
-      setError(err.message || "Unable to sign in.");
+      setError(
+        err.message ||
+          "Unable to sign in."
+      );
     } finally {
       setBusy(false);
     }
@@ -111,17 +177,25 @@ export default function App() {
 
   async function handleRegister(event) {
     event.preventDefault();
+
     setBusy(true);
     setError("");
     setMessage("");
 
     try {
-      await registerWithEmail(email, password);
+      await registerWithEmail(
+        email,
+        password
+      );
+
       setMessage(
         "Registration successful. Please check your email for verification."
       );
     } catch (err) {
-      setError(err.message || "Unable to register.");
+      setError(
+        err.message ||
+          "Unable to register."
+      );
     } finally {
       setBusy(false);
     }
@@ -134,9 +208,15 @@ export default function App() {
 
     try {
       await loginWithGoogle();
-      setMessage("Google sign-in successful.");
+
+      setMessage(
+        "Google sign-in successful."
+      );
     } catch (err) {
-      setError(err.message || "Unable to sign in with Google.");
+      setError(
+        err.message ||
+          "Unable to sign in with Google."
+      );
     } finally {
       setBusy(false);
     }
@@ -144,7 +224,9 @@ export default function App() {
 
   async function handlePasswordReset() {
     if (!email) {
-      setError("Enter your email address first.");
+      setError(
+        "Enter your email address first."
+      );
       return;
     }
 
@@ -154,9 +236,15 @@ export default function App() {
 
     try {
       await sendPasswordReset(email);
-      setMessage("Password reset instructions have been sent.");
+
+      setMessage(
+        "Password reset instructions have been sent."
+      );
     } catch (err) {
-      setError(err.message || "Unable to send password reset email.");
+      setError(
+        err.message ||
+          "Unable to send password reset email."
+      );
     } finally {
       setBusy(false);
     }
@@ -164,7 +252,9 @@ export default function App() {
 
   async function handleAdminMagicLink() {
     if (!email) {
-      setError("Enter the authorised administrator email address.");
+      setError(
+        "Enter the authorised administrator email address."
+      );
       return;
     }
 
@@ -174,12 +264,14 @@ export default function App() {
 
     try {
       await sendAdminMagicLink(email);
+
       setMessage(
         "Administrator sign-in link sent. Check your email."
       );
     } catch (err) {
       setError(
-        err.message || "Unable to send administrator sign-in link."
+        err.message ||
+          "Unable to send administrator sign-in link."
       );
     } finally {
       setBusy(false);
@@ -188,7 +280,12 @@ export default function App() {
 
   async function handleLogout() {
     await logout();
+
+    setUser(null);
+    setAdminProfile(null);
     setActiveModule("Dashboard");
+    setMessage("");
+    setError("");
   }
 
   if (authLoading) {
@@ -205,9 +302,12 @@ export default function App() {
     return (
       <div className="app-shell">
         <div className="auth-card">
+
           <div className="brand-block">
             <h1>IRPA</h1>
-            <p>Digital Board Governance System</p>
+            <p>
+              Digital Board Governance System
+            </p>
           </div>
 
           <h2>
@@ -236,30 +336,43 @@ export default function App() {
             }
           >
             <div className="form-field">
-              <label>Email Address</label>
+              <label>
+                Email Address
+              </label>
+
               <input
                 type="email"
                 value={email}
                 onChange={(event) =>
-                  setEmail(event.target.value)
+                  setEmail(
+                    event.target.value
+                  )
                 }
                 required
               />
             </div>
 
             <div className="form-field">
-              <label>Password</label>
+              <label>
+                Password
+              </label>
+
               <input
                 type="password"
                 value={password}
                 onChange={(event) =>
-                  setPassword(event.target.value)
+                  setPassword(
+                    event.target.value
+                  )
                 }
                 required
               />
             </div>
 
-            <button type="submit" disabled={busy}>
+            <button
+              type="submit"
+              disabled={busy}
+            >
               {busy
                 ? "Please wait..."
                 : authMode === "register"
@@ -280,7 +393,9 @@ export default function App() {
           <button
             type="button"
             className="secondary-button"
-            onClick={handleAdminMagicLink}
+            onClick={
+              handleAdminMagicLink
+            }
             disabled={busy}
           >
             Send Administrator Sign-In Link
@@ -290,7 +405,9 @@ export default function App() {
             <button
               type="button"
               className="text-button"
-              onClick={handlePasswordReset}
+              onClick={
+                handlePasswordReset
+              }
               disabled={busy}
             >
               Forgot Password?
@@ -306,6 +423,7 @@ export default function App() {
                   ? "register"
                   : "login"
               );
+
               setError("");
               setMessage("");
             }}
@@ -314,6 +432,60 @@ export default function App() {
               ? "Create a new account"
               : "Already have an account? Sign in"}
           </button>
+
+        </div>
+      </div>
+    );
+  }
+
+  if (profileLoading) {
+    return (
+      <div className="app-shell">
+        <div className="loading-screen">
+          Verifying IRPA access...
+        </div>
+      </div>
+    );
+  }
+
+  const isAdministrator =
+    adminProfile?.active === true;
+
+  if (!isAdministrator) {
+    return (
+      <div className="app-shell">
+        <div className="auth-card">
+
+          <div className="brand-block">
+            <h1>IRPA</h1>
+            <p>
+              Digital Board Governance System
+            </p>
+          </div>
+
+          <h2>
+            Access Pending
+          </h2>
+
+          <div className="error-message">
+            Your account is authenticated, but it has not been authorised as an active IRPA administrator.
+          </div>
+
+          <p>
+            Signed in as:
+            <br />
+            <strong>
+              {user.email}
+            </strong>
+          </p>
+
+          <button
+            type="button"
+            onClick={handleLogout}
+          >
+            Sign Out
+          </button>
+
         </div>
       </div>
     );
@@ -321,43 +493,67 @@ export default function App() {
 
   return (
     <div className="app-shell">
+
       <aside className="sidebar">
+
         <div className="sidebar-brand">
           <h1>IRPA</h1>
-          <p>Digital Board Governance</p>
+          <p>
+            Digital Board Governance
+          </p>
         </div>
 
         <nav className="sidebar-nav">
-          {NAVIGATION.map((section) => (
-            <div
-              className="nav-section"
-              key={section.title}
-            >
-              <div className="nav-section-title">
-                {section.title}
-              </div>
 
-              {section.items.map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  className={
-                    activeModule === item
-                      ? "nav-item active"
-                      : "nav-item"
-                  }
-                  onClick={() => setActiveModule(item)}
-                >
-                  {item}
-                </button>
-              ))}
-            </div>
-          ))}
+          {NAVIGATION.map(
+            (section) => (
+              <div
+                className="nav-section"
+                key={section.title}
+              >
+
+                <div className="nav-section-title">
+                  {section.title}
+                </div>
+
+                {section.items.map(
+                  (item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      className={
+                        activeModule === item
+                          ? "nav-item active"
+                          : "nav-item"
+                      }
+                      onClick={() =>
+                        setActiveModule(
+                          item
+                        )
+                      }
+                    >
+                      {item}
+                    </button>
+                  )
+                )}
+
+              </div>
+            )
+          )}
+
         </nav>
 
         <div className="sidebar-footer">
+
           <div className="sidebar-user">
-            {user.email}
+            <strong>
+              {adminProfile?.role ||
+                "Administrator"}
+            </strong>
+
+            <span>
+              {user.email}
+            </span>
           </div>
 
           <button
@@ -367,36 +563,67 @@ export default function App() {
           >
             Sign Out
           </button>
+
         </div>
+
       </aside>
 
       <section className="main-area">
+
         <header className="topbar">
+
           <div>
-            <h2>{activeModule}</h2>
-            <p>IRPA Digital Board Governance Workspace</p>
+            <h2>
+              {activeModule}
+            </h2>
+
+            <p>
+              IRPA Digital Board Governance Workspace
+            </p>
           </div>
 
           <div className="user-info">
-            <span>{user.email}</span>
+            <span>
+              {adminProfile?.role ||
+                "Administrator"}
+            </span>
+
+            <span>
+              {user.email}
+            </span>
           </div>
+
         </header>
 
         <main className="content-area">
-          {activeModule === "Dashboard" ? (
-            <Dashboard />
-          ) : activeModule === "Members" ? (
+
+          {activeModule ===
+            "Dashboard" ? (
+            <Dashboard
+              adminProfile={
+                adminProfile
+              }
+            />
+          ) : activeModule ===
+            "Members" ? (
             <Members />
           ) : (
-            <ModulePlaceholder name={activeModule} />
+            <ModulePlaceholder
+              name={activeModule}
+            />
           )}
+
         </main>
+
       </section>
+
     </div>
   );
 }
 
-function Dashboard() {
+function Dashboard({
+  adminProfile
+}) {
   const cards = [
     ["Members", "0"],
     ["Meetings", "0"],
@@ -408,36 +635,72 @@ function Dashboard() {
 
   return (
     <div>
+
       <div className="welcome-panel">
-        <h1>Governance Dashboard</h1>
+
+        <h1>
+          Governance Dashboard
+        </h1>
+
         <p>
           Central workspace for IRPA Board and governance activities.
         </p>
+
+        <small>
+          Administrator:
+          {" "}
+          {adminProfile?.role ||
+            "Administrator"}
+        </small>
+
       </div>
 
       <div className="dashboard-grid">
-        {cards.map(([title, value]) => (
-          <div className="stat-card" key={title}>
-            <span>{title}</span>
-            <strong>{value}</strong>
-          </div>
-        ))}
+
+        {cards.map(
+          ([title, value]) => (
+            <div
+              className="stat-card"
+              key={title}
+            >
+              <span>
+                {title}
+              </span>
+
+              <strong>
+                {value}
+              </strong>
+            </div>
+          )
+        )}
+
       </div>
+
     </div>
   );
 }
 
-function ModulePlaceholder({ name }) {
+function ModulePlaceholder({
+  name
+}) {
   return (
     <section className="module-panel">
+
       <div className="module-header">
+
         <div>
-          <h1>{name}</h1>
+          <h1>
+            {name}
+          </h1>
+
           <p>
             This governance module is ready for implementation.
           </p>
         </div>
+
       </div>
+
     </section>
   );
 }
+```
