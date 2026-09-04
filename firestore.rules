@@ -1,0 +1,64 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function adminProfileExists() { return signedIn() && exists(/databases/$(database)/documents/adminProfiles/$(request.auth.uid)); }
+    function admin() { return adminProfileExists() && get(/databases/$(database)/documents/adminProfiles/$(request.auth.uid)).data.active == true; }
+    function self(uid) { return signedIn() && request.auth.uid == uid; }
+
+    match /adminProfiles/{uid} {
+      allow read: if self(uid) || admin();
+      allow create: if admin();
+      allow update: if admin() && uid != request.auth.uid;
+      allow delete: if false;
+    }
+
+    match /members/{id} {
+      allow read: if signedIn();
+      allow create: if admin() || (signedIn() && request.resource.data.uid == request.auth.uid);
+      allow update: if admin() || (signedIn() && resource.data.uid == request.auth.uid && request.resource.data.uid == request.auth.uid);
+      allow delete: if admin();
+    }
+
+    match /invitations/{id} {
+      allow read: if admin() || (signedIn() && resource.data.email == request.auth.token.email);
+      allow create, update, delete: if admin();
+    }
+
+    match /documents/{id} {
+      allow read: if signedIn() && (admin() || resource.data.authorizedUids.hasAny([request.auth.uid]));
+      allow create, update: if admin();
+      allow delete: if admin();
+    }
+
+    match /signatures/{id} {
+      allow read: if signedIn() && (admin() || resource.data.signerUid == request.auth.uid);
+      allow create: if admin() || (signedIn() && request.resource.data.signerUid == request.auth.uid);
+      allow update: if admin() || (signedIn() && resource.data.signerUid == request.auth.uid && request.resource.data.signerUid == request.auth.uid);
+      allow delete: if false;
+    }
+
+    match /votes/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.voterUid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /voteLocks/{id} {
+      allow read: if signedIn();
+      allow create, update: if admin();
+      allow delete: if false;
+    }
+
+    match /audit/{id} {
+      allow read: if admin();
+      allow create: if signedIn();
+      allow update, delete: if false;
+    }
+
+    match /{collection}/{id} {
+      allow read: if signedIn();
+      allow create, update, delete: if admin();
+    }
+  }
+}
