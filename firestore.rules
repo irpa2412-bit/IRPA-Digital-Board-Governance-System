@@ -3,9 +3,23 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    /* =========================
+       AUTHENTICATION
+       ========================= */
+
     function signedIn() {
       return request.auth != null;
     }
+
+    function self(uid) {
+      return signedIn()
+        && request.auth.uid == uid;
+    }
+
+
+    /* =========================
+       ADMINISTRATOR ACCESS
+       ========================= */
 
     function adminProfileExists() {
       return signedIn()
@@ -21,10 +35,10 @@ service cloud.firestore {
         ).data.active == true;
     }
 
-    function self(uid) {
-      return signedIn()
-        && request.auth.uid == uid;
-    }
+
+    /* =========================
+       MEMBER ACCESS
+       ========================= */
 
     function memberProfileExists() {
       return signedIn()
@@ -45,12 +59,25 @@ service cloud.firestore {
     }
 
 
+    /* =========================
+       ADMIN PROFILES
+       ========================= */
+
     match /adminProfiles/{uid} {
 
       allow read: if self(uid) || admin();
 
+      /*
+       * First administrator must be provisioned
+       * securely outside the client application.
+       */
       allow create: if admin();
 
+      /*
+       * An administrator cannot change their
+       * own administrator profile through the
+       * client application.
+       */
       allow update: if admin()
         && uid != request.auth.uid;
 
@@ -58,20 +85,46 @@ service cloud.firestore {
     }
 
 
-    match /members/{id} {
+    /* =========================
+       MEMBERS
+       ========================= */
+
+    /*
+     * IMPORTANT:
+     *
+     * Member document ID MUST equal Firebase UID.
+     *
+     * Example:
+     * members/ABC123
+     *
+     * where ABC123 is request.auth.uid.
+     */
+
+    match /members/{uid} {
 
       allow read: if admin()
-        || self(id);
+        || self(uid);
 
+      /*
+       * Administrators may create member profiles.
+       *
+       * A member may create their own profile only
+       * when the UID matches the document ID.
+       */
       allow create: if admin()
         || (
-          signedIn()
+          self(uid)
           && request.resource.data.uid == request.auth.uid
+          && request.resource.data.status == "Active"
         );
 
+      /*
+       * Members may update their own profile,
+       * but cannot change their role or status.
+       */
       allow update: if admin()
         || (
-          self(id)
+          self(uid)
           && resource.data.uid == request.auth.uid
           && request.resource.data.uid == request.auth.uid
           && request.resource.data.role == resource.data.role
@@ -82,6 +135,10 @@ service cloud.firestore {
     }
 
 
+    /* =========================
+       INVITATIONS
+       ========================= */
+
     match /invitations/{id} {
 
       allow read: if admin()
@@ -90,9 +147,17 @@ service cloud.firestore {
           && resource.data.email == request.auth.token.email
         );
 
-      allow create, update, delete: if admin();
+      allow create: if admin();
+
+      allow update: if admin();
+
+      allow delete: if admin();
     }
 
+
+    /* =========================
+       DOCUMENTS
+       ========================= */
 
     match /documents/{id} {
 
@@ -110,6 +175,10 @@ service cloud.firestore {
       allow create, update, delete: if admin();
     }
 
+
+    /* =========================
+       SIGNATURES
+       ========================= */
 
     match /signatures/{id} {
 
@@ -136,6 +205,10 @@ service cloud.firestore {
     }
 
 
+    /* =========================
+       VOTING
+       ========================= */
+
     match /votes/{id} {
 
       allow read: if governanceUser();
@@ -157,156 +230,258 @@ service cloud.firestore {
     }
 
 
+    /* =========================
+       AUDIT TRAIL
+       ========================= */
+
     match /audit/{id} {
 
       allow read: if admin();
 
       allow create: if signedIn();
 
+      /*
+       * Audit records are immutable.
+       */
       allow update, delete: if false;
     }
 
 
+    /* =========================
+       PARTICIPANTS
+       ========================= */
+
     match /participants/{id} {
+
       allow read: if governanceUser();
+
       allow create, update: if admin();
+
       allow delete: if admin();
     }
 
+
+    /* =========================
+       MEETINGS
+       ========================= */
 
     match /meetings/{id} {
+
       allow read: if governanceUser();
+
       allow create, update, delete: if admin();
     }
 
+
+    /* =========================
+       MEETING SUBSCRIPTIONS
+       ========================= */
 
     match /meetingSubscriptions/{id} {
+
       allow read: if governanceUser();
+
       allow create, update: if admin();
+
       allow delete: if admin();
     }
 
+
+    /* =========================
+       MEETING ROOM
+       ========================= */
 
     match /meetingRoomEvents/{id} {
+
       allow read: if governanceUser();
+
       allow create, update: if governanceUser();
+
       allow delete: if admin();
     }
 
+
+    /* =========================
+       TRANSCRIPTION & PROCEEDINGS
+       ========================= */
 
     match /transcriptions/{id} {
+
       allow read: if governanceUser();
+
       allow create, update: if governanceUser();
+
       allow delete: if admin();
     }
 
+
+    /* =========================
+       RESOLUTIONS
+       ========================= */
 
     match /resolutions/{id} {
+
       allow read: if governanceUser();
+
       allow create, update: if admin();
+
       allow delete: if admin();
     }
 
+
+    /* =========================
+       ACTIONS
+       ========================= */
 
     match /actions/{id} {
+
       allow read: if governanceUser();
+
       allow create, update: if governanceUser();
+
       allow delete: if admin();
     }
 
+
+    /* =========================
+       DECISIONS
+       ========================= */
 
     match /decisions/{id} {
+
       allow read: if governanceUser();
+
       allow create, update: if admin();
+
       allow delete: if admin();
     }
 
+
+    /* =========================
+       RISK REGISTER
+       ========================= */
 
     match /risks/{id} {
+
       allow read: if governanceUser();
+
       allow create, update: if admin();
+
       allow delete: if admin();
     }
 
+
+    /* =========================
+       REPORTS
+       ========================= */
 
     match /reports/{id} {
+
       allow read: if governanceUser();
+
       allow create, update: if admin();
+
       allow delete: if admin();
     }
 
 
+    /* =========================
+       FINANCE
+       ========================= */
+
     match /financeBudgets/{id} {
+
       allow read: if admin();
+
       allow create, update, delete: if admin();
     }
-
 
     match /financeTransactions/{id} {
+
       allow read: if admin();
+
       allow create, update, delete: if admin();
     }
-
 
     match /financeFunding/{id} {
+
       allow read: if admin();
+
       allow create, update, delete: if admin();
     }
-
 
     match /financeApprovals/{id} {
+
       allow read: if admin();
+
       allow create, update, delete: if admin();
     }
-
 
     match /financeCommitments/{id} {
+
       allow read: if admin();
+
       allow create, update, delete: if admin();
     }
-
 
     match /financeGrants/{id} {
+
       allow read: if admin();
+
       allow create, update, delete: if admin();
     }
-
 
     match /financeBankAccounts/{id} {
+
       allow read: if admin();
+
       allow create, update, delete: if admin();
     }
-
 
     match /financeReconciliations/{id} {
+
       allow read: if admin();
+
       allow create, update, delete: if admin();
     }
-
 
     match /financeAssets/{id} {
+
       allow read: if admin();
+
       allow create, update, delete: if admin();
     }
-
 
     match /financeRisks/{id} {
+
       allow read: if admin();
+
       allow create, update, delete: if admin();
     }
-
 
     match /financeReports/{id} {
+
       allow read: if admin();
+
       allow create, update, delete: if admin();
     }
 
+
+    /* =========================
+       SYSTEM SETTINGS
+       ========================= */
 
     match /systemSettings/{id} {
+
       allow read: if admin();
+
       allow create, update, delete: if admin();
     }
 
+
+    /* =========================
+       DENY EVERYTHING ELSE
+       ========================= */
 
     match /{document=**} {
       allow read, write: if false;
