@@ -6,6 +6,7 @@ import {
   updateRecord,
   deleteRecord
 } from "../firebase/data";
+import { auth } from "../firebase/config";
 
 const ROLES = [
   "Board Chairperson",
@@ -39,15 +40,12 @@ export default function Members() {
   const [members, setMembers] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState(null);
-
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
-
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -119,10 +117,19 @@ export default function Members() {
     setSuccess("");
 
     try {
+      const existingMember = editingId
+        ? members.find((member) => member.id === editingId)
+        : null;
+
       const memberData = {
         ...form,
+        uid: existingMember?.uid || null,
         memberType: "Governance Member"
       };
+
+      if (!editingId && auth.currentUser?.uid) {
+        memberData.createdBy = auth.currentUser.uid;
+      }
 
       if (editingId) {
         await updateRecord(
@@ -266,14 +273,11 @@ export default function Members() {
 
   return (
     <section className="module-panel">
-
       <div className="module-header">
         <div>
           <h1>Members</h1>
-
           <p>
-            Manage IRPA Board, committee and governance
-            members.
+            Manage IRPA Board, committee and governance members.
           </p>
         </div>
 
@@ -300,7 +304,6 @@ export default function Members() {
       )}
 
       <div className="member-summary">
-
         <div className="stat-card">
           <span>Total Members</span>
           <strong>{totalMembers}</strong>
@@ -320,7 +323,6 @@ export default function Members() {
           <span>Suspended</span>
           <strong>{suspendedMembers}</strong>
         </div>
-
       </div>
 
       {showForm && (
@@ -328,10 +330,8 @@ export default function Members() {
           className="record-form"
           onSubmit={saveMember}
         >
-
           <div className="form-field">
             <label>Full Name</label>
-
             <input
               name="fullName"
               value={form.fullName}
@@ -342,7 +342,6 @@ export default function Members() {
 
           <div className="form-field">
             <label>Email Address</label>
-
             <input
               type="email"
               name="email"
@@ -354,7 +353,6 @@ export default function Members() {
 
           <div className="form-field">
             <label>Phone</label>
-
             <input
               name="phone"
               value={form.phone}
@@ -364,17 +362,13 @@ export default function Members() {
 
           <div className="form-field">
             <label>Governance Role</label>
-
             <select
               name="role"
               value={form.role}
               onChange={changeField}
             >
               {ROLES.map((role) => (
-                <option
-                  key={role}
-                  value={role}
-                >
+                <option key={role} value={role}>
                   {role}
                 </option>
               ))}
@@ -383,7 +377,6 @@ export default function Members() {
 
           <div className="form-field">
             <label>Position</label>
-
             <input
               name="position"
               value={form.position}
@@ -394,7 +387,6 @@ export default function Members() {
 
           <div className="form-field">
             <label>Committee</label>
-
             <input
               name="committee"
               value={form.committee}
@@ -405,17 +397,13 @@ export default function Members() {
 
           <div className="form-field">
             <label>Status</label>
-
             <select
               name="status"
               value={form.status}
               onChange={changeField}
             >
               {STATUSES.map((status) => (
-                <option
-                  key={status}
-                  value={status}
-                >
+                <option key={status} value={status}>
                   {status}
                 </option>
               ))}
@@ -424,7 +412,6 @@ export default function Members() {
 
           <div className="form-field">
             <label>Notes</label>
-
             <textarea
               name="notes"
               value={form.notes}
@@ -434,7 +421,6 @@ export default function Members() {
           </div>
 
           <div className="form-actions">
-
             <button
               type="submit"
               disabled={saving}
@@ -453,17 +439,13 @@ export default function Members() {
             >
               Cancel
             </button>
-
           </div>
-
         </form>
       )}
 
       <div className="member-filters">
-
         <div className="form-field">
           <label>Search Members</label>
-
           <input
             type="search"
             value={search}
@@ -476,7 +458,6 @@ export default function Members() {
 
         <div className="form-field">
           <label>Role</label>
-
           <select
             value={roleFilter}
             onChange={(event) =>
@@ -486,10 +467,7 @@ export default function Members() {
             <option value="All">All Roles</option>
 
             {ROLES.map((role) => (
-              <option
-                key={role}
-                value={role}
-              >
+              <option key={role} value={role}>
                 {role}
               </option>
             ))}
@@ -498,7 +476,6 @@ export default function Members() {
 
         <div className="form-field">
           <label>Status</label>
-
           <select
             value={statusFilter}
             onChange={(event) =>
@@ -508,20 +485,15 @@ export default function Members() {
             <option value="All">All Statuses</option>
 
             {STATUSES.map((status) => (
-              <option
-                key={status}
-                value={status}
-              >
+              <option key={status} value={status}>
                 {status}
               </option>
             ))}
           </select>
         </div>
-
       </div>
 
       <div className="records-table">
-
         {loading ? (
           <p>Loading members...</p>
         ) : filteredMembers.length === 0 ? (
@@ -532,31 +504,21 @@ export default function Members() {
           </p>
         ) : (
           filteredMembers.map((member) => (
-
             <article
               className="record-row"
               key={member.id}
             >
-
               <div className="record-main">
+                <strong>{member.fullName}</strong>
 
-                <strong>
-                  {member.fullName}
-                </strong>
-
-                <div>
-                  {member.email}
-                </div>
+                <div>{member.email}</div>
 
                 {member.phone && (
-                  <div>
-                    {member.phone}
-                  </div>
+                  <div>{member.phone}</div>
                 )}
 
                 <div>
                   {member.role}
-
                   {member.position
                     ? ` · ${member.position}`
                     : ""}
@@ -571,11 +533,9 @@ export default function Members() {
                 <div>
                   Status: {member.status}
                 </div>
-
               </div>
 
               <div className="member-actions">
-
                 <button
                   type="button"
                   onClick={() =>
@@ -635,16 +595,11 @@ export default function Members() {
                 >
                   Delete
                 </button>
-
               </div>
-
             </article>
-
           ))
         )}
-
       </div>
-
     </section>
   );
 }
