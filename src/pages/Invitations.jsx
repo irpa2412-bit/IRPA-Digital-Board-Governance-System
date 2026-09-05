@@ -5,7 +5,7 @@ import {
   updateRecord,
   COLLECTIONS
 } from "../firebase/data";
-import { sendMemberInvitationLink } from "../firebase/auth";
+import { sendMemberInvitationEmail } from "../firebase/auth";
 
 export default function Invitations() {
   const [invitations, setInvitations] = useState([]);
@@ -46,23 +46,72 @@ export default function Invitations() {
         name: cleanName,
         role,
         memberType,
-        status: "Pending"
+        status: "Pending",
+        deliveryStatus: "Preparing"
       });
 
-      await sendMemberInvitationLink(cleanEmail, invitationId);
+      try {
+        await sendMemberInvitationEmail(cleanEmail, invitationId);
+
+        await updateRecord(COLLECTIONS.invitations, invitationId, {
+          status: "Sent",
+          deliveryStatus: "Delivered to Firebase email service",
+          sentAt: new Date().toISOString()
+        });
+
+        setMessage(
+          `Invitation created successfully. A password setup email has been sent to ${cleanEmail}.`
+        );
+      } catch (sendError) {
+        await updateRecord(COLLECTIONS.invitations, invitationId, {
+          deliveryStatus: "Failed",
+          deliveryError: sendError.message || "Email delivery failed."
+        });
+
+        throw new Error(
+          `Invitation record was created, but the email could not be sent: ${
+            sendError.message || "Email delivery failed."
+          }`
+        );
+      }
 
       setEmail("");
       setName("");
       setRole("Board Member");
       setMemberType("Governance Member");
-
       await loadInvitations();
-
-      setMessage(
-        `Member invitation created and sign-in link sent to ${cleanEmail}.`
-      );
     } catch (err) {
       setError(err.message || "Unable to create the member invitation.");
+      await loadInvitations();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resendInvitation(invitation) {
+    setBusy(true);
+    setError("");
+    setMessage("");
+
+    try {
+      await sendMemberInvitationEmail(invitation.email, invitation.id);
+
+      await updateRecord(COLLECTIONS.invitations, invitation.id, {
+        status: "Sent",
+        deliveryStatus: "Delivered to Firebase email service",
+        sentAt: new Date().toISOString(),
+        deliveryError: ""
+      });
+
+      await loadInvitations();
+      setMessage(`Invitation email resent to ${invitation.email}.`);
+    } catch (err) {
+      await updateRecord(COLLECTIONS.invitations, invitation.id, {
+        deliveryStatus: "Failed",
+        deliveryError: err.message || "Email delivery failed."
+      });
+      await loadInvitations();
+      setError(err.message || "Unable to resend invitation.");
     } finally {
       setBusy(false);
     }
@@ -104,8 +153,8 @@ export default function Invitations() {
       <div className="panel">
         <h2>Create Member Invitation</h2>
         <p className="panel-description">
-          The invitation records the intended member identity and governance role.
-          The recipient receives a dedicated member sign-in link; it does not grant administrator privileges.
+          The member receives a Firebase password setup email. The administrator
+          does not create or see the member's permanent password.
         </p>
 
         <form onSubmit={createInvitation}>
@@ -177,13 +226,14 @@ export default function Invitations() {
                 <th>Role</th>
                 <th>Type</th>
                 <th>Status</th>
+                <th>Delivery</th>
                 <th>Action</th>
               </tr>
             </thead>
             <tbody>
               {invitations.length === 0 ? (
                 <tr>
-                  <td colSpan="6">No invitations found.</td>
+                  <td colSpan="7">No invitations found.</td>
                 </tr>
               ) : (
                 invitations.map((invitation) => (
@@ -197,15 +247,25 @@ export default function Invitations() {
                         {invitation.status}
                       </span>
                     </td>
+                    <td>{invitation.deliveryStatus || "—"}</td>
                     <td>
-                      {invitation.status === "Pending" && (
-                        <button
-                          type="button"
-                          onClick={() => cancelInvitation(invitation)}
-                          disabled={busy}
-                        >
-                          Cancel
-                        </button>
+                      {invitation.status !== "Cancelled" && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => resendInvitation(invitation)}
+                            disabled={busy}
+                          >
+                            Resend
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => cancelInvitation(invitation)}
+                            disabled={busy}
+                          >
+                            Cancel
+                          </button>
+                        </>
                       )}
                     </td>
                   </tr>
