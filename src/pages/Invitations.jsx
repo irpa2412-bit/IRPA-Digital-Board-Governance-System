@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   createRecord,
+  deleteRecord,
   getRecords,
   updateRecord,
   COLLECTIONS
@@ -55,7 +56,7 @@ export default function Invitations() {
 
         await updateRecord(COLLECTIONS.invitations, invitationId, {
           status: "Sent",
-          deliveryStatus: "Delivered to Firebase email service",
+          deliveryStatus: "Accepted by Firebase email service",
           sentAt: new Date().toISOString()
         });
 
@@ -98,7 +99,7 @@ export default function Invitations() {
 
       await updateRecord(COLLECTIONS.invitations, invitation.id, {
         status: "Sent",
-        deliveryStatus: "Delivered to Firebase email service",
+        deliveryStatus: "Accepted by Firebase email service",
         sentAt: new Date().toISOString(),
         deliveryError: ""
       });
@@ -124,13 +125,36 @@ export default function Invitations() {
 
     try {
       await updateRecord(COLLECTIONS.invitations, invitation.id, {
-        status: "Cancelled"
+        status: "Cancelled",
+        deliveryStatus: "—"
       });
 
       await loadInvitations();
       setMessage("Invitation cancelled.");
     } catch (err) {
       setError(err.message || "Unable to cancel invitation.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function permanentlyDeleteInvitation(invitation) {
+    const confirmed = window.confirm(
+      `Permanently delete the cancelled invitation for ${invitation.email}? This action cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    setBusy(true);
+    setError("");
+    setMessage("");
+
+    try {
+      await deleteRecord(COLLECTIONS.invitations, invitation.id);
+      await loadInvitations();
+      setMessage("Cancelled invitation permanently deleted.");
+    } catch (err) {
+      setError(err.message || "Unable to delete the cancelled invitation.");
     } finally {
       setBusy(false);
     }
@@ -266,6 +290,15 @@ export default function Invitations() {
                             Cancel
                           </button>
                         </>
+                      )}
+                      {invitation.status === "Cancelled" && (
+                        <button
+                          type="button"
+                          onClick={() => permanentlyDeleteInvitation(invitation)}
+                          disabled={busy}
+                        >
+                          Delete Permanently
+                        </button>
                       )}
                     </td>
                   </tr>
