@@ -3,125 +3,101 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /* =========================
-       AUTHENTICATION
-       ========================= */
-
     function signedIn() {
       return request.auth != null;
     }
 
     function self(uid) {
-      return signedIn()
-        && request.auth.uid == uid;
+      return signedIn() && request.auth.uid == uid;
     }
 
-
-    /* =========================
-       ADMINISTRATOR ACCESS
-       ========================= */
-
     function adminProfileExists() {
-      return signedIn()
-        && exists(
-          /databases/$(database)/documents/adminProfiles/$(request.auth.uid)
-        );
+      return signedIn() && exists(
+        /databases/$(database)/documents/adminProfiles/$(request.auth.uid)
+      );
     }
 
     function admin() {
       return adminProfileExists()
-        && get(
-          /databases/$(database)/documents/adminProfiles/$(request.auth.uid)
-        ).data.active == true;
+        && get(/databases/$(database)/documents/adminProfiles/$(request.auth.uid)).data.active == true;
     }
 
-
-    /* =========================
-       MEMBER ACCESS
-       ========================= */
-
     function memberProfileExists() {
-      return signedIn()
-        && exists(
-          /databases/$(database)/documents/members/$(request.auth.uid)
-        );
+      return signedIn() && exists(
+        /databases/$(database)/documents/members/$(request.auth.uid)
+      );
     }
 
     function activeMember() {
       return memberProfileExists()
-        && get(
-          /databases/$(database)/documents/members/$(request.auth.uid)
-        ).data.status == "Active";
+        && get(/databases/$(database)/documents/members/$(request.auth.uid)).data.status == "Active";
+    }
+
+    function memberRole(role) {
+      return activeMember()
+        && get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role == role;
+    }
+
+    function anyMemberRole(roles) {
+      return activeMember()
+        && roles.hasAny([
+          get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role
+        ]);
     }
 
     function governanceUser() {
       return admin() || activeMember();
     }
 
+    function financePersonnel() {
+      return admin()
+        || anyMemberRole(["Finance Personnel", "Finance Manager", "Executive Director"]);
+    }
 
-    /* =========================
-       ADMIN PROFILES
-       ========================= */
+    function financeBoardViewer() {
+      return financePersonnel()
+        || anyMemberRole(["Board Member", "Board Chairperson", "Board Secretary"]);
+    }
+
+    function secretariat() {
+      return admin()
+        || anyMemberRole(["Secretariat", "Board Secretary", "Executive Director"]);
+    }
+
+    function management() {
+      return admin()
+        || anyMemberRole(["Executive Director", "Management", "Finance Manager"]);
+    }
+
+    function workflowParticipant(resourceData) {
+      return governanceUser()
+        && resourceData.involvedUids is list
+        && resourceData.involvedUids.hasAny([request.auth.uid]);
+    }
 
     match /adminProfiles/{uid} {
-
       allow read: if self(uid) || admin();
-
-      /*
-       * First administrator must be provisioned
-       * securely outside the client application.
-       */
       allow create: if admin();
-
-      /*
-       * An administrator cannot change their
-       * own administrator profile through the
-       * client application.
-       */
-      allow update: if admin()
-        && uid != request.auth.uid;
-
+      allow update: if admin() && uid != request.auth.uid;
       allow delete: if false;
     }
 
-
-    /* =========================
-       MEMBERS
-       ========================= */
-
-    /*
-     * IMPORTANT:
-     *
-     * Member document ID MUST equal Firebase UID.
-     *
-     * Example:
-     * members/ABC123
-     *
-     * where ABC123 is request.auth.uid.
-     */
-
     match /members/{uid} {
+      allow read: if admin() || self(uid);
 
-      allow read: if admin()
-        || self(uid);
-
-      /*
-       * Administrators may create member profiles.
-       *
-       * A member may create their own profile only
-       * when the UID matches the document ID.
-       */
       allow create: if admin()
         || (
           self(uid)
           && request.resource.data.uid == request.auth.uid
           && request.resource.data.status == "Active"
+          && request.resource.data.invitationId is string
+          && exists(/databases/$(database)/documents/invitations/$(request.resource.data.invitationId))
+          && get(/databases/$(database)/documents/invitations/$(request.resource.data.invitationId)).data.email == request.auth.token.email
+          && get(/databases/$(database)/documents/invitations/$(request.resource.data.invitationId)).data.status != "Cancelled"
+          && request.resource.data.role == get(/databases/$(database)/documents/invitations/$(request.resource.data.invitationId)).data.role
+          && request.resource.data.memberType == get(/databases/$(database)/documents/invitations/$(request.resource.data.invitationId)).data.memberType
         );
 
-      /*
-       * Members may update their own profile,
-       * but cannot change their role or status.
-       */
       allow update: if admin()
         || (
           self(uid)
@@ -129,359 +105,177 @@ service cloud.firestore {
           && request.resource.data.uid == request.auth.uid
           && request.resource.data.role == resource.data.role
           && request.resource.data.status == resource.data.status
+          && request.resource.data.invitationId == resource.data.invitationId
         );
 
       allow delete: if admin();
     }
-
-
-    /* =========================
-       INVITATIONS
-       ========================= */
 
     match /invitations/{id} {
-
       allow read: if admin()
-        || (
-          signedIn()
-          && resource.data.email == request.auth.token.email
-        );
-
-      allow create: if admin();
-
-      allow update: if admin();
-
-      allow delete: if admin();
+        || (signedIn() && resource.data.email == request.auth.token.email);
+      allow create, update, delete: if admin();
     }
-
-
-    /* =========================
-       DOCUMENTS
-       ========================= */
 
     match /documents/{id} {
-
-      allow read: if governanceUser()
-        && (
-          admin()
-          || (
-            resource.data.authorizedUids is list
-            && resource.data.authorizedUids.hasAny(
-              [request.auth.uid]
-            )
-          )
-        );
-
+      allow read: if governanceUser() && (
+        admin()
+        || (resource.data.authorizedUids is list && resource.data.authorizedUids.hasAny([request.auth.uid]))
+      );
       allow create, update, delete: if admin();
     }
-
-
-    /* =========================
-       SIGNATURES
-       ========================= */
 
     match /signatures/{id} {
-
-      allow read: if admin()
-        || (
-          signedIn()
-          && resource.data.signerUid == request.auth.uid
-        );
-
-      allow create: if admin()
-        || (
-          activeMember()
-          && request.resource.data.signerUid == request.auth.uid
-        );
-
-      allow update: if admin()
-        || (
-          activeMember()
-          && resource.data.signerUid == request.auth.uid
-          && request.resource.data.signerUid == request.auth.uid
-        );
-
+      allow read: if admin() || (signedIn() && resource.data.signerUid == request.auth.uid);
+      allow create: if admin() || (activeMember() && request.resource.data.signerUid == request.auth.uid);
+      allow update: if admin() || (
+        activeMember()
+        && resource.data.signerUid == request.auth.uid
+        && request.resource.data.signerUid == request.auth.uid
+      );
       allow delete: if false;
     }
-
-
-    /* =========================
-       VOTING
-       ========================= */
 
     match /votes/{id} {
-
       allow read: if governanceUser();
-
-      allow create: if activeMember()
-        && request.resource.data.voterUid == request.auth.uid;
-
+      allow create: if activeMember() && request.resource.data.voterUid == request.auth.uid;
       allow update, delete: if false;
     }
 
-
     match /voteLocks/{id} {
-
       allow read: if governanceUser();
-
       allow create, update: if admin();
-
       allow delete: if false;
     }
 
-
-    /* =========================
-       AUDIT TRAIL
-       ========================= */
-
     match /audit/{id} {
-
       allow read: if admin();
-
       allow create: if signedIn();
-
-      /*
-       * Audit records are immutable.
-       */
       allow update, delete: if false;
     }
 
-
-    /* =========================
-       PARTICIPANTS
-       ========================= */
-
     match /participants/{id} {
-
       allow read: if governanceUser();
-
-      allow create, update: if admin();
-
-      allow delete: if admin();
+      allow create, update, delete: if admin();
     }
-
-
-    /* =========================
-       MEETINGS
-       ========================= */
 
     match /meetings/{id} {
-
       allow read: if governanceUser();
-
       allow create, update, delete: if admin();
     }
-
-
-    /* =========================
-       MEETING SUBSCRIPTIONS
-       ========================= */
 
     match /meetingSubscriptions/{id} {
-
       allow read: if governanceUser();
-
       allow create, update: if admin();
-
       allow delete: if admin();
     }
-
-
-    /* =========================
-       MEETING ROOM
-       ========================= */
 
     match /meetingRoomEvents/{id} {
-
       allow read: if governanceUser();
-
       allow create, update: if governanceUser();
-
       allow delete: if admin();
     }
-
-
-    /* =========================
-       TRANSCRIPTION & PROCEEDINGS
-       ========================= */
 
     match /transcriptions/{id} {
-
       allow read: if governanceUser();
-
       allow create, update: if governanceUser();
-
       allow delete: if admin();
     }
-
-
-    /* =========================
-       RESOLUTIONS
-       ========================= */
 
     match /resolutions/{id} {
-
       allow read: if governanceUser();
-
       allow create, update: if admin();
-
       allow delete: if admin();
     }
-
-
-    /* =========================
-       ACTIONS
-       ========================= */
 
     match /actions/{id} {
-
       allow read: if governanceUser();
-
       allow create, update: if governanceUser();
-
       allow delete: if admin();
     }
-
-
-    /* =========================
-       DECISIONS
-       ========================= */
 
     match /decisions/{id} {
-
       allow read: if governanceUser();
-
       allow create, update: if admin();
-
       allow delete: if admin();
     }
-
-
-    /* =========================
-       RISK REGISTER
-       ========================= */
 
     match /risks/{id} {
-
       allow read: if governanceUser();
-
       allow create, update: if admin();
-
       allow delete: if admin();
     }
-
-
-    /* =========================
-       REPORTS
-       ========================= */
 
     match /reports/{id} {
-
       allow read: if governanceUser();
-
-      allow create, update: if admin();
-
-      allow delete: if admin();
+      allow create, update, delete: if admin() || secretariat() || management();
     }
 
-
-    /* =========================
-       FINANCE
-       ========================= */
-
+    /* Finance: raw execution data is restricted to Finance/Accounting authority. */
     match /financeBudgets/{id} {
-
-      allow read: if admin();
-
-      allow create, update, delete: if admin();
+      allow read: if financeBoardViewer();
+      allow create, update, delete: if financePersonnel();
     }
 
     match /financeTransactions/{id} {
-
-      allow read: if admin();
-
-      allow create, update, delete: if admin();
+      allow read, create, update, delete: if financePersonnel();
     }
 
     match /financeFunding/{id} {
-
-      allow read: if admin();
-
-      allow create, update, delete: if admin();
+      allow read, create, update, delete: if financePersonnel();
     }
 
     match /financeApprovals/{id} {
-
-      allow read: if admin();
-
-      allow create, update, delete: if admin();
+      allow read, create, update, delete: if financePersonnel();
     }
 
     match /financeCommitments/{id} {
-
-      allow read: if admin();
-
-      allow create, update, delete: if admin();
+      allow read, create, update, delete: if financePersonnel();
     }
 
     match /financeGrants/{id} {
-
-      allow read: if admin();
-
-      allow create, update, delete: if admin();
+      allow read, create, update, delete: if financePersonnel();
     }
 
     match /financeBankAccounts/{id} {
-
-      allow read: if admin();
-
-      allow create, update, delete: if admin();
+      allow read, create, update, delete: if financePersonnel();
     }
 
     match /financeReconciliations/{id} {
-
-      allow read: if admin();
-
-      allow create, update, delete: if admin();
+      allow read, create, update, delete: if financePersonnel();
     }
 
     match /financeAssets/{id} {
-
-      allow read: if admin();
-
-      allow create, update, delete: if admin();
+      allow read, create, update, delete: if financePersonnel();
     }
 
     match /financeRisks/{id} {
-
-      allow read: if admin();
-
-      allow create, update, delete: if admin();
+      allow read, create, update, delete: if financePersonnel();
     }
 
     match /financeReports/{id} {
-
-      allow read: if admin();
-
-      allow create, update, delete: if admin();
+      allow read: if financeBoardViewer();
+      allow create, update, delete: if financePersonnel();
     }
 
+    /* Authorization and approval workflow. */
+    match /authorizationRequests/{id} {
+      allow read: if admin() || workflowParticipant(resource);
+      allow create: if admin() || secretariat() || management() || financePersonnel();
+      allow update: if admin() || workflowParticipant(resource) || workflowParticipant(request.resource);
+      allow delete: if admin();
+    }
 
-    /* =========================
-       SYSTEM SETTINGS
-       ========================= */
+    match /workflowActions/{id} {
+      allow read: if admin() || workflowParticipant(resource);
+      allow create: if admin() || secretariat() || management() || financePersonnel();
+      allow update: if admin() || workflowParticipant(resource) || workflowParticipant(request.resource);
+      allow delete: if admin();
+    }
 
     match /systemSettings/{id} {
-
-      allow read: if admin();
-
-      allow create, update, delete: if admin();
+      allow read, create, update, delete: if admin();
     }
-
-
-    /* =========================
-       DENY EVERYTHING ELSE
-       ========================= */
 
     match /{document=**} {
       allow read, write: if false;
