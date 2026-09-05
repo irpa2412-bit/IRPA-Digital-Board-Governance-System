@@ -5,7 +5,7 @@ import {
   updateRecord,
   COLLECTIONS
 } from "../firebase/data";
-import { sendAdminMagicLink } from "../firebase/auth";
+import { sendMemberInvitationLink } from "../firebase/auth";
 
 export default function Invitations() {
   const [invitations, setInvitations] = useState([]);
@@ -34,21 +34,22 @@ export default function Invitations() {
     event.preventDefault();
 
     const cleanEmail = email.trim().toLowerCase();
+    const cleanName = name.trim();
 
     setBusy(true);
     setError("");
     setMessage("");
 
     try {
-      await createRecord(COLLECTIONS.invitations, {
+      const invitationId = await createRecord(COLLECTIONS.invitations, {
         email: cleanEmail,
-        name: name.trim(),
+        name: cleanName,
         role,
         memberType,
         status: "Pending"
       });
 
-      await sendAdminMagicLink(cleanEmail);
+      await sendMemberInvitationLink(cleanEmail, invitationId);
 
       setEmail("");
       setName("");
@@ -58,12 +59,10 @@ export default function Invitations() {
       await loadInvitations();
 
       setMessage(
-        `Invitation created for ${cleanEmail}.`
+        `Member invitation created and sign-in link sent to ${cleanEmail}.`
       );
     } catch (err) {
-      setError(
-        err.message || "Unable to create the invitation."
-      );
+      setError(err.message || "Unable to create the member invitation.");
     } finally {
       setBusy(false);
     }
@@ -75,21 +74,14 @@ export default function Invitations() {
     setMessage("");
 
     try {
-      await updateRecord(
-        COLLECTIONS.invitations,
-        invitation.id,
-        {
-          status: "Cancelled"
-        }
-      );
+      await updateRecord(COLLECTIONS.invitations, invitation.id, {
+        status: "Cancelled"
+      });
 
       await loadInvitations();
-
       setMessage("Invitation cancelled.");
     } catch (err) {
-      setError(
-        err.message || "Unable to cancel invitation."
-      );
+      setError(err.message || "Unable to cancel invitation.");
     } finally {
       setBusy(false);
     }
@@ -101,29 +93,23 @@ export default function Invitations() {
         <div>
           <h1>Member Invitations</h1>
           <p>
-            Securely invite authorised IRPA governance members.
+            Create controlled invitations for authorised IRPA governance members.
           </p>
         </div>
       </div>
 
-      {message && (
-        <div className="success-message">
-          {message}
-        </div>
-      )}
-
-      {error && (
-        <div className="error-message">
-          {error}
-        </div>
-      )}
+      {message && <div className="success-message">{message}</div>}
+      {error && <div className="error-message">{error}</div>}
 
       <div className="panel">
-        <h2>Create Invitation</h2>
+        <h2>Create Member Invitation</h2>
+        <p className="panel-description">
+          The invitation records the intended member identity and governance role.
+          The recipient receives a dedicated member sign-in link; it does not grant administrator privileges.
+        </p>
 
         <form onSubmit={createInvitation}>
           <div className="form-grid">
-
             <div className="form-field">
               <label>Member Name</label>
               <input
@@ -147,10 +133,7 @@ export default function Invitations() {
 
             <div className="form-field">
               <label>Governance Role</label>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-              >
+              <select value={role} onChange={(e) => setRole(e.target.value)}>
                 <option>Board Member</option>
                 <option>Board Chairperson</option>
                 <option>Board Secretary</option>
@@ -163,9 +146,7 @@ export default function Invitations() {
               <label>Member Type</label>
               <select
                 value={memberType}
-                onChange={(e) =>
-                  setMemberType(e.target.value)
-                }
+                onChange={(e) => setMemberType(e.target.value)}
               >
                 <option>Governance Member</option>
                 <option>Management</option>
@@ -173,13 +154,10 @@ export default function Invitations() {
                 <option>Observer</option>
               </select>
             </div>
-
           </div>
 
           <button type="submit" disabled={busy}>
-            {busy
-              ? "Creating Invitation..."
-              : "Create Member Invitation"}
+            {busy ? "Sending Invitation..." : "Create & Send Invitation"}
           </button>
         </form>
       </div>
@@ -187,9 +165,7 @@ export default function Invitations() {
       <div className="panel">
         <div className="panel-header">
           <h2>Invitation Register</h2>
-          <span>
-            {invitations.length} invitation(s)
-          </span>
+          <span>{invitations.length} invitation(s)</span>
         </div>
 
         <div className="table-wrapper">
@@ -204,13 +180,10 @@ export default function Invitations() {
                 <th>Action</th>
               </tr>
             </thead>
-
             <tbody>
               {invitations.length === 0 ? (
                 <tr>
-                  <td colSpan="6">
-                    No invitations found.
-                  </td>
+                  <td colSpan="6">No invitations found.</td>
                 </tr>
               ) : (
                 invitations.map((invitation) => (
@@ -228,9 +201,7 @@ export default function Invitations() {
                       {invitation.status === "Pending" && (
                         <button
                           type="button"
-                          onClick={() =>
-                            cancelInvitation(invitation)
-                          }
+                          onClick={() => cancelInvitation(invitation)}
                           disabled={busy}
                         >
                           Cancel
