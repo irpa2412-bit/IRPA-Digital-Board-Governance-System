@@ -30,7 +30,6 @@ export const COLLECTIONS = {
   risks: "risks",
   audit: "audit",
   reports: "reports",
-
   financeBudgets: "financeBudgets",
   financeTransactions: "financeTransactions",
   financeFunding: "financeFunding",
@@ -42,11 +41,12 @@ export const COLLECTIONS = {
   financeAssets: "financeAssets",
   financeRisks: "financeRisks",
   financeReports: "financeReports",
-
   signatures: "signatures",
   invitations: "invitations",
   adminProfiles: "adminProfiles",
-  systemSettings: "systemSettings"
+  systemSettings: "systemSettings",
+  authorizationRequests: "authorizationRequests",
+  workflowActions: "workflowActions"
 };
 
 function currentActor() {
@@ -56,238 +56,101 @@ function currentActor() {
   };
 }
 
-async function writeAudit(
-  action,
-  collectionName,
-  recordId,
-  details = {}
-) {
+async function writeAudit(action, collectionName, recordId, details = {}) {
   const actor = currentActor();
-
-  await addDoc(
-    collection(db, COLLECTIONS.audit),
-    {
-      action,
-      collection: collectionName,
-      recordId,
-      details,
-      actorUid: actor.uid,
-      actorEmail: actor.email,
-      createdAt: serverTimestamp()
-    }
-  );
+  await addDoc(collection(db, COLLECTIONS.audit), {
+    action,
+    collection: collectionName,
+    recordId,
+    details,
+    actorUid: actor.uid,
+    actorEmail: actor.email,
+    createdAt: serverTimestamp()
+  });
 }
 
-/*
- * Generic record creation.
- */
-export async function createRecord(
-  collectionName,
-  data
-) {
-  const ref = await addDoc(
-    collection(db, collectionName),
-    {
-      ...data,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    }
-  );
-
-  await writeAudit(
-    "CREATE",
-    collectionName,
-    ref.id,
-    data
-  );
-
+export async function createRecord(collectionName, data) {
+  const ref = await addDoc(collection(db, collectionName), {
+    ...data,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  });
+  await writeAudit("CREATE", collectionName, ref.id, data);
   return ref.id;
 }
 
-/*
- * Create or replace a member profile using
- * the Firebase Authentication UID as the
- * Firestore document ID.
- *
- * Result:
- * members/{uid}
- */
-export async function createMemberProfile(
-  uid,
-  data
-) {
-  if (!uid) {
-    throw new Error(
-      "A Firebase Authentication UID is required."
-    );
-  }
-
-  const memberRef = doc(
-    db,
-    COLLECTIONS.members,
-    uid
-  );
-
-  await setDoc(
-    memberRef,
-    {
-      ...data,
-      uid,
-      memberType:
-        data.memberType ||
-        "Governance Member",
-      createdAt:
-        data.createdAt ||
-        serverTimestamp(),
-      updatedAt: serverTimestamp()
-    },
-    {
-      merge: true
-    }
-  );
-
-  await writeAudit(
-    "CREATE_OR_UPDATE_MEMBER_PROFILE",
-    COLLECTIONS.members,
+export async function createMemberProfile(uid, data) {
+  if (!uid) throw new Error("A Firebase Authentication UID is required.");
+  const memberRef = doc(db, COLLECTIONS.members, uid);
+  await setDoc(memberRef, {
+    ...data,
     uid,
-    {
-      ...data,
-      uid
-    }
-  );
-
+    memberType: data.memberType || "Governance Member",
+    createdAt: data.createdAt || serverTimestamp(),
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+  await writeAudit("CREATE_OR_UPDATE_MEMBER_PROFILE", COLLECTIONS.members, uid, { ...data, uid });
   return uid;
 }
 
-/*
- * Get one record.
- */
-export async function getRecord(
-  collectionName,
-  id
-) {
-  const snapshot = await getDoc(
-    doc(db, collectionName, id)
-  );
+export async function provisionCurrentMemberFromInvitation(invitationId) {
+  const uid = auth.currentUser?.uid;
+  const email = auth.currentUser?.email?.trim().toLowerCase();
+  if (!uid || !email || !invitationId) return null;
 
-  if (!snapshot.exists()) {
-    return null;
+  const invitation = await getRecord(COLLECTIONS.invitations, invitationId);
+  if (!invitation) throw new Error("The member invitation could not be found.");
+  if (invitation.email?.trim().toLowerCase() !== email) {
+    throw new Error("This invitation is not assigned to the authenticated email address.");
+  }
+  if (invitation.status === "Cancelled") {
+    throw new Error("This member invitation has been cancelled.");
   }
 
-  return {
-    id: snapshot.id,
-    ...snapshot.data()
-  };
+  return await createMemberProfile(uid, {
+    invitationId,
+    email,
+    name: invitation.name || "",
+    role: invitation.role || "Board Member",
+    memberType: invitation.memberType || "Governance Member",
+    status: "Active"
+  });
 }
 
-/*
- * Get all records ordered by creation date.
- */
-export async function getRecords(
-  collectionName
-) {
-  const q = query(
-    collection(db, collectionName),
-    orderBy("createdAt", "desc")
-  );
+export async function getRecord(collectionName, id) {
+  const snapshot = await getDoc(doc(db, collectionName, id));
+  if (!snapshot.exists()) return null;
+  return { id: snapshot.id, ...snapshot.data() };
+}
 
+export async function getRecords(collectionName) {
+  const q = query(collection(db, collectionName), orderBy("createdAt", "desc"));
   const snapshot = await getDocs(q);
-
-  return snapshot.docs.map((item) => ({
-    id: item.id,
-    ...item.data()
-  }));
+  return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
 }
 
-/*
- * Update a record.
- */
-export async function updateRecord(
-  collectionName,
-  id,
-  data
-) {
-  await updateDoc(
-    doc(db, collectionName, id),
-    {
-      ...data,
-      updatedAt: serverTimestamp()
-    }
-  );
-
-  await writeAudit(
-    "UPDATE",
-    collectionName,
-    id,
-    data
-  );
+export async function updateRecord(collectionName, id, data) {
+  await updateDoc(doc(db, collectionName, id), {
+    ...data,
+    updatedAt: serverTimestamp()
+  });
+  await writeAudit("UPDATE", collectionName, id, data);
 }
 
-/*
- * Delete a record.
- */
-export async function deleteRecord(
-  collectionName,
-  id
-) {
-  await deleteDoc(
-    doc(db, collectionName, id)
-  );
-
-  await writeAudit(
-    "DELETE",
-    collectionName,
-    id
-  );
+export async function deleteRecord(collectionName, id) {
+  await deleteDoc(doc(db, collectionName, id));
+  await writeAudit("DELETE", collectionName, id);
 }
 
-/*
- * Get the currently authenticated administrator
- * profile.
- */
-export async function getAdminProfile(
-  uid
-) {
-  if (!uid) {
-    return null;
-  }
-
-  const snapshot = await getDoc(
-    doc(
-      db,
-      COLLECTIONS.adminProfiles,
-      uid
-    )
-  );
-
-  if (!snapshot.exists()) {
-    return null;
-  }
-
-  return {
-    id: snapshot.id,
-    ...snapshot.data()
-  };
+export async function getAdminProfile(uid) {
+  if (!uid) return null;
+  const snapshot = await getDoc(doc(db, COLLECTIONS.adminProfiles, uid));
+  if (!snapshot.exists()) return null;
+  return { id: snapshot.id, ...snapshot.data() };
 }
 
-/*
- * Get the currently authenticated member
- * profile.
- *
- * Because member documents now use UID as
- * their document ID:
- *
- * members/{auth.uid}
- */
 export async function getCurrentMemberProfile() {
   const uid = auth.currentUser?.uid;
-
-  if (!uid) {
-    return null;
-  }
-
-  return await getRecord(
-    COLLECTIONS.members,
-    uid
-  );
+  if (!uid) return null;
+  return await getRecord(COLLECTIONS.members, uid);
 }
