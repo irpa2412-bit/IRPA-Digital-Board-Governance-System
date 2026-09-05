@@ -60,6 +60,26 @@ function generateTemporaryPassword() {
   return `IRPA-${random}-9!aQ`;
 }
 
+function firebaseErrorMessage(error) {
+  const code = error?.code || "";
+  const message = error?.message || "Firebase Authentication request failed.";
+
+  const known = {
+    "auth/operation-not-allowed": "Email/password authentication is not enabled for this Firebase project.",
+    "auth/invalid-api-key": "The Firebase API key is invalid.",
+    "auth/network-request-failed": "Firebase Authentication could not reach the network. Check the browser connection and try again.",
+    "auth/too-many-requests": "Firebase has temporarily blocked requests from this device because of too many attempts. Please wait and try again.",
+    "auth/quota-exceeded": "Firebase Authentication quota has been exceeded.",
+    "auth/invalid-continue-uri": "The registration link destination is not authorized in Firebase Authentication.",
+    "auth/unauthorized-continue-uri": "The registration link destination is not authorized in Firebase Authentication. Add the application domain under Authorized domains.",
+    "auth/missing-continue-uri": "The registration link destination is missing.",
+    "auth/user-not-found": "Firebase Authentication could not find this email account.",
+    "auth/invalid-email": "The email address is invalid."
+  };
+
+  return known[code] ? `${known[code]} (${code})` : `${message}${code ? ` (${code})` : ""}`;
+}
+
 async function sendAuthResetEmailWithSecondaryApp(email, actionCodeSettings, appPrefix) {
   const cleanEmail = email.trim().toLowerCase();
   const secondaryName = `${appPrefix}-${Date.now()}-${Math.random()
@@ -79,16 +99,22 @@ async function sendAuthResetEmailWithSecondaryApp(email, actionCodeSettings, app
       accountCreated = true;
     } catch (error) {
       if (error?.code !== "auth/email-already-in-use") {
-        throw error;
+        throw new Error(firebaseErrorMessage(error));
       }
     }
 
-    await sendPasswordResetEmail(secondaryAuth, cleanEmail, actionCodeSettings);
+    try {
+      await sendPasswordResetEmail(secondaryAuth, cleanEmail, actionCodeSettings);
+    } catch (error) {
+      throw new Error(firebaseErrorMessage(error));
+    }
 
     return {
       email: cleanEmail,
       accountCreated,
-      emailRequested: true
+      emailRequested: true,
+      provider: "Firebase Authentication",
+      deliveryStatus: "Accepted by Firebase Authentication"
     };
   } finally {
     await deleteApp(secondaryApp);
