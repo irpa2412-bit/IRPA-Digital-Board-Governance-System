@@ -1,5 +1,6 @@
 import {
   createUserWithEmailAndPassword,
+  deleteUser,
   sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
@@ -71,13 +72,16 @@ export async function sendMemberInvitationEmail(email, invitationId) {
     .slice(2, 8)}`;
   const secondaryApp = initializeApp(firebaseConfig, secondaryName);
   const secondaryAuth = getAuth(secondaryApp);
+  let temporaryUser = null;
 
   try {
-    await createUserWithEmailAndPassword(
+    const credential = await createUserWithEmailAndPassword(
       secondaryAuth,
       cleanEmail,
       generateTemporaryPassword()
     );
+
+    temporaryUser = credential.user;
 
     const actionCodeSettings = {
       url:
@@ -99,6 +103,14 @@ export async function sendMemberInvitationEmail(email, invitationId) {
       throw new Error(
         "This email address already has a Firebase account. Use the member's existing account or a different email address."
       );
+    }
+
+    if (temporaryUser) {
+      try {
+        await deleteUser(temporaryUser);
+      } catch {
+        // The original delivery error is more useful to the administrator.
+      }
     }
 
     throw error;
