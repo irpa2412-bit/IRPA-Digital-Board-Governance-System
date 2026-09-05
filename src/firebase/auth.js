@@ -60,20 +60,13 @@ function generateTemporaryPassword() {
   return `IRPA-${random}-9!aQ`;
 }
 
-export async function sendMemberInvitationEmail(email, invitationId) {
-  if (!email || !invitationId) {
-    throw new Error("Member email and invitation ID are required.");
-  }
-
+async function sendAuthResetEmailWithSecondaryApp(email, actionCodeSettings, appPrefix) {
   const cleanEmail = email.trim().toLowerCase();
-
-  const secondaryName = `member-invitation-${Date.now()}-${Math.random()
+  const secondaryName = `${appPrefix}-${Date.now()}-${Math.random()
     .toString(36)
     .slice(2, 8)}`;
-
   const secondaryApp = initializeApp(firebaseConfig, secondaryName);
   const secondaryAuth = getAuth(secondaryApp);
-
   let accountCreated = false;
 
   try {
@@ -83,7 +76,6 @@ export async function sendMemberInvitationEmail(email, invitationId) {
         cleanEmail,
         generateTemporaryPassword()
       );
-
       accountCreated = true;
     } catch (error) {
       if (error?.code !== "auth/email-already-in-use") {
@@ -91,32 +83,63 @@ export async function sendMemberInvitationEmail(email, invitationId) {
       }
     }
 
-    const actionCodeSettings = {
-      url:
-        window.location.origin +
-        "/?memberInvite=" +
-        encodeURIComponent(invitationId) +
-        "&email=" +
-        encodeURIComponent(cleanEmail),
-      handleCodeInApp: false
-    };
-
-    await sendPasswordResetEmail(
-      secondaryAuth,
-      cleanEmail,
-      actionCodeSettings
-    );
+    await sendPasswordResetEmail(secondaryAuth, cleanEmail, actionCodeSettings);
 
     return {
       email: cleanEmail,
       accountCreated,
       emailRequested: true
     };
-  } catch (error) {
-    throw error;
   } finally {
     await deleteApp(secondaryApp);
   }
+}
+
+export async function sendMemberInvitationEmail(email, invitationId) {
+  if (!email || !invitationId) {
+    throw new Error("Member email and invitation ID are required.");
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+
+  const actionCodeSettings = {
+    url:
+      window.location.origin +
+      "/?memberInvite=" +
+      encodeURIComponent(invitationId) +
+      "&email=" +
+      encodeURIComponent(cleanEmail),
+    handleCodeInApp: false
+  };
+
+  return sendAuthResetEmailWithSecondaryApp(
+    cleanEmail,
+    actionCodeSettings,
+    "member-invitation"
+  );
+}
+
+export async function sendEmployeeRegistrationEmail(email, employeeNumber) {
+  if (!email || !employeeNumber) {
+    throw new Error("Employee email and Employee Number are required.");
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+  const actionCodeSettings = {
+    url:
+      window.location.origin +
+      "/?employeeNumber=" +
+      encodeURIComponent(employeeNumber) +
+      "&email=" +
+      encodeURIComponent(cleanEmail),
+    handleCodeInApp: false
+  };
+
+  return sendAuthResetEmailWithSecondaryApp(
+    cleanEmail,
+    actionCodeSettings,
+    "employee-registration"
+  );
 }
 
 export function isMagicLink(url = window.location.href) {
