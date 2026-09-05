@@ -15,7 +15,7 @@ import {
   getStorage
 } from "firebase/storage";
 
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: "AIzaSyC2aMdxHD14nMnGiRyf4mSL1ixXdzBoOtE",
   authDomain: "irpa-digital-board-governance.firebaseapp.com",
   projectId: "irpa-digital-board-governance",
@@ -36,8 +36,7 @@ export const db = getFirestore(app);
 
 export const storage = getStorage(app);
 
-export const googleProvider =
-  new GoogleAuthProvider();
+export const googleProvider = new GoogleAuthProvider();
 
 googleProvider.setCustomParameters({
   prompt: "select_account"
