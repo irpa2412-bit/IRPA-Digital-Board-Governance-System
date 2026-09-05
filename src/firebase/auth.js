@@ -1,6 +1,5 @@
 import {
   createUserWithEmailAndPassword,
-  deleteUser,
   sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
@@ -67,21 +66,30 @@ export async function sendMemberInvitationEmail(email, invitationId) {
   }
 
   const cleanEmail = email.trim().toLowerCase();
+
   const secondaryName = `member-invitation-${Date.now()}-${Math.random()
     .toString(36)
     .slice(2, 8)}`;
+
   const secondaryApp = initializeApp(firebaseConfig, secondaryName);
   const secondaryAuth = getAuth(secondaryApp);
-  let temporaryUser = null;
+
+  let accountCreated = false;
 
   try {
-    const credential = await createUserWithEmailAndPassword(
-      secondaryAuth,
-      cleanEmail,
-      generateTemporaryPassword()
-    );
+    try {
+      await createUserWithEmailAndPassword(
+        secondaryAuth,
+        cleanEmail,
+        generateTemporaryPassword()
+      );
 
-    temporaryUser = credential.user;
+      accountCreated = true;
+    } catch (error) {
+      if (error?.code !== "auth/email-already-in-use") {
+        throw error;
+      }
+    }
 
     const actionCodeSettings = {
       url:
@@ -98,21 +106,13 @@ export async function sendMemberInvitationEmail(email, invitationId) {
       cleanEmail,
       actionCodeSettings
     );
+
+    return {
+      email: cleanEmail,
+      accountCreated,
+      emailRequested: true
+    };
   } catch (error) {
-    if (error?.code === "auth/email-already-in-use") {
-      throw new Error(
-        "This email address already has a Firebase account. Use the member's existing account or a different email address."
-      );
-    }
-
-    if (temporaryUser) {
-      try {
-        await deleteUser(temporaryUser);
-      } catch {
-        // The original delivery error is more useful to the administrator.
-      }
-    }
-
     throw error;
   } finally {
     await deleteApp(secondaryApp);
