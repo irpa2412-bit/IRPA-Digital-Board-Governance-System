@@ -12,31 +12,20 @@ service cloud.firestore {
     function financePersonnel() { return admin() || anyMemberRole(["Finance Personnel","Finance Manager","Accountant","Finance Officer","Executive Director"]); }
     function financeOversight() { return admin() || anyMemberRole(["Executive Director","Director Internal Oversight","Internal Oversight Officer"]); }
     function financePortfolioViewer() { return financePersonnel() || financeOversight(); }
-    function secretariat() { return admin() || activeMember(); }
     function management() { return admin() || anyMemberRole(["Executive Director","Management","Finance Manager","Director Internal Oversight"]); }
+    function hrManagement() { return admin() || anyMemberRole(["Executive Director","Director Human Resources","HR Manager"]); }
     function workflowParticipant(resourceData) { return governanceUser() && resourceData.involvedUids is list && resourceData.involvedUids.hasAny([request.auth.uid]); }
 
-    match /adminProfiles/{uid} {
-      allow read: if self(uid) || admin();
-      allow create: if admin();
-      allow update: if admin() && uid != request.auth.uid;
-      allow delete: if false;
-    }
+    match /adminProfiles/{uid} { allow read: if self(uid) || admin(); allow create: if admin(); allow update: if admin() && uid != request.auth.uid; allow delete: if false; }
     match /members/{uid} {
       allow read: if admin() || self(uid);
       allow create: if admin() || (self(uid) && request.resource.data.uid == request.auth.uid && request.resource.data.status == "Active" && request.resource.data.invitationId is string && exists(/databases/$(database)/documents/invitations/$(request.resource.data.invitationId)) && get(/databases/$(database)/documents/invitations/$(request.resource.data.invitationId)).data.email == request.auth.token.email && get(/databases/$(database)/documents/invitations/$(request.resource.data.invitationId)).data.status != "Cancelled" && request.resource.data.role == get(/databases/$(database)/documents/invitations/$(request.resource.data.invitationId)).data.role && request.resource.data.memberType == get(/databases/$(database)/documents/invitations/$(request.resource.data.invitationId)).data.memberType);
       allow update: if admin() || (self(uid) && request.resource.data.uid == request.auth.uid && request.resource.data.role == resource.data.role && request.resource.data.status == resource.data.status && request.resource.data.invitationId == resource.data.invitationId);
       allow delete: if admin();
     }
-    match /employees/{uid} {
-      allow read: if admin() || self(uid) || anyMemberRole(["Executive Director","Director Human Resources","HR Manager","Director Finance & Administration","Finance Manager","Director Internal Oversight"]);
-      allow create, update: if admin() || anyMemberRole(["Executive Director","Director Human Resources","HR Manager"]);
-      allow delete: if admin();
-    }
-    match /invitations/{id} {
-      allow read: if admin() || (signedIn() && resource.data.email == request.auth.token.email);
-      allow create, update, delete: if admin();
-    }
+    /* Every IRPA employee is registered here. HR/ED maintain employment records; employees can see their own record. */
+    match /employees/{uid} { allow read: if admin() || self(uid) || hrManagement() || anyMemberRole(["Director Finance & Administration","Finance Manager","Director Internal Oversight"]); allow create, update: if hrManagement(); allow delete: if admin(); }
+    match /invitations/{id} { allow read: if admin() || (signedIn() && resource.data.email == request.auth.token.email); allow create, update, delete: if admin(); }
     match /documents/{id} { allow read: if governanceUser() && (admin() || (resource.data.authorizedUids is list && resource.data.authorizedUids.hasAny([request.auth.uid]))); allow create, update, delete: if admin(); }
     match /signatures/{id} { allow read: if admin() || (signedIn() && resource.data.signerUid == request.auth.uid); allow create: if admin() || (activeMember() && request.resource.data.signerUid == request.auth.uid); allow update: if admin() || (activeMember() && resource.data.signerUid == request.auth.uid && request.resource.data.signerUid == request.auth.uid); allow delete: if false; }
     match /votes/{id} { allow read: if governanceUser(); allow create: if activeMember() && request.resource.data.voterUid == request.auth.uid; allow update, delete: if false; }
@@ -53,7 +42,7 @@ service cloud.firestore {
     match /risks/{id} { allow read: if governanceUser(); allow create, update, delete: if admin(); }
     match /reports/{id} { allow read: if governanceUser(); allow create, update, delete: if admin() || management(); }
 
-    /* Finance Portfolio is restricted by organizational title/role. Board members do not receive raw operational finance access. */
+    /* Restricted Finance Portfolio: access follows organizational title, not general membership. */
     match /financeBudgets/{id} { allow read: if financePortfolioViewer(); allow create, update, delete: if financePersonnel(); }
     match /financeTransactions/{id} { allow read, create, update, delete: if financePersonnel(); }
     match /financeFunding/{id} { allow read, create, update, delete: if financePersonnel(); }
@@ -66,9 +55,9 @@ service cloud.firestore {
     match /financeRisks/{id} { allow read, create, update, delete: if financePersonnel(); }
     match /financeReports/{id} { allow read: if financePortfolioViewer(); allow create, update, delete: if financePersonnel(); }
 
-    /* Every employee can lodge a payment/allowance request. Finance processes it; the Accounting Officer authorizes execution according to delegated authority. */
+    /* All employees may lodge salary/allowance/reimbursement requests; finance and Accounting Officer roles process/authorize them. */
     match /staffPaymentRequests/{id} {
-      allow read: if admin() || (activeMember() && (resource.data.employeeUid == request.auth.uid || resource.data.involvedUids.hasAny([request.auth.uid])) ) || financePersonnel() || management();
+      allow read: if admin() || financePersonnel() || management() || (activeMember() && (resource.data.employeeUid == request.auth.uid || (resource.data.involvedUids is list && resource.data.involvedUids.hasAny([request.auth.uid]))));
       allow create: if activeMember() && request.resource.data.employeeUid == request.auth.uid;
       allow update: if admin() || financePersonnel() || management() || (activeMember() && resource.data.employeeUid == request.auth.uid && resource.data.status in ["Draft","Returned"]);
       allow delete: if admin();
