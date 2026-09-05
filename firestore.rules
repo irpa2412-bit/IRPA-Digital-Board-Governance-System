@@ -1,71 +1,55 @@
 rules_version = '2';
 service cloud.firestore {
-  match /databases/{database}/documents {
-    function signedIn() { return request.auth != null; }
-    function self(uid) { return signedIn() && request.auth.uid == uid; }
-    function adminProfileExists() { return signedIn() && exists(/databases/$(database)/documents/adminProfiles/$(request.auth.uid)); }
-    function admin() { return adminProfileExists() && get(/databases/$(database)/documents/adminProfiles/$(request.auth.uid)).data.active == true; }
-    function memberProfileExists() { return signedIn() && exists(/databases/$(database)/documents/members/$(request.auth.uid)); }
-    function activeMember() { return memberProfileExists() && get(/databases/$(database)/documents/members/$(request.auth.uid)).data.status == "Active"; }
-    function anyMemberRole(roles) { return activeMember() && roles.hasAny([get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role]); }
-    function governanceUser() { return admin() || activeMember(); }
-    function financePersonnel() { return admin() || anyMemberRole(["Finance Personnel","Finance Manager","Accountant","Finance Officer","Executive Director"]); }
-    function financeOversight() { return admin() || anyMemberRole(["Executive Director","Director Internal Oversight","Internal Oversight Officer"]); }
-    function financePortfolioViewer() { return financePersonnel() || financeOversight(); }
-    function management() { return admin() || anyMemberRole(["Executive Director","Management","Finance Manager","Director Internal Oversight"]); }
-    function hrManagement() { return admin() || anyMemberRole(["Executive Director","Director Human Resources","HR Manager"]); }
-    function workflowParticipant(resourceData) { return governanceUser() && resourceData.involvedUids is list && resourceData.involvedUids.hasAny([request.auth.uid]); }
-
-    match /adminProfiles/{uid} { allow read: if self(uid) || admin(); allow create: if admin(); allow update: if admin() && uid != request.auth.uid; allow delete: if false; }
-    match /members/{uid} {
-      allow read: if admin() || self(uid);
-      allow create: if admin() || (self(uid) && request.resource.data.uid == request.auth.uid && request.resource.data.status == "Active" && request.resource.data.invitationId is string && exists(/databases/$(database)/documents/invitations/$(request.resource.data.invitationId)) && get(/databases/$(database)/documents/invitations/$(request.resource.data.invitationId)).data.email == request.auth.token.email && get(/databases/$(database)/documents/invitations/$(request.resource.data.invitationId)).data.status != "Cancelled" && request.resource.data.role == get(/databases/$(database)/documents/invitations/$(request.resource.data.invitationId)).data.role && request.resource.data.memberType == get(/databases/$(database)/documents/invitations/$(request.resource.data.invitationId)).data.memberType);
-      allow update: if admin() || (self(uid) && request.resource.data.uid == request.auth.uid && request.resource.data.role == resource.data.role && request.resource.data.status == resource.data.status && request.resource.data.invitationId == resource.data.invitationId);
-      allow delete: if admin();
-    }
-    /* Every IRPA employee is registered here. HR/ED maintain employment records; employees can see their own record. */
-    match /employees/{uid} { allow read: if admin() || self(uid) || hrManagement() || anyMemberRole(["Director Finance & Administration","Finance Manager","Director Internal Oversight"]); allow create, update: if hrManagement(); allow delete: if admin(); }
-    match /invitations/{id} { allow read: if admin() || (signedIn() && resource.data.email == request.auth.token.email); allow create, update, delete: if admin(); }
-    match /documents/{id} { allow read: if governanceUser() && (admin() || (resource.data.authorizedUids is list && resource.data.authorizedUids.hasAny([request.auth.uid]))); allow create, update, delete: if admin(); }
-    match /signatures/{id} { allow read: if admin() || (signedIn() && resource.data.signerUid == request.auth.uid); allow create: if admin() || (activeMember() && request.resource.data.signerUid == request.auth.uid); allow update: if admin() || (activeMember() && resource.data.signerUid == request.auth.uid && request.resource.data.signerUid == request.auth.uid); allow delete: if false; }
-    match /votes/{id} { allow read: if governanceUser(); allow create: if activeMember() && request.resource.data.voterUid == request.auth.uid; allow update, delete: if false; }
-    match /voteLocks/{id} { allow read: if governanceUser(); allow create, update: if admin(); allow delete: if false; }
-    match /audit/{id} { allow read: if admin(); allow create: if signedIn(); allow update, delete: if false; }
-    match /participants/{id} { allow read: if governanceUser(); allow create, update, delete: if admin(); }
-    match /meetings/{id} { allow read: if governanceUser(); allow create, update, delete: if admin(); }
-    match /meetingSubscriptions/{id} { allow read: if governanceUser(); allow create, update, delete: if admin(); }
-    match /meetingRoomEvents/{id} { allow read: if governanceUser(); allow create, update: if governanceUser(); allow delete: if admin(); }
-    match /transcriptions/{id} { allow read: if governanceUser(); allow create, update: if governanceUser(); allow delete: if admin(); }
-    match /resolutions/{id} { allow read: if governanceUser(); allow create, update, delete: if admin(); }
-    match /actions/{id} { allow read: if governanceUser(); allow create, update: if governanceUser(); allow delete: if admin(); }
-    match /decisions/{id} { allow read: if governanceUser(); allow create, update, delete: if admin(); }
-    match /risks/{id} { allow read: if governanceUser(); allow create, update, delete: if admin(); }
-    match /reports/{id} { allow read: if governanceUser(); allow create, update, delete: if admin() || management(); }
-
-    /* Restricted Finance Portfolio: access follows organizational title, not general membership. */
-    match /financeBudgets/{id} { allow read: if financePortfolioViewer(); allow create, update, delete: if financePersonnel(); }
-    match /financeTransactions/{id} { allow read, create, update, delete: if financePersonnel(); }
-    match /financeFunding/{id} { allow read, create, update, delete: if financePersonnel(); }
-    match /financeApprovals/{id} { allow read, create, update, delete: if financePersonnel(); }
-    match /financeCommitments/{id} { allow read, create, update, delete: if financePersonnel(); }
-    match /financeGrants/{id} { allow read, create, update, delete: if financePersonnel(); }
-    match /financeBankAccounts/{id} { allow read, create, update, delete: if financePersonnel(); }
-    match /financeReconciliations/{id} { allow read, create, update, delete: if financePersonnel(); }
-    match /financeAssets/{id} { allow read, create, update, delete: if financePersonnel(); }
-    match /financeRisks/{id} { allow read, create, update, delete: if financePersonnel(); }
-    match /financeReports/{id} { allow read: if financePortfolioViewer(); allow create, update, delete: if financePersonnel(); }
-
-    /* All employees may lodge salary/allowance/reimbursement requests; finance and Accounting Officer roles process/authorize them. */
-    match /staffPaymentRequests/{id} {
-      allow read: if admin() || financePersonnel() || management() || (activeMember() && (resource.data.employeeUid == request.auth.uid || (resource.data.involvedUids is list && resource.data.involvedUids.hasAny([request.auth.uid]))));
-      allow create: if activeMember() && request.resource.data.employeeUid == request.auth.uid;
-      allow update: if admin() || financePersonnel() || management() || (activeMember() && resource.data.employeeUid == request.auth.uid && resource.data.status in ["Draft","Returned"]);
-      allow delete: if admin();
-    }
-
-    match /authorizationRequests/{id} { allow read: if admin() || workflowParticipant(resource); allow create: if admin() || activeMember(); allow update: if admin() || workflowParticipant(resource) || workflowParticipant(request.resource); allow delete: if admin(); }
-    match /workflowActions/{id} { allow read: if admin() || workflowParticipant(resource); allow create: if admin() || activeMember(); allow update: if admin() || workflowParticipant(resource) || workflowParticipant(request.resource); allow delete: if admin(); }
-    match /systemSettings/{id} { allow read, create, update, delete: if admin(); }
-    match /{document=**} { allow read, write: if false; }
-  }
+ match /databases/{database}/documents {
+  function signedIn(){return request.auth!=null;}
+  function self(uid){return signedIn()&&request.auth.uid==uid;}
+  function adminProfileExists(){return signedIn()&&exists(/databases/$(database)/documents/adminProfiles/$(request.auth.uid));}
+  function admin(){return adminProfileExists()&&get(/databases/$(database)/documents/adminProfiles/$(request.auth.uid)).data.active==true;}
+  function memberProfileExists(){return signedIn()&&exists(/databases/$(database)/documents/members/$(request.auth.uid));}
+  function activeMember(){return memberProfileExists()&&get(/databases/$(database)/documents/members/$(request.auth.uid)).data.status=="Active";}
+  function anyMemberRole(roles){return activeMember()&&roles.hasAny([get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role]);}
+  function governanceUser(){return admin()||activeMember();}
+  function financePersonnel(){return admin()||anyMemberRole(["Finance Personnel","Finance Manager","Accountant","Finance Officer","Executive Director"]);}
+  function financeOversight(){return admin()||anyMemberRole(["Executive Director","Director Internal Oversight","Internal Oversight Officer"]);}
+  function financePortfolioViewer(){return financePersonnel()||financeOversight();}
+  function management(){return admin()||anyMemberRole(["Executive Director","Management","Finance Manager","Director Internal Oversight"]);}
+  function hrManagement(){return admin()||anyMemberRole(["Executive Director","Director Human Resources","HR Manager"]);}
+  function workflowParticipant(d){return governanceUser()&&d.involvedUids is list&&d.involvedUids.hasAny([request.auth.uid]);}
+  match /adminProfiles/{uid}{allow read:if self(uid)||admin();allow create:if admin();allow update:if admin()&&uid!=request.auth.uid;allow delete:if false;}
+  match /members/{uid}{allow read:if admin()||self(uid);allow create:if admin()||(self(uid)&&request.resource.data.uid==request.auth.uid&&request.resource.data.status=="Active"&&request.resource.data.invitationId is string&&exists(/databases/$(database)/documents/invitations/$(request.resource.data.invitationId))&&get(/databases/$(database)/documents/invitations/$(request.resource.data.invitationId)).data.email==request.auth.token.email&&get(/databases/$(database)/documents/invitations/$(request.resource.data.invitationId)).data.status!="Cancelled"&&request.resource.data.role==get(/databases/$(database)/documents/invitations/$(request.resource.data.invitationId)).data.role&&request.resource.data.memberType==get(/databases/$(database)/documents/invitations/$(request.resource.data.invitationId)).data.memberType);allow update:if admin()||(self(uid)&&request.resource.data.uid==request.auth.uid&&request.resource.data.role==resource.data.role&&request.resource.data.status==resource.data.status&&request.resource.data.invitationId==resource.data.invitationId);allow delete:if admin();}
+  match /employees/{uid}{allow read:if admin()||self(uid)||hrManagement()||anyMemberRole(["Director Finance & Administration","Finance Manager","Director Internal Oversight"]);allow create:if admin()||hrManagement();allow update:if admin()||hrManagement();allow delete:if admin();}
+  match /employeeCounters/{id}{allow read:if admin()||hrManagement();allow create,update:if admin()||hrManagement();allow delete:if false;}
+  match /invitations/{id}{allow read:if admin()||(signedIn()&&resource.data.email==request.auth.token.email);allow create,update,delete:if admin();}
+  match /staffPaymentRequests/{id}{allow read:if admin()||financePersonnel()||management()||(activeMember()&&(resource.data.employeeUid==request.auth.uid||(resource.data.involvedUids is list&&resource.data.involvedUids.hasAny([request.auth.uid]))));allow create:if activeMember()&&request.resource.data.employeeUid==request.auth.uid;allow update:if admin()||financePersonnel()||management()||(activeMember()&&resource.data.employeeUid==request.auth.uid&&resource.data.status in ["Draft","Returned"]);allow delete:if admin();}
+  match /documents/{id}{allow read:if governanceUser()&&(admin()||(resource.data.authorizedUids is list&&resource.data.authorizedUids.hasAny([request.auth.uid])));allow create,update,delete:if admin();}
+  match /signatures/{id}{allow read:if admin()||(signedIn()&&resource.data.signerUid==request.auth.uid);allow create:if admin()||(activeMember()&&request.resource.data.signerUid==request.auth.uid);allow update:if admin()||(activeMember()&&resource.data.signerUid==request.auth.uid&&request.resource.data.signerUid==request.auth.uid);allow delete:if false;}
+  match /votes/{id}{allow read:if governanceUser();allow create:if activeMember()&&request.resource.data.voterUid==request.auth.uid;allow update,delete:if false;}
+  match /voteLocks/{id}{allow read:if governanceUser();allow create,update:if admin();allow delete:if false;}
+  match /audit/{id}{allow read:if admin();allow create:if signedIn();allow update,delete:if false;}
+  match /participants/{id}{allow read:if governanceUser();allow create,update,delete:if admin();}
+  match /meetings/{id}{allow read:if governanceUser();allow create,update,delete:if admin();}
+  match /meetingSubscriptions/{id}{allow read:if governanceUser();allow create,update,delete:if admin();}
+  match /meetingRoomEvents/{id}{allow read:if governanceUser();allow create,update:if governanceUser();allow delete:if admin();}
+  match /transcriptions/{id}{allow read:if governanceUser();allow create,update:if governanceUser();allow delete:if admin();}
+  match /resolutions/{id}{allow read:if governanceUser();allow create,update,delete:if admin();}
+  match /actions/{id}{allow read:if governanceUser();allow create,update:if governanceUser();allow delete:if admin();}
+  match /decisions/{id}{allow read:if governanceUser();allow create,update,delete:if admin();}
+  match /risks/{id}{allow read:if governanceUser();allow create,update,delete:if admin();}
+  match /reports/{id}{allow read:if governanceUser();allow create,update,delete:if admin()||management();}
+  match /financeBudgets/{id}{allow read:if financePortfolioViewer();allow create,update,delete:if financePersonnel();}
+  match /financeTransactions/{id}{allow read,create,update,delete:if financePersonnel();}
+  match /financeFunding/{id}{allow read,create,update,delete:if financePersonnel();}
+  match /financeApprovals/{id}{allow read,create,update,delete:if financePersonnel();}
+  match /financeCommitments/{id}{allow read,create,update,delete:if financePersonnel();}
+  match /financeGrants/{id}{allow read,create,update,delete:if financePersonnel();}
+  match /financeBankAccounts/{id}{allow read,create,update,delete:if financePersonnel();}
+  match /financeReconciliations/{id}{allow read,create,update,delete:if financePersonnel();}
+  match /financeAssets/{id}{allow read,create,update,delete:if financePersonnel();}
+  match /financeRisks/{id}{allow read,create,update,delete:if financePersonnel();}
+  match /financeReports/{id}{allow read:if financePortfolioViewer();allow create,update,delete:if financePersonnel();}
+  match /authorizationRequests/{id}{allow read:if admin()||workflowParticipant(resource);allow create:if admin()||activeMember();allow update:if admin()||workflowParticipant(resource)||workflowParticipant(request.resource);allow delete:if admin();}
+  match /workflowActions/{id}{allow read:if admin()||workflowParticipant(resource);allow create:if admin()||activeMember();allow update:if admin()||workflowParticipant(resource)||workflowParticipant(request.resource);allow delete:if admin();}
+  match /systemSettings/{id}{allow read,create,update,delete:if admin();}
+  match /{document=**}{allow read,write:if false;}
+ }
 }
