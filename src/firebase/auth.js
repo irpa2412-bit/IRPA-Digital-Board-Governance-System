@@ -11,7 +11,9 @@ import {
   onAuthStateChanged
 } from "firebase/auth";
 
-import { auth, googleProvider } from "./config";
+import { auth, firebaseConfig, googleProvider } from "./config";
+import { initializeApp, deleteApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
 
 export async function registerWithEmail(email, password) {
   const result = await createUserWithEmailAndPassword(auth, email, password);
@@ -47,22 +49,62 @@ export async function sendAdminMagicLink(email) {
   window.localStorage.setItem("irpaEmailForSignIn", email);
 }
 
-export async function sendMemberInvitationLink(email, invitationId) {
+function generateTemporaryPassword() {
+  const random =
+    typeof crypto !== "undefined" && crypto.getRandomValues
+      ? Array.from(crypto.getRandomValues(new Uint32Array(8)))
+          .map((value) => value.toString(36))
+          .join("")
+      : Math.random().toString(36).slice(2) + Date.now().toString(36);
+
+  return `IRPA-${random}-9!aQ`;
+}
+
+export async function sendMemberInvitationEmail(email, invitationId) {
   if (!email || !invitationId) {
     throw new Error("Member email and invitation ID are required.");
   }
 
-  const actionCodeSettings = {
-    url:
-      window.location.origin +
-      "/?memberInvite=" +
-      encodeURIComponent(invitationId),
-    handleCodeInApp: true
-  };
+  const cleanEmail = email.trim().toLowerCase();
+  const secondaryName = `member-invitation-${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
+  const secondaryApp = initializeApp(firebaseConfig, secondaryName);
+  const secondaryAuth = getAuth(secondaryApp);
 
-  await sendSignInLinkToEmail(auth, email, actionCodeSettings);
+  try {
+    await createUserWithEmailAndPassword(
+      secondaryAuth,
+      cleanEmail,
+      generateTemporaryPassword()
+    );
 
-  window.localStorage.setItem("irpaMemberInviteEmail", email);
+    const actionCodeSettings = {
+      url:
+        window.location.origin +
+        "/?memberInvite=" +
+        encodeURIComponent(invitationId) +
+        "&email=" +
+        encodeURIComponent(cleanEmail),
+      handleCodeInApp: false
+    };
+
+    await sendPasswordResetEmail(
+      secondaryAuth,
+      cleanEmail,
+      actionCodeSettings
+    );
+  } catch (error) {
+    if (error?.code === "auth/email-already-in-use") {
+      throw new Error(
+        "This email address already has a Firebase account. Use the member's existing account or a different email address."
+      );
+    }
+
+    throw error;
+  } finally {
+    await deleteApp(secondaryApp);
+  }
 }
 
 export function isMagicLink(url = window.location.href) {
