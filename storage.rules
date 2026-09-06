@@ -2,18 +2,10 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     function signedIn() { return request.auth != null; }
-    function admin() {
-      return signedIn() && firestore.exists(/databases/(default)/documents/adminProfiles/$(request.auth.uid)) && firestore.get(/databases/(default)/documents/adminProfiles/$(request.auth.uid)).data.active == true;
-    }
-    match /signatureProfiles/{uid}/{fileName} {
-      allow read: if signedIn() && (request.auth.uid == uid || admin());
-      allow write: if signedIn() && (request.auth.uid == uid || admin())
-        && request.resource.size < 1048576
-        && request.resource.contentType.matches('image/(png|jpeg|webp)');
-      allow delete: if false;
-    }
-    match /{allPaths=**} {
-      allow read, write: if false;
-    }
+    function admin() { return signedIn() && firestore.exists(/databases/(default)/documents/adminProfiles/$(request.auth.uid)) && firestore.get(/databases/(default)/documents/adminProfiles/$(request.auth.uid)).data.active == true; }
+    function envelopeParticipant(envelopeId) { return signedIn() && firestore.exists(/databases/(default)/documents/signatureEnvelopes/$(envelopeId)) && firestore.get(/databases/(default)/documents/signatureEnvelopes/$(envelopeId)).data.participantUids.hasAny([request.auth.uid]); }
+    match /signatureProfiles/{uid}/{fileName} { allow read: if signedIn() && (request.auth.uid == uid || admin()); allow write: if signedIn() && (request.auth.uid == uid || admin()) && request.resource.size < 1048576 && request.resource.contentType.matches('image/(png|jpeg|webp)'); allow delete: if false; }
+    match /signatureEnvelopes/{envelopeId}/{fileName} { allow read: if admin() || envelopeParticipant(envelopeId); allow write: if admin() || envelopeParticipant(envelopeId); }
+    match /{allPaths=**} { allow read, write: if false; }
   }
 }
