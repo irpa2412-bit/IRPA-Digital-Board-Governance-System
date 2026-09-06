@@ -16,6 +16,11 @@ service cloud.firestore {
   function management(){return admin()||anyMemberRole(["Executive Director","Management","Finance Manager","Director Internal Oversight"]);}
   function hrManagement(){return admin()||anyMemberRole(["Executive Director","Director Human Resources","HR Manager"]);}
   function workflowParticipant(d){return governanceUser()&&d.involvedUids is list&&d.involvedUids.hasAny([request.auth.uid]);}
+  function validWorkflowStatus(s){return s in ["Draft","Submitted","Under Review","Approved","Rejected","Returned","Completed","Evaluation","Ordered","Cancelled","Authorized","Superseded","Archived","Pending Signature","Signed","Declined","Expired","In Implementation","Implemented"];}
+  function validWorkflowRecord(d){return d.workflowType is string&&d.module is string&&d.status is string&&validWorkflowStatus(d.status)&&d.stageIndex is int&&d.stageIndex>=0&&d.involvedUids is list;}
+  function workflowUpdateAllowed(){return admin()||workflowParticipant(resource)||workflowParticipant(request.resource);}
+  function workflowTransitionAllowed(){return request.resource.data.stageIndex==resource.data.stageIndex+1||request.resource.data.status in ["Rejected","Cancelled"];}
+  function workflowTerminal(){return resource.data.status in ["Completed","Rejected","Cancelled","Archived","Superseded","Signed","Declined","Expired","Implemented"];}
   match /adminProfiles/{uid}{allow read:if self(uid)||admin();allow create:if admin();allow update:if admin()&&uid!=request.auth.uid;allow delete:if false;}
   match /members/{uid}{allow read:if admin()||self(uid);allow create:if admin()||(self(uid)&&request.resource.data.uid==request.auth.uid&&request.resource.data.status=="Active"&&request.resource.data.invitationId is string&&exists(/databases/$(database)/documents/invitations/$(request.resource.data.invitationId))&&get(/databases/$(database)/documents/invitations/$(request.resource.data.invitationId)).data.email==request.auth.token.email&&get(/databases/$(database)/documents/invitations/$(request.resource.data.invitationId)).data.status!="Cancelled"&&request.resource.data.role==get(/databases/$(database)/documents/invitations/$(request.resource.data.invitationId)).data.role&&request.resource.data.memberType==get(/databases/$(database)/documents/invitations/$(request.resource.data.invitationId)).data.memberType);allow update:if admin()||(self(uid)&&request.resource.data.uid==request.auth.uid&&request.resource.data.role==resource.data.role&&request.resource.data.status==resource.data.status&&request.resource.data.invitationId==resource.data.invitationId);allow delete:if admin();}
   match /employees/{id}{allow read:if admin()||hrManagement()||anyMemberRole(["Director Finance & Administration","Finance Manager","Director Internal Oversight"])||(signedIn()&&resource.data.uid==request.auth.uid);allow create:if admin()||hrManagement();allow update:if admin()||hrManagement();allow delete:if admin();}
@@ -53,7 +58,7 @@ service cloud.firestore {
   match /financeRisks/{id}{allow read,create,update,delete:if financePersonnel();}
   match /financeReports/{id}{allow read:if financePortfolioViewer();allow create,update,delete:if financePersonnel();}
   match /authorizationRequests/{id}{allow read:if admin()||workflowParticipant(resource);allow create:if admin()||activeMember();allow update:if admin()||workflowParticipant(resource)||workflowParticipant(request.resource);allow delete:if admin();}
-  match /workflowActions/{id}{allow read:if admin()||workflowParticipant(resource);allow create:if admin()||activeMember();allow update:if admin()||workflowParticipant(resource)||workflowParticipant(request.resource);allow delete:if admin();}
+  match /workflowActions/{id}{allow read:if admin()||workflowParticipant(resource);allow create:if admin()||activeMember();allow update:if workflowUpdateAllowed()&&validWorkflowRecord(request.resource.data)&&!workflowTerminal()&&workflowTransitionAllowed();allow delete:if admin();}
   match /systemSettings/{id}{allow read,create,update,delete:if admin();}
   match /{document=**}{allow read,write:if false;}
  }
