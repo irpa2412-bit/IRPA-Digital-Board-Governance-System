@@ -1,4 +1,5 @@
 import React,{useEffect,useMemo,useState}from"react";
+import MeetingRoom from"./MeetingRoom";
 import{createRecord,deleteRecord,getRecords,updateRecord,COLLECTIONS}from"../firebase/data";
 
 const CONFIG={
@@ -19,6 +20,7 @@ const STATUS={"Meeting Room":["Scheduled","Live","Paused","Closed"],Actions:["Op
 function blank(module){const b={title:"",reference:"",description:"",status:(STATUS[module]?.[0]||"Draft"),owner:"",dueDate:"",priority:"Medium",meetingReference:"",documentReference:"",authorizedUids:"",assignedTo:"",reviewer:"",approver:"",approvalDate:"",notes:""};if(module==="Risk Register")return{...b,likelihood:"3",impact:"3",mitigation:"",riskOwner:""};if(module==="Finance Portfolio")return{...b,budgetYear:String(new Date().getFullYear()),budgetAmount:"",fundingSource:"",costCentre:""};if(module==="Procurement")return{...b,procurementMethod:"Request for Quotations",supplier:"",estimatedAmount:"",purchaseOrder:""};if(module==="Reports")return{...b,reportType:"Management Report",reportingPeriod:"",preparedBy:"",approvedBy:""};if(module==="Signature Platform")return{...b,signerUid:"",signerName:"",signerEmail:"",signedAt:"",signatureStatus:"Pending Signature"};if(module==="Authorization & Approvals")return{...b,requestType:"Operational Authorization",requestedBy:"",involvedUids:"",requestedAmount:"",budgetLine:""};if(module==="Documents")return{...b,documentType:"Governance Document",version:"1.0",classification:"Internal",authorizedUids:"",expiryDate:""};return b}
 function Field({label,name,value,onChange,children,wide=false,type="text"}){return <div className={wide?"form-field form-field-wide":"form-field"}><label>{label}</label>{children||<input type={type} name={name} value={value??""} onChange={onChange}/>}</div>}
 export default function OperationalGateways({module}){
+ if(module==="Meeting Room")return <MeetingRoom/>;
  const cfg=CONFIG[module]||CONFIG.Settings;const readOnly=module==="Audit Trail";const[rows,setRows]=useState([]),[form,setForm]=useState(blank(module)),[editing,setEditing]=useState(null),[view,setView]=useState(null),[search,setSearch]=useState(""),[busy,setBusy]=useState(false),[msg,setMsg]=useState(""),[err,setErr]=useState("");
  async function load(){try{setRows(await getRecords(COLLECTIONS[cfg.collection]))}catch(e){setErr(e.message||`Unable to load ${cfg.title}.`)}}
  useEffect(()=>{setForm(blank(module));setEditing(null);setView(null);setMsg("");setErr("");load()},[module]);
