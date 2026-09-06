@@ -1,12 +1,13 @@
 import React,{useEffect,useMemo,useState}from"react";
 import { getAdminProfile,getRecords } from "../firebase/data";
+import { auth } from "../firebase/config";
 import { createSignatureEnvelope,getMySignatureProfile,getSignatureEnvelopes,saveMySignatureProfile } from "../firebase/signaturePlatform";
 const FIELD_TYPES=["Signature","Initials","Date","Name","Text","Checkbox"];
 export default function SignaturePlatform(){
  const[tab,setTab]=useState("Profile"),[profile,setProfile]=useState(null),[docs,setDocs]=useState([]),[envelopes,setEnvelopes]=useState([]),[members,setMembers]=useState([]),[busy,setBusy]=useState(false),[message,setMessage]=useState("");
  const[displayName,setDisplayName]=useState(""),[initials,setInitials]=useState(""),[signatureFile,setSignatureFile]=useState(null),[initialsFile,setInitialsFile]=useState(null);
  const[title,setTitle]=useState(""),[documentId,setDocumentId]=useState(""),[signingMode,setSigningMode]=useState("Sequential"),[selectedSigner,setSelectedSigner]=useState(""),[recipients,setRecipients]=useState([]),[fields,setFields]=useState([]);
- useEffect(()=>{(async()=>{try{const[p,d,e]=await Promise.all([getMySignatureProfile(),getRecords("documents"),getSignatureEnvelopes()]);setProfile(p);setDocs(d);setEnvelopes(e);setDisplayName(p?.displayName||"");setInitials(p?.initials||"");const admin=await getAdminProfile();if(admin?.active===true){const m=await getRecords("members");setMembers(m.filter(x=>x.status==="Active"));}}catch(x){setMessage(x.message||"Unable to load Signature Platform.")}})()},[]);
+ useEffect(()=>{(async()=>{try{const[p,d,e]=await Promise.all([getMySignatureProfile(),getRecords("documents"),getSignatureEnvelopes()]);setProfile(p);setDocs(d);setEnvelopes(e);setDisplayName(p?.displayName||"");setInitials(p?.initials||"");const admin=await getAdminProfile(auth.currentUser?.uid);if(admin?.active===true){const m=await getRecords("members");setMembers(m.filter(x=>x.status==="Active"));}}catch(x){setMessage(x.message||"Unable to load Signature Platform.")}})()},[]);
  const selectedDoc=useMemo(()=>docs.find(x=>x.id===documentId),[docs,documentId]);
  async function saveProfile(e){e.preventDefault();setBusy(true);setMessage("");try{if(!signatureFile)throw new Error("Upload your real handwritten signature first.");const p=await saveMySignatureProfile({signatureFile,initialsFile,displayName,initials});setProfile(p);setSignatureFile(null);setInitialsFile(null);e.target.reset();setMessage("Signature profile saved successfully.");}catch(x){setMessage(x.message||"Unable to save signature profile.")}finally{setBusy(false)}}
  function addSigner(){const m=members.find(x=>x.uid===selectedSigner);if(!m)return;if(recipients.some(x=>x.uid===m.uid))return;setRecipients([...recipients,{uid:m.uid,name:m.name||m.email,email:m.email||"",role:m.role||"Signer",routingOrder:signingMode==="Sequential"?recipients.length+1:1,status:"Pending"}]);setSelectedSigner("");}
