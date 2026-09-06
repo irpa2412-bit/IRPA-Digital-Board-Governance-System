@@ -1,57 +1,65 @@
 # IRPA Digital Board Governance System
 
-Clean React/Vite rebuild aligned to the original IRPA governance gateway layout.
+React/Vite application for the digital governance, authorization, finance and employee-management workspace of Improvement of Rangeland in Pastoral Areas (IRPA).
 
-## Preserved layout
+## Current structure
 
 - Dark IRPA governance interface
-- Left navigation with Governance / Finance / Evidence / System sections
-- Administrator profile panel
-- Gateway top bar
-- Governance Control Centre dashboard
-- Board Members, Participants, Meetings, Meeting Room
-- Transcription & Proceedings
-- Resolutions, Voting, Actions, Documents
-- Signature Platform
-- Decisions, Risk Register
-- Finance Portfolio
-- Reports and Audit Trail
-- System Settings
+- Governance / Finance / Evidence / System navigation
+- Administrator and authorized-user access control
+- Dashboard
+- Invitations
+- Members & Personnel / Employees
+- Meetings and integrated proceedings workspace
+- Resolutions
+- Voting
+- Employee Payments
+- Generic governance registers for the remaining planned modules
 
-The source evidence for this structure is retained in the IRPA HTML versions previously supplied. The original interface explicitly used these navigation sections and modules.
-
-## Rebuilt application architecture
+## Application architecture
 
 - React 19 + Vite
 - Firebase Authentication
 - Firestore
-- Firebase Storage
 - Email/password authentication
-- One-time email-link administrator sign-in
 - Google sign-in configuration
-- Role-aware Firestore rules
-- Controlled invitations collection
-- Document authorization model
-- Signature records
-- Immutable audit collection
+- Administrator email-link sign-in
+- Role-aware application access
+- Firestore security rules
+- Controlled invitations
 - Meeting-linked governance records
+- Anonymous voting records with separate participation controls
+- Immutable audit records
 
-## Important
+## Governance workflow
 
-The uploaded historical HTML exports contained the interface and Firebase configuration but did not contain a complete React `src/main.jsx` application implementation. Therefore this package is a clean reconstruction, not a claim that missing source was recovered verbatim.
+The intended governance chain is:
 
-## Run
+**Meeting → Proceedings → Resolution → Voting → Decision → Action → Accountability**
+
+The repository currently contains the Meeting, Resolution and Voting foundations. The remaining workflow integrations are deliberately being completed only after the repository and application foundation has been cleaned and verified.
+
+## Repository hygiene
+
+The repository contains only the active production source tree and required Firebase/Vite configuration. Historical ZIP archives, obsolete nested source trees and temporary public test artifacts are not part of the active application.
+
+## Run locally
 
 ```bash
 npm install
 npm run dev
 ```
 
-## Production
+## Build
 
 ```bash
 npm run build
+```
+
+## Firebase deployment
+
+```bash
 firebase deploy
 ```
 
-Before production use, verify Firebase Authentication providers, authorized domains, Firestore rules, Storage rules, and the initial `adminProfiles/{uid}` administrator record in the Firebase Console.
+Before production use, verify Firebase Authentication providers, authorized domains, Firestore rules, and the initial `adminProfiles/{uid}` administrator record in the Firebase Console.
