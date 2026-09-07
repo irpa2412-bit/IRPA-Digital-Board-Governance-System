@@ -6,6 +6,7 @@ service firebase.storage {
     function envelopeParticipant(envelopeId) { return signedIn() && firestore.exists(/databases/(default)/documents/signatureEnvelopes/$(envelopeId)) && firestore.get(/databases/(default)/documents/signatureEnvelopes/$(envelopeId)).data.participantUids.hasAny([request.auth.uid]); }
     match /signatureProfiles/{uid}/{fileName} { allow read: if signedIn() && (request.auth.uid == uid || admin()); allow write: if signedIn() && (request.auth.uid == uid || admin()) && request.resource.size < 1048576 && request.resource.contentType.matches('image/(png|jpeg|webp)'); allow delete: if false; }
     match /signatureEnvelopes/{envelopeId}/{fileName} { allow read: if admin() || envelopeParticipant(envelopeId); allow write: if admin() || envelopeParticipant(envelopeId); }
+    match /documents/{uid}/{fileName} { allow read: if signedIn(); allow write: if signedIn() && (request.auth.uid == uid || admin()) && request.resource.size <= 10485760 && request.resource.contentType == 'application/pdf'; allow delete: if admin(); }
     match /{allPaths=**} { allow read, write: if false; }
   }
 }
