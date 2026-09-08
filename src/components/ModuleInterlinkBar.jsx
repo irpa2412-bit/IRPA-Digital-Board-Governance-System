@@ -1,5 +1,6 @@
 import React,{useEffect,useState}from"react";
 import{readWorkflowContext,navigateWorkflow}from"../firebase/workflowLinks";
+import"../styles/interlinks.css";
 
 const CORE=[
   ["Meetings","Meetings"],["Participants","Participants"],["Meeting Room","Meeting Room"],
