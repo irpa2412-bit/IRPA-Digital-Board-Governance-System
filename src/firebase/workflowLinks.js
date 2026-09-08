@@ -31,6 +31,22 @@ export function actorLink() {
   return { actorUid: auth.currentUser?.uid || null, actorEmail: auth.currentUser?.email || null };
 }
 
-export function navigateWorkflow(module) {
-  window.dispatchEvent(new CustomEvent("irpa:navigate", { detail: module }));
+export function navigateWorkflow(module, context = {}) {
+  const safeContext = workflowLinks(context);
+  try {
+    if (Object.keys(safeContext).length) sessionStorage.setItem("irpaWorkflowContext", JSON.stringify({ module, ...safeContext, updatedAt: new Date().toISOString() }));
+    else sessionStorage.removeItem("irpaWorkflowContext");
+  } catch { /* session storage may be unavailable; navigation still works */ }
+  window.dispatchEvent(new CustomEvent("irpa:navigate", { detail: { module, context: safeContext } }));
+}
+
+export function readWorkflowContext() {
+  try {
+    const raw = sessionStorage.getItem("irpaWorkflowContext");
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+export function clearWorkflowContext() {
+  try { sessionStorage.removeItem("irpaWorkflowContext"); } catch { /* no-op */ }
 }
