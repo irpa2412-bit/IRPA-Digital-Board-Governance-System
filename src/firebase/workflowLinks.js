@@ -28,13 +28,9 @@ export function withWorkflowLinks(data = {}, links = {}) {
 }
 
 export function actorLink() {
-  return {
-    actorUid: auth.currentUser?.uid || null,
-    actorEmail: auth.currentUser?.email || null
-  };
+  return { actorUid: auth.currentUser?.uid || null, actorEmail: auth.currentUser?.email || null };
 }
 
-export function navigateWorkflow(module, detail = {}) {
-  const payload = { module, ...detail };
-  window.dispatchEvent(new CustomEvent("irpa:navigate", { detail: payload }));
+export function navigateWorkflow(module) {
+  window.dispatchEvent(new CustomEvent("irpa:navigate", { detail: module }));
 }
