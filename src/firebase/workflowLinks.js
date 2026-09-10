@@ -15,17 +15,15 @@ export const LINK_DEFINITIONS = [
   ["reportId", "reportReference", "Reports"]
 ];
 
-export const LINK_FIELDS = LINK_DEFINITIONS.flatMap(([id, reference]) => [id, reference]);
+export const LINK_FIELDS = LINK_DEFINITIONS.flatMap(([idField, referenceField]) => [idField, referenceField]);
+
+const hasValue = value => value !== undefined && value !== null && String(value).trim() !== "";
 
 export function workflowLinks(input = {}) {
   const links = {};
   for (const [idField, referenceField] of LINK_DEFINITIONS) {
-    const id = input[idField];
-    const reference = input[referenceField];
-    if ((id !== undefined && id !== null && String(id).trim() !== "") || (reference !== undefined && reference !== null && String(reference).trim() !== "")) {
-      if (id !== undefined && id !== null && String(id).trim() !== "") links[idField] = id;
-      if (reference !== undefined && reference !== null && String(reference).trim() !== "") links[referenceField] = reference;
-    }
+    if (hasValue(input[idField])) links[idField] = input[idField];
+    if (hasValue(input[referenceField])) links[referenceField] = input[referenceField];
   }
   return links;
 }
@@ -33,7 +31,7 @@ export function workflowLinks(input = {}) {
 export function workflowLinkEntries(input = {}) {
   const links = workflowLinks(input);
   return LINK_DEFINITIONS
-    .filter(([idField, referenceField]) => links[idField] || links[referenceField])
+    .filter(([idField, referenceField]) => hasValue(links[idField]) || hasValue(links[referenceField]))
     .map(([idField, referenceField, module]) => ({
       module,
       id: links[idField] || null,
@@ -41,8 +39,9 @@ export function workflowLinkEntries(input = {}) {
     }));
 }
 
+/** Build canonical cross-module relationship fields while retaining query-friendly link fields. */
 export function withWorkflowLinks(data = {}, links = {}) {
-  const merged = { ...data, ...workflowLinks(links) };
+  const merged = { ...data, ...workflowLinks(data), ...workflowLinks(links) };
   const normalized = workflowLinks(merged);
   return {
     ...merged,
@@ -52,7 +51,10 @@ export function withWorkflowLinks(data = {}, links = {}) {
 }
 
 export function actorLink() {
-  return { actorUid: auth.currentUser?.uid || null, actorEmail: auth.currentUser?.email || null };
+  return {
+    actorUid: auth.currentUser?.uid || null,
+    actorEmail: auth.currentUser?.email || null
+  };
 }
 
 export function navigateWorkflow(module, context = {}) {
