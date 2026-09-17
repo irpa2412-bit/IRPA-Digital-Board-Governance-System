@@ -1,0 +1,4 @@
+IRPA Digital Board Governance System
+Deployment trigger commit: 2026-09-17
+
+This file intentionally contains no credentials or secrets. Its purpose is to trigger the Firebase deployment workflow after deployment credentials were configured in GitHub Actions.
