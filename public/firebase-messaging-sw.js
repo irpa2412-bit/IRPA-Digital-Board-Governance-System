@@ -16,27 +16,24 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
   const notification = payload.notification || {};
   const title = notification.title || "IRPA Digital Governance";
-  const options = {
+  const data = payload.data || {};
+  self.registration.showNotification(title, {
     body: notification.body || "You have a new IRPA governance notification.",
     icon: "/logo.svg",
     badge: "/logo.svg",
-    data: payload.data || {},
-    tag: payload.data?.notificationId || "irpa-governance-notification",
-  };
-
-  self.registration.showNotification(title, options);
+    data,
+    tag: data.notificationId || "irpa-governance-notification",
+  });
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const target = event.notification.data?.url || "/";
+  const target = event.notification.data?.route || event.notification.data?.url || "/";
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
-        if ("focus" in client) {
-          client.navigate(target);
-          return client.focus();
-        }
+        if ("navigate" in client) client.navigate(target);
+        if ("focus" in client) return client.focus();
       }
       return clients.openWindow(target);
     })
