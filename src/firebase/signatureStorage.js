@@ -43,3 +43,16 @@ export async function downloadDriveBytes(fileId) {
   for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
   return bytes;
 }
+
+if (typeof window !== "undefined" && !window.__irpaDriveFetchPatched) {
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = async (input, init) => {
+    const url = typeof input === "string" ? input : input?.url;
+    if (typeof url === "string" && url.startsWith("drive://")) {
+      const bytes = await downloadDriveBytes(url.slice("drive://".length));
+      return new Response(bytes, { status: 200, headers: { "Content-Type": "application/octet-stream" } });
+    }
+    return nativeFetch(input, init);
+  };
+  window.__irpaDriveFetchPatched = true;
+}
