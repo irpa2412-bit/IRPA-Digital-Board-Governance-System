@@ -49,11 +49,21 @@ export async function sendMemberInvitationEmail(email,invitationId){
   const actionCodeSettings={url:window.location.origin+"/?memberInvite="+encodeURIComponent(invitationId),handleCodeInApp:true};
   try{
     await sendSignInLinkToEmail(auth,cleanEmail,actionCodeSettings);
-    window.localStorage.setItem("irpaEmailForSignIn",cleanEmail);
     window.localStorage.setItem("irpaMemberEmailForSignIn",cleanEmail);
     return{email:cleanEmail,emailRequested:true,provider:"Firebase Authentication",deliveryStatus:"Accepted by Firebase Authentication"};
   }catch(error){throw new Error(firebaseErrorMessage(error));}
 }
 export function isMagicLink(url=window.location.href){return isSignInWithEmailLink(auth,url);}
-export async function completeMagicLink(email,url=window.location.href){return await signInWithEmailLink(auth,email,url);}
+export async function completeMagicLink(email,url=window.location.href){
+  const result=await signInWithEmailLink(auth,email,url);
+  const invitationId=new URLSearchParams(new URL(url,window.location.origin).search).get("memberInvite");
+  if(invitationId){
+    const {provisionCurrentMemberFromInvitationV2}=await import("./invitationWorkflow");
+    await provisionCurrentMemberFromInvitationV2(invitationId);
+    window.localStorage.removeItem("irpaMemberEmailForSignIn");
+  } else {
+    window.localStorage.removeItem("irpaEmailForSignIn");
+  }
+  return result.user;
+}
 export function observeAuthState(callback){return onAuthStateChanged(auth,callback);}
