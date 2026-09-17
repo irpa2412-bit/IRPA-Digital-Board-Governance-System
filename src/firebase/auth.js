@@ -10,8 +10,9 @@ import {
   signInWithEmailLink,
   onAuthStateChanged
 } from "firebase/auth";
-
-import { auth, googleProvider } from "./config";
+import { initializeApp, deleteApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
+import { auth, firebaseConfig, googleProvider } from "./config";
 
 export async function registerWithEmail(email, password) {
   const result = await createUserWithEmailAndPassword(auth, email, password);
@@ -26,6 +27,12 @@ export async function sendAdminMagicLink(email) {
   const actionCodeSettings={url:window.location.origin+"/",handleCodeInApp:true};
   await sendSignInLinkToEmail(auth,email,actionCodeSettings);
   window.localStorage.setItem("irpaEmailForSignIn",email.trim().toLowerCase());
+}
+function generateTemporaryPassword(){
+  const random=typeof crypto!=="undefined"&&crypto.getRandomValues
+    ?Array.from(crypto.getRandomValues(new Uint32Array(8))).map(value=>value.toString(36)).join("")
+    :Math.random().toString(36).slice(2)+Date.now().toString(36);
+  return `IRPA-${random}-9!aQ`;
 }
 function firebaseErrorMessage(error){
   const code=error?.code||"",message=error?.message||"Firebase Authentication request failed.";
@@ -43,13 +50,36 @@ function firebaseErrorMessage(error){
   };
   return known[code]?`${known[code]} (${code})`:`${message}${code?` (${code})`:""}`;
 }
+async function sendAuthResetEmailWithSecondaryApp(email,actionCodeSettings,appPrefix){
+  const cleanEmail=email.trim().toLowerCase();
+  const secondaryName=`${appPrefix}-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+  const secondaryApp=initializeApp(firebaseConfig,secondaryName);
+  const secondaryAuth=getAuth(secondaryApp);
+  let accountCreated=false;
+  try{
+    try{
+      await createUserWithEmailAndPassword(secondaryAuth,cleanEmail,generateTemporaryPassword());
+      accountCreated=true;
+    }catch(error){
+      if(error?.code!=="auth/email-already-in-use")throw new Error(firebaseErrorMessage(error));
+    }
+    await sendPasswordResetEmail(secondaryAuth,cleanEmail,actionCodeSettings);
+    return{email:cleanEmail,accountCreated,emailRequested:true,provider:"Firebase Authentication",deliveryStatus:"Accepted by Firebase Authentication"};
+  }catch(error){throw new Error(firebaseErrorMessage(error));}
+  finally{await deleteApp(secondaryApp);}
+}
+export async function sendEmployeeRegistrationEmail(email,employeeNumber){
+  if(!email||!employeeNumber)throw new Error("Employee email and Employee Number are required.");
+  const cleanEmail=email.trim().toLowerCase();
+  const actionCodeSettings={url:window.location.origin+"/?employeeNumber="+encodeURIComponent(employeeNumber)+"&email="+encodeURIComponent(cleanEmail),handleCodeInApp:false};
+  return sendAuthResetEmailWithSecondaryApp(cleanEmail,actionCodeSettings,"employee-registration");
+}
 export async function sendMemberInvitationEmail(email,invitationId){
   if(!email||!invitationId)throw new Error("Member email and invitation ID are required.");
   const cleanEmail=email.trim().toLowerCase();
   const actionCodeSettings={url:window.location.origin+"/?memberInvite="+encodeURIComponent(invitationId),handleCodeInApp:true};
   try{
     await sendSignInLinkToEmail(auth,cleanEmail,actionCodeSettings);
-    // Keep the address locally so the recipient can complete the email-link flow securely.
     window.localStorage.setItem("irpaMemberEmailForSignIn",cleanEmail);
     window.localStorage.setItem("irpaEmailForSignIn",cleanEmail);
     return{email:cleanEmail,emailRequested:true,provider:"Firebase Authentication",deliveryStatus:"Accepted by Firebase Authentication"};
@@ -64,9 +94,7 @@ export async function completeMagicLink(email,url=window.location.href){
     await provisionCurrentMemberFromInvitationV2(invitationId);
     window.localStorage.removeItem("irpaMemberEmailForSignIn");
     window.localStorage.removeItem("irpaEmailForSignIn");
-  } else {
-    window.localStorage.removeItem("irpaEmailForSignIn");
-  }
+  }else window.localStorage.removeItem("irpaEmailForSignIn");
   return result.user;
 }
 export function observeAuthState(callback){return onAuthStateChanged(auth,callback);}
