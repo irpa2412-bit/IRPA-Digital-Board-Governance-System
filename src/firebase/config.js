@@ -6,7 +6,6 @@ export const firebaseConfig = {
   apiKey: "AIzaSyC2aMdxHD14nMnGiRyf4mSL1ixXdzBoOtE",
   authDomain: "irpa-digital-board-governance.firebaseapp.com",
   projectId: "irpa-digital-board-governance",
-  storageBucket: "irpa-digital-board-governance.firebasestorage.app",
   messagingSenderId: "217055978789",
   appId: "1:217055978789:web:937d1f2f781202cc1e26cc",
   measurementId: "G-XDJEBRBEVC"
