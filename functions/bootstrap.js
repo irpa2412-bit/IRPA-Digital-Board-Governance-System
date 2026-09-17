@@ -1,4 +1,5 @@
 module.exports = {
   ...require("./index"),
-  ...require("./googleDrive")
+  ...require("./googleDrive"),
+  ...require("./googleDriveBinary")
 };
