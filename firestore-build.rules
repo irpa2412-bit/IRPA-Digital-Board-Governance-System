@@ -1,10 +1,17 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // BUILD PHASE ONLY: authenticated users can exercise the interdependent application.
-    // Replace with architecture-specific rules after functional testing is complete.
+    function signedIn() { return request.auth != null; }
+    function self(uid) { return signedIn() && request.auth.uid == uid; }
+
+    // Existing application collections remain available to authenticated users during build/testing.
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if signedIn();
+    }
+
+    // Notification tokens are restricted to the authenticated owner even during build.
+    match /notificationTokens/{uid}/tokens/{tokenId} {
+      allow read, write: if self(uid);
     }
   }
 }
