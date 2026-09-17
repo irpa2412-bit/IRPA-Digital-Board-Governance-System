@@ -1,11 +1,16 @@
 import React, { useEffect, useState } from "react";
+import { httpsCallable } from "firebase/functions";
 import { browserSupportsPush, listenForForegroundMessages, notificationPermissionState, requestPushPermission } from "../firebase/messaging";
+import { functions } from "../firebase/functions";
 
 export default function Settings() {
   const [supported, setSupported] = useState(false);
   const [permission, setPermission] = useState("unknown");
   const [busy, setBusy] = useState(false);
+  const [resetBusy, setResetBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [confirmation, setConfirmation] = useState("");
+  const [result, setResult] = useState(null);
 
   useEffect(() => {
     let unsubscribe = () => {};
@@ -35,6 +40,29 @@ export default function Settings() {
     }
   }
 
+  async function resetTrialData() {
+    if (confirmation !== "RESET IRPA TRIAL DATA") {
+      setMessage("Enter the exact confirmation phrase: RESET IRPA TRIAL DATA");
+      return;
+    }
+    if (!window.confirm("This will permanently delete all member and employee trial records and reset both counters. Continue?")) return;
+    setResetBusy(true);
+    setMessage("");
+    setResult(null);
+    try {
+      const call = httpsCallable(functions, "resetTrialData");
+      const response = await call({ confirmation });
+      const data = response.data || {};
+      setResult(data);
+      setConfirmation("");
+      setMessage(`Trial data reset completed. ${data.membersDeleted || 0} member records and ${data.employeesDeleted || 0} employee records deleted. Counters reset to zero.`);
+    } catch (error) {
+      setMessage(error?.message || "The trial-data reset failed.");
+    } finally {
+      setResetBusy(false);
+    }
+  }
+
   return (
     <div className="page">
       <section className="panel">
@@ -61,6 +89,35 @@ export default function Settings() {
           </button>
         </div>
         {message && <div className="auth-message" style={{ marginTop: 16 }}>{message}</div>}
+      </section>
+
+      <section className="panel" style={{ marginTop: 20 }}>
+        <div className="panel-header">
+          <div>
+            <span className="eyebrow">ADMINISTRATOR CONTROL</span>
+            <h2>Reset Trial Data</h2>
+            <p className="panel-description">Controlled permanent deletion of trial member and employee records. This operation is available only to an active IRPA administrator and creates an audit record before deletion.</p>
+          </div>
+        </div>
+        <div className="stat-card" style={{ marginBottom: 18 }}>
+          <span>Scope</span>
+          <strong>Members + Employees</strong>
+          <small>Employee counter → 0 · Member counter → 0 · Governance records remain intact</small>
+        </div>
+        <label>Type confirmation phrase</label>
+        <input
+          value={confirmation}
+          onChange={(e) => setConfirmation(e.target.value)}
+          placeholder="RESET IRPA TRIAL DATA"
+          autoComplete="off"
+          disabled={resetBusy}
+        />
+        <div className="form-actions" style={{ marginTop: 14 }}>
+          <button className="secondary-button" onClick={resetTrialData} disabled={resetBusy || confirmation !== "RESET IRPA TRIAL DATA"}>
+            {resetBusy ? "Resetting Trial Data..." : "Reset Trial Data"}
+          </button>
+        </div>
+        {result && <div className="auth-message" style={{ marginTop: 16 }}>Audit recorded successfully. Deleted: {result.membersDeleted || 0} members; {result.employeesDeleted || 0} employees.</div>}
       </section>
     </div>
   );
