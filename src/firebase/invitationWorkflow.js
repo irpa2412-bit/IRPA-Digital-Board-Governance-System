@@ -4,10 +4,16 @@ import {
   createEmployeeProfile,
   createMemberProfile,
   getRecord,
+  getRecords,
   updateRecord,
 } from "./data";
 
 const EMPLOYEE_ROLES = [
+  "Board Member",
+  "Board Chairperson",
+  "Board Secretary",
+  "Board Treasurer",
+  "Board Vice Chairperson",
   "Executive Director",
   "Director Human Resources",
   "HR Manager",
@@ -50,14 +56,13 @@ export async function provisionCurrentMemberFromInvitationV2(invitationId) {
   const memberType = invitation.memberType || "Governance Member";
   let employee = null;
 
-  // Link the authenticated account to the existing institutional personnel record.
+  // Prefer the institutional personnel record explicitly attached to the invitation.
   if (invitation.employeeId) {
     employee = await getRecord(COLLECTIONS.employees, invitation.employeeId);
     if (!employee) throw new Error("The institutional personnel record linked to this invitation could not be found.");
     if (employee.email?.trim().toLowerCase() !== email) {
       throw new Error("The invitation email does not match the institutional personnel record.");
     }
-
     await updateRecord(COLLECTIONS.employees, employee.id, {
       uid,
       invitationId,
@@ -68,17 +73,32 @@ export async function provisionCurrentMemberFromInvitationV2(invitationId) {
       activatedAt: new Date().toISOString(),
     });
   } else if (EMPLOYEE_ROLES.includes(role)) {
-    employee = await createEmployeeProfile({
-      uid,
-      email,
-      name: invitation.name || "",
-      role,
-      department: invitation.department || "",
-      employmentType: invitation.employmentType || "Employee",
-      status: "Active",
-      registrationStatus: "Activated",
-      invitationId,
-    });
+    // Link an existing employee/board-member record by official email before creating anything new.
+    const employees = await getRecords(COLLECTIONS.employees);
+    employee = employees.find(x => String(x.email || "").trim().toLowerCase() === email) || null;
+    if (employee) {
+      await updateRecord(COLLECTIONS.employees, employee.id, {
+        uid,
+        invitationId,
+        accountActivated: true,
+        registrationStatus: "Activated",
+        registrationEmailStatus: "Completed",
+        status: employee.status || "Active",
+        activatedAt: new Date().toISOString(),
+      });
+    } else {
+      employee = await createEmployeeProfile({
+        uid,
+        email,
+        name: invitation.name || "",
+        role,
+        department: invitation.department || "",
+        employmentType: invitation.employmentType || "Employee",
+        status: "Active",
+        registrationStatus: "Activated",
+        invitationId,
+      });
+    }
   }
 
   await createMemberProfile(uid, {
