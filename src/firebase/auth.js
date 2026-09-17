@@ -49,7 +49,9 @@ export async function sendMemberInvitationEmail(email,invitationId){
   const actionCodeSettings={url:window.location.origin+"/?memberInvite="+encodeURIComponent(invitationId),handleCodeInApp:true};
   try{
     await sendSignInLinkToEmail(auth,cleanEmail,actionCodeSettings);
+    // Keep the address locally so the recipient can complete the email-link flow securely.
     window.localStorage.setItem("irpaMemberEmailForSignIn",cleanEmail);
+    window.localStorage.setItem("irpaEmailForSignIn",cleanEmail);
     return{email:cleanEmail,emailRequested:true,provider:"Firebase Authentication",deliveryStatus:"Accepted by Firebase Authentication"};
   }catch(error){throw new Error(firebaseErrorMessage(error));}
 }
@@ -61,6 +63,7 @@ export async function completeMagicLink(email,url=window.location.href){
     const {provisionCurrentMemberFromInvitationV2}=await import("./invitationWorkflow");
     await provisionCurrentMemberFromInvitationV2(invitationId);
     window.localStorage.removeItem("irpaMemberEmailForSignIn");
+    window.localStorage.removeItem("irpaEmailForSignIn");
   } else {
     window.localStorage.removeItem("irpaEmailForSignIn");
   }
