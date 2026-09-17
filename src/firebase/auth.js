@@ -15,86 +15,132 @@ import { getAuth } from "firebase/auth";
 import { auth, firebaseConfig, googleProvider } from "./config";
 
 export async function registerWithEmail(email, password) {
-  const result = await createUserWithEmailAndPassword(auth, email, password);
+  const result = await createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
   await sendEmailVerification(result.user);
   return result.user;
 }
-export async function loginWithEmail(email, password) { const result = await signInWithEmailAndPassword(auth, email, password); return result.user; }
-export async function loginWithGoogle() { const result = await signInWithPopup(auth, googleProvider); return result.user; }
-export async function sendPasswordReset(email) { await sendPasswordResetEmail(auth, email); }
-export async function logout() { await signOut(auth); }
-export async function sendAdminMagicLink(email) {
-  const actionCodeSettings={url:window.location.origin+"/",handleCodeInApp:true};
-  await sendSignInLinkToEmail(auth,email,actionCodeSettings);
-  window.localStorage.setItem("irpaEmailForSignIn",email.trim().toLowerCase());
+
+export async function loginWithEmail(email, password) {
+  const cleanEmail = email.trim().toLowerCase();
+  if (!cleanEmail || !password) throw new Error("Email address and password are required.");
+  try {
+    const result = await signInWithEmailAndPassword(auth, cleanEmail, password);
+    return result.user;
+  } catch (error) {
+    throw new Error(firebaseErrorMessage(error));
+  }
 }
-function generateTemporaryPassword(){
-  const random=typeof crypto!=="undefined"&&crypto.getRandomValues
-    ?Array.from(crypto.getRandomValues(new Uint32Array(8))).map(value=>value.toString(36)).join("")
-    :Math.random().toString(36).slice(2)+Date.now().toString(36);
+
+export async function loginWithGoogle() {
+  const result = await signInWithPopup(auth, googleProvider);
+  return result.user;
+}
+
+export async function sendPasswordReset(email) {
+  const cleanEmail = email.trim().toLowerCase();
+  if (!cleanEmail) throw new Error("Enter your email address first.");
+  try {
+    await sendPasswordResetEmail(auth, cleanEmail);
+  } catch (error) {
+    throw new Error(firebaseErrorMessage(error));
+  }
+}
+
+export async function logout() { await signOut(auth); }
+
+export async function sendAdminMagicLink(email) {
+  const actionCodeSettings = { url: window.location.origin + "/", handleCodeInApp: true };
+  await sendSignInLinkToEmail(auth, email.trim().toLowerCase(), actionCodeSettings);
+  window.localStorage.setItem("irpaEmailForSignIn", email.trim().toLowerCase());
+}
+
+function generateTemporaryPassword() {
+  const random = typeof crypto !== "undefined" && crypto.getRandomValues
+    ? Array.from(crypto.getRandomValues(new Uint32Array(8))).map(value => value.toString(36)).join("")
+    : Math.random().toString(36).slice(2) + Date.now().toString(36);
   return `IRPA-${random}-9!aQ`;
 }
-function firebaseErrorMessage(error){
-  const code=error?.code||"",message=error?.message||"Firebase Authentication request failed.";
-  const known={
-    "auth/operation-not-allowed":"Email/password authentication is not enabled for this Firebase project.",
-    "auth/invalid-api-key":"The Firebase API key is invalid.",
-    "auth/network-request-failed":"Firebase Authentication could not reach the network. Check the browser connection and try again.",
-    "auth/too-many-requests":"Firebase has temporarily blocked requests from this device because of too many attempts. Please wait and try again.",
-    "auth/quota-exceeded":"Firebase Authentication quota has been exceeded.",
-    "auth/invalid-continue-uri":"The registration link destination is not authorized in Firebase Authentication.",
-    "auth/unauthorized-continue-uri":"The registration link destination is not authorized in Firebase Authentication. Add the application domain under Authorized domains.",
-    "auth/missing-continue-uri":"The registration link destination is missing.",
-    "auth/user-not-found":"Firebase Authentication could not find this email account.",
-    "auth/invalid-email":"The email address is invalid."
+
+function firebaseErrorMessage(error) {
+  const code = error?.code || "";
+  const message = error?.message || "Firebase Authentication request failed.";
+  const known = {
+    "auth/operation-not-allowed": "Email/password authentication is not enabled for this Firebase project.",
+    "auth/invalid-api-key": "The Firebase API key is invalid.",
+    "auth/network-request-failed": "Firebase Authentication could not reach the network. Check the browser connection and try again.",
+    "auth/too-many-requests": "Firebase has temporarily blocked requests from this device because of too many attempts. Please wait and try again.",
+    "auth/quota-exceeded": "Firebase Authentication quota has been exceeded.",
+    "auth/invalid-continue-uri": "The registration link destination is not authorized in Firebase Authentication.",
+    "auth/unauthorized-continue-uri": "The registration link destination is not authorized in Firebase Authentication. Add the application domain under Authorized domains.",
+    "auth/missing-continue-uri": "The registration link destination is missing.",
+    "auth/user-not-found": "No IRPA account was found for this email address. Check the email or create an account.",
+    "auth/invalid-email": "The email address is invalid.",
+    "auth/wrong-password": "Incorrect password. Please check your password or use Forgot password? to create a new one.",
+    "auth/invalid-credential": "The email or password is incorrect. Check your credentials or use Forgot password? to reset the password.",
+    "auth/user-disabled": "This Firebase account has been disabled. Contact the IRPA administrator.",
+    "auth/weak-password": "The password must contain at least 6 characters.",
+    "auth/email-already-in-use": "An account already exists for this email address. Use Forgot password? if you need to reset it."
   };
-  return known[code]?`${known[code]} (${code})`:`${message}${code?` (${code})`:""}`;
+  return known[code] ? `${known[code]} (${code})` : `${message}${code ? ` (${code})` : ""}`;
 }
-async function sendAuthResetEmailWithSecondaryApp(email,actionCodeSettings,appPrefix){
-  const cleanEmail=email.trim().toLowerCase();
-  const secondaryName=`${appPrefix}-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
-  const secondaryApp=initializeApp(firebaseConfig,secondaryName);
-  const secondaryAuth=getAuth(secondaryApp);
-  let accountCreated=false;
-  try{
-    try{
-      await createUserWithEmailAndPassword(secondaryAuth,cleanEmail,generateTemporaryPassword());
-      accountCreated=true;
-    }catch(error){
-      if(error?.code!=="auth/email-already-in-use")throw new Error(firebaseErrorMessage(error));
+
+async function sendAuthResetEmailWithSecondaryApp(email, actionCodeSettings, appPrefix) {
+  const cleanEmail = email.trim().toLowerCase();
+  const secondaryName = `${appPrefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const secondaryApp = initializeApp(firebaseConfig, secondaryName);
+  const secondaryAuth = getAuth(secondaryApp);
+  let accountCreated = false;
+  try {
+    try {
+      await createUserWithEmailAndPassword(secondaryAuth, cleanEmail, generateTemporaryPassword());
+      accountCreated = true;
+    } catch (error) {
+      if (error?.code !== "auth/email-already-in-use") throw new Error(firebaseErrorMessage(error));
     }
-    await sendPasswordResetEmail(secondaryAuth,cleanEmail,actionCodeSettings);
-    return{email:cleanEmail,accountCreated,emailRequested:true,provider:"Firebase Authentication",deliveryStatus:"Accepted by Firebase Authentication"};
-  }catch(error){throw new Error(firebaseErrorMessage(error));}
-  finally{await deleteApp(secondaryApp);}
+    await sendPasswordResetEmail(secondaryAuth, cleanEmail, actionCodeSettings);
+    return { email: cleanEmail, accountCreated, emailRequested: true, provider: "Firebase Authentication", deliveryStatus: "Accepted by Firebase Authentication" };
+  } catch (error) {
+    throw new Error(firebaseErrorMessage(error));
+  } finally {
+    await deleteApp(secondaryApp);
+  }
 }
-export async function sendEmployeeRegistrationEmail(email,employeeNumber){
-  if(!email||!employeeNumber)throw new Error("Employee email and Employee Number are required.");
-  const cleanEmail=email.trim().toLowerCase();
-  const actionCodeSettings={url:window.location.origin+"/?employeeNumber="+encodeURIComponent(employeeNumber)+"&email="+encodeURIComponent(cleanEmail),handleCodeInApp:false};
-  return sendAuthResetEmailWithSecondaryApp(cleanEmail,actionCodeSettings,"employee-registration");
+
+export async function sendEmployeeRegistrationEmail(email, employeeNumber) {
+  if (!email || !employeeNumber) throw new Error("Employee email and Employee Number are required.");
+  const cleanEmail = email.trim().toLowerCase();
+  const actionCodeSettings = { url: window.location.origin + "/?employeeNumber=" + encodeURIComponent(employeeNumber) + "&email=" + encodeURIComponent(cleanEmail), handleCodeInApp: false };
+  return sendAuthResetEmailWithSecondaryApp(cleanEmail, actionCodeSettings, "employee-registration");
 }
-export async function sendMemberInvitationEmail(email,invitationId){
-  if(!email||!invitationId)throw new Error("Member email and invitation ID are required.");
-  const cleanEmail=email.trim().toLowerCase();
-  const actionCodeSettings={url:window.location.origin+"/?memberInvite="+encodeURIComponent(invitationId),handleCodeInApp:true};
-  try{
-    await sendSignInLinkToEmail(auth,cleanEmail,actionCodeSettings);
-    window.localStorage.setItem("irpaMemberEmailForSignIn",cleanEmail);
-    window.localStorage.setItem("irpaEmailForSignIn",cleanEmail);
-    return{email:cleanEmail,emailRequested:true,provider:"Firebase Authentication",deliveryStatus:"Accepted by Firebase Authentication"};
-  }catch(error){throw new Error(firebaseErrorMessage(error));}
+
+export async function sendMemberInvitationEmail(email, invitationId) {
+  if (!email || !invitationId) throw new Error("Member email and invitation ID are required.");
+  const cleanEmail = email.trim().toLowerCase();
+  const actionCodeSettings = { url: window.location.origin + "/?memberInvite=" + encodeURIComponent(invitationId), handleCodeInApp: true };
+  try {
+    await sendSignInLinkToEmail(auth, cleanEmail, actionCodeSettings);
+    window.localStorage.setItem("irpaMemberEmailForSignIn", cleanEmail);
+    window.localStorage.setItem("irpaEmailForSignIn", cleanEmail);
+    return { email: cleanEmail, emailRequested: true, provider: "Firebase Authentication", deliveryStatus: "Accepted by Firebase Authentication" };
+  } catch (error) {
+    throw new Error(firebaseErrorMessage(error));
+  }
 }
-export function isMagicLink(url=window.location.href){return isSignInWithEmailLink(auth,url);}
-export async function completeMagicLink(email,url=window.location.href){
-  const result=await signInWithEmailLink(auth,email,url);
-  const invitationId=new URLSearchParams(new URL(url,window.location.origin).search).get("memberInvite");
-  if(invitationId){
-    const {provisionCurrentMemberFromInvitationV2}=await import("./invitationWorkflow");
+
+export function isMagicLink(url = window.location.href) { return isSignInWithEmailLink(auth, url); }
+
+export async function completeMagicLink(email, url = window.location.href) {
+  const result = await signInWithEmailLink(auth, email.trim().toLowerCase(), url);
+  const invitationId = new URLSearchParams(new URL(url, window.location.origin).search).get("memberInvite");
+  if (invitationId) {
+    const { provisionCurrentMemberFromInvitationV2 } = await import("./invitationWorkflow");
     await provisionCurrentMemberFromInvitationV2(invitationId);
     window.localStorage.removeItem("irpaMemberEmailForSignIn");
     window.localStorage.removeItem("irpaEmailForSignIn");
-  }else window.localStorage.removeItem("irpaEmailForSignIn");
+  } else {
+    window.localStorage.removeItem("irpaEmailForSignIn");
+  }
   return result.user;
 }
-export function observeAuthState(callback){return onAuthStateChanged(auth,callback);}
+
+export function observeAuthState(callback) { return onAuthStateChanged(auth, callback); }
