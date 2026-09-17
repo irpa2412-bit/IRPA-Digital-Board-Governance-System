@@ -1,19 +1,6 @@
-import {
-  initializeApp
-} from "firebase/app";
-
-import {
-  getAuth,
-  GoogleAuthProvider
-} from "firebase/auth";
-
-import {
-  getFirestore
-} from "firebase/firestore";
-
-import {
-  getStorage
-} from "firebase/storage";
+import { initializeApp } from "firebase/app";
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
 export const firebaseConfig = {
   apiKey: "AIzaSyC2aMdxHD14nMnGiRyf4mSL1ixXdzBoOtE",
@@ -31,11 +18,7 @@ export const GOOGLE_OAUTH_CLIENT_ID =
 const app = initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
-
 export const db = getFirestore(app);
-
-export const storage = getStorage(app);
-
 export const googleProvider = new GoogleAuthProvider();
 
 googleProvider.setCustomParameters({
