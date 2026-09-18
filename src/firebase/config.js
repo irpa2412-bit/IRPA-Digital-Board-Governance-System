@@ -11,9 +11,6 @@ export const firebaseConfig = {
   measurementId: "G-XDJEBRBEVC"
 };
 
-export const GOOGLE_OAUTH_CLIENT_ID =
-  "217055978789-2tuhm77gfv4kcdjmgua5cnnajhd28e0b.apps.googleusercontent.com";
-
 const app = initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
