@@ -75,6 +75,15 @@ export async function downloadDriveBytes(fileId, documentId = null) {
   return bytes;
 }
 
+export async function deleteDriveFile(fileId, documentId = null) {
+  if (!fileId) throw new Error("Google Drive file ID is required.");
+
+  return gatewayPost("/api/delete", {
+    fileId,
+    documentId
+  });
+}
+
 export async function startGoogleDriveAuthorization() {
   const result = await gatewayPost("/oauth/start", {});
   if (!result.authorizationUrl) throw new Error("Google Drive authorization URL was not returned.");
