@@ -1,5 +1,6 @@
 import React,{useEffect,useMemo,useRef,useState}from"react";
 import{getRecords}from"../firebase/data";
+import{downloadDriveBytes}from"../firebase/signatureStorage";
 import{auth}from"../firebase/config";
 import{createCompletionCertificate,createSignatureEnvelope,getMySignatureProfile,getSignatureEnvelope,getSignatureEnvelopes,saveMySignatureProfile,signEnvelope}from"../firebase/signaturePlatform";
 import*as pdfjsLib from"pdfjs-dist";
@@ -32,7 +33,7 @@ function FieldBox({field,selected,onSelect,onMove,onResize,onDelete,zoom}){
 
 function PDFDesigner({url,fields,setFields,recipients,selectedField,setSelectedField}){
  const canvasRef=useRef(null),pageHostRef=useRef(null);const[pdf,setPdf]=useState(null);const[pageNum,setPageNum]=useState(1);const[pageSize,setPageSize]=useState({width:800,height:1035});const[zoom,setZoom]=useState(1);const[loading,setLoading]=useState(false);const[error,setError]=useState("");
- useEffect(()=>{let dead=false;(async()=>{if(!url){setPdf(null);return}setLoading(true);setError("");try{const task=pdfjsLib.getDocument({url});const p=await task.promise;if(!dead){setPdf(p);setPageNum(1)}}catch(e){if(!dead)setError(e.message||"Unable to render PDF.")}finally{if(!dead)setLoading(false)}})();return()=>{dead=true};},[url]);
+ useEffect(()=>{let dead=false;(async()=>{if(!url){setPdf(null);return}setLoading(true);setError("");try{const source=url.startsWith("drive://")?{data:await downloadDriveBytes(url.slice("drive://".length))}:{url};const task=pdfjsLib.getDocument(source);const p=await task.promise;if(!dead){setPdf(p);setPageNum(1)}}catch(e){if(!dead)setError(e.message||"Unable to render PDF.")}finally{if(!dead)setLoading(false)}})();return()=>{dead=true};},[url]);
  useEffect(()=>{let dead=false;(async()=>{if(!pdf||!canvasRef.current)return;try{const page=await pdf.getPage(pageNum);const base=page.getViewport({scale:1});const scale=Math.max(.55,(760/base.width))*zoom;const viewport=page.getViewport({scale});const canvas=canvasRef.current;const output=window.devicePixelRatio||1;canvas.width=Math.floor(viewport.width*output);canvas.height=Math.floor(viewport.height*output);canvas.style.width=`${viewport.width}px`;canvas.style.height=`${viewport.height}px`;setPageSize({width:viewport.width,height:viewport.height});const ctx=canvas.getContext("2d");ctx.setTransform(output,0,0,output,0,0);await page.render({canvasContext:ctx,viewport}).promise;if(!dead){} }catch(e){if(!dead)setError(e.message||"Unable to render page.")}})();return()=>{dead=true}},[pdf,pageNum,zoom]);
  const pageFields=fields.filter(f=>Number(f.page)===pageNum);
  const addAt=(type,x,y)=>{if(!recipients.length){setError("Add at least one signer before placing fields.");return}const f=makeField(type,fields.length,recipients[0].uid,pageNum);f.x=clamp(x-f.width/2,0,100-f.width);f.y=clamp(y-f.height/2,0,100-f.height);setFields([...fields,f]);setSelectedField(f.fieldId);};
