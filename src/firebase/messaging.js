@@ -36,10 +36,11 @@ export async function requestPushPermission() {
   }
 
   const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js", { scope: "/" });
+  const readyRegistration = await navigator.serviceWorker.ready;
   const messaging = getMessaging();
   const token = await getToken(messaging, {
     vapidKey: VAPID_KEY,
-    serviceWorkerRegistration: registration,
+    serviceWorkerRegistration: readyRegistration,
   });
 
   if (!token) throw new Error("Firebase did not return a browser notification token.");
