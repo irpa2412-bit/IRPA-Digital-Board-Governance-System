@@ -53,9 +53,17 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
     try{
       if(signerOnly){
         if(!signingEnvelopeId)throw new Error("No signing invitation was supplied.");
-        const envelope=await getSignatureEnvelope(signingEnvelopeId);
+
+        const [envelope, signerProfile] = await Promise.all([
+          getSignatureEnvelope(signingEnvelopeId),
+          getMySignatureProfile()
+        ]);
+
         setEnvelopes([envelope]);
         setSelected(envelope);
+        setProfile(signerProfile);
+        setDisplayName(signerProfile?.displayName||"");
+        setInitials(signerProfile?.initials||"");
         setTab("Sign Document");
         return;
       }
