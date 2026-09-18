@@ -41,6 +41,10 @@ export default {
         return await download(request, env);
       }
 
+      if (url.pathname === "/api/delete" && request.method === "POST") {
+        return await deleteDriveFile(request, env);
+      }
+
       return json({ ok: false, error: "Not found." }, 404, corsHeaders(request));
     } catch (error) {
       console.error("Drive gateway error", error);
@@ -258,6 +262,118 @@ async function download(request, env) {
     base64: uint8ToBase64(buffer)
   }, 200, corsHeaders(request));
 }
+
+
+async function deleteDriveFile(request, env) {
+  const claims = await authenticateFirebaseRequest(request);
+  const data = await request.json();
+
+  const fileId = String(data.fileId || "").trim();
+  const documentId = String(data.documentId || "").trim();
+
+  if (!fileId) {
+    return json(
+      { ok: false, error: "Google Drive file ID is required." },
+      400,
+      corsHeaders(request)
+    );
+  }
+
+  if (!documentId) {
+    return json(
+      { ok: false, error: "Firestore document ID is required." },
+      400,
+      corsHeaders(request)
+    );
+  }
+
+  const admin = await getFirestoreDocument(
+    env,
+    `adminProfiles/${claims.user_id}`,
+    claims.token
+  );
+
+  if (!admin?.fields?.active?.booleanValue) {
+    return json(
+      { ok: false, error: "Administrator authorization is required." },
+      403,
+      corsHeaders(request)
+    );
+  }
+
+  const document = await getFirestoreDocument(
+    env,
+    `documents/${documentId}`,
+    claims.token
+  );
+
+  if (!document) {
+    return json(
+      { ok: false, error: "The controlled document record was not found." },
+      404,
+      corsHeaders(request)
+    );
+  }
+
+  const storedFileId = document?.fields?.fileId?.stringValue || "";
+
+  if (!storedFileId || storedFileId !== fileId) {
+    return json(
+      { ok: false, error: "The supplied Drive file does not match the controlled document record." },
+      409,
+      corsHeaders(request)
+    );
+  }
+
+  const accessToken = await getDriveAccessToken(env);
+
+  const metadata = await driveFetch(
+    env,
+    accessToken,
+    `/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,name,mimeType,size,description,trashed`
+  );
+
+  const description = parseDescription(metadata.description);
+
+  if (!description?.irpaGovernance) {
+    return json(
+      { ok: false, error: "The requested file is not an IRPA governance document." },
+      403,
+      corsHeaders(request)
+    );
+  }
+
+  const response = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`,
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      }
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      `Google Drive deletion failed (${response.status}): ${errorText.slice(0, 500)}`
+    );
+  }
+
+  return json(
+    {
+      ok: true,
+      fileId,
+      fileName: metadata.name || "Document",
+      documentId,
+      deletedByUid: claims.user_id
+    },
+    200,
+    corsHeaders(request)
+  );
+}
+
+
 
 async function getDriveAccessToken(env) {
   const stored = await env.DRIVE_KV.get("google-drive-refresh-token", "json");
