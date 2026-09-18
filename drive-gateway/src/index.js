@@ -1,4 +1,4 @@
-git statusconst FIREBASE_PROJECT_ID = "irpa-digital-board-governance";
+const FIREBASE_PROJECT_ID = "irpa-digital-board-governance";
 const AUTHORIZED_DRIVE_EMAIL = "irpa2412@gmail.com";
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const MAX_BYTES = 10 * 1024 * 1024;
