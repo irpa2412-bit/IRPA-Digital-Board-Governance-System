@@ -10,6 +10,21 @@ async function hash(file){return hashBytes(await file.arrayBuffer());}
 async function uploadAsset(uid,type,file){if(!file)throw new Error(`${type} is required.`);if(!["image/png","image/jpeg","image/jpg","image/webp"].includes(file.type))throw new Error(`${type} must be PNG, JPG or WEBP.`);if(file.size>1024*1024)throw new Error(`${type} must not exceed 1 MB.`);const sha=await hash(file);const path=`signatureProfiles/${uid}/${type.toLowerCase()}-${sha}`;const r=ref(null,path);await uploadBytes(r,file,{contentType:file.type,customMetadata:{ownerUid:uid,assetType:type,sha256:sha}});return{path,url:await getDownloadURL(r),sha};}
 export async function getMySignatureProfile(){const u=user(),s=await getDoc(doc(db,PROFILE_COLLECTION,u.uid));return s.exists()?{id:s.id,...s.data()}:null;}
 export async function saveMySignatureProfile({signatureFile,initialsFile,displayName,initials,method="Upload"}){const u=user();if(!String(displayName||u.displayName||"").trim())throw new Error("Display name is required.");const signature=await uploadAsset(u.uid,"Signature",signatureFile);const initialsAsset=initialsFile?await uploadAsset(u.uid,"Initials",initialsFile):null;const p={uid:u.uid,email:u.email||"",displayName:String(displayName).trim(),initials:String(initials||"").trim(),method,signaturePath:signature.path,signatureUrl:signature.url,signatureSha256:signature.sha,initialsPath:initialsAsset?.path||null,initialsUrl:initialsAsset?.url||null,initialsSha256:initialsAsset?.sha||null,status:"Active",adoptionDate:serverTimestamp(),updatedAt:serverTimestamp()};await setDoc(doc(db,PROFILE_COLLECTION,u.uid),p,{merge:true});return p;}
+export async function getSignatureEnvelope(envelopeId){
+  const u=user();
+  if(!envelopeId)throw new Error("Signing envelope ID is required.");
+  const snap=await getDoc(doc(db,ENVELOPE_COLLECTION,envelopeId));
+  if(!snap.exists())throw new Error("This signing invitation is no longer available.");
+  const envelope={id:snap.id,...snap.data()};
+  if(!(envelope.participantUids||[]).includes(u.uid)){
+    throw new Error("You are not authorized to access this signing invitation.");
+  }
+  if(["Cancelled","Declined"].includes(envelope.status)){
+    throw new Error("This signing envelope is no longer available.");
+  }
+  return envelope;
+}
+
 export async function getSignatureEnvelopes(){const u=user();const q=query(collection(db,ENVELOPE_COLLECTION),where("participantUids","array-contains",u.uid));const s=await getDocs(q);return s.docs.map(x=>({id:x.id,...x.data()})).sort((a,b)=>Number(b.createdAt?.seconds||0)-Number(a.createdAt?.seconds||0));}
 export async function sendSignatureInvitation(envelope, recipient) {
   const u = user();
