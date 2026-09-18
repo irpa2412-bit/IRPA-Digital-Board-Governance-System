@@ -1,4 +1,4 @@
-const FIREBASE_PROJECT_ID = "irpa-digital-board-governance";
+git statusconst FIREBASE_PROJECT_ID = "irpa-digital-board-governance";
 const AUTHORIZED_DRIVE_EMAIL = "irpa2412@gmail.com";
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -13,7 +13,7 @@ export default {
     const url = new URL(request.url);
 
     if (request.method === "OPTIONS") {
-      return json({ ok: true }, 204, corsHeaders(request));
+      return new Response(null, { status: 204, headers: corsHeaders(request) });
     }
 
     try {
@@ -44,10 +44,19 @@ export default {
       return json({ ok: false, error: "Not found." }, 404, corsHeaders(request));
     } catch (error) {
       console.error("Drive gateway error", error);
+
+      const message = error?.message || "Drive gateway request failed.";
+      const isAuthError =
+        message === "Firebase authentication is required." ||
+        message.startsWith("Invalid Firebase ID token") ||
+        message.startsWith("Invalid Firebase token") ||
+        message === "Firebase token is expired." ||
+        message === "Firebase token signing key not found.";
+
       return json({
         ok: false,
-        error: error?.message || "Drive gateway request failed."
-      }, 500, corsHeaders(request));
+        error: message
+      }, isAuthError ? 401 : 500, corsHeaders(request));
     }
   }
 };
@@ -61,7 +70,7 @@ async function startOAuth(request, env) {
 
   const state = randomBase64Url(32);
   await env.DRIVE_KV.put(
-    `oauth-state:${sha256Hex(state)}`,
+    `oauth-state:${await sha256Hex(state)}`,
     JSON.stringify({
       uid: claims.user_id,
       email: claims.email || null,
@@ -348,21 +357,31 @@ async function authenticateFirebaseRequest(request) {
 }
 
 async function getFirebaseJwks() {
-  if (jwksCache && Date.now() - jwksFetchedAt < 60 * 60 * 1000) return jwksCache;
-  const response = await fetch("https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com");
-  if (!response.ok) throw new Error("Unable to retrieve Firebase signing keys.");
-  const certs = await response.json();
-  const entries = await Promise.all(Object.entries(certs).map(async ([kid, pem]) => [kid, await pemToJwk(pem)]));
-  jwksCache = Object.fromEntries(entries);
-  jwksFetchedAt = Date.now();
-  return jwksCache;
-}
+  if (jwksCache && Date.now() - jwksFetchedAt < 60 * 60 * 1000) {
+    return jwksCache;
+  }
 
-async function pemToJwk(pem) {
-  const b64 = pem.replace(/-----[^-]+-----/g, "").replace(/\s+/g, "");
-  const binary = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-  const key = await crypto.subtle.importKey("spki", binary, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, true, ["verify"]);
-  return crypto.subtle.exportKey("jwk", key);
+  const response = await fetch(
+    "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com"
+  );
+
+  if (!response.ok) {
+    throw new Error("Unable to retrieve Firebase signing keys.");
+  }
+
+  const data = await response.json();
+
+  if (!Array.isArray(data.keys) || data.keys.length === 0) {
+    throw new Error("Firebase signing keys were not returned.");
+  }
+
+  jwksCache = Object.fromEntries(
+    data.keys.map((key) => [key.kid, key])
+  );
+
+  jwksFetchedAt = Date.now();
+
+  return jwksCache;
 }
 
 async function getFirestoreDocument(env, path, firebaseToken) {
