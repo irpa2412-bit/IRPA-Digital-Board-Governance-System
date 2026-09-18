@@ -2,6 +2,7 @@ const FIREBASE_PROJECT_ID = "irpa-digital-board-governance";
 const AUTHORIZED_DRIVE_EMAIL = "irpa2412@gmail.com";
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const MAX_BYTES = 10 * 1024 * 1024;
+const ALLOWED_CONTENT_TYPES = new Set(["application/pdf","image/png","image/jpeg","image/webp"]);
 const OAUTH_STATE_TTL = 600;
 
 let jwksCache = null;
@@ -148,17 +149,17 @@ async function oauthCallback(request, env) {
 async function upload(request, env) {
   const claims = await authenticateFirebaseRequest(request);
   const data = await request.json();
-  const fileName = cleanName(data.fileName || "IRPA-document.pdf");
+  const fileName = cleanName(data.fileName || "IRPA-document");
   const contentType = String(data.contentType || "application/pdf").toLowerCase();
   const fileSize = Number(data.fileSize || 0);
   const base64 = String(data.base64 || "");
   const purpose = cleanName(data.purpose || "Controlled Documents");
 
-  if (contentType !== "application/pdf") {
-    return json({ ok: false, error: "Only PDF documents are accepted." }, 400, corsHeaders(request));
+  if (!ALLOWED_CONTENT_TYPES.has(contentType)) {
+    return json({ ok: false, error: "Only PDF, PNG, JPEG or WEBP files are accepted." }, 400, corsHeaders(request));
   }
   if (!Number.isFinite(fileSize) || fileSize <= 0 || fileSize > MAX_BYTES) {
-    return json({ ok: false, error: "PDF must not exceed 10 MB." }, 400, corsHeaders(request));
+    return json({ ok: false, error: "Uploaded files must not exceed 10 MB." }, 400, corsHeaders(request));
   }
 
   const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
