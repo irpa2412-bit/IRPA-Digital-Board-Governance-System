@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { auth } from "../firebase/config";
 import { createRecord, COLLECTIONS } from "../firebase/data";
 import { uploadBytes, ref } from "../firebase/signatureStorage";
@@ -9,6 +9,33 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const fileInputRef = useRef(null);
+
+  async function chooseFile() {
+    setError("");
+
+    try {
+      if (window.showOpenFilePicker) {
+        const [handle] = await window.showOpenFilePicker({
+          multiple: false,
+          types: [{
+            description: "PDF documents",
+            accept: { "application/pdf": [".pdf"] }
+          }]
+        });
+
+        const selected = await handle.getFile();
+        setFile(selected);
+        return;
+      }
+    } catch (x) {
+      if (x?.name === "AbortError") return;
+      setError(x.message || "Unable to open the device file picker.");
+      return;
+    }
+
+    fileInputRef.current?.click();
+  }
 
   async function submit(e) {
     e.preventDefault();
@@ -37,6 +64,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         storageProvider: "Google Drive",
         storagePath: target.path,
         webViewLink: uploaded.metadata?.webViewLink || null,
+        fileUrl: uploaded.metadata?.webViewLink || null,
         contentType: "application/pdf",
         fileSize: file.size,
         purpose,
@@ -54,6 +82,8 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         fileName: file.name,
         fileId: target.fileId,
         storageProvider: "Google Drive",
+        webViewLink: uploaded.metadata?.webViewLink || null,
+        fileUrl: uploaded.metadata?.webViewLink || null,
         purpose,
         status: "Draft",
         authorizationStatus: "Draft",
@@ -93,7 +123,24 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
           </div>
           <div className="form-field">
             <label>PDF File</label>
-            <input type="file" accept="application/pdf,.pdf" onChange={e => setFile(e.target.files?.[0] || null)} required />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/pdf,.pdf"
+              onChange={e => setFile(e.target.files?.[0] || null)}
+              required
+              style={{ display: "none" }}
+            />
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={chooseFile}
+            >
+              Choose PDF from This Device
+            </button>
+            <div className="muted" style={{ marginTop: 8 }}>
+              {file ? `Selected: ${file.name}` : "Select a PDF directly from this device."}
+            </div>
           </div>
         </div>
         <div className="form-actions">

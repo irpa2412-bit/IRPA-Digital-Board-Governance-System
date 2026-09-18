@@ -1,4 +1,5 @@
 import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from "firebase/firestore";
+import { sendSignInLinkToEmail } from "firebase/auth";
 import { getDownloadURL, ref, uploadBytes } from "./signatureStorage";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { auth, db } from "./config";
@@ -10,6 +11,55 @@ async function uploadAsset(uid,type,file){if(!file)throw new Error(`${type} is r
 export async function getMySignatureProfile(){const u=user(),s=await getDoc(doc(db,PROFILE_COLLECTION,u.uid));return s.exists()?{id:s.id,...s.data()}:null;}
 export async function saveMySignatureProfile({signatureFile,initialsFile,displayName,initials,method="Upload"}){const u=user();if(!String(displayName||u.displayName||"").trim())throw new Error("Display name is required.");const signature=await uploadAsset(u.uid,"Signature",signatureFile);const initialsAsset=initialsFile?await uploadAsset(u.uid,"Initials",initialsFile):null;const p={uid:u.uid,email:u.email||"",displayName:String(displayName).trim(),initials:String(initials||"").trim(),method,signaturePath:signature.path,signatureUrl:signature.url,signatureSha256:signature.sha,initialsPath:initialsAsset?.path||null,initialsUrl:initialsAsset?.url||null,initialsSha256:initialsAsset?.sha||null,status:"Active",adoptionDate:serverTimestamp(),updatedAt:serverTimestamp()};await setDoc(doc(db,PROFILE_COLLECTION,u.uid),p,{merge:true});return p;}
 export async function getSignatureEnvelopes(){const u=user();const q=query(collection(db,ENVELOPE_COLLECTION),where("participantUids","array-contains",u.uid));const s=await getDocs(q);return s.docs.map(x=>({id:x.id,...x.data()})).sort((a,b)=>Number(b.createdAt?.seconds||0)-Number(a.createdAt?.seconds||0));}
+export async function sendSignatureInvitation(envelope, recipient) {
+  const u = user();
+
+  if (!envelope?.id) throw new Error("A valid signing envelope is required.");
+  if (!recipient?.uid || !recipient?.email) {
+    throw new Error("The signer must have a valid account UID and email address.");
+  }
+
+  if (!(envelope.participantUids || []).includes(recipient.uid)) {
+    throw new Error("The selected signer is not a participant in this envelope.");
+  }
+
+  const cleanEmail = String(recipient.email).trim().toLowerCase();
+
+  const actionCodeSettings = {
+    url:
+      window.location.origin +
+      "/?signEnvelope=" +
+      encodeURIComponent(envelope.id),
+    handleCodeInApp: true
+  };
+
+  await sendSignInLinkToEmail(auth, cleanEmail, actionCodeSettings);
+
+  await updateDoc(doc(db, ENVELOPE_COLLECTION, envelope.id), {
+    status: envelope.status === "Draft" ? "Sent" : envelope.status,
+    invitationStatus: "Sent",
+    invitationSentAt: serverTimestamp(),
+    invitationSentByUid: u.uid,
+    invitationSentByEmail: u.email || "",
+    updatedAt: serverTimestamp()
+  });
+
+  await recordEnvelopeEvent(envelope.id, "Signing Invitation Sent", {
+    signerUid: recipient.uid,
+    signerEmail: cleanEmail,
+    signerName: recipient.name || "",
+    deliveryStatus: "Accepted by Firebase Authentication"
+  });
+
+  return {
+    envelopeId: envelope.id,
+    signerUid: recipient.uid,
+    signerEmail: cleanEmail,
+    emailRequested: true,
+    deliveryStatus: "Accepted by Firebase Authentication"
+  };
+}
+
 export async function createSignatureEnvelope({title,documentId,documentReference,documentUrl,signingMode,recipients,fields=[]}){const u=user();if(!title?.trim())throw new Error("Envelope title is required.");if(!documentId)throw new Error("An authorized document must be selected.");if(!documentUrl)throw new Error("The selected document has no PDF file URL. Upload/link the controlled PDF before sending for signature.");if(!recipients?.length)throw new Error("At least one signer is required.");const envelopeId=`IRPA-ENV-${new Date().getFullYear()}-${Date.now().toString().slice(-8)}`;const participantUids=[u.uid,...recipients.map(r=>r.uid).filter(Boolean)];const payload={envelopeReference:envelopeId,title:title.trim(),documentId,documentReference:documentReference||"",documentUrl,senderUid:u.uid,senderEmail:u.email||"",status:"Draft",signingMode:signingMode||"Sequential",recipients,fields,participantUids,currentSignerUid:signingMode==="Sequential"?recipients[0]?.uid:null,createdAt:serverTimestamp(),updatedAt:serverTimestamp()};await setDoc(doc(db,ENVELOPE_COLLECTION,envelopeId),payload);await recordEnvelopeEvent(envelopeId,"Envelope Created",{status:"Draft"});return{id:envelopeId,...payload};}
 export async function recordEnvelopeEvent(envelopeId,event,details={}){const u=user();await setDoc(doc(collection(db,EVENT_COLLECTION)),{envelopeId,event,details,actorUid:u.uid,actorEmail:u.email||"",createdAt:serverTimestamp()});}
 async function fetchBytes(url){const r=await fetch(url);if(!r.ok)throw new Error(`Unable to retrieve the controlled PDF (${r.status}).`);return new Uint8Array(await r.arrayBuffer());}
