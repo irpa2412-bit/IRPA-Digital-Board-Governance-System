@@ -120,7 +120,7 @@ export async function sendMemberInvitationEmail(email, invitationId) {
   if (!gateway) throw new Error("IRPA mail gateway is not configured.");
   const token = await auth.currentUser?.getIdToken();
   if (!token) throw new Error("Administrator authentication is required.");
-  const response = await fetch(gateway.replace(/\\/$/,"") + "/api/invitations/send", {
+  const response = await fetch(gateway.replace(/\/$/,"") + "/api/invitations/send", {
     method: "POST",
     headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({ invitationId, email: cleanEmail })
@@ -134,4 +134,28 @@ export async function sendMemberInvitationEmail(email, invitationId) {
     deliveryStatus: result.deliveryStatus || "Submitted to mail.irpa.or.tz",
     messageId: result.messageId || null
   };
+}
+
+export function observeAuthState(callback) {
+  return onAuthStateChanged(auth, callback);
+}
+
+export function isMagicLink(url = window.location.href) {
+  return isSignInWithEmailLink(auth, url);
+}
+
+export async function completeMagicLink(email, url = window.location.href) {
+  const result = await signInWithEmailLink(auth, email.trim().toLowerCase(), url);
+  const invitationId = new URLSearchParams(new URL(url, window.location.origin).search).get("memberInvite");
+
+  if (invitationId) {
+    const { provisionCurrentMemberFromInvitationV2 } = await import("./invitationWorkflow");
+    await provisionCurrentMemberFromInvitationV2(invitationId);
+    window.localStorage.removeItem("irpaMemberEmailForSignIn");
+    window.localStorage.removeItem("irpaEmailForSignIn");
+  } else {
+    window.localStorage.removeItem("irpaEmailForSignIn");
+  }
+
+  return result.user;
 }
