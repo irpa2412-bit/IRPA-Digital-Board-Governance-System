@@ -2,11 +2,13 @@ import React, { useEffect, useState } from "react";
 import { httpsCallable } from "firebase/functions";
 import { browserSupportsPush, listenForForegroundMessages, notificationPermissionState, requestPushPermission } from "../firebase/messaging";
 import { functions } from "../firebase/functions";
+import { startGoogleDriveAuthorization } from "../firebase/signatureStorage";
 
-export default function Settings() {
+export default function Settings({ admin = false }) {
   const [supported, setSupported] = useState(false);
   const [permission, setPermission] = useState("unknown");
   const [busy, setBusy] = useState(false);
+  const [driveBusy, setDriveBusy] = useState(false);
   const [resetBusy, setResetBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [confirmation, setConfirmation] = useState("");
@@ -40,6 +42,17 @@ export default function Settings() {
     }
   }
 
+  async function authorizeGoogleDrive() {
+    setDriveBusy(true);
+    setMessage("");
+    try {
+      await startGoogleDriveAuthorization();
+    } catch (error) {
+      setMessage(error?.message || "Unable to start Google Drive authorization.");
+      setDriveBusy(false);
+    }
+  }
+
   async function resetTrialData() {
     if (confirmation !== "RESET IRPA TRIAL DATA") {
       setMessage("Enter the exact confirmation phrase: RESET IRPA TRIAL DATA");
@@ -65,7 +78,29 @@ export default function Settings() {
 
   return (
     <div className="page">
-      <section className="panel">
+      {admin && (
+        <section className="panel">
+          <div className="panel-header">
+            <div>
+              <span className="eyebrow">DOCUMENT STORAGE</span>
+              <h2>Google Drive Authorization</h2>
+              <p className="panel-description">Authorize the IRPA Google Drive account used for controlled governance documents. The authorization is restricted to the configured IRPA Drive account.</p>
+            </div>
+          </div>
+          <div className="stat-card" style={{ marginBottom: 18 }}>
+            <span>Storage provider</span>
+            <strong>Google Drive</strong>
+            <small>Authorized account: irpa2412@gmail.com</small>
+          </div>
+          <div className="form-actions">
+            <button onClick={authorizeGoogleDrive} disabled={driveBusy}>
+              {driveBusy ? "Opening Google authorization…" : "Authorize Google Drive"}
+            </button>
+          </div>
+        </section>
+      )}
+
+      <section className="panel" style={{ marginTop: admin ? 20 : 0 }}>
         <div className="panel-header">
           <div>
             <span className="eyebrow">SYSTEM SETTINGS</span>
