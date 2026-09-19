@@ -4,12 +4,12 @@ const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const MAX_BYTES = 10 * 1024 * 1024;
 const ALLOWED_CONTENT_TYPES = new Set(["application/pdf","image/png","image/jpeg","image/webp"]);
 const OAUTH_STATE_TTL = 600;
-const SMTP_HOST = "mail.irpa.or.tz";
+const SMTP_HOST = "smtp.hostinger.com";
 const SMTP_PORT = 465;
 const SMTP_FROM = "info@irpa.or.tz";
 const SMTP_CONNECT_TIMEOUT_MS = 6000;
 const SMTP_RESPONSE_TIMEOUT_MS = 8000;
-const SMTP_FALLBACK_HOST = "";
+const SMTP_FALLBACK_HOST = "mail.irpa.or.tz";
 
 let jwksCache = null;
 let jwksFetchedAt = 0;
