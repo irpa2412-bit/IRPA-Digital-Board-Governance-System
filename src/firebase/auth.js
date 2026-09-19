@@ -116,22 +116,38 @@ export async function sendEmployeeRegistrationEmail(email, employeeNumber) {
 export async function sendMemberInvitationEmail(email, invitationId) {
   if (!email || !invitationId) throw new Error("Member email and invitation ID are required.");
   const cleanEmail = email.trim().toLowerCase();
-  const actionCodeSettings = { url: window.location.origin + "/?memberInvite=" + encodeURIComponent(invitationId), handleCodeInApp: true };
-  try {
-    await sendSignInLinkToEmail(auth, cleanEmail, actionCodeSettings);
-    window.localStorage.setItem("irpaMemberEmailForSignIn", cleanEmail);
-    window.localStorage.setItem("irpaEmailForSignIn", cleanEmail);
-    return { email: cleanEmail, emailRequested: true, provider: "Firebase Authentication", deliveryStatus: "Accepted by Firebase Authentication" };
-  } catch (error) {
-    throw new Error(firebaseErrorMessage(error));
-  }
+  const gateway = import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL;
+  if (!gateway) throw new Error("IRPA mail gateway is not configured.");
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error("Administrator authentication is required.");
+  const response = await fetch(gateway.replace(/\/$/,"") + "/api/invitations/send", {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ invitationId, email: cleanEmail })
+  });
+  const result = await response.json().catch(()=>({}));
+  if (!response.ok || !result.ok) throw new Error(result.error || "IRPA invitation email could not be sent.");
+  return {
+    email: cleanEmail,
+    emailRequested: true,
+    provider: "IRPA Mail Server",
+    deliveryStatus: result.deliveryStatus || "Submitted to mail.irpa.or.tz",
+    messageId: result.messageId || null
+  };
 }
 
-export function isMagicLink(url = window.location.href) { return isSignInWithEmailLink(auth, url); }
+export function observeAuthState(callback) {
+  return onAuthStateChanged(auth, callback);
+}
+
+export function isMagicLink(url = window.location.href) {
+  return isSignInWithEmailLink(auth, url);
+}
 
 export async function completeMagicLink(email, url = window.location.href) {
   const result = await signInWithEmailLink(auth, email.trim().toLowerCase(), url);
   const invitationId = new URLSearchParams(new URL(url, window.location.origin).search).get("memberInvite");
+
   if (invitationId) {
     const { provisionCurrentMemberFromInvitationV2 } = await import("./invitationWorkflow");
     await provisionCurrentMemberFromInvitationV2(invitationId);
@@ -140,7 +156,6 @@ export async function completeMagicLink(email, url = window.location.href) {
   } else {
     window.localStorage.removeItem("irpaEmailForSignIn");
   }
+
   return result.user;
 }
-
-export function observeAuthState(callback) { return onAuthStateChanged(auth, callback); }
