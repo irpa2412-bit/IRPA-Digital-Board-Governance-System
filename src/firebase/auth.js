@@ -116,7 +116,7 @@ export async function sendEmployeeRegistrationEmail(email, employeeNumber) {
 export async function sendMemberInvitationEmail(email, invitationId) {
   if (!email || !invitationId) throw new Error("Member email and invitation ID are required.");
   const cleanEmail = email.trim().toLowerCase();
-  const gateway = import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL;
+  const gateway = import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL || "https://irpa-google-drive-gateway.irpa-governance.workers.dev";
   if (!gateway) throw new Error("IRPA mail gateway is not configured.");
   const token = await auth.currentUser?.getIdToken();
   if (!token) throw new Error("Administrator authentication is required.");
