@@ -9,7 +9,7 @@ const SMTP_PORT = 465;
 const SMTP_FROM = "info@irpa.or.tz";
 const SMTP_CONNECT_TIMEOUT_MS = 6000;
 const SMTP_RESPONSE_TIMEOUT_MS = 8000;
-const SMTP_FALLBACK_HOST = "mail.irpa.or.tz";
+const SMTP_FALLBACK_HOST = "";
 
 let jwksCache = null;
 let jwksFetchedAt = 0;
@@ -301,8 +301,7 @@ async function sendMemberInvitation(request, env) {
 
 async function smtpSendWithFallback(env, message) {
   const configuredHost = String(env.SMTP_HOST || SMTP_HOST).trim();
-  const hosts = [configuredHost];
-  if (configuredHost.toLowerCase() !== SMTP_FALLBACK_HOST) hosts.push(SMTP_FALLBACK_HOST);
+  const hosts = [configuredHost].filter(Boolean);
 
   const configuredPort = Number(env.SMTP_PORT || SMTP_PORT);
   const ports = configuredPort === 465 ? [465, 587] : [configuredPort, configuredPort === 587 ? 465 : 587];
