@@ -312,7 +312,7 @@ async function smtpSend(env,{to,subject,text,html}) {
       buffer=lines.pop() || "";
       for (let i=0;i<lines.length;i++) {
         const line=lines[i];
-        if (/^\\d{3} /.test(line)) {
+        if (/^\d{3} /.test(line)) {
           const code=Number(line.slice(0,3));
           if (code>=400) throw new Error(`IRPA SMTP error ${code}: ${line.slice(4)}`);
           return line;
