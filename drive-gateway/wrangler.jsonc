@@ -14,7 +14,7 @@
     "FIREBASE_PROJECT_ID": "irpa-digital-board-governance",
     "AUTHORIZED_DRIVE_EMAIL": "irpa2412@gmail.com",
     "IRPA_APP_URL": "https://irpa-digital-board-governance.web.app",
-    "SMTP_HOST": "mail.irpa.or.tz",
+    "SMTP_HOST": "smtp.hostinger.com",
     "SMTP_PORT": "465",
     "SMTP_FROM": "info@irpa.or.tz"
   }
