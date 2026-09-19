@@ -11,7 +11,7 @@ function MemberActivationScreen({invitationId}) {
     setBusy(true);
     try{
       const {registerWithEmail}=await import("./firebase/auth");
-      await registerWithEmail(clean,password);
+      await registerWithEmail(clean,password,{verify:false});
       await provisionCurrentMemberFromInvitationV2(invitationId);
       window.history.replaceState({},document.title,window.location.pathname+window.location.hash);
       window.location.reload();
