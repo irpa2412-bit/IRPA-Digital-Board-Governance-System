@@ -119,13 +119,28 @@ export async function sendMemberInvitationEmail(email, invitationId) {
   const gateway = String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL || "https://irpa-google-drive-gateway.irpa-governance.workers.dev").replace(/\/$/,"");
   const token = await auth.currentUser?.getIdToken();
   if (!token) throw new Error("Administrator authentication is required.");
-  const response = await fetch(gateway + "/api/invitations/send", {
-    method: "POST",
-    headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ invitationId, email: cleanEmail })
-  });
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 30000);
+  let response;
+  try {
+    response = await fetch(gateway + "/api/invitations/send", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ invitationId, email: cleanEmail }),
+      signal: controller.signal
+    });
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error("IRPA Mail Server did not respond within 30 seconds. The invitation was not confirmed as sent; use Resend after checking the mail server.");
+    }
+    throw new Error(error?.message || "IRPA Mail Server could not be reached.");
+  } finally {
+    window.clearTimeout(timeout);
+  }
   const result = await response.json().catch(()=>({}));
-  if (!response.ok || !result.ok) throw new Error(result.error || "IRPA invitation email could not be sent.");
+  if (!response.ok || !result.ok) {
+    throw new Error(result.error || `IRPA Mail Server rejected the invitation request (HTTP ${response.status}).`);
+  }
   return {
     email: cleanEmail,
     emailRequested: true,
