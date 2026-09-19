@@ -292,7 +292,10 @@ async function sendMemberInvitation(request, env) {
   const subject = "IRPA Digital Board Governance — Invitation to Activate Your Account";
   const text = `Dear ${name || "IRPA Member"},\\n\\nYou have been invited to access the IRPA Digital Board Governance System as ${role}.\\n\\nActivate your account using this secure invitation link:\\n${link}\\n\\nOn the activation page, use your invited email address and create your permanent password. After activation, you can sign in normally using your email address and password.\\n\\nIf you did not expect this invitation, please contact Improvement of Rangeland in Pastoral Areas (IRPA).\\n\\nRegards,\\nIRPA Administration\\ninfo@irpa.or.tz`;
   const htmlBody = `<!doctype html><html><body style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937"><h2>IRPA Digital Board Governance</h2><p>Dear ${escapeHtml(name || "IRPA Member")},</p><p>You have been invited to access the <strong>IRPA Digital Board Governance System</strong> as <strong>${escapeHtml(role)}</strong>.</p><p><a href="${escapeHtml(link)}" style="display:inline-block;padding:12px 18px;background:#0f766e;color:#fff;text-decoration:none;border-radius:6px">Activate Your IRPA Account</a></p><p>On the activation page, use your invited email address and create your permanent password.</p><p>If you did not expect this invitation, please contact <a href="mailto:info@irpa.or.tz">info@irpa.or.tz</a>.</p><p>Regards,<br>IRPA Administration</p></body></html>`;
-  const messageId = await Promise.race([\n    smtpSend(env, {to:email, subject, text, html:htmlBody}),\n    new Promise((_, reject) => setTimeout(() => reject(new Error("IRPA SMTP server did not respond within 25 seconds.")), 25000))\n  ]);
+  const messageId = await Promise.race([
+    smtpSend(env, {to:email, subject, text, html:htmlBody}),
+    new Promise((_, reject) => setTimeout(() => reject(new Error("IRPA SMTP server did not respond within 25 seconds.")), 25000))
+  ]);
   return json({ok:true,email,emailRequested:true,provider:"IRPA Mail Server",deliveryStatus:"Submitted to mail.irpa.or.tz",messageId},200,corsHeaders(request));
 }
 
