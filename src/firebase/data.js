@@ -85,7 +85,8 @@ export async function processPaymentRequest(id,changes){const actor=currentActor
 export async function deleteRecord(collectionName,id){await deleteDoc(doc(db,collectionName,id));await writeAudit("DELETE",collectionName,id);}
 export async function getAdminProfile(uid){return uid?getRecord(COLLECTIONS.adminProfiles,uid):null;}
 export async function getCurrentMemberProfile(){const uid=auth.currentUser?.uid;return uid?getRecord(COLLECTIONS.members,uid):null;}
-export async function getCurrentEmployeeProfile(){const uid=auth.currentUser?.uid;return uid?getRecord(COLLECTIONS.employees,uid):null;export async function retryEmployeeRegistrationEmail(employee){
+export async function getCurrentEmployeeProfile(){const uid=auth.currentUser?.uid;return uid?getRecord(COLLECTIONS.employees,uid):null;}
+export async function retryEmployeeRegistrationEmail(employee){
   if(!employee?.id||!employee.employeeNumber)throw new Error("A valid employee record is required.");
   if(!employee.email)throw new Error("This employee has no official email address.");
   const emailResult=await ensureEmployeeInvitation(employee);
