@@ -7,6 +7,7 @@ const OAUTH_STATE_TTL = 600;
 const SMTP_HOST = "mail.irpa.or.tz";
 const SMTP_PORT = 465;
 const SMTP_FROM = "info@irpa.or.tz";
+const SMTP_CONNECT_TIMEOUT_MS = 10000;
 
 let jwksCache = null;
 let jwksFetchedAt = 0;
@@ -299,22 +300,60 @@ async function sendMemberInvitation(request, env) {
   return json({ok:true,email,emailRequested:true,provider:"IRPA Mail Server",deliveryStatus:"Submitted to mail.irpa.or.tz",messageId},200,corsHeaders(request));
 }
 
-async function smtpSend(env,{to,subject,text,html}) {
+async function smtpSendWithFallback(env, message) {
+  const host = String(env.SMTP_HOST || SMTP_HOST).trim();
+  const configuredPort = Number(env.SMTP_PORT || SMTP_PORT);
+  const ports = configuredPort === 465 ? [465, 587] : [configuredPort];
+
+  let lastError = null;
+  for (const port of ports) {
+    try {
+      return await smtpSend(env, message, host, port);
+    } catch (error) {
+      lastError = error;
+      console.error("SMTP attempt failed", { host, port, error: error?.message || String(error) });
+    }
+  }
+
+  throw new Error(
+    lastError?.message ||
+    "IRPA mail server could not be reached. Check the SMTP host, port and mailbox credentials."
+  );
+}
+
+async function smtpSend(env,{to,subject,text,html}, host, port) {
   if (!env.SMTP_PASSWORD) throw new Error("IRPA SMTP password is not configured in the deployment environment.");
   const { connect } = await import("cloudflare:sockets");
-  const socket = connect({hostname:SMTP_HOST,port:SMTP_PORT},{secureTransport:"on"});
-  const reader = socket.readable.getReader();
-  const writer = socket.writable.getWriter();
+  const useStartTls = Number(port) === 587;
+  let socket = connect(
+    {hostname:host,port:Number(port)},
+    {secureTransport:useStartTls ? "starttls" : "on"}
+  );
+
+  await Promise.race([
+    socket.opened,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`IRPA SMTP connection to ${host}:${port} timed out.`)), SMTP_CONNECT_TIMEOUT_MS)
+    )
+  ]);
+
+  let reader = socket.readable.getReader();
+  let writer = socket.writable.getWriter();
   let buffer = "";
+
   async function readResponse() {
     while (true) {
-      const {value,done}=await reader.read();
+      const {value,done}=await Promise.race([
+        reader.read(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error(`IRPA SMTP server ${host}:${port} did not respond within ${SMTP_CONNECT_TIMEOUT_MS / 1000} seconds.`)), SMTP_CONNECT_TIMEOUT_MS)
+        )
+      ]);
       if (done) throw new Error("SMTP server closed the connection.");
       buffer += new TextDecoder().decode(value);
       const lines=buffer.split("\r\n");
       buffer=lines.pop() || "";
-      for (let i=0;i<lines.length;i++) {
-        const line=lines[i];
+      for (const line of lines) {
         if (/^\d{3} /.test(line)) {
           const code=Number(line.slice(0,3));
           if (code>=400) throw new Error(`IRPA SMTP error ${code}: ${line.slice(4)}`);
@@ -323,19 +362,35 @@ async function smtpSend(env,{to,subject,text,html}) {
       }
     }
   }
+
   async function command(value, expectedClass) {
     await writer.write(new TextEncoder().encode(value+"\r\n"));
     const line=await readResponse();
     if (expectedClass && !line.startsWith(String(expectedClass))) throw new Error("Unexpected SMTP response: "+line);
     return line;
   }
+
   try {
     await readResponse();
     await command("EHLO irpa-digital-board-governance","2");
+
+    if (useStartTls) {
+      await command("STARTTLS","2");
+      const secureSocket = socket.startTls();
+      try { reader.releaseLock(); } catch {}
+      try { writer.releaseLock(); } catch {}
+      socket = secureSocket;
+      reader = socket.readable.getReader();
+      writer = socket.writable.getWriter();
+      buffer = "";
+      await command("EHLO irpa-digital-board-governance","2");
+    }
+
     await command("AUTH PLAIN "+btoa("\0"+SMTP_FROM+"\0"+env.SMTP_PASSWORD),"2");
     await command(`MAIL FROM:<${SMTP_FROM}>`,"2");
     await command(`RCPT TO:<${to}>`,"2");
     await command("DATA","3");
+
     const boundary="IRPA-"+crypto.randomUUID();
     const mime=[
       `From: "IRPA Administration" <${SMTP_FROM}>`,
@@ -358,7 +413,8 @@ async function smtpSend(env,{to,subject,text,html}) {
       "",
       `--${boundary}--`,
       ""
-    ].join("\r\n").replace(/\r?\n/g,"\r\n");
+    ].join("\r\n");
+
     await writer.write(new TextEncoder().encode(mime+"\r\n.\r\n"));
     const accepted=await readResponse();
     if (!accepted.startsWith("2")) throw new Error("SMTP message was not accepted: "+accepted);
@@ -367,7 +423,7 @@ async function smtpSend(env,{to,subject,text,html}) {
   } finally {
     try { reader.releaseLock(); } catch {}
     try { writer.releaseLock(); } catch {}
-    try { socket.close(); } catch {}
+    try { await socket.close(); } catch {}
   }
 }
 
