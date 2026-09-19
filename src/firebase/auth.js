@@ -122,7 +122,7 @@ export async function sendMemberInvitationEmail(email, invitationId) {
   const token = await auth.currentUser?.getIdToken();
   if (!token) throw new Error("Administrator authentication is required.");
   const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), 30000);
+  const timeout = window.setTimeout(() => controller.abort(), 60000);
   let response;
   try {
     response = await fetch(gateway.replace(/\/$/,"") + "/api/invitations/send", {
@@ -132,7 +132,7 @@ export async function sendMemberInvitationEmail(email, invitationId) {
       signal: controller.signal
     });
   } catch (error) {
-    if (error?.name === "AbortError") throw new Error("IRPA mail server did not respond within 30 seconds. The invitation was not sent; you can safely try Resend.");
+    if (error?.name === "AbortError") throw new Error("IRPA mail server did not respond within 60 seconds. Check the Invitation Register before retrying so a delayed submission is not duplicated.");
     throw error;
   } finally {
     window.clearTimeout(timeout);
