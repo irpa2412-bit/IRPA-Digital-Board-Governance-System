@@ -7,7 +7,9 @@ const OAUTH_STATE_TTL = 600;
 const SMTP_HOST = "mail.irpa.or.tz";
 const SMTP_PORT = 465;
 const SMTP_FROM = "info@irpa.or.tz";
-const SMTP_CONNECT_TIMEOUT_MS = 10000;
+const SMTP_CONNECT_TIMEOUT_MS = 6000;
+const SMTP_RESPONSE_TIMEOUT_MS = 8000;
+const SMTP_FALLBACK_HOST = "smtp.hostinger.com";
 
 let jwksCache = null;
 let jwksFetchedAt = 0;
@@ -298,23 +300,29 @@ async function sendMemberInvitation(request, env) {
 }
 
 async function smtpSendWithFallback(env, message) {
-  const host = String(env.SMTP_HOST || SMTP_HOST).trim();
+  const configuredHost = String(env.SMTP_HOST || SMTP_HOST).trim();
+  const hosts = [configuredHost];
+  if (configuredHost.toLowerCase() !== SMTP_FALLBACK_HOST) hosts.push(SMTP_FALLBACK_HOST);
+
   const configuredPort = Number(env.SMTP_PORT || SMTP_PORT);
-  const ports = configuredPort === 465 ? [465, 587] : [configuredPort];
+  const ports = configuredPort === 465 ? [465, 587] : [configuredPort, configuredPort === 587 ? 465 : 587];
 
   let lastError = null;
-  for (const port of ports) {
-    try {
-      return await smtpSend(env, message, host, port);
-    } catch (error) {
-      lastError = error;
-      console.error("SMTP attempt failed", { host, port, error: error?.message || String(error) });
+  for (const host of hosts) {
+    for (const port of [...new Set(ports)]) {
+      try {
+        console.log("SMTP attempt", { host, port });
+        return await smtpSend(env, message, host, port);
+      } catch (error) {
+        lastError = error;
+        console.error("SMTP attempt failed", { host, port, error: error?.message || String(error) });
+      }
     }
   }
 
   throw new Error(
     lastError?.message ||
-    "IRPA mail server could not be reached. Check the SMTP host, port and mailbox credentials."
+    "IRPA mail server could not be reached. The invitation was not sent."
   );
 }
 
@@ -327,15 +335,8 @@ async function smtpSend(env,{to,subject,text,html}, host, port) {
     {secureTransport:useStartTls ? "starttls" : "on"}
   );
 
-  await Promise.race([
-    socket.opened,
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error(`IRPA SMTP connection to ${host}:${port} timed out.`)), SMTP_CONNECT_TIMEOUT_MS)
-    )
-  ]);
-
-  let reader = socket.readable.getReader();
-  let writer = socket.writable.getWriter();
+  let reader = null;
+  let writer = null;
   let buffer = "";
 
   async function readResponse() {
@@ -343,7 +344,7 @@ async function smtpSend(env,{to,subject,text,html}, host, port) {
       const {value,done}=await Promise.race([
         reader.read(),
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error(`IRPA SMTP server ${host}:${port} did not respond within ${SMTP_CONNECT_TIMEOUT_MS / 1000} seconds.`)), SMTP_CONNECT_TIMEOUT_MS)
+          setTimeout(() => reject(new Error(`IRPA SMTP server ${host}:${port} did not respond within ${SMTP_RESPONSE_TIMEOUT_MS / 1000} seconds.`)), SMTP_RESPONSE_TIMEOUT_MS)
         )
       ]);
       if (done) throw new Error("SMTP server closed the connection.");
@@ -368,6 +369,15 @@ async function smtpSend(env,{to,subject,text,html}, host, port) {
   }
 
   try {
+    await Promise.race([
+      socket.opened,
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error(`IRPA SMTP connection to ${host}:${port} timed out after ${SMTP_CONNECT_TIMEOUT_MS / 1000} seconds.`)), SMTP_CONNECT_TIMEOUT_MS)
+      )
+    ]);
+    reader = socket.readable.getReader();
+    writer = socket.writable.getWriter();
+
     await readResponse();
     await command("EHLO irpa-digital-board-governance","2");
 
