@@ -14,9 +14,9 @@ import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { auth, firebaseConfig, googleProvider } from "./config";
 
-export async function registerWithEmail(email, password) {
+export async function registerWithEmail(email, password, options = {}) {
   const result = await createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
-  await sendEmailVerification(result.user);
+  if (options.verify !== false) await sendEmailVerification(result.user);
   return result.user;
 }
 
@@ -125,7 +125,7 @@ export async function sendMemberInvitationEmail(email, invitationId) {
   try {
     response = await fetch(gateway + "/api/invitations/send", {
       method: "POST",
-      headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+      headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json", "X-IRPA-Invitation-Version": "2" },
       body: JSON.stringify({ invitationId, email: cleanEmail }),
       signal: controller.signal
     });
