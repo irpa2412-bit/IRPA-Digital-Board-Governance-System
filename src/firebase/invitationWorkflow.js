@@ -4,7 +4,6 @@ import {
   createEmployeeProfile,
   createMemberProfile,
   getRecord,
-  getRecords,
   updateRecord,
 } from "./data";
 
