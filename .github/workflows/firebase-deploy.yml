@@ -2,7 +2,7 @@ name: Deploy IRPA Governance to Firebase
 
 on:
   push:
-    branches: [main]
+    branches: [main, invitation-only-signer]
   workflow_dispatch:
 
 jobs:
