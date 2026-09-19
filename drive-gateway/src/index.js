@@ -308,7 +308,7 @@ async function smtpSend(env,{to,subject,text,html}) {
       const {value,done}=await reader.read();
       if (done) throw new Error("SMTP server closed the connection.");
       buffer += new TextDecoder().decode(value);
-      const lines=buffer.split("\\r\\n");
+      const lines=buffer.split("\r\n");
       buffer=lines.pop() || "";
       for (let i=0;i<lines.length;i++) {
         const line=lines[i];
@@ -321,7 +321,7 @@ async function smtpSend(env,{to,subject,text,html}) {
     }
   }
   async function command(value, expectedClass) {
-    await writer.write(new TextEncoder().encode(value+"\\r\\n"));
+    await writer.write(new TextEncoder().encode(value+"\r\n"));
     const line=await readResponse();
     if (expectedClass && !line.startsWith(String(expectedClass))) throw new Error("Unexpected SMTP response: "+line);
     return line;
@@ -329,7 +329,7 @@ async function smtpSend(env,{to,subject,text,html}) {
   try {
     await readResponse();
     await command("EHLO irpa-digital-board-governance","2");
-    await command("AUTH PLAIN "+btoa("\\0"+SMTP_FROM+"\\0"+env.SMTP_PASSWORD),"2");
+    await command("AUTH PLAIN "+btoa("\0"+SMTP_FROM+"\0"+env.SMTP_PASSWORD),"2");
     await command(`MAIL FROM:<${SMTP_FROM}>`,"2");
     await command(`RCPT TO:<${to}>`,"2");
     await command("DATA","3");
@@ -355,8 +355,8 @@ async function smtpSend(env,{to,subject,text,html}) {
       "",
       `--${boundary}--`,
       ""
-    ].join("\\r\\n").replace(/\\r?\\n/g,"\\r\\n");
-    await writer.write(new TextEncoder().encode(mime+"\\r\\n.\\r\\n"));
+    ].join("\r\n").replace(/\r?\n/g,"\r\n");
+    await writer.write(new TextEncoder().encode(mime+"\r\n.\r\n"));
     const accepted=await readResponse();
     if (!accepted.startsWith("2")) throw new Error("SMTP message was not accepted: "+accepted);
     await command("QUIT","2");
