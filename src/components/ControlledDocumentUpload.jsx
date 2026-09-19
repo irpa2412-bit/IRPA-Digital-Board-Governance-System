@@ -1,6 +1,7 @@
 import React, { useRef, useState } from "react";
 import { auth } from "../firebase/config";
 import { createRecord, COLLECTIONS } from "../firebase/data";
+import { readWorkflowContext, withWorkflowLinks } from "../firebase/workflowLinks";
 import { uploadBytes, ref } from "../firebase/signatureStorage";
 
 export default function ControlledDocumentUpload({ purpose = "Controlled Document", onUploaded }) {
@@ -57,7 +58,8 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
       });
 
       const now = new Date().toISOString();
-      const documentId = await createRecord(COLLECTIONS.documents, {
+      const workflowContext = readWorkflowContext();
+      const documentId = await createRecord(COLLECTIONS.documents, withWorkflowLinks({
         title: name,
         fileName: file.name,
         fileId: target.fileId,
@@ -74,7 +76,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         uploadedByUid: auth.currentUser.uid,
         uploadedByEmail: auth.currentUser.email || null,
         uploadedAt: now
-      });
+      }, workflowContext || {}));
 
       const doc = {
         id: documentId,
