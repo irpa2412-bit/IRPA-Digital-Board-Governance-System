@@ -120,11 +120,22 @@ export async function sendMemberInvitationEmail(email, invitationId) {
   if (!gateway) throw new Error("IRPA mail gateway is not configured.");
   const token = await auth.currentUser?.getIdToken();
   if (!token) throw new Error("Administrator authentication is required.");
-  const response = await fetch(gateway.replace(/\/$/,"") + "/api/invitations/send", {
-    method: "POST",
-    headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ invitationId, email: cleanEmail })
-  });
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 30000);
+  let response;
+  try {
+    response = await fetch(gateway.replace(/\/$/,"") + "/api/invitations/send", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ invitationId, email: cleanEmail }),
+      signal: controller.signal
+    });
+  } catch (error) {
+    if (error?.name === "AbortError") throw new Error("IRPA mail server did not respond within 30 seconds. The invitation was not sent; you can safely try Resend.");
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+  }
   const result = await response.json().catch(()=>({}));
   if (!response.ok || !result.ok) throw new Error(result.error || "IRPA invitation email could not be sent.");
   return {
