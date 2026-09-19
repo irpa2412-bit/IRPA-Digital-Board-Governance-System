@@ -75,11 +75,11 @@ function firebaseErrorMessage(error) {
     "auth/missing-continue-uri": "The registration link destination is missing.",
     "auth/user-not-found": "No IRPA account was found for this email address. Check the email or create an account.",
     "auth/invalid-email": "The email address is invalid.",
-    "auth/wrong-password": "Incorrect password. Please check your password or use Forgot password? to create a new one.",
+    "auth/wrong-password": "Incorrect password. Please check your password or use Forgot password? to reset it.",
     "auth/invalid-credential": "The email or password is incorrect. Check your credentials or use Forgot password? to reset the password.",
     "auth/user-disabled": "This Firebase account has been disabled. Contact the IRPA administrator.",
     "auth/weak-password": "The password must contain at least 6 characters.",
-    "auth/email-already-in-use": "An account already exists for this email address. Use Forgot password? if you need to reset it."
+    "auth/email-already-in-use": "An account already exists for this email address. Use Forgot password? if you need to reset the password."
   };
   return known[code] ? `${known[code]} (${code})` : `${message}${code ? ` (${code})` : ""}`;
 }
@@ -116,11 +116,10 @@ export async function sendEmployeeRegistrationEmail(email, employeeNumber) {
 export async function sendMemberInvitationEmail(email, invitationId) {
   if (!email || !invitationId) throw new Error("Member email and invitation ID are required.");
   const cleanEmail = email.trim().toLowerCase();
-  const gateway = import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL;
-  if (!gateway) throw new Error("IRPA mail gateway is not configured.");
+  const gateway = String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL || "https://irpa-google-drive-gateway.irpa-governance.workers.dev").replace(/\/$/,"");
   const token = await auth.currentUser?.getIdToken();
   if (!token) throw new Error("Administrator authentication is required.");
-  const response = await fetch(gateway.replace(/\/$/,"") + "/api/invitations/send", {
+  const response = await fetch(gateway + "/api/invitations/send", {
     method: "POST",
     headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({ invitationId, email: cleanEmail })
