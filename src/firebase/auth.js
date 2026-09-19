@@ -13,6 +13,7 @@ import {
 import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { auth, firebaseConfig, googleProvider } from "./config";
+// Member invitations are delivered by the IRPA mail gateway, not Firebase Authentication.
 
 export async function registerWithEmail(email, password, options = {}) {
   const result = await createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
