@@ -73,32 +73,20 @@ export async function provisionCurrentMemberFromInvitationV2(invitationId) {
       activatedAt: new Date().toISOString(),
     });
   } else if (EMPLOYEE_ROLES.includes(role)) {
-    // Link an existing employee/board-member record by official email before creating anything new.
-    const employees = await getRecords(COLLECTIONS.employees);
-    employee = employees.find(x => String(x.email || "").trim().toLowerCase() === email) || null;
-    if (employee) {
-      await updateRecord(COLLECTIONS.employees, employee.id, {
-        uid,
-        invitationId,
-        accountActivated: true,
-        registrationStatus: "Activated",
-        registrationEmailStatus: "Completed",
-        status: employee.status || "Active",
-        activatedAt: new Date().toISOString(),
-      });
-    } else {
-      employee = await createEmployeeProfile({
-        uid,
-        email,
-        name: invitation.name || "",
-        role,
-        department: invitation.department || "",
-        employmentType: invitation.employmentType || "Employee",
-        status: "Active",
-        registrationStatus: "Activated",
-        invitationId,
-      });
-    }
+    // Unlinked invitations create the new authoritative personnel record.
+    // Do not scan the employee collection here: an invited account is intentionally
+    // restricted to its own invitation and linked personnel record.
+    employee = await createEmployeeProfile({
+      uid,
+      email,
+      name: invitation.name || "",
+      role,
+      department: invitation.department || "",
+      employmentType: invitation.employmentType || "Employee",
+      status: "Active",
+      registrationStatus: "Activated",
+      invitationId,
+    });
   }
 
   await createMemberProfile(uid, {
