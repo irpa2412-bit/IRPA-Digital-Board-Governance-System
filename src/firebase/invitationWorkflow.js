@@ -9,11 +9,6 @@ import {
 } from "./data";
 
 const EMPLOYEE_ROLES = [
-  "Board Member",
-  "Board Chairperson",
-  "Board Secretary",
-  "Board Treasurer",
-  "Board Vice Chairperson",
   "Executive Director",
   "Director Human Resources",
   "HR Manager",
@@ -57,7 +52,9 @@ export async function provisionCurrentMemberFromInvitationV2(invitationId) {
   let employee = null;
 
   // Prefer the institutional personnel record explicitly attached to the invitation.
-  if (invitation.employeeId) {
+  const isBoardMember = ["Board Member","Board Chairperson","Board Secretary","Board Treasurer","Board Vice Chairperson"].includes(role);
+
+  if (invitation.employeeId && !isBoardMember) {
     employee = await getRecord(COLLECTIONS.employees, invitation.employeeId);
     if (!employee) throw new Error("The institutional personnel record linked to this invitation could not be found.");
     if (employee.email?.trim().toLowerCase() !== email) {
