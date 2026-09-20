@@ -118,6 +118,7 @@ export async function sendMemberInvitationEmail(email, invitationId) {
   if (!email || !invitationId) throw new Error("Member email and invitation ID are required.");
   const cleanEmail = email.trim().toLowerCase();
   const defaultGateway = "https://irpa-google-drive-gateway.irpa-governance.workers.dev";
+  // Member invitations are permanently routed through the IRPA SMTP gateway. Never call Firebase Authentication email delivery here.\n  const invitationDeliveryVersion = "5";
   const appOrigin = window.location.origin;
   const configuredGateway = String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL || "").trim().replace(/\/$/,"");
   const gatewayCandidates = [configuredGateway, defaultGateway].filter(Boolean);
@@ -137,7 +138,7 @@ export async function sendMemberInvitationEmail(email, invitationId) {
           "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json",
           "Cache-Control": "no-store",
-          "X-IRPA-Invitation-Version": "4"
+          "X-IRPA-Invitation-Version": invitationDeliveryVersion
         },
         body: JSON.stringify({ invitationId, email: cleanEmail }),
         signal: controller.signal,
