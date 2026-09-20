@@ -1,4 +1,4 @@
-import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, orderBy, query, runTransaction, serverTimestamp, updateDoc, setDoc, where } from "firebase/firestore";
+import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, orderBy, query, runTransaction, serverTimestamp, updateDoc, setDoc, where, writeBatch } from "firebase/firestore";
 import { auth, db } from "./config";
 import { sendEmployeeRegistrationEmail } from "./auth";
 
@@ -16,6 +16,37 @@ export async function createEmployeeProfile(data){const uid=data.uid||auth.curre
 export async function provisionCurrentMemberFromInvitation(invitationId){const uid=auth.currentUser?.uid;const email=auth.currentUser?.email?.trim().toLowerCase();if(!uid||!email||!invitationId)return null;const invitation=await getRecord(COLLECTIONS.invitations,invitationId);if(!invitation)throw new Error("The member invitation could not be found.");if(invitation.email?.trim().toLowerCase()!==email)throw new Error("This invitation is not assigned to the authenticated email address.");if(invitation.status==="Cancelled")throw new Error("This member invitation has been cancelled.");const role=invitation.role||"Board Member";const memberType=invitation.memberType||"Governance Member";const member=await createMemberProfile(uid,{invitationId,email,name:invitation.name||"",role,memberType,status:"Active"});const employeeRoles=["Executive Director","Director Human Resources","HR Manager","Director Finance & Administration","Finance Personnel","Finance Manager","Accountant","Finance Officer","Director Internal Oversight","Internal Oversight Officer","Secretariat","Procurement Officer","Programme/Technical Officer","Management","Operations Manager","Rangeland Officer","Livestock Officer","Outreach Officer","Community Development Officer","Environment Officer","HR Officer","Employee"];if(employeeRoles.includes(role))await createEmployeeProfile({uid,email,name:invitation.name||"",role,department:invitation.department||"",employmentType:invitation.employmentType||"Employee",status:"Active",invitationId});return member;}
 export async function getRecord(collectionName,id){const s=await getDoc(doc(db,collectionName,id));return s.exists()?{id:s.id,...s.data()}:null;}
 export async function getRecords(collectionName){const s=await getDocs(query(collection(db,collectionName),orderBy("createdAt","desc")));return s.docs.map(x=>({id:x.id,...x.data()}));}
+
+export async function resetTrialData(){
+  const uid=auth.currentUser?.uid;
+  if(!uid)throw new Error("Authentication is required.");
+  const adminSnap=await getDoc(doc(db,COLLECTIONS.adminProfiles,uid));
+  if(!adminSnap.exists()||adminSnap.data()?.active!==true)throw new Error("Administrator authorization is required.");
+  const [membersSnap,employeesSnap]=await Promise.all([
+    getDocs(collection(db,COLLECTIONS.members)),
+    getDocs(collection(db,COLLECTIONS.employees))
+  ]);
+  const membersDeleted=membersSnap.size,employeesDeleted=employeesSnap.size;
+  const startedAt=serverTimestamp();
+  const startRef=doc(collection(db,COLLECTIONS.audit));
+  await setDoc(startRef,{action:"RESET_TRIAL_DATA_STARTED",category:"SYSTEM_ADMINISTRATION",description:"Controlled administrator-only reset of trial member and employee data.",actorUid:uid,actorEmail:auth.currentUser?.email||adminSnap.data()?.email||null,membersTargeted:membersDeleted,employeesTargeted:employeesDeleted,status:"Started",createdAt:startedAt});
+  try{
+    const docs=[...membersSnap.docs,...employeesSnap.docs];
+    for(let i=0;i<docs.length;i+=450){
+      const batch=writeBatch(db);
+      docs.slice(i,i+450).forEach(x=>batch.delete(x.ref));
+      await batch.commit();
+    }
+    await setDoc(doc(db,COLLECTIONS.employeeCounters,"employees"),{currentNumber:0,nextNumber:1,updatedAt:serverTimestamp(),resetByUid:uid},{merge:true});
+    const completionRef=doc(collection(db,COLLECTIONS.audit));
+    await setDoc(completionRef,{action:"RESET_TRIAL_DATA_COMPLETED",category:"SYSTEM_ADMINISTRATION",description:"Trial member and employee records cleared and employee counter reset.",actorUid:uid,actorEmail:auth.currentUser?.email||adminSnap.data()?.email||null,membersDeleted,employeesDeleted,counterReset:true,status:"Completed",createdAt:serverTimestamp(),startedAuditId:startRef.id});
+    return{success:true,membersDeleted,employeesDeleted};
+  }catch(error){
+    const failureRef=doc(collection(db,COLLECTIONS.audit));
+    await setDoc(failureRef,{action:"RESET_TRIAL_DATA_FAILED",category:"SYSTEM_ADMINISTRATION",description:"Trial-data reset did not complete successfully.",actorUid:uid,actorEmail:auth.currentUser?.email||adminSnap.data()?.email||null,membersTargeted:membersDeleted,employeesTargeted:employeesDeleted,status:"Failed",error:error?.message||String(error),createdAt:serverTimestamp(),startedAuditId:startRef.id});
+    throw error;
+  }
+}
 export async function getEmployeePaymentRequests(employeeUid){const s=await getDocs(query(collection(db,COLLECTIONS.staffPaymentRequests),where("employeeUid","==",employeeUid),orderBy("createdAt","desc")));return s.docs.map(x=>({id:x.id,...x.data()}));}
 async function digestKey(value){const bytes=new TextEncoder().encode(value);const digest=await crypto.subtle.digest("SHA-256",bytes);return Array.from(new Uint8Array(digest)).map(b=>b.toString(16).padStart(2,"0")).join("");}
 export async function openVotingIssue({meetingId,meetingReference,resolutionId=null,resolutionReference=null,votingReference}){if(!auth.currentUser)throw new Error("Authentication is required.");if(!meetingId)throw new Error("A meeting is required for every voting issue.");const origin=String(votingReference||"").trim();if(!origin)throw new Error("The voting origin / issue requiring voting action is required.");const meeting=await getRecord(COLLECTIONS.meetings,meetingId);if(!meeting)throw new Error("The originating meeting could not be found.");if(resolutionId){const resolution=await getRecord(COLLECTIONS.resolutions,resolutionId);if(!resolution)throw new Error("The linked resolution could not be found.");if(resolution.meetingId!==meetingId)throw new Error("A resolution can only be voted on within its originating meeting.");}const issueKey=await digestKey(`${meetingId}|${resolutionId||""}|${origin.toLowerCase()}`);const ref=doc(db,COLLECTIONS.votingIssues,issueKey);return runTransaction(db,async tx=>{const existing=await tx.get(ref);if(existing.exists()){const status=existing.data().status||"Open";if(status!=="Cancelled")return{...existing.data(),id:existing.id,alreadyOpen:true};}const data={meetingId,meetingReference:meetingReference||meeting.title||meetingId,resolutionId,resolutionReference,votingReference:origin,status:"Open",result:"Pending",anonymous:true,openedAt:serverTimestamp(),openedByProcess:true,createdAt:serverTimestamp(),updatedAt:serverTimestamp()};tx.set(ref,data);return{...data,id:ref.id,alreadyOpen:false};});}
