@@ -129,7 +129,7 @@ export async function sendMemberInvitationEmail(email, invitationId) {
   let lastNetworkError = null;
   for (const gateway of gateways) {
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 20000);
+    const timeout = window.setTimeout(() => controller.abort(), 60000);
     try {
       const response = await fetch(gateway + "/api/invitations/send", {
         method: "POST",
@@ -158,7 +158,7 @@ export async function sendMemberInvitationEmail(email, invitationId) {
       if (error?.name === "AbortError") {
         lastNetworkError = new Error("IRPA mail gateway timed out.");
       } else if (error instanceof TypeError && /fetch/i.test(error.message || "")) {
-        lastNetworkError = new Error("IRPA mail gateway could not be reached.");
+        lastNetworkError = new Error("IRPA mail gateway could not be reached. The deployed mail gateway is unavailable from this browser.");
       } else {
         throw error;
       }
