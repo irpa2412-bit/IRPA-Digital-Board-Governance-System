@@ -1,12 +1,12 @@
 import React,{useEffect,useState}from"react";
-import {createMemberRegistration,getRecords,updateRecord,deleteRecord,COLLECTIONS}from"../firebase/data";
+import {createMemberRegistration,repairBoardMemberRegistration,getRecords,updateRecord,deleteRecord,COLLECTIONS}from"../firebase/data";
 
 const empty={name:"",email:"",phone:"",gender:"",dateOfBirth:"",nationality:"Tanzanian",address:"",role:"Board Member",department:"Board of Directors",employmentType:"Board Appointment",status:"Active",startDate:"",appointmentDate:"",termStart:"",termEnd:"",biography:""};
 const positions=["Board Chairperson","Board Vice Chairperson","Board Secretary","Board Treasurer","Board Member"];
 
 export default function BoardMembers(){
  const[records,setRecords]=useState([]),[form,setForm]=useState(empty),[editing,setEditing]=useState(null),[viewing,setViewing]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState(""),[search,setSearch]=useState("");
- async function load(){try{const all=await getRecords(COLLECTIONS.members);setRecords(all.filter(x=>x.boardMember===true||x.role==="Board Member"||x.boardPosition))}catch(e){setError(e.message||"Unable to load Board Member register.")}}
+ async function load(){try{const all=await getRecords(COLLECTIONS.members);const board=all.filter(x=>x.boardMember===true||x.role==="Board Member"||x.boardPosition);for(const record of board){if(!record.memberNumber){await repairBoardMemberRegistration(record.id)}}const refreshed=board.some(x=>!x.memberNumber)?await getRecords(COLLECTIONS.members):all;setRecords(refreshed.filter(x=>x.boardMember===true||x.role==="Board Member"||x.boardPosition))}catch(e){setError(e.message||"Unable to load Board Member register.")}}
  useEffect(()=>{load()},[]);
  const change=e=>setForm({...form,[e.target.name]:e.target.value});
  function reset(){setEditing(null);setForm(empty)}
