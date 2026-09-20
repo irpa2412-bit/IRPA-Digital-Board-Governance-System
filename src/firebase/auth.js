@@ -117,35 +117,54 @@ export async function sendEmployeeRegistrationEmail(email, employeeNumber) {
 export async function sendMemberInvitationEmail(email, invitationId) {
   if (!email || !invitationId) throw new Error("Member email and invitation ID are required.");
   const cleanEmail = email.trim().toLowerCase();
-  const gateway = import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL || "https://irpa-google-drive-gateway.irpa-governance.workers.dev";
-  if (!gateway) throw new Error("IRPA mail gateway is not configured.");
+  const defaultGateway = "https://irpa-google-drive-gateway.irpa-governance.workers.dev";
+  const configuredGateway = String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL || "").trim().replace(/\/$/,"");
+  const gateways = [...new Set([configuredGateway, defaultGateway].filter(Boolean))];
   const token = await auth.currentUser?.getIdToken();
   if (!token) throw new Error("Administrator authentication is required.");
-  const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), 60000);
-  let response;
-  try {
-    response = await fetch(gateway.replace(/\/$/,"") + "/api/invitations/send", {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json", "Cache-Control": "no-store", "X-IRPA-Invitation-Version": "3" },
-      body: JSON.stringify({ invitationId, email: cleanEmail }),
-      signal: controller.signal, cache: "no-store"
-    });
-  } catch (error) {
-    if (error?.name === "AbortError") throw new Error("IRPA mail server did not respond within 60 seconds. Check the Invitation Register before retrying so a delayed submission is not duplicated.");
-    throw error;
-  } finally {
-    window.clearTimeout(timeout);
+
+  let lastNetworkError = null;
+  for (const gateway of gateways) {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 20000);
+    try {
+      const response = await fetch(gateway + "/api/invitations/send", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+          "X-IRPA-Invitation-Version": "4"
+        },
+        body: JSON.stringify({ invitationId, email: cleanEmail }),
+        signal: controller.signal,
+        cache: "no-store"
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || "IRPA invitation email could not be sent.");
+      }
+      return {
+        email: cleanEmail,
+        emailRequested: true,
+        provider: "IRPA Mail Server",
+        deliveryStatus: result.deliveryStatus || "Submitted to mail.irpa.or.tz",
+        messageId: result.messageId || null
+      };
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        lastNetworkError = new Error("IRPA mail gateway timed out.");
+      } else if (error instanceof TypeError && /fetch/i.test(error.message || "")) {
+        lastNetworkError = new Error("IRPA mail gateway could not be reached.");
+      } else {
+        throw error;
+      }
+    } finally {
+      window.clearTimeout(timeout);
+    }
   }
-  const result = await response.json().catch(()=>({}));
-  if (!response.ok || !result.ok) throw new Error(result.error || "IRPA invitation email could not be sent.");
-  return {
-    email: cleanEmail,
-    emailRequested: true,
-    provider: "IRPA Mail Server",
-    deliveryStatus: result.deliveryStatus || "Submitted to mail.irpa.or.tz",
-    messageId: result.messageId || null
-  };
+
+  throw lastNetworkError || new Error("IRPA mail gateway could not be reached.");
 }
 
 export function observeAuthState(callback) {
