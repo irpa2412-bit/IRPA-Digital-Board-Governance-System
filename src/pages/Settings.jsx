@@ -165,7 +165,7 @@ export default function Settings({ admin = false }) {
         <div className="form-actions" style={{marginTop:14}}><button onClick={saveLeadingRegistrationNumber} disabled={leadingBusy}>{leadingBusy ? "Saving Sequence..." : "Save Leading Number"}</button></div>
         <div className="auth-message" style={{marginTop:16}}>Example: entering <strong>25</strong> for Employees records <strong>IRPA-EMP-00025</strong> as the leading number, and the next Employee registration automatically receives <strong>IRPA-EMP-00026</strong>. The same logic applies independently to Members.</div>
       </section>}
-      <section className="panel" style={{ marginTop: 20 }}>
+      {admin && <section className="panel" style={{ marginTop: 20 }}>
         <div className="panel-header">
           <div>
             <span className="eyebrow">ADMINISTRATOR CONTROL</span>
