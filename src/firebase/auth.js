@@ -118,8 +118,11 @@ export async function sendMemberInvitationEmail(email, invitationId) {
   if (!email || !invitationId) throw new Error("Member email and invitation ID are required.");
   const cleanEmail = email.trim().toLowerCase();
   const defaultGateway = "https://irpa-google-drive-gateway.irpa-governance.workers.dev";
+  const appOrigin = window.location.origin;
+  const gatewayCandidates = [configuredGateway, defaultGateway].filter(Boolean);
+  const gateways = [...new Set(gatewayCandidates)];
   const configuredGateway = String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL || "").trim().replace(/\/$/,"");
-  const gateways = [...new Set([configuredGateway, defaultGateway].filter(Boolean))];
+
   const token = await auth.currentUser?.getIdToken();
   if (!token) throw new Error("Administrator authentication is required.");
 
