@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { browserSupportsPush, listenForForegroundMessages, notificationPermissionState, requestPushPermission } from "../firebase/messaging";
-import { resetEmployeeTrialData, resetMemberTrialData, setLeadingRegistrationNumber } from "../firebase/data";
+import { resetDocumentTrialData, resetEmployeeTrialData, resetMemberTrialData, setLeadingRegistrationNumber } from "../firebase/data";
 import { startGoogleDriveAuthorization } from "../firebase/signatureStorage";
 
 export default function Settings({ admin = false }) {
@@ -9,6 +9,7 @@ export default function Settings({ admin = false }) {
   const [busy, setBusy] = useState(false);
   const [driveBusy, setDriveBusy] = useState(false);
   const [resetBusy, setResetBusy] = useState(false);
+  const [documentResetBusy, setDocumentResetBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [result, setResult] = useState(null);
@@ -72,6 +73,28 @@ export default function Settings({ admin = false }) {
       setMessage(error?.message || "Unable to set the leading registration number.");
     } finally {
       setLeadingBusy(false);
+    }
+  }
+
+  async function resetDocumentTrial() {
+    const phrase = "RESET IRPA DOCUMENT TRIAL DATA";
+    if (confirmation !== phrase) {
+      setMessage(`Enter the exact confirmation phrase: ${phrase}`);
+      return;
+    }
+    if (!window.confirm("This will permanently delete all trial Controlled Document records. Employee, Member and Board Member records and their registration counters will not be affected. Continue?")) return;
+    setDocumentResetBusy(true);
+    setMessage("");
+    setResult(null);
+    try {
+      const data = await resetDocumentTrialData();
+      setConfirmation("");
+      setResult({ ...data, type: "documents" });
+      setMessage(`Document trial reset completed. ${data.recordsDeleted || 0} Controlled Document records deleted. Employee and Member registration counters were not changed.`);
+    } catch (error) {
+      setMessage(error?.message || "The document trial-data reset failed.");
+    } finally {
+      setDocumentResetBusy(false);
     }
   }
 
@@ -164,6 +187,24 @@ export default function Settings({ admin = false }) {
         </div>
         <div className="form-actions" style={{marginTop:14}}><button onClick={saveLeadingRegistrationNumber} disabled={leadingBusy}>{leadingBusy ? "Saving Sequence..." : "Save Leading Number"}</button></div>
         <div className="auth-message" style={{marginTop:16}}>Example: entering <strong>25</strong> for Employees records <strong>IRPA-EMP-00025</strong> as the leading number, and the next Employee registration automatically receives <strong>IRPA-EMP-00026</strong>. The same logic applies independently to Members.</div>
+      </section>}
+      {admin && <section className="panel" style={{ marginTop: 20 }}>
+        <div className="panel-header"><div>
+          <span className="eyebrow">ADMINISTRATOR CONTROL</span>
+          <h2>Document Trial Data Control</h2>
+          <p className="panel-description">Reset the Controlled Documents platform independently. This operation affects only document records and does not reset Employee, Member or Board Member registration numbers.</p>
+        </div></div>
+        <div className="stat-card" style={{ marginBottom: 18 }}>
+          <span>DOCUMENTS</span>
+          <strong>Controlled Documents</strong>
+          <small>Independent document platform reset</small>
+        </div>
+        <label>Type the exact reset confirmation phrase</label>
+        <input value={confirmation} onChange={(e) => setConfirmation(e.target.value)} placeholder="RESET IRPA DOCUMENT TRIAL DATA" autoComplete="off" disabled={!!resetBusy || documentResetBusy}/>
+        <div className="form-actions" style={{ marginTop: 14 }}>
+          <button className="danger-button" onClick={resetDocumentTrial} disabled={documentResetBusy || !!resetBusy || confirmation !== "RESET IRPA DOCUMENT TRIAL DATA"}>{documentResetBusy ? "Deleting Document Trials..." : "Delete Document Trial Data"}</button>
+        </div>
+        {result?.type === "documents" && <div className="auth-message" style={{ marginTop: 16 }}>Audit recorded successfully. Deleted: {result.recordsDeleted || 0} Controlled Document record(s). Employee and Member counters were not changed.</div>}
       </section>}
       {admin && <section className="panel" style={{ marginTop: 20 }}>
         <div className="panel-header">
