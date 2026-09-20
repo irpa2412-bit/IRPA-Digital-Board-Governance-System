@@ -127,7 +127,7 @@ export async function sendMemberInvitationEmail(email, invitationId) {
   try {
     response = await fetch(gateway.replace(/\/$/,"") + "/api/invitations/send", {
       method: "POST",
-      headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json", "X-IRPA-Invitation-Version": "2" },
+      headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json", "Cache-Control": "no-store", "X-IRPA-Invitation-Version": "3" },
       body: JSON.stringify({ invitationId, email: cleanEmail }),
       signal: controller.signal, cache: "no-store"
     });
