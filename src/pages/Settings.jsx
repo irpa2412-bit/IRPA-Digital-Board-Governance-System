@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { browserSupportsPush, listenForForegroundMessages, notificationPermissionState, requestPushPermission } from "../firebase/messaging";
-import { resetEmployeeTrialData, resetMemberTrialData } from "../firebase/data";
+import { resetEmployeeTrialData, resetMemberTrialData, setLeadingRegistrationNumber } from "../firebase/data";
 import { startGoogleDriveAuthorization } from "../firebase/signatureStorage";
 
 export default function Settings({ admin = false }) {
@@ -12,6 +12,9 @@ export default function Settings({ admin = false }) {
   const [message, setMessage] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [result, setResult] = useState(null);
+  const [leadingType, setLeadingType] = useState("employees");
+  const [leadingNumber, setLeadingNumber] = useState("");
+  const [leadingBusy, setLeadingBusy] = useState(false);
 
   useEffect(() => {
     let unsubscribe = () => {};
@@ -49,6 +52,26 @@ export default function Settings({ admin = false }) {
     } catch (error) {
       setMessage(error?.message || "Unable to start Google Drive authorization.");
       setDriveBusy(false);
+    }
+  }
+
+  async function saveLeadingRegistrationNumber() {
+    if (leadingNumber === "") {
+      setMessage("Enter the current leading Employee Number or Member Number.");
+      return;
+    }
+    setLeadingBusy(true);
+    setMessage("");
+    try {
+      const data = await setLeadingRegistrationNumber(leadingType, leadingNumber);
+      setLeadingNumber("");
+      const prefix = leadingType === "employees" ? "IRPA-EMP" : "IRPA-MEM";
+      const label = leadingType === "employees" ? "Employee" : "Member";
+      setMessage(label + " sequence seeded at " + data.registrationNumber + ". The next new registration will automatically receive " + prefix + "-" + String(data.nextNumber).padStart(5, "0") + ".");
+    } catch (error) {
+      setMessage(error?.message || "Unable to set the leading registration number.");
+    } finally {
+      setLeadingBusy(false);
     }
   }
 
@@ -129,6 +152,19 @@ export default function Settings({ admin = false }) {
         {message && <div className="auth-message" style={{ marginTop: 16 }}>{message}</div>}
       </section>
 
+      {admin && <section className="panel" style={{ marginTop: 20 }}>
+        <div className="panel-header"><div>
+          <span className="eyebrow">ADMINISTRATOR CONTROL</span>
+          <h2>Leading Registration Number Manual Entry</h2>
+          <p className="panel-description">Use this portal when IRPA already has numbered Employees or Members outside the system. Enter the highest existing number; the system will preserve the sequence and automatically issue the next number to future registrations.</p>
+        </div></div>
+        <div className="form-grid">
+          <div className="form-field"><label>Registration Platform</label><select value={leadingType} onChange={e=>setLeadingType(e.target.value)} disabled={leadingBusy}><option value="employees">Employees — IRPA-EMP</option><option value="members">Members — IRPA-MEM</option></select></div>
+          <div className="form-field"><label>Current Leading Number</label><input type="number" min="0" step="1" value={leadingNumber} onChange={e=>setLeadingNumber(e.target.value)} placeholder="e.g. 25" disabled={leadingBusy}/></div>
+        </div>
+        <div className="form-actions" style={{marginTop:14}}><button onClick={saveLeadingRegistrationNumber} disabled={leadingBusy}>{leadingBusy ? "Saving Sequence..." : "Save Leading Number"}</button></div>
+        <div className="auth-message" style={{marginTop:16}}>Example: entering <strong>25</strong> for Employees records <strong>IRPA-EMP-00025</strong> as the leading number, and the next Employee registration automatically receives <strong>IRPA-EMP-00026</strong>. The same logic applies independently to Members.</div>
+      </section>}
       <section className="panel" style={{ marginTop: 20 }}>
         <div className="panel-header">
           <div>
