@@ -167,7 +167,7 @@ export async function sendMemberInvitationEmail(email, invitationId) {
     }
   }
 
-  throw lastNetworkError || new Error("IRPA mail gateway could not be reached.");
+  throw lastNetworkError || new Error(`IRPA mail gateway could not be reached at ${gateways.join(" or ")}. Please verify the deployed Cloudflare Worker is online.`);
 }
 
 export function observeAuthState(callback) {
