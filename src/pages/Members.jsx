@@ -1,7 +1,7 @@
 import React,{useEffect,useState}from"react";
 import {createMemberRegistration,getRecords,updateRecord,deleteRecord,COLLECTIONS}from"../firebase/data";
 
-const empty={memberNumber:"",name:"",email:"",phone:"",gender:"",nationality:"Tanzanian",address:"",memberType:"Governance Member",status:"Active",biography:""};
+const empty={name:"",email:"",phone:"",gender:"",nationality:"Tanzanian",address:"",memberType:"Governance Member",status:"Active",biography:""};
 const types=["Governance Member","General Member","Institutional Member","Youth Member","Women Member"];
 
 export default function Members(){
@@ -19,7 +19,7 @@ export default function Members(){
   {message&&<div className="success-message action-feedback"role="status">{message}</div>}{error&&<div className="error-message action-feedback"role="alert">{error}</div>}
   <section className="panel"><div className="panel-header"><div><h2>{editing?`Edit ${editing.memberNumber}`:"Register Member"}</h2><span>Independent Member registration platform</span></div></div>
    <form onSubmit={submit}><div className="form-grid">
-    <div className="form-field"><label>Member Number</label><input name="memberNumber"value={form.memberNumber}onChange={change}placeholder="IRPA-MEM-00001"pattern="IRPA-MEM-[0-9]{5}"title="Use format IRPA-MEM-00001"required={!editing}/></div>
+    {editing&&<div className="form-field"><label>Member Number</label><input value={form.memberNumber} readOnly/></div>}
     <div className="form-field"><label>Full Name</label><input name="name"value={form.name}onChange={change}required/></div>
     <div className="form-field"><label>Official Email</label><input type="email"name="email"value={form.email}onChange={change}required/></div>
     <div className="form-field"><label>Phone</label><input name="phone"value={form.phone}onChange={change}/></div>
