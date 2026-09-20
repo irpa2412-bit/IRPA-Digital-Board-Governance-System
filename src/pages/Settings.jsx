@@ -8,7 +8,7 @@ export default function Settings({ admin = false }) {
   const [permission, setPermission] = useState("unknown");
   const [busy, setBusy] = useState(false);
   const [driveBusy, setDriveBusy] = useState(false);
-  const [resetBusy, setResetBusy] = useState("");
+  const [resetBusy, setResetBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [result, setResult] = useState(null);
@@ -75,9 +75,61 @@ export default function Settings({ admin = false }) {
     } catch (error) {
       setMessage(error?.message || "The trial-data reset failed.");
     } finally {
-      setResetBusy("");
+      setResetBusy(false);
     }
-  }      <section className="panel" style={{ marginTop: 20 }}>
+  }
+
+  return (
+    <div className="page">
+      {admin && (
+        <section className="panel">
+          <div className="panel-header">
+            <div>
+              <span className="eyebrow">DOCUMENT STORAGE</span>
+              <h2>Google Drive Authorization</h2>
+              <p className="panel-description">Authorize the IRPA Google Drive account used for controlled governance documents. The authorization is restricted to the configured IRPA Drive account.</p>
+            </div>
+          </div>
+          <div className="stat-card" style={{ marginBottom: 18 }}>
+            <span>Storage provider</span>
+            <strong>Google Drive</strong>
+            <small>Authorized account: irpa2412@gmail.com</small>
+          </div>
+          <div className="form-actions">
+            <button onClick={authorizeGoogleDrive} disabled={driveBusy}>
+              {driveBusy ? "Opening Google authorization…" : "Authorize Google Drive"}
+            </button>
+          </div>
+        </section>
+      )}
+
+      <section className="panel" style={{ marginTop: admin ? 20 : 0 }}>
+        <div className="panel-header">
+          <div>
+            <span className="eyebrow">SYSTEM SETTINGS</span>
+            <h2>Notifications</h2>
+            <p className="panel-description">Control browser push notifications for meetings, authorizations, signatures, voting and other IRPA governance events.</p>
+          </div>
+        </div>
+        <div className="stat-card" style={{ marginBottom: 18 }}>
+          <span>Browser support</span>
+          <strong>{supported ? "Supported" : "Not supported"}</strong>
+          <small>Firebase Cloud Messaging</small>
+        </div>
+        <div className="stat-card" style={{ marginBottom: 18 }}>
+          <span>Permission</span>
+          <strong>{permission}</strong>
+          <small>Current browser notification permission</small>
+        </div>
+        <div className="form-actions">
+          <button onClick={enableNotifications} disabled={busy || !supported}>
+            {busy ? "Enabling..." : "Enable Push Notifications"}
+          </button>
+        </div>
+        {message && <div className="auth-message" style={{ marginTop: 16 }}>{message}</div>}
+      </section>
+
+      <section className="panel" style={{ marginTop: 20 }}>
         <div className="panel-header">
           <div>
             <span className="eyebrow">ADMINISTRATOR CONTROL</span>
@@ -86,37 +138,17 @@ export default function Settings({ admin = false }) {
           </div>
         </div>
         <div className="dashboard-grid" style={{ marginBottom: 18 }}>
-          <div className="stat-card">
-            <span>MEMBERS</span>
-            <strong>IRPA-MEM-00001</strong>
-            <small>Independent Member Number sequence</small>
-          </div>
-          <div className="stat-card">
-            <span>EMPLOYEES</span>
-            <strong>IRPA-EMP-00001</strong>
-            <small>Independent Employee Number sequence</small>
-          </div>
+          <div className="stat-card"><span>MEMBERS</span><strong>IRPA-MEM-00001</strong><small>Independent Member Number sequence</small></div>
+          <div className="stat-card"><span>EMPLOYEES</span><strong>IRPA-EMP-00001</strong><small>Independent Employee Number sequence</small></div>
         </div>
         <label>Type the exact reset confirmation phrase</label>
-        <input
-          value={confirmation}
-          onChange={(e) => setConfirmation(e.target.value)}
-          placeholder="RESET IRPA EMPLOYEE TRIAL DATA or RESET IRPA MEMBER TRIAL DATA"
-          autoComplete="off"
-          disabled={!!resetBusy}
-        />
+        <input value={confirmation} onChange={(e) => setConfirmation(e.target.value)} placeholder="RESET IRPA EMPLOYEE TRIAL DATA or RESET IRPA MEMBER TRIAL DATA" autoComplete="off" disabled={!!resetBusy}/>
         <div className="form-actions" style={{ marginTop: 14 }}>
-          <button className="danger-button" onClick={() => resetRegistrationTrial("employees")} disabled={!!resetBusy || confirmation !== "RESET IRPA EMPLOYEE TRIAL DATA"}>
-            {resetBusy === "employees" ? "Resetting Employee Trials..." : "Delete Employee Trial Data"}
-          </button>
-          <button className="secondary-button" onClick={() => resetRegistrationTrial("members")} disabled={!!resetBusy || confirmation !== "RESET IRPA MEMBER TRIAL DATA"}>
-            {resetBusy === "members" ? "Resetting Member Trials..." : "Delete Member Trial Data"}
-          </button>
+          <button className="danger-button" onClick={() => resetRegistrationTrial("employees")} disabled={!!resetBusy || confirmation !== "RESET IRPA EMPLOYEE TRIAL DATA"}>{resetBusy === "employees" ? "Deleting Employee Trials..." : "Delete Employee Trial Data"}</button>
+          <button className="secondary-button" onClick={() => resetRegistrationTrial("members")} disabled={!!resetBusy || confirmation !== "RESET IRPA MEMBER TRIAL DATA"}>{resetBusy === "members" ? "Deleting Member Trials..." : "Delete Member Trial Data"}</button>
         </div>
         {message && <div className="auth-message" style={{ marginTop: 16 }}>{message}</div>}
-        {result && <div className="auth-message" style={{ marginTop: 16 }}>
-          Audit recorded successfully. Deleted: {result.recordsDeleted || 0} {result.type === "employees" ? "Employee" : "Member"} record(s). Only the corresponding registration counter was reset.
-        </div>}
+        {result && <div className="auth-message" style={{ marginTop: 16 }}>Audit recorded successfully. Deleted: {result.recordsDeleted || 0} {result.type === "employees" ? "Employee" : "Member"} record(s). Only the corresponding registration counter was reset.</div>}
       </section>import React, { useEffect, useState } from "react";
 import { browserSupportsPush, listenForForegroundMessages, notificationPermissionState, requestPushPermission } from "../firebase/messaging";
 import { resetEmployeeTrialData, resetMemberTrialData } from "../firebase/data";
@@ -127,7 +159,7 @@ export default function Settings({ admin = false }) {
   const [permission, setPermission] = useState("unknown");
   const [busy, setBusy] = useState(false);
   const [driveBusy, setDriveBusy] = useState(false);
-  const [resetBusy, setResetBusy] = useState("");
+  const [resetBusy, setResetBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [result, setResult] = useState(null);
@@ -194,6 +226,88 @@ export default function Settings({ admin = false }) {
     } catch (error) {
       setMessage(error?.message || "The trial-data reset failed.");
     } finally {
-      setResetBusy("");
+      setResetBusy(false);
     }
   }
+
+  return (
+    <div className="page">
+      {admin && (
+        <section className="panel">
+          <div className="panel-header">
+            <div>
+              <span className="eyebrow">DOCUMENT STORAGE</span>
+              <h2>Google Drive Authorization</h2>
+              <p className="panel-description">Authorize the IRPA Google Drive account used for controlled governance documents. The authorization is restricted to the configured IRPA Drive account.</p>
+            </div>
+          </div>
+          <div className="stat-card" style={{ marginBottom: 18 }}>
+            <span>Storage provider</span>
+            <strong>Google Drive</strong>
+            <small>Authorized account: irpa2412@gmail.com</small>
+          </div>
+          <div className="form-actions">
+            <button onClick={authorizeGoogleDrive} disabled={driveBusy}>
+              {driveBusy ? "Opening Google authorization…" : "Authorize Google Drive"}
+            </button>
+          </div>
+        </section>
+      )}
+
+      <section className="panel" style={{ marginTop: admin ? 20 : 0 }}>
+        <div className="panel-header">
+          <div>
+            <span className="eyebrow">SYSTEM SETTINGS</span>
+            <h2>Notifications</h2>
+            <p className="panel-description">Control browser push notifications for meetings, authorizations, signatures, voting and other IRPA governance events.</p>
+          </div>
+        </div>
+        <div className="stat-card" style={{ marginBottom: 18 }}>
+          <span>Browser support</span>
+          <strong>{supported ? "Supported" : "Not supported"}</strong>
+          <small>Firebase Cloud Messaging</small>
+        </div>
+        <div className="stat-card" style={{ marginBottom: 18 }}>
+          <span>Permission</span>
+          <strong>{permission}</strong>
+          <small>Current browser notification permission</small>
+        </div>
+        <div className="form-actions">
+          <button onClick={enableNotifications} disabled={busy || !supported}>
+            {busy ? "Enabling..." : "Enable Push Notifications"}
+          </button>
+        </div>
+        {message && <div className="auth-message" style={{ marginTop: 16 }}>{message}</div>}
+      </section>
+
+      <section className="panel" style={{ marginTop: 20 }}>
+        <div className="panel-header">
+          <div>
+            <span className="eyebrow">ADMINISTRATOR CONTROL</span>
+            <h2>Reset Trial Data</h2>
+            <p className="panel-description">Controlled permanent deletion of trial member and employee records. This operation is available only to an active IRPA administrator and creates an audit record before deletion.</p>
+          </div>
+        </div>
+        <div className="stat-card" style={{ marginBottom: 18 }}>
+          <span>Scope</span>
+          <strong>Members + Employees</strong>
+          <small>Employee counter → 0 · Member counter → 0 · Governance records remain intact</small>
+        </div>
+        <label>Type confirmation phrase</label>
+        <input
+          value={confirmation}
+          onChange={(e) => setConfirmation(e.target.value)}
+          placeholder="RESET IRPA TRIAL DATA"
+          autoComplete="off"
+          disabled={resetBusy}
+        />
+        <div className="form-actions" style={{ marginTop: 14 }}>
+          <button className="secondary-button" onClick={resetTrialData} disabled={resetBusy || confirmation !== "RESET IRPA TRIAL DATA"}>
+            {resetBusy ? "Resetting Trial Data..." : "Reset Trial Data"}
+          </button>
+        </div>
+        {result && <div className="auth-message" style={{ marginTop: 16 }}>Audit recorded successfully. Deleted: {result.membersDeleted || 0} members; {result.employeesDeleted || 0} employees.</div>}
+      </section>
+    </div>
+  );
+}
