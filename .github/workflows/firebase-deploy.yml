@@ -1,4 +1,5 @@
 name: Deploy IRPA Governance to Firebase
+# Deployment trigger for current production changes
 
 on:
   push:
