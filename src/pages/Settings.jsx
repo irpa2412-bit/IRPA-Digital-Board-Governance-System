@@ -185,7 +185,7 @@ export default function Settings({ admin = false }) {
         </div>
         {message && <div className="auth-message" style={{ marginTop: 16 }}>{message}</div>}
         {result && <div className="auth-message" style={{ marginTop: 16 }}>Audit recorded successfully. Deleted: {result.recordsDeleted || 0} {result.type === "employees" ? "Employee" : "Member"} record(s). Only the corresponding registration counter was reset.</div>}
-      </section
+      </section>}
     </div>
   );
 }
