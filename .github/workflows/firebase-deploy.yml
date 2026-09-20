@@ -18,12 +18,6 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Setup Java for Android packaging
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "21"
-
       - name: Install web and Android packaging dependencies
         run: npm install
 
@@ -32,21 +26,6 @@ jobs:
           VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
           VITE_GOOGLE_DRIVE_GATEWAY_URL: ${{ secrets.VITE_GOOGLE_DRIVE_GATEWAY_URL }}
         run: npm run build
-
-      - name: Create Android project
-        run: npx cap add android
-
-      - name: Synchronize Capacitor Android project
-        run: npx cap sync android
-
-      - name: Build Android APK
-        working-directory: android
-        run: ./gradlew assembleDebug --no-daemon
-
-      - name: Publish APK into Firebase Hosting downloads
-        run: |
-          mkdir -p dist/downloads
-          cp android/app/build/outputs/apk/debug/app-debug.apk dist/downloads/IRPA-Digital-Governance.apk
 
       - name: Deploy Hosting and Firestore only
         uses: w9jds/firebase-action@v14.17.0
