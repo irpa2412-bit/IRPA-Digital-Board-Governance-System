@@ -4,7 +4,7 @@ const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const MAX_BYTES = 10 * 1024 * 1024;
 const ALLOWED_CONTENT_TYPES = new Set(["application/pdf","image/png","image/jpeg","image/webp"]);
 const OAUTH_STATE_TTL = 600;
-const SMTP_HOST = "smtp.hostinger.com";
+const SMTP_HOST = "mail.irpa.or.tz";
 const SMTP_PORT = 465;
 const SMTP_FROM = "info@irpa.or.tz";
 const SMTP_CONNECT_TIMEOUT_MS = 6000;
@@ -304,7 +304,7 @@ async function smtpSendWithFallback(env, message) {
   const hosts = [...new Set([configuredHost, SMTP_FALLBACK_HOST].filter(Boolean))];
 
   const configuredPort = Number(env.SMTP_PORT || SMTP_PORT);
-  const ports = configuredPort === 465 ? [465, 587] : [configuredPort, configuredPort === 587 ? 465 : 587];
+  const ports = configuredPort === 587 ? [587, 465] : [587, configuredPort];
 
   let lastError = null;
   for (const host of hosts) {
