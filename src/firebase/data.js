@@ -49,6 +49,29 @@ export async function resetEmployeeTrialData(){
 export async function resetMemberTrialData(){
   return resetRegistrationCollection(COLLECTIONS.members,"memberCounters","members","MEMBER");
 }
+export async function resetDocumentTrialData(){
+  return resetDocumentCollection(COLLECTIONS.documents,"DOCUMENT");
+}
+async function resetDocumentCollection(collectionName,label){
+  const uid=auth.currentUser?.uid;
+  if(!uid)throw new Error("Authentication is required.");
+  const adminSnap=await getDoc(doc(db,COLLECTIONS.adminProfiles,uid));
+  if(!adminSnap.exists()||adminSnap.data()?.active!==true)throw new Error("Administrator authorization is required.");
+  const snap=await getDocs(collection(db,collectionName));
+  const targeted=snap.docs.map(x=>x.ref);
+  const startRef=doc(collection(db,COLLECTIONS.audit));
+  await setDoc(startRef,{action:"RESET_"+label+"_TRIAL_DATA_STARTED",category:"SYSTEM_ADMINISTRATION",description:"Controlled administrator-only reset of trial "+label.toLowerCase()+" records.",actorUid:uid,actorEmail:auth.currentUser?.email||adminSnap.data()?.email||null,recordsTargeted:targeted.length,status:"Started",createdAt:serverTimestamp()});
+  try{
+    for(let i=0;i<targeted.length;i+=450){const batch=writeBatch(db);targeted.slice(i,i+450).forEach(ref=>batch.delete(ref));await batch.commit();}
+    const verify=await getDocs(collection(db,collectionName));
+    if(!verify.empty)throw new Error("The "+label.toLowerCase()+" records could not be completely deleted.");
+    await setDoc(doc(collection(db,COLLECTIONS.audit)),{action:"RESET_"+label+"_TRIAL_DATA_COMPLETED",category:"SYSTEM_ADMINISTRATION",description:label+" trial records cleared. No Employee or Member registration counter was changed.",actorUid:uid,actorEmail:auth.currentUser?.email||adminSnap.data()?.email||null,recordsDeleted:targeted.length,status:"Completed",createdAt:serverTimestamp(),startedAuditId:startRef.id});
+    return{success:true,recordsDeleted:targeted.length};
+  }catch(error){
+    await setDoc(doc(collection(db,COLLECTIONS.audit)),{action:"RESET_"+label+"_TRIAL_DATA_FAILED",category:"SYSTEM_ADMINISTRATION",description:"Trial "+label.toLowerCase()+" reset did not complete successfully.",actorUid:uid,actorEmail:auth.currentUser?.email||adminSnap.data()?.email||null,recordsTargeted:targeted.length,status:"Failed",error:error?.message||String(error),createdAt:serverTimestamp(),startedAuditId:startRef.id});
+    throw error;
+  }
+}
 async function resetRegistrationCollection(collectionName,counterCollection,counterId,label){
   const uid=auth.currentUser?.uid;
   if(!uid)throw new Error("Authentication is required.");
