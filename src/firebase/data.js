@@ -19,6 +19,27 @@ export async function provisionCurrentMemberFromInvitation(invitationId){const u
 export async function getRecord(collectionName,id){const s=await getDoc(doc(db,collectionName,id));return s.exists()?{id:s.id,...s.data()}:null;}
 export async function getRecords(collectionName){const s=await getDocs(query(collection(db,collectionName),orderBy("createdAt","desc")));return s.docs.map(x=>({id:x.id,...x.data()}));}
 
+export async function setLeadingRegistrationNumber(type, leadingNumber){
+  const uid=auth.currentUser?.uid;
+  if(!uid)throw new Error("Authentication is required.");
+  const adminSnap=await getDoc(doc(db,COLLECTIONS.adminProfiles,uid));
+  if(!adminSnap.exists()||adminSnap.data()?.active!==true)throw new Error("Administrator authorization is required.");
+  const value=Number(leadingNumber);
+  if(!Number.isInteger(value)||value<0)throw new Error("Enter a valid whole-number leading registration number.");
+  const isEmployee=type==="employees";
+  const label=isEmployee?"Employee":"Member";
+  const prefix=isEmployee?"IRPA-EMP-":"IRPA-MEM-";
+  const counterCollection=isEmployee?COLLECTIONS.employeeCounters:COLLECTIONS.memberCounters;
+  const counterId=isEmployee?"employees":"members";
+  const ref=doc(db,counterCollection,counterId);
+  const existing=await getDoc(ref);
+  const existingNext=existing.exists()?Number(existing.data()?.nextNumber||1):1;
+  const requestedNext=value+1;
+  const nextNumber=Math.max(existingNext,requestedNext);
+  await setDoc(ref,{currentNumber:nextNumber-1,nextNumber,updatedAt:serverTimestamp(),setByUid:uid,manualSeed:true},{merge:true});
+  await setDoc(doc(collection(db,COLLECTIONS.audit)),{action:"SET_"+label.toUpperCase()+"_LEADING_REGISTRATION_NUMBER",category:"SYSTEM_ADMINISTRATION",description:"Administrator set the leading "+label.toLowerCase()+" registration number; future registrations continue automatically from the next number.",actorUid:uid,actorEmail:auth.currentUser?.email||adminSnap.data()?.email||null,leadingNumber:nextNumber-1,nextNumber,registrationNumber:prefix+String(nextNumber-1).padStart(5,"0"),previousNextNumber:existingNext,status:"Completed",createdAt:serverTimestamp()});
+  return{leadingNumber:nextNumber-1,nextNumber,registrationNumber:prefix+String(nextNumber-1).padStart(5,"0"),preservedHigherCounter:nextNumber!==requestedNext};
+}
 export async function resetEmployeeTrialData(){
   return resetRegistrationCollection(COLLECTIONS.employees,"employeeCounters","employees","EMPLOYEE");
 }
