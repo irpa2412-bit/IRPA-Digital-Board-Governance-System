@@ -199,7 +199,8 @@ async function upload(request, env) {
     description: JSON.stringify({
       irpaGovernance: true,
       uploadedByUid: claims.user_id,
-      purpose
+      purpose,
+      ownerUid: claims.user_id
     })
   };
 
@@ -250,6 +251,9 @@ async function download(request, env) {
   const description = parseDescription(metadata.description);
   if (!description?.irpaGovernance) {
     return json({ ok: false, error: "The requested file is not an IRPA governance document." }, 403, corsHeaders(request));
+  }
+  if (description.purpose === "Signature Profile" && description.ownerUid !== claims.user_id) {
+    return json({ ok: false, error: "This signature asset is restricted to its owner." }, 403, corsHeaders(request));
   }
 
   const size = Number(metadata.size || 0);
