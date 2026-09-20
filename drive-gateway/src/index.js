@@ -782,7 +782,7 @@ function corsHeaders(request) {
   const allowed = origin === "https://irpa.or.tz" || origin === "https://www.irpa.or.tz" || origin === "https://irpa-digital-board-governance.web.app" || origin === "https://irpa-digital-board-governance.firebaseapp.com" || origin === "http://localhost:5173" || origin === "http://localhost:4173";
   return {
     "Access-Control-Allow-Origin": allowed ? origin : "https://irpa.or.tz",
-    "Access-Control-Allow-Headers": "Authorization, Content-Type",
+    "Access-Control-Allow-Headers": "Authorization, Content-Type, Cache-Control, X-IRPA-Invitation-Version",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Vary": "Origin"
   };
