@@ -1,0 +1,10 @@
+{
+  "name": "IRPA Digital Board Governance System",
+  "short_name": "IRPA Governance",
+  "description": "Improvement of Rangeland in Pastoral Areas Digital Board Governance System",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#071713",
+  "theme_color": "#071713"
+}
