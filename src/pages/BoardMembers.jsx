@@ -1,7 +1,7 @@
 import React,{useEffect,useState}from"react";
 import {createMemberRegistration,repairBoardMemberRegistration,getRecords,updateRecord,deleteRecord,COLLECTIONS}from"../firebase/data";
 
-const empty={name:"",email:"",phone:"",gender:"",dateOfBirth:"",nationality:"Tanzanian",address:"",role:"Board Member",department:"Board of Directors",employmentType:"Board Appointment",status:"Active",startDate:"",appointmentDate:"",termStart:"",termEnd:"",biography:""};
+const empty={memberNumber:"",name:"",email:"",phone:"",gender:"",dateOfBirth:"",nationality:"Tanzanian",address:"",role:"Board Member",department:"Board of Directors",employmentType:"Board Appointment",status:"Active",startDate:"",appointmentDate:"",termStart:"",termEnd:"",biography:""};
 const positions=["Board Chairperson","Board Vice Chairperson","Board Secretary","Board Treasurer","Board Member"];
 
 export default function BoardMembers(){
