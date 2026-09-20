@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { httpsCallable } from "firebase/functions";
 import { browserSupportsPush, listenForForegroundMessages, notificationPermissionState, requestPushPermission } from "../firebase/messaging";
-import { functions } from "../firebase/functions";
+import { resetTrialData } from "../firebase/data";
 import { startGoogleDriveAuthorization } from "../firebase/signatureStorage";
 
 export default function Settings({ admin = false }) {
@@ -63,9 +62,7 @@ export default function Settings({ admin = false }) {
     setMessage("");
     setResult(null);
     try {
-      const call = httpsCallable(functions, "resetTrialData");
-      const response = await call({ confirmation });
-      const data = response.data || {};
+      const data = await resetTrialData();
       setResult(data);
       setConfirmation("");
       setMessage(`Trial data reset completed. ${data.membersDeleted || 0} member records and ${data.employeesDeleted || 0} employee records deleted. Counters reset to zero.`);
