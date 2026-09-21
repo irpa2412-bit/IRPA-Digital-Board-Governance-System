@@ -49,7 +49,7 @@ export async function sendPasswordReset(email) {
 export async function logout() { await signOut(auth); }
 
 export async function sendAdminMagicLink(email) {
-  const actionCodeSettings = { url: window.location.origin + "/", handleCodeInApp: true };
+  const actionCodeSettings = { url: window.location.origin + "/?adminGateway=1&adminModule=Settings", handleCodeInApp: true };
   await sendSignInLinkToEmail(auth, email.trim().toLowerCase(), actionCodeSettings);
   window.localStorage.setItem("irpaEmailForSignIn", email.trim().toLowerCase());
 }
