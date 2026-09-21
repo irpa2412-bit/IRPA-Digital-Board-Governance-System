@@ -82,6 +82,12 @@ export async function ensureDocumentArchiveFolder({documentId,title,reference,ar
   return result;
 }
 
+export async function ensureSignatureWorkflowFolder(envelopeId) {
+  const result = await gatewayPost("/api/signature-workflow/folder", { envelopeId });
+  if (!result.folderId) throw new Error("Google Drive did not return the signature workflow folder.");
+  return result;
+}
+
 export async function ensureSignatureProfileFolder(uid) {
   const email = uid === auth.currentUser?.uid ? (auth.currentUser?.email || "") : "";
   const result = await gatewayPost("/api/signature-profile/folder", { uid, email });
