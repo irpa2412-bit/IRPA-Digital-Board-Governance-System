@@ -92,7 +92,7 @@ export async function ensureSignatureProfileFolder(uid) {
   const email = uid === auth.currentUser?.uid ? (auth.currentUser?.email || "") : "";
   const result = await gatewayPost("/api/signature-profile/folder", { uid, email });
   if (!result.folderId) throw new Error("Google Drive did not return a signature profile folder ID.");
-  return result;
+  return { ...result, signatureArchiveUidLink: `https://drive.google.com/drive/folders/${encodeURIComponent(result.folderId)}` };
 }
 
 export async function getDownloadURL(target) {
