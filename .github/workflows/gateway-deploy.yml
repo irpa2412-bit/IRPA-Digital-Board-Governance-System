@@ -16,14 +16,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Verify Cloudflare deployment credentials
+      - name: Verify Cloudflare deployment credentials and resolve account
+        id: cloudflare
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_ACCOUNT_ID_SECRET: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
+          set -e
           test -n "$CLOUDFLARE_API_TOKEN" || { echo "CLOUDFLARE_API_TOKEN is not available to this workflow."; exit 1; }
-          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "CLOUDFLARE_ACCOUNT_ID is not available to this workflow."; exit 1; }
-          echo "Cloudflare CI credentials are present."
+          if [ -n "$CLOUDFLARE_ACCOUNT_ID_SECRET" ]; then
+            ACCOUNT_ID="$CLOUDFLARE_ACCOUNT_ID_SECRET"
+          else
+            ACCOUNT_ID="$(curl --fail --silent --show-error -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" https://api.cloudflare.com/client/v4/accounts | python -c 'import json,sys; d=json.load(sys.stdin); a=d.get("result",[]); print(a[0]["id"] if a else "")')"
+          fi
+          test -n "$ACCOUNT_ID" || { echo "Unable to resolve a Cloudflare account ID from the supplied API token."; exit 1; }
+          echo "account_id=$ACCOUNT_ID" >> "$GITHUB_OUTPUT"
+          echo "Cloudflare account resolved."
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -44,7 +52,7 @@ jobs:
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          accountId: ${{ steps.cloudflare.outputs.account_id }}
           workingDirectory: drive-gateway
           command: deploy
 
