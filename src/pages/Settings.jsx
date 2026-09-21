@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { browserSupportsPush, listenForForegroundMessages, notificationPermissionState, requestPushPermission } from "../firebase/messaging";
-import { resetDocumentTrialData, resetEmployeeTrialData, resetMemberTrialData, setLeadingRegistrationNumber } from "../firebase/data";
+
 import { startGoogleDriveAuthorization } from "../firebase/signatureStorage";
 
 export default function Settings({ admin = false }) {
@@ -8,14 +8,7 @@ export default function Settings({ admin = false }) {
   const [permission, setPermission] = useState("unknown");
   const [busy, setBusy] = useState(false);
   const [driveBusy, setDriveBusy] = useState(false);
-  const [resetBusy, setResetBusy] = useState(false);
-  const [documentResetBusy, setDocumentResetBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const [confirmation, setConfirmation] = useState("");
-  const [result, setResult] = useState(null);
-  const [leadingType, setLeadingType] = useState("employees");
-  const [leadingNumber, setLeadingNumber] = useState("");
-  const [leadingBusy, setLeadingBusy] = useState(false);
 
   useEffect(() => {
     let unsubscribe = () => {};
@@ -53,75 +46,6 @@ export default function Settings({ admin = false }) {
     } catch (error) {
       setMessage(error?.message || "Unable to start Google Drive authorization.");
       setDriveBusy(false);
-    }
-  }
-
-  async function saveLeadingRegistrationNumber() {
-    if (leadingNumber === "") {
-      setMessage("Enter the current leading Employee Number or Member Number.");
-      return;
-    }
-    setLeadingBusy(true);
-    setMessage("");
-    try {
-      const data = await setLeadingRegistrationNumber(leadingType, leadingNumber);
-      setLeadingNumber("");
-      const prefix = leadingType === "employees" ? "IRPA-EMP" : "IRPA-MEM";
-      const label = leadingType === "employees" ? "Employee" : "Member";
-      setMessage(label + " sequence seeded at " + data.registrationNumber + ". The next new registration will automatically receive " + prefix + "-" + String(data.nextNumber).padStart(5, "0") + ".");
-    } catch (error) {
-      setMessage(error?.message || "Unable to set the leading registration number.");
-    } finally {
-      setLeadingBusy(false);
-    }
-  }
-
-  async function resetDocumentTrial() {
-    const phrase = "RESET IRPA DOCUMENT TRIAL DATA";
-    if (confirmation !== phrase) {
-      setMessage(`Enter the exact confirmation phrase: ${phrase}`);
-      return;
-    }
-    if (!window.confirm("This will permanently delete all trial Controlled Document records. Employee, Member and Board Member records and their registration counters will not be affected. Continue?")) return;
-    setDocumentResetBusy(true);
-    setMessage("");
-    setResult(null);
-    try {
-      const data = await resetDocumentTrialData();
-      setConfirmation("");
-      setResult({ ...data, type: "documents" });
-      setMessage(`Document trial reset completed. ${data.recordsDeleted || 0} Controlled Document records deleted. Employee and Member registration counters were not changed.`);
-    } catch (error) {
-      setMessage(error?.message || "The document trial-data reset failed.");
-    } finally {
-      setDocumentResetBusy(false);
-    }
-  }
-
-  async function resetRegistrationTrial(type) {
-    const phrase = type === "employees" ? "RESET IRPA EMPLOYEE TRIAL DATA" : "RESET IRPA MEMBER TRIAL DATA";
-    if (confirmation !== phrase) {
-      setMessage(`Enter the exact confirmation phrase: ${phrase}`);
-      return;
-    }
-    const warning = type === "employees"
-      ? "This will permanently delete all trial Employee records and reset only the Employee Number counter. Member records will not be affected. Continue?"
-      : "This will permanently delete all trial Member records and reset only the Member Number counter. Employee records will not be affected. Continue?";
-    if (!window.confirm(warning)) return;
-    setResetBusy(type);
-    setMessage("");
-    setResult(null);
-    try {
-      const data = type === "employees" ? await resetEmployeeTrialData() : await resetMemberTrialData();
-      setResult({ ...data, type });
-      setConfirmation("");
-      setMessage(type === "employees"
-        ? `Employee trial reset completed. ${data.recordsDeleted || 0} Employee records deleted. Employee Number counter reset to zero.`
-        : `Member trial reset completed. ${data.recordsDeleted || 0} Member records deleted. Member Number counter reset to zero.`);
-    } catch (error) {
-      setMessage(error?.message || "The trial-data reset failed.");
-    } finally {
-      setResetBusy(false);
     }
   }
 
@@ -175,58 +99,7 @@ export default function Settings({ admin = false }) {
         {message && <div className="auth-message" style={{ marginTop: 16 }}>{message}</div>}
       </section>
 
-      {admin && <section className="panel" style={{ marginTop: 20 }}>
-        <div className="panel-header"><div>
-          <span className="eyebrow">ADMINISTRATOR CONTROL</span>
-          <h2>Leading Registration Number Manual Entry</h2>
-          <p className="panel-description">Use this portal when IRPA already has numbered Employees or Members outside the system. Enter the highest existing number; the system will preserve the sequence and automatically issue the next number to future registrations.</p>
-        </div></div>
-        <div className="form-grid">
-          <div className="form-field"><label>Registration Platform</label><select value={leadingType} onChange={e=>setLeadingType(e.target.value)} disabled={leadingBusy}><option value="employees">Employees — IRPA-EMP</option><option value="members">Members — IRPA-MEM</option></select></div>
-          <div className="form-field"><label>Current Leading Number</label><input type="number" min="0" step="1" value={leadingNumber} onChange={e=>setLeadingNumber(e.target.value)} placeholder="e.g. 25" disabled={leadingBusy}/></div>
-        </div>
-        <div className="form-actions" style={{marginTop:14}}><button onClick={saveLeadingRegistrationNumber} disabled={leadingBusy}>{leadingBusy ? "Saving Sequence..." : "Save Leading Number"}</button></div>
-        <div className="auth-message" style={{marginTop:16}}>Example: entering <strong>25</strong> for Employees records <strong>IRPA-EMP-00025</strong> as the leading number, and the next Employee registration automatically receives <strong>IRPA-EMP-00026</strong>. The same logic applies independently to Members.</div>
-      </section>}
-      {admin && <section className="panel" style={{ marginTop: 20 }}>
-        <div className="panel-header"><div>
-          <span className="eyebrow">ADMINISTRATOR CONTROL</span>
-          <h2>Document Trial Data Control</h2>
-          <p className="panel-description">Reset the Controlled Documents platform independently. This operation affects only document records and does not reset Employee, Member or Board Member registration numbers.</p>
-        </div></div>
-        <div className="stat-card" style={{ marginBottom: 18 }}>
-          <span>DOCUMENTS</span>
-          <strong>Controlled Documents</strong>
-          <small>Independent document platform reset</small>
-        </div>
-        <label>Type the exact reset confirmation phrase</label>
-        <input value={confirmation} onChange={(e) => setConfirmation(e.target.value)} placeholder="RESET IRPA DOCUMENT TRIAL DATA" autoComplete="off" disabled={!!resetBusy || documentResetBusy}/>
-        <div className="form-actions" style={{ marginTop: 14 }}>
-          <button className="danger-button" onClick={resetDocumentTrial} disabled={documentResetBusy || !!resetBusy || confirmation !== "RESET IRPA DOCUMENT TRIAL DATA"}>{documentResetBusy ? "Deleting Document Trials..." : "Delete Document Trial Data"}</button>
-        </div>
-        {result?.type === "documents" && <div className="auth-message" style={{ marginTop: 16 }}>Audit recorded successfully. Deleted: {result.recordsDeleted || 0} Controlled Document record(s). Employee and Member counters were not changed.</div>}
-      </section>}
-      {admin && <section className="panel" style={{ marginTop: 20 }}>
-        <div className="panel-header">
-          <div>
-            <span className="eyebrow">ADMINISTRATOR CONTROL</span>
-            <h2>Trial Registration Data Controls</h2>
-            <p className="panel-description">Members and Employees are separate registration platforms with independent registration-number counters. Each reset affects only the selected platform and is recorded in the audit trail.</p>
-          </div>
-        </div>
-        <div className="dashboard-grid" style={{ marginBottom: 18 }}>
-          <div className="stat-card"><span>MEMBERS</span><strong>IRPA-MEM-00001</strong><small>Independent Member Number sequence</small></div>
-          <div className="stat-card"><span>EMPLOYEES</span><strong>IRPA-EMP-00001</strong><small>Independent Employee Number sequence</small></div>
-        </div>
-        <label>Type the exact reset confirmation phrase</label>
-        <input value={confirmation} onChange={(e) => setConfirmation(e.target.value)} placeholder="RESET IRPA EMPLOYEE TRIAL DATA or RESET IRPA MEMBER TRIAL DATA" autoComplete="off" disabled={!!resetBusy}/>
-        <div className="form-actions" style={{ marginTop: 14 }}>
-          <button className="danger-button" onClick={() => resetRegistrationTrial("employees")} disabled={!!resetBusy || confirmation !== "RESET IRPA EMPLOYEE TRIAL DATA"}>{resetBusy === "employees" ? "Deleting Employee Trials..." : "Delete Employee Trial Data"}</button>
-          <button className="secondary-button" onClick={() => resetRegistrationTrial("members")} disabled={!!resetBusy || confirmation !== "RESET IRPA MEMBER TRIAL DATA"}>{resetBusy === "members" ? "Deleting Member Trials..." : "Delete Member Trial Data"}</button>
-        </div>
-        {message && <div className="auth-message" style={{ marginTop: 16 }}>{message}</div>}
-        {result && <div className="auth-message" style={{ marginTop: 16 }}>Audit recorded successfully. Deleted: {result.recordsDeleted || 0} {result.type === "employees" ? "Employee" : "Member"} record(s). Only the corresponding registration counter was reset.</div>}
-      </section>}
+
     </div>
   );
 }
