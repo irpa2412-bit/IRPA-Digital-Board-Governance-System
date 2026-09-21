@@ -90,6 +90,12 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         webViewLink: uploaded.metadata?.webViewLink || null,
         fileUrl: target.fileId ? `drive://${target.fileId}` : null,
         purpose,
+        archiveCategory,
+        classification,
+        archiveFolderId: archive.folderId,
+        archiveUidLink: archive.archiveUidLink,
+        archivePath: archive.archivePath,
+        archiveAccess: archive.archiveAccess,
         status: "Draft",
         authorizationStatus: "Draft",
         authorizedUids: [auth.currentUser.uid]
