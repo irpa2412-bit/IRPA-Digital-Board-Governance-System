@@ -1,16 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { browserSupportsPush, listenForForegroundMessages, notificationPermissionState, requestPushPermission } from "../firebase/messaging";
 import { startGoogleDriveAuthorization } from "../firebase/signatureStorage";
-import { resetDocumentTrialData, resetEmployeeTrialData, resetMemberTrialData } from "../firebase/data";
 
 export default function Settings({ admin = false }) {
   const [supported, setSupported] = useState(false);
   const [permission, setPermission] = useState("unknown");
   const [busy, setBusy] = useState(false);
   const [driveBusy, setDriveBusy] = useState(false);
-  const [resetBusy, setResetBusy] = useState("");
-  const [confirmation, setConfirmation] = useState("");
-  const [result, setResult] = useState(null);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -38,42 +34,6 @@ export default function Settings({ admin = false }) {
       setMessage(error?.message || "Unable to enable push notifications.");
     } finally {
       setBusy(false);
-    }
-  }
-
-  async function runTrialReset(type) {
-    const phrases = {
-      documents: "RESET IRPA DOCUMENT TRIAL DATA",
-      employees: "RESET IRPA EMPLOYEE TRIAL DATA",
-      members: "RESET IRPA MEMBER TRIAL DATA"
-    };
-    const phrase = phrases[type];
-    if (confirmation !== phrase) {
-      setMessage(`Enter the exact confirmation phrase: ${phrase}`);
-      return;
-    }
-    const warning = type === "documents"
-      ? "This permanently deletes all Controlled Document trial records. Employee, Member and Board Member records are not affected. Continue?"
-      : type === "employees"
-        ? "This permanently deletes all Employee records and resets the Employee Number counter. Member and Board Member records are not affected. Continue?"
-        : "This permanently deletes all general Member records and resets the Member Number counter. Board Member records are preserved. Continue?";
-    if (!window.confirm(warning)) return;
-    setResetBusy(type);
-    setMessage("");
-    setResult(null);
-    try {
-      const data = type === "documents"
-        ? await resetDocumentTrialData()
-        : type === "employees"
-          ? await resetEmployeeTrialData()
-          : await resetMemberTrialData();
-      setConfirmation("");
-      setResult({ ...data, type });
-      setMessage(`${type === "documents" ? "Document" : type === "employees" ? "Employee" : "Member"} trial reset completed successfully.`);
-    } catch (error) {
-      setMessage(error?.message || "The trial-data reset failed.");
-    } finally {
-      setResetBusy("");
     }
   }
 
@@ -137,47 +97,6 @@ export default function Settings({ admin = false }) {
         </div>
         {message && <div className="auth-message" style={{ marginTop: 16 }}>{message}</div>}
       </section>
-
-      {admin && (
-        <section className="panel" style={{ marginTop: 20 }}>
-          <div className="panel-header">
-            <div>
-              <span className="eyebrow">ADMINISTRATOR CONTROL</span>
-              <h2>Trial Data Resets</h2>
-              <p className="panel-description">Controlled, administrator-only removal of trial records. Each reset requires an exact confirmation phrase and creates an audit entry.</p>
-            </div>
-          </div>
-          <div className="stat-card" style={{ marginBottom: 14 }}>
-            <span>Documents</span>
-            <strong>Controlled Document Trial Data</strong>
-            <small>Permanently removes the current document trial records.</small>
-            <div className="form-actions" style={{ marginTop: 12 }}>
-              <button onClick={() => runTrialReset("documents")} disabled={!!resetBusy}>Reset Documents</button>
-            </div>
-          </div>
-          <div className="stat-card" style={{ marginBottom: 14 }}>
-            <span>Employees</span>
-            <strong>Employee Trial Data</strong>
-            <small>Removes Employee records and resets the Employee Number counter.</small>
-            <div className="form-actions" style={{ marginTop: 12 }}>
-              <button onClick={() => runTrialReset("employees")} disabled={!!resetBusy}>Reset Employees</button>
-            </div>
-          </div>
-          <div className="stat-card" style={{ marginBottom: 14 }}>
-            <span>Members</span>
-            <strong>General Member Trial Data</strong>
-            <small>Removes general Members and resets the Member Number counter. Board Members are preserved.</small>
-            <div className="form-actions" style={{ marginTop: 12 }}>
-              <button onClick={() => runTrialReset("members")} disabled={!!resetBusy}>Reset Members</button>
-            </div>
-          </div>
-          <label className="field" style={{ display: "block" }}>
-            <span>Confirmation phrase</span>
-            <input value={confirmation} onChange={e => setConfirmation(e.target.value)} placeholder="Enter the exact phrase shown after selecting a reset" />
-          </label>
-          {result && <div className="auth-message" style={{ marginTop: 16 }}>Reset completed. Records deleted: {result.recordsDeleted ?? 0}{result.boardMembersPreserved ? " · Board Members preserved." : ""}</div>}
-        </section>
-      )}
 
     </div>
   );
