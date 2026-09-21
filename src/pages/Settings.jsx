@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { browserSupportsPush, listenForForegroundMessages, notificationPermissionState, requestPushPermission } from "../firebase/messaging";
+import { resetDocumentTrialData, resetEmployeeTrialData, resetMemberTrialData } from "../firebase/data";
 
 import { startGoogleDriveAuthorization } from "../firebase/signatureStorage";
 
@@ -8,6 +9,10 @@ export default function Settings({ admin = false }) {
   const [permission, setPermission] = useState("unknown");
   const [busy, setBusy] = useState(false);
   const [driveBusy, setDriveBusy] = useState(false);
+  const [resetBusy, setResetBusy] = useState(false);
+  const [documentResetBusy, setDocumentResetBusy] = useState(false);
+  const [confirmation, setConfirmation] = useState("");
+  const [result, setResult] = useState(null);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -21,7 +26,56 @@ export default function Settings({ admin = false }) {
         setMessage(`${title}: ${body}`);
       });
     })();
-    return () => unsubscribe();
+    async function resetDocumentTrial() {
+    const phrase = "RESET IRPA DOCUMENT TRIAL DATA";
+    if (confirmation !== phrase) {
+      setMessage(`Enter the exact confirmation phrase: ${phrase}`);
+      return;
+    }
+    if (!window.confirm("This will permanently delete only Controlled Document trial records. Employee, Member and Board Member records will not be affected. Continue?")) return;
+    setDocumentResetBusy(true);
+    setMessage("");
+    setResult(null);
+    try {
+      const data = await resetDocumentTrialData();
+      setConfirmation("");
+      setResult({ ...data, type: "documents" });
+      setMessage(`Document trial reset completed. ${data.recordsDeleted || 0} Controlled Document records deleted. Other registration platforms were not changed.`);
+    } catch (error) {
+      setMessage(error?.message || "The document trial-data reset failed.");
+    } finally {
+      setDocumentResetBusy(false);
+    }
+  }
+
+  async function resetRegistrationTrial(type) {
+    const phrase = type === "employees" ? "RESET IRPA EMPLOYEE TRIAL DATA" : "RESET IRPA MEMBER TRIAL DATA";
+    if (confirmation !== phrase) {
+      setMessage(`Enter the exact confirmation phrase: ${phrase}`);
+      return;
+    }
+    const warning = type === "employees"
+      ? "This will permanently delete only trial Employee records and reset only the Employee Number counter. Member and Board Member records will not be affected. Continue?"
+      : "This will permanently delete only trial Member records and reset only the Member Number counter. Employee and Board Member records will not be affected. Continue?";
+    if (!window.confirm(warning)) return;
+    setResetBusy(type);
+    setMessage("");
+    setResult(null);
+    try {
+      const data = type === "employees" ? await resetEmployeeTrialData() : await resetMemberTrialData();
+      setConfirmation("");
+      setResult({ ...data, type });
+      setMessage(type === "employees"
+        ? `Employee trial reset completed. ${data.recordsDeleted || 0} Employee records deleted. Only the Employee Number counter was reset.`
+        : `Member trial reset completed. ${data.recordsDeleted || 0} Member records deleted. Only the Member Number counter was reset.`);
+    } catch (error) {
+      setMessage(error?.message || "The trial-data reset failed.");
+    } finally {
+      setResetBusy(false);
+    }
+  }
+
+  return () => unsubscribe();
   }, []);
 
   async function enableNotifications() {
@@ -99,6 +153,42 @@ export default function Settings({ admin = false }) {
         {message && <div className="auth-message" style={{ marginTop: 16 }}>{message}</div>}
       </section>
 
+
+      {admin && <section className="panel" style={{ marginTop: 20 }}>
+        <div className="panel-header"><div>
+          <span className="eyebrow">ADMINISTRATOR CONTROL</span>
+          <h2>Document Trial Data Control</h2>
+          <p className="panel-description">Reset the Controlled Documents platform independently. This does not reset Employee, Member or Board Member registration data.</p>
+        </div></div>
+        <div className="stat-card" style={{ marginBottom: 18 }}>
+          <span>DOCUMENTS</span><strong>Controlled Documents</strong><small>Independent document platform reset</small>
+        </div>
+        <label>Type the exact reset confirmation phrase</label>
+        <input value={confirmation} onChange={e=>setConfirmation(e.target.value)} placeholder="RESET IRPA DOCUMENT TRIAL DATA" autoComplete="off" disabled={!!resetBusy || documentResetBusy}/>
+        <div className="form-actions" style={{ marginTop: 14 }}>
+          <button type="button" className="danger-button" onClick={resetDocumentTrial} disabled={documentResetBusy || !!resetBusy || confirmation !== "RESET IRPA DOCUMENT TRIAL DATA"}>{documentResetBusy ? "Deleting Document Trials..." : "Delete Document Trial Data"}</button>
+        </div>
+        {result?.type === "documents" && <div className="auth-message" style={{ marginTop: 16 }}>Audit recorded successfully. Deleted: {result.recordsDeleted || 0} Controlled Document record(s).</div>}
+      </section>}
+
+      {admin && <section className="panel" style={{ marginTop: 20 }}>
+        <div className="panel-header"><div>
+          <span className="eyebrow">ADMINISTRATOR CONTROL</span>
+          <h2>Trial Registration Data Controls</h2>
+          <p className="panel-description">Employees and Members remain separate platforms with independent automatic registration-number counters. Each reset affects only the selected platform and is recorded in the audit trail.</p>
+        </div></div>
+        <div className="dashboard-grid" style={{ marginBottom: 18 }}>
+          <div className="stat-card"><span>MEMBERS</span><strong>IRPA-MEM</strong><small>Independent automatic Member Number sequence</small></div>
+          <div className="stat-card"><span>EMPLOYEES</span><strong>IRPA-EMP</strong><small>Independent automatic Employee Number sequence</small></div>
+        </div>
+        <label>Type the exact reset confirmation phrase</label>
+        <input value={confirmation} onChange={e=>setConfirmation(e.target.value)} placeholder="RESET IRPA EMPLOYEE TRIAL DATA or RESET IRPA MEMBER TRIAL DATA" autoComplete="off" disabled={!!resetBusy || documentResetBusy}/>
+        <div className="form-actions" style={{ marginTop: 14 }}>
+          <button type="button" className="danger-button" onClick={()=>resetRegistrationTrial("employees")} disabled={!!resetBusy || documentResetBusy || confirmation !== "RESET IRPA EMPLOYEE TRIAL DATA"}>{resetBusy === "employees" ? "Deleting Employee Trials..." : "Delete Employee Trial Data"}</button>
+          <button type="button" className="secondary-button" onClick={()=>resetRegistrationTrial("members")} disabled={!!resetBusy || documentResetBusy || confirmation !== "RESET IRPA MEMBER TRIAL DATA"}>{resetBusy === "members" ? "Deleting Member Trials..." : "Delete Member Trial Data"}</button>
+        </div>
+        {result && result.type !== "documents" && <div className="auth-message" style={{ marginTop: 16 }}>Audit recorded successfully. Deleted: {result.recordsDeleted || 0} {result.type === "employees" ? "Employee" : "Member"} record(s). Only the corresponding registration counter was reset.</div>}
+      </section>}
 
     </div>
   );
