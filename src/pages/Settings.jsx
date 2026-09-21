@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { browserSupportsPush, listenForForegroundMessages, notificationPermissionState, requestPushPermission } from "../firebase/messaging";
-import { resetDocumentTrialData, resetEmployeeTrialData, resetMemberTrialData, setLeadingRegistrationNumber } from "../firebase/data";
+import { resetDocumentTrialData, resetEmployeeTrialData, resetMemberTrialData } from "../firebase/data";
 import { startGoogleDriveAuthorization } from "../firebase/signatureStorage";
 
 export default function Settings({ admin = false }) {
@@ -13,9 +13,6 @@ export default function Settings({ admin = false }) {
   const [message, setMessage] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [result, setResult] = useState(null);
-  const [leadingType, setLeadingType] = useState("employees");
-  const [leadingNumber, setLeadingNumber] = useState("");
-  const [leadingBusy, setLeadingBusy] = useState(false);
 
   useEffect(() => {
     let unsubscribe = () => {};
@@ -53,26 +50,6 @@ export default function Settings({ admin = false }) {
     } catch (error) {
       setMessage(error?.message || "Unable to start Google Drive authorization.");
       setDriveBusy(false);
-    }
-  }
-
-  async function saveLeadingRegistrationNumber() {
-    if (leadingNumber === "") {
-      setMessage("Enter the current leading Employee Number or Member Number.");
-      return;
-    }
-    setLeadingBusy(true);
-    setMessage("");
-    try {
-      const data = await setLeadingRegistrationNumber(leadingType, leadingNumber);
-      setLeadingNumber("");
-      const prefix = leadingType === "employees" ? "IRPA-EMP" : "IRPA-MEM";
-      const label = leadingType === "employees" ? "Employee" : "Member";
-      setMessage(label + " sequence seeded at " + data.registrationNumber + ". The next new registration will automatically receive " + prefix + "-" + String(data.nextNumber).padStart(5, "0") + ".");
-    } catch (error) {
-      setMessage(error?.message || "Unable to set the leading registration number.");
-    } finally {
-      setLeadingBusy(false);
     }
   }
 
