@@ -3,6 +3,7 @@ import { browserSupportsPush, listenForForegroundMessages, notificationPermissio
 import { startGoogleDriveAuthorization } from "../firebase/signatureStorage";
 import { resetDocumentTrialData, resetEmployeeTrialData, resetMemberTrialData } from "../firebase/data";
 import { createAdministrator } from "../firebase/functions";
+import { sendPasswordReset } from "../firebase/auth";
 
 export default function Settings({ admin = false, section = "settings" }) {
   const [supported, setSupported] = useState(false);
@@ -121,11 +122,12 @@ export default function Settings({ admin = false, section = "settings" }) {
             setAdminResult(null);
             try {
               const data = await createAdministrator({ name, email });
+              await sendPasswordReset(email);
               setAdminResult({
                 ok: true,
                 message: data?.accountCreated
-                  ? "Administrator account created and activated successfully. The new administrator can use Forgot password? to establish a permanent password."
-                  : "The existing account has been activated as an Administrator successfully."
+                  ? "Administrator account created and activated successfully. An administrator activation link has been sent to the new email address. Open that email and set the permanent password."
+                  : "The existing account has been activated as an Administrator successfully. An administrator activation link has been sent to the email address."
               });
               setAdminName("");
               setAdminEmail("");
