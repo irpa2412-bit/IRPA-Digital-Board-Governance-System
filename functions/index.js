@@ -24,6 +24,51 @@ async function deleteCollectionDocs(collectionName){
   return deleted;
 }
 
+exports.createAdministrator = onCall({region:"us-central1"}, async request => {
+  const uid=request.auth?.uid;
+  if(!uid) throw new HttpsError("unauthenticated","Administrator authentication is required.");
+  const actorSnap=await db.collection("adminProfiles").doc(uid).get();
+  const actor=actorSnap.exists?actorSnap.data():null;
+  if(!actor || actor.active!==true) throw new HttpsError("permission-denied","Administrator authorization is required.");
+
+  const email=String(request.data?.email||"").trim().toLowerCase();
+  const name=String(request.data?.name||"").trim();
+  if(!email || !email.includes("@")) throw new HttpsError("invalid-argument","A valid administrator email address is required.");
+  if(email===String(request.auth.token?.email||actor.email||"").trim().toLowerCase()) throw new HttpsError("failed-precondition","The current administrator is already an administrator.");
+
+  let target;
+  try {
+    target=await require("firebase-admin/auth").getAuth().getUserByEmail(email);
+  } catch(error) {
+    if(error?.code!=="auth/user-not-found") throw new HttpsError("internal","Unable to look up the administrator account.");
+    const tempPassword="IRPA-"+crypto.randomBytes(24).toString("base64url")+"-9!aQ";
+    target=await require("firebase-admin/auth").getAuth().createUser({email,password:tempPassword,emailVerified:false,displayName:name||undefined});
+  }
+
+  await require("firebase-admin/auth").getAuth().setCustomUserClaims(target.uid,{...(target.customClaims||{}),admin:true});
+  await db.collection("adminProfiles").doc(target.uid).set({
+    uid:target.uid,
+    email,
+    name:name||target.displayName||email.split("@")[0],
+    role:"Administrator",
+    active:true,
+    createdByUid:uid,
+    createdByEmail:request.auth.token?.email||actor.email||null,
+    createdAt:FieldValue.serverTimestamp(),
+    updatedAt:FieldValue.serverTimestamp()
+  },{merge:true});
+  await db.collection("audit").add({
+    action:"ADMINISTRATOR_CREATED_OR_ACTIVATED",
+    collection:"adminProfiles",
+    recordId:target.uid,
+    details:{targetEmail:email,targetUid:target.uid,createdByUid:uid,createdByEmail:request.auth.token?.email||actor.email||null,accountCreated:!target.metadata?.creationTime||target.metadata.creationTime===target.metadata.lastSignInTime},
+    actorUid:uid,
+    actorEmail:request.auth.token?.email||actor.email||null,
+    createdAt:FieldValue.serverTimestamp()
+  });
+  return {ok:true,uid:target.uid,email,name:name||target.displayName||email.split("@")[0],accountCreated:!target.metadata?.lastSignInTime};
+});
+
 exports.resetTrialData = onCall({region:"us-central1"}, async request => {
   const uid=request.auth?.uid;
   if(!uid) throw new HttpsError("unauthenticated","Authentication is required.");
