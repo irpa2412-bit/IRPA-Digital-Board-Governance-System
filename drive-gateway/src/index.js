@@ -40,6 +40,10 @@ export default {
         return await upload(request, env);
       }
 
+      if (url.pathname === "/api/signature-profile/folder" && request.method === "POST") {
+        return await ensureSignatureProfileFolder(request, env);
+      }
+
       if (url.pathname === "/api/download" && request.method === "POST") {
         return await download(request, env);
       }
@@ -174,6 +178,19 @@ async function upload(request, env) {
   const fileSize = Number(data.fileSize || 0);
   const base64 = String(data.base64 || "");
   const purpose = cleanName(data.purpose || "Controlled Documents");
+  const requestedFolderId = String(data.folderId || "").trim();
+  const ownerUid = String(data.ownerUid || claims.user_id).trim();
+
+  if (purpose === "Signature Profile") {
+    if (ownerUid !== claims.user_id) {
+      return json({ ok: false, error: "A signature profile may only be uploaded by its owner." }, 403, corsHeaders(request));
+    }
+    if (!requestedFolderId) {
+      return json({ ok: false, error: "A member signature folder is required." }, 400, corsHeaders(request));
+    }
+  } else if (requestedFolderId || data.ownerUid) {
+    return json({ ok: false, error: "Signature-folder parameters are restricted to Signature Profile uploads." }, 400, corsHeaders(request));
+  }
 
   if (!ALLOWED_CONTENT_TYPES.has(contentType)) {
     return json({ ok: false, error: "Only PDF, PNG, JPEG or WEBP files are accepted." }, 400, corsHeaders(request));
@@ -189,8 +206,21 @@ async function upload(request, env) {
 
   const accessToken = await getDriveAccessToken(env);
   const rootId = await findOrCreateFolder(env, accessToken, "IRPA Governance System");
-  const documentsId = await findOrCreateFolder(env, accessToken, "Controlled Documents", rootId);
-  const purposeId = await findOrCreateFolder(env, accessToken, purpose, documentsId);
+  let purposeId;
+  if (purpose === "Signature Profile") {
+    const folderMeta = await driveFetch(env, accessToken, `/drive/v3/files/${encodeURIComponent(requestedFolderId)}?fields=id,name,mimeType,description,trashed`);
+    const folderDescription = parseDescription(folderMeta.description);
+    if (folderMeta.mimeType !== "application/vnd.google-apps.folder" || folderMeta.trashed) {
+      return json({ ok: false, error: "The member signature folder is invalid." }, 409, corsHeaders(request));
+    }
+    if (folderDescription.irpaGovernanceSignatureFolder !== true || folderDescription.ownerUid !== claims.user_id) {
+      return json({ ok: false, error: "The member signature folder does not belong to the authenticated member." }, 403, corsHeaders(request));
+    }
+    purposeId = requestedFolderId;
+  } else {
+    const documentsId = await findOrCreateFolder(env, accessToken, "Controlled Documents", rootId);
+    purposeId = await findOrCreateFolder(env, accessToken, purpose, documentsId);
+  }
 
   const metadata = {
     name: fileName,
@@ -200,7 +230,8 @@ async function upload(request, env) {
       irpaGovernance: true,
       uploadedByUid: claims.user_id,
       purpose,
-      ownerUid: claims.user_id
+      ownerUid,
+      driveFolderId: purpose === "Signature Profile" ? purposeId : null
     })
   };
 
@@ -274,6 +305,40 @@ async function download(request, env) {
   }, 200, corsHeaders(request));
 }
 
+
+async function ensureSignatureProfileFolder(request, env) {
+  const claims = await authenticateFirebaseRequest(request);
+  const data = await request.json();
+  const requestedUid = cleanId(data.uid || claims.user_id);
+  if (!requestedUid) return json({ ok: false, error: "Member UID is required." }, 400, corsHeaders(request));
+
+  const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
+  const isAdmin = Boolean(admin?.fields?.active?.booleanValue);
+  if (!isAdmin && requestedUid !== claims.user_id) {
+    return json({ ok: false, error: "You may only provision your own signature folder." }, 403, corsHeaders(request));
+  }
+
+  const accessToken = await getDriveAccessToken(env);
+  const rootId = await findOrCreateFolder(env, accessToken, "IRPA Governance System");
+  const signaturesId = await findOrCreateFolder(env, accessToken, "Signature Profiles", rootId);
+  const folderName = `IRPA-SIGNATURE-${requestedUid}`;
+  const folderId = await findOrCreateFolder(env, accessToken, folderName, signaturesId, {
+    irpaGovernanceSignatureFolder: true,
+    ownerUid: requestedUid,
+    folderUid: requestedUid,
+    purpose: "Member Signature Profile"
+  });
+
+  return json({
+    ok: true,
+    uid: requestedUid,
+    folderId,
+    folderName,
+    parentFolderId: signaturesId,
+    path: `IRPA Governance System/Signature Profiles/${folderName}`,
+    storageProvider: "Google Drive"
+  }, 200, corsHeaders(request));
+}
 
 async function sendMemberInvitation(request, env) {
   const claims = await authenticateFirebaseRequest(request);
@@ -503,7 +568,7 @@ async function getDriveAccessToken(env) {
   return tokens.access_token;
 }
 
-async function findOrCreateFolder(env, accessToken, name, parentId = null) {
+async function findOrCreateFolder(env, accessToken, name, parentId = null, descriptionData = null) {
   const safeName = name.replace(/'/g, "\\'");
   const q = [
     `name='${safeName}'`,
@@ -520,7 +585,7 @@ async function findOrCreateFolder(env, accessToken, name, parentId = null) {
       name,
       mimeType: "application/vnd.google-apps.folder",
       ...(parentId ? { parents: [parentId] } : {}),
-      description: JSON.stringify({ irpaGovernanceFolder: true })
+      description: JSON.stringify(descriptionData || { irpaGovernanceFolder: true })
     })
   });
   return created.id;
