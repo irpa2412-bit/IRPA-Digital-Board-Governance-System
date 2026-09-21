@@ -5,6 +5,20 @@ import app, { firebaseConfig, auth, db } from "./config";
 
 export const functions = null;
 
+function firebaseProvisioningError(error, fallback="Firebase administrator provisioning failed."){
+  const code=error?.code||"";
+  const messages={
+    "auth/operation-not-allowed":"Email/password authentication is not enabled in Firebase Authentication.",
+    "auth/invalid-api-key":"The Firebase API key is invalid for this deployment.",
+    "auth/network-request-failed":"Firebase Authentication could not reach the network. Check the connection and try again.",
+    "auth/too-many-requests":"Firebase has temporarily blocked authentication requests from this device. Wait a moment and try again.",
+    "auth/quota-exceeded":"Firebase Authentication quota has been exceeded.",
+    "auth/invalid-email":"The administrator email address is invalid.",
+    "auth/weak-password":"Firebase rejected the generated administrator password. Please try again.",
+    "auth/internal-error":"Firebase Authentication returned an internal error while provisioning the administrator account. No silent success is reported. Try again once; if it repeats, the Firebase Authentication service/configuration needs attention."
+  };
+  return messages[code] ? messages[code]+" ("+code+")" : (error?.message||fallback);
+}
 function temporaryPassword(){
   const values = typeof crypto !== "undefined" && crypto.getRandomValues
     ? Array.from(crypto.getRandomValues(new Uint32Array(8))).map(v => v.toString(36)).join("")
@@ -65,9 +79,7 @@ export async function createAdministrator({ name, email, onProgress }){
   }catch(error){
     const code = error?.code || "";
     if(code === "auth/email-already-in-use") throw new Error("An account already exists for this email. Use the existing IRPA account or choose a new administrator email.");
-    throw new Error(error?.message || "Unable to create the administrator account.");
-  }finally{
-    await deleteApp(secondaryApp);
+    throw new Error(firebaseProvisioningError(error,"Unable to create the administrator account."));
   }
 
   progress("Saving the Administrator authorization profile…");
@@ -100,11 +112,12 @@ export async function createAdministrator({ name, email, onProgress }){
 
   try{
     progress("Requesting the Administrator activation email…");
-    await sendPasswordResetEmail(auth, cleanEmail);
+    await sendPasswordResetEmail(secondaryAuth, cleanEmail);
   }catch(error){
-    throw new Error(`Administrator was created, but the activation email could not be requested: ${error?.message || "Firebase Authentication error"}`);
+    throw new Error("Administrator was created, but the activation email could not be requested: "+firebaseProvisioningError(error,"Firebase could not accept the activation email request."));
   }
 
+  await deleteApp(secondaryApp);
   progress("Administrator setup completed.");
   return {
     ok: true,
