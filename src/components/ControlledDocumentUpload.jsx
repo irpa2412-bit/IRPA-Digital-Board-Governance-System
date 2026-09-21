@@ -142,6 +142,16 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
       </div>
       {message && <div className="success-message action-feedback">{message}</div>}
       {error && <div className="error-message action-feedback">{error}</div>}
+      <div className="success-message action-feedback" style={{marginBottom:16}}>
+        <strong>Google Drive Archive Routing</strong>
+        <div style={{marginTop:6}}>Choose where this document will be stored:</div>
+        <ul style={{margin:"6px 0 0 20px"}}>
+          <li><strong>Finance Documents</strong> — finance records and supporting evidence.</li>
+          <li><strong>Procurement Documents</strong> — procurement records, quotations, evaluations and purchase documentation.</li>
+          <li><strong>Administrative Documents</strong> — policies, governance, HR and general administrative records.</li>
+        </ul>
+        <div style={{marginTop:6}}>Each archive is separated by <strong>Public, Internal, Confidential</strong> or <strong>Restricted</strong> classification. The selected route is recorded with the document UID and archive link.</div>
+      </div>
       <form onSubmit={submit}>
         <div className="form-grid">
           <div className="form-field"><label>Document Archive</label><select value={archiveCategory} onChange={e => setArchiveCategory(e.target.value)}><option>Finance Documents</option><option>Procurement Documents</option><option>Administrative Documents</option></select></div>
