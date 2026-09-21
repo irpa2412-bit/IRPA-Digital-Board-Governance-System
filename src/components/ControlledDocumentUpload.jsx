@@ -2,11 +2,13 @@ import React, { useRef, useState } from "react";
 import { auth } from "../firebase/config";
 import { createRecord, COLLECTIONS } from "../firebase/data";
 import { readWorkflowContext, withWorkflowLinks } from "../firebase/workflowLinks";
-import { uploadBytes, ref } from "../firebase/signatureStorage";
+import { uploadBytes, ref, ensureDocumentArchiveFolder } from "../firebase/signatureStorage";
 
 export default function ControlledDocumentUpload({ purpose = "Controlled Document", onUploaded }) {
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState("");
+  const [archiveCategory, setArchiveCategory] = useState("Administrative Documents");
+  const [classification, setClassification] = useState("Public");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -31,11 +33,16 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
       if (file.size > 10 * 1024 * 1024) throw new Error("PDF must not exceed 10 MB.");
 
       const name = (title.trim() || file.name.replace(/\.pdf$/i, "")).slice(0, 160);
-      const target = ref(null, `controlled-documents/${purpose}/${name}.pdf`);
+      const documentUid = `IRPA-DOC-${crypto.randomUUID()}`;
+      setMessage("Creating the Google Drive archive location…");
+      const archive = await ensureDocumentArchiveFolder({documentId: documentUid,title:name,reference:name,archiveCategory,classification});
+      const target = ref(null, `document-archives/${archiveCategory}/${classification}/${documentUid}/${name}.pdf`);
       setMessage("Uploading PDF to Google Drive…");
       const uploaded = await uploadBytes(target, file, {
         contentType: "application/pdf",
-        purpose
+        purpose,
+        folderId: archive.folderId,
+        ownerUid: auth.currentUser.uid
       });
 
       const now = new Date().toISOString();
@@ -43,6 +50,13 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
       setMessage("Google Drive upload complete. Registering the document…");
       const documentId = await createRecord(COLLECTIONS.documents, withWorkflowLinks({
         title: name,
+        documentUid,
+        archiveCategory,
+        classification,
+        archiveFolderId: archive.folderId,
+        archiveUidLink: archive.archiveUidLink,
+        archivePath: archive.archivePath,
+        archiveAccess: archive.archiveAccess,
         recordOrigin: "PRODUCTION",
         fileName: file.name,
         fileId: target.fileId,
@@ -53,6 +67,12 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         contentType: "application/pdf",
         fileSize: file.size,
         purpose,
+        archiveCategory,
+        classification,
+        archiveFolderId: archive.folderId,
+        archiveUidLink: archive.archiveUidLink,
+        archivePath: archive.archivePath,
+        archiveAccess: archive.archiveAccess,
         status: "Draft",
         authorizationStatus: "Draft",
         authorizedUids: [auth.currentUser.uid],
@@ -78,6 +98,8 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
       setMessage(`Document uploaded successfully to Google Drive: ${name}.`);
       setFile(null);
       setTitle("");
+      setArchiveCategory("Administrative Documents");
+      setClassification("Public");
       e.target.reset();
       onUploaded?.(doc);
     } catch (x) {
@@ -103,6 +125,8 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
       {error && <div className="error-message action-feedback">{error}</div>}
       <form onSubmit={submit}>
         <div className="form-grid">
+          <div className="form-field"><label>Document Archive</label><select value={archiveCategory} onChange={e => setArchiveCategory(e.target.value)}><option>Finance Documents</option><option>Procurement Documents</option><option>Administrative Documents</option></select></div>
+          <div className="form-field"><label>Access Classification</label><select value={classification} onChange={e => setClassification(e.target.value)}><option>Public</option><option>Internal</option><option>Confidential</option><option>Restricted</option></select></div>
           <div className="form-field">
             <label>Document Title</label>
             <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Enter document title" />
