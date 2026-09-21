@@ -3,7 +3,6 @@ import { sendSignInLinkToEmail } from "firebase/auth";
 import { downloadDriveBytes, ensureSignedDocumentArchive, ensureSignatureProfileFolder, getDownloadURL, ref, uploadBytes } from "./signatureStorage";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { auth, db } from "./config";
-import { DANIEL_E_MOLLEL_SIGNATURE_DATA_URL, DANIEL_E_MOLLEL_SIGNATURE_SHA256 } from "../assets/danielSignature";
 const PROFILE_COLLECTION="signatureProfiles";const ENVELOPE_COLLECTION="signatureEnvelopes";const EVENT_COLLECTION="signatureEvents";
 const VIEW_ONLY_ROLES=["View Only","Read Only","Information / FYI","Observer"];
 function isViewOnlyRecipient(recipient){return !!recipient?.accessOnly||VIEW_ONLY_ROLES.includes(String(recipient?.role||"").trim());}
@@ -28,61 +27,75 @@ export async function getMySignatureProfile(){
   const u=user();
   const profileRef=doc(db,PROFILE_COLLECTION,u.uid);
   const snap=await getDoc(profileRef);
-  const email=String(u.email||"").trim().toLowerCase();
-  const name=String(u.displayName||"").trim();
-  const isDanielProfile=email==="irpa2412@gmail.com"||/^daniel(?:\\s+e\\.?)?\\s+mollel$/i.test(name);
+  if(!snap.exists()) return null;
 
-  // Never make an existing signature dependent on Google Drive provisioning.
-  // Drive folder creation is secondary storage administration, not profile identity.
-  if(snap.exists()){
-    const existing=snap.data();
-    const isLegacyPreloaded=String(existing.signaturePath||"").startsWith("preloaded/")||existing.method==="Admin Assigned Upload";
-    if(isLegacyPreloaded){
-      const cleanup={signaturePath:deleteField(),signatureUrl:deleteField(),signatureSha256:deleteField(),method:"Awaiting Handwritten Signature",status:"Profile Setup Required",updatedAt:serverTimestamp()};
-      await updateDoc(profileRef,cleanup);
-      return{id:snap.id,...existing,signaturePath:null,signatureUrl:null,signatureSha256:null,method:"Awaiting Handwritten Signature",status:"Profile Setup Required"};
-    }
-    const existing=snap.data();
-    const needsRecovery=isDanielProfile&&!existing.signatureUrl;
-    let folder=null;
-    try{folder=await ensureSignatureProfileFolder(u.uid);}catch(_error){folder=null;}
+  const existing=snap.data();
+  const isLegacyPreloaded=
+    String(existing.signaturePath||"").startsWith("preloaded/") ||
+    existing.method==="Admin Assigned Upload";
 
-    const folderFields=folder?{
-      driveSignatureFolderId:folder.folderId,
-      driveSignatureFolderName:folder.folderName,
-      driveSignatureFolderPath:folder.path,
-      driveSignatureFolderUid:u.uid
-    }:{};
-
-    const recoveryFields=needsRecovery?{
-      uid:u.uid,
-      email:u.email||existing.email||"",
-      displayName:existing.displayName||"Daniel E. Mollel",
-      role:existing.role||"Executive Director",
-      method:existing.method||"Admin Assigned Upload",
-      signaturePath:"preloaded/daniel-e-mollel",
-      signatureUrl:DANIEL_E_MOLLEL_SIGNATURE_DATA_URL,
-      signatureSha256:DANIEL_E_MOLLEL_SIGNATURE_SHA256,
-      initialsPath:existing.initialsPath||null,
-      initialsUrl:existing.initialsUrl||null,
-      initialsSha256:existing.initialsSha256||null,
-      status:"Active"
-    }:{};
-
-    if(Object.keys(folderFields).length||Object.keys(recoveryFields).length){
-      const patch={...folderFields,...recoveryFields,updatedAt:serverTimestamp()};
-      await updateDoc(profileRef,patch);
-      return{id:snap.id,...existing,...patch};
-    }
-    return{id:snap.id,...existing};
+  if(isLegacyPreloaded){
+    const cleanup={
+      signaturePath:deleteField(),
+      signatureUrl:deleteField(),
+      signatureSha256:deleteField(),
+      method:"Awaiting Handwritten Signature",
+      status:"Profile Setup Required",
+      updatedAt:serverTimestamp()
+    };
+    await updateDoc(profileRef,cleanup);
+    return{
+      id:snap.id,
+      ...existing,
+      signaturePath:null,
+      signatureUrl:null,
+      signatureSha256:null,
+      method:"Awaiting Handwritten Signature",
+      status:"Profile Setup Required"
+    };
   }
 
-  // No preloaded signature is created. Each signer must explicitly serve a handwritten or uploaded signature.
-
-  return null;
+  return{id:snap.id,...existing};
 }
 
-export async function saveMySignatureProfile({signatureFile,initialsFile,displayName,initials,method="Upload"}){const u=user();const folder=await ensureSignatureProfileFolder(u.uid);if(!String(displayName||u.displayName||"").trim())throw new Error("Display name is required.");const signature=await uploadAsset(u.uid,"Signature",signatureFile,folder.folderId);const initialsAsset=initialsFile?await uploadAsset(u.uid,"Initials",initialsFile,folder.folderId):null;const p={uid:u.uid,email:u.email||"",displayName:String(displayName).trim(),initials:String(initials||"").trim(),method,driveSignatureFolderId:folder.folderId,driveSignatureFolderName:folder.folderName,driveSignatureFolderPath:folder.path,driveSignatureFolderUid:u.uid,signaturePath:signature.path,signatureUrl:signature.url,signatureSha256:signature.sha,initialsPath:initialsAsset?.path||null,initialsUrl:initialsAsset?.url||null,initialsSha256:initialsAsset?.sha||null,status:"Active",adoptionDate:serverTimestamp(),updatedAt:serverTimestamp()};await setDoc(doc(db,PROFILE_COLLECTION,u.uid),p,{merge:true});return p;}
+export async function saveMySignatureProfile({signatureFile,initialsFile,displayName,initials,method="Upload"}){
+  const u=user();
+  if(!String(displayName||u.displayName||"").trim())throw new Error("Display name is required.");
+
+  // The Signature Profile is authoritative. Google Drive folder provisioning is secondary
+  // and must never block saving or replacing the signature specimen.
+  let folder=null;
+  try{folder=await ensureSignatureProfileFolder(u.uid);}catch(_error){folder=null;}
+
+  const folderId=folder?.folderId||null;
+  const signature=await uploadAsset(u.uid,"Signature",signatureFile,folderId);
+  const initialsAsset=initialsFile?await uploadAsset(u.uid,"Initials",initialsFile,folderId):null;
+
+  const p={
+    uid:u.uid,
+    email:u.email||"",
+    displayName:String(displayName).trim(),
+    initials:String(initials||"").trim(),
+    method,
+    driveSignatureFolderId:folder?.folderId||null,
+    driveSignatureFolderName:folder?.folderName||null,
+    driveSignatureFolderPath:folder?.path||null,
+    driveSignatureFolderUid:folder?u.uid:null,
+    signaturePath:signature.path,
+    signatureUrl:signature.url,
+    signatureSha256:signature.sha,
+    initialsPath:initialsAsset?.path||null,
+    initialsUrl:initialsAsset?.url||null,
+    initialsSha256:initialsAsset?.sha||null,
+    status:"Active",
+    adoptionDate:serverTimestamp(),
+    updatedAt:serverTimestamp()
+  };
+
+  await setDoc(doc(db,PROFILE_COLLECTION,u.uid),p,{merge:true});
+  return p;
+}
+
 export async function getSignatureEnvelope(envelopeId){
   const u=user();
   if(!envelopeId)throw new Error("Signing envelope ID is required.");
