@@ -52,12 +52,20 @@ export async function uploadBytes(target, file, metadata = {}) {
     contentType: metadata.contentType || file.type || "application/pdf",
     fileSize: bytes.length,
     base64: btoa(binary),
-    purpose: metadata.purpose || "Controlled Documents"
+    purpose: metadata.purpose || "Controlled Documents",
+    folderId: metadata.folderId || null,
+    ownerUid: metadata.ownerUid || null
   });
 
   target.fileId = result.fileId || null;
   if (!target.fileId) throw new Error("Google Drive did not return a file ID.");
   return { ref: target, metadata: result };
+}
+
+export async function ensureSignatureProfileFolder(uid) {
+  const result = await gatewayPost("/api/signature-profile/folder", { uid });
+  if (!result.folderId) throw new Error("Google Drive did not return a signature profile folder ID.");
+  return result;
 }
 
 export async function getDownloadURL(target) {
