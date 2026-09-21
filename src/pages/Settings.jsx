@@ -4,7 +4,7 @@ import { startGoogleDriveAuthorization } from "../firebase/signatureStorage";
 import { resetDocumentTrialData, resetEmployeeTrialData, resetMemberTrialData } from "../firebase/data";
 import { createAdministrator } from "../firebase/functions";
 
-export default function Settings({ admin = false }) {
+export default function Settings({ admin = false, section = "settings" }) {
   const [supported, setSupported] = useState(false);
   const [permission, setPermission] = useState("unknown");
   const [busy, setBusy] = useState(false);
@@ -95,6 +95,66 @@ export default function Settings({ admin = false }) {
 
   return (
     <div className="page">
+      {admin && section === "administrators" && (
+        <section className="panel">
+          <div className="panel-header">
+            <div>
+              <span className="eyebrow">ADMINISTRATOR GATEWAY</span>
+              <h2>Add Administrator</h2>
+              <p className="panel-description">Create or activate another IRPA Administrator. This control is available only to an authenticated Administrator. Executive Director and ordinary member accounts cannot access it.</p>
+            </div>
+          </div>
+          <div className="stat-card" style={{ marginBottom: 18 }}>
+            <span>Authorised administrator account</span>
+            <strong>irpa2412@gmail.com</strong>
+            <small>Only an active Administrator can use this gateway.</small>
+          </div>
+          <form onSubmit={async e => {
+            e.preventDefault();
+            const name = adminName.trim();
+            const email = adminEmail.trim().toLowerCase();
+            if (!name || !email) {
+              setAdminResult({ ok: false, message: "Enter the new administrator's full name and email address." });
+              return;
+            }
+            setAdminBusy(true);
+            setAdminResult(null);
+            try {
+              const data = await createAdministrator({ name, email });
+              setAdminResult({
+                ok: true,
+                message: data?.accountCreated
+                  ? "Administrator account created and activated successfully. The new administrator can use Forgot password? to establish a permanent password."
+                  : "The existing account has been activated as an Administrator successfully."
+              });
+              setAdminName("");
+              setAdminEmail("");
+            } catch (error) {
+              setAdminResult({ ok: false, message: error?.message || "Unable to add the Administrator." });
+            } finally {
+              setAdminBusy(false);
+            }
+          }}>
+            <label className="field" style={{ display: "block" }}>
+              <span>New Administrator Name</span>
+              <input value={adminName} onChange={e => setAdminName(e.target.value)} placeholder="Full name" required autoComplete="name" />
+            </label>
+            <label className="field" style={{ display: "block", marginTop: 14 }}>
+              <span>New Administrator Email</span>
+              <input type="email" value={adminEmail} onChange={e => setAdminEmail(e.target.value)} placeholder="administrator@example.com" required autoComplete="email" />
+            </label>
+            <div className="form-actions" style={{ marginTop: 18 }}>
+              <button type="submit" disabled={adminBusy}>{adminBusy ? "Adding Administrator…" : "Add Administrator"}</button>
+            </div>
+          </form>
+          {adminResult && (
+            <div className={adminResult.ok ? "success-message" : "auth-message"} style={{ marginTop: 16 }} role="status" aria-live="polite">
+              {adminResult.message}
+            </div>
+          )}
+        </section>
+      )}
+
       {admin && (
         <section className="panel">
           <div className="panel-header">
