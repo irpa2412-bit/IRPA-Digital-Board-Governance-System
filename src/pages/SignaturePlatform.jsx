@@ -46,7 +46,7 @@ function PDFDesigner({url,documentId,fields,setFields,recipients,selectedField,s
  </div>;
 }
 
-export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=null}){
+export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=null,initialDocument=null}){
  const[tab,setTab]=useState("Profile"),[profile,setProfile]=useState(null),[docs,setDocs]=useState([]),[envelopes,setEnvelopes]=useState([]),[members,setMembers]=useState([]),[selected,setSelected]=useState(null),[busy,setBusy]=useState(false),[message,setMessage]=useState("");
  const[displayName,setDisplayName]=useState(""),[initials,setInitials]=useState(""),[signatureFile,setSignatureFile]=useState(null),[initialsFile,setInitialsFile]=useState(null);
  const[title,setTitle]=useState(""),[documentId,setDocumentId]=useState(""),[documentUrl,setDocumentUrl]=useState(""),[signingMode,setSigningMode]=useState("Sequential"),[selectedSigner,setSelectedSigner]=useState(""),[signerEmail,setSignerEmail]=useState(""),[signerRole,setSignerRole]=useState("Review"),[recipients,setRecipients]=useState([]),[fields,setFields]=useState([]),[selectedField,setSelectedField]=useState(null),[fieldValues,setFieldValues]=useState({}),[ownerSigningEnabled,setOwnerSigningEnabled]=useState(false);
@@ -87,6 +87,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
       setMessage(x.message||"Unable to load Signature Platform.")
     }
   })()},[signerOnly,signingEnvelopeId]);
+ useEffect(()=>{if(initialDocument?.id){setDocs(prev=>[initialDocument,...prev.filter(d=>d.id!==initialDocument.id)]);setDocumentId(initialDocument.id);setTab("Prepare Envelope");setMessage(`Document "${initialDocument.title||initialDocument.fileName||initialDocument.id}" is ready for selection and signing.`)}},[initialDocument]);
  const selectedDoc=useMemo(()=>docs.find(x=>x.id===documentId),[docs,documentId]);
  const documentOwner=useMemo(()=>({uid:auth.currentUser?.uid,name:auth.currentUser?.displayName||auth.currentUser?.email||"Document Owner",email:auth.currentUser?.email||"",role:"Document Owner",routingOrder:1,status:"Owner"}),[auth.currentUser?.uid,auth.currentUser?.displayName,auth.currentUser?.email]);
  const workflowRecipients=useMemo(()=>[documentOwner,...recipients.filter(r=>r.uid!==documentOwner.uid).map((r,i)=>({...r,routingOrder:signingMode==="Sequential"?i+2:r.routingOrder||1}))],[documentOwner,recipients,signingMode]);
