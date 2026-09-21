@@ -15,7 +15,115 @@ const DEFAULTS={Signature:{width:28,height:10},Initials:{width:16,height:8},Date
 function makeField(type,i,uid,page=1){const d=DEFAULTS[type]||DEFAULTS.Text;return{fieldId:`FIELD-${Date.now()}-${i}`,type,page,x:8,y:12,width:d.width,height:d.height,required:type!=="Checkbox",signerUid:uid,responsibility:type==="Signature"?"Signature":type==="Initials"?"Initial":type==="Date"?"Date":type==="Comment"?"Comment":type==="Remarks"?"Remarks":type==="Number"?"Number Entry":type==="Checkbox"?"Approval":"Review",placeholder:type==="Comment"?"Enter comment":type==="Remarks"?"Enter remarks":type==="Number"?"Enter number":""};}
 
 function clamp(v,min,max){return Math.max(min,Math.min(max,v));}
-function InkCapture({label="Sign directly on this device",onUse,onSave,replacementMode=false}){const canvasRef=useRef(null),drawing=useRef(false),hasInk=useRef(false);const[empty,setEmpty]=useState(true),[feedback,setFeedback]=useState("");useEffect(()=>{const c=canvasRef.current;if(!c)return;const dpr=Math.max(1,window.devicePixelRatio||1),w=720,h=180;c.width=w*dpr;c.height=h*dpr;c.style.width="100%";c.style.height=h+"px";const ctx=c.getContext("2d");ctx.scale(dpr,dpr);ctx.fillStyle="#fff";ctx.fillRect(0,0,w,h);ctx.strokeStyle="#111827";ctx.lineWidth=3;ctx.lineCap="round";ctx.lineJoin="round";},[]);const point=e=>{const c=canvasRef.current,r=c.getBoundingClientRect();return{x:(e.clientX-r.left)*720/r.width,y:(e.clientY-r.top)*180/r.height}};const start=e=>{e.preventDefault();const p=point(e),ctx=canvasRef.current.getContext("2d");ctx.beginPath();ctx.moveTo(p.x,p.y);drawing.current=true;hasInk.current=true;setEmpty(false);canvasRef.current.setPointerCapture?.(e.pointerId)};const move=e=>{if(!drawing.current)return;e.preventDefault();const p=point(e),ctx=canvasRef.current.getContext("2d");ctx.lineTo(p.x,p.y);ctx.stroke()};const end=()=>{drawing.current=false};const clear=()=>{const c=canvasRef.current,ctx=c.getContext("2d");ctx.clearRect(0,0,c.width,c.height);setFeedback("");const dpr=Math.max(1,window.devicePixelRatio||1);ctx.save();ctx.scale(dpr,dpr);ctx.fillStyle="#fff";ctx.fillRect(0,0,720,180);ctx.restore();hasInk.current=false;setEmpty(true)};return <div data-signature-specimen="true"><div className="panel" style={{marginTop:16,border:"1px solid rgba(109,93,252,.45)"}}><div className="panel-heading"><div><span className="eyebrow">DIGITAL SIGNING SPECIMEN</span><h3 style={{margin:"6px 0"}}>{label}</h3><p className="muted">Sign in the box below using your finger, stylus or mouse. This is your signing specimen and can be saved directly to your Signature Profile.</p></div></div><div role="status" aria-live="polite" style={{marginBottom:10,padding:"12px 14px",borderRadius:8,background:replacementMode?"rgba(220,38,38,.16)":"rgba(22,163,74,.10)",border:`1px solid ${replacementMode?"rgba(248,113,113,.55)":"rgba(74,222,128,.35)"}`,color:"#fff",fontWeight:700}}>{replacementMode?"REPLACEMENT MODE — the signature currently served remains active until this new handwritten specimen is successfully saved.":"HANDWRITTEN SPECIMEN — save it once to make it the persistent signature for future documents."}</div><div style={{background:"#fff",border:"2px solid #6d5dfc",borderRadius:10,padding:6,overflow:"hidden",boxShadow:"inset 0 -28px 0 rgba(109,93,252,.06)"}}><canvas ref={canvasRef} onPointerDown={start} onPointerMove={move} onPointerUp={end} onPointerCancel={end} style={{display:"block",width:"100%",height:180,touchAction:"none",cursor:"crosshair"}}/></div><div style={{display:"flex",gap:8,marginTop:12,flexWrap:"wrap"}}><button type="button" className="text-button" onClick={clear}>Clear Specimen</button><button type="button" disabled={empty} onClick={async()=>{if(empty){setFeedback("ACTION REQUIRED: sign in the box first.");return}setFeedback("Saving and serving this signature to your Signature Profile…");try{const result=await (onSave?onSave(canvasRef.current.toDataURL("image/png")):onUse(canvasRef.current.toDataURL("image/png")));setFeedback("SUCCESS: this signature is now served from your Signature Profile and can be reused for future documents.");return result}catch(e){setFeedback("SAVE FAILED: "+(e?.message||"The signature could not be stored. No new signature was saved."));}}}>{replacementMode?"Save & Serve Replacement":"Save & Serve Signature"}</button></div></div>;}
+function InkCapture({label="Sign directly on this device",onUse,onSave,replacementMode=false}){
+  const canvasRef=useRef(null);
+  const drawing=useRef(false);
+  const [empty,setEmpty]=useState(true);
+  const [feedback,setFeedback]=useState("");
+
+  useEffect(()=>{
+    const c=canvasRef.current;
+    if(!c)return;
+    const dpr=Math.max(1,window.devicePixelRatio||1);
+    const w=720,h=180;
+    c.width=w*dpr;
+    c.height=h*dpr;
+    c.style.width="100%";
+    c.style.height=h+"px";
+    const ctx=c.getContext("2d");
+    ctx.scale(dpr,dpr);
+    ctx.fillStyle="#fff";
+    ctx.fillRect(0,0,w,h);
+    ctx.strokeStyle="#111827";
+    ctx.lineWidth=3;
+    ctx.lineCap="round";
+    ctx.lineJoin="round";
+  },[]);
+
+  const point=e=>{
+    const c=canvasRef.current;
+    const r=c.getBoundingClientRect();
+    return{x:(e.clientX-r.left)*720/r.width,y:(e.clientY-r.top)*180/r.height};
+  };
+  const start=e=>{
+    e.preventDefault();
+    const p=point(e);
+    const ctx=canvasRef.current.getContext("2d");
+    ctx.beginPath();
+    ctx.moveTo(p.x,p.y);
+    drawing.current=true;
+    setEmpty(false);
+    canvasRef.current.setPointerCapture?.(e.pointerId);
+  };
+  const move=e=>{
+    if(!drawing.current)return;
+    e.preventDefault();
+    const p=point(e);
+    const ctx=canvasRef.current.getContext("2d");
+    ctx.lineTo(p.x,p.y);
+    ctx.stroke();
+  };
+  const end=()=>{drawing.current=false};
+  const clear=()=>{
+    const c=canvasRef.current;
+    const ctx=c.getContext("2d");
+    const dpr=Math.max(1,window.devicePixelRatio||1);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,720,180);
+    ctx.fillStyle="#fff";
+    ctx.fillRect(0,0,720,180);
+    ctx.strokeStyle="#111827";
+    ctx.lineWidth=3;
+    ctx.lineCap="round";
+    ctx.lineJoin="round";
+    setEmpty(true);
+    setFeedback("");
+  };
+  const save=async()=>{
+    if(empty){
+      setFeedback("ACTION REQUIRED: sign in the box first.");
+      return;
+    }
+    setFeedback("Saving and serving this handwritten signature…");
+    try{
+      const dataUrl=canvasRef.current.toDataURL("image/png");
+      const result=await(onSave?onSave(dataUrl):onUse(dataUrl));
+      setFeedback("SUCCESS: this handwritten signature is now the CURRENT SERVED SIGNATURE and will be reused for future documents.");
+      return result;
+    }catch(e){
+      setFeedback("SAVE FAILED: "+(e?.message||"The signature could not be stored."));
+    }
+  };
+
+  return(
+    <div data-signature-specimen="true">
+      <div className="panel" style={{marginTop:16,border:"1px solid rgba(109,93,252,.45)"}}>
+        <div className="panel-heading">
+          <div>
+            <span className="eyebrow">DIGITAL SIGNING SPECIMEN</span>
+            <h3 style={{margin:"6px 0"}}>{label}</h3>
+            <p className="muted">Sign in the box below using your finger, stylus or mouse. This is your signing specimen and can be saved directly to your Signature Profile.</p>
+          </div>
+        </div>
+        <div role="status" aria-live="polite" style={{marginBottom:10,padding:"12px 14px",borderRadius:8,background:replacementMode?"rgba(220,38,38,.16)":"rgba(22,163,74,.10)",border:replacementMode?"1px solid rgba(248,113,113,.55)":"1px solid rgba(74,222,128,.35)",color:"#fff",fontWeight:700}}>
+          {replacementMode
+            ?"REPLACEMENT MODE — your current served signature remains active until this new handwritten specimen is successfully saved."
+            :"HANDWRITTEN SPECIMEN — save it once to make it the persistent signature for future documents."}
+        </div>
+        <div style={{background:"#fff",border:"2px solid #6d5dfc",borderRadius:10,padding:6,overflow:"hidden",boxShadow:"inset 0 -28px 0 rgba(109,93,252,.06)"}}>
+          <canvas ref={canvasRef} onPointerDown={start} onPointerMove={move} onPointerUp={end} onPointerCancel={end} style={{display:"block",width:"100%",height:180,touchAction:"none",cursor:"crosshair"}}/>
+        </div>
+        <div style={{display:"flex",gap:8,marginTop:12,flexWrap:"wrap"}}>
+          <button type="button" className="text-button" onClick={clear}>Clear Specimen</button>
+          <button type="button" disabled={empty} onClick={save}>
+            {replacementMode?"Save & Serve Replacement":"Save & Serve Signature"}
+          </button>
+        </div>
+        {feedback&&<div className="auth-message" role="status" aria-live="polite" style={{marginTop:10}}>{feedback}</div>}
+      </div>
+    </div>
+  );
+}
 
 function FieldBox({field,selected,onSelect,onMove,onResize,onDelete,zoom,recipients,activeAssigneeUid}){
  const ref=useRef(null);const drag=useRef(null);const resize=useRef(null);
