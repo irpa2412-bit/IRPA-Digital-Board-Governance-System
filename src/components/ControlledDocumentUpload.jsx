@@ -61,6 +61,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
       const workflowContext = readWorkflowContext();
       const documentId = await createRecord(COLLECTIONS.documents, withWorkflowLinks({
         title: name,
+        recordOrigin: "PRODUCTION",
         fileName: file.name,
         fileId: target.fileId,
         storageProvider: "Google Drive",
