@@ -63,7 +63,8 @@ export async function uploadBytes(target, file, metadata = {}) {
 }
 
 export async function ensureSignatureProfileFolder(uid) {
-  const result = await gatewayPost("/api/signature-profile/folder", { uid });
+  const email = uid === auth.currentUser?.uid ? (auth.currentUser?.email || "") : "";
+  const result = await gatewayPost("/api/signature-profile/folder", { uid, email });
   if (!result.folderId) throw new Error("Google Drive did not return a signature profile folder ID.");
   return result;
 }
