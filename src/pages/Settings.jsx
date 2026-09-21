@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { browserSupportsPush, listenForForegroundMessages, notificationPermissionState, requestPushPermission } from "../firebase/messaging";
 import { startGoogleDriveAuthorization } from "../firebase/signatureStorage";
 import { resetDocumentTrialData, resetEmployeeTrialData, resetMemberTrialData } from "../firebase/data";
+import { createAdministrator } from "../firebase/functions";
 
 export default function Settings({ admin = false }) {
   const [supported, setSupported] = useState(false);
@@ -12,6 +13,10 @@ export default function Settings({ admin = false }) {
   const [confirmation, setConfirmation] = useState("");
   const [result, setResult] = useState(null);
   const [message, setMessage] = useState("");
+  const [adminName, setAdminName] = useState("");
+  const [adminEmail, setAdminEmail] = useState("");
+  const [adminBusy, setAdminBusy] = useState(false);
+  const [adminResult, setAdminResult] = useState(null);
 
   useEffect(() => {
     let unsubscribe = () => {};
