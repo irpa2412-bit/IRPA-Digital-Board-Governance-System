@@ -310,7 +310,11 @@ async function ensureSignatureProfileFolder(request, env) {
   const claims = await authenticateFirebaseRequest(request);
   const data = await request.json();
   const requestedUid = cleanId(data.uid || claims.user_id);
+  const requestedEmail = String(data.email || claims.email || "").trim().toLowerCase();
   if (!requestedUid) return json({ ok: false, error: "Member UID is required." }, 400, corsHeaders(request));
+  if (requestedUid === claims.user_id && requestedEmail && requestedEmail !== String(claims.email || "").trim().toLowerCase()) {
+    return json({ ok: false, error: "The signature-folder email does not match the authenticated account." }, 403, corsHeaders(request));
+  }
 
   const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
   const isAdmin = Boolean(admin?.fields?.active?.booleanValue);
@@ -329,6 +333,11 @@ async function ensureSignatureProfileFolder(request, env) {
     purpose: "Member Signature Profile"
   });
 
+  let folderShared = false;
+  if (requestedEmail) {
+    folderShared = await ensureSignatureFolderPermission(env, accessToken, folderId, requestedEmail);
+  }
+
   return json({
     ok: true,
     uid: requestedUid,
@@ -336,6 +345,8 @@ async function ensureSignatureProfileFolder(request, env) {
     folderName,
     parentFolderId: signaturesId,
     path: `IRPA Governance System/Signature Profiles/${folderName}`,
+    folderShared,
+    sharedWithEmail: requestedEmail || null,
     storageProvider: "Google Drive"
   }, 200, corsHeaders(request));
 }
@@ -566,6 +577,41 @@ async function getDriveAccessToken(env) {
   const tokens = await response.json();
   if (!response.ok || !tokens.access_token) throw new Error(tokens.error_description || "Google Drive access token refresh failed.");
   return tokens.access_token;
+}
+
+async function ensureSignatureFolderPermission(env, accessToken, folderId, email) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  if (!folderId || !normalizedEmail) return false;
+
+  try {
+    const listed = await driveFetch(
+      env,
+      accessToken,
+      `/drive/v3/files/${encodeURIComponent(folderId)}/permissions?fields=permissions(id,type,emailAddress,role)&pageSize=100`
+    );
+    const existing = (listed.permissions || []).find(
+      p => p.type === "user" && String(p.emailAddress || "").trim().toLowerCase() === normalizedEmail
+    );
+    if (existing) return true;
+
+    await driveFetch(
+      env,
+      accessToken,
+      `/drive/v3/files/${encodeURIComponent(folderId)}/permissions?sendNotificationEmail=false&supportsAllDrives=true`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          type: "user",
+          role: "reader",
+          emailAddress: normalizedEmail
+        })
+      }
+    );
+    return true;
+  } catch (error) {
+    console.warn("Signature folder sharing was not completed", normalizedEmail, error?.message || error);
+    return false;
+  }
 }
 
 async function findOrCreateFolder(env, accessToken, name, parentId = null, descriptionData = null) {
