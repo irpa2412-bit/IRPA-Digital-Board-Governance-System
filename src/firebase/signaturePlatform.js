@@ -24,7 +24,66 @@ async function cropSignatureImage(file){
   return new File([blob],"IRPA-"+String(file.name||"signature").replace(/\.[^.]+$/,"")+"-cropped.png",{type:"image/png",lastModified:Date.now()});
 }
 async function uploadAsset(uid,type,file,folderId){if(!file)throw new Error(type+" is required.");if(!["image/png","image/jpeg","image/jpg","image/webp"].includes(file.type))throw new Error(type+" must be PNG, JPG or WEBP.");const prepared=type==="Signature"||type==="Initials"?await cropSignatureImage(file):file;if(prepared.size>1024*1024)throw new Error(type+" must not exceed 1 MB after processing.");const sha=await hash(prepared);const path="signatureProfiles/"+uid+"/"+type.toLowerCase()+"-"+sha+".png";const r=ref(null,path);await uploadBytes(r,prepared,{contentType:prepared.type,ownerUid:uid,folderId,purpose:"Signature Profile",customMetadata:{ownerUid:uid,assetType:type,sha256:sha,purpose:"Signature Profile",cropped:true}});return{path,url:await getDownloadURL(r),sha};}
-export async function getMySignatureProfile(){const u=user(),s=await getDoc(doc(db,PROFILE_COLLECTION,u.uid));const folder=await ensureSignatureProfileFolder(u.uid);const name=String(u.displayName||"").trim();if(/daniel\s+e?\.?\s*mollel/i.test(name)){const p={uid:u.uid,email:u.email||"",displayName:"Daniel E. Mollel",role:"Executive Director",method:"Admin Assigned Upload",driveSignatureFolderId:folder.folderId,driveSignatureFolderName:folder.folderName,driveSignatureFolderPath:folder.path,driveSignatureFolderUid:u.uid,signaturePath:"preloaded/daniel-e-mollel",signatureUrl:DANIEL_E_MOLLEL_SIGNATURE_DATA_URL,signatureSha256:DANIEL_E_MOLLEL_SIGNATURE_SHA256,initialsPath:null,initialsUrl:null,initialsSha256:null,status:"Active",adoptionDate:serverTimestamp(),updatedAt:serverTimestamp()};await setDoc(doc(db,PROFILE_COLLECTION,u.uid),p,{merge:true});await recordEnvelopeEvent("SYSTEM","Signature Profile Assigned",{signerUid:u.uid,signerName:p.displayName,role:p.role,method:p.method,signatureSha256:p.signatureSha256});await setDoc(doc(db,PROFILE_COLLECTION,u.uid),p,{merge:true});return{id:u.uid,...p};}if(s.exists()){const existing=s.data();if(existing.driveSignatureFolderId!==folder.folderId||existing.driveSignatureFolderUid!==u.uid){await updateDoc(doc(db,PROFILE_COLLECTION,u.uid),{driveSignatureFolderId:folder.folderId,driveSignatureFolderName:folder.folderName,driveSignatureFolderPath:folder.path,driveSignatureFolderUid:u.uid,updatedAt:serverTimestamp()});}return{id:s.id,...existing,driveSignatureFolderId:folder.folderId,driveSignatureFolderName:folder.folderName,driveSignatureFolderPath:folder.path,driveSignatureFolderUid:u.uid};}return null;}
+export async function getMySignatureProfile(){
+  const u=user();
+  const s=await getDoc(doc(db,PROFILE_COLLECTION,u.uid));
+  let folder=null;
+  let folderError=null;
+  try{
+    folder=await ensureSignatureProfileFolder(u.uid);
+  }catch(error){
+    folderError=error;
+  }
+
+  const folderFields=folder?{
+    driveSignatureFolderId:folder.folderId,
+    driveSignatureFolderName:folder.folderName,
+    driveSignatureFolderPath:folder.path,
+    driveSignatureFolderUid:u.uid
+  }:{};
+
+  // Preserve an already configured signature profile even if Google Drive folder
+  // provisioning is temporarily unavailable. Folder provisioning must not make an
+  // existing signature disappear from the portal.
+  if(s.exists()){
+    const existing=s.data();
+    if(Object.keys(folderFields).length){
+      await updateDoc(doc(db,PROFILE_COLLECTION,u.uid),{...folderFields,updatedAt:serverTimestamp()});
+    }
+    return{id:s.id,...existing,...folderFields};
+  }
+
+  // Daniel's reviewed signature is a preloaded institutional profile. Restore it
+  // locally even when Drive provisioning is unavailable; Drive folder metadata is
+  // added automatically as soon as the gateway is reachable.
+  const name=String(u.displayName||"").trim();
+  if(/daniel\\s+e?\\.?\\s*mollel/i.test(name)){
+    const p={
+      uid:u.uid,
+      email:u.email||"",
+      displayName:"Daniel E. Mollel",
+      role:"Executive Director",
+      method:"Admin Assigned Upload",
+      ...folderFields,
+      signaturePath:"preloaded/daniel-e-mollel",
+      signatureUrl:DANIEL_E_MOLLEL_SIGNATURE_DATA_URL,
+      signatureSha256:DANIEL_E_MOLLEL_SIGNATURE_SHA256,
+      initialsPath:null,
+      initialsUrl:null,
+      initialsSha256:null,
+      status:"Active",
+      adoptionDate:serverTimestamp(),
+      updatedAt:serverTimestamp()
+    };
+    await setDoc(doc(db,PROFILE_COLLECTION,u.uid),p,{merge:true});
+    await recordEnvelopeEvent("SYSTEM","Signature Profile Assigned",{signerUid:u.uid,signerName:p.displayName,role:p.role,method:p.method,signatureSha256:p.signatureSha256});
+    return{id:u.uid,...p};
+  }
+
+  if(folderError) throw folderError;
+  return null;
+}
+
 export async function saveMySignatureProfile({signatureFile,initialsFile,displayName,initials,method="Upload"}){const u=user();const folder=await ensureSignatureProfileFolder(u.uid);if(!String(displayName||u.displayName||"").trim())throw new Error("Display name is required.");const signature=await uploadAsset(u.uid,"Signature",signatureFile,folder.folderId);const initialsAsset=initialsFile?await uploadAsset(u.uid,"Initials",initialsFile,folder.folderId):null;const p={uid:u.uid,email:u.email||"",displayName:String(displayName).trim(),initials:String(initials||"").trim(),method,driveSignatureFolderId:folder.folderId,driveSignatureFolderName:folder.folderName,driveSignatureFolderPath:folder.path,driveSignatureFolderUid:u.uid,signaturePath:signature.path,signatureUrl:signature.url,signatureSha256:signature.sha,initialsPath:initialsAsset?.path||null,initialsUrl:initialsAsset?.url||null,initialsSha256:initialsAsset?.sha||null,status:"Active",adoptionDate:serverTimestamp(),updatedAt:serverTimestamp()};await setDoc(doc(db,PROFILE_COLLECTION,u.uid),p,{merge:true});return p;}
 export async function getSignatureEnvelope(envelopeId){
   const u=user();
