@@ -98,7 +98,8 @@ export async function getMySignatureProfile(){
         driveSignatureFolderId:folder.folderId,
         driveSignatureFolderName:folder.folderName,
         driveSignatureFolderPath:folder.path,
-        driveSignatureFolderUid:u.uid
+        driveSignatureFolderUid:u.uid,
+        signatureArchiveUidLink: folder.signatureArchiveUidLink || `https://drive.google.com/drive/folders/${encodeURIComponent(folder.folderId)}`
       };
       await updateDoc(profileRef,{...folderFields,updatedAt:serverTimestamp()});
       return{id:u.uid,...p,...folderFields};
