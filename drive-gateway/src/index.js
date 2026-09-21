@@ -194,8 +194,10 @@ async function upload(request, env) {
     if (!requestedFolderId) {
       return json({ ok: false, error: "A member signature folder is required." }, 400, corsHeaders(request));
     }
+  } else if (purpose === "Signed Documents Archive") {
+    if (!requestedFolderId) return json({ ok:false, error:"A signed-document archive folder is required." },400,corsHeaders(request));
   } else if (requestedFolderId || data.ownerUid) {
-    return json({ ok: false, error: "Signature-folder parameters are restricted to Signature Profile uploads." }, 400, corsHeaders(request));
+    return json({ ok: false, error: "Folder parameters are restricted to authorized IRPA archive uploads." }, 400, corsHeaders(request));
   }
 
   if (!ALLOWED_CONTENT_TYPES.has(contentType)) {
@@ -213,14 +215,17 @@ async function upload(request, env) {
   const accessToken = await getDriveAccessToken(env);
   const rootId = await findOrCreateFolder(env, accessToken, "IRPA Governance System");
   let purposeId;
-  if (purpose === "Signature Profile") {
+  if (purpose === "Signature Profile" || purpose === "Signed Documents Archive") {
     const folderMeta = await driveFetch(env, accessToken, `/drive/v3/files/${encodeURIComponent(requestedFolderId)}?fields=id,name,mimeType,description,trashed`);
     const folderDescription = parseDescription(folderMeta.description);
     if (folderMeta.mimeType !== "application/vnd.google-apps.folder" || folderMeta.trashed) {
-      return json({ ok: false, error: "The member signature folder is invalid." }, 409, corsHeaders(request));
+      return json({ ok: false, error: "The requested IRPA archive folder is invalid." }, 409, corsHeaders(request));
     }
-    if (folderDescription.irpaGovernanceSignatureFolder !== true || folderDescription.ownerUid !== claims.user_id) {
+    if (purpose === "Signature Profile" && (folderDescription.irpaGovernanceSignatureFolder !== true || folderDescription.ownerUid !== claims.user_id)) {
       return json({ ok: false, error: "The member signature folder does not belong to the authenticated member." }, 403, corsHeaders(request));
+    }
+    if (purpose === "Signed Documents Archive" && folderDescription.irpaGovernanceArchive !== true) {
+      return json({ ok: false, error: "The requested folder is not an IRPA signed-document archive folder." }, 403, corsHeaders(request));
     }
     purposeId = requestedFolderId;
   } else {
