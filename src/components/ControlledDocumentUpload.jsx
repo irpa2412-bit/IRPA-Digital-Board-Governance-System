@@ -7,6 +7,9 @@ import { uploadBytes, ref, ensureDocumentArchiveFolder } from "../firebase/signa
 export default function ControlledDocumentUpload({ purpose = "Controlled Document", onUploaded }) {
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState("");
+  const [reference, setReference] = useState("");
+  const [documentType, setDocumentType] = useState("Governance Document");
+  const [version, setVersion] = useState("1.0");
   const [archiveCategory, setArchiveCategory] = useState("Administrative Documents");
   const [classification, setClassification] = useState("Public");
   const [busy, setBusy] = useState(false);
@@ -35,7 +38,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
       const name = (title.trim() || file.name.replace(/\.pdf$/i, "")).slice(0, 160);
       const documentUid = `IRPA-DOC-${crypto.randomUUID()}`;
       setMessage("Creating the Google Drive archive location…");
-      const archive = await ensureDocumentArchiveFolder({documentId: documentUid,title:name,reference:name,archiveCategory,classification});
+      const archive = await ensureDocumentArchiveFolder({documentId: documentUid,title:name,reference:reference.trim()||documentUid,archiveCategory,classification});
       const target = ref(null, `document-archives/${archiveCategory}/${classification}/${documentUid}/${name}.pdf`);
       setMessage("Uploading PDF to Google Drive…");
       const uploaded = await uploadBytes(target, file, {
@@ -50,6 +53,9 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
       setMessage("Google Drive upload complete. Registering the document…");
       const documentId = await createRecord(COLLECTIONS.documents, withWorkflowLinks({
         title: name,
+        reference: reference.trim() || documentUid,
+        documentType,
+        version,
         documentUid,
         archiveCategory,
         classification,
@@ -78,12 +84,16 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         authorizedUids: [auth.currentUser.uid],
         uploadedByUid: auth.currentUser.uid,
         uploadedByEmail: auth.currentUser.email || null,
-        uploadedAt: now
+        uploadedAt: now,
+        uploadedAtDisplay: new Date(now).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "medium", hour12: false })
       }, workflowContext || {}));
 
       const doc = {
         id: documentId,
         title: name,
+        reference: reference.trim() || documentUid,
+        documentType,
+        version,
         fileName: file.name,
         fileId: target.fileId,
         storageProvider: "Google Drive",
@@ -104,6 +114,9 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
       setMessage(`Document uploaded successfully to Google Drive: ${name}.`);
       setFile(null);
       setTitle("");
+      setReference("");
+      setDocumentType("Governance Document");
+      setVersion("1.0");
       setArchiveCategory("Administrative Documents");
       setClassification("Public");
       e.target.reset();
@@ -136,6 +149,10 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
           <div className="form-field">
             <label>Document Title</label>
             <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Enter document title" />
+          </div>
+          <div className="form-field"><label>Document Reference / Identification No.</label><input value={reference} onChange={e => setReference(e.target.value)} placeholder="Enter document reference / identification number" /></div>
+          <div className="form-field"><label>Document Type</label><input value={documentType} onChange={e => setDocumentType(e.target.value)} placeholder="e.g. Policy, Invoice, Procurement Record" /></div>
+          <div className="form-field"><label>Version</label><input value={version} onChange={e => setVersion(e.target.value)} placeholder="e.g. 1.0" />
           </div>
           <div className="form-field">
             <label>PDF File</label>
