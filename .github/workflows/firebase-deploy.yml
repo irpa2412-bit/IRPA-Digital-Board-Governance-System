@@ -34,3 +34,8 @@ jobs:
           args: deploy --project irpa-digital-board-governance --only hosting,firestore
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+
+      - name: Verify live Firebase application
+        run: |
+          set -e
+          curl --fail --silent --show-error --retry 5 --retry-delay 3             https://irpa-digital-board-governance.web.app/
