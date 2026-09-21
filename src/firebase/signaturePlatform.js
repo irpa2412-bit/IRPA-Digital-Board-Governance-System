@@ -22,7 +22,25 @@ async function cropSignatureImage(file){
   const out=document.createElement("canvas");out.width=maxX-minX+1;out.height=maxY-minY+1;const octx=out.getContext("2d");octx.clearRect(0,0,out.width,out.height);octx.drawImage(canvas,minX,minY,out.width,out.height,0,0,out.width,out.height);const blob=await new Promise(resolve=>out.toBlob(resolve,"image/png"));if(!blob)return file;
   return new File([blob],"IRPA-"+String(file.name||"signature").replace(/\.[^.]+$/,"")+"-cropped.png",{type:"image/png",lastModified:Date.now()});
 }
-async function uploadAsset(uid,type,file,folderId){if(!file)throw new Error(type+" is required.");if(!["image/png","image/jpeg","image/jpg","image/webp"].includes(file.type))throw new Error(type+" must be PNG, JPG or WEBP.");const prepared=type==="Signature"||type==="Initials"?await cropSignatureImage(file):file;if(prepared.size>1024*1024)throw new Error(type+" must not exceed 1 MB after processing.");const sha=await hash(prepared);const path="signatureProfiles/"+uid+"/"+type.toLowerCase()+"-"+sha+".png";const r=ref(null,path);await uploadBytes(r,prepared,{contentType:prepared.type,ownerUid:uid,folderId,purpose:"Signature Profile",customMetadata:{ownerUid:uid,assetType:type,sha256:sha,purpose:"Signature Profile",cropped:true}});return{path,url:await getDownloadURL(r),sha};}
+async function fileDataUrl(file){
+  return await new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(String(reader.result||""));
+    reader.onerror=()=>reject(reader.error||new Error("Unable to prepare signature preview."));
+    reader.readAsDataURL(file);
+  });
+}
+async function uploadAsset(uid,type,file,folderId){
+  if(!file)throw new Error(type+" is required.");
+  if(!["image/png","image/jpeg","image/jpg","image/webp"].includes(file.type))throw new Error(type+" must be PNG, JPG or WEBP.");
+  const prepared=type==="Signature"||type==="Initials"?await cropSignatureImage(file):file;
+  if(prepared.size>1024*1024)throw new Error(type+" must not exceed 1 MB after processing.");
+  const sha=await hash(prepared);
+  const path="signatureProfiles/"+uid+"/"+type.toLowerCase()+"-"+sha+".png";
+  const r=ref(null,path);
+  await uploadBytes(r,prepared,{contentType:prepared.type,ownerUid:uid,folderId,purpose:"Signature Profile",customMetadata:{ownerUid:uid,assetType:type,sha256:sha,purpose:"Signature Profile",cropped:true}});
+  return{path,driveUrl:await getDownloadURL(r),displayUrl:await fileDataUrl(prepared),sha};
+}
 export async function getMySignatureProfile(){
   const u=user();
   const profileRef=doc(db,PROFILE_COLLECTION,u.uid);
@@ -62,8 +80,6 @@ export async function saveMySignatureProfile({signatureFile,initialsFile,display
   const u=user();
   if(!String(displayName||u.displayName||"").trim())throw new Error("Display name is required.");
 
-  // The Signature Profile is authoritative. Google Drive folder provisioning is secondary
-  // and must never block saving or replacing the signature specimen.
   let folder=null;
   try{folder=await ensureSignatureProfileFolder(u.uid);}catch(_error){folder=null;}
 
@@ -82,10 +98,13 @@ export async function saveMySignatureProfile({signatureFile,initialsFile,display
     driveSignatureFolderPath:folder?.path||null,
     driveSignatureFolderUid:folder?u.uid:null,
     signaturePath:signature.path,
-    signatureUrl:signature.url,
+    // The served signature is a browser-renderable data URL. Google Drive remains the archive.
+    signatureUrl:signature.displayUrl,
+    signatureDriveUrl:signature.driveUrl,
     signatureSha256:signature.sha,
     initialsPath:initialsAsset?.path||null,
-    initialsUrl:initialsAsset?.url||null,
+    initialsUrl:initialsAsset?.displayUrl||null,
+    initialsDriveUrl:initialsAsset?.driveUrl||null,
     initialsSha256:initialsAsset?.sha||null,
     status:"Active",
     adoptionDate:serverTimestamp(),
