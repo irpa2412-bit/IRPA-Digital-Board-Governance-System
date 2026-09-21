@@ -1,4 +1,4 @@
-import { arrayUnion, collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from "firebase/firestore";
+import { arrayUnion, collection, deleteField, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from "firebase/firestore";
 import { sendSignInLinkToEmail } from "firebase/auth";
 import { downloadDriveBytes, ensureSignedDocumentArchive, ensureSignatureProfileFolder, getDownloadURL, ref, uploadBytes } from "./signatureStorage";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
@@ -36,6 +36,13 @@ export async function getMySignatureProfile(){
   // Drive folder creation is secondary storage administration, not profile identity.
   if(snap.exists()){
     const existing=snap.data();
+    const isLegacyPreloaded=String(existing.signaturePath||"").startsWith("preloaded/")||existing.method==="Admin Assigned Upload";
+    if(isLegacyPreloaded){
+      const cleanup={signaturePath:deleteField(),signatureUrl:deleteField(),signatureSha256:deleteField(),method:"Awaiting Handwritten Signature",status:"Profile Setup Required",updatedAt:serverTimestamp()};
+      await updateDoc(profileRef,cleanup);
+      return{id:snap.id,...existing,signaturePath:null,signatureUrl:null,signatureSha256:null,method:"Awaiting Handwritten Signature",status:"Profile Setup Required"};
+    }
+    const existing=snap.data();
     const needsRecovery=isDanielProfile&&!existing.signatureUrl;
     let folder=null;
     try{folder=await ensureSignatureProfileFolder(u.uid);}catch(_error){folder=null;}
@@ -70,43 +77,7 @@ export async function getMySignatureProfile(){
     return{id:snap.id,...existing};
   }
 
-  // Self-heal Daniel's institutional profile if an earlier deployment left the
-  // Firestore profile document missing. This uses the reviewed asset already
-  // packaged with the application and does not require Drive to be online.
-  if(isDanielProfile){
-    const p={
-      uid:u.uid,
-      email:u.email||"",
-      displayName:"Daniel E. Mollel",
-      role:"Executive Director",
-      method:"Admin Assigned Upload",
-      signaturePath:"preloaded/daniel-e-mollel",
-      signatureUrl:DANIEL_E_MOLLEL_SIGNATURE_DATA_URL,
-      signatureSha256:DANIEL_E_MOLLEL_SIGNATURE_SHA256,
-      initialsPath:null,
-      initialsUrl:null,
-      initialsSha256:null,
-      status:"Active",
-      adoptionDate:serverTimestamp(),
-      updatedAt:serverTimestamp()
-    };
-    await setDoc(profileRef,p,{merge:true});
-    try{await recordEnvelopeEvent("SYSTEM","Signature Profile Recovered",{signerUid:u.uid,signerName:p.displayName,role:p.role,method:p.method,signatureSha256:p.signatureSha256});}catch(_error){}
-    try{
-      const folder=await ensureSignatureProfileFolder(u.uid);
-      const folderFields={
-        driveSignatureFolderId:folder.folderId,
-        driveSignatureFolderName:folder.folderName,
-        driveSignatureFolderPath:folder.path,
-        driveSignatureFolderUid:u.uid,
-        signatureArchiveUidLink: folder.signatureArchiveUidLink || `https://drive.google.com/drive/folders/${encodeURIComponent(folder.folderId)}`
-      };
-      await updateDoc(profileRef,{...folderFields,updatedAt:serverTimestamp()});
-      return{id:u.uid,...p,...folderFields};
-    }catch(_error){
-      return{id:u.uid,...p};
-    }
-  }
+  // No preloaded signature is created. Each signer must explicitly serve a handwritten or uploaded signature.
 
   return null;
 }
