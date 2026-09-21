@@ -26,45 +26,60 @@ async function cropSignatureImage(file){
 async function uploadAsset(uid,type,file,folderId){if(!file)throw new Error(type+" is required.");if(!["image/png","image/jpeg","image/jpg","image/webp"].includes(file.type))throw new Error(type+" must be PNG, JPG or WEBP.");const prepared=type==="Signature"||type==="Initials"?await cropSignatureImage(file):file;if(prepared.size>1024*1024)throw new Error(type+" must not exceed 1 MB after processing.");const sha=await hash(prepared);const path="signatureProfiles/"+uid+"/"+type.toLowerCase()+"-"+sha+".png";const r=ref(null,path);await uploadBytes(r,prepared,{contentType:prepared.type,ownerUid:uid,folderId,purpose:"Signature Profile",customMetadata:{ownerUid:uid,assetType:type,sha256:sha,purpose:"Signature Profile",cropped:true}});return{path,url:await getDownloadURL(r),sha};}
 export async function getMySignatureProfile(){
   const u=user();
-  const s=await getDoc(doc(db,PROFILE_COLLECTION,u.uid));
-  let folder=null;
-  let folderError=null;
-  try{
-    folder=await ensureSignatureProfileFolder(u.uid);
-  }catch(error){
-    folderError=error;
-  }
-
-  const folderFields=folder?{
-    driveSignatureFolderId:folder.folderId,
-    driveSignatureFolderName:folder.folderName,
-    driveSignatureFolderPath:folder.path,
-    driveSignatureFolderUid:u.uid
-  }:{};
-
-  // Preserve an already configured signature profile even if Google Drive folder
-  // provisioning is temporarily unavailable. Folder provisioning must not make an
-  // existing signature disappear from the portal.
-  if(s.exists()){
-    const existing=s.data();
-    if(Object.keys(folderFields).length){
-      await updateDoc(doc(db,PROFILE_COLLECTION,u.uid),{...folderFields,updatedAt:serverTimestamp()});
-    }
-    return{id:s.id,...existing,...folderFields};
-  }
-
-  // Daniel's reviewed signature is a preloaded institutional profile. Restore it
-  // locally even when Drive provisioning is unavailable; Drive folder metadata is
-  // added automatically as soon as the gateway is reachable.
+  const profileRef=doc(db,PROFILE_COLLECTION,u.uid);
+  const snap=await getDoc(profileRef);
+  const email=String(u.email||"").trim().toLowerCase();
   const name=String(u.displayName||"").trim();
-  if(/daniel\\s+e?\\.?\\s*mollel/i.test(name)){
+  const isDanielProfile=email==="irpa2412@gmail.com"||/^daniel(?:\\s+e\\.?)?\\s+mollel$/i.test(name);
+
+  // Never make an existing signature dependent on Google Drive provisioning.
+  // Drive folder creation is secondary storage administration, not profile identity.
+  if(snap.exists()){
+    const existing=snap.data();
+    const needsRecovery=isDanielProfile&&!existing.signatureUrl;
+    let folder=null;
+    try{folder=await ensureSignatureProfileFolder(u.uid);}catch(_error){folder=null;}
+
+    const folderFields=folder?{
+      driveSignatureFolderId:folder.folderId,
+      driveSignatureFolderName:folder.folderName,
+      driveSignatureFolderPath:folder.path,
+      driveSignatureFolderUid:u.uid
+    }:{};
+
+    const recoveryFields=needsRecovery?{
+      uid:u.uid,
+      email:u.email||existing.email||"",
+      displayName:existing.displayName||"Daniel E. Mollel",
+      role:existing.role||"Executive Director",
+      method:existing.method||"Admin Assigned Upload",
+      signaturePath:"preloaded/daniel-e-mollel",
+      signatureUrl:DANIEL_E_MOLLEL_SIGNATURE_DATA_URL,
+      signatureSha256:DANIEL_E_MOLLEL_SIGNATURE_SHA256,
+      initialsPath:existing.initialsPath||null,
+      initialsUrl:existing.initialsUrl||null,
+      initialsSha256:existing.initialsSha256||null,
+      status:"Active"
+    }:{};
+
+    if(Object.keys(folderFields).length||Object.keys(recoveryFields).length){
+      const patch={...folderFields,...recoveryFields,updatedAt:serverTimestamp()};
+      await updateDoc(profileRef,patch);
+      return{id:snap.id,...existing,...patch};
+    }
+    return{id:snap.id,...existing};
+  }
+
+  // Self-heal Daniel's institutional profile if an earlier deployment left the
+  // Firestore profile document missing. This uses the reviewed asset already
+  // packaged with the application and does not require Drive to be online.
+  if(isDanielProfile){
     const p={
       uid:u.uid,
       email:u.email||"",
       displayName:"Daniel E. Mollel",
       role:"Executive Director",
       method:"Admin Assigned Upload",
-      ...folderFields,
       signaturePath:"preloaded/daniel-e-mollel",
       signatureUrl:DANIEL_E_MOLLEL_SIGNATURE_DATA_URL,
       signatureSha256:DANIEL_E_MOLLEL_SIGNATURE_SHA256,
@@ -75,12 +90,23 @@ export async function getMySignatureProfile(){
       adoptionDate:serverTimestamp(),
       updatedAt:serverTimestamp()
     };
-    await setDoc(doc(db,PROFILE_COLLECTION,u.uid),p,{merge:true});
-    await recordEnvelopeEvent("SYSTEM","Signature Profile Assigned",{signerUid:u.uid,signerName:p.displayName,role:p.role,method:p.method,signatureSha256:p.signatureSha256});
-    return{id:u.uid,...p};
+    await setDoc(profileRef,p,{merge:true});
+    try{await recordEnvelopeEvent("SYSTEM","Signature Profile Recovered",{signerUid:u.uid,signerName:p.displayName,role:p.role,method:p.method,signatureSha256:p.signatureSha256});}catch(_error){}
+    try{
+      const folder=await ensureSignatureProfileFolder(u.uid);
+      const folderFields={
+        driveSignatureFolderId:folder.folderId,
+        driveSignatureFolderName:folder.folderName,
+        driveSignatureFolderPath:folder.path,
+        driveSignatureFolderUid:u.uid
+      };
+      await updateDoc(profileRef,{...folderFields,updatedAt:serverTimestamp()});
+      return{id:u.uid,...p,...folderFields};
+    }catch(_error){
+      return{id:u.uid,...p};
+    }
   }
 
-  if(folderError) throw folderError;
   return null;
 }
 
