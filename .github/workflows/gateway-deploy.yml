@@ -47,3 +47,8 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: drive-gateway
           command: deploy
+
+      - name: Verify live gateway
+        run: |
+          set -e
+          curl --fail --silent --show-error --retry 5 --retry-delay 3             https://irpa-google-drive-gateway.irpa-governance.workers.dev/health
