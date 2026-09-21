@@ -43,6 +43,9 @@ export default {
       if (url.pathname === "/api/signature-profile/folder" && request.method === "POST") {
         return await ensureSignatureProfileFolder(request, env);
       }
+      if (url.pathname === "/api/document-archive/folder" && request.method === "POST") {
+        return await ensureDocumentArchiveFolder(request, env);
+      }
 
       if (url.pathname === "/api/download" && request.method === "POST") {
         return await download(request, env);
@@ -349,6 +352,77 @@ async function ensureSignatureProfileFolder(request, env) {
     sharedWithEmail: requestedEmail || null,
     storageProvider: "Google Drive"
   }, 200, corsHeaders(request));
+}
+
+async function ensureDocumentArchiveFolder(request, env) {
+  const claims = await authenticateFirebaseRequest(request);
+  const data = await request.json();
+  const documentId = cleanId(data.documentId || "");
+  if (!documentId) return json({ ok:false, error:"Document ID is required." },400,corsHeaders(request));
+
+  const document = await getFirestoreDocument(env, `documents/${documentId}`, claims.token);
+  if (!document) return json({ ok:false, error:"Document registry record was not found." },404,corsHeaders(request));
+
+  const fields = document.fields || {};
+  const classification = String(
+    data.classification || fields.classification || fields.accessLevel || fields.visibility || "Public"
+  ).trim();
+  const isPublic = classification.toLowerCase() === "public";
+  const title = cleanName(data.title || fields.title?.stringValue || documentId);
+  const reference = cleanName(data.reference || fields.reference?.stringValue || documentId);
+
+  const accessToken = await getDriveAccessToken(env);
+  const rootId = await findOrCreateFolder(env, accessToken, "IRPA Governance System");
+  const archiveId = await findOrCreateFolder(env, accessToken, "Signed Documents Archive", rootId, {
+    irpaGovernanceArchive: true,
+    purpose: "Signed Documents Archive"
+  });
+  const folderName = `IRPA-DOC-${documentId}`;
+  const folderId = await findOrCreateFolder(env, accessToken, folderName, archiveId, {
+    irpaGovernanceArchive: true,
+    purpose: "Signed Document",
+    documentId,
+    documentUid: documentId,
+    documentTitle: title,
+    documentReference: reference,
+    classification,
+    publicAccess: isPublic
+  });
+
+  if (isPublic) {
+    await ensureAnyoneReaderPermission(env, accessToken, folderId);
+  }
+
+  const folderLink = `https://drive.google.com/drive/folders/${folderId}`;
+  return json({
+    ok:true,
+    documentId,
+    documentUid:documentId,
+    folderId,
+    folderName,
+    archiveFolderId:archiveId,
+    archivePath:`IRPA Governance System/Signed Documents Archive/${folderName}`,
+    archiveUidLink:folderLink,
+    archiveAccess:isPublic?"Public":"Restricted",
+    classification
+  },200,corsHeaders(request));
+}
+
+async function ensureAnyoneReaderPermission(env, accessToken, folderId) {
+  const existing = await driveFetch(
+    env,
+    accessToken,
+    `/drive/v3/files/${encodeURIComponent(folderId)}/permissions?fields=permissions(id,type,role)&pageSize=100`
+  );
+  if ((existing.permissions || []).some(p => p.type === "anyone" && ["reader","commenter","writer"].includes(p.role))) {
+    return true;
+  }
+  await driveFetch(env, accessToken, `/drive/v3/files/${encodeURIComponent(folderId)}/permissions?sendNotificationEmail=false`, {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({type:"anyone",role:"reader"})
+  });
+  return true;
 }
 
 async function sendMemberInvitation(request, env) {
