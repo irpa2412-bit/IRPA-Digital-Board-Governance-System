@@ -46,6 +46,9 @@ export default {
       if (url.pathname === "/api/document-archive/folder" && request.method === "POST") {
         return await ensureDocumentArchiveFolder(request, env);
       }
+      if (url.pathname === "/api/document-archive/provision" && request.method === "POST") {
+        return await provisionDocumentArchive(request, env);
+      }
 
       if (url.pathname === "/api/download" && request.method === "POST") {
         return await download(request, env);
@@ -347,14 +350,7 @@ async function ensureSignatureProfileFolder(request, env) {
     folderId,
     folderName,
     parentFolderId: signaturesId,
-    path: `IRPA Governance System/Signature Profiles/${folderName}`,
-    folderShared,
-    sharedWithEmail: requestedEmail || null,
-    storageProvider: "Google Drive"
-  }, 200, corsHeaders(request));
-}
-
-async function ensureDocumentArchiveFolder(request, env) {
+    path: `IRPA Governance System/Signaturasync function ensureDocumentArchiveFolder(request, env) {
   const claims = await authenticateFirebaseRequest(request);
   const data = await request.json();
   const documentId = cleanId(data.documentId || "");
@@ -364,48 +360,87 @@ async function ensureDocumentArchiveFolder(request, env) {
   if (!document) return json({ ok:false, error:"Document registry record was not found." },404,corsHeaders(request));
 
   const fields = document.fields || {};
-  const classification = String(
-    data.classification || fields.classification || fields.accessLevel || fields.visibility || "Public"
-  ).trim();
-  const isPublic = classification.toLowerCase() === "public";
+  const classification = String(data.classification || fields.classification?.stringValue || fields.accessLevel?.stringValue || "Public").trim();
+  const archiveCategory = String(data.archiveCategory || fields.archiveCategory?.stringValue || "Administrative Documents").trim();
+  const allowedCategories = ["Finance Documents","Procurement Documents","Administrative Documents"];
+  if (!allowedCategories.includes(archiveCategory)) return json({ok:false,error:"Invalid document archive category."},400,corsHeaders(request));
+
   const title = cleanName(data.title || fields.title?.stringValue || documentId);
   const reference = cleanName(data.reference || fields.reference?.stringValue || documentId);
+  const isPublic = classification.toLowerCase() === "public";
 
   const accessToken = await getDriveAccessToken(env);
   const rootId = await findOrCreateFolder(env, accessToken, "IRPA Governance System");
-  const archiveId = await findOrCreateFolder(env, accessToken, "Signed Documents Archive", rootId, {
-    irpaGovernanceArchive: true,
-    purpose: "Signed Documents Archive"
+  const archiveRootId = await findOrCreateFolder(env, accessToken, "Document Archives", rootId, {
+    irpaGovernanceArchive:true,
+    purpose:"Controlled Document Archives"
+  });
+  const categoryId = await findOrCreateFolder(env, accessToken, archiveCategory, archiveRootId, {
+    irpaGovernanceArchive:true,
+    archiveCategory,
+    purpose:"Controlled Document Category"
+  });
+  const classificationId = await findOrCreateFolder(env, accessToken, classification, categoryId, {
+    irpaGovernanceArchive:true,
+    archiveCategory,
+    classification,
+    purpose:"Controlled Document Classification"
   });
   const folderName = `IRPA-DOC-${documentId}`;
-  const folderId = await findOrCreateFolder(env, accessToken, folderName, archiveId, {
-    irpaGovernanceArchive: true,
-    purpose: "Signed Document",
+  const folderId = await findOrCreateFolder(env, accessToken, folderName, classificationId, {
+    irpaGovernanceArchive:true,
+    purpose:"Controlled Document",
     documentId,
-    documentUid: documentId,
-    documentTitle: title,
-    documentReference: reference,
+    documentUid:documentId,
+    documentTitle:title,
+    documentReference:reference,
+    archiveCategory,
     classification,
-    publicAccess: isPublic
+    publicAccess:isPublic
   });
 
-  if (isPublic) {
-    await ensureAnyoneReaderPermission(env, accessToken, folderId);
-  }
+  if (isPublic) await ensureAnyoneReaderPermission(env, accessToken, folderId);
 
-  const folderLink = `https://drive.google.com/drive/folders/${folderId}`;
   return json({
     ok:true,
     documentId,
     documentUid:documentId,
     folderId,
     folderName,
-    archiveFolderId:archiveId,
-    archivePath:`IRPA Governance System/Signed Documents Archive/${folderName}`,
-    archiveUidLink:folderLink,
-    archiveAccess:isPublic?"Public":"Restricted",
-    classification
+    archiveRootId,
+    categoryId,
+    classificationId,
+    archiveCategory,
+    classification,
+    archivePath:`IRPA Governance System/Document Archives/${archiveCategory}/${classification}/${folderName}`,
+    archiveUidLink:`https://drive.google.com/drive/folders/${folderId}`,
+    archiveCategoryUidLink:`https://drive.google.com/drive/folders/${categoryId}`,
+    archiveAccess:isPublic?"Public":"Restricted"
   },200,corsHeaders(request));
+}
+
+async function provisionDocumentArchive(request, env) {
+  const claims = await authenticateFirebaseRequest(request);
+  const data = await request.json();
+  const documentId = cleanId(data.documentId || "");
+  if (!documentId) return json({ok:false,error:"Document ID is required."},400,corsHeaders(request));
+  const document = await getFirestoreDocument(env, `documents/${documentId}`, claims.token);
+  if (!document) return json({ok:false,error:"Document registry record was not found."},404,corsHeaders(request));
+  const archive = await ensureDocumentArchiveFolder(new Request(request.url,{method:"POST",headers:request.headers,body:JSON.stringify(data)}),env);
+  const fileId = document.fields?.fileId?.stringValue || "";
+  let archivedFileId = "";
+  let archivedFileLink = "";
+  if (fileId) {
+    const accessToken = await getDriveAccessToken(env);
+    const copied = await driveFetch(env,accessToken,`/drive/v3/files/${encodeURIComponent(fileId)}/copy?supportsAllDrives=true`,{
+      method:"POST",
+      body:JSON.stringify({name:cleanName(document.fields?.fileName?.stringValue||document.fields?.title?.stringValue||"Controlled Document.pdf"),parents:[archive.folderId]})
+    });
+    archivedFileId=copied.id||"";
+    archivedFileLink=archivedFileId?`https://drive.google.com/file/d/${archivedFileId}/view`:"";
+    if(archive.archiveAccess==="Public"&&archivedFileId) await ensureAnyoneReaderPermission(env,accessToken,archivedFileId);
+  }
+  return json({...archive,archivedFileId,archivedFileLink},200,corsHeaders(request));
 }
 
 async function ensureAnyoneReaderPermission(env, accessToken, folderId) {
