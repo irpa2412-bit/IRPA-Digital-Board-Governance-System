@@ -150,9 +150,9 @@ export default function Settings({ admin = false }) {
           <div className="stat-card" style={{ marginBottom: 14 }}>
             <span>Documents</span>
             <strong>Controlled Document Trial Data</strong>
-            <small>Permanently removes the current document trial records.</small>
+            <small>Permanently removes records explicitly marked as trial documents only. Production controlled documents and all Signature Profiles are preserved.</small>
             <div className="form-actions" style={{ marginTop: 12 }}>
-              <button onClick={() => runTrialReset("documents")} disabled={!!resetBusy}>Reset Documents</button>
+              <button type="button" onClick={() => runTrialReset("documents")} disabled={!!resetBusy} aria-busy={resetBusy==="documents"?"true":"false"}>{resetBusy==="documents" ? "Resetting Documents…" : "Reset Documents"}</button>
             </div>
           </div>
           <div className="stat-card" style={{ marginBottom: 14 }}>
@@ -160,7 +160,7 @@ export default function Settings({ admin = false }) {
             <strong>Employee Trial Data</strong>
             <small>Removes Employee records and resets the Employee Number counter.</small>
             <div className="form-actions" style={{ marginTop: 12 }}>
-              <button onClick={() => runTrialReset("employees")} disabled={!!resetBusy}>Reset Employees</button>
+              <button type="button" onClick={() => runTrialReset("employees")} disabled={!!resetBusy} aria-busy={resetBusy==="employees"?"true":"false"}>{resetBusy==="employees" ? "Resetting Employees…" : "Reset Employees"}</button>
             </div>
           </div>
           <div className="stat-card" style={{ marginBottom: 14 }}>
@@ -168,10 +168,10 @@ export default function Settings({ admin = false }) {
             <strong>General Member Trial Data</strong>
             <small>Removes general Members and resets the Member Number counter. Board Members are preserved.</small>
             <div className="form-actions" style={{ marginTop: 12 }}>
-              <button onClick={() => runTrialReset("members")} disabled={!!resetBusy}>Reset Members</button>
+              <button type="button" onClick={() => runTrialReset("members")} disabled={!!resetBusy} aria-busy={resetBusy==="members"?"true":"false"}>{resetBusy==="members" ? "Resetting Members…" : "Reset Members"}</button>
             </div>
           </div>
-          <label className="field" style={{ display: "block" }}>
+          <div className="success-message" style={{ marginTop: 8 }}>Enter the exact phrase for the reset you want to perform. Document reset only removes records marked as trial data; it does not remove Signature Profiles.</div><label className="field" style={{ display: "block" }}>
             <span>Confirmation phrase</span>
             <input value={confirmation} onChange={e => setConfirmation(e.target.value)} placeholder="Enter the exact phrase shown after selecting a reset" />
           </label>
