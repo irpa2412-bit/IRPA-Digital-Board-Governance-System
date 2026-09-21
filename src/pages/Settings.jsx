@@ -175,6 +175,7 @@ export default function Settings({ admin = false }) {
         {message && <div className="auth-message" style={{ marginTop: 16 }}>{message}</div>}
       </section>
 
+}
       {admin && <section className="panel" style={{ marginTop: 20 }}>
         <div className="panel-header"><div>
           <span className="eyebrow">ADMINISTRATOR CONTROL</span>
