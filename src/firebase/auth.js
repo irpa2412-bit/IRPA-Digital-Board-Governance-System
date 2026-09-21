@@ -79,7 +79,9 @@ function firebaseErrorMessage(error) {
     "auth/invalid-credential": "The email or password is incorrect. Check your credentials or use Forgot password? to reset the password.",
     "auth/user-disabled": "This Firebase account has been disabled. Contact the IRPA administrator.",
     "auth/weak-password": "The password must contain at least 6 characters.",
-    "auth/email-already-in-use": "An account already exists for this email address. Use Forgot password? if you need to reset the password."
+    "auth/email-already-in-use": "An account already exists for this email address. Use Forgot password? if you need to reset the password.",
+    "auth/invalid-action-code": "This sign-in link is invalid or has expired. Request a fresh IRPA invitation/sign-in link and use the newest email only.",
+    "auth/expired-action-code": "This sign-in link has expired. Request a fresh IRPA invitation/sign-in link."
   };
   return known[code] ? `${known[code]} (${code})` : `${message}${code ? ` (${code})` : ""}`;
 }
