@@ -354,22 +354,20 @@ async function ensureSignatureProfileFolder(request, env) {
   const claims = await authenticateFirebaseRequest(request);
   const data = await request.json();
   const documentId = cleanId(data.documentId || "");
-  if (!documentId) return json({ ok:false, error:"Document ID is required." },400,corsHeaders(request));
+  if (!documentId) return json({ok:false,error:"Document UID is required."},400,corsHeaders(request));
 
-  const document = await getFirestoreDocument(env, `documents/${documentId}`, claims.token);
-  if (!document) return json({ ok:false, error:"Document registry record was not found." },404,corsHeaders(request));
-
-  const fields = document.fields || {};
-  const classification = String(data.classification || fields.classification?.stringValue || fields.accessLevel?.stringValue || "Public").trim();
-  const archiveCategory = String(data.archiveCategory || fields.archiveCategory?.stringValue || "Administrative Documents").trim();
+  const classification = String(data.classification || "Public").trim();
+  const archiveCategory = String(data.archiveCategory || "Administrative Documents").trim();
   const allowedCategories = ["Finance Documents","Procurement Documents","Administrative Documents"];
+  const allowedClassifications = ["Public","Internal","Confidential","Restricted"];
   if (!allowedCategories.includes(archiveCategory)) return json({ok:false,error:"Invalid document archive category."},400,corsHeaders(request));
+  if (!allowedClassifications.includes(classification)) return json({ok:false,error:"Invalid document access classification."},400,corsHeaders(request));
 
-  const title = cleanName(data.title || fields.title?.stringValue || documentId);
-  const reference = cleanName(data.reference || fields.reference?.stringValue || documentId);
-  const isPublic = classification.toLowerCase() === "public";
-
+  const title = cleanName(data.title || documentId);
+  const reference = cleanName(data.reference || documentId);
+  const isPublic = classification === "Public";
   const accessToken = await getDriveAccessToken(env);
+
   const rootId = await findOrCreateFolder(env, accessToken, "IRPA Governance System");
   const archiveRootId = await findOrCreateFolder(env, accessToken, "Document Archives", rootId, {
     irpaGovernanceArchive:true,
@@ -403,7 +401,6 @@ async function ensureSignatureProfileFolder(request, env) {
 
   return json({
     ok:true,
-    documentId,
     documentUid:documentId,
     folderId,
     folderName,
@@ -415,7 +412,8 @@ async function ensureSignatureProfileFolder(request, env) {
     archivePath:`IRPA Governance System/Document Archives/${archiveCategory}/${classification}/${folderName}`,
     archiveUidLink:`https://drive.google.com/drive/folders/${folderId}`,
     archiveCategoryUidLink:`https://drive.google.com/drive/folders/${categoryId}`,
-    archiveAccess:isPublic?"Public":"Restricted"
+    archiveAccess:isPublic?"Public":"Restricted",
+    createdByUid:claims.user_id
   },200,corsHeaders(request));
 }
 
