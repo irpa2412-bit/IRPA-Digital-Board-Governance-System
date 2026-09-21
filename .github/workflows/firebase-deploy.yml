@@ -1,5 +1,6 @@
 name: Deploy IRPA Governance to Firebase
 # Deployment trigger for current production changes
+# Administrator Gateway fix deployment marker: 2026-09-21T22:20Z
 
 on:
   push:
