@@ -3,7 +3,6 @@ import { browserSupportsPush, listenForForegroundMessages, notificationPermissio
 import { startGoogleDriveAuthorization } from "../firebase/signatureStorage";
 import { resetDocumentTrialData, resetEmployeeTrialData, resetMemberTrialData } from "../firebase/data";
 import { createAdministrator } from "../firebase/functions";
-import { sendPasswordReset } from "../firebase/auth";
 
 export default function Settings({ admin = false, section = "settings" }) {
   const [supported, setSupported] = useState(false);
@@ -119,20 +118,28 @@ export default function Settings({ admin = false, section = "settings" }) {
               return;
             }
             setAdminBusy(true);
-            setAdminResult(null);
+            setAdminResult({ ok: true, working: true, message: "Starting Administrator setup…" });
             try {
-              const data = await createAdministrator({ name, email });
-              await sendPasswordReset(email);
+              const data = await createAdministrator({
+                name,
+                email,
+                onProgress: message => setAdminResult({ ok: true, working: true, message })
+              });
               setAdminResult({
                 ok: true,
+                working: false,
                 message: data?.accountCreated
-                  ? "Administrator account created and activated successfully. An administrator activation link has been sent to the new email address. Open that email and set the permanent password."
-                  : "The existing account has been activated as an Administrator successfully. An administrator activation link has been sent to the email address."
+                  ? `Administrator account created for ${email}. Firebase accepted the activation email request. The new Administrator must open the email and set a permanent password before signing in.`
+                  : `Existing IRPA account ${email} has been activated as an Administrator. Firebase accepted the activation email request.`
               });
               setAdminName("");
               setAdminEmail("");
             } catch (error) {
-              setAdminResult({ ok: false, message: error?.message || "Unable to add the Administrator." });
+              setAdminResult({
+                ok: false,
+                working: false,
+                message: error?.message || "Unable to add the Administrator. No confirmation was received."
+              });
             } finally {
               setAdminBusy(false);
             }
@@ -150,7 +157,13 @@ export default function Settings({ admin = false, section = "settings" }) {
             </div>
           </form>
           {adminResult && (
-            <div className={adminResult.ok ? "success-message" : "auth-message"} style={{ marginTop: 16 }} role="status" aria-live="polite">
+            <div
+              className={adminResult.ok ? "success-message" : "auth-message"}
+              style={{ marginTop: 16 }}
+              role="status"
+              aria-live="polite"
+              aria-busy={adminResult.working ? "true" : "false"}
+            >
               {adminResult.message}
             </div>
           )}
