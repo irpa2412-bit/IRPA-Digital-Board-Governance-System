@@ -70,6 +70,12 @@ export async function provisionDocumentArchive({documentId,title,reference,archi
   return result;
 }
 
+export async function ensureSignedDocumentArchive({documentId,title,reference,archiveCategory,classification}={}) {
+  const result = await gatewayPost("/api/signed-document/archive", { documentId, title, reference, archiveCategory, classification });
+  if (!result.folderId || !result.archiveUidLink) throw new Error("Google Drive did not return the signed-document archive.");
+  return result;
+}
+
 export async function ensureDocumentArchiveFolder({documentId,title,reference,archiveCategory,classification}={}) {
   const result = await gatewayPost("/api/document-archive/folder", { documentId, title, reference, archiveCategory, classification });
   if (!result.folderId || !result.archiveUidLink) throw new Error("Google Drive did not return the signed-document archive.");
