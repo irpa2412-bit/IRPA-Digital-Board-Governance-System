@@ -22,7 +22,9 @@ async function requireAdministrator(){
   return { uid, email: auth.currentUser?.email || snap.data()?.email || null };
 }
 
-export async function createAdministrator({ name, email }){
+export async function createAdministrator({ name, email, onProgress }){
+  const progress = (message) => { try { onProgress?.(message); } catch (_) {} };
+  progress("Checking Administrator authorization…");
   const actor = await requireAdministrator();
   const cleanEmail = String(email || "").trim().toLowerCase();
   const cleanName = String(name || "").trim();
@@ -30,6 +32,7 @@ export async function createAdministrator({ name, email }){
   if(!cleanEmail || !cleanEmail.includes("@")) throw new Error("A valid administrator email address is required.");
   if(cleanEmail === String(actor.email || "").toLowerCase()) throw new Error("The current administrator is already an administrator.");
 
+  progress("Validating the new Administrator details…");
   let targetUid = null;
   let accountCreated = false;
   let targetDisplayName = cleanName;
@@ -39,12 +42,14 @@ export async function createAdministrator({ name, email }){
 
   try{
     try{
+      progress("Creating the Firebase account…");
       const credential = await createUserWithEmailAndPassword(secondaryAuth, cleanEmail, temporaryPassword());
       targetUid = credential.user.uid;
       accountCreated = true;
     }catch(error){
       if(error?.code !== "auth/email-already-in-use") throw error;
 
+      progress("The email already has a Firebase account. Matching it to an IRPA profile…");
       const adminMatch = await getDocs(query(collection(db,"adminProfiles"),where("email","==",cleanEmail)));
       if(!adminMatch.empty){
         targetUid = adminMatch.docs[0].id;
@@ -65,6 +70,7 @@ export async function createAdministrator({ name, email }){
     await deleteApp(secondaryApp);
   }
 
+  progress("Saving the Administrator authorization profile…");
   const existing = await getDoc(doc(db,"adminProfiles",targetUid));
   const previous = existing.exists() ? existing.data() : {};
   targetDisplayName = cleanName || previous.name || cleanEmail.split("@")[0];
@@ -81,6 +87,7 @@ export async function createAdministrator({ name, email }){
     updatedAt: serverTimestamp()
   },{merge:true});
 
+  progress("Writing the security audit record…");
   await addDoc(collection(db,"audit"),{
     action: accountCreated ? "ADMINISTRATOR_CREATED" : "ADMINISTRATOR_ACTIVATED",
     collection: "adminProfiles",
@@ -92,11 +99,13 @@ export async function createAdministrator({ name, email }){
   });
 
   try{
+    progress("Requesting the Administrator activation email…");
     await sendPasswordResetEmail(auth, cleanEmail);
   }catch(error){
     throw new Error(`Administrator was created, but the activation email could not be requested: ${error?.message || "Firebase Authentication error"}`);
   }
 
+  progress("Administrator setup completed.");
   return {
     ok: true,
     uid: targetUid,
