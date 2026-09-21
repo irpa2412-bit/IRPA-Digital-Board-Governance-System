@@ -356,7 +356,7 @@ async function sendMemberInvitation(request, env) {
   const name = String(fields.name?.stringValue || "").trim();
   const role = String(fields.role?.stringValue || "IRPA Member");
   if (!email) return json({ok:false,error:"Invitation email address is missing."},400,corsHeaders(request));
-  const appUrl = String(env.IRPA_APP_URL || "https://irpa-digital-board-governance.web.app").replace(/\\/$/,"");
+  const appUrl = String(env.IRPA_APP_URL || "https://irpa-digital-board-governance.web.app").replace(/\/$/,"");
   const link = `${appUrl}/?memberInvite=${encodeURIComponent(invitationId)}`;
   const subject = "IRPA Digital Board Governance — Invitation to Activate Your Account";
   const text = `Dear ${name || "IRPA Member"},\\n\\nYou have been invited to access the IRPA Digital Board Governance System as ${role}.\\n\\nActivate your account using this secure invitation link:\\n${link}\\n\\nOn the activation page, use your invited email address and create your permanent password. After activation, you can sign in normally using your email address and password.\\n\\nIf you did not expect this invitation, please contact Improvement of Rangeland in Pastoral Areas (IRPA).\\n\\nRegards,\\nIRPA Administration\\ninfo@irpa.or.tz`;
