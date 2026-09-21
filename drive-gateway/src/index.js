@@ -52,6 +52,9 @@ export default {
       if (url.pathname === "/api/signed-document/archive" && request.method === "POST") {
         return await ensureSignedDocumentArchive(request, env);
       }
+      if (url.pathname === "/api/signature-workflow/folder" && request.method === "POST") {
+        return await ensureSignatureWorkflowFolder(request, env);
+      }
 
       if (url.pathname === "/api/download" && request.method === "POST") {
         return await download(request, env);
@@ -493,6 +496,27 @@ async function ensureSignedDocumentArchive(request, env) {
   return json({ok:true,documentUid:documentId,folderId,archiveRootId:signedRootId,categoryId,classificationId,archiveCategory,classification,archivePath:`IRPA Governance System/Signed Documents Archive/${archiveCategory}/${classification}/${folderName}`,archiveUidLink:`https://drive.google.com/drive/folders/${folderId}`,archiveCategoryUidLink:`https://drive.google.com/drive/folders/${categoryId}`,archiveAccess:classification==="Public"?"Public":"Restricted"},200,corsHeaders(request));
 }
 
+
+async function ensureSignatureWorkflowFolder(request, env) {
+  const claims = await authenticateFirebaseRequest(request);
+  const data = await request.json();
+  const envelopeId = cleanId(data.envelopeId || "");
+  if (!envelopeId) return json({ok:false,error:"Signature workflow ID is required."},400,corsHeaders(request));
+  const accessToken = await getDriveAccessToken(env);
+  const rootId = await findOrCreateFolder(env, accessToken, "IRPA Governance System");
+  const workflowsId = await findOrCreateFolder(env, accessToken, "Signature Workflows", rootId, {
+    irpaGovernanceSignatureWorkflow:true,
+    purpose:"Signature Workflow Working Files"
+  });
+  const folderName = `IRPA-WORKFLOW-${envelopeId}`;
+  const folderId = await findOrCreateFolder(env, accessToken, folderName, workflowsId, {
+    irpaGovernanceSignatureWorkflow:true,
+    envelopeId,
+    ownerUid:claims.user_id,
+    purpose:"Signature Workflow Working File"
+  });
+  return json({ok:true,envelopeId,folderId,folderName,archiveAccess:"Restricted",path:`IRPA Governance System/Signature Workflows/${folderName}`},200,corsHeaders(request));
+}
 
 async function sendMemberInvitation(request, env) {
   const claims = await authenticateFirebaseRequest(request);
