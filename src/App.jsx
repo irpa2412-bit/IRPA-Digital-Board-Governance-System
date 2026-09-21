@@ -83,8 +83,11 @@ useEffect(()=>observeAuthState(async u=>{setUser(u);setProfile(undefined);setEmp
   const url=new URL(window.location.href);
   const signingEnvelopeId=url.searchParams.get("signEnvelope");
 
-  if(!e&&signingEnvelopeId){
-    e=window.prompt("Enter the email address that received this IRPA signing invitation:");
+  if(!e){
+    const promptText=signingEnvelopeId
+      ?"Enter the email address that received this IRPA signing invitation:"
+      :"Enter the email address that received this IRPA sign-in link:";
+    e=window.prompt(promptText);
     if(e){
       e=e.trim().toLowerCase();
       window.localStorage.setItem("irpaEmailForSignIn",e);
