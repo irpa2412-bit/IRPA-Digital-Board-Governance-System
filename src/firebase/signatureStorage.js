@@ -62,6 +62,12 @@ export async function uploadBytes(target, file, metadata = {}) {
   return { ref: target, metadata: result };
 }
 
+export async function ensureDocumentArchiveFolder({documentId,title,reference,classification}={}) {
+  const result = await gatewayPost("/api/document-archive/folder", { documentId, title, reference, classification });
+  if (!result.folderId || !result.archiveUidLink) throw new Error("Google Drive did not return the signed-document archive.");
+  return result;
+}
+
 export async function ensureSignatureProfileFolder(uid) {
   const email = uid === auth.currentUser?.uid ? (auth.currentUser?.email || "") : "";
   const result = await gatewayPost("/api/signature-profile/folder", { uid, email });
