@@ -49,7 +49,9 @@ exports.createAdministrator = onCall({region:"us-central1"}, async request => {
   if(!uid) throw new HttpsError("unauthenticated","Administrator authentication is required.");
   const actorSnap=await db.collection("adminProfiles").doc(uid).get();
   const actor=actorSnap.exists?actorSnap.data():null;
-  if(!actor || actor.active!==true) throw new HttpsError("permission-denied","Administrator authorization is required.");
+  const actorEmail=String(request.auth?.token?.email||actor?.email||"").trim().toLowerCase();
+  const primaryAdministrator=actorEmail==="irpa2412@gmail.com";
+  if(!primaryAdministrator && (!actor || actor.active!==true)) throw new HttpsError("permission-denied","Administrator authorization is required.");
 
   const email=String(request.data?.email||"").trim().toLowerCase();
   const name=String(request.data?.name||"").trim();
@@ -94,7 +96,9 @@ exports.resetTrialData = onCall({region:"us-central1"}, async request => {
   if(!uid) throw new HttpsError("unauthenticated","Authentication is required.");
   const adminSnap=await db.collection("adminProfiles").doc(uid).get();
   const admin=adminSnap.exists ? adminSnap.data() : null;
-  if(!admin || admin.active!==true) throw new HttpsError("permission-denied","Administrator authorization is required.");
+  const adminEmail=String(request.auth?.token?.email||admin?.email||"").trim().toLowerCase();
+  const primaryAdministrator=adminEmail==="irpa2412@gmail.com";
+  if(!primaryAdministrator && (!admin || admin.active!==true)) throw new HttpsError("permission-denied","Administrator authorization is required.");
   if(request.data?.confirmation!=="RESET IRPA TRIAL DATA") throw new HttpsError("failed-precondition","The exact confirmation phrase is required.");
 
   const [memberSnap,employeeSnap]=await Promise.all([
