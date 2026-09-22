@@ -130,8 +130,8 @@
       busy(true); show("");
       try{
         await sendPasswordResetEmail(auth,ADMIN_EMAIL,{
-          url: location.origin + "/administrator.html",
-          handleCodeInApp: true
+          url: location.origin + "/administrator.html?adminReset=1",
+          handleCodeInApp: false
         });
         show("A password-reset email has been sent to irpa2412@gmail.com.");
       }catch(err){show(errorText(err))}
