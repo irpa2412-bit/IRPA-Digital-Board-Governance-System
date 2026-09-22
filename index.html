@@ -13,6 +13,14 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Keep the administrator gateway independent from the React governance
+      // application. If the main bundle ever fails, administrator access must
+      // still have a deterministic HTML entry point.
+      if (new URLSearchParams(window.location.search).get("adminGateway") === "1") {
+        window.location.replace("/administrator.html");
+      }
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
