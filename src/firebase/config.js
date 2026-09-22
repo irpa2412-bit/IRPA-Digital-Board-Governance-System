@@ -4,7 +4,11 @@ import { getFirestore } from "firebase/firestore";
 
 export const firebaseConfig = {
   apiKey: "AIzaSyC2aMdxHD14nMnGiRyf4mSL1ixXdzBoOtE",
-  authDomain: "irpa-digital-board-governance.firebaseapp.com",
+  // The production application is served from this Firebase Hosting web.app
+  // origin. Using the same origin for Auth removes the cross-origin Auth
+  // helper/storage boundary that can block Google authentication in modern
+  // mobile browsers.
+  authDomain: "irpa-digital-board-governance.web.app",
   projectId: "irpa-digital-board-governance",
   messagingSenderId: "217055978789",
   appId: "1:217055978789:web:937d1f2f781202cc1e26cc",
