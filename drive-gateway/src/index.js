@@ -518,6 +518,39 @@ async function ensureSignatureWorkflowFolder(request, env) {
   return json({ok:true,envelopeId,folderId,folderName,archiveAccess:"Restricted",path:`IRPA Governance System/Signature Workflows/${folderName}`},200,corsHeaders(request));
 }
 
+async function sendRegistrationNumber(request, env) {
+  const claims = await authenticateFirebaseRequest(request);
+  const data = await request.json();
+  const uid = cleanId(data.uid || claims.user_id);
+  if (uid !== claims.user_id) return json({ok:false,error:"Registration-number email may only be requested for the authenticated account."},403,corsHeaders(request));
+  const member = await getFirestoreDocument(env, `members/${uid}`, claims.token);
+  const employee = await getFirestoreDocument(env, `employees/${uid}`, claims.token);
+  const memberFields = member?.fields || {};
+  const employeeFields = employee?.fields || {};
+  const number = employeeFields.employeeNumber?.stringValue || memberFields.memberNumber?.stringValue || "";
+  const email = String(claims.email || employeeFields.email?.stringValue || memberFields.email?.stringValue || "").trim().toLowerCase();
+  const name = employeeFields.name?.stringValue || memberFields.name?.stringValue || "IRPA Member/Employee";
+  if (!number) return json({ok:false,error:"No IRPA member/employee registration number is currently assigned to this account."},409,corsHeaders(request));
+  if (!email) return json({ok:false,error:"No official email address is available for this account."},409,corsHeaders(request));
+  const subject = "IRPA Digital Board Governance — Registration Number Confirmation";
+  const text = `Dear ${name},
+
+Your IRPA Digital Board Governance induction form has been saved successfully.
+
+Your existing IRPA registration number is: ${number}
+
+This number was retrieved from the IRPA registration system and was not entered or changed during induction. Keep it for your IRPA Digital Governance System records.
+
+Your completed induction has been routed to the registered department/unit for role and duties assignment.
+
+Regards,
+IRPA Administration
+info@irpa.or.tz`;
+  const htmlBody = `<!doctype html><html><body style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937"><h2>IRPA Digital Board Governance</h2><p>Dear ${escapeHtml(name)},</p><p>Your IRPA Digital Board Governance induction form has been saved successfully.</p><p><strong>Your IRPA registration number: ${escapeHtml(number)}</strong></p><p>This number was retrieved from the IRPA registration system and was not entered or changed during induction.</p><p>Your completed induction has been routed to the registered department/unit for role and duties assignment.</p><p>Regards,<br>IRPA Administration<br><a href="mailto:info@irpa.or.tz">info@irpa.or.tz</a></p></body></html>`;
+  const messageId = await smtpSend(env,{to:email,subject,text,html:htmlBody});
+  return json({ok:true,email,registrationNumber:number,emailRequested:true,provider:"IRPA Mail Server",deliveryStatus:"Submitted to mail.irpa.or.tz",messageId},200,corsHeaders(request));
+}
+
 async function sendMemberInvitation(request, env) {
   const claims = await authenticateFirebaseRequest(request);
   const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
