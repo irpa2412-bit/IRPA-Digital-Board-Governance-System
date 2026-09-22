@@ -1,5 +1,6 @@
 
-import { auth } from "./config";\nimport { getFunctions, httpsCallable } from "firebase/functions";
+import { auth } from "./config";
+import { getFunctions, httpsCallable } from "firebase/functions";
 
 export async function createAdministrator({ name, email, onProgress }){
   const cleanName = String(name || "").trim();
