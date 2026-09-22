@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow">
+  <meta http-equiv="Cache-Control" content="no-store,no-cache,must-revalidate,max-age=0">
+  <title>IRPA Administrator Gateway</title>
+  <style>
+    :root{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#17211b;background:#eef3ef}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:20px}
+    .card{width:min(480px,100%);background:#fff;border:1px solid #d9e2db;border-radius:20px;padding:28px;box-shadow:0 18px 50px rgba(24,45,31,.12)}
+    .brand{font-size:13px;font-weight:800;letter-spacing:.18em;color:#28613d;text-transform:uppercase}.title{margin:8px 0 6px;font-size:28px}.sub{margin:0 0 24px;color:#5b665f;line-height:1.5}
+    label{display:block;margin:16px 0 7px;font-size:14px;font-weight:700}input{width:100%;padding:13px 14px;border:1px solid #b9c8bd;border-radius:10px;font-size:16px;background:#fff}input:focus{outline:2px solid #7eb28e;border-color:#4f8b61}
+    button{width:100%;margin-top:20px;padding:13px 16px;border:0;border-radius:10px;background:#28613d;color:#fff;font-size:16px;font-weight:800;cursor:pointer}button:disabled{opacity:.65;cursor:wait}
+    .secondary{background:#fff;color:#28613d;border:1px solid #9eb6a5}.link{background:transparent;color:#28613d;font-size:14px;margin-top:8px;padding:8px}
+    .message{margin-top:16px;padding:12px 14px;border-radius:10px;background:#f1f6f2;color:#304238;line-height:1.45;display:none}.message.show{display:block}
+    .small{margin-top:18px;color:#6b756f;font-size:12px;text-align:center;line-height:1.5}
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="brand">IRPA</div>
+    <h1 class="title">Administrator Gateway</h1>
+    <p class="sub">Secure administrator access to the IRPA Digital Board Governance System.</p>
+    <form id="loginForm">
+      <label for="email">Administrator email</label>
+      <input id="email" type="email" value="irpa2412@gmail.com" readonly autocomplete="username">
+      <label for="password">Administrator password</label>
+      <input id="password" type="password" required minlength="6" autocomplete="current-password" placeholder="Enter your administrator password">
+      <button id="loginButton" type="submit">Administrator Sign In</button>
+    </form>
+    <button id="resetButton" class="link" type="button">Forgot administrator password?</button>
+    <button id="googleButton" class="secondary" type="button">Sign In with Google</button>
+    <div id="message" class="message" role="status" aria-live="polite"></div>
+    <div class="small">Assigned administrator: irpa2412@gmail.com</div>
+  </main>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+    import {
+      getAuth, setPersistence, browserLocalPersistence,
+      signInWithEmailAndPassword, sendPasswordResetEmail,
+      GoogleAuthProvider, signInWithPopup
+    } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
+
+    const firebaseConfig={
+      apiKey:"AIzaSyC2aMdxHD14nMnGiRyf4mSL1ixXdzBoOtE",
+      authDomain:"irpa-digital-board-governance.firebaseapp.com",
+      projectId:"irpa-digital-board-governance",
+      messagingSenderId:"217055978789",
+      appId:"1:217055978789:web:937d1f2f781202cc1e26cc",
+      measurementId:"G-XDJEBRBEVC"
+    };
+    const ADMIN_EMAIL="irpa2412@gmail.com";
+    const app=initializeApp(firebaseConfig);
+    const auth=getAuth(app);
+    const message=document.getElementById("message");
+    const loginButton=document.getElementById("loginButton");
+    const resetButton=document.getElementById("resetButton");
+    const googleButton=document.getElementById("googleButton");
+    const password=document.getElementById("password");
+
+    const show=(text)=>{
+      message.textContent=text;
+      message.classList.add("show");
+    };
+    const busy=(value)=>{
+      loginButton.disabled=value;
+      resetButton.disabled=value;
+      googleButton.disabled=value;
+    };
+    const errorText=(e)=>{
+      const code=e?.code||"";
+      if(code==="auth/invalid-credential"||code==="auth/wrong-password") return "The administrator password was not accepted.";
+      if(code==="auth/user-not-found") return "The assigned administrator account was not found.";
+      if(code==="auth/too-many-requests") return "Too many attempts. Wait a moment and try again.";
+      if(code==="auth/popup-closed-by-user") return "Google sign-in was closed before authentication completed.";
+      return e?.message||"Administrator authentication failed.";
+    };
+
+    await setPersistence(auth,browserLocalPersistence);
+
+    document.getElementById("loginForm").addEventListener("submit",async(e)=>{
+      e.preventDefault(); show(""); busy(true);
+      try{
+        const credential=await signInWithEmailAndPassword(auth,ADMIN_EMAIL,password.value);
+        if((credential.user.email||"").toLowerCase()!==ADMIN_EMAIL){
+          await auth.signOut();
+          throw new Error("This account is not the assigned IRPA administrator account.");
+        }
+        show("Administrator authenticated. Opening the governance dashboard...");
+        setTimeout(()=>location.replace(location.origin+"/"),500);
+      }catch(err){show(errorText(err));busy(false)}
+    });
+
+    resetButton.addEventListener("click",async()=>{
+      busy(true); show("");
+      try{
+        await sendPasswordResetEmail(auth,ADMIN_EMAIL);
+        show("A password-reset email has been sent to irpa2412@gmail.com.");
+      }catch(err){show(errorText(err))}
+      finally{busy(false)}
+    });
+
+    googleButton.addEventListener("click",async()=>{
+      busy(true); show("");
+      try{
+        const provider=new GoogleAuthProvider();
+        provider.setCustomParameters({prompt:"select_account",login_hint:ADMIN_EMAIL});
+        const credential=await signInWithPopup(auth,provider);
+        if((credential.user.email||"").toLowerCase()!==ADMIN_EMAIL){
+          await auth.signOut();
+          throw new Error("The Google account used is not the assigned IRPA administrator account.");
+        }
+        show("Administrator authenticated. Opening the governance dashboard...");
+        setTimeout(()=>location.replace(location.origin+"/"),500);
+      }catch(err){show(errorText(err));busy(false)}
+    });
+  </script>
+</body>
+</html>
