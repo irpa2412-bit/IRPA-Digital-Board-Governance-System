@@ -150,34 +150,27 @@ useEffect(()=>{
         }
       }
 
-      const gateway=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").replace(/\/$/,"");
+      // Member/employee authorization is resolved directly from Firebase.
+      // The induction/tutorial workflow must never sit in the administrator
+      // authentication path and must not depend on the external gateway.
       const loadMemberSession=async()=>{
         const withTimeout=(promise,ms,label)=>Promise.race([
           promise,new Promise((_,reject)=>window.setTimeout(()=>reject(new Error(label)),ms))
         ]);
-        const firebaseProfile=withTimeout((async()=>{
-          const [memberDirect,employeeDirect]=await Promise.all([
-            getCurrentMemberProfile().catch(()=>null),
-            getCurrentEmployeeProfile().catch(()=>null)
-          ]);
-          if(!memberDirect&&!employeeDirect)return null;
-          return {ok:true,uid:u.uid,email:u.email||memberDirect?.email||employeeDirect?.email||"",admin:null,member:memberDirect?.status==="Active"?memberDirect:null,employee:employeeDirect||null,authorizationSource:"firebase"};
-        })(),3000,"Firebase member authorization lookup timed out.");
-
-        const gatewayProfile=withTimeout((async()=>{
-          const token=await u.getIdToken();
-          const response=await fetch(gateway+"/api/session/profile",{
-            method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},cache:"no-store"
-          });
-          const result=await response.json().catch(()=>({}));
-          if(!response.ok||!result.ok)throw new Error(result.error||"Unable to verify IRPA authorization.");
-          return result;
-        })(),3000,"Authorization gateway timed out.");
-
-        const results=await Promise.allSettled([firebaseProfile,gatewayProfile]);
-        const session=results.filter(result=>result.status==="fulfilled"&&result.value).map(result=>result.value).find(value=>value.ok||value.member||value.employee);
-        if(session)return session;
-        throw new Error("No active IRPA authorization profile was found.");
+        const [memberDirect,employeeDirect]=await Promise.all([
+          withTimeout(getCurrentMemberProfile().catch(()=>null),5000,"Firebase member authorization lookup timed out."),
+          withTimeout(getCurrentEmployeeProfile().catch(()=>null),5000,"Firebase employee authorization lookup timed out.")
+        ]);
+        if(!memberDirect&&!employeeDirect)throw new Error("No active IRPA authorization profile was found.");
+        return {
+          ok:true,
+          uid:u.uid,
+          email:u.email||memberDirect?.email||employeeDirect?.email||"",
+          admin:null,
+          member:memberDirect?.status==="Active"?memberDirect:null,
+          employee:employeeDirect||null,
+          authorizationSource:"firebase"
+        };
       };
 
       const session=await loadMemberSession();
