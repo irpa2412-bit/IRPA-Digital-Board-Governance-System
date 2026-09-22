@@ -211,10 +211,18 @@ export default function Settings({ admin = false, section = "settings" }) {
           <small>Current browser notification permission</small>
         </div>
         <div className="form-actions">
-          <button onClick={enableNotifications} disabled={busy || !supported}>
-            {busy ? "Enabling..." : "Enable Push Notifications"}
+          <button onClick={enableNotifications} disabled={busy || !supported || permission === "denied"}>
+            {busy ? "Enabling..." : permission === "denied" ? "Notifications Blocked — Allow in Browser Settings" : "Enable Push Notifications"}
           </button>
         </div>
+        {permission === "denied" && (
+          <div className="auth-message" style={{ marginTop: 16 }}>
+            <strong>Browser permission is blocked.</strong><br />
+            On Android Chrome, open the site controls for this IRPA web app, choose
+            <strong> Permissions → Notifications → Allow</strong>, then return here and press
+            <strong> Enable Push Notifications</strong>.
+          </div>
+        )}
         {message && <div className="auth-message" style={{ marginTop: 16 }}>{message}</div>}
       </section>
 
