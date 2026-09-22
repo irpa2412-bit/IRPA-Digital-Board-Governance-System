@@ -154,13 +154,13 @@ export default function InductionOrientation(){
   try{
    const result=await submitInductionApplication(form,context);
    if(result.alreadyLinked){setMessage("Your induction has already been approved and linked by an administrator.");return}
-   setMessage("Induction & Orientation submitted successfully. Your application is now awaiting administrator LINK. Your registered role(s), department/unit and Board Member status remain system-controlled.");
+   setMessage("Induction and Orientation submitted successfully. Your application is now awaiting administrator LINK. Your registered role(s), department/unit and Board Member status remain system-controlled.");
   }catch(x){setError(x.message||"The induction application could not be submitted.");}
   finally{setSaving(false);}
  }
 
- if(busy)return <div className="page"><section className="panel"><h2>Induction & Orientation</h2><p className="muted">Retrieving your registered IRPA information and invitation details…</p></section></div>;
- if(error&&!context)return <div className="page"><section className="panel"><h2>Induction & Orientation — Access Check</h2><div className="error-message action-feedback">{error}</div><p className="panel-description">The system could not retrieve a matching IRPA registration/invitation record, so the application remains blocked.</p></section></div>;
+ if(busy)return <div className="page"><section className="panel"><h2>Induction and Orientation</h2><p className="muted">Retrieving your registered IRPA information and invitation details…</p></section></div>;
+ if(error&&!context)return <div className="page"><section className="panel"><h2>Induction and Orientation — Access Check</h2><div className="error-message action-feedback">{error}</div><p className="panel-description">The system could not retrieve a matching IRPA registration/invitation record, so the application remains blocked.</p></section></div>;
 
  return <div className="page">
   <section className="welcome-panel">
