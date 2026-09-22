@@ -37,31 +37,13 @@ export async function loginWithEmail(email, password) {
 export async function loginWithGoogle(expectedEmail = "", options = {}) {
   const expected = String(expectedEmail || "").trim().toLowerCase();
 
-  // Administrator Gateway: use popup first so Chrome/mobile can complete OAuth
-  // without depending on redirect-state recovery. If the browser blocks popups,
-  // fall back to the full-page redirect flow.
+  // Administrator Gateway uses Firebase redirect authentication. This is
+  // deterministic on Android/mobile browsers and avoids popup/tab blockers.
   if (options.admin === true) {
-    try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const actual = String(result.user?.email || "").trim().toLowerCase();
-      if (expected && actual !== expected) {
-        await signOut(auth);
-        throw new Error(`Use the designated IRPA administrator Google account: ${expected}.`);
-      }
-      return result.user;
-    } catch (error) {
-      const fallbackCodes = new Set([
-        "auth/popup-blocked",
-        "auth/popup-closed-by-user",
-        "auth/cancelled-popup-request",
-        "auth/operation-not-supported-in-this-environment"
-      ]);
-      if (!fallbackCodes.has(error?.code)) throw new Error(firebaseErrorMessage(error));
-
-      window.sessionStorage.setItem("irpaExpectedGoogleAdminEmail", expected);
-      await signInWithRedirect(auth, googleProvider);
-      return null;
-    }
+    window.sessionStorage.setItem("irpaExpectedGoogleAdminEmail", expected);
+    window.sessionStorage.setItem("irpaAdminRedirectPending", "1");
+    await signInWithRedirect(auth, googleProvider);
+    return null;
   }
 
   if (options.redirect === true) {
