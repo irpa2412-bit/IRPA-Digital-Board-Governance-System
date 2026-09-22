@@ -111,10 +111,14 @@ useEffect(()=>observeAuthState(async u=>{setUser(u);setProfile(undefined);setEmp
     })(),3000,"Authorization gateway timed out.");
 
     try{
-      const session=await Promise.any([
+      const results=await Promise.allSettled([
         firebaseProfile,
         gatewayProfile
       ]);
+      const session=results
+        .filter(result=>result.status==="fulfilled"&&result.value)
+        .map(result=>result.value)
+        .find(value=>value.ok||value.admin||value.member||value.employee);
       if(session) return session;
       throw new Error("No active IRPA authorization profile was found.");
     }catch(error){
