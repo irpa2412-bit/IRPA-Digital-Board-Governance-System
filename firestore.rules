@@ -94,6 +94,7 @@ service cloud.firestore {
   match /authorizationRequests/{id}{allow read:if admin()||workflowParticipant(resource);allow create:if admin()||activeMember();allow update:if admin()||workflowParticipant(resource)||workflowParticipant(request.resource);allow delete:if admin();}
   match /workflowActions/{id}{allow read:if admin()||workflowParticipant(resource);allow create:if admin()||activeMember()&&validAuthorizationCreate();allow update:if workflowUpdateAllowed()&&validWorkflowRecord(request.resource)&&!workflowTerminal()&&(request.resource.data.workflowType!="Authorization"||authorizationTransitionAllowed());allow delete:if admin();}
   match /systemSettings/{id}{allow read,create,update,delete:if admin();}
+  match /inductionRecords/{uid}{allow read:if self(uid)||admin();allow create,update:if self(uid)&&activeMember()&&request.resource.data.uid==request.auth.uid;allow delete:if admin();}
   match /{document=**}{allow read,write:if false;}
  }
 }
