@@ -32,7 +32,7 @@ jobs:
       - name: Deploy Hosting and Firestore only
         uses: w9jds/firebase-action@v14.17.0
         with:
-          args: deploy --project irpa-digital-board-governance --only hosting,firestore,functions
+          args: deploy --project irpa-digital-board-governance --only hosting,firestore
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
 
