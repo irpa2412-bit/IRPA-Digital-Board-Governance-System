@@ -68,6 +68,10 @@ export default {
         return await sendMemberInvitation(request, env);
       }
 
+      if (url.pathname === "/api/induction/lookup" && request.method === "POST") {
+        return await lookupInductionRegistration(request, env);
+      }
+
       return json({ ok: false, error: "Not found." }, 404, corsHeaders(request));
     } catch (error) {
       console.error("Drive gateway error", error);
@@ -970,6 +974,67 @@ async function getFirebaseJwks() {
   jwksFetchedAt = Date.now();
 
   return jwksCache;
+}
+
+async function lookupInductionRegistration(request, env) {
+  const claims = await authenticateFirebaseRequest(request);
+  const body = await request.json().catch(() => ({}));
+  const fullName = String(body.fullName || "").trim();
+  if (fullName.length < 2) {
+    return json({ok:false,error:"Full name is required."},400,corsHeaders(request));
+  }
+
+  const [memberDoc, employeeDoc, invitations] = await Promise.all([
+    getFirestoreDocument(env, `members/${claims.user_id}`, claims.token),
+    getFirestoreDocument(env, `employees/${claims.user_id}`, claims.token),
+    queryFirestoreByEmail(env, "invitations", "email", String(claims.email || "").toLowerCase(), claims.token)
+  ]);
+
+  const member = firestoreDocumentToPlain(memberDoc) || {};
+  const employee = firestoreDocumentToPlain(employeeDoc) || {};
+  const invitationRows = invitations.map(firestoreDocumentToPlain).filter(Boolean);
+  const normalize = value => String(value || "").trim().toLowerCase().replace(/\\s+/g," ");
+  const entered = normalize(fullName);
+  const memberName = normalize(member.name || member.fullName);
+  const employeeName = normalize(employee.name || employee.fullName);
+  const invitation = invitationRows.find(x => normalize(x.name || x.fullName) === entered) ||
+                     invitationRows[0] || null;
+  const nameMatches = entered === memberName || entered === employeeName || Boolean(invitation && normalize(invitation.name || invitation.fullName) === entered);
+
+  if (!nameMatches) {
+    return json({ok:true,matched:false,reason:"No matching IRPA registration information was found for the authenticated account."},200,corsHeaders(request));
+  }
+
+  const registrationNumber = String(employee.employeeNumber || member.memberNumber || employee.registrationNumber || member.registrationNumber || "").trim();
+  const role = String(employee.role || member.role || invitation?.role || "").trim();
+  const department = String(employee.department || member.department || "").trim();
+  const unit = String(employee.unit || member.unit || "").trim();
+
+  return json({
+    ok:true,
+    matched:true,
+    registration:{
+      fullName: employee.name || member.name || invitation?.name || fullName,
+      email: claims.email || member.email || employee.email || invitation?.email || "",
+      registrationNumber,
+      employeeNumber: employee.employeeNumber || "",
+      memberNumber: member.memberNumber || "",
+      role,
+      department,
+      unit,
+      memberType: member.memberType || invitation?.memberType || "",
+      employmentType: employee.employmentType || "",
+      employmentStatus: employee.employmentStatus || "",
+      memberStatus: member.status || "",
+      invitationStatus: invitation?.status || "",
+      invitationId: invitation ? String(invitation.id || "") : "",
+      sources: [
+        memberName === entered ? "Members Registration" : "",
+        employeeName === entered ? "Employees & Personnel Registration" : "",
+        invitation && normalize(invitation.name || invitation.fullName) === entered ? "Member & Personnel Invitations" : ""
+      ].filter(Boolean)
+    }
+  },200,corsHeaders(request));
 }
 
 async function queryFirestoreByEmail(env, collectionName, fieldName, email, firebaseToken) {
