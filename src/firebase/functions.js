@@ -1,14 +1,7 @@
 import { getFirestore, doc, getDoc, setDoc, addDoc, collection, serverTimestamp, query, where, getDocs } from "firebase/firestore";
 import app, { firebaseConfig, auth, db } from "./config";
-import { getFunctions, httpsCallable } from "firebase/functions";
 
-export const functions = getFunctions(app, "us-central1");
-
-export async function ensurePrimaryAdministrator(){
-  const callable = httpsCallable(functions, "ensurePrimaryAdministrator");
-  const result = await callable({});
-  return result.data;
-}
+export const functions = null;
 
 function firebaseProvisioningError(error, fallback="Firebase administrator provisioning failed."){
   const code=error?.code||"";
