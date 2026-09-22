@@ -49,25 +49,35 @@ useEffect(()=>observeAuthState(async u=>{setUser(u);setProfile(undefined);setEmp
     new URLSearchParams(window.location.search).get("signEnvelope");
 
   if(activeSigningId){
-    const envelope=await getSignatureEnvelope(activeSigningId);
-    const recipient=(envelope.recipients||[]).find(r=>r.uid===u.uid);
+    try{
+      const envelope=await Promise.race([
+        getSignatureEnvelope(activeSigningId),
+        new Promise((_,reject)=>window.setTimeout(()=>reject(new Error("Signing invitation lookup timed out.")),3000))
+      ]);
+      const recipient=(envelope.recipients||[]).find(r=>r.uid===u.uid);
 
-    if(!recipient){
-      throw new Error("This account is not an invited signer for this document.");
+      if(!recipient){
+        throw new Error("This account is not an invited signer for this document.");
+      }
+
+      setSigningEnvelopeId(activeSigningId);
+      setProfile({
+        uid:u.uid,
+        email:u.email||recipient.email||"",
+        name:recipient.name||u.displayName||u.email||"Signing Participant",
+        role:recipient.role||"Signer",
+        authorizationType:"signer",
+        signingEnvelopeId:activeSigningId,
+        signingRecipient:recipient
+      });
+      setEmployee(null);
+      return;
+    }catch(signingError){
+      console.warn("Stale or unavailable signing invitation; continuing with normal IRPA authorization.",signingError);
+      window.sessionStorage.removeItem("irpaSigningEnvelopeId");
+      window.sessionStorage.removeItem("irpaSigningRecipient");
+      setSigningEnvelopeId(null);
     }
-
-    setSigningEnvelopeId(activeSigningId);
-    setProfile({
-      uid:u.uid,
-      email:u.email||recipient.email||"",
-      name:recipient.name||u.displayName||u.email||"Signing Participant",
-      role:recipient.role||"Signer",
-      authorizationType:"signer",
-      signingEnvelopeId:activeSigningId,
-      signingRecipient:recipient
-    });
-    setEmployee(null);
-    return;
   }
 
   const gateway=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").replace(/\/$/,"");
