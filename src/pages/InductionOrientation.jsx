@@ -99,7 +99,7 @@ function ChoiceField({label,value,onChange,options,help,disabled=false,required=
 
 export default function InductionOrientation(){
  const[context,setContext]=useState(null),[busy,setBusy]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState("");
- const[form,setForm]=useState({identityConfirmation:"",primaryRole:"",department:"",unit:"",employmentType:"",orientationModules:[],q1:"",q2:"",q3:"",comments:"",declaration:false});
+ const[form,setForm]=useState({identityConfirmation:"",accountType:"",primaryRole:"",department:"",unit:"",employmentType:"",orientationModules:[],q1:"",q2:"",q3:"",comments:"",declaration:false});
 
  useEffect(()=>{let live=true;(async()=>{
   try{
@@ -110,6 +110,7 @@ export default function InductionOrientation(){
    const priorModules=Array.isArray(c.existingRequest?.orientationModules)?c.existingRequest.orientationModules:[];
    setForm({
     identityConfirmation:prior.identityConfirmation||"",
+    accountType:prior.accountType||c.accountType||"",
     primaryRole:prior.primaryRole||c.roles[0]||"",
     department:prior.department||c.department||"",
     unit:prior.unit||c.unit||"",
@@ -122,6 +123,7 @@ export default function InductionOrientation(){
   finally{if(live)setBusy(false);}
  })();return()=>{live=false}},[]);
 
+ const accountTypeOptions=useMemo(()=>unique(context?.accountTypeOptions||[]),[context]);
  const roleOptions=useMemo(()=>unique(context?.roles||[]),[context]);
  const departmentOptions=useMemo(()=>unique([context?.department,...(context?.invitations||[]).map(x=>x.department)]),[context]);
  const unitOptions=useMemo(()=>{
@@ -148,6 +150,7 @@ export default function InductionOrientation(){
  async function submit(e){
   e.preventDefault();setError("");setMessage("");
   if(!context){setError("The IRPA registration could not be retrieved. The application is blocked.");return}
+  if(!form.accountType){setError("Please confirm whether you are applying in your registered Employee or Member capacity.");return}
   if(form.identityConfirmation!=="Yes"){setError("You must confirm that the displayed registration and invitation information belongs to you.");return}
   if(!form.primaryRole||!form.department||!form.unit||!form.employmentType||!form.q1||!form.q2||!form.q3||!form.orientationModules.length||!form.declaration){setError("Please complete all required selections before submitting.");return}
   setSaving(true);
@@ -175,6 +178,7 @@ export default function InductionOrientation(){
    <div className="panel-header"><div><span className="eyebrow">SYSTEM-RETRIEVED IDENTITY</span><h2>Your Registered Information</h2><p className="panel-description">These fields are retrieved from IRPA registration/invitation records. The registration number is intentionally withheld during induction and is issued to you by email after the administrator completes LINK.</p></div></div>
    <div className="detail-grid">
     <div><span>FULL NAME</span><strong>{context.fullName||"—"}</strong></div>
+    <div><span>REGISTERED CAPACITY</span><strong>{context.accountType||"—"}</strong></div>
     <div><span>REGISTERED ROLE(S)</span><strong>{context.role||"—"}</strong></div>
     <div><span>DEPARTMENT</span><strong>{context.department||"—"}</strong></div>
     <div><span>UNIT</span><strong>{context.unit||"—"}</strong></div>
@@ -187,12 +191,13 @@ export default function InductionOrientation(){
 
   <form onSubmit={submit}>
    <section className="panel">
-    <div className="panel-header"><div><span className="eyebrow">STEP 1</span><h2>Identity Confirmation</h2></div></div>
+    <div className="panel-header"><div><span className="eyebrow">STEP 1</span><h2>Applicant Capacity & Identity</h2><p className="panel-description">Your Member/Employee status is retrieved from IRPA records. If both records exist, choose the capacity in which this induction is being completed.</p></div></div>
+    <ChoiceField label="I am applying in my registered capacity as" value={form.accountType} onChange={v=>patch("accountType",v)} options={accountTypeOptions} help="Only capacities already found in your IRPA registration records are offered."/>
     <ChoiceField label="Does the system-retrieved identity above belong to you?" value={form.identityConfirmation} onChange={v=>patch("identityConfirmation",v)} options={["Yes","No"]} help="Selecting No blocks submission so the registration/invitation record can be corrected before induction."/>
    </section>
 
    <section className="panel">
-    <div className="panel-header"><div><span className="eyebrow">STEP 2</span><h2>Role, Department & Unit</h2><p className="panel-description">The choices below are constrained by your registered information and the department/unit structure.</p></div></div>
+    <div className="panel-header"><div><span className="eyebrow">STEP 2</span><h2>Position, Department & Unit</h2><p className="panel-description">The choices below are constrained by your registered information and the department/unit structure.</p></div></div>
     <div className="form-grid">
      <ChoiceField label="Role for this orientation" value={form.primaryRole} onChange={v=>patch("primaryRole",v)} options={roleOptions} help={context.role?"All registered roles remain recorded: "+context.role:""}/>
      <ChoiceField label="Department" value={form.department} onChange={v=>patch("department",v)} options={departmentOptions}/>
