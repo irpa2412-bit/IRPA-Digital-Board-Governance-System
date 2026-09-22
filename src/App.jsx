@@ -50,8 +50,10 @@ useEffect(()=>{
   // This prevents Android/mobile browsers from returning to the gateway
   // without the application adopting the authenticated Firebase user.
   const resolveGoogleRedirect=async()=>{
-    const expected=window.sessionStorage.getItem("irpaExpectedGoogleAdminEmail");
-    if(!expected)return;
+    // Always ask Firebase for a pending redirect result. Do not depend on
+    // sessionStorage surviving the Google/Firebase cross-origin round trip.
+    // Some Android browsers partition or clear sessionStorage during redirects.
+    const expected=window.sessionStorage.getItem("irpaExpectedGoogleAdminEmail")||"irpa2412@gmail.com";
     try{
       const redirectedUser=await completeGoogleRedirect(expected);
       window.sessionStorage.removeItem("irpaAdminRedirectPending");
@@ -67,7 +69,10 @@ useEffect(()=>{
             active:true,
             authorizationType:"administrator"
           });
-          window.history.replaceState({},document.title,window.location.pathname);
+          window.sessionStorage.removeItem("irpaExpectedGoogleAdminEmail");
+          if(new URLSearchParams(window.location.search).get("adminGateway")==="1"){
+            window.history.replaceState({},document.title,window.location.pathname);
+          }
         }
       }
     }catch(x){
