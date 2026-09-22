@@ -16,7 +16,8 @@ import {
 } from "firebase/auth";
 import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { auth, firebaseConfig, googleProvider } from "./config";
+import { auth, db, firebaseConfig, googleProvider } from "./config";
+import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
 
 // The administrator gateway uses a dedicated OAuth Auth instance pinned to
@@ -151,10 +152,16 @@ export async function sendPasswordReset(email) {
 
 export async function logout() { await signOut(auth); }
 
-export async function sendAdminMagicLink(email) {
-  const actionCodeSettings = { url: window.location.origin + "/?adminGateway=1&adminModule=Add%20Administrator", handleCodeInApp: true };
-  await sendSignInLinkToEmail(auth, email.trim().toLowerCase(), actionCodeSettings);
-  window.localStorage.setItem("irpaEmailForSignIn", email.trim().toLowerCase());
+export async function sendAdminMagicLink(email, invitationId = "") {
+  const cleanEmail = email.trim().toLowerCase();
+  if(!cleanEmail) throw new Error("Administrator email is required.");
+  if(!invitationId) throw new Error("Administrator invitation ID is required.");
+  const actionCodeSettings = {
+    url: window.location.origin + "/?adminGateway=1&adminModule=Add%20Administrator&adminInvite=" + encodeURIComponent(invitationId),
+    handleCodeInApp: true
+  };
+  await sendSignInLinkToEmail(auth, cleanEmail, actionCodeSettings);
+  window.localStorage.setItem("irpaEmailForSignIn", cleanEmail);
 }
 
 function generateTemporaryPassword() {
@@ -264,12 +271,50 @@ export function isMagicLink(url = window.location.href) {
 }
 
 export async function completeMagicLink(email, url = window.location.href) {
-  const result = await signInWithEmailLink(auth, email.trim().toLowerCase(), url);
-  const invitationId = new URLSearchParams(new URL(url, window.location.origin).search).get("memberInvite");
+  const cleanEmail = email.trim().toLowerCase();
+  const params = new URL(url, window.location.origin).searchParams;
+  const adminInvitationId = params.get("adminInvite");
+  const memberInvitationId = params.get("memberInvite");
+  const result = await signInWithEmailLink(auth, cleanEmail, url);
 
-  if (invitationId) {
+  if (adminInvitationId) {
+    const invitationRef = doc(db, "adminInvitations", adminInvitationId);
+    const invitationSnap = await getDoc(invitationRef);
+    if(!invitationSnap.exists()) throw new Error("This Administrator invitation is invalid or no longer available.");
+    const invitation = invitationSnap.data();
+    if(String(invitation.email || "").trim().toLowerCase() !== cleanEmail) {
+      await signOut(auth);
+      throw new Error("This Administrator activation link was issued for a different email address.");
+    }
+    if(invitation.status !== "Pending") throw new Error("This Administrator invitation has already been activated or is no longer pending.");
+
+    await setDoc(doc(db, "adminProfiles", result.user.uid), {
+      uid: result.user.uid,
+      email: cleanEmail,
+      name: invitation.name || result.user.displayName || cleanEmail.split("@")[0],
+      role: "Administrator",
+      active: true,
+      invitationId: adminInvitationId,
+      createdByUid: invitation.createdByUid || null,
+      createdByEmail: invitation.createdByEmail || null,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+
+    await setDoc(invitationRef, {
+      status: "Activated",
+      activatedUid: result.user.uid,
+      activatedAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+
+    window.localStorage.removeItem("irpaEmailForSignIn");
+    return result.user;
+  }
+
+  if (memberInvitationId) {
     const { provisionCurrentMemberFromInvitationV2 } = await import("./invitationWorkflow");
-    await provisionCurrentMemberFromInvitationV2(invitationId);
+    await provisionCurrentMemberFromInvitationV2(memberInvitationId);
     window.localStorage.removeItem("irpaMemberEmailForSignIn");
     window.localStorage.removeItem("irpaEmailForSignIn");
   } else {
