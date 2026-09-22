@@ -91,6 +91,65 @@ exports.createAdministrator = onCall({region:"us-central1"}, async request => {
   return {ok:true,uid:target.uid,email,name:name||target.displayName||email.split("@")[0],accountCreated:!target.metadata?.lastSignInTime};
 });
 
+exports.submitCredentialInterview = onCall({region:"us-central1"}, async request => {
+  const data=request.data||{};
+  const email=String(data.email||"").trim().toLowerCase();
+  const name=String(data.name||"").trim();
+  const invitationReference=String(data.invitationReference||"").trim();
+  const requestedCapacity=String(data.requestedCapacity||"").trim();
+  const requestedRole=String(data.requestedRole||"").trim();
+  if(!email||!email.includes("@")||!name) throw new HttpsError("invalid-argument","Name and a valid email address are required.");
+  const invitationSnap=await db.collection("invitations").where("email","==",email).limit(10).get();
+  const invitations=invitationSnap.docs.map(d=>({id:d.id,...d.data()}));
+  const invitation=invitations.find(x=>!invitationReference||x.invitationReference===invitationReference||x.reference===invitationReference)||invitations[0]||null;
+  const [memberSnap,employeeSnap]=await Promise.all([
+    db.collection("members").where("email","==",email).limit(5).get(),
+    db.collection("employees").where("email","==",email).limit(5).get()
+  ]);
+  if(!invitation&&!memberSnap.size&&!employeeSnap.size) throw new HttpsError("not-found","No matching IRPA invitation, Member or Employee registration could be retrieved for this email. The credential interview is blocked.");
+  const roles=[...employeeSnap.docs.flatMap(d=>Array.isArray(d.data().roles)?d.data().roles:[d.data().role]),...memberSnap.docs.flatMap(d=>Array.isArray(d.data().roles)?d.data().roles:[d.data().role]),invitation?.role||""].flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean));
+  const ref=db.collection("credentialInterviewRequests").doc();
+  await ref.set({email,name,invitationId:invitation?.id||null,invitationReference:invitation?.invitationReference||invitation?.reference||invitationReference||null,requestedCapacity:requestedCapacity||null,requestedRole:requestedRole||null,registeredRoles:[...new Set(roles)],status:"Pending Login Approval",loginApproved:false,createdAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()});
+  return {ok:true,requestId:ref.id,status:"Pending Login Approval"};
+});
+
+exports.getCredentialInterviewRequests = onCall({region:"us-central1"}, async request => {
+  const uid=request.auth?.uid;
+  if(!uid) throw new HttpsError("unauthenticated","Administrator authentication is required.");
+  const adminSnap=await db.collection("adminProfiles").doc(uid).get();
+  const email=String(request.auth?.token?.email||adminSnap.data()?.email||"").trim().toLowerCase();
+  if(email!=="irpa2412@gmail.com" && (!adminSnap.exists||adminSnap.data()?.active!==true)) throw new HttpsError("permission-denied","Administrator authorization is required.");
+  const snap=await db.collection("credentialInterviewRequests").orderBy("createdAt","desc").limit(100).get();
+  return {requests:snap.docs.map(d=>({id:d.id,...d.data()}))};
+});
+
+exports.approveCredentialInterview = onCall({region:"us-central1"}, async request => {
+  const uid=request.auth?.uid;
+  if(!uid) throw new HttpsError("unauthenticated","Administrator authentication is required.");
+  const adminSnap=await db.collection("adminProfiles").doc(uid).get();
+  const actorEmail=String(request.auth?.token?.email||adminSnap.data()?.email||"").trim().toLowerCase();
+  if(actorEmail!=="irpa2412@gmail.com" && (!adminSnap.exists||adminSnap.data()?.active!==true)) throw new HttpsError("permission-denied","Administrator authorization is required.");
+  const requestId=String(request.data?.requestId||"").trim();
+  if(!requestId) throw new HttpsError("invalid-argument","Credential interview request ID is required.");
+  const ref=db.collection("credentialInterviewRequests").doc(requestId);
+  const snap=await ref.get();
+  if(!snap.exists) throw new HttpsError("not-found","Credential interview request not found.");
+  const item=snap.data();
+  if(item.loginApproved===true) return {ok:true,alreadyApproved:true,email:item.email,uid:item.authUid||null};
+  const authAdmin=require("firebase-admin/auth").getAuth();
+  let user;
+  try { user=await authAdmin.getUserByEmail(item.email); }
+  catch(error) {
+    if(error?.code!=="auth/user-not-found") throw new HttpsError("internal","Unable to retrieve the Firebase account.");
+    user=await authAdmin.createUser({email:item.email,displayName:item.name,emailVerified:false});
+  }
+  await authAdmin.updateUser(user.uid,{disabled:false,displayName:item.name||user.displayName||undefined});
+  await authAdmin.setCustomUserClaims(user.uid,{...(user.customClaims||{}),loginApproved:true});
+  await ref.update({status:"Login Approved",loginApproved:true,authUid:user.uid,approvedByUid:uid,approvedByEmail:actorEmail,approvedAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()});
+  await db.collection("audit").add({action:"CREDENTIAL_INTERVIEW_LOGIN_APPROVED",collection:"credentialInterviewRequests",recordId:requestId,details:{email:item.email,authUid:user.uid},actorUid:uid,actorEmail,createdAt:FieldValue.serverTimestamp()});
+  return {ok:true,email:item.email,uid:user.uid,loginApproved:true};
+});
+
 exports.resetTrialData = onCall({region:"us-central1"}, async request => {
   const uid=request.auth?.uid;
   if(!uid) throw new HttpsError("unauthenticated","Authentication is required.");
