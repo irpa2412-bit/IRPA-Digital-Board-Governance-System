@@ -128,9 +128,9 @@ export default function Settings({ admin = false, section = "settings" }) {
               setAdminResult({
                 ok: true,
                 working: false,
-                message: data?.accountCreated
-                  ? `Administrator account created for ${email}. Firebase accepted the activation email request. The new Administrator must open the email and set a permanent password before signing in.`
-                  : `Existing IRPA account ${email} has been activated as an Administrator. Firebase accepted the activation email request.`
+                message: data?.emailRequested
+                  ? `Administrator invitation created for ${email}. Firebase Authentication accepted the secure activation link request. The new Administrator must open the email link to activate the Administrator account.`
+                  : `Administrator invitation created for ${email}. The activation link could not be confirmed as sent.`
               });
               setAdminName("");
               setAdminEmail("");
