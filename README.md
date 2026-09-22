@@ -57,6 +57,7 @@ npm run build
 ```
 
 ## Firebase deployment
+<!-- Production deployment trigger: 2026-09-22 admin authorization synchronization -->
 
 ```bash
 firebase deploy
