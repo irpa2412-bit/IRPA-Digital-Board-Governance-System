@@ -43,7 +43,7 @@ export async function getCurrentEmployeeProfile(){const uid=auth.currentUser?.ui
 
 export async function getInductionRegistrationRequests(){
   await requireActiveAdmin();
-  return getRecords(COLLECTIONS.registrationRequests);
+  const snap=await getDocs(collection(db,COLLECTIONS.registrationRequests)); return snap.docs.map(x=>({id:x.id,...x.data()})).sort((a,b)=>{const ta=a.lastSubmittedAt?.toMillis?.()||a.submittedAt?.toMillis?.()||0;const tb=b.lastSubmittedAt?.toMillis?.()||b.submittedAt?.toMillis?.()||0;return tb-ta;});
 }
 
 export async function linkInductionRegistration(requestId){
