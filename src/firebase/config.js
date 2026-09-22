@@ -18,7 +18,8 @@ export const db = getFirestore(app);
 export const googleProvider = new GoogleAuthProvider();
 
 googleProvider.setCustomParameters({
-  prompt: "select_account"
+  prompt: "select_account",
+  login_hint: "irpa2412@gmail.com"
 });
 
 export default app;
