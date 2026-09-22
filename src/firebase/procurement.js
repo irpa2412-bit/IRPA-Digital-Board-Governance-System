@@ -4,6 +4,39 @@ import{COLLECTIONS,getRecord}from"./data";
 import{ref,uploadBytes,ensureDocumentArchiveFolder}from"./signatureStorage";
 
 export const PROCUREMENT_STAGES=["Quotations Required","PR Registration","Procurement Review","Pending Authorization","PO Generation","PO Generated","Delivery Note Required","Invoice Required","Finance Handoff","Sent to Finance","Payment Completed"];
+export const PROCUREMENT_GOODS_SERVICES=[
+ "Office Supplies & Stationery",
+ "ICT Equipment & Services",
+ "Furniture & Office Equipment",
+ "Vehicles & Transport Services",
+ "Vehicle Maintenance & Spare Parts",
+ "Fuel & Lubricants",
+ "Construction & Civil Works",
+ "Building Maintenance & Repairs",
+ "Water Infrastructure & Borehole Services",
+ "Solar Energy & Electrical Services",
+ "Livestock & Veterinary Supplies",
+ "Animal Health Services",
+ "Livestock Equipment & Infrastructure",
+ "Agricultural Inputs & Fodder",
+ "Rangeland Restoration & Environmental Services",
+ "Tree Seedlings & Nursery Supplies",
+ "Research & Consultancy Services",
+ "Training & Capacity Development",
+ "Travel & Accommodation Services",
+ "Communication & Media Services",
+ "Printing & Branding Services",
+ "Security Services",
+ "Cleaning & Sanitation Services",
+ "Professional & Legal Services",
+ "Insurance Services",
+ "Financial & Audit Services",
+ "Events & Conference Services",
+ "Food & Catering Services",
+ "Logistics & Freight Services",
+ "Other",
+ "Others"
+];
 export const PROCUREMENT_DEPARTMENTS=[
  "Executive Office",
  "Internal Oversight",
@@ -45,7 +78,7 @@ async function audit(action,c,id,details={}){const a=await actor();await addDoc(
 async function nextNumber(counter,prefix){const r=doc(db,"systemSettings","procurementCounters");return runTransaction(db,async tx=>{const s=await tx.get(r);const n=Number(s.data()?.[counter]||0)+1;tx.set(r,{[counter]:n,updatedAt:serverTimestamp()},{merge:true});return prefix+"-"+new Date().getFullYear()+"-"+String(n).padStart(5,"0")})}
 async function request(id){const r=await getRecord(COLLECTIONS.procurementRequests,id);if(!r)throw new Error("Procurement request not found.");return r}
 export async function getMyProcurementRequests(){const a=await actor();const q=await getDocs(query(collection(db,COLLECTIONS.procurementRequests),where("requestedByUid","==",a.uid)));return q.docs.map(x=>({id:x.id,...x.data()}))}
-export async function createProcurementVendor(data){const a=await actor();const name=String(data.name||"").trim();if(!name)throw new Error("Vendor / service provider name is required.");const q=await getDocs(query(collection(db,COLLECTIONS.procurementVendors),where("name","==",name)));if(!q.empty)throw new Error("This vendor / service provider is already registered.");const r=await addDoc(collection(db,COLLECTIONS.procurementVendors),{...data,name,status:"Pending Review",registeredByUid:a.uid,registeredByEmail:a.email||auth.currentUser?.email,registeredByName:a.name||auth.currentUser?.email,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});await audit("PROCUREMENT_VENDOR_REGISTERED",COLLECTIONS.procurementVendors,r.id,{name});return r.id}
+export async function createProcurementVendor(data){const a=await actor();const name=String(data.name||"").trim();if(!name)throw new Error("Vendor / service provider name is required.");const serviceType=String(data.serviceType||"").trim();const serviceTypeOther=String(data.serviceTypeOther||"").trim();if(!PROCUREMENT_GOODS_SERVICES.includes(serviceType))throw new Error("Select a goods/service from the provided list.");if((serviceType==="Others"||serviceType==="Other")&&!serviceTypeOther)throw new Error("Please provide clarification for the Others selection.");const q=await getDocs(query(collection(db,COLLECTIONS.procurementVendors),where("name","==",name)));if(!q.empty)throw new Error("This vendor / service provider is already registered.");const r=await addDoc(collection(db,COLLECTIONS.procurementVendors),{...data,name,serviceType,serviceTypeOther:serviceType==="Others"||serviceType==="Other"?serviceTypeOther:"",status:"Pending Review",registeredByUid:a.uid,registeredByEmail:a.email||auth.currentUser?.email,registeredByName:a.name||auth.currentUser?.email,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});await audit("PROCUREMENT_VENDOR_REGISTERED",COLLECTIONS.procurementVendors,r.id,{name});return r.id}
 export async function createProcurementRequest(data){const a=await actor();const v=await getRecord(COLLECTIONS.procurementVendors,data.vendorId);if(!v)throw new Error("Registered vendor / service provider not found.");const method=procurementMethodConfig(data.procurementMethod);const department=String(data.department||"").trim();const unit=String(data.unit||"").trim();if(!PROCUREMENT_DEPARTMENTS.includes(department))throw new Error("Select a valid IRPA department from the listed choices.");if(!(PROCUREMENT_UNITS_BY_DEPARTMENT[department]||[]).includes(unit))throw new Error("Select a valid unit from the listed choices for the selected department.");
 const requestedEntries=Math.max(method.minEntries,Math.min(method.maxEntries,Number(data.quotationRequiredCount||method.defaultEntries)));
 const n=await nextNumber("requestNumber","IRPA-PREQ");const r=await addDoc(collection(db,COLLECTIONS.procurementRequests),{requestNumber:n,title:String(data.title||"").trim(),description:String(data.description||"").trim(),department:String(data.department||"").trim(),unit:String(data.unit||"").trim(),estimatedAmount:Number(data.estimatedAmount||0),procurementMethod:method.value,quotationRequiredCount:requestedEntries,vendorId:v.id,vendorName:v.name,vendorRegistrationNumber:v.vendorRegistrationNumber||v.registrationNumber||"",vendorStatus:v.status,status:"Quotations Required",quotationCount:0,requestedByUid:a.uid,requestedByEmail:a.email||auth.currentUser?.email,requestedByName:a.name||auth.currentUser?.email,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});await audit("PROCUREMENT_REQUEST_INITIATED",COLLECTIONS.procurementRequests,r.id,{requestNumber:n});return r.id}
