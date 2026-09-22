@@ -172,14 +172,14 @@ export default function InductionOrientation(){
   {error&&<div className="error-message action-feedback" role="alert">{error}</div>}
 
   <section className="panel">
-   <div className="panel-header"><div><span className="eyebrow">SYSTEM-RETRIEVED IDENTITY</span><h2>Your Registered Information</h2><p className="panel-description">These fields are retrieved from IRPA registration/invitation records. They are not free-text identity fields.</p></div></div>
+   <div className="panel-header"><div><span className="eyebrow">SYSTEM-RETRIEVED IDENTITY</span><h2>Your Registered Information</h2><p className="panel-description">These fields are retrieved from IRPA registration/invitation records. The registration number is intentionally withheld during induction and is issued to you by email after the administrator completes LINK.</p></div></div>
    <div className="detail-grid">
     <div><span>FULL NAME</span><strong>{context.fullName||"—"}</strong></div>
-    <div><span>REGISTRATION NUMBER</span><strong>{context.registrationNumber||"—"}</strong></div>
     <div><span>REGISTERED ROLE(S)</span><strong>{context.role||"—"}</strong></div>
     <div><span>DEPARTMENT</span><strong>{context.department||"—"}</strong></div>
     <div><span>UNIT</span><strong>{context.unit||"—"}</strong></div>
     <div><span>BOARD MEMBER</span><strong>{context.boardMember?"Yes":"No"}</strong></div>
+    <div><span>REGISTRATION NUMBER</span><strong>Issued by email after administrator LINK</strong></div>
     <div><span>INVITATION</span><strong>{context.invitation?"Matched":"No separate invitation found"}</strong></div>
     <div><span>INVITATION REFERENCE</span><strong>{context.invitation?.invitationReference||context.invitation?.reference||context.invitationId||"—"}</strong></div>
    </div>
