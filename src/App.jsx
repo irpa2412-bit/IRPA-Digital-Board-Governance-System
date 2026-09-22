@@ -151,6 +151,22 @@ useEffect(()=>observeAuthState(async u=>{setUser(u);setProfile(undefined);setEmp
   setProfile(null);
 }}),[]);
 
+// Primary administrator authorization guard: resolve the configured administrator
+// directly from the authenticated Firebase user before any secondary authorization work.
+useEffect(()=>{
+  const adminEmail=String(user?.email||"").trim().toLowerCase();
+  if(adminEmail==="irpa2412@gmail.com" && profile===undefined){
+    setProfile({
+      uid:user.uid,
+      email:user.email||"irpa2412@gmail.com",
+      name:"IRPA Primary Administrator",
+      role:"Administrator",
+      active:true,
+      authorizationType:"administrator"
+    });
+  }
+},[user,profile]);
+
 // Login watchdog: authorization must never leave the application permanently
 // on the loading screen. This is limited to authentication/session state only.
 useEffect(()=>{
