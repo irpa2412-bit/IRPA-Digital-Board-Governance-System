@@ -1,7 +1,7 @@
 import React,{useEffect,useMemo,useState}from"react";
 import{auth}from"../firebase/config";
 import{COLLECTIONS,getRecords}from"../firebase/data";
-import{createProcurementVendor,createProcurementRequest,uploadProcurementQuotation,registerProcurementPR,reviewProcurementRequest,authorizeProcurementRequest,generateProcurementPO,uploadProcurementEvidence,sendProcurementToFinance,PROCUREMENT_STAGES,procurementTeamRole,procurementApproverRole}from"../firebase/procurement";
+import{createProcurementVendor,createProcurementRequest,uploadProcurementQuotation,getMyProcurementRequests,registerProcurementPR,reviewProcurementRequest,authorizeProcurementRequest,generateProcurementPO,uploadProcurementEvidence,sendProcurementToFinance,PROCUREMENT_STAGES,procurementTeamRole,procurementApproverRole}from"../firebase/procurement";
 const APPROVERS=["Executive Director","Director Livestock","Livestock Director","Director Internal Oversight","Internal Oversight Director","Director Finance & Administration","Director Human Resources","Director Outreach","Director Community Development","Director Environment","Director Field","Director Operations","Operations Director","Outreach Director","Community Development Director","Environment Director","Field Director"];
 function Field({label,name,value,onChange,type="text",wide=false,required=false,children}){return <label className={wide?"form-field form-field-wide":"form-field"}>{label}{children||<input name={name} value={value??""} type={type} onChange={onChange} required={required}/>}</label>}
 export default function ProcurementPortal({profile}){
@@ -9,7 +9,7 @@ export default function ProcurementPortal({profile}){
  const[vendors,setVendors]=useState([]),[requests,setRequests]=useState([]),[directors,setDirectors]=useState([]),[selected,setSelected]=useState(null),[files,setFiles]=useState([null,null,null]),[busy,setBusy]=useState(false),[message,setMessage]=useState(""),[error,setError]=useState("");
  const[vf,setVf]=useState({name:"",serviceType:"",contactName:"",phone:"",email:"",address:"",registrationNumber:"",taxNumber:""});
  const[rf,setRf]=useState({title:"",description:"",department:"",estimatedAmount:"",procurementMethod:"Request for Quotations",vendorId:""});
- async function load(){try{const[v,r]=await Promise.all([getRecords(COLLECTIONS.procurementVendors),getRecords(COLLECTIONS.procurementRequests)]);setVendors(v);setRequests(r);if(team||approver){const e=await getRecords(COLLECTIONS.employees);setDirectors(e.filter(x=>APPROVERS.includes(x.role)&&x.status==="Active"&&x.uid))}else setDirectors([])}catch(x){setError(x.message||"Unable to load procurement records.")}}
+ async function load(){try{const v=await getRecords(COLLECTIONS.procurementVendors);const r=(team||approver)?await getRecords(COLLECTIONS.procurementRequests):await getMyProcurementRequests();setVendors(v);setRequests(r);if(team||approver){const e=await getRecords(COLLECTIONS.employees);setDirectors(e.filter(x=>APPROVERS.includes(x.role)&&x.status==="Active"&&x.uid))}else setDirectors([])}catch(x){setError(x.message||"Unable to load procurement records.")}}
  useEffect(()=>{load()},[]);
  const visible=useMemo(()=>requests.filter(r=>team||approver||r.requestedByUid===uid),[requests,team,approver,uid]);
  async function run(fn,success){setBusy(true);setError("");setMessage("");try{await fn();setMessage(success);setSelected(null);await load()}catch(x){setError(x.message||"Action failed.")}finally{setBusy(false)}}
