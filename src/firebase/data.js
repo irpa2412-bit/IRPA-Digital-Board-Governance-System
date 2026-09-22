@@ -216,7 +216,7 @@ export async function linkInductionRegistration(requestId){
   };
   await updateDoc(requestRef,updates);
   await setDoc(doc(db,COLLECTIONS.inductionRecords,uid),{
-    status:"Approved",
+    status:"Completed",
     inductionStatus:"Approved",
     roleAssignmentStatus:"Linked",
     approvedRole:role,
