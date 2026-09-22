@@ -73,6 +73,40 @@ jobs:
           });
           NODE
 
+      - name: Set Firebase Auth custom email action handler
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-service-account.json"
+          gcloud auth activate-service-account --key-file="$RUNNER_TEMP/firebase-service-account.json" --project=irpa-digital-board-governance >/dev/null
+          ACCESS_TOKEN="$(gcloud auth print-access-token)"
+          CONFIG="$(curl --fail --silent --show-error \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H "X-Goog-User-Project: irpa-digital-board-governance" \
+            "https://identitytoolkit.googleapis.com/admin/v2/projects/irpa-digital-board-governance/config")"
+          CONFIG_NAME="$(node -e 'const c=JSON.parse(process.argv[1]); process.stdout.write(c.name || "projects/irpa-digital-board-governance/config")' "$CONFIG")"
+          printf '%s' "$CONFIG" > "$RUNNER_TEMP/identity-config.json"
+          node <<'NODE'
+          const fs = require("fs");
+          const config = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/identity-config.json", "utf8"));
+          config.notification ??= {};
+          config.notification.sendEmail ??= {};
+          config.notification.sendEmail.callbackUri = "https://irpa-digital-board-governance.web.app/administrator.html";
+          fs.writeFileSync(process.env.RUNNER_TEMP + "/identity-config-patch.json", JSON.stringify({
+            name: config.name,
+            notification: { sendEmail: { callbackUri: config.notification.sendEmail.callbackUri } }
+          }));
+          console.log("Prepared Firebase Auth callback URI:", config.notification.sendEmail.callbackUri);
+          NODE
+          curl --fail --silent --show-error --request PATCH \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H "X-Goog-User-Project: irpa-digital-board-governance" \
+            -H "Content-Type: application/json" \
+            --data-binary @"$RUNNER_TEMP/identity-config-patch.json" \
+            "https://identitytoolkit.googleapis.com/admin/v2/projects/irpa-digital-board-governance/config?updateMask=notification.sendEmail.callbackUri"
+          rm -f "$RUNNER_TEMP/firebase-service-account.json" "$RUNNER_TEMP/identity-config.json" "$RUNNER_TEMP/identity-config-patch.json"
+
       - name: Deploy Hosting and Firestore only
         uses: w9jds/firebase-action@v14.17.0
         with:
