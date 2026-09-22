@@ -518,6 +518,59 @@ async function ensureSignatureWorkflowFolder(request, env) {
   return json({ok:true,envelopeId,folderId,folderName,archiveAccess:"Restricted",path:`IRPA Governance System/Signature Workflows/${folderName}`},200,corsHeaders(request));
 }
 
+async function lookupInductionRegistration(request, env) {
+  const claims = await authenticateFirebaseRequest(request);
+  const data = await request.json();
+  const enteredName = String(data.fullName || "").trim();
+  if (enteredName.length < 2) return json({ok:true,matched:false,reason:"Enter at least 2 characters."},200,corsHeaders(request));
+
+  const normalize = value => String(value || "").trim().toLowerCase().replace(/\\s+/g," ");
+  const target = normalize(enteredName);
+  const member = await getFirestoreDocument(env, `members/${cleanId(claims.user_id)}`, claims.token);
+  const employee = await getFirestoreDocument(env, `employees/${cleanId(claims.user_id)}`, claims.token);
+  const invitationRows = await queryFirestoreByEmail(env, "invitations", "email", claims.email || "", claims.token);
+
+  const memberFields = member?.fields || {};
+  const employeeFields = employee?.fields || {};
+  const invitationRecords = invitationRows.map(row => row.document).filter(Boolean);
+  const invitation = invitationRecords
+    .map(doc => firestoreDocumentToPlain(doc))
+    .filter(x => normalize(x.email) === normalize(claims.email) && normalize(x.name) === target)
+    .sort((a,b) => Number(b.updatedAt?.timestampValue ? Date.parse(b.updatedAt.timestampValue) : 0) - Number(a.updatedAt?.timestampValue ? Date.parse(a.updatedAt.timestampValue) : 0))[0] || null;
+
+  const memberPlain = firestoreDocumentToPlain(member);
+  const employeePlain = firestoreDocumentToPlain(employee);
+  const ownNames = [employeePlain?.name, memberPlain?.name].filter(Boolean).map(normalize);
+  const nameMatchesOwnRecord = ownNames.includes(target);
+  if (!nameMatchesOwnRecord && !invitation) {
+    return json({ok:true,matched:false,reason:"No registration record matching the entered full name was found for the authenticated IRPA account."},200,corsHeaders(request));
+  }
+
+  const number = employeeFields.employeeNumber?.stringValue || memberFields.memberNumber?.stringValue || "";
+  const merged = {
+    fullName: employeePlain?.name || memberPlain?.name || invitation?.name || enteredName,
+    email: claims.email || employeePlain?.email || memberPlain?.email || invitation?.email || "",
+    registrationNumber: number,
+    employeeNumber: employeeFields.employeeNumber?.stringValue || "",
+    memberNumber: memberFields.memberNumber?.stringValue || "",
+    role: employeePlain?.role || memberPlain?.role || invitation?.role || "",
+    department: employeePlain?.department || memberPlain?.department || invitation?.department || "",
+    unit: employeePlain?.unit || memberPlain?.unit || invitation?.unit || "",
+    memberType: memberPlain?.memberType || invitation?.memberType || "",
+    employmentType: employeePlain?.employmentType || invitation?.employmentType || "",
+    employmentStatus: employeePlain?.status || employeePlain?.employmentStatus || "",
+    memberStatus: memberPlain?.status || "",
+    invitationStatus: invitation?.status || "",
+    invitationId: invitation?.id || "",
+    sources: [
+      memberPlain ? "Members Registration" : null,
+      employeePlain ? "Employees & Personnel Registration" : null,
+      invitation ? "Member & Personnel Invitations" : null
+    ].filter(Boolean)
+  };
+  return json({ok:true,matched:true,registration:merged},200,corsHeaders(request));
+}
+
 async function sendRegistrationNumber(request, env) {
   const claims = await authenticateFirebaseRequest(request);
   const data = await request.json();
@@ -919,6 +972,45 @@ async function getFirebaseJwks() {
   return jwksCache;
 }
 
+async function queryFirestoreByEmail(env, collectionName, fieldName, email, firebaseToken) {
+  const value = String(email || "").trim().toLowerCase();
+  if (!value) return [];
+  const response = await fetch(`https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:runQuery`, {
+    method:"POST",
+    headers:{"Authorization":`Bearer ${firebaseToken}`,"Content-Type":"application/json"},
+    body:JSON.stringify({
+      structuredQuery:{
+        from:[{collectionId:collectionName}],
+        where:{fieldFilter:{field:{fieldPath:fieldName},op:"EQUAL",value:{stringValue:value}}},
+        limit:10
+      }
+    })
+  });
+  if (!response.ok) {
+    if (response.status === 403) return [];
+    throw new Error("Unable to query the IRPA registration records.");
+  }
+  const rows=await response.json();
+  return Array.isArray(rows)?rows:[];
+}
+
+function firestoreDocumentToPlain(document) {
+  if (!document?.fields) return null;
+  const convert = field => {
+    if (!field) return null;
+    if ("stringValue" in field) return field.stringValue;
+    if ("booleanValue" in field) return field.booleanValue;
+    if ("integerValue" in field) return Number(field.integerValue);
+    if ("doubleValue" in field) return field.doubleValue;
+    if ("timestampValue" in field) return field.timestampValue;
+    if ("nullValue" in field) return null;
+    if ("arrayValue" in field) return (field.arrayValue.values || []).map(convert);
+    if ("mapValue" in field) return Object.fromEntries(Object.entries(field.mapValue.fields || {}).map(([k,v])=>[k,convert(v)]));
+    return null;
+  };
+  return Object.fromEntries(Object.entries(document.fields).map(([k,v])=>[k,convert(v)]));
+}
+ 
 async function getFirestoreDocument(env, path, firebaseToken) {
   const response = await fetch(`https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/${path}`, {
     headers: { Authorization: `Bearer ${firebaseToken}` }
