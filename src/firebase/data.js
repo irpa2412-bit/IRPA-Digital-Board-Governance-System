@@ -56,8 +56,10 @@ export async function linkInductionRegistration(requestId){
   if(request.status==="Linked"||request.roleAssignmentStatus==="Linked") return {id:requestId,alreadyLinked:true,...request};
   const uid=String(request.uid||request.memberProfileUid||request.employeeProfileUid||"").trim();
   if(!uid) throw new Error("The application has no authenticated IRPA account UID.");
-  const memberRef=doc(db,COLLECTIONS.members,uid);
-  const employeeRef=doc(db,COLLECTIONS.employees,uid);
+  const memberId=String(request.memberProfileUid||uid).trim();
+  const employeeId=String(request.employeeProfileUid||uid).trim();
+  const memberRef=doc(db,COLLECTIONS.members,memberId);
+  const employeeRef=doc(db,COLLECTIONS.employees,employeeId);
   const memberSnap=await getDoc(memberRef);
   const employeeSnap=await getDoc(employeeRef);
   if(!memberSnap.exists()&&!employeeSnap.exists()) throw new Error("No registered Member or Employee profile could be retrieved for this applicant. The application cannot be linked.");
