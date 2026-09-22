@@ -62,7 +62,6 @@ export default function InductionOrientation({profile,employee}){
     const unit=String(sourceEmployee.unit||sourceMember.unit||"").trim();
     const registrationNumber=String(sourceEmployee.employeeNumber||sourceMember.memberNumber||"").trim();
     if(!roles.length && !registrationNumber) throw new Error("No registered role or registration number could be retrieved from the IRPA system. The induction application is blocked.");
-    if(!department && !boardMember) throw new Error("No registered department could be retrieved from the IRPA system. The induction application is blocked.");
     const boardMember=Boolean(sourceMember.boardMember||sourceEmployee.boardMember||roles.some(r=>/board member/i.test(r)));const registration={fullName:matchedName,role,roles,department,unit,registrationNumber,boardMember,sources:[sourceEmployee.uid?"Employees":"Members"].filter(Boolean),memberType:sourceMember.memberType||"—",employmentType:sourceEmployee.employmentType||"—",invitationStatus:sourceMember.invitationId||sourceEmployee.invitationId?"Registered invitation":"Registered account"};
     setRegistration(registration);
     setForm(x=>({...x,fullName:matchedName,role,department,unit}));
