@@ -47,26 +47,32 @@ jobs:
           (async () => {
             const auth = getAuth();
             const db = getFirestore();
-            const email = "irpa2412@gmail.com";
-            const user = await auth.getUserByEmail(email);
+            const administrators = [
+              { email: "irpa2412@gmail.com", name: "IRPA Primary Administrator" },
+              { email: "crissdaniel2213@gmail.com", name: "Chris Cato Daniel" }
+            ];
 
-            await db.collection("adminProfiles").doc(user.uid).set({
-              uid: user.uid,
-              email,
-              name: user.displayName || "IRPA Primary Administrator",
-              role: "Administrator",
-              active: true,
-              createdByUid: user.uid,
-              createdByEmail: email,
-              updatedAt: FieldValue.serverTimestamp()
-            }, { merge: true });
+            for (const administrator of administrators) {
+              const user = await auth.getUserByEmail(administrator.email);
 
-            await auth.setCustomUserClaims(user.uid, {
-              ...(user.customClaims || {}),
-              admin: true
-            });
+              await db.collection("adminProfiles").doc(user.uid).set({
+                uid: user.uid,
+                email: administrator.email,
+                name: administrator.name,
+                role: "Administrator",
+                active: true,
+                createdByUid: "irpa2412@gmail.com",
+                createdByEmail: "irpa2412@gmail.com",
+                updatedAt: FieldValue.serverTimestamp()
+              }, { merge: true });
 
-            console.log(`Primary administrator authorization bootstrapped for ${email} (UID ${user.uid}).`);
+              await auth.setCustomUserClaims(user.uid, {
+                ...(user.customClaims || {}),
+                admin: true
+              });
+
+              console.log(`Administrator authorization bootstrapped for ${administrator.email} (UID ${user.uid}).`);
+            }
           })().catch(error => {
             console.error(error);
             process.exit(1);
