@@ -206,10 +206,6 @@ useEffect(()=>{
   return()=>{disposed=true;unsubscribe()};
 },[]);;
 
-// Keep the administrator gateway visible while Firebase restores any prior
-// session. Member/employee authorization must never hide the login form.
-if(adminGatewayMode&&user===undefined)return <AuthScreen/>;
-
 // Login watchdog: authorization must never leave the application permanently
 // on the loading screen. The primary administrator is explicitly excluded:
 // member/employee/induction authorization must never log out the administrator.
@@ -268,7 +264,7 @@ useEffect(()=>{async function magic(){
     console.error(x);
     window.alert(x.message||"Unable to open the signing invitation.");
   }
-}magic()},[]);const invitationId=new URLSearchParams(window.location.search).get("memberInvite");if(user===undefined||profile===undefined)return <Loading/>;if(!user)return invitationId?<MemberActivationScreen invitationId={invitationId}/>:<AuthScreen/>;
+}magic()},[]);const invitationId=new URLSearchParams(window.location.search).get("memberInvite");if(user===undefined)return <AuthScreen/>;if(profile===undefined)return <Loading/>;if(!user)return invitationId?<MemberActivationScreen invitationId={invitationId}/>:<AuthScreen/>;
 if(!profile)return <AccessDenied user={user}reason={error}/>;
 if(profile.authorizationType==="signer"){
   return <SignerShell user={user} profile={profile} signingEnvelopeId={signingEnvelopeId}/>;
