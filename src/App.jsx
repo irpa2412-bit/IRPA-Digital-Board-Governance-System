@@ -43,7 +43,7 @@ export default function App(){
   return()=>window.removeEventListener("irpa:signing-invitation",handler);
 },[]);
 
-useEffect(()=>{\n  const expected=window.sessionStorage.getItem("irpaExpectedGoogleAdminEmail");\n  if(expected){ completeGoogleRedirect(expected).catch(x=>console.error("Google redirect completion:",x)); }\n  return observeAuthState(async u=>{setUser(u);setProfile(undefined);setEmployee(null);setInductionComplete(false);setError("");if(!u){setProfile(null);return}try{
+useEffect(()=>{ const expected=window.sessionStorage.getItem("irpaExpectedGoogleAdminEmail"); if(expected){ completeGoogleRedirect(expected).catch(x=>console.error("Google redirect completion:",x)); } return observeAuthState(async u=>{setUser(u);setProfile(undefined);setEmployee(null);setInductionComplete(false);setError("");if(!u){setProfile(null);return}try{
   // Primary administrator session is resolved directly after Firebase authentication.
   // This exact-account check is limited to the Administrator Gateway and does not alter governance modules.
   if(String(u.email||"").trim().toLowerCase()==="irpa2412@gmail.com"){
