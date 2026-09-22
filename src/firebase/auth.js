@@ -37,20 +37,45 @@ export async function loginWithEmail(email, password) {
 export async function loginWithGoogle(expectedEmail = "", options = {}) {
   const expected = String(expectedEmail || "").trim().toLowerCase();
 
-  // Administrator Gateway uses Firebase redirect authentication. This is
-  // deterministic on Android/mobile browsers and avoids popup/tab blockers.
+  // Administrator Gateway: use a direct popup while the action still has
+  // the user's browser gesture. If the browser explicitly blocks Firebase's
+  // popup, fall back to redirect authentication. The successful popup path
+  // returns the Firebase user immediately and therefore does not depend on
+  // redirect-result recovery on Android.
   if (options.admin === true) {
-    // Strip the gateway query BEFORE starting the OAuth redirect. Firebase
-    // returns the browser to the URL from which redirect auth was initiated;
-    // keeping ?adminGateway=1 here can send a mobile browser back into the
-    // gateway before the application has consumed the Firebase redirect result.
     window.sessionStorage.setItem("irpaExpectedGoogleAdminEmail", expected);
     window.sessionStorage.setItem("irpaAdminRedirectPending", "1");
     window.localStorage.setItem("irpaExpectedGoogleAdminEmail", expected);
     window.localStorage.setItem("irpaAdminRedirectPending", "1");
-    window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
-    await signInWithRedirect(auth, googleProvider);
-    return null;
+
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const actual = String(result.user?.email || "").trim().toLowerCase();
+      if (expected && actual !== expected) {
+        await signOut(auth);
+        throw new Error(`Use the designated IRPA administrator Google account: ${expected}.`);
+      }
+      window.sessionStorage.removeItem("irpaExpectedGoogleAdminEmail");
+      window.sessionStorage.removeItem("irpaAdminRedirectPending");
+      window.localStorage.removeItem("irpaExpectedGoogleAdminEmail");
+      window.localStorage.removeItem("irpaAdminRedirectPending");
+      return result.user;
+    } catch (error) {
+      const code = error?.code || "";
+      const popupBlocked = [
+        "auth/popup-blocked",
+        "auth/operation-not-supported-in-this-environment",
+        "auth/web-storage-unsupported"
+      ].includes(code);
+      if (!popupBlocked) throw error;
+
+      // Fallback only when the browser explicitly prevents the popup.
+      // Remove the gateway query before redirect so the OAuth return target
+      // is the normal application root, not the gateway itself.
+      window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
+      await signInWithRedirect(auth, googleProvider);
+      return null;
+    }
   }
 
   if (options.redirect === true) {
