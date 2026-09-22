@@ -24,6 +24,32 @@ async function deleteCollectionDocs(collectionName){
   return deleted;
 }
 
+exports.ensurePrimaryAdministrator = onCall({region:"us-central1"}, async request => {
+  const uid=request.auth?.uid;
+  const email=String(request.auth?.token?.email||"").trim().toLowerCase();
+  if(!uid) throw new HttpsError("unauthenticated","Administrator authentication is required.");
+  if(email!=="irpa2412@gmail.com") throw new HttpsError("permission-denied","This Firebase account is not the configured primary IRPA administrator.");
+  await db.collection("adminProfiles").doc(uid).set({
+    uid,
+    email,
+    name:"IRPA Primary Administrator",
+    role:"Administrator",
+    active:true,
+    updatedAt:FieldValue.serverTimestamp()
+  },{merge:true});
+  await require("firebase-admin/auth").getAuth().setCustomUserClaims(uid,{...(request.auth?.token||{}).admin?{admin:true}:{admin:true}});
+  await db.collection("audit").add({
+    action:"PRIMARY_ADMINISTRATOR_SESSION_REPAIRED",
+    collection:"adminProfiles",
+    recordId:uid,
+    details:{email},
+    actorUid:uid,
+    actorEmail:email,
+    createdAt:FieldValue.serverTimestamp()
+  });
+  return {ok:true,uid,email};
+});
+
 exports.createAdministrator = onCall({region:"us-central1"}, async request => {
   const uid=request.auth?.uid;
   if(!uid) throw new HttpsError("unauthenticated","Administrator authentication is required.");
