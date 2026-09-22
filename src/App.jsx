@@ -44,6 +44,17 @@ export default function App(){
 },[]);
 
 useEffect(()=>observeAuthState(async u=>{setUser(u);setProfile(undefined);setEmployee(null);setInductionComplete(false);setError("");if(!u){setProfile(null);return}try{
+  // Administrator authorization is resolved FIRST and is completely independent
+  // of signing invitations, member induction, and the Drive gateway.
+  const adminDirect=await Promise.race([
+    getAdminProfile(u.uid),
+    new Promise((_,reject)=>window.setTimeout(()=>reject(new Error("Administrator authorization lookup timed out.")),3000))
+  ]);
+  if(adminDirect?.active===true){
+    setProfile({...adminDirect,uid:u.uid,email:u.email||"",authorizationType:"administrator"});
+    return;
+  }
+
   const activeSigningId=
     window.sessionStorage.getItem("irpaSigningEnvelopeId")||
     new URLSearchParams(window.location.search).get("signEnvelope");
@@ -56,19 +67,12 @@ useEffect(()=>observeAuthState(async u=>{setUser(u);setProfile(undefined);setEmp
       ]);
       const recipient=(envelope.recipients||[]).find(r=>r.uid===u.uid);
 
-      if(!recipient){
-        throw new Error("This account is not an invited signer for this document.");
-      }
+      if(!recipient)throw new Error("This account is not an invited signer for this document.");
 
       setSigningEnvelopeId(activeSigningId);
       setProfile({
-        uid:u.uid,
-        email:u.email||recipient.email||"",
-        name:recipient.name||u.displayName||u.email||"Signing Participant",
-        role:recipient.role||"Signer",
-        authorizationType:"signer",
-        signingEnvelopeId:activeSigningId,
-        signingRecipient:recipient
+        uid:u.uid,email:u.email||recipient.email||"",name:recipient.name||u.displayName||u.email||"Signing Participant",
+        role:recipient.role||"Signer",authorizationType:"signer",signingEnvelopeId:activeSigningId,signingRecipient:recipient
       });
       setEmployee(null);
       return;
@@ -81,68 +85,43 @@ useEffect(()=>observeAuthState(async u=>{setUser(u);setProfile(undefined);setEmp
   }
 
   const gateway=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").replace(/\/$/,"");
-  const loadSessionProfile=async()=>{
-    // Login authorization is resolved from the authenticated Firebase session.
-    // The Drive gateway is optional and is raced in parallel so a slow auxiliary
-    // service can never hold the governance application on the authorization screen.
+  const loadMemberSession=async()=>{
     const withTimeout=(promise,ms,label)=>Promise.race([
-      promise,
-      new Promise((_,reject)=>window.setTimeout(()=>reject(new Error(label)),ms))
+      promise,new Promise((_,reject)=>window.setTimeout(()=>reject(new Error(label)),ms))
     ]);
-
     const firebaseProfile=withTimeout((async()=>{
-      const [adminDirect,memberDirect,employeeDirect]=await Promise.all([
-        getAdminProfile(u.uid).catch(()=>null),
+      const [memberDirect,employeeDirect]=await Promise.all([
         getCurrentMemberProfile().catch(()=>null),
         getCurrentEmployeeProfile().catch(()=>null)
       ]);
-      if(!adminDirect&&!memberDirect&&!employeeDirect) return null;
+      if(!memberDirect&&!employeeDirect)return null;
       return {
-        ok:true,
-        uid:u.uid,
-        email:u.email||memberDirect?.email||employeeDirect?.email||"",
-        admin:adminDirect?.active===true?adminDirect:null,
-        member:memberDirect?.status==="Active"?memberDirect:null,
-        employee:employeeDirect||null,
-        authorizationSource:"firebase"
+        ok:true,uid:u.uid,email:u.email||memberDirect?.email||employeeDirect?.email||"",
+        admin:null,member:memberDirect?.status==="Active"?memberDirect:null,
+        employee:employeeDirect||null,authorizationSource:"firebase"
       };
-    })(),3000,"Firebase authorization lookup timed out.");
+    })(),3000,"Firebase member authorization lookup timed out.");
 
     const gatewayProfile=withTimeout((async()=>{
       const token=await u.getIdToken();
       const response=await fetch(gateway+"/api/session/profile",{
-        method:"POST",
-        headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},
-        cache:"no-store"
+        method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},cache:"no-store"
       });
       const result=await response.json().catch(()=>({}));
-      if(!response.ok||!result.ok) throw new Error(result.error||"Unable to verify IRPA authorization.");
+      if(!response.ok||!result.ok)throw new Error(result.error||"Unable to verify IRPA authorization.");
       return result;
     })(),3000,"Authorization gateway timed out.");
 
-    try{
-      const results=await Promise.allSettled([
-        firebaseProfile,
-        gatewayProfile
-      ]);
-      const session=results
-        .filter(result=>result.status==="fulfilled"&&result.value)
-        .map(result=>result.value)
-        .find(value=>value.ok||value.admin||value.member||value.employee);
-      if(session) return session;
-      throw new Error("No active IRPA authorization profile was found.");
-    }catch(error){
-      console.error("IRPA login authorization failed",error);
-      throw new Error("Unable to verify the authenticated IRPA account. Please retry once.");
-    }
+    const results=await Promise.allSettled([firebaseProfile,gatewayProfile]);
+    const session=results.filter(result=>result.status==="fulfilled"&&result.value)
+      .map(result=>result.value).find(value=>value.ok||value.member||value.employee);
+    if(session)return session;
+    throw new Error("No active IRPA authorization profile was found.");
   };
-  const session=await loadSessionProfile();
-  if(session.admin?.active===true){
-    setProfile({...session.admin,uid:u.uid,email:session.email||u.email||"",authorizationType:"administrator"});
-    return;
-  }
 
-  let m=session.member;const invitationId=new URLSearchParams(window.location.search).get("memberInvite");
+  const session=await loadMemberSession();
+  let m=session.member;
+  const invitationId=new URLSearchParams(window.location.search).get("memberInvite");
   if(!m&&invitationId){
     await provisionCurrentMemberFromInvitationV2(invitationId);
     m=await getCurrentMemberProfile();
@@ -161,7 +140,12 @@ useEffect(()=>observeAuthState(async u=>{setUser(u);setProfile(undefined);setEmp
   }catch(inductionError){
     console.warn("Induction status check unavailable",inductionError);
     setInductionComplete(false);
-  }}catch(x){console.error(x);setError(x.message||"Unable to verify IRPA authorization.");setProfile(null)}}),[]);
+  }
+}catch(x){
+  console.error(x);
+  setError(x.message||"Unable to verify IRPA authorization.");
+  setProfile(null);
+}}),[]);
 
 // Login watchdog: authorization must never leave the application permanently
 // on the loading screen. This is limited to authentication/session state only.
