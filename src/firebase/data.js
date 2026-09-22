@@ -160,8 +160,7 @@ export async function submitInductionApplication(form,context){
   await writeAudit("INDUCTION_APPLICATION_SUBMITTED",COLLECTIONS.registrationRequests,uid,{
     applicantUid:uid,
     applicantEmail:context.email,
-    registrationNumber:null,
-    registrationNumberStatus:"Issued after administrator LINK",
+    registrationNumberStatus:"Withheld until administrator LINK",
     invitationId:context.invitationId||null,
     roles:context.roles,
     requestedRole:payload.requestedRole,
@@ -200,8 +199,12 @@ export async function linkInductionRegistration(requestId){
   const roles=Array.isArray(request.systemRoles)?request.systemRoles:((Array.isArray(employee.roles)?employee.roles:[]).concat(Array.isArray(member.roles)?member.roles:[]).concat([request.systemRole,request.requestedRole,employee.role,member.role]).flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean)));const uniqueRoles=[...new Set(roles)];const role=uniqueRoles.join(" • ");
   if(!role) throw new Error("The system could not retrieve the applicant's registered role. The application cannot be linked.");
   const boardMember=Boolean(member.boardMember||employee.boardMember||uniqueRoles.some(r=>/board member/i.test(r)));
-  const registrationNumber=String(employee.employeeNumber||member.memberNumber||"").trim();
-  if(!registrationNumber) throw new Error("The administrator LINK cannot complete until the system can assign an IRPA registration number to this applicant.");
+  let registrationNumber=String(employee.employeeNumber||member.memberNumber||"").trim();
+  if(!registrationNumber){
+    registrationNumber=employeeSnap.exists()?await generateEmployeeNumber():await generateMemberNumber();
+    if(employeeSnap.exists()) await updateDoc(employeeRef,{employeeNumber:registrationNumber,registrationEmailStatus:"Pending after induction LINK",updatedAt:serverTimestamp()});
+    else if(memberSnap.exists()) await updateDoc(memberRef,{memberNumber:registrationNumber,registrationEmailStatus:"Pending after induction LINK",updatedAt:serverTimestamp()});
+  }
   const linkedAt=serverTimestamp();
   const updates={
     inductionStatus:"Approved",
