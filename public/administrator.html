@@ -40,7 +40,7 @@
     import {
       getAuth, setPersistence, browserLocalPersistence,
       signInWithEmailAndPassword, sendPasswordResetEmail,
-      GoogleAuthProvider, signInWithPopup
+      GoogleAuthProvider, signInWithPopup, verifyPasswordResetCode, confirmPasswordReset
     } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
 
     const firebaseConfig={
@@ -59,6 +59,9 @@
     const resetButton=document.getElementById("resetButton");
     const googleButton=document.getElementById("googleButton");
     const password=document.getElementById("password");
+    const params=new URLSearchParams(location.search);
+    const resetMode=params.get("mode")==="resetPassword";
+    const resetCode=params.get("oobCode");
 
     const show=(text)=>{
       message.textContent=text;
@@ -80,9 +83,39 @@
 
     await setPersistence(auth,browserLocalPersistence);
 
+    if(resetMode){
+      document.querySelector(".title").textContent="Set Administrator Password";
+      document.querySelector(".sub").textContent="Create a new password for the assigned IRPA administrator account.";
+      document.querySelector("#email").closest("label")?.remove();
+      document.querySelector("#email").remove();
+      document.querySelector('label[for="password"]').textContent="New administrator password";
+      password.autocomplete="new-password";
+      password.placeholder="Enter a new password";
+      loginButton.textContent="Set New Password";
+      resetButton.style.display="none";
+      googleButton.style.display="none";
+      if(!resetCode){
+        show("The password-reset link is incomplete. Request a new reset email.");
+        loginButton.disabled=true;
+      }else{
+        try{
+          await verifyPasswordResetCode(auth,resetCode);
+        }catch(err){
+          show("This password-reset link has expired or has already been used. Request a new reset email.");
+          loginButton.disabled=true;
+        }
+      }
+    }
+
     document.getElementById("loginForm").addEventListener("submit",async(e)=>{
       e.preventDefault(); show(""); busy(true);
       try{
+        if(resetMode){
+          await confirmPasswordReset(auth,resetCode,password.value);
+          show("Administrator password updated successfully. You can now sign in.");
+          setTimeout(()=>location.replace(location.origin+"/administrator.html"),700);
+          return;
+        }
         const credential=await signInWithEmailAndPassword(auth,ADMIN_EMAIL,password.value);
         if((credential.user.email||"").toLowerCase()!==ADMIN_EMAIL){
           await auth.signOut();
@@ -96,7 +129,10 @@
     resetButton.addEventListener("click",async()=>{
       busy(true); show("");
       try{
-        await sendPasswordResetEmail(auth,ADMIN_EMAIL);
+        await sendPasswordResetEmail(auth,ADMIN_EMAIL,{
+          url: location.origin + "/administrator.html",
+          handleCodeInApp: true
+        });
         show("A password-reset email has been sent to irpa2412@gmail.com.");
       }catch(err){show(errorText(err))}
       finally{busy(false)}
