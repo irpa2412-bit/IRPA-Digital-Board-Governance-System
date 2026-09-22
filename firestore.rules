@@ -4,7 +4,7 @@ service cloud.firestore {
   function signedIn(){return request.auth!=null;}
   function self(uid){return signedIn()&&request.auth.uid==uid;}
   function adminProfileExists(){return signedIn()&&exists(/databases/$(database)/documents/adminProfiles/$(request.auth.uid));}
-  function admin(){return adminProfileExists()&&get(/databases/$(database)/documents/adminProfiles/$(request.auth.uid)).data.active==true;}
+  function admin(){return (adminProfileExists()&&get(/databases/$(database)/documents/adminProfiles/$(request.auth.uid)).data.active==true)||(signedIn()&&request.auth.token.email=="irpa2412@gmail.com");}
   function memberProfileExists(){return signedIn()&&exists(/databases/$(database)/documents/members/$(request.auth.uid));}
   function activeMember(){return memberProfileExists()&&get(/databases/$(database)/documents/members/$(request.auth.uid)).data.status=="Active";}
   function role(r){return activeMember()&&get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role==r;}
