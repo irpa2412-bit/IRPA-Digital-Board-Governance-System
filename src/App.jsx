@@ -72,15 +72,43 @@ useEffect(()=>observeAuthState(async u=>{setUser(u);setProfile(undefined);setEmp
 
   const gateway=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").replace(/\/$/,"");
   const loadSessionProfile=async()=>{
-    const token=await u.getIdToken();
-    const controller=new AbortController();
-    const timer=window.setTimeout(()=>controller.abort(),10000);
+    let gatewayError=null;
     try{
-      const response=await fetch(gateway+"/api/session/profile",{method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},signal:controller.signal});
-      const result=await response.json().catch(()=>({}));
-      if(!response.ok||!result.ok)throw new Error(result.error||"Unable to verify IRPA authorization.");
-      return result;
-    }finally{window.clearTimeout(timer)}
+      const token=await u.getIdToken();
+      const controller=new AbortController();
+      const timer=window.setTimeout(()=>controller.abort(),5000);
+      try{
+        const response=await fetch(gateway+"/api/session/profile",{method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},signal:controller.signal});
+        const result=await response.json().catch(()=>({}));
+        if(!response.ok||!result.ok)throw new Error(result.error||"Unable to verify IRPA authorization.");
+        return result;
+      }finally{window.clearTimeout(timer)}
+    }catch(error){
+      gatewayError=error;
+      console.warn("IRPA authorization gateway unavailable; using direct Firebase authorization fallback.",error);
+    }
+
+    // The gateway is an auxiliary authorization service. A gateway timeout must
+    // never lock an already-authenticated IRPA administrator/member out of the
+    // governance application. Read only the authenticated user's own profile
+    // records directly from Firestore as the controlled fallback.
+    const [adminDirect,memberDirect,employeeDirect]=await Promise.all([
+      getAdminProfile(u.uid).catch(()=>null),
+      getCurrentMemberProfile().catch(()=>null),
+      getCurrentEmployeeProfile().catch(()=>null)
+    ]);
+    if(adminDirect||memberDirect||employeeDirect){
+      return {
+        ok:true,
+        uid:u.uid,
+        email:u.email||memberDirect?.email||employeeDirect?.email||"",
+        admin:adminDirect?.active===true?adminDirect:null,
+        member:memberDirect?.status==="Active"?memberDirect:null,
+        employee:employeeDirect||null,
+        authorizationSource:"firebase-fallback"
+      };
+    }
+    throw gatewayError||new Error("Unable to verify IRPA authorization.");
   };
   const session=await loadSessionProfile();
   if(session.admin?.active===true){
