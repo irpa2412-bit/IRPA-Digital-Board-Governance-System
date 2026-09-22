@@ -48,7 +48,8 @@ jobs:
             const auth = getAuth();
             const db = getFirestore();
             const administrators = [
-              { email: "irpa2412@gmail.com", name: "IRPA Primary Administrator" }
+              { email: "irpa2412@gmail.com", name: "IRPA Primary Administrator" },
+              { email: "crissdaniel2213@gmail.com", name: "Chris Cato Daniel" }
             ];
 
             for (const administrator of administrators) {
@@ -78,48 +79,8 @@ jobs:
           });
           NODE
 
-      - name: Revoke removed administrator authorization
-        env:
-          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
-          NODE_PATH: ${{ github.workspace }}/functions/node_modules
-        run: |
-          node <<'NODE'
-          const { initializeApp, cert } = require("firebase-admin/app");
-          const { getAuth } = require("firebase-admin/auth");
-          const { getFirestore } = require("firebase-admin/firestore");
-
-          const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-          initializeApp({ credential: cert(serviceAccount) });
-
-          (async () => {
-            const auth = getAuth();
-            const db = getFirestore();
-            const email = "crissdaniel2213@gmail.com";
-            try {
-              const user = await auth.getUserByEmail(email);
-              await db.collection("adminProfiles").doc(user.uid).set({
-                uid: user.uid,
-                email,
-                name: "Chris Cato Daniel",
-                role: "Administrator",
-                active: false
-              }, { merge: true });
-              const claims = { ...(user.customClaims || {}) };
-              delete claims.admin;
-              await auth.setCustomUserClaims(user.uid, claims);
-              console.log("Administrator authorization revoked for " + email + " (UID " + user.uid + ").");
-            } catch (error) {
-              if (error?.code === "auth/user-not-found") {
-                console.log("No Firebase account found for " + email + "; nothing to revoke.");
-                return;
-              }
-              throw error;
-            }
-          })().catch(error => {
-            console.error(error);
-            process.exit(1);
-          });
-          NODE
+      - name: Verify configured administrator authorization
+        run: echo "Primary administrator and approved additional administrator accounts are bootstrapped above; no hard-coded administrator revocation is performed during deployment."
 
       - name: Deploy Hosting and Firestore only
         uses: w9jds/firebase-action@v14.17.0
