@@ -30,14 +30,57 @@ jobs:
           VITE_GOOGLE_DRIVE_GATEWAY_URL: ${{ secrets.VITE_GOOGLE_DRIVE_GATEWAY_URL }}
         run: npm run build
 
+      - name: Bootstrap primary administrator authorization
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+        run: |
+          npm --prefix functions install --omit=dev
+          node <<'NODE'
+          const { initializeApp, cert } = require("./functions/node_modules/firebase-admin/app");
+          const { getAuth } = require("./functions/node_modules/firebase-admin/auth");
+          const { getFirestore, FieldValue } = require("./functions/node_modules/firebase-admin/firestore");
+
+          const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+          initializeApp({ credential: cert(serviceAccount) });
+
+          (async () => {
+            const auth = getAuth();
+            const db = getFirestore();
+            const email = "irpa2412@gmail.com";
+            const user = await auth.getUserByEmail(email);
+
+            await db.collection("adminProfiles").doc(user.uid).set({
+              uid: user.uid,
+              email,
+              name: user.displayName || "IRPA Primary Administrator",
+              role: "Administrator",
+              active: true,
+              createdByUid: user.uid,
+              createdByEmail: email,
+              updatedAt: FieldValue.serverTimestamp()
+            }, { merge: true });
+
+            await auth.setCustomUserClaims(user.uid, {
+              ...(user.customClaims || {}),
+              admin: true
+            });
+
+            console.log(`Primary administrator authorization bootstrapped for ${email} (UID ${user.uid}).`);
+          })().catch(error => {
+            console.error(error);
+            process.exit(1);
+          });
+          NODE
+
       - name: Deploy Hosting and Firestore only
         uses: w9jds/firebase-action@v14.17.0
         with:
-          args: deploy --project irpa-digital-board-governance --only hosting,firestore,functions
+          args: deploy --project irpa-digital-board-governance --only hosting,firestore
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
 
       - name: Verify live Firebase application
         run: |
           set -e
-          curl --fail --silent --show-error --retry 5 --retry-delay 3             https://irpa-digital-board-governance.web.app/
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 \
+            https://irpa-digital-board-governance.web.app/
