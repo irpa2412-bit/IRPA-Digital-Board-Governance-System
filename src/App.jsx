@@ -70,13 +70,44 @@ useEffect(()=>observeAuthState(async u=>{setUser(u);setProfile(undefined);setEmp
     return;
   }
 
-  const a=await getAdminProfile(u.uid);
-  if(a?.active===true){
-    setProfile({...a,authorizationType:"administrator"});
+  const gateway=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").replace(/\\/$/,"");
+  const loadSessionProfile=async()=>{
+    const token=await u.getIdToken();
+    const controller=new AbortController();
+    const timer=window.setTimeout(()=>controller.abort(),10000);
+    try{
+      const response=await fetch(gateway+"/api/session/profile",{method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},signal:controller.signal});
+      const result=await response.json().catch(()=>({}));
+      if(!response.ok||!result.ok)throw new Error(result.error||"Unable to verify IRPA authorization.");
+      return result;
+    }finally{window.clearTimeout(timer)}
+  };
+  const session=await loadSessionProfile();
+  if(session.admin?.active===true){
+    setProfile({...session.admin,uid:u.uid,email:session.email||u.email||"",authorizationType:"administrator"});
     return;
   }
 
-  let m=await getCurrentMemberProfile();const invitationId=new URLSearchParams(window.location.search).get("memberInvite");if(!m&&invitationId){await provisionCurrentMemberFromInvitationV2(invitationId);m=await getCurrentMemberProfile();if(m)window.history.replaceState({},document.title,window.location.pathname+window.location.hash)}if(!m){setError("This account has no active IRPA member profile.");setProfile(null);return}if(m.status!=="Active"){setError("The IRPA member profile exists but is not active.");setProfile(null);return}setProfile({...m,authorizationType:"member"});setEmployee(await getCurrentEmployeeProfile());const induction=await getDoc(doc(db,"inductionRecords",u.uid));setInductionComplete(induction.exists()&&induction.data()?.status==="Completed")}catch(x){console.error(x);setError(x.message||"Unable to verify IRPA authorization.");setProfile(null)}}),[]);useEffect(()=>{async function magic(){
+  let m=session.member;const invitationId=new URLSearchParams(window.location.search).get("memberInvite");
+  if(!m&&invitationId){
+    await provisionCurrentMemberFromInvitationV2(invitationId);
+    m=await getCurrentMemberProfile();
+    if(m)window.history.replaceState({},document.title,window.location.pathname+window.location.hash);
+  }
+  if(!m){setError("This account has no active IRPA member profile.");setProfile(null);return}
+  if(m.status!=="Active"){setError("The IRPA member profile exists but is not active.");setProfile(null);return}
+  setProfile({...m,authorizationType:"member"});
+  setEmployee(session.employee||null);
+  try{
+    const induction=await Promise.race([
+      getDoc(doc(db,"inductionRecords",u.uid)),
+      new Promise((_,reject)=>window.setTimeout(()=>reject(new Error("Induction status check timed out.")),10000))
+    ]);
+    setInductionComplete(induction.exists()&&induction.data()?.status==="Completed");
+  }catch(inductionError){
+    console.warn("Induction status check unavailable",inductionError);
+    setInductionComplete(false);
+  }}catch(x){console.error(x);setError(x.message||"Unable to verify IRPA authorization.");setProfile(null)}}),[]);useEffect(()=>{async function magic(){
   if(!isMagicLink())return;
 
   let e=window.localStorage.getItem("irpaEmailForSignIn")||window.localStorage.getItem("irpaMemberEmailForSignIn");
