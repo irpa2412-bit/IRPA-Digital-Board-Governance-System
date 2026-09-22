@@ -32,8 +32,14 @@ export async function loginWithEmail(email, password) {
   }
 }
 
-export async function loginWithGoogle() {
+export async function loginWithGoogle(expectedEmail = "") {
   const result = await signInWithPopup(auth, googleProvider);
+  const expected = String(expectedEmail || "").trim().toLowerCase();
+  const actual = String(result.user?.email || "").trim().toLowerCase();
+  if (expected && actual !== expected) {
+    await signOut(auth);
+    throw new Error(`Use the designated IRPA administrator Google account: ${expected}.`);
+  }
   return result.user;
 }
 
