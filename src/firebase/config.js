@@ -4,11 +4,10 @@ import { getFirestore } from "firebase/firestore";
 
 export const firebaseConfig = {
   apiKey: "AIzaSyC2aMdxHD14nMnGiRyf4mSL1ixXdzBoOtE",
-  // The production application is served from this Firebase Hosting web.app
-  // origin. Using the same origin for Auth removes the cross-origin Auth
-  // helper/storage boundary that can block Google authentication in modern
-  // mobile browsers.
-  authDomain: "irpa-digital-board-governance.web.app",
+  // Keep Firebase's provisioned Auth domain. The Google OAuth client is
+  // registered for this Firebase handler; changing this to web.app without
+  // adding the matching OAuth redirect URI causes Google Error 400.
+  authDomain: "irpa-digital-board-governance.firebaseapp.com",
   projectId: "irpa-digital-board-governance",
   messagingSenderId: "217055978789",
   appId: "1:217055978789:web:937d1f2f781202cc1e26cc",
