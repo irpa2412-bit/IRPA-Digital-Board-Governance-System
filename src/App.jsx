@@ -161,7 +161,25 @@ useEffect(()=>observeAuthState(async u=>{setUser(u);setProfile(undefined);setEmp
   }catch(inductionError){
     console.warn("Induction status check unavailable",inductionError);
     setInductionComplete(false);
-  }}catch(x){console.error(x);setError(x.message||"Unable to verify IRPA authorization.");setProfile(null)}}),[]);useEffect(()=>{async function magic(){
+  }}catch(x){console.error(x);setError(x.message||"Unable to verify IRPA authorization.");setProfile(null)}}),[]);
+
+// Login watchdog: authorization must never leave the application permanently
+// on the loading screen. This is limited to authentication/session state only.
+useEffect(()=>{
+  if(user===undefined||profile!==undefined)return;
+  const timer=window.setTimeout(async()=>{
+    if(profile!==undefined)return;
+    console.error("IRPA login watchdog: authorization did not complete.");
+    try{await logout();}catch(_){}
+    setError("");
+    setEmployee(null);
+    setProfile(null);
+    setUser(null);
+  },7000);
+  return()=>window.clearTimeout(timer);
+},[user,profile]);
+
+useEffect(()=>{async function magic(){
   if(!isMagicLink())return;
 
   let e=window.localStorage.getItem("irpaEmailForSignIn")||window.localStorage.getItem("irpaMemberEmailForSignIn");
