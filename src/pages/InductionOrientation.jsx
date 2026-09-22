@@ -20,18 +20,18 @@ const ROLE_GUIDES={
 };
 
 function guideFor(profile,employee){
- const role=String(profile?.role||employee?.role||"").trim();
+ const roles=roleValues(employee?.roles||employee?.role||profile?.roles||profile?.role);const role=roles.join(" • ");
  const dept=String(profile?.department||employee?.department||"").trim();
  const unit=String(profile?.unit||employee?.unit||"").trim();
- if(/board member/i.test(role)||profile?.boardMember)return ROLE_GUIDES["Board Member"];
- if(role==="Executive Director")return ROLE_GUIDES["Executive Director"];
+ if(profile?.boardMember||employee?.boardMember||roles.some(r=>/board member/i.test(r)))return ROLE_GUIDES["Board Member"];
+ if(roles.includes("Executive Director"))return ROLE_GUIDES["Executive Director"];
  if(/finance|accountant|accounts/i.test(role+" "+dept+" "+unit))return ROLE_GUIDES["Finance"];
  if(/procurement/i.test(role+" "+dept+" "+unit))return ROLE_GUIDES["Procurement"];
  if(/human resources|hr manager|hr officer/i.test(role+" "+dept+" "+unit))return ROLE_GUIDES["Human Resources"];
  if(/programme|technical/i.test(role+" "+dept))return ROLE_GUIDES["Programme & Technical"];
  if(/operations/i.test(role+" "+dept))return ROLE_GUIDES["Operations"];
  if(/field/i.test(role+" "+dept))return ROLE_GUIDES["Field"];
- if(/^director|director /i.test(role))return ROLE_GUIDES["Director"];
+ if(roles.some(r=>/^director\b|\bdirector\b/i.test(r)))return ROLE_GUIDES["Director"];
  return ROLE_GUIDES["General Employee"];
 }
 
