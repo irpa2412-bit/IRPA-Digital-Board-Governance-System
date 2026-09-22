@@ -170,6 +170,8 @@ useEffect(()=>{
 },[user,profile]);
 
 useEffect(()=>{async function magic(){
+  const adminGateway=new URLSearchParams(window.location.search).get("adminGateway")==="1";
+  if(adminGateway)return;
   if(!isMagicLink())return;
 
   let e=window.localStorage.getItem("irpaEmailForSignIn")||window.localStorage.getItem("irpaMemberEmailForSignIn");
