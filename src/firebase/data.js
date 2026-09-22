@@ -67,9 +67,9 @@ export async function linkInductionRegistration(requestId){
   const employee=employeeSnap.exists()?employeeSnap.data():{};
   const department=String(request.systemDepartment||request.routingDepartment||employee.department||member.department||"").trim();
   const unit=String(request.systemUnit||request.routingUnit||employee.unit||member.unit||"").trim();
-  const role=String(request.systemRole||request.requestedRole||employee.role||member.role||"").trim();
+  const roles=Array.isArray(request.systemRoles)?request.systemRoles:((Array.isArray(employee.roles)?employee.roles:[]).concat(Array.isArray(member.roles)?member.roles:[]).concat([request.systemRole,request.requestedRole,employee.role,member.role]).flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean)));const uniqueRoles=[...new Set(roles)];const role=uniqueRoles.join(" • ");
   if(!role) throw new Error("The system could not retrieve the applicant's registered role. The application cannot be linked.");
-  const boardMember=Boolean(member.boardMember||member.role==="Board Member"||/board member/i.test(role));
+  const boardMember=Boolean(member.boardMember||employee.boardMember||uniqueRoles.some(r=>/board member/i.test(r)));
   const linkedAt=serverTimestamp();
   const updates={
     inductionStatus:"Approved",
@@ -79,6 +79,7 @@ export async function linkInductionRegistration(requestId){
     linkedByEmail:auth.currentUser?.email||null,
     linkedAt,
     approvedRole:role,
+    approvedRoles:uniqueRoles,
     approvedDepartment:department||null,
     approvedUnit:unit||null,
     boardMember,
@@ -105,6 +106,7 @@ export async function linkInductionRegistration(requestId){
     linkedDepartment:department||member.department||null,
     linkedUnit:unit||member.unit||null,
     linkedRole:role||member.role||null,
+    linkedRoles:uniqueRoles,
     boardMember,
     updatedAt:linkedAt
   });
@@ -114,6 +116,7 @@ export async function linkInductionRegistration(requestId){
     department:department||employee.department||null,
     unit:unit||employee.unit||null,
     role:role||employee.role||null,
+    roles:uniqueRoles,
     updatedAt:linkedAt
   });
   await writeAudit("INDUCTION_APPLICATION_LINKED",COLLECTIONS.registrationRequests,requestId,{
