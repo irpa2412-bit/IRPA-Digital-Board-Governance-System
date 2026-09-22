@@ -4,6 +4,8 @@ import {
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signInWithCredential,
+  GoogleAuthProvider,
   signInWithRedirect,
   getRedirectResult,
   signOut,
@@ -16,6 +18,22 @@ import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { auth, firebaseConfig, googleProvider } from "./config";
 import { getFunctions, httpsCallable } from "firebase/functions";
+
+// The administrator gateway uses a dedicated OAuth Auth instance pinned to
+// Firebase's provisioned auth domain. This isolates the administrator sign-in
+// from the Hosting domain and leaves all member/governance authentication
+// flows on the existing primary Auth instance unchanged.
+const ADMIN_OAUTH_APP_NAME = "irpa-admin-google-oauth";
+const adminOAuthApp = initializeApp(
+  { ...firebaseConfig, authDomain: "irpa-digital-board-governance.firebaseapp.com" },
+  ADMIN_OAUTH_APP_NAME
+);
+const adminOAuthAuth = getAuth(adminOAuthApp);
+const adminGoogleProvider = new GoogleAuthProvider();
+adminGoogleProvider.setCustomParameters({
+  prompt: "select_account",
+  login_hint: "irpa2412@gmail.com"
+});
 
 export async function registerWithEmail(email, password, options = {}) {
   const result = await createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
@@ -43,36 +61,38 @@ export async function loginWithGoogle(expectedEmail = "", options = {}) {
   // returns the Firebase user immediately and therefore does not depend on
   // redirect-result recovery on Android.
   if (options.admin === true) {
+    // Never enter the redirect flow for the Administrator Gateway. The
+    // dedicated Auth instance above launches Google with the registered
+    // firebaseapp.com OAuth callback, then the resulting Google credential is
+    // exchanged into the primary Auth instance used by the rest of the app.
+    window.sessionStorage.removeItem("irpaAdminRedirectPending");
+    window.localStorage.removeItem("irpaAdminRedirectPending");
     window.sessionStorage.setItem("irpaExpectedGoogleAdminEmail", expected);
-    window.sessionStorage.setItem("irpaAdminRedirectPending", "1");
     window.localStorage.setItem("irpaExpectedGoogleAdminEmail", expected);
-    window.localStorage.setItem("irpaAdminRedirectPending", "1");
 
     try {
-      const result = await signInWithPopup(auth, googleProvider);
+      const result = await signInWithPopup(adminOAuthAuth, adminGoogleProvider);
       const actual = String(result.user?.email || "").trim().toLowerCase();
       if (expected && actual !== expected) {
-        await signOut(auth);
+        await signOut(adminOAuthAuth);
         throw new Error(`Use the designated IRPA administrator Google account: ${expected}.`);
       }
+
+      // Exchange the Google OAuth credential into the application's primary
+      // Auth instance. This keeps every existing governance portal attached
+      // to the same Firebase session and authorization listeners.
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      if (!credential) throw new Error("Google authentication did not return a usable credential.");
+      const primaryResult = await signInWithCredential(auth, credential);
+
+      await signOut(adminOAuthAuth);
       window.sessionStorage.removeItem("irpaExpectedGoogleAdminEmail");
       window.sessionStorage.removeItem("irpaAdminRedirectPending");
       window.localStorage.removeItem("irpaExpectedGoogleAdminEmail");
       window.localStorage.removeItem("irpaAdminRedirectPending");
-      return result.user;
+      return primaryResult.user;
     } catch (error) {
-      const code = error?.code || "";
-      const popupBlocked = [
-        "auth/popup-blocked",
-        "auth/operation-not-supported-in-this-environment",
-        "auth/web-storage-unsupported"
-      ].includes(code);
-      if (!popupBlocked) throw error;
-
-      // Do not silently switch to a redirect after a popup failure.
-      // Redirect authentication has a separate OAuth callback configuration
-      // and can hide the actual blocker behind another browser round trip.
-      // The administrator should receive the concrete Firebase error instead.
+      try { await signOut(adminOAuthAuth); } catch (_) {}
       throw error;
     }
   }
