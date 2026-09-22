@@ -11,7 +11,7 @@ export default function ProcurementPortal({profile}){
  const[rf,setRf]=useState({title:"",description:"",department:"",estimatedAmount:"",procurementMethod:"Request for Quotations",vendorId:""});
  async function load(){try{const[v,r]=await Promise.all([getRecords(COLLECTIONS.procurementVendors),getRecords(COLLECTIONS.procurementRequests)]);setVendors(v);setRequests(r);if(team||approver){const e=await getRecords(COLLECTIONS.employees);setDirectors(e.filter(x=>APPROVERS.includes(x.role)&&x.status==="Active"&&x.uid))}else setDirectors([])}catch(x){setError(x.message||"Unable to load procurement records.")}}
  useEffect(()=>{load()},[]);
- const visible=useMemo(()=>requests.filter(r=>team||r.requestedByUid===uid),[requests,team,uid]);
+ const visible=useMemo(()=>requests.filter(r=>team||approver||r.requestedByUid===uid),[requests,team,approver,uid]);
  async function run(fn,success){setBusy(true);setError("");setMessage("");try{await fn();setMessage(success);setSelected(null);await load()}catch(x){setError(x.message||"Action failed.")}finally{setBusy(false)}}
  async function submitVendor(e){e.preventDefault();await run(()=>createProcurementVendor(vf),"Vendor/service provider registered. Procurement Team review is now required.");setVf({name:"",serviceType:"",contactName:"",phone:"",email:"",address:"",registrationNumber:"",taxNumber:""})}
  async function submitRequest(e){e.preventDefault();await run(()=>createProcurementRequest(rf),"Procurement request initiated. Step 2 — three quotations — is now open.");setRf({title:"",description:"",department:"",estimatedAmount:"",procurementMethod:"Request for Quotations",vendorId:""})}
