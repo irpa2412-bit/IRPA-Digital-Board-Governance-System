@@ -41,6 +41,89 @@ export async function getAdminProfile(uid){return uid?getRecord(COLLECTIONS.admi
 export async function getCurrentMemberProfile(){const uid=auth.currentUser?.uid;return uid?getRecord(COLLECTIONS.members,uid):null;}
 export async function getCurrentEmployeeProfile(){const uid=auth.currentUser?.uid;return uid?getRecord(COLLECTIONS.employees,uid):null;}
 
+
+export async function getCurrentInductionContext(){
+  const uid=auth.currentUser?.uid;
+  const email=String(auth.currentUser?.email||"").trim().toLowerCase();
+  if(!uid||!email) throw new Error("Authentication is required to load the induction form.");
+
+  const [member,employee,existingRequest]=await Promise.all([
+    getRecord(COLLECTIONS.members,uid),
+    getRecord(COLLECTIONS.employees,uid),
+    getRecord(COLLECTIONS.registrationRequests,uid)
+  ]);
+
+  const invitationSnap=await getDocs(query(collection(db,COLLECTIONS.invitations),where("email","==",email)));
+  const invitations=invitationSnap.docs.map(x=>({id:x.id,...x.data()}));
+  const invitationId=String(member?.invitationId||employee?.invitationId||existingRequest?.invitationId||"").trim();
+  const invitation=invitations.find(x=>x.id===invitationId)||invitations[0]||null;
+
+  const roles=[...(Array.isArray(employee?.roles)?employee.roles:[]),...(Array.isArray(member?.roles)?member.roles:[]),employee?.role,member?.role,invitation?.role]
+    .flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean));
+  const uniqueRoles=[...new Set(roles)];
+  const fullName=String(employee?.name||member?.name||invitation?.name||auth.currentUser?.displayName||"").trim();
+  const department=String(employee?.department||member?.department||invitation?.department||"").trim();
+  const unit=String(employee?.unit||member?.unit||invitation?.unit||"").trim();
+  const registrationNumber=String(employee?.employeeNumber||member?.memberNumber||invitation?.registrationNumber||"").trim();
+  const boardMember=Boolean(member?.boardMember||employee?.boardMember||uniqueRoles.some(r=>/board member/i.test(r)));
+  const accountTypeOptions=[...(employee?["Employee"]:[]),...(member?["Member"]:[])];
+  const accountType=accountTypeOptions.length===2?"Employee & Member":(accountTypeOptions[0]||"");
+  if(!member&&!employee&&!invitation) throw new Error("No matching IRPA registration or invitation record could be retrieved for this account. The induction application is blocked.");
+
+  return {uid,email,fullName,roles:uniqueRoles,role:uniqueRoles.join(" • "),department,unit,registrationNumber,accountType,accountTypeOptions,
+    memberType:member?.memberType||invitation?.memberType||"",
+    employmentType:employee?.employmentType||invitation?.employmentType||"",
+    boardMember,member,employee,invitation,invitations,
+    invitationId:invitation?.id||invitationId||null,existingRequest};
+}
+
+export async function submitInductionApplication(form,context){
+  const uid=auth.currentUser?.uid;
+  if(!uid||uid!==context?.uid) throw new Error("Authenticated registration identity could not be verified.");
+  if(!context?.roles?.length) throw new Error("No registered role could be retrieved. The induction application is blocked.");
+  if(context.existingRequest?.status==="Linked"||context.existingRequest?.roleAssignmentStatus==="Linked") return {alreadyLinked:true,requestId:uid};
+
+  const submittedAt=serverTimestamp();
+  const requestRef=doc(db,COLLECTIONS.registrationRequests,uid);
+  const existingSnap=await getDoc(requestRef);
+  const payload={
+    uid,email:context.email,fullName:context.fullName,
+    memberProfileUid:context.member?.uid||uid,employeeProfileUid:context.employee?.uid||uid,
+    memberEmployeeNumber:null,registrationNumberStatus:"Issued after administrator LINK",
+    invitationId:context.invitationId||null,
+    invitationReference:context.invitation?.invitationReference||context.invitation?.reference||null,
+    invitationStatus:context.invitation?"Registered invitation":"Registered account",
+    systemRoles:context.roles,systemRole:context.role,systemDepartment:context.department||null,systemUnit:context.unit||null,
+    boardMember:context.boardMember,accountType:String(form.accountType||context.accountType||"").trim(),
+    requestedRole:String(form.primaryRole||context.role).trim(),requestedDepartment:String(form.department||context.department||"").trim(),
+    requestedUnit:String(form.unit||context.unit||"").trim(),employmentType:String(form.employmentType||context.employmentType||"").trim(),
+    orientationModules:Array.isArray(form.orientationModules)?form.orientationModules:[],
+    answers:{
+      identityConfirmation:form.identityConfirmation||"",accountType:form.accountType||"",primaryRole:form.primaryRole||"",
+      department:form.department||"",unit:form.unit||"",employmentType:form.employmentType||"",
+      orientationModules:Array.isArray(form.orientationModules)?form.orientationModules:[],
+      q1:form.q1||"",q2:form.q2||"",q3:form.q3||"",comments:String(form.comments||"").trim()
+    },
+    completedSteps:Array.isArray(form.completedSteps)?form.completedSteps:[],
+    declaration:form.declaration===true,status:"Pending Department & Unit Review",roleAssignmentStatus:"Pending",inductionStatus:"Submitted",
+    submittedAt:existingSnap.exists()?(existingSnap.data()?.submittedAt||submittedAt):submittedAt,
+    lastSubmittedAt:submittedAt,updatedAt:submittedAt
+  };
+  await setDoc(requestRef,payload,{merge:true});
+  await setDoc(doc(db,COLLECTIONS.inductionRecords,uid),{
+    uid,email:context.email,fullName:context.fullName,systemRoles:context.roles,systemRole:context.role,
+    systemDepartment:context.department||null,systemUnit:context.unit||null,boardMember:context.boardMember,
+    accountType:payload.accountType,orientationModules:payload.orientationModules,answers:payload.answers,
+    declaration:payload.declaration,status:"Submitted",inductionStatus:"Submitted",roleAssignmentStatus:"Pending",
+    submittedAt,lastSubmittedAt:submittedAt,updatedAt:submittedAt
+  },{merge:true});
+  await writeAudit("INDUCTION_APPLICATION_SUBMITTED",COLLECTIONS.registrationRequests,uid,{
+    applicantEmail:context.email,roles:context.roles,department:payload.requestedDepartment||null,unit:payload.requestedUnit||null,
+    boardMember:context.boardMember,accountType:payload.accountType
+  });
+  return {alreadyLinked:false,requestId:uid,status:payload.status};
+}
+
 export async function getInductionRegistrationRequests(){
   await requireActiveAdmin();
   const snap=await getDocs(collection(db,COLLECTIONS.registrationRequests)); return snap.docs.map(x=>({id:x.id,...x.data()})).sort((a,b)=>{const ta=a.lastSubmittedAt?.toMillis?.()||a.submittedAt?.toMillis?.()||0;const tb=b.lastSubmittedAt?.toMillis?.()||b.submittedAt?.toMillis?.()||0;return tb-ta;});
