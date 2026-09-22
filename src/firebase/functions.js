@@ -1,5 +1,5 @@
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { auth, db } from "./config";
+
+import { auth } from "./config";\nimport { getFunctions, httpsCallable } from "firebase/functions";
 
 export async function createAdministrator({ name, email, onProgress }){
   const cleanName = String(name || "").trim();
@@ -9,51 +9,30 @@ export async function createAdministrator({ name, email, onProgress }){
   if(!actor) throw new Error("Administrator authentication is required. Please sign in again.");
   if(!cleanName) throw new Error("The new administrator's name is required.");
   if(!cleanEmail || !cleanEmail.includes("@")) throw new Error("A valid administrator email address is required.");
-  if(cleanEmail === String(actor.email || "").trim().toLowerCase()) {
-    throw new Error("The current administrator is already an administrator.");
-  }
+  if(cleanEmail === String(actor.email || "").trim().toLowerCase()) throw new Error("The current administrator is already an administrator.");
 
   try {
-    onProgress?.("Creating the Administrator invitation securely…");
+    onProgress?.("Creating the Administrator account securely…");
+    const functions = getFunctions(undefined, "us-central1");
+    const call = httpsCallable(functions, "createAdministrator");
+    const result = await call({ name: cleanName, email: cleanEmail });
 
-    const invitation = await addDoc(collection(db, "adminInvitations"), {
-      email: cleanEmail,
-      name: cleanName,
-      role: "Administrator",
-      status: "Pending",
-      createdByUid: actor.uid,
-      createdByEmail: actor.email || "",
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    });
-
-    onProgress?.("Administrator invitation created. Sending the secure activation link…");
-
-    // Firebase Authentication sends the activation link directly. No
-    // Cloud Function is required, so the Administrator pathway remains
-    // available on projects using Firebase's no-cost hosting/Firestore tier.
+    onProgress?.("Administrator account prepared. Sending the secure activation link…");
     const { sendAdminMagicLink } = await import("./auth");
-    await sendAdminMagicLink(cleanEmail, invitation.id);
+    await sendAdminMagicLink(cleanEmail);
 
     onProgress?.("Administrator activation link sent.");
-    return {
-      ok: true,
-      uid: null,
-      email: cleanEmail,
-      name: cleanName,
-      accountCreated: false,
-      emailRequested: true,
-      invitationId: invitation.id
-    };
+    return { ...(result.data || {}), ok: true, email: cleanEmail, name: cleanName, emailRequested: true };
   } catch(error){
-    const code = String(error?.code || "").replace(/^firestore\//, "").replace(/^auth\//, "");
+    const code = String(error?.code || "").replace(/^functions\//, "").replace(/^auth\//, "");
     const messages = {
-      "permission-denied": "Firebase denied creation of the Administrator invitation. Confirm that the current account is an active Administrator.",
+      "permission-denied": "Firebase denied creation of the Administrator account. Confirm that the current account is an active Administrator.",
       "unauthenticated": "Administrator authentication is required. Please sign in again.",
       "invalid-argument": "Please enter a valid administrator name and email address.",
-      "unavailable": "Firebase is temporarily unavailable. Please retry the Administrator invitation.",
-      "auth/unauthorized-continue-uri": "Firebase Authentication rejected the activation-link destination. The IRPA web application domain must be listed under Firebase Authentication → Settings → Authorized domains.",
-      "auth/invalid-continue-uri": "Firebase Authentication rejected the activation-link destination. Check the Firebase Authentication authorized domains."
+      "already-exists": "That email address is already registered. Use the existing account or choose another administrator email address.",
+      "unavailable": "Firebase is temporarily unavailable. Please retry the Administrator setup.",
+      "unauthorized-continue-uri": "Firebase Authentication rejected the activation-link destination. Add the IRPA web application domain under Firebase Authentication → Authorized domains.",
+      "invalid-continue-uri": "Firebase Authentication rejected the activation-link destination. Check the Firebase Authentication authorized domains."
     };
     throw new Error(messages[code] || error?.message || "Unable to add the Administrator.");
   }
