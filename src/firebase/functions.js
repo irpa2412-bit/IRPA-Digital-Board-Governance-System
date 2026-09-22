@@ -38,3 +38,25 @@ export async function createAdministrator({ name, email, onProgress }){
     throw new Error(messages[code] || error?.message || "Unable to add the Administrator.");
   }
 }
+export async function submitCredentialInterview(data){
+  const functions=getFunctions(undefined,"us-central1");
+  const call=httpsCallable(functions,"submitCredentialInterview");
+  const result=await call(data||{});
+  return result.data||{};
+}
+export async function getCredentialInterviewRequests(){
+  const actor=auth.currentUser;
+  if(!actor) throw new Error("Administrator authentication is required.");
+  const functions=getFunctions(undefined,"us-central1");
+  const call=httpsCallable(functions,"getCredentialInterviewRequests");
+  const result=await call({});
+  return result.data?.requests||[];
+}
+export async function approveCredentialInterview(requestId){
+  const actor=auth.currentUser;
+  if(!actor) throw new Error("Administrator authentication is required.");
+  const functions=getFunctions(undefined,"us-central1");
+  const call=httpsCallable(functions,"approveCredentialInterview");
+  const result=await call({requestId});
+  return result.data||{};
+}
