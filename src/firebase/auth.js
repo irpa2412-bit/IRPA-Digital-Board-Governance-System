@@ -71,13 +71,16 @@ export async function loginWithGoogle(expectedEmail = "", options = {}) {
 export async function completeGoogleRedirect(expectedEmail = "") {
   const result = await getRedirectResult(auth);
   if (!result?.user) return null;
-  const expected = String(expectedEmail || "").trim().toLowerCase();
+  const expected = String(expectedEmail || window.localStorage.getItem("irpaExpectedGoogleAdminEmail") || "").trim().toLowerCase();
   const actual = String(result.user?.email || "").trim().toLowerCase();
   if (expected && actual !== expected) {
     await signOut(auth);
     throw new Error(`Use the designated IRPA administrator Google account: ${expected}.`);
   }
   window.sessionStorage.removeItem("irpaExpectedGoogleAdminEmail");
+  window.sessionStorage.removeItem("irpaAdminRedirectPending");
+  window.localStorage.removeItem("irpaExpectedGoogleAdminEmail");
+  window.localStorage.removeItem("irpaAdminRedirectPending");
   return result.user;
 }
 
