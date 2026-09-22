@@ -53,10 +53,11 @@ useEffect(()=>{
     // Always ask Firebase for a pending redirect result. Do not depend on
     // sessionStorage surviving the Google/Firebase cross-origin round trip.
     // Some Android browsers partition or clear sessionStorage during redirects.
-    const expected=window.sessionStorage.getItem("irpaExpectedGoogleAdminEmail")||"irpa2412@gmail.com";
+    const expected=window.sessionStorage.getItem("irpaExpectedGoogleAdminEmail")||window.localStorage.getItem("irpaExpectedGoogleAdminEmail")||"irpa2412@gmail.com";
     try{
       const redirectedUser=await completeGoogleRedirect(expected);
       window.sessionStorage.removeItem("irpaAdminRedirectPending");
+      window.localStorage.removeItem("irpaAdminRedirectPending");
       if(redirectedUser&&!disposed){
         setUser(redirectedUser);
         const actual=String(redirectedUser.email||"").trim().toLowerCase();
@@ -70,6 +71,7 @@ useEffect(()=>{
             authorizationType:"administrator"
           });
           window.sessionStorage.removeItem("irpaExpectedGoogleAdminEmail");
+          window.localStorage.removeItem("irpaExpectedGoogleAdminEmail");
           if(new URLSearchParams(window.location.search).get("adminGateway")==="1"){
             window.history.replaceState({},document.title,window.location.pathname);
           }
