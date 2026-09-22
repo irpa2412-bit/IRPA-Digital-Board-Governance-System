@@ -43,116 +43,167 @@ export default function App(){
   return()=>window.removeEventListener("irpa:signing-invitation",handler);
 },[]);
 
-useEffect(()=>{ const expected=window.sessionStorage.getItem("irpaExpectedGoogleAdminEmail"); if(expected){ completeGoogleRedirect(expected).catch(x=>console.error("Google redirect completion:",x)); } return observeAuthState(async u=>{setUser(u);setProfile(undefined);setEmployee(null);setInductionComplete(false);setError("");if(!u){setProfile(null);return}try{
-  // Primary administrator session is resolved directly after Firebase authentication.
-  // This exact-account check is limited to the Administrator Gateway and does not alter governance modules.
-  if(String(u.email||"").trim().toLowerCase()==="irpa2412@gmail.com"){
-    setProfile({uid:u.uid,email:"irpa2412@gmail.com",name:"IRPA Primary Administrator",role:"Administrator",active:true,authorizationType:"administrator"});
-    return;
-  }
-  // Administrator authorization is resolved FIRST and is completely independent
-  // of signing invitations, member induction, and the Drive gateway.
-  const adminDirect=await Promise.race([
-    getAdminProfile(u.uid),
-    new Promise((_,reject)=>window.setTimeout(()=>reject(new Error("Administrator authorization lookup timed out.")),3000))
-  ]);
-  if(adminDirect?.active===true){
-    setProfile({...adminDirect,uid:u.uid,email:u.email||"",authorizationType:"administrator"});
-    return;
-  }
+useEffect(()=>{
+  let disposed=false;
 
-  const activeSigningId=
-    window.sessionStorage.getItem("irpaSigningEnvelopeId")||
-    new URLSearchParams(window.location.search).get("signEnvelope");
-
-  if(activeSigningId){
+  // Resolve a Google redirect before relying on the auth-state callback.
+  // This prevents Android/mobile browsers from returning to the gateway
+  // without the application adopting the authenticated Firebase user.
+  const resolveGoogleRedirect=async()=>{
+    const expected=window.sessionStorage.getItem("irpaExpectedGoogleAdminEmail");
+    if(!expected)return;
     try{
-      const envelope=await Promise.race([
-        getSignatureEnvelope(activeSigningId),
-        new Promise((_,reject)=>window.setTimeout(()=>reject(new Error("Signing invitation lookup timed out.")),3000))
-      ]);
-      const recipient=(envelope.recipients||[]).find(r=>r.uid===u.uid);
-
-      if(!recipient)throw new Error("This account is not an invited signer for this document.");
-
-      setSigningEnvelopeId(activeSigningId);
-      setProfile({
-        uid:u.uid,email:u.email||recipient.email||"",name:recipient.name||u.displayName||u.email||"Signing Participant",
-        role:recipient.role||"Signer",authorizationType:"signer",signingEnvelopeId:activeSigningId,signingRecipient:recipient
-      });
-      setEmployee(null);
-      return;
-    }catch(signingError){
-      console.warn("Stale or unavailable signing invitation; continuing with normal IRPA authorization.",signingError);
-      window.sessionStorage.removeItem("irpaSigningEnvelopeId");
-      window.sessionStorage.removeItem("irpaSigningRecipient");
-      setSigningEnvelopeId(null);
+      const redirectedUser=await completeGoogleRedirect(expected);
+      window.sessionStorage.removeItem("irpaAdminRedirectPending");
+      if(redirectedUser&&!disposed){
+        setUser(redirectedUser);
+        const actual=String(redirectedUser.email||"").trim().toLowerCase();
+        if(actual==="irpa2412@gmail.com"){
+          setProfile({
+            uid:redirectedUser.uid,
+            email:"irpa2412@gmail.com",
+            name:"IRPA Primary Administrator",
+            role:"Administrator",
+            active:true,
+            authorizationType:"administrator"
+          });
+          window.history.replaceState({},document.title,window.location.pathname);
+        }
+      }
+    }catch(x){
+      console.error("Google redirect completion:",x);
+      window.sessionStorage.removeItem("irpaAdminRedirectPending");
+      if(!disposed)setError(x.message||"Google administrator authentication could not be completed.");
     }
-  }
-
-  const gateway=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").replace(/\/$/,"");
-  const loadMemberSession=async()=>{
-    const withTimeout=(promise,ms,label)=>Promise.race([
-      promise,new Promise((_,reject)=>window.setTimeout(()=>reject(new Error(label)),ms))
-    ]);
-    const firebaseProfile=withTimeout((async()=>{
-      const [memberDirect,employeeDirect]=await Promise.all([
-        getCurrentMemberProfile().catch(()=>null),
-        getCurrentEmployeeProfile().catch(()=>null)
-      ]);
-      if(!memberDirect&&!employeeDirect)return null;
-      return {
-        ok:true,uid:u.uid,email:u.email||memberDirect?.email||employeeDirect?.email||"",
-        admin:null,member:memberDirect?.status==="Active"?memberDirect:null,
-        employee:employeeDirect||null,authorizationSource:"firebase"
-      };
-    })(),3000,"Firebase member authorization lookup timed out.");
-
-    const gatewayProfile=withTimeout((async()=>{
-      const token=await u.getIdToken();
-      const response=await fetch(gateway+"/api/session/profile",{
-        method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},cache:"no-store"
-      });
-      const result=await response.json().catch(()=>({}));
-      if(!response.ok||!result.ok)throw new Error(result.error||"Unable to verify IRPA authorization.");
-      return result;
-    })(),3000,"Authorization gateway timed out.");
-
-    const results=await Promise.allSettled([firebaseProfile,gatewayProfile]);
-    const session=results.filter(result=>result.status==="fulfilled"&&result.value)
-      .map(result=>result.value).find(value=>value.ok||value.member||value.employee);
-    if(session)return session;
-    throw new Error("No active IRPA authorization profile was found.");
   };
 
-  const session=await loadMemberSession();
-  let m=session.member;
-  const invitationId=new URLSearchParams(window.location.search).get("memberInvite");
-  if(!m&&invitationId){
-    await provisionCurrentMemberFromInvitationV2(invitationId);
-    m=await getCurrentMemberProfile();
-    if(m)window.history.replaceState({},document.title,window.location.pathname+window.location.hash);
-  }
-  if(!m){setError("This account has no active IRPA member profile.");setProfile(null);return}
-  if(m.status!=="Active"){setError("The IRPA member profile exists but is not active.");setProfile(null);return}
-  setProfile({...m,authorizationType:"member"});
-  setEmployee(session.employee||null);
-  try{
-    const induction=await Promise.race([
-      getDoc(doc(db,"inductionRecords",u.uid)),
-      new Promise((_,reject)=>window.setTimeout(()=>reject(new Error("Induction status check timed out.")),10000))
-    ]);
-    setInductionComplete(induction.exists()&&induction.data()?.status==="Completed");
-  }catch(inductionError){
-    console.warn("Induction status check unavailable",inductionError);
+  resolveGoogleRedirect();
+
+  const unsubscribe=observeAuthState(async u=>{
+    if(disposed)return;
+    setUser(u);
+    setProfile(undefined);
+    setEmployee(null);
     setInductionComplete(false);
-  }
-}catch(x){
-  console.error(x);
-  setError(x.message||"Unable to verify IRPA authorization.");
-  setProfile(null);
-}});
-},[]);
+    setError("");
+    if(!u){setProfile(null);return}
+    try{
+      // The designated primary administrator is resolved immediately after
+      // Firebase authentication, independently of all member workflows.
+      if(String(u.email||"").trim().toLowerCase()==="irpa2412@gmail.com"){
+        setProfile({
+          uid:u.uid,
+          email:"irpa2412@gmail.com",
+          name:"IRPA Primary Administrator",
+          role:"Administrator",
+          active:true,
+          authorizationType:"administrator"
+        });
+        window.sessionStorage.removeItem("irpaExpectedGoogleAdminEmail");
+        window.sessionStorage.removeItem("irpaAdminRedirectPending");
+        if(new URLSearchParams(window.location.search).get("adminGateway")==="1"){
+          window.history.replaceState({},document.title,window.location.pathname);
+        }
+        return;
+      }
+
+      const adminDirect=await Promise.race([
+        getAdminProfile(u.uid),
+        new Promise((_,reject)=>window.setTimeout(()=>reject(new Error("Administrator authorization lookup timed out.")),3000))
+      ]);
+      if(adminDirect?.active===true){
+        setProfile({...adminDirect,uid:u.uid,email:u.email||"",authorizationType:"administrator"});
+        return;
+      }
+
+      const activeSigningId=
+        window.sessionStorage.getItem("irpaSigningEnvelopeId")||
+        new URLSearchParams(window.location.search).get("signEnvelope");
+
+      if(activeSigningId){
+        try{
+          const envelope=await Promise.race([
+            getSignatureEnvelope(activeSigningId),
+            new Promise((_,reject)=>window.setTimeout(()=>reject(new Error("Signing invitation lookup timed out.")),3000))
+          ]);
+          const recipient=(envelope.recipients||[]).find(r=>r.uid===u.uid);
+          if(!recipient)throw new Error("This account is not an invited signer for this document.");
+          setSigningEnvelopeId(activeSigningId);
+          setProfile({
+            uid:u.uid,email:u.email||recipient.email||"",name:recipient.name||u.displayName||u.email||"Signing Participant",
+            role:recipient.role||"Signer",authorizationType:"signer",signingEnvelopeId:activeSigningId,signingRecipient:recipient
+          });
+          setEmployee(null);
+          return;
+        }catch(signingError){
+          console.warn("Stale or unavailable signing invitation; continuing with normal IRPA authorization.",signingError);
+          window.sessionStorage.removeItem("irpaSigningEnvelopeId");
+          window.sessionStorage.removeItem("irpaSigningRecipient");
+          setSigningEnvelopeId(null);
+        }
+      }
+
+      const gateway=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").replace(/\/$/,"");
+      const loadMemberSession=async()=>{
+        const withTimeout=(promise,ms,label)=>Promise.race([
+          promise,new Promise((_,reject)=>window.setTimeout(()=>reject(new Error(label)),ms))
+        ]);
+        const firebaseProfile=withTimeout((async()=>{
+          const [memberDirect,employeeDirect]=await Promise.all([
+            getCurrentMemberProfile().catch(()=>null),
+            getCurrentEmployeeProfile().catch(()=>null)
+          ]);
+          if(!memberDirect&&!employeeDirect)return null;
+          return {ok:true,uid:u.uid,email:u.email||memberDirect?.email||employeeDirect?.email||"",admin:null,member:memberDirect?.status==="Active"?memberDirect:null,employee:employeeDirect||null,authorizationSource:"firebase"};
+        })(),3000,"Firebase member authorization lookup timed out.");
+
+        const gatewayProfile=withTimeout((async()=>{
+          const token=await u.getIdToken();
+          const response=await fetch(gateway+"/api/session/profile",{
+            method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},cache:"no-store"
+          });
+          const result=await response.json().catch(()=>({}));
+          if(!response.ok||!result.ok)throw new Error(result.error||"Unable to verify IRPA authorization.");
+          return result;
+        })(),3000,"Authorization gateway timed out.");
+
+        const results=await Promise.allSettled([firebaseProfile,gatewayProfile]);
+        const session=results.filter(result=>result.status==="fulfilled"&&result.value).map(result=>result.value).find(value=>value.ok||value.member||value.employee);
+        if(session)return session;
+        throw new Error("No active IRPA authorization profile was found.");
+      };
+
+      const session=await loadMemberSession();
+      let m=session.member;
+      const invitationId=new URLSearchParams(window.location.search).get("memberInvite");
+      if(!m&&invitationId){
+        await provisionCurrentMemberFromInvitationV2(invitationId);
+        m=await getCurrentMemberProfile();
+        if(m)window.history.replaceState({},document.title,window.location.pathname+window.location.hash);
+      }
+      if(!m){setError("This account has no active IRPA member profile.");setProfile(null);return}
+      if(m.status!=="Active"){setError("The IRPA member profile exists but is not active.");setProfile(null);return}
+      setProfile({...m,authorizationType:"member"});
+      setEmployee(session.employee||null);
+      try{
+        const induction=await Promise.race([
+          getDoc(doc(db,"inductionRecords",u.uid)),
+          new Promise((_,reject)=>window.setTimeout(()=>reject(new Error("Induction status check timed out.")),10000))
+        ]);
+        setInductionComplete(induction.exists()&&induction.data()?.status==="Completed");
+      }catch(inductionError){
+        console.warn("Induction status check unavailable",inductionError);
+        setInductionComplete(false);
+      }
+    }catch(x){
+      console.error(x);
+      setError(x.message||"Unable to verify IRPA authorization.");
+      setProfile(null);
+    }
+  });
+
+  return()=>{disposed=true;unsubscribe()};
+},[]);;
 
 // Login watchdog: authorization must never leave the application permanently
 // on the loading screen. This is limited to authentication/session state only.
