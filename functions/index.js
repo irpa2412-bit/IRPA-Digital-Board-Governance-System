@@ -24,6 +24,26 @@ async function deleteCollectionDocs(collectionName){
   return deleted;
 }
 
+exports.bootstrapPrimaryAdministrator = onCall({region:"us-central1"}, async request => {
+  const uid=request.auth?.uid;
+  const email=String(request.auth?.token?.email||"").trim().toLowerCase();
+  if(!uid) throw new HttpsError("unauthenticated","Google authentication is required.");
+  if(email!=="irpa2412@gmail.com") throw new HttpsError("permission-denied","This Google account is not the designated IRPA primary administrator.");
+  const user=await require("firebase-admin/auth").getAuth().getUser(uid);
+  await db.collection("adminProfiles").doc(uid).set({
+    uid,
+    email,
+    name:user.displayName||"IRPA Primary Administrator",
+    role:"Administrator",
+    active:true,
+    createdByUid:uid,
+    createdByEmail:email,
+    updatedAt:FieldValue.serverTimestamp()
+  },{merge:true});
+  await require("firebase-admin/auth").getAuth().setCustomUserClaims(uid,{...(user.customClaims||{}),admin:true});
+  return {ok:true,uid,email};
+});
+
 exports.createAdministrator = onCall({region:"us-central1"}, async request => {
   const uid=request.auth?.uid;
   if(!uid) throw new HttpsError("unauthenticated","Administrator authentication is required.");
