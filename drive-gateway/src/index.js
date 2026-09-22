@@ -72,6 +72,10 @@ export default {
         return await lookupInductionRegistration(request, env);
       }
 
+      if (url.pathname === "/api/session/profile" && request.method === "POST") {
+        return await getSessionProfile(request, env);
+      }
+
       return json({ ok: false, error: "Not found." }, 404, corsHeaders(request));
     } catch (error) {
       console.error("Drive gateway error", error);
@@ -520,6 +524,26 @@ async function ensureSignatureWorkflowFolder(request, env) {
     purpose:"Signature Workflow Working File"
   });
   return json({ok:true,envelopeId,folderId,folderName,archiveAccess:"Restricted",path:`IRPA Governance System/Signature Workflows/${folderName}`},200,corsHeaders(request));
+}
+
+async function getSessionProfile(request, env) {
+  const claims = await authenticateFirebaseRequest(request);
+  const [adminDoc, memberDoc, employeeDoc] = await Promise.all([
+    getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token),
+    getFirestoreDocument(env, `members/${claims.user_id}`, claims.token),
+    getFirestoreDocument(env, `employees/${claims.user_id}`, claims.token)
+  ]);
+  const admin = firestoreDocumentToPlain(adminDoc);
+  const member = firestoreDocumentToPlain(memberDoc);
+  const employee = firestoreDocumentToPlain(employeeDoc);
+  return json({
+    ok:true,
+    uid:claims.user_id,
+    email:claims.email || member?.email || employee?.email || "",
+    admin: admin && admin.active === true ? admin : null,
+    member: member && member.status === "Active" ? member : null,
+    employee: employee || null
+  },200,corsHeaders(request));
 }
 
 async function lookupInductionRegistration(request, env) {
