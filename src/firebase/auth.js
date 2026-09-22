@@ -40,8 +40,15 @@ export async function loginWithGoogle(expectedEmail = "", options = {}) {
   // Administrator Gateway uses Firebase redirect authentication. This is
   // deterministic on Android/mobile browsers and avoids popup/tab blockers.
   if (options.admin === true) {
+    // Strip the gateway query BEFORE starting the OAuth redirect. Firebase
+    // returns the browser to the URL from which redirect auth was initiated;
+    // keeping ?adminGateway=1 here can send a mobile browser back into the
+    // gateway before the application has consumed the Firebase redirect result.
     window.sessionStorage.setItem("irpaExpectedGoogleAdminEmail", expected);
     window.sessionStorage.setItem("irpaAdminRedirectPending", "1");
+    window.localStorage.setItem("irpaExpectedGoogleAdminEmail", expected);
+    window.localStorage.setItem("irpaAdminRedirectPending", "1");
+    window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
     await signInWithRedirect(auth, googleProvider);
     return null;
   }
