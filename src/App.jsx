@@ -83,6 +83,7 @@ function Shell({user,profile,admin,employee,inductionComplete,onInductionComplet
 function shortcut(){setMessage("");setBusy("shortcut");try{const blob=new Blob(["[InternetShortcut]\\r\\nURL="+window.location.origin+"\\r\\nIconIndex=0\\r\\n"],{type:"application/internet-shortcut"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="IRPA-Digital-Governance.url";document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);feedback("PC shortcut download started. Check your browser Downloads folder.");}catch(e){feedback("PC shortcut download failed: "+(e?.message||"Unknown error."))}finally{setBusy("")}}
 export default function App(){
   const adminGatewayMode=new URLSearchParams(window.location.search).get("adminGateway")==="1";
+  const adminGatewayMode=new URLSearchParams(window.location.search).get("adminGateway")==="1";
   const[user,setUser]=useState(undefined),
     [profile,setProfile]=useState(undefined),
     [employee,setEmployee]=useState(null),
@@ -320,7 +321,7 @@ useEffect(()=>{async function magic(){
     console.error(x);
     window.alert(x.message||"Unable to open the signing invitation.");
   }
-}magic()},[]);const invitationId=new URLSearchParams(window.location.search).get("memberInvite");if(user===undefined)return <AuthScreen/>;if(profile===undefined)return <Loading/>;if(!user)return invitationId?<MemberActivationScreen invitationId={invitationId}/>:<AuthScreen/>;
+}magic()},[]);const invitationId=new URLSearchParams(window.location.search).get("memberInvite");if(adminGatewayMode)return <AuthScreen/>;if(user===undefined)return <AuthScreen/>;if(profile===undefined)return <Loading/>;if(!user)return invitationId?<MemberActivationScreen invitationId={invitationId}/>:<AuthScreen/>;
 if(!profile)return <AccessDenied user={user}reason={error}/>;
 if(profile.authorizationType==="signer"){
   return <SignerShell user={user} profile={profile} signingEnvelopeId={signingEnvelopeId}/>;
