@@ -54,7 +54,7 @@ export default function InductionOrientation({profile,employee}){
   setLookupBusy(true);setLookupMessage("");
   try{
     const token=await user.getIdToken();
-    const gateway=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").replace(/\\/$/,"");
+    const gateway=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").replace(/\/$/,"");
     const response=await fetch(gateway+"/api/induction/lookup",{method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({fullName:value})});
     const result=await response.json().catch(()=>({}));
     if(!response.ok||!result.ok)throw new Error(result.error||"Unable to retrieve your IRPA registration information.");
