@@ -152,12 +152,11 @@ export async function sendPasswordReset(email) {
 
 export async function logout() { await signOut(auth); }
 
-export async function sendAdminMagicLink(email, invitationId = "") {
+export async function sendAdminMagicLink(email) {
   const cleanEmail = email.trim().toLowerCase();
   if(!cleanEmail) throw new Error("Administrator email is required.");
-  if(!invitationId) throw new Error("Administrator invitation ID is required.");
   const actionCodeSettings = {
-    url: window.location.origin + "/?adminGateway=1&adminModule=Add%20Administrator&adminInvite=" + encodeURIComponent(invitationId),
+    url: window.location.origin + "/?adminGateway=1&adminModule=Add%20Administrator",
     handleCodeInApp: true
   };
   await sendSignInLinkToEmail(auth, cleanEmail, actionCodeSettings);
@@ -278,6 +277,8 @@ export async function completeMagicLink(email, url = window.location.href) {
   const result = await signInWithEmailLink(auth, cleanEmail, url);
 
   if (adminInvitationId) {
+    // Legacy Firestore-backed invitation links remain supported for links
+    // issued before the daily-limit-free administrator pathway was deployed.
     const invitationRef = doc(db, "adminInvitations", adminInvitationId);
     const invitationSnap = await getDoc(invitationRef);
     if(!invitationSnap.exists()) throw new Error("This Administrator invitation is invalid or no longer available.");
@@ -287,27 +288,13 @@ export async function completeMagicLink(email, url = window.location.href) {
       throw new Error("This Administrator activation link was issued for a different email address.");
     }
     if(invitation.status !== "Pending") throw new Error("This Administrator invitation has already been activated or is no longer pending.");
-
     await setDoc(doc(db, "adminProfiles", result.user.uid), {
-      uid: result.user.uid,
-      email: cleanEmail,
-      name: invitation.name || result.user.displayName || cleanEmail.split("@")[0],
-      role: "Administrator",
-      active: true,
-      invitationId: adminInvitationId,
-      createdByUid: invitation.createdByUid || null,
-      createdByEmail: invitation.createdByEmail || null,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    }, { merge: true });
-
-    await setDoc(invitationRef, {
-      status: "Activated",
-      activatedUid: result.user.uid,
-      activatedAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    }, { merge: true });
-
+      uid:result.user.uid,email:cleanEmail,name:invitation.name||result.user.displayName||cleanEmail.split("@")[0],
+      role:"Administrator",active:true,invitationId:adminInvitationId,
+      createdByUid:invitation.createdByUid||null,createdByEmail:invitation.createdByEmail||null,
+      createdAt:serverTimestamp(),updatedAt:serverTimestamp()
+    },{merge:true});
+    await setDoc(invitationRef,{status:"Activated",activatedUid:result.user.uid,activatedAt:serverTimestamp(),updatedAt:serverTimestamp()},{merge:true});
     window.localStorage.removeItem("irpaEmailForSignIn");
     return result.user;
   }
@@ -318,8 +305,12 @@ export async function completeMagicLink(email, url = window.location.href) {
     window.localStorage.removeItem("irpaMemberEmailForSignIn");
     window.localStorage.removeItem("irpaEmailForSignIn");
   } else {
+    const adminSnap = await getDoc(doc(db, "adminProfiles", result.user.uid));
+    if (!adminSnap.exists() || adminSnap.data()?.active !== true) {
+      await signOut(auth);
+      throw new Error("This email is not an active IRPA Administrator account. Ask an existing Administrator to add the account first.");
+    }
     window.localStorage.removeItem("irpaEmailForSignIn");
   }
-
   return result.user;
 }
