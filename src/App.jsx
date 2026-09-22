@@ -154,7 +154,8 @@ useEffect(()=>{ const expected=window.sessionStorage.getItem("irpaExpectedGoogle
   console.error(x);
   setError(x.message||"Unable to verify IRPA authorization.");
   setProfile(null);
-}});\n},[]);
+}});
+},[]);
 
 // Login watchdog: authorization must never leave the application permanently
 // on the loading screen. This is limited to authentication/session state only.
