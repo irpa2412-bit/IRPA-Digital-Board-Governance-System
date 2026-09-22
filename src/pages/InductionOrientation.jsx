@@ -2,7 +2,7 @@ import React,{useEffect,useMemo,useState}from"react";
 import{doc,getDoc,setDoc,serverTimestamp}from"firebase/firestore";
 import{auth,db}from"../firebase/config";
 
-const uniqueNonEmpty=(values)=>[...new Set(values.map(v=>String(v||"").trim()).filter(Boolean))];
+const roleValues=(v)=>Array.isArray(v)?v.flatMap(roleValues):String(v||"").split(",").map(x=>x.trim()).filter(Boolean);const uniqueNonEmpty=(values)=>[...new Set(values.map(v=>String(v||"").trim()).filter(Boolean))];
 const assignedOptions=(primary,secondary,fallbacks)=>uniqueNonEmpty([primary,secondary,...fallbacks]);
 const SelectField=({label,value,onChange,options,placeholder,disabled=false})=><label>{label}<select value={value||""} onChange={e=>onChange(e.target.value)} disabled={disabled}><option value="">{placeholder}</option>{options.map(v=><option key={v} value={v}>{v}</option>)}</select></label>;
 
@@ -37,10 +37,10 @@ function guideFor(profile,employee){
 
 export default function InductionOrientation({profile,employee}){
  const user=auth.currentUser;
- const systemIdentity=useMemo(()=>({fullName:String(employee?.name||profile?.name||user?.displayName||"").trim(),role:String(employee?.role||profile?.role||"").trim(),department:String(employee?.department||profile?.department||"").trim(),unit:String(employee?.unit||profile?.unit||"").trim()}),[profile,employee,user?.displayName]);
+ const systemIdentity=useMemo(()=>({fullName:String(employee?.name||profile?.name||user?.displayName||"").trim(),role:roleValues(employee?.roles||employee?.role||profile?.roles||profile?.role).join(" • "),department:String(employee?.department||profile?.department||"").trim(),unit:String(employee?.unit||profile?.unit||"").trim()}),[profile,employee,user?.displayName]);
  const [registration,setRegistration]=useState(null),[lookupBusy,setLookupBusy]=useState(false),[lookupMessage,setLookupMessage]=useState("");
  const nameChoices=useMemo(()=>[...new Map([employee?.name,profile?.name,user?.displayName].filter(Boolean).map(name=>[String(name).trim().toLowerCase(),String(name).trim()])).values()], [employee?.name,profile?.name,user?.displayName]);
- const roleChoices=useMemo(()=>assignedOptions(registration?.role,systemIdentity.role,[]),[registration?.role,systemIdentity.role]);
+ const roleChoices=useMemo(()=>uniqueNonEmpty([...roleValues(registration?.roles||registration?.role),...roleValues(employee?.roles||employee?.role),...roleValues(profile?.roles||profile?.role)]),[registration,employee,profile]);
  const departmentChoices=useMemo(()=>assignedOptions(registration?.department,systemIdentity.department,[]),[registration?.department,systemIdentity.department]);
  const unitChoices=useMemo(()=>assignedOptions(registration?.unit,systemIdentity.unit,[]),[registration?.unit,systemIdentity.unit]);
  const [form,setForm]=useState({fullName:systemIdentity.fullName,role:systemIdentity.role,department:systemIdentity.department,unit:systemIdentity.unit,completedSteps:[],q1:"",q2:"",q3:"",comments:"",declaration:false});
@@ -57,13 +57,13 @@ export default function InductionOrientation({profile,employee}){
   try{
     const sourceMember=profile||{};
     const sourceEmployee=employee||{};
-    const role=String(sourceEmployee.role||sourceMember.role||"").trim();
+    const roles=uniqueNonEmpty([...roleValues(sourceEmployee.roles||sourceEmployee.role),...roleValues(sourceMember.roles||sourceMember.role)]);const role=roles.join(" • ");
     const department=String(sourceEmployee.department||sourceMember.department||"").trim();
     const unit=String(sourceEmployee.unit||sourceMember.unit||"").trim();
     const registrationNumber=String(sourceEmployee.employeeNumber||sourceMember.memberNumber||"").trim();
-    if(!role && !registrationNumber) throw new Error("No registered role or registration number could be retrieved from the IRPA system. The induction application is blocked.");
-    if(!department && !sourceMember.boardMember && !/board member/i.test(role)) throw new Error("No registered department could be retrieved from the IRPA system. The induction application is blocked.");
-    const registration={fullName:matchedName,role,department,unit,registrationNumber,sources:[sourceEmployee.uid?"Employees":"Members"].filter(Boolean),memberType:sourceMember.memberType||"—",employmentType:sourceEmployee.employmentType||"—",invitationStatus:sourceMember.invitationId||sourceEmployee.invitationId?"Registered invitation":"Registered account"};
+    if(!roles.length && !registrationNumber) throw new Error("No registered role or registration number could be retrieved from the IRPA system. The induction application is blocked.");
+    if(!department && !boardMember) throw new Error("No registered department could be retrieved from the IRPA system. The induction application is blocked.");
+    const boardMember=Boolean(sourceMember.boardMember||sourceEmployee.boardMember||roles.some(r=>/board member/i.test(r)));const registration={fullName:matchedName,role,roles,department,unit,registrationNumber,boardMember,sources:[sourceEmployee.uid?"Employees":"Members"].filter(Boolean),memberType:sourceMember.memberType||"—",employmentType:sourceEmployee.employmentType||"—",invitationStatus:sourceMember.invitationId||sourceEmployee.invitationId?"Registered invitation":"Registered account"};
     setRegistration(registration);
     setForm(x=>({...x,fullName:matchedName,role,department,unit}));
     setLookupMessage("System registration retrieved successfully. The application may proceed.");
