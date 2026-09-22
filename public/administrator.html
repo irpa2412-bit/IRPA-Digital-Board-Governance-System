@@ -60,9 +60,10 @@
     const googleButton=document.getElementById("googleButton");
     const password=document.getElementById("password");
     const params=new URLSearchParams(location.search);
-    const resetMode=params.get("mode")==="resetPassword";
+    const resetMode=params.get("mode")==="resetPassword"||params.get("adminReset")==="1";
     const resetCode=params.get("oobCode");
 
+    const clearAuthState=()=>{try{sessionStorage.removeItem("irpaAdminRedirectPending")}catch(_){}};
     const show=(text)=>{
       message.textContent=text;
       message.classList.add("show");
@@ -78,7 +79,7 @@
       if(code==="auth/user-not-found") return "The assigned administrator account was not found.";
       if(code==="auth/too-many-requests") return "Too many attempts. Wait a moment and try again.";
       if(code==="auth/popup-closed-by-user") return "Google sign-in was closed before authentication completed.";
-      return e?.message||"Administrator authentication failed.";
+      return e?.message?`${e.message}${code?` (${code})`:""}`:"Administrator authentication failed. Check Firebase Authentication configuration.";
     };
 
     await setPersistence(auth,browserLocalPersistence);
@@ -123,7 +124,7 @@
         }
         show("Administrator authenticated. Opening the governance dashboard...");
         setTimeout(()=>location.replace(location.origin+"/"),500);
-      }catch(err){show(errorText(err));busy(false)}
+      }catch(err){console.error("IRPA administrator authentication error:",err);show(errorText(err));busy(false)}
     });
 
     resetButton.addEventListener("click",async()=>{
@@ -134,7 +135,7 @@
           handleCodeInApp: false
         });
         show("A password-reset email has been sent to irpa2412@gmail.com.");
-      }catch(err){show(errorText(err))}
+      }catch(err){console.error("IRPA administrator reset error:",err);show(errorText(err))}
       finally{busy(false)}
     });
 
@@ -150,7 +151,7 @@
         }
         show("Administrator authenticated. Opening the governance dashboard...");
         setTimeout(()=>location.replace(location.origin+"/"),500);
-      }catch(err){show(errorText(err));busy(false)}
+      }catch(err){console.error("IRPA administrator Google authentication error:",err);show(errorText(err));busy(false)}
     });
   </script>
 </body>
