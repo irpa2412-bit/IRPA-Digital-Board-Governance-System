@@ -69,12 +69,11 @@ export async function loginWithGoogle(expectedEmail = "", options = {}) {
       ].includes(code);
       if (!popupBlocked) throw error;
 
-      // Fallback only when the browser explicitly prevents the popup.
-      // Remove the gateway query before redirect so the OAuth return target
-      // is the normal application root, not the gateway itself.
-      window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
-      await signInWithRedirect(auth, googleProvider);
-      return null;
+      // Do not silently switch to a redirect after a popup failure.
+      // Redirect authentication has a separate OAuth callback configuration
+      // and can hide the actual blocker behind another browser round trip.
+      // The administrator should receive the concrete Firebase error instead.
+      throw error;
     }
   }
 
