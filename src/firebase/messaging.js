@@ -30,9 +30,17 @@ export async function requestPushPermission() {
   }
   if (!auth.currentUser) throw new Error("You must be signed in before enabling notifications.");
 
-  const permission = await Notification.requestPermission();
+  const currentPermission = Notification.permission;
+  if (currentPermission === "denied") {
+    throw new Error("IRPA notifications are blocked by this browser. On Android Chrome, open the site controls for irpa-digital-board-governance.web.app → Permissions → Notifications → Allow, then return to IRPA and press Enable Push Notifications again.");
+  }
+
+  const permission = currentPermission === "granted"
+    ? "granted"
+    : await Notification.requestPermission();
+
   if (permission !== "granted") {
-    throw new Error("Notification permission was not granted by the browser.");
+    throw new Error("Notification permission was not granted. Choose Allow in the browser permission prompt, then press Enable Push Notifications again.");
   }
 
   const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js", { scope: "/" });
