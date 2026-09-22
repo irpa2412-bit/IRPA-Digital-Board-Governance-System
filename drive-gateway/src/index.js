@@ -46,9 +46,6 @@ export default {
       if (url.pathname === "/api/document-archive/folder" && request.method === "POST") {
         return await ensureDocumentArchiveFolder(request, env);
       }
-      if (url.pathname === "/api/procurement/finance-handoff" && request.method === "POST") {
-        return await procurementFinanceHandoff(request, env);
-      }
       if (url.pathname === "/api/document-archive/provision" && request.method === "POST") {
         return await provisionDocumentArchive(request, env);
       }
@@ -499,55 +496,6 @@ async function ensureSignedDocumentArchive(request, env) {
   return json({ok:true,documentUid:documentId,folderId,archiveRootId:signedRootId,categoryId,classificationId,archiveCategory,classification,archivePath:`IRPA Governance System/Signed Documents Archive/${archiveCategory}/${classification}/${folderName}`,archiveUidLink:`https://drive.google.com/drive/folders/${folderId}`,archiveCategoryUidLink:`https://drive.google.com/drive/folders/${categoryId}`,archiveAccess:classification==="Public"?"Public":"Restricted"},200,corsHeaders(request));
 }
 
-
-async function procurementFinanceHandoff(request, env) {
-  const claims = await authenticateFirebaseRequest(request);
-  const member = await getFirestoreDocument(env, `members/${cleanId(claims.user_id)}`, claims.token);
-  const role = String(member?.fields?.role?.stringValue || "");
-  if (!["Procurement Officer","Procurement Manager","Procurement Team Member"].includes(role)) {
-    return json({ok:false,error:"Procurement Team authorization is required."},403,corsHeaders(request));
-  }
-
-  const data = await request.json();
-  const requestId = cleanId(data.requestId || "");
-  const requestNumber = cleanName(data.requestNumber || requestId);
-  const title = cleanName(data.title || requestNumber);
-  const reference = cleanName(data.reference || requestNumber);
-  const fileIds = Array.isArray(data.fileIds) ? [...new Set(data.fileIds.map(x=>String(x||"").trim()).filter(Boolean))] : [];
-  if (!requestId || !fileIds.length) return json({ok:false,error:"Procurement request ID and uploaded evidence file IDs are required."},400,corsHeaders(request));
-
-  const procurementRequest = await getFirestoreDocument(env, `procurementRequests/${requestId}`, claims.token);
-  if (!procurementRequest) return json({ok:false,error:"The procurement request was not found."},404,corsHeaders(request));
-  const status = String(procurementRequest?.fields?.status?.stringValue || "");
-  if (status !== "Finance Handoff") return json({ok:false,error:"The procurement request is not ready for Finance handoff."},409,corsHeaders(request));
-
-  const accessToken = await getDriveAccessToken(env);
-  const rootId = await findOrCreateFolder(env, accessToken, "IRPA Governance System");
-  const archiveRootId = await findOrCreateFolder(env, accessToken, "Document Archives", rootId, {irpaGovernanceArchive:true,purpose:"Controlled Document Archives"});
-  const categoryId = await findOrCreateFolder(env, accessToken, "Finance Documents", archiveRootId, {irpaGovernanceArchive:true,archiveCategory:"Finance Documents",purpose:"Controlled Document Category"});
-  const classificationId = await findOrCreateFolder(env, accessToken, "Confidential", categoryId, {irpaGovernanceArchive:true,archiveCategory:"Finance Documents",classification:"Confidential",purpose:"Controlled Document Classification"});
-  const folderId = await findOrCreateFolder(env, accessToken, `IRPA-FIN-${requestNumber}`, classificationId, {irpaGovernanceArchive:true,purpose:"Procurement Finance Evidence",procurementRequestId:requestId,requestNumber,reference});
-
-  const copiedFiles = [];
-  for (const fileId of fileIds) {
-    const metadata = await driveFetch(env, accessToken, `/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,name,mimeType,description,trashed`);
-    const description = parseDescription(metadata.description);
-    if (metadata.trashed || !description?.irpaGovernance || !["Procurement Quotation","Procurement deliveryNote","Procurement invoice"].includes(String(description.purpose || ""))) {
-      return json({ok:false,error:"One or more evidence files are not recognized IRPA procurement documents."},403,corsHeaders(request));
-    }
-    const copied = await driveFetch(env, accessToken, `/drive/v3/files/${encodeURIComponent(fileId)}/copy?supportsAllDrives=true&fields=id,name,mimeType,size,webViewLink,parents`, {
-      method:"POST",
-      body:JSON.stringify({
-        name:metadata.name,
-        parents:[folderId],
-        description:JSON.stringify({...description,financeHandoff:true,financeFolderId:folderId,sourceFileId:fileId,financeCopiedAt:new Date().toISOString()})
-      })
-    });
-    copiedFiles.push({sourceFileId:fileId,fileId:copied.id,fileName:copied.name,webViewLink:copied.webViewLink||`https://drive.google.com/file/d/${copied.id}/view`});
-  }
-
-  return json({ok:true,requestId,requestNumber,folderId,folderName:`IRPA-FIN-${requestNumber}`,archivePath:`IRPA Governance System/Document Archives/Finance Documents/Confidential/IRPA-FIN-${requestNumber}`,archiveUidLink:`https://drive.google.com/drive/folders/${folderId}`,files:copiedFiles},200,corsHeaders(request));
-}
 
 async function ensureSignatureWorkflowFolder(request, env) {
   const claims = await authenticateFirebaseRequest(request);
