@@ -1,5 +1,4 @@
 import React,{useEffect,useMemo,useState}from"react";import Invitations from"./pages/Invitations";import Employees from"./pages/Employees";import BoardMembers from"./pages/BoardMembers";import Members from"./pages/Members";import EmployeePayments from"./pages/EmployeePayments";import Meetings from"./pages/Meetings";import Resolutions from"./pages/Resolutions";import Voting from"./pages/Voting";import OperationalGateways from"./pages/OperationalGateways";import OperationalGatewaysParticipants from"./pages/OperationalGatewaysParticipants";import AuthorizationApprovals from"./pages/AuthorizationApprovals";import SignaturePlatformWithUpload from"./pages/SignaturePlatformWithUpload";import FinancePortfolio from"./pages/FinancePortfolio";import ProcurementPortal from"./pages/ProcurementPortal";import Settings from"./pages/Settings";import InductionOrientation from"./pages/InductionOrientation";import ModuleInterlinkBar from"./components/ModuleInterlinkBar";import{observeAuthState,loginWithEmail,loginWithGoogle,registerWithEmail,sendPasswordReset,sendAdminMagicLink,isMagicLink,completeMagicLink,logout}from"./firebase/auth";import{getAdminProfile,getCurrentMemberProfile,getCurrentEmployeeProfile,getRecords,COLLECTIONS}from"./firebase/data";import{getSignatureEnvelope}from"./firebase/signaturePlatform";import{provisionCurrentMemberFromInvitationV2}from"./firebase/invitationWorkflow";import{auth}from"./firebase/config";
-import{ensurePrimaryAdministrator}from"./firebase/functions";
 const NAV={GOVERNANCE:["Dashboard","Induction & Orientation","Board Members Registration","Members & Personnel","Invitations","Participants","Meetings","Meeting Room","Resolutions","Voting","Actions","Documents","Signature Platform","Decisions","Risk Register","Authorization & Approvals","Employee Payments"],FINANCE:["Finance Portfolio","Procurement"],EVIDENCE:["Reports","Audit Trail"],SYSTEM:["Downloads","Settings","Add Administrator"]};const ALL_MODULES=Object.values(NAV).flat();const BASE_MEMBER_MODULES=["Dashboard","Meetings","Meeting Room","Resolutions","Voting","Actions","Documents","Signature Platform","Decisions","Authorization & Approvals","Employee Payments","Induction & Orientation","Procurement","Reports","Downloads"];const FINANCE_ROLES=["Finance Personnel","Finance Manager","Accountant","Finance Officer","Executive Director","Director Finance & Administration"];const PROCUREMENT_ROLES=["Procurement Officer","Procurement Manager","Procurement Team Member"];const PROCUREMENT_APPROVAL_ROLES=["Executive Director","Director Livestock","Livestock Director","Director Internal Oversight","Internal Oversight Director","Director Finance & Administration","Director Human Resources","Director Outreach","Director Community Development","Director Environment","Director Field","Director Operations","Operations Director","Outreach Director","Community Development Director","Environment Director","Field Director"];const HR_ROLES=["Executive Director","Director Human Resources","HR Manager"];const EXECUTIVE_DIRECTOR_MODULES=["Members & Personnel","Participants","Risk Register"];const CONFIGURED_MODULES=["Meeting Room","Actions","Documents","Decisions","Risk Register","Reports","Audit Trail"];
 function isFinancePortalMember(p,e){const r=p?.role||"";return FINANCE_ROLES.includes(r)||(p?.department==="Finance & Administration"&&["Finance Unit","Accounting Unit"].includes(p?.unit))||(e?.department==="Finance & Administration"&&["Finance Unit","Accounting Unit"].includes(e?.unit));}function isProcurementPortalMember(p,e){const r=p?.role||"";return PROCUREMENT_ROLES.includes(r)||PROCUREMENT_APPROVAL_ROLES.includes(r)||(p?.department==="Finance & Administration"&&p?.unit==="Procurement Unit")||(e?.department==="Finance & Administration"&&e?.unit==="Procurement Unit");}function memberModules(p,e){const r=p?.role||"",m=[...BASE_MEMBER_MODULES.filter(x=>x!=="Procurement")];if(isFinancePortalMember(p,e))m.splice(m.indexOf("Reports"),0,"Finance Portfolio");if(isProcurementPortalMember(p,e))m.splice(m.indexOf("Reports"),0,"Procurement");if(HR_ROLES.includes(r))m.splice(m.indexOf("Reports"),0,"Members & Personnel");if(r==="Executive Director")m.push(...EXECUTIVE_DIRECTOR_MODULES);return[...new Set(m)]}
 function MemberActivationScreen({invitationId}) {
@@ -45,18 +44,12 @@ export default function App(){
 },[]);
 
 useEffect(()=>observeAuthState(async u=>{setUser(u);setProfile(undefined);setEmployee(null);setInductionComplete(false);setError("");if(!u){setProfile(null);return}try{
-  // Repair the configured primary administrator profile for the authenticated Firebase UID.
-  if(String(u.email||"").trim().toLowerCase()==="irpa2412@gmail.com"){
-    try{
-      await Promise.race([
-        ensurePrimaryAdministrator(),
-        new Promise((_,reject)=>window.setTimeout(()=>reject(new Error("Primary administrator repair timed out.")),3000))
-      ]);
-    }catch(_){}
-  }
-
   // Administrator authorization is resolved FIRST and is completely independent
   // of signing invitations, member induction, and the Drive gateway.
+  if(String(u.email||"").trim().toLowerCase()==="irpa2412@gmail.com"){
+    setProfile({uid:u.uid,email:u.email||"irpa2412@gmail.com",name:"IRPA Primary Administrator",role:"Administrator",active:true,authorizationType:"administrator"});
+    return;
+  }
   const adminDirect=await Promise.race([
     getAdminProfile(u.uid),
     new Promise((_,reject)=>window.setTimeout(()=>reject(new Error("Administrator authorization lookup timed out.")),3000))
