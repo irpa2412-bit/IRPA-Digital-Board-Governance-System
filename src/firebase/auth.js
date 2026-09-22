@@ -32,7 +32,7 @@ const adminOAuthAuth = getAuth(adminOAuthApp);
 const adminGoogleProvider = new GoogleAuthProvider();
 adminGoogleProvider.setCustomParameters({
   prompt: "select_account",
-  login_hint: "irpa2412@gmail.com"
+  login_hint: "select_account"
 });
 
 export async function registerWithEmail(email, password, options = {}) {
