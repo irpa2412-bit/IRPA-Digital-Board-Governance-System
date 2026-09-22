@@ -1,4 +1,4 @@
-import React,{useEffect,useMemo,useState}from"react";
+import React,{useEffect,useMemo,useRef,useState}from"react";
 import{getCurrentInductionContext,submitInductionApplication}from"../firebase/data";
 
 const unique=(values)=>[...new Set(values.flatMap(v=>Array.isArray(v)?v:String(v||"").split(",")).map(v=>String(v||"").trim()).filter(Boolean))];
@@ -98,7 +98,7 @@ function ChoiceField({label,value,onChange,options,help,disabled=false,required=
 }
 
 export default function InductionOrientation(){
- const[context,setContext]=useState(null),[busy,setBusy]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState("");
+ const[context,setContext]=useState(null),[busy,setBusy]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState("");const feedbackRef=useRef(null);
  const[form,setForm]=useState({identityConfirmation:"",accountType:"",primaryRole:"",department:"",unit:"",employmentType:"",orientationModules:[],q1:"",q2:"",q3:"",comments:"",declaration:false});
 
  useEffect(()=>{let live=true;(async()=>{
@@ -134,7 +134,7 @@ export default function InductionOrientation(){
  const moduleOptions=useMemo(()=>orientationModules(form.primaryRole||context?.role||""),[form.primaryRole,context]);
  const questions=useMemo(()=>questionSet(form.primaryRole||context?.role||"",form.department,form.q1),[form.primaryRole,form.department,form.q1]);
  const linked=String(context?.existingRequest?.status||"")==="Linked"||String(context?.existingRequest?.roleAssignmentStatus||"")==="Linked";
- const pending=Boolean(context?.existingRequest&&!linked);
+ const pending=Boolean(context?.existingRequest&&!linked);const completedFields=[form.accountType,form.identityConfirmation,form.primaryRole,form.department,form.unit,form.employmentType,form.orientationModules.length,form.q1,form.q2,form.q3,form.declaration].filter(Boolean).length;const progress=Math.round((completedFields/11)*100);
 
  function patch(name,value){
   setForm(x=>{
@@ -148,12 +148,12 @@ export default function InductionOrientation(){
  function toggleModule(value){setForm(x=>({...x,orientationModules:x.orientationModules.includes(value)?x.orientationModules.filter(v=>v!==value):[...x.orientationModules,value]}));}
 
  async function submit(e){
-  e.preventDefault();setError("");setMessage("");
-  if(!context){setError("The IRPA registration could not be retrieved. The application is blocked.");return}
+  e.preventDefault();setError("");setMessage("");if(feedbackRef.current)feedbackRef.current.scrollIntoView({behavior:"smooth",block:"nearest"});
+  if(!context){setError("The IRPA registration could not be retrieved. The application is blocked.");return}if(pending){setMessage("Your induction application is already awaiting administrator LINK. No duplicate submission is required.");return}
   if(!form.accountType){setError("Please confirm whether you are applying in your registered Employee or Member capacity.");return}
   if(form.identityConfirmation!=="Yes"){setError("You must confirm that the displayed registration and invitation information belongs to you.");return}
   if(!form.primaryRole||!form.department||!form.unit||!form.employmentType||!form.q1||!form.q2||!form.q3||!form.orientationModules.length||!form.declaration){setError("Please complete all required selections before submitting.");return}
-  setSaving(true);
+  setSaving(true);setMessage("Submitting your Induction and Orientation application… Please wait for the administrator-routing confirmation.");
   try{
    const result=await submitInductionApplication(form,context);
    if(result.alreadyLinked){setMessage("Your induction has already been approved and linked by an administrator.");return}
@@ -162,17 +162,18 @@ export default function InductionOrientation(){
   finally{setSaving(false);}
  }
 
- if(busy)return <div className="page"><section className="panel"><h2>Induction and Orientation</h2><p className="muted">Retrieving your registered IRPA information and invitation details…</p></section></div>;
- if(error&&!context)return <div className="page"><section className="panel"><h2>Induction and Orientation — Access Check</h2><div className="error-message action-feedback">{error}</div><p className="panel-description">The system could not retrieve a matching IRPA registration/invitation record, so the application remains blocked.</p></section></div>;
+ if(busy)return <div className="page induction-page"><section className="panel induction-loading" aria-live="polite"><div className="induction-spinner" aria-hidden="true"/><h2>Induction and Orientation</h2><p className="muted">Retrieving your registered IRPA information and invitation details…</p><small className="field-help">The form will open automatically when the authenticated IRPA record has been verified.</small></section></div>;
+ if(error&&!context)return <div className="page induction-page"><section className="panel"><h2>Induction and Orientation — Access Check</h2><div ref={feedbackRef} className="error-message action-feedback" role="alert">{error}</div><p className="panel-description">The system could not retrieve a matching IRPA registration/invitation record, so the application remains blocked.</p><button type="button" className="secondary-button" onClick={()=>window.location.reload()}>RETRY REGISTRATION CHECK</button></section></div>;
 
- return <div className="page">
+ return <div className="page induction-page" aria-busy={saving?"true":"false"}>
   <section className="welcome-panel">
    <div><span className="eyebrow">IRPA INDUCTION & ORIENTATION</span><h1>Registration-Linked Induction Application</h1><p>The form is pre-filled from your authenticated IRPA Member/Employee registration and invitation records. Choices are generated from the information already registered in the system.</p></div>
    <div className="identity-card"><span>APPLICATION STATUS</span><strong>{linked?"LINKED":pending?"PENDING LINK":"READY"}</strong><small>{linked?"Administrator approval completed":pending?"Awaiting administrator LINK":"Complete the guided form below"}</small></div>
   </section>
 
-  {message&&<div className="success-message action-feedback" role="status">{message}</div>}
-  {error&&<div className="error-message action-feedback" role="alert">{error}</div>}
+  {(message||error)&&<div ref={feedbackRef} className="induction-feedback" aria-live="polite">{message&&<div className="success-message action-feedback" role="status">{message}</div>}{error&&<div className="error-message action-feedback" role="alert">{error}</div>}</div>}
+
+  <section className="panel induction-progress-panel"><div className="induction-progress-head"><div><span className="eyebrow">APPLICATION PROGRESS</span><strong>{progress}% complete</strong></div><span>{pending?"Pending administrator LINK":linked?"Administrator LINK completed":"Complete the required fields below"}</span></div><div className="induction-progress-track" aria-label={`Application ${progress}% complete`}><span style={{width:`${progress}%`}}/></div><div className="induction-steps" aria-label="Induction steps">{["Identity","Position","Modules","Orientation Check","Declaration"].map((x,i)=><span key={x} className={completedFields>=[2,4,5,8,11][i]?"complete":""}>{i+1}. {x}</span>)}</div></section>
 
   <section className="panel">
    <div className="panel-header"><div><span className="eyebrow">SYSTEM-RETRIEVED IDENTITY</span><h2>Your Registered Information</h2><p className="panel-description">These fields are retrieved from IRPA registration/invitation records. The registration number is intentionally withheld during induction and is issued to you by email after the administrator completes LINK.</p></div></div>
@@ -224,7 +225,7 @@ export default function InductionOrientation(){
    <section className="panel">
     <div className="panel-header"><div><span className="eyebrow">STEP 5</span><h2>Declaration & Submission</h2><p className="panel-description">Submission creates/updates your induction application and routes it to the administrator for the required <strong>LINK</strong> action.</p></div></div>
     <label style={{display:"flex",gap:10,alignItems:"flex-start"}}><input type="checkbox" checked={form.declaration} onChange={e=>patch("declaration",e.target.checked)} required/><span>I confirm that I have reviewed the system-retrieved registration/invitation information, completed the orientation selections truthfully, and understand that my final role, department/unit and Board Member status are validated from the IRPA system.</span></label>
-    <div className="form-actions" style={{marginTop:18}}><button type="submit" disabled={saving||linked}>{saving?"SUBMITTING…":linked?"ALREADY LINKED":"SUBMIT INDUCTION APPLICATION"}</button></div>
+    <div className="form-actions induction-submit-actions" style={{marginTop:18}}><button type="submit" disabled={saving||linked||pending}>{saving?"SUBMITTING…":linked?"ALREADY LINKED":pending?"APPLICATION ALREADY SUBMITTED":"SUBMIT INDUCTION APPLICATION"}</button><small className="submit-status">{saving?"Saving and routing your application securely…":linked?"No further submission is required.":pending?"Administrator LINK is pending.":"Your submission will be routed to the administrator for LINK."}</small></div>
    </section>
   </form>
  </div>;
