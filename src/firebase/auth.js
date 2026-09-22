@@ -13,6 +13,7 @@ import {
 import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { auth, firebaseConfig, googleProvider } from "./config";
+import { getFunctions, httpsCallable } from "firebase/functions";
 
 export async function registerWithEmail(email, password, options = {}) {
   const result = await createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
@@ -34,6 +35,17 @@ export async function loginWithEmail(email, password) {
 export async function loginWithGoogle() {
   const result = await signInWithPopup(auth, googleProvider);
   return result.user;
+}
+
+export async function bootstrapPrimaryAdministrator() {
+  const user = auth.currentUser;
+  if(!user) throw new Error("Google authentication is required.");
+  const email = String(user.email || "").trim().toLowerCase();
+  if(email !== "irpa2412@gmail.com") throw new Error("This Google account is not the designated IRPA primary administrator.");
+  const functions = getFunctions(undefined, "us-central1");
+  const call = httpsCallable(functions, "bootstrapPrimaryAdministrator");
+  const result = await call({});
+  return result.data;
 }
 
 export async function sendPasswordReset(email) {
