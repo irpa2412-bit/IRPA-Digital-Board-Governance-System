@@ -92,7 +92,7 @@ jobs:
           const config = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/identity-config.json", "utf8"));
           config.notification ??= {};
           config.notification.sendEmail ??= {};
-          config.notification.sendEmail.callbackUri = "https://irpa-digital-board-governance.web.app/administrator.html";
+          config.notification.sendEmail.callbackUri = "https://irpa-digital-board-governance.firebaseapp.com/administrator.html";
           fs.writeFileSync(process.env.RUNNER_TEMP + "/identity-config-patch.json", JSON.stringify({
             name: config.name,
             notification: { sendEmail: { callbackUri: config.notification.sendEmail.callbackUri } }
