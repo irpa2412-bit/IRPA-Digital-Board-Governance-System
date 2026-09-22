@@ -81,6 +81,7 @@ service cloud.firestore {
   match /reports/{id}{allow read:if governanceUser();allow create,update,delete:if admin()||management();}
   match /financeBudgets/{id}{allow read:if financePortfolioViewer();allow create,update,delete:if financePersonnel();}
   match /financeTransactions/{id}{allow read:if financePersonnel();allow create:if financePersonnel()||(procurementTeam()&&request.resource.data.sourceModule=="Procurement"&&request.resource.data.status=="Pending Approval"&&request.resource.data.procurementRequestId is string);allow update,delete:if financePersonnel();}
+  match /financePaymentTrace/{id}{allow read:if financePortfolioViewer();allow create:if financePersonnel()||(procurementTeam()&&request.resource.data.sourceModule=="Procurement"&&request.resource.data.handoffStatus=="Handoff Received"&&request.resource.data.authorizationStatus=="Authorized"&&request.resource.data.financeTransactionId is string);allow update:if financePersonnel();allow delete:if false;}
   match /financeFunding/{id}{allow read,create,update,delete:if financePersonnel();}
   match /financeApprovals/{id}{allow read,create,update,delete:if financePersonnel();}
   match /financeCommitments/{id}{allow read,create,update,delete:if financePersonnel();}
