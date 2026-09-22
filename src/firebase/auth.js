@@ -4,6 +4,7 @@ import {
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
   signOut,
   sendSignInLinkToEmail,
   isSignInWithEmailLink,
@@ -32,9 +33,14 @@ export async function loginWithEmail(email, password) {
   }
 }
 
-export async function loginWithGoogle(expectedEmail = "") {
-  const result = await signInWithPopup(auth, googleProvider);
+export async function loginWithGoogle(expectedEmail = "", options = {}) {
   const expected = String(expectedEmail || "").trim().toLowerCase();
+  if (options.redirect === true) {
+    window.sessionStorage.setItem("irpaExpectedGoogleAdminEmail", expected);
+    await signInWithRedirect(auth, googleProvider);
+    return null;
+  }
+  const result = await signInWithPopup(auth, googleProvider);
   const actual = String(result.user?.email || "").trim().toLowerCase();
   if (expected && actual !== expected) {
     await signOut(auth);
