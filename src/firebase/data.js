@@ -85,7 +85,6 @@ export async function submitInductionApplication(form,context){
   const uid=auth.currentUser?.uid;
   if(!uid||uid!==context?.uid) throw new Error("Authenticated registration identity could not be verified.");
   if(!context?.roles?.length) throw new Error("No registered role could be retrieved. The induction application is blocked.");
-  if(!context?.registrationNumber) throw new Error("No IRPA registration number could be retrieved. The induction application is blocked.");
   if(context.existingRequest?.status==="Linked"||context.existingRequest?.roleAssignmentStatus==="Linked") {
     return {alreadyLinked:true,requestId:uid};
   }
@@ -97,7 +96,8 @@ export async function submitInductionApplication(form,context){
     fullName:context.fullName,
     memberProfileUid:context.member?.uid||uid,
     employeeProfileUid:context.employee?.uid||uid,
-    memberEmployeeNumber:context.registrationNumber,
+    memberEmployeeNumber:null,
+    registrationNumberStatus:"Issued after administrator LINK",
     invitationId:context.invitationId||null,
     invitationReference:context.invitation?.invitationReference||context.invitation?.reference||null,
     invitationStatus:context.invitation?"Registered invitation":"Registered account",
@@ -138,7 +138,8 @@ export async function submitInductionApplication(form,context){
     uid,
     email:context.email,
     fullName:context.fullName,
-    registrationNumber:context.registrationNumber,
+    registrationNumber:null,
+    registrationNumberStatus:"Issued after administrator LINK",
     invitationId:context.invitationId||null,
     systemRoles:context.roles,
     systemRole:context.role,
@@ -159,7 +160,8 @@ export async function submitInductionApplication(form,context){
   await writeAudit("INDUCTION_APPLICATION_SUBMITTED",COLLECTIONS.registrationRequests,uid,{
     applicantUid:uid,
     applicantEmail:context.email,
-    registrationNumber:context.registrationNumber,
+    registrationNumber:null,
+    registrationNumberStatus:"Issued after administrator LINK",
     invitationId:context.invitationId||null,
     roles:context.roles,
     requestedRole:payload.requestedRole,
@@ -198,6 +200,8 @@ export async function linkInductionRegistration(requestId){
   const roles=Array.isArray(request.systemRoles)?request.systemRoles:((Array.isArray(employee.roles)?employee.roles:[]).concat(Array.isArray(member.roles)?member.roles:[]).concat([request.systemRole,request.requestedRole,employee.role,member.role]).flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean)));const uniqueRoles=[...new Set(roles)];const role=uniqueRoles.join(" • ");
   if(!role) throw new Error("The system could not retrieve the applicant's registered role. The application cannot be linked.");
   const boardMember=Boolean(member.boardMember||employee.boardMember||uniqueRoles.some(r=>/board member/i.test(r)));
+  const registrationNumber=String(employee.employeeNumber||member.memberNumber||"").trim();
+  if(!registrationNumber) throw new Error("The administrator LINK cannot complete until the system can assign an IRPA registration number to this applicant.");
   const linkedAt=serverTimestamp();
   const updates={
     inductionStatus:"Approved",
@@ -211,6 +215,8 @@ export async function linkInductionRegistration(requestId){
     approvedDepartment:department||null,
     approvedUnit:unit||null,
     boardMember,
+    registrationNumber,
+    registrationNumberStatus:"Issued after administrator LINK",
     routingStatus:"Approved & Linked",
     updatedAt:linkedAt
   };
@@ -223,6 +229,8 @@ export async function linkInductionRegistration(requestId){
     approvedDepartment:department||null,
     approvedUnit:unit||null,
     boardMember,
+    registrationNumber,
+    registrationNumberStatus:"Issued after administrator LINK",
     linkedByUid:adminUid,
     linkedByEmail:auth.currentUser?.email||null,
     linkedAt,
@@ -254,7 +262,19 @@ export async function linkInductionRegistration(requestId){
     department:department||null,
     unit:unit||null,
     boardMember,
-    linkedByUid:adminUid
+    registrationNumber,
+    registrationNumberStatus:"Issued after administrator LINK"
   });
-  return {id:requestId,alreadyLinked:false,...request,...updates,uid,role,department,unit,boardMember};
+  let registrationEmailStatus="Not sent";
+  try{
+    const email=String(request.email||member.email||employee.email||"").trim().toLowerCase();
+    if(email){
+      const emailResult=await sendEmployeeRegistrationEmail(email,registrationNumber);
+      registrationEmailStatus=emailResult?.deliveryStatus||"Queued";
+    }
+  }catch(error){
+    registrationEmailStatus=`Failed: ${error.message||"Unable to send registration email"}`;
+  }
+  await writeAudit("INDUCTION_REGISTRATION_NUMBER_EMAIL",COLLECTIONS.registrationRequests,requestId,{applicantUid:uid,registrationNumber,email:request.email||member.email||employee.email||null,status:registrationEmailStatus});
+  return {id:requestId,alreadyLinked:false,...request,...updates,uid,role,department,unit,boardMember,registrationNumber,registrationEmailStatus};
 }
