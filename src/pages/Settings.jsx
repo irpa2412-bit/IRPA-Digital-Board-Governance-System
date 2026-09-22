@@ -33,8 +33,12 @@ export default function Settings({ admin = false, section = "settings" }) {
   }, []);
 
   async function enableNotifications() {
-    setBusy(true);
     setMessage("");
+    if (notificationPermissionState() === "denied") {
+      setMessage("Notifications are blocked by Chrome for this site. Open Chrome site controls → Permissions → Notifications → Allow, then return to this page and press Enable Push Notifications again.");
+      return;
+    }
+    setBusy(true);
     try {
       await requestPushPermission();
       setPermission(notificationPermissionState());
@@ -211,8 +215,8 @@ export default function Settings({ admin = false, section = "settings" }) {
           <small>Current browser notification permission</small>
         </div>
         <div className="form-actions">
-          <button onClick={enableNotifications} disabled={busy || !supported || permission === "denied"}>
-            {busy ? "Enabling..." : permission === "denied" ? "Notifications Blocked — Allow in Browser Settings" : "Enable Push Notifications"}
+          <button type="button" onClick={enableNotifications} disabled={busy || !supported} aria-busy={busy ? "true" : "false"}>
+            {busy ? "Enabling..." : permission === "denied" ? "Check Browser Notification Permission" : "Enable Push Notifications"}
           </button>
         </div>
         {permission === "denied" && (
