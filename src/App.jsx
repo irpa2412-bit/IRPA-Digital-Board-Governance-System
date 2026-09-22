@@ -70,7 +70,7 @@ useEffect(()=>observeAuthState(async u=>{setUser(u);setProfile(undefined);setEmp
     return;
   }
 
-  const gateway=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").replace(/\\/$/,"");
+  const gateway=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").replace(/\/$/,"");
   const loadSessionProfile=async()=>{
     const token=await u.getIdToken();
     const controller=new AbortController();
