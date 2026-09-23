@@ -120,7 +120,7 @@ export async function submitInductionApplication(form,context){
   if(context.existingRequest?.status==="Linked"||context.existingRequest?.roleAssignmentStatus==="Linked") return {alreadyLinked:true,requestId:uid};
 
   const submittedAt=serverTimestamp();
-  const requestRef=doc(db,COLLECTIONS.registrationRequests,uid);
+  const requestRef=doc(activeDb,COLLECTIONS.registrationRequests,uid);
   const existingSnap=await getDoc(requestRef);
   const payload={
     uid,email:context.email,fullName:context.fullName,
@@ -147,14 +147,14 @@ export async function submitInductionApplication(form,context){
     lastSubmittedAt:submittedAt,updatedAt:submittedAt
   };
   await setDoc(requestRef,payload,{merge:true});
-  await setDoc(doc(db,COLLECTIONS.inductionRecords,uid),{
+  await setDoc(doc(activeDb,COLLECTIONS.inductionRecords,uid),{
     uid,email:context.email,fullName:context.fullName,verifiedEmail:String(form.verifiedEmail||context.email||"").trim().toLowerCase(),verifiedFullName:String(form.verifiedFullName||context.fullName||"").trim(),systemRoles:context.roles,systemRole:context.role,
     systemDepartment:context.department||null,systemUnit:context.unit||null,boardMember:context.boardMember,
     accountType:payload.accountType,orientationModules:payload.orientationModules,answers:payload.answers,
     declaration:payload.declaration,status:"Submitted",inductionStatus:"Submitted",roleAssignmentStatus:"Pending",
     submittedAt,lastSubmittedAt:submittedAt,updatedAt:submittedAt
   },{merge:true});
-  await writeAudit("INDUCTION_APPLICATION_SUBMITTED",COLLECTIONS.registrationRequests,uid,{
+  if(!context.anonymous) await writeAudit("INDUCTION_APPLICATION_SUBMITTED",COLLECTIONS.registrationRequests,uid,{
     applicantEmail:context.email,roles:context.roles,department:payload.requestedDepartment||null,unit:payload.requestedUnit||null,
     boardMember:context.boardMember,accountType:payload.accountType
   });
