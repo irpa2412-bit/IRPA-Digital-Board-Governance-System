@@ -142,7 +142,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
       </div>
       {message && <div className="success-message action-feedback">{message}</div>}
       {error && <div className="error-message action-feedback">{error}</div>}
-      <div className="success-message action-feedback" style={{marginBottom:16}}>
+      <div className="archive-routing-panel" style={{marginBottom:16}}>
         <strong>Google Drive Archive Routing</strong>
         <div style={{marginTop:6}}>Choose where this document will be stored:</div>
         <ul style={{margin:"6px 0 0 20px"}}>
