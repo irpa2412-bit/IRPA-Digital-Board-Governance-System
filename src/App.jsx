@@ -284,7 +284,6 @@ useEffect(()=>{
       }
       const activeMember = m?.status === "Active" ? m : null;
       if(!activeEmployee && session.employee) activeEmployee=session.employee;
-      const activeEmployee = session.employee || null;
       if(!activeMember && !activeEmployee){
         setError("This account has no active IRPA enrollment record.");
         setProfile(null);
