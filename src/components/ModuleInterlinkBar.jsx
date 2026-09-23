@@ -4,14 +4,14 @@ import"../styles/interlinks.css";
 
 const PORTAL_GROUPS=[
   {label:"Meeting Portal",target:"Meetings",children:[
-    ["Meeting Room","Meeting Room"],["Participants","Participants"],["Resolutions","Resolutions"],
-    ["Voting","Voting"],["Decisions","Decisions"],["Actions","Actions"]
+    ["Meeting Room Portal","Meeting Room"],["Participants Portal","Participants"],["Resolutions Portal","Resolutions"],
+    ["Voting Portal","Voting"],["Decisions Portal","Decisions"],["Actions Portal","Actions"]
   ]},
   {label:"Finance Portal",target:"Finance Portfolio",children:[["Procurement Portal","Procurement"]]}
 ];
 const CORE=[
-  ["Documents","Documents"],["Signature Portal","Signature Platform"],["Authorization","Authorization & Approvals"],
-  ["Employee Payments","Employee Payments"],["Reports","Reports"]
+  ["Documents Portal","Documents"],["Signature Portal","Signature Platform"],["Authorization & Approvals Portal","Authorization & Approvals"],
+  ["Employee Payments Portal","Employee Payments"],["Reports Portal","Reports"]
 ];
 function contextLabel(c){if(!c)return"";return c.resolutionReference||c.meetingReference||c.documentReference||c.procurementReference||c.authorizationReference||c.employeeNumber||""}
 export default function ModuleInterlinkBar({active,onNavigate,admin=false,role=""}){
