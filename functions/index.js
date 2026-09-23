@@ -93,13 +93,17 @@ exports.createAdministrator = onCall({region:"us-central1"}, async request => {
 
 exports.fetchInductionMatchingRecords = onCall({region:"us-central1"}, async request => {
   const invitationId=String(request.data?.invitationId||"").trim();
-  if(!invitationId) throw new HttpsError("invalid-argument","An invitation reference is required for applicant matching.");
-  const invitationSnap=await db.collection("invitations").doc(invitationId).get();
-  if(!invitationSnap.exists) throw new HttpsError("not-found","The IRPA invitation could not be found.");
-  const invitation={id:invitationSnap.id,...invitationSnap.data()};
-  if(String(invitation.status||"").toLowerCase()==="cancelled") throw new HttpsError("failed-precondition","This IRPA invitation has been cancelled.");
-  const email=String(invitation.email||"").trim().toLowerCase();
-  const name=String(invitation.name||"").trim().toLowerCase();
+  const suppliedEmail=String(request.data?.email||"").trim().toLowerCase();
+  let invitation=null;
+  if(invitationId){
+    const snap=await db.collection("invitations").doc(invitationId).get();
+    if(snap.exists) invitation={id:snap.id,...snap.data()};
+  }else if(suppliedEmail){
+    const snap=await db.collection("invitations").where("email","==",suppliedEmail).get();
+    if(!snap.empty) invitation={id:snap.docs[0].id,...snap.docs[0].data()};
+  }
+  const email=String(invitation?.email||suppliedEmail).trim().toLowerCase();
+  const name=String(invitation?.name||"").trim().toLowerCase();
   const [employeeSnap,memberSnap]=await Promise.all([
     email?db.collection("employees").where("email","==",email).get():Promise.resolve({docs:[]}),
     email?db.collection("members").where("email","==",email).get():Promise.resolve({docs:[]})
@@ -107,15 +111,11 @@ exports.fetchInductionMatchingRecords = onCall({region:"us-central1"}, async req
   const clean=docSnap=>({id:docSnap.id,...docSnap.data()});
   const employees=employeeSnap.docs.map(clean);
   const members=memberSnap.docs.map(clean);
-  const nameMatches={
-    employees:employees.filter(x=>String(x.name||"").trim().toLowerCase()===name),
-    members:members.filter(x=>String(x.name||"").trim().toLowerCase()===name)
-  };
   return {
     invitation,
     employees:employees.map(x=>({id:x.id,uid:x.uid||null,name:x.name||"",email:x.email||email,employeeNumber:x.employeeNumber||"",role:x.role||"",roles:Array.isArray(x.roles)?x.roles:[],department:x.department||"",unit:x.unit||"",employmentType:x.employmentType||"",status:x.status||"",registrationStatus:x.registrationStatus||""})),
     members:members.map(x=>({id:x.id,uid:x.uid||null,name:x.name||"",email:x.email||email,memberNumber:x.memberNumber||"",memberType:x.memberType||"",role:x.role||"",roles:Array.isArray(x.roles)?x.roles:[],department:x.department||"",unit:x.unit||"",boardMember:Boolean(x.boardMember),status:x.status||"",registrationStatus:x.registrationStatus||""})),
-    exactNameMatch:Boolean(nameMatches.employees.length||nameMatches.members.length)
+    exactNameMatch:Boolean([...employees,...members].some(x=>String(x.name||"").trim().toLowerCase()===name))
   };
 });
 
