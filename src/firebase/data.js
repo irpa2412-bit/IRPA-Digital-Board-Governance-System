@@ -3,7 +3,7 @@ import { auth, db, applicantAuth, applicantDb } from "./config";
 import { sendEmployeeRegistrationEmail } from "./auth";
 import { getFunctions, httpsCallable } from "firebase/functions";
 
-const uniqueValues=(values)=>[...new Set(values.flatMap(v=>Array.isArray(v)?v:String(v||"").split(",")).map(v=>String(v||"").trim()).filter(Boolean))];
+const uniqueInductionValues=(values)=>[...new Set(values.flatMap(v=>Array.isArray(v)?v:String(v||"").split(",")).map(v=>String(v||"").trim()).filter(Boolean))];
 
 export const COLLECTIONS={members:"members",employees:"employees",employeeCounters:"employeeCounters",memberCounters:"memberCounters",participants:"participants",meetings:"meetings",meetingSubscriptions:"meetingSubscriptions",meetingRoomEvents:"meetingRoomEvents",transcriptions:"transcriptions",resolutions:"resolutions",votes:"votes",voteLocks:"voteLocks",voteCorrections:"voteCorrections",votingIssues:"votingIssues",actions:"actions",documents:"documents",signatures:"signatures",decisions:"decisions",risks:"risks",audit:"audit",reports:"reports",authorizationRequests:"authorizationRequests",workflowActions:"workflowActions",staffPaymentRequests:"staffPaymentRequests",financeBudgets:"financeBudgets",financeTransactions:"financeTransactions",financeFunding:"financeFunding",financeApprovals:"financeApprovals",financeCommitments:"financeCommitments",financeGrants:"financeGrants",financeBankAccounts:"financeBankAccounts",financeReconciliations:"financeReconciliations",financeAssets:"financeAssets",financeRisks:"financeRisks",financeReports:"financeReports",financePaymentTrace:"financePaymentTrace",procurementVendors:"procurementVendors",procurementRequests:"procurementRequests",procurementVendorScores:"procurementVendorScores",procurementVendorBlacklist:"procurementVendorBlacklist",procurementVendorProbation:"procurementVendorProbation",invitations:"invitations",registrationRequests:"registrationRequests",inductionRecords:"inductionRecords",adminProfiles:"adminProfiles",systemSettings:"systemSettings",mail:"mail"};
 function currentActor(){return{uid:auth.currentUser?.uid||null,email:auth.currentUser?.email||null};}
@@ -81,7 +81,7 @@ export async function getCurrentInductionContext(){
     }
     const matchedEmployees=Array.isArray(registerMatches.employees)?registerMatches.employees:[];
     const matchedMembers=Array.isArray(registerMatches.members)?registerMatches.members:[];
-    const roles=uniqueValues([
+    const roles=uniqueInductionValues([
       invitation?.role,
       ...(Array.isArray(invitation?.roles)?invitation.roles:[]),
       ...matchedEmployees.flatMap(x=>[x.role,...(x.roles||[])]),
