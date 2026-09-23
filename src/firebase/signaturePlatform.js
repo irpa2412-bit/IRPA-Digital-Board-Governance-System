@@ -121,11 +121,11 @@ export async function getSignatureEnvelope(envelopeId){
   const snap=await getDoc(doc(db,ENVELOPE_COLLECTION,envelopeId));
   if(!snap.exists())throw new Error("This signing invitation is no longer available.");
   const envelope={id:snap.id,...snap.data()};
-  // The signing ceremony itself may be loaded by any authenticated IRPA user.
-  // Signing authority remains restricted to the participant/current-signer checks in
-  // previewEnvelopeSigning(), signEnvelope(), and the workflow routing functions.
-  // This allows an owner to open a ceremony for a document intended only for the
-  // owner's own e-signature, even when no additional signer has been assigned.
+  // A signing envelope is private to its participants. The document PDF may be
+  // visible to an assigned participant, but other officers' assignments are not.
+  if(!Array.isArray(envelope.participantUids)||!envelope.participantUids.includes(u.uid)){
+    throw new Error("You are not assigned to this signing envelope.");
+  }
   if(["Cancelled","Declined"].includes(envelope.status)){
     throw new Error("This signing envelope is no longer available.");
   }
