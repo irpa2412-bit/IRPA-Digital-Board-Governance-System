@@ -187,8 +187,15 @@ exports.routeInductionApplication = onCall({region:"us-central1"}, async request
   if(!requestId) throw new HttpsError("invalid-argument","Induction application ID is required.");
   if(requestId!==callerUid) throw new HttpsError("permission-denied","This induction application does not belong to the current applicant session.");
   const requestRef=db.collection("registrationRequests").doc(requestId);
-  const snap=await requestRef.get();
-  if(!snap.exists) throw new HttpsError("not-found","The induction application could not be found.");
+  let snap=await requestRef.get();
+  if(!snap.exists){
+    const recoverySnap=await db.collection("inductionRecords").doc(requestId).get();
+    if(!recoverySnap.exists) throw new HttpsError("not-found","The induction application could not be found in the application reception or induction recovery records.");
+    const recovered=recoverySnap.data()||{};
+    const recoveredItem={uid:requestId,email:recovered.email||recovered.verifiedEmail||"",fullName:recovered.fullName||recovered.verifiedFullName||"",systemRoles:recovered.systemRoles||[],systemRole:recovered.systemRole||null,systemDepartment:recovered.systemDepartment||null,systemUnit:recovered.systemUnit||null,boardMember:Boolean(recovered.boardMember),accountType:recovered.accountType||"",orientationModules:Array.isArray(recovered.orientationModules)?recovered.orientationModules:[],answers:recovered.answers||{},declaration:recovered.declaration===true,status:"Pending Department & Unit Review",roleAssignmentStatus:"Pending",inductionStatus:"Submitted",submittedAt:recovered.submittedAt||FieldValue.serverTimestamp(),lastSubmittedAt:recovered.lastSubmittedAt||FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp(),recoveredFromInductionRecord:true};
+    await requestRef.set(recoveredItem,{merge:true});
+    snap=await requestRef.get();
+  }
   const item=snap.data();
   if(item.routingStatus==="Advanced to Administrator"||item.routingStatus==="Filtered — Below 75% Accuracy"){
     return {ok:true,routingStatus:item.routingStatus,accuracyPercentage:item.accuracyPercentage,systemSummary:item.systemSummary||""};
