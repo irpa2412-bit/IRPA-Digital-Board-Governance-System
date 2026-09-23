@@ -3,12 +3,12 @@ import{readWorkflowContext,navigateWorkflow,workflowLinkEntries}from"../firebase
 import"../styles/interlinks.css";
 
 const CORE=[
-  ["Meetings","Meetings"],["Participants","Participants"],["Meeting Room","Meeting Room"],
+  ["Meeting Portal","Meetings"],["Participants","Participants"],["Meeting Room","Meeting Room"],
   ["Resolutions","Resolutions"],["Voting","Voting"],["Decisions","Decisions"],["Actions","Actions"],
-  ["Documents","Documents"],["Signature Platform","Signature Platform"],["Authorization","Authorization & Approvals"],
+  ["Documents","Documents"],["Signature Portal","Signature Platform"],["Authorization","Authorization & Approvals"],
   ["Employee Payments","Employee Payments"],["Reports","Reports"]
 ];
-const FINANCE=[["Finance","Finance Portfolio"],["Procurement","Procurement"]];
+const FINANCE=[["Finance Portal","Finance Portfolio"],["Procurement Portal","Procurement"]];
 function contextLabel(c){if(!c)return"";return c.resolutionReference||c.meetingReference||c.documentReference||c.procurementReference||c.authorizationReference||c.employeeNumber||""}
 export default function ModuleInterlinkBar({active,onNavigate,admin=false,role=""}){
   const[context,setContext]=useState(null),[feedback,setFeedback]=useState("");
