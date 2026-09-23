@@ -39,7 +39,30 @@ adminGoogleProvider.setCustomParameters({
   login_hint: "select_account"
 });
 
-export async function ensureInductionAnonymousSession() {\n  if (auth.currentUser) return auth.currentUser;\n  const result = await signInAnonymously(auth);\n  return result.user;\n}\n\nexport async function upgradeInductionApplicant(email) {\n  const cleanEmail=String(email||"").trim().toLowerCase();\n  const current=auth.currentUser;\n  if(!current||!current.isAnonymous) throw new Error("The induction enrollment session is no longer available. Reload the induction page and try again.");\n  if(!cleanEmail) throw new Error("An email address is required for the new member/employee record.");\n  const random=typeof crypto!=="undefined"&&crypto.getRandomValues?Array.from(crypto.getRandomValues(new Uint32Array(8))).map(v=>v.toString(36)).join(""):Math.random().toString(36).slice(2)+Date.now().toString(36);\n  const temporaryPassword=`IRPA-${random}-9!aQ`;\n  const credential=EmailAuthProvider.credential(cleanEmail,temporaryPassword);\n  let linked;\n  try{linked=await linkWithCredential(current,credential);}catch(error){\n    if(error?.code==="auth/email-already-in-use") throw new Error("This email address already has an IRPA account. Use the normal sign-in pathway instead of creating a duplicate enrollment.");\n    throw new Error(firebaseErrorMessage(error));\n  }\n  await sendPasswordResetEmail(auth,cleanEmail);\n  return linked.user;\n}\n\nexport async function registerWithEmail(email, password, options = {}) {
+export async function ensureInductionAnonymousSession() {
+  if (auth.currentUser) return auth.currentUser;
+  const result = await signInAnonymously(auth);
+  return result.user;
+}
+
+export async function upgradeInductionApplicant(email) {
+  const cleanEmail=String(email||"").trim().toLowerCase();
+  const current=auth.currentUser;
+  if(!current||!current.isAnonymous) throw new Error("The induction enrollment session is no longer available. Reload the induction page and try again.");
+  if(!cleanEmail) throw new Error("An email address is required for the new member/employee record.");
+  const random=typeof crypto!=="undefined"&&crypto.getRandomValues?Array.from(crypto.getRandomValues(new Uint32Array(8))).map(v=>v.toString(36)).join(""):Math.random().toString(36).slice(2)+Date.now().toString(36);
+  const temporaryPassword=`IRPA-${random}-9!aQ`;
+  const credential=EmailAuthProvider.credential(cleanEmail,temporaryPassword);
+  let linked;
+  try{linked=await linkWithCredential(current,credential);}catch(error){
+    if(error?.code==="auth/email-already-in-use") throw new Error("This email address already has an IRPA account. Use the normal sign-in pathway instead of creating a duplicate enrollment.");
+    throw new Error(firebaseErrorMessage(error));
+  }
+  await sendPasswordResetEmail(auth,cleanEmail);
+  return linked.user;
+}
+
+export async function registerWithEmail(email, password, options = {}) {
   const result = await createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
   if (options.verify !== false) await sendEmailVerification(result.user);
   return result.user;
