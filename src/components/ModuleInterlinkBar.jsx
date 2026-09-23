@@ -11,19 +11,21 @@ const CORE=[
 const FINANCE=[["Finance","Finance Portfolio"],["Procurement","Procurement"]];
 function contextLabel(c){if(!c)return"";return c.resolutionReference||c.meetingReference||c.documentReference||c.procurementReference||c.authorizationReference||c.employeeNumber||""}
 export default function ModuleInterlinkBar({active,onNavigate,admin=false,role=""}){
-  const[context,setContext]=useState(null);
+  const[context,setContext]=useState(null),[feedback,setFeedback]=useState("");
   const finance=admin||["Executive Director","Finance Personnel","Finance Manager","Accountant","Finance Officer"].includes(role);
   const items=finance?[...CORE,...FINANCE]:CORE;
   useEffect(()=>{const sync=()=>setContext(readWorkflowContext());sync();const handler=e=>setContext(e?.detail?.context||readWorkflowContext());window.addEventListener("irpa:navigate",handler);return()=>window.removeEventListener("irpa:navigate",handler)},[active]);
   const go=target=>{
-    if(target===active)return;
+    if(target===active){setFeedback(`${target} is already open.`);return}
+    setFeedback(`Opening ${target}…`);
     const current=readWorkflowContext()||{};
     navigateWorkflow(target,current);
     if(onNavigate)onNavigate(target);
+    window.setTimeout(()=>setFeedback(`${target} opened.`),120);
   };
   const label=contextLabel(context);
   const linked=workflowLinkEntries(context||{});
-  return <section className="module-interlink-bar" aria-label="Related governance modules">
+  return <section className="module-interlink-bar" aria-label="Related governance modules">{feedback&&<div className="action-feedback" role="status" aria-live="polite">{feedback}</div>}
     <div className="module-interlink-heading"><span>CONNECTED WORKFLOW</span><small>Move directly between linked institutional records</small>{label&&<strong className="workflow-context-chip">Linked record: {label}</strong>}</div>
     <div className="module-interlink-list">
       {items.map(([itemLabel,target])=><button key={target} type="button" className={target===active?"active":""} onClick={()=>go(target)}>{itemLabel}</button>)}
