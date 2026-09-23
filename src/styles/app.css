@@ -11,3 +11,10 @@
 .induction-page input,.induction-page select,.induction-page textarea,.induction-page button{pointer-events:auto;touch-action:manipulation}
 .induction-page input,.induction-page select,.induction-page textarea{cursor:text}
 .induction-page select{cursor:pointer}
+
+/* Induction submission feedback: deliberately persistent attention cue. The message remains visible while the submitted fields are cleared. */
+.induction-feedback-attention{position:sticky;top:12px;z-index:1000;margin:14px 0;padding:4px;border-radius:14px}
+.induction-feedback-blink{animation:irpa-induction-feedback-blink 1.15s steps(2,start) infinite;outline:3px solid currentColor;box-shadow:0 0 0 5px rgba(255,255,255,.08),0 0 24px rgba(255,255,255,.22);font-weight:900;letter-spacing:.02em;padding:18px 20px;min-height:58px;display:flex;align-items:center}
+@keyframes irpa-induction-feedback-blink{0%,49%{opacity:1;transform:scale(1)}50%,100%{opacity:.28;transform:scale(.99)}}
+@media(prefers-reduced-motion:reduce){.induction-feedback-blink{animation:irpa-induction-feedback-pulse 1.8s ease-in-out infinite}}
+@keyframes irpa-induction-feedback-pulse{0%,100%{opacity:1}50%{opacity:.65}}
