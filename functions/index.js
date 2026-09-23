@@ -97,6 +97,70 @@ exports.createAdministrator = onCall({region:"us-central1"}, async request => {
   }
 });
 
+exports.listAdministrators = onCall({region:"us-central1"}, async request => {
+  const uid=request.auth?.uid;
+  if(!uid) throw new HttpsError("unauthenticated","Administrator authentication is required.");
+  const actorSnap=await db.collection("adminProfiles").doc(uid).get();
+  const actor=actorSnap.exists?actorSnap.data():null;
+  const actorEmail=String(request.auth?.token?.email||actor?.email||"").trim().toLowerCase();
+  if(actorEmail!=="irpa2412@gmail.com" && (!actor || actor.active!==true))
+    throw new HttpsError("permission-denied","Administrator authorization is required.");
+  const snap=await db.collection("adminProfiles").where("active","==",true).get();
+  return {ok:true, administrators:snap.docs.map(d=>({uid:d.id,email:d.data()?.email||"",name:d.data()?.name||"",role:d.data()?.role||"Administrator",active:d.data()?.active===true,primary:String(d.data()?.email||"").trim().toLowerCase()==="irpa2412@gmail.com"}))};
+});
+
+exports.removeAdministrator = onCall({region:"us-central1"}, async request => {
+  const uid=request.auth?.uid;
+  if(!uid) throw new HttpsError("unauthenticated","Administrator authentication is required.");
+  const actorSnap=await db.collection("adminProfiles").doc(uid).get();
+  const actor=actorSnap.exists?actorSnap.data():null;
+  const actorEmail=String(request.auth?.token?.email||actor?.email||"").trim().toLowerCase();
+  const primaryAdministrator=actorEmail==="irpa2412@gmail.com";
+  if(!primaryAdministrator && (!actor || actor.active!==true))
+    throw new HttpsError("permission-denied","Administrator authorization is required.");
+
+  const targetUid=String(request.data?.uid||"").trim();
+  if(!targetUid) throw new HttpsError("invalid-argument","The Administrator to remove is required.");
+  if(targetUid===uid) throw new HttpsError("failed-precondition","You cannot remove your own Administrator access.");
+  const targetRef=db.collection("adminProfiles").doc(targetUid);
+  const targetSnap=await targetRef.get();
+  if(!targetSnap.exists) throw new HttpsError("not-found","The selected Administrator was not found.");
+  const target=targetSnap.data()||{};
+  const targetEmail=String(target.email||"").trim().toLowerCase();
+  if(targetEmail==="irpa2412@gmail.com")
+    throw new HttpsError("failed-precondition","The primary IRPA Administrator cannot be removed.");
+  if(target.active!==true)
+    return {ok:true,uid:targetUid,email:targetEmail,alreadyRemoved:true};
+
+  await targetRef.set({
+    active:false,
+    removedAt:FieldValue.serverTimestamp(),
+    removedByUid:uid,
+    removedByEmail:actorEmail||null,
+    updatedAt:FieldValue.serverTimestamp()
+  },{merge:true});
+
+  try {
+    const adminAuth=getAuth();
+    const targetUser=await adminAuth.getUser(targetUid);
+    await adminAuth.setCustomUserClaims(targetUid,{...(targetUser.customClaims||{}),admin:false});
+  } catch(error) {
+    console.error("removeAdministrator claim update failed",error);
+    throw new HttpsError("internal","Administrator access was not fully revoked at Firebase Authentication level.");
+  }
+
+  await db.collection("audit").add({
+    action:"ADMINISTRATOR_REMOVED",
+    collection:"adminProfiles",
+    recordId:targetUid,
+    details:{targetEmail,targetUid,removedByUid:uid,removedByEmail:actorEmail||null},
+    actorUid:uid,
+    actorEmail:actorEmail||null,
+    createdAt:FieldValue.serverTimestamp()
+  });
+  return {ok:true,uid:targetUid,email:targetEmail,name:target.name||"",removed:true};
+});
+
 exports.fetchInductionMatchingRecords = onCall({region:"us-central1"}, async request => {
   const invitationId=String(request.data?.invitationId||"").trim();
   const suppliedEmail=String(request.data?.email||"").trim().toLowerCase();
