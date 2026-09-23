@@ -190,3 +190,40 @@
 .members-personnel-page .page-header p{color:#687871}
 .members-personnel-page .page-header .eyebrow,.members-personnel-page .page-header span{color:#687871}
 @media(max-width:600px){.members-personnel-page{margin:-18px -18px -24px;padding:18px 18px 24px}}
+
+/* Members & Personnel — full pale-white portal surface, including forms, registers and detail panels */
+.members-personnel-page,
+.members-personnel-page .panel,
+.members-personnel-page .registration-feedback,
+.members-personnel-page .detail-grid>div{
+  background:#f8faf9;
+  color:#26352f;
+}
+.members-personnel-page .panel{
+  border:1px solid #d9e3de;
+  box-shadow:0 6px 22px rgba(26,54,43,.06);
+}
+.members-personnel-page .page-header h1,
+.members-personnel-page .panel h2{color:#18241f}
+.members-personnel-page .page-header p,
+.members-personnel-page .panel-description{color:#5f7169}
+.members-personnel-page .form-field label{color:#3e5149}
+.members-personnel-page .form-field input,
+.members-personnel-page .form-field select,
+.members-personnel-page .form-field textarea,
+.members-personnel-page .table-search{
+  color:#26352f;
+  background:#fff;
+  border:1px solid #cbd8d2;
+}
+.members-personnel-page .form-field input::placeholder,
+.members-personnel-page .table-search::placeholder{color:#7b8c85}
+.members-personnel-page th{color:#536960;border-bottom-color:#d5e0db}
+.members-personnel-page td{color:#30433b;border-bottom-color:#dbe4df}
+.members-personnel-page .detail-grid>div{border-color:#d5e0db}
+.members-personnel-page .detail-grid span{color:#60746b}
+.members-personnel-page .detail-grid strong{color:#263b32}
+.members-personnel-page .table-wrapper{background:#fff;border:1px solid #d9e3de}
+.members-personnel-page table{background:#fff}
+.members-personnel-page .status-badge{background:#e5f3eb;color:#17613d;border:1px solid #b9dcc8}
+.members-personnel-page .registration-feedback{border-color:#c9ddd3}
