@@ -837,3 +837,54 @@
 .content-area .page .dashboard-function-button.function-category-risk:hover{background:#f3e6c7!important;border-color:#d9c18c!important}
 .content-area .page .dashboard-function-button.function-category-information:hover{background:#dce9f5!important;border-color:#adc9e1!important}
 .content-area .page .dashboard-function-button.function-category-finance:hover{background:#f3ddd6!important;border-color:#d9b3a5!important}
+
+/* FINAL PORTAL CARD PRINCIPLE — apply the approved muted-light surface hierarchy
+   across workflow/archive/stat cards. Saturated green is reserved for semantic success,
+   not used as a decorative fill for every card. */
+.content-area:not(.dashboard-content-area) .page .stat-card,
+.content-area:not(.dashboard-content-area) .page .workflow-stage{
+  background:#f3f6f4!important;
+  color:#24362f!important;
+  border:1px solid #d7e1dc!important;
+  box-shadow:0 5px 16px rgba(24,61,45,.05)!important;
+}
+.content-area:not(.dashboard-content-area) .page .stat-card span,
+.content-area:not(.dashboard-content-area) .page .workflow-stage span{
+  color:#355247!important;
+  font-weight:800!important;
+}
+.content-area:not(.dashboard-content-area) .page .stat-card strong,
+.content-area:not(.dashboard-content-area) .page .workflow-stage strong{
+  color:#173a2b!important;
+  font-weight:900!important;
+}
+.content-area:not(.dashboard-content-area) .page .stat-card small,
+.content-area:not(.dashboard-content-area) .page .workflow-stage small{
+  color:#64776e!important;
+}
+.content-area:not(.dashboard-content-area) .page .stat-card:hover,
+.content-area:not(.dashboard-content-area) .page .workflow-stage:hover{
+  background:#eaf2ed!important;
+  border-color:#b9d1c2!important;
+}
+.content-area:not(.dashboard-content-area) .page .workflow-stage.active-stage,
+.content-area:not(.dashboard-content-area) .page .stat-card.active-stage{
+  background:#e5f0ea!important;
+  border-color:#6d9d81!important;
+  box-shadow:0 0 0 2px rgba(61,119,83,.09),0 6px 18px rgba(24,61,45,.07)!important;
+}
+.content-area:not(.dashboard-content-area) .page .workflow-stage.active-stage span,
+.content-area:not(.dashboard-content-area) .page .stat-card.active-stage span{
+  color:#214f38!important;
+}
+.content-area:not(.dashboard-content-area) .page .workflow-stage.active-stage strong,
+.content-area:not(.dashboard-content-area) .page .stat-card.active-stage strong{
+  color:#123b28!important;
+}
+/* Archive/category cards follow the same light surface rule. */
+.content-area:not(.dashboard-content-area) .page .document-category-card,
+.content-area:not(.dashboard-content-area) .page .archive-card{
+  background:#f3f6f4!important;
+  color:#24362f!important;
+  border-color:#d7e1dc!important;
+}
