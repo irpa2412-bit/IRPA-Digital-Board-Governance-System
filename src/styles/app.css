@@ -116,3 +116,4 @@
   .dashboard-application-reception .form-actions{display:block}
   .dashboard-application-reception .form-actions button{width:100%;margin-top:8px}
 }
+.dashboard-application-gauge{cursor:pointer;text-align:left;position:relative}.dashboard-application-gauge strong{font-size:20px;line-height:1.2}.dashboard-application-gauge b{display:block;margin-top:10px;font-size:10px;color:#d6a52c}@media(max-width:760px){.dashboard-application-gauge{min-height:112px}.dashboard-application-gauge strong{font-size:16px}}
