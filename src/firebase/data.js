@@ -144,14 +144,19 @@ export async function submitInductionApplication(form,context){
     const invitation=match.invitation||null;
     const employeeMatches=Array.isArray(match.employees)?match.employees:[];
     const memberMatches=Array.isArray(match.members)?match.members:[];
-    if(!invitation) throw new Error("No matching IRPA invitation was found for this email. The application remains outside the administrator review queue.");
-    if(!employeeMatches.length&&!memberMatches.length) throw new Error("The invitation could not be verified against the Employee or Member register. The application remains outside the administrator review queue.");
-    const records=[...employeeMatches,...memberMatches];
-    const roleMatch=records.some(x=>[x.role,...(x.roles||[])].some(v=>clean(v)===clean(form.primaryRole)))||clean(invitation.role)===clean(form.primaryRole);
-    const departmentMatch=records.some(x=>clean(x.department)===clean(form.department))||clean(invitation.department)===clean(form.department);
-    const unitMatch=records.some(x=>clean(x.unit)===clean(form.unit))||clean(invitation.unit)===clean(form.unit);
-    if(!roleMatch||!departmentMatch||!unitMatch) throw new Error("The application information does not sufficiently match the registered invitation and Employee/Member records. It cannot be routed to the Administrator until the comparison is resolved.");
-    context={...context,invitation,invitations:[invitation],invitationId:invitation.id,registerMatches:{employees:employeeMatches,members:memberMatches},email,fullName:form.verifiedFullName||context.fullName};
+    // New applicants do not need a pre-existing invitation or registration record.
+    // If a matching invitation/register exists, use it consultatively and validate the
+    // supplied details. Otherwise route the self-enrollment to administrator review.
+    if(invitation||employeeMatches.length||memberMatches.length){
+      const records=[...employeeMatches,...memberMatches];
+      if(invitation){
+        const roleMatch=records.some(x=>[x.role,...(x.roles||[])].some(v=>clean(v)===clean(form.primaryRole)))||clean(invitation.role)===clean(form.primaryRole);
+        const departmentMatch=records.some(x=>clean(x.department)===clean(form.department))||clean(invitation.department)===clean(form.department);
+        const unitMatch=records.some(x=>clean(x.unit)===clean(form.unit))||clean(invitation.unit)===clean(form.unit);
+        if(!roleMatch||!departmentMatch||!unitMatch) throw new Error("The application information does not sufficiently match the retrieved IRPA records. Please review the prompted role, department and unit before submitting.");
+      }
+    }
+    context={...context,invitation:invitation||null,invitations:invitation?[invitation]:[],invitationId:invitation?.id||"",registerMatches:{employees:employeeMatches,members:memberMatches},email,fullName:form.verifiedFullName||context.fullName};
   }
   if(context.existingRequest?.status==="Linked"||context.existingRequest?.roleAssignmentStatus==="Linked") return {alreadyLinked:true,requestId:uid};
 
