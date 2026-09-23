@@ -112,6 +112,9 @@ useEffect(()=>{
   // This prevents Android/mobile browsers from returning to the gateway
   // without the application adopting the authenticated Firebase user.
   const resolveGoogleRedirect=async()=>{
+    // Induction and Orientation is a parallel protocol. It must never adopt,
+    // inspect, or mutate the primary login session.
+    if(inductionMode)return;
     // Always ask Firebase for a pending redirect result. Do not depend on
     // sessionStorage surviving the Google/Firebase cross-origin round trip.
     // Some Android browsers partition or clear sessionStorage during redirects.
@@ -150,6 +153,9 @@ useEffect(()=>{
 
   const unsubscribe=observeAuthState(async u=>{
     if(disposed)return;
+    // The induction protocol is isolated from the primary authentication
+    // observer. Its only destination is the Administrator review/LINK stage.
+    if(inductionMode)return;
     setUser(u);
     setProfile(undefined);
     setEmployee(null);
@@ -273,7 +279,7 @@ useEffect(()=>{
 useEffect(()=>{
   const isPrimaryAdmin=String(user?.email||"").trim().toLowerCase()==="irpa2412@gmail.com";
   const isAdminGateway=new URLSearchParams(window.location.search).get("adminGateway")==="1";
-  if(user===undefined||profile!==undefined||isPrimaryAdmin||isAdminGateway)return;
+  if(inductionMode||user===undefined||profile!==undefined||isPrimaryAdmin||isAdminGateway)return;
   const timer=window.setTimeout(async()=>{
     if(profile!==undefined)return;
     console.error("IRPA login watchdog: authorization did not complete.");
@@ -326,7 +332,7 @@ useEffect(()=>{async function magic(){
     console.error(x);
     window.alert(x.message||"Unable to open the signing invitation.");
   }
-}magic()},[]);const invitationId=params.get("memberInvite");if(adminGatewayMode)return <AuthScreen/>;if(inductionMode&&params.get("applicant")==="1"&&entryRoute==="subscription"&&user===undefined)return <MemberActivationScreen invitationId={invitationId}/>;if(applicantInductionMode&&user===undefined)return <InductionOrientation/>;if(inductionMode&&user===undefined)return <AuthScreen/>;if(user===undefined)return <AuthScreen/>;if(profile===undefined)return <Loading/>;if(!user)return invitationId?<MemberActivationScreen invitationId={invitationId}/>:<AuthScreen/>;
+}magic()},[]);const invitationId=params.get("memberInvite");if(adminGatewayMode)return <AuthScreen/>;if(applicantInductionMode)return <InductionOrientation/>;if(inductionMode&&params.get("applicant")==="1"&&entryRoute==="subscription"&&user===undefined)return <MemberActivationScreen invitationId={invitationId}/>;if(inductionMode&&user===undefined)return <AuthScreen/>;if(user===undefined)return <AuthScreen/>;if(profile===undefined)return <Loading/>;if(!user)return invitationId?<MemberActivationScreen invitationId={invitationId}/>:<AuthScreen/>;
 if(!profile)return <AccessDenied user={user}reason={error}/>;
 if(profile.authorizationType==="signer"){
   return <SignerShell user={user} profile={profile} signingEnvelopeId={signingEnvelopeId}/>;
