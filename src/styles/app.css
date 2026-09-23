@@ -728,3 +728,18 @@
   border-color:#ffffff!important;
   box-shadow:inset 0 -3px #ffffff,0 7px 22px rgba(35,91,58,.16)!important;
 }
+
+/* Destructive actions — every Delete control is consistently red. */
+.content-area .page button.danger-button,
+.content-area .page button.delete-button{
+  background:#b42318!important;
+  color:#fff!important;
+  border:1px solid #8f1d15!important;
+  box-shadow:0 4px 10px rgba(180,35,24,.16)!important;
+}
+.content-area .page button.danger-button:hover,
+.content-area .page button.delete-button:hover{
+  background:#991b1b!important;
+  color:#fff!important;
+  border-color:#7f1d1d!important;
+}
