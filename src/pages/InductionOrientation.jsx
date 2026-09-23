@@ -1,6 +1,5 @@
 import React,{useEffect,useMemo,useRef,useState}from"react";
 import{getCurrentInductionContext,submitInductionApplication}from"../firebase/data";
-import{ensureInductionAnonymousSession,upgradeInductionApplicant}from"../firebase/auth";
 
 const unique=(values)=>[...new Set(values.flatMap(v=>Array.isArray(v)?v:String(v||"").split(",")).map(v=>String(v||"").trim()).filter(Boolean))];
 
@@ -104,7 +103,6 @@ export default function InductionOrientation(){
 
  useEffect(()=>{let live=true;(async()=>{
   try{
-   await ensureInductionAnonymousSession();
    const c=await getCurrentInductionContext();
    if(!live)return;
    setContext(c);
@@ -158,11 +156,6 @@ if(form.identityConfirmation!=="Yes"){setError(context.anonymous?"Please confirm
   if(!form.verifiedEmail||!form.verifiedFullName||!form.primaryRole||!form.department||!form.unit||!form.employmentType||!form.q1||!form.q2||!form.q3||!form.q4||!form.q5||!form.q6||!form.orientationModules.length||!form.declaration){setError("Please complete all required selections before submitting.");return}
   setSaving(true);setMessage("Submitting your Induction and Orientation application… Please wait for the administrator-routing confirmation.");
   try{
-   if(context.anonymous){
-    if(!form.verifiedEmail){setError("Please provide an email address for the new IRPA account.");return}
-    setMessage("Registering your IRPA enrollment… Please wait.");
-    await upgradeInductionApplicant(form.verifiedEmail);
-   }
    const submissionContext={...context,email:String(form.verifiedEmail||context.email||"").trim().toLowerCase(),fullName:String(form.verifiedFullName||context.fullName||"").trim(),role:form.primaryRole,roles:form.primaryRole?[form.primaryRole]:[],department:form.department,unit:form.unit,employmentType:form.employmentType,accountType:form.accountType,boardMember:roleFamily(form.primaryRole)==="Board Member"};const result=await submitInductionApplication(form,submissionContext);
    if(result.alreadyLinked){setMessage("Your induction has already been approved and linked by an administrator.");return}
    setMessage("Induction and Orientation submitted successfully. Your application is now awaiting administrator LINK. Your registered role(s), department/unit and Board Member status remain system-controlled.");
@@ -172,12 +165,12 @@ if(form.identityConfirmation!=="Yes"){setError(context.anonymous?"Please confirm
 
 
 
- if(busy)return <div className="page induction-page"><section className="panel induction-loading" aria-live="polite"><div className="induction-spinner" aria-hidden="true"/><h2>Induction and Orientation</h2><p className="muted">Retrieving your registered IRPA information and invitation details…</p><small className="field-help">The enrollment form is opening securely. No existing IRPA credentials are required.</small></section></div>;
+ if(busy)return <div className="page induction-page"><section className="panel induction-loading" aria-live="polite"><div className="induction-spinner" aria-hidden="true"/><h2>Induction and Orientation</h2><p className="muted">Retrieving your registered IRPA information and invitation details…</p><small className="field-help">The registered IRPA identity is being retrieved securely. Use the parallel login-assistance pathway if your normal credentials are blocked.</small></section></div>;
  if(error&&!context)return <div className="page induction-page"><section className="panel"><h2>Induction and Orientation — Access Check</h2><div ref={feedbackRef} className="error-message action-feedback" role="alert">{error}</div><p className="panel-description">The system could not retrieve a matching IRPA registration/invitation record, so the application remains blocked.</p><button type="button" className="secondary-button" onClick={()=>window.location.reload()}>RETRY REGISTRATION CHECK</button></section></div>;
 
  return <div className="page induction-page" aria-busy={saving?"true":"false"}>
   <section className="welcome-panel">
-   <div><span className="eyebrow">IRPA INDUCTION & ORIENTATION</span><h1>{isNewApplicant?"New Member / Employee Enrollment":"Registration-Linked Induction Application"}</h1><p>{isNewApplicant?"Complete this enrollment without an existing IRPA account. The administrator will review and LINK the application before governance access is activated.":"The form is pre-filled from your authenticated IRPA Member/Employee registration and invitation records. Choices are generated from the information already registered in the system."}</p></div>
+   <div><span className="eyebrow">IRPA INDUCTION & ORIENTATION</span><h1>{isNewApplicant?"New Member / Employee Enrollment":"Registration-Linked Induction Application"}</h1><p>{isNewApplicant?"This pathway assists an existing IRPA Member or Employee whose registration is already held by the administrator. Complete the guided orientation and submit it for the normal administrator review and LINK workflow.":"The form is pre-filled from your authenticated IRPA Member/Employee registration and invitation records. Choices are generated from the information already registered in the system."}</p></div>
    <div className="identity-card"><span>APPLICATION STATUS</span><strong>{linked?"LINKED":pending?"PENDING LINK":"READY"}</strong><small>{linked?"Administrator approval completed":pending?"Awaiting administrator LINK":"Complete the guided form below"}</small></div>
   </section>
 
@@ -190,7 +183,7 @@ if(form.identityConfirmation!=="Yes"){setError(context.anonymous?"Please confirm
   </section>
 
   <section className="panel">
-   <div className="panel-header"><div><span className="eyebrow">SYSTEM-RETRIEVED IDENTITY</span><h2>Your Registered Information</h2><p className="panel-description">These fields are retrieved from IRPA registration/invitation records. The registration number is intentionally withheld during induction and is issued to you by email after the administrator completes LINK.</p></div></div>
+   <div className="panel-header"><div><span className="eyebrow">SYSTEM-RETRIEVED IDENTITY</span><h2>Your Registered Information</h2><p className="panel-description">These fields are retrieved from IRPA registration/invitation records. Your registration number and role remain controlled by the administrator registration record.</p></div></div>
    <div className="detail-grid">
     <div><span>FULL NAME</span><strong>{context.fullName||"Applicant enters below"}</strong></div>
     <div><span>REGISTERED CAPACITY</span><strong>{context.accountType||"New applicant selects below"}</strong></div>
@@ -206,13 +199,13 @@ if(form.identityConfirmation!=="Yes"){setError(context.anonymous?"Please confirm
 
   <form onSubmit={submit}>
    <section className="panel">
-    <div className="panel-header"><div><span className="eyebrow">STEP 1</span><h2>Applicant Capacity & Identity</h2><p className="panel-description">If you are a new applicant, choose whether you are applying as a Member or Employee. Existing members/employees will see their registered capacity.</p></div></div>
+    <div className="panel-header"><div><span className="eyebrow">STEP 1</span><h2>Applicant Capacity & Identity</h2><p className="panel-description">Your registered Member/Employee capacity is retrieved from the administrator-controlled IRPA record.</p></div></div>
     {isNewApplicant?<><div className="form-field"><label>Email address for IRPA enrollment</label><input type="email" value={form.verifiedEmail} onChange={e=>patch("verifiedEmail",e.target.value)} placeholder="Enter the email address you will use for IRPA access" required/><small className="field-help">This address receives the credential setup/password-reset message after enrollment is submitted.</small></div><div className="form-field"><label>Full name</label><input type="text" value={form.verifiedFullName} onChange={e=>patch("verifiedFullName",e.target.value)} placeholder="Enter your full name" required/></div></>:<><ChoiceField label="Select the invitation email registered for you" value={form.verifiedEmail} onChange={v=>patch("verifiedEmail",v)} options={emailOptions} help="Choose the exact email contained in your IRPA invitation."/><ChoiceField label="Select your registered full name" value={form.verifiedFullName} onChange={v=>patch("verifiedFullName",v)} options={nameOptions} help="Choose the exact name attached to your invitation/registration."/></>}<ChoiceField label="I am applying in my registered capacity as" value={form.accountType} onChange={v=>patch("accountType",v)} options={accountTypeOptions} help="Only capacities already found in your IRPA registration records are offered."/>
     <ChoiceField label={isNewApplicant?"Do you confirm that the information you entered is accurate?":"Does the system-retrieved identity above belong to you?"} value={form.identityConfirmation} onChange={v=>patch("identityConfirmation",v)} options={["Yes","No"]} help={isNewApplicant?"Selecting No blocks submission until you correct the entries.":"Selecting No blocks submission so the registration/invitation record can be corrected before induction."}/>
    </section>
 
    <section className="panel">
-    <div className="panel-header"><div><span className="eyebrow">STEP 2</span><h2>Position, Department & Unit</h2><p className="panel-description">The choices below are generated from the IRPA organizational structure. New applicants select the position and organizational assignment they are applying for.</p></div></div>
+    <div className="panel-header"><div><span className="eyebrow">STEP 2</span><h2>Position, Department & Unit</h2><p className="panel-description">The choices below are generated from your administrator-controlled IRPA organizational registration.</p></div></div>
     <div className="form-grid">
      <ChoiceField label="Role for this orientation" value={form.primaryRole} onChange={v=>patch("primaryRole",v)} options={roleOptions} help={context.role?"All registered roles remain recorded: "+context.role:""}/>
      <ChoiceField label="Department" value={form.department} onChange={v=>patch("department",v)} options={departmentOptions}/>
