@@ -112,6 +112,7 @@ export default function App(){
   const entryRoute=params.get("route")||"assistance";
   const adminGatewayMode=params.get("adminGateway")==="1"||entryRoute==="admin";
   const inductionMode=params.get("induction")==="1";
+  const activationMode=inductionMode&&params.get("applicant")==="1"&&entryRoute==="subscription"&&Boolean(params.get("memberInvite"));
   const applicantInductionMode=inductionMode&&params.get("applicant")==="1"&&entryRoute==="assistance";
   const[user,setUser]=useState(undefined),
     [profile,setProfile]=useState(undefined),
@@ -139,7 +140,7 @@ useEffect(()=>{
   const resolveGoogleRedirect=async()=>{
     // Induction and Orientation is a parallel protocol. It must never adopt,
     // inspect, or mutate the primary login session.
-    if(inductionMode)return;
+    if(inductionMode&&!activationMode)return;
     // Always ask Firebase for a pending redirect result. Do not depend on
     // sessionStorage surviving the Google/Firebase cross-origin round trip.
     // Some Android browsers partition or clear sessionStorage during redirects.
@@ -180,7 +181,7 @@ useEffect(()=>{
     if(disposed)return;
     // The induction protocol is isolated from the primary authentication
     // observer. Its only destination is the Administrator review/LINK stage.
-    if(inductionMode)return;
+    if(inductionMode&&!activationMode)return;
     setUser(u);
     setProfile(undefined);
     setEmployee(null);
