@@ -200,7 +200,14 @@ export async function submitInductionApplication(form,context){
     applicantEmail:context.email,roles:context.roles,department:payload.requestedDepartment||null,unit:payload.requestedUnit||null,
     boardMember:context.boardMember,accountType:payload.accountType
   });
-  return {alreadyLinked:false,requestId:uid,status:payload.status};
+  try{
+    const routeCall=httpsCallable(getFunctions(undefined,"us-central1"),"routeInductionApplication");
+    const routed=await routeCall({requestId:uid});
+    return {alreadyLinked:false,requestId:uid,status:payload.status,...(routed.data||{})};
+  }catch(routeError){
+    return {alreadyLinked:false,requestId:uid,status:payload.status,routingStatus:"Routing Pending",routingError:routeError?.message||"Administrator routing could not be completed yet."};
+  }
+
 }
 
 export async function getInductionRegistrationRequests(){
