@@ -18,3 +18,5 @@
 @keyframes irpa-induction-feedback-blink{0%,49%{opacity:1;transform:scale(1)}50%,100%{opacity:.28;transform:scale(.99)}}
 @media(prefers-reduced-motion:reduce){.induction-feedback-blink{animation:irpa-induction-feedback-pulse 1.8s ease-in-out infinite}}
 @keyframes irpa-induction-feedback-pulse{0%,100%{opacity:1}50%{opacity:.65}}
+
+.nav-child{padding-left:28px;font-size:11px;color:#829b92;min-height:34px}.nav-child:before{content:"↳";margin-right:7px;color:#55786b}.nav-child.active{padding-left:28px}.nav-child.active:before{color:#d6a52c}.nav-child+.nav-child{margin-top:1px}
