@@ -1,6 +1,7 @@
 import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, orderBy, query, runTransaction, serverTimestamp, updateDoc, setDoc, where, } from "firebase/firestore";
 import { auth, db, applicantAuth, applicantDb } from "./config";
 import { sendEmployeeRegistrationEmail } from "./auth";
+import { getFunctions, httpsCallable } from "firebase/functions";
 
 export const COLLECTIONS={members:"members",employees:"employees",employeeCounters:"employeeCounters",memberCounters:"memberCounters",participants:"participants",meetings:"meetings",meetingSubscriptions:"meetingSubscriptions",meetingRoomEvents:"meetingRoomEvents",transcriptions:"transcriptions",resolutions:"resolutions",votes:"votes",voteLocks:"voteLocks",voteCorrections:"voteCorrections",votingIssues:"votingIssues",actions:"actions",documents:"documents",signatures:"signatures",decisions:"decisions",risks:"risks",audit:"audit",reports:"reports",authorizationRequests:"authorizationRequests",workflowActions:"workflowActions",staffPaymentRequests:"staffPaymentRequests",financeBudgets:"financeBudgets",financeTransactions:"financeTransactions",financeFunding:"financeFunding",financeApprovals:"financeApprovals",financeCommitments:"financeCommitments",financeGrants:"financeGrants",financeBankAccounts:"financeBankAccounts",financeReconciliations:"financeReconciliations",financeAssets:"financeAssets",financeRisks:"financeRisks",financeReports:"financeReports",financePaymentTrace:"financePaymentTrace",procurementVendors:"procurementVendors",procurementRequests:"procurementRequests",procurementVendorScores:"procurementVendorScores",procurementVendorBlacklist:"procurementVendorBlacklist",procurementVendorProbation:"procurementVendorProbation",invitations:"invitations",registrationRequests:"registrationRequests",inductionRecords:"inductionRecords",adminProfiles:"adminProfiles",systemSettings:"systemSettings",mail:"mail"};
 function currentActor(){return{uid:auth.currentUser?.uid||null,email:auth.currentUser?.email||null};}
@@ -168,101 +169,14 @@ export async function getInductionRegistrationRequests(){
 }
 
 export async function linkInductionRegistration(requestId){
-  const adminUid=await requireActiveAdmin();
+  await requireActiveAdmin();
   if(!requestId) throw new Error("An induction registration request is required.");
-  const requestRef=doc(db,COLLECTIONS.registrationRequests,requestId);
-  const requestSnap=await getDoc(requestRef);
-  if(!requestSnap.exists()) throw new Error("The induction application could not be found.");
-  const request=requestSnap.data();
-  if(request.status==="Linked"||request.roleAssignmentStatus==="Linked") return {id:requestId,alreadyLinked:true,...request};
-  const uid=String(request.uid||request.memberProfileUid||request.employeeProfileUid||"").trim();
-  if(!uid) throw new Error("The application has no authenticated IRPA account UID.");
-  const memberId=String(request.memberProfileUid||uid).trim();
-  const employeeId=String(request.employeeProfileUid||uid).trim();
-  let memberRef=doc(db,COLLECTIONS.members,memberId);
-  let employeeRef=doc(db,COLLECTIONS.employees,employeeId);
-  let memberSnap=await getDoc(memberRef);
-  let employeeSnap=await getDoc(employeeRef);
-  const requestedAccountType=String(request.accountType||request.answers?.accountType||"").trim().toLowerCase();
-  const applicantEmail=String(request.email||request.answers?.verifiedEmail||"").trim().toLowerCase();
-  const applicantName=String(request.fullName||request.answers?.verifiedFullName||"").trim();
-  const requestedRole=String(request.requestedRole||request.answers?.primaryRole||"General Employee").trim();
-  const requestedDepartment=String(request.requestedDepartment||request.answers?.department||"").trim();
-  const requestedUnit=String(request.requestedUnit||request.answers?.unit||"").trim();
-  const requestedEmploymentType=String(request.employmentType||request.answers?.employmentType||"").trim();
-  if(!memberSnap.exists()&&!employeeSnap.exists()){
-    if(requestedAccountType==="member"){
-      await createMemberProfile(uid,{email:applicantEmail,name:applicantName,role:requestedRole,roles:[requestedRole],department:requestedDepartment,unit:requestedUnit,memberType:requestedRole==="Board Member"?"Board Member":"Governance Member",employmentType:requestedEmploymentType,status:"Active",registrationStatus:"Registered — Account Pending Administrator LINK",boardMember:/board member/i.test(requestedRole),inductionStatus:"Pending LINK"});
-      memberSnap=await getDoc(memberRef);
-    }else if(requestedAccountType==="employee"){
-      await createEmployeeProfile({uid,email:applicantEmail,name:applicantName,role:requestedRole,roles:[requestedRole],department:requestedDepartment,unit:requestedUnit,employmentType:requestedEmploymentType,status:"Active",registrationStatus:"Registered — Account Pending Administrator LINK",boardMember:/board member/i.test(requestedRole),inductionStatus:"Pending LINK"});
-      employeeSnap=await getDoc(employeeRef);
-    }else throw new Error("The applicant capacity is missing. Select Member or Employee before LINK.");
+  const functions=getFunctions(undefined,"us-central1");
+  try{
+    const call=httpsCallable(functions,"approveInductionApplication");
+    const result=await call({requestId});
+    return result.data;
+  }catch(error){
+    throw new Error(error?.message||"The administrator LINK could not provision the approved applicant.");
   }
-  const member=memberSnap.exists()?memberSnap.data():{};
-  const employee=employeeSnap.exists()?employeeSnap.data():{};
-  const department=String(request.systemDepartment||request.routingDepartment||employee.department||member.department||"").trim();
-  const unit=String(request.systemUnit||request.routingUnit||employee.unit||member.unit||"").trim();
-  const roles=Array.isArray(request.systemRoles)?request.systemRoles:((Array.isArray(employee.roles)?employee.roles:[]).concat(Array.isArray(member.roles)?member.roles:[]).concat([request.systemRole,request.requestedRole,employee.role,member.role]).flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean)));const uniqueRoles=[...new Set(roles)];const role=uniqueRoles.join(" • ");
-  if(!role) throw new Error("The system could not retrieve the applicant's registered role. The application cannot be linked.");
-  const boardMember=Boolean(member.boardMember||employee.boardMember||uniqueRoles.some(r=>/board member/i.test(r)));
-  const linkedAt=serverTimestamp();
-  const updates={
-    inductionStatus:"Approved",
-    status:"Linked",
-    roleAssignmentStatus:"Linked",
-    linkedByUid:adminUid,
-    linkedByEmail:auth.currentUser?.email||null,
-    linkedAt,
-    approvedRole:role,
-    approvedRoles:uniqueRoles,
-    approvedDepartment:department||null,
-    approvedUnit:unit||null,
-    boardMember,
-    routingStatus:"Approved & Linked",
-    updatedAt:linkedAt
-  };
-  await updateDoc(requestRef,updates);
-  await setDoc(doc(db,COLLECTIONS.inductionRecords,uid),{
-    status:"Approved",
-    inductionStatus:"Approved",
-    roleAssignmentStatus:"Linked",
-    approvedRole:role,
-    approvedDepartment:department||null,
-    approvedUnit:unit||null,
-    boardMember,
-    linkedByUid:adminUid,
-    linkedByEmail:auth.currentUser?.email||null,
-    linkedAt,
-    updatedAt:linkedAt
-  },{merge:true});
-  if(memberSnap.exists()) await updateDoc(memberRef,{
-    inductionStatus:"Approved",
-    inductionLinked:true,
-    linkedDepartment:department||member.department||null,
-    linkedUnit:unit||member.unit||null,
-    linkedRole:role||member.role||null,
-    linkedRoles:uniqueRoles,
-    boardMember,
-    updatedAt:linkedAt
-  });
-  if(employeeSnap.exists()) await updateDoc(employeeRef,{
-    inductionStatus:"Approved",
-    inductionLinked:true,
-    department:department||employee.department||null,
-    unit:unit||employee.unit||null,
-    role:role||employee.role||null,
-    roles:uniqueRoles,
-    updatedAt:linkedAt
-  });
-  await writeAudit("INDUCTION_APPLICATION_LINKED",COLLECTIONS.registrationRequests,requestId,{
-    applicantUid:uid,
-    applicantEmail:request.email||member.email||employee.email||null,
-    role,
-    department:department||null,
-    unit:unit||null,
-    boardMember,
-    linkedByUid:adminUid
-  });
-  return {id:requestId,alreadyLinked:false,...request,...updates,uid,role,department,unit,boardMember};
 }
