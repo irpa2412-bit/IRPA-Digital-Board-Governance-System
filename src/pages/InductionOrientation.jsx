@@ -1,5 +1,6 @@
 import React,{useEffect,useMemo,useRef,useState}from"react";
 import{getCurrentInductionContext,submitInductionApplication}from"../firebase/data";
+import{submitCredentialInterview}from"../firebase/functions";
 
 const unique=(values)=>[...new Set(values.flatMap(v=>Array.isArray(v)?v:String(v||"").split(",")).map(v=>String(v||"").trim()).filter(Boolean))];
 
@@ -99,7 +100,7 @@ function ChoiceField({label,value,onChange,options,help,disabled=false,required=
 
 export default function InductionOrientation(){
  const[context,setContext]=useState(null),[busy,setBusy]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState("");const feedbackRef=useRef(null);
- const[form,setForm]=useState({identityConfirmation:"",accountType:"",primaryRole:"",department:"",unit:"",employmentType:"",orientationModules:[],q1:"",q2:"",q3:"",q4:"",q5:"",q6:"",comments:"",declaration:false,verifiedEmail:"",verifiedFullName:""});
+ const[form,setForm]=useState({identityConfirmation:"",accountType:"",primaryRole:"",department:"",unit:"",employmentType:"",orientationModules:[],q1:"",q2:"",q3:"",q4:"",q5:"",q6:"",comments:"",declaration:false,verifiedEmail:"",verifiedFullName:"",credentialCapacity:"",credentialRole:"",credentialInvitationReference:""});
 
  useEffect(()=>{let live=true;(async()=>{
   try{
@@ -117,6 +118,7 @@ export default function InductionOrientation(){
     employmentType:prior.employmentType||c.employmentType||"",
     orientationModules:priorModules.length?priorModules:orientationModules(c.roles[0]||""),
     q1:prior.q1||"",q2:prior.q2||"",q3:prior.q3||"",q4:prior.q4||"",q5:prior.q5||"",q6:prior.q6||"",verifiedEmail:prior.verifiedEmail||c.invitation?.email||c.email||"",verifiedFullName:prior.verifiedFullName||c.invitation?.name||c.fullName||"",
+    credentialCapacity:prior.credentialCapacity||"",credentialRole:prior.credentialRole||prior.primaryRole||"",credentialInvitationReference:prior.credentialInvitationReference||c.invitation?.invitationReference||c.invitation?.reference||"",
     comments:prior.comments||"",declaration:Boolean(c.existingRequest?.declaration)
    });
   }catch(e){if(live)setError(e.message||"Unable to retrieve the IRPA registration and invitation information.");}
@@ -160,6 +162,17 @@ export default function InductionOrientation(){
    setMessage("Induction and Orientation submitted successfully. Your application is now awaiting administrator LINK. Your registered role(s), department/unit and Board Member status remain system-controlled.");
   }catch(x){setError(x.message||"The induction application could not be submitted.");}
   finally{setSaving(false);}
+ }
+
+ async function submitCredentialFallback(e){
+  e.preventDefault();setError("");setMessage("");
+  if(!form.credentialCapacity||!form.credentialRole){setError("Select your registered capacity and role for the credential interview.");return}
+  setSaving(true);setMessage("Submitting the credential interview for administrator login approval…");
+  try{
+   await submitCredentialInterview({name:form.verifiedFullName||context?.fullName||"",email:form.verifiedEmail||context?.email||"",invitationReference:form.credentialInvitationReference||context?.invitation?.invitationReference||context?.invitation?.reference||"",requestedCapacity:form.credentialCapacity,requestedRole:form.credentialRole});
+   setMessage("Credential interview submitted successfully. It is now routed to the Administrator Induction & Orientation portal for login approval. Do not create another request.");
+  }catch(x){setError(x?.message||"The credential interview could not be submitted.");}
+  finally{setSaving(false)}
  }
 
  if(busy)return <div className="page induction-page"><section className="panel induction-loading" aria-live="polite"><div className="induction-spinner" aria-hidden="true"/><h2>Induction and Orientation</h2><p className="muted">Retrieving your registered IRPA information and invitation details…</p><small className="field-help">The form will open automatically when the authenticated IRPA record has been verified.</small></section></div>;
@@ -220,6 +233,17 @@ export default function InductionOrientation(){
      <ChoiceField label={questions.q3.label} value={form.q3} onChange={v=>patch("q3",v)} options={questions.q3.options}/><ChoiceField label="4. How should an invitation or registration mismatch be handled?" value={form.q4} onChange={v=>patch("q4",v)} options={["Stop and request administrator correction before induction","Continue using an incorrect name or email","Create a second unverified account","Bypass the invitation record"]}/><ChoiceField label="5. Which identity should control access to this governance workspace?" value={form.q5} onChange={v=>patch("q5",v)} options={["My authenticated account matched to the registered invitation","Any email address I choose","Another person's credentials","A shared departmental password"]}/><ChoiceField label="6. What should happen after submission?" value={form.q6} onChange={v=>patch("q6",v)} options={["The application is saved and routed to the Administrator Induction & Orientation portal for review/LINK","The application is deleted","Access is granted without review","The applicant changes the Firestore record directly"]}/>
     </div>
     <div className="form-field" style={{marginTop:16}}><label>Additional orientation comments</label><textarea value={form.comments} onChange={e=>patch("comments",e.target.value)} rows="4" placeholder="Optional comments, questions or support required during induction…"/></div>
+   </section>
+
+
+   <section className="panel">
+    <div className="panel-header"><div><span className="eyebrow">LOGIN RECOVERY</span><h2>Credential Interview & Login Approval</h2><p className="panel-description">If first-time account activation or sign-in causes a problem, complete this interview here. It does not grant access automatically; the Administrator reviews the registered identity and approves login access.</p></div><div className="identity-card"><span>APPROVAL</span><strong>ADMIN LINK</strong><small>Administrator approval is the login approval.</small></div></div>
+    <div className="form-grid">
+     <ChoiceField label="Registered capacity" value={form.credentialCapacity} onChange={v=>patch("credentialCapacity",v)} options={accountTypeOptions.length?accountTypeOptions:["Employee","Member","Employee & Member"]}/>
+     <ChoiceField label="Role / position you are expecting" value={form.credentialRole} onChange={v=>patch("credentialRole",v)} options={roleOptions.length?roleOptions:[form.primaryRole||context?.role||""]}/>
+     <div className="form-field"><label>Invitation reference</label><input value={form.credentialInvitationReference} onChange={e=>patch("credentialInvitationReference",e.target.value)} placeholder="Optional"/></div>
+    </div>
+    <div className="form-actions induction-submit-actions" style={{marginTop:18}}><button type="button" onClick={submitCredentialFallback} disabled={saving||linked}>{saving?"SUBMITTING…":"SUBMIT CREDENTIAL INTERVIEW FOR LOGIN APPROVAL"}</button><small className="submit-status">Your verified name and email are taken from the induction identity selections and routed to the administrator.</small></div>
    </section>
 
    <section className="panel">
