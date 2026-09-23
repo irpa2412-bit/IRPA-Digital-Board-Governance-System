@@ -1,6 +1,6 @@
 import React,{useEffect,useMemo,useRef,useState}from"react";
 import{getCurrentInductionContext,submitInductionApplication}from"../firebase/data";
-import{upgradeInductionApplicant}from"../firebase/auth";
+import{ensureInductionAnonymousSession,upgradeInductionApplicant}from"../firebase/auth";
 
 const unique=(values)=>[...new Set(values.flatMap(v=>Array.isArray(v)?v:String(v||"").split(",")).map(v=>String(v||"").trim()).filter(Boolean))];
 
@@ -103,6 +103,7 @@ export default function InductionOrientation(){
  const[form,setForm]=useState({identityConfirmation:"",accountType:"",primaryRole:"",department:"",unit:"",employmentType:"",orientationModules:[],q1:"",q2:"",q3:"",q4:"",q5:"",q6:"",comments:"",declaration:false,verifiedEmail:"",verifiedFullName:"",credentialCapacity:"",credentialRole:"",credentialInvitationReference:""});
 
  useEffect(()=>{let live=true;(async()=>{
+  await ensureInductionAnonymousSession();
   try{
    const c=await getCurrentInductionContext();
    if(!live)return;
@@ -153,7 +154,7 @@ export default function InductionOrientation(){
   e.preventDefault();setError("");setMessage("");if(feedbackRef.current)feedbackRef.current.scrollIntoView({behavior:"smooth",block:"nearest"});
   if(!context){setError("The IRPA induction enrollment session could not be established.");return}if(pending){setMessage("Your induction application is already awaiting administrator LINK. No duplicate submission is required.");return}
   if(!form.accountType){setError("Please confirm whether you are applying in your registered Employee or Member capacity.");return}
-if(form.identityConfirmation!=="Yes"){setError("You must confirm that the displayed registration and invitation information belongs to you.");return}
+if(form.identityConfirmation!=="Yes"){setError(context.anonymous?"Please confirm that the new enrollment information you entered is accurate.":"You must confirm that the displayed registration and invitation information belongs to you.");return}
   if(!form.verifiedEmail||!form.verifiedFullName||!form.primaryRole||!form.department||!form.unit||!form.employmentType||!form.q1||!form.q2||!form.q3||!form.q4||!form.q5||!form.q6||!form.orientationModules.length||!form.declaration){setError("Please complete all required selections before submitting.");return}
   setSaving(true);setMessage("Submitting your Induction and Orientation application… Please wait for the administrator-routing confirmation.");
   try{
