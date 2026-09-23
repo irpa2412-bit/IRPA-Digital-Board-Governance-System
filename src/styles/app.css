@@ -978,3 +978,27 @@
     grid-column:4!important;
   }
 }
+
+/* Controlled Document primary action — light IRPA green and slightly enlarged. */
+.controlled-document-open-button{
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  min-height:46px!important;
+  padding:12px 20px!important;
+  border-radius:10px!important;
+  background:#dcefe4!important;
+  border:1px solid #9fc9b0!important;
+  color:#17613d!important;
+  font-size:14px!important;
+  font-weight:850!important;
+  line-height:1.2!important;
+  text-decoration:none!important;
+  box-shadow:0 4px 12px rgba(31,92,62,.08)!important;
+}
+.controlled-document-open-button:hover{
+  background:#cce7d7!important;
+  border-color:#73ad89!important;
+  color:#124f32!important;
+  transform:translateY(-1px);
+}
