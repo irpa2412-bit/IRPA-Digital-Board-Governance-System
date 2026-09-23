@@ -181,8 +181,11 @@ function scoreInductionApplication(item, records){
 }
 
 exports.routeInductionApplication = onCall({region:"us-central1"}, async request => {
+  const callerUid=request.auth?.uid;
   const requestId=String(request.data?.requestId||"").trim();
+  if(!callerUid) throw new HttpsError("unauthenticated","The induction application session is not authenticated.");
   if(!requestId) throw new HttpsError("invalid-argument","Induction application ID is required.");
+  if(requestId!==callerUid) throw new HttpsError("permission-denied","This induction application does not belong to the current applicant session.");
   const requestRef=db.collection("registrationRequests").doc(requestId);
   const snap=await requestRef.get();
   if(!snap.exists) throw new HttpsError("not-found","The induction application could not be found.");
