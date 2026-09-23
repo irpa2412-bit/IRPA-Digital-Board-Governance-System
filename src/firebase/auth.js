@@ -266,7 +266,14 @@ export async function sendMemberInvitationEmail(email, invitationId) {
     response = await fetch(gateway + "/api/invitations/send", {
       method: "POST",
       headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ invitationId, email: cleanEmail }),
+      body: JSON.stringify({
+        invitationId,
+        email: cleanEmail,
+        subscriptionLink: window.location.origin + "/?memberInvite=" + encodeURIComponent(invitationId),
+        loginAssistanceLink: window.location.origin + "/?induction=1&applicant=1&memberInvite=" + encodeURIComponent(invitationId),
+        inductionOrientationLink: window.location.origin + "/?induction=1&applicant=1&memberInvite=" + encodeURIComponent(invitationId),
+        loginLink: window.location.origin
+      }),
       signal: controller.signal
     });
   } catch (error) {
