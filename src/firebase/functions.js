@@ -1,7 +1,7 @@
 
 import { auth, db } from "./config";
 import { getFunctions, httpsCallable } from "firebase/functions";
-import { collection, doc, getDoc, getDocs, query, serverTimestamp, where, writeBatch } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where, writeBatch } from "firebase/firestore";
 
 export async function createAdministrator({ name, email, onProgress }){
   const cleanName=String(name||"").trim();
