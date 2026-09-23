@@ -18,7 +18,7 @@ const app = initializeApp(firebaseConfig);
 
 // Applicant enrollment uses a separate Firebase Auth/Firestore client so
 // invitation-based assistance can never replace or poison the primary login session.
-const applicantApp = initializeApp(firebaseConfig, "irpa-applicant-enrollment");
+export const applicantApp = initializeApp(firebaseConfig, "irpa-applicant-enrollment");
 export const applicantAuth = getAuth(applicantApp);
 export const applicantDb = getFirestore(applicantApp);
 
