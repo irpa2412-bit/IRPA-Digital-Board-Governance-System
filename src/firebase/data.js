@@ -1,5 +1,5 @@
 import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, orderBy, query, runTransaction, serverTimestamp, updateDoc, setDoc, where, } from "firebase/firestore";
-import { auth, db, applicantAuth, applicantDb } from "./config";
+import { auth, db, applicantAuth, applicantDb, applicantApp } from "./config";
 import { sendEmployeeRegistrationEmail } from "./auth";
 import { getFunctions, httpsCallable } from "firebase/functions";
 
@@ -201,7 +201,7 @@ export async function submitInductionApplication(form,context){
     boardMember:context.boardMember,accountType:payload.accountType
   });
   try{
-    const routeCall=httpsCallable(getFunctions(undefined,"us-central1"),"routeInductionApplication");
+    const routeCall=httpsCallable(getFunctions(context?.anonymous?applicantApp:undefined,"us-central1"),"routeInductionApplication");
     const routed=await routeCall({requestId:uid});
     return {alreadyLinked:false,requestId:uid,status:payload.status,...(routed.data||{})};
   }catch(routeError){
