@@ -147,11 +147,26 @@ export async function linkInductionRegistration(requestId){
   if(!uid) throw new Error("The application has no authenticated IRPA account UID.");
   const memberId=String(request.memberProfileUid||uid).trim();
   const employeeId=String(request.employeeProfileUid||uid).trim();
-  const memberRef=doc(db,COLLECTIONS.members,memberId);
-  const employeeRef=doc(db,COLLECTIONS.employees,employeeId);
-  const memberSnap=await getDoc(memberRef);
-  const employeeSnap=await getDoc(employeeRef);
-  if(!memberSnap.exists()&&!employeeSnap.exists()) throw new Error("No registered Member or Employee profile could be retrieved for this applicant. The application cannot be linked.");
+  let memberRef=doc(db,COLLECTIONS.members,memberId);
+  let employeeRef=doc(db,COLLECTIONS.employees,employeeId);
+  let memberSnap=await getDoc(memberRef);
+  let employeeSnap=await getDoc(employeeRef);
+  const requestedAccountType=String(request.accountType||request.answers?.accountType||"").trim().toLowerCase();
+  const applicantEmail=String(request.email||request.answers?.verifiedEmail||"").trim().toLowerCase();
+  const applicantName=String(request.fullName||request.answers?.verifiedFullName||"").trim();
+  const requestedRole=String(request.requestedRole||request.answers?.primaryRole||"General Employee").trim();
+  const requestedDepartment=String(request.requestedDepartment||request.answers?.department||"").trim();
+  const requestedUnit=String(request.requestedUnit||request.answers?.unit||"").trim();
+  const requestedEmploymentType=String(request.employmentType||request.answers?.employmentType||"").trim();
+  if(!memberSnap.exists()&&!employeeSnap.exists()){
+    if(requestedAccountType==="member"){
+      await createMemberProfile(uid,{email:applicantEmail,name:applicantName,role:requestedRole,roles:[requestedRole],department:requestedDepartment,unit:requestedUnit,memberType:requestedRole==="Board Member"?"Board Member":"Governance Member",employmentType:requestedEmploymentType,status:"Active",registrationStatus:"Registered — Account Pending Administrator LINK",boardMember:/board member/i.test(requestedRole),inductionStatus:"Pending LINK"});
+      memberSnap=await getDoc(memberRef);
+    }else if(requestedAccountType==="employee"){
+      await createEmployeeProfile({uid,email:applicantEmail,name:applicantName,role:requestedRole,roles:[requestedRole],department:requestedDepartment,unit:requestedUnit,employmentType:requestedEmploymentType,status:"Active",registrationStatus:"Registered — Account Pending Administrator LINK",boardMember:/board member/i.test(requestedRole),inductionStatus:"Pending LINK"});
+      employeeSnap=await getDoc(employeeRef);
+    }else throw new Error("The applicant capacity is missing. Select Member or Employee before LINK.");
+  }
   const member=memberSnap.exists()?memberSnap.data():{};
   const employee=employeeSnap.exists()?employeeSnap.data():{};
   const department=String(request.systemDepartment||request.routingDepartment||employee.department||member.department||"").trim();
