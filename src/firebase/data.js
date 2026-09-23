@@ -1,5 +1,5 @@
 import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, orderBy, query, runTransaction, serverTimestamp, updateDoc, setDoc, where, } from "firebase/firestore";
-import { auth, db } from "./config";
+import { auth, db, applicantAuth, applicantDb } from "./config";
 import { sendEmployeeRegistrationEmail } from "./auth";
 
 export const COLLECTIONS={members:"members",employees:"employees",employeeCounters:"employeeCounters",memberCounters:"memberCounters",participants:"participants",meetings:"meetings",meetingSubscriptions:"meetingSubscriptions",meetingRoomEvents:"meetingRoomEvents",transcriptions:"transcriptions",resolutions:"resolutions",votes:"votes",voteLocks:"voteLocks",voteCorrections:"voteCorrections",votingIssues:"votingIssues",actions:"actions",documents:"documents",signatures:"signatures",decisions:"decisions",risks:"risks",audit:"audit",reports:"reports",authorizationRequests:"authorizationRequests",workflowActions:"workflowActions",staffPaymentRequests:"staffPaymentRequests",financeBudgets:"financeBudgets",financeTransactions:"financeTransactions",financeFunding:"financeFunding",financeApprovals:"financeApprovals",financeCommitments:"financeCommitments",financeGrants:"financeGrants",financeBankAccounts:"financeBankAccounts",financeReconciliations:"financeReconciliations",financeAssets:"financeAssets",financeRisks:"financeRisks",financeReports:"financeReports",financePaymentTrace:"financePaymentTrace",procurementVendors:"procurementVendors",procurementRequests:"procurementRequests",procurementVendorScores:"procurementVendorScores",procurementVendorBlacklist:"procurementVendorBlacklist",procurementVendorProbation:"procurementVendorProbation",invitations:"invitations",registrationRequests:"registrationRequests",inductionRecords:"inductionRecords",adminProfiles:"adminProfiles",systemSettings:"systemSettings",mail:"mail"};
@@ -43,22 +43,58 @@ export async function getCurrentEmployeeProfile(){const uid=auth.currentUser?.ui
 
 
 export async function getCurrentInductionContext(){
-  const uid=auth.currentUser?.uid;
-  const email=String(auth.currentUser?.email||"").trim().toLowerCase();
-  if(!uid) throw new Error("An induction enrollment session could not be established.");
-  if(!email) throw new Error("Authentication is required to load the induction form.");
+  const applicantUser=applicantAuth.currentUser;
+  const isAnonymousApplicant=Boolean(applicantUser?.isAnonymous);
+  const activeAuth=isAnonymousApplicant?applicantAuth:auth;
+  const activeDb=isAnonymousApplicant?applicantDb:db;
+  const uid=activeAuth.currentUser?.uid;
+  const email=String(activeAuth.currentUser?.email||"").trim().toLowerCase();
+  if(!uid) throw new Error("An induction session could not be established.");
 
+  if(isAnonymousApplicant){
+    const params=new URLSearchParams(window.location.search);
+    const invitationId=String(params.get("memberInvite")||"").trim();
+    let invitation=null;
+    if(invitationId){
+      const snap=await getDoc(doc(activeDb,COLLECTIONS.invitations,invitationId));
+      if(snap.exists()){
+        const value=snap.data();
+        if(String(value.status||"").toLowerCase()!=="cancelled") invitation={id:snap.id,...value};
+      }
+    }
+    const existingSnap=await getDoc(doc(activeDb,COLLECTIONS.registrationRequests,uid));
+    const existingRequest=existingSnap.exists()?existingSnap.data():null;
+    const invitationEmail=String(invitation?.email||"").trim().toLowerCase();
+    const invitationName=String(invitation?.name||"").trim();
+    const roles=uniqueValues([
+      invitation?.role,
+      ...(Array.isArray(invitation?.roles)?invitation.roles:[])
+    ]);
+    const accountType=String(invitation?.accountType||invitation?.memberType||"").trim();
+    return {
+      uid,email:invitationEmail,fullName:invitationName,
+      roles:roles.length?roles:["Board Member","Executive Director","Director","Finance","Procurement","Human Resources","Programme & Technical","Operations","Field","General Employee"],
+      role:roles.join(" • "),department:String(invitation?.department||"").trim(),
+      unit:String(invitation?.unit||"").trim(),registrationNumber:"",
+      accountType,accountTypeOptions:accountType?[accountType]:["Member","Employee"],
+      memberType:String(invitation?.memberType||"").trim(),
+      employmentType:String(invitation?.employmentType||"").trim(),
+      boardMember:Boolean(invitation?.boardMember||roles.some(r=>/board member/i.test(r))),
+      member:null,employee:null,invitation,invitations:invitation?[invitation]:[],
+      invitationId:invitation?.id||invitationId||null,existingRequest,anonymous:true
+    };
+  }
+
+  if(!email) throw new Error("Authentication is required to load the induction form.");
   const [member,employee,existingRequest]=await Promise.all([
     getRecord(COLLECTIONS.members,uid),
     getRecord(COLLECTIONS.employees,uid),
     getRecord(COLLECTIONS.registrationRequests,uid)
   ]);
-
   const invitationSnap=await getDocs(query(collection(db,COLLECTIONS.invitations),where("email","==",email)));
   const invitations=invitationSnap.docs.map(x=>({id:x.id,...x.data()}));
   const invitationId=String(member?.invitationId||employee?.invitationId||existingRequest?.invitationId||"").trim();
   const invitation=invitations.find(x=>x.id===invitationId)||invitations[0]||null;
-
   const roles=[...(Array.isArray(employee?.roles)?employee.roles:[]),...(Array.isArray(member?.roles)?member.roles:[]),employee?.role,member?.role,invitation?.role]
     .flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean));
   const uniqueRoles=[...new Set(roles)];
@@ -70,16 +106,15 @@ export async function getCurrentInductionContext(){
   const accountTypeOptions=[...(employee?["Employee"]:[]),...(member?["Member"]:[])];
   const accountType=accountTypeOptions.length===2?"Employee & Member":(accountTypeOptions[0]||"");
   if(!member&&!employee&&!invitation) throw new Error("No matching IRPA registration or invitation record could be retrieved for this account. The induction application is blocked.");
-
   return {uid,email,fullName,roles:uniqueRoles,role:uniqueRoles.join(" • "),department,unit,registrationNumber,accountType,accountTypeOptions,
-    memberType:member?.memberType||invitation?.memberType||"",
-    employmentType:employee?.employmentType||invitation?.employmentType||"",
-    boardMember,member,employee,invitation,invitations,
-    invitationId:invitation?.id||invitationId||null,existingRequest};
+    memberType:member?.memberType||invitation?.memberType||"",employmentType:employee?.employmentType||invitation?.employmentType||"",
+    boardMember,member,employee,invitation,invitations,invitationId:invitation?.id||invitationId||null,existingRequest};
 }
 
 export async function submitInductionApplication(form,context){
-  const uid=auth.currentUser?.uid;
+  const activeAuth=context?.anonymous?applicantAuth:auth;
+  const activeDb=context?.anonymous?applicantDb:db;
+  const uid=activeAuth.currentUser?.uid;
   if(!uid||uid!==context?.uid) throw new Error("Authenticated registration identity could not be verified.");
   if(!context?.roles?.length) throw new Error("No registered role could be retrieved. The induction application is blocked.");
   if(context.existingRequest?.status==="Linked"||context.existingRequest?.roleAssignmentStatus==="Linked") return {alreadyLinked:true,requestId:uid};
