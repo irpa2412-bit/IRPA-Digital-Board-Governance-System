@@ -114,7 +114,7 @@ function InkCapture({label="Sign directly on this device",onUse,onSave,replaceme
           <canvas ref={canvasRef} onPointerDown={start} onPointerMove={move} onPointerUp={end} onPointerCancel={end} style={{display:"block",width:"100%",height:180,touchAction:"none",cursor:"crosshair"}}/>
         </div>
         <div style={{display:"flex",gap:8,marginTop:12,flexWrap:"wrap"}}>
-          <button type="button" className="text-button" onClick={clear}>Clear Specimen</button>
+          <button type="button" className="specimen-clear-button" onClick={clear}>Clear Specimen</button>
           <button type="button" disabled={empty} onClick={save}>
             {replacementMode?"Save & Serve Replacement":"Save & Serve Signature"}
           </button>
