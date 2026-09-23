@@ -91,6 +91,81 @@ exports.createAdministrator = onCall({region:"us-central1"}, async request => {
   return {ok:true,uid:target.uid,email,name:name||target.displayName||email.split("@")[0],accountCreated:!target.metadata?.lastSignInTime};
 });
 
+exports.approveInductionApplication = onCall({region:"us-central1"}, async request => {
+  const adminUid=request.auth?.uid;
+  if(!adminUid) throw new HttpsError("unauthenticated","Administrator authentication is required.");
+  const adminSnap=await db.collection("adminProfiles").doc(adminUid).get();
+  const actorEmail=String(request.auth?.token?.email||adminSnap.data()?.email||"").trim().toLowerCase();
+  if(actorEmail!=="irpa2412@gmail.com" && (!adminSnap.exists || adminSnap.data()?.active!==true)) throw new HttpsError("permission-denied","Administrator authorization is required.");
+
+  const requestId=String(request.data?.requestId||"").trim();
+  if(!requestId) throw new HttpsError("invalid-argument","Induction application ID is required.");
+  const requestRef=db.collection("registrationRequests").doc(requestId);
+  const requestSnap=await requestRef.get();
+  if(!requestSnap.exists) throw new HttpsError("not-found","The induction application could not be found.");
+  const item=requestSnap.data();
+  if(item.status==="Linked" && item.authUid) return {ok:true,alreadyLinked:true,uid:item.authUid,email:item.email||null};
+
+  const email=String(item.email||item.answers?.verifiedEmail||"").trim().toLowerCase();
+  const name=String(item.fullName||item.answers?.verifiedFullName||"").trim();
+  if(!email || !email.includes("@")) throw new HttpsError("failed-precondition","The approved applicant has no valid email address.");
+  if(!name) throw new HttpsError("failed-precondition","The approved applicant has no full name.");
+
+  const capacity=String(item.accountType||item.answers?.accountType||"").trim().toLowerCase();
+  const role=String(item.requestedRole||item.answers?.primaryRole||item.systemRole||"General Employee").trim();
+  const roles=Array.isArray(item.systemRoles)&&item.systemRoles.length?item.systemRoles:[role];
+  const department=String(item.requestedDepartment||item.answers?.department||item.systemDepartment||"").trim();
+  const unit=String(item.requestedUnit||item.answers?.unit||item.systemUnit||"").trim();
+  const employmentType=String(item.employmentType||item.answers?.employmentType||"").trim();
+  const wantsMember=["member","employee & member","member & employee"].includes(capacity);
+  const wantsEmployee=["employee","employee & member","member & employee"].includes(capacity);
+  if(!wantsMember&&!wantsEmployee) throw new HttpsError("failed-precondition","The approved applicant capacity must be Member or Employee.");
+
+  const authAdmin=require("firebase-admin/auth").getAuth();
+  let user,accountCreated=false;
+  try { user=await authAdmin.getUserByEmail(email); await authAdmin.updateUser(user.uid,{disabled:false,displayName:name}); }
+  catch(error) {
+    if(error?.code!=="auth/user-not-found") throw new HttpsError("internal","Firebase Authentication could not retrieve the applicant account.");
+    user=await authAdmin.createUser({email,displayName:name,emailVerified:false,disabled:false}); accountCreated=true;
+  }
+  await authAdmin.setCustomUserClaims(user.uid,{...(user.customClaims||{}),loginApproved:true,irpaMember:true});
+
+  const nextNumber=async(collectionName,counterName,prefix,field)=>{
+    const counterRef=db.collection(counterName).doc("current");
+    const existing=await db.collection(collectionName).select().get();
+    let highest=0;
+    existing.forEach(d=>{const n=Number(String(d.data()?.[field]||"").split("-").pop());if(Number.isInteger(n)&&n>highest)highest=n;});
+    return db.runTransaction(async tx=>{
+      const snap=await tx.get(counterRef); const current=Number(snap.exists?(snap.data().nextNumber||1):1);
+      const next=Math.max(current,highest+1);
+      tx.set(counterRef,{nextNumber:next+1,currentNumber:next,updatedAt:FieldValue.serverTimestamp()},{merge:true});
+      return prefix+String(next).padStart(5,"0");
+    });
+  };
+
+  const common={uid:user.uid,email,name,role,roles,department,unit,employmentType,status:"Active",registrationStatus:"Activated",inductionStatus:"Approved",invitationId:item.invitationId||null,createdAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()};
+  const existingMembers=await db.collection("members").where("email","==",email).limit(10).get();
+  const existingEmployees=await db.collection("employees").where("email","==",email).limit(10).get();
+
+  if(wantsMember){
+    const number=existingMembers.docs[0]?.data()?.memberNumber||await nextNumber("members","memberCounters","IRPA-MEM-","memberNumber");
+    if(existingMembers.empty) await db.collection("members").doc(user.uid).set({...common,memberNumber:number,memberType:item.memberType||"Governance Member",boardMember:Boolean(item.boardMember),activatedAt:FieldValue.serverTimestamp()},{merge:true});
+    else for(const d of existingMembers.docs) await d.ref.set({...common,memberNumber:d.data()?.memberNumber||number,boardMember:Boolean(item.boardMember),activatedAt:FieldValue.serverTimestamp()},{merge:true});
+  }
+  if(wantsEmployee){
+    const number=existingEmployees.docs[0]?.data()?.employeeNumber||await nextNumber("employees","employeeCounters","IRPA-EMP-","employeeNumber");
+    if(existingEmployees.empty) await db.collection("employees").doc(user.uid).set({...common,employeeNumber:number,accountActivated:true,registrationEmailStatus:"Pending",activatedAt:FieldValue.serverTimestamp()},{merge:true});
+    else for(const d of existingEmployees.docs) await d.ref.set({...common,employeeNumber:d.data()?.employeeNumber||number,accountActivated:true,registrationEmailStatus:"Pending",activatedAt:FieldValue.serverTimestamp()},{merge:true});
+  }
+
+  const passwordSetupLink=await authAdmin.generatePasswordResetLink(email,{url:process.env.IRPA_LOGIN_URL||"https://irpa-digital-board-governance.web.app/",handleCodeInApp:false});
+  await requestRef.set({status:"Linked",inductionStatus:"Approved",roleAssignmentStatus:"Linked",authUid:user.uid,memberProfileUid:wantsMember?user.uid:null,employeeProfileUid:wantsEmployee?user.uid:null,approvedRole:role,approvedRoles:roles,approvedDepartment:department||null,approvedUnit:unit||null,boardMember:Boolean(item.boardMember),routingStatus:"Approved & Linked",loginApproved:true,accountCreated,credentialStatus:"Firebase account provisioned — password setup required",passwordSetupLink,linkedByUid:adminUid,linkedByEmail:actorEmail,linkedAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()},{merge:true});
+  await db.collection("inductionRecords").doc(requestId).set({uid:user.uid,originalApplicantUid:item.uid||requestId,email,name,status:"Approved",inductionStatus:"Approved",roleAssignmentStatus:"Linked",approvedRole:role,approvedDepartment:department||null,approvedUnit:unit||null,boardMember:Boolean(item.boardMember),linkedByUid:adminUid,linkedByEmail:actorEmail,linkedAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()},{merge:true});
+  if(item.invitationId) await db.collection("invitations").doc(item.invitationId).set({status:"Activated",authUid:user.uid,activatedUid:user.uid,activatedAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()},{merge:true});
+  await db.collection("audit").add({action:"INDUCTION_APPLICATION_APPROVED_AND_SUBSCRIBED",collection:"registrationRequests",recordId:requestId,details:{email,authUid:user.uid,accountCreated,wantsMember,wantsEmployee},actorUid:adminUid,actorEmail,createdAt:FieldValue.serverTimestamp()});
+  return {ok:true,alreadyLinked:false,uid:user.uid,email,accountCreated,memberSubscribed:wantsMember,employeeSubscribed:wantsEmployee,passwordSetupLink};
+});
+
 exports.submitCredentialInterview = onCall({region:"us-central1"}, async request => {
   const data=request.data||{};
   const email=String(data.email||"").trim().toLowerCase();
