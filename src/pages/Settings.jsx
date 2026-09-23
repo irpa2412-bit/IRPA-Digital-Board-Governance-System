@@ -11,6 +11,7 @@ export default function Settings({ admin = false, section = "settings" }) {
   const [driveBusy, setDriveBusy] = useState(false);
   const [resetBusy, setResetBusy] = useState("");
   const [confirmation, setConfirmation] = useState("");
+  const [selectedReset, setSelectedReset] = useState("");
   const [result, setResult] = useState(null);
   const [message, setMessage] = useState("");
   const [adminName, setAdminName] = useState("");
@@ -48,6 +49,15 @@ export default function Settings({ admin = false, section = "settings" }) {
     } finally {
       setBusy(false);
     }
+  }
+
+  function prepareTrialReset(type) {
+    setSelectedReset(type);
+    setMessage("");
+    setResult(null);
+    const phrases = { documents: "RESET IRPA DOCUMENT TRIAL DATA", employees: "RESET IRPA EMPLOYEE TRIAL DATA", members: "RESET IRPA MEMBER TRIAL DATA" };
+    setMessage(`Trial reset selected. Enter the exact confirmation phrase below: ${phrases[type]}`);
+    setTimeout(() => document.getElementById("trial-reset-confirmation")?.focus(), 0);
   }
 
   async function runTrialReset(type) {
@@ -244,7 +254,7 @@ export default function Settings({ admin = false, section = "settings" }) {
             <strong>Controlled Document Trial Data</strong>
             <small>Permanently removes records explicitly marked as trial documents only. Production controlled documents and all Signature Profiles are preserved.</small>
             <div className="form-actions" style={{ marginTop: 12 }}>
-              <button type="button" onClick={() => runTrialReset("documents")} disabled={!!resetBusy} aria-busy={resetBusy==="documents"?"true":"false"}>{resetBusy==="documents" ? "Resetting Documents…" : "Reset Documents"}</button>
+              <button type="button" onClick={() => prepareTrialReset("documents")} disabled={!!resetBusy} aria-busy={resetBusy==="documents"?"true":"false"}>{resetBusy==="documents" ? "Resetting Documents…" : "Reset Documents"}</button>
             </div>
           </div>
           <div className="stat-card" style={{ marginBottom: 14 }}>
@@ -252,7 +262,7 @@ export default function Settings({ admin = false, section = "settings" }) {
             <strong>Employee Trial Data</strong>
             <small>Removes Employee records and resets the Employee Number counter.</small>
             <div className="form-actions" style={{ marginTop: 12 }}>
-              <button type="button" onClick={() => runTrialReset("employees")} disabled={!!resetBusy} aria-busy={resetBusy==="employees"?"true":"false"}>{resetBusy==="employees" ? "Resetting Employees…" : "Reset Employees"}</button>
+              <button type="button" onClick={() => prepareTrialReset("employees")} disabled={!!resetBusy} aria-busy={resetBusy==="employees"?"true":"false"}>{resetBusy==="employees" ? "Resetting Employees…" : "Reset Employees"}</button>
             </div>
           </div>
           <div className="stat-card" style={{ marginBottom: 14 }}>
@@ -260,13 +270,15 @@ export default function Settings({ admin = false, section = "settings" }) {
             <strong>General Member Trial Data</strong>
             <small>Removes general Members and resets the Member Number counter. Board Members are preserved.</small>
             <div className="form-actions" style={{ marginTop: 12 }}>
-              <button type="button" onClick={() => runTrialReset("members")} disabled={!!resetBusy} aria-busy={resetBusy==="members"?"true":"false"}>{resetBusy==="members" ? "Resetting Members…" : "Reset Members"}</button>
+              <button type="button" onClick={() => prepareTrialReset("members")} disabled={!!resetBusy} aria-busy={resetBusy==="members"?"true":"false"}>{resetBusy==="members" ? "Resetting Members…" : "Reset Members"}</button>
             </div>
           </div>
           <div className="success-message" style={{ marginTop: 8 }}>Enter the exact phrase for the reset you want to perform. Document reset only removes records marked as trial data; it does not remove Signature Profiles.</div><label className="field" style={{ display: "block" }}>
             <span>Confirmation phrase</span>
-            <input value={confirmation} onChange={e => setConfirmation(e.target.value)} placeholder="Enter the exact phrase shown after selecting a reset" />
+            <input id="trial-reset-confirmation" value={confirmation} onChange={e => setConfirmation(e.target.value)} placeholder="Enter the exact phrase shown after selecting a reset" aria-label="Trial reset confirmation phrase" />
           </label>
+          {selectedReset && <div className="auth-message" style={{ marginTop: 16 }}><strong>Selected reset:</strong> {selectedReset === "documents" ? "Documents" : selectedReset === "employees" ? "Employees" : "Members"}. Enter the exact confirmation phrase above, then press the selected reset button again to execute.</div>}
+          {selectedReset && <div className="form-actions" style={{ marginTop: 12 }}><button type="button" className="danger-button" onClick={() => runTrialReset(selectedReset)} disabled={!!resetBusy} aria-busy={resetBusy===selectedReset?"true":"false"}>{resetBusy===selectedReset ? "Executing Reset…" : `Execute ${selectedReset === "documents" ? "Document" : selectedReset === "employees" ? "Employee" : "Member"} Reset`}</button><button type="button" className="secondary-button" onClick={() => { setSelectedReset(""); setConfirmation(""); setMessage(""); }} disabled={!!resetBusy}>Cancel</button></div>}
           {result && <div className="auth-message" style={{ marginTop: 16 }}>Reset completed. Records deleted: {result.recordsDeleted ?? 0}{result.boardMembersPreserved ? " · Board Members preserved." : ""}</div>}
         </section>
       )}
