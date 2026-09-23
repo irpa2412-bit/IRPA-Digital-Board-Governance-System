@@ -9,6 +9,11 @@ import {
 const EMPLOYEE_ROLES = [
   "Executive Director",
   "Director Human Resources",
+  "Director Livestock",
+  "Director Environment",
+  "Director Outreach",
+  "Director Community Development",
+  "Director Field Operations",
   "HR Manager",
   "Director Finance & Administration",
   "Finance Personnel",
@@ -22,6 +27,14 @@ const EMPLOYEE_ROLES = [
   "Programme/Technical Officer",
   "Management",
   "Operations Manager",
+  "IT Specialist",
+  "Information Technology Officer",
+  "Driver",
+  "Field Assistant",
+  "Administrative Assistant",
+  "Communications Officer",
+  "Monitoring & Evaluation Officer",
+  "Project Officer",
   "Rangeland Officer",
   "Livestock Officer",
   "Outreach Officer",
@@ -83,7 +96,7 @@ export async function provisionCurrentMemberFromInvitationV2(invitationId) {
       status:"Accepted",acceptedUid:uid,acceptedAt:new Date().toISOString(),accountActivated:true,activationCompleted:true
     }, {touchUpdatedAt:false, audit:false});
     return { employee: boardMember, invitationId: invitation.id, uid };
-  } else if (EMPLOYEE_ROLES.includes(role)) {
+  } else if (invitation.employeeId || invitation.institutionalRecordType === "Employee" || EMPLOYEE_ROLES.includes(role)) {
     // Employees follow the same controlled activation pattern as Board Members:
     // resolve the authoritative employee record by its invitation link or official
     // email, then update only the fields permitted by the recipient security rule.
