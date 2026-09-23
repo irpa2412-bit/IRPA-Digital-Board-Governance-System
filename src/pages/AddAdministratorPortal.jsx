@@ -3,8 +3,23 @@ import {createAdministrator,listAdministrators,removeAdministrator}from"../fireb
 import {sendAdminMagicLink}from"../firebase/auth";
 
 export default function AddAdministratorPortal(){
- const[name,setName]=useState(""),[email,setEmail]=useState(""),[lastInvitationId,setLastInvitationId]=useState(""),[busy,setBusy]=useState(false),[resendBusy,setResendBusy]=useState(false),[removeBusy,setRemoveBusy]=useState(""),[result,setResult]=useState(null),[lastEmail,setLastEmail]=useState(""),[administrators,setAdministrators]=useState([]);
- const loadAdministrators=async()=>{try{setAdministrators(await listAdministrators())}catch(error){setResult({ok:false,message:error?.message||"Unable to load Administrator register."})}};
+ const[name,setName]=useState(""),[email,setEmail]=useState(""),[lastInvitationId,setLastInvitationId]=useState(""),[busy,setBusy]=useState(false),[resendBusy,setResendBusy]=useState(false),[removeBusy,setRemoveBusy]=useState(""),[result,setResult]=useState(null),[lastEmail,setLastEmail]=useState(""),[administrators,setAdministrators]=useState([]),[refreshBusy,setRefreshBusy]=useState(false),[lastRefresh,setLastRefresh]=useState("");
+ const loadAdministrators=async(showFeedback=false)=>{
+  if(showFeedback){setRefreshBusy(true);setResult({ok:true,working:true,message:"Refreshing the Administrator register…"});}
+  try{
+    const rows=await listAdministrators();
+    setAdministrators(rows);
+    const stamp=new Date().toLocaleTimeString();
+    setLastRefresh(stamp);
+    if(showFeedback) setResult({ok:true,working:false,message:"Administrator register refreshed successfully at "+stamp+"."});
+    return rows;
+  }catch(error){
+    setResult({ok:false,working:false,message:error?.message||"Unable to load Administrator register."});
+    throw error;
+  }finally{
+    if(showFeedback) setRefreshBusy(false);
+  }
+};
  useEffect(()=>{loadAdministrators()},[]);
 
  async function submit(e){
@@ -56,8 +71,8 @@ export default function AddAdministratorPortal(){
   {lastEmail&&<div className="form-actions" style={{marginTop:12}}><button type="button" className="secondary-button" onClick={resend} disabled={busy||resendBusy||!!removeBusy}>{resendBusy?"Resending…":"Resend activation link"}</button></div>}
 
   <section className="panel" style={{marginTop:24}}>
-   <div className="panel-header"><div><span className="eyebrow">ADMINISTRATOR REGISTER</span><h3>Active Administrators</h3><p className="panel-description">Remove access here when an Administrator should no longer hold Administrator privileges.</p></div><button type="button" className="secondary-button" onClick={loadAdministrators} disabled={busy||resendBusy||!!removeBusy}>Refresh</button></div>
-   <div style={{display:"grid",gap:10}}>
+   <div className="panel-header"><div><span className="eyebrow">ADMINISTRATOR REGISTER</span><h3>Active Administrators</h3><p className="panel-description">Remove access here when an Administrator should no longer hold Administrator privileges.</p></div><button type="button" className="secondary-button administrator-register-refresh" onClick={(event)=>{event.preventDefault();event.stopPropagation();loadAdministrators(true)}} disabled={busy||resendBusy||!!removeBusy||refreshBusy} aria-label="Refresh Administrator register" style={{position:"relative",zIndex:50,pointerEvents:"auto",touchAction:"manipulation",minHeight:44}}>{refreshBusy?"Refreshing…":"Refresh"}</button></div>
+   <div style={{display:"grid",gap:10,pointerEvents:"auto"}}>
     {administrators.length===0?<div className="muted">No active additional Administrators are currently registered.</div>:administrators.map(admin=><div key={admin.uid} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap",padding:"12px",border:"1px solid rgba(127,127,127,.22)",borderRadius:10}}>
       <div><strong>{admin.name||"Administrator"}</strong><div className="muted">{admin.email}</div></div>
       {admin.primary?<span className="muted">Primary Administrator — protected</span>:<button type="button" className="secondary-button" onClick={()=>remove(admin)} disabled={busy||resendBusy||!!removeBusy}>{removeBusy===admin.uid?"Removing…":"Remove Administrator"}</button>}
