@@ -296,6 +296,28 @@ exports.approveInductionApplication = onCall({region:"us-central1"}, async reque
   return {ok:true,alreadyLinked:false,uid:user.uid,email,accountCreated,memberSubscribed:wantsMember,employeeSubscribed:wantsEmployee,passwordSetupLink};
 });
 
+exports.rejectInductionApplication = onCall({region:"us-central1"}, async request => {
+  const adminUid=request.auth?.uid;
+  if(!adminUid) throw new HttpsError("unauthenticated","Administrator authentication is required.");
+  const adminSnap=await db.collection("adminProfiles").doc(adminUid).get();
+  const actorEmail=String(request.auth?.token?.email||adminSnap.data()?.email||"").trim().toLowerCase();
+  if(actorEmail!=="irpa2412@gmail.com" && (!adminSnap.exists||adminSnap.data()?.active!==true)) throw new HttpsError("permission-denied","Administrator authorization is required.");
+  const requestId=String(request.data?.requestId||"").trim();
+  const reason=String(request.data?.reason||"").trim();
+  if(!requestId) throw new HttpsError("invalid-argument","Induction application ID is required.");
+  if(!reason) throw new HttpsError("invalid-argument","A decision reason is required.");
+  const ref=db.collection("registrationRequests").doc(requestId);
+  const snap=await ref.get();
+  if(!snap.exists) throw new HttpsError("not-found","The induction application could not be found.");
+  const item=snap.data();
+  const email=String(item.email||item.answers?.verifiedEmail||"").trim().toLowerCase();
+  await ref.set({status:"Rejected",inductionStatus:"Rejected",roleAssignmentStatus:"Rejected",routingStatus:"Administrator Decision — Rejected",decision:"Rejected",decisionReason:reason,decidedByUid:adminUid,decidedByEmail:actorEmail,decidedAt:FieldValue.serverTimestamp(),feedbackStatus:"Queued",updatedAt:FieldValue.serverTimestamp()},{merge:true});
+  await db.collection("inductionRecords").doc(requestId).set({status:"Rejected",inductionStatus:"Rejected",roleAssignmentStatus:"Rejected",routingStatus:"Administrator Decision — Rejected",decision:"Rejected",decisionReason:reason,decidedByUid:adminUid,decidedByEmail:actorEmail,decidedAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()},{merge:true});
+  if(email) await queueInductionEmail(email,"IRPA Induction Application — Administrator Decision",`Dear ${item.fullName||"Applicant"},\\n\\nThe Administrator has reviewed your IRPA Induction and Orientation application and recorded a decision of REJECTED.\\n\\nReason: ${reason}\\n\\nYou may contact IRPA for clarification or submit a new application when appropriate.\\n\\nIRPA Digital Board Governance System`,`<strong>IRPA Induction Application — Administrator Decision</strong><p>Dear ${item.fullName||"Applicant"},</p><p>The Administrator has reviewed your application and recorded a decision of <strong>REJECTED</strong>.</p><p><strong>Reason:</strong> ${reason}</p><p>You may contact IRPA for clarification or submit a new application when appropriate.</p>`);
+  await db.collection("audit").add({action:"INDUCTION_APPLICATION_REJECTED",collection:"registrationRequests",recordId:requestId,details:{email,reason},actorUid:adminUid,actorEmail,createdAt:FieldValue.serverTimestamp()});
+  return {ok:true,decision:"Rejected",requestId,email};
+});
+
 exports.submitCredentialInterview = onCall({region:"us-central1"}, async request => {
   const data=request.data||{};
   const email=String(data.email||"").trim().toLowerCase();
