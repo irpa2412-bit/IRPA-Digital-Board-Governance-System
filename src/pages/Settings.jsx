@@ -200,10 +200,6 @@ export default function Settings({ admin = false, section = "settings" }) {
               <span className="eyebrow">DOCUMENT STORAGE</span><h2>Google Drive Authorization</h2><p className="panel-description">Authorize the IRPA Google Drive account used for controlled governance documents. The authorization is restricted to the configured IRPA Drive account.</p>
             </div>
           </div>
-              <h2>Google Drive Authorization</h2>
-              <p className="panel-description">Authorize the IRPA Google Drive account used for controlled governance documents. The authorization is restricted to the configured IRPA Drive account.</p>
-            </div>
-          </div>
           <div className="stat-card" style={{ marginBottom: 18 }}>
             <span>Storage provider</span>
             <strong>Google Drive</strong>
