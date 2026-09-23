@@ -199,20 +199,31 @@ if(form.identityConfirmation!=="Yes"){setError(context.anonymous?"Please confirm
     <div><span>INVITATION</span><strong>{context.invitation?"Matched":isNewApplicant?"Not required for new enrollment":"No separate invitation found"}</strong></div>
     <div><span>INVITATION REFERENCE</span><strong>{context.invitation?.invitationReference||context.invitation?.reference||context.invitationId||"Not applicable"}</strong></div>
     <div><span>APPLICATION FILTER</span><strong>{isNewApplicant?((registerEmployees.length||registerMembers.length)?"PASSED — READY FOR ADMINISTRATOR REVIEW":"BLOCKED — VERIFICATION REQUIRED"):"REGISTERED ACCOUNT"}</strong></div>
-   </div>>
+   </div>
   </section>
 
-  <section className="panel" aria-label="IRPA System Assistant" style={{border:"1px solid rgba(180,210,190,.35)",background:"rgba(10,45,34,.55)"}}>
-   <div className="panel-header"><div><span className="eyebrow">IRPA SYSTEM ASSISTANT</span><h2>Consultative Applicant Guidance</h2><p className="panel-description">The assistant uses the IRPA registration, invitation, Member/Employee and organisational information already retrieved for this session. It proposes answers so the applicant does not have to repeat information already known by the system.</p></div></div>
-   <div style={{display:"grid",gap:12}}>
-    <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-     <button type="button" className="secondary-button" onClick={()=>{const n=context?.fullName||context?.invitation?.name||registerEmployees[0]?.name||registerMembers[0]?.name||"";if(n)patch("verifiedFullName",n);const e=context?.email||context?.invitation?.email||registerEmployees[0]?.email||registerMembers[0]?.email||"";if(e)patch("verifiedEmail",e)}}>Use retrieved identity</button>
-     <button type="button" className="secondary-button" onClick={()=>{const a=context?.accountType||(registerEmployees.length&&registerMembers.length?"Employee & Member":registerEmployees.length?"Employee":registerMembers.length?"Member":"");if(a)patch("accountType",a);const r=context?.role||registerEmployees[0]?.role||registerMembers[0]?.role||"";if(r)patch("primaryRole",r);}}>Suggest capacity & role</button>
-     <button type="button" className="secondary-button" onClick={()=>{const d=context?.department||registerEmployees[0]?.department||registerMembers[0]?.department||"";if(d)patch("department",d);}}>Suggest department</button>
-     <button type="button" className="secondary-button" onClick={()=>{const d=form.department||context?.department||registerEmployees[0]?.department||registerMembers[0]?.department||"";const u=context?.unit||registerEmployees.find(x=>x.department===d)?.unit||registerMembers.find(x=>x.department===d)?.unit||DEPARTMENT_UNITS[d]?.[0]||"";if(u)patch("unit",u);const et=context?.employmentType||registerEmployees[0]?.employmentType||registerMembers[0]?.memberType||"";if(et)patch("employmentType",et);}}>Suggest remaining identity</button>
-     <button type="button" className="secondary-button" onClick={()=>{patch("identityConfirmation",context?.boardMember?"Yes":"Yes");if(!form.q1)patch("q1",questions.q1.options[0]||"");if(!form.q2)patch("q2",questions.q2.options[0]||"");if(!form.q3)patch("q3",questions.q3.options[0]||"");if(!form.q4)patch("q4",questions.q4.options[0]||"");if(!form.q5)patch("q5",questions.q5.options[0]||"");if(!form.q6)patch("q6",questions.q6.options[0]||"");}}>Apply system prompts to unanswered fields</button>
-    </div>
-    <div className="field-help" aria-live="polite">Suggested values are drawn from information available to this application. The applicant can edit them where permitted. Administrator-controlled registration numbers and approval status are never fabricated.</div>
+  <section className="panel" aria-label="IRPA System Assistant">
+   <div className="panel-header"><div><span className="eyebrow">SYSTEM CONSULTATION</span><h2>IRPA Applicant Assistant</h2><p className="panel-description">The gateway has consulted the information available in this session and is prompting the applicant with usable answers. Tap a suggested answer to place it into the corresponding field; edit it when the field is applicant-editable.</p></div></div>
+   <div style={{display:"grid",gap:14}}>
+    {[
+      ["Full name",form.verifiedFullName||context?.fullName||context?.invitation?.name||registerEmployees[0]?.name||registerMembers[0]?.name,"verifiedFullName"],
+      ["Email",form.verifiedEmail||context?.email||context?.invitation?.email||registerEmployees[0]?.email||registerMembers[0]?.email,"verifiedEmail"],
+      ["Capacity",form.accountType||context?.accountType||context?.accountTypeOptions?.[0]||"","accountType"],
+      ["Role / position",form.primaryRole||context?.role||context?.roles?.[0]||"","primaryRole"],
+      ["Department",form.department||context?.department||"","department"],
+      ["Unit",form.unit||context?.unit||"","unit"],
+      ["Employment / membership",form.employmentType||context?.employmentType||context?.memberType||"","employmentType"],
+      ["Identity confirmation",form.identityConfirmation||"","identityConfirmation"]
+    ].filter(x=>x[1]).map(([label,value,key])=>
+      <div key={key} className="field-suggestion-list" style={{display:"flex",alignItems:"center",flexWrap:"wrap",gap:8,padding:"10px 0"}}>
+       <strong style={{minWidth:150}}>{label}</strong>
+       <button type="button" className="secondary-button" onMouseDown={e=>e.preventDefault()} onClick={()=>patch(key,value)} style={{pointerEvents:"auto",cursor:"pointer"}}>Use: {String(value)}</button>
+      </div>
+    )}
+    {questions.q1.options.length>0&&<div><strong>Orientation question prompts</strong><div style={{display:"grid",gap:8,marginTop:8}}>
+      {[["q1",questions.q1],["q2",questions.q2],["q3",questions.q3],["q4",questions.q4],["q5",questions.q5],["q6",questions.q6]].map(([key,q])=><div key={key} style={{display:"flex",flexWrap:"wrap",gap:8,alignItems:"center"}}><span style={{flex:"1 1 280px"}}>{q.label}</span>{q.options.slice(0,3).map(option=><button type="button" key={String(option)} className="secondary-button" onClick={()=>patch(key,option)} style={{pointerEvents:"auto",cursor:"pointer"}}>Suggest: {String(option)}</button>)}</div>)}
+    </div></div>}
+    <div className="field-help" aria-live="polite">The assistant does not ask again for information already retrieved. Where no record exists, it explicitly says so rather than inventing an answer.</div>
    </div>
   </section>
 
