@@ -54,7 +54,14 @@ export async function provisionCurrentMemberFromInvitationV2(invitationId) {
   // Prefer the institutional personnel record explicitly attached to the invitation.
   const isBoardMember = ["Board Member","Board Chairperson","Board Secretary","Board Treasurer","Board Vice Chairperson"].includes(role);
 
-  if (invitation.employeeId && !isBoardMember) {
+  if (invitation.boardMemberId || invitation.institutionalRecordType === "Board Member") {
+    const boardMemberId = invitation.boardMemberId || invitation.institutionalRecordId;
+    const boardMember = boardMemberId ? await getRecord(COLLECTIONS.members, boardMemberId) : null;
+    if (!boardMember) throw new Error("The Board Member record linked to this invitation could not be found.");
+    if (boardMember.email?.trim().toLowerCase() !== email) throw new Error("The invitation email does not match the Board Member institutional record.");
+    await updateRecord(COLLECTIONS.members, boardMember.id, {uid, invitationId, accountActivated:true, registrationStatus:"Activated", activatedAt:new Date().toISOString()});
+    employee = boardMember;
+  } else if (invitation.employeeId && !isBoardMember) {
     employee = await getRecord(COLLECTIONS.employees, invitation.employeeId);
     if (!employee) throw new Error("The institutional personnel record linked to this invitation could not be found.");
     if (employee.email?.trim().toLowerCase() !== email) {
