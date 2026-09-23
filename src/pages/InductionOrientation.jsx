@@ -1,5 +1,6 @@
 import React,{useEffect,useMemo,useRef,useState}from"react";
 import{getCurrentInductionContext,submitInductionApplication}from"../firebase/data";
+import{ensureInvitationApplicantSession,upgradeInvitationApplicant}from"../firebase/auth";
 
 const unique=(values)=>[...new Set(values.flatMap(v=>Array.isArray(v)?v:String(v||"").split(",")).map(v=>String(v||"").trim()).filter(Boolean))];
 
@@ -102,6 +103,11 @@ export default function InductionOrientation(){
  const[form,setForm]=useState({identityConfirmation:"",accountType:"",primaryRole:"",department:"",unit:"",employmentType:"",orientationModules:[],q1:"",q2:"",q3:"",q4:"",q5:"",q6:"",comments:"",declaration:false,verifiedEmail:"",verifiedFullName:"",credentialCapacity:"",credentialRole:"",credentialInvitationReference:""});
 
  useEffect(()=>{let live=true;(async()=>{
+  const params=new URLSearchParams(window.location.search);
+  const applicantMode=params.get("applicant")==="1";
+  if(applicantMode){
+   try{await ensureInvitationApplicantSession();}catch(e){if(live){setError(e.message||"The invitation login-assistance session could not be opened.");setBusy(false);}return;}
+  }
   try{
    const c=await getCurrentInductionContext();
    if(!live)return;
@@ -158,7 +164,7 @@ if(form.identityConfirmation!=="Yes"){setError(context.anonymous?"Please confirm
   try{
    const submissionContext={...context,email:String(form.verifiedEmail||context.email||"").trim().toLowerCase(),fullName:String(form.verifiedFullName||context.fullName||"").trim(),role:form.primaryRole,roles:form.primaryRole?[form.primaryRole]:[],department:form.department,unit:form.unit,employmentType:form.employmentType,accountType:form.accountType,boardMember:roleFamily(form.primaryRole)==="Board Member"};const result=await submitInductionApplication(form,submissionContext);
    if(result.alreadyLinked){setMessage("Your induction has already been approved and linked by an administrator.");return}
-   setMessage("Induction and Orientation submitted successfully. Your application is now awaiting administrator LINK. Your registered role(s), department/unit and Board Member status remain system-controlled.");
+   if(!context.anonymous)setMessage("Induction and Orientation submitted successfully. Your application is now awaiting administrator LINK. Your registered role(s), department/unit and Board Member status remain system-controlled.");
   }catch(x){setError(x.message||"The induction application could not be submitted.");}
   finally{setSaving(false);}
  }
@@ -170,7 +176,7 @@ if(form.identityConfirmation!=="Yes"){setError(context.anonymous?"Please confirm
 
  return <div className="page induction-page" aria-busy={saving?"true":"false"}>
   <section className="welcome-panel">
-   <div><span className="eyebrow">IRPA INDUCTION & ORIENTATION</span><h1>{isNewApplicant?"New Member / Employee Enrollment":"Registration-Linked Induction Application"}</h1><p>{isNewApplicant?"This pathway assists an existing IRPA Member or Employee whose registration is already held by the administrator. Complete the guided orientation and submit it for the normal administrator review and LINK workflow.":"The form is pre-filled from your authenticated IRPA Member/Employee registration and invitation records. Choices are generated from the information already registered in the system."}</p></div>
+   <div><span className="eyebrow">IRPA INDUCTION & ORIENTATION</span><h1>{isNewApplicant?"New Member / Employee Enrollment":"Registration-Linked Induction Application"}</h1><p>{isNewApplicant?"This pathway assists an existing registered Member/Employee and also accepts a new Member/Employee who has received an IRPA invitation or subscription email. Complete the guided orientation; the Administrator will link the submitted information to the available system registration before access is activated.":"The form is pre-filled from your authenticated IRPA Member/Employee registration and invitation records. Choices are generated from the information already registered in the system."}</p></div>
    <div className="identity-card"><span>APPLICATION STATUS</span><strong>{linked?"LINKED":pending?"PENDING LINK":"READY"}</strong><small>{linked?"Administrator approval completed":pending?"Awaiting administrator LINK":"Complete the guided form below"}</small></div>
   </section>
 
@@ -179,7 +185,7 @@ if(form.identityConfirmation!=="Yes"){setError(context.anonymous?"Please confirm
   <section className="panel induction-progress-panel"><div className="induction-progress-head"><div><span className="eyebrow">APPLICATION PROGRESS</span><strong>{progress}% complete</strong></div><span>{pending?"Pending administrator LINK":linked?"Administrator LINK completed":"Complete the required fields below"}</span></div><div className="induction-progress-track" aria-label={`Application ${progress}% complete`}><span style={{width:`${progress}%`}}/></div><div className="induction-steps" aria-label="Induction steps">{["Identity","Position","Modules","Orientation Check","Declaration"].map((x,i)=><span key={x} className={completedFields>=[2,4,5,8,11][i]?"complete":""}>{i+1}. {x}</span>)}</div></section>
 
   <section className="panel applicant-entry-panel" id="applicant-entry">
-   <div className="panel-header"><div><span className="eyebrow">{isNewApplicant?"APPLICANT ENTRY":"INDUCTION ENTRY"}</span><h2>{isNewApplicant?"Applicant Entry — Enrollment & Approval Stage":"Induction Entry — Registration & Orientation"}</h2><p className="panel-description">{isNewApplicant?"This is the applicant-facing entry point. Enter your identity and position information below, complete the orientation checks and submit. The application then moves to the Administrator Induction & Orientation portal for review and LINK. No existing IRPA credentials are required.":"Continue your registration-linked induction here. Your application status is shown above and the Administrator LINK stage remains system-controlled."}</p></div></div><div className="detail-grid"><div><span>APPLICANT ACCESS</span><strong>{isNewApplicant?"Open — no prior credentials required":"Authenticated IRPA account"}</strong></div><div><span>APPROVAL STAGE</span><strong>{linked?"LINKED":pending?"PENDING ADMINISTRATOR LINK":"NOT YET SUBMITTED"}</strong></div><div><span>NEXT ACTION</span><strong>{linked?"Use your issued IRPA credentials":pending?"Wait for administrator LINK":"Complete the entries below and submit"}</strong></div></div>
+   <div className="panel-header"><div><span className="eyebrow">{isNewApplicant?"APPLICANT ENTRY":"INDUCTION ENTRY"}</span><h2>{isNewApplicant?"Applicant Entry — Enrollment & Approval Stage":"Induction Entry — Registration & Orientation"}</h2><p className="panel-description">{isNewApplicant?"This is the invitation/subscription-assisted entry point. Enter the identity and position information available to you, complete the orientation checks and submit. The application then moves to the Administrator Induction & Orientation portal, where the Administrator links it to the available system registration. No existing credentials are required for this assistance stage.":"Continue your registration-linked induction here. Your application status is shown above and the Administrator LINK stage remains system-controlled."}</p></div></div><div className="detail-grid"><div><span>APPLICANT ACCESS</span><strong>{isNewApplicant?"Open — no prior credentials required":"Authenticated IRPA account"}</strong></div><div><span>APPROVAL STAGE</span><strong>{linked?"LINKED":pending?"PENDING ADMINISTRATOR LINK":"NOT YET SUBMITTED"}</strong></div><div><span>NEXT ACTION</span><strong>{linked?"Use your issued IRPA credentials":pending?"Wait for administrator LINK":"Complete the entries below and submit"}</strong></div></div>
   </section>
 
   <section className="panel">
