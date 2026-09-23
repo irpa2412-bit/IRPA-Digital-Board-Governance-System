@@ -216,8 +216,11 @@ exports.routeInductionApplication = onCall({region:"us-central1"}, async request
     ? `Dear ${item.fullName||"Applicant"},\\n\\nYour IRPA Induction and Orientation application has been received and scored at ${score.percentage}% (${score.correct}/${score.total}). It has therefore been advanced to the Administrator for decision.\\n\\nSystem summary: ${summary}\\n\\nNo login account is authorised until the Administrator completes the decision.\\n\\nIRPA Digital Board Governance System`
     : `Dear ${item.fullName||"Applicant"},\\n\\nYour IRPA Induction and Orientation application has been received. The automated accuracy check recorded ${score.percentage}% (${score.correct}/${score.total}), below the 75% advancement threshold.\\n\\nSystem feedback: ${summary}\\n\\nPlease return to the induction form, correct the indicated items and resubmit.\\n\\nIRPA Digital Board Governance System`;
   const emailId=await queueInductionEmail(email,applicantSubject,applicantText,applicantText.replace(/\\n/g,"<br>"));
-  const adminEmails=(await db.collection("adminProfiles").where("active","==",true).get()).docs.map(d=>String(d.data()?.email||"").trim().toLowerCase()).filter(Boolean);
+  const activeAdminSnap=await db.collection("adminProfiles").where("active","==",true).get();
+  const adminProfiles=activeAdminSnap.docs.map(d=>({uid:d.id,...d.data()}));
+  const adminEmails=adminProfiles.map(d=>String(d.email||"").trim().toLowerCase()).filter(Boolean);
   if(score.advanced){
+    await notify({recipientUids:adminProfiles.map(d=>d.uid),type:"INDUCTION_APPLICATION_ADVANCED",title:"Induction application advanced for decision",body:`${item.fullName||"Applicant"} — ${score.percentage}% accuracy. Open Induction & Orientation Administrator Applications for the decision brief.`,module:"Induction & Orientation",recordId:requestId,route:"/induction-admin",priority:"high",eventKey:`INDUCTION_APPLICATION_ADVANCED|${requestId}`});
     for(const adminEmail of [...new Set(adminEmails)]) await queueInductionEmail(adminEmail,"IRPA Induction Application Advanced for Decision",`Applicant: ${item.fullName||"Unnamed"}\\nEmail: ${email}\\n${summary}\\nApplication ID: ${requestId}`,`<strong>IRPA Induction Application Advanced for Decision</strong><br>Applicant: ${item.fullName||"Unnamed"}<br>Email: ${email}<br>${summary}<br>Application ID: ${requestId}`);
   }
   return {ok:true,routingStatus,accuracyPercentage:score.percentage,systemSummary:summary,feedbackQueued:Boolean(emailId),advanced:score.advanced};
