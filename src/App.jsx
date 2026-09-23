@@ -274,10 +274,19 @@ useEffect(()=>{
         m=await getCurrentMemberProfile();
         if(m)window.history.replaceState({},document.title,window.location.pathname+window.location.hash);
       }
-      if(!m){setError("This account has no active IRPA member profile.");setProfile(null);return}
-      if(m.status!=="Active"){setError("The IRPA member profile exists but is not active.");setProfile(null);return}
-      setProfile({...m,authorizationType:"member"});
-      setEmployee(session.employee||null);
+      const activeMember = m?.status === "Active" ? m : null;
+      const activeEmployee = session.employee || null;
+      if(!activeMember && !activeEmployee){
+        setError("This account has no active IRPA enrollment record.");
+        setProfile(null);
+        return;
+      }
+      // Employees are enrolled from the Employees Register and do not require
+      // a duplicate members/{uid} authorization document. Use the employee
+      // record as the canonical application profile when no member profile exists.
+      const canonicalProfile = activeMember || activeEmployee;
+      setProfile({...canonicalProfile, authorizationType:"member", enrollmentType:activeEmployee && !activeMember ? "employee" : "member"});
+      setEmployee(activeEmployee);
       try{
         const induction=await Promise.race([
           getDoc(doc(db,"inductionRecords",u.uid)),
