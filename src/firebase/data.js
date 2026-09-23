@@ -130,84 +130,32 @@ export async function getCurrentInductionContext(){
 
 export async function submitInductionApplication(form,context){
   const activeAuth=context?.anonymous?applicantAuth:auth;
-  const activeDb=context?.anonymous?applicantDb:db;
   const uid=activeAuth.currentUser?.uid;
   if(!uid||uid!==context?.uid) throw new Error("Authenticated registration identity could not be verified.");
   if(!context?.roles?.length) throw new Error("No registered role could be retrieved. The induction application is blocked.");
-  if(context.anonymous){
-    const clean=v=>String(v||"").trim().toLowerCase();
-    const email=clean(form.verifiedEmail||context.email);
-    if(!email) throw new Error("An email address is required before the application can be verified.");
-    const call=httpsCallable(getFunctions(undefined,"us-central1"),"fetchInductionMatchingRecords");
-    const result=await call({invitationId:context.invitationId||"",email});
-    const match=result.data||{};
-    const invitation=match.invitation||null;
-    const employeeMatches=Array.isArray(match.employees)?match.employees:[];
-    const memberMatches=Array.isArray(match.members)?match.members:[];
-    // New applicants do not need a pre-existing invitation or registration record.
-    // If a matching invitation/register exists, use it consultatively and validate the
-    // supplied details. Otherwise route the self-enrollment to administrator review.
-    if(invitation||employeeMatches.length||memberMatches.length){
-      const records=[...employeeMatches,...memberMatches];
-      if(invitation){
-        const roleMatch=records.some(x=>[x.role,...(x.roles||[])].some(v=>clean(v)===clean(form.primaryRole)))||clean(invitation.role)===clean(form.primaryRole);
-        const departmentMatch=records.some(x=>clean(x.department)===clean(form.department))||clean(invitation.department)===clean(form.department);
-        const unitMatch=records.some(x=>clean(x.unit)===clean(form.unit))||clean(invitation.unit)===clean(form.unit);
-        if(!roleMatch||!departmentMatch||!unitMatch) throw new Error("The application information does not sufficiently match the retrieved IRPA records. Please review the prompted role, department and unit before submitting.");
-      }
-    }
-    context={...context,invitation:invitation||null,invitations:invitation?[invitation]:[],invitationId:invitation?.id||"",registerMatches:{employees:employeeMatches,members:memberMatches},email,fullName:form.verifiedFullName||context.fullName};
-  }
+  const email=String(form.verifiedEmail||context.email||"").trim().toLowerCase();
+  if(!email) throw new Error("An email address is required before the application can be verified.");
   if(context.existingRequest?.status==="Linked"||context.existingRequest?.roleAssignmentStatus==="Linked") return {alreadyLinked:true,requestId:uid};
 
-  const submittedAt=serverTimestamp();
-  const requestRef=doc(activeDb,COLLECTIONS.registrationRequests,uid);
-  const existingSnap=await getDoc(requestRef);
-  const payload={
-    uid,email:context.email,fullName:context.fullName,
-    memberProfileUid:context.member?.uid||uid,employeeProfileUid:context.employee?.uid||uid,
-    memberEmployeeNumber:null,registrationNumberStatus:"Issued after administrator LINK",
-    invitationId:context.invitationId||null,
-    invitationReference:context.invitation?.invitationReference||context.invitation?.reference||null,
-    invitationStatus:context.invitation?"Registered invitation":"Subscription / registration email",
-    enrollmentSource:context.invitation?"invitation":"subscription",
-    systemRoles:context.roles,systemRole:context.role,systemDepartment:context.department||null,systemUnit:context.unit||null,
-    boardMember:context.boardMember,accountType:String(form.accountType||context.accountType||"").trim(),
-    requestedRole:String(form.primaryRole||context.role).trim(),requestedDepartment:String(form.department||context.department||"").trim(),
-    requestedUnit:String(form.unit||context.unit||"").trim(),employmentType:String(form.employmentType||context.employmentType||"").trim(),
-    orientationModules:Array.isArray(form.orientationModules)?form.orientationModules:[],
-    answers:{
-      identityConfirmation:form.identityConfirmation||"",verifiedEmail:String(form.verifiedEmail||context.email||"").trim().toLowerCase(),verifiedFullName:String(form.verifiedFullName||context.fullName||"").trim(),accountType:form.accountType||"",primaryRole:form.primaryRole||"",
-      department:form.department||"",unit:form.unit||"",employmentType:form.employmentType||"",
-      orientationModules:Array.isArray(form.orientationModules)?form.orientationModules:[],
-      credentialCapacity:form.credentialCapacity||"",credentialRole:form.credentialRole||"",credentialInvitationReference:String(form.credentialInvitationReference||"").trim(),
-      q1:form.q1||"",q2:form.q2||"",q3:form.q3||"",q4:form.q4||"",q5:form.q5||"",q6:form.q6||"",comments:String(form.comments||"").trim()
-    },
-    completedSteps:Array.isArray(form.completedSteps)?form.completedSteps:[],
-    declaration:form.declaration===true,status:"Pending Department & Unit Review",roleAssignmentStatus:"Pending",inductionStatus:"Submitted",
-    submittedAt:existingSnap.exists()?(existingSnap.data()?.submittedAt||submittedAt):submittedAt,
-    lastSubmittedAt:submittedAt,updatedAt:submittedAt
-  };
-  await setDoc(requestRef,payload,{merge:true});
-  await setDoc(doc(activeDb,COLLECTIONS.inductionRecords,uid),{
-    uid,email:context.email,fullName:context.fullName,verifiedEmail:String(form.verifiedEmail||context.email||"").trim().toLowerCase(),verifiedFullName:String(form.verifiedFullName||context.fullName||"").trim(),systemRoles:context.roles,systemRole:context.role,
-    systemDepartment:context.department||null,systemUnit:context.unit||null,boardMember:context.boardMember,
-    accountType:payload.accountType,orientationModules:payload.orientationModules,answers:payload.answers,
-    declaration:payload.declaration,status:"Submitted",inductionStatus:"Submitted",roleAssignmentStatus:"Pending",
-    submittedAt,lastSubmittedAt:submittedAt,updatedAt:submittedAt
-  },{merge:true});
-  if(!context.anonymous) await writeAudit("INDUCTION_APPLICATION_SUBMITTED",COLLECTIONS.registrationRequests,uid,{
-    applicantEmail:context.email,roles:context.roles,department:payload.requestedDepartment||null,unit:payload.requestedUnit||null,
-    boardMember:context.boardMember,accountType:payload.accountType
-  });
+  // Root submission path: the browser no longer writes registrationRequests/inductionRecords
+  // and no longer performs a second client-side routing call. One authenticated callable
+  // is the authoritative receiver, scorer, reporter and router.
+  const call=httpsCallable(getFunctions(context?.anonymous?applicantApp:undefined,"us-central1"),"submitInductionApplication");
   try{
-    const routeCall=httpsCallable(getFunctions(context?.anonymous?applicantApp:undefined,"us-central1"),"routeInductionApplication");
-    const routed=await routeCall({requestId:uid});
-    return {alreadyLinked:false,requestId:uid,status:payload.status,...(routed.data||{})};
-  }catch(routeError){
-    return {alreadyLinked:false,requestId:uid,status:payload.status,routingStatus:"Routing Pending",routingError:routeError?.message||"Administrator routing could not be completed yet."};
+    const result=await call({
+      form:{...form,verifiedEmail:email,verifiedFullName:String(form.verifiedFullName||context.fullName||"").trim()},
+      context:{
+        uid,email,fullName:String(form.verifiedFullName||context.fullName||"").trim(),
+        anonymous:Boolean(context.anonymous),roles:context.roles,role:context.role,
+        department:context.department,unit:context.unit,employmentType:context.employmentType,
+        accountType:context.accountType,boardMember:Boolean(context.boardMember),
+        invitationId:context.invitationId||""
+      }
+    });
+    return result.data||{ok:true,requestId:uid};
+  }catch(error){
+    throw new Error(error?.message||"The Induction & Orientation application could not be received by the administrator system.");
   }
-
 }
 
 export async function getInductionRegistrationRequests(){
