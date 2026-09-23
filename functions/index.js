@@ -240,6 +240,30 @@ exports.routeInductionApplication = onCall({region:"us-central1"}, async request
   return {ok:true,routingStatus,accuracyPercentage:score.percentage,systemSummary:summary,feedbackQueued:Boolean(emailId),advanced:score.advanced};
 });
 
+exports.getInductionApplicationReception = onCall({region:"us-central1"}, async request => {
+  const adminUid=request.auth?.uid;
+  if(!adminUid) throw new HttpsError("unauthenticated","Administrator authentication is required.");
+  const adminSnap=await db.collection("adminProfiles").doc(adminUid).get();
+  const actorEmail=String(request.auth?.token?.email||adminSnap.data()?.email||"").trim().toLowerCase();
+  if(actorEmail!=="irpa2412@gmail.com" && (!adminSnap.exists || adminSnap.data()?.active!==true)) throw new HttpsError("permission-denied","Administrator authorization is required.");
+
+  const [requestSnap,inductionSnap]=await Promise.all([
+    db.collection("registrationRequests").orderBy("lastSubmittedAt","desc").limit(100).get(),
+    db.collection("inductionRecords").orderBy("lastSubmittedAt","desc").limit(100).get()
+  ]);
+  const rows=new Map();
+  for(const d of requestSnap.docs) rows.set(d.id,{id:d.id,...d.data(),_source:"registrationRequests"});
+  for(const d of inductionSnap.docs){
+    if(!rows.has(d.id)) rows.set(d.id,{id:d.id,...d.data(),_source:"inductionRecords",recoveryRequired:true,status:d.data()?.status||"Submitted",routingStatus:d.data()?.routingStatus||null});
+  }
+  const applications=[...rows.values()].sort((a,b)=>{
+    const ta=a.lastSubmittedAt?.toMillis?.()||a.submittedAt?.toMillis?.()||0;
+    const tb=b.lastSubmittedAt?.toMillis?.()||b.submittedAt?.toMillis?.()||0;
+    return tb-ta;
+  });
+  return {ok:true,applications,checkedCollections:["registrationRequests","inductionRecords"],retrievedAt:new Date().toISOString()};
+});
+
 exports.processInductionApplicationAdmin = onCall({region:"us-central1"}, async request => {
   const adminUid=request.auth?.uid;
   if(!adminUid) throw new HttpsError("unauthenticated","Administrator authentication is required.");
