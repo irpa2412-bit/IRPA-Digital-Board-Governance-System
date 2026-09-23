@@ -1222,3 +1222,21 @@
   color:#3f5149!important;
   font-weight:600!important;
 }
+
+/* Trial reset controls: selected reset must provide unmistakable touch/click feedback. */
+.content-area .page button[aria-pressed="true"]{
+  background:#8f1d15!important;
+  color:#fff!important;
+  border-color:#f0a19a!important;
+  box-shadow:0 0 0 2px rgba(240,161,154,.18),0 5px 14px rgba(180,35,24,.22)!important;
+}
+.content-area .page button[aria-pressed="true"]:active{
+  transform:translateY(1px)!important;
+  filter:brightness(.96)!important;
+}
+@media(max-width:760px){
+  .content-area .page .form-actions button{
+    min-height:48px;
+    touch-action:manipulation;
+  }
+}
