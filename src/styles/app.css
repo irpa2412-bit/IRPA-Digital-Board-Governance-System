@@ -1169,3 +1169,56 @@
 .content-area.dashboard-content-area .page .dashboard-feed-title button{
   color:#326d9f!important;
 }
+
+/* FINAL DASHBOARD TEXT CONTRAST — force readable wording on every dashboard tile/feed.
+   Decorative category accents remain; typography is never pale on pale surfaces. */
+.dashboard-content-area .dashboard-gauge,
+.dashboard-content-area .dashboard-function-button{
+  background:#ffffff!important;
+  color:#182a22!important;
+}
+.dashboard-content-area .dashboard-gauge *,
+.dashboard-content-area .dashboard-function-button *{
+  text-shadow:none!important;
+}
+.dashboard-content-area .dashboard-gauge>span:not(.dashboard-gauge-icon),
+.dashboard-content-area .dashboard-function-button>span{
+  color:#182a22!important;
+  font-weight:850!important;
+}
+.dashboard-content-area .dashboard-gauge>strong,
+.dashboard-content-area .dashboard-function-button>b{
+  color:#14231d!important;
+  font-weight:900!important;
+}
+.dashboard-content-area .dashboard-gauge>small,
+.dashboard-content-area .dashboard-function-button>small{
+  color:#3f5149!important;
+  font-weight:650!important;
+}
+.dashboard-content-area .dashboard-gauge .dashboard-gauge-icon,
+.dashboard-content-area .dashboard-function-button .dashboard-function-icon{
+  background:#edf3f0!important;
+  color:#245f48!important;
+}
+.dashboard-content-area .dashboard-feed{
+  background:#ffffff!important;
+  color:#182a22!important;
+  border:1px solid #d7e1dc!important;
+}
+.dashboard-content-area .dashboard-feed *{
+  text-shadow:none!important;
+}
+.dashboard-content-area .dashboard-feed .dashboard-feed-title,
+.dashboard-content-area .dashboard-feed .dashboard-feed-title span{
+  color:#182a22!important;
+  font-weight:850!important;
+}
+.dashboard-content-area .dashboard-feed .dashboard-feed-title button{
+  color:#245f48!important;
+  font-weight:800!important;
+}
+.dashboard-content-area .dashboard-feed .dashboard-empty{
+  color:#3f5149!important;
+  font-weight:600!important;
+}
