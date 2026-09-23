@@ -796,3 +796,44 @@
   background:#0b3d70!important;
   border-color:#6ea6d2!important;
 }
+
+/* QUICK ACCESS CATEGORY COLOUR SYSTEM — muted fills, white/dark readable text.
+   Purple = people; teal = process/operations; amber = risk/compliance;
+   blue = information/reporting; coral = finance/procurement. */
+.content-area .page .dashboard-function-button.function-category-people{
+  background:#eee9f7!important;border-color:#d8cdea!important;color:#3f3157!important;
+}
+.content-area .page .dashboard-function-button.function-category-process{
+  background:#e3f2f0!important;border-color:#c2ded9!important;color:#234e4a!important;
+}
+.content-area .page .dashboard-function-button.function-category-risk{
+  background:#f7efdc!important;border-color:#e7d5a8!important;color:#654d20!important;
+}
+.content-area .page .dashboard-function-button.function-category-information{
+  background:#e6eff8!important;border-color:#c5d9ec!important;color:#274a68!important;
+}
+.content-area .page .dashboard-function-button.function-category-finance{
+  background:#f8e8e3!important;border-color:#e8c8bd!important;color:#673b31!important;
+}
+.content-area .page .dashboard-function-button.function-category-people span,
+.content-area .page .dashboard-function-button.function-category-process span,
+.content-area .page .dashboard-function-button.function-category-risk span,
+.content-area .page .dashboard-function-button.function-category-information span,
+.content-area .page .dashboard-function-button.function-category-finance span{
+  font-weight:850!important;
+}
+.content-area .page .dashboard-function-button.function-category-people small{color:#675878!important}
+.content-area .page .dashboard-function-button.function-category-process small{color:#4c6f6b!important}
+.content-area .page .dashboard-function-button.function-category-risk small{color:#7b663e!important}
+.content-area .page .dashboard-function-button.function-category-information small{color:#58738d!important}
+.content-area .page .dashboard-function-button.function-category-finance small{color:#7d554a!important}
+.content-area .page .dashboard-function-button.function-category-people .dashboard-function-icon{color:#6f4aa1!important;background:#e2d8f0!important}
+.content-area .page .dashboard-function-button.function-category-process .dashboard-function-icon{color:#287d75!important;background:#d2e9e5!important}
+.content-area .page .dashboard-function-button.function-category-risk .dashboard-function-icon{color:#a06b12!important;background:#f0dfb8!important}
+.content-area .page .dashboard-function-button.function-category-information .dashboard-function-icon{color:#3974a7!important;background:#d4e4f2!important}
+.content-area .page .dashboard-function-button.function-category-finance .dashboard-function-icon{color:#b05b46!important;background:#efd2c8!important}
+.content-area .page .dashboard-function-button.function-category-people:hover{background:#e7def2!important;border-color:#c5b3dd!important}
+.content-area .page .dashboard-function-button.function-category-process:hover{background:#d9ece9!important;border-color:#acd0c9!important}
+.content-area .page .dashboard-function-button.function-category-risk:hover{background:#f3e6c7!important;border-color:#d9c18c!important}
+.content-area .page .dashboard-function-button.function-category-information:hover{background:#dce9f5!important;border-color:#adc9e1!important}
+.content-area .page .dashboard-function-button.function-category-finance:hover{background:#f3ddd6!important;border-color:#d9b3a5!important}
