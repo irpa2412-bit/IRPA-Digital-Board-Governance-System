@@ -87,6 +87,7 @@ export default function App(){
   const params=new URLSearchParams(window.location.search);
   const adminGatewayMode=params.get("adminGateway")==="1";
   const inductionMode=params.get("induction")==="1";
+  const applicantInductionMode=params.get("applicant")==="1";
   const[user,setUser]=useState(undefined),
     [profile,setProfile]=useState(undefined),
     [employee,setEmployee]=useState(null),
