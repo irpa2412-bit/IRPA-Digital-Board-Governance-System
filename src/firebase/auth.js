@@ -231,52 +231,28 @@ export async function sendEmployeeRegistrationEmail(email, employeeNumber) {
   return sendAuthResetEmailWithSecondaryApp(cleanEmail, actionCodeSettings, "employee-registration");
 }
 
-export async function sendMemberInvitationEmail(email, invitationId, role = "", memberType = "") {
+export async function sendMemberInvitationEmail(email, invitationId) {
   if (!email || !invitationId) throw new Error("Member email and invitation ID are required.");
-  const cleanEmail = email.trim().toLowerCase();
-  const gateway = String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL || "https://irpa-google-drive-gateway.irpa-governance.workers.dev").replace(/\/$/,"");
-  const token = await auth.currentUser?.getIdToken();
-  if (!token) throw new Error("Administrator authentication is required.");
-  const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), 30000);
-  let response;
+  const functions=getFunctions(undefined,"us-central1");
+  const call=httpsCallable(functions,"sendMemberInvitation");
   try {
-    response = await fetch(gateway + "/api/invitations/send", {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        invitationId,
-        email: cleanEmail,
-        role: role || "",
-        memberType: memberType || "",
-        subscriptionLink: window.location.origin + "/?induction=1&applicant=1&route=subscription&memberInvite=" + encodeURIComponent(invitationId),
-        loginAssistanceLink: window.location.origin + "/?induction=1&applicant=1&route=assistance&memberInvite=" + encodeURIComponent(invitationId),
-        inductionOrientationLink: window.location.origin + "/?induction=1&applicant=1&route=assistance&memberInvite=" + encodeURIComponent(invitationId),
-        loginLink: window.location.origin + "/?induction=1&applicant=1&route=login"
-      }),
-      signal: controller.signal
-    });
-  } catch (error) {
-    if (error?.name === "AbortError") {
-      throw new Error("IRPA Mail Server did not respond within 30 seconds. The invitation was not confirmed as sent; use Resend after checking the mail server.");
-    }
-    throw new Error(error?.message || "IRPA Mail Server could not be reached.");
-  } finally {
-    window.clearTimeout(timeout);
+    const result=await call({invitationId});
+    return {
+      email:String(result.data?.email||email).trim().toLowerCase(),
+      emailRequested:true,
+      provider:"Firebase mail queue",
+      deliveryStatus:result.data?.deliveryStatus||"Queued in Firebase mail collection",
+      messageId:result.data?.mailQueueId||null,
+      role:result.data?.role||"",
+      memberType:result.data?.memberType||"",
+      sourceLabel:result.data?.sourceLabel||""
+    };
+  } catch(error) {
+    const code=error?.code||"";
+    const message=error?.message||"Firebase could not queue the invitation email.";
+    throw new Error(message+(code?" ("+code+")":""));
   }
-  const result = await response.json().catch(()=>({}));
-  if (!response.ok || !result.ok) {
-    throw new Error(result.error || `IRPA Mail Server rejected the invitation request (HTTP ${response.status}).`);
-  }
-  return {
-    email: cleanEmail,
-    emailRequested: true,
-    provider: "IRPA Mail Server",
-    deliveryStatus: result.deliveryStatus || "Submitted to mail.irpa.or.tz",
-    messageId: result.messageId || null
-  };
 }
-
 export function observeAuthState(callback) {
   return onAuthStateChanged(auth, callback);
 }
