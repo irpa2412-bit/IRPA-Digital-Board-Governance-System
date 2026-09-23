@@ -231,33 +231,42 @@ export async function sendEmployeeRegistrationEmail(email, employeeNumber) {
   return sendAuthResetEmailWithSecondaryApp(cleanEmail, actionCodeSettings, "employee-registration");
 }
 
-export async function sendMemberInvitationEmail(email, invitationId) {
+export async function sendMemberInvitationEmail(email, invitationId, role = "", memberType = "") {
   if (!email || !invitationId) throw new Error("Member email and invitation ID are required.");
-  const functions=getFunctions(undefined,"us-central1");
-  const call=httpsCallable(functions,"sendMemberInvitation");
+  const cleanEmail = String(email).trim().toLowerCase();
+  const origin = window.location.origin;
+  const continueUrl = origin + "/?induction=1&applicant=1&route=subscription&memberInvite=" + encodeURIComponent(invitationId);
+
+  // Mail delivery is intentionally delegated to Firebase Authentication's
+  // configured custom SMTP relay. This removes the invitation-mail path from
+  // Cloud Functions/Cloud Build/Artifact Registry while retaining the
+  // configured IRPA SMTP server (mail.irpa.or.tz) at the Firebase Auth layer.
+  const actionCodeSettings = {
+    url: continueUrl,
+    handleCodeInApp: false
+  };
+
   try {
-    const result=await call({invitationId});
+    const result = await sendAuthResetEmailWithSecondaryApp(
+      cleanEmail,
+      actionCodeSettings,
+      "member-invitation"
+    );
+
     return {
-      email:String(result.data?.email||email).trim().toLowerCase(),
-      emailRequested:true,
-      provider:"Firebase mail queue → SMTP transport",
-      deliveryStatus:result.data?.deliveryStatus||"Queued — awaiting SMTP transport",
-      messageId:result.data?.mailQueueId||null,
-      role:result.data?.role||"",
-      memberType:result.data?.memberType||"",
-      sourceLabel:result.data?.sourceLabel||""
+      email: cleanEmail,
+      emailRequested: true,
+      provider: "Firebase Authentication → configured IRPA custom SMTP",
+      deliveryStatus: "Accepted by Firebase Authentication → configured SMTP relay",
+      messageId: null,
+      role: String(role || "").trim(),
+      memberType: String(memberType || "").trim(),
+      sourceLabel: "Authoritative IRPA Register"
     };
-  } catch(error) {
-    const code=error?.code||"";
-    const rawMessage=String(error?.message||"Firebase could not process the invitation email.");
-    const friendly = code === "functions/internal"
-      ? "Firebase could not execute the invitation mail service. The server-side mail function is not currently available. No email was released. Please complete the Firebase Cloud Functions deployment before retrying."
-      : code === "functions/unavailable"
-        ? "The IRPA invitation mail service is temporarily unavailable. No email was released. Please retry after the Firebase mail service is online."
-        : code === "functions/failed-precondition"
-          ? rawMessage
-          : rawMessage;
-    throw new Error(friendly+(code&&code!=="functions/internal"&&code!=="functions/unavailable"?" ("+code+")":""));
+  } catch (error) {
+    const rawMessage = String(error?.message || "Firebase Authentication could not request the invitation email.");
+    const code = error?.code || "";
+    throw new Error(code ? rawMessage + " (" + code + ")" : rawMessage);
   }
 }
 export function observeAuthState(callback) {
