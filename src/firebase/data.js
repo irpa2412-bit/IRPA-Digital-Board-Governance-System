@@ -215,6 +215,18 @@ export async function getInductionRegistrationRequests(){
   const snap=await getDocs(collection(db,COLLECTIONS.registrationRequests)); return snap.docs.map(x=>({id:x.id,...x.data()})).sort((a,b)=>{const ta=a.lastSubmittedAt?.toMillis?.()||a.submittedAt?.toMillis?.()||0;const tb=b.lastSubmittedAt?.toMillis?.()||b.submittedAt?.toMillis?.()||0;return tb-ta;});
 }
 
+export async function processInductionRegistrationAdmin(requestId){
+  await requireActiveAdmin();
+  if(!requestId) throw new Error("An induction registration request is required.");
+  const call=httpsCallable(getFunctions(undefined,"us-central1"),"processInductionApplicationAdmin");
+  try{
+    const result=await call({requestId});
+    return result.data;
+  }catch(error){
+    throw new Error(error?.message||"The administrator could not process the pending induction application.");
+  }
+}
+
 export async function rejectInductionRegistration(requestId,reason){
   await requireActiveAdmin();
   if(!requestId) throw new Error("An induction registration request is required.");
