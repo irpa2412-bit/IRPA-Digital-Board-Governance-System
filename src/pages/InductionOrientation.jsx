@@ -98,7 +98,7 @@ function ChoiceField({label,value,onChange,options,help,disabled=false,required=
 
 export default function InductionOrientation(){
  const[context,setContext]=useState(null),[busy,setBusy]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState("");const feedbackRef=useRef(null);const formRef=useRef(null);
- const[form,setForm]=useState({identityConfirmation:"",accountType:"",primaryRole:"",department:"",unit:"",employmentType:"",orientationModules:[],q1:"",q2:"",q3:"",q4:"",q5:"",q6:"",comments:"",declaration:false,verifiedEmail:"",verifiedFullName:"",credentialCapacity:"",credentialRole:"",credentialInvitationReference:""});
+ const[form,setForm]=useState({identityConfirmation:"",accountType:"",primaryRole:"",selectedRoles:[],department:"",unit:"",employmentType:"",orientationModules:[],q1:"",q2:"",q3:"",q4:"",q5:"",q6:"",comments:"",declaration:false,verifiedEmail:"",verifiedFullName:"",credentialCapacity:"",credentialRole:"",credentialInvitationReference:""});
 
  useEffect(()=>{let live=true;(async()=>{
   const params=new URLSearchParams(window.location.search);
@@ -112,10 +112,11 @@ export default function InductionOrientation(){
    setContext(c);
    const prior=c.existingRequest?.answers||{};
    const priorModules=Array.isArray(c.existingRequest?.orientationModules)?c.existingRequest.orientationModules:[];
+   const priorRoles=Array.isArray(c.existingRequest?.answers?.selectedRoles)?c.existingRequest.answers.selectedRoles:[];
    setForm({
     identityConfirmation:prior.identityConfirmation||"",
     accountType:prior.accountType||c.accountType||"",
-    primaryRole:prior.primaryRole||c.roles[0]||"",
+    primaryRole:prior.primaryRole||c.roles[0]||"",selectedRoles:priorRoles.length?priorRoles:(c.roles||[]),
     department:prior.department||c.department||"",
     unit:prior.unit||c.unit||"",
     employmentType:prior.employmentType||c.employmentType||"",
@@ -139,12 +140,12 @@ export default function InductionOrientation(){
  const moduleOptions=useMemo(()=>orientationModules(form.primaryRole||context?.role||""),[form.primaryRole,context]);
  const questions=useMemo(()=>questionSet(form.primaryRole||context?.role||"",form.department,form.q1,context,form),[form.primaryRole,form.department,form.q1,context,form.accountType,form.unit,form.employmentType]);
  const linked=String(context?.existingRequest?.status||"")==="Linked"||String(context?.existingRequest?.roleAssignmentStatus||"")==="Linked";
- const pending=Boolean(context?.existingRequest&&!linked);const completedFields=[form.accountType,form.identityConfirmation,form.verifiedEmail,form.verifiedFullName,form.primaryRole,form.department,form.unit,form.employmentType,form.orientationModules.length,form.q1,form.q2,form.q3,form.q4,form.q5,form.q6,form.declaration].filter(Boolean).length;const progress=Math.round((completedFields/17)*100);
+ const pending=Boolean(context?.existingRequest&&!linked);const completedFields=[form.accountType,form.identityConfirmation,form.verifiedEmail,form.verifiedFullName,form.primaryRole,form.selectedRoles.length,form.department,form.unit,form.employmentType,form.orientationModules.length,form.q1,form.q2,form.q3,form.q4,form.q5,form.q6,form.declaration].filter(Boolean).length;const progress=Math.round((completedFields/17)*100);
 
  function patch(name,value){
   setForm(x=>{
    const next={...x,[name]:value};
-   if(name==="primaryRole"){next.q1="";next.q2="";next.q3="";next.orientationModules=orientationModules(value);}
+   if(name==="primaryRole"){next.q1="";next.q2="";next.q3="";next.orientationModules=orientationModules(value);if(!next.selectedRoles.includes(value))next.selectedRoles=[...next.selectedRoles,value];}
    if(name==="department"){next.unit="";next.q3="";}
    if(name==="verifiedEmail"||name==="verifiedFullName"){const invitationMatch=(context?.invitations||[]).find(x=>String(x.email||"").toLowerCase()===String(next.verifiedEmail||"").toLowerCase()&&String(x.name||"").trim().toLowerCase()===String(next.verifiedFullName||"").trim().toLowerCase());const registerMatch=[...registerEmployees,...registerMembers].find(x=>String(x.email||"").toLowerCase()===String(next.verifiedEmail||"").toLowerCase()&&(String(x.name||"").trim().toLowerCase()===String(next.verifiedFullName||"").trim().toLowerCase()||!next.verifiedFullName));const match=registerMatch||invitationMatch;if(match){next.primaryRole=match.role||next.primaryRole;next.department=match.department||next.department;next.unit=match.unit||next.unit;next.employmentType=match.employmentType||next.employmentType;}}if(name==="q1")next.q2="";
    return next;
@@ -160,11 +161,11 @@ if(form.identityConfirmation!=="Yes"){setError(context.anonymous?"Please confirm
   if(!form.verifiedEmail||!form.verifiedFullName){setError("Please provide the applicant email and full name so the system can score the application and send the required feedback.");return}
   setSaving(true);setMessage("Submitting your Induction and Orientation application… Please wait for the administrator-routing confirmation.");
   try{
-   const submissionContext={...context,email:String(form.verifiedEmail||context.email||"").trim().toLowerCase(),fullName:String(form.verifiedFullName||context.fullName||"").trim(),role:form.primaryRole,roles:form.primaryRole?[form.primaryRole]:[],department:form.department,unit:form.unit,employmentType:form.employmentType,accountType:form.accountType,boardMember:roleFamily(form.primaryRole)==="Board Member"};const result=await submitInductionApplication(form,submissionContext);
+   const submissionContext={...context,email:String(form.verifiedEmail||context.email||"").trim().toLowerCase(),fullName:String(form.verifiedFullName||context.fullName||"").trim(),role:form.primaryRole,roles:form.selectedRoles.length?form.selectedRoles:(context.roles||[form.primaryRole]).filter(Boolean),department:form.department,unit:form.unit,employmentType:form.employmentType,accountType:form.accountType,boardMember:roleFamily(form.primaryRole)==="Board Member"};const result=await submitInductionApplication(form,submissionContext);
    if(result.alreadyLinked){setMessage("Your induction has already been approved and linked by an administrator.");return}
    const submittedEmail=String(form.verifiedEmail||"").trim();
 const clearSubmittedForm=()=>{
- setForm({identityConfirmation:"",accountType:"",primaryRole:"",department:"",unit:"",employmentType:"",orientationModules:[],q1:"",q2:"",q3:"",q4:"",q5:"",q6:"",comments:"",declaration:false,verifiedEmail:"",verifiedFullName:"",credentialCapacity:"",credentialRole:"",credentialInvitationReference:""});
+ setForm({identityConfirmation:"",accountType:"",primaryRole:"",selectedRoles:[],department:"",unit:"",employmentType:"",orientationModules:[],q1:"",q2:"",q3:"",q4:"",q5:"",q6:"",comments:"",declaration:false,verifiedEmail:"",verifiedFullName:"",credentialCapacity:"",credentialRole:"",credentialInvitationReference:""});
  setNameQuery("");setEmailQuery("");
  if(formRef.current)formRef.current.reset();
 };
@@ -199,7 +200,19 @@ const clearSubmittedForm=()=>{
    <div className="detail-grid" style={{alignItems:"stretch"}}>
     <div className="form-field"><label>FULL NAME</label><input type="text" value={form.verifiedFullName||context.fullName||""} onChange={e=>patch("verifiedFullName",e.target.value)} placeholder="Enter or select your full name" autoComplete="name" style={{pointerEvents:"auto",cursor:"text"}}/><small className="field-help">This field is editable. Registered information is used as a prompt, not as a frozen value.</small></div>
     <ChoiceField label="REGISTERED CAPACITY" value={form.accountType||context.accountType||""} onChange={v=>patch("accountType",v)} options={accountTypeOptions.length?accountTypeOptions:["Member","Employee","Employee & Member"]} help="Tap the field and choose a prompted capacity, or type it."/>
-    <ChoiceField label="REGISTERED ROLE(S)" value={form.primaryRole||String(context.role||"").split(" • ")[0]} onChange={v=>patch("primaryRole",v)} options={roleOptions} help="Tap the field to see role suggestions."/>
+    <ChoiceField label="PRIMARY REGISTERED ROLE" value={form.primaryRole||String(context.role||"").split(" • ")[0]} onChange={v=>patch("primaryRole",v)} options={roleOptions} help="Select the principal role for this induction record."/>
+    <div className="form-field form-field-wide">
+      <label>ALL REGISTERED ROLES / CAPACITIES</label>
+      <div className="dashboard-grid">
+        {roleOptions.map(role=>(
+          <label key={role} className="stat-card" style={{cursor:"pointer",display:"flex",gap:10,alignItems:"center"}}>
+            <input type="checkbox" checked={form.selectedRoles.includes(role)} onChange={()=>setForm(v=>({...v,selectedRoles:v.selectedRoles.includes(role)?v.selectedRoles.filter(x=>x!==role):[...v.selectedRoles,role]}))}/>
+            <span><strong>{role}</strong><small style={{display:"block",opacity:.7}}>Authorization role</small></span>
+          </label>
+        ))}
+      </div>
+      <small className="field-help">Roles are prompted from the IRPA Employee and Board Member registers. Selecting a role here does not create a new role; it confirms the institutional roles already associated with this identity.</small>
+    </div>
     <ChoiceField label="DEPARTMENT" value={form.department||context.department||""} onChange={v=>patch("department",v)} options={departmentOptions} help="Department suggestions are retrieved from the IRPA structure."/>
     <ChoiceField label="UNIT" value={form.unit||context.unit||""} onChange={v=>patch("unit",v)} options={unitOptions} help="Unit suggestions respond to the selected department."/>
     <ChoiceField label="BOARD MEMBER" value={form.identityConfirmation||""} onChange={v=>patch("identityConfirmation",v)} options={["Yes","No"]} help={context.boardMember?"Retrieved record indicates Board Member: Yes. Confirm above.":"Retrieved record indicates Board Member: No. Confirm above."}/>
