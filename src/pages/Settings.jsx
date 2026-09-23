@@ -213,7 +213,7 @@ export default function Settings({ admin = false, section = "settings" }) {
         </section>
       )}
 
-      <section className="panel" style={{ marginTop: admin ? 20 : 0 }}>
+      {section === "settings" && (\n      <section className="panel" style={{ marginTop: admin ? 20 : 0 }}>
         <div className="panel-header">
           <div>
             <span className="eyebrow">SYSTEM SETTINGS</span>
@@ -245,9 +245,9 @@ export default function Settings({ admin = false, section = "settings" }) {
           </div>
         )}
         {message && <div className="auth-message" style={{ marginTop: 16 }}>{message}</div>}
-      </section>
+      </section>\n      )}
 
-      {admin && (
+      {admin && section === "settings" && (
         <section className="panel" style={{ marginTop: 20 }}>
           <div className="panel-header">
             <div>
