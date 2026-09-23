@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import { auth } from "../firebase/config";
-import { createRecord, COLLECTIONS } from "../firebase/data";
+import { createRecord, COLLECTIONS, getCurrentMemberProfile, getCurrentEmployeeProfile } from "../firebase/data";
 import { readWorkflowContext, withWorkflowLinks } from "../firebase/workflowLinks";
 import { uploadBytes, ref, ensureDocumentArchiveFolder } from "../firebase/signatureStorage";
 
@@ -9,6 +9,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
   const [title, setTitle] = useState("");
   const [reference, setReference] = useState("");
   const [documentType, setDocumentType] = useState("Governance Document");
+  const [allowDualRoleDocumentTypes, setAllowDualRoleDocumentTypes] = useState(false);
   const [version, setVersion] = useState("1.0");
   const [archiveCategory, setArchiveCategory] = useState("Administrative Documents");
   const [classification, setClassification] = useState("Public");
@@ -16,6 +17,38 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [member, employee] = await Promise.all([
+          getCurrentMemberProfile().catch(() => null),
+          getCurrentEmployeeProfile().catch(() => null)
+        ]);
+        const values = [
+          member?.role,
+          ...(Array.isArray(member?.roles) ? member.roles : []),
+          ...(Array.isArray(member?.assignedRoles) ? member.assignedRoles : []),
+          ...(Array.isArray(member?.selectedRoles) ? member.selectedRoles : []),
+          ...(Array.isArray(member?.roleAssignments) ? member.roleAssignments : []),
+          employee?.role,
+          ...(Array.isArray(employee?.roles) ? employee.roles : []),
+          ...(Array.isArray(employee?.assignedRoles) ? employee.assignedRoles : []),
+          ...(Array.isArray(employee?.selectedRoles) ? employee.selectedRoles : []),
+          ...(Array.isArray(employee?.roleAssignments) ? employee.roleAssignments : [])
+        ].flatMap(v => String(v || "").split(",").map(x => x.trim()).filter(Boolean));
+        const normalized = new Set(values.map(v => v.toLowerCase()));
+        const dualRole =
+          normalized.has("board secretary") &&
+          normalized.has("executive director");
+        if (!cancelled) setAllowDualRoleDocumentTypes(dualRole);
+      } catch (_) {
+        if (!cancelled) setAllowDualRoleDocumentTypes(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   function chooseFile() {
     setError("");
@@ -161,7 +194,30 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
             <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Enter document title" />
           </div>
           <div className="form-field"><label>Document Reference / Identification No.</label><input value={reference} onChange={e => setReference(e.target.value)} placeholder="Enter document reference / identification number" /></div>
-          <div className="form-field"><label>Document Type</label><input value={documentType} onChange={e => setDocumentType(e.target.value)} placeholder="e.g. Policy, Invoice, Procurement Record" /></div>
+          <div className="form-field">
+            <label>Document Type</label>
+            {allowDualRoleDocumentTypes ? (
+              <select
+                value={documentType}
+                onChange={e => setDocumentType(e.target.value)}
+                aria-label="Document Type"
+              >
+                <option>Governance Document</option>
+                <option>Administrative Document</option>
+              </select>
+            ) : (
+              <input
+                value={documentType}
+                onChange={e => setDocumentType(e.target.value)}
+                placeholder="e.g. Policy, Invoice, Procurement Record"
+              />
+            )}
+            {allowDualRoleDocumentTypes && (
+              <small className="muted" style={{display:"block",marginTop:6}}>
+                Dual-role access: Governance and Administrative document types are available.
+              </small>
+            )}
+          </div>
           <div className="form-field"><label>Version</label><input value={version} onChange={e => setVersion(e.target.value)} placeholder="e.g. 1.0" />
           </div>
           <div className="form-field">
