@@ -102,6 +102,7 @@ export async function submitInductionApplication(form,context){
       identityConfirmation:form.identityConfirmation||"",verifiedEmail:String(form.verifiedEmail||context.email||"").trim().toLowerCase(),verifiedFullName:String(form.verifiedFullName||context.fullName||"").trim(),accountType:form.accountType||"",primaryRole:form.primaryRole||"",
       department:form.department||"",unit:form.unit||"",employmentType:form.employmentType||"",
       orientationModules:Array.isArray(form.orientationModules)?form.orientationModules:[],
+      credentialCapacity:form.credentialCapacity||"",credentialRole:form.credentialRole||"",credentialInvitationReference:String(form.credentialInvitationReference||"").trim(),
       q1:form.q1||"",q2:form.q2||"",q3:form.q3||"",q4:form.q4||"",q5:form.q5||"",q6:form.q6||"",comments:String(form.comments||"").trim()
     },
     completedSteps:Array.isArray(form.completedSteps)?form.completedSteps:[],
