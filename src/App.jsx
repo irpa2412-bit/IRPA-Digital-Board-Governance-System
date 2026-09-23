@@ -32,6 +32,9 @@ function SignerShell({user,profile,signingEnvelopeId}){
   return <div className="app-shell">
     <aside className="sidebar">
       <div className="sidebar-brand">
+        <div className="sidebar-brand-logo-wrap" aria-label="IRPA logo">
+          <img className="sidebar-brand-logo" src="/irpa-logo.jpg" alt="IRPA" />
+        </div>
         <div className="sidebar-brand-copy">
           <strong>IRPA</strong>
           <span>Digital Governance</span>
