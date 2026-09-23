@@ -155,13 +155,7 @@ export async function linkInductionRegistration(requestId){
   const requestedUnit=String(request.requestedUnit||request.answers?.unit||"").trim();
   const requestedEmploymentType=String(request.employmentType||request.answers?.employmentType||"").trim();
   if(!memberSnap.exists()&&!employeeSnap.exists()){
-    if(requestedAccountType==="member"){
-      await createMemberProfile(uid,{email:applicantEmail,name:applicantName,role:requestedRole,roles:[requestedRole],department:requestedDepartment,unit:requestedUnit,memberType:requestedRole==="Board Member"?"Board Member":"Governance Member",employmentType:requestedEmploymentType,status:"Active",registrationStatus:"Registered — Account Pending Administrator LINK",boardMember:/board member/i.test(requestedRole),inductionStatus:"Pending LINK"});
-      memberSnap=await getDoc(memberRef);
-    }else if(requestedAccountType==="employee"){
-      await createEmployeeProfile({uid,email:applicantEmail,name:applicantName,role:requestedRole,roles:[requestedRole],department:requestedDepartment,unit:requestedUnit,employmentType:requestedEmploymentType,status:"Active",registrationStatus:"Registered — Account Pending Administrator LINK",boardMember:/board member/i.test(requestedRole),inductionStatus:"Pending LINK"});
-      employeeSnap=await getDoc(employeeRef);
-    }else throw new Error("The applicant capacity is missing. Select Member or Employee before LINK.");
+    throw new Error("The induction application is not linked to an administrator-registered Member or Employee record. Register the person first, then use Induction and Orientation as login assistance.");
   }
   const member=memberSnap.exists()?memberSnap.data():{};
   const employee=employeeSnap.exists()?employeeSnap.data():{};
