@@ -1,9 +1,8 @@
-const { onDocumentCreated, onDocumentUpdated } = require("firebase-functions/v2/firestore");
+const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getMessaging } = require("firebase-admin/messaging");
-const nodemailer = require("nodemailer");
 const crypto = require("crypto");
 initializeApp(); const db = getFirestore();
 async function stableId(v){return crypto.createHash("sha256").update(String(v)).digest("hex");}
@@ -119,60 +118,6 @@ exports.fetchInductionMatchingRecords = onCall({region:"us-central1"}, async req
     exactNameMatch:Boolean([...employees,...members].some(x=>String(x.name||"").trim().toLowerCase()===name))
   };
 });
-
-async function deliverQueuedMail(mailId, mailData){
-  const host=String(process.env.IRPA_SMTP_HOST||"mail.irpa.or.tz").trim();
-  const port=Number(process.env.IRPA_SMTP_PORT||465);
-  const secure=String(process.env.IRPA_SMTP_SECURE||"true").toLowerCase()!=="false";
-  const user=String(process.env.IRPA_SMTP_USER||"").trim();
-  const pass=String(process.env.IRPA_SMTP_PASSWORD||"");
-  const from=String(process.env.IRPA_SMTP_FROM||user||"").trim();
-  if(!host) throw new Error("IRPA SMTP host is not configured.");
-  if(!from) throw new Error("IRPA SMTP sender address is not configured.");
-  const transporter=nodemailer.createTransport({host,port,secure,auth:user?{user,pass}:undefined,connectionTimeout:15000,greetingTimeout:15000,socketTimeout:20000});
-  const msg=mailData.message||{};
-  const info=await transporter.sendMail({from,to:mailData.to,subject:msg.subject||"IRPA Notification",text:msg.text||"",html:msg.html||undefined});
-  await db.collection("mail").doc(mailId).set({
-    deliveryStatus:"Sent",
-    deliveryProvider:"SMTP → "+host,
-    providerMessageId:info.messageId||null,
-    acceptedRecipients:Array.isArray(info.accepted)?info.accepted:[],
-    rejectedRecipients:Array.isArray(info.rejected)?info.rejected:[],
-    sentAt:FieldValue.serverTimestamp(),
-    lastAttemptAt:FieldValue.serverTimestamp(),
-    attemptCount:FieldValue.increment(1),
-    error:null,
-    updatedAt:FieldValue.serverTimestamp()
-  },{merge:true});
-  return info;
-}
-
-exports.processIRPAMailQueue = onDocumentCreated("mail/{mailId}", async event => {
-  const mailId=event.params.mailId;
-  const data=event.data?.data();
-  if(!data) return;
-  const ref=db.collection("mail").doc(mailId);
-  await ref.set({deliveryStatus:"Processing",lastAttemptAt:FieldValue.serverTimestamp(),attemptCount:FieldValue.increment(1),updatedAt:FieldValue.serverTimestamp()},{merge:true});
-  try {
-    await deliverQueuedMail(mailId,data);
-  } catch(error) {
-    const message=String(error?.message||error||"Unknown SMTP error");
-    await ref.set({deliveryStatus:"Failed",deliveryProvider:"SMTP → "+String(process.env.IRPA_SMTP_HOST||"mail.irpa.or.tz"),error:message,lastAttemptAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()},{merge:true});
-    console.error("IRPA mail delivery failed", {mailId,to:data.to,error:message});
-  }
-});
-
-async function queueInductionEmail(to,subject,text,html){
-  const recipient=String(to||"").trim().toLowerCase();
-  if(!recipient||!recipient.includes("@")) return null;
-  const ref=await db.collection("mail").add({
-    to:recipient,
-    message:{subject,text,html},
-    source:"IRPA Induction & Orientation",
-    createdAt:FieldValue.serverTimestamp()
-  });
-  return ref.id;
-}
 
 function scoreInductionApplication(item, records){
   const clean=v=>String(v||"").trim().toLowerCase();
