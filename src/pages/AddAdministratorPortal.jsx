@@ -15,7 +15,9 @@ export default function AddAdministratorPortal(){
   try{
    const data=await createAdministrator({name:cleanName,email:cleanEmail,onProgress:message=>setResult({ok:true,working:true,message})});
    setLastEmail(data?.email||cleanEmail);
-   setResult({ok:true,working:false,message:"Administrator account created for "+(data?.email||cleanEmail)+". The secure activation link has been sent."});
+   setResult(data?.emailRequested===false
+    ? {ok:true,working:false,message:"Administrator account created for "+(data?.email||cleanEmail)+", but the activation link was not sent. Use “Resend activation link” after correcting the email-delivery/authorized-domain issue. The account was not lost."}
+    : {ok:true,working:false,message:"Administrator account created for "+(data?.email||cleanEmail)+". The secure activation link has been sent."});
    setName("");setEmail("");await loadAdministrators();
   }catch(error){setResult({ok:false,working:false,message:error?.message||"Unable to add the Administrator. No success confirmation was received."})}
   finally{setBusy(false)}
