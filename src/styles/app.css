@@ -970,3 +970,11 @@
     grid-template-columns:1fr!important;
   }
 }
+
+/* DOCUMENT WORKFLOW — final single card aligns to the far RIGHT of the screen.
+   Desktop layout remains 4 + 4 + 1; the ninth card occupies column 4 on the final row. */
+@media(min-width:1101px){
+  .content-area:not(.dashboard-content-area) .page .workflow-stage-grid > .workflow-stage:last-child{
+    grid-column:4!important;
+  }
+}
