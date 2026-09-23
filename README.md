@@ -66,3 +66,5 @@ firebase deploy
 Before production use, verify Firebase Authentication providers, authorized domains, Firestore rules, and the initial `adminProfiles/{uid}` administrator record in the Firebase Console.
 
 <!-- Induction gateway migration deployment trigger: 2026-09-23 -->
+
+<!-- Sign-in cleanup deployment trigger: 2026-09-23 -->
