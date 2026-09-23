@@ -1244,4 +1244,4 @@
 /* Audit Trail controls: explicit touch/click hit area. */
 .audit-trail-workspace{position:relative;z-index:1}
 .audit-trail-workspace .table-wrapper,.audit-trail-workspace table,.audit-trail-workspace tbody,.audit-trail-workspace tr,.audit-trail-workspace td,.audit-trail-workspace .member-actions{pointer-events:auto!important}
-.audit-trail-workspace .member-actions button{position:relative;z-index:20;pointer-events:auto!important;touch-action:manipulation!important;cursor:pointer!important;min-height:44px}
+.audit-trail-workspace .member-actions button{position:relative;z-index:20;pointer-events:auto!important;touch-action:manipulation!important;cursor:pointer!important;min-height:44px}\n.invitation-action-buttons{position:relative;z-index:20;display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start;pointer-events:auto!important;isolation:isolate}.invitation-action-buttons button{position:relative;z-index:21;pointer-events:auto!important;touch-action:manipulation!important;cursor:pointer!important;min-height:44px;white-space:normal}.invitation-action-buttons .status-badge{align-self:center}
