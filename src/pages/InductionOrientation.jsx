@@ -99,7 +99,7 @@ function ChoiceField({label,value,onChange,options,help,disabled=false,required=
 
 export default function InductionOrientation(){
  const[context,setContext]=useState(null),[busy,setBusy]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState("");const feedbackRef=useRef(null);
- const[form,setForm]=useState({identityConfirmation:"",accountType:"",primaryRole:"",department:"",unit:"",employmentType:"",orientationModules:[],q1:"",q2:"",q3:"",comments:"",declaration:false});
+ const[form,setForm]=useState({identityConfirmation:"",accountType:"",primaryRole:"",department:"",unit:"",employmentType:"",orientationModules:[],q1:"",q2:"",q3:"",q4:"",q5:"",q6:"",comments:"",declaration:false,verifiedEmail:"",verifiedFullName:""});
 
  useEffect(()=>{let live=true;(async()=>{
   try{
@@ -116,14 +116,14 @@ export default function InductionOrientation(){
     unit:prior.unit||c.unit||"",
     employmentType:prior.employmentType||c.employmentType||"",
     orientationModules:priorModules.length?priorModules:orientationModules(c.roles[0]||""),
-    q1:prior.q1||"",q2:prior.q2||"",q3:prior.q3||"",
+    q1:prior.q1||"",q2:prior.q2||"",q3:prior.q3||"",q4:prior.q4||"",q5:prior.q5||"",q6:prior.q6||"",verifiedEmail:prior.verifiedEmail||c.invitation?.email||c.email||"",verifiedFullName:prior.verifiedFullName||c.invitation?.name||c.fullName||"",
     comments:prior.comments||"",declaration:Boolean(c.existingRequest?.declaration)
    });
   }catch(e){if(live)setError(e.message||"Unable to retrieve the IRPA registration and invitation information.");}
   finally{if(live)setBusy(false);}
  })();return()=>{live=false}},[]);
 
- const accountTypeOptions=useMemo(()=>unique(context?.accountTypeOptions||[]),[context]);
+ const invitationOptions=useMemo(()=>context?.invitations||[],[context]);const emailOptions=useMemo(()=>unique([context?.email,...invitationOptions.map(x=>x.email)]),[context,invitationOptions]);const nameOptions=useMemo(()=>unique([context?.fullName,...invitationOptions.map(x=>x.name)]),[context,invitationOptions]);const accountTypeOptions=useMemo(()=>unique(context?.accountTypeOptions||[]),[context]);
  const roleOptions=useMemo(()=>unique(context?.roles||[]),[context]);
  const departmentOptions=useMemo(()=>unique([context?.department,...(context?.invitations||[]).map(x=>x.department)]),[context]);
  const unitOptions=useMemo(()=>{
@@ -134,14 +134,14 @@ export default function InductionOrientation(){
  const moduleOptions=useMemo(()=>orientationModules(form.primaryRole||context?.role||""),[form.primaryRole,context]);
  const questions=useMemo(()=>questionSet(form.primaryRole||context?.role||"",form.department,form.q1),[form.primaryRole,form.department,form.q1]);
  const linked=String(context?.existingRequest?.status||"")==="Linked"||String(context?.existingRequest?.roleAssignmentStatus||"")==="Linked";
- const pending=Boolean(context?.existingRequest&&!linked);const completedFields=[form.accountType,form.identityConfirmation,form.primaryRole,form.department,form.unit,form.employmentType,form.orientationModules.length,form.q1,form.q2,form.q3,form.declaration].filter(Boolean).length;const progress=Math.round((completedFields/11)*100);
+ const pending=Boolean(context?.existingRequest&&!linked);const completedFields=[form.accountType,form.identityConfirmation,form.verifiedEmail,form.verifiedFullName,form.primaryRole,form.department,form.unit,form.employmentType,form.orientationModules.length,form.q1,form.q2,form.q3,form.q4,form.q5,form.q6,form.declaration].filter(Boolean).length;const progress=Math.round((completedFields/17)*100);
 
  function patch(name,value){
   setForm(x=>{
    const next={...x,[name]:value};
    if(name==="primaryRole"){next.q1="";next.q2="";next.q3="";next.orientationModules=orientationModules(value);}
    if(name==="department"){next.unit="";next.q3="";}
-   if(name==="q1")next.q2="";
+   if(name==="verifiedEmail"||name==="verifiedFullName"){const match=(context?.invitations||[]).find(x=>x.email===next.verifiedEmail&&x.name===next.verifiedFullName);if(match){next.primaryRole=match.role||next.primaryRole;next.department=match.department||next.department;next.unit=match.unit||next.unit;next.employmentType=match.employmentType||next.employmentType;}}if(name==="q1")next.q2="";
    return next;
   });
  }
@@ -152,7 +152,7 @@ export default function InductionOrientation(){
   if(!context){setError("The IRPA registration could not be retrieved. The application is blocked.");return}if(pending){setMessage("Your induction application is already awaiting administrator LINK. No duplicate submission is required.");return}
   if(!form.accountType){setError("Please confirm whether you are applying in your registered Employee or Member capacity.");return}
   if(form.identityConfirmation!=="Yes"){setError("You must confirm that the displayed registration and invitation information belongs to you.");return}
-  if(!form.primaryRole||!form.department||!form.unit||!form.employmentType||!form.q1||!form.q2||!form.q3||!form.orientationModules.length||!form.declaration){setError("Please complete all required selections before submitting.");return}
+  if(!form.verifiedEmail||!form.verifiedFullName||!form.primaryRole||!form.department||!form.unit||!form.employmentType||!form.q1||!form.q2||!form.q3||!form.q4||!form.q5||!form.q6||!form.orientationModules.length||!form.declaration){setError("Please complete all required selections before submitting.");return}
   setSaving(true);setMessage("Submitting your Induction and Orientation application… Please wait for the administrator-routing confirmation.");
   try{
    const result=await submitInductionApplication(form,context);
@@ -193,7 +193,7 @@ export default function InductionOrientation(){
   <form onSubmit={submit}>
    <section className="panel">
     <div className="panel-header"><div><span className="eyebrow">STEP 1</span><h2>Applicant Capacity & Identity</h2><p className="panel-description">Your Member/Employee status is retrieved from IRPA records. If both records exist, choose the capacity in which this induction is being completed.</p></div></div>
-    <ChoiceField label="I am applying in my registered capacity as" value={form.accountType} onChange={v=>patch("accountType",v)} options={accountTypeOptions} help="Only capacities already found in your IRPA registration records are offered."/>
+    <ChoiceField label="Select the invitation email registered for you" value={form.verifiedEmail} onChange={v=>patch("verifiedEmail",v)} options={emailOptions} help="Choose the exact email contained in your IRPA invitation."/><ChoiceField label="Select your registered full name" value={form.verifiedFullName} onChange={v=>patch("verifiedFullName",v)} options={nameOptions} help="Choose the exact name attached to your invitation/registration."/><ChoiceField label="I am applying in my registered capacity as" value={form.accountType} onChange={v=>patch("accountType",v)} options={accountTypeOptions} help="Only capacities already found in your IRPA registration records are offered."/>
     <ChoiceField label="Does the system-retrieved identity above belong to you?" value={form.identityConfirmation} onChange={v=>patch("identityConfirmation",v)} options={["Yes","No"]} help="Selecting No blocks submission so the registration/invitation record can be corrected before induction."/>
    </section>
 
@@ -217,7 +217,7 @@ export default function InductionOrientation(){
     <div className="form-grid">
      <ChoiceField label={questions.q1.label} value={form.q1} onChange={v=>patch("q1",v)} options={questions.q1.options}/>
      <ChoiceField label={questions.q2.label} value={form.q2} onChange={v=>patch("q2",v)} options={questions.q2.options} disabled={!form.q1}/>
-     <ChoiceField label={questions.q3.label} value={form.q3} onChange={v=>patch("q3",v)} options={questions.q3.options}/>
+     <ChoiceField label={questions.q3.label} value={form.q3} onChange={v=>patch("q3",v)} options={questions.q3.options}/><ChoiceField label="4. How should an invitation or registration mismatch be handled?" value={form.q4} onChange={v=>patch("q4",v)} options={["Stop and request administrator correction before induction","Continue using an incorrect name or email","Create a second unverified account","Bypass the invitation record"]}/><ChoiceField label="5. Which identity should control access to this governance workspace?" value={form.q5} onChange={v=>patch("q5",v)} options={["My authenticated account matched to the registered invitation","Any email address I choose","Another person's credentials","A shared departmental password"]}/><ChoiceField label="6. What should happen after submission?" value={form.q6} onChange={v=>patch("q6",v)} options={["The application is saved and routed to the Administrator Induction & Orientation portal for review/LINK","The application is deleted","Access is granted without review","The applicant changes the Firestore record directly"]}/>
     </div>
     <div className="form-field" style={{marginTop:16}}><label>Additional orientation comments</label><textarea value={form.comments} onChange={e=>patch("comments",e.target.value)} rows="4" placeholder="Optional comments, questions or support required during induction…"/></div>
    </section>
