@@ -240,8 +240,8 @@ export async function sendMemberInvitationEmail(email, invitationId) {
     return {
       email:String(result.data?.email||email).trim().toLowerCase(),
       emailRequested:true,
-      provider:"Firebase mail queue",
-      deliveryStatus:result.data?.deliveryStatus||"Queued in Firebase mail collection",
+      provider:"Firebase mail queue → SMTP transport",
+      deliveryStatus:result.data?.deliveryStatus||"Queued — awaiting SMTP transport",
       messageId:result.data?.mailQueueId||null,
       role:result.data?.role||"",
       memberType:result.data?.memberType||"",
