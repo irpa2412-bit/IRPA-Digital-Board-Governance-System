@@ -183,3 +183,10 @@
 
 .auth-logo-wrap{width:104px;height:104px;margin:0 auto 14px;border-radius:50%;overflow:hidden;background:#fff;display:grid;place-items:center;box-shadow:0 3px 12px rgba(0,0,0,.14)}.auth-logo{width:100%;height:100%;object-fit:contain;display:block}
 
+
+/* Members & Personnel Portal — approved pale-white workspace */
+.members-personnel-page{background:#fff;color:#26352f;min-height:calc(100vh - 92px);margin:-30px -34px -45px;padding:30px 34px 45px}
+.members-personnel-page .page-header h1{color:#18241f}
+.members-personnel-page .page-header p{color:#687871}
+.members-personnel-page .page-header .eyebrow,.members-personnel-page .page-header span{color:#687871}
+@media(max-width:600px){.members-personnel-page{margin:-18px -18px -24px;padding:18px 18px 24px}}
