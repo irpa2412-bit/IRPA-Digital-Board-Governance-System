@@ -1043,3 +1043,66 @@
 .archive-routing-panel div{
   color:#40564d!important;
 }
+
+/* GOVERNANCE DASHBOARD READABILITY STANDARD — all functional tabs/cards use
+   light surfaces with dark readable wording. Category colour is carried by
+   the icon/accent rather than a saturated full-card background. */
+.dashboard-content-area .dashboard-function-button{
+  background:#ffffff!important;
+  color:#24362f!important;
+  border:1px solid #d7e1dc!important;
+  box-shadow:0 4px 14px rgba(24,61,45,.05)!important;
+}
+.dashboard-content-area .dashboard-function-button>span{
+  color:#203a30!important;
+  font-weight:850!important;
+}
+.dashboard-content-area .dashboard-function-button>small{
+  color:#52675e!important;
+  font-weight:600!important;
+}
+.dashboard-content-area .dashboard-function-button>b{
+  color:#587269!important;
+}
+.dashboard-content-area .dashboard-function-button:hover{
+  background:#f4f8f6!important;
+  border-color:#b9cfc2!important;
+}
+.dashboard-content-area .dashboard-function-button.function-category-people{
+  border-top:3px solid #7a63a8!important;
+}
+.dashboard-content-area .dashboard-function-button.function-category-process{
+  border-top:3px solid #2d8b78!important;
+}
+.dashboard-content-area .dashboard-function-button.function-category-risk{
+  border-top:3px solid #c4863c!important;
+}
+.dashboard-content-area .dashboard-function-button.function-category-information{
+  border-top:3px solid #3d7fb5!important;
+}
+.dashboard-content-area .dashboard-function-button.function-category-finance{
+  border-top:3px solid #b76565!important;
+}
+.dashboard-content-area .dashboard-function-button.function-category-people .dashboard-function-icon{color:#6b5599!important}
+.dashboard-content-area .dashboard-function-button.function-category-process .dashboard-function-icon{color:#247765!important}
+.dashboard-content-area .dashboard-function-button.function-category-risk .dashboard-function-icon{color:#a96f2d!important}
+.dashboard-content-area .dashboard-function-button.function-category-information .dashboard-function-icon{color:#326d9f!important}
+.dashboard-content-area .dashboard-function-button.function-category-finance .dashboard-function-icon{color:#9d5656!important}
+
+/* Dashboard lower information panels are informational, not success states. */
+.dashboard-content-area .dashboard-feed{
+  background:#ffffff!important;
+  color:#263a32!important;
+  border:1px solid #d7e1dc!important;
+  box-shadow:0 4px 14px rgba(24,61,45,.05)!important;
+}
+.dashboard-content-area .dashboard-feed-title{
+  color:#203a30!important;
+}
+.dashboard-content-area .dashboard-feed-title button{
+  color:#326d9f!important;
+  font-weight:800!important;
+}
+.dashboard-content-area .dashboard-empty{
+  color:#596d64!important;
+}
