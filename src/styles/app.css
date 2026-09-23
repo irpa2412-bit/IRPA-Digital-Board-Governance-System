@@ -485,3 +485,90 @@
   color:#17613d;
   border:1px solid #bddbc9;
 }
+
+/* IRPA PORTAL SURFACE STANDARD — NO BLACK/DARK WORKSPACE PANELS.
+   Authenticated portal content must use the approved pale-white presentation.
+   Sidebar, topbar and authentication shell remain architectural chrome. */
+.content-area{
+  background:#f8faf9;
+  color:#26352f;
+}
+.content-area .page{
+  background:transparent;
+  color:#26352f;
+}
+.content-area .page .welcome-panel,
+.content-area .page .module-panel,
+.content-area .page .panel,
+.content-area .page .stat-card,
+.content-area .page .workflow-stage,
+.content-area .page .dashboard-feed,
+.content-area .page .dashboard-function-button,
+.content-area .page .dashboard-gauge,
+.content-area .page .dashboard-hero,
+.content-area .page .mobile-dashboard-search,
+.content-area .page .mobile-dashboard-section,
+.content-area .page .mobile-stat-card{
+  background:#fff;
+  color:#26352f;
+  border-color:#d8e3dd;
+  box-shadow:0 5px 18px rgba(24,61,45,.055);
+}
+.content-area .page h1,
+.content-area .page h2,
+.content-area .page h3,
+.content-area .page .panel-header h2,
+.content-area .page .dashboard-section-heading,
+.content-area .page .dashboard-feed-title,
+.content-area .page .mobile-section-title{
+  color:#183b2d;
+}
+.content-area .page p,
+.content-area .page small,
+.content-area .page .panel-description,
+.content-area .page .dashboard-empty,
+.content-area .page .dashboard-function-button>small,
+.content-area .page .dashboard-gauge>small,
+.content-area .page .mobile-greeting p,
+.content-area .page .mobile-stat-card small{
+  color:#65776f;
+}
+.content-area .page .dashboard-gauge>span:not(.dashboard-gauge-icon),
+.content-area .page .dashboard-function-button>span,
+.content-area .page .mobile-stat-card span{
+  color:#30473d;
+}
+.content-area .page .dashboard-gauge>strong,
+.content-area .page .dashboard-function-button>b,
+.content-area .page .mobile-stat-card strong{
+  color:#18382b;
+}
+.content-area .page .form-field input,
+.content-area .page .form-field select,
+.content-area .page .form-field textarea,
+.content-area .page .table-search,
+.content-area .page .record-details,
+.content-area .page .detail-grid>div,
+.content-area .page .identity-card,
+.content-area .page .table-wrapper,
+.content-area .page table{
+  background:#fff;
+  color:#26352f;
+  border-color:#cbd9d2;
+}
+.content-area .page th{color:#315746;border-bottom-color:#d4e0da}
+.content-area .page td{color:#30473d;border-bottom-color:#dce5e0}
+.content-area .page .mobile-dashboard-search input{
+  background:#fff;
+  color:#243b32;
+  border-color:#cbd9d2;
+}
+.content-area .page .form-actions{
+  background:transparent;
+}
+.content-area .page .module-interlink-bar,
+.content-area .page .workflow-linked-records{
+  background:#fff;
+  color:#30473d;
+  border-color:#d8e3dd;
+}
