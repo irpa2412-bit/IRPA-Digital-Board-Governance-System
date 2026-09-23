@@ -3,7 +3,7 @@ import {createAdministrator,listAdministrators,removeAdministrator}from"../fireb
 import {sendAdminMagicLink}from"../firebase/auth";
 
 export default function AddAdministratorPortal(){
- const[name,setName]=useState(""),[email,setEmail]=useState(""),[lastInvitationId,setLastInvitationId]=useState(""),[busy,setBusy]=useState(false),[resendBusy,setResendBusy]=useState(false),[removeBusy,setRemoveBusy]=useState(""),[result,setResult]=useState(null),[lastEmail,setLastEmail]=useState(""),[administrators,setAdministrators]=useState([]),[refreshBusy,setRefreshBusy]=useState(false),[lastRefresh,setLastRefresh]=useState("");
+ const[name,setName]=useState(""),[email,setEmail]=useState(""),[lastInvitationId,setLastInvitationId]=useState(""),[busy,setBusy]=useState(false),[resendBusy,setResendBusy]=useState(false),[removeBusy,setRemoveBusy]=useState(""),[result,setResult]=useState(null),[lastEmail,setLastEmail]=useState(""),[administrators,setAdministrators]=useState([]),[removalTarget,setRemovalTarget]=useState(null),[removalConfirm,setRemovalConfirm]=useState(""),[refreshBusy,setRefreshBusy]=useState(false),[lastRefresh,setLastRefresh]=useState("");
  const loadAdministrators=async(showFeedback=false)=>{
   if(showFeedback){setRefreshBusy(true);setResult({ok:true,working:true,message:"Refreshing the Administrator register…"});}
   try{
