@@ -338,7 +338,6 @@ useEffect(()=>{
 },[user,profile]);
 useEffect(()=>{async function magic(){
   const adminGateway=new URLSearchParams(window.location.search).get("adminGateway")==="1";
-  if(adminGateway)return;
   if(inductionMode)return;
   if(!isMagicLink())return;
 
@@ -374,11 +373,14 @@ useEffect(()=>{async function magic(){
 
     window.localStorage.removeItem("irpaEmailForSignIn");
     window.localStorage.removeItem("irpaMemberEmailForSignIn");
+    if(adminGateway){
+      window.history.replaceState({},document.title,window.location.pathname+window.location.hash);
+    }
   }catch(x){
     console.error(x);
     window.alert(x.message||"Unable to open the signing invitation.");
   }
-}magic()},[]);const invitationId=params.get("memberInvite");if(adminGatewayMode)return <AuthScreen/>;if(applicantInductionMode)return <InductionOrientation/>;if(inductionMode&&params.get("applicant")==="1"&&entryRoute==="subscription"&&user===undefined)return <MemberActivationScreen invitationId={invitationId}/>;if(inductionMode&&user===undefined)return <AuthScreen/>;if(user===undefined)return <AuthScreen/>;if(profile===undefined)return <Loading/>;if(!user)return invitationId?<MemberActivationScreen invitationId={invitationId}/>:<AuthScreen/>;
+}magic()},[]);const invitationId=params.get("memberInvite");if(adminGatewayMode&&!user)return <AuthScreen/>;if(applicantInductionMode)return <InductionOrientation/>;if(inductionMode&&params.get("applicant")==="1"&&entryRoute==="subscription"&&user===undefined)return <MemberActivationScreen invitationId={invitationId}/>;if(inductionMode&&user===undefined)return <AuthScreen/>;if(user===undefined)return <AuthScreen/>;if(profile===undefined)return <Loading/>;if(!user)return invitationId?<MemberActivationScreen invitationId={invitationId}/>:<AuthScreen/>;
 if(!profile)return <AccessDenied user={user}reason={error}/>;
 if(profile.authorizationType==="signer"){
   return <SignerShell user={user} profile={profile} signingEnvelopeId={signingEnvelopeId}/>;
