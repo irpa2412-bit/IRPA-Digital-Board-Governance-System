@@ -1,6 +1,7 @@
 
-import { auth } from "./config";
+import { auth, db } from "./config";
 import { getFunctions, httpsCallable } from "firebase/functions";
+import { collection, doc, getDoc, getDocs, query, serverTimestamp, where, writeBatch } from "firebase/firestore";
 
 export async function createAdministrator({ name, email, onProgress }){
   const cleanName = String(name || "").trim();
@@ -41,19 +42,66 @@ export async function createAdministrator({ name, email, onProgress }){
 export async function listAdministrators(){
   const actor=auth.currentUser;
   if(!actor) throw new Error("Administrator authentication is required.");
-  const functions=getFunctions(undefined,"us-central1");
-  const call=httpsCallable(functions,"listAdministrators");
-  const result=await call({});
-  return result.data?.administrators||[];
+  try{
+    // Administrator profiles are already protected by Firestore rules. Reading the
+    // register directly keeps this portal independent of newly deployed Functions.
+    const snap=await getDocs(query(collection(db,"adminProfiles"),where("active","==",true)));
+    return snap.docs.map(d=>({
+      uid:d.id,
+      email:String(d.data()?.email||"").trim().toLowerCase(),
+      name:String(d.data()?.name||"").trim(),
+      role:d.data()?.role||"Administrator",
+      active:d.data()?.active===true,
+      primary:String(d.data()?.email||"").trim().toLowerCase()==="irpa2412@gmail.com"
+    })).sort((a,b)=>Number(b.primary)-Number(a.primary)||a.name.localeCompare(b.name));
+  }catch(error){
+    const code=String(error?.code||"");
+    if(code.includes("permission-denied")) throw new Error("Administrator authorization is required to view the Administrator register.");
+    throw new Error(error?.message||"Unable to load the Administrator register.");
+  }
 }
 export async function removeAdministrator(uid){
   const actor=auth.currentUser;
   if(!actor) throw new Error("Administrator authentication is required.");
   if(!uid) throw new Error("Select an Administrator to remove.");
-  const functions=getFunctions(undefined,"us-central1");
-  const call=httpsCallable(functions,"removeAdministrator");
-  const result=await call({uid});
-  return result.data||{};
+  if(uid===actor.uid) throw new Error("You cannot remove your own Administrator access.");
+
+  const targetRef=doc(db,"adminProfiles",uid);
+  const targetSnap=await getDoc(targetRef);
+  if(!targetSnap.exists()) throw new Error("The selected Administrator was not found.");
+  const target=targetSnap.data()||{};
+  const targetEmail=String(target.email||"").trim().toLowerCase();
+  if(targetEmail==="irpa2412@gmail.com") throw new Error("The primary IRPA Administrator cannot be removed.");
+  if(target.active!==true) return {ok:true,uid,email:targetEmail,alreadyRemoved:true};
+
+  // Firestore rules make an active Administrator the authorizer and prevent
+  // self-removal. The same transaction records the immutable audit event.
+  const batch=writeBatch(db);
+  batch.update(targetRef,{
+    active:false,
+    removedAt:serverTimestamp(),
+    removedByUid:actor.uid,
+    removedByEmail:String(actor.email||"").trim().toLowerCase()||null,
+    updatedAt:serverTimestamp()
+  });
+  const auditRef=doc(collection(db,"audit"));
+  batch.set(auditRef,{
+    action:"ADMINISTRATOR_REMOVED",
+    collection:"adminProfiles",
+    recordId:uid,
+    details:{targetEmail,targetUid:uid,removedByUid:actor.uid,removedByEmail:String(actor.email||"").trim().toLowerCase()||null},
+    actorUid:actor.uid,
+    actorEmail:String(actor.email||"").trim().toLowerCase()||null,
+    createdAt:serverTimestamp()
+  });
+  try{
+    await batch.commit();
+    return {ok:true,uid,email:targetEmail,name:target.name||"",removed:true};
+  }catch(error){
+    const code=String(error?.code||"");
+    if(code.includes("permission-denied")) throw new Error("Firebase denied Administrator removal. Confirm that the current account is an active Administrator.");
+    throw new Error(error?.message||"Administrator removal failed. No change was confirmed.");
+  }
 }
 export async function submitCredentialInterview(data){
   const functions=getFunctions(undefined,"us-central1");
