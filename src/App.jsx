@@ -11,8 +11,9 @@ function MemberActivationScreen({invitationId}) {
     if(password!==confirm){setMessage("The passwords do not match.");return}
     setBusy(true);
     try{
-      const {registerWithEmail}=await import("./firebase/auth");
-      await registerWithEmail(clean,password);
+      const {loginWithEmail}=await import("./firebase/auth");
+      const signedIn=await loginWithEmail(clean,password);
+      if(!signedIn?.uid) throw new Error("IRPA account authentication did not return a valid user session.");
       await provisionCurrentMemberFromInvitationV2(invitationId);
       window.history.replaceState({},document.title,window.location.pathname+window.location.hash);
       window.location.reload();
