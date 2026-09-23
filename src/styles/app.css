@@ -1134,3 +1134,38 @@
 .content-area:not(.dashboard-content-area) .controlled-document-upload-panel .muted{
   color:#65776f!important;
 }
+
+/* DASHBOARD READABILITY CORRECTION — final specificity override.
+   Dashboard cards use light surfaces; all primary labels and descriptions must remain dark/readable. */
+.content-area.dashboard-content-area .page .dashboard-gauge,
+.content-area.dashboard-content-area .page .dashboard-function-button,
+.content-area.dashboard-content-area .page .dashboard-feed{
+  background:#ffffff!important;
+  color:#24362f!important;
+  border-color:#d7e1dc!important;
+}
+.content-area.dashboard-content-area .page .dashboard-gauge>span:not(.dashboard-gauge-icon),
+.content-area.dashboard-content-area .page .dashboard-function-button>span,
+.content-area.dashboard-content-area .page .dashboard-feed-title{
+  color:#203a30!important;
+  font-weight:850!important;
+}
+.content-area.dashboard-content-area .page .dashboard-gauge>strong,
+.content-area.dashboard-content-area .page .dashboard-function-button>b{
+  color:#24362f!important;
+  font-weight:900!important;
+}
+.content-area.dashboard-content-area .page .dashboard-gauge>small,
+.content-area.dashboard-content-area .page .dashboard-function-button>small,
+.content-area.dashboard-content-area .page .dashboard-empty{
+  color:#52675e!important;
+  font-weight:600!important;
+}
+.content-area.dashboard-content-area .page .dashboard-function-button .dashboard-function-icon,
+.content-area.dashboard-content-area .page .dashboard-gauge .dashboard-gauge-icon{
+  color:#326d9f!important;
+  background:#eef4f1!important;
+}
+.content-area.dashboard-content-area .page .dashboard-feed-title button{
+  color:#326d9f!important;
+}
