@@ -337,10 +337,29 @@ exports.submitCredentialInterview = onCall({region:"us-central1"}, async request
     db.collection("employees").where("email","==",email).limit(5).get()
   ]);
   if(!invitation&&!memberSnap.size&&!employeeSnap.size) throw new HttpsError("not-found","No matching IRPA invitation, Member or Employee registration could be retrieved for this email. The credential interview is blocked.");
-  const roles=[...employeeSnap.docs.flatMap(d=>Array.isArray(d.data().roles)?d.data().roles:[d.data().role]),...memberSnap.docs.flatMap(d=>Array.isArray(d.data().roles)?d.data().roles:[d.data().role]),invitation?.role||""].flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean));
+  const employeeRecords=employeeSnap.docs.map(d=>({id:d.id,...d.data()}));
+  const memberRecords=memberSnap.docs.map(d=>({id:d.id,...d.data()}));
+  const roles=[...employeeRecords.flatMap(d=>Array.isArray(d.roles)?d.roles:[d.role]),...memberRecords.flatMap(d=>Array.isArray(d.roles)?d.roles:[d.role]),invitation?.role||"",...(Array.isArray(invitation?.roles)?invitation.roles:[])].flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean));
+  const capturedProfile={
+    position:requestedRole||invitation?.role||employeeRecords[0]?.role||memberRecords[0]?.role||"Not yet assigned",
+    assignedRoles:[...new Set(roles)],
+    department:invitation?.department||employeeRecords[0]?.department||memberRecords[0]?.department||"",
+    unit:invitation?.unit||employeeRecords[0]?.unit||memberRecords[0]?.unit||"",
+    capacity:requestedCapacity||invitation?.accountType||invitation?.memberType||"",
+    employmentType:invitation?.employmentType||employeeRecords[0]?.employmentType||"",
+    memberType:invitation?.memberType||memberRecords[0]?.memberType||"",
+    boardMember:Boolean(invitation?.boardMember||memberRecords.some(x=>x.boardMember)),
+    registrationNumber:invitation?.registrationNumber||employeeRecords[0]?.employeeNumber||memberRecords[0]?.memberNumber||"",
+    invitationReference:invitation?.invitationReference||invitation?.reference||invitationReference||"",
+    invitationId:invitation?.id||null
+  };
   const ref=db.collection("credentialInterviewRequests").doc();
-  await ref.set({email,name,invitationId:invitation?.id||null,invitationReference:invitation?.invitationReference||invitation?.reference||invitationReference||null,requestedCapacity:requestedCapacity||null,requestedRole:requestedRole||null,registeredRoles:[...new Set(roles)],status:"Pending Login Approval",loginApproved:false,createdAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()});
-  return {ok:true,requestId:ref.id,status:"Pending Login Approval"};
+  await ref.set({email,name,invitationId:invitation?.id||null,invitationReference:capturedProfile.invitationReference,requestedCapacity:requestedCapacity||null,requestedRole:requestedRole||null,registeredRoles:capturedProfile.assignedRoles,systemCapturedProfile:capturedProfile,status:"Pending Login Approval",loginApproved:false,emailReleaseStatus:"Queued",createdAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()});
+  const systemText=`Preliminary IRPA registration received. The following information was captured from the IRPA invitation/registration system for your awareness:\\n\\nName: ${name}\\nEmail: ${email}\\nPosition: ${capturedProfile.position}\\nAssigned roles: ${capturedProfile.assignedRoles.join(", ")||"Not yet assigned"}\\nDepartment: ${capturedProfile.department||"Not specified"}\\nUnit: ${capturedProfile.unit||"Not specified"}\\nCapacity: ${capturedProfile.capacity||"Not specified"}\\nEmployment/member type: ${capturedProfile.employmentType||capturedProfile.memberType||"Not specified"}\\nBoard Member status: ${capturedProfile.boardMember?"Yes":"No"}\\nRegistration number: ${capturedProfile.registrationNumber||"Not yet issued"}\\nInvitation reference: ${capturedProfile.invitationReference||"Not available"}\\n\\nStatus: Pending Login Approval. This preliminary registration does not itself authorise system access.`;
+  await queueInductionEmail(email,"IRPA Preliminary Registration — Captured System Information",systemText,systemText.replace(/\\n/g,"<br>"));
+  const adminEmails=(await db.collection("adminProfiles").where("active","==",true).get()).docs.map(d=>String(d.data()?.email||"").trim().toLowerCase()).filter(Boolean);
+  for(const adminEmail of [...new Set(adminEmails)]) await queueInductionEmail(adminEmail,"IRPA Preliminary Registration — Invitee Captured Profile",`Invitee: ${name}\\nEmail: ${email}\\nPosition: ${capturedProfile.position}\\nAssigned roles: ${capturedProfile.assignedRoles.join(", ")||"Not yet assigned"}\\nDepartment: ${capturedProfile.department||"Not specified"}\\nUnit: ${capturedProfile.unit||"Not specified"}\\nInvitation reference: ${capturedProfile.invitationReference||"Not available"}\\nRequest ID: ${ref.id}`,`<strong>IRPA Preliminary Registration — Invitee Captured Profile</strong><p>Invitee: ${name}<br>Email: ${email}<br>Position: ${capturedProfile.position}<br>Assigned roles: ${capturedProfile.assignedRoles.join(", ")||"Not yet assigned"}<br>Department: ${capturedProfile.department||"Not specified"}<br>Unit: ${capturedProfile.unit||"Not specified"}<br>Invitation reference: ${capturedProfile.invitationReference||"Not available"}<br>Request ID: ${ref.id}</p>`);
+  return {ok:true,requestId:ref.id,status:"Pending Login Approval",emailReleaseStatus:"Queued",systemCapturedProfile:capturedProfile};
 });
 
 exports.getCredentialInterviewRequests = onCall({region:"us-central1"}, async request => {
