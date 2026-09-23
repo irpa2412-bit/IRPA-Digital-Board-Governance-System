@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { browserSupportsPush, listenForForegroundMessages, notificationPermissionState, requestPushPermission } from "../firebase/messaging";
 import { startGoogleDriveAuthorization } from "../firebase/signatureStorage";
-import { resetDocumentTrialData, resetEmployeeTrialData, resetMemberTrialData } from "../firebase/data";
+import { resetDocumentTrialData, resetEmployeeTrialData, resetMemberTrialData, resetSignatureEnvelopeTrialData } from "../firebase/data";
 import { createAdministrator } from "../firebase/functions";
 
 export default function Settings({ admin = false, section = "settings" }) {
@@ -55,7 +55,7 @@ export default function Settings({ admin = false, section = "settings" }) {
     setSelectedReset(type);
     setMessage("");
     setResult(null);
-    const phrases = { documents: "RESET IRPA DOCUMENT TRIAL DATA", employees: "RESET IRPA EMPLOYEE TRIAL DATA", members: "RESET IRPA MEMBER TRIAL DATA" };
+    const phrases = { documents: "RESET IRPA DOCUMENT TRIAL DATA", employees: "RESET IRPA EMPLOYEE TRIAL DATA", members: "RESET IRPA MEMBER TRIAL DATA", envelopes: "RESET IRPA TRIAL ENVELOPE DATA" };
     setMessage(`Trial reset selected. Enter the exact confirmation phrase below: ${phrases[type]}`);
     setTimeout(() => document.getElementById("trial-reset-confirmation")?.focus(), 0);
   }
@@ -64,7 +64,8 @@ export default function Settings({ admin = false, section = "settings" }) {
     const phrases = {
       documents: "RESET IRPA DOCUMENT TRIAL DATA",
       employees: "RESET IRPA EMPLOYEE TRIAL DATA",
-      members: "RESET IRPA MEMBER TRIAL DATA"
+      members: "RESET IRPA MEMBER TRIAL DATA",
+      envelopes: "RESET IRPA TRIAL ENVELOPE DATA"
     };
     const phrase = phrases[type];
     if (confirmation !== phrase) {
@@ -75,7 +76,9 @@ export default function Settings({ admin = false, section = "settings" }) {
       ? "This permanently deletes all Controlled Document trial records. Employee, Member and Board Member records are not affected. Continue?"
       : type === "employees"
         ? "This permanently deletes all Employee records and resets the Employee Number counter. Member and Board Member records are not affected. Continue?"
-        : "This permanently deletes all general Member records and resets the Member Number counter. Board Member records are preserved. Continue?";
+        : type === "members"
+          ? "This permanently deletes all general Member records and resets the Member Number counter. Board Member records are preserved. Continue?"
+          : "This permanently deletes trial Signature Envelope records, their linked signature transaction records and envelope events. Only records explicitly marked as trial are removed. Continue?";
     if (!window.confirm(warning)) return;
     setResetBusy(type);
     setMessage("");
@@ -85,10 +88,12 @@ export default function Settings({ admin = false, section = "settings" }) {
         ? await resetDocumentTrialData()
         : type === "employees"
           ? await resetEmployeeTrialData()
-          : await resetMemberTrialData();
+          : type === "members"
+            ? await resetMemberTrialData()
+            : await resetSignatureEnvelopeTrialData();
       setConfirmation("");
       setResult({ ...data, type });
-      setMessage(`${type === "documents" ? "Document" : type === "employees" ? "Employee" : "Member"} trial reset completed successfully.`);
+      setMessage(`${type === "documents" ? "Document" : type === "employees" ? "Employee" : type === "members" ? "Member" : "Signature Envelope"} trial reset completed successfully.`);
     } catch (error) {
       setMessage(error?.message || "The trial-data reset failed.");
     } finally {
@@ -271,6 +276,14 @@ export default function Settings({ admin = false, section = "settings" }) {
             <small>Removes general Members and resets the Member Number counter. Board Members are preserved.</small>
             <div className="form-actions" style={{ marginTop: 12 }}>
               <button type="button" onClick={() => selectedReset === "members" ? runTrialReset("members") : prepareTrialReset("members")} disabled={!!resetBusy} aria-busy={resetBusy==="members"?"true":"false"} aria-pressed={selectedReset === "members"}>{resetBusy==="members" ? "Executing Member Reset…" : selectedReset === "members" ? "Confirm & Execute Member Reset" : "Reset Members"}</button>
+            </div>
+          </div>
+          <div className="stat-card" style={{ marginBottom: 14 }}>
+            <span>Signature Envelopes</span>
+            <strong>IRPA Trial Envelope Data</strong>
+            <small>Removes Signature Envelopes explicitly marked as trial, together with their linked signature transaction records and envelope events. Production envelopes are preserved.</small>
+            <div className="form-actions" style={{ marginTop: 12 }}>
+              <button type="button" onClick={() => selectedReset === "envelopes" ? runTrialReset("envelopes") : prepareTrialReset("envelopes")} disabled={!!resetBusy} aria-busy={resetBusy==="envelopes"?"true":"false"} aria-pressed={selectedReset === "envelopes"}>{resetBusy==="envelopes" ? "Executing Envelope Reset…" : selectedReset === "envelopes" ? "Confirm & Execute Envelope Reset" : "Reset Trial Envelopes"}</button>
             </div>
           </div>
           <div className="success-message" style={{ marginTop: 8 }}>Enter the exact phrase for the reset you want to perform. Document reset only removes records marked as trial data; it does not remove Signature Profiles.</div><label className="field" style={{ display: "block" }}>
