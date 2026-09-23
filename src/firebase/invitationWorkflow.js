@@ -1,10 +1,8 @@
-import { auth } from "./config";
+import { auth, db } from "./config";
+import { doc, getDocs, query, collection, serverTimestamp, setDoc, where } from "firebase/firestore";
 import {
   COLLECTIONS,
-  createEmployeeProfile,
-  createMemberProfile,
   getRecord,
-  getRecords,
   updateRecord,
 } from "./data";
 
@@ -85,60 +83,78 @@ export async function provisionCurrentMemberFromInvitationV2(invitationId) {
       status:"Accepted",acceptedUid:uid,acceptedAt:new Date().toISOString(),accountActivated:true,activationCompleted:true
     }, {touchUpdatedAt:false, audit:false});
     return { employee: boardMember, invitationId: invitation.id, uid };
-  } else if (invitation.employeeId && !isBoardMember) {
-    employee = await getRecord(COLLECTIONS.employees, invitation.employeeId);
-    if (!employee) throw new Error("The institutional personnel record linked to this invitation could not be found.");
-    if (employee.email?.trim().toLowerCase() !== email) {
-      throw new Error("The invitation email does not match the institutional personnel record.");
+  } else if (EMPLOYEE_ROLES.includes(role)) {
+    // Employees follow the same controlled activation pattern as Board Members:
+    // resolve the authoritative employee record by its invitation link or official
+    // email, then update only the fields permitted by the recipient security rule.
+    const employeeId = invitation.employeeId || invitation.institutionalRecordId;
+    employee = employeeId && invitation.institutionalRecordType !== "Board Member"
+      ? await getRecord(COLLECTIONS.employees, employeeId)
+      : null;
+
+    // Older invitations may not carry employeeId. Resolve them with a constrained
+    // email query rather than scanning the employees collection. Firestore evaluates
+    // queries against their potential result set, so the email constraint is required
+    // by the employee read rule.
+    if (!employee) {
+      const snap = await getDocs(query(collection(db, COLLECTIONS.employees), where("email", "==", email)));
+      const matches = snap.docs.map(x => ({ id: x.id, ...x.data() }));
+      employee = matches.find(x =>
+        String(x.email || "").trim().toLowerCase() === email &&
+        (!x.role || x.role === role)
+      ) || matches[0] || null;
     }
+
+    if (!employee) {
+      throw new Error("The Employee institutional record for this invitation could not be resolved. Ask an administrator to relink the invitation to the Employees Register.");
+    }
+    if (employee.email?.trim().toLowerCase() !== email) {
+      throw new Error("The invitation email does not match the Employee institutional record.");
+    }
+
     await updateRecord(COLLECTIONS.employees, employee.id, {
       uid,
       invitationId,
       accountActivated: true,
       registrationStatus: "Activated",
       registrationEmailStatus: "Completed",
-      status: employee.status || "Active",
       activatedAt: new Date().toISOString(),
-    });
-  } else if (EMPLOYEE_ROLES.includes(role)) {
-    // Link an existing employee/board-member record by official email before creating anything new.
-    const employees = await getRecords(COLLECTIONS.employees);
-    employee = employees.find(x => String(x.email || "").trim().toLowerCase() === email) || null;
-    if (employee) {
-      await updateRecord(COLLECTIONS.employees, employee.id, {
+    }, { touchUpdatedAt: false, audit: false });
+
+    // The employees collection remains the authoritative personnel register.
+    // A lightweight members/{uid} document is created only as the application's
+    // authorization profile. Avoid the legacy member-number generator and audit write.
+    const memberRef = doc(db, COLLECTIONS.members, uid);
+    const existingMember = await getRecord(COLLECTIONS.members, uid);
+    if (!existingMember) {
+      await setDoc(memberRef, {
+        uid,
+        invitationId,
+        employeeId: employee.id,
+        employeeNumber: employee.employeeNumber || null,
+        email,
+        name: invitation.name || employee.name || "",
+        role,
+        memberType,
+        status: "Active",
+        accountActivated: true,
+        registrationStatus: "Activated",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        activatedAt: new Date().toISOString(),
+      });
+    } else if (existingMember.status !== "Active" || existingMember.invitationId !== invitationId) {
+      await updateRecord(COLLECTIONS.members, existingMember.id, {
         uid,
         invitationId,
         accountActivated: true,
         registrationStatus: "Activated",
-        registrationEmailStatus: "Completed",
-        status: employee.status || "Active",
         activatedAt: new Date().toISOString(),
-      });
-    } else {
-      employee = await createEmployeeProfile({
-        uid,
-        email,
-        name: invitation.name || "",
-        role,
-        department: invitation.department || "",
-        employmentType: invitation.employmentType || "Employee",
-        status: "Active",
-        registrationStatus: "Activated",
-        invitationId,
-      });
+      }, { touchUpdatedAt: false, audit: false });
     }
+  } else {
+    throw new Error("This invitation does not contain a recognized IRPA employee or Board Member role.");
   }
-
-  await createMemberProfile(uid, {
-    invitationId,
-    employeeId: employee?.id || null,
-    email,
-    name: invitation.name || employee?.name || "",
-    role,
-    memberType,
-    status: "Active",
-    activatedAt: new Date().toISOString(),
-  });
 
   await updateRecord(COLLECTIONS.invitations, invitation.id, {
     status: "Accepted",
@@ -146,7 +162,7 @@ export async function provisionCurrentMemberFromInvitationV2(invitationId) {
     acceptedAt: new Date().toISOString(),
     accountActivated: true,
     activationCompleted: true,
-  });
+  }, { touchUpdatedAt: false, audit: false });
 
   return { employee, invitationId: invitation.id, uid };
 }
