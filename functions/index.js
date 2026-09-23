@@ -119,6 +119,107 @@ exports.fetchInductionMatchingRecords = onCall({region:"us-central1"}, async req
   };
 });
 
+async function queueInductionEmail(to,subject,text,html){
+  const recipient=String(to||"").trim().toLowerCase();
+  if(!recipient||!recipient.includes("@")) return null;
+  const ref=await db.collection("mail").add({
+    to:recipient,
+    message:{subject,text,html},
+    source:"IRPA Induction & Orientation",
+    createdAt:FieldValue.serverTimestamp()
+  });
+  return ref.id;
+}
+
+function scoreInductionApplication(item, records){
+  const clean=v=>String(v||"").trim().toLowerCase();
+  const answers=item.answers||{};
+  const employees=records.employees||[];
+  const members=records.members||[];
+  const invitation=records.invitation||null;
+  const all=[...employees,...members];
+  const expectedNames=[invitation?.name,...all.map(x=>x.name)].filter(Boolean).map(clean);
+  const expectedEmails=[invitation?.email,...all.map(x=>x.email)].filter(Boolean).map(clean);
+  const expectedRoles=[invitation?.role,...all.flatMap(x=>[x.role,...(x.roles||[])])].filter(Boolean).map(clean);
+  const expectedDepartments=[invitation?.department,...all.map(x=>x.department)].filter(Boolean).map(clean);
+  const expectedUnits=[invitation?.unit,...all.map(x=>x.unit)].filter(Boolean).map(clean);
+  const expectedEmployment=[invitation?.employmentType,...employees.map(x=>x.employmentType)].filter(Boolean).map(clean);
+  const expectedMemberTypes=[invitation?.memberType,...members.map(x=>x.memberType)].filter(Boolean).map(clean);
+  const expectedNumbers=[...employees.map(x=>x.employeeNumber),...members.map(x=>x.memberNumber),invitation?.registrationNumber].filter(Boolean).map(clean);
+  const expectedRefs=[invitation?.invitationReference,invitation?.reference].filter(Boolean).map(clean);
+  const expectedCapacity=[...new Set([
+    employees.length?"employee":"",
+    members.length?"member":"",
+    employees.length&&members.length?"employee & member":"",
+    invitation?.accountType||""
+  ].filter(Boolean).map(clean))];
+  const scoreItems=[];
+  const add=(label,ok,reason)=>scoreItems.push({label,ok:Boolean(ok),reason:reason||""});
+  add("Identity confirmation",answers.identityConfirmation==="Yes","Applicant did not confirm identity/information.");
+  add("Full name",answers.verifiedFullName && (!expectedNames.length||expectedNames.includes(clean(answers.verifiedFullName)),"Name does not match the available IRPA record."));
+  add("Email",answers.verifiedEmail && (!expectedEmails.length||expectedEmails.includes(clean(answers.verifiedEmail)),"Email does not match the available IRPA record."));
+  add("Capacity",answers.accountType && (!expectedCapacity.length||expectedCapacity.includes(clean(answers.accountType)),"Capacity is not consistent with the available record."));
+  add("Role / position",answers.primaryRole && (!expectedRoles.length||expectedRoles.includes(clean(answers.primaryRole)),"Role is not consistent with the available record."));
+  add("Department",answers.department && (!expectedDepartments.length||expectedDepartments.includes(clean(answers.department)),"Department is not consistent with the available record."));
+  add("Unit",answers.unit && (!expectedUnits.length||expectedUnits.includes(clean(answers.unit)),"Unit is not consistent with the available record."));
+  add("Employment / membership",answers.employmentType && (!expectedEmployment.length||expectedEmployment.includes(clean(answers.employmentType)||expectedMemberTypes.includes(clean(answers.employmentType))),"Employment or membership detail is not consistent with the available record."));
+  add("Q1 — name",answers.q1 && (!expectedNames.length||expectedNames.includes(clean(answers.q1))),"Q1 does not match the available name.");
+  add("Q2 — email",answers.q2 && (!expectedEmails.length||expectedEmails.includes(clean(answers.q2))),"Q2 does not match the available email.");
+  add("Q3 — registration number",answers.q3 && (!expectedNumbers.length||expectedNumbers.includes(clean(answers.q3))||/no registration number/i.test(String(answers.q3))),"Q3 does not match the available registration number.");
+  add("Q4 — role",answers.q4 && (!expectedRoles.length||expectedRoles.includes(clean(answers.q4))),"Q4 does not match the available role.");
+  add("Q5 — department/unit",answers.q5 && (!expectedDepartments.length||expectedDepartments.some(v=>clean(answers.q5).includes(v))||expectedUnits.some(v=>clean(answers.q5).includes(v))),"Q5 does not match the available department/unit.");
+  add("Q6 — membership/invitation",answers.q6 && (!expectedRefs.length&&!expectedEmployment.length||expectedRefs.includes(clean(answers.q6))||expectedEmployment.includes(clean(answers.q6))||expectedMemberTypes.includes(clean(answers.q6))),"Q6 does not match the available membership/employment or invitation detail.");
+  add("Orientation modules",Array.isArray(answers.orientationModules)&&answers.orientationModules.length>0,"No orientation modules were selected.");
+  add("Declaration",item.declaration===true,"The declaration was not accepted.");
+  const total=scoreItems.length;
+  const correct=scoreItems.filter(x=>x.ok).length;
+  const percentage=Math.round((correct/total)*100);
+  const threshold=75;
+  const issues=scoreItems.filter(x=>!x.ok).map(x=>x.label);
+  const reasons=scoreItems.filter(x=>!x.ok).map(x=>x.reason).filter(Boolean);
+  return {percentage,correct,total,threshold,advanced:percentage>=threshold,issues,reasons,scoreItems};
+}
+
+exports.routeInductionApplication = onCall({region:"us-central1"}, async request => {
+  const requestId=String(request.data?.requestId||"").trim();
+  if(!requestId) throw new HttpsError("invalid-argument","Induction application ID is required.");
+  const requestRef=db.collection("registrationRequests").doc(requestId);
+  const snap=await requestRef.get();
+  if(!snap.exists) throw new HttpsError("not-found","The induction application could not be found.");
+  const item=snap.data();
+  if(item.routingStatus==="Advanced to Administrator"||item.routingStatus==="Filtered — Below 75% Accuracy"){
+    return {ok:true,routingStatus:item.routingStatus,accuracyPercentage:item.accuracyPercentage,systemSummary:item.systemSummary||""};
+  }
+
+  const email=String(item.email||item.answers?.verifiedEmail||"").trim().toLowerCase();
+  const invitationId=String(item.invitationId||"").trim();
+  let invitation=null;
+  if(invitationId){const s=await db.collection("invitations").doc(invitationId).get();if(s.exists)invitation={id:s.id,...s.data()};}
+  const [employeeSnap,memberSnap]=await Promise.all([
+    email?db.collection("employees").where("email","==",email).limit(10).get():Promise.resolve({docs:[]}),
+    email?db.collection("members").where("email","==",email).limit(10).get():Promise.resolve({docs:[]})
+  ]);
+  const employees=employeeSnap.docs.map(d=>({id:d.id,...d.data()}));
+  const members=memberSnap.docs.map(d=>({id:d.id,...d.data()}));
+  const score=scoreInductionApplication(item,{invitation,employees,members});
+  const routingStatus=score.advanced?"Advanced to Administrator":"Filtered — Below 75% Accuracy";
+  const status=score.advanced?"Pending Administrator Decision":"Filtered — Applicant Feedback Required";
+  const summary=(score.advanced?"Advanced for administrator review. ":"Filtered pending applicant correction. ")+`Accuracy: ${score.percentage}% (${score.correct}/${score.total}).`+(score.issues.length?` Review items: ${score.issues.join(", ")}.`:" All scored items are consistent.");
+  await requestRef.set({accuracyPercentage:score.percentage,accuracyCorrect:score.correct,accuracyTotal:score.total,accuracyThreshold:score.threshold,accuracyAdvanced:score.advanced,routingStatus,systemSummary:summary,accuracyIssues:score.issues,accuracyReasons:score.reasons,status,inductionStatus:score.advanced?"Advanced":"Filtered",roleAssignmentStatus:score.advanced?"Pending Administrator Decision":"Filtered",feedbackStatus:"Queued",updatedAt:FieldValue.serverTimestamp()},{merge:true});
+  await db.collection("inductionRecords").doc(requestId).set({accuracyPercentage:score.percentage,accuracyCorrect:score.correct,accuracyTotal:score.total,accuracyThreshold:score.threshold,accuracyAdvanced:score.advanced,routingStatus,systemSummary:summary,status:score.advanced?"Advanced":"Filtered",inductionStatus:score.advanced?"Advanced":"Filtered",updatedAt:FieldValue.serverTimestamp()},{merge:true});
+
+  const applicantSubject=score.advanced?"IRPA Induction Application — Advanced to Administrator":"IRPA Induction Application — Further Information Required";
+  const applicantText=score.advanced
+    ? `Dear ${item.fullName||"Applicant"},\\n\\nYour IRPA Induction and Orientation application has been received and scored at ${score.percentage}% (${score.correct}/${score.total}). It has therefore been advanced to the Administrator for decision.\\n\\nSystem summary: ${summary}\\n\\nNo login account is authorised until the Administrator completes the decision.\\n\\nIRPA Digital Board Governance System`
+    : `Dear ${item.fullName||"Applicant"},\\n\\nYour IRPA Induction and Orientation application has been received. The automated accuracy check recorded ${score.percentage}% (${score.correct}/${score.total}), below the 75% advancement threshold.\\n\\nSystem feedback: ${summary}\\n\\nPlease return to the induction form, correct the indicated items and resubmit.\\n\\nIRPA Digital Board Governance System`;
+  const emailId=await queueInductionEmail(email,applicantSubject,applicantText,applicantText.replace(/\\n/g,"<br>"));
+  const adminEmails=(await db.collection("adminProfiles").where("active","==",true).get()).docs.map(d=>String(d.data()?.email||"").trim().toLowerCase()).filter(Boolean);
+  if(score.advanced){
+    for(const adminEmail of [...new Set(adminEmails)]) await queueInductionEmail(adminEmail,"IRPA Induction Application Advanced for Decision",`Applicant: ${item.fullName||"Unnamed"}\\nEmail: ${email}\\n${summary}\\nApplication ID: ${requestId}`,`<strong>IRPA Induction Application Advanced for Decision</strong><br>Applicant: ${item.fullName||"Unnamed"}<br>Email: ${email}<br>${summary}<br>Application ID: ${requestId}`);
+  }
+  return {ok:true,routingStatus,accuracyPercentage:score.percentage,systemSummary:summary,feedbackQueued:Boolean(emailId),advanced:score.advanced};
+});
+
 exports.approveInductionApplication = onCall({region:"us-central1"}, async request => {
   const adminUid=request.auth?.uid;
   if(!adminUid) throw new HttpsError("unauthenticated","Administrator authentication is required.");
@@ -191,6 +292,7 @@ exports.approveInductionApplication = onCall({region:"us-central1"}, async reque
   await db.collection("inductionRecords").doc(requestId).set({uid:user.uid,originalApplicantUid:item.uid||requestId,email,name,status:"Approved",inductionStatus:"Approved",roleAssignmentStatus:"Linked",approvedRole:role,approvedDepartment:department||null,approvedUnit:unit||null,boardMember:Boolean(item.boardMember),linkedByUid:adminUid,linkedByEmail:actorEmail,linkedAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()},{merge:true});
   if(item.invitationId) await db.collection("invitations").doc(item.invitationId).set({status:"Activated",authUid:user.uid,activatedUid:user.uid,activatedAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()},{merge:true});
   await db.collection("audit").add({action:"INDUCTION_APPLICATION_APPROVED_AND_SUBSCRIBED",collection:"registrationRequests",recordId:requestId,details:{email,authUid:user.uid,accountCreated,wantsMember,wantsEmployee},actorUid:adminUid,actorEmail,createdAt:FieldValue.serverTimestamp()});
+  await queueInductionEmail(email,"IRPA Induction Application — Approved",`Dear ${name},\\n\\nYour IRPA Induction and Orientation application has been approved by the Administrator. Your IRPA account has been provisioned and login authorisation has been granted. Use the password setup route provided below to establish your password:\\n\\n${passwordSetupLink}\\n\\nApproved role: ${role}\\nDepartment: ${department||"Not specified"}\\nUnit: ${unit||"Not specified"}\\n\\nIRPA Digital Board Governance System`, `<strong>IRPA Induction Application — Approved</strong><p>Dear ${name},</p><p>Your application has been approved by the Administrator. Your IRPA account has been provisioned and login authorisation has been granted.</p><p><a href="${passwordSetupLink}">Set up your password</a></p><p>Approved role: ${role}<br>Department: ${department||"Not specified"}<br>Unit: ${unit||"Not specified"}</p>`);
   return {ok:true,alreadyLinked:false,uid:user.uid,email,accountCreated,memberSubscribed:wantsMember,employeeSubscribed:wantsEmployee,passwordSetupLink};
 });
 
