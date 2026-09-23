@@ -46,10 +46,6 @@ export async function getCurrentInductionContext(){
   const uid=auth.currentUser?.uid;
   const email=String(auth.currentUser?.email||"").trim().toLowerCase();
   if(!uid) throw new Error("An induction enrollment session could not be established.");
-  const isAnonymous=Boolean(auth.currentUser?.isAnonymous);
-  if(isAnonymous){
-    return {uid,email:"",fullName:"",roles:["Board Member","Executive Director","Director","Finance","Procurement","Human Resources","Programme & Technical","Operations","Field","General Employee"],role:"",department:"",unit:"",registrationNumber:"",accountType:"",accountTypeOptions:["Member","Employee"],memberType:"",employmentType:"",boardMember:false,member:null,employee:null,invitation:null,invitations:[],invitationId:null,existingRequest:null,anonymous:true};
-  }
   if(!email) throw new Error("Authentication is required to load the induction form.");
 
   const [member,employee,existingRequest]=await Promise.all([
