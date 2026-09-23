@@ -339,7 +339,7 @@ useEffect(()=>{async function magic(){
     console.error(x);
     window.alert(x.message||"Unable to open the signing invitation.");
   }
-}magic()},[]);const invitationId=params.get("memberInvite");if(adminGatewayMode)return <AuthScreen/>;if(inductionMode&&user===undefined)return <Loading/>;if(user===undefined)return <AuthScreen/>;if(profile===undefined)return <Loading/>;if(!user)return invitationId?<MemberActivationScreen invitationId={invitationId}/>:<AuthScreen/>;
+}magic()},[]);const invitationId=params.get("memberInvite");if(adminGatewayMode)return <AuthScreen/>;if(inductionMode&&user===undefined)return <Loading/>;if(inductionMode)return <InductionOrientation/>;if(user===undefined)return <AuthScreen/>;if(profile===undefined)return <Loading/>;if(!user)return invitationId?<MemberActivationScreen invitationId={invitationId}/>:<AuthScreen/>;
 if(!profile)return <AccessDenied user={user}reason={error}/>;
 if(profile.authorizationType==="signer"){
   return <SignerShell user={user} profile={profile} signingEnvelopeId={signingEnvelopeId}/>;
