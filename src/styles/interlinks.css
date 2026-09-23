@@ -57,3 +57,8 @@
   background:#e5f3eb!important;
   border-color:#b9d8c5!important;
 }
+
+/* Interactive tab controls: keep the tab hit-area above decorative workflow layers. */
+.module-interlink-list,.workflow-portal-group,.workflow-portal-children,.workflow-linked-records{position:relative;z-index:20;pointer-events:auto!important}
+.module-interlink-list button,.workflow-portal-parent,.workflow-portal-children button,.workflow-linked-records button{position:relative;z-index:21;pointer-events:auto!important;touch-action:manipulation!important;cursor:pointer!important;user-select:none}
+.module-interlink-list button:disabled,.workflow-portal-parent:disabled,.workflow-portal-children button:disabled,.workflow-linked-records button:disabled{pointer-events:none!important;cursor:not-allowed!important}
