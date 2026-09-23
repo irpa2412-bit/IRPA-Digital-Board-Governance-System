@@ -38,6 +38,23 @@ export async function createAdministrator({ name, email, onProgress }){
     throw new Error(messages[code] || error?.message || "Unable to add the Administrator.");
   }
 }
+export async function listAdministrators(){
+  const actor=auth.currentUser;
+  if(!actor) throw new Error("Administrator authentication is required.");
+  const functions=getFunctions(undefined,"us-central1");
+  const call=httpsCallable(functions,"listAdministrators");
+  const result=await call({});
+  return result.data?.administrators||[];
+}
+export async function removeAdministrator(uid){
+  const actor=auth.currentUser;
+  if(!actor) throw new Error("Administrator authentication is required.");
+  if(!uid) throw new Error("Select an Administrator to remove.");
+  const functions=getFunctions(undefined,"us-central1");
+  const call=httpsCallable(functions,"removeAdministrator");
+  const result=await call({uid});
+  return result.data||{};
+}
 export async function submitCredentialInterview(data){
   const functions=getFunctions(undefined,"us-central1");
   const call=httpsCallable(functions,"submitCredentialInterview");
