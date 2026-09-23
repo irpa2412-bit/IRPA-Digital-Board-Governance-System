@@ -216,7 +216,7 @@ if(form.identityConfirmation!=="Yes"){setError(context.anonymous?"Please confirm
     <div className="panel-header"><div><span className="eyebrow">STEP 4</span><h2>Adaptive Orientation Check</h2><p className="panel-description">The available answers change according to your selected role, department and previous answer.</p></div></div>
     <div className="form-grid">
      <ChoiceField label={questions.q1.label} value={form.q1} onChange={v=>patch("q1",v)} options={questions.q1.options}/>
-     <ChoiceField label={questions.q2.label} value={form.q2} onChange={v=>patch("q2",v)} options={questions.q2.options} disabled={!form.q1}/>
+     <ChoiceField label={questions.q2.label} value={form.q2} onChange={v=>patch("q2",v)} options={questions.q2.options} disabled={false}/>
      <ChoiceField label={questions.q3.label} value={form.q3} onChange={v=>patch("q3",v)} options={questions.q3.options}/><ChoiceField label={questions.q4.label} value={form.q4} onChange={v=>patch("q4",v)} options={questions.q4.options}/><ChoiceField label={questions.q5.label} value={form.q5} onChange={v=>patch("q5",v)} options={questions.q5.options}/><ChoiceField label={questions.q6.label} value={form.q6} onChange={v=>patch("q6",v)} options={questions.q6.options}/>
     </div>
     <div className="form-field" style={{marginTop:16}}><label>Additional orientation comments</label><textarea value={form.comments} onChange={e=>patch("comments",e.target.value)} rows="4" placeholder="Optional comments, questions or support required during induction…"/></div>
