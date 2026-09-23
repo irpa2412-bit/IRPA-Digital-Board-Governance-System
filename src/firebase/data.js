@@ -132,6 +132,21 @@ export async function submitInductionApplication(form,context){
   const uid=activeAuth.currentUser?.uid;
   if(!uid||uid!==context?.uid) throw new Error("Authenticated registration identity could not be verified.");
   if(!context?.roles?.length) throw new Error("No registered role could be retrieved. The induction application is blocked.");
+  if(context.anonymous){
+    const employeeMatches=Array.isArray(context.registerMatches?.employees)?context.registerMatches.employees:[];
+    const memberMatches=Array.isArray(context.registerMatches?.members)?context.registerMatches.members:[];
+    if(!context.invitation?.id) throw new Error("The application must enter through a registered IRPA invitation before administrator review.");
+    if(!employeeMatches.length&&!memberMatches.length) throw new Error("The invitation could not be verified against the Employee or Member register. The application remains outside the administrator review queue.");
+    const clean=v=>String(v||"").trim().toLowerCase();
+    const email=clean(form.verifiedEmail||context.email);
+    const name=clean(form.verifiedFullName||context.fullName);
+    const records=[...employeeMatches,...memberMatches];
+    const emailMatch=records.some(x=>clean(x.email)===email)&&clean(context.invitation.email)===email;
+    const roleMatch=records.some(x=>[x.role,...(x.roles||[])].some(v=>clean(v)===clean(form.primaryRole)))||clean(context.invitation.role)===clean(form.primaryRole);
+    const departmentMatch=records.some(x=>clean(x.department)===clean(form.department))||clean(context.invitation.department)===clean(form.department);
+    const unitMatch=records.some(x=>clean(x.unit)===clean(form.unit))||clean(context.invitation.unit)===clean(form.unit);
+    if(!emailMatch||!roleMatch||!departmentMatch||!unitMatch) throw new Error("The application information does not sufficiently match the registered invitation and Employee/Member records. It cannot be routed to the Administrator until the comparison is resolved.");
+  }
   if(context.existingRequest?.status==="Linked"||context.existingRequest?.roleAssignmentStatus==="Linked") return {alreadyLinked:true,requestId:uid};
 
   const submittedAt=serverTimestamp();
