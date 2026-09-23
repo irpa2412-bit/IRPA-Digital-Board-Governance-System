@@ -62,3 +62,22 @@
   .mobile-dashboard-only~.dashboard-grid{display:none}
   .mobile-dashboard-only~.panel{display:none}
 }
+
+/* Mobile dashboard cleanup: prevent compact controls from collapsing into each other. */
+@media(max-width:760px){
+  .mobile-dashboard-search,
+  .mobile-dashboard-section{width:100%;box-sizing:border-box}
+  .mobile-stat-grid{grid-template-columns:1fr 1fr;gap:10px}
+  .mobile-stat-card{display:block!important;width:100%!important;box-sizing:border-box!important;min-width:0!important;white-space:normal!important;overflow:hidden!important;line-height:1.25!important}
+  .mobile-stat-card span,.mobile-stat-card strong,.mobile-stat-card small{white-space:normal!important;word-break:normal!important}
+  .mobile-quick-list{grid-template-columns:1fr!important;gap:9px!important}
+  .mobile-portal-card{display:block!important;width:100%!important;box-sizing:border-box!important;min-height:64px!important;padding:12px 42px 12px 14px!important;white-space:normal!important;line-height:1.3!important}
+  .mobile-portal-card span{display:block!important;white-space:normal!important;line-height:1.25!important}
+  .mobile-portal-card small{display:block!important;max-width:100%!important;white-space:normal!important;line-height:1.35!important}
+  .mobile-attention-list{grid-template-columns:1fr!important;gap:8px!important}
+  .mobile-attention-list button{display:block!important;width:100%!important;box-sizing:border-box!important;min-height:48px!important;white-space:normal!important;line-height:1.35!important;padding:10px 38px 10px 13px!important}
+  .mobile-portal-directory{grid-template-columns:1fr!important;gap:5px!important}
+  .mobile-portal-directory button{display:block!important;width:100%!important;box-sizing:border-box!important;min-height:46px!important;white-space:normal!important;line-height:1.3!important;padding:10px 38px 10px 10px!important;background:#081a14!important;border:1px solid #294c3d!important;border-radius:9px!important}
+  .mobile-dashboard-search input{box-sizing:border-box!important;height:44px!important;font-size:13px!important}
+  .mobile-section-title{padding-bottom:2px}
+}
