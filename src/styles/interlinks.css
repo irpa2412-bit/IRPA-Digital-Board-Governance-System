@@ -32,3 +32,28 @@
   font-weight:900!important;
   box-shadow:inset 0 -2px #fff!important;
 }
+
+/* HARD UNIFORMITY: every overhead portal tab uses one identical light-green surface.
+   Active/hover states change only the border, never the fill colour. */
+.module-interlink-list > button,
+.workflow-portal-parent,
+.workflow-portal-children button{
+  background:#347d55!important;
+  color:#f7fff9!important;
+  border:1px solid #5fa77b!important;
+}
+.module-interlink-list > button:hover,
+.module-interlink-list > button.active,
+.workflow-portal-parent:hover,
+.workflow-portal-parent.active,
+.workflow-portal-children button:hover,
+.workflow-portal-children button.active{
+  background:#347d55!important;
+  color:#ffffff!important;
+  border-color:#ffffff!important;
+}
+.workflow-portal-group,
+.workflow-portal-group.active-group{
+  background:#e5f3eb!important;
+  border-color:#b9d8c5!important;
+}
