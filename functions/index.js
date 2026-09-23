@@ -68,8 +68,7 @@ exports.createAdministrator = onCall({region:"us-central1"}, async request => {
       target=await adminAuth.getUserByEmail(email);
     } catch(error) {
       if(error?.code!=="auth/user-not-found") throw new HttpsError("internal","Firebase Authentication could not verify the new administrator email address.");
-      const tempPassword="IRPA-"+crypto.randomBytes(24).toString("base64url")+"-9!aQ";
-      target=await adminAuth.createUser({email,password:tempPassword,emailVerified:false,displayName:name});
+      target=await adminAuth.createUser({email,emailVerified:false,displayName:name});
       accountCreated=true;
     }
     if(target.disabled===true){
