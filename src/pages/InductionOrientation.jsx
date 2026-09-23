@@ -117,12 +117,12 @@ export default function InductionOrientation(){
   finally{if(live)setBusy(false);}
  })();return()=>{live=false}},[]);
 
- const invitationOptions=useMemo(()=>context?.invitations||[],[context]);const isNewApplicant=Boolean(context?.anonymous);const emailOptions=useMemo(()=>unique([context?.email,...invitationOptions.map(x=>x.email)]),[context,invitationOptions]);const nameOptions=useMemo(()=>unique([context?.fullName,...invitationOptions.map(x=>x.name)]),[context,invitationOptions]);const accountTypeOptions=useMemo(()=>unique(context?.accountTypeOptions||[]),[context]);
- const roleOptions=useMemo(()=>unique(context?.roles||[]),[context]);
- const departmentOptions=useMemo(()=>unique([context?.department,...(context?.invitations||[]).map(x=>x.department),...Object.keys(DEPARTMENT_UNITS)]),[context]);
+ const invitationOptions=useMemo(()=>context?.invitations||[],[context]);const registerEmployees=useMemo(()=>context?.registerMatches?.employees||[],[context]);const registerMembers=useMemo(()=>context?.registerMatches?.members||[],[context]);const isNewApplicant=Boolean(context?.anonymous);const emailOptions=useMemo(()=>unique([context?.email,...invitationOptions.map(x=>x.email),...registerEmployees.map(x=>x.email),...registerMembers.map(x=>x.email)]),[context,invitationOptions,registerEmployees,registerMembers]);const nameOptions=useMemo(()=>unique([context?.fullName,...invitationOptions.map(x=>x.name),...registerEmployees.map(x=>x.name),...registerMembers.map(x=>x.name)]),[context,invitationOptions,registerEmployees,registerMembers]);const accountTypeOptions=useMemo(()=>unique([...(context?.accountTypeOptions||[]),...(registerEmployees.length?["Employee"]:[]),...(registerMembers.length?["Member"]:[])]),[context,registerEmployees,registerMembers]);
+ const roleOptions=useMemo(()=>unique([...(context?.roles||[]),...registerEmployees.flatMap(x=>[x.role,...(x.roles||[])]),...registerMembers.flatMap(x=>[x.role,...(x.roles||[])])]),[context,registerEmployees,registerMembers]);
+ const departmentOptions=useMemo(()=>unique([context?.department,...(context?.invitations||[]).map(x=>x.department),...registerEmployees.map(x=>x.department),...registerMembers.map(x=>x.department),...Object.keys(DEPARTMENT_UNITS)]),[context,registerEmployees,registerMembers]);
  const unitOptions=useMemo(()=>{
   const selected=form.department;
-  return unique([context?.unit,...(context?.invitations||[]).filter(x=>x.department===selected).map(x=>x.unit),...(DEPARTMENT_UNITS[selected]||[])]);
+  return unique([context?.unit,...(context?.invitations||[]).filter(x=>x.department===selected).map(x=>x.unit),...registerEmployees.filter(x=>x.department===selected).map(x=>x.unit),...registerMembers.filter(x=>x.department===selected).map(x=>x.unit),...(DEPARTMENT_UNITS[selected]||[])]);
  },[context,form.department]);
  const employmentOptions=useMemo(()=>unique([context?.employmentType,...(context?.invitations||[]).map(x=>x.employmentType),"Full-time","Part-time","Contract","Consultancy","Internship"]),[context]);
  const moduleOptions=useMemo(()=>orientationModules(form.primaryRole||context?.role||""),[form.primaryRole,context]);
@@ -135,7 +135,7 @@ export default function InductionOrientation(){
    const next={...x,[name]:value};
    if(name==="primaryRole"){next.q1="";next.q2="";next.q3="";next.orientationModules=orientationModules(value);}
    if(name==="department"){next.unit="";next.q3="";}
-   if(name==="verifiedEmail"||name==="verifiedFullName"){const match=(context?.invitations||[]).find(x=>x.email===next.verifiedEmail&&x.name===next.verifiedFullName);if(match){next.primaryRole=match.role||next.primaryRole;next.department=match.department||next.department;next.unit=match.unit||next.unit;next.employmentType=match.employmentType||next.employmentType;}}if(name==="q1")next.q2="";
+   if(name==="verifiedEmail"||name==="verifiedFullName"){const invitationMatch=(context?.invitations||[]).find(x=>String(x.email||"").toLowerCase()===String(next.verifiedEmail||"").toLowerCase()&&String(x.name||"").trim().toLowerCase()===String(next.verifiedFullName||"").trim().toLowerCase());const registerMatch=[...registerEmployees,...registerMembers].find(x=>String(x.email||"").toLowerCase()===String(next.verifiedEmail||"").toLowerCase()&&(String(x.name||"").trim().toLowerCase()===String(next.verifiedFullName||"").trim().toLowerCase()||!next.verifiedFullName));const match=registerMatch||invitationMatch;if(match){next.primaryRole=match.role||next.primaryRole;next.department=match.department||next.department;next.unit=match.unit||next.unit;next.employmentType=match.employmentType||next.employmentType;}}if(name==="q1")next.q2="";
    return next;
   });
  }
@@ -186,7 +186,7 @@ if(form.identityConfirmation!=="Yes"){setError(context.anonymous?"Please confirm
     <div><span>BOARD MEMBER</span><strong>{context.boardMember?"Yes":"No"}</strong></div>
     <div><span>REGISTRATION NUMBER</span><strong>Issued by email after administrator LINK</strong></div>
     <div><span>INVITATION</span><strong>{context.invitation?"Matched":isNewApplicant?"Not required for new enrollment":"No separate invitation found"}</strong></div>
-    <div><span>INVITATION REFERENCE</span><strong>{context.invitation?.invitationReference||context.invitation?.reference||context.invitationId||"Not applicable"}</strong></div>
+    <div><span>INVITATION REFERENCE</span><strong>{context.invitation?.invitationReference||context.invitation?.reference||context.invitationId||"Not applicable"}</strong></div><div><span>REGISTER MATCHING</span><strong>{(registerEmployees.length||registerMembers.length)?"Existing register record matched":"No existing member/employee match"}</strong></div>
    </div>
   </section>
 
@@ -198,7 +198,7 @@ if(form.identityConfirmation!=="Yes"){setError(context.anonymous?"Please confirm
    </section>
 
    <section className="panel">
-    <div className="panel-header"><div><span className="eyebrow">STEP 2</span><h2>Position, Department & Unit</h2><p className="panel-description">The choices below are generated from your administrator-controlled IRPA organizational registration.</p></div></div>
+    <div className="panel-header"><div><span className="eyebrow">STEP 2</span><h2>Position, Department & Unit</h2><p className="panel-description">The choices below are generated by comparing the invitation with the existing Member and Employee registers. Matching records are used to prompt the applicant and reduce administrator editorial work; the applicant can still correct their name spelling.</p></div></div>
     <div className="form-grid">
      <ChoiceField label="Role for this orientation" value={form.primaryRole} onChange={v=>patch("primaryRole",v)} options={roleOptions} help={context.role?"All registered roles remain recorded: "+context.role:""}/>
      <ChoiceField label="Department" value={form.department} onChange={v=>patch("department",v)} options={departmentOptions}/>
