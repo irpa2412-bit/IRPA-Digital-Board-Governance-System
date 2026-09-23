@@ -16,7 +16,6 @@ export default function AddAdministratorPortal(){
  }
  return <div className="page"><section className="panel">
   <div className="panel-header"><div><span className="eyebrow">ADMINISTRATOR GATEWAY</span><h2>Add Administrator</h2><p className="panel-description">Register another IRPA Administrator. Only an authenticated active Administrator can use this portal.</p></div></div>
-  <div className="stat-card" style={{marginBottom:18}}><span>Administrator authorization</span><strong>Active Administrator Required</strong><small>The authenticated account must be present in the IRPA Administrator Registry and marked active.</small></div>
   <form onSubmit={submit}>
    <label className="field" style={{display:"block"}}><span>New Administrator Name</span><input value={name} onChange={e=>setName(e.target.value)} placeholder="Full name" required autoComplete="name"/></label>
    <label className="field" style={{display:"block",marginTop:14}}><span>New Administrator Email</span><input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="administrator@example.com" required autoComplete="email"/></label>
