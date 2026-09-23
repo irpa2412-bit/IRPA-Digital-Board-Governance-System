@@ -49,7 +49,6 @@ jobs:
             const db = getFirestore();
             const administrators = [
               { email: "irpa2412@gmail.com", name: "IRPA Primary Administrator" },
-              { email: "crissdaniel2213@gmail.com", name: "Chris Cato Daniel" }
             ];
 
             for (const administrator of administrators) {
