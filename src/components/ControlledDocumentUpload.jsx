@@ -130,7 +130,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
   }
 
   return (
-    <section className="panel">
+    <section className="panel controlled-document-upload-panel">
       <div className="panel-header">
         <div>
           <span className="eyebrow">CONTROLLED DOCUMENT UPLOAD</span>
