@@ -153,7 +153,27 @@ export async function provisionCurrentMemberFromInvitationV2(invitationId) {
       }, { touchUpdatedAt: false, audit: false });
     }
   } else {
-    throw new Error("This invitation does not contain a recognized IRPA employee or Board Member role.");
+    // Non-board/non-employee invitation roles (for example Technical Advisor or
+    // Observer) still receive a minimal authorization profile without invoking the
+    // legacy member-number generator or unrestricted collection scans.
+    const memberRef = doc(db, COLLECTIONS.members, uid);
+    const existingMember = await getRecord(COLLECTIONS.members, uid);
+    if (!existingMember) {
+      await setDoc(memberRef, {
+        uid,
+        invitationId,
+        email,
+        name: invitation.name || "",
+        role,
+        memberType,
+        status: "Active",
+        accountActivated: true,
+        registrationStatus: "Activated",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        activatedAt: new Date().toISOString(),
+      });
+    }
   }
 
   await updateRecord(COLLECTIONS.invitations, invitation.id, {
