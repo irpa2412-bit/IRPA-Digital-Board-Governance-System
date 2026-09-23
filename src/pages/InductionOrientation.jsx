@@ -1,5 +1,5 @@
 import React,{useEffect,useMemo,useRef,useState}from"react";
-import{getCurrentInductionContext,submitInductionApplication}from"../firebase/data";
+import{getCurrentInductionContext,submitInductionApplication}from"../firebase/data";\nimport{upgradeInductionApplicant}from"../firebase/auth";
 
 const unique=(values)=>[...new Set(values.flatMap(v=>Array.isArray(v)?v:String(v||"").split(",")).map(v=>String(v||"").trim()).filter(Boolean))];
 
@@ -150,13 +150,13 @@ export default function InductionOrientation(){
 
  async function submit(e){
   e.preventDefault();setError("");setMessage("");if(feedbackRef.current)feedbackRef.current.scrollIntoView({behavior:"smooth",block:"nearest"});
-  if(!context){setError("The IRPA registration could not be retrieved. The application is blocked.");return}if(pending){setMessage("Your induction application is already awaiting administrator LINK. No duplicate submission is required.");return}
+  if(!context){setError("The IRPA induction enrollment session could not be established.");return}if(pending){setMessage("Your induction application is already awaiting administrator LINK. No duplicate submission is required.");return}
   if(!form.accountType){setError("Please confirm whether you are applying in your registered Employee or Member capacity.");return}
-  if(!form.credentialCapacity||!form.credentialRole){setError("Please complete the registration and login approval questions.");return}if(form.identityConfirmation!=="Yes"){setError("You must confirm that the displayed registration and invitation information belongs to you.");return}
+if(form.identityConfirmation!=="Yes"){setError("You must confirm that the displayed registration and invitation information belongs to you.");return}
   if(!form.verifiedEmail||!form.verifiedFullName||!form.primaryRole||!form.department||!form.unit||!form.employmentType||!form.q1||!form.q2||!form.q3||!form.q4||!form.q5||!form.q6||!form.orientationModules.length||!form.declaration){setError("Please complete all required selections before submitting.");return}
   setSaving(true);setMessage("Submitting your Induction and Orientation application… Please wait for the administrator-routing confirmation.");
   try{
-   const result=await submitInductionApplication(form,context);
+   if(context.anonymous){\n    if(!form.verifiedEmail){setError("Please provide an email address for the new IRPA account.");return}\n    setMessage("Registering your IRPA enrollment… Please wait.");\n    await upgradeInductionApplicant(form.verifiedEmail);\n   }\n   const result=await submitInductionApplication(form,{...context,email:String(form.verifiedEmail||context.email||"").trim().toLowerCase(),fullName:String(form.verifiedFullName||context.fullName||"").trim()});
    if(result.alreadyLinked){setMessage("Your induction has already been approved and linked by an administrator.");return}
    setMessage("Induction and Orientation submitted successfully. Your application is now awaiting administrator LINK. Your registered role(s), department/unit and Board Member status remain system-controlled.");
   }catch(x){setError(x.message||"The induction application could not be submitted.");}
