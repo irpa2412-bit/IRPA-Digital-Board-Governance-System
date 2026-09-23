@@ -269,13 +269,21 @@ useEffect(()=>{
 
       const session=await loadMemberSession();
       let m=session.member;
+      let activeEmployee=session.employee||null;
       const invitationId=new URLSearchParams(window.location.search).get("memberInvite");
-      if(!m&&invitationId){
+      // An authenticated invitation activation must complete institutional
+      // enrollment before the normal authorization gate is evaluated. Do this
+      // for both Board Members and Employees; do not rely on the existence of
+      // an unactivated register record as proof of enrollment.
+      if(activationMode&&invitationId){
         await provisionCurrentMemberFromInvitationV2(invitationId);
-        m=await getCurrentMemberProfile();
-        if(m)window.history.replaceState({},document.title,window.location.pathname+window.location.hash);
+        const refreshed=[await getCurrentMemberProfile().catch(()=>null),await getCurrentEmployeeProfile().catch(()=>null)];
+        m=refreshed[0];
+        activeEmployee=refreshed[1];
+        window.history.replaceState({},document.title,window.location.pathname+window.location.hash);
       }
       const activeMember = m?.status === "Active" ? m : null;
+      if(!activeEmployee && session.employee) activeEmployee=session.employee;
       const activeEmployee = session.employee || null;
       if(!activeMember && !activeEmployee){
         setError("This account has no active IRPA enrollment record.");
