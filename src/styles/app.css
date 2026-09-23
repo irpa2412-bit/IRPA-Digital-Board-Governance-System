@@ -332,3 +332,110 @@
   border-color:#b8ddc7;
   color:#17633e;
 }
+
+/* IRPA portal-wide light workspace — applies to authenticated portals, never to the approved dashboard */
+.content-area:not(.dashboard-content-area){
+  background:#f8faf9;
+  color:#26352f;
+}
+.content-area:not(.dashboard-content-area) .page{
+  color:#26352f;
+}
+.content-area:not(.dashboard-content-area) .page .welcome-panel,
+.content-area:not(.dashboard-content-area) .page .module-panel,
+.content-area:not(.dashboard-content-area) .page .panel{
+  background:#fff;
+  color:#26352f;
+  border:1px solid #dce5e0;
+  box-shadow:0 6px 20px rgba(24,61,45,.055);
+}
+.content-area:not(.dashboard-content-area) .page .welcome-panel h1,
+.content-area:not(.dashboard-content-area) .page .module-header h1,
+.content-area:not(.dashboard-content-area) .page .page-header h1,
+.content-area:not(.dashboard-content-area) .page .panel h2,
+.content-area:not(.dashboard-content-area) .page .panel-header h2{
+  color:#183b2d;
+}
+.content-area:not(.dashboard-content-area) .page .welcome-panel p,
+.content-area:not(.dashboard-content-area) .page .module-header p,
+.content-area:not(.dashboard-content-area) .page .page-header p,
+.content-area:not(.dashboard-content-area) .page .panel-description,
+.content-area:not(.dashboard-content-area) .page .module-panel>p{
+  color:#65776f;
+}
+.content-area:not(.dashboard-content-area) .page .form-field label{
+  color:#385248;
+}
+.content-area:not(.dashboard-content-area) .page .form-field input,
+.content-area:not(.dashboard-content-area) .page .form-field select,
+.content-area:not(.dashboard-content-area) .page .form-field textarea,
+.content-area:not(.dashboard-content-area) .page .table-search{
+  color:#243b32;
+  background:#fbfdfc;
+  border:1px solid #cbd9d2;
+}
+.content-area:not(.dashboard-content-area) .page .form-field input::placeholder,
+.content-area:not(.dashboard-content-area) .page .form-field textarea::placeholder,
+.content-area:not(.dashboard-content-area) .page .table-search::placeholder{
+  color:#7a8b84;
+}
+.content-area:not(.dashboard-content-area) .page th{
+  color:#496258;
+  border-bottom-color:#d4e0da;
+}
+.content-area:not(.dashboard-content-area) .page td{
+  color:#30473d;
+  border-bottom-color:#dce5e0;
+}
+.content-area:not(.dashboard-content-area) .page .table-wrapper,
+.content-area:not(.dashboard-content-area) .page table{
+  background:#fff;
+}
+.content-area:not(.dashboard-content-area) .page .detail-grid>div{
+  background:#f8fbf9;
+  border-color:#d6e2dc;
+}
+.content-area:not(.dashboard-content-area) .page .detail-grid span{
+  color:#647970;
+}
+.content-area:not(.dashboard-content-area) .page .detail-grid strong{
+  color:#27443a;
+}
+.content-area:not(.dashboard-content-area) .page .identity-card{
+  background:#f7fbf9;
+  border-color:#d3e0d9;
+}
+.content-area:not(.dashboard-content-area) .page .identity-card span{
+  color:#687d74;
+}
+.content-area:not(.dashboard-content-area) .page .identity-card strong{
+  color:#234438;
+}
+.content-area:not(.dashboard-content-area) .page .record-details{
+  background:#f8fbf9;
+  border-color:#d6e2dc;
+  color:#30473d;
+}
+.content-area:not(.dashboard-content-area) .page .module-interlink-bar{
+  background:#fff;
+  border-color:#dce5e0;
+  color:#30473d;
+}
+.content-area:not(.dashboard-content-area) .page .module-interlink-list button{
+  background:#f5f9f7;
+  border-color:#d6e2dc;
+  color:#30473d;
+}
+.content-area:not(.dashboard-content-area) .page .module-interlink-list button.active{
+  background:#eaf3ee;
+  border-color:#a9c5b7;
+  color:#174d36;
+}
+/* Keep the approved Governance Command Dashboard panels exactly on their existing light treatment. */
+.dashboard-content-area .dashboard-hero,
+.dashboard-content-area .dashboard-gauge,
+.dashboard-content-area .dashboard-function-button,
+.dashboard-content-area .dashboard-feed{
+  background:#fff;
+  color:#26352f;
+}
