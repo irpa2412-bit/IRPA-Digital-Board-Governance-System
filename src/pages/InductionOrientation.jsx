@@ -2,7 +2,8 @@ import React,{useEffect,useMemo,useRef,useState}from"react";
 import{getCurrentInductionContext,submitInductionApplication}from"../firebase/data";
 import{ensureInvitationApplicantSession}from"../firebase/auth";
 
-const unique=(values)=>[...new Set(values.flatMap(v=>Array.isArray(v)?v:String(v||"").split(",")).map(v=>String(v||"").trim()).filter(Boolean))];\nconst uniqueValues=unique;
+const unique=(values)=>[...new Set(values.flatMap(v=>Array.isArray(v)?v:String(v||"").split(",")).map(v=>String(v||"").trim()).filter(Boolean))];
+const uniqueValues=unique;
 
 const DEPARTMENT_UNITS={
 "Executive Office":["Executive Director's Office","Management Coordination Unit"],
