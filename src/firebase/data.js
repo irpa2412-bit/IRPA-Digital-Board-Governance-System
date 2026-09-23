@@ -99,10 +99,10 @@ export async function submitInductionApplication(form,context){
     requestedUnit:String(form.unit||context.unit||"").trim(),employmentType:String(form.employmentType||context.employmentType||"").trim(),
     orientationModules:Array.isArray(form.orientationModules)?form.orientationModules:[],
     answers:{
-      identityConfirmation:form.identityConfirmation||"",accountType:form.accountType||"",primaryRole:form.primaryRole||"",
+      identityConfirmation:form.identityConfirmation||"",verifiedEmail:String(form.verifiedEmail||context.email||"").trim().toLowerCase(),verifiedFullName:String(form.verifiedFullName||context.fullName||"").trim(),accountType:form.accountType||"",primaryRole:form.primaryRole||"",
       department:form.department||"",unit:form.unit||"",employmentType:form.employmentType||"",
       orientationModules:Array.isArray(form.orientationModules)?form.orientationModules:[],
-      q1:form.q1||"",q2:form.q2||"",q3:form.q3||"",comments:String(form.comments||"").trim()
+      q1:form.q1||"",q2:form.q2||"",q3:form.q3||"",q4:form.q4||"",q5:form.q5||"",q6:form.q6||"",comments:String(form.comments||"").trim()
     },
     completedSteps:Array.isArray(form.completedSteps)?form.completedSteps:[],
     declaration:form.declaration===true,status:"Pending Department & Unit Review",roleAssignmentStatus:"Pending",inductionStatus:"Submitted",
@@ -111,7 +111,7 @@ export async function submitInductionApplication(form,context){
   };
   await setDoc(requestRef,payload,{merge:true});
   await setDoc(doc(db,COLLECTIONS.inductionRecords,uid),{
-    uid,email:context.email,fullName:context.fullName,systemRoles:context.roles,systemRole:context.role,
+    uid,email:context.email,fullName:context.fullName,verifiedEmail:String(form.verifiedEmail||context.email||"").trim().toLowerCase(),verifiedFullName:String(form.verifiedFullName||context.fullName||"").trim(),systemRoles:context.roles,systemRole:context.role,
     systemDepartment:context.department||null,systemUnit:context.unit||null,boardMember:context.boardMember,
     accountType:payload.accountType,orientationModules:payload.orientationModules,answers:payload.answers,
     declaration:payload.declaration,status:"Submitted",inductionStatus:"Submitted",roleAssignmentStatus:"Pending",
