@@ -1,6 +1,5 @@
 import React,{useEffect,useMemo,useRef,useState}from"react";
 import{getCurrentInductionContext,submitInductionApplication}from"../firebase/data";
-import{submitCredentialInterview}from"../firebase/functions";
 
 const unique=(values)=>[...new Set(values.flatMap(v=>Array.isArray(v)?v:String(v||"").split(",")).map(v=>String(v||"").trim()).filter(Boolean))];
 
@@ -153,7 +152,7 @@ export default function InductionOrientation(){
   e.preventDefault();setError("");setMessage("");if(feedbackRef.current)feedbackRef.current.scrollIntoView({behavior:"smooth",block:"nearest"});
   if(!context){setError("The IRPA registration could not be retrieved. The application is blocked.");return}if(pending){setMessage("Your induction application is already awaiting administrator LINK. No duplicate submission is required.");return}
   if(!form.accountType){setError("Please confirm whether you are applying in your registered Employee or Member capacity.");return}
-  if(form.identityConfirmation!=="Yes"){setError("You must confirm that the displayed registration and invitation information belongs to you.");return}
+  if(!form.credentialCapacity||!form.credentialRole){setError("Please complete the registration and login approval questions.");return}if(form.identityConfirmation!=="Yes"){setError("You must confirm that the displayed registration and invitation information belongs to you.");return}
   if(!form.verifiedEmail||!form.verifiedFullName||!form.primaryRole||!form.department||!form.unit||!form.employmentType||!form.q1||!form.q2||!form.q3||!form.q4||!form.q5||!form.q6||!form.orientationModules.length||!form.declaration){setError("Please complete all required selections before submitting.");return}
   setSaving(true);setMessage("Submitting your Induction and Orientation application… Please wait for the administrator-routing confirmation.");
   try{
@@ -164,16 +163,7 @@ export default function InductionOrientation(){
   finally{setSaving(false);}
  }
 
- async function submitCredentialFallback(e){
-  e.preventDefault();setError("");setMessage("");
-  if(!form.credentialCapacity||!form.credentialRole){setError("Select your registered capacity and role for the credential interview.");return}
-  setSaving(true);setMessage("Submitting the credential interview for administrator login approval…");
-  try{
-   await submitCredentialInterview({name:form.verifiedFullName||context?.fullName||"",email:form.verifiedEmail||context?.email||"",invitationReference:form.credentialInvitationReference||context?.invitation?.invitationReference||context?.invitation?.reference||"",requestedCapacity:form.credentialCapacity,requestedRole:form.credentialRole});
-   setMessage("Credential interview submitted successfully. It is now routed to the Administrator Induction & Orientation portal for login approval. Do not create another request.");
-  }catch(x){setError(x?.message||"The credential interview could not be submitted.");}
-  finally{setSaving(false)}
- }
+
 
  if(busy)return <div className="page induction-page"><section className="panel induction-loading" aria-live="polite"><div className="induction-spinner" aria-hidden="true"/><h2>Induction and Orientation</h2><p className="muted">Retrieving your registered IRPA information and invitation details…</p><small className="field-help">The form will open automatically when the authenticated IRPA record has been verified.</small></section></div>;
  if(error&&!context)return <div className="page induction-page"><section className="panel"><h2>Induction and Orientation — Access Check</h2><div ref={feedbackRef} className="error-message action-feedback" role="alert">{error}</div><p className="panel-description">The system could not retrieve a matching IRPA registration/invitation record, so the application remains blocked.</p><button type="button" className="secondary-button" onClick={()=>window.location.reload()}>RETRY REGISTRATION CHECK</button></section></div>;
@@ -237,13 +227,12 @@ export default function InductionOrientation(){
 
 
    <section className="panel">
-    <div className="panel-header"><div><span className="eyebrow">LOGIN RECOVERY</span><h2>Credential Interview & Login Approval</h2><p className="panel-description">If first-time account activation or sign-in causes a problem, complete this interview here. It does not grant access automatically; the Administrator reviews the registered identity and approves login access.</p></div><div className="identity-card"><span>APPROVAL</span><strong>ADMIN LINK</strong><small>Administrator approval is the login approval.</small></div></div>
+    <div className="panel-header"><div><span className="eyebrow">REGISTRATION & LOGIN APPROVAL</span><h2>Registration and Access Questions</h2><p className="panel-description">These questions are part of the Induction and Orientation process. They replace the former separate interview gateway. Your answers are saved with this induction application and reviewed by the Administrator before login approval.</p></div></div>
     <div className="form-grid">
-     <ChoiceField label="Registered capacity" value={form.credentialCapacity} onChange={v=>patch("credentialCapacity",v)} options={accountTypeOptions.length?accountTypeOptions:["Employee","Member","Employee & Member"]}/>
-     <ChoiceField label="Role / position you are expecting" value={form.credentialRole} onChange={v=>patch("credentialRole",v)} options={roleOptions.length?roleOptions:[form.primaryRole||context?.role||""]}/>
-     <div className="form-field"><label>Invitation reference</label><input value={form.credentialInvitationReference} onChange={e=>patch("credentialInvitationReference",e.target.value)} placeholder="Optional"/></div>
+     <ChoiceField label="What is your registered capacity with IRPA?" value={form.credentialCapacity} onChange={v=>patch("credentialCapacity",v)} options={accountTypeOptions.length?accountTypeOptions:["Employee","Member","Employee & Member"]}/>
+     <ChoiceField label="What role / position are you registered or invited for?" value={form.credentialRole} onChange={v=>patch("credentialRole",v)} options={roleOptions.length?roleOptions:[form.primaryRole||context?.role||""]}/>
+     <div className="form-field"><label>What is your invitation reference, if available?</label><input value={form.credentialInvitationReference} onChange={e=>patch("credentialInvitationReference",e.target.value)} placeholder="Enter invitation reference if available"/></div>
     </div>
-    <div className="form-actions induction-submit-actions" style={{marginTop:18}}><button type="button" onClick={submitCredentialFallback} disabled={saving||linked}>{saving?"SUBMITTING…":"SUBMIT CREDENTIAL INTERVIEW FOR LOGIN APPROVAL"}</button><small className="submit-status">Your verified name and email are taken from the induction identity selections and routed to the administrator.</small></div>
    </section>
 
    <section className="panel">
