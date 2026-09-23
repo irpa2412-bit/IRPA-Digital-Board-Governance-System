@@ -90,6 +90,17 @@ export async function provisionCurrentMemberFromInvitationV2(invitationId) {
       uid, invitationId, accountActivated:true, registrationStatus:"Activated", activatedAt:new Date().toISOString()
     }, {touchUpdatedAt:false, audit:false});
 
+    // A person may legitimately hold both a Board role and an Employee role.
+    // The Board Member register remains canonical for the governance record, but
+    // the same Firebase UID is also attached to the matching Employee record so
+    // the authorization layer can resolve both role families after activation.
+    const employeeSnap = await getDocs(query(collection(db, COLLECTIONS.employees), where("email", "==", email)));
+    for (const d of employeeSnap.docs) {
+      await updateRecord(COLLECTIONS.employees, d.id, {
+        uid, invitationId, accountActivated:true, registrationStatus:"Activated", registrationEmailStatus:"Completed", activatedAt:new Date().toISOString()
+      }, {touchUpdatedAt:false, audit:false});
+    }
+
     // Keep the institutional Board Member document as the canonical member record;
     // do not create a duplicate members/{uid} document.
     await updateRecord(COLLECTIONS.invitations, invitation.id, {
@@ -134,11 +145,27 @@ export async function provisionCurrentMemberFromInvitationV2(invitationId) {
       activatedAt: new Date().toISOString(),
     }, { touchUpdatedAt: false, audit: false });
 
-    // The Employees Register is the authoritative enrollment record.
-    // Do not create a second members/{uid} document here. The main application
-    // already accepts an active employee record as a valid enrollment identity,
-    // and creating a member document introduces a second Firestore write and an
-    // avoidable permission dependency into the activation transaction.
+    // A person may legitimately hold both an Employee role and a Board role.
+    // If a Board Member institutional record exists for the same verified email,
+    // attach the same Firebase UID to it as well. This does not create a duplicate
+    // governance record; it simply links the two authoritative registers to one
+    // authenticated person.
+    const boardSnap = await getDocs(query(collection(db, COLLECTIONS.members), where("email", "==", email)));
+    for (const d of boardSnap.docs) {
+      const data = d.data() || {};
+      if (data.boardMember === true || data.boardPosition || data.department === "Board of Directors" || String(data.role || "").toLowerCase().includes("board")) {
+        await updateRecord(COLLECTIONS.members, d.id, {
+          uid,
+          invitationId,
+          accountActivated: true,
+          registrationStatus: "Activated",
+          activatedAt: new Date().toISOString(),
+        }, { touchUpdatedAt:false, audit:false });
+      }
+    }
+
+    // The Employees Register remains authoritative for the employee record.
+    // No duplicate members/{uid} document is created.
   } else {
     // Non-board/non-employee invitation roles (for example Technical Advisor or
     // Observer) still receive a minimal authorization profile without invoking the
