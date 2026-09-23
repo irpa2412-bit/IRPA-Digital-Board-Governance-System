@@ -180,6 +180,79 @@ function scoreInductionApplication(item, records){
   return {percentage,correct,total,threshold,advanced:percentage>=threshold,issues,reasons,scoreItems};
 }
 
+exports.sendMemberInvitation = onCall({region:"us-central1"}, async request => {
+  const uid=request.auth?.uid;
+  const actorEmail=String(request.auth?.token?.email||"").trim().toLowerCase();
+  if(!uid) throw new HttpsError("unauthenticated","Administrator authentication is required.");
+  const adminSnap=await db.collection("adminProfiles").doc(uid).get();
+  if(actorEmail!=="irpa2412@gmail.com" && (!adminSnap.exists || adminSnap.data()?.active!==true)){
+    throw new HttpsError("permission-denied","Administrator authorization is required.");
+  }
+  const invitationId=String(request.data?.invitationId||"").trim();
+  if(!invitationId) throw new HttpsError("invalid-argument","Invitation ID is required.");
+  const ref=db.collection("invitations").doc(invitationId);
+  const snap=await ref.get();
+  if(!snap.exists) throw new HttpsError("not-found","The invitation record could not be found.");
+  const invitation={id:snap.id,...snap.data()};
+  const email=String(invitation.email||"").trim().toLowerCase();
+  const name=String(invitation.name||"").trim();
+  if(!email||!email.includes("@")) throw new HttpsError("failed-precondition","The invitation has no valid addressee email.");
+  if(!name) throw new HttpsError("failed-precondition","The invitation has no addressee name.");
+
+  let role=String(invitation.role||"").trim();
+  let memberType=String(invitation.memberType||"").trim();
+  let department=String(invitation.department||"").trim();
+  let unit=String(invitation.unit||"").trim();
+  let sourceLabel="Invitation Register";
+
+  if(invitation.boardMemberId || invitation.institutionalRecordType==="Board Member"){
+    const sourceId=invitation.boardMemberId||invitation.institutionalRecordId;
+    const source=sourceId?await db.collection("members").doc(sourceId).get():null;
+    if(!source?.exists) throw new HttpsError("failed-precondition","The linked Board Member record could not be found.");
+    const data=source.data();
+    if(String(data.email||"").trim().toLowerCase()!==email) throw new HttpsError("failed-precondition","The invitation email does not match the linked Board Member record.");
+    role=String(data.boardPosition||data.role||role||"Board Member").trim();
+    memberType=String(data.memberType||memberType||"Governance Member").trim();
+    department=String(data.department||"Board of Directors").trim();
+    unit=String(data.unit||"").trim();
+    sourceLabel="Board Members' Register";
+  } else if(invitation.employeeId){
+    const source=await db.collection("employees").doc(invitation.employeeId).get();
+    if(!source.exists) throw new HttpsError("failed-precondition","The linked Employee record could not be found.");
+    const data=source.data();
+    if(String(data.email||"").trim().toLowerCase()!==email) throw new HttpsError("failed-precondition","The invitation email does not match the linked Employee record.");
+    role=String(data.role||role||"Employee").trim();
+    memberType=String(data.memberType||memberType||"Management").trim();
+    department=String(data.department||"").trim();
+    unit=String(data.unit||"").trim();
+    sourceLabel="Employees' Register";
+  }
+  if(!role) role="Board Member";
+  if(!memberType) memberType="Governance Member";
+
+  const origin=process.env.IRPA_LOGIN_URL||"https://irpa-digital-board-governance.web.app";
+  const subscriptionLink=origin+"/?induction=1&applicant=1&route=subscription&memberInvite="+encodeURIComponent(invitationId);
+  const assistanceLink=origin+"/?induction=1&applicant=1&route=assistance&memberInvite="+encodeURIComponent(invitationId);
+  const loginLink=origin+"/?induction=1&applicant=1&route=login";
+  const subject="IRPA Invitation — "+role;
+  const text="Dear "+name+",\\n\\nYou have been invited to access the IRPA Digital Board Governance System.\\n\\nAssigned IRPA role: "+role+"\\nMember type: "+memberType+"\\nSource register: "+sourceLabel+(department?"\\nDepartment: "+department:"")+(unit?"\\nUnit: "+unit:"")+"\\n\\nComplete your Induction & Orientation / subscription pathway here:\\n"+subscriptionLink+"\\n\\nIf you need login assistance:\\n"+assistanceLink+"\\n\\nNormal login route:\\n"+loginLink+"\\n\\nThis invitation is addressed to "+email+".\\n\\nImprovement of Rangeland in Pastoral Areas (IRPA)";
+  const html="<p>Dear "+name+",</p><p>You have been invited to access the IRPA Digital Board Governance System.</p><p><strong>Assigned IRPA role:</strong> "+role+"<br><strong>Member type:</strong> "+memberType+"<br><strong>Source register:</strong> "+sourceLabel+(department?"<br><strong>Department:</strong> "+department:"")+(unit?"<br><strong>Unit:</strong> "+unit:"")+"</p><p><a href='"+subscriptionLink+"'>Complete Induction &amp; Orientation / Subscription</a></p><p><a href='"+assistanceLink+"'>Login assistance</a></p><p><a href='"+loginLink+"'>Normal login</a></p><p>This invitation is addressed to "+email+".</p><p>Improvement of Rangeland in Pastoral Areas (IRPA)</p>";
+  const mailId=await queueInductionEmail(email,subject,text,html);
+  await ref.set({
+    role,memberType,department:department||null,unit:unit||null,
+    status:"Sent",deliveryStatus:"Queued in Firebase mail collection",
+    deliveryProvider:"Firebase mail queue → configured IRPA mail transport",
+    mailQueueId:mailId,mailQueuedAt:FieldValue.serverTimestamp(),
+    invitationRoleSource:sourceLabel,updatedAt:FieldValue.serverTimestamp()
+  },{merge:true});
+  await db.collection("audit").add({
+    action:"MEMBER_INVITATION_EMAIL_QUEUED",collection:"invitations",recordId:invitationId,
+    details:{email,role,memberType,sourceLabel,mailQueueId:mailId},
+    actorUid:uid,actorEmail,createdAt:FieldValue.serverTimestamp()
+  });
+  return {ok:true,email,role,memberType,sourceLabel,deliveryStatus:"Queued in Firebase mail collection",mailQueueId:mailId};
+});
+
 exports.submitInductionApplication = onCall({region:"us-central1"}, async request => {
   const uid=request.auth?.uid;
   if(!uid) throw new HttpsError("unauthenticated","The induction application session is not authenticated.");
