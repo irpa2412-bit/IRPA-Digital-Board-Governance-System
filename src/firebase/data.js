@@ -67,21 +67,35 @@ export async function getCurrentInductionContext(){
     const existingRequest=existingSnap.exists()?existingSnap.data():null;
     const invitationEmail=String(invitation?.email||"").trim().toLowerCase();
     const invitationName=String(invitation?.name||"").trim();
+    let registerMatches={employees:[],members:[],exactNameMatch:false};
+    if(invitation?.id){
+      try{
+        const call=httpsCallable(getFunctions(undefined,"us-central1"),"fetchInductionMatchingRecords");
+        const result=await call({invitationId:invitation.id});
+        registerMatches=result.data||registerMatches;
+      }catch(error){
+        console.warn("Induction register matching unavailable; invitation data will remain available.",error);
+      }
+    }
+    const matchedEmployees=Array.isArray(registerMatches.employees)?registerMatches.employees:[];
+    const matchedMembers=Array.isArray(registerMatches.members)?registerMatches.members:[];
     const roles=uniqueValues([
       invitation?.role,
-      ...(Array.isArray(invitation?.roles)?invitation.roles:[])
+      ...(Array.isArray(invitation?.roles)?invitation.roles:[]),
+      ...matchedEmployees.flatMap(x=>[x.role,...(x.roles||[])]),
+      ...matchedMembers.flatMap(x=>[x.role,...(x.roles||[])])
     ]);
-    const accountType=String(invitation?.accountType||invitation?.memberType||"").trim();
+    const accountType=matchedEmployees.length&&matchedMembers.length?"Employee & Member":matchedEmployees.length?"Employee":matchedMembers.length?"Member":String(invitation?.accountType||invitation?.memberType||"").trim();
     return {
       uid,email:invitationEmail,fullName:invitationName,
       roles:roles.length?roles:["Board Member","Executive Director","Director","Finance","Procurement","Human Resources","Programme & Technical","Operations","Field","General Employee"],
       role:roles.join(" • "),department:String(invitation?.department||"").trim(),
       unit:String(invitation?.unit||"").trim(),registrationNumber:"",
       accountType,accountTypeOptions:accountType?[accountType]:["Member","Employee"],
-      memberType:String(invitation?.memberType||"").trim(),
-      employmentType:String(invitation?.employmentType||"").trim(),
-      boardMember:Boolean(invitation?.boardMember||roles.some(r=>/board member/i.test(r))),
-      member:null,employee:null,invitation,invitations:invitation?[invitation]:[],
+      memberType:String(matchedMembers[0]?.memberType||invitation?.memberType||"").trim(),
+      employmentType:String(matchedEmployees[0]?.employmentType||invitation?.employmentType||"").trim(),
+      boardMember:Boolean(invitation?.boardMember||matchedMembers.some(x=>x.boardMember)||roles.some(r=>/board member/i.test(r))),
+      member:matchedMembers[0]||null,employee:matchedEmployees[0]||null,registerMatches,invitation,invitations:invitation?[invitation]:[],
       invitationId:invitation?.id||invitationId||null,existingRequest,anonymous:true
     };
   }
