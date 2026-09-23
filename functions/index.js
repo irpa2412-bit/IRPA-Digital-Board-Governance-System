@@ -226,6 +226,43 @@ exports.routeInductionApplication = onCall({region:"us-central1"}, async request
   return {ok:true,routingStatus,accuracyPercentage:score.percentage,systemSummary:summary,feedbackQueued:Boolean(emailId),advanced:score.advanced};
 });
 
+exports.processInductionApplicationAdmin = onCall({region:"us-central1"}, async request => {
+  const adminUid=request.auth?.uid;
+  if(!adminUid) throw new HttpsError("unauthenticated","Administrator authentication is required.");
+  const adminSnap=await db.collection("adminProfiles").doc(adminUid).get();
+  const actorEmail=String(request.auth?.token?.email||adminSnap.data()?.email||"").trim().toLowerCase();
+  if(actorEmail!=="irpa2412@gmail.com" && (!adminSnap.exists || adminSnap.data()?.active!==true)) throw new HttpsError("permission-denied","Administrator authorization is required.");
+  const requestId=String(request.data?.requestId||"").trim();
+  if(!requestId) throw new HttpsError("invalid-argument","Induction application ID is required.");
+  const requestRef=db.collection("registrationRequests").doc(requestId);
+  const snap=await requestRef.get();
+  if(!snap.exists) throw new HttpsError("not-found","The induction application could not be found.");
+  const item=snap.data();
+  const email=String(item.email||item.answers?.verifiedEmail||"").trim().toLowerCase();
+  const invitationId=String(item.invitationId||"").trim();
+  let invitation=null;
+  if(invitationId){const inv=await db.collection("invitations").doc(invitationId).get();if(inv.exists) invitation={id:inv.id,...inv.data()};}
+  const [employeeSnap,memberSnap]=await Promise.all([
+    email?db.collection("employees").where("email","==",email).limit(10).get():Promise.resolve({docs:[]}),
+    email?db.collection("members").where("email","==",email).limit(10).get():Promise.resolve({docs:[]})
+  ]);
+  const employees=employeeSnap.docs.map(d=>({id:d.id,...d.data()}));
+  const members=memberSnap.docs.map(d=>({id:d.id,...d.data()}));
+  const score=scoreInductionApplication(item,{invitation,employees,members});
+  const routingStatus=score.advanced?"Advanced to Administrator":"Filtered — Below 75% Accuracy";
+  const status=score.advanced?"Pending Administrator Decision":"Filtered — Applicant Feedback Required";
+  const summary=(score.advanced?"Advanced for administrator review. ":"Filtered pending applicant correction. ")+`Accuracy: ${score.percentage}% (${score.correct}/${score.total}).`+(score.issues.length?` Review items: ${score.issues.join(", ")}.`:" All scored items are consistent.");
+  await requestRef.set({accuracyPercentage:score.percentage,accuracyCorrect:score.correct,accuracyTotal:score.total,accuracyThreshold:score.threshold,accuracyAdvanced:score.advanced,routingStatus,systemSummary:summary,accuracyIssues:score.issues,accuracyReasons:score.reasons,status,inductionStatus:score.advanced?"Advanced":"Filtered",roleAssignmentStatus:score.advanced?"Pending Administrator Decision":"Filtered",feedbackStatus:"Queued",updatedAt:FieldValue.serverTimestamp(),adminProcessedByUid:adminUid,adminProcessedAt:FieldValue.serverTimestamp()},{merge:true});
+  await db.collection("inductionRecords").doc(requestId).set({accuracyPercentage:score.percentage,accuracyCorrect:score.correct,accuracyTotal:score.total,accuracyThreshold:score.threshold,accuracyAdvanced:score.advanced,routingStatus,systemSummary:summary,status:score.advanced?"Advanced":"Filtered",inductionStatus:score.advanced?"Advanced":"Filtered",updatedAt:FieldValue.serverTimestamp()},{merge:true});
+  if(email) await queueInductionEmail(email,score.advanced?"IRPA Induction Application — Advanced to Administrator":"IRPA Induction Application — Further Information Required",`Dear ${item.fullName||"Applicant"},\\n\\n${summary}\\n\\nIRPA Digital Board Governance System`,`<strong>IRPA Induction Application</strong><br>${summary.replace(/</g,"&lt;")}`);
+  const activeAdminSnap=await db.collection("adminProfiles").where("active","==",true).get();
+  const adminProfiles=activeAdminSnap.docs.map(d=>({uid:d.id,...d.data()}));
+  if(score.advanced){
+    await notify({recipientUids:adminProfiles.map(d=>d.uid),type:"INDUCTION_APPLICATION_ADVANCED",title:"Induction application advanced for decision",body:`${item.fullName||"Applicant"} — ${score.percentage}% accuracy. Open Induction & Orientation Administrator Applications.`,module:"Induction & Orientation",recordId:requestId,route:"/induction-admin",priority:"high",eventKey:`INDUCTION_APPLICATION_ADVANCED|${requestId}`});
+  }
+  return {ok:true,routingStatus,accuracyPercentage:score.percentage,systemSummary:summary};
+});
+
 exports.approveInductionApplication = onCall({region:"us-central1"}, async request => {
   const adminUid=request.auth?.uid;
   if(!adminUid) throw new HttpsError("unauthenticated","Administrator authentication is required.");
