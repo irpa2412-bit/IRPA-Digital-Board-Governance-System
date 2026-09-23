@@ -179,15 +179,6 @@ export default function Settings({ admin = false, section = "settings" }) {
               <button type="submit" disabled={adminBusy}>{adminBusy ? "Adding Administrator…" : "Add Administrator"}</button>
             </div>
           </form>
-        <section className="panel" style={{ marginTop: 20 }}>
-          <div className="panel-header"><div><span className="eyebrow">EXTERNAL ASSURANCE</span><h2>External Auditor Access</h2><p className="panel-description">Authorize an independent auditor by email. The auditor receives read-only access to the External Auditor Portal and its governance evidence reports; no governance action, approval, signature or editing rights are granted.</p></div></div>
-          <form onSubmit={async e=>{e.preventDefault();setAuditorBusy(true);setAuditorResult(null);try{const data=await createExternalAuditorProfile({name:auditorName,email:auditorEmail});setAuditorResult({ok:true,message:`External Auditor authorized for ${data.email}. Give the auditor the External Auditor Portal link and their Firebase sign-in credentials.`});setAuditorName("");setAuditorEmail("");}catch(error){setAuditorResult({ok:false,message:error?.message||"Unable to authorize the External Auditor."});}finally{setAuditorBusy(false)}}}>
-            <label className="field" style={{display:"block"}}><span>External Auditor Name</span><input value={auditorName} onChange={e=>setAuditorName(e.target.value)} placeholder="Auditor / audit firm representative" required /></label>
-            <label className="field" style={{display:"block",marginTop:14}}><span>External Auditor Email</span><input type="email" value={auditorEmail} onChange={e=>setAuditorEmail(e.target.value)} placeholder="auditor@example.org" required /></label>
-            <div className="form-actions" style={{marginTop:18}}><button type="submit" disabled={auditorBusy}>{auditorBusy?"Authorizing…":"Authorize External Auditor"}</button></div>
-          </form>
-          {auditorResult&&<div className={auditorResult.ok?"success-message":"auth-message"} style={{marginTop:16}}>{auditorResult.message}</div>}
-        </section>
           {adminResult && (
             <div
               className={adminResult.ok ? "success-message" : "auth-message"}
