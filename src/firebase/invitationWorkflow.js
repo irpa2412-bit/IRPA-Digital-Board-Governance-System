@@ -134,37 +134,11 @@ export async function provisionCurrentMemberFromInvitationV2(invitationId) {
       activatedAt: new Date().toISOString(),
     }, { touchUpdatedAt: false, audit: false });
 
-    // The employees collection remains the authoritative personnel register.
-    // A lightweight members/{uid} document is created only as the application's
-    // authorization profile. Avoid the legacy member-number generator and audit write.
-    const memberRef = doc(db, COLLECTIONS.members, uid);
-    const existingMember = await getRecord(COLLECTIONS.members, uid);
-    if (!existingMember) {
-      await setDoc(memberRef, {
-        uid,
-        invitationId,
-        employeeId: employee.id,
-        employeeNumber: employee.employeeNumber || null,
-        email,
-        name: invitation.name || employee.name || "",
-        role,
-        memberType,
-        status: "Active",
-        accountActivated: true,
-        registrationStatus: "Activated",
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        activatedAt: new Date().toISOString(),
-      });
-    } else if (existingMember.status !== "Active" || existingMember.invitationId !== invitationId) {
-      await updateRecord(COLLECTIONS.members, existingMember.id, {
-        uid,
-        invitationId,
-        accountActivated: true,
-        registrationStatus: "Activated",
-        activatedAt: new Date().toISOString(),
-      }, { touchUpdatedAt: false, audit: false });
-    }
+    // The Employees Register is the authoritative enrollment record.
+    // Do not create a second members/{uid} document here. The main application
+    // already accepts an active employee record as a valid enrollment identity,
+    // and creating a member document introduces a second Firestore write and an
+    // avoidable permission dependency into the activation transaction.
   } else {
     // Non-board/non-employee invitation roles (for example Technical Advisor or
     // Observer) still receive a minimal authorization profile without invoking the
