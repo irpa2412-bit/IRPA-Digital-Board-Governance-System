@@ -51,34 +51,40 @@ function orientationModules(role){
 }
 
 function questionSet(role,department,q1,context,form){
- const family=roleFamily(role);
- const accountOptions=unique([context?.accountType,context?.accountTypeOptions,...(context?.invitations||[]).map(x=>x.accountType)]);
- const roleOptions=unique([role,context?.role,...(context?.roles||[]),(context?.invitations||[]).map(x=>x.role)]);
- const departmentOptions=unique([department,context?.department,...(context?.invitations||[]).map(x=>x.department)]);
- const unitOptions=unique([form?.unit,context?.unit,...(context?.invitations||[]).map(x=>x.unit)]);
- const nameOptions=unique([context?.fullName,context?.invitation?.name,...(context?.invitations||[]).map(x=>x.name)]);
- const emailOptions=unique([context?.email,context?.invitation?.email,...(context?.invitations||[]).map(x=>x.email)]);
- const familyText={
-  "Board Member":"Board governance, meetings, resolutions, voting and delegated authority",
-  "Executive Director":"executive approvals, delegated authority, finance, procurement and reporting",
-  "Finance":"financial records, approvals, supporting evidence and payment controls",
-  "Procurement":"procurement requests, supplier evidence, approvals and Finance handoff",
-  "Human Resources":"member/personnel records, invitations and controlled HR workflows",
-  "Programme & Technical":"programme implementation, actions, documents and reporting",
-  "Operations":"operational assignments, actions, documents and authorised approvals",
-  "Field":"field implementation, evidence and reporting",
-  "Director":"directorate authority, actions, risk and approvals",
-  "General Employee":"assigned employee workspace, actions, documents and signatures"
- }[family]||"your assigned IRPA governance workspace";
- const q3Options=unique([departmentOptions.map(x=>"Department: "+x),unitOptions.map(x=>"Unit: "+x)]);
- const q4Options=unique([nameOptions.map(x=>"Name: "+x),emailOptions.map(x=>"Email: "+x)]);
+ const employees=Array.isArray(context?.registerMatches?.employees)?context.registerMatches.employees:[];
+ const members=Array.isArray(context?.registerMatches?.members)?context.registerMatches.members:[];
+ const invitations=Array.isArray(context?.invitations)?context.invitations:[];
+ const invitation=context?.invitation||invitations[0]||{};
+ const accountOptions=unique([context?.accountType,...(context?.accountTypeOptions||[]),employees.length?"Employee":"",members.length?"Member":""]);
+ const nameOptions=unique([context?.fullName,invitation.name,...employees.map(x=>x.name),...members.map(x=>x.name)]);
+ const emailOptions=unique([context?.email,invitation.email,...employees.map(x=>x.email),...members.map(x=>x.email)]);
+ const numberOptions=unique([
+  ...employees.map(x=>x.employeeNumber),
+  ...members.map(x=>x.memberNumber),
+  context?.employeeNumber,context?.memberNumber
+ ]);
+ const roleOptions=unique([role,invitation.role,...employees.flatMap(x=>[x.role,...(x.roles||[])]),...members.flatMap(x=>[x.role,...(x.roles||[])])]);
+ const organisationOptions=unique([
+  department?department:"",
+  ...employees.map(x=>x.department),...members.map(x=>x.department),
+  invitation.department,
+  form?.unit,...employees.map(x=>x.unit),...members.map(x=>x.unit),invitation.unit
+ ].filter(Boolean));
+ const statusOptions=unique([
+  ...employees.map(x=>x.employmentType),...members.map(x=>x.memberType),
+  invitation.employmentType,invitation.memberType,
+  context?.employmentType
+ ]);
+ const invitationOptions=unique([
+  invitation.invitationReference,invitation.reference,context?.invitationId
+ ]);
  return{
-  q1:{label:"1. Which IRPA capacity is shown for this application?",options:accountOptions.length?accountOptions:[form?.accountType||"Employee","Member","Employee & Member"]},
-  q2:{label:"2. Which role/position is the system associating with this application?",options:roleOptions.length?roleOptions:[role||"Applicant"]},
-  q3:{label:"3. Which department and unit should this application use?",options:q3Options.length?q3Options:[department?"Department: "+department:"Use the registered department/unit"]},
-  q4:{label:"4. Which identity detail should match the IRPA invitation/registration before submission?",options:q4Options.length?q4Options:["The applicant's verified name and email"]},
-  q5:{label:"5. What orientation area is relevant to this registered role?",options:["Follow "+familyText,...orientationModules(role).map(x=>"Use the "+x+" portal according to my authority"),"Use every portal regardless of authorization"]},
-  q6:{label:"6. What happens after the applicant confirms the system information and submits?",options:["The application is routed to the Administrator Induction & Orientation portal for review and LINK","Login is authorised immediately without administrator action","The applicant edits Firebase Authentication directly","The application is deleted"]}
+  q1:{label:"1. Which name in the IRPA records corresponds to you?",options:nameOptions.length?nameOptions:["Enter the applicant name shown above"]},
+  q2:{label:"2. Which email address is recorded for this applicant?",options:emailOptions.length?emailOptions:["Use the email address supplied for this application"]},
+  q3:{label:"3. Which IRPA registration number is associated with you, if one is already issued?",options:numberOptions.length?numberOptions:["No registration number is currently shown"]},
+  q4:{label:"4. Which role or position is recorded for this applicant?",options:roleOptions.length?roleOptions:[role||"No role shown"]},
+  q5:{label:"5. Which department and/or unit is recorded for this applicant?",options:organisationOptions.length?organisationOptions:["No department or unit is currently shown"]},
+  q6:{label:"6. Which membership/employment detail or invitation reference matches this application?",options:unique([...statusOptions,...invitationOptions].filter(Boolean)).length?unique([...statusOptions,...invitationOptions].filter(Boolean)):["No additional matching detail is currently shown"]}
  };
 }
 function ChoiceField({label,value,onChange,options,help,disabled=false,required=true}){
@@ -213,7 +219,7 @@ if(form.identityConfirmation!=="Yes"){setError(context.anonymous?"Please confirm
    </section>
 
    <section className="panel">
-    <div className="panel-header"><div><span className="eyebrow">STEP 4</span><h2>Adaptive Orientation Check</h2><p className="panel-description">The available answers change according to your selected role, department and previous answer.</p></div></div>
+    <div className="panel-header"><div><span className="eyebrow">STEP 4</span><h2>Adaptive Orientation Check</h2><p className="panel-description">The questions below use particulars already available in the IRPA Member, Employee and Invitation registers. Confirm the record that corresponds to you; they are used to support administrator verification and LINK.</p></div></div>
     <div className="form-grid">
      <ChoiceField label={questions.q1.label} value={form.q1} onChange={v=>patch("q1",v)} options={questions.q1.options}/>
      <ChoiceField label={questions.q2.label} value={form.q2} onChange={v=>patch("q2",v)} options={questions.q2.options} disabled={false}/>
