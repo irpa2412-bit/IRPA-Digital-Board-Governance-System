@@ -159,11 +159,11 @@ export async function sendPasswordReset(email) {
 
 export async function logout() { await signOut(auth); }
 
-export async function sendAdminMagicLink(email) {
+export async function sendAdminMagicLink(email, invitationId = "") {
   const cleanEmail = email.trim().toLowerCase();
   if(!cleanEmail) throw new Error("Administrator email is required.");
   const actionCodeSettings = {
-    url: window.location.origin + "/?adminGateway=1&adminModule=Add%20Administrator",
+    url: window.location.origin + "/?adminGateway=1&adminModule=Add%20Administrator" + (invitationId ? "&adminInvite=" + encodeURIComponent(invitationId) : ""),
     handleCodeInApp: true
   };
   await sendSignInLinkToEmail(auth, cleanEmail, actionCodeSettings);
