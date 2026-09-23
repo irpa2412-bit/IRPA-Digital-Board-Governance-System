@@ -249,8 +249,15 @@ export async function sendMemberInvitationEmail(email, invitationId) {
     };
   } catch(error) {
     const code=error?.code||"";
-    const message=error?.message||"Firebase could not queue the invitation email.";
-    throw new Error(message+(code?" ("+code+")":""));
+    const rawMessage=String(error?.message||"Firebase could not process the invitation email.");
+    const friendly = code === "functions/internal"
+      ? "Firebase could not execute the invitation mail service. The server-side mail function is not currently available. No email was released. Please complete the Firebase Cloud Functions deployment before retrying."
+      : code === "functions/unavailable"
+        ? "The IRPA invitation mail service is temporarily unavailable. No email was released. Please retry after the Firebase mail service is online."
+        : code === "functions/failed-precondition"
+          ? rawMessage
+          : rawMessage;
+    throw new Error(friendly+(code&&code!=="functions/internal"&&code!=="functions/unavailable"?" ("+code+")":""));
   }
 }
 export function observeAuthState(callback) {
