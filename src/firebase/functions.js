@@ -4,39 +4,60 @@ import { getFunctions, httpsCallable } from "firebase/functions";
 import { collection, doc, getDoc, getDocs, query, serverTimestamp, where, writeBatch } from "firebase/firestore";
 
 export async function createAdministrator({ name, email, onProgress }){
-  const cleanName = String(name || "").trim();
-  const cleanEmail = String(email || "").trim().toLowerCase();
-  const actor = auth.currentUser;
-
+  const cleanName=String(name||"").trim();
+  const cleanEmail=String(email||"").trim().toLowerCase();
+  const actor=auth.currentUser;
   if(!actor) throw new Error("Administrator authentication is required. Please sign in again.");
   if(!cleanName) throw new Error("The new administrator's name is required.");
   if(!cleanEmail || !cleanEmail.includes("@")) throw new Error("A valid administrator email address is required.");
-  if(cleanEmail === String(actor.email || "").trim().toLowerCase()) throw new Error("The current administrator is already an administrator.");
+  if(cleanEmail===String(actor.email||"").trim().toLowerCase()) throw new Error("The current administrator is already an administrator.");
 
-  try {
-    onProgress?.("Creating the Administrator account securely…");
-    const functions = getFunctions(undefined, "us-central1");
-    const call = httpsCallable(functions, "createAdministrator");
-    const result = await call({ name: cleanName, email: cleanEmail });
+  try{
+    // This is the inverse of Administrator removal: create a controlled
+    // invitation record first, then let the recipient's secure email-link
+    // activation create/reactivate the adminProfiles record. No Cloud Function
+    // is required for the browser command.
+    onProgress?.("Checking the Administrator register…");
+    const activeSnap=await getDocs(query(collection(db,"adminProfiles"),where("email","==",cleanEmail),where("active","==",true)));
+    if(!activeSnap.empty) throw new Error("That email address is already an active Administrator.");
 
-    onProgress?.("Administrator account prepared. Sending the secure activation link…");
-    const { sendAdminMagicLink } = await import("./auth");
-    await sendAdminMagicLink(cleanEmail);
+    const invitationRef=doc(collection(db,"adminInvitations"));
+    const invitationId=invitationRef.id;
+    onProgress?.("Registering the Administrator invitation…");
+    await setDoc(invitationRef,{
+      email:cleanEmail,
+      name:cleanName,
+      role:"Administrator",
+      status:"Pending",
+      createdByUid:actor.uid,
+      createdByEmail:String(actor.email||"").trim().toLowerCase(),
+      createdAt:serverTimestamp(),
+      updatedAt:serverTimestamp()
+    });
 
+    const auditRef=doc(collection(db,"audit"));
+    await setDoc(auditRef,{
+      action:"ADMINISTRATOR_INVITED",
+      collection:"adminInvitations",
+      recordId:invitationId,
+      details:{email:cleanEmail,name:cleanName,invitationId},
+      actorUid:actor.uid,
+      actorEmail:String(actor.email||"").trim().toLowerCase(),
+      createdAt:serverTimestamp()
+    });
+
+    onProgress?.("Sending the secure Administrator activation link…");
+    const {sendAdminMagicLink}=await import("./auth");
+    await sendAdminMagicLink(cleanEmail,invitationId);
     onProgress?.("Administrator activation link sent.");
-    return { ...(result.data || {}), ok: true, email: cleanEmail, name: cleanName, emailRequested: true };
-  } catch(error){
-    const code = String(error?.code || "").replace(/^functions\//, "").replace(/^auth\//, "");
-    const messages = {
-      "permission-denied": "Firebase denied creation of the Administrator account. Confirm that the current account is an active Administrator.",
-      "unauthenticated": "Administrator authentication is required. Please sign in again.",
-      "invalid-argument": "Please enter a valid administrator name and email address.",
-      "already-exists": "That email address is already registered. Use the existing account or choose another administrator email address.",
-      "unavailable": "Firebase is temporarily unavailable. Please retry the Administrator setup.",
-      "unauthorized-continue-uri": "Firebase Authentication rejected the activation-link destination. Add the IRPA web application domain under Firebase Authentication → Authorized domains.",
-      "invalid-continue-uri": "Firebase Authentication rejected the activation-link destination. Check the Firebase Authentication authorized domains."
-    };
-    throw new Error(messages[code] || error?.message || "Unable to add the Administrator.");
+    return {ok:true,email:cleanEmail,name:cleanName,invitationId,emailRequested:true};
+  }catch(error){
+    const message=String(error?.message||"Unable to add the Administrator.");
+    if(message.includes("already an active Administrator")) throw error;
+    const code=String(error?.code||"");
+    if(code.includes("permission-denied")) throw new Error("Firebase denied the Administrator invitation. Confirm that the current account is an active Administrator.");
+    if(code.includes("unauthorized-continue-uri")||message.includes("unauthorized-continue-uri")) throw new Error("Firebase Authentication rejected the activation-link destination. Add the IRPA web application domain under Firebase Authentication → Authorized domains.");
+    throw new Error(message);
   }
 }
 export async function listAdministrators(){
