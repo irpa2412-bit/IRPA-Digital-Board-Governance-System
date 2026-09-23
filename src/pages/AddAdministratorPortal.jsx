@@ -3,7 +3,7 @@ import {createAdministrator,listAdministrators,removeAdministrator}from"../fireb
 import {sendAdminMagicLink}from"../firebase/auth";
 
 export default function AddAdministratorPortal(){
- const[name,setName]=useState(""),[email,setEmail]=useState(""),[busy,setBusy]=useState(false),[resendBusy,setResendBusy]=useState(false),[removeBusy,setRemoveBusy]=useState(""),[result,setResult]=useState(null),[lastEmail,setLastEmail]=useState(""),[administrators,setAdministrators]=useState([]);
+ const[name,setName]=useState(""),[email,setEmail]=useState(""),[lastInvitationId,setLastInvitationId]=useState(""),[busy,setBusy]=useState(false),[resendBusy,setResendBusy]=useState(false),[removeBusy,setRemoveBusy]=useState(""),[result,setResult]=useState(null),[lastEmail,setLastEmail]=useState(""),[administrators,setAdministrators]=useState([]);
  const loadAdministrators=async()=>{try{setAdministrators(await listAdministrators())}catch(error){setResult({ok:false,message:error?.message||"Unable to load Administrator register."})}};
  useEffect(()=>{loadAdministrators()},[]);
 
@@ -14,7 +14,7 @@ export default function AddAdministratorPortal(){
   setBusy(true);setResult({ok:true,working:true,message:"Creating the Administrator account securely..."});
   try{
    const data=await createAdministrator({name:cleanName,email:cleanEmail,onProgress:message=>setResult({ok:true,working:true,message})});
-   setLastEmail(data?.email||cleanEmail);
+   setLastEmail(data?.email||cleanEmail);setLastInvitationId(data?.invitationId||"");
    setResult(data?.emailRequested===false
     ? {ok:true,working:false,message:"Administrator account created for "+(data?.email||cleanEmail)+", but the activation link was not sent. Use “Resend activation link” after correcting the email-delivery/authorized-domain issue. The account was not lost."}
     : {ok:true,working:false,message:"Administrator account created for "+(data?.email||cleanEmail)+". The secure activation link has been sent."});
@@ -25,7 +25,7 @@ export default function AddAdministratorPortal(){
  async function resend(){
   const target=lastEmail.trim().toLowerCase();if(!target)return;
   setResendBusy(true);setResult({ok:true,working:true,message:"Resending the secure Administrator activation link..."});
-  try{await sendAdminMagicLink(target);setResult({ok:true,working:false,message:"A new secure activation link has been sent to "+target+"."})}
+  try{await sendAdminMagicLink(target,lastInvitationId);setResult({ok:true,working:false,message:"A new secure activation link has been sent to "+target+"."})}
   catch(error){setResult({ok:false,working:false,message:error?.message||"The activation link could not be resent."})}
   finally{setResendBusy(false)}
  }
@@ -43,7 +43,7 @@ export default function AddAdministratorPortal(){
  }
  function cancelCommand(){
   if(busy||removeBusy||resendBusy){setResult({ok:false,message:"A command is currently running. Wait for it to finish before cancelling."});return}
-  setName("");setEmail("");setLastEmail("");setResult({ok:true,message:"Administrator command cancelled. No account was created or removed."});
+  setName("");setEmail("");setLastEmail("");setLastInvitationId("");setResult({ok:true,message:"Administrator command cancelled. No account was created or removed."});
  }
  return <div className="page"><section className="panel">
   <div className="panel-header"><div><span className="eyebrow">ADMINISTRATOR GATEWAY</span><h2>Add Administrator</h2><p className="panel-description">Register another IRPA Administrator. Only an authenticated active Administrator can use this portal.</p></div></div>
