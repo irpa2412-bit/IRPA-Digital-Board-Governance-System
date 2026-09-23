@@ -105,8 +105,16 @@ export default function App(){
 
 useEffect(()=>{
   if(!inductionMode)return;
-  ensureInductionAnonymousSession().catch(x=>setError(x.message||"Induction enrollment could not be opened."));
-},[inductionMode]);
+  const openApplicantSession=async()=>{
+    try{
+      if(applicantInductionMode&&auth.currentUser&&!auth.currentUser.isAnonymous){
+        await logout();
+      }
+      await ensureInductionAnonymousSession();
+    }catch(x){setError(x.message||"Induction enrollment could not be opened.");}
+  };
+  openApplicantSession();
+},[inductionMode,applicantInductionMode]);
 
 useEffect(()=>{
   let disposed=false;
