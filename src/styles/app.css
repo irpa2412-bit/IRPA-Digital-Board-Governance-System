@@ -572,3 +572,100 @@
   color:#30473d;
   border-color:#d8e3dd;
 }
+
+/* FINAL IRPA PORTAL COLOUR STANDARD — UNIFORM LIGHT GREEN THROUGHOUT ALL PORTALS.
+   Authentication, fixed sidebar and topbar remain separate architectural chrome.
+   Every authenticated portal workspace uses the same light-green surface family. */
+.content-area,
+.content-area:not(.dashboard-content-area),
+.dashboard-content-area{
+  background:#edf7f1!important;
+  color:#20382e!important;
+}
+.content-area .page,
+.content-area:not(.dashboard-content-area) .page,
+.dashboard-content-area .page{
+  background:transparent!important;
+  color:#20382e!important;
+}
+.content-area .page .welcome-panel,
+.content-area .page .module-panel,
+.content-area .page .panel,
+.content-area .page .stat-card,
+.content-area .page .workflow-stage,
+.content-area .page .dashboard-hero,
+.content-area .page .dashboard-gauge,
+.content-area .page .dashboard-function-button,
+.content-area .page .dashboard-feed,
+.content-area .page .detail-grid>div,
+.content-area .page .identity-card,
+.content-area .page .record-details,
+.content-area .page .table-wrapper,
+.content-area .page table,
+.content-area .page .module-interlink-bar{
+  background:#e5f3eb!important;
+  color:#20382e!important;
+  border-color:#b9d8c5!important;
+  box-shadow:0 5px 18px rgba(31,92,62,.07)!important;
+}
+.content-area .page .dashboard-gauge-icon{
+  background:#d4eadc!important;
+  color:#17613d!important;
+}
+.content-area .page h1,
+.content-area .page h2,
+.content-area .page h3,
+.content-area .page .panel-header h2,
+.content-area .page .dashboard-section-heading,
+.content-area .page .dashboard-feed-title,
+.content-area .page .dashboard-gauge>strong,
+.content-area .page .dashboard-function-button>span,
+.content-area .page .stat-card strong{
+  color:#173b2a!important;
+}
+.content-area .page p,
+.content-area .page small,
+.content-area .page .panel-description,
+.content-area .page .dashboard-hero p,
+.content-area .page .dashboard-gauge>small,
+.content-area .page .dashboard-function-button>small,
+.content-area .page .dashboard-empty,
+.content-area .page .stat-card small{
+  color:#4f695d!important;
+}
+.content-area .page .form-field input,
+.content-area .page .form-field select,
+.content-area .page .form-field textarea,
+.content-area .page .table-search{
+  background:#f7fcf9!important;
+  color:#20382e!important;
+  border-color:#b9d8c5!important;
+}
+.content-area .page th{
+  background:#dcefe4!important;
+  color:#28513d!important;
+  border-bottom-color:#b9d8c5!important;
+}
+.content-area .page td{
+  background:transparent!important;
+  color:#294638!important;
+  border-bottom-color:#c9dfd2!important;
+}
+.content-area .page tbody tr:nth-child(even){
+  background:#eaf6ef!important;
+}
+.content-area .page .success-message{
+  background:#dcefe4!important;
+  color:#145c38!important;
+  border-color:#9fc9b0!important;
+}
+.content-area .page .error-message{
+  background:#fff0ed!important;
+  color:#8a2f25!important;
+  border-color:#e4bbb5!important;
+}
+.content-area .page .status-badge{
+  background:#d5ecdf!important;
+  color:#17613d!important;
+  border-color:#9fc9b0!important;
+}
