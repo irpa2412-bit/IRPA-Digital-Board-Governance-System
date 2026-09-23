@@ -59,9 +59,9 @@ export async function provisionCurrentMemberFromInvitationV2(invitationId) {
     const boardMember = boardMemberId ? await getRecord(COLLECTIONS.members, boardMemberId) : null;
     if (!boardMember) throw new Error("The Board Member record linked to this invitation could not be found.");
     if (boardMember.email?.trim().toLowerCase() !== email) throw new Error("The invitation email does not match the Board Member institutional record.");
-    await updateRecord(COLLECTIONS.members, boardMember.id, {uid, invitationId, accountActivated:true, registrationStatus:"Activated", activatedAt:new Date().toISOString()});
+    await updateRecord(COLLECTIONS.members, boardMember.id, {uid, invitationId, accountActivated:true, registrationStatus:"Activated", activatedAt:new Date().toISOString()}, {touchUpdatedAt:false, audit:false});
     // Keep the institutional Board Member document as the canonical member record; do not create a duplicate members/{uid} document.
-    await updateRecord(COLLECTIONS.invitations, invitation.id, {status:"Accepted",acceptedUid:uid,acceptedAt:new Date().toISOString(),accountActivated:true,activationCompleted:true});
+    await updateRecord(COLLECTIONS.invitations, invitation.id, {status:"Accepted",acceptedUid:uid,acceptedAt:new Date().toISOString(),accountActivated:true,activationCompleted:true}, {touchUpdatedAt:false, audit:false});
     return { employee: boardMember, invitationId: invitation.id, uid };
   } else if (invitation.employeeId && !isBoardMember) {
     employee = await getRecord(COLLECTIONS.employees, invitation.employeeId);
