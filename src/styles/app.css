@@ -743,3 +743,40 @@
   color:#fff!important;
   border-color:#7f1d1d!important;
 }
+
+/* IRPA TAB/CARD STATUS PALETTE — adopt the approved deep-navy + neutral hierarchy.
+   Positive/active/value-bearing cards use #0C447C; zero-value/inactive cards use a light neutral.
+   Status colours remain reserved for their semantic meaning (success, warning, destructive). */
+.content-area .page .stat-card.value-card,
+.content-area .page .dashboard-gauge.value-card,
+.content-area .page .dashboard-function-button.value-card{
+  background:#0C447C!important;
+  color:#fff!important;
+  border-color:#1b5a92!important;
+}
+.content-area .page .stat-card.value-card span,
+.content-area .page .stat-card.value-card strong,
+.content-area .page .stat-card.value-card small,
+.content-area .page .dashboard-gauge.value-card *,
+.content-area .page .dashboard-function-button.value-card *{
+  color:#fff!important;
+}
+.content-area .page .stat-card.zero-value-card,
+.content-area .page .dashboard-gauge.zero-value-card,
+.content-area .page .dashboard-function-button.zero-value-card{
+  background:#f2f4f3!important;
+  color:#34463e!important;
+  border-color:#d9e1dd!important;
+  box-shadow:0 4px 14px rgba(24,61,45,.045)!important;
+}
+.content-area .page .stat-card.zero-value-card span,
+.content-area .page .stat-card.zero-value-card strong,
+.content-area .page .stat-card.zero-value-card small,
+.content-area .page .dashboard-gauge.zero-value-card *,
+.content-area .page .dashboard-function-button.zero-value-card *{
+  color:#34463e!important;
+}
+.content-area .page .stat-card.zero-value-card strong,
+.content-area .page .dashboard-gauge.zero-value-card strong{
+  color:#24362f!important;
+}
