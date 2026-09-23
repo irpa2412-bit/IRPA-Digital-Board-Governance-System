@@ -306,6 +306,7 @@ exports.submitInductionApplication = onCall({region:"us-central1"}, async reques
     unit:requestedUnit,
     employmentType:form.employmentType||"",
     orientationModules:Array.isArray(form.orientationModules)?form.orientationModules:[],
+    selectedRoles:Array.isArray(form.selectedRoles)?form.selectedRoles:systemRoles,
     credentialCapacity:form.credentialCapacity||"",
     credentialRole:form.credentialRole||"",
     credentialInvitationReference:String(form.credentialInvitationReference||"").trim(),
@@ -341,7 +342,7 @@ exports.submitInductionApplication = onCall({region:"us-central1"}, async reques
   const status=score.advanced?"Pending Administrator Decision":"Filtered — Applicant Feedback Required";
   const summary=(score.advanced?"Advanced for administrator review. ":"Filtered pending applicant correction. ")+`Accuracy: ${score.percentage}% (${score.correct}/${score.total}).`+(score.issues.length?` Review items: ${score.issues.join(", ")}.`:" All scored items are consistent.");
   const capturedSystemInformation={
-    position:systemRole,assignedRoles:systemRoles,department:systemDepartment,unit:systemUnit,
+    position:systemRole,assignedRoles:systemRoles,selectedRoles:Array.isArray(form.selectedRoles)?form.selectedRoles:systemRoles,department:systemDepartment,unit:systemUnit,
     capacity:form.credentialCapacity||form.accountType||suppliedContext.accountType||null,
     employmentType:payload.employmentType,memberType:matchedMember?.memberType||null,
     boardMember,registrationNumber:matchedEmployee?.employeeNumber||matchedMember?.memberNumber||null,
