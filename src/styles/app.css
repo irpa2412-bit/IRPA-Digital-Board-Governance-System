@@ -173,3 +173,10 @@
 
 /* Right-side architectural navigation icons */
 .nav-svg-icon{width:24px;height:24px;display:block;flex:0 0 24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.nav-item-content .nav-item-icon{width:28px;height:28px;display:grid;place-items:center;flex:0 0 28px;border-radius:7px;background:transparent;color:#f2f5f3;font-size:0;font-weight:400;font-style:normal}.nav-item.active .nav-item-icon{background:transparent;color:#fff}.nav-child .nav-item-icon{width:24px;height:24px;flex-basis:24px}.nav-child .nav-svg-icon{width:21px;height:21px}.nav-item-icon{display:inline-grid;place-items:center;width:24px;height:24px;flex:0 0 24px;border-radius:7px;background:rgba(214,165,44,.12);color:#d6a52c;font-size:14px;font-weight:800;font-style:normal}.nav-item.active .nav-item-icon{background:rgba(214,165,44,.2);color:#d6a52c}.nav-child .nav-item-icon{width:20px;height:20px;flex-basis:20px;font-size:12px}.nav-item-content>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Final sidebar taskbar icon treatment */
+.nav-item-content .nav-item-icon{width:28px;height:28px;flex:0 0 28px;background:transparent!important;color:#f2f5f3!important;border-radius:7px;font-size:0!important}
+.nav-item.active .nav-item-icon{background:transparent!important;color:#fff!important}
+.nav-item-content .nav-svg-icon{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.nav-child .nav-item-icon{width:24px;height:24px;flex-basis:24px}
+.nav-child .nav-svg-icon{width:21px;height:21px}
