@@ -126,7 +126,7 @@ export default function InductionOrientation(){
 
  const invitationOptions=useMemo(()=>context?.invitations||[],[context]);const emailOptions=useMemo(()=>unique([context?.email,...invitationOptions.map(x=>x.email)]),[context,invitationOptions]);const nameOptions=useMemo(()=>unique([context?.fullName,...invitationOptions.map(x=>x.name)]),[context,invitationOptions]);const accountTypeOptions=useMemo(()=>unique(context?.accountTypeOptions||[]),[context]);
  const roleOptions=useMemo(()=>unique(context?.roles||[]),[context]);
- const departmentOptions=useMemo(()=>unique([context?.department,...(context?.invitations||[]).map(x=>x.department)]),[context]);
+ const departmentOptions=useMemo(()=>unique([context?.department,...(context?.invitations||[]).map(x=>x.department),...Object.keys(DEPARTMENT_UNITS)]),[context]);
  const unitOptions=useMemo(()=>{
   const selected=form.department;
   return unique([context?.unit,...(context?.invitations||[]).filter(x=>x.department===selected).map(x=>x.unit),...(DEPARTMENT_UNITS[selected]||[])]);
