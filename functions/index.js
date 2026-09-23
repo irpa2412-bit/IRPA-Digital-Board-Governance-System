@@ -91,6 +91,34 @@ exports.createAdministrator = onCall({region:"us-central1"}, async request => {
   return {ok:true,uid:target.uid,email,name:name||target.displayName||email.split("@")[0],accountCreated:!target.metadata?.lastSignInTime};
 });
 
+exports.fetchInductionMatchingRecords = onCall({region:"us-central1"}, async request => {
+  const invitationId=String(request.data?.invitationId||"").trim();
+  if(!invitationId) throw new HttpsError("invalid-argument","An invitation reference is required for applicant matching.");
+  const invitationSnap=await db.collection("invitations").doc(invitationId).get();
+  if(!invitationSnap.exists) throw new HttpsError("not-found","The IRPA invitation could not be found.");
+  const invitation={id:invitationSnap.id,...invitationSnap.data()};
+  if(String(invitation.status||"").toLowerCase()==="cancelled") throw new HttpsError("failed-precondition","This IRPA invitation has been cancelled.");
+  const email=String(invitation.email||"").trim().toLowerCase();
+  const name=String(invitation.name||"").trim().toLowerCase();
+  const [employeeSnap,memberSnap]=await Promise.all([
+    email?db.collection("employees").where("email","==",email).get():Promise.resolve({docs:[]}),
+    email?db.collection("members").where("email","==",email).get():Promise.resolve({docs:[]})
+  ]);
+  const clean=docSnap=>({id:docSnap.id,...docSnap.data()});
+  const employees=employeeSnap.docs.map(clean);
+  const members=memberSnap.docs.map(clean);
+  const nameMatches={
+    employees:employees.filter(x=>String(x.name||"").trim().toLowerCase()===name),
+    members:members.filter(x=>String(x.name||"").trim().toLowerCase()===name)
+  };
+  return {
+    invitation,
+    employees:employees.map(x=>({id:x.id,uid:x.uid||null,name:x.name||"",email:x.email||email,employeeNumber:x.employeeNumber||"",role:x.role||"",roles:Array.isArray(x.roles)?x.roles:[],department:x.department||"",unit:x.unit||"",employmentType:x.employmentType||"",status:x.status||"",registrationStatus:x.registrationStatus||""})),
+    members:members.map(x=>({id:x.id,uid:x.uid||null,name:x.name||"",email:x.email||email,memberNumber:x.memberNumber||"",memberType:x.memberType||"",role:x.role||"",roles:Array.isArray(x.roles)?x.roles:[],department:x.department||"",unit:x.unit||"",boardMember:Boolean(x.boardMember),status:x.status||"",registrationStatus:x.registrationStatus||""})),
+    exactNameMatch:Boolean(nameMatches.employees.length||nameMatches.members.length)
+  };
+});
+
 exports.approveInductionApplication = onCall({region:"us-central1"}, async request => {
   const adminUid=request.auth?.uid;
   if(!adminUid) throw new HttpsError("unauthenticated","Administrator authentication is required.");
