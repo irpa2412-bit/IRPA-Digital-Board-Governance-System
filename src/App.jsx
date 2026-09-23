@@ -116,6 +116,7 @@ export default function App(){
   const entryRoute=params.get("route")||"assistance";
   const adminGatewayMode=params.get("adminGateway")==="1"||entryRoute==="admin";
   const inductionMode=params.get("induction")==="1";
+  const auditorMode=params.get("auditor")==="1"||entryRoute==="auditor";
   const activationMode=inductionMode&&params.get("applicant")==="1"&&entryRoute==="subscription"&&Boolean(params.get("memberInvite"));
   const applicantInductionMode=inductionMode&&params.get("applicant")==="1"&&entryRoute==="assistance";if(auditorMode)return <ExternalAuditorGateway/>;
   const[user,setUser]=useState(undefined),
