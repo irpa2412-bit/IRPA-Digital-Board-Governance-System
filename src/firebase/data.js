@@ -212,7 +212,14 @@ export async function submitInductionApplication(form,context){
 
 export async function getInductionRegistrationRequests(){
   await requireActiveAdmin();
-  const snap=await getDocs(collection(db,COLLECTIONS.registrationRequests)); return snap.docs.map(x=>({id:x.id,...x.data()})).sort((a,b)=>{const ta=a.lastSubmittedAt?.toMillis?.()||a.submittedAt?.toMillis?.()||0;const tb=b.lastSubmittedAt?.toMillis?.()||b.submittedAt?.toMillis?.()||0;return tb-ta;});
+  const [requestSnap,inductionSnap]=await Promise.all([
+    getDocs(collection(db,COLLECTIONS.registrationRequests)),
+    getDocs(collection(db,COLLECTIONS.inductionRecords))
+  ]);
+  const requests=requestSnap.docs.map(x=>({id:x.id,...x.data(),_source:"registrationRequests"}));
+  const existing=new Set(requests.map(x=>x.id));
+  const recovery=inductionSnap.docs.filter(x=>!existing.has(x.id)).map(x=>({id:x.id,...x.data(),_source:"inductionRecords",recoveryRequired:true,status:x.data()?.status||"Submitted",routingStatus:x.data()?.routingStatus||null}));
+  return [...requests,...recovery].sort((a,b)=>{const ta=a.lastSubmittedAt?.toMillis?.()||a.submittedAt?.toMillis?.()||0;const tb=b.lastSubmittedAt?.toMillis?.()||b.submittedAt?.toMillis?.()||0;return tb-ta;});
 }
 
 export async function processInductionRegistrationAdmin(requestId){
