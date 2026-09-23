@@ -180,3 +180,5 @@
 .nav-item-content .nav-svg-icon{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .nav-child .nav-item-icon{width:24px;height:24px;flex-basis:24px}
 .nav-child .nav-svg-icon{width:21px;height:21px}
+
+.auth-logo-wrap{width:104px;height:104px;margin:0 auto 14px;border-radius:50%;overflow:hidden;background:#fff;display:grid;place-items:center;box-shadow:0 3px 12px rgba(0,0,0,.14)}.auth-logo{width:100%;height:100%;object-fit:contain;display:block}
