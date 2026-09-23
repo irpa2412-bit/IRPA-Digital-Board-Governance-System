@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { auth } from "../firebase/config";
 import { createRecord, COLLECTIONS, getCurrentMemberProfile, getCurrentEmployeeProfile } from "../firebase/data";
 import { readWorkflowContext, withWorkflowLinks } from "../firebase/workflowLinks";
