@@ -439,3 +439,49 @@
   background:#fff;
   color:#26352f;
 }
+
+/* Readability-first portal cards — light surfaces outside the approved dashboard */
+.content-area:not(.dashboard-content-area) .page .stat-card,
+.content-area:not(.dashboard-content-area) .page .workflow-stage{
+  background:#fff;
+  color:#243b32;
+  border:1px solid #d7e3dd;
+  box-shadow:0 5px 18px rgba(24,61,45,.055);
+}
+.content-area:not(.dashboard-content-area) .page .stat-card:after{
+  background:#b88618;
+}
+.content-area:not(.dashboard-content-area) .page .stat-card span{
+  color:#3f5a4f;
+  font-weight:800;
+}
+.content-area:not(.dashboard-content-area) .page .stat-card strong{
+  color:#18382b;
+  font-weight:850;
+}
+.content-area:not(.dashboard-content-area) .page .stat-card small{
+  color:#667a71;
+}
+.content-area:not(.dashboard-content-area) .page .workflow-stage:hover{
+  border-color:#7da992;
+  box-shadow:0 7px 22px rgba(24,61,45,.08);
+}
+.content-area:not(.dashboard-content-area) .page .workflow-stage.active-stage{
+  border-color:#b88618;
+  box-shadow:0 0 0 2px rgba(184,134,24,.12),0 7px 22px rgba(24,61,45,.08);
+}
+.content-area:not(.dashboard-content-area) .page .success-message{
+  background:#edf8f1;
+  color:#145c38;
+  border-color:#b9dbc6;
+}
+.content-area:not(.dashboard-content-area) .page .error-message{
+  background:#fff3f1;
+  color:#8a2f25;
+  border-color:#e4bbb5;
+}
+.content-area:not(.dashboard-content-area) .page .status-badge{
+  background:#e9f5ee;
+  color:#17613d;
+  border:1px solid #bddbc9;
+}
