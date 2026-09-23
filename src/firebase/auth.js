@@ -231,7 +231,7 @@ export async function sendEmployeeRegistrationEmail(email, employeeNumber) {
   return sendAuthResetEmailWithSecondaryApp(cleanEmail, actionCodeSettings, "employee-registration");
 }
 
-export async function sendMemberInvitationEmail(email, invitationId) {
+export async function sendMemberInvitationEmail(email, invitationId, role = "", memberType = "") {
   if (!email || !invitationId) throw new Error("Member email and invitation ID are required.");
   const cleanEmail = email.trim().toLowerCase();
   const gateway = String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL || "https://irpa-google-drive-gateway.irpa-governance.workers.dev").replace(/\/$/,"");
@@ -247,6 +247,8 @@ export async function sendMemberInvitationEmail(email, invitationId) {
       body: JSON.stringify({
         invitationId,
         email: cleanEmail,
+        role: role || "",
+        memberType: memberType || "",
         subscriptionLink: window.location.origin + "/?induction=1&applicant=1&route=subscription&memberInvite=" + encodeURIComponent(invitationId),
         loginAssistanceLink: window.location.origin + "/?induction=1&applicant=1&route=assistance&memberInvite=" + encodeURIComponent(invitationId),
         inductionOrientationLink: window.location.origin + "/?induction=1&applicant=1&route=assistance&memberInvite=" + encodeURIComponent(invitationId),
