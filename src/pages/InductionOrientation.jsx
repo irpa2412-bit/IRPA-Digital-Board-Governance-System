@@ -178,7 +178,7 @@ if(form.identityConfirmation!=="Yes"){setError(context.anonymous?"Please confirm
    <div className="identity-card"><span>APPLICATION STATUS</span><strong>{linked?"LINKED":pending?"PENDING LINK":"READY"}</strong><small>{linked?"Administrator approval completed":pending?"Awaiting administrator LINK":"Complete the guided form below"}</small></div>
   </section>
 
-  {(message||error)&&<div ref={feedbackRef} className="induction-feedback" aria-live="polite">{message&&<div className="success-message action-feedback" role="status">{message}</div>}{error&&<div className="error-message action-feedback" role="alert">{error}</div>}</div>}
+  {(message||error)&&<div ref={feedbackRef} className="induction-feedback induction-feedback-attention" aria-live="polite">{message&&<div className="success-message action-feedback induction-feedback-blink" role="status">{message}</div>}{error&&<div className="error-message action-feedback induction-feedback-blink" role="alert">{error}</div>}</div>}
 
   <section className="panel induction-progress-panel"><div className="induction-progress-head"><div><span className="eyebrow">APPLICATION PROGRESS</span><strong>{progress}% complete</strong></div><span>{pending?"Pending administrator LINK":linked?"Administrator LINK completed":"Complete the required fields below"}</span></div><div className="induction-progress-track" aria-label={`Application ${progress}% complete`}><span style={{width:`${progress}%`}}/></div><div className="induction-steps" aria-label="Induction steps">{["Identity","Position","Modules","Orientation Check","Declaration"].map((x,i)=><span key={x} className={completedFields>=[2,4,5,8,11][i]?"complete":""}>{i+1}. {x}</span>)}</div></section>
 
