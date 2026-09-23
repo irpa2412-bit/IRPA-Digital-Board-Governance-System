@@ -49,51 +49,37 @@ function orientationModules(role){
  return unique(base);
 }
 
-function questionSet(role,department,q1){
+function questionSet(role,department,q1,context,form){
  const family=roleFamily(role);
- const q1Options={
-  "Board Member":["Confirm the Board/member identity and delegated authority","Open a formal vote immediately","Change my registered role","Bypass the meeting and resolution records"],
-  "Executive Director":["Confirm delegated authority and review pending approvals/actions","Edit another employee's registration","Bypass the approval workflow","Open restricted records without authorization"],
-  "Finance":["Confirm Finance access and review the relevant financial record/workflow","Approve every transaction automatically","Delete supporting evidence","Move a procurement record to payment without the required handoff"],
-  "Procurement":["Confirm the procurement request, evidence and workflow stage","Skip quotations and approval controls","Send an unapproved request directly to payment","Delete supplier evidence"],
-  "Human Resources":["Confirm the employee/member record and controlled HR workflow","Share personnel records with all users","Change another user's password","Bypass registration controls"],
-  "Programme & Technical":["Confirm the assigned programme/technical role and implementation workspace","Approve restricted finance records without authority","Delete implementation evidence","Bypass reporting"],
-  "Operations":["Confirm the operational assignment and active workflow","Approve every departmental request","Delete operational records","Bypass authorization"],
-  "Field":["Confirm the field assignment and reporting workspace","Change the registered department without approval","Delete field evidence","Bypass reporting"],
-  "Director":["Confirm the directorate, delegated authority and pending actions","Approve all requests regardless of authority","Delete audit records","Bypass governance workflow"],
-  "General Employee":["Confirm my registered role, department and assigned workspace","Access restricted portals without authorization","Change another user's registration","Bypass assigned workflows"]
- }[family]||[];
- const q2ByQ1={
-  "Confirm the Board/member identity and delegated authority":["Review Meetings, Resolutions and authorised Voting","Open Finance Portfolio regardless of authority","Change the Board register","Delete governance records"],
-  "Confirm delegated authority and review pending approvals/actions":["Review Authorization & Approvals, Actions, Reports and delegated workspaces","Bypass all approvals","Change another person's role","Delete audit records"],
-  "Confirm Finance access and review the relevant financial record/workflow":["Use Finance Portfolio and the designated Documents evidence trail","Send every record directly to payment","Delete financial evidence","Approve records outside delegated authority"],
-  "Confirm the procurement request, evidence and workflow stage":["Review the procurement stage, quotations/evidence and authorised Finance handoff","Skip quotation requirements","Send directly to payment","Delete vendor evidence"],
-  "Confirm the employee/member record and controlled HR workflow":["Use Members & Personnel, Invitations and authorised HR documents","Share personnel files broadly","Delete employee records","Bypass HR controls"],
-  "Confirm the assigned programme/technical role and implementation workspace":["Use assigned Meetings, Actions, Documents and Reports","Open restricted Finance records","Delete implementation evidence","Bypass reporting"],
-  "Confirm the operational assignment and active workflow":["Track operational Actions, Meetings, Documents and authorised approvals","Approve every request","Delete records","Bypass workflow"],
-  "Confirm the field assignment and reporting workspace":["Use assigned Actions, Documents and Reports for field evidence","Change another user's role","Delete evidence","Bypass reporting"],
-  "Confirm the directorate, delegated authority and pending actions":["Review departmental Actions, Reports, Risks and Authorization & Approvals","Approve everything automatically","Delete audit records","Bypass delegated authority"],
-  "Confirm my registered role, department and assigned workspace":["Use the modules assigned to my registered role","Open restricted portals without authorization","Change another user's role","Bypass assigned workflows"]
- };
- const q2Options=q2ByQ1[q1]||orientationModules(role).map(x=>"Use "+x+" according to my registered authority");
- const q3Options=department?[
-  "Follow the registered department/unit workflow and escalate approvals through the formal system",
-  "Ignore the department/unit assignment and use any portal",
-  "Change the department/unit directly without administrator approval",
-  "Share restricted records outside the authorised workflow"
- ]:[
-  "Follow the assigned role workflow and request administrator assistance where an assignment is missing",
-  "Use every portal regardless of authorization",
-  "Bypass registration controls",
-  "Share restricted records with other users"
- ];
+ const accountOptions=unique([context?.accountType,context?.accountTypeOptions,...(context?.invitations||[]).map(x=>x.accountType)]);
+ const roleOptions=unique([role,context?.role,...(context?.roles||[]),(context?.invitations||[]).map(x=>x.role)]);
+ const departmentOptions=unique([department,context?.department,...(context?.invitations||[]).map(x=>x.department)]);
+ const unitOptions=unique([form?.unit,context?.unit,...(context?.invitations||[]).map(x=>x.unit)]);
+ const nameOptions=unique([context?.fullName,context?.invitation?.name,...(context?.invitations||[]).map(x=>x.name)]);
+ const emailOptions=unique([context?.email,context?.invitation?.email,...(context?.invitations||[]).map(x=>x.email)]);
+ const familyText={
+  "Board Member":"Board governance, meetings, resolutions, voting and delegated authority",
+  "Executive Director":"executive approvals, delegated authority, finance, procurement and reporting",
+  "Finance":"financial records, approvals, supporting evidence and payment controls",
+  "Procurement":"procurement requests, supplier evidence, approvals and Finance handoff",
+  "Human Resources":"member/personnel records, invitations and controlled HR workflows",
+  "Programme & Technical":"programme implementation, actions, documents and reporting",
+  "Operations":"operational assignments, actions, documents and authorised approvals",
+  "Field":"field implementation, evidence and reporting",
+  "Director":"directorate authority, actions, risk and approvals",
+  "General Employee":"assigned employee workspace, actions, documents and signatures"
+ }[family]||"your assigned IRPA governance workspace";
+ const q3Options=unique([departmentOptions.map(x=>"Department: "+x),unitOptions.map(x=>"Unit: "+x)]);
+ const q4Options=unique([nameOptions.map(x=>"Name: "+x),emailOptions.map(x=>"Email: "+x)]);
  return{
-  q1:{label:"1. What is the correct first action for your registered role?",options:q1Options},
-  q2:{label:"2. Based on your first answer, which system action follows?",options:q2Options},
-  q3:{label:"3. What should you do when the workflow reaches a department, unit, approval or signature boundary?",options:q3Options}
+  q1:{label:"1. Which IRPA capacity is shown for this application?",options:accountOptions.length?accountOptions:[form?.accountType||"Employee","Member","Employee & Member"]},
+  q2:{label:"2. Which role/position is the system associating with this application?",options:roleOptions.length?roleOptions:[role||"Applicant"]},
+  q3:{label:"3. Which department and unit should this application use?",options:q3Options.length?q3Options:[department?"Department: "+department:"Use the registered department/unit"]},
+  q4:{label:"4. Which identity detail should match the IRPA invitation/registration before submission?",options:q4Options.length?q4Options:["The applicant's verified name and email"]},
+  q5:{label:"5. What orientation area is relevant to this registered role?",options:["Follow "+familyText,...orientationModules(role).map(x=>"Use the "+x+" portal according to my authority"),"Use every portal regardless of authorization"]},
+  q6:{label:"6. What happens after the applicant confirms the system information and submits?",options:["The application is routed to the Administrator Induction & Orientation portal for review and LINK","Login is authorised immediately without administrator action","The applicant edits Firebase Authentication directly","The application is deleted"]}
  };
 }
-
 function ChoiceField({label,value,onChange,options,help,disabled=false,required=true}){
  return <div className="form-field"><label>{label}</label><select value={value||""} onChange={e=>onChange(e.target.value)} disabled={disabled} required={required}><option value="">Select an answer</option>{options.map(x=><option key={x} value={x}>{x}</option>)}</select>{help&&<small className="field-help">{help}</small>}</div>;
 }
@@ -139,7 +125,7 @@ export default function InductionOrientation(){
  },[context,form.department]);
  const employmentOptions=useMemo(()=>unique([context?.employmentType,...(context?.invitations||[]).map(x=>x.employmentType),"Full-time","Part-time","Contract","Consultancy","Internship"]),[context]);
  const moduleOptions=useMemo(()=>orientationModules(form.primaryRole||context?.role||""),[form.primaryRole,context]);
- const questions=useMemo(()=>questionSet(form.primaryRole||context?.role||"",form.department,form.q1),[form.primaryRole,form.department,form.q1]);
+ const questions=useMemo(()=>questionSet(form.primaryRole||context?.role||"",form.department,form.q1,context,form),[form.primaryRole,form.department,form.q1,context,form.accountType,form.unit,form.employmentType]);
  const linked=String(context?.existingRequest?.status||"")==="Linked"||String(context?.existingRequest?.roleAssignmentStatus||"")==="Linked";
  const pending=Boolean(context?.existingRequest&&!linked);const completedFields=[form.accountType,form.identityConfirmation,form.verifiedEmail,form.verifiedFullName,form.primaryRole,form.department,form.unit,form.employmentType,form.orientationModules.length,form.q1,form.q2,form.q3,form.q4,form.q5,form.q6,form.declaration].filter(Boolean).length;const progress=Math.round((completedFields/17)*100);
 
@@ -206,7 +192,7 @@ if(form.identityConfirmation!=="Yes"){setError(context.anonymous?"Please confirm
   <form onSubmit={submit}>
    <section className="panel">
     <div className="panel-header"><div><span className="eyebrow">STEP 1</span><h2>Applicant Capacity & Identity</h2><p className="panel-description">Your registered Member/Employee capacity is retrieved from the administrator-controlled IRPA record.</p></div></div>
-    {isNewApplicant?<><div className="form-field"><label>Email address for IRPA enrollment</label><input type="email" value={form.verifiedEmail} onChange={e=>patch("verifiedEmail",e.target.value)} placeholder="Enter the email address you will use for IRPA access" required/><small className="field-help">This address receives the credential setup/password-reset message after enrollment is submitted.</small></div><div className="form-field"><label>Full name</label><input type="text" value={form.verifiedFullName} onChange={e=>patch("verifiedFullName",e.target.value)} placeholder="Enter your full name" required/></div></>:<><ChoiceField label="Select the invitation email registered for you" value={form.verifiedEmail} onChange={v=>patch("verifiedEmail",v)} options={emailOptions} help="Choose the exact email contained in your IRPA invitation."/><ChoiceField label="Select your registered full name" value={form.verifiedFullName} onChange={v=>patch("verifiedFullName",v)} options={nameOptions} help="Choose the exact name attached to your invitation/registration."/></>}<ChoiceField label="I am applying in my registered capacity as" value={form.accountType} onChange={v=>patch("accountType",v)} options={accountTypeOptions} help="Only capacities already found in your IRPA registration records are offered."/>
+    {isNewApplicant?<><div className="form-field"><label>Email address for IRPA enrollment</label><input type="email" value={form.verifiedEmail} onChange={e=>patch("verifiedEmail",e.target.value)} placeholder="Enter the email address you will use for IRPA access" required/><small className="field-help">This address receives the credential setup/password-reset message after enrollment is submitted.</small></div><div className="form-field"><label>Full name</label><input type="text" value={form.verifiedFullName} onChange={e=>patch("verifiedFullName",e.target.value)} placeholder="Enter your full name" required/></div></>:<><div className="form-field"><label>Applicant name — enter or edit your name</label><input type="text" list="irpa-applicant-name-suggestions" value={form.verifiedFullName} onChange={e=>patch("verifiedFullName",e.target.value)} placeholder="Enter your correct full name" required/><datalist id="irpa-applicant-name-suggestions">{nameOptions.map(name=><option key={name} value={name}/>)}</datalist><small className="field-help">Start typing your name. Proposed names from the available IRPA invitation/registration records will appear for selection. The applicant controls the spelling of their name.</small>{nameOptions.length>0&&<div className="name-suggestion-list" style={{display:"flex",flexWrap:"wrap",gap:8,marginTop:8}}>{nameOptions.map(name=><button type="button" key={name} className="secondary-button" onClick={()=>patch("verifiedFullName",name)}>{name}</button>)}</div>}</div><div className="form-field"><label>Invitation / registration email</label><select value={form.verifiedEmail||""} onChange={e=>patch("verifiedEmail",e.target.value)} required><option value="">Select the matching email</option>{emailOptions.map(email=><option key={email} value={email}>{email}</option>)}</select><small className="field-help">The email remains matched to the invitation/registration record before administrator review.</small></div></>}<ChoiceField label="I am applying in my registered capacity as" value={form.accountType} onChange={v=>patch("accountType",v)} options={accountTypeOptions} help="Only capacities already found in your IRPA registration records are offered."/>
     <ChoiceField label={isNewApplicant?"Do you confirm that the information you entered is accurate?":"Does the system-retrieved identity above belong to you?"} value={form.identityConfirmation} onChange={v=>patch("identityConfirmation",v)} options={["Yes","No"]} help={isNewApplicant?"Selecting No blocks submission until you correct the entries.":"Selecting No blocks submission so the registration/invitation record can be corrected before induction."}/>
    </section>
 
@@ -230,7 +216,7 @@ if(form.identityConfirmation!=="Yes"){setError(context.anonymous?"Please confirm
     <div className="form-grid">
      <ChoiceField label={questions.q1.label} value={form.q1} onChange={v=>patch("q1",v)} options={questions.q1.options}/>
      <ChoiceField label={questions.q2.label} value={form.q2} onChange={v=>patch("q2",v)} options={questions.q2.options} disabled={!form.q1}/>
-     <ChoiceField label={questions.q3.label} value={form.q3} onChange={v=>patch("q3",v)} options={questions.q3.options}/><ChoiceField label="4. How should an invitation or registration mismatch be handled?" value={form.q4} onChange={v=>patch("q4",v)} options={["Stop and request administrator correction before induction","Continue using an incorrect name or email","Create a second unverified account","Bypass the invitation record"]}/><ChoiceField label="5. Which identity should control access to this governance workspace?" value={form.q5} onChange={v=>patch("q5",v)} options={["My authenticated account matched to the registered invitation","Any email address I choose","Another person's credentials","A shared departmental password"]}/><ChoiceField label="6. What should happen after submission?" value={form.q6} onChange={v=>patch("q6",v)} options={["The application is saved and routed to the Administrator Induction & Orientation portal for review/LINK","The application is deleted","Access is granted without review","The applicant changes the Firestore record directly"]}/>
+     <ChoiceField label={questions.q3.label} value={form.q3} onChange={v=>patch("q3",v)} options={questions.q3.options}/><ChoiceField label={questions.q4.label} value={form.q4} onChange={v=>patch("q4",v)} options={questions.q4.options}/><ChoiceField label={questions.q5.label} value={form.q5} onChange={v=>patch("q5",v)} options={questions.q5.options}/><ChoiceField label={questions.q6.label} value={form.q6} onChange={v=>patch("q6",v)} options={questions.q6.options}/>
     </div>
     <div className="form-field" style={{marginTop:16}}><label>Additional orientation comments</label><textarea value={form.comments} onChange={e=>patch("comments",e.target.value)} rows="4" placeholder="Optional comments, questions or support required during induction…"/></div>
    </section>
