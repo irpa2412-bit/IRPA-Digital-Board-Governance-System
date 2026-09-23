@@ -105,3 +105,14 @@
   .global-home-button{min-height:36px;padding:7px 9px;font-size:10px}
   .topbar-heading-row>div{min-width:0}
 }
+
+.dashboard-application-reception{margin-top:18px}
+.dashboard-application-reception .panel-header{align-items:center}
+.dashboard-application-reception .panel-header>div{min-width:0}
+@media(max-width:760px){
+  .dashboard-application-reception{margin-top:14px}
+  .dashboard-application-reception .panel-header{display:flex;flex-direction:column;align-items:stretch;gap:12px}
+  .dashboard-application-reception .panel-header>button{width:100%;min-height:46px}
+  .dashboard-application-reception .form-actions{display:block}
+  .dashboard-application-reception .form-actions button{width:100%;margin-top:8px}
+}
