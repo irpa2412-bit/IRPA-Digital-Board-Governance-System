@@ -3,6 +3,7 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getMessaging } = require("firebase-admin/messaging");
+const { getAuth } = require("firebase-admin/auth");
 const crypto = require("crypto");
 initializeApp(); const db = getFirestore();
 async function stableId(v){return crypto.createHash("sha256").update(String(v)).digest("hex");}
@@ -56,39 +57,45 @@ exports.createAdministrator = onCall({region:"us-central1"}, async request => {
   const email=String(request.data?.email||"").trim().toLowerCase();
   const name=String(request.data?.name||"").trim();
   if(!email || !email.includes("@")) throw new HttpsError("invalid-argument","A valid administrator email address is required.");
-  if(email===String(request.auth.token?.email||actor.email||"").trim().toLowerCase()) throw new HttpsError("failed-precondition","The current administrator is already an administrator.");
+  if(!name) throw new HttpsError("invalid-argument","The new administrator's name is required.");
+  if(email===actorEmail) throw new HttpsError("failed-precondition","The current administrator is already an administrator.");
 
-  let target;
+  const adminAuth=getAuth();
+  let target=null;
+  let accountCreated=false;
   try {
-    target=await require("firebase-admin/auth").getAuth().getUserByEmail(email);
+    try {
+      target=await adminAuth.getUserByEmail(email);
+    } catch(error) {
+      if(error?.code!=="auth/user-not-found") throw new HttpsError("internal","Firebase Authentication could not verify the new administrator email address.");
+      const tempPassword="IRPA-"+crypto.randomBytes(24).toString("base64url")+"-9!aQ";
+      target=await adminAuth.createUser({email,password:tempPassword,emailVerified:false,displayName:name});
+      accountCreated=true;
+    }
+    if(target.disabled===true){
+      await adminAuth.updateUser(target.uid,{disabled:false,displayName:name||target.displayName});
+      target=await adminAuth.getUser(target.uid);
+    }
+    await adminAuth.setCustomUserClaims(target.uid,{...(target.customClaims||{}),admin:true});
+    await db.collection("adminProfiles").doc(target.uid).set({
+      uid:target.uid,email,name:name||target.displayName||email.split("@")[0],
+      role:"Administrator",active:true,createdByUid:uid,createdByEmail:actorEmail||null,
+      createdAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()
+    },{merge:true});
+    await db.collection("audit").add({
+      action:"ADMINISTRATOR_CREATED_OR_ACTIVATED",collection:"adminProfiles",recordId:target.uid,
+      details:{targetEmail:email,targetUid:target.uid,createdByUid:uid,createdByEmail:actorEmail||null,accountCreated},
+      actorUid:uid,actorEmail:actorEmail||null,createdAt:FieldValue.serverTimestamp()
+    });
+    return {ok:true,uid:target.uid,email,name:name||target.displayName||email.split("@")[0],accountCreated};
   } catch(error) {
-    if(error?.code!=="auth/user-not-found") throw new HttpsError("internal","Unable to look up the administrator account.");
-    const tempPassword="IRPA-"+crypto.randomBytes(24).toString("base64url")+"-9!aQ";
-    target=await require("firebase-admin/auth").getAuth().createUser({email,password:tempPassword,emailVerified:false,displayName:name||undefined});
+    if(error instanceof HttpsError) throw error;
+    console.error("createAdministrator failed",error);
+    const code=String(error?.code||"");
+    if(code==="auth/email-already-exists") throw new HttpsError("already-exists","That email address is already registered. Use the existing account or choose another administrator email address.");
+    if(code==="auth/invalid-email") throw new HttpsError("invalid-argument","The administrator email address is invalid.");
+    throw new HttpsError("internal","Administrator creation failed on the Firebase server. No success confirmation was issued.");
   }
-
-  await require("firebase-admin/auth").getAuth().setCustomUserClaims(target.uid,{...(target.customClaims||{}),admin:true});
-  await db.collection("adminProfiles").doc(target.uid).set({
-    uid:target.uid,
-    email,
-    name:name||target.displayName||email.split("@")[0],
-    role:"Administrator",
-    active:true,
-    createdByUid:uid,
-    createdByEmail:request.auth.token?.email||actor.email||null,
-    createdAt:FieldValue.serverTimestamp(),
-    updatedAt:FieldValue.serverTimestamp()
-  },{merge:true});
-  await db.collection("audit").add({
-    action:"ADMINISTRATOR_CREATED_OR_ACTIVATED",
-    collection:"adminProfiles",
-    recordId:target.uid,
-    details:{targetEmail:email,targetUid:target.uid,createdByUid:uid,createdByEmail:request.auth.token?.email||actor.email||null,accountCreated:!target.metadata?.creationTime||target.metadata.creationTime===target.metadata.lastSignInTime},
-    actorUid:uid,
-    actorEmail:request.auth.token?.email||actor.email||null,
-    createdAt:FieldValue.serverTimestamp()
-  });
-  return {ok:true,uid:target.uid,email,name:name||target.displayName||email.split("@")[0],accountCreated:!target.metadata?.lastSignInTime};
 });
 
 exports.fetchInductionMatchingRecords = onCall({region:"us-central1"}, async request => {
