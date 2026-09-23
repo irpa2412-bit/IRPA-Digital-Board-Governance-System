@@ -10,3 +10,25 @@
 .workflow-portal-children button:hover{background:#2a704f!important;border-color:rgba(255,255,255,.70)!important;color:#fff!important}
 .workflow-portal-children button.active{font-weight:850;color:#fff!important;background:#1f6244!important;border-color:#fff!important;box-shadow:inset 0 -2px #fff}
 @media(max-width:900px){.workflow-portal-group{width:100%;align-items:flex-start;flex-direction:column}.workflow-portal-children{width:100%;border-left:0;border-top:1px solid rgba(255,255,255,.30);padding:5px 0 0;flex-wrap:wrap}.workflow-portal-parent{width:100%;text-align:left}}
+/* Unified IRPA portal navigation palette — every portal button uses the same green/white architecture. */
+.module-interlink-list > button{
+  font-size:11px!important;
+  padding:7px 10px!important;
+  color:#fff!important;
+  border:1px solid rgba(255,255,255,.38)!important;
+  border-radius:8px!important;
+  background:#347f5b!important;
+  font-weight:750!important;
+}
+.module-interlink-list > button:hover{
+  background:#2a704f!important;
+  border-color:rgba(255,255,255,.72)!important;
+  color:#fff!important;
+}
+.module-interlink-list > button.active{
+  background:#1f6244!important;
+  border-color:#fff!important;
+  color:#fff!important;
+  font-weight:900!important;
+  box-shadow:inset 0 -2px #fff!important;
+}
