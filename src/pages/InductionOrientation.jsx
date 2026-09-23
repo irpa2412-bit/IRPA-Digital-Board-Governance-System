@@ -103,8 +103,8 @@ export default function InductionOrientation(){
  const[form,setForm]=useState({identityConfirmation:"",accountType:"",primaryRole:"",department:"",unit:"",employmentType:"",orientationModules:[],q1:"",q2:"",q3:"",q4:"",q5:"",q6:"",comments:"",declaration:false,verifiedEmail:"",verifiedFullName:"",credentialCapacity:"",credentialRole:"",credentialInvitationReference:""});
 
  useEffect(()=>{let live=true;(async()=>{
-  await ensureInductionAnonymousSession();
   try{
+   await ensureInductionAnonymousSession();
    const c=await getCurrentInductionContext();
    if(!live)return;
    setContext(c);
