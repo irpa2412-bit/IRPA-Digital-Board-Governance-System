@@ -212,14 +212,13 @@ export async function submitInductionApplication(form,context){
 
 export async function getInductionRegistrationRequests(){
   await requireActiveAdmin();
-  const [requestSnap,inductionSnap]=await Promise.all([
-    getDocs(collection(db,COLLECTIONS.registrationRequests)),
-    getDocs(collection(db,COLLECTIONS.inductionRecords))
-  ]);
-  const requests=requestSnap.docs.map(x=>({id:x.id,...x.data(),_source:"registrationRequests"}));
-  const existing=new Set(requests.map(x=>x.id));
-  const recovery=inductionSnap.docs.filter(x=>!existing.has(x.id)).map(x=>({id:x.id,...x.data(),_source:"inductionRecords",recoveryRequired:true,status:x.data()?.status||"Submitted",routingStatus:x.data()?.routingStatus||null}));
-  return [...requests,...recovery].sort((a,b)=>{const ta=a.lastSubmittedAt?.toMillis?.()||a.submittedAt?.toMillis?.()||0;const tb=b.lastSubmittedAt?.toMillis?.()||b.submittedAt?.toMillis?.()||0;return tb-ta;});
+  const call=httpsCallable(getFunctions(undefined,"us-central1"),"getInductionApplicationReception");
+  try{
+    const result=await call({});
+    return Array.isArray(result.data?.applications)?result.data.applications:[];
+  }catch(error){
+    throw new Error(error?.message||"The administrator application reception could not be loaded.");
+  }
 }
 
 export async function processInductionRegistrationAdmin(requestId){
