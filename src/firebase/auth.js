@@ -269,10 +269,10 @@ export async function sendMemberInvitationEmail(email, invitationId) {
       body: JSON.stringify({
         invitationId,
         email: cleanEmail,
-        subscriptionLink: window.location.origin + "/?memberInvite=" + encodeURIComponent(invitationId),
-        loginAssistanceLink: window.location.origin + "/?induction=1&applicant=1&memberInvite=" + encodeURIComponent(invitationId),
-        inductionOrientationLink: window.location.origin + "/?induction=1&applicant=1&memberInvite=" + encodeURIComponent(invitationId),
-        loginLink: window.location.origin
+        subscriptionLink: window.location.origin + "/?induction=1&applicant=1&route=subscription&memberInvite=" + encodeURIComponent(invitationId),
+        loginAssistanceLink: window.location.origin + "/?induction=1&applicant=1&route=assistance&memberInvite=" + encodeURIComponent(invitationId),
+        inductionOrientationLink: window.location.origin + "/?induction=1&applicant=1&route=assistance&memberInvite=" + encodeURIComponent(invitationId),
+        loginLink: window.location.origin + "/?induction=1&applicant=1&route=login"
       }),
       signal: controller.signal
     });
