@@ -82,8 +82,7 @@ export async function saveMySignatureProfile({signatureFile,initialsFile,display
   const u=user();
   if(!String(displayName||u.displayName||"").trim())throw new Error("Display name is required.");
 
-  let folder=null;
-  try{folder=await ensureSignatureProfileFolder(u.uid);}catch(_error){folder=null;}
+  const folder=await ensureSignatureProfileFolder(u.uid);if(!folder?.folderId)throw new Error("Your protected Google Drive Signature Profile folder could not be established. No signature asset has been saved.");if(folder.ownerUid&&folder.ownerUid!==u.uid)throw new Error("The Google Drive Signature Profile folder is not owned by the authenticated profile.");
 
   const folderId=folder?.folderId||null;
   const signature=await uploadAsset(u.uid,"Signature",signatureFile,folderId);
