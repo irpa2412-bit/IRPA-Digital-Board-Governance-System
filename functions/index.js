@@ -180,6 +180,153 @@ function scoreInductionApplication(item, records){
   return {percentage,correct,total,threshold,advanced:percentage>=threshold,issues,reasons,scoreItems};
 }
 
+exports.submitInductionApplication = onCall({region:"us-central1"}, async request => {
+  const uid=request.auth?.uid;
+  if(!uid) throw new HttpsError("unauthenticated","The induction application session is not authenticated.");
+  const form=request.data?.form||{};
+  const suppliedContext=request.data?.context||{};
+  const clean=v=>String(v||"").trim().toLowerCase();
+  const anonymous=request.auth?.token?.firebase?.sign_in_provider==="anonymous";
+  const authEmail=clean(request.auth?.token?.email||"");
+  const email=clean(form.verifiedEmail||suppliedContext.email||authEmail);
+  const fullName=String(form.verifiedFullName||suppliedContext.fullName||request.auth?.token?.name||"").trim();
+  if(!email||!email.includes("@")) throw new HttpsError("invalid-argument","An email address is required before the application can be received.");
+  if(!fullName) throw new HttpsError("invalid-argument","Applicant full name is required before the application can be received.");
+  if(!anonymous && authEmail && email!==authEmail) throw new HttpsError("permission-denied","The submitted email must match the authenticated IRPA account.");
+  if(!Array.isArray(suppliedContext.roles)||!suppliedContext.roles.length) throw new HttpsError("failed-precondition","No registered role could be retrieved. The induction application is blocked.");
+
+  const invitationId=String(suppliedContext.invitationId||"").trim();
+  let invitation=null;
+  if(invitationId){
+    const snap=await db.collection("invitations").doc(invitationId).get();
+    if(snap.exists) invitation={id:snap.id,...snap.data()};
+  } else {
+    const snap=await db.collection("invitations").where("email","==",email).get();
+    if(!snap.empty) invitation={id:snap.docs[0].id,...snap.docs[0].data()};
+  }
+  const [employeeSnap,memberSnap]=await Promise.all([
+    db.collection("employees").where("email","==",email).limit(10).get(),
+    db.collection("members").where("email","==",email).limit(10).get()
+  ]);
+  const employees=employeeSnap.docs.map(d=>({id:d.id,...d.data()}));
+  const members=memberSnap.docs.map(d=>({id:d.id,...d.data()}));
+
+  const requestedRole=String(form.primaryRole||suppliedContext.role||"").trim();
+  const requestedDepartment=String(form.department||suppliedContext.department||"").trim();
+  const requestedUnit=String(form.unit||suppliedContext.unit||"").trim();
+  if(invitation){
+    const records=[...employees,...members];
+    const roleMatch=records.some(x=>[x.role,...(x.roles||[])].some(v=>clean(v)===clean(requestedRole)))||clean(invitation.role)===clean(requestedRole);
+    const departmentMatch=records.some(x=>clean(x.department)===clean(requestedDepartment))||clean(invitation.department)===clean(requestedDepartment);
+    const unitMatch=records.some(x=>clean(x.unit)===clean(requestedUnit))||clean(invitation.unit)===clean(requestedUnit);
+    if(!roleMatch||!departmentMatch||!unitMatch) throw new HttpsError("failed-precondition","The application information does not sufficiently match the retrieved IRPA records. Please review the prompted role, department and unit before submitting.");
+  }
+
+  const requestRef=db.collection("registrationRequests").doc(uid);
+  const existingSnap=await requestRef.get();
+  const existing=existingSnap.exists?existingSnap.data():{};
+  if(existing.status==="Linked"||existing.roleAssignmentStatus==="Linked") return {alreadyLinked:true,requestId:uid};
+
+  const matchedEmployee=employees[0]||null;
+  const matchedMember=members[0]||null;
+  const systemRoles=Array.isArray(suppliedContext.roles)&&suppliedContext.roles.length?suppliedContext.roles:[requestedRole].filter(Boolean);
+  const systemRole=suppliedContext.role||matchedEmployee?.role||matchedMember?.role||requestedRole||null;
+  const systemDepartment=suppliedContext.department||matchedEmployee?.department||matchedMember?.department||requestedDepartment||null;
+  const systemUnit=suppliedContext.unit||matchedEmployee?.unit||matchedMember?.unit||requestedUnit||null;
+  const boardMember=Boolean(suppliedContext.boardMember||matchedMember?.boardMember||matchedMember?.role==="Board Member");
+  const submittedAt=FieldValue.serverTimestamp();
+  const answers={
+    identityConfirmation:form.identityConfirmation||"",
+    verifiedEmail:email,
+    verifiedFullName:fullName,
+    accountType:form.accountType||"",
+    primaryRole:requestedRole,
+    department:requestedDepartment,
+    unit:requestedUnit,
+    employmentType:form.employmentType||"",
+    orientationModules:Array.isArray(form.orientationModules)?form.orientationModules:[],
+    credentialCapacity:form.credentialCapacity||"",
+    credentialRole:form.credentialRole||"",
+    credentialInvitationReference:String(form.credentialInvitationReference||"").trim(),
+    q1:form.q1||"",q2:form.q2||"",q3:form.q3||"",q4:form.q4||"",q5:form.q5||"",q6:form.q6||"",
+    comments:String(form.comments||"").trim()
+  };
+  const payload={
+    uid,email,fullName,memberProfileUid:matchedMember?.uid||uid,employeeProfileUid:matchedEmployee?.uid||uid,
+    memberEmployeeNumber:null,registrationNumberStatus:"Issued after administrator LINK",
+    invitationId:invitation?.id||null,
+    invitationReference:invitation?.invitationReference||invitation?.reference||null,
+    invitationStatus:invitation?"Registered invitation":"Subscription / registration email",
+    enrollmentSource:invitation?"invitation":"subscription",
+    systemRoles,systemRole,systemDepartment,systemUnit,boardMember,
+    accountType:String(form.accountType||suppliedContext.accountType||"").trim(),
+    requestedRole,requestedDepartment,requestedUnit,
+    employmentType:String(form.employmentType||suppliedContext.employmentType||"").trim(),
+    orientationModules:answers.orientationModules,answers,
+    completedSteps:Array.isArray(form.completedSteps)?form.completedSteps:[],
+    declaration:form.declaration===true,
+    status:"Submitted",roleAssignmentStatus:"Pending",inductionStatus:"Submitted",
+    submittedAt:existing.submittedAt||submittedAt,lastSubmittedAt:submittedAt,updatedAt:submittedAt,
+    recoveredFromInductionRecord:false
+  };
+  await requestRef.set(payload,{merge:true});
+  await db.collection("inductionRecords").doc(uid).set({
+    ...payload,status:"Submitted",inductionStatus:"Submitted",roleAssignmentStatus:"Pending",
+    submittedAt:existing.submittedAt||submittedAt,lastSubmittedAt:submittedAt,updatedAt:submittedAt
+  },{merge:true});
+
+  const score=scoreInductionApplication(payload,{invitation,employees,members});
+  const routingStatus=score.advanced?"Advanced to Administrator":"Filtered — Below 75% Accuracy";
+  const status=score.advanced?"Pending Administrator Decision":"Filtered — Applicant Feedback Required";
+  const summary=(score.advanced?"Advanced for administrator review. ":"Filtered pending applicant correction. ")+`Accuracy: ${score.percentage}% (${score.correct}/${score.total}).`+(score.issues.length?` Review items: ${score.issues.join(", ")}.`:" All scored items are consistent.");
+  const capturedSystemInformation={
+    position:systemRole,assignedRoles:systemRoles,department:systemDepartment,unit:systemUnit,
+    capacity:form.credentialCapacity||form.accountType||suppliedContext.accountType||null,
+    employmentType:payload.employmentType,memberType:matchedMember?.memberType||null,
+    boardMember,registrationNumber:matchedEmployee?.employeeNumber||matchedMember?.memberNumber||null,
+    invitationReference:payload.invitationReference,invitationId:payload.invitationId
+  };
+  const report={
+    reportType:"IRPA Induction & Orientation Submission Report",reportVersion:"1.0",applicationId:uid,
+    receivedAt:FieldValue.serverTimestamp(),applicant:{fullName,email},
+    score:{percentage:score.percentage,correct:score.correct,total:score.total,threshold:score.threshold,advanced:score.advanced},
+    routingStatus,decisionStatus:status,systemSummary:summary,accuracyIssues:score.issues,accuracyReasons:score.reasons,
+    submittedAnswers:answers,capturedSystemInformation,administratorAction:"Review in Induction & Orientation Administrator Applications"
+  };
+  await requestRef.set({
+    accuracyPercentage:score.percentage,accuracyCorrect:score.correct,accuracyTotal:score.total,accuracyThreshold:score.threshold,
+    accuracyAdvanced:score.advanced,routingStatus,systemSummary:summary,accuracyIssues:score.issues,accuracyReasons:score.reasons,
+    status,inductionStatus:score.advanced?"Advanced":"Filtered",
+    roleAssignmentStatus:score.advanced?"Pending Administrator Decision":"Filtered",
+    feedbackStatus:"Queued",inductionOrientationReport:report,
+    administratorReportStatus:"Available in Application Reception",auditStatus:"Recorded",
+    systemCapturedProfile:capturedSystemInformation,updatedAt:FieldValue.serverTimestamp()
+  },{merge:true});
+  await db.collection("inductionRecords").doc(uid).set({
+    accuracyPercentage:score.percentage,accuracyCorrect:score.correct,accuracyTotal:score.total,accuracyThreshold:score.threshold,
+    accuracyAdvanced:score.advanced,routingStatus,systemSummary:summary,status:score.advanced?"Advanced":"Filtered",
+    inductionStatus:score.advanced?"Advanced":"Filtered",systemCapturedProfile:capturedSystemInformation,
+    updatedAt:FieldValue.serverTimestamp()
+  },{merge:true});
+  await db.collection("audit").add({
+    action:"INDUCTION_ORIENTATION_SUBMISSION_RECEIVED",collection:"registrationRequests",recordId:uid,
+    details:{reportType:report.reportType,reportVersion:report.reportVersion,accuracyPercentage:score.percentage,
+      routingStatus,administratorReportStatus:"Available in Application Reception",auditStatus:"Recorded",source:"server-side submission gateway"},
+    actorUid:uid,actorEmail:email,createdAt:FieldValue.serverTimestamp()
+  });
+  const applicantSubject=score.advanced?"IRPA Induction & Orientation — Application Advanced to Administrator":"IRPA Induction & Orientation — Application Feedback";
+  const applicantText=score.advanced
+    ?`Dear ${fullName},\\n\\nYour IRPA Induction and Orientation application has been received and advanced to the Administrator decision queue with ${score.percentage}% accuracy.\\n\\nNo administrator decision is granted by this message.\\n\\nIRPA Digital Board Governance System`
+    :`Dear ${fullName},\\n\\nYour IRPA Induction and Orientation application has been received. The automated accuracy check recorded ${score.percentage}% (${score.correct}/${score.total}), below the 75% advancement threshold.\\n\\nSystem feedback: ${summary}\\n\\nPlease return to the induction form, correct the indicated items and resubmit.\\n\\nIRPA Digital Board Governance System`;
+  const emailId=await queueInductionEmail(email,applicantSubject,applicantText,applicantText.replace(/\\n/g,"<br>"));
+  const activeAdminSnap=await db.collection("adminProfiles").where("active","==",true).get();
+  const adminProfiles=activeAdminSnap.docs.map(d=>({uid:d.id,...d.data()}));
+  if(score.advanced){
+    await notify({recipientUids:adminProfiles.map(d=>d.uid),type:"INDUCTION_APPLICATION_ADVANCED",title:"Induction application advanced for decision",body:`${fullName} — ${score.percentage}% accuracy. The full Induction & Orientation Submission Report is available directly in Application Reception and is audit-traceable.`,module:"Induction & Orientation",recordId:uid,route:"/induction-admin",priority:"high",eventKey:`INDUCTION_APPLICATION_ADVANCED|${uid}`});
+  }
+  return {ok:true,alreadyLinked:false,requestId:uid,status:"Submitted",routingStatus,accuracyPercentage:score.percentage,systemSummary:summary,feedbackQueued:Boolean(emailId),advanced:score.advanced};
+});
+
 exports.routeInductionApplication = onCall({region:"us-central1"}, async request => {
   const callerUid=request.auth?.uid;
   const requestId=String(request.data?.requestId||"").trim();
