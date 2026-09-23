@@ -292,7 +292,7 @@ export default function Settings({ admin = false, section = "settings" }) {
           </label>
           {selectedReset && <div className="auth-message" style={{ marginTop: 16 }}><strong>Reset armed:</strong> {selectedReset === "documents" ? "Documents" : selectedReset === "employees" ? "Employees" : "Members"}. Enter the exact confirmation phrase above, then tap the same reset button again. The same button now performs the reset action.</div>}
           {selectedReset && <div className="form-actions" style={{ marginTop: 12 }}><button type="button" className="secondary-button" onClick={() => { setSelectedReset(""); setConfirmation(""); setMessage(""); }} disabled={!!resetBusy}>Cancel Reset</button></div>}
-          {result && <div className="auth-message" style={{ marginTop: 16 }}>Reset completed. Records deleted: {result.recordsDeleted ?? 0}{result.boardMembersPreserved ? " · Board Members preserved." : ""}</div>}
+          {result && <div className="auth-message" style={{ marginTop: 16 }}>Reset completed. {result.type === "envelopes" ? <>Envelopes deleted: {result.envelopesDeleted ?? 0} · Pending signing cleared · Controlled documents deleted: {result.documentsDeleted ?? 0} · Signature transactions deleted: {result.signaturesDeleted ?? 0} · Events deleted: {result.eventsDeleted ?? 0}.</> : <>Records deleted: {result.recordsDeleted ?? 0}{result.boardMembersPreserved ? " · Board Members preserved." : ""}</>}</div>}
         </section>
       )}
 
