@@ -4,8 +4,6 @@ import {
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInAnonymously,
-  linkWithCredential,
-  EmailAuthProvider,
   signInWithPopup,
   signInWithCredential,
   GoogleAuthProvider,
@@ -43,26 +41,6 @@ export async function ensureInvitationApplicantSession() {
   if (applicantAuth.currentUser) return applicantAuth.currentUser;
   const result = await signInAnonymously(applicantAuth);
   return result.user;
-}
-
-export async function upgradeInvitationApplicant(email) {
-  const cleanEmail = String(email || "").trim().toLowerCase();
-  const current = applicantAuth.currentUser;
-  if (!current?.isAnonymous) throw new Error("The invitation enrollment session is no longer available. Reload the invitation link and try again.");
-  if (!cleanEmail) throw new Error("An email address is required for the IRPA account.");
-
-  const temporaryPassword = generateTemporaryPassword();
-  const credential = EmailAuthProvider.credential(cleanEmail, temporaryPassword);
-  try {
-    const result = await linkWithCredential(current, credential);
-    await sendPasswordResetEmail(applicantAuth, cleanEmail);
-    return result.user;
-  } catch (error) {
-    if (error?.code === "auth/email-already-in-use") {
-      throw new Error("This email already has an IRPA account. Return to the normal sign-in pathway and use Forgot password / Login assistance.");
-    }
-    throw new Error(firebaseErrorMessage(error));
-  }
 }
 
 export async function registerWithEmail(email, password, options = {}) {
