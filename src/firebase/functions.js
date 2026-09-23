@@ -20,28 +20,10 @@ export async function createAdministrator({ name, email, onProgress }){
 
     onProgress?.("Administrator account prepared. Sending the secure activation link…");
     const { sendAdminMagicLink } = await import("./auth");
-    try {
-      await sendAdminMagicLink(cleanEmail);
-      onProgress?.("Administrator activation link sent.");
-      return { ...(result.data || {}), ok: true, email: cleanEmail, name: cleanName, emailRequested: true, activationStatus: "sent" };
-    } catch(emailError) {
-      // Account creation is already committed server-side. Do not report this
-      // as a failed Administrator creation, otherwise the operator may retry
-      // and receive an "already exists" error for a perfectly valid account.
-      const emailCode = String(emailError?.code || "").replace(/^functions\//, "").replace(/^auth\//, "");
-      const emailMessage = emailError?.message || "Firebase Authentication could not request the activation email.";
-      onProgress?.("Administrator account created, but the activation email could not be sent. Use Resend activation link.");
-      return {
-        ...(result.data || {}),
-        ok: true,
-        email: cleanEmail,
-        name: cleanName,
-        emailRequested: false,
-        activationStatus: "send_failed",
-        activationErrorCode: emailCode || null,
-        activationError: emailMessage
-      };
-    }
+    await sendAdminMagicLink(cleanEmail);
+
+    onProgress?.("Administrator activation link sent.");
+    return { ...(result.data || {}), ok: true, email: cleanEmail, name: cleanName, emailRequested: true };
   } catch(error){
     const code = String(error?.code || "").replace(/^functions\//, "").replace(/^auth\//, "");
     const messages = {
