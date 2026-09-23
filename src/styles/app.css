@@ -1106,3 +1106,31 @@
 .dashboard-content-area .dashboard-empty{
   color:#596d64!important;
 }
+
+/* CONTROLLED DOCUMENT UPLOAD — never use the dark application surface here.
+   This is a light operational form within the authenticated portal. */
+.content-area:not(.dashboard-content-area) .controlled-document-upload-panel{
+  background:#ffffff!important;
+  color:#26352f!important;
+  border:1px solid #d7e1dc!important;
+  box-shadow:0 6px 20px rgba(24,61,45,.055)!important;
+}
+.content-area:not(.dashboard-content-area) .controlled-document-upload-panel h2{
+  color:#183b2d!important;
+}
+.content-area:not(.dashboard-content-area) .controlled-document-upload-panel .panel-description{
+  color:#65776f!important;
+}
+.content-area:not(.dashboard-content-area) .controlled-document-upload-panel .form-field label{
+  color:#385248!important;
+}
+.content-area:not(.dashboard-content-area) .controlled-document-upload-panel .form-field input,
+.content-area:not(.dashboard-content-area) .controlled-document-upload-panel .form-field select,
+.content-area:not(.dashboard-content-area) .controlled-document-upload-panel .form-field textarea{
+  background:#fbfdfc!important;
+  color:#243b32!important;
+  border:1px solid #cbd9d2!important;
+}
+.content-area:not(.dashboard-content-area) .controlled-document-upload-panel .muted{
+  color:#65776f!important;
+}
