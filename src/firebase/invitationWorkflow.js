@@ -54,14 +54,36 @@ export async function provisionCurrentMemberFromInvitationV2(invitationId) {
   // Prefer the institutional personnel record explicitly attached to the invitation.
   const isBoardMember = ["Board Member","Board Chairperson","Board Secretary","Board Treasurer","Board Vice Chairperson"].includes(role);
 
-  if (invitation.boardMemberId || invitation.institutionalRecordType === "Board Member") {
+  if (invitation.boardMemberId || invitation.institutionalRecordType === "Board Member" || isBoardMember) {
     const boardMemberId = invitation.boardMemberId || invitation.institutionalRecordId;
-    const boardMember = boardMemberId ? await getRecord(COLLECTIONS.members, boardMemberId) : null;
-    if (!boardMember) throw new Error("The Board Member record linked to this invitation could not be found.");
+    let boardMember = boardMemberId ? await getRecord(COLLECTIONS.members, boardMemberId) : null;
+
+    // Older invitations may not contain the Board Member document ID. Resolve the
+    // institutional record by the authenticated invitation email using a constrained
+    // query; never scan the members collection because recipient reads are restricted.
+    if (!boardMember) {
+      const { getDocs, query, collection, where } = await import("firebase/firestore");
+      const { db } = await import("./config");
+      const snap = await getDocs(query(collection(db, COLLECTIONS.members), where("email", "==", email)));
+      const matches = snap.docs.map(x => ({id:x.id,...x.data()}));
+      boardMember = matches.find(x =>
+        x.boardMember === true ||
+        ["Board Member","Board Chairperson","Board Secretary","Board Treasurer","Board Vice Chairperson"].includes(x.role)
+      ) || null;
+    }
+
+    if (!boardMember) throw new Error("The Board Member institutional record for this invitation could not be resolved. Ask an administrator to relink the invitation to the Board Member register.");
     if (boardMember.email?.trim().toLowerCase() !== email) throw new Error("The invitation email does not match the Board Member institutional record.");
-    await updateRecord(COLLECTIONS.members, boardMember.id, {uid, invitationId, accountActivated:true, registrationStatus:"Activated", activatedAt:new Date().toISOString()}, {touchUpdatedAt:false, audit:false});
-    // Keep the institutional Board Member document as the canonical member record; do not create a duplicate members/{uid} document.
-    await updateRecord(COLLECTIONS.invitations, invitation.id, {status:"Accepted",acceptedUid:uid,acceptedAt:new Date().toISOString(),accountActivated:true,activationCompleted:true}, {touchUpdatedAt:false, audit:false});
+
+    await updateRecord(COLLECTIONS.members, boardMember.id, {
+      uid, invitationId, accountActivated:true, registrationStatus:"Activated", activatedAt:new Date().toISOString()
+    }, {touchUpdatedAt:false, audit:false});
+
+    // Keep the institutional Board Member document as the canonical member record;
+    // do not create a duplicate members/{uid} document.
+    await updateRecord(COLLECTIONS.invitations, invitation.id, {
+      status:"Accepted",acceptedUid:uid,acceptedAt:new Date().toISOString(),accountActivated:true,activationCompleted:true
+    }, {touchUpdatedAt:false, audit:false});
     return { employee: boardMember, invitationId: invitation.id, uid };
   } else if (invitation.employeeId && !isBoardMember) {
     employee = await getRecord(COLLECTIONS.employees, invitation.employeeId);
