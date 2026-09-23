@@ -780,3 +780,19 @@
 .content-area .page .dashboard-gauge.zero-value-card strong{
   color:#24362f!important;
 }
+
+/* Functional access tabs use the same deep-navy #0C447C treatment; zero-value metric cards remain neutral. */
+.content-area .page .dashboard-function-button{
+  background:#0C447C!important;
+  color:#fff!important;
+  border-color:#1b5a92!important;
+}
+.content-area .page .dashboard-function-button span,
+.content-area .page .dashboard-function-button small,
+.content-area .page .dashboard-function-button b{
+  color:#fff!important;
+}
+.content-area .page .dashboard-function-button:hover{
+  background:#0b3d70!important;
+  border-color:#6ea6d2!important;
+}
