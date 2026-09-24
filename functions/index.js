@@ -45,6 +45,97 @@ exports.bootstrapPrimaryAdministrator = onCall({region:"us-central1"}, async req
   return {ok:true,uid,email};
 });
 
+exports.updateSignerAuthority = onCall({region:"us-central1"}, async request => {
+  const uid=request.auth?.uid;
+  const email=String(request.auth?.token?.email||"").trim().toLowerCase();
+  if(!uid) throw new HttpsError("unauthenticated","Authentication is required.");
+
+  const requestedRole=String(request.data?.authorityRole||"").trim();
+  const authorityStatus=String(request.data?.authorityStatus||"Current").trim();
+  const authorityReference=String(request.data?.authorityReference||"").trim();
+  const authorityEffectiveAt=String(request.data?.authorityEffectiveAt||"").trim()||null;
+  const authorityExpiresAt=String(request.data?.authorityExpiresAt||"").trim()||null;
+  const allowedStatuses=["Current","Pending Verification","Expired","Not yet assigned"];
+  if(!requestedRole) throw new HttpsError("invalid-argument","Select the current signing authority before saving.");
+  if(!allowedStatuses.includes(authorityStatus)) throw new HttpsError("invalid-argument","Select a valid signing authority status.");
+  if(authorityEffectiveAt&&authorityExpiresAt&&authorityExpiresAt<authorityEffectiveAt)
+    throw new HttpsError("invalid-argument","Authority expiry date cannot be earlier than the effective date.");
+
+  const records=[];
+  const addSnapshot=(snap,sourceCollection)=>{
+    snap.forEach(docSnap=>{
+      if(docSnap.exists) records.push({id:docSnap.id,...docSnap.data(),sourceCollection});
+    });
+  };
+  const [memberByUid,employeeByUid,memberByEmail,employeeByEmail]=await Promise.all([
+    db.collection("members").doc(uid).get(),
+    db.collection("employees").doc(uid).get(),
+    email?db.collection("members").where("email","==",email).get():null,
+    email?db.collection("employees").where("email","==",email).get():null
+  ]);
+  if(memberByUid.exists)records.push({id:memberByUid.id,...memberByUid.data(),sourceCollection:"members"});
+  if(employeeByUid.exists)records.push({id:employeeByUid.id,...employeeByUid.data(),sourceCollection:"employees"});
+  if(memberByEmail)addSnapshot(memberByEmail,"members");
+  if(employeeByEmail)addSnapshot(employeeByEmail,"employees");
+
+  const uniqueRecords=[...new Map(records.map(item=>[item.sourceCollection+":"+item.id,item])).values()]
+    .filter(item=>String(item.status||item.employmentStatus||"Active").toLowerCase()!=="inactive");
+  if(!uniqueRecords.length) throw new HttpsError("permission-denied","No active IRPA member or employee register entry was found for this account.");
+
+  const valuesFor=record=>[
+    record.role,record.boardPosition,
+    ...(Array.isArray(record.roles)?record.roles:[]),
+    ...(Array.isArray(record.assignedRoles)?record.assignedRoles:[]),
+    ...(Array.isArray(record.selectedRoles)?record.selectedRoles:[]),
+    ...(Array.isArray(record.roleAssignments)?record.roleAssignments:[])
+  ].flatMap(value=>String(value||"").split(",").map(value=>value.trim()).filter(Boolean));
+
+  const allowedRoles=[...new Set(uniqueRecords.flatMap(valuesFor))];
+  if(!allowedRoles.includes(requestedRole))
+    throw new HttpsError("permission-denied","The selected signing authority is not registered to this IRPA member/employee account.");
+
+  const source=uniqueRecords.find(record=>valuesFor(record).includes(requestedRole))||uniqueRecords[0];
+  const authorityDepartment=String(source.department||"").trim();
+  const authorityUnit=String(source.unit||source.unitName||source.boardPosition||"").trim();
+
+  const identityRef=db.collection("signerIdentities").doc(uid);
+  const identitySnap=await identityRef.get();
+  if(!identitySnap.exists) throw new HttpsError("failed-precondition","Signer Identity record is not available. Restore the Signer Identity link before updating signing authority.");
+
+  const actorEmail=email||String(identitySnap.data()?.email||"").trim().toLowerCase();
+  const now=FieldValue.serverTimestamp();
+  await identityRef.update({
+    authorityRole:requestedRole,
+    authorityStatus,
+    authorityReference,
+    authorityEffectiveAt,
+    authorityExpiresAt,
+    authorityDepartment,
+    authorityUnit,
+    authoritySourceCollection:source.sourceCollection,
+    authoritySourceRecordId:source.id,
+    authorityUpdatedAt:now,
+    updatedAt:now
+  });
+  await db.collection("audit").add({
+    action:"UPDATE_SIGNER_AUTHORITY",
+    collection:"signerIdentities",
+    recordId:uid,
+    details:{
+      authorityRole:requestedRole,
+      authorityStatus,
+      authorityDepartment,
+      authorityUnit,
+      authoritySourceCollection:source.sourceCollection,
+      authoritySourceRecordId:source.id
+    },
+    actorUid:uid,
+    actorEmail:actorEmail||null,
+    createdAt:now
+  });
+  return {ok:true,uid,authorityRole:requestedRole,authorityStatus,authorityReference,authorityEffectiveAt,authorityExpiresAt,authorityDepartment,authorityUnit,authoritySourceCollection:source.sourceCollection,authoritySourceRecordId:source.id};
+});
+
 exports.createAdministrator = onCall({region:"us-central1"}, async request => {
   const uid=request.auth?.uid;
   if(!uid) throw new HttpsError("unauthenticated","Administrator authentication is required.");
