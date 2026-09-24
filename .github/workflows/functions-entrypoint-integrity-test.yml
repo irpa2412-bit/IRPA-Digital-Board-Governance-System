@@ -2,7 +2,7 @@ name: Firebase Functions Entrypoint Integrity Test
 
 on:
   push:
-    branches: [repair/functions-entrypoint-integrity-2026-09-24]
+    branches: [main, repair/functions-entrypoint-integrity-2026-09-24]
   pull_request:
     branches: [main]
 
