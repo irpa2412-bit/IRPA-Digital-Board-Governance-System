@@ -329,7 +329,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
        ...(Array.isArray(record.roleAssignments)?record.roleAssignments:[])
      ].flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean));
      for(const value of [...new Set(values)]){
-       records.push({sourceCollection,sourceRecordId:record.id||record.uid||"",department,unit,role:value});
+       records.push({...record,sourceCollection,sourceRecordId:record.id||record.uid||"",department,unit,role:value});
      }
    }
    return records.filter(item=>item.department||item.unit||item.role);
@@ -353,6 +353,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
    }
    return options.sort((a,b)=>a.role.localeCompare(b.role));
  },[authorityRegisterRecords,authorityDepartment]);
+ const authorityDisplayLabel=role=>String(role||"").trim().toLowerCase()==="board chairperson"?"CHAIRPERSON":role;
  async function saveSignerAuthority(e){
    e.preventDefault();
    if(authorityBusy)return;
@@ -426,7 +427,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
          setAuthorityUnit(selectedAuthority?.unit||authorityDepartment||"");
        }} required disabled={authorityBusy||!authorityDepartment}>
          <option value="">Select registered authority / capacity</option>
-         {authorityOptions.map(option=><option key={option.sourceCollection+"|"+option.sourceRecordId+"|"+option.role} value={option.role}>{option.role}</option>)}
+         {authorityOptions.map(option=><option key={option.sourceCollection+"|"+option.sourceRecordId+"|"+option.role} value={option.role}>{authorityDisplayLabel(option.role)}</option>)}
        </select>
        <small>Only capacities recorded for your authenticated Member/Employee register entries are offered. If you hold multiple registered roles, select the department first and then the applicable capacity. This prevents impersonation.</small>
      </label>
