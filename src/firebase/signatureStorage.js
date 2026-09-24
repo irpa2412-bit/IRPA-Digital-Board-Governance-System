@@ -62,6 +62,29 @@ export async function uploadBytes(target, file, metadata = {}) {
   return { ref: target, metadata: result };
 }
 
+export async function uploadControlledDocumentRouted({
+  documentId,title,reference,documentType="Governance Document",archiveCategory="Administrative Documents",
+  classification="Public",file
+}={}) {
+  if (!file) throw new Error("A PDF file is required.");
+  if (file.type !== "application/pdf") throw new Error("Only PDF documents are accepted.");
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  if (!bytes.length || bytes.length > 10 * 1024 * 1024) throw new Error("PDF must not exceed 10 MB.");
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + chunkSize, bytes.length)));
+  }
+  const result = await gatewayPost("/api/upload-controlled-document", {
+    documentId,title,reference,documentType,archiveCategory,classification,
+    fileName:file.name,contentType:"application/pdf",fileSize:bytes.length,base64:btoa(binary)
+  });
+  if (!result.categoryArchive?.folderId || !result.categoryArchive?.file?.fileId) {
+    throw new Error("The controlled PDF was not returned with its primary archive route.");
+  }
+  return result;
+}
+
 export async function provisionDocumentArchive({documentId,title,reference,archiveCategory,classification}={}) {
   const result = await gatewayPost("/api/document-archive/provision", {
     documentId,title,reference,archiveCategory,classification
