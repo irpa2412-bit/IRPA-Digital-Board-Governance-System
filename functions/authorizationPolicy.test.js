@@ -100,4 +100,16 @@ assert.ok(OPERATIONAL_ROLE_PERMISSIONS["Director Human Resources"].includes("mem
 assert.ok(OPERATIONAL_ROLE_PERMISSIONS["Programme/Technical Officer"].includes("document.edit"));
 assert.ok(OPERATIONAL_ROLE_PERMISSIONS["Executive Director"].includes("resolution.approve"));
 console.log("Operational role permission catalogue tests passed.");
+const { getOperationalRolePermissions, buildRoleProvisioningPlan } = require("./authorizationPolicy");
+assert.deepEqual(getOperationalRolePermissions("Finance Manager"),["finance.view","finance.create","reports.view","document.view"]);
+assert.deepEqual(getOperationalRolePermissions("Unknown Role"),[]);
+const plan=buildRoleProvisioningPlan({role:"Finance Manager",currentPermissions:["finance.view"]});
+assert.deepEqual(plan.additions,["finance.create","reports.view","document.view"]);
+assert.deepEqual(plan.removals,[]);
+assert.equal(plan.destructiveChanges,false);
+assert.equal(plan.requiresExplicitApproval,true);
+const unknownPlan=buildRoleProvisioningPlan({role:"Unknown Role",currentPermissions:["finance.view"]});
+assert.deepEqual(unknownPlan.additions,[]);
+assert.deepEqual(unknownPlan.removals,[]);
+console.log("Non-destructive departmental provisioning plan tests passed.");
 
