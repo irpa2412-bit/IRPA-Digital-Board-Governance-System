@@ -341,7 +341,26 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
    }
    return records.filter(item=>item.department||item.unit||item.role);
  },[authorityRegisterEntries,authorityMember,authorityEmployee]);
- const authorityDepartments=useMemo(()=>[...new Set(authorityRegisterRecords.map(x=>x.department).filter(Boolean))],[authorityRegisterRecords]);
+ const authorityDepartments=useMemo(()=>{
+   // Department choices are derived from the authenticated user's institutional
+   // records. Employee register data is the primary source; signing-authority
+   // register entries may add only departments already recorded for this user.
+   const employeeDepartments=[
+     authorityEmployee?.department,
+     ...(Array.isArray(authorityEmployee?.departments)?authorityEmployee.departments:[])
+   ].flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean));
+   const registeredDepartments=authorityRegisterRecords
+     .map(x=>String(x.department||"").trim())
+     .filter(Boolean);
+   const memberDepartments=[
+     authorityMember?.department,
+     ...(Array.isArray(authorityMember?.departments)?authorityMember.departments:[])
+   ].flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean));
+   const source=employeeDepartments.length
+     ? [...employeeDepartments,...registeredDepartments]
+     : [...registeredDepartments,...memberDepartments];
+   return [...new Set(source)];
+ },[authorityRegisterRecords,authorityEmployee,authorityMember]);
  const authorityOptions=useMemo(()=>{
    const department=String(authorityDepartment||"").trim().toLowerCase();
    if(department==="board of directors"){
