@@ -162,3 +162,16 @@ Safety decision:
 
 This prevents an Authorization migration from becoming the mechanism that introduces or masks a broader Functions deployment failure.
 
+## Portal boundary / inlet-outlet register
+
+The Authorization & Approvals portal remains the subject of this migration. No other portal is being connected at this stage.
+
+Potential external dependencies identified for later, separately tested integration:
+- **Administrator portal:** provides administrator identity/access records used by the policy service. Any repair must be performed and tested in the Administrator pathway first; no connection is made now.
+- **Members / Employees registers:** provide institutional identity and role data. Any role-data repair belongs to those registers; this migration only reads their current records in the isolated service.
+- **Signature Portal:** provides signature authority evidence. No signature connection is made now.
+- **Meetings / Documents / Finance / Voting / Reports:** are future protected-operation consumers. They remain on their existing authorization controls until each is separately mapped, tested and connected.
+- **Firebase Functions deployment:** is an infrastructure inlet, not an Authorization Portal repair. It remains disconnected until the existing Functions entrypoint is independently repaired and tested.
+
+Migration rule: an identified dependency is recorded as an inlet/outlet and tested in isolation before any connection is enabled. No cross-portal repair is performed merely to make Authorization appear operational.
+
