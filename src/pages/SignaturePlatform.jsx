@@ -1,5 +1,5 @@
 import React,{useEffect,useMemo,useRef,useState}from"react";
-import{getRecord,getRecords}from"../firebase/data";
+import{getCurrentEmployeeProfile,getCurrentMemberProfile,getRecords}from"../firebase/data";
 import{downloadDriveBytes}from"../firebase/signatureStorage";
 import{auth}from"../firebase/config";
 import{getMySignerIdentity}from"../firebase/signerIdentity";
@@ -273,8 +273,8 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
           setAuthorityExpiresAt(identity.authorityExpiresAt||"");
         }
         const [memberRecord,employeeRecord]=await Promise.all([
-          getRecord("members",auth.currentUser?.uid),
-          getRecord("employees",auth.currentUser?.uid)
+          getCurrentMemberProfile().catch(()=>null),
+          getCurrentEmployeeProfile().catch(()=>null)
         ]);
         setAuthorityMember(memberRecord);
         setAuthorityEmployee(employeeRecord);
@@ -311,16 +311,29 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
  }
  async function migrateProfileNow(){if(busy)return;setBusy(true);setMessage("Migrating your existing Signature Profile into the new Signer Identity layer…");try{const result=await migrateExistingSignatureProfile();if(result?.identity)setSignerIdentity(result.identity);setMessage(result?.migrated?"Migration verified. Your existing Signature Profile was retained and linked to the new Signer Identity record.":"No existing Signature Profile was found to migrate.");}catch(error){setMessage("MIGRATION FAILED: "+(error?.message||"No changes were made."));}finally{setBusy(false)}}
  const authorityOptions=useMemo(()=>{
-   const values=[
-     ...(Array.isArray(authorityMember?.roles)?authorityMember.roles:[]),
-     ...(Array.isArray(authorityEmployee?.roles)?authorityEmployee.roles:[]),
-     authorityMember?.role,authorityEmployee?.role,
-     authorityMember?.boardPosition,authorityEmployee?.boardPosition
-   ].flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean));
-   return [...new Set(values)];
+   const records=[authorityMember,authorityEmployee].filter(Boolean);
+   const options=[];
+   for(const record of records){
+     const department=String(record.department||"").trim()||"Department not recorded";
+     const unit=String(record.unit||record.unitName||record.boardPosition||"").trim()||"Unit not recorded";
+     const values=[
+       record.role,record.boardPosition,
+       ...(Array.isArray(record.roles)?record.roles:[]),
+       ...(Array.isArray(record.assignedRoles)?record.assignedRoles:[]),
+       ...(Array.isArray(record.selectedRoles)?record.selectedRoles:[]),
+       ...(Array.isArray(record.roleAssignments)?record.roleAssignments:[])
+     ].flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean));
+     for(const value of values){
+       const key=value+"|"+department+"|"+unit;
+       if(!options.some(option=>option.key===key)){
+         options.push({key,value,label:`${department} · ${unit} · ${value}`});
+       }
+     }
+   }
+   return options;
  },[authorityMember,authorityEmployee]);
- const authorityDepartment=authorityEmployee?.department||authorityMember?.department||"Not recorded";
- const authorityUnit=authorityEmployee?.unit||authorityMember?.unit||"Not recorded";
+ const authorityDepartment=signerIdentity?.authorityDepartment||authorityEmployee?.department||authorityMember?.department||"Not recorded";
+ const authorityUnit=signerIdentity?.authorityUnit||authorityEmployee?.unit||authorityEmployee?.unitName||authorityMember?.unit||authorityMember?.unitName||authorityMember?.boardPosition||"Not recorded";
  async function saveSignerAuthority(e){
    e.preventDefault();
    if(authorityBusy)return;
@@ -367,9 +380,9 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
      <label>Current signing authority
        <select value={authorityRole} onChange={e=>setAuthorityRole(e.target.value)} required disabled={authorityBusy}>
          <option value="">Select registered authority</option>
-         {authorityOptions.map(option=><option key={option} value={option}>{option}</option>)}
+         {authorityOptions.map(option=><option key={option.key} value={option.value}>{option.label}</option>)}
        </select>
-       <small>Options are derived from your registered role/board position.</small>
+       <small>Options are derived only from your active IRPA member/employee register entries: department → unit/board position → registered role.</small>
      </label>
      <label>Authority status
        <select value={authorityStatus} onChange={e=>setAuthorityStatus(e.target.value)} disabled={authorityBusy}>
