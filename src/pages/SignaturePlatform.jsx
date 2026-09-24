@@ -379,6 +379,11 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
    const r=String(role||"").trim().toLowerCase();
    return d==="executive office"&&(r==="executive director"||r==="executive office");
  };
+ const isBoardMemberAuthority=(department=authorityDepartment,role=authorityRole)=>{
+   const d=String(department||"").trim().toLowerCase();
+   const r=String(role||"").trim().toLowerCase();
+   return d==="board of directors"&&r==="board member";
+ };
  async function saveSignerAuthority(e){
    e.preventDefault();
    if(authorityBusy)return;
@@ -394,8 +399,8 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
        authorityRole,
        authorityStatus:isPermanentExecutiveAuthority()?"Current":authorityStatus,
        authorityReference,
-       authorityEffectiveAt,
-       authorityExpiresAt,
+       authorityEffectiveAt:isBoardMemberAuthority()?authorityEffectiveAt:"",
+       authorityExpiresAt:isBoardMemberAuthority()?authorityExpiresAt:"",
        authorityDepartment,
        authorityUnit:selectedAuthority?.unit||authorityUnit||authorityDepartment
      });
@@ -463,7 +468,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
    </div></div>
    <div className="form-grid">
      <label className="signature-authority-field">Department
-       <select value={authorityDepartment} onChange={e=>{const value=e.target.value;setAuthorityDepartment(value);setAuthorityUnit("");setAuthorityRole("");if(String(value||"").trim().toLowerCase()==="executive office")setAuthorityStatus("Current");}} required disabled={authorityBusy}>
+       <select value={authorityDepartment} onChange={e=>{const value=e.target.value;setAuthorityDepartment(value);setAuthorityUnit("");setAuthorityRole("");setAuthorityEffectiveAt("");setAuthorityExpiresAt("");if(String(value||"").trim().toLowerCase()==="executive office")setAuthorityStatus("Current");}} required disabled={authorityBusy}>
          <option value="">Select registered department</option>
          {authorityDepartments.map(value=><option key={value} value={value}>{value}</option>)}
        </select>
@@ -472,6 +477,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
        <select value={authorityRole} onChange={e=>{
          const value=e.target.value;
          setAuthorityRole(value);
+         if(!isBoardMemberAuthority(authorityDepartment,value)){setAuthorityEffectiveAt("");setAuthorityExpiresAt("");}
          if(isPermanentExecutiveAuthority(authorityDepartment,value))setAuthorityStatus("Current");
          const selectedAuthority=authorityOptions.find(x=>x.role===value);
          setAuthorityUnit(selectedAuthority?.unit||authorityDepartment||"");
@@ -498,10 +504,10 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
        <input value={authorityReference} onChange={e=>setAuthorityReference(e.target.value)} placeholder="Appointment / authority reference (optional)" disabled={authorityBusy}/>
        <small>Optional for officers whose register capacity does not require a formal appointment reference.</small>
      </label>}
-     {authorityDepartment&&authorityUnit&&authorityRole&&<label className="signature-authority-field">Effective date <span className="muted">(optional)</span>
+     {isBoardMemberAuthority()&&<label className="signature-authority-field">Effective date <span className="muted">(optional)</span>
        <input type="date" value={authorityEffectiveAt} onChange={e=>setAuthorityEffectiveAt(e.target.value)} disabled={authorityBusy}/>
      </label>}
-     {authorityDepartment&&authorityUnit&&authorityRole&&<label className="signature-authority-field">Expiry date <span className="muted">(optional)</span>
+     {isBoardMemberAuthority()&&<label className="signature-authority-field">Expiry date <span className="muted">(optional)</span>
        <input type="date" value={authorityExpiresAt} onChange={e=>setAuthorityExpiresAt(e.target.value)} min={authorityEffectiveAt||undefined} disabled={authorityBusy}/>
      </label>}
    </div>
