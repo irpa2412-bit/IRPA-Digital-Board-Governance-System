@@ -31,13 +31,7 @@ jobs:
             echo "ERROR: destructive deleteField usage remains in Signature Portal migration source."
             exit 1
           fi
-          identity_line=$(grep -nF 'const signerIdentity=await ensureMySignerIdentity' src/firebase/signaturePlatform.js | head -n1 | cut -d: -f1)
-          upload_line=$(grep -nF 'await uploadBytes(storageRef,signedBytes' src/firebase/signaturePlatform.js | head -n1 | cut -d: -f1)
-          test -n "$identity_line"
-          test -n "$upload_line"
-          test "$identity_line" -lt "$upload_line"
-          grep -Fq 'recordSignerAuthenticationEvidence' src/firebase/signaturePlatform.js
-          echo "Signature migration safety invariants passed."
+          node --input-type=module -e 'import fs from "node:fs"; const s=fs.readFileSync("src/firebase/signaturePlatform.js","utf8"); const identity=s.indexOf("const signerIdentity=await ensureMySignerIdentity"); const upload=s.indexOf("await uploadBytes(storageRef,signedBytes"); if(identity<0||upload<0||identity>=upload) { console.error({identity,upload}); process.exit(1); } if(!s.includes("recordSignerAuthenticationEvidence")) process.exit(1); console.log("Signature migration safety invariants passed.",{identity,upload});'
 
       - name: Build web application
         env:
