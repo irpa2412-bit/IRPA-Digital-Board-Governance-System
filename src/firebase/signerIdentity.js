@@ -33,11 +33,6 @@ export async function ensureMySignerIdentity(profile, options={}){
     signerName:normalise(profile?.displayName||u.displayName||u.email||"Signer"),
     email:normalise(profile?.email||u.email||""),
     organisationName,
-    authorityRole:authorityRole||"Not yet assigned",
-    authorityStatus:normalise(options.authorityStatus||existing.data()?.authorityStatus||"Unspecified"),
-    authorityReference:normalise(options.authorityReference||existing.data()?.authorityReference||""),
-    authorityEffectiveAt:options.authorityEffectiveAt||existing.data()?.authorityEffectiveAt||null,
-    authorityExpiresAt:options.authorityExpiresAt||existing.data()?.authorityExpiresAt||null,
     trustRecordVersion:"1.0",
     migrationSource:existing.data()?.migrationSource||"signatureProfiles",
     migratedFromSignatureProfile:existing.data()?.migratedFromSignatureProfile??true,
@@ -48,8 +43,19 @@ export async function ensureMySignerIdentity(profile, options={}){
     updatedAt:serverTimestamp()
   };
   if(!existing.exists()){
-    await setDoc(ref,{...payload,createdAt:serverTimestamp()});
+    await setDoc(ref,{
+      ...payload,
+      authorityRole:authorityRole||"Not yet assigned",
+      authorityStatus:normalise(options.authorityStatus||"Unspecified"),
+      authorityReference:normalise(options.authorityReference||""),
+      authorityEffectiveAt:options.authorityEffectiveAt||null,
+      authorityExpiresAt:options.authorityExpiresAt||null,
+      createdAt:serverTimestamp()
+    });
   }else{
+    // Authority is a separately controlled trust attribute. Existing authority
+    // values are deliberately preserved here; changes go through the
+    // server-authorized updateSignerAuthority callable.
     await updateDoc(ref,payload);
   }
   return {id:u.uid,...payload};
