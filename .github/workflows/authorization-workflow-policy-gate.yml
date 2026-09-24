@@ -1,8 +1,6 @@
 name: Authorization Workflow Policy Gate
 
 on:
-  push:
-    branches: [feature/authorization-workflow-central-gate]
   pull_request:
     branches: [main]
 
