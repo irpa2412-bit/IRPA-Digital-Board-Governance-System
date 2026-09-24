@@ -35,7 +35,7 @@ assert.equal(r.allow,true);
 r=evaluateAuthorizationWorkflowTransition({...base,actor:{uid:"implementer",active:true,organisation:ORGANISATION},workflow:{...base.workflow,status:"Approved"},nextStatus:"Completed",effectivePermissions:["authorization.workflow.complete"]});
 assert.equal(r.allow,true);
 
-r=evaluateAuthorizationWorkflowTransition({...base,nextStatus:"Approved",effectivePermissions:["authorization.workflow.approve"]});
+r=evaluateAuthorizationWorkflowTransition({...base,workflow:{...base.workflow,status:"Under Review"},nextStatus:"Approved",effectivePermissions:["authorization.workflow.approve"]});
 assert.equal(r.reason,"NAMED_APPROVER_REQUIRED");
 
 r=evaluateAuthorizationWorkflowTransition({...base,nextStatus:"Not A Stage",effectivePermissions:["authorization.workflow.review"]});
