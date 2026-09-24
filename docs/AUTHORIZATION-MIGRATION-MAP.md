@@ -210,4 +210,38 @@ A connection to another portal may proceed only after:
 6. the connection is explicitly approved for the next migration stage.
 
 No cross-portal connection is implicit.
+## Operational departmental access — staged catalogue
+
+The central policy now contains a non-provisioning operational role catalogue for relevant IRPA organisational functions. It defines what each role could receive after explicit approval and controlled provisioning; it does not grant live access by itself.
+
+| Organisational function / role | Controlled operational scope |
+|---|---|
+| Director Internal Oversight | Authorization administration, resolution view, reports view |
+| Internal Oversight Officer | Authorization view, resolution view, reports view |
+| Director Human Resources | Member administration, reports |
+| HR Manager | Member administration, reports |
+| Director Finance & Administration | Finance operations/approval, reports, document view |
+| Finance Manager | Finance operations, reports, document view |
+| Programme/Technical Officer | Meetings, documents, reports |
+| Operations Manager | Meetings, documents, reports |
+| Executive Director | Executive approvals, resolution approval, controlled signing, finance approval, reports |
+| Director Livestock | Programme documents, meetings, reports |
+| Director Environment | Programme documents, meetings, reports |
+| Director Outreach | Meetings, documents, reports |
+| Director Community Development | Meetings, documents, reports |
+| Field Department | Meetings/document view, field reporting |
+
+**Safety condition:** this catalogue is policy metadata only. It must not be interpreted as a grant to every person carrying the role title. Actual access remains dependent on an active institutional identity and an explicitly provisioned authorizationRolePermissions/{role} record or controlled direct grant.
+
+No access has been extended to production users through this change.
+
+### Operationalisation gate
+Before a role is provisioned:
+1. verify the role against the current Members/Employees register;
+2. confirm the department's actual duties and separation-of-duties requirements;
+3. provision only the minimum required permissions;
+4. test allow/deny cases for that role;
+5. record the provisioning decision and approver;
+6. test revocation;
+7. only then connect the role to the relevant portal.
 
