@@ -886,8 +886,11 @@ exports.resetTrialData = onCall({region:"us-central1"}, async request => {
     db.collection("members").get(),
     db.collection("employees").get()
   ]);
-  const memberCount=memberSnap.size;
-  const employeeCount=employeeSnap.size;
+  const isTrialRecord=data=>String(data?.recordOrigin||"").trim().toUpperCase()==="TRIAL"||data?.trialData===true||data?.isTrial===true;
+  const trialMembers=memberSnap.docs.filter(d=>isTrialRecord(d.data())&&!(d.data()?.boardMember===true||d.data()?.role==="Board Member"||d.data()?.boardPosition));
+  const trialEmployees=employeeSnap.docs.filter(d=>isTrialRecord(d.data()));
+  const memberCount=trialMembers.length;
+  const employeeCount=trialEmployees.length;
   const auditRef=db.collection("audit").doc();
   await auditRef.set({
     action:"RESET_TRIAL_DATA",
@@ -898,5 +901,22 @@ exports.resetTrialData = onCall({region:"us-central1"}, async request => {
     memberRecordsTargeted:memberCount,
     employeeRecordsTargeted:employeeCount,
     status:"Started",
+    trialOnly:true,
+    boardMembersPreserved:true,
     createdAt:FieldValue.serverTimestamp()
   });
+
+  try{
+    let membersDeleted=0;
+    let employeesDeleted=0;
+    for(const d of trialMembers){await d.ref.delete();membersDeleted++;}
+    for(const d of trialEmployees){await d.ref.delete();employeesDeleted++;}
+    await db.collection("employeeCounters").doc("employees").set({currentNumber:0,nextNumber:1,updatedAt:FieldValue.serverTimestamp(),source:"administrator-trial-reset"},{merge:true});
+    await db.collection("memberCounters").doc("members").set({currentNumber:0,nextNumber:1,updatedAt:FieldValue.serverTimestamp(),source:"administrator-trial-reset"},{merge:true});
+    await auditRef.update({status:"Completed",membersDeleted,employeesDeleted,completedAt:FieldValue.serverTimestamp()});
+    return {success:true,membersDeleted,employeesDeleted,trialOnly:true,boardMembersPreserved:true};
+  }catch(error){
+    await auditRef.update({status:"Failed",error:String(error?.message||error),failedAt:FieldValue.serverTimestamp()});
+    throw new HttpsError("internal","The trial-data reset failed. The audit record has been retained.");
+  }
+});
