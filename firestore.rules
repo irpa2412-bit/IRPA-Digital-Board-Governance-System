@@ -124,7 +124,19 @@ service cloud.firestore {
   // Central Authorization Service records are server-managed. The browser may read
   // only the authenticated user's effective grants; all grant/revoke mutations
   // are performed by trusted Cloud Functions.
-  match /authorizationRolePermissions/{roleKey}{\n    allow read:if admin();\n    allow create,update,delete:if false;\n  }\n  match /authorizationGrants/{id}{\n    allow read:if admin()||(signedIn()&&resource.data.targetUid==request.auth.uid);\n    allow create,update,delete:if false;\n  }\n  match /authorizationDecisions/{id}{\n    allow read:if admin()||(signedIn()&&resource.data.actorUid==request.auth.uid);\n    allow create,update,delete:if false;\n  }\n  match /systemSettings/{id}{allow read,create,update,delete:if admin();}
+  match /authorizationRolePermissions/{roleKey}{
+    allow read:if admin();
+    allow create,update,delete:if false;
+  }
+  match /authorizationGrants/{id}{
+    allow read:if admin()||(signedIn()&&resource.data.targetUid==request.auth.uid);
+    allow create,update,delete:if false;
+  }
+  match /authorizationDecisions/{id}{
+    allow read:if admin()||(signedIn()&&resource.data.actorUid==request.auth.uid);
+    allow create,update,delete:if false;
+  }
+  match /systemSettings/{id}{allow read,create,update,delete:if admin();}
   match /inductionRecords/{uid}{allow read:if self(uid)||admin();allow create,update:if self(uid)&&request.resource.data.uid==request.auth.uid&&(activeMember()||request.auth.token.firebase.sign_in_provider=="anonymous");allow delete:if admin();}
   match /{document=**}{allow read,write:if false;}
  }
