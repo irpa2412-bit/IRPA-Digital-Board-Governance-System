@@ -39,15 +39,24 @@ export async function getRecords(collectionName){const s=await getDocs(query(col
 export async function getControlledDocumentsForSigning(){
   if(!auth.currentUser)throw new Error("Authentication is required.");
   const uid=auth.currentUser.uid;
-  const queries=[
-    query(collection(db,COLLECTIONS.documents),where("authorizedUids","array-contains",uid)),
-    query(collection(db,COLLECTIONS.documents),where("uploadedByUid","==",uid))
+  const querySpecs=[
+    query(collection(db,COLLECTIONS.documents),where("uploadedByUid","==",uid)),
+    query(collection(db,COLLECTIONS.documents),where("authorizedUids","array-contains",uid))
   ];
-  const results=await Promise.all(queries.map(async q=>{
-    const snap=await getDocs(q);
-    return snap.docs.map(x=>({id:x.id,...x.data()}));
-  }));
-  const byId=new Map(results.flat().map(d=>[d.id,d]));
+  const results=[];
+  const errors=[];
+  for(const q of querySpecs){
+    try{
+      const snap=await getDocs(q);
+      results.push(...snap.docs.map(x=>({id:x.id,...x.data()})));
+    }catch(error){
+      errors.push(error);
+    }
+  }
+  if(!results.length && errors.length===querySpecs.length){
+    throw errors[0] || new Error("Controlled document list could not be loaded.");
+  }
+  const byId=new Map(results.map(d=>[d.id,d]));
   const usable=[...byId.values()].filter(d=>{
     if(String(d?.recordOrigin||"PRODUCTION").toUpperCase()==="TRIAL"||d?.trialData===true||d?.isTrial===true)return false;
     const contentType=String(d?.contentType||"application/pdf").toLowerCase();
