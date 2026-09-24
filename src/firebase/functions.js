@@ -146,3 +146,13 @@ export async function approveCredentialInterview(requestId){
   const result=await call({requestId});
   return result.data||{};
 }
+
+
+export async function authorizeWorkflowTransition({workflowId,nextStatus,decisionReason=""}){
+  const actor=auth.currentUser;
+  if(!actor) throw new Error("Authentication is required.");
+  const functions=getFunctions(undefined,"us-central1");
+  const call=httpsCallable(functions,"authorizeWorkflowTransition");
+  const result=await call({workflowId,nextStatus,decisionReason:String(decisionReason||"").trim()});
+  return result.data||{};
+}
