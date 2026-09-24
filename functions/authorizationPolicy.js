@@ -73,6 +73,37 @@ function buildRoleProvisioningPlan({role,currentPermissions=[]}={}){
   };
 }
 
+const OPERATIONAL_DEPARTMENT_ACCESS = Object.freeze({
+  "Internal Oversight": ["Director Internal Oversight","Internal Oversight Officer"],
+  "Human Resources": ["Director Human Resources","HR Manager"],
+  "Finance & Administration": ["Director Finance & Administration","Finance Manager"],
+  "Programme & Technical": ["Programme/Technical Officer"],
+  "Operations": ["Operations Manager"],
+  "Executive Management": ["Executive Director"],
+  "Livestock": ["Director Livestock"],
+  "Environment": ["Director Environment"],
+  "Outreach": ["Director Outreach"],
+  "Community Development": ["Director Community Development"],
+  "Field": ["Field Department"]
+});
+
+function buildDepartmentalProvisioningPlan({currentByRole={}}={}){
+  const departments={};
+  for(const [department,roles] of Object.entries(OPERATIONAL_DEPARTMENT_ACCESS)){
+    departments[department]=roles.map(role=>buildRoleProvisioningPlan({
+      role,
+      currentPermissions:Array.isArray(currentByRole?.[role])?currentByRole[role]:[]
+    }));
+  }
+  return {
+    organisation:ORGANISATION,
+    departments,
+    destructiveChanges:false,
+    requiresExplicitApproval:true,
+    writesPerformed:false
+  };
+}
+
 function validPermission(permission){
   return PERMISSION_SET.has(clean(permission));
 }
@@ -118,4 +149,4 @@ function evaluatePolicy({ actor, organisation, action, resource = {}, context = 
   };
 }
 
-module.exports = { ORGANISATION, PERMISSIONS, OPERATIONAL_ROLE_PERMISSIONS, validPermission, getOperationalRolePermissions, buildRoleProvisioningPlan, evaluatePolicy };
+module.exports = { ORGANISATION, PERMISSIONS, OPERATIONAL_ROLE_PERMISSIONS, OPERATIONAL_DEPARTMENT_ACCESS, validPermission, getOperationalRolePermissions, buildRoleProvisioningPlan, buildDepartmentalProvisioningPlan, evaluatePolicy };
