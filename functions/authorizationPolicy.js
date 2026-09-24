@@ -30,6 +30,25 @@ const PERMISSIONS = Object.freeze([
 ]);
 
 const PERMISSION_SET = new Set(PERMISSIONS);
+// Proposed operational role catalogue. This is a policy definition only; it does
+// not provision Firestore access until each role is explicitly approved and tested.
+const OPERATIONAL_ROLE_PERMISSIONS = Object.freeze({
+  "Director Internal Oversight": ["authorization.permission.view","authorization.permission.grant","authorization.permission.revoke","resolution.view","reports.view"],
+  "Internal Oversight Officer": ["authorization.permission.view","resolution.view","reports.view"],
+  "Director Human Resources": ["member.create","member.update","member.remove","reports.view"],
+  "HR Manager": ["member.create","member.update","reports.view"],
+  "Director Finance & Administration": ["finance.view","finance.create","finance.approve","reports.view","document.view"],
+  "Finance Manager": ["finance.view","finance.create","reports.view","document.view"],
+  "Programme/Technical Officer": ["meeting.create","meeting.edit","meeting.view","document.create","document.edit","document.view","reports.create","reports.view"],
+  "Operations Manager": ["meeting.create","meeting.edit","meeting.view","document.view","reports.create","reports.view"],
+  "Executive Director": ["authorization.permission.view","meeting.view","resolution.view","resolution.approve","document.view","document.sign","signature.sign","finance.view","finance.approve","reports.view","reports.create"],
+  "Director Livestock": ["document.create","document.edit","document.view","meeting.view","reports.create","reports.view"],
+  "Director Environment": ["document.create","document.edit","document.view","meeting.view","reports.create","reports.view"],
+  "Director Outreach": ["meeting.view","document.create","document.edit","document.view","reports.create","reports.view"],
+  "Director Community Development": ["meeting.view","document.create","document.edit","document.view","reports.create","reports.view"],
+  "Field Department": ["meeting.view","document.view","reports.create","reports.view"]
+});
+
 
 function clean(value){ return String(value ?? "").trim(); }
 
@@ -78,4 +97,4 @@ function evaluatePolicy({ actor, organisation, action, resource = {}, context = 
   };
 }
 
-module.exports = { ORGANISATION, PERMISSIONS, validPermission, evaluatePolicy };
+module.exports = { ORGANISATION, PERMISSIONS, OPERATIONAL_ROLE_PERMISSIONS, validPermission, evaluatePolicy };
