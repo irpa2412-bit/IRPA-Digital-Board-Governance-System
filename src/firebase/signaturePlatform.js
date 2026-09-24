@@ -117,9 +117,20 @@ export async function saveMySignatureProfile({signatureFile,initialsFile,display
     updatedAt:serverTimestamp()
   };
 
-  await setDoc(doc(db,PROFILE_COLLECTION,u.uid),p,{merge:true});
-  await ensureMySignerIdentity(p,{organisationName:IRPA_ORGANISATION});
-  return p;
+  const profileRef=doc(db,PROFILE_COLLECTION,u.uid);
+  await setDoc(profileRef,p,{merge:true});
+  const persisted=await getDoc(profileRef);
+  if(!persisted.exists()) throw new Error("Signature Profile was not persisted. The account does not have permission to save its own profile.");
+  const persistedProfile={id:persisted.id,...persisted.data()};
+  try{
+    await ensureMySignerIdentity(persistedProfile,{organisationName:IRPA_ORGANISATION});
+  }catch(error){
+    // The Signature Profile is the primary save operation. A secondary trust-record
+    // refresh must never turn a successfully archived signature into a false SAVE FAILED.
+    console.warn("Signature Profile saved; Signer Identity synchronization will be retried on profile load.",error);
+    persistedProfile.signerIdentitySyncPending=true;
+  }
+  return persistedProfile;
 }
 
 export async function revokeSignatureApplication(){
