@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getAuth } = require("firebase-admin/auth");
-const { ORGANISATION, PERMISSIONS, validPermission, evaluatePolicy } = require("./authorizationPolicy");
+const { ORGANISATION, PERMISSIONS, validPermission, evaluatePolicy, getOperationalRolePermissions, evaluateAuthorizationWorkflowTransition } = require("./authorizationPolicy");
 
 const db = getFirestore();
 const auth = getAuth();
@@ -50,6 +50,8 @@ async function rolePermissions(actor){
     const snap=await db.collection("authorizationRolePermissions").doc(role).get();
     if(snap.exists && snap.data()?.active!==false){
       for(const p of Array.isArray(snap.data()?.permissions)?snap.data().permissions:[]) if(validPermission(p)) permissions.add(clean(p));
+    } else {
+      for(const p of getOperationalRolePermissions(role)) permissions.add(clean(p));
     }
   }
   return [...permissions];
@@ -78,6 +80,8 @@ async function getEffectivePermissions(uid){
   if(!actor) return {uid,active:false,roles:[],permissions:[]};
   const [rolePerms,grants]=await Promise.all([rolePermissions(actor),directPermissions(uid)]);
   const permissions=new Set(rolePerms);
+  // Existing workflow behavior permits active institutional actors to submit their own requests.
+  if(actor.active===true) permissions.add("authorization.workflow.submit");
   for(const grant of grants){
     if(grant.effect!=="Deny" && grant.status==="Active" && validPermission(grant.permission)) permissions.add(grant.permission);
   }
