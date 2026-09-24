@@ -437,8 +437,10 @@ async function ensureSignatureProfileFolder(request, env) {
   const claims = await authenticateFirebaseRequest(request);
   const memberRecord = await getFirestoreDocument(env, `members/${claims.user_id}`, claims.token);
   const employeeRecord = await getFirestoreDocument(env, `employees/${claims.user_id}`, claims.token);
-  const isSignatureProfileOwner = Boolean(memberRecord?.name || memberRecord?.fields) || Boolean(employeeRecord?.name || employeeRecord?.fields);
-  if (!isSignatureProfileOwner && !(await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token))?.fields?.active?.booleanValue) {
+  const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
+  const isSignatureProfileOwner = Boolean(memberRecord) || Boolean(employeeRecord);
+  const isAdmin = Boolean(adminRecord?.fields?.active?.booleanValue);
+  if (!isSignatureProfileOwner && !isAdmin) {
     return json({ ok: false, error: "A registered IRPA member or employee profile is required before a Signature Profile archive can be created." }, 403, corsHeaders(request));
   }
 
