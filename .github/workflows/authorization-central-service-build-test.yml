@@ -30,11 +30,11 @@ jobs:
           test -f functions/authorizationPolicy.js
           test -f functions/authorizationService.js
           test -f src/firebase/authorizationService.js
-          grep -Fq 'grantAuthorizationPermission' functions/index.js
-          grep -Fq 'revokeAuthorizationPermission' functions/index.js
+          grep -Fq 'grantAuthorizationPermission' functions/authorizationFunctions.js
+          grep -Fq 'revokeAuthorizationPermission' functions/authorizationFunctions.js
           grep -Fq 'authorizationGrants' firestore.rules
           grep -Fq 'allow create,update,delete:if false;' firestore.rules
-          grep -Fq 'Current Authorization & Approvals appearance remains unchanged.' docs/AUTHORIZATION-MIGRATION-MAP.md
+          grep -Fq 'current Authorization & Approvals appearance remains unchanged.' docs/AUTHORIZATION-MIGRATION-MAP.md
       - name: Build web application
         working-directory: .
         run: |
