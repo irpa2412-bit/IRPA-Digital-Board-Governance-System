@@ -3,6 +3,7 @@ name: Deploy IRPA Governance to Firebase
 # Administrator Gateway fix deployment marker: 2026-09-21T22:20Z
 # Production restore redeploy: 2026-09-22T12:03Z
 # V3 Meeting Centre safety hardening redeploy trigger: 2026-09-24T08:46Z
+# Signature Profile save authorization redeploy trigger: 2026-09-24T16:51Z
 
 on:
   push:
