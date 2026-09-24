@@ -23,8 +23,11 @@ jobs:
         run: npm install --omit=dev
       - name: Test pure authorization policy
         run: node authorizationPolicy.test.js
-      - name: Syntax-check staged Authorization callable gateway
-        run: node --check authorizationFunctions.js
+      - name: Syntax-check staged Authorization service and callable gateway
+        run: |
+          node --check authorizationPolicy.js
+          node --check authorizationService.js
+          node --check authorizationFunctions.js
       - name: Check migration invariants
         working-directory: .
         run: |
