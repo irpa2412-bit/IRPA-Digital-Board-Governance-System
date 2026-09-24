@@ -1,4 +1,4 @@
-import React,{useEffect,useMemo,useState}from"react";
+// V3.0 participant/invitation integration: system records + controlled external invitees.\nimport React,{useEffect,useMemo,useState}from"react";
 import{createRecord,getRecords,updateRecord,deleteRecord,COLLECTIONS}from"../firebase/data";
 import{sendMemberInvitationEmail}from"../firebase/auth";
 const empty={participantName:"",participantUid:"",participantEmail:"",participantRole:"Board Member",participantType:"External Invitee",sourceType:"Manual Invitee",sourceRecordId:"",employeeId:"",boardMemberId:"",memberType:"Technical Advisor",meetingId:"",meetingReference:"",attendanceStatus:"Invited",notes:""};
