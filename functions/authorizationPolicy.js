@@ -136,7 +136,7 @@ const AUTHORIZATION_WORKFLOW_TRANSITIONS = Object.freeze({
   "Approved->Completed": "authorization.workflow.complete"
 });
 
-function evaluateAuthorizationWorkflowTransition({actor, workflow, nextStatus, effectivePermissions=[]}={}){
+function evaluateAuthorizationWorkflowTransition({actor, workflow, nextStatus, effectivePermissions=[], decisionReason}={}){
   const from=clean(workflow?.status);
   const next=clean(nextStatus);
   const permission=AUTHORIZATION_WORKFLOW_TRANSITIONS[from+"->"+next];
@@ -153,7 +153,8 @@ function evaluateAuthorizationWorkflowTransition({actor, workflow, nextStatus, e
   if(["Approved","Rejected"].includes(next) && workflow?.approverUid!==actor.uid) return {allow:false,reason:"NAMED_APPROVER_REQUIRED",policyVersion:"1.0"};
   if(next==="Completed" && workflow?.implementerUid!==actor.uid) return {allow:false,reason:"NAMED_IMPLEMENTER_REQUIRED",policyVersion:"1.0"};
   if(next==="Returned" && workflow?.reviewerUid!==actor.uid) return {allow:false,reason:"NAMED_REVIEWER_REQUIRED",policyVersion:"1.0"};
-  if(["Rejected","Returned"].includes(next) && !String(workflow?.decisionReason||"").trim())
+  const proposedDecisionReason=decisionReason ?? workflow?.decisionReason;
+  if(["Rejected","Returned"].includes(next) && !String(proposedDecisionReason||"").trim())
     return {allow:false,reason:"DECISION_REASON_REQUIRED",policyVersion:"1.0"};
   return {allow:true,reason:"PERMISSION_GRANTED",policyVersion:"1.0",action:permission,from,next};
 }
