@@ -7,7 +7,7 @@ service cloud.firestore {
   function adminProfileExists(){return signedIn()&&exists(/databases/$(database)/documents/adminProfiles/$(request.auth.uid));}
   function admin(){return primaryAdmin()||(adminProfileExists()&&get(/databases/$(database)/documents/adminProfiles/$(request.auth.uid)).data.active==true);}
   function memberProfileExists(){return signedIn()&&exists(/databases/$(database)/documents/members/$(request.auth.uid));}
-  function activeMember(){return memberProfileExists()&&get(/databases/$(database)/documents/members/$(request.auth.uid)).data.status=="Active";}
+  function activeMember(){return memberProfileExists()&&((get(/databases/$(database)/documents/members/$(request.auth.uid)).data.get("status","") in ["Active","Activated"])||get(/databases/$(database)/documents/members/$(request.auth.uid)).data.get("registrationStatus","")=="Activated");}
   function activeEmployee(){return signedIn()&&exists(/databases/$(database)/documents/employees/$(request.auth.uid))&&(get(/databases/$(database)/documents/employees/$(request.auth.uid)).data.get("status","")=="Active"||get(/databases/$(database)/documents/employees/$(request.auth.uid)).data.get("employmentStatus","")=="Active"||get(/databases/$(database)/documents/employees/$(request.auth.uid)).data.get("registrationStatus","")=="Activated");}
   function signatureProfileUser(){return activeMember()||activeEmployee();}
   function meetingUser(){return admin()||activeMember()||activeEmployee();}
