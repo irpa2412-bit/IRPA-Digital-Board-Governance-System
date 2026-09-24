@@ -467,9 +467,6 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
        <input type="date" value={authorityExpiresAt} onChange={e=>setAuthorityExpiresAt(e.target.value)} min={authorityEffectiveAt||undefined} disabled={authorityBusy}/>
      </label>}
    </div>
-   <div className="auth-message" role="status" style={{marginTop:10}}>
-     Register match: <strong>{authorityDepartment||"—"} → {authorityRole||"—"}</strong>{authorityUnit&&authorityUnit!==authorityDepartment?<small style={{display:"block",marginTop:4}}>Source unit/capacity: {authorityUnit}</small>:null}
-   </div>
    <div style={{display:"flex",justifyContent:"flex-end",marginTop:12}}>
      <button type="submit" disabled={authorityBusy||!authorityDepartment||!authorityRole}>{authorityBusy?"Saving Authority…":"Save Current Authority"}</button>
    </div>
