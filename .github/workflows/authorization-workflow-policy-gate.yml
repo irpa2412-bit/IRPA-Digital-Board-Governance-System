@@ -1,0 +1,25 @@
+name: Authorization Workflow Policy Gate
+
+on:
+  push:
+    branches: [feature/authorization-workflow-central-gate]
+  pull_request:
+    branches: [main]
+
+jobs:
+  policy-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Functions dependencies
+        working-directory: functions
+        run: npm install
+      - name: Validate transition policy
+        run: |
+          node --check functions/authorizationPolicy.js
+          node functions/authorizationWorkflowPolicy.test.js
+      - name: Confirm non-deploying gate
+        run: echo "Authorization workflow policy gate is non-deploying."
