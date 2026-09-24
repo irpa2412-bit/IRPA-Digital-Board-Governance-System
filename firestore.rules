@@ -10,6 +10,7 @@ service cloud.firestore {
   function activeMember(){return memberProfileExists()&&get(/databases/$(database)/documents/members/$(request.auth.uid)).data.status=="Active";}
   function activeEmployee(){return signedIn()&&exists(/databases/$(database)/documents/employees/$(request.auth.uid))&&(get(/databases/$(database)/documents/employees/$(request.auth.uid)).data.get("status","")=="Active"||get(/databases/$(database)/documents/employees/$(request.auth.uid)).data.get("employmentStatus","")=="Active"||get(/databases/$(database)/documents/employees/$(request.auth.uid)).data.get("registrationStatus","")=="Activated");}
   function signatureProfileUser(){return activeMember()||activeEmployee();}
+  function meetingUser(){return admin()||activeMember()||activeEmployee();}
   function role(r){return activeMember()&&get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role==r;}
   function anyMemberRole(roles){return activeMember()&&roles.hasAny([get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role]);}
   function auditor(){return signedIn()&&exists(/databases/$(database)/documents/auditorProfiles/$(request.auth.token.email))&&get(/databases/$(database)/documents/auditorProfiles/$(request.auth.token.email)).data.active==true&&get(/databases/$(database)/documents/auditorProfiles/$(request.auth.token.email)).data.email==request.auth.token.email;}
@@ -108,10 +109,10 @@ service cloud.firestore {
   match /auditorProfiles/{email}{allow read:if admin()||(auditor()&&request.auth.token.email==email);allow create,update:if admin();allow delete:if admin();}
   match /audit/{id}{allow read:if admin()||auditor();allow create:if signedIn();allow update,delete:if false;}
   match /participants/{id}{allow read:if governanceUser();allow create,update,delete:if admin();}
-  match /meetings/{id}{allow read:if governanceUser();allow create,update,delete:if admin();}
-  match /meetingSubscriptions/{id}{allow read:if governanceUser();allow create,update,delete:if admin();}
-  match /meetingRoomEvents/{id}{allow read:if governanceUser();allow create,update:if governanceUser();allow delete:if admin();}
-  match /transcriptions/{id}{allow read:if governanceUser();allow create,update:if governanceUser();allow delete:if admin();}
+  match /meetings/{id}{allow read:if meetingUser();allow create,update,delete:if admin();}
+  match /meetingSubscriptions/{id}{allow read:if meetingUser();allow create,update,delete:if admin();}
+  match /meetingRoomEvents/{id}{allow read:if meetingUser();allow create,update:if governanceUser();allow delete:if admin();}
+  match /transcriptions/{id}{allow read:if meetingUser();allow create,update:if governanceUser();allow delete:if admin();}
   match /resolutions/{id}{allow read:if governanceUser();allow create,update,delete:if admin();}
   match /actions/{id}{allow read:if governanceUser();allow create,update:if governanceUser();allow delete:if admin();}
   match /decisions/{id}{allow read:if governanceUser();allow create,update,delete:if admin();}
