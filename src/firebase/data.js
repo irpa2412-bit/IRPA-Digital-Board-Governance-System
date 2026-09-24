@@ -72,6 +72,34 @@ function mergeInstitutionalRecords(records=[]){
 export async function getCurrentMemberProfile(){const uid=auth.currentUser?.uid;const email=String(auth.currentUser?.email||"").trim().toLowerCase();if(!uid)return null;const records=[];const direct=await getRecord(COLLECTIONS.members,uid).catch(()=>null);if(direct)records.push(direct);if(email){const snap=await getDocs(query(collection(db,COLLECTIONS.members),where("email","==",email))).catch(()=>null);if(snap)records.push(...snap.docs.map(x=>({id:x.id,...x.data()})));}return mergeInstitutionalRecords(records);}
 export async function getCurrentEmployeeProfile(){const uid=auth.currentUser?.uid;const email=String(auth.currentUser?.email||"").trim().toLowerCase();if(!uid)return null;const records=[];const direct=await getRecord(COLLECTIONS.employees,uid).catch(()=>null);if(direct)records.push(direct);if(email){const snap=await getDocs(query(collection(db,COLLECTIONS.employees),where("email","==",email))).catch(()=>null);if(snap)records.push(...snap.docs.map(x=>({id:x.id,...x.data()})));}return mergeInstitutionalRecords(records);}
 
+// Returns every active institutional register entry linked to the authenticated
+// member, including separate Member and Employee records. This is intentionally
+// not merged: a dual-role person must be able to select the exact registered
+// department/unit/capacity used for signing.
+export async function getCurrentSigningAuthorityRegisterEntries(){
+ const uid=auth.currentUser?.uid;
+ const email=String(auth.currentUser?.email||"").trim().toLowerCase();
+ if(!uid)return[];
+ const entries=[];
+ const collect=(record,sourceCollection)=>{
+   if(!record)return;
+   const active=String(record.status||record.employmentStatus||"Active").trim().toLowerCase()!=="inactive";
+   if(active)entries.push({id:record.id||record.uid||uid,...record,sourceCollection});
+ };
+ collect(await getRecord(COLLECTIONS.members,uid).catch(()=>null),"members");
+ collect(await getRecord(COLLECTIONS.employees,uid).catch(()=>null),"employees");
+ if(email){
+   const [memberSnap,employeeSnap]=await Promise.all([
+     getDocs(query(collection(db,COLLECTIONS.members),where("email","==",email))).catch(()=>null),
+     getDocs(query(collection(db,COLLECTIONS.employees),where("email","==",email))).catch(()=>null)
+   ]);
+   memberSnap?.docs.forEach(x=>collect({id:x.id,...x.data()},"members"));
+   employeeSnap?.docs.forEach(x=>collect({id:x.id,...x.data()},"employees"));
+ }
+ const seen=new Set();
+ return entries.filter(entry=>{const key=entry.sourceCollection+":"+entry.id;if(seen.has(key))return false;seen.add(key);return true;});
+}
+
 
 export async function getCurrentInductionContext(){
   const applicantUser=applicantAuth.currentUser;
