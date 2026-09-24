@@ -37,18 +37,23 @@ export async function getRecords(collectionName){const s=await getDocs(query(col
 // that may not contain createdAt, while preserving the existing Firestore
 // authorization rules on the documents collection.
 export async function getControlledDocumentsForSigning(){
-  const uid=auth.currentUser?.uid;
-  if(!uid)throw new Error("Authentication is required to load controlled documents.");
-  const readRows=async(q)=>{const snap=await getDocs(q);return snap.docs.map(x=>({id:x.id,...x.data()}));};
-  // Read only documents the authenticated officer is explicitly authorized to use,
-  // plus documents they personally registered. This avoids relying on an unrestricted
-  // collection scan and remains compatible with the existing documents security rule.
-  const [authorized,owned]=await Promise.all([
-    readRows(query(collection(db,COLLECTIONS.documents),where("authorizedUids","array-contains",uid))),
-    readRows(query(collection(db,COLLECTIONS.documents),where("uploadedByUid","==",uid)))
-  ]);
-  const byId=new Map([...authorized,...owned].map(d=>[d.id,d]));
-  const usable=[...byId.values()].filter(d=>{
+  if(!auth.currentUser)throw new Error("Authentication is required.");
+  const uid=auth.currentUser.uid;
+  let snap;
+  let queryError=null;
+  // Controlled uploads record the initiating user's UID in authorizedUids.
+  // Prefer that per-user index so Firestore can evaluate the read against
+  // the same authorization record instead of requiring a broad collection read.
+  try{
+    snap=await getDocs(query(collection(db,COLLECTIONS.documents),where("authorizedUids","array-contains",uid)));
+  }catch(error){queryError=error;}
+  // Compatibility fallback for legacy document records.
+  if(!snap){
+    try{snap=await getDocs(collection(db,COLLECTIONS.documents));}
+    catch(error){throw queryError||error;}
+  }
+  const rows=snap.docs.map(x=>({id:x.id,...x.data()}));
+  const usable=rows.filter(d=>{
     if(String(d?.recordOrigin||"PRODUCTION").toUpperCase()==="TRIAL"||d?.trialData===true||d?.isTrial===true)return false;
     const contentType=String(d?.contentType||"application/pdf").toLowerCase();
     if(contentType && contentType!=="application/pdf")return false;
@@ -62,7 +67,6 @@ export async function getControlledDocumentsForSigning(){
     return bt-at;
   });
 }
-
 export async function getEmployeePaymentRequests(employeeUid){const s=await getDocs(query(collection(db,COLLECTIONS.staffPaymentRequests),where("employeeUid","==",employeeUid),orderBy("createdAt","desc")));return s.docs.map(x=>({id:x.id,...x.data()}));}
 async function digestKey(value){const bytes=new TextEncoder().encode(value);const digest=await crypto.subtle.digest("SHA-256",bytes);return Array.from(new Uint8Array(digest)).map(b=>b.toString(16).padStart(2,"0")).join("");}
 export async function openVotingIssue({meetingId,meetingReference,resolutionId=null,resolutionReference=null,votingReference}){if(!auth.currentUser)throw new Error("Authentication is required.");if(!meetingId)throw new Error("A meeting is required for every voting issue.");const origin=String(votingReference||"").trim();if(!origin)throw new Error("The voting origin / issue requiring voting action is required.");const meeting=await getRecord(COLLECTIONS.meetings,meetingId);if(!meeting)throw new Error("The originating meeting could not be found.");if(resolutionId){const resolution=await getRecord(COLLECTIONS.resolutions,resolutionId);if(!resolution)throw new Error("The linked resolution could not be found.");if(resolution.meetingId!==meetingId)throw new Error("A resolution can only be voted on within its originating meeting.");}const issueKey=await digestKey(`${meetingId}|${resolutionId||""}|${origin.toLowerCase()}`);const ref=doc(db,COLLECTIONS.votingIssues,issueKey);return runTransaction(db,async tx=>{const existing=await tx.get(ref);if(existing.exists()){const status=existing.data().status||"Open";if(status!=="Cancelled")return{...existing.data(),id:existing.id,alreadyOpen:true};}const data={meetingId,meetingReference:meetingReference||meeting.title||meetingId,resolutionId,resolutionReference,votingReference:origin,status:"Open",result:"Pending",anonymous:true,openedAt:serverTimestamp(),openedByProcess:true,createdAt:serverTimestamp(),updatedAt:serverTimestamp()};tx.set(ref,data);return{...data,id:ref.id,alreadyOpen:false};});}
