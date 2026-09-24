@@ -88,6 +88,25 @@ export async function ensureSignatureWorkflowFolder(envelopeId) {
   return result;
 }
 
+export async function finalizeSignatureProfileArchives({envelopeId,signedBytes,finalHash,originalHash}={}) {
+  if (!envelopeId || !signedBytes?.length || !finalHash) throw new Error("Completed signer archive data is incomplete.");
+  const bytes = signedBytes instanceof Uint8Array ? signedBytes : new Uint8Array(signedBytes);
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + chunkSize, bytes.length)));
+  }
+  const result = await gatewayPost("/api/signature-profile/finalize", {
+    envelopeId,
+    originalHash: originalHash || "",
+    finalHash,
+    fileSize: bytes.length,
+    base64: btoa(binary)
+  });
+  if (!result.deliveries) throw new Error("Google Drive did not return completed signer archive deliveries.");
+  return result;
+}
+
 export async function ensureSignatureProfileFolder(uid) {
   const email = uid === auth.currentUser?.uid ? (auth.currentUser?.email || "") : "";
   const result = await gatewayPost("/api/signature-profile/folder", { uid, email });
