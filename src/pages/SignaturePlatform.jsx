@@ -1,5 +1,5 @@
 import React,{useEffect,useMemo,useRef,useState}from"react";
-import{getCurrentEmployeeProfile,getCurrentMemberProfile,getRecords}from"../firebase/data";
+import{getCurrentEmployeeProfile,getCurrentMemberProfile,getCurrentSigningAuthorityRegisterEntries,getRecords}from"../firebase/data";
 import{downloadDriveBytes}from"../firebase/signatureStorage";
 import{auth}from"../firebase/config";
 import{getMySignerIdentity}from"../firebase/signerIdentity";
@@ -178,7 +178,7 @@ function SigningDocumentViewer({url,documentId,fields,profile,fieldValues,setFie
 
 export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=null,initialDocument=null}){
  const[tab,setTab]=useState("Profile"),[profile,setProfile]=useState(null),[signerIdentity,setSignerIdentity]=useState(null),[docs,setDocs]=useState([]),[envelopes,setEnvelopes]=useState([]),[members,setMembers]=useState([]),[selected,setSelected]=useState(null),[busy,setBusy]=useState(false),[message,setMessage]=useState(""),[revokeOpen,setRevokeOpen]=useState(false),[revokeBusy,setRevokeBusy]=useState(false);
- const[authorityMember,setAuthorityMember]=useState(null),[authorityEmployee,setAuthorityEmployee]=useState(null),[authorityDepartment,setAuthorityDepartment]=useState(""),[authorityUnit,setAuthorityUnit]=useState(""),[authorityRole,setAuthorityRole]=useState(""),[authorityStatus,setAuthorityStatus]=useState("Current"),[authorityReference,setAuthorityReference]=useState(""),[authorityEffectiveAt,setAuthorityEffectiveAt]=useState(""),[authorityExpiresAt,setAuthorityExpiresAt]=useState(""),[authorityBusy,setAuthorityBusy]=useState(false);
+ const[authorityMember,setAuthorityMember]=useState(null),[authorityEmployee,setAuthorityEmployee]=useState(null),[authorityRegisterEntries,setAuthorityRegisterEntries]=useState([]),[authorityDepartment,setAuthorityDepartment]=useState(""),[authorityUnit,setAuthorityUnit]=useState(""),[authorityRole,setAuthorityRole]=useState(""),[authorityStatus,setAuthorityStatus]=useState("Current"),[authorityReference,setAuthorityReference]=useState(""),[authorityEffectiveAt,setAuthorityEffectiveAt]=useState(""),[authorityExpiresAt,setAuthorityExpiresAt]=useState(""),[authorityBusy,setAuthorityBusy]=useState(false);
  const[displayName,setDisplayName]=useState(""),[initials,setInitials]=useState(""),[servedSignatureSrc,setServedSignatureSrc]=useState(""),[servedInitialsSrc,setServedInitialsSrc]=useState(""),[signatureFile,setSignatureFile]=useState(null),[initialsFile,setInitialsFile]=useState(null),[drawnSignature,setDrawnSignature]=useState(""),[replacementMode,setReplacementMode]=useState(false);
  const[title,setTitle]=useState(""),[documentId,setDocumentId]=useState(""),[documentUrl,setDocumentUrl]=useState(""),[signingMode,setSigningMode]=useState("Sequential"),[selectedSigner,setSelectedSigner]=useState(""),[draftEnvelopeId,setDraftEnvelopeId]=useState(null),[signerEmail,setSignerEmail]=useState(""),[signerRole,setSignerRole]=useState("Review"),[recipients,setRecipients]=useState([]),[fields,setFields]=useState([]),[selectedField,setSelectedField]=useState(null),[fieldValues,setFieldValues]=useState({}),[ownerSigningEnabled,setOwnerSigningEnabled]=useState(false);
  useEffect(()=>{
@@ -272,14 +272,16 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
           setAuthorityEffectiveAt(identity.authorityEffectiveAt||"");
           setAuthorityExpiresAt(identity.authorityExpiresAt||"");
         }
-        const [memberRecord,employeeRecord]=await Promise.all([
+        const [memberRecord,employeeRecord,registerEntries]=await Promise.all([
           getCurrentMemberProfile().catch(()=>null),
-          getCurrentEmployeeProfile().catch(()=>null)
+          getCurrentEmployeeProfile().catch(()=>null),
+          getCurrentSigningAuthorityRegisterEntries().catch(()=>[])
         ]);
         setAuthorityMember(memberRecord);
         setAuthorityEmployee(employeeRecord);
-        setAuthorityDepartment(identity?.authorityDepartment||employeeRecord?.department||memberRecord?.department||"");
-        setAuthorityUnit(identity?.authorityUnit||employeeRecord?.unit||employeeRecord?.unitName||memberRecord?.unit||memberRecord?.unitName||memberRecord?.boardPosition||"");
+        setAuthorityRegisterEntries(Array.isArray(registerEntries)?registerEntries:[]);
+        setAuthorityDepartment(identity?.authorityDepartment||registerEntries?.find(x=>x.department)?.department||employeeRecord?.department||memberRecord?.department||"");
+        setAuthorityUnit(identity?.authorityUnit||registerEntries?.find(x=>x.department===(identity?.authorityDepartment||"")&&String(x.unit||x.unitName||x.boardPosition||"").trim())?.unit||employeeRecord?.unit||employeeRecord?.unitName||memberRecord?.unit||memberRecord?.unitName||memberRecord?.boardPosition||"");
       }catch(identityError){
         console.warn("IRPA Signature Portal: Signer Identity record unavailable.",identityError);
         setSignerIdentity(null);
@@ -313,9 +315,10 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
  }
  async function migrateProfileNow(){if(busy)return;setBusy(true);setMessage("Migrating your existing Signature Profile into the new Signer Identity layer…");try{const result=await migrateExistingSignatureProfile();if(result?.identity)setSignerIdentity(result.identity);setMessage(result?.migrated?"Migration verified. Your existing Signature Profile was retained and linked to the new Signer Identity record.":"No existing Signature Profile was found to migrate.");}catch(error){setMessage("MIGRATION FAILED: "+(error?.message||"No changes were made."));}finally{setBusy(false)}}
  const authorityRegisterRecords=useMemo(()=>{
+   const sourceEntries=authorityRegisterEntries.length?authorityRegisterEntries:[authorityMember,authorityEmployee].filter(Boolean);
    const records=[];
-   const add=(record,sourceCollection)=>{
-     if(!record)return;
+   for(const record of sourceEntries){
+     const sourceCollection=record.sourceCollection||"register";
      const department=String(record.department||"").trim();
      const unit=String(record.unit||record.unitName||record.boardPosition||"").trim();
      const values=[
@@ -328,11 +331,9 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
      for(const value of [...new Set(values)]){
        records.push({sourceCollection,sourceRecordId:record.id||record.uid||"",department,unit,role:value});
      }
-   };
-   add(authorityMember,"members");
-   add(authorityEmployee,"employees");
+   }
    return records.filter(item=>item.department||item.unit||item.role);
- },[authorityMember,authorityEmployee]);
+ },[authorityRegisterEntries,authorityMember,authorityEmployee]);
  const authorityDepartments=useMemo(()=>[...new Set(authorityRegisterRecords.map(x=>x.department).filter(Boolean))],[authorityRegisterRecords]);
  const authorityUnits=useMemo(()=>[...new Set(authorityRegisterRecords.filter(x=>x.department===authorityDepartment).map(x=>x.unit).filter(Boolean))],[authorityRegisterRecords,authorityDepartment]);
  const authorityOptions=useMemo(()=>authorityRegisterRecords.filter(x=>x.department===authorityDepartment&&x.unit===authorityUnit),[authorityRegisterRecords,authorityDepartment,authorityUnit]);
@@ -346,7 +347,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
    setAuthorityBusy(true);
    setMessage("Saving your registered signing authority…");
    try{
-     const updated=await updateMySignerAuthority({
+     await updateMySignerAuthority({
        authorityRole,
        authorityStatus,
        authorityReference,
@@ -355,8 +356,20 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
        authorityDepartment,
        authorityUnit
      });
-     setSignerIdentity(updated);
-     setMessage("SUCCESS: your current signing authority has been updated in the Signer Identity trust record.");
+     // Re-read the persisted trust record from Firestore. Do not rely on the
+     // callable response shape, because the identity panel must reflect the
+     // exact record that will survive a full page refresh.
+     const persisted=await getMySignerIdentity();
+     if(!persisted)throw new Error("The authority update returned without a persisted Signer Identity record.");
+     setSignerIdentity(persisted);
+     setAuthorityRole(persisted.authorityRole||"");
+     setAuthorityStatus(persisted.authorityStatus||"Current");
+     setAuthorityReference(persisted.authorityReference||"");
+     setAuthorityEffectiveAt(persisted.authorityEffectiveAt||"");
+     setAuthorityExpiresAt(persisted.authorityExpiresAt||"");
+     setAuthorityDepartment(persisted.authorityDepartment||authorityDepartment);
+     setAuthorityUnit(persisted.authorityUnit||authorityUnit);
+     setMessage("SUCCESS: the current signing authority is saved and re-read from the persistent Signer Identity record.");
    }catch(error){
      setMessage("SIGNING AUTHORITY UPDATE FAILED: "+(error?.message||"No changes were made."));
    }finally{setAuthorityBusy(false)}
