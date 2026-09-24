@@ -1,4 +1,4 @@
-const fs=require("fs");
+import fs from "node:fs";
 const source=fs.readFileSync("functions/index.js","utf8");
 const required=["trialOnly:true","boardMembersPreserved:true","RESET IRPA TRIAL DATA","exports.resetTrialData"];
 for(const token of required){if(!source.includes(token))throw new Error("Missing reset safety marker: "+token);}
