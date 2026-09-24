@@ -40,6 +40,10 @@ export default {
         return await upload(request, env);
       }
 
+      if (url.pathname === "/api/upload-controlled-document" && request.method === "POST") {
+        return await uploadControlledDocument(request, env);
+      }
+
       if (url.pathname === "/api/signature-profile/folder" && request.method === "POST") {
         return await ensureSignatureProfileFolder(request, env);
       }
@@ -295,6 +299,163 @@ async function upload(request, env) {
     uploadedByUid: claims.user_id,
     storageProvider: "Google Drive"
   }, 200, corsHeaders(request));
+}
+
+async function uploadControlledDocument(request, env) {
+  const claims = await authenticateFirebaseRequest(request);
+  const data = await request.json();
+  const fileName = cleanName(data.fileName || "IRPA-governance-document.pdf");
+  const contentType = String(data.contentType || "application/pdf").toLowerCase();
+  const fileSize = Number(data.fileSize || 0);
+  const base64 = String(data.base64 || "");
+  const title = cleanName(data.title || fileName.replace(/\\.pdf$/i, ""));
+  const reference = cleanName(data.reference || "");
+  const documentId = cleanId(data.documentId || `IRPA-DOC-${crypto.randomUUID()}`);
+  const documentType = cleanName(data.documentType || "Governance Document");
+  const archiveCategory = String(data.archiveCategory || "Administrative Documents").trim();
+  const classification = String(data.classification || "Public").trim();
+  const governanceArchive = data.governanceArchive !== false && /governance/i.test(documentType);
+
+  const allowedCategories = ["Finance Documents","Procurement Documents","Administrative Documents"];
+  const allowedClassifications = ["Public","Internal","Confidential","Restricted"];
+  if (!allowedCategories.includes(archiveCategory)) return json({ok:false,error:"Invalid document archive category."},400,corsHeaders(request));
+  if (!allowedClassifications.includes(classification)) return json({ok:false,error:"Invalid document access classification."},400,corsHeaders(request));
+  if (contentType !== "application/pdf") return json({ok:false,error:"Only PDF documents are accepted for controlled-document routing."},400,corsHeaders(request));
+  if (!Number.isFinite(fileSize) || fileSize <= 0 || fileSize > MAX_BYTES) return json({ok:false,error:"Uploaded PDFs must not exceed 10 MB."},400,corsHeaders(request));
+
+  const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+  if (bytes.length !== fileSize) return json({ok:false,error:"Uploaded PDF size could not be verified."},400,corsHeaders(request));
+
+  const accessToken = await getDriveAccessToken(env);
+  const rootId = await findOrCreateFolder(env, accessToken, "IRPA Governance System");
+
+  const archiveRootId = await findOrCreateFolder(env, accessToken, "Document Archives", rootId, {
+    irpaGovernanceArchive:true,
+    purpose:"Controlled Document Archives"
+  });
+  const categoryId = await findOrCreateFolder(env, accessToken, archiveCategory, archiveRootId, {
+    irpaGovernanceArchive:true,
+    archiveCategory,
+    purpose:"Controlled Document Category"
+  });
+  const classificationId = await findOrCreateFolder(env, accessToken, classification, categoryId, {
+    irpaGovernanceArchive:true,
+    archiveCategory,
+    classification,
+    purpose:"Controlled Document Classification"
+  });
+  const folderName = `IRPA-DOC-${documentId}`;
+  const categoryFolderId = await findOrCreateFolder(env, accessToken, folderName, classificationId, {
+    irpaGovernanceArchive:true,
+    purpose:"Controlled Document",
+    documentId,
+    documentUid:documentId,
+    documentTitle:title,
+    documentReference:reference,
+    archiveCategory,
+    classification,
+    publicAccess:classification==="Public"
+  });
+  if (classification==="Public") await ensureAnyoneReaderPermission(env,accessToken,categoryFolderId);
+
+  let governanceRootId = null;
+  let governanceClassificationId = null;
+  let governanceFolderId = null;
+  if (governanceArchive) {
+    governanceRootId = await findOrCreateFolder(env, accessToken, "Board of Directors Governance Archive", rootId, {
+      irpaGovernanceArchive:true,
+      irpaBoardGovernanceArchive:true,
+      purpose:"Board of Directors Governance Documents"
+    });
+    governanceClassificationId = await findOrCreateFolder(env, accessToken, classification, governanceRootId, {
+      irpaGovernanceArchive:true,
+      irpaBoardGovernanceArchive:true,
+      classification,
+      purpose:"Board of Directors Governance Classification"
+    });
+    governanceFolderId = await findOrCreateFolder(env, accessToken, folderName, governanceClassificationId, {
+      irpaGovernanceArchive:true,
+      irpaBoardGovernanceArchive:true,
+      purpose:"Board of Directors Governance Document",
+      documentId,
+      documentUid:documentId,
+      documentTitle:title,
+      documentReference:reference,
+      archiveCategory,
+      classification
+    });
+    if (classification==="Public") await ensureAnyoneReaderPermission(env,accessToken,governanceFolderId);
+  }
+
+  const uploadToFolder = async (folderId, purposeLabel, archiveChannel) => {
+    const metadata = {
+      name:fileName,
+      parents:[folderId],
+      mimeType:contentType,
+      description:JSON.stringify({
+        irpaGovernance:true,
+        irpaBoardGovernanceArchive:archiveChannel==="Board of Directors Governance Archive",
+        uploadedByUid:claims.user_id,
+        purpose:purposeLabel,
+        documentId,
+        documentUid:documentId,
+        documentTitle:title,
+        documentReference:reference,
+        archiveCategory,
+        classification,
+        archiveChannel
+      })
+    };
+    const boundary=`irpa-${crypto.randomUUID()}`;
+    const body=buildMultipartBody(boundary,metadata,bytes,contentType);
+    const response=await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType,size,webViewLink,createdTime,parents",{
+      method:"POST",
+      headers:{Authorization:`Bearer ${accessToken}`,"Content-Type":`multipart/related; boundary=${boundary}`},
+      body
+    });
+    const result=await response.json();
+    if(!response.ok) throw new Error(result.error?.message || `Google Drive upload failed for ${archiveChannel}.`);
+    return {
+      fileId:result.id,
+      fileName:result.name,
+      fileSize:Number(result.size||fileSize),
+      webViewLink:result.webViewLink||`https://drive.google.com/file/d/${result.id}/view`,
+      folderId,
+      archiveChannel
+    };
+  };
+
+  const categoryFile=await uploadToFolder(categoryFolderId,"Controlled Documents",archiveCategory);
+  const governanceFile=governanceFolderId
+    ? await uploadToFolder(governanceFolderId,"Board of Directors Governance Documents","Board of Directors Governance Archive")
+    : null;
+
+  return json({
+    ok:true,
+    documentId,
+    fileName,
+    fileSize,
+    storageProvider:"Google Drive",
+    categoryArchive:{
+      archiveRootId,
+      categoryId,
+      classificationId,
+      folderId:categoryFolderId,
+      archiveCategory,
+      classification,
+      archivePath:`IRPA Governance System/Document Archives/${archiveCategory}/${classification}/${folderName}`,
+      archiveUidLink:`https://drive.google.com/drive/folders/${encodeURIComponent(categoryFolderId)}`,
+      file:categoryFile
+    },
+    governanceArchive:governanceFile ? {
+      rootId:governanceRootId,
+      classificationId:governanceClassificationId,
+      folderId:governanceFolderId,
+      archivePath:`IRPA Governance System/Board of Directors Governance Archive/${classification}/${folderName}`,
+      archiveUidLink:`https://drive.google.com/drive/folders/${encodeURIComponent(governanceFolderId)}`,
+      file:governanceFile
+    } : null
+  },200,corsHeaders(request));
 }
 
 async function download(request, env) {
