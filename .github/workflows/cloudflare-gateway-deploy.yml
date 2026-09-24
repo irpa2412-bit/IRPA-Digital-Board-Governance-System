@@ -23,10 +23,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Verify Worker identity
+      - name: Verify production Worker configuration
         run: |
           set -euo pipefail
-          node -e 'const c=require("./wrangler.json"); if(c.name!=="irpa-google-drive-gateway") process.exit(1);'
+          node <<'NODE'
+          const fs = require("fs");
+          const c = JSON.parse(fs.readFileSync("wrangler.json", "utf8"));
+          if (c.name !== "irpa-google-drive-gateway") throw new Error("Worker identity mismatch.");
+          const kv = Array.isArray(c.kv_namespaces) ? c.kv_namespaces : [];
+          const driveKv = kv.find(x => x && x.binding === "DRIVE_KV");
+          if (!driveKv || !/^[a-f0-9]{32}$/.test(String(driveKv.id || ""))) {
+            throw new Error("Production DRIVE_KV binding is not declared with its existing namespace ID. Deployment is intentionally blocked to prevent disconnecting Google Drive authorization state.");
+          }
+          NODE
+
+      - name: Verify governance application build
+        working-directory: .
+        run: |
+          set -euo pipefail
+          npm install
+          npm run build
 
       - name: Deploy existing production Worker
         uses: cloudflare/wrangler-action@v3
