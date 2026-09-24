@@ -37,6 +37,8 @@ export async function ensureMySignerIdentity(profile, options={}){
     authorityReference:normalise(options.authorityReference||existing.data()?.authorityReference||""),
     authorityEffectiveAt:options.authorityEffectiveAt||existing.data()?.authorityEffectiveAt||null,
     authorityExpiresAt:options.authorityExpiresAt||existing.data()?.authorityExpiresAt||null,
+    trustRecordVersion:"1.0",
+    migrationSource:"signatureProfiles",
     signatureStatus:normalise(profile?.status||existing.data()?.signatureStatus||"Profile Setup Required"),
     revocationStatus:normalise(profile?.status==="Revoked"?"Revoked":existing.data()?.revocationStatus||"Active"),
     revocationReason:normalise(profile?.revocationReason||existing.data()?.revocationReason||""),
