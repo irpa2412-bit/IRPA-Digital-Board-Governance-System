@@ -139,22 +139,33 @@ async function grantPermission({actorUid,targetUid,permission,scope={},reason=""
   targetUid=clean(targetUid); permission=clean(permission);
   if(!targetUid || !validPermission(permission)) throw Object.assign(new Error("A valid target user and controlled permission are required."),{code:"invalid-argument"});
   if(targetUid===actorUid) throw Object.assign(new Error("Self-grant is not permitted. Administrator access is managed separately."),{code:"failed-precondition"});
+  if(!clean(reason)) throw Object.assign(new Error("A reason is required when granting a permission."),{code:"invalid-argument"});
   const target=await institutionalActor(targetUid);
   if(!target?.active) throw Object.assign(new Error("The target user is not an active IRPA institutional account."),{code:"failed-precondition"});
 
-  const id=grantId({targetUid,permission,scope});
-  const ref=db.collection("authorizationGrants").doc(id);
-  const existing=await ref.get();
-  if(existing.exists && existing.data()?.status==="Active") return {ok:true,alreadyActive:true,grantId:id,permission,targetUid};
-
-  await ref.set({
-    grantId:id,targetUid,permission,effect:"Allow",scope:scope||{},
-    status:"Active",organisation:ORGANISATION,grantedByUid:actorUid,grantedByEmail:actor.email||null,
-    grantedAt:FieldValue.serverTimestamp(),reason:clean(reason)||null,
-    policyVersion:"1.0",updatedAt:FieldValue.serverTimestamp()
-  },{merge:true});
-  await audit("AUTHORIZATION_PERMISSION_GRANTED",id,{targetUid,permission,scope,reason:clean(reason)||null},actor);
-  return {ok:true,alreadyActive:false,grantId:id,permission,targetUid};
+  const scopeValue=scope||{};
+  const activeQuery=db.collection("authorizationGrants")
+    .where("targetUid","==",targetUid)
+    .where("organisation","==",ORGANISATION)
+    .where("permission","==",permission)
+    .where("status","==","Active");
+  const transactionResult=await db.runTransaction(async tx=>{
+    const active=await tx.get(activeQuery);
+    const sameScope=active.docs.find(d=>JSON.stringify(stableJson(d.data()?.scope||{}))===JSON.stringify(stableJson(scopeValue)));
+    if(sameScope) return {alreadyActive:true,grantId:sameScope.id};
+    const id=crypto.randomUUID();
+    const ref=db.collection("authorizationGrants").doc(id);
+    tx.create(ref,{
+      grantId:id,targetUid,permission,effect:"Allow",scope:scopeValue,
+      status:"Active",organisation:ORGANISATION,grantedByUid:actorUid,grantedByEmail:actor.email||null,
+      grantedAt:FieldValue.serverTimestamp(),reason:clean(reason),
+      policyVersion:"1.0",updatedAt:FieldValue.serverTimestamp()
+    });
+    return {alreadyActive:false,grantId:id};
+  });
+  if(transactionResult.alreadyActive) return {ok:true,alreadyActive:true,grantId:transactionResult.grantId,permission,targetUid};
+  await audit("AUTHORIZATION_PERMISSION_GRANTED",transactionResult.grantId,{targetUid,permission,scope:scopeValue,reason:clean(reason)},actor);
+  return {ok:true,alreadyActive:false,grantId:transactionResult.grantId,permission,targetUid};
 }
 
 async function revokePermission({actorUid,targetUid,permission,scope={},reason=""}={}){
@@ -163,19 +174,28 @@ async function revokePermission({actorUid,targetUid,permission,scope={},reason="
   if(!targetUid || !validPermission(permission)) throw Object.assign(new Error("A valid target user and controlled permission are required."),{code:"invalid-argument"});
   if(targetUid===actorUid) throw Object.assign(new Error("Self-revocation is not permitted through the permission service."),{code:"failed-precondition"});
   if(!clean(reason)) throw Object.assign(new Error("A reason is required when revoking a permission."),{code:"invalid-argument"});
-  const id=grantId({targetUid,permission,scope});
-  const ref=db.collection("authorizationGrants").doc(id);
-  const existing=await ref.get();
-  if(!existing.exists) return {ok:true,alreadyRevoked:true,grantId:id,permission,targetUid};
-  if(existing.data()?.status==="Revoked") return {ok:true,alreadyRevoked:true,grantId:id,permission,targetUid};
 
-  await ref.set({
-    status:"Revoked",revokedAt:FieldValue.serverTimestamp(),
-    revokedByUid:actorUid,revokedByEmail:actor.email||null,
-    revokeReason:clean(reason)||null,updatedAt:FieldValue.serverTimestamp()
-  },{merge:true});
-  await audit("AUTHORIZATION_PERMISSION_REVOKED",id,{targetUid,permission,scope,reason:clean(reason)||null},actor);
-  return {ok:true,alreadyRevoked:false,grantId:id,permission,targetUid};
+  const scopeValue=scope||{};
+  const activeQuery=db.collection("authorizationGrants")
+    .where("targetUid","==",targetUid)
+    .where("organisation","==",ORGANISATION)
+    .where("permission","==",permission)
+    .where("status","==","Active");
+  const transactionResult=await db.runTransaction(async tx=>{
+    const active=await tx.get(activeQuery);
+    const match=active.docs.find(d=>JSON.stringify(stableJson(d.data()?.scope||{}))===JSON.stringify(stableJson(scopeValue)));
+    if(!match) return {alreadyRevoked:true};
+    const ref=match.ref;
+    tx.update(ref,{
+      status:"Revoked",revokedAt:FieldValue.serverTimestamp(),
+      revokedByUid:actorUid,revokedByEmail:actor.email||null,
+      revokeReason:clean(reason),updatedAt:FieldValue.serverTimestamp()
+    });
+    return {alreadyRevoked:false,grantId:match.id};
+  });
+  if(transactionResult.alreadyRevoked) return {ok:true,alreadyRevoked:true,permission,targetUid};
+  await audit("AUTHORIZATION_PERMISSION_REVOKED",transactionResult.grantId,{targetUid,permission,scope:scopeValue,reason:clean(reason)},actor);
+  return {ok:true,alreadyRevoked:false,grantId:transactionResult.grantId,permission,targetUid};
 }
 
 async function listPermissions({actorUid,targetUid}={}){
