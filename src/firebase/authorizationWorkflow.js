@@ -2,7 +2,7 @@ import { collection, doc, getDoc, getDocs, orderBy, query, runTransaction, serve
 import { auth, db } from "./config";
 import { workflowLinks } from "./workflowLinks";
 import { authorizeWorkflowTransition } from "./functions";
-const WORKFLOW="Authorization";const MODULE="Authorization & Approvals";const TERMINAL=["Completed","Rejected"];
+const WORKFLOW="Authorization";const MODULE="Authorization & Approvals";const DISPLAY_NAME="Authorisation & Approval";const TERMINAL=["Completed","Rejected"];
 const ROLES={reviewer:["Director Internal Oversight","Internal Oversight Officer","Director Human Resources","HR Manager","Director Finance & Administration","Finance Manager","Programme/Technical Officer","Operations Manager"],approver:["Executive Director"],implementer:["Executive Director","Director Finance & Administration","Finance Manager","Operations Manager","Programme/Technical Officer","Director Human Resources","HR Manager"]};
 function uid(){return auth.currentUser?.uid||null}function email(){return auth.currentUser?.email||null}function actorData(){return{uid:uid(),email:email()}}function list(v){return Array.from(new Set((Array.isArray(v)?v:String(v||"").split(",")).map(x=>String(x).trim()).filter(Boolean)))}
 function audit(action,recordId,details={}){const a=actorData();return{action,collection:"workflowActions",recordId,details,actorUid:a.uid,actorEmail:a.email,createdAt:serverTimestamp()}}
