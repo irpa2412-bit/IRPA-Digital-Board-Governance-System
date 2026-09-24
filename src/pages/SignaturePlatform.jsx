@@ -426,13 +426,13 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
      <p className="muted">Your signing capacity is taken directly from the active IRPA Member and Employee Registers. Department → unit/board capacity → registered authority controls the available choices; no free-text authority can be entered.</p>
    </div></div>
    <div className="form-grid">
-     <label>Department
+     <label className="signature-authority-field">Department
        <select value={authorityDepartment} onChange={e=>{setAuthorityDepartment(e.target.value);setAuthorityUnit("");setAuthorityRole("");}} required disabled={authorityBusy}>
          <option value="">Select registered department</option>
          {authorityDepartments.map(value=><option key={value} value={value}>{value}</option>)}
        </select>
      </label>
-     <label>Current signing authority / registered capacity
+     <label className="signature-authority-field">Current signing authority / registered capacity
        <select value={authorityRole} onChange={e=>{
          const value=e.target.value;
          setAuthorityRole(value);
@@ -451,19 +451,19 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
        </select>
        <small>Only capacities recorded for your authenticated Member/Employee register entries are offered. If you hold multiple registered roles, select the department first and then the applicable capacity. This prevents impersonation.</small>
      </label>
-     <label>Authority status
+     <label className="signature-authority-field">Authority status
        <select value={authorityStatus} onChange={e=>setAuthorityStatus(e.target.value)} disabled={authorityBusy}>
          <option>Current</option><option>Pending Verification</option><option>Expired</option><option>Not yet assigned</option>
        </select>
      </label>
-     {authorityDepartment&&authorityUnit&&authorityRole&&<label>Authority reference / appointment no. <span className="muted">(optional)</span>
+     {authorityDepartment&&authorityUnit&&authorityRole&&<label className="signature-authority-field">Authority reference / appointment no. <span className="muted">(optional)</span>
        <input value={authorityReference} onChange={e=>setAuthorityReference(e.target.value)} placeholder="Appointment / authority reference (optional)" disabled={authorityBusy}/>
        <small>Optional for officers whose register capacity does not require a formal appointment reference.</small>
      </label>}
-     {authorityDepartment&&authorityUnit&&authorityRole&&<label>Effective date <span className="muted">(optional)</span>
+     {authorityDepartment&&authorityUnit&&authorityRole&&<label className="signature-authority-field">Effective date <span className="muted">(optional)</span>
        <input type="date" value={authorityEffectiveAt} onChange={e=>setAuthorityEffectiveAt(e.target.value)} disabled={authorityBusy}/>
      </label>}
-     {authorityDepartment&&authorityUnit&&authorityRole&&<label>Expiry date <span className="muted">(optional)</span>
+     {authorityDepartment&&authorityUnit&&authorityRole&&<label className="signature-authority-field">Expiry date <span className="muted">(optional)</span>
        <input type="date" value={authorityExpiresAt} onChange={e=>setAuthorityExpiresAt(e.target.value)} min={authorityEffectiveAt||undefined} disabled={authorityBusy}/>
      </label>}
    </div>
