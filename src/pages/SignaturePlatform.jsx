@@ -353,7 +353,11 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
    }
    return options.sort((a,b)=>a.role.localeCompare(b.role));
  },[authorityRegisterRecords,authorityDepartment]);
- const authorityDisplayLabel=role=>String(role||"").trim().toLowerCase()==="board chairperson"?"CHAIRPERSON":role;
+ const authorityDisplayLabel=(role,department=authorityDepartment)=>{
+   const normalized=String(role||"").trim().toLowerCase().replace(/[_-]+/g," ").replace(/\s+/g," ");
+   if(String(department||"").trim().toLowerCase()==="board of directors" && /(^| )chairperson$|^board chairperson$|^chairman$|^chairwoman$/.test(normalized)) return "Board Chairperson";
+   return role;
+ };
  async function saveSignerAuthority(e){
    e.preventDefault();
    if(authorityBusy)return;
@@ -427,7 +431,14 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
          setAuthorityUnit(selectedAuthority?.unit||authorityDepartment||"");
        }} required disabled={authorityBusy||!authorityDepartment}>
          <option value="">Select registered authority / capacity</option>
-         {authorityOptions.map(option=><option key={option.sourceCollection+"|"+option.sourceRecordId+"|"+option.role} value={option.role}>{authorityDisplayLabel(option.role)}</option>)}
+         {authorityOptions
+           .slice()
+           .sort((a,b)=>{
+             const aChair=authorityDisplayLabel(a.role,a.department||authorityDepartment)==="Board Chairperson";
+             const bChair=authorityDisplayLabel(b.role,b.department||authorityDepartment)==="Board Chairperson";
+             return Number(bChair)-Number(aChair)||a.role.localeCompare(b.role);
+           })
+           .map(option=><option key={option.sourceCollection+"|"+option.sourceRecordId+"|"+option.role} value={option.role}>{authorityDisplayLabel(option.role,option.department||authorityDepartment)}</option>)}
        </select>
        <small>Only capacities recorded for your authenticated Member/Employee register entries are offered. If you hold multiple registered roles, select the department first and then the applicable capacity. This prevents impersonation.</small>
      </label>
