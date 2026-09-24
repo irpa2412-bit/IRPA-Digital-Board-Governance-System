@@ -1,6 +1,6 @@
 import React,{useEffect,useMemo,useRef,useState}from"react";
 import{createRecord,deleteRecord,getRecords,updateRecord,COLLECTIONS,openVotingIssue}from"../firebase/data";
-import{MEETING_POLICIES,MEETING_TYPE_OPTIONS,normalizeMeetingForV3,meetingCapabilities,governanceLineage}from"../firebase/meetingPolicy";
+import{MEETING_POLICIES,MEETING_TYPE_OPTIONS,normalizeMeetingForV3,meetingCapabilities}from"../firebase/meetingPolicy";
 
 const TYPES=MEETING_TYPE_OPTIONS;
 const STATUSES=["Scheduled","In Progress","Completed","Cancelled"];
