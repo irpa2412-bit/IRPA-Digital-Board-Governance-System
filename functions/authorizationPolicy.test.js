@@ -35,3 +35,58 @@ console.log("Central Authorization policy tests passed.");
 const denyReasonTest=evaluatePolicy({actor:{uid:"u2",active:true},organisation:ORGANISATION,action:"signature.sign",effectivePermissions:["signature.sign"],context:{ownerOnly:true},resource:{ownerUid:"u1"}});
 assert.equal(denyReasonTest.allow,false);
 assert.equal(denyReasonTest.reason,"RESOURCE_OWNER_REQUIRED");
+
+const { PERMISSIONS } = require("./authorizationPolicy");
+
+assert.equal(PERMISSIONS.length, new Set(PERMISSIONS).size, "Permission catalog must contain unique entries.");
+assert.equal(PERMISSIONS.includes("authorization.permission.grant"), true);
+assert.equal(PERMISSIONS.includes("authorization.permission.revoke"), true);
+
+const unauthenticated=evaluatePolicy({
+  organisation:ORGANISATION,
+  action:"authorization.permission.grant",
+  effectivePermissions:["authorization.permission.grant"]
+});
+assert.equal(unauthenticated.allow,false);
+assert.equal(unauthenticated.reason,"AUTHENTICATION_REQUIRED");
+
+const financeSod=evaluatePolicy({
+  actor:{uid:"u1",active:true},
+  organisation:ORGANISATION,
+  action:"finance.approve",
+  effectivePermissions:["finance.approve"],
+  resource:{requestedByUid:"u1"}
+});
+assert.equal(financeSod.allow,false);
+assert.equal(financeSod.reason,"SEPARATION_OF_DUTIES_VIOLATION");
+
+const signatureVerified=evaluatePolicy({
+  actor:{uid:"u1",active:true},
+  organisation:ORGANISATION,
+  action:"signature.sign",
+  effectivePermissions:["signature.sign"],
+  context:{signatureAuthorityRequired:true,signatureAuthorityVerified:true}
+});
+assert.equal(signatureVerified.allow,true);
+
+const ownerAllowed=evaluatePolicy({
+  actor:{uid:"u1",active:true},
+  organisation:ORGANISATION,
+  action:"document.edit",
+  effectivePermissions:["document.edit"],
+  context:{ownerOnly:true},
+  resource:{ownerUid:"u1",id:"doc-1"}
+});
+assert.equal(ownerAllowed.allow,true);
+assert.equal(ownerAllowed.resourceId,"doc-1");
+
+const whitespacePermission=evaluatePolicy({
+  actor:{uid:"u1",active:true},
+  organisation:ORGANISATION,
+  action:" authorization.permission.grant ",
+  effectivePermissions:["authorization.permission.grant"]
+});
+assert.equal(whitespacePermission.allow,true);
+
+console.log("Authorization policy denial/allow matrix passed.");
+
