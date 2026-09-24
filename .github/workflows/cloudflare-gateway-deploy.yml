@@ -1,0 +1,42 @@
+name: Deploy IRPA Google Drive Gateway
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "drive-gateway/**"
+      - ".github/workflows/cloudflare-gateway-deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: drive-gateway
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify Worker identity
+        run: |
+          set -euo pipefail
+          node -e 'const c=require("./wrangler.json"); if(c.name!=="irpa-google-drive-gateway") process.exit(1);'
+
+      - name: Deploy existing production Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: drive-gateway
+          command: deploy --keep-vars
+
+      - name: Verify production gateway
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 5 --retry-delay 2 https://irpa-google-drive-gateway.irpa-governance.workers.dev/health
