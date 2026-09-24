@@ -244,4 +244,15 @@ Before a role is provisioned:
 5. record the provisioning decision and approver;
 6. test revocation;
 7. only then connect the role to the relevant portal.
+## Safe departmental provisioning mechanism
+
+The policy layer now exposes a non-destructive provisioning-plan operation. It calculates the permissions proposed for a role and reports additions, but deliberately reports **no automatic removals**. It does not write Firestore records and does not grant access.
+
+This creates a safe review point before any `authorizationRolePermissions/{role}` record is provisioned.
+
+The required sequence is:
+
+`Institutional role verification → provisioning plan → human review/approval → controlled write → allow/deny test → revocation test → portal connection`
+
+A role with no recognised policy definition produces an empty plan rather than inheriting permissions. This is intentional fail-closed behaviour.
 
