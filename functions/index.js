@@ -921,3 +921,11 @@ exports.resetTrialData = onCall({region:"us-central1"}, async request => {
     throw new HttpsError("internal","The trial-data reset failed. The audit record has been retained.");
   }
 });
+
+// Central Authorization callables are exported from the repaired Functions entrypoint.
+const authorizationFunctions = require("./authorizationFunctions");
+exports.authorizeAction = authorizationFunctions.authorizeAction;
+exports.grantAuthorizationPermission = authorizationFunctions.grantAuthorizationPermission;
+exports.revokeAuthorizationPermission = authorizationFunctions.revokeAuthorizationPermission;
+exports.getEffectiveAuthorizationPermissions = authorizationFunctions.getEffectiveAuthorizationPermissions;
+exports.authorizeWorkflowTransition = authorizationFunctions.authorizeWorkflowTransition;
