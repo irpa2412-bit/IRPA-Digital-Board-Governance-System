@@ -1,0 +1,40 @@
+name: Signature Portal Migration Build Test
+
+on:
+  push:
+    branches:
+      - feature/signer-identity-migration
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm install
+      - name: Verify migration safety invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f src/firebase/signerIdentity.js
+          test -f src/firebase/signaturePlatform.js
+          grep -Fq 'SIGNER_IDENTITY_COLLECTION = "signerIdentities"' src/firebase/signerIdentity.js
+          grep -Fq 'signatureProfiles' src/firebase/signaturePlatform.js
+          grep -Fq 'migrateExistingSignatureProfile' src/firebase/signaturePlatform.js
+          if grep -Fq 'deleteField' src/firebase/signaturePlatform.js; then
+            echo "ERROR: destructive deleteField usage remains in Signature Portal migration source."
+            exit 1
+          fi
+          node --input-type=module -e 'import fs from "node:fs"; const s=fs.readFileSync("src/firebase/signaturePlatform.js","utf8"); const identity=s.indexOf("const signerIdentity=await ensureMySignerIdentity"); const upload=s.indexOf("await uploadBytes(storageRef,signedBytes"); if(identity<0||upload<0||identity>=upload) { console.error({identity,upload}); process.exit(1); } if(!s.includes("recordSignerAuthenticationEvidence")) process.exit(1); console.log("Signature migration safety invariants passed.",{identity,upload});'
+
+      - name: Build web application
+        env:
+          VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
+          VITE_GOOGLE_DRIVE_GATEWAY_URL: ${{ secrets.VITE_GOOGLE_DRIVE_GATEWAY_URL }}
+        run: npm run build
