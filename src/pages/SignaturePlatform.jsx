@@ -178,7 +178,7 @@ function SigningDocumentViewer({url,documentId,fields,profile,fieldValues,setFie
 
 export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=null,initialDocument=null}){
  const[tab,setTab]=useState("Profile"),[profile,setProfile]=useState(null),[signerIdentity,setSignerIdentity]=useState(null),[docs,setDocs]=useState([]),[envelopes,setEnvelopes]=useState([]),[members,setMembers]=useState([]),[selected,setSelected]=useState(null),[busy,setBusy]=useState(false),[message,setMessage]=useState(""),[revokeOpen,setRevokeOpen]=useState(false),[revokeBusy,setRevokeBusy]=useState(false);
- const[authorityMember,setAuthorityMember]=useState(null),[authorityEmployee,setAuthorityEmployee]=useState(null),[authorityRole,setAuthorityRole]=useState(""),[authorityStatus,setAuthorityStatus]=useState("Current"),[authorityReference,setAuthorityReference]=useState(""),[authorityEffectiveAt,setAuthorityEffectiveAt]=useState(""),[authorityExpiresAt,setAuthorityExpiresAt]=useState(""),[authorityBusy,setAuthorityBusy]=useState(false);
+ const[authorityMember,setAuthorityMember]=useState(null),[authorityEmployee,setAuthorityEmployee]=useState(null),[authorityDepartment,setAuthorityDepartment]=useState(""),[authorityUnit,setAuthorityUnit]=useState(""),[authorityRole,setAuthorityRole]=useState(""),[authorityStatus,setAuthorityStatus]=useState("Current"),[authorityReference,setAuthorityReference]=useState(""),[authorityEffectiveAt,setAuthorityEffectiveAt]=useState(""),[authorityExpiresAt,setAuthorityExpiresAt]=useState(""),[authorityBusy,setAuthorityBusy]=useState(false);
  const[displayName,setDisplayName]=useState(""),[initials,setInitials]=useState(""),[servedSignatureSrc,setServedSignatureSrc]=useState(""),[servedInitialsSrc,setServedInitialsSrc]=useState(""),[signatureFile,setSignatureFile]=useState(null),[initialsFile,setInitialsFile]=useState(null),[drawnSignature,setDrawnSignature]=useState(""),[replacementMode,setReplacementMode]=useState(false);
  const[title,setTitle]=useState(""),[documentId,setDocumentId]=useState(""),[documentUrl,setDocumentUrl]=useState(""),[signingMode,setSigningMode]=useState("Sequential"),[selectedSigner,setSelectedSigner]=useState(""),[draftEnvelopeId,setDraftEnvelopeId]=useState(null),[signerEmail,setSignerEmail]=useState(""),[signerRole,setSignerRole]=useState("Review"),[recipients,setRecipients]=useState([]),[fields,setFields]=useState([]),[selectedField,setSelectedField]=useState(null),[fieldValues,setFieldValues]=useState({}),[ownerSigningEnabled,setOwnerSigningEnabled]=useState(false);
  useEffect(()=>{
@@ -278,6 +278,8 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
         ]);
         setAuthorityMember(memberRecord);
         setAuthorityEmployee(employeeRecord);
+        setAuthorityDepartment(identity?.authorityDepartment||employeeRecord?.department||memberRecord?.department||"");
+        setAuthorityUnit(identity?.authorityUnit||employeeRecord?.unit||employeeRecord?.unitName||memberRecord?.unit||memberRecord?.unitName||memberRecord?.boardPosition||"");
       }catch(identityError){
         console.warn("IRPA Signature Portal: Signer Identity record unavailable.",identityError);
         setSignerIdentity(null);
@@ -310,12 +312,12 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
   finally{setRevokeBusy(false)}
  }
  async function migrateProfileNow(){if(busy)return;setBusy(true);setMessage("Migrating your existing Signature Profile into the new Signer Identity layer…");try{const result=await migrateExistingSignatureProfile();if(result?.identity)setSignerIdentity(result.identity);setMessage(result?.migrated?"Migration verified. Your existing Signature Profile was retained and linked to the new Signer Identity record.":"No existing Signature Profile was found to migrate.");}catch(error){setMessage("MIGRATION FAILED: "+(error?.message||"No changes were made."));}finally{setBusy(false)}}
- const authorityOptions=useMemo(()=>{
-   const records=[authorityMember,authorityEmployee].filter(Boolean);
-   const options=[];
-   for(const record of records){
-     const department=String(record.department||"").trim()||"Department not recorded";
-     const unit=String(record.unit||record.unitName||record.boardPosition||"").trim()||"Unit not recorded";
+ const authorityRegisterRecords=useMemo(()=>{
+   const records=[];
+   const add=(record,sourceCollection)=>{
+     if(!record)return;
+     const department=String(record.department||"").trim();
+     const unit=String(record.unit||record.unitName||record.boardPosition||"").trim();
      const values=[
        record.role,record.boardPosition,
        ...(Array.isArray(record.roles)?record.roles:[]),
@@ -323,21 +325,24 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
        ...(Array.isArray(record.selectedRoles)?record.selectedRoles:[]),
        ...(Array.isArray(record.roleAssignments)?record.roleAssignments:[])
      ].flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean));
-     for(const value of values){
-       const key=value+"|"+department+"|"+unit;
-       if(!options.some(option=>option.key===key)){
-         options.push({key,value,label:`${department} · ${unit} · ${value}`});
-       }
+     for(const value of [...new Set(values)]){
+       records.push({sourceCollection,sourceRecordId:record.id||record.uid||"",department,unit,role:value});
      }
-   }
-   return options;
+   };
+   add(authorityMember,"members");
+   add(authorityEmployee,"employees");
+   return records.filter(item=>item.department||item.unit||item.role);
  },[authorityMember,authorityEmployee]);
- const authorityDepartment=signerIdentity?.authorityDepartment||authorityEmployee?.department||authorityMember?.department||"Not recorded";
- const authorityUnit=signerIdentity?.authorityUnit||authorityEmployee?.unit||authorityEmployee?.unitName||authorityMember?.unit||authorityMember?.unitName||authorityMember?.boardPosition||"Not recorded";
+ const authorityDepartments=useMemo(()=>[...new Set(authorityRegisterRecords.map(x=>x.department).filter(Boolean))],[authorityRegisterRecords]);
+ const authorityUnits=useMemo(()=>[...new Set(authorityRegisterRecords.filter(x=>x.department===authorityDepartment).map(x=>x.unit).filter(Boolean))],[authorityRegisterRecords,authorityDepartment]);
+ const authorityOptions=useMemo(()=>authorityRegisterRecords.filter(x=>x.department===authorityDepartment&&x.unit===authorityUnit),[authorityRegisterRecords,authorityDepartment,authorityUnit]);
  async function saveSignerAuthority(e){
    e.preventDefault();
    if(authorityBusy)return;
-   if(!authorityRole){setMessage("Select your current signing authority before saving.");return;}
+   if(!authorityDepartment||!authorityUnit||!authorityRole){
+     setMessage("Select the registered department, unit and current signing authority before saving.");
+     return;
+   }
    setAuthorityBusy(true);
    setMessage("Saving your registered signing authority…");
    try{
@@ -374,17 +379,27 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
    <div className="panel-heading"><div>
      <span className="eyebrow">SIGNING AUTHORITY CONTROL</span>
      <h3 style={{margin:"6px 0"}}>Update Current Signing Authority</h3>
-     <p className="muted">Select only an authority already registered to your IRPA member/employee record. Department and unit are displayed from the registers and cannot be impersonated through free-text entry.</p>
+     <p className="muted">Capacity identity is taken from the active IRPA Member and Employee Registers. Choose the department, unit and authority recorded for you. Free-text authority entry is not permitted.</p>
    </div></div>
    <div className="form-grid">
-     <label>Department<input value={authorityDepartment} readOnly/></label>
-     <label>Unit<input value={authorityUnit} readOnly/></label>
-     <label>Current signing authority
-       <select value={authorityRole} onChange={e=>setAuthorityRole(e.target.value)} required disabled={authorityBusy}>
-         <option value="">Select registered authority</option>
-         {authorityOptions.map(option=><option key={option.key} value={option.value}>{option.label}</option>)}
+     <label>Department
+       <select value={authorityDepartment} onChange={e=>{setAuthorityDepartment(e.target.value);setAuthorityUnit("");setAuthorityRole("");}} required disabled={authorityBusy}>
+         <option value="">Select registered department</option>
+         {authorityDepartments.map(value=><option key={value} value={value}>{value}</option>)}
        </select>
-       <small>Options are derived only from your active IRPA member/employee register entries: department → unit/board position → registered role.</small>
+     </label>
+     <label>Unit / Board capacity
+       <select value={authorityUnit} onChange={e=>{setAuthorityUnit(e.target.value);setAuthorityRole("");}} required disabled={authorityBusy||!authorityDepartment}>
+         <option value="">Select registered unit / board capacity</option>
+         {authorityUnits.map(value=><option key={value} value={value}>{value}</option>)}
+       </select>
+     </label>
+     <label>Current signing authority
+       <select value={authorityRole} onChange={e=>setAuthorityRole(e.target.value)} required disabled={authorityBusy||!authorityUnit}>
+         <option value="">Select registered authority</option>
+         {authorityOptions.map(option=><option key={option.sourceCollection+"|"+option.sourceRecordId+"|"+option.role} value={option.role}>{option.role}</option>)}
+       </select>
+       <small>For personnel holding two or more registered roles, all roles for the selected department/unit are available for selection. The selected capacity is stored with its register source.</small>
      </label>
      <label>Authority status
        <select value={authorityStatus} onChange={e=>setAuthorityStatus(e.target.value)} disabled={authorityBusy}>
@@ -401,8 +416,11 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
        <input type="date" value={authorityExpiresAt} onChange={e=>setAuthorityExpiresAt(e.target.value)} min={authorityEffectiveAt||undefined} disabled={authorityBusy}/>
      </label>
    </div>
+   <div className="auth-message" role="status" style={{marginTop:10}}>
+     Register match: <strong>{authorityDepartment||"—"} → {authorityUnit||"—"} → {authorityRole||"—"}</strong>
+   </div>
    <div style={{display:"flex",justifyContent:"flex-end",marginTop:12}}>
-     <button type="submit" disabled={authorityBusy||!authorityRole}>{authorityBusy?"Saving Authority…":"Save Current Authority"}</button>
+     <button type="submit" disabled={authorityBusy||!authorityDepartment||!authorityUnit||!authorityRole}>{authorityBusy?"Saving Authority…":"Save Current Authority"}</button>
    </div>
  </form></div></>:<div className="panel" role="status" style={{marginTop:14,border:"1px solid rgba(245,158,11,.4)"}}><div className="panel-heading"><div><span className="eyebrow">SIGNER IDENTITY & TRUST RECORD</span><h3 style={{margin:"6px 0"}}>Trust Record Pending</h3><p className="muted">The Signer Identity record is not currently available. This does not delete, replace or invalidate your existing Signature Profile.</p></div></div><button type="button" className="text-button" disabled={busy} onClick={migrateProfileNow}>Verify / Restore Signer Identity Link</button></div>}{profile?.driveSignatureFolderId&&<div className="success-message action-feedback" style={{marginTop:12}}>Your signature assets are stored in your UID-restricted Google Drive folder: <a href={`https://drive.google.com/drive/folders/${encodeURIComponent(profile.driveSignatureFolderId)}`} target="_blank" rel="noopener noreferrer">Open My Signature Folder</a>.</div>}<form onSubmit={saveProfile}><div className="form-grid"><label>Display name<input value={displayName} onChange={e=>setDisplayName(e.target.value)} required/></label><label>Initials<input value={initials} onChange={e=>setInitials(e.target.value)} placeholder="e.g. DEM"/></label><label>Signature image<input type="file" accept="image/png,image/jpeg,image/webp" onChange={e=>{setSignatureFile(e.target.files?.[0]||null);setDrawnSignature("")}}/><small>Optional if you sign directly below.</small></label><label>Initials image<input type="file" accept="image/png,image/jpeg,image/webp" onChange={e=>setInitialsFile(e.target.files?.[0]||null)}/></label></div><InkCapture onUse={saveDrawnSignature} onSave={saveDrawnSignature} replacementMode={replacementMode}/><div className="dashboard-grid" style={{marginTop:16}}>{profile?.signatureUrl?<div className="stat-card"><span>CURRENT SIGNATURE</span><div style={{background:"#fff",padding:12,borderRadius:8,marginTop:8}}>{servedSignatureSrc?<img src={servedSignatureSrc} alt="Current served signature" style={{maxWidth:"100%",maxHeight:100}}/>:<div className="auth-message" role="status">Loading current served signature…</div>}</div><small>SHA-256: {profile.signatureSha256}</small><div className="auth-message" role="status" style={{marginTop:10}}>This is the signature currently saved from your Signature Profile and reused for future signing.</div></div>:<div className="stat-card"><span>NO SIGNATURE CURRENTLY SERVED</span><div className="auth-message" role="status" style={{marginTop:10}}>Your handwritten specimen above has not been served yet. Press <strong>Save &amp; Serve Signature</strong> once to make it your persistent signature.</div></div>}{profile?.initialsUrl&&<div className="stat-card"><span>Saved initials</span><div style={{background:"#fff",padding:12,borderRadius:8,marginTop:8}}>{servedInitialsSrc?<img src={servedInitialsSrc} alt="Initials" style={{maxWidth:"100%",maxHeight:100}}/>:<div className="auth-message" role="status">Loading initials…</div>}</div></div>}</div>{profile&&<div className="panel" style={{marginTop:16,border:"1px solid rgba(220,38,38,.45)"}}>
  <div className="panel-heading"><div><span className="eyebrow">SIGNATURE APPLICATION CONTROL</span><h3 style={{margin:"6px 0"}}>Revoke My Signature Application</h3><p className="muted">Only the Signature Profile owner can initiate this revocation. Revocation disables this Signature Application for future signing. It does not delete the person's account or erase completed signing records.</p></div></div>
