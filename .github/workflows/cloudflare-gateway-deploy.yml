@@ -23,6 +23,45 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Recover existing production DRIVE_KV binding safely
+        env:
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$CF_API_TOKEN"
+          test -n "$CF_ACCOUNT_ID"
+
+          response="$(curl --fail --silent --show-error             -H "Authorization: Bearer $CF_API_TOKEN"             -H "Accept: application/json"             "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/workers/scripts/irpa-google-drive-gateway/settings")"
+
+          node - "$response" <<'NODE'
+          const fs = require("fs");
+          const response = JSON.parse(process.argv[2]);
+          if (response.success !== true) throw new Error("Cloudflare rejected the production Worker settings request.");
+
+          const bindings = Array.isArray(response.result?.bindings) ? response.result.bindings : [];
+          const unsupported = bindings.filter(b => !(b && b.type === "kv_namespace" && b.name === "DRIVE_KV"));
+          if (unsupported.length) {
+            throw new Error("Safety stop: the existing production Worker has bindings other than the expected DRIVE_KV binding. No deployment was attempted.");
+          }
+
+          const driveKv = bindings.find(b => b && b.type === "kv_namespace" && b.name === "DRIVE_KV");
+          if (!driveKv || !/^[a-f0-9]{32}$/.test(String(driveKv.namespace_id || ""))) {
+            throw new Error("Safety stop: existing production DRIVE_KV binding was not returned with a valid namespace ID.");
+          }
+
+          const config = {
+            name: "irpa-google-drive-gateway",
+            main: "src/index.js",
+            compatibility_date: "2026-09-24",
+            kv_namespaces: [{ binding: "DRIVE_KV", id: driveKv.namespace_id }]
+          };
+
+          fs.writeFileSync("wrangler.json", JSON.stringify(config, null, 2) + "\n");
+          NODE
+
+          echo "Recovered the existing production DRIVE_KV binding. Namespace ID is intentionally not printed."
+
       - name: Verify production Worker configuration
         run: |
           set -euo pipefail
@@ -33,7 +72,7 @@ jobs:
           const kv = Array.isArray(c.kv_namespaces) ? c.kv_namespaces : [];
           const driveKv = kv.find(x => x && x.binding === "DRIVE_KV");
           if (!driveKv || !/^[a-f0-9]{32}$/.test(String(driveKv.id || ""))) {
-            throw new Error("Production DRIVE_KV binding is not declared with its existing namespace ID. Deployment is intentionally blocked to prevent disconnecting Google Drive authorization state.");
+            throw new Error("Production DRIVE_KV binding is invalid. Deployment blocked.");
           }
           NODE
 
@@ -55,4 +94,7 @@ jobs:
       - name: Verify production gateway
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --retry 5 --retry-delay 2 https://irpa-google-drive-gateway.irpa-governance.workers.dev/health
+          body="$(curl --fail --silent --show-error --retry 5 --retry-delay 2 https://irpa-google-drive-gateway.irpa-governance.workers.dev/health)"
+          echo "$body"
+          echo "$body" | grep -q '"ok":true'
+          echo "$body" | grep -q '"storageProvider":"Google Drive"'
