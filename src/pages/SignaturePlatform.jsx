@@ -227,20 +227,39 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
         return;
       }
 
-      const[p,d,e]=await Promise.all([
-        getMySignatureProfile(),
-        getRecords("documents"),
-        getSignatureEnvelopes()
-      ]);
+      // Load the persisted Signature Profile first. It is the authoritative
+      // source for the user's saved signing specimen and must remain visible
+      // even if another portal query or trust-record refresh is temporarily
+      // unavailable.
+      let p=null;
+      try{
+        p=await getMySignatureProfile();
+        setProfile(p);
+        setDisplayName(p?.displayName||"");
+        setInitials(p?.initials||"");
+      }catch(profileError){
+        console.error("Signature Profile retrieval failed:",profileError);
+        setMessage("Unable to retrieve the saved Signature Profile. No signature data has been deleted.");
+      }
 
-      // Load the core Signature Portal data independently from the optional
-      // Signer Identity trust record. A missing/temporarily unavailable trust
-      // record must never crash or blank the entire Signature Portal.
-      setProfile(p);
-      setDocs(d);
-      setEnvelopes(e);
-      setDisplayName(p?.displayName||"");
-      setInitials(p?.initials||"");
+      // The supporting workspace datasets are intentionally loaded separately.
+      // A failure in Documents or Envelopes must not erase/hide the saved
+      // Signature Profile from the panel after refresh.
+      try{
+        const d=await getRecords("documents");
+        setDocs(d);
+      }catch(error){
+        console.warn("Controlled Documents unavailable:",error);
+        setDocs([]);
+      }
+      try{
+        const e=await getSignatureEnvelopes();
+        setEnvelopes(e);
+      }catch(error){
+        console.warn("Signature Envelopes unavailable:",error);
+        setEnvelopes([]);
+      }
+
       try{
         setSignerIdentity(await getMySignerIdentity());
       }catch(identityError){
