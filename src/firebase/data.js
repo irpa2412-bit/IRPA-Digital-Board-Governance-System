@@ -32,6 +32,28 @@ export async function provisionCurrentMemberFromInvitation(invitationId){const u
 export async function getRecord(collectionName,id){const s=await getDoc(doc(db,collectionName,id));return s.exists()?{id:s.id,...s.data()}:null;}
 export async function getRecords(collectionName){const s=await getDocs(query(collection(db,collectionName),orderBy("createdAt","desc")));return s.docs.map(x=>({id:x.id,...x.data()}));}
 
+// Signing uses a dedicated document read path rather than the generic ordered
+// query. This keeps the Signature Portal resilient to legacy document records
+// that may not contain createdAt, while preserving the existing Firestore
+// authorization rules on the documents collection.
+export async function getControlledDocumentsForSigning(){
+  const snap=await getDocs(collection(db,COLLECTIONS.documents));
+  const rows=snap.docs.map(x=>({id:x.id,...x.data()}));
+  const usable=rows.filter(d=>{
+    if(String(d?.recordOrigin||"PRODUCTION").toUpperCase()==="TRIAL"||d?.trialData===true||d?.isTrial===true)return false;
+    const contentType=String(d?.contentType||"application/pdf").toLowerCase();
+    if(contentType && contentType!=="application/pdf")return false;
+    const link=String(d?.webViewLink||"");
+    const driveId=d?.fileId||((link.match(/\/d\/([a-zA-Z0-9_-]+)/)||[])[1])||((link.match(/[?&]id=([a-zA-Z0-9_-]+)/)||[])[1])||"";
+    return Boolean(d?.fileUrl||d?.documentUrl||d?.storageUrl||d?.pdfUrl||driveId);
+  });
+  return usable.sort((a,b)=>{
+    const at=a.createdAt?.seconds?Number(a.createdAt.seconds):Date.parse(a.createdAt||0)||0;
+    const bt=b.createdAt?.seconds?Number(b.createdAt.seconds):Date.parse(b.createdAt||0)||0;
+    return bt-at;
+  });
+}
+
 export async function getEmployeePaymentRequests(employeeUid){const s=await getDocs(query(collection(db,COLLECTIONS.staffPaymentRequests),where("employeeUid","==",employeeUid),orderBy("createdAt","desc")));return s.docs.map(x=>({id:x.id,...x.data()}));}
 async function digestKey(value){const bytes=new TextEncoder().encode(value);const digest=await crypto.subtle.digest("SHA-256",bytes);return Array.from(new Uint8Array(digest)).map(b=>b.toString(16).padStart(2,"0")).join("");}
 export async function openVotingIssue({meetingId,meetingReference,resolutionId=null,resolutionReference=null,votingReference}){if(!auth.currentUser)throw new Error("Authentication is required.");if(!meetingId)throw new Error("A meeting is required for every voting issue.");const origin=String(votingReference||"").trim();if(!origin)throw new Error("The voting origin / issue requiring voting action is required.");const meeting=await getRecord(COLLECTIONS.meetings,meetingId);if(!meeting)throw new Error("The originating meeting could not be found.");if(resolutionId){const resolution=await getRecord(COLLECTIONS.resolutions,resolutionId);if(!resolution)throw new Error("The linked resolution could not be found.");if(resolution.meetingId!==meetingId)throw new Error("A resolution can only be voted on within its originating meeting.");}const issueKey=await digestKey(`${meetingId}|${resolutionId||""}|${origin.toLowerCase()}`);const ref=doc(db,COLLECTIONS.votingIssues,issueKey);return runTransaction(db,async tx=>{const existing=await tx.get(ref);if(existing.exists()){const status=existing.data().status||"Open";if(status!=="Cancelled")return{...existing.data(),id:existing.id,alreadyOpen:true};}const data={meetingId,meetingReference:meetingReference||meeting.title||meetingId,resolutionId,resolutionReference,votingReference:origin,status:"Open",result:"Pending",anonymous:true,openedAt:serverTimestamp(),openedByProcess:true,createdAt:serverTimestamp(),updatedAt:serverTimestamp()};tx.set(ref,data);return{...data,id:ref.id,alreadyOpen:false};});}
