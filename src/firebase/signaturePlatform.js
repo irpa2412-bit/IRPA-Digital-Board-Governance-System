@@ -1,4 +1,4 @@
-import { arrayUnion, collection, deleteField, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, setDoc, updateDoc, where, writeBatch } from "firebase/firestore";
+import { arrayUnion, collection, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, setDoc, updateDoc, where, writeBatch } from "firebase/firestore";
 import { sendSignInLinkToEmail } from "firebase/auth";
 import { downloadDriveBytes, ensureSignedDocumentArchive, ensureSignatureProfileFolder, getDownloadURL, ref, uploadBytes } from "./signatureStorage";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
@@ -65,20 +65,15 @@ export async function getMySignatureProfile(){
     String(existing.signaturePath||"").startsWith("preloaded/") ||
     existing.method==="Admin Assigned Upload";
 
-  if(isLegacyPreloaded){
-    const cleanup={
-      signaturePath:deleteField(),
-      signatureUrl:deleteField(),
-      signatureSha256:deleteField(),
-      method:"Awaiting Handwritten Signature",
-      status:"Profile Setup Required",
-      updatedAt:serverTimestamp()
-    };
-    await updateDoc(profileRef,cleanup);
-    const migrated={id:snap.id,...existing,signaturePath:null,signatureUrl:null,signatureSha256:null,method:"Awaiting Handwritten Signature",status:"Profile Setup Required"};
-    await ensureMySignerIdentity(migrated,{organisationName:IRPA_ORGANISATION});
-    return migrated;
-  }
+  // Migration must retain historical Signature Profile data. Legacy/preloaded
+  // records are therefore read-only from this migration path: no signature
+  // asset, hash, method, or status is deleted or rewritten here.
+  const migrated={id:snap.id,...existing};
+  await ensureMySignerIdentity(migrated,{
+    organisationName:IRPA_ORGANISATION,
+    authorityStatus:isLegacyPreloaded?"Legacy Profile - Review Required":undefined
+  });
+  return migrated;
 
   const migrated={id:snap.id,...existing};
   await ensureMySignerIdentity(migrated,{organisationName:IRPA_ORGANISATION});
