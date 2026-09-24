@@ -4,6 +4,9 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: authorization-workflow-policy-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   policy-gate:
     runs-on: ubuntu-latest
