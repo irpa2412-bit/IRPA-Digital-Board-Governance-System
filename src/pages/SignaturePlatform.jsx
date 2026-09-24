@@ -343,6 +343,15 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
  },[authorityRegisterEntries,authorityMember,authorityEmployee]);
  const authorityDepartments=useMemo(()=>[...new Set(authorityRegisterRecords.map(x=>x.department).filter(Boolean))],[authorityRegisterRecords]);
  const authorityOptions=useMemo(()=>{
+   const department=String(authorityDepartment||"").trim().toLowerCase();
+   if(department==="board of directors"){
+     return [
+       {role:"Board Chairperson",unit:"Board of Directors",sourceCollection:"governance",sourceRecordId:"board-chairperson"},
+       {role:"Board Vice Chairperson",unit:"Board of Directors",sourceCollection:"governance",sourceRecordId:"board-vice-chairperson"},
+       {role:"Board Secretary",unit:"Board of Directors",sourceCollection:"governance",sourceRecordId:"board-secretary"},
+       {role:"Board Members",unit:"Board of Directors",sourceCollection:"governance",sourceRecordId:"board-members"}
+     ];
+   }
    const options=[];
    for(const record of authorityRegisterRecords.filter(x=>x.department===authorityDepartment)){
      const values=[
@@ -364,7 +373,9 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
    const normalized=String(role||"").trim().toLowerCase().replace(/[_-]+/g," ").replace(/\s+/g," ");
    if(String(department||"").trim().toLowerCase()==="board of directors"){
      if(/(^| )chairperson$|^board chairperson$|^chairman$|^chairwoman$/.test(normalized)) return "Board Chairperson";
+     if(/(^| )vice chairperson$|^board vice chairperson$|^vice chairman$|^vice chairwoman$/.test(normalized)) return "Board Vice Chairperson";
      if(/(^| )board secretary$|^secretary$/.test(normalized)) return "Board Secretary";
+     if(normalized==="board member"||normalized==="board members") return "Board Members";
    }
    return role;
  };
@@ -382,7 +393,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
  const isBoardMemberAuthority=(department=authorityDepartment,role=authorityRole)=>{
    const d=String(department||"").trim().toLowerCase();
    const r=String(role||"").trim().toLowerCase();
-   return d==="board of directors"&&r==="board member";
+   return d==="board of directors"&&(r==="board member"||r==="board members");
  };
  async function saveSignerAuthority(e){
    e.preventDefault();
