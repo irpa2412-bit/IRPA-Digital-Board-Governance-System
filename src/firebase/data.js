@@ -37,9 +37,18 @@ export async function getRecords(collectionName){const s=await getDocs(query(col
 // that may not contain createdAt, while preserving the existing Firestore
 // authorization rules on the documents collection.
 export async function getControlledDocumentsForSigning(){
-  const snap=await getDocs(collection(db,COLLECTIONS.documents));
-  const rows=snap.docs.map(x=>({id:x.id,...x.data()}));
-  const usable=rows.filter(d=>{
+  const uid=auth.currentUser?.uid;
+  if(!uid)throw new Error("Authentication is required to load controlled documents.");
+  const readRows=async(q)=>{const snap=await getDocs(q);return snap.docs.map(x=>({id:x.id,...x.data()}));};
+  // Read only documents the authenticated officer is explicitly authorized to use,
+  // plus documents they personally registered. This avoids relying on an unrestricted
+  // collection scan and remains compatible with the existing documents security rule.
+  const [authorized,owned]=await Promise.all([
+    readRows(query(collection(db,COLLECTIONS.documents),where("authorizedUids","array-contains",uid))),
+    readRows(query(collection(db,COLLECTIONS.documents),where("uploadedByUid","==",uid)))
+  ]);
+  const byId=new Map([...authorized,...owned].map(d=>[d.id,d]));
+  const usable=[...byId.values()].filter(d=>{
     if(String(d?.recordOrigin||"PRODUCTION").toUpperCase()==="TRIAL"||d?.trialData===true||d?.isTrial===true)return false;
     const contentType=String(d?.contentType||"application/pdf").toLowerCase();
     if(contentType && contentType!=="application/pdf")return false;
