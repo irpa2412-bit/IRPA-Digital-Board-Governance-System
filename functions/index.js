@@ -5,7 +5,6 @@ const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getMessaging } = require("firebase-admin/messaging");
 const { getAuth } = require("firebase-admin/auth");
 const crypto = require("crypto");
-const { authorize, grantPermission, revokePermission, listPermissions } = require("./authorizationService");
 initializeApp(); const db = getFirestore();
 async function stableId(v){return crypto.createHash("sha256").update(String(v)).digest("hex");}
 async function notify({recipientUids,type,title,body,module,recordId,route="/",priority="normal",eventKey}){for(const recipientUid of [...new Set((recipientUids||[]).filter(Boolean).map(String))]){const id=await stableId(`${eventKey}|${recipientUid}`);await db.collection("notifications").doc(id).set({recipientUid,type,title,body,module,recordId:recordId||null,route,priority,read:false,createdByUid:"system",createdAt:FieldValue.serverTimestamp()},{merge:true});}}
@@ -796,56 +795,4 @@ exports.resetTrialData = onCall({region:"us-central1"}, async request => {
     employeeRecordsTargeted:employeeCount,
     status:"Started",
     createdAt:FieldValue.serverTimestamp()
-  });\n\n// Central Authorization Service — staged migration. These callables are not used by the existing UI yet.
-exports.authorizeAction = onCall({region:"us-central1"}, async request => {
-  const uid=request.auth?.uid;
-  if(!uid) throw new HttpsError("unauthenticated","Authentication is required.");
-  try {
-    return await authorize({uid,action:request.data?.action,resource:request.data?.resource||{},context:request.data?.context||{},auditDecision:request.data?.auditDecision===true});
-  } catch(error) {
-    console.error("authorizeAction failed",error);
-    throw new HttpsError("permission-denied",error?.message||"Authorization decision failed.");
-  }
-});
-
-exports.grantAuthorizationPermission = onCall({region:"us-central1"}, async request => {
-  const actorUid=request.auth?.uid;
-  if(!actorUid) throw new HttpsError("unauthenticated","Administrator authentication is required.");
-  try {
-    return await grantPermission({actorUid,targetUid:request.data?.targetUid,permission:request.data?.permission,scope:request.data?.scope||{},reason:request.data?.reason||""});
-  } catch(error) {
-    console.error("grantAuthorizationPermission failed",error);
-    const code=String(error?.code||"");
-    const mapped=code==="invalid-argument"?"invalid-argument":code==="failed-precondition"?"failed-precondition":"permission-denied";
-    throw new HttpsError(mapped,error?.message||"Permission grant was denied.");
-  }
-});
-
-exports.revokeAuthorizationPermission = onCall({region:"us-central1"}, async request => {
-  const actorUid=request.auth?.uid;
-  if(!actorUid) throw new HttpsError("unauthenticated","Administrator authentication is required.");
-  try {
-    return await revokePermission({actorUid,targetUid:request.data?.targetUid,permission:request.data?.permission,scope:request.data?.scope||{},reason:request.data?.reason||""});
-  } catch(error) {
-    console.error("revokeAuthorizationPermission failed",error);
-    const code=String(error?.code||"");
-    const mapped=code==="invalid-argument"?"invalid-argument":code==="failed-precondition"?"failed-precondition":"permission-denied";
-    throw new HttpsError(mapped,error?.message||"Permission revocation was denied.");
-  }
-});
-
-exports.getEffectiveAuthorizationPermissions = onCall({region:"us-central1"}, async request => {
-  const actorUid=request.auth?.uid;
-  if(!actorUid) throw new HttpsError("unauthenticated","Authentication is required.");
-  try {
-    const targetUid=String(request.data?.targetUid||"").trim();
-    if(targetUid && targetUid!==actorUid) {
-      const self=await listPermissions({actorUid,targetUid});
-      return self;
-    }
-    return await listPermissions({actorUid,targetUid:actorUid});
-  } catch(error) {
-    console.error("getEffectiveAuthorizationPermissions failed",error);
-    throw new HttpsError("permission-denied",error?.message||"Permission register access was denied.");
-  }
-});
+  });
