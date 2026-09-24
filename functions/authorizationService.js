@@ -51,7 +51,7 @@ async function rolePermissions(actor){
   return [...permissions];
 }
 async function directPermissions(uid){
-  const snap=await db.collection("authorizationGrants").where("targetUid","==",uid).where("status","==","Active").get();
+  const snap=await db.collection("authorizationGrants").where("targetUid","==",uid).where("organisation","==",ORGANISATION).where("status","==","Active").get();
   return snap.docs.map(d=>({id:d.id,...d.data()}));
 }
 async function audit(action,recordId,details,actor){
@@ -101,12 +101,27 @@ async function authorize({uid,action,resource={},context={},auditDecision=false}
   const decisionId=crypto.randomUUID();
   const result={...decision,decisionId,actorUid:uid,permissions:effective.permissions};
   if(auditDecision){
+    const decisionRecord={
+      decisionId,
+      actorUid:uid,
+      actorEmail:actor.email||null,
+      organisation:ORGANISATION,
+      action:clean(action),
+      resourceId:resource?.id||resource?.resourceId||null,
+      resource,
+      context,
+      allow:decision.allow===true,
+      reason:decision.reason,
+      policyVersion:decision.policyVersion,
+      createdAt:FieldValue.serverTimestamp()
+    };
+    await db.collection("authorizationDecisions").doc(decisionId).set(decisionRecord);
     await db.collection("audit").add({
       action:decision.allow?"AUTHORIZATION_ALLOWED":"AUTHORIZATION_DENIED",
       category:"AUTHORIZATION",
       collection:"authorizationDecisions",
       recordId:decisionId,
-      details:{action,resourceId:resource?.id||resource?.resourceId||null,reason:decision.reason,context},
+      details:{action:clean(action),resourceId:resource?.id||resource?.resourceId||null,reason:decision.reason,context},
       actorUid:uid,
       actorEmail:actor.email||null,
       createdAt:FieldValue.serverTimestamp()
@@ -143,6 +158,7 @@ async function revokePermission({actorUid,targetUid,permission,scope={},reason="
   targetUid=clean(targetUid); permission=clean(permission);
   if(!targetUid || !validPermission(permission)) throw Object.assign(new Error("A valid target user and controlled permission are required."),{code:"invalid-argument"});
   if(targetUid===actorUid) throw Object.assign(new Error("Self-revocation is not permitted through the permission service."),{code:"failed-precondition"});
+  if(!clean(reason)) throw Object.assign(new Error("A reason is required when revoking a permission."),{code:"invalid-argument"});
   const id=grantId({targetUid,permission,scope});
   const ref=db.collection("authorizationGrants").doc(id);
   const existing=await ref.get();
