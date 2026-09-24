@@ -19,4 +19,5 @@ jobs:
         run: node --check functions/bootstrap.js
       - name: Validate Authorization gateway syntax in isolation
         run: node --check functions/authorizationFunctions.js
-      - name: Verify reset gate remains trial-only\n        run: node scripts/verify-functions-entrypoint-integrity.js\n
+      - name: Verify reset gate remains trial-only
+        run: node scripts/verify-functions-entrypoint-integrity.js
