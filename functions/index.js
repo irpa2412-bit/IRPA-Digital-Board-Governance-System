@@ -51,6 +51,8 @@ exports.updateSignerAuthority = onCall({region:"us-central1"}, async request => 
   if(!uid) throw new HttpsError("unauthenticated","Authentication is required.");
 
   const requestedRole=String(request.data?.authorityRole||"").trim();
+  const requestedDepartment=String(request.data?.authorityDepartment||"").trim();
+  const requestedUnit=String(request.data?.authorityUnit||"").trim();
   const authorityStatus=String(request.data?.authorityStatus||"Current").trim();
   const authorityReference=String(request.data?.authorityReference||"").trim();
   const authorityEffectiveAt=String(request.data?.authorityEffectiveAt||"").trim()||null;
@@ -94,7 +96,18 @@ exports.updateSignerAuthority = onCall({region:"us-central1"}, async request => 
   if(!allowedRoles.includes(requestedRole))
     throw new HttpsError("permission-denied","The selected signing authority is not registered to this IRPA member/employee account.");
 
-  const source=uniqueRecords.find(record=>valuesFor(record).includes(requestedRole))||uniqueRecords[0];
+  const matchingRecords=uniqueRecords.filter(record=>{
+    if(!valuesFor(record).includes(requestedRole)) return false;
+    if(requestedDepartment&&String(record.department||"").trim()!==requestedDepartment) return false;
+    if(requestedUnit){
+      const recordUnit=String(record.unit||record.unitName||record.boardPosition||"").trim();
+      if(recordUnit!==requestedUnit) return false;
+    }
+    return true;
+  });
+  if(!matchingRecords.length)
+    throw new HttpsError("permission-denied","The selected department, unit and signing authority do not match an active IRPA register entry for this account.");
+  const source=matchingRecords[0];
   const authorityDepartment=String(source.department||"").trim();
   const authorityUnit=String(source.unit||source.unitName||source.boardPosition||"").trim();
 
