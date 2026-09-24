@@ -1245,3 +1245,87 @@
 .audit-trail-workspace{position:relative;z-index:1}
 .audit-trail-workspace .table-wrapper,.audit-trail-workspace table,.audit-trail-workspace tbody,.audit-trail-workspace tr,.audit-trail-workspace td,.audit-trail-workspace .member-actions{pointer-events:auto!important}
 .audit-trail-workspace .member-actions button{position:relative;z-index:20;pointer-events:auto!important;touch-action:manipulation!important;cursor:pointer!important;min-height:44px}\n.invitation-action-buttons{position:relative;z-index:20;display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start;pointer-events:auto!important;isolation:isolate}.invitation-action-buttons button{position:relative;z-index:21;pointer-events:auto!important;touch-action:manipulation!important;cursor:pointer!important;min-height:44px;white-space:normal}.invitation-action-buttons .status-badge{align-self:center}\n.invitation-editor-panel.is-editing{border-color:#2b7a50;box-shadow:0 0 0 2px rgba(43,122,80,.16),0 14px 35px rgba(0,0,0,.12)}.invitation-edit-notice{margin:12px 0 18px!important;color:#174f34!important;background:#e8f6ee!important;border-color:#9bcfb0!important}
+
+
+/* Signature Portal controls — keep navigation and profile actions fully legible
+   on both the dark portal surface and light/washed displays. */
+.signature-portal-nav{
+  display:flex;
+  gap:8px;
+  margin-bottom:18px;
+  flex-wrap:wrap;
+  align-items:center;
+}
+.signature-portal-nav .signature-nav-button{
+  min-height:44px;
+  padding:10px 14px;
+  border:1px solid #456d5b;
+  border-radius:9px;
+  background:#10291f;
+  color:#d9ebe3;
+  font-size:12px;
+  font-weight:800;
+  line-height:1.2;
+  opacity:1!important;
+  cursor:pointer;
+  pointer-events:auto;
+  touch-action:manipulation;
+  transition:background .16s ease,border-color .16s ease,color .16s ease,transform .16s ease;
+}
+.signature-portal-nav .signature-nav-button:hover{
+  background:#17442f;
+  border-color:#6b9d83;
+  color:#fff;
+  transform:translateY(-1px);
+}
+.signature-portal-nav .signature-nav-button.active{
+  background:#d6a52c;
+  border-color:#e4bd58;
+  color:#07140f;
+  box-shadow:0 4px 14px rgba(214,165,44,.22);
+}
+.signature-profile-primary-button,
+.signature-profile-secondary-button{
+  min-height:44px!important;
+  padding:10px 16px!important;
+  border-radius:9px!important;
+  font-weight:850!important;
+  opacity:1!important;
+  pointer-events:auto!important;
+  touch-action:manipulation!important;
+}
+.signature-profile-primary-button{
+  background:#187343!important;
+  border:1px solid #4b9a70!important;
+  color:#fff!important;
+  box-shadow:0 4px 12px rgba(24,115,67,.18);
+}
+.signature-profile-primary-button:hover{
+  background:#208b52!important;
+  border-color:#69b78a!important;
+}
+.signature-profile-secondary-button{
+  background:#102f25!important;
+  border:1px solid #5a806d!important;
+  color:#dff1e8!important;
+}
+.signature-profile-secondary-button:hover{
+  background:#17442f!important;
+  border-color:#82aa98!important;
+  color:#fff!important;
+}
+.signature-profile-primary-button:disabled,
+.signature-profile-secondary-button:disabled,
+.signature-portal-nav .signature-nav-button:disabled{
+  opacity:.55!important;
+  cursor:not-allowed!important;
+  transform:none!important;
+}
+@media(max-width:700px){
+  .signature-portal-nav{gap:6px}
+  .signature-portal-nav .signature-nav-button{
+    flex:1 1 auto;
+    min-height:46px;
+    padding:10px 11px;
+  }
+}
