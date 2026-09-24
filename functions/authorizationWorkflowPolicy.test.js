@@ -32,7 +32,7 @@ assert.equal(r.reason,"SEPARATION_OF_DUTIES_VIOLATION");
 r=evaluateAuthorizationWorkflowTransition({...base,actor:{uid:"approver",active:true,organisation:ORGANISATION},workflow:{...base.workflow,status:"Under Review"},nextStatus:"Rejected",effectivePermissions:["authorization.workflow.reject"],decisionReason:"Insufficient justification"});
 assert.equal(r.allow,true);
 
-r=evaluateAuthorizationWorkflowTransition({...base,actor:{uid:"implementer",active:true,organisation:ORGANISATION},nextStatus:"Completed",effectivePermissions:["authorization.workflow.complete"]});
+r=evaluateAuthorizationWorkflowTransition({...base,actor:{uid:"implementer",active:true,organisation:ORGANISATION},workflow:{...base.workflow,status:"Approved"},nextStatus:"Completed",effectivePermissions:["authorization.workflow.complete"]});
 assert.equal(r.allow,true);
 
 r=evaluateAuthorizationWorkflowTransition({...base,nextStatus:"Approved",effectivePermissions:["authorization.workflow.approve"]});
