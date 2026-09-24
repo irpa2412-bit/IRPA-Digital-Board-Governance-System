@@ -69,6 +69,15 @@ export default function FinanceDonorControlCockpit(){
    <div className="form-actions"><button type="button" className="secondary-button" onClick={load} disabled={busy}>{busy?"Refreshing…":"Refresh Snapshot"}</button><button type="button" onClick={printSnapshot} disabled={busy}>Print Donor Snapshot</button></div>
   </div>
   {error&&<div className="error-message action-feedback">{error}</div>}
+  <section className="panel" aria-label="Unified finance controls">
+   <div className="panel-header"><div><span className="eyebrow">UNIFIED CONTROL NAVIGATION</span><h3>Operational Finance Registers</h3><p className="panel-description">The new control layer is now the management entry point; the existing operational registers remain the authoritative transaction layer. Navigation below moves directly to those existing controls without copying or replacing their data.</p></div></div>
+   <div className="member-actions">
+    <a className="secondary-button" href="#finance-operational-registers">Financial Registers</a>
+    <a className="secondary-button" href="#procurement-finance-handoff">Procurement → Finance</a>
+    <a className="secondary-button" href="#finance-traceability">Payment Trace</a>
+    <a className="secondary-button" href="#finance-entry">Controlled Entry</a>
+   </div>
+  </section>
   <div className="dashboard-grid">
    <div className="stat-card"><span>Budget Portfolio</span><strong>{money(summary.budgets)}</strong><small>{summary.boardApprovedBudgets} approved/active budget records</small></div>
    <div className="stat-card"><span>Transaction Value</span><strong>{money(summary.transactions)}</strong><small>Recorded Finance transactions</small></div>
