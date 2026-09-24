@@ -1,3 +1,5 @@
 module.exports = {
-  ...require("./index")
+  ...require("./index"),
+  ...require("./authorizationFunctions")
 };
+
