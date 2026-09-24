@@ -18,6 +18,26 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm install
+      - name: Verify migration safety invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f src/firebase/signerIdentity.js
+          test -f src/firebase/signaturePlatform.js
+          grep -q 'SIGNER_IDENTITY_COLLECTION = "signerIdentities"' src/firebase/signerIdentity.js
+          grep -q 'signatureProfiles' src/firebase/signaturePlatform.js
+          grep -q 'migrateExistingSignatureProfile' src/firebase/signaturePlatform.js
+          if grep -n 'deleteField' src/firebase/signaturePlatform.js; then
+            echo "ERROR: destructive deleteField usage remains in Signature Portal migration source."
+            exit 1
+          fi
+          identity_line=$(grep -n 'const signerIdentity=await ensureMySignerIdentity' src/firebase/signaturePlatform.js | head -n1 | cut -d: -f1)
+          upload_line=$(grep -n 'await uploadBytes(storageRef,signedBytes' src/firebase/signaturePlatform.js | head -n1 | cut -d: -f1)
+          test -n "$identity_line" && test -n "$upload_line"
+          test "$identity_line" -lt "$upload_line"
+          grep -q 'recordSignerAuthenticationEvidence' src/firebase/signaturePlatform.js
+          echo "Signature migration safety invariants passed."
+
       - name: Build web application
         env:
           VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
