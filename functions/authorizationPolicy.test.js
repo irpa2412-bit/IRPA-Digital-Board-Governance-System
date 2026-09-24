@@ -113,3 +113,23 @@ assert.deepEqual(unknownPlan.additions,[]);
 assert.deepEqual(unknownPlan.removals,[]);
 console.log("Non-destructive departmental provisioning plan tests passed.");
 
+
+const { OPERATIONAL_DEPARTMENT_ACCESS, buildDepartmentalProvisioningPlan } = require("./authorizationPolicy");
+const departmentPlan=buildDepartmentalProvisioningPlan({
+  currentByRole:{
+    "Finance Manager":["finance.view"],
+    "Director Human Resources":["member.create"]
+  }
+});
+assert.equal(Object.keys(departmentPlan.departments).length,Object.keys(OPERATIONAL_DEPARTMENT_ACCESS).length);
+assert.deepEqual(departmentPlan.departments["Finance & Administration"][1].additions,["finance.create","reports.view","document.view"]);
+assert.deepEqual(departmentPlan.departments["Human Resources"][0].additions,["member.update","member.remove","reports.view"]);
+for(const plans of Object.values(departmentPlan.departments)){
+  for(const plan of plans){
+    assert.deepEqual(plan.removals,[]);
+    assert.equal(plan.destructiveChanges,false);
+    assert.equal(plan.requiresExplicitApproval,true);
+  }
+}
+assert.equal(departmentPlan.writesPerformed,false);
+console.log("Simultaneous departmental provisioning plan tests passed.");
