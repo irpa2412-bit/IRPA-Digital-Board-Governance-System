@@ -1,0 +1,47 @@
+name: Authorization Central Service Build Test
+
+on:
+  push:
+    branches:
+      - feature/authorization-central-service
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: functions
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Functions dependencies
+        run: npm install --omit=dev
+      - name: Test pure authorization policy
+        run: node authorizationPolicy.test.js
+      - name: Syntax-check staged Authorization service and callable gateway
+        run: |
+          node --check authorizationPolicy.js
+          node --check authorizationService.js
+          node --check authorizationFunctions.js
+      - name: Check migration invariants
+        working-directory: .
+        run: |
+          set -euo pipefail
+          test -f functions/authorizationPolicy.js
+          test -f functions/authorizationService.js
+          test -f src/firebase/authorizationService.js
+          grep -Fq 'grantAuthorizationPermission' functions/authorizationFunctions.js
+          grep -Fq 'revokeAuthorizationPermission' functions/authorizationFunctions.js
+          grep -Fq 'authorizationGrants' firestore.rules
+          grep -Fq 'allow create,update,delete:if false;' firestore.rules
+          grep -Fq 'current Authorization & Approvals appearance remains unchanged.' docs/AUTHORIZATION-MIGRATION-MAP.md
+      - name: Build web application
+        working-directory: .
+        run: |
+          npm install --no-audit --no-fund
+          npm run build

@@ -1,4 +1,15 @@
 {
-  "indexes": [],
+  "indexes": [
+    {
+      "collectionGroup": "authorizationGrants",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath":"targetUid","order":"ASCENDING"},
+        {"fieldPath":"organisation","order":"ASCENDING"},
+        {"fieldPath":"permission","order":"ASCENDING"},
+        {"fieldPath":"status","order":"ASCENDING"}
+      ]
+    }
+  ],
   "fieldOverrides": []
 }
