@@ -1,4 +1,5 @@
 name: Authorization Functions Integration Gate
+# Non-deploying safety gate; validates the repaired Functions entrypoint before production wiring.
 
 on:
   push:
