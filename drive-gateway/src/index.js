@@ -43,6 +43,9 @@ export default {
       if (url.pathname === "/api/signature-profile/folder" && request.method === "POST") {
         return await ensureSignatureProfileFolder(request, env);
       }
+      if (url.pathname === "/api/signature-profile/finalize" && request.method === "POST") {
+        return await finalizeSignatureProfileArchives(request, env);
+      }
       if (url.pathname === "/api/document-archive/folder" && request.method === "POST") {
         return await ensureDocumentArchiveFolder(request, env);
       }
@@ -334,6 +337,101 @@ async function download(request, env) {
   }, 200, corsHeaders(request));
 }
 
+
+
+async function finalizeSignatureProfileArchives(request, env) {
+  const claims = await authenticateFirebaseRequest(request);
+  const data = await request.json();
+  const envelopeId = cleanId(data.envelopeId || "");
+  const finalHash = String(data.finalHash || "").trim();
+  const originalHash = String(data.originalHash || "").trim();
+  const base64 = String(data.base64 || "");
+  const fileSize = Number(data.fileSize || 0);
+  if (!envelopeId || !finalHash || !base64 || !Number.isFinite(fileSize) || fileSize <= 0 || fileSize > MAX_BYTES) {
+    return json({ok:false,error:"Completed signature archive data is incomplete."},400,corsHeaders(request));
+  }
+
+  const envelope = await getFirestoreDocument(env, `signatureEnvelopes/${envelopeId}`, claims.token);
+  const fields = envelope?.fields || {};
+  const status = fields.status?.stringValue || "";
+  const lastSignedByUid = fields.lastSignedByUid?.stringValue || "";
+  if (status !== "Completed" || lastSignedByUid !== claims.user_id) {
+    return json({ok:false,error:"Final signer authorization is required before distributing the completed document to signer archives."},403,corsHeaders(request));
+  }
+
+  const recipients = firestoreMapArray(fields.recipients);
+  const actionRecipients = recipients.filter(r => !r.accessOnly && r.uid);
+  if (!actionRecipients.length) {
+    return json({ok:true,envelopeId,deliveries:{}},200,corsHeaders(request));
+  }
+
+  const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+  if (bytes.length !== fileSize) return json({ok:false,error:"Completed signed PDF size could not be verified."},400,corsHeaders(request));
+
+  const accessToken = await getDriveAccessToken(env);
+  const rootId = await findOrCreateFolder(env, accessToken, "IRPA Governance System");
+  const signaturesId = await findOrCreateFolder(env, accessToken, "Signature Profiles", rootId);
+  const deliveries = {};
+
+  for (const recipient of actionRecipients) {
+    const uid = cleanId(recipient.uid);
+    const email = String(recipient.email || "").trim().toLowerCase();
+    if (!uid) continue;
+    const folderName = `IRPA-SIGNATURE-${uid}`;
+    const folderId = await findOrCreateFolder(env, accessToken, folderName, signaturesId, {
+      irpaGovernanceSignatureFolder: true,
+      ownerUid: uid,
+      folderUid: uid,
+      purpose: "Member Signature Profile"
+    });
+    if (email) await ensureSignatureFolderPermission(env, accessToken, folderId, email);
+    const completedFolderId = await findOrCreateFolder(env, accessToken, "Completed Signed Documents", folderId, {
+      irpaGovernanceSignatureProfileArchive: true,
+      ownerUid: uid,
+      folderUid: uid,
+      purpose: "Completed Documents Signed by Profile Owner"
+    });
+    const fileName = `completed-${envelopeId}-${finalHash}.pdf`;
+    const metadata = {
+      name: fileName,
+      parents: [completedFolderId],
+      mimeType: "application/pdf",
+      description: JSON.stringify({
+        irpaGovernance: true,
+        uploadedByUid: claims.user_id,
+        purpose: "Signature Profile",
+        ownerUid: uid,
+        envelopeId,
+        signerUid: uid,
+        finalSignerUid: claims.user_id,
+        originalHash,
+        finalHash,
+        archiveProtocol: "IRPA-SIGNER-COPY-V2",
+        archiveState: "Final Completed Document"
+      })
+    };
+    const boundary = `irpa-${crypto.randomUUID()}`;
+    const body = buildMultipartBody(boundary, metadata, bytes, "application/pdf");
+    const response = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType,size,webViewLink,createdTime,parents", {
+      method:"POST",
+      headers:{Authorization:`Bearer ${accessToken}`,"Content-Type":`multipart/related; boundary=${boundary}`},
+      body
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error?.message || `Unable to archive completed document for signer ${uid}.`);
+    deliveries[uid] = {
+      fileId: result.id,
+      fileName: result.name,
+      webViewLink: result.webViewLink || `https://drive.google.com/file/d/${result.id}/view`,
+      folderId: completedFolderId,
+      folderLink: `https://drive.google.com/drive/folders/${encodeURIComponent(completedFolderId)}`,
+      finalHash,
+      archiveProtocol: "IRPA-SIGNER-COPY-V2"
+    };
+  }
+
+  return json({ok:true,envelopeId,deliveries},200,corsHeaders(request));
+}
 
 async function ensureSignatureProfileFolder(request, env) {
   const claims = await authenticateFirebaseRequest(request);
@@ -1135,6 +1233,27 @@ async function getFirestoreDocument(env, path, firebaseToken) {
   if (response.status === 404) return null;
   if (!response.ok) throw new Error("Unable to verify the Firestore authorization record.");
   return response.json();
+}
+
+function firestoreMapArray(field) {
+  if (!Array.isArray(field?.arrayValue?.values)) return [];
+  return field.arrayValue.values.map(v => {
+    const m = v?.mapValue?.fields || {};
+    const value = key => {
+      const x = m[key];
+      if (x?.stringValue !== undefined) return x.stringValue;
+      if (x?.booleanValue !== undefined) return x.booleanValue;
+      if (x?.integerValue !== undefined) return Number(x.integerValue);
+      return null;
+    };
+    return {
+      uid:value("uid"),
+      email:value("email"),
+      name:value("name"),
+      role:value("role"),
+      accessOnly:Boolean(value("accessOnly"))
+    };
+  });
 }
 
 function firestoreStringArray(field) {
