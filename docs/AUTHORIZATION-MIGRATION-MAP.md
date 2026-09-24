@@ -175,3 +175,39 @@ Potential external dependencies identified for later, separately tested integrat
 
 Migration rule: an identified dependency is recorded as an inlet/outlet and tested in isolation before any connection is enabled. No cross-portal repair is performed merely to make Authorization appear operational.
 
+## Step D controlled test matrix
+
+Before any portal or external-system connection, the central Authorization operation must pass these isolated cases:
+
+| Test | Expected result |
+|---|---|
+| Unauthenticated decision | DENY |
+| Inactive actor | DENY |
+| Wrong organisation | DENY |
+| Unknown permission | DENY |
+| Missing effective permission | DENY |
+| Self approval | DENY |
+| Unverified signature authority when required | DENY |
+| Owner-only operation by non-owner | DENY |
+| Valid controlled permission | ALLOW |
+| Verified signature authority | ALLOW |
+| Valid owner-only operation by owner | ALLOW |
+| Duplicate active grant | No duplicate active grant |
+| Revocation without reason | DENY / validation failure |
+| Revocation of missing grant | Safe idempotent result |
+| Revocation of already revoked grant | Safe idempotent result |
+
+The matrix is policy/service validation only. It does not create or modify production authorization records.
+
+### Connection gate
+
+A connection to another portal may proceed only after:
+1. the Authorization-side tests pass;
+2. the receiving portal's current controls are mapped;
+3. the proposed inlet/outlet data contract is documented;
+4. negative consequences are tested without enabling production access;
+5. rollback is defined;
+6. the connection is explicitly approved for the next migration stage.
+
+No cross-portal connection is implicit.
+
