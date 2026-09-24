@@ -208,6 +208,12 @@ async function upload(request, env) {
     if (ownerUid !== claims.user_id) {
       return json({ ok: false, error: "A signature profile may only be uploaded by its owner." }, 403, corsHeaders(request));
     }
+    const memberRecord = await getFirestoreDocument(env, `members/${claims.user_id}`, claims.token);
+    const employeeRecord = await getFirestoreDocument(env, `employees/${claims.user_id}`, claims.token);
+    const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
+    if (!memberRecord && !employeeRecord && !adminRecord?.fields?.active?.booleanValue) {
+      return json({ ok: false, error: "A registered IRPA member or employee profile is required before a Signature Profile asset can be uploaded." }, 403, corsHeaders(request));
+    }
     if (!requestedFolderId) {
       return json({ ok: false, error: "A member signature folder is required." }, 400, corsHeaders(request));
     }
