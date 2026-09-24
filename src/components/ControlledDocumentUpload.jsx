@@ -190,13 +190,14 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         <ul style={{margin:"6px 0 0 20px"}}>
           <li><strong>Finance Documents</strong> — finance records and supporting evidence.</li>
           <li><strong>Procurement Documents</strong> — procurement records, quotations, evaluations and purchase documentation.</li>
+          <li><strong>Governance Documents</strong> — Board, committee, resolutions, decisions and other governance records.</li>
           <li><strong>Administrative Documents</strong> — policies, governance, HR and general administrative records.</li>
         </ul>
         <div style={{marginTop:6}}>Each archive is separated by <strong>Public, Internal, Confidential</strong> or <strong>Restricted</strong> classification. The selected route is recorded with the document UID and archive link.</div>
       </div>
       <form onSubmit={submit}>
         <div className="form-grid">
-          <div className="form-field"><label>Document Archive</label><select value={archiveCategory} onChange={e => setArchiveCategory(e.target.value)}><option>Finance Documents</option><option>Procurement Documents</option><option>Administrative Documents</option></select></div>
+          <div className="form-field"><label>Document Archive</label><select value={archiveCategory} onChange={e => setArchiveCategory(e.target.value)}><option>Finance Documents</option><option>Procurement Documents</option><option>Governance Documents</option><option>Administrative Documents</option></select></div>
           <div className="form-field"><label>Access Classification</label><select value={classification} onChange={e => setClassification(e.target.value)}><option>Public</option><option>Internal</option><option>Confidential</option><option>Restricted</option></select></div>
           <div className="form-field">
             <label>Document Title</label>
