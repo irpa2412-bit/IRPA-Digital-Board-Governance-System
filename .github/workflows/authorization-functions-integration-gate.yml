@@ -1,0 +1,45 @@
+name: Authorization Functions Integration Gate
+
+on:
+  push:
+    branches: [feature/authorization-functions-integration-gate]
+  pull_request:
+    branches: [main]
+
+jobs:
+  integration-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Functions dependencies
+        working-directory: functions
+        run: npm install
+      - name: Validate Functions syntax
+        run: |
+          node --check functions/index.js
+          node --check functions/bootstrap.js
+          node --check functions/authorizationPolicy.js
+          node --check functions/authorizationService.js
+          node --check functions/authorizationFunctions.js
+      - name: Verify Authorization exports through package entrypoint
+        working-directory: functions
+        run: |
+          node - <<'NODE'
+          const entry=require("./bootstrap");
+          const required=[
+            "authorizeAction",
+            "grantAuthorizationPermission",
+            "revokeAuthorizationPermission",
+            "getEffectiveAuthorizationPermissions"
+          ];
+          for(const name of required){
+            if(!entry[name]) throw new Error("Missing Authorization callable export: "+name);
+          }
+          if(!entry.resetTrialData) throw new Error("Existing resetTrialData export disappeared.");
+          console.log("AUTHORIZATION_FUNCTIONS_BOOTSTRAP_GATE_OK");
+          NODE
+      - name: Confirm no deployment is performed
+        run: echo "Integration gate is non-deploying."
