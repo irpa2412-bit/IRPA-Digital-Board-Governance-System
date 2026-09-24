@@ -66,17 +66,37 @@ export async function updateMySignerAuthority(data={}){
   const authorityRole=normalise(data.authorityRole);
   if(!authorityRole) throw new Error("Select the current signing authority before saving.");
   const call=httpsCallable(getFunctions(undefined,"us-central1"),"updateSignerAuthority");
+  const payload={
+    authorityRole,
+    authorityStatus:normalise(data.authorityStatus||"Current"),
+    authorityReference:normalise(data.authorityReference||""),
+    authorityEffectiveAt:normalise(data.authorityEffectiveAt||""),
+    authorityExpiresAt:normalise(data.authorityExpiresAt||""),
+    authorityDepartment:normalise(data.authorityDepartment||""),
+    authorityUnit:normalise(data.authorityUnit||"")
+  };
   try{
-    const result=await call({
-      authorityRole,
-      authorityStatus:normalise(data.authorityStatus||"Current"),
-      authorityReference:normalise(data.authorityReference||""),
-      authorityEffectiveAt:normalise(data.authorityEffectiveAt||""),
-      authorityExpiresAt:normalise(data.authorityExpiresAt||"")
-    });
+    const result=await call(payload);
     return {id:u.uid,...(result.data||{})};
   }catch(error){
-    throw new Error(error?.message||"The server could not verify and save the signing authority.");
+    // The production project currently cannot deploy new callable functions
+    // because its Google Cloud billing account is closed. Fall back only for
+    // an unavailable/not-deployed function; Firestore rules remain the final
+    // authorization boundary and validate the same institutional register.
+    const code=String(error?.code||"");
+    if(code!=="functions/not-found"&&code!=="functions/unavailable") {
+      throw new Error(error?.message||"The server could not verify and save the signing authority.");
+    }
+    const ref=doc(db,SIGNER_IDENTITY_COLLECTION,u.uid);
+    const snap=await getDoc(ref);
+    if(!snap.exists()) throw new Error("Signer Identity record is not available. Restore the Signer Identity link before updating signing authority.");
+    await updateDoc(ref,{
+      ...payload,
+      authorityUpdatedAt:serverTimestamp(),
+      updatedAt:serverTimestamp()
+    });
+    const updated=await getDoc(ref);
+    return updated.exists()?{id:updated.id,...updated.data()}:null;
   }
 }
 
