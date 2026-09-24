@@ -59,7 +59,28 @@ export async function updateMySignerAuthority(data={}){
   const ref=doc(db,SIGNER_IDENTITY_COLLECTION,u.uid);
   const snap=await getDoc(ref);
   if(!snap.exists()) throw new Error("Signer Identity record is not available. Restore the Signer Identity link before updating signing authority.");
+
+  // The authority selector is constrained to the authenticated person's
+  // registered IRPA roles. Department/unit are identity attributes, not
+  // free-text values supplied by the signer, which prevents impersonation
+  // through arbitrary authority labels.
+  const [memberSnap,employeeSnap]=await Promise.all([
+    getDoc(doc(db,"members",u.uid)),
+    getDoc(doc(db,"employees",u.uid))
+  ]);
+  const member=memberSnap.exists()?memberSnap.data():{};
+  const employee=employeeSnap.exists()?employeeSnap.data():{};
+  const registeredRoles=[
+    ...(Array.isArray(member.roles)?member.roles:[]),
+    ...(Array.isArray(employee.roles)?employee.roles:[]),
+    member.role,employee.role,member.boardPosition,employee.boardPosition
+  ].flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean));
+  const allowedRoles=[...new Set(registeredRoles)];
   const authorityRole=normalise(data.authorityRole);
+  if(!authorityRole) throw new Error("Select the current signing authority before saving.");
+  if(!allowedRoles.includes(authorityRole)){
+    throw new Error("The selected signing authority is not registered to this member. Use the authority options provided by the member and employee registers.");
+  }
   if(!authorityRole) throw new Error("Enter the current signing authority before saving.");
   const authorityStatus=normalise(data.authorityStatus||"Current");
   const allowedStatuses=["Current","Pending Verification","Expired","Not yet assigned"];
