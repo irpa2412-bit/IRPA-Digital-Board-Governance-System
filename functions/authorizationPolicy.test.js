@@ -31,3 +31,7 @@ assert.equal(signature.allow,false);
 assert.equal(signature.reason,"SIGNATURE_AUTHORITY_NOT_VERIFIED");
 
 console.log("Central Authorization policy tests passed.");
+
+const denyReasonTest=evaluatePolicy({actor:{uid:"u2",active:true},organisation:ORGANISATION,action:"signature.sign",effectivePermissions:["signature.sign"],context:{ownerOnly:true},resource:{ownerUid:"u1"}});
+assert.equal(denyReasonTest.allow,false);
+assert.equal(denyReasonTest.reason,"RESOURCE_OWNER_REQUIRED");
