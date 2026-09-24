@@ -118,7 +118,7 @@ export async function saveMySignatureProfile({signatureFile,initialsFile,display
   };
 
   await setDoc(doc(db,PROFILE_COLLECTION,u.uid),p,{merge:true});
-  await ensureMySignerIdentity(p,{organisationName:IRPA_ORGANISATION,authorityRole:"Not yet assigned"});
+  await ensureMySignerIdentity(p,{organisationName:IRPA_ORGANISATION});
   return p;
 }
 
