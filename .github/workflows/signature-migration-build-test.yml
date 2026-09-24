@@ -1,0 +1,23 @@
+name: Signature Portal Migration Build Test
+
+on:
+  push:
+    branches:
+      - feature/signer-identity-migration
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm install
+      - name: Build web application
+        env:
+          VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
+          VITE_GOOGLE_DRIVE_GATEWAY_URL: ${{ secrets.VITE_GOOGLE_DRIVE_GATEWAY_URL }}
+        run: npm run build
