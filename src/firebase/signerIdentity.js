@@ -54,6 +54,35 @@ export async function ensureMySignerIdentity(profile, options={}){
   return {id:u.uid,...payload};
 }
 
+export async function updateMySignerAuthority(data={}){ 
+  const u=currentUser();
+  const ref=doc(db,SIGNER_IDENTITY_COLLECTION,u.uid);
+  const snap=await getDoc(ref);
+  if(!snap.exists()) throw new Error("Signer Identity record is not available. Restore the Signer Identity link before updating signing authority.");
+  const authorityRole=normalise(data.authorityRole);
+  if(!authorityRole) throw new Error("Enter the current signing authority before saving.");
+  const authorityStatus=normalise(data.authorityStatus||"Current");
+  const allowedStatuses=["Current","Pending Verification","Expired","Not yet assigned"];
+  if(!allowedStatuses.includes(authorityStatus)) throw new Error("Select a valid signing authority status.");
+  const authorityReference=normalise(data.authorityReference||"");
+  const authorityEffectiveAt=normalise(data.authorityEffectiveAt||"")||null;
+  const authorityExpiresAt=normalise(data.authorityExpiresAt||"")||null;
+  if(authorityExpiresAt&&authorityEffectiveAt&&authorityExpiresAt<authorityEffectiveAt){
+    throw new Error("Authority expiry date cannot be earlier than the effective date.");
+  }
+  await updateDoc(ref,{
+    authorityRole,
+    authorityStatus,
+    authorityReference,
+    authorityEffectiveAt,
+    authorityExpiresAt,
+    authorityUpdatedAt:serverTimestamp(),
+    updatedAt:serverTimestamp()
+  });
+  const updated=await getDoc(ref);
+  return updated.exists()?{id:updated.id,...updated.data()}:null;
+}
+
 export async function recordSignerAuthenticationEvidence(identityId, context={}){
   const u=currentUser();
   if(identityId!==u.uid) throw new Error("Signer identity ownership verification failed.");
