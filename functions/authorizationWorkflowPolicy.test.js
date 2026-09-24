@@ -17,10 +17,10 @@ assert.equal(r.reason,"PERMISSION_DENIED");
 r=evaluateAuthorizationWorkflowTransition({...base,actor:{uid:"other",active:true,organisation:ORGANISATION},nextStatus:"Under Review",effectivePermissions:["authorization.workflow.review"]});
 assert.equal(r.reason,"NAMED_REVIEWER_REQUIRED");
 
-r=evaluateAuthorizationWorkflowTransition({...base,nextStatus:"Returned",effectivePermissions:["authorization.workflow.return"]});
+r=evaluateAuthorizationWorkflowTransition({...base,workflow:{...base.workflow,status:"Under Review"},nextStatus:"Returned",effectivePermissions:["authorization.workflow.return"]});
 assert.equal(r.reason,"DECISION_REASON_REQUIRED");
 
-r=evaluateAuthorizationWorkflowTransition({...base,nextStatus:"Returned",effectivePermissions:["authorization.workflow.return"],decisionReason:"Needs correction"});
+r=evaluateAuthorizationWorkflowTransition({...base,workflow:{...base.workflow,status:"Under Review"},nextStatus:"Returned",effectivePermissions:["authorization.workflow.return"],decisionReason:"Needs correction"});
 assert.equal(r.allow,true);
 
 r=evaluateAuthorizationWorkflowTransition({...base,actor:{uid:"approver",active:true,organisation:ORGANISATION},nextStatus:"Approved",effectivePermissions:["authorization.workflow.approve"]});
