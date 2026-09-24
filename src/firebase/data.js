@@ -39,24 +39,19 @@ export async function getRecords(collectionName){const s=await getDocs(query(col
 export async function getControlledDocumentsForSigning(){
   if(!auth.currentUser)throw new Error("Authentication is required.");
   const uid=auth.currentUser.uid;
-  let snap;
-  let queryError=null;
-  // Controlled uploads record the initiating user's UID in authorizedUids.
-  // Prefer that per-user index so Firestore can evaluate the read against
-  // the same authorization record instead of requiring a broad collection read.
-  try{
-    snap=await getDocs(query(collection(db,COLLECTIONS.documents),where("authorizedUids","array-contains",uid)));
-  }catch(error){queryError=error;}
-  // Compatibility fallback for legacy document records.
-  if(!snap){
-    try{snap=await getDocs(collection(db,COLLECTIONS.documents));}
-    catch(error){throw queryError||error;}
-  }
-  const rows=snap.docs.map(x=>({id:x.id,...x.data()}));
-  const usable=rows.filter(d=>{
+  const queries=[
+    query(collection(db,COLLECTIONS.documents),where("authorizedUids","array-contains",uid)),
+    query(collection(db,COLLECTIONS.documents),where("uploadedByUid","==",uid))
+  ];
+  const results=await Promise.all(queries.map(async q=>{
+    const snap=await getDocs(q);
+    return snap.docs.map(x=>({id:x.id,...x.data()}));
+  }));
+  const byId=new Map(results.flat().map(d=>[d.id,d]));
+  const usable=[...byId.values()].filter(d=>{
     if(String(d?.recordOrigin||"PRODUCTION").toUpperCase()==="TRIAL"||d?.trialData===true||d?.isTrial===true)return false;
     const contentType=String(d?.contentType||"application/pdf").toLowerCase();
-    if(contentType && contentType!=="application/pdf")return false;
+    if(contentType!=="application/pdf")return false;
     const link=String(d?.webViewLink||"");
     const driveId=d?.fileId||((link.match(/\/d\/([a-zA-Z0-9_-]+)/)||[])[1])||((link.match(/[?&]id=([a-zA-Z0-9_-]+)/)||[])[1])||"";
     return Boolean(d?.fileUrl||d?.documentUrl||d?.storageUrl||d?.pdfUrl||driveId);
