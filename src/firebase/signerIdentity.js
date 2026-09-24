@@ -1,4 +1,4 @@
-import { doc, getDoc, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from "firebase/firestore";
 import { auth, db } from "./config";
 
 export const SIGNER_IDENTITY_COLLECTION = "signerIdentities";
@@ -60,43 +60,72 @@ export async function updateMySignerAuthority(data={}){
   const snap=await getDoc(ref);
   if(!snap.exists()) throw new Error("Signer Identity record is not available. Restore the Signer Identity link before updating signing authority.");
 
-  // The authority selector is constrained to the authenticated person's
-  // registered IRPA roles. Department/unit are identity attributes, not
-  // free-text values supplied by the signer, which prevents impersonation
-  // through arbitrary authority labels.
-  const [memberSnap,employeeSnap]=await Promise.all([
-    getDoc(doc(db,"members",u.uid)),
-    getDoc(doc(db,"employees",u.uid))
-  ]);
-  const member=memberSnap.exists()?memberSnap.data():{};
-  const employee=employeeSnap.exists()?employeeSnap.data():{};
-  const registeredRoles=[
-    ...(Array.isArray(member.roles)?member.roles:[]),
-    ...(Array.isArray(employee.roles)?employee.roles:[]),
-    member.role,employee.role,member.boardPosition,employee.boardPosition
-  ].flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean));
-  const allowedRoles=[...new Set(registeredRoles)];
+  const email=normalise(u.email).toLowerCase();
+  const registeredRecords=[];
+  const directMember=await getDoc(doc(db,"members",u.uid)).catch(()=>null);
+  const directEmployee=await getDoc(doc(db,"employees",u.uid)).catch(()=>null);
+  if(directMember?.exists())registeredRecords.push({id:directMember.id,...directMember.data(),sourceCollection:"members"});
+  if(directEmployee?.exists())registeredRecords.push({id:directEmployee.id,...directEmployee.data(),sourceCollection:"employees"});
+  if(email){
+    const [memberMatches,employeeMatches]=await Promise.all([
+      getDocs(query(collection(db,"members"),where("email","==",email))).catch(()=>null),
+      getDocs(query(collection(db,"employees"),where("email","==",email))).catch(()=>null)
+    ]);
+    memberMatches?.forEach(item=>registeredRecords.push({id:item.id,...item.data(),sourceCollection:"members"}));
+    employeeMatches?.forEach(item=>registeredRecords.push({id:item.id,...item.data(),sourceCollection:"employees"}));
+  }
+  const uniqueRecords=[...new Map(registeredRecords.map(item=>[item.sourceCollection+":"+item.id,item])).values()]
+    .filter(item=>String(item.status||item.employmentStatus||"Active").toLowerCase()!=="inactive");
+  if(!uniqueRecords.length) throw new Error("No active IRPA member or employee register entry was found for this account.");
+
+  const authorityOptions=[...new Set(uniqueRecords.flatMap(record=>[
+    record.role,record.boardPosition,
+    ...(Array.isArray(record.roles)?record.roles:[]),
+    ...(Array.isArray(record.assignedRoles)?record.assignedRoles:[]),
+    ...(Array.isArray(record.selectedRoles)?record.selectedRoles:[]),
+    ...(Array.isArray(record.roleAssignments)?record.roleAssignments:[])
+  ]).flatMap(value=>String(value||"").split(",").map(value=>value.trim()).filter(Boolean)))];
+
   const authorityRole=normalise(data.authorityRole);
   if(!authorityRole) throw new Error("Select the current signing authority before saving.");
-  if(!allowedRoles.includes(authorityRole)){
-    throw new Error("The selected signing authority is not registered to this member. Use the authority options provided by the member and employee registers.");
+  if(!authorityOptions.includes(authorityRole)){
+    throw new Error("The selected signing authority is not registered to your IRPA member/employee record. Select an authority from the controlled list.");
   }
-  if(!authorityRole) throw new Error("Enter the current signing authority before saving.");
+
   const authorityStatus=normalise(data.authorityStatus||"Current");
   const allowedStatuses=["Current","Pending Verification","Expired","Not yet assigned"];
   if(!allowedStatuses.includes(authorityStatus)) throw new Error("Select a valid signing authority status.");
+
   const authorityReference=normalise(data.authorityReference||"");
   const authorityEffectiveAt=normalise(data.authorityEffectiveAt||"")||null;
   const authorityExpiresAt=normalise(data.authorityExpiresAt||"")||null;
   if(authorityExpiresAt&&authorityEffectiveAt&&authorityExpiresAt<authorityEffectiveAt){
     throw new Error("Authority expiry date cannot be earlier than the effective date.");
   }
+
+  const source=uniqueRecords.find(record=>{
+    const values=[
+      record.role,record.boardPosition,
+      ...(Array.isArray(record.roles)?record.roles:[]),
+      ...(Array.isArray(record.assignedRoles)?record.assignedRoles:[]),
+      ...(Array.isArray(record.selectedRoles)?record.selectedRoles:[]),
+      ...(Array.isArray(record.roleAssignments)?record.roleAssignments:[])
+    ].flatMap(value=>String(value||"").split(",").map(value=>value.trim()).filter(Boolean));
+    return values.includes(authorityRole);
+  })||uniqueRecords[0];
+
+  const authorityDepartment=normalise(source.department||"");
+  const authorityUnit=normalise(source.unit||source.unitName||source.boardPosition||"");
   await updateDoc(ref,{
     authorityRole,
     authorityStatus,
     authorityReference,
     authorityEffectiveAt,
     authorityExpiresAt,
+    authorityDepartment,
+    authorityUnit,
+    authoritySourceCollection:source.sourceCollection,
+    authoritySourceRecordId:source.id,
     authorityUpdatedAt:serverTimestamp(),
     updatedAt:serverTimestamp()
   });
