@@ -133,3 +133,10 @@ for(const plans of Object.values(departmentPlan.departments)){
 }
 assert.equal(departmentPlan.writesPerformed,false);
 console.log("Simultaneous departmental provisioning plan tests passed.");
+
+const { validateInstitutionalRoleRecord } = require("./authorizationPolicy");
+assert.equal(validateInstitutionalRoleRecord({status:"Active",role:"Finance Manager",department:"Finance & Administration"}).provisionable,true);
+assert.equal(validateInstitutionalRoleRecord({status:"Inactive",role:"Finance Manager",department:"Finance & Administration"}).reason,"INSTITUTIONAL_RECORD_NOT_ACTIVE");
+assert.equal(validateInstitutionalRoleRecord({status:"Active",role:"Unknown Role",department:"Finance & Administration"}).provisionable,false);
+assert.equal(validateInstitutionalRoleRecord({status:"Active",role:"Finance Manager",department:"Finance & Administration"}).recognisedDepartment,true);
+console.log("Institutional role verification tests passed.");
