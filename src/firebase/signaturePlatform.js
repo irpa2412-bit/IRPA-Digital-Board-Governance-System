@@ -85,26 +85,47 @@ export async function getMySignatureProfile(){
 
 export async function saveMySignatureProfile({signatureFile,initialsFile,displayName,initials,method="Upload"}){
   const u=user();
-  if(!String(displayName||u.displayName||"").trim())throw new Error("Display name is required.");
+  const cleanDisplayName=String(displayName||u.displayName||"").trim();
+  if(!cleanDisplayName)throw new Error("Display name is required.");
+  if(!signatureFile)throw new Error("A signature specimen is required.");
 
-  const folder=await ensureSignatureProfileFolder(u.uid);if(!folder?.folderId)throw new Error("Your protected Google Drive Signature Profile folder could not be established. No signature asset has been saved.");if(folder.ownerUid&&folder.ownerUid!==u.uid)throw new Error("The Google Drive Signature Profile folder is not owned by the authenticated profile.");
+  // IRPA Signature Pathway V3:
+  // capture -> protected profile folder -> specimen archive -> Firestore profile ->
+  // immediate read-back verification -> supplementary Signer Identity synchronization.
+  let folder;
+  try{
+    folder=await ensureSignatureProfileFolder(u.uid);
+  }catch(error){
+    throw new Error(`SIGNATURE PATHWAY / PROFILE STORAGE: ${error?.message||"Unable to establish the protected Signature Profile folder."}`);
+  }
+  if(!folder?.folderId)throw new Error("SIGNATURE PATHWAY / PROFILE STORAGE: Google Drive did not return the protected Signature Profile folder.");
+  if(folder.ownerUid&&folder.ownerUid!==u.uid)throw new Error("SIGNATURE PATHWAY / PROFILE STORAGE: the Google Drive Signature Profile folder is not owned by the authenticated profile.");
 
-  const folderId=folder?.folderId||null;
-  const signature=await uploadAsset(u.uid,"Signature",signatureFile,folderId);
-  const initialsAsset=initialsFile?await uploadAsset(u.uid,"Initials",initialsFile,folderId):null;
+  const folderId=folder.folderId;
+  let signature;
+  let initialsAsset=null;
+  try{
+    signature=await uploadAsset(u.uid,"Signature",signatureFile,folderId);
+    if(initialsFile)initialsAsset=await uploadAsset(u.uid,"Initials",initialsFile,folderId);
+  }catch(error){
+    throw new Error(`SIGNATURE PATHWAY / SPECIMEN ARCHIVE: ${error?.message||"The signature specimen could not be archived."}`);
+  }
 
   const p={
     uid:u.uid,
     email:u.email||"",
-    displayName:String(displayName).trim(),
+    displayName:cleanDisplayName,
     initials:String(initials||"").trim(),
     method,
-    driveSignatureFolderId:folder?.folderId||null,
+    pathwayVersion:"IRPA-SIGNATURE-PATHWAY-V3",
+    driveSignatureFolderId:folderId,
     driveSignatureFolderName:folder?.folderName||null,
     driveSignatureFolderPath:folder?.path||null,
-    driveSignatureFolderUid:folder?u.uid:null,
+    driveSignatureFolderUid:u.uid,
+    completedDocumentsFolderId:folder?.completedDocumentsFolderId||null,
+    completedDocumentsFolderLink:folder?.completedDocumentsFolderLink||null,
+    completedDocumentsFolderPath:folder?.completedDocumentsFolderPath||null,
     signaturePath:signature.path,
-    // The served signature is a browser-renderable data URL. Google Drive remains the archive.
     signatureUrl:signature.displayUrl,
     signatureDriveUrl:signature.driveUrl,
     signatureSha256:signature.sha,
@@ -118,16 +139,24 @@ export async function saveMySignatureProfile({signatureFile,initialsFile,display
   };
 
   const profileRef=doc(db,PROFILE_COLLECTION,u.uid);
-  await setDoc(profileRef,p,{merge:true});
+  try{
+    await setDoc(profileRef,p,{merge:true});
+  }catch(error){
+    const code=String(error?.code||"");
+    throw new Error(`SIGNATURE PATHWAY / PROFILE PERSISTENCE: Firestore rejected Signature Profile persistence${code?` (${code})`:""}: ${error?.message||"Missing or insufficient permissions."}`);
+  }
+
   const persisted=await getDoc(profileRef);
-  if(!persisted.exists()) throw new Error("Signature Profile was not persisted. The account does not have permission to save its own profile.");
+  if(!persisted.exists())throw new Error("SIGNATURE PATHWAY / PROFILE VERIFICATION: the Signature Profile was not readable immediately after save.");
   const persistedProfile={id:persisted.id,...persisted.data()};
+  if(persistedProfile.uid!==u.uid||persistedProfile.signatureSha256!==signature.sha||persistedProfile.driveSignatureFolderId!==folderId){
+    throw new Error("SIGNATURE PATHWAY / PROFILE VERIFICATION: the persisted profile does not match the archived signature specimen.");
+  }
+
   try{
     await ensureMySignerIdentity(persistedProfile,{organisationName:IRPA_ORGANISATION});
   }catch(error){
-    // The Signature Profile is the primary save operation. A secondary trust-record
-    // refresh must never turn a successfully archived signature into a false SAVE FAILED.
-    console.warn("Signature Profile saved; Signer Identity synchronization will be retried on profile load.",error);
+    console.warn("Signature Profile saved and verified; supplementary Signer Identity synchronization will be retried on profile load.",error);
     persistedProfile.signerIdentitySyncPending=true;
   }
   return persistedProfile;
