@@ -1,0 +1,34 @@
+name: Firebase Functions Deployment Prerequisite Check
+
+on:
+  push:
+    branches: [release/authorization-functions-portal-2026-09-24]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: firebase-functions-prerequisite
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+      - name: Verify Firebase project billing prerequisite
+        run: |
+          set -e
+          enabled="$(gcloud billing projects describe irpa-digital-board-governance --format='value(billingEnabled)')"
+          echo "billingEnabled=$enabled"
+          test "$enabled" = "True"
+      - name: Verify Functions source entrypoint
+        run: |
+          test -f functions/index.js
+          node --check functions/index.js
+          node --check functions/authorizationFunctions.js
+          echo "Functions entrypoint and Authorization callable source are syntactically valid."
