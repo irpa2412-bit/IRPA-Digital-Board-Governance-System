@@ -208,8 +208,7 @@ async function upload(request, env) {
     if (ownerUid !== claims.user_id) {
       return json({ ok: false, error: "A signature profile may only be uploaded by its owner." }, 403, corsHeaders(request));
     }
-    const memberRecord = await getFirestoreDocument(env, `members/${claims.user_id}`, claims.token);
-    const employeeRecord = await getFirestoreDocument(env, `employees/${claims.user_id}`, claims.token);
+    const { memberRecord, employeeRecord } = await getInstitutionalProfileForUser(env, claims);
     const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
     if (!memberRecord && !employeeRecord && !adminRecord?.fields?.active?.booleanValue) {
       return json({ ok: false, error: "A registered IRPA member or employee profile is required before a Signature Profile asset can be uploaded." }, 403, corsHeaders(request));
@@ -441,8 +440,7 @@ async function finalizeSignatureProfileArchives(request, env) {
 
 async function ensureSignatureProfileFolder(request, env) {
   const claims = await authenticateFirebaseRequest(request);
-  const memberRecord = await getFirestoreDocument(env, `members/${claims.user_id}`, claims.token);
-  const employeeRecord = await getFirestoreDocument(env, `employees/${claims.user_id}`, claims.token);
+  const { memberRecord, employeeRecord } = await getInstitutionalProfileForUser(env, claims);
   const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
   const isSignatureProfileOwner = Boolean(memberRecord) || Boolean(employeeRecord);
   const isAdmin = Boolean(adminRecord?.fields?.active?.booleanValue);
@@ -1241,6 +1239,53 @@ function firestoreDocumentToPlain(document) {
   return Object.fromEntries(Object.entries(document.fields).map(([k,v])=>[k,convert(v)]));
 }
  
+async function getFirestoreDocumentsByEmail(env, collectionName, email, firebaseToken) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  if (!normalizedEmail) return [];
+  const response = await fetch(
+    `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:runQuery`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${firebaseToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: collectionName }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: "email" },
+              op: "EQUAL",
+              value: { stringValue: normalizedEmail }
+            }
+          },
+          limit: 5
+        }
+      })
+    }
+  );
+  if (!response.ok) throw new Error("Unable to verify the Firestore institutional profile.");
+  const rows = await response.json();
+  return rows.filter(row => row.document).map(row => row.document);
+}
+
+async function getInstitutionalProfileForUser(env, claims) {
+  const uid = claims.user_id;
+  const email = String(claims.email || "").trim().toLowerCase();
+  const directMember = await getFirestoreDocument(env, `members/${uid}`, claims.token);
+  const directEmployee = await getFirestoreDocument(env, `employees/${uid}`, claims.token);
+  if (directMember || directEmployee) return { memberRecord: directMember, employeeRecord: directEmployee };
+  const [memberMatches, employeeMatches] = await Promise.all([
+    getFirestoreDocumentsByEmail(env, "members", email, claims.token),
+    getFirestoreDocumentsByEmail(env, "employees", email, claims.token)
+  ]);
+  return {
+    memberRecord: memberMatches[0] || null,
+    employeeRecord: employeeMatches[0] || null
+  };
+}
+
 async function getFirestoreDocument(env, path, firebaseToken) {
   const response = await fetch(`https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/${path}`, {
     headers: { Authorization: `Bearer ${firebaseToken}` }
