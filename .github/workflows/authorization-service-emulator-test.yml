@@ -20,5 +20,4 @@ jobs:
       - name: Install Firebase CLI
         run: npm install --global firebase-tools
       - name: Run Authorization service against Firestore emulator
-        working-directory: functions
-        run: firebase emulators:exec --only firestore --project irpa-authorization-emulator "node authorizationService.integration.test.js"
+        run: firebase emulators:exec --only firestore --project irpa-authorization-emulator "node functions/authorizationService.integration.test.js"
