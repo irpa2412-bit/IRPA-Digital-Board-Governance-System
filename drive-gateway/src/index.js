@@ -591,6 +591,8 @@ async function finalizeSignatureProfileArchives(request, env) {
       webViewLink: result.webViewLink || `https://drive.google.com/file/d/${result.id}/view`,
       folderId: completedFolderId,
       folderLink: `https://drive.google.com/drive/folders/${encodeURIComponent(completedFolderId)}`,
+      myDocumentsPortal: "My Documents",
+      myDocumentsPortalPath: `My Documents/Completed Signed Documents/${fileName}`,
       finalHash,
       archiveProtocol: "IRPA-SIGNER-COPY-V2"
     };
