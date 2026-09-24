@@ -23,6 +23,8 @@ jobs:
         run: npm install --omit=dev
       - name: Test pure authorization policy
         run: node authorizationPolicy.test.js
+      - name: Test Functions integration boundary
+        run: node authorizationFunctions.integration.test.js
       - name: Check migration invariants
         working-directory: .
         run: |
