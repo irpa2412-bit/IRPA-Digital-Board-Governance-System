@@ -1,0 +1,24 @@
+name: Authorization Service Emulator Integration Test
+
+on:
+  push:
+    branches: [feature/authorization-central-service]
+  pull_request:
+    branches: [main]
+
+jobs:
+  authorization-emulator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Functions dependencies
+        working-directory: functions
+        run: npm install
+      - name: Install Firebase CLI
+        run: npm install --global firebase-tools
+      - name: Run Authorization service against Firestore emulator
+        working-directory: functions
+        run: firebase emulators:exec --only firestore --project irpa-authorization-emulator "node authorizationService.integration.test.js"
