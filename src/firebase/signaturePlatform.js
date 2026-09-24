@@ -44,6 +44,16 @@ async function uploadAsset(uid,type,file,folderId){
   await uploadBytes(r,prepared,{contentType:prepared.type,ownerUid:uid,folderId,purpose:"Signature Profile",customMetadata:{ownerUid:uid,assetType:type,sha256:sha,purpose:"Signature Profile",cropped:true}});
   return{path,driveUrl:await getDownloadURL(r),displayUrl:await fileDataUrl(prepared),sha};
 }
+export async function migrateExistingSignatureProfile(){
+  const u=user();
+  const ref=doc(db,PROFILE_COLLECTION,u.uid);
+  const snap=await getDoc(ref);
+  if(!snap.exists()) return {migrated:false,reason:"No existing Signature Profile"};
+  const profile={id:snap.id,...snap.data()};
+  const identity=await ensureMySignerIdentity(profile,{organisationName:IRPA_ORGANISATION});
+  return {migrated:true,profile,identity};
+}
+
 export async function getMySignatureProfile(){
   const u=user();
   const profileRef=doc(db,PROFILE_COLLECTION,u.uid);
