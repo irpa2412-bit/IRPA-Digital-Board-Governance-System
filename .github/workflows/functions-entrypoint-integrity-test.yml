@@ -36,5 +36,6 @@ const required=[
 for(const token of required){
   if(!s.includes(token)) throw new Error("Missing reset safety marker: "+token);
 }
-console.log("Trial-only reset safety markers present.");
+if(s.includes('employeeCounters").doc("employees").set({currentNumber:0') || s.includes('memberCounters").doc("members").set({currentNumber:0')) throw new Error("Trial reset must not rewrite production numbering counters.");
+console.log("Trial-only reset safety markers present and production counters are preserved.");
 NODE
