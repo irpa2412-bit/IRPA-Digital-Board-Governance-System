@@ -4,6 +4,12 @@ const PERMISSIONS = Object.freeze([
   "authorization.permission.view",
   "authorization.permission.grant",
   "authorization.permission.revoke",
+  "authorization.workflow.submit",
+  "authorization.workflow.review",
+  "authorization.workflow.approve",
+  "authorization.workflow.return",
+  "authorization.workflow.reject",
+  "authorization.workflow.complete",
   "administrator.create",
   "administrator.remove",
   "member.create",
@@ -119,6 +125,39 @@ function buildDepartmentalProvisioningPlan({currentByRole={}}={}){
   };
 }
 
+const AUTHORIZATION_WORKFLOW_TRANSITIONS = Object.freeze({
+  "Draft->Submitted": "authorization.workflow.submit",
+  "Submitted->Under Review": "authorization.workflow.review",
+  "Submitted->Returned": "authorization.workflow.return",
+  "Under Review->Approved": "authorization.workflow.approve",
+  "Under Review->Rejected": "authorization.workflow.reject",
+  "Under Review->Returned": "authorization.workflow.return",
+  "Returned->Submitted": "authorization.workflow.submit",
+  "Approved->Completed": "authorization.workflow.complete"
+});
+
+function evaluateAuthorizationWorkflowTransition({actor, workflow, nextStatus, effectivePermissions=[]}={}){
+  const from=clean(workflow?.status);
+  const next=clean(nextStatus);
+  const permission=AUTHORIZATION_WORKFLOW_TRANSITIONS[from+"->"+next];
+  if(!clean(actor?.uid)) return {allow:false,reason:"AUTHENTICATION_REQUIRED",policyVersion:"1.0"};
+  if(actor?.active!==true) return {allow:false,reason:"ACTOR_NOT_ACTIVE",policyVersion:"1.0"};
+  if(clean(actor?.organisation||ORGANISATION)!==ORGANISATION) return {allow:false,reason:"ORGANISATION_BOUNDARY_MISMATCH",policyVersion:"1.0"};
+  if(!permission) return {allow:false,reason:"WORKFLOW_TRANSITION_NOT_PERMITTED",policyVersion:"1.0"};
+  if(!new Set((effectivePermissions||[]).map(clean)).has(permission)) return {allow:false,reason:"PERMISSION_DENIED",policyVersion:"1.0"};
+  if(clean(workflow?.workflowType)!=="Authorization" || clean(workflow?.module)!=="Authorization & Approvals")
+    return {allow:false,reason:"WORKFLOW_MODULE_MISMATCH",policyVersion:"1.0"};
+  if(["Approved","Rejected","Completed"].includes(next) && workflow?.requestedByUid===actor.uid)
+    return {allow:false,reason:"SEPARATION_OF_DUTIES_VIOLATION",policyVersion:"1.0"};
+  if(next==="Under Review" && workflow?.reviewerUid!==actor.uid) return {allow:false,reason:"NAMED_REVIEWER_REQUIRED",policyVersion:"1.0"};
+  if(["Approved","Rejected"].includes(next) && workflow?.approverUid!==actor.uid) return {allow:false,reason:"NAMED_APPROVER_REQUIRED",policyVersion:"1.0"};
+  if(next==="Completed" && workflow?.implementerUid!==actor.uid) return {allow:false,reason:"NAMED_IMPLEMENTER_REQUIRED",policyVersion:"1.0"};
+  if(next==="Returned" && workflow?.reviewerUid!==actor.uid) return {allow:false,reason:"NAMED_REVIEWER_REQUIRED",policyVersion:"1.0"};
+  if(["Rejected","Returned"].includes(next) && !String(workflow?.decisionReason||"").trim())
+    return {allow:false,reason:"DECISION_REASON_REQUIRED",policyVersion:"1.0"};
+  return {allow:true,reason:"PERMISSION_GRANTED",policyVersion:"1.0",action:permission,from,next};
+}
+
 function validPermission(permission){
   return PERMISSION_SET.has(clean(permission));
 }
@@ -164,4 +203,4 @@ function evaluatePolicy({ actor, organisation, action, resource = {}, context = 
   };
 }
 
-module.exports = { ORGANISATION, PERMISSIONS, OPERATIONAL_ROLE_PERMISSIONS, OPERATIONAL_DEPARTMENT_ACCESS, validPermission, getOperationalRolePermissions, buildRoleProvisioningPlan, buildDepartmentalProvisioningPlan, validateInstitutionalRoleRecord, evaluatePolicy };
+module.exports = { ORGANISATION, PERMISSIONS, OPERATIONAL_ROLE_PERMISSIONS, OPERATIONAL_DEPARTMENT_ACCESS, validPermission, getOperationalRolePermissions, buildRoleProvisioningPlan, buildDepartmentalProvisioningPlan, validateInstitutionalRoleRecord, AUTHORIZATION_WORKFLOW_TRANSITIONS, evaluateAuthorizationWorkflowTransition, evaluatePolicy };
