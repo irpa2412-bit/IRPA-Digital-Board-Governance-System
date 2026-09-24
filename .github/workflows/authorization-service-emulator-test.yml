@@ -17,6 +17,11 @@ jobs:
       - name: Install Functions dependencies
         working-directory: functions
         run: npm install
+      - name: Install Java 21 for Firestore emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
       - name: Install Firebase CLI
         run: npm install --global firebase-tools
       - name: Run Authorization service against Firestore emulator
