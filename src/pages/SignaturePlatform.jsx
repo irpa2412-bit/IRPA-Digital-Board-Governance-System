@@ -367,6 +367,11 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
    if(label==="Board Secretary")return 1;
    return 2;
  };
+ const isPermanentExecutiveAuthority=(department=authorityDepartment,role=authorityRole)=>{
+   const d=String(department||"").trim().toLowerCase();
+   const r=String(role||"").trim().toLowerCase();
+   return d==="executive office"&&(r==="executive director"||r==="executive office");
+ };
  async function saveSignerAuthority(e){
    e.preventDefault();
    if(authorityBusy)return;
@@ -380,7 +385,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
      const selectedAuthority=authorityOptions.find(x=>x.role===authorityRole);
      await updateMySignerAuthority({
        authorityRole,
-       authorityStatus,
+       authorityStatus:isPermanentExecutiveAuthority()?"Current":authorityStatus,
        authorityReference,
        authorityEffectiveAt,
        authorityExpiresAt,
@@ -427,7 +432,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
    </div></div>
    <div className="form-grid">
      <label className="signature-authority-field">Department
-       <select value={authorityDepartment} onChange={e=>{setAuthorityDepartment(e.target.value);setAuthorityUnit("");setAuthorityRole("");}} required disabled={authorityBusy}>
+       <select value={authorityDepartment} onChange={e=>{const value=e.target.value;setAuthorityDepartment(value);setAuthorityUnit("");setAuthorityRole("");if(String(value||"").trim().toLowerCase()==="executive office")setAuthorityStatus("Current");}} required disabled={authorityBusy}>
          <option value="">Select registered department</option>
          {authorityDepartments.map(value=><option key={value} value={value}>{value}</option>)}
        </select>
@@ -436,6 +441,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
        <select value={authorityRole} onChange={e=>{
          const value=e.target.value;
          setAuthorityRole(value);
+         if(isPermanentExecutiveAuthority(authorityDepartment,value))setAuthorityStatus("Current");
          const selectedAuthority=authorityOptions.find(x=>x.role===value);
          setAuthorityUnit(selectedAuthority?.unit||authorityDepartment||"");
        }} required disabled={authorityBusy||!authorityDepartment}>
@@ -452,9 +458,10 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
        <small>Only capacities recorded for your authenticated Member/Employee register entries are offered. If you hold multiple registered roles, select the department first and then the applicable capacity. This prevents impersonation.</small>
      </label>
      <label className="signature-authority-field">Authority status
-       <select value={authorityStatus} onChange={e=>setAuthorityStatus(e.target.value)} disabled={authorityBusy}>
-         <option>Current</option><option>Pending Verification</option><option>Expired</option><option>Not yet assigned</option>
+       <select value={authorityStatus} onChange={e=>setAuthorityStatus(e.target.value)} disabled={authorityBusy||isPermanentExecutiveAuthority()}>
+         <option>Current</option><option>Not Applicable</option>{!isPermanentExecutiveAuthority()&&<><option>Pending Verification</option><option>Expired</option><option>Not yet assigned</option></>}
        </select>
+       <small>{isPermanentExecutiveAuthority()?"Executive Director is a permanent Executive Office authority; status remains Current.":"Select the applicable registered authority status."}</small>
      </label>
      {authorityDepartment&&authorityUnit&&authorityRole&&<label className="signature-authority-field">Authority reference / appointment no. <span className="muted">(optional)</span>
        <input value={authorityReference} onChange={e=>setAuthorityReference(e.target.value)} placeholder="Appointment / authority reference (optional)" disabled={authorityBusy}/>
