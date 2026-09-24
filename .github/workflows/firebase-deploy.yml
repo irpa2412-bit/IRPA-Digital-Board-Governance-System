@@ -128,6 +128,52 @@ jobs:
           });
           NODE
 
+      - name: Migrate retained Signature Profiles to Signer Identity records
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+        run: |
+          node <<'NODE'
+          const { initializeApp, cert } = require("firebase-admin/app");
+          const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+
+          const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+          initializeApp({ credential: cert(serviceAccount) });
+
+          (async () => {
+            const db = getFirestore();
+            const profiles = await db.collection("signatureProfiles").get();
+            const writer = db.bulkWriter();
+            let migrated = 0;
+
+            for (const profileDoc of profiles.docs) {
+              const p = profileDoc.data() || {};
+              const uid = String(p.uid || profileDoc.id).trim();
+              if (!uid) continue;
+
+              writer.set(db.collection("signerIdentities").doc(uid), {
+                uid,
+                signerProfileId: uid,
+                signerName: String(p.displayName || p.email || "Signer"),
+                email: String(p.email || ""),
+                organisationName: "Improvement of Rangeland in Pastoral Areas",
+                signatureStatus: String(p.status || "Profile Setup Required"),
+                revocationStatus: p.status === "Revoked" ? "Revoked" : "Active",
+                revocationReason: String(p.revocationReason || ""),
+                currentSignatureHash: p.signatureSha256 || null,
+                migratedFromSignatureProfile: true,
+                updatedAt: FieldValue.serverTimestamp()
+              }, { merge: true });
+              migrated += 1;
+            }
+
+            await writer.close();
+            console.log(`Retained Signature Profiles migrated into Signer Identity records: ${migrated}.`);
+          })().catch(error => {
+            console.error(error);
+            process.exit(1);
+          });
+          NODE
+
       - name: Deploy Hosting and Firestore
         uses: w9jds/firebase-action@v14.17.0
         with:
