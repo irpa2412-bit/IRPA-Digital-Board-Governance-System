@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from "react";
 import { auth } from "../firebase/config";
-import { createRecord, COLLECTIONS, getCurrentMemberProfile, getCurrentEmployeeProfile } from "../firebase/data";
+import { createRecord, getRecord, COLLECTIONS, getCurrentMemberProfile, getCurrentEmployeeProfile } from "../firebase/data";
 import { readWorkflowContext, withWorkflowLinks } from "../firebase/workflowLinks";
 import { uploadControlledDocumentRouted } from "../firebase/signatureStorage";
 
@@ -85,7 +85,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
       const now = new Date().toISOString();
       const workflowContext = readWorkflowContext();
       setMessage("Google Drive dual-channel upload complete. Registering the document…");
-      const documentId = await createRecord(COLLECTIONS.documents, withWorkflowLinks({
+      const documentPayload = withWorkflowLinks({
         title: name,
         reference: reference.trim() || documentUid,
         documentType,
@@ -122,7 +122,18 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         uploadedByEmail: auth.currentUser.email || null,
         uploadedAt: now,
         uploadedAtDisplay: new Date(now).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "medium", hour12: false })
-      }, workflowContext || {}));
+      }, workflowContext || {});
+      let documentId = "";
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
+        try {
+          documentId = await createRecord(COLLECTIONS.documents, documentPayload);
+          const persisted = await getRecord(COLLECTIONS.documents, documentId);
+          if (!persisted) throw new Error("The controlled-document register record could not be verified after creation.");
+          break;
+        } catch (error) {
+          if (attempt === 2) throw new Error(`PDF archive upload completed, but the PDF could not be saved to the IRPA controlled-document register: ${error?.message || "Firestore registration failed."}`);
+        }
+      }
 
       const doc = {
         id: documentId,
