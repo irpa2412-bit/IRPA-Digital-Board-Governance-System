@@ -20,7 +20,7 @@ assert.equal(r.reason,"NAMED_REVIEWER_REQUIRED");
 r=evaluateAuthorizationWorkflowTransition({...base,nextStatus:"Returned",effectivePermissions:["authorization.workflow.return"]});
 assert.equal(r.reason,"DECISION_REASON_REQUIRED");
 
-r=evaluateAuthorizationWorkflowTransition({...base,nextStatus:"Returned",effectivePermissions:["authorization.workflow.return"],workflow:{...base.workflow,decisionReason:"Needs correction"}});
+r=evaluateAuthorizationWorkflowTransition({...base,nextStatus:"Returned",effectivePermissions:["authorization.workflow.return"],decisionReason:"Needs correction"});
 assert.equal(r.allow,true);
 
 r=evaluateAuthorizationWorkflowTransition({...base,actor:{uid:"approver",active:true,organisation:ORGANISATION},nextStatus:"Approved",effectivePermissions:["authorization.workflow.approve"]});
@@ -29,7 +29,7 @@ assert.equal(r.allow,true);
 r=evaluateAuthorizationWorkflowTransition({...base,actor:{uid:"requester",active:true,organisation:ORGANISATION},nextStatus:"Approved",effectivePermissions:["authorization.workflow.approve"]});
 assert.equal(r.reason,"SEPARATION_OF_DUTIES_VIOLATION");
 
-r=evaluateAuthorizationWorkflowTransition({...base,actor:{uid:"approver",active:true,organisation:ORGANISATION},nextStatus:"Rejected",effectivePermissions:["authorization.workflow.reject"],workflow:{...base.workflow,decisionReason:"Insufficient justification"}});
+r=evaluateAuthorizationWorkflowTransition({...base,actor:{uid:"approver",active:true,organisation:ORGANISATION},nextStatus:"Rejected",effectivePermissions:["authorization.workflow.reject"],decisionReason:"Insufficient justification"});
 assert.equal(r.allow,true);
 
 r=evaluateAuthorizationWorkflowTransition({...base,actor:{uid:"implementer",active:true,organisation:ORGANISATION},nextStatus:"Completed",effectivePermissions:["authorization.workflow.complete"]});
