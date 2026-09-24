@@ -89,4 +89,15 @@ const whitespacePermission=evaluatePolicy({
 assert.equal(whitespacePermission.allow,true);
 
 console.log("Authorization policy denial/allow matrix passed.");
+const { OPERATIONAL_ROLE_PERMISSIONS } = require("./authorizationPolicy");
+for(const [role,permissions] of Object.entries(OPERATIONAL_ROLE_PERMISSIONS)){
+  assert.ok(role.trim(), "Operational role names must be non-empty.");
+  assert.equal(new Set(permissions).size, permissions.length, `Duplicate permissions for ${role}`);
+  for(const permission of permissions) assert.equal(validPermission(permission),true,`Unknown permission for ${role}: ${permission}`);
+}
+assert.ok(OPERATIONAL_ROLE_PERMISSIONS["Director Finance & Administration"].includes("finance.approve"));
+assert.ok(OPERATIONAL_ROLE_PERMISSIONS["Director Human Resources"].includes("member.update"));
+assert.ok(OPERATIONAL_ROLE_PERMISSIONS["Programme/Technical Officer"].includes("document.edit"));
+assert.ok(OPERATIONAL_ROLE_PERMISSIONS["Executive Director"].includes("resolution.approve"));
+console.log("Operational role permission catalogue tests passed.");
 
