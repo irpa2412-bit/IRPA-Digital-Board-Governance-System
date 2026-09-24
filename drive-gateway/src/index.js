@@ -235,8 +235,12 @@ async function upload(request, env) {
     if (folderMeta.mimeType !== "application/vnd.google-apps.folder" || folderMeta.trashed) {
       return json({ ok: false, error: "The requested IRPA archive folder is invalid." }, 409, corsHeaders(request));
     }
-    if (purpose === "Signature Profile" && (folderDescription.irpaGovernanceSignatureFolder !== true || folderDescription.ownerUid !== claims.user_id)) {
-      return json({ ok: false, error: "The member signature folder does not belong to the authenticated member." }, 403, corsHeaders(request));
+    if (purpose === "Signature Profile") {
+      const isProfileRoot = folderDescription.irpaGovernanceSignatureFolder === true;
+      const isCompletedArchive = folderDescription.irpaGovernanceSignatureProfileArchive === true;
+      if ((!isProfileRoot && !isCompletedArchive) || folderDescription.ownerUid !== claims.user_id) {
+        return json({ ok: false, error: "The requested signature archive does not belong to the authenticated member." }, 403, corsHeaders(request));
+      }
     }
     if ((purpose === "Signed Documents Archive" || purpose === "Documents Portal" || purpose === "Controlled Documents") && folderDescription.irpaGovernanceArchive !== true) {
       return json({ ok: false, error: "The requested folder is not an IRPA controlled-document archive folder." }, 403, corsHeaders(request));
