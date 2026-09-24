@@ -303,6 +303,11 @@ async function upload(request, env) {
 
 async function uploadControlledDocument(request, env) {
   const claims = await authenticateFirebaseRequest(request);
+  const { memberRecord, employeeRecord } = await getInstitutionalProfileForUser(env, claims);
+  const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
+  if (!memberRecord && !employeeRecord && !adminRecord?.fields?.active?.booleanValue) {
+    return json({ok:false,error:"An active IRPA member, employee or administrator profile is required for controlled document upload."},403,corsHeaders(request));
+  }
   const data = await request.json();
   const fileName = cleanName(data.fileName || "IRPA-governance-document.pdf");
   const contentType = String(data.contentType || "application/pdf").toLowerCase();
