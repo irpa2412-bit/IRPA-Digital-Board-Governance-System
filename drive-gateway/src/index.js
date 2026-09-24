@@ -358,6 +358,21 @@ async function ensureSignatureProfileFolder(request, env) {
     purpose: "Member Signature Profile"
   });
 
+  // Prescribed personal archive for every completed signing action by this profile.
+  // It is a child of the established Signature Profile and is never a loose folder.
+  const completedDocumentsFolderId = await findOrCreateFolder(
+    env,
+    accessToken,
+    "Completed Signed Documents",
+    folderId,
+    {
+      irpaGovernanceSignatureProfileArchive: true,
+      ownerUid: requestedUid,
+      folderUid: requestedUid,
+      purpose: "Completed Documents Signed by Profile Owner"
+    }
+  );
+
   let folderShared = false;
   if (requestedEmail) {
     folderShared = await ensureSignatureFolderPermission(env, accessToken, folderId, requestedEmail);
@@ -369,7 +384,16 @@ async function ensureSignatureProfileFolder(request, env) {
     folderId,
     folderName,
     parentFolderId: signaturesId,
-    path: `IRPA Governance System/Signaturasync function ensureDocumentArchiveFolder(request, env) {
+    completedDocumentsFolderId,
+    completedDocumentsFolderName: "Completed Signed Documents",
+    completedDocumentsFolderPath: `IRPA Governance System/Signature Profiles/${folderName}/Completed Signed Documents`,
+    completedDocumentsFolderLink: `https://drive.google.com/drive/folders/${completedDocumentsFolderId}`,
+    folderShared,
+    path: `IRPA Governance System/Signature Profiles/${folderName}`
+  }, 200, corsHeaders(request));
+}
+
+async function ensureDocumentArchiveFolder(request, env) {
   const claims = await authenticateFirebaseRequest(request);
   const data = await request.json();
   const documentId = cleanId(data.documentId || "");
