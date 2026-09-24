@@ -131,6 +131,7 @@ jobs:
       - name: Migrate retained Signature Profiles to Signer Identity records
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+          NODE_PATH: ${{ github.workspace }}/functions/node_modules
         run: |
           node <<'NODE'
           const { initializeApp, cert } = require("firebase-admin/app");
