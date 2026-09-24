@@ -74,8 +74,6 @@ export async function getMySignatureProfile(){
     authorityStatus:isLegacyPreloaded?"Legacy Profile - Review Required":undefined
   });
   return migrated;
-
-  const migrated={id:snap.id,...existing};
   await ensureMySignerIdentity(migrated,{organisationName:IRPA_ORGANISATION});
   return migrated;
 }
