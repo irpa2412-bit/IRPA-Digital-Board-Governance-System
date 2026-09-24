@@ -346,7 +346,9 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
        authorityStatus,
        authorityReference,
        authorityEffectiveAt,
-       authorityExpiresAt
+       authorityExpiresAt,
+       authorityDepartment,
+       authorityUnit
      });
      setSignerIdentity(updated);
      setMessage("SUCCESS: your current signing authority has been updated in the Signer Identity trust record.");
