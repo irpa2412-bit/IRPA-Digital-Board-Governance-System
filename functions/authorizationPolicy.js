@@ -52,6 +52,27 @@ const OPERATIONAL_ROLE_PERMISSIONS = Object.freeze({
 
 function clean(value){ return String(value ?? "").trim(); }
 
+function getOperationalRolePermissions(role){
+  const key=clean(role);
+  const permissions=OPERATIONAL_ROLE_PERMISSIONS[key];
+  return permissions ? [...permissions] : [];
+}
+
+function buildRoleProvisioningPlan({role,currentPermissions=[]}={}){
+  const requested=getOperationalRolePermissions(role);
+  const current=new Set((currentPermissions||[]).map(clean).filter(validPermission));
+  const requestedSet=new Set(requested);
+  return {
+    role:clean(role),
+    organisation:ORGANISATION,
+    requestedPermissions:requested,
+    additions:requested.filter(p=>!current.has(p)),
+    removals:[],
+    destructiveChanges:false,
+    requiresExplicitApproval:true
+  };
+}
+
 function validPermission(permission){
   return PERMISSION_SET.has(clean(permission));
 }
@@ -97,4 +118,4 @@ function evaluatePolicy({ actor, organisation, action, resource = {}, context = 
   };
 }
 
-module.exports = { ORGANISATION, PERMISSIONS, OPERATIONAL_ROLE_PERMISSIONS, validPermission, evaluatePolicy };
+module.exports = { ORGANISATION, PERMISSIONS, OPERATIONAL_ROLE_PERMISSIONS, validPermission, getOperationalRolePermissions, buildRoleProvisioningPlan, evaluatePolicy };
