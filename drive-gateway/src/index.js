@@ -789,21 +789,95 @@ async function ensureSignedDocumentArchive(request, env) {
   const archiveCategory = String(data.archiveCategory || fields.archiveCategory?.stringValue || "Administrative Documents").trim();
   const title = cleanName(data.title || fields.title?.stringValue || documentId);
   const reference = cleanName(data.reference || fields.reference?.stringValue || documentId);
+  const documentType = String(fields.documentType?.stringValue || data.documentType || "Administrative Document").trim();
+  const governanceArchive = /governance/i.test(documentType);
   const allowedCategories = ["Finance Documents","Procurement Documents","Administrative Documents"];
   const allowedClassifications = ["Public","Internal","Confidential","Restricted"];
   if (!allowedCategories.includes(archiveCategory)) return json({ok:false,error:"Invalid document archive category."},400,corsHeaders(request));
   if (!allowedClassifications.includes(classification)) return json({ok:false,error:"Invalid document access classification."},400,corsHeaders(request));
+
   const accessToken = await getDriveAccessToken(env);
   const rootId = await findOrCreateFolder(env, accessToken, "IRPA Governance System");
-  const signedRootId = await findOrCreateFolder(env, accessToken, "Signed Documents Archive", rootId, {irpaGovernanceArchive:true,purpose:"Signed Documents Archive"});
-  const categoryId = await findOrCreateFolder(env, accessToken, archiveCategory, signedRootId, {irpaGovernanceArchive:true,archiveCategory,purpose:"Signed Document Category"});
-  const classificationId = await findOrCreateFolder(env, accessToken, classification, categoryId, {irpaGovernanceArchive:true,archiveCategory,classification,purpose:"Signed Document Classification"});
+  const signedRootId = await findOrCreateFolder(env, accessToken, "Signed Documents Archive", rootId, {
+    irpaGovernanceArchive:true,
+    purpose:"Signed Documents Archive"
+  });
+  const categoryId = await findOrCreateFolder(env, accessToken, archiveCategory, signedRootId, {
+    irpaGovernanceArchive:true,
+    archiveCategory,
+    purpose:"Signed Document Category"
+  });
+  const classificationId = await findOrCreateFolder(env, accessToken, classification, categoryId, {
+    irpaGovernanceArchive:true,
+    archiveCategory,
+    classification,
+    purpose:"Signed Document Classification"
+  });
   const folderName = `IRPA-DOC-${documentId}`;
-  const folderId = await findOrCreateFolder(env, accessToken, folderName, classificationId, {irpaGovernanceArchive:true,purpose:"Signed Document",documentId,documentUid:documentId,documentTitle:title,documentReference:reference,archiveCategory,classification,publicAccess:classification==="Public"});
+  const folderId = await findOrCreateFolder(env, accessToken, folderName, classificationId, {
+    irpaGovernanceArchive:true,
+    purpose:"Signed Document",
+    documentId,
+    documentUid:documentId,
+    documentTitle:title,
+    documentReference:reference,
+    archiveCategory,
+    classification,
+    publicAccess:classification==="Public"
+  });
   if (classification==="Public") await ensureAnyoneReaderPermission(env,accessToken,folderId);
-  return json({ok:true,documentUid:documentId,folderId,archiveRootId:signedRootId,categoryId,classificationId,archiveCategory,classification,archivePath:`IRPA Governance System/Signed Documents Archive/${archiveCategory}/${classification}/${folderName}`,archiveUidLink:`https://drive.google.com/drive/folders/${folderId}`,archiveCategoryUidLink:`https://drive.google.com/drive/folders/${categoryId}`,archiveAccess:classification==="Public"?"Public":"Restricted"},200,corsHeaders(request));
-}
 
+  let governanceRootId=null;
+  let governanceClassificationId=null;
+  let governanceFolderId=null;
+  if (governanceArchive) {
+    governanceRootId = await findOrCreateFolder(env, accessToken, "Board of Directors Governance Archive", rootId, {
+      irpaGovernanceArchive:true,
+      irpaBoardGovernanceArchive:true,
+      purpose:"Board of Directors Governance Documents"
+    });
+    governanceClassificationId = await findOrCreateFolder(env, accessToken, classification, governanceRootId, {
+      irpaGovernanceArchive:true,
+      irpaBoardGovernanceArchive:true,
+      classification,
+      purpose:"Board of Directors Governance Signed Documents"
+    });
+    governanceFolderId = await findOrCreateFolder(env, accessToken, folderName, governanceClassificationId, {
+      irpaGovernanceArchive:true,
+      irpaBoardGovernanceArchive:true,
+      purpose:"Board of Directors Governance Signed Document",
+      documentId,
+      documentUid:documentId,
+      documentTitle:title,
+      documentReference:reference,
+      archiveCategory,
+      classification
+    });
+    if (classification==="Public") await ensureAnyoneReaderPermission(env,accessToken,governanceFolderId);
+  }
+
+  return json({
+    ok:true,
+    documentUid:documentId,
+    folderId,
+    archiveRootId:signedRootId,
+    categoryId,
+    classificationId,
+    archiveCategory,
+    classification,
+    archivePath:`IRPA Governance System/Signed Documents Archive/${archiveCategory}/${classification}/${folderName}`,
+    archiveUidLink:`https://drive.google.com/drive/folders/${encodeURIComponent(folderId)}`,
+    archiveCategoryUidLink:`https://drive.google.com/drive/folders/${encodeURIComponent(categoryId)}`,
+    archiveAccess:classification==="Public"?"Public":"Restricted",
+    governanceArchive:governanceFolderId ? {
+      rootId:governanceRootId,
+      classificationId:governanceClassificationId,
+      folderId:governanceFolderId,
+      archivePath:`IRPA Governance System/Board of Directors Governance Archive/${classification}/Signed Documents/${folderName}`,
+      archiveUidLink:`https://drive.google.com/drive/folders/${encodeURIComponent(governanceFolderId)}`
+    } : null
+  },200,corsHeaders(request));
+}
 
 async function ensureSignatureWorkflowFolder(request, env) {
   const claims = await authenticateFirebaseRequest(request);
