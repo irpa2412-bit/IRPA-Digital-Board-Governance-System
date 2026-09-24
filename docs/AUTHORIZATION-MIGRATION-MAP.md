@@ -146,3 +146,19 @@ Only after the central engine is proven and the module-by-module migration passe
 USERS → ROLES → PERMISSIONS → POLICY ENGINE → AUTHORIZATION DECISION → ALLOW/DENY → PROTECTED ACTION → AUDIT + NOTIFY.
 
 Until then, the current Authorization & Approvals appearance remains unchanged.
+
+## Functions integration gate — HOLD before production wiring
+
+The staged Authorization callable gateway is intentionally **not** exported from the production Functions entrypoint yet.
+
+During isolated integration verification, the frozen `functions/index.js` was parsed and found to have a pre-existing incomplete `resetTrialData` callable: the function reaches its audit write and then ends at end-of-file without its closing implementation. This is a Functions-entrypoint integrity issue, not an Authorization policy failure.
+
+Safety decision:
+- do not wire the new Authorization callables into `functions/index.js` while this defect exists;
+- do not deploy Functions;
+- preserve the existing entrypoint unchanged;
+- keep the Authorization callable gateway isolated and syntax-tested;
+- repair and independently test the frozen Functions entrypoint before the Authorization integration boundary is reopened.
+
+This prevents an Authorization migration from becoming the mechanism that introduces or masks a broader Functions deployment failure.
+
