@@ -69,10 +69,17 @@ export async function getMySignatureProfile(){
   // records are therefore read-only from this migration path: no signature
   // asset, hash, method, or status is deleted or rewritten here.
   const migrated={id:snap.id,...existing};
-  await ensureMySignerIdentity(migrated,{
-    organisationName:IRPA_ORGANISATION,
-    authorityStatus:isLegacyPreloaded?"Legacy Profile - Review Required":undefined
-  });
+  // The Signature Profile is the persistent signing specimen. Signer Identity
+  // is an additional trust record and must never be allowed to hide a valid
+  // Signature Profile after a page refresh.
+  try{
+    await ensureMySignerIdentity(migrated,{
+      organisationName:IRPA_ORGANISATION,
+      authorityStatus:isLegacyPreloaded?"Legacy Profile - Review Required":undefined
+    });
+  }catch(error){
+    console.warn("Signer Identity refresh unavailable; retained Signature Profile will still be served.",error);
+  }
   return migrated;
 }
 
