@@ -321,7 +321,7 @@ async function uploadControlledDocument(request, env) {
   const classification = String(data.classification || "Public").trim();
   const governanceArchive = data.governanceArchive !== false && /governance/i.test(documentType);
 
-  const allowedCategories = ["Finance Documents","Procurement Documents","Administrative Documents"];
+  const allowedCategories = ["Finance Documents","Procurement Documents","Governance Documents","Administrative Documents"];
   const allowedClassifications = ["Public","Internal","Confidential","Restricted"];
   if (!allowedCategories.includes(archiveCategory)) return json({ok:false,error:"Invalid document archive category."},400,corsHeaders(request));
   if (!allowedClassifications.includes(classification)) return json({ok:false,error:"Invalid document access classification."},400,corsHeaders(request));
@@ -684,7 +684,7 @@ async function ensureDocumentArchiveFolder(request, env) {
 
   const classification = String(data.classification || "Public").trim();
   const archiveCategory = String(data.archiveCategory || "Administrative Documents").trim();
-  const allowedCategories = ["Finance Documents","Procurement Documents","Administrative Documents"];
+  const allowedCategories = ["Finance Documents","Procurement Documents","Governance Documents","Administrative Documents"];
   const allowedClassifications = ["Public","Internal","Confidential","Restricted"];
   if (!allowedCategories.includes(archiveCategory)) return json({ok:false,error:"Invalid document archive category."},400,corsHeaders(request));
   if (!allowedClassifications.includes(classification)) return json({ok:false,error:"Invalid document access classification."},400,corsHeaders(request));
@@ -798,7 +798,7 @@ async function ensureSignedDocumentArchive(request, env) {
   const reference = cleanName(data.reference || fields.reference?.stringValue || documentId);
   const documentType = String(fields.documentType?.stringValue || data.documentType || "Administrative Document").trim();
   const governanceArchive = /governance/i.test(documentType);
-  const allowedCategories = ["Finance Documents","Procurement Documents","Administrative Documents"];
+  const allowedCategories = ["Finance Documents","Procurement Documents","Governance Documents","Administrative Documents"];
   const allowedClassifications = ["Public","Internal","Confidential","Restricted"];
   if (!allowedCategories.includes(archiveCategory)) return json({ok:false,error:"Invalid document archive category."},400,corsHeaders(request));
   if (!allowedClassifications.includes(classification)) return json({ok:false,error:"Invalid document access classification."},400,corsHeaders(request));
