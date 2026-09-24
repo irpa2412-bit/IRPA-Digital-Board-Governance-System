@@ -320,7 +320,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
    for(const record of sourceEntries){
      const sourceCollection=record.sourceCollection||"register";
      const department=String(record.department||"").trim();
-     const unit=String(record.unit||record.unitName||record.boardPosition||"").trim();
+     const unit=String(record.unit||record.unitName||"").trim();
      const values=[
        record.role,record.boardPosition,
        ...(Array.isArray(record.roles)?record.roles:[]),
