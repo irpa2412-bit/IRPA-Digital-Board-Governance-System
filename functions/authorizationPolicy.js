@@ -87,6 +87,21 @@ const OPERATIONAL_DEPARTMENT_ACCESS = Object.freeze({
   "Field": ["Field Department"]
 });
 
+function validateInstitutionalRoleRecord(record={}){
+  const status=clean(record.status||record.employmentStatus);
+  const role=clean(record.role);
+  const department=clean(record.department);
+  return {
+    active: status==="Active",
+    role,
+    department,
+    recognisedRole: !!OPERATIONAL_ROLE_PERMISSIONS[role],
+    recognisedDepartment: Object.prototype.hasOwnProperty.call(OPERATIONAL_DEPARTMENT_ACCESS,department),
+    provisionable: status==="Active" && !!OPERATIONAL_ROLE_PERMISSIONS[role],
+    reason: status!=="Active"?"INSTITUTIONAL_RECORD_NOT_ACTIVE":!OPERATIONAL_ROLE_PERMISSIONS[role]?"ROLE_NOT_IN_CONTROLLED_CATALOG":"READY_FOR_EXPLICIT_PROVISIONING"
+  };
+}
+
 function buildDepartmentalProvisioningPlan({currentByRole={}}={}){
   const departments={};
   for(const [department,roles] of Object.entries(OPERATIONAL_DEPARTMENT_ACCESS)){
@@ -149,4 +164,4 @@ function evaluatePolicy({ actor, organisation, action, resource = {}, context = 
   };
 }
 
-module.exports = { ORGANISATION, PERMISSIONS, OPERATIONAL_ROLE_PERMISSIONS, OPERATIONAL_DEPARTMENT_ACCESS, validPermission, getOperationalRolePermissions, buildRoleProvisioningPlan, buildDepartmentalProvisioningPlan, evaluatePolicy };
+module.exports = { ORGANISATION, PERMISSIONS, OPERATIONAL_ROLE_PERMISSIONS, OPERATIONAL_DEPARTMENT_ACCESS, validPermission, getOperationalRolePermissions, buildRoleProvisioningPlan, buildDepartmentalProvisioningPlan, validateInstitutionalRoleRecord, evaluatePolicy };
