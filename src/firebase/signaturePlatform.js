@@ -65,18 +65,14 @@ export async function getMySignatureProfile(){
       updatedAt:serverTimestamp()
     };
     await updateDoc(profileRef,cleanup);
-    return{
-      id:snap.id,
-      ...existing,
-      signaturePath:null,
-      signatureUrl:null,
-      signatureSha256:null,
-      method:"Awaiting Handwritten Signature",
-      status:"Profile Setup Required"
-    };
+    const migrated={id:snap.id,...existing,signaturePath:null,signatureUrl:null,signatureSha256:null,method:"Awaiting Handwritten Signature",status:"Profile Setup Required"};
+    await ensureMySignerIdentity(migrated,{organisationName:IRPA_ORGANISATION});
+    return migrated;
   }
 
-  return{id:snap.id,...existing};
+  const migrated={id:snap.id,...existing};
+  await ensureMySignerIdentity(migrated,{organisationName:IRPA_ORGANISATION});
+  return migrated;
 }
 
 export async function saveMySignatureProfile({signatureFile,initialsFile,displayName,initials,method="Upload"}){
