@@ -796,3 +796,12 @@ exports.resetTrialData = onCall({region:"us-central1"}, async request => {
     status:"Started",
     createdAt:FieldValue.serverTimestamp()
   });
+
+// Authorization Central Service — staged integration boundary.
+// These callables are exported here only after the isolated policy/service tests
+// have passed. No client module is wired to them by this migration stage.
+const authorizationCallables = require("./authorizationFunctions");
+exports.authorizeAction = authorizationCallables.authorizeAction;
+exports.grantAuthorizationPermission = authorizationCallables.grantAuthorizationPermission;
+exports.revokeAuthorizationPermission = authorizationCallables.revokeAuthorizationPermission;
+exports.getEffectiveAuthorizationPermissions = authorizationCallables.getEffectiveAuthorizationPermissions;
