@@ -373,6 +373,9 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
  const authorityOptions=useMemo(()=>{
    const department=String(authorityDepartment||"").trim().toLowerCase();
    if(department==="board of directors"){
+     // Board capacity is a fixed four-choice institutional selector.
+     // Never derive these four labels from register records here: doing so can
+     // duplicate a legacy "Board Chairperson" record and hide the Vice Chairperson.
      return [
        {role:"Board Chairperson",unit:"Board of Directors",sourceCollection:"governance",sourceRecordId:"board-chairperson"},
        {role:"Board Vice Chairperson",unit:"Board of Directors",sourceCollection:"governance",sourceRecordId:"board-vice-chairperson"},
