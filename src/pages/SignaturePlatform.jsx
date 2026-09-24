@@ -355,8 +355,17 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
  },[authorityRegisterRecords,authorityDepartment]);
  const authorityDisplayLabel=(role,department=authorityDepartment)=>{
    const normalized=String(role||"").trim().toLowerCase().replace(/[_-]+/g," ").replace(/\s+/g," ");
-   if(String(department||"").trim().toLowerCase()==="board of directors" && /(^| )chairperson$|^board chairperson$|^chairman$|^chairwoman$/.test(normalized)) return "Board Chairperson";
+   if(String(department||"").trim().toLowerCase()==="board of directors"){
+     if(/(^| )chairperson$|^board chairperson$|^chairman$|^chairwoman$/.test(normalized)) return "Board Chairperson";
+     if(/(^| )board secretary$|^secretary$/.test(normalized)) return "Board Secretary";
+   }
    return role;
+ };
+ const authorityCapacityPriority=(role,department=authorityDepartment)=>{
+   const label=authorityDisplayLabel(role,department);
+   if(label==="Board Chairperson")return 0;
+   if(label==="Board Secretary")return 1;
+   return 2;
  };
  async function saveSignerAuthority(e){
    e.preventDefault();
@@ -434,9 +443,9 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
          {authorityOptions
            .slice()
            .sort((a,b)=>{
-             const aChair=authorityDisplayLabel(a.role,a.department||authorityDepartment)==="Board Chairperson";
-             const bChair=authorityDisplayLabel(b.role,b.department||authorityDepartment)==="Board Chairperson";
-             return Number(bChair)-Number(aChair)||a.role.localeCompare(b.role);
+             const aPriority=authorityCapacityPriority(a.role,a.department||authorityDepartment);
+             const bPriority=authorityCapacityPriority(b.role,b.department||authorityDepartment);
+             return aPriority-bPriority||a.role.localeCompare(b.role);
            })
            .map(option=><option key={option.sourceCollection+"|"+option.sourceRecordId+"|"+option.role} value={option.role}>{authorityDisplayLabel(option.role,option.department||authorityDepartment)}</option>)}
        </select>
