@@ -85,7 +85,7 @@ exports.updateSignerAuthority = onCall({region:"us-central1"}, async request => 
   if(!uniqueRecords.length) throw new HttpsError("permission-denied","No active IRPA member or employee register entry was found for this account.");
 
   const valuesFor=record=>[
-    record.role,record.boardPosition,
+    record.role,record.boardPosition,record.unit,record.unitName,
     ...(Array.isArray(record.roles)?record.roles:[]),
     ...(Array.isArray(record.assignedRoles)?record.assignedRoles:[]),
     ...(Array.isArray(record.selectedRoles)?record.selectedRoles:[]),
@@ -100,7 +100,7 @@ exports.updateSignerAuthority = onCall({region:"us-central1"}, async request => 
     if(!valuesFor(record).includes(requestedRole)) return false;
     if(requestedDepartment&&String(record.department||"").trim()!==requestedDepartment) return false;
     if(requestedUnit){
-      const recordUnit=String(record.unit||record.unitName||record.boardPosition||"").trim();
+      const recordUnit=String(record.unit||record.unitName||"").trim()||authorityDepartment||requestedDepartment;
       if(recordUnit!==requestedUnit) return false;
     }
     return true;
@@ -109,7 +109,7 @@ exports.updateSignerAuthority = onCall({region:"us-central1"}, async request => 
     throw new HttpsError("permission-denied","The selected department, unit and signing authority do not match an active IRPA register entry for this account.");
   const source=matchingRecords[0];
   const authorityDepartment=String(source.department||"").trim();
-  const authorityUnit=String(source.unit||source.unitName||source.boardPosition||"").trim();
+  const authorityUnit=String(source.unit||source.unitName||"").trim()||authorityDepartment;
 
   const identityRef=db.collection("signerIdentities").doc(uid);
   const identitySnap=await identityRef.get();
