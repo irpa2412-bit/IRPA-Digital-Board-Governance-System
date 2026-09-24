@@ -6,7 +6,7 @@ const { ORGANISATION, PERMISSIONS, validPermission, evaluatePolicy } = require("
 const db = getFirestore();
 const auth = getAuth();
 
-function clean(value){ return String(value ?? "").trim(); }
+const DEFAULT_ROLE_PERMISSIONS = Object.freeze({\n  Administrator: ["authorization.permission.view","authorization.permission.grant","authorization.permission.revoke"]\n});\n\nfunction clean(value){ return String(value ?? "").trim(); }
 function lower(value){ return clean(value).toLowerCase(); }
 function stableJson(value){
   if(Array.isArray(value)) return value.map(stableJson);
