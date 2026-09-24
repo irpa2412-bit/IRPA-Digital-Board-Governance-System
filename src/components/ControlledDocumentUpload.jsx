@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from "react";
 import { auth } from "../firebase/config";
 import { createRecord, COLLECTIONS, getCurrentMemberProfile, getCurrentEmployeeProfile } from "../firebase/data";
 import { readWorkflowContext, withWorkflowLinks } from "../firebase/workflowLinks";
-import { uploadBytes, ref, ensureDocumentArchiveFolder } from "../firebase/signatureStorage";
+import { uploadControlledDocumentRouted } from "../firebase/signatureStorage";
 
 export default function ControlledDocumentUpload({ purpose = "Controlled Document", onUploaded }) {
   const [file, setFile] = useState(null);
@@ -70,20 +70,21 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
 
       const name = (title.trim() || file.name.replace(/\.pdf$/i, "")).slice(0, 160);
       const documentUid = `IRPA-DOC-${crypto.randomUUID()}`;
-      setMessage("Creating the Google Drive archive location…");
-      const archive = await ensureDocumentArchiveFolder({documentId: documentUid,title:name,reference:reference.trim()||documentUid,archiveCategory,classification});
-      const target = ref(null, `document-archives/${archiveCategory}/${classification}/${documentUid}/${name}.pdf`);
-      setMessage("Uploading PDF to Google Drive…");
-      const uploaded = await uploadBytes(target, file, {
-        contentType: "application/pdf",
-        purpose,
-        folderId: archive.folderId,
-        ownerUid: auth.currentUser.uid
+      setMessage("Routing the PDF into its selected archive and Board of Directors Governance archive…");
+      const routed = await uploadControlledDocumentRouted({
+        documentId: documentUid,
+        title: name,
+        reference: reference.trim() || documentUid,
+        documentType,
+        archiveCategory,
+        classification,
+        file
       });
-
+      const archive = routed.categoryArchive;
+      const governanceArchive = routed.governanceArchive;
       const now = new Date().toISOString();
       const workflowContext = readWorkflowContext();
-      setMessage("Google Drive upload complete. Registering the document…");
+      setMessage("Google Drive dual-channel upload complete. Registering the document…");
       const documentId = await createRecord(COLLECTIONS.documents, withWorkflowLinks({
         title: name,
         reference: reference.trim() || documentUid,
@@ -95,14 +96,22 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         archiveFolderId: archive.folderId,
         archiveUidLink: archive.archiveUidLink,
         archivePath: archive.archivePath,
-        archiveAccess: archive.archiveAccess,
+        archiveAccess: archive.archiveAccess || (classification === "Public" ? "Public" : "Restricted"),
+        archiveFileId: archive.file?.fileId || null,
+        archiveFileWebViewLink: archive.file?.webViewLink || null,
+        governanceArchiveFolderId: governanceArchive?.folderId || null,
+        governanceArchiveUidLink: governanceArchive?.archiveUidLink || null,
+        governanceArchivePath: governanceArchive?.archivePath || null,
+        governanceArchiveFileId: governanceArchive?.file?.fileId || null,
+        governanceArchiveFileWebViewLink: governanceArchive?.file?.webViewLink || null,
+        governanceArchiveStatus: governanceArchive ? "Routed" : "Not Required",
         recordOrigin: "PRODUCTION",
         fileName: file.name,
-        fileId: target.fileId,
+        fileId: archive.file?.fileId || null,
         storageProvider: "Google Drive",
-        storagePath: target.path,
-        webViewLink: uploaded.metadata?.webViewLink || null,
-        fileUrl: target.fileId ? `drive://${target.fileId}` : null,
+        storagePath: `document-archives/${archiveCategory}/${classification}/${documentUid}/${file.name}`,
+        webViewLink: archive.file?.webViewLink || null,
+        fileUrl: archive.file?.fileId ? `drive://${archive.file.fileId}` : null,
         contentType: "application/pdf",
         fileSize: file.size,
         purpose,
@@ -138,7 +147,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         authorizedUids: [auth.currentUser.uid]
       };
 
-      setMessage(`Document uploaded successfully to Google Drive: ${name}.`);
+      setMessage(`Document uploaded successfully to Google Drive: ${name}. Primary category and Board of Directors Governance archive routing completed.`);
       setFile(null);
       setTitle("");
       setReference("");
