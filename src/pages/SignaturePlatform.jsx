@@ -382,8 +382,10 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
  const authorityCapacityPriority=(role,department=authorityDepartment)=>{
    const label=authorityDisplayLabel(role,department);
    if(label==="Board Chairperson")return 0;
-   if(label==="Board Secretary")return 1;
-   return 2;
+   if(label==="Board Vice Chairperson")return 1;
+   if(label==="Board Secretary")return 2;
+   if(label==="Board Members")return 3;
+   return 4;
  };
  const isPermanentExecutiveAuthority=(department=authorityDepartment,role=authorityRole)=>{
    const d=String(department||"").trim().toLowerCase();
