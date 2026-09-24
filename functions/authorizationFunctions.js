@@ -59,7 +59,6 @@ exports.getEffectiveAuthorizationPermissions = onCall({region:"us-central1"}, as
   if(!actorUid) throw new HttpsError("unauthenticated","Authentication is required.");
   try {
     const targetUid=String(request.data?.targetUid||"").trim();
-    if(targetUid && targetUid!==actorUid) await listPermissions({actorUid,targetUid});
     return await listPermissions({actorUid,targetUid:targetUid||actorUid});
   } catch(error) {
     throw new HttpsError("permission-denied",error?.message||"Permission register access was denied.");
