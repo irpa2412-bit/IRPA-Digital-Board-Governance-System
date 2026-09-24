@@ -911,8 +911,9 @@ exports.resetTrialData = onCall({region:"us-central1"}, async request => {
     let employeesDeleted=0;
     for(const d of trialMembers){await d.ref.delete();membersDeleted++;}
     for(const d of trialEmployees){await d.ref.delete();employeesDeleted++;}
-    await db.collection("employeeCounters").doc("employees").set({currentNumber:0,nextNumber:1,updatedAt:FieldValue.serverTimestamp(),source:"administrator-trial-reset"},{merge:true});
-    await db.collection("memberCounters").doc("members").set({currentNumber:0,nextNumber:1,updatedAt:FieldValue.serverTimestamp(),source:"administrator-trial-reset"},{merge:true});
+    // Trial resets must never rewrite production numbering counters. Existing production
+    // counters are intentionally preserved; the next registration continues from the
+    // established sequence rather than being recycled to 1.
     await auditRef.update({status:"Completed",membersDeleted,employeesDeleted,completedAt:FieldValue.serverTimestamp()});
     return {success:true,membersDeleted,employeesDeleted,trialOnly:true,boardMembersPreserved:true};
   }catch(error){
