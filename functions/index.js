@@ -102,6 +102,48 @@ async function deleteCollectionDocs(collectionName){
 }
 
 
+async function requirePrimaryAdministratorCallable(request){
+  const uid=request.auth?.uid;
+  const email=String(request.auth?.token?.email||"").trim().toLowerCase();
+  if(!uid) throw new HttpsError("unauthenticated","Administrator authentication is required.");
+  if(email==="irpa2412@gmail.com" || request.auth?.token?.admin===true) return {uid,email};
+  throw new HttpsError("permission-denied","Primary administrator authorization is required.");
+}
+
+exports.setAdministratorAccess = onCall({region:"us-central1"}, async request => {
+  const actor=await requirePrimaryAdministratorCallable(request);
+  const targetEmail=String(request.data?.email||"").trim().toLowerCase();
+  const enabled=request.data?.enabled===true;
+  const reason=String(request.data?.reason||"").trim();
+  if(!targetEmail || !targetEmail.includes("@")) throw new HttpsError("invalid-argument","A valid administrator email is required.");
+  if(!reason) throw new HttpsError("invalid-argument","A reason is required for administrator access changes.");
+  if(targetEmail==="irpa2412@gmail.com" && enabled===false) throw new HttpsError("failed-precondition","The designated primary administrator cannot be disabled by this workflow.");
+  const authAdmin=getAuth();
+  let target;
+  try { target=await authAdmin.getUserByEmail(targetEmail); }
+  catch(error) {
+    if(error?.code==="auth/user-not-found") throw new HttpsError("not-found","The target administrator must already have a Firebase Authentication account.");
+    throw error;
+  }
+  const existingClaims=target.customClaims||{};
+  const nextClaims={...existingClaims,admin:enabled};
+  if(!enabled) delete nextClaims.irpaRoles;
+  await authAdmin.setCustomUserClaims(target.uid,nextClaims);
+  await db.collection("adminProfiles").doc(target.uid).set({
+    uid:target.uid,email:targetEmail,active:enabled,role:"Administrator",
+    accessSource:"Server-controlled administrator access",
+    changedByUid:actor.uid,changedByEmail:actor.email,
+    changeReason:reason,updatedAt:FieldValue.serverTimestamp()
+  },{merge:true});
+  await db.collection("audit").add({
+    action:enabled?"ADMINISTRATOR_ACCESS_GRANTED":"ADMINISTRATOR_ACCESS_REVOKED",
+    collection:"adminProfiles",recordId:target.uid,
+    details:{targetEmail,enabled,reason,serverControlled:true},
+    actorUid:actor.uid,actorEmail:actor.email,createdAt:FieldValue.serverTimestamp()
+  });
+  return {ok:true,uid:target.uid,email:targetEmail,enabled};
+});
+
 async function requireActiveAdministratorCallable(request){
   const uid=request.auth?.uid;
   const email=String(request.auth?.token?.email||"").trim().toLowerCase();
