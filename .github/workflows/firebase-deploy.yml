@@ -82,6 +82,77 @@ jobs:
           });
           NODE
 
+      - name: Synchronize server-controlled authorization claims
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+          NODE_PATH: ${{ github.workspace }}/functions/node_modules
+        run: |
+          node <<'NODE'
+          const { initializeApp, cert } = require("firebase-admin/app");
+          const { getAuth } = require("firebase-admin/auth");
+          const { getFirestore } = require("firebase-admin/firestore");
+          const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+          initializeApp({ credential: cert(serviceAccount) });
+          (async () => {
+            const db = getFirestore();
+            const auth = getAuth();
+            const rolesByUid = new Map();
+            const addRoles = (uid, data) => {
+              if (!uid) return;
+              const values = [
+                data?.role,
+                ...(Array.isArray(data?.roles) ? data.roles : []),
+                ...(Array.isArray(data?.assignedRoles) ? data.assignedRoles : []),
+                ...(Array.isArray(data?.selectedRoles) ? data.selectedRoles : []),
+                ...(Array.isArray(data?.roleAssignments) ? data.roleAssignments : [])
+              ].flatMap(v => String(v || "").split(",").map(x => x.trim()).filter(Boolean));
+              const existing = rolesByUid.get(uid) || new Set();
+              values.forEach(v => existing.add(v));
+              rolesByUid.set(uid, existing);
+            };
+            for (const collection of ["members","employees"]) {
+              const snap = await db.collection(collection).get();
+              for (const doc of snap.docs) {
+                const data = doc.data() || {};
+                const uid = String(data.uid || doc.id || "").trim();
+                const active = String(data.status || data.employmentStatus || data.registrationStatus || "").toLowerCase();
+                if (uid && active !== "inactive" && active !== "disabled") addRoles(uid, data);
+              }
+            }
+            const adminSnap = await db.collection("adminProfiles").get();
+            const adminUids = new Set();
+            for (const doc of adminSnap.docs) {
+              const data = doc.data() || {};
+              if (data.active === true && doc.id) adminUids.add(doc.id);
+            }
+            let updated = 0;
+            for (const [uid, roleSet] of rolesByUid.entries()) {
+              try {
+                const user = await auth.getUser(uid);
+                const previous = user.customClaims || {};
+                const claims = { ...previous, irpaRoles: [...roleSet].slice(0, 60) };
+                if (adminUids.has(uid) || String(user.email || "").toLowerCase() === "irpa2412@gmail.com") claims.admin = true;
+                else delete claims.admin;
+                await auth.setCustomUserClaims(uid, claims);
+                updated++;
+              } catch (error) {
+                console.warn("Authorization claim synchronization skipped", uid, error.message);
+              }
+            }
+            for (const uid of adminUids) {
+              if (rolesByUid.has(uid)) continue;
+              try {
+                const user = await auth.getUser(uid);
+                await auth.setCustomUserClaims(uid, { ...(user.customClaims || {}), admin: true });
+                updated++;
+              } catch (error) {
+                console.warn("Administrator claim synchronization skipped", uid, error.message);
+              }
+            }
+            console.log(`SERVER_CONTROLLED_AUTH_CLAIMS_SYNCHRONIZED: ${updated}`);
+          })().catch(error => { console.error(error); process.exit(1); });
+          NODE
+
       - name: Verify configured administrator authorization
         run: echo "Primary administrator and approved additional administrator accounts are bootstrapped above; no hard-coded administrator revocation is performed during deployment."
 
