@@ -2692,9 +2692,9 @@
     gap:8px!important;
   }
   .content-area.dashboard-content-area .mobile-quote1-top img{
-    width:48px!important;height:48px!important;min-width:48px!important;object-fit:contain!important;
-    display:block!important;padding:2px!important;border-radius:50%!important;background:#fff!important;
-    box-shadow:0 2px 8px rgba(0,0,0,.14)!important;
+    width:62px!important;height:50px!important;min-width:62px!important;object-fit:contain!important;
+    display:block!important;padding:0!important;border-radius:0!important;background:transparent!important;
+    box-shadow:none!important;
   }
   .content-area.dashboard-content-area .mobile-quote1-top>div{
     min-width:0!important;display:flex!important;flex:1 1 auto!important;flex-direction:column!important;
