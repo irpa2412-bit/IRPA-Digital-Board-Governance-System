@@ -47,10 +47,10 @@ function Dashboard({user,admin,employee,profile,onNavigate}){
  useEffect(()=>{let live=true;(async()=>{
    try{
     if(admin){
-      const names=[COLLECTIONS.employees,COLLECTIONS.members,COLLECTIONS.meetings,COLLECTIONS.authorizationRequests,COLLECTIONS.actions,COLLECTIONS.risks];
+      const names=[COLLECTIONS.employees,COLLECTIONS.members,COLLECTIONS.meetings,COLLECTIONS.authorizationRequests,COLLECTIONS.actions,COLLECTIONS.risks,COLLECTIONS.reports];
       const v=await Promise.all(names.map(n=>getRecords(n).catch(()=>[])));
       if(live){
-       setStats({employees:v[0].length,members:v[1].length,meetings:v[2].length,authorizations:v[3].filter(x=>["Submitted","Under Review"].includes(x.status)).length,actions:v[4].filter(x=>!["Completed","Cancelled"].includes(x.status)).length,risks:v[5].filter(x=>!["Closed","Mitigated"].includes(x.status)).length,payments:0,signatures:0,reports:v[0].length?0:0});
+       setStats({employees:v[0].length,members:v[1].length,meetings:v[2].length,authorizations:v[3].filter(x=>["Submitted","Under Review"].includes(x.status)).length,actions:v[4].filter(x=>!["Completed","Cancelled"].includes(x.status)).length,risks:v[5].filter(x=>!["Closed","Mitigated"].includes(x.status)).length,payments:0,signatures:0,reports:v[6].filter(x=>!["Archived"].includes(x.status)).length});
        const rows=[...v[3].map(x=>({...x,_kind:"Authorization"})),...v[2].map(x=>({...x,_kind:"Meeting"})),...v[4].map(x=>({...x,_kind:"Action"}))];
        setActivity(rows.sort((a,b)=>String(b.updatedAt||b.createdAt||b.date||"").localeCompare(String(a.updatedAt||a.createdAt||a.date||""))).slice(0,5));
       }
