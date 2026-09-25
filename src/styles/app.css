@@ -3600,3 +3600,36 @@ body{
     font-size:11px!important;
   }
 }
+
+
+/* IRPA READABILITY FIX — UNIFIED CONTROL NAVIGATION — 2026-09-25 */
+.module-interlink-bar .module-interlink-list > button,
+.module-interlink-bar .workflow-portal-parent,
+.module-interlink-bar .workflow-portal-children button{
+  background:#0b5fa8!important;
+  background-color:#0b5fa8!important;
+  background-image:none!important;
+  color:#ffffff!important;
+  border:1px solid #2f86cf!important;
+  text-shadow:none!important;
+  font-size:13px!important;
+  line-height:1.35!important;
+  font-weight:800!important;
+  min-height:42px!important;
+  padding:9px 13px!important;
+}
+.module-interlink-bar .module-interlink-list > button:hover,
+.module-interlink-bar .module-interlink-list > button.active,
+.module-interlink-bar .workflow-portal-parent:hover,
+.module-interlink-bar .workflow-portal-parent.active,
+.module-interlink-bar .workflow-portal-children button:hover,
+.module-interlink-bar .workflow-portal-children button.active{
+  background:#0b5fa8!important;
+  background-color:#0b5fa8!important;
+  color:#ffffff!important;
+  border-color:#ffffff!important;
+}
+.module-interlink-bar .workflow-portal-group{
+  background:#e5f3eb!important;
+  border-color:#b9d8c5!important;
+}
