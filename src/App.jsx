@@ -105,13 +105,6 @@ function Dashboard({user,admin,employee,profile,onNavigate}){
         <path fill="#1B4332" d="M0 259c70-12 143-9 210 4 70 13 127 8 191-6 76-17 141-14 207 2 65 16 128 15 192-1v22H0Z"/>
       </svg>
       <div className="mobile-quote1-shade"></div>
-      <div className="mobile-quote1-top">
-        <img src="/irpa-brand.svg" alt="IRPA"/>
-
-        
-        <div><strong>IMPROVEMENT OF RANGELAND</strong><small>IN PASTORAL AREAS</small></div>
-        <button type="button" onClick={()=>go("Alerts")} aria-label="Notifications" className="mobile-quote1-notification"><i className="fa-solid fa-bell" aria-hidden="true"></i><b>1</b></button>
-      </div>
       <div className="mobile-quote1-user"><div className="mobile-quote1-photo">{photo?<img src={photo} alt={displayName}/>:<span>{initials}</span>}</div><div><span>GOOD MORNING,</span><h1>{displayName}</h1><p>{profileTitle}{registrationNo?" · "+registrationNo:""}</p><em>{admin?"Administrator":profileTitle}</em></div></div>
     </section>
     <section className="mobile-quote1-stats">{cards.map(([label,value,sub,target])=><button key={label} type="button" onClick={()=>go(target)}><span>{iconFor(label)}</span><strong>{busy?"—":value}</strong><b>{label}</b><small>{sub}</small><i>›</i></button>)}</section>
