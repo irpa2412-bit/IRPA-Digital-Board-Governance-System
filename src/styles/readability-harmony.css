@@ -889,6 +889,11 @@ textarea:focus-visible{
     top:auto!important;
     min-width:0!important;
   }
+  .desktop-date-card.open-portal-panel > span,
+  .desktop-date-card.open-portal-panel > strong,
+  .desktop-date-card.open-portal-panel > small{
+    display:none!important;
+  }
 }
 
 
