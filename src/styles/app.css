@@ -3111,3 +3111,26 @@
   .mobile-nav-sheet{position:fixed!important;top:calc(72px + env(safe-area-inset-top))!important;bottom:auto!important;z-index:10001!important;max-height:calc(100vh - 84px - env(safe-area-inset-top))!important}
   .dashboard-content-area{padding-bottom:24px!important}
 }
+
+/* IRPA MOBILE BLUE WORKSPACE + WHITE NAVIGATION LABELS */
+@media(max-width:760px){
+  .dashboard-content-area{background:linear-gradient(180deg,#0b5fa8 0%,#0a4f8d 55%,#083f73 100%)!important;color:#fff!important}
+  .dashboard-content-area .dashboard-command{background:transparent!important;color:#fff!important}
+  .mobile-quote1-stats>button{background:#082f55!important;color:#fff!important;border:1px solid rgba(255,255,255,.22)!important;box-shadow:0 6px 18px rgba(0,20,50,.28)!important}
+  .mobile-quote1-stats>button:hover,.mobile-quote1-stats>button:focus-visible{background:#0b3e6d!important;border-color:rgba(255,255,255,.55)!important}
+  .mobile-quote1-stats>button>strong,.mobile-quote1-stats>button>b,.mobile-quote1-stats>button>small{color:#fff!important}
+  .mobile-quote1-stats>button>i{color:#fff!important}
+  .mobile-quote1-quick{color:#fff!important}
+  .mobile-quote1-heading h2{color:#fff!important}
+  .mobile-quote1-heading>button{background:#082f55!important;color:#fff!important;border:1px solid rgba(255,255,255,.3)!important}
+  .mobile-quote1-grid>button{background:#082f55!important;color:#fff!important;border:1px solid rgba(255,255,255,.22)!important;box-shadow:0 6px 18px rgba(0,20,50,.28)!important}
+  .mobile-quote1-grid>button:hover,.mobile-quote1-grid>button:focus-visible{background:#0b3e6d!important;border-color:rgba(255,255,255,.55)!important}
+  .mobile-quote1-grid>button>strong{color:#fff!important;text-shadow:0 1px 2px rgba(0,0,0,.3)}
+  .mobile-global-nav{background:#062b4c!important;border-bottom-color:rgba(255,255,255,.22)!important}
+  .mobile-global-nav button,.mobile-global-nav button b{color:#fff!important}
+  .mobile-global-nav button.active{color:#fff!important;background:#0b5fa8!important;box-shadow:inset 0 3px #fff!important}
+  .mobile-nav-sheet{background:#062b4c!important;border-color:rgba(255,255,255,.25)!important}
+  .mobile-nav-sheet-header{color:#fff!important;border-bottom-color:rgba(255,255,255,.2)!important}
+  .mobile-nav-sheet-header button,.mobile-nav-sheet-list button{color:#fff!important;background:#0b3e6d!important;border-color:rgba(255,255,255,.2)!important}
+  .mobile-nav-sheet-list button b{color:#fff!important}
+}
