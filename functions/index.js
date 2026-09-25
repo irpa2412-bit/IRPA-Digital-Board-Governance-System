@@ -601,7 +601,7 @@ exports.sendMemberInvitation = onCall({region:"us-central1"}, async request => {
   const invitationSecret=crypto.randomBytes(32).toString("base64url");
   const invitationSecretHash=crypto.createHash("sha256").update(invitationSecret).digest("hex");
   const invitationExpiresAt=new Date(Date.now()+72*60*60*1000);
-  const invitationUrl=origin+"/?invitationToken="+encodeURIComponent(invitationId+"."+invitationSecret");
+  const invitationUrl=origin+"/?invitationToken="+encodeURIComponent(invitationId+"."+invitationSecret);
   const subscriptionLink=invitationUrl;
   const assistanceLink=origin+"/?induction=1&applicant=1&route=assistance&memberInvite="+encodeURIComponent(invitationId);
   const loginLink=origin+"/?induction=1&applicant=1&route=login";
