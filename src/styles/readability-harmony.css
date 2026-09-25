@@ -890,3 +890,60 @@ textarea:focus-visible{
     min-width:0!important;
   }
 }
+
+
+/* DASHBOARD BUTTON ICON VISIBILITY — 2026-09-25
+   Give every dashboard action/stat icon a dedicated high-contrast surface so
+   the symbol remains immediately visible against the IRPA blue buttons. */
+@media screen and (min-width:761px){
+  .dashboard-desktop-view .dashboard-quote4-stats .quote4-stat-icon{
+    display:grid!important;
+    place-items:center!important;
+    background:#ffffff!important;
+    color:#0b5fa8!important;
+    border:2px solid rgba(255,255,255,.92)!important;
+    box-shadow:0 2px 7px rgba(0,0,0,.18)!important;
+    text-shadow:none!important;
+    opacity:1!important;
+  }
+  .dashboard-desktop-view .dashboard-quote4-stats .quote4-stat-icon i{
+    color:#0b5fa8!important;
+    opacity:1!important;
+    text-shadow:none!important;
+  }
+  .dashboard-desktop-view .quote4-quick-grid>button>span{
+    display:grid!important;
+    place-items:center!important;
+    width:46px!important;
+    height:46px!important;
+    min-width:46px!important;
+    border-radius:11px!important;
+    background:#ffffff!important;
+    color:#0b5fa8!important;
+    border:2px solid rgba(255,255,255,.92)!important;
+    box-shadow:0 2px 7px rgba(0,0,0,.18)!important;
+    font-size:23px!important;
+    line-height:1!important;
+    opacity:1!important;
+    text-shadow:none!important;
+  }
+  .dashboard-desktop-view .quote4-quick-grid>button>span i{
+    color:#0b5fa8!important;
+    opacity:1!important;
+    text-shadow:none!important;
+  }
+  .dashboard-desktop-view .desktop-blue-nav-button:hover .quote4-stat-icon,
+  .dashboard-desktop-view .desktop-blue-nav-button:focus-visible .quote4-stat-icon,
+  .dashboard-desktop-view .quote4-quick-grid>button:hover>span,
+  .dashboard-desktop-view .quote4-quick-grid>button:focus-visible>span{
+    background:#f7fbff!important;
+    color:#084f8d!important;
+    border-color:#f4d474!important;
+  }
+  .dashboard-desktop-view .desktop-blue-nav-button:hover .quote4-stat-icon i,
+  .dashboard-desktop-view .desktop-blue-nav-button:focus-visible .quote4-stat-icon i,
+  .dashboard-desktop-view .quote4-quick-grid>button:hover>span i,
+  .dashboard-desktop-view .quote4-quick-grid>button:focus-visible>span i{
+    color:#084f8d!important;
+  }
+}
