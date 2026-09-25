@@ -1175,3 +1175,123 @@ textarea:focus-visible{
     min-width:160px!important;
   }
 }
+
+/* SIDEBAR NO-CLIPPING / FULL-LABEL PASS — 2026-09-25
+   Final cascade correction for the operator sidebar.
+   Portal labels must remain inside their buttons and must never be clipped,
+   hidden behind the footer, or truncated by an earlier compression rule. */
+@media screen and (min-width:1101px){
+  .sidebar{
+    width:350px!important;
+    min-width:350px!important;
+    max-width:350px!important;
+    left:0!important;
+    right:auto!important;
+    box-sizing:border-box!important;
+    overflow:hidden!important;
+  }
+  .main-area{
+    margin-left:350px!important;
+    margin-right:0!important;
+  }
+  .sidebar nav{
+    flex:1 1 auto!important;
+    min-height:0!important;
+    width:100%!important;
+    box-sizing:border-box!important;
+    overflow-y:auto!important;
+    overflow-x:hidden!important;
+    padding:10px 10px 24px!important;
+    scrollbar-gutter:stable!important;
+  }
+  .sidebar .nav-group{
+    width:100%!important;
+    box-sizing:border-box!important;
+    margin:0 0 14px!important;
+  }
+  .sidebar .nav-item,
+  .sidebar .nav-child{
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    height:auto!important;
+    box-sizing:border-box!important;
+    align-items:center!important;
+    overflow:visible!important;
+    white-space:normal!important;
+  }
+  .sidebar .nav-item-content{
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    flex:1 1 auto!important;
+    box-sizing:border-box!important;
+  }
+  .sidebar .nav-item-content>span{
+    min-width:0!important;
+    max-width:100%!important;
+    flex:1 1 auto!important;
+    white-space:normal!important;
+    overflow:visible!important;
+    text-overflow:clip!important;
+    overflow-wrap:break-word!important;
+    word-break:normal!important;
+    hyphens:none!important;
+  }
+  .sidebar .nav-item-content .nav-item-icon,
+  .sidebar .nav-item-content .nav-svg-icon{
+    flex-shrink:0!important;
+  }
+  .sidebar .sidebar-footer{
+    flex:0 0 auto!important;
+    position:relative!important;
+    z-index:5!important;
+    box-sizing:border-box!important;
+    background:#06130e!important;
+  }
+}
+@media screen and (min-width:761px) and (max-width:1100px){
+  .sidebar{
+    width:100%!important;
+    max-width:none!important;
+    box-sizing:border-box!important;
+    overflow:hidden!important;
+  }
+  .sidebar nav{
+    width:100%!important;
+    box-sizing:border-box!important;
+    overflow-x:hidden!important;
+  }
+  .sidebar .nav-item,
+  .sidebar .nav-child{
+    height:auto!important;
+    max-width:100%!important;
+    box-sizing:border-box!important;
+    overflow:visible!important;
+  }
+  .sidebar .nav-item-content>span{
+    white-space:normal!important;
+    overflow:visible!important;
+    text-overflow:clip!important;
+    overflow-wrap:break-word!important;
+    word-break:normal!important;
+  }
+}
+@media screen and (max-width:760px){
+  .sidebar nav{
+    overflow-x:hidden!important;
+  }
+  .sidebar .nav-item,
+  .sidebar .nav-child{
+    height:auto!important;
+    max-width:100%!important;
+    box-sizing:border-box!important;
+  }
+  .sidebar .nav-item-content>span{
+    white-space:normal!important;
+    overflow:visible!important;
+    text-overflow:clip!important;
+    overflow-wrap:break-word!important;
+    word-break:normal!important;
+  }
+}
