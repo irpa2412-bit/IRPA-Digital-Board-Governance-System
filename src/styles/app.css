@@ -3288,3 +3288,39 @@
     text-shadow:0 1px 2px rgba(0,0,0,.45)!important;
   }
 }
+
+
+/* IRPA DESKTOP FRONT DASHBOARD BLUE/WHITE EXPLICIT BUTTON GUARANTEE V6 */
+@media screen and (min-width:761px){
+  .dashboard-desktop-view .desktop-blue-nav-button,
+  .dashboard-desktop-view .quote4-quick-grid .desktop-blue-nav-button,
+  .dashboard-desktop-view .dashboard-quote4-stats .desktop-blue-nav-button,
+  .dashboard-desktop-view .quote4-heading>button{
+    -webkit-appearance:none!important;
+    appearance:none!important;
+    background:#0b5fa8!important;
+    background-color:#0b5fa8!important;
+    background-image:none!important;
+    color:#fff!important;
+    border:1px solid rgba(255,255,255,.55)!important;
+    box-shadow:0 5px 16px rgba(0,45,90,.22)!important;
+  }
+  .dashboard-desktop-view .desktop-blue-nav-button:hover,
+  .dashboard-desktop-view .desktop-blue-nav-button:focus-visible,
+  .dashboard-desktop-view .quote4-heading>button:hover,
+  .dashboard-desktop-view .quote4-heading>button:focus-visible{
+    background:#1672bf!important;
+    background-color:#1672bf!important;
+    background-image:none!important;
+    color:#fff!important;
+    border-color:#fff!important;
+  }
+  .dashboard-desktop-view .desktop-blue-nav-button strong,
+  .dashboard-desktop-view .desktop-blue-nav-button b,
+  .dashboard-desktop-view .desktop-blue-nav-button small,
+  .dashboard-desktop-view .desktop-blue-nav-button i,
+  .dashboard-desktop-view .desktop-blue-nav-button span,
+  .dashboard-desktop-view .quote4-heading>button{
+    color:#fff!important;
+  }
+}
