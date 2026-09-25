@@ -1517,3 +1517,54 @@
     white-space:normal!important;
   }
 }
+
+
+/* FINAL CROSS-APP CONTROL SURFACE OVERRIDE — consistent black inactive / IRPA-green active language
+   for navigation/action button families while preserving each component's functional dimensions. */
+.content-area .page .module-interlink-list button,
+.content-area .page .workflow-portal-parent,
+.content-area .page .workflow-portal-children button,
+.content-area .page .dashboard-function-button,
+.content-area .page .signature-profile-primary-button,
+.content-area .page .signature-profile-secondary-button{
+  background:#111111!important;
+  border-color:#4b4b4b!important;
+  color:#ffffff!important;
+}
+.content-area .page .module-interlink-list button:hover,
+.content-area .page .workflow-portal-parent:hover,
+.content-area .page .workflow-portal-children button:hover,
+.content-area .page .dashboard-function-button:hover,
+.content-area .page .signature-profile-primary-button:hover,
+.content-area .page .signature-profile-secondary-button:hover{
+  background:#1d1d1d!important;
+  border-color:#707070!important;
+  color:#ffffff!important;
+}
+.content-area .page .module-interlink-list button.active,
+.content-area .page .workflow-portal-parent.active,
+.content-area .page .workflow-portal-children button.active,
+.content-area .page .dashboard-function-button.active{
+  background:#197343!important;
+  border-color:#197343!important;
+  color:#ffffff!important;
+  box-shadow:inset 0 -3px #d6a52c!important;
+}
+.content-area .page .signature-profile-primary-button{
+  background:#197343!important;
+  border-color:#197343!important;
+  color:#ffffff!important;
+}
+.content-area .page .signature-profile-secondary-button{
+  background:#111111!important;
+  border-color:#4b4b4b!important;
+  color:#ffffff!important;
+}
+.content-area .page .dashboard-function-button{
+  color:#ffffff!important;
+}
+.content-area .page .dashboard-function-button>span,
+.content-area .page .dashboard-function-button>small,
+.content-area .page .dashboard-function-button>b{
+  color:#ffffff!important;
+}
