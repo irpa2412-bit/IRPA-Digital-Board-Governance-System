@@ -16,7 +16,8 @@
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^5.4.54",
     "@capacitor/core": "^8.0.0",
-    "@capacitor/android": "^8.0.0"
+    "@capacitor/android": "^8.0.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^5.0.2",
