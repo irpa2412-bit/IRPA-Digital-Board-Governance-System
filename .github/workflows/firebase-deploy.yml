@@ -131,8 +131,10 @@ jobs:
                 const user = await auth.getUser(uid);
                 const previous = user.customClaims || {};
                 const claims = { ...previous, irpaRoles: [...roleSet].slice(0, 60) };
-                if (adminUids.has(uid) || String(user.email || "").toLowerCase() === "irpa2412@gmail.com") claims.admin = true;
-                else delete claims.admin;
+                // Administrator continuity safeguard: deployment may grant/retain admin
+                // access, but it must never revoke an existing admin claim. Explicit
+                // administrator removal is handled only by the controlled server workflow.
+                if (adminUids.has(uid) || String(user.email || "").toLowerCase() === "irpa2412@gmail.com" || previous.admin === true) claims.admin = true;
                 await auth.setCustomUserClaims(uid, claims);
                 updated++;
               } catch (error) {
