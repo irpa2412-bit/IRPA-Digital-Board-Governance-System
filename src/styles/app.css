@@ -2388,3 +2388,253 @@
     background:#e7f4ed!important;color:#087047!important;box-shadow:inset 0 3px #d5a72f!important;font-weight:950!important;
   }
 }
+
+
+/* FINAL SELECTED MOBILE QUOTE 1 — fidelity correction.
+   Quote 1 is the circled reference supplied by the user.
+   This block intentionally overrides the generic button system on Home
+   so the dashboard cards remain the light cards shown in the reference. */
+@media(max-width:760px){
+  .dashboard-content-area{
+    padding:0 0 72px!important;
+    background:#f5faf7!important;
+  }
+  .dashboard-content-area .dashboard-command{
+    padding:0 14px 18px!important;
+  }
+  .dashboard-content-area .dashboard-mobile-view{
+    display:block!important;
+  }
+
+  .mobile-quote1-hero{
+    height:224px!important;
+    min-height:224px!important;
+    margin:0 -14px!important;
+    border-radius:0 0 22px 22px!important;
+    overflow:hidden!important;
+    background:#0b6847!important;
+    box-shadow:none!important;
+  }
+  .mobile-quote1-image{
+    inset:0!important;
+    background-image:url('/irpa-rangeland-hero.svg')!important;
+    background-position:center 44%!important;
+    background-size:cover!important;
+  }
+  .mobile-quote1-shade{
+    background:linear-gradient(180deg,rgba(5,48,34,.40) 0%,rgba(5,75,49,.46) 47%,rgba(4,86,55,.90) 100%)!important;
+  }
+  .mobile-quote1-top{
+    height:58px!important;
+    padding:10px 18px 0!important;
+    gap:8px!important;
+  }
+  .mobile-quote1-top img{
+    width:46px!important;height:46px!important;
+    border-radius:50%!important;
+    padding:2px!important;
+    background:#fff!important;
+    object-fit:contain!important;
+  }
+  .mobile-quote1-top>div{gap:1px!important}
+  .mobile-quote1-top strong{
+    font-size:8px!important;
+    letter-spacing:.065em!important;
+    text-shadow:0 1px 3px rgba(0,0,0,.45)!important;
+  }
+  .mobile-quote1-top small{
+    font-size:7px!important;
+    letter-spacing:.08em!important;
+    color:#f6d86b!important;
+  }
+  .mobile-quote1-top>button{
+    width:37px!important;height:37px!important;
+    margin-left:auto!important;
+    background:#fff!important;
+    color:#d63f36!important;
+    border:0!important;
+    box-shadow:0 3px 10px rgba(0,0,0,.22)!important;
+    border-radius:50%!important;
+    font-size:15px!important;
+  }
+
+  .mobile-quote1-user{
+    margin:25px 20px 0!important;
+    gap:10px!important;
+    align-items:center!important;
+  }
+  .mobile-quote1-photo{
+    width:51px!important;height:51px!important;
+    flex:0 0 51px!important;
+    border:3px solid #fff!important;
+    font-size:15px!important;
+    box-shadow:0 2px 8px rgba(0,0,0,.18)!important;
+  }
+  .mobile-quote1-user span{
+    font-size:7px!important;
+    letter-spacing:.11em!important;
+  }
+  .mobile-quote1-user h1{
+    font-size:17px!important;
+    margin:2px 0 2px!important;
+    color:#fff!important;
+    text-shadow:0 1px 4px rgba(0,0,0,.48)!important;
+  }
+  .mobile-quote1-user p{
+    font-size:8px!important;
+    color:#edf7f2!important;
+    text-shadow:0 1px 3px rgba(0,0,0,.42)!important;
+  }
+  .mobile-quote1-user em{
+    margin-top:5px!important;
+    padding:3px 8px!important;
+    background:#f4cf52!important;
+    color:#173e2d!important;
+    font-size:7px!important;
+  }
+
+  .mobile-quote1-stats{
+    grid-template-columns:1fr 1fr!important;
+    gap:9px!important;
+    margin:12px 0 16px!important;
+  }
+  .mobile-quote1-stats>button{
+    min-height:67px!important;
+    height:67px!important;
+    grid-template-columns:31px 1fr auto!important;
+    padding:8px 10px!important;
+    background:#fff!important;
+    color:#193f30!important;
+    border:1px solid #d9e7df!important;
+    border-radius:13px!important;
+    box-shadow:0 3px 11px rgba(27,71,52,.07)!important;
+  }
+  .content-area .page .mobile-quote1-stats>button,
+  .content-area .page .mobile-quote1-stats>button:hover,
+  .content-area .page .mobile-quote1-stats>button:focus{
+    background:#fff!important;
+    color:#193f30!important;
+    border-color:#d9e7df!important;
+  }
+  .mobile-quote1-stats>button>span{
+    width:31px!important;height:31px!important;
+    background:#e6f4ed!important;
+    color:#17784e!important;
+    border-radius:9px!important;
+  }
+  .mobile-quote1-stats>button:nth-child(2)>span{background:#e7f0fb!important;color:#2875b1!important}
+  .mobile-quote1-stats>button:nth-child(3)>span{background:#fff0d7!important;color:#c17a25!important}
+  .mobile-quote1-stats>button:nth-child(4)>span{background:#eee8fa!important;color:#704ba7!important}
+  .mobile-quote1-stats>button>strong{
+    font-size:20px!important;
+    color:#15764d!important;
+    line-height:1!important;
+  }
+  .mobile-quote1-stats>button>b{
+    font-size:8px!important;color:#274b3d!important;
+  }
+  .mobile-quote1-stats>button>small{
+    font-size:7px!important;color:#72867d!important;
+  }
+  .mobile-quote1-stats>button>i{
+    color:#168052!important;font-size:17px!important;
+  }
+
+  .mobile-quote1-heading{
+    margin:0 4px 9px!important;
+    align-items:center!important;
+  }
+  .mobile-quote1-heading h2{
+    font-size:18px!important;
+    color:#173f2f!important;
+    font-weight:850!important;
+  }
+  .content-area .page .mobile-quote1-heading button{
+    min-height:0!important;
+    height:auto!important;
+    padding:3px 1px!important;
+    background:transparent!important;
+    color:#17784e!important;
+    border:0!important;
+    border-radius:0!important;
+    box-shadow:none!important;
+    font-size:9px!important;
+    font-weight:900!important;
+  }
+  .content-area .page .mobile-quote1-heading button:hover,
+  .content-area .page .mobile-quote1-heading button:focus{
+    background:transparent!important;
+    color:#0e603f!important;
+    border:0!important;
+    box-shadow:none!important;
+  }
+  .mobile-quote1-grid{
+    grid-template-columns:repeat(3,1fr)!important;
+    gap:8px!important;
+  }
+  .mobile-quote1-grid>button,
+  .content-area .page .mobile-quote1-grid>button{
+    min-height:72px!important;
+    height:72px!important;
+    padding:8px 4px!important;
+    background:#fff!important;
+    color:#254a3c!important;
+    border:1px solid #d9e7df!important;
+    border-radius:11px!important;
+    box-shadow:0 3px 10px rgba(27,71,52,.055)!important;
+  }
+  .mobile-quote1-grid>button:hover,
+  .mobile-quote1-grid>button:focus{
+    background:#fff!important;
+    color:#254a3c!important;
+    border-color:#c8ded3!important;
+    transform:none!important;
+  }
+  .mobile-quote1-grid>button>span{
+    width:30px!important;height:30px!important;
+    background:#e7f4ed!important;
+    color:#14774d!important;
+    border-radius:9px!important;
+    font-size:15px!important;
+  }
+  .mobile-quote1-grid>button:nth-child(3n+2)>span{background:#fff0d8!important;color:#bd7723!important}
+  .mobile-quote1-grid>button:nth-child(3n)>span{background:#e8f0fb!important;color:#2a73ad!important}
+  .mobile-quote1-grid>button>strong{
+    font-size:8px!important;
+    color:#254a3c!important;
+  }
+  .mobile-quote1-motto{
+    margin:15px 0 0!important;
+    min-height:48px!important;
+    padding:8px 11px!important;
+    background:#e7f4ed!important;
+    border:1px solid #c7ded2!important;
+    border-radius:12px!important;
+  }
+
+  /* Selected Quote 1 has a white bottom navigation with green active Home. */
+  .main-area>.mobile-global-nav{
+    position:fixed!important;
+    left:0!important;right:0!important;bottom:0!important;
+    z-index:9000!important;
+    height:62px!important;
+    background:#fff!important;
+    border-top:1px solid #d8e6df!important;
+    box-shadow:0 -6px 20px rgba(20,67,48,.10)!important;
+  }
+  .main-area>.mobile-global-nav button{
+    min-height:62px!important;
+    background:#fff!important;
+    color:#667b72!important;
+    border:0!important;
+    border-radius:0!important;
+    box-shadow:none!important;
+    font-size:10px!important;
+    font-weight:750!important;
+  }
+  .main-area>.mobile-global-nav button.active{
+    background:#e6f4ed!important;
+    color:#08734a!important;
+    box-shadow:inset 0 3px #d4a82f!important;
+  }
+}
