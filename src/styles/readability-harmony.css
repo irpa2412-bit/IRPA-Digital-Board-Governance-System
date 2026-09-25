@@ -1541,22 +1541,198 @@ textarea:focus-visible{
   }
 }
 
-/* LIVE GOOGLE WEATHER PANEL — automatic current conditions and forecast */
-.topbar .google-weather-panel{cursor:default!important;pointer-events:auto!important;}
-.topbar .google-weather-panel .live-weather-content{width:100%;min-width:0;color:#eef7f3;}
-.topbar .google-weather-panel .live-weather-current{display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;}
-.topbar .google-weather-panel .live-weather-current-main{display:flex;align-items:center;gap:10px;min-width:0;}
-.topbar .google-weather-panel .live-weather-icon{width:40px;height:40px;display:grid;place-items:center;flex:0 0 40px;font-size:25px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.22);border-radius:10px;}
-.topbar .google-weather-panel .live-weather-current-main div{min-width:0;}
-.topbar .google-weather-panel .live-weather-current-main strong{display:block;margin:0;color:#fff;font-size:19px;line-height:1.1;font-weight:850;}
-.topbar .google-weather-panel .live-weather-current-main span{display:block;margin-top:2px;color:#f4d474;font-size:11px;line-height:1.2;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.topbar .google-weather-panel .live-weather-current-main small{display:block;margin-top:2px;color:#cfe1d9;font-size:9px;line-height:1.2;white-space:nowrap;}
-.topbar .google-weather-panel .live-weather-metrics{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:7px;color:#dcebe5;font-size:9px;line-height:1.2;}
-.topbar .google-weather-panel .live-weather-days{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:7px;width:100%;}
-.topbar .google-weather-panel .live-weather-day{min-width:0;padding:5px 6px;background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.1);border-radius:7px;}
-.topbar .google-weather-panel .live-weather-day strong{display:block;color:#f4d474;font-size:8px;line-height:1.1;}
-.topbar .google-weather-panel .live-weather-day span{display:block;margin-top:2px;color:#eaf4f0;font-size:8px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.topbar .google-weather-panel .live-weather-day b{display:block;margin-top:2px;color:#fff;font-size:9px;line-height:1.1;}
-.topbar .google-weather-panel .live-weather-day small{display:block;margin-top:2px;color:#c9ddd5;font-size:7px;line-height:1.1;}
-.topbar .google-weather-panel .live-weather-attribution{display:flex;justify-content:space-between;gap:8px;margin-top:4px;color:#a9c1b8;font-size:7px;line-height:1.1;}
-.topbar .google-weather-panel .live-weather-attribution small{margin:0;color:#a9c1b8;font-size:7px;line-height:1.1;}
+/* LIVE GOOGLE WEATHER PANEL — content-fitted Google Weather visual treatment
+   The panel must expand to contain the current conditions, metrics, four-day
+   forecast and attribution without clipping. Colours follow the Google Weather
+   visual language: sky blue, Google blue, white surfaces and dark neutral text. */
+.topbar .google-weather-panel{
+  cursor:default!important;
+  pointer-events:auto!important;
+  position:relative!important;
+  left:auto!important;
+  right:auto!important;
+  top:auto!important;
+  bottom:auto!important;
+  transform:none!important;
+  width:78%!important;
+  min-width:0!important;
+  height:auto!important;
+  min-height:170px!important;
+  max-height:none!important;
+  margin:0!important;
+  padding:12px 16px!important;
+  box-sizing:border-box!important;
+  overflow:visible!important;
+  align-self:center!important;
+  justify-self:center!important;
+  display:flex!important;
+  flex-direction:column!important;
+  justify-content:flex-start!important;
+  align-items:stretch!important;
+  text-align:left!important;
+  text-decoration:none!important;
+  color:#202124!important;
+  background:linear-gradient(135deg,#e8f0fe 0%,#d2e3fc 52%,#aecbfa 100%)!important;
+  border:1px solid #8ab4f8!important;
+  border-radius:14px!important;
+  box-shadow:0 8px 24px rgba(66,133,244,.20)!important;
+}
+.topbar .google-weather-panel>span{
+  display:block!important;
+  flex:0 0 auto!important;
+  margin:0 0 7px!important;
+  color:#174ea6!important;
+  font-size:10px!important;
+  line-height:1.2!important;
+  font-weight:850!important;
+  letter-spacing:.14em!important;
+  text-align:left!important;
+}
+.topbar .google-weather-panel .live-weather-content{
+  width:100%!important;
+  min-width:0!important;
+  color:#202124!important;
+}
+.topbar .google-weather-panel .live-weather-current{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  gap:12px!important;
+  width:100%!important;
+}
+.topbar .google-weather-panel .live-weather-current-main{
+  display:flex!important;
+  align-items:center!important;
+  gap:9px!important;
+  min-width:0!important;
+  flex:1 1 auto!important;
+}
+.topbar .google-weather-panel .live-weather-icon{
+  width:42px!important;
+  height:42px!important;
+  display:grid!important;
+  place-items:center!important;
+  flex:0 0 42px!important;
+  font-size:25px!important;
+  background:rgba(255,255,255,.78)!important;
+  border:1px solid rgba(66,133,244,.30)!important;
+  border-radius:12px!important;
+  box-shadow:0 2px 8px rgba(60,64,67,.10)!important;
+}
+.topbar .google-weather-panel .live-weather-current-main div{min-width:0!important;}
+.topbar .google-weather-panel .live-weather-current-main strong{
+  display:block!important;
+  margin:0!important;
+  color:#202124!important;
+  font-size:20px!important;
+  line-height:1.05!important;
+  font-weight:850!important;
+}
+.topbar .google-weather-panel .live-weather-current-main span{
+  display:block!important;
+  margin-top:3px!important;
+  color:#3c4043!important;
+  font-size:11px!important;
+  line-height:1.2!important;
+  font-weight:700!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+.topbar .google-weather-panel .live-weather-current-main small{
+  display:block!important;
+  margin-top:3px!important;
+  color:#5f6368!important;
+  font-size:9px!important;
+  line-height:1.2!important;
+  white-space:nowrap!important;
+}
+.topbar .google-weather-panel .live-weather-metrics{
+  display:flex!important;
+  flex-wrap:wrap!important;
+  justify-content:flex-end!important;
+  gap:5px!important;
+  max-width:48%!important;
+  color:#3c4043!important;
+  font-size:9px!important;
+  line-height:1.2!important;
+}
+.topbar .google-weather-panel .live-weather-metrics span{
+  padding:4px 6px!important;
+  border-radius:999px!important;
+  background:rgba(255,255,255,.72)!important;
+  border:1px solid rgba(66,133,244,.18)!important;
+  white-space:nowrap!important;
+}
+.topbar .google-weather-panel .live-weather-days{
+  display:grid!important;
+  grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  gap:6px!important;
+  margin-top:9px!important;
+  width:100%!important;
+}
+.topbar .google-weather-panel .live-weather-day{
+  min-width:0!important;
+  padding:6px 7px!important;
+  background:rgba(255,255,255,.70)!important;
+  border:1px solid rgba(66,133,244,.18)!important;
+  border-radius:9px!important;
+  box-shadow:0 1px 5px rgba(60,64,67,.06)!important;
+}
+.topbar .google-weather-panel .live-weather-day strong{
+  display:block!important;
+  color:#1a73e8!important;
+  font-size:8px!important;
+  line-height:1.1!important;
+}
+.topbar .google-weather-panel .live-weather-day span{
+  display:block!important;
+  margin-top:3px!important;
+  color:#3c4043!important;
+  font-size:8px!important;
+  line-height:1.15!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+.topbar .google-weather-panel .live-weather-day b{
+  display:block!important;
+  margin-top:3px!important;
+  color:#202124!important;
+  font-size:9px!important;
+  line-height:1.1!important;
+}
+.topbar .google-weather-panel .live-weather-day small{
+  display:block!important;
+  margin-top:3px!important;
+  color:#5f6368!important;
+  font-size:7px!important;
+  line-height:1.1!important;
+}
+.topbar .google-weather-panel .live-weather-attribution{
+  display:flex!important;
+  justify-content:space-between!important;
+  gap:8px!important;
+  margin-top:6px!important;
+  color:#5f6368!important;
+  font-size:7px!important;
+  line-height:1.1!important;
+}
+.topbar .google-weather-panel .live-weather-attribution small{
+  margin:0!important;
+  color:#5f6368!important;
+  font-size:7px!important;
+  line-height:1.1!important;
+}
+@media(min-width:761px) and (max-width:1100px){
+  .topbar .google-weather-panel{
+    width:78%!important;
+    min-height:180px!important;
+    height:auto!important;
+    max-height:none!important;
+    padding:12px 14px!important;
+  }
+  .topbar .google-weather-panel .live-weather-current{
+    align-items:flex-start!important;
+  }
+}
