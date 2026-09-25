@@ -3,8 +3,7 @@ const { before, after, beforeEach, test } = require("node:test");
 const {
   initializeTestEnvironment,
   assertFails,
-  assertSucceeds,
-  withSecurityRulesDisabled
+  assertSucceeds
 } = require("@firebase/rules-unit-testing");
 
 let testEnv;
@@ -23,7 +22,7 @@ after(async () => {
 
 beforeEach(async () => {
   await testEnv.clearFirestore();
-  await withSecurityRulesDisabled(testEnv, async context => {
+  await testEnv.withSecurityRulesDisabled(async context => {
     const db = context.firestore();
     await db.doc("adminProfiles/admin-user").set({ active: true, email: "admin@example.test" });
     await db.doc("members/member-user").set({
