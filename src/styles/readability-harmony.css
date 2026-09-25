@@ -1937,3 +1937,39 @@ textarea:focus-visible{
     left:0!important;
   }
 }
+
+/* QUICK ACCESS BUTTON HEIGHT ROOT-CAUSE FIX — 2026-09-25 */
+/*
+   The Quick Access panel was stretching because the two-column dashboard grid
+   stretches sibling panels to the tallest row. Its buttons then inherited the
+   stretched grid-row height. Decouple the Quick Access panel from that stretch
+   and give its six navigation buttons the same compact, controlled footprint.
+*/
+@media screen and (min-width:761px){
+  .dashboard-desktop-view .dashboard-quote4-main .dashboard-quote4-quick,
+  .dashboard-desktop-view .dashboard-quote4-main .dashboard-quote4-quick.panel,
+  .dashboard-desktop-view .dashboard-quote4-main .dashboard-quote4-quick.panel.dashboard-quote4-quick{
+    align-self:start!important;
+    height:auto!important;
+    min-height:0!important;
+    max-height:none!important;
+    overflow:visible!important;
+  }
+  .dashboard-desktop-view .dashboard-quote4-main .quote4-quick-grid{
+    align-content:start!important;
+    grid-auto-rows:124px!important;
+    height:auto!important;
+    min-height:0!important;
+    max-height:none!important;
+    gap:8px!important;
+  }
+  .dashboard-desktop-view .dashboard-quote4-main .quote4-quick-grid>button,
+  .dashboard-desktop-view .dashboard-quote4-main .quote4-quick-grid>button.desktop-blue-nav-button{
+    height:124px!important;
+    min-height:124px!important;
+    max-height:124px!important;
+    padding:12px!important;
+    box-sizing:border-box!important;
+    align-self:start!important;
+  }
+}
