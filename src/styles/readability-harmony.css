@@ -1418,7 +1418,8 @@ textarea:focus-visible{
 .dashboard-live-date-slot .desktop-date-card.open-portal-panel{
   position:relative!important;
   inset:auto!important;
-  width:min(100%,1080px)!important;
+  width:100%!important;
+  max-width:none!important;
   min-width:0!important;
   height:160px!important;
   min-height:160px!important;
