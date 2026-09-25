@@ -2201,23 +2201,23 @@
   .topbar{
     min-height:70px!important;
     padding:12px 25px!important;
-    background:#fff!important;
-    border-bottom:1px solid #dce7e1!important;
-    box-shadow:0 3px 16px rgba(23,64,47,.06)!important;
+    background:linear-gradient(135deg,#063524 0%,#075032 58%,#043121 100%)!important;
+    border-bottom:1px solid #0d6641!important;
+    box-shadow:0 3px 16px rgba(4,48,33,.18)!important;
   }
   .topbar-heading-row{gap:12px!important}
   .global-home-button{
-    background:#eaf5ef!important;color:#17633f!important;border:1px solid #c4ded0!important;
+    background:#0b5fa8!important;color:#fff!important;border:1px solid #2f86cf!important;
     padding:9px 12px!important;border-radius:9px!important;font-weight:850!important;
   }
-  .topbar-kicker{color:#7a9188!important}
-  .topbar h2{color:#173b2d!important;font-size:19px!important}
-  .topbar p{color:#73867e!important}
-  .user-info{color:#193b2e!important}
-  .user-info strong{color:#173b2d!important}
-  .user-info span{color:#71867d!important}
+  .topbar-kicker{color:#f7cf61!important}
+  .topbar h2{color:#fff!important;font-size:19px!important}
+  .topbar p{color:#e7f4ee!important}
+  .user-info{color:#fff!important}
+  .user-info strong{color:#fff!important}
+  .user-info span{color:#f7cf61!important}
   .user-avatar{
-    width:40px!important;height:40px!important;border:2px solid #d3e5dc!important;
+    width:40px!important;height:40px!important;border:2px solid rgba(255,255,255,.45)!important;
     background:#e6f3ec!important;color:#11613e!important;overflow:hidden!important;
   }
   .user-avatar img{width:100%;height:100%;object-fit:cover}
