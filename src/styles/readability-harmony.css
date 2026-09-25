@@ -970,63 +970,130 @@ textarea:focus-visible{
 
 
 /* SIDEBAR READABILITY FINAL PASS — 2026-09-25
-   Strengthen portal-name typography and navigation icons without changing
-   sidebar geometry, routes, permissions, or application behavior. */
+   One consolidated desktop navigation treatment: readable labels, high-contrast
+   icons, adequate button height, and enough horizontal space for portal names.
+   No navigation, permission, authentication, or application behavior changes. */
 @media(min-width:761px){
+  .sidebar .nav-group-title{
+    color:#f4d474!important;
+    font-size:12px!important;
+    line-height:1.4!important;
+    font-weight:900!important;
+    letter-spacing:.12em!important;
+    opacity:1!important;
+    margin:14px 10px 8px!important;
+  }
   .sidebar .nav-item{
     color:#ffffff!important;
-    font-size:15px!important;
+    font-size:16px!important;
     line-height:1.35!important;
-    font-weight:800!important;
-    min-height:48px!important;
-    padding:10px 10px!important;
-    letter-spacing:.01em!important;
+    font-weight:850!important;
+    min-height:54px!important;
+    padding:11px 12px!important;
+    letter-spacing:.005em!important;
+    overflow:visible!important;
+    text-shadow:0 1px 2px rgba(0,0,0,.35)!important;
     -webkit-font-smoothing:antialiased!important;
     text-rendering:optimizeLegibility!important;
   }
   .sidebar .nav-item-content{
-    gap:10px!important;
+    display:flex!important;
+    align-items:center!important;
+    gap:12px!important;
+    min-width:0!important;
+    width:100%!important;
   }
   .sidebar .nav-item-content .nav-item-icon{
-    flex:0 0 38px!important;
-    width:38px!important;
-    height:38px!important;
+    flex:0 0 42px!important;
+    width:42px!important;
+    min-width:42px!important;
+    height:42px!important;
+    display:grid!important;
+    place-items:center!important;
     color:#ffffff!important;
     opacity:1!important;
   }
   .sidebar .nav-item-content .nav-svg-icon{
-    width:28px!important;
-    height:28px!important;
+    width:30px!important;
+    height:30px!important;
     color:#ffffff!important;
     stroke:currentColor!important;
-    stroke-width:2.4!important;
+    stroke-width:2.6!important;
     opacity:1!important;
   }
   .sidebar .nav-item-content>span{
+    display:block!important;
+    flex:1 1 auto!important;
+    min-width:0!important;
+    max-width:none!important;
     color:#ffffff!important;
     opacity:1!important;
-    font-weight:800!important;
-    text-shadow:0 1px 2px rgba(0,0,0,.28)!important;
+    white-space:normal!important;
+    overflow:visible!important;
+    text-overflow:clip!important;
+    overflow-wrap:anywhere!important;
+    word-break:normal!important;
+    hyphens:none!important;
+    font-weight:850!important;
   }
   .sidebar .nav-child{
     color:#ffffff!important;
-    font-size:14px!important;
+    font-size:15px!important;
     line-height:1.35!important;
     font-weight:800!important;
-    min-height:46px!important;
+    min-height:50px!important;
+    padding:10px 12px 10px 16px!important;
+  }
+  .sidebar .nav-child .nav-item-content{
+    gap:10px!important;
   }
   .sidebar .nav-child .nav-item-icon{
-    flex:0 0 34px!important;
-    width:34px!important;
-    height:34px!important;
+    flex:0 0 38px!important;
+    width:38px!important;
+    min-width:38px!important;
+    height:38px!important;
   }
   .sidebar .nav-child .nav-svg-icon{
-    width:25px!important;
-    height:25px!important;
-    stroke-width:2.4!important;
+    width:27px!important;
+    height:27px!important;
+    stroke-width:2.5!important;
+  }
+  .sidebar .nav-item.active,
+  .sidebar .nav-child.active{
+    color:#ffffff!important;
+  }
+  .sidebar .secure-label{
+    color:#ffffff!important;
+    font-size:13px!important;
+    line-height:1.4!important;
+    font-weight:750!important;
+    opacity:1!important;
   }
 }
-
+@media(min-width:1101px){
+  .sidebar{
+    width:350px!important;
+  }
+  .main-area{
+    margin-left:350px!important;
+  }
+}
+@media(max-width:760px){
+  .sidebar .nav-group-title{
+    font-size:11px!important;
+    font-weight:900!important;
+  }
+  .sidebar .nav-item{
+    font-size:15px!important;
+    line-height:1.35!important;
+    font-weight:800!important;
+    min-height:50px!important;
+  }
+  .sidebar .nav-child{
+    font-size:14px!important;
+    font-weight:800!important;
+  }
+}
 
 /* INDEPENDENT TOPBAR PANEL LAYOUT — 2026-09-25
    The Open Portal panel must occupy its own layout column. It must never
