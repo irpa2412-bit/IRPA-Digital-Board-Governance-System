@@ -2078,3 +2078,50 @@ textarea:focus-visible{
 .topbar .google-weather-panel .live-weather-day-condition:focus-visible .live-weather-word-popup{
   transform:translateY(0)!important;
 }
+
+/* LIVE DATE SHORTCUT TEXT FORMAT — 2026-09-25
+   Keep Pending Authorizations and Reports readable like the attached reference:
+   icon on the left, text block vertically centered and left-aligned, arrow on
+   the far right. This targets only the two shortcuts inside the live date card. */
+@media screen and (min-width:761px){
+  .dashboard-live-date-slot .live-date-stat-buttons .desktop-blue-nav-button{
+    display:grid!important;
+    grid-template-columns:44px minmax(0,1fr) 18px!important;
+    align-items:center!important;
+    justify-content:stretch!important;
+    text-align:left!important;
+    column-gap:12px!important;
+  }
+  .dashboard-live-date-slot .live-date-stat-buttons .desktop-blue-nav-button>div{
+    display:flex!important;
+    flex-direction:column!important;
+    align-items:flex-start!important;
+    justify-content:center!important;
+    min-width:0!important;
+    width:100%!important;
+    text-align:left!important;
+  }
+  .dashboard-live-date-slot .live-date-stat-buttons .desktop-blue-nav-button strong,
+  .dashboard-live-date-slot .live-date-stat-buttons .desktop-blue-nav-button b,
+  .dashboard-live-date-slot .live-date-stat-buttons .desktop-blue-nav-button small{
+    display:block!important;
+    width:100%!important;
+    margin-left:0!important;
+    margin-right:0!important;
+    text-align:left!important;
+  }
+  .dashboard-live-date-slot .live-date-stat-buttons .desktop-blue-nav-button strong{
+    align-self:flex-start!important;
+  }
+  .dashboard-live-date-slot .live-date-stat-buttons .desktop-blue-nav-button b{
+    align-self:flex-start!important;
+  }
+  .dashboard-live-date-slot .live-date-stat-buttons .desktop-blue-nav-button small{
+    align-self:flex-start!important;
+  }
+  .dashboard-live-date-slot .live-date-stat-buttons .desktop-blue-nav-button>i{
+    justify-self:end!important;
+    align-self:center!important;
+    text-align:center!important;
+  }
+}
