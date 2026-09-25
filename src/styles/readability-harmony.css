@@ -827,6 +827,16 @@ textarea:focus-visible{
   font-size:10px!important;
   line-height:1.4!important;
 }
+.desktop-date-card.open-portal-panel .desktop-date-workspace{
+  display:block!important;
+  margin-top:7px!important;
+  color:#a9c3b7!important;
+  font-size:10px!important;
+  line-height:1.35!important;
+  font-style:normal!important;
+  font-weight:600!important;
+  opacity:1!important;
+}
 .topbar .open-portal-panel{
   position:absolute!important;
   left:24%!important;
