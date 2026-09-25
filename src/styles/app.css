@@ -3370,3 +3370,62 @@
     line-height:1.2!important;
   }
 }
+
+
+/* IRPA DESKTOP DATE-REFERENCE READABILITY SCALE — 2026-09-25 */
+@media screen and (min-width:761px){
+  /* The date card is the visual reference: dashboard controls use a comparable readable type scale. */
+  .dashboard-desktop-view .dashboard-quote4-stats{
+    gap:10px!important;
+    margin:12px 0!important;
+  }
+  .dashboard-desktop-view .dashboard-quote4-stats>button{
+    min-height:108px!important;
+    height:108px!important;
+    padding:14px 16px!important;
+    gap:13px!important;
+    border-radius:12px!important;
+  }
+  .dashboard-desktop-view .dashboard-quote4-stats .quote4-stat-icon{
+    width:48px!important;
+    height:48px!important;
+    flex-basis:48px!important;
+    border-radius:11px!important;
+    font-size:22px!important;
+  }
+  .dashboard-desktop-view .dashboard-quote4-stats>button strong{
+    font-size:27px!important;
+    line-height:1.1!important;
+  }
+  .dashboard-desktop-view .dashboard-quote4-stats>button b{
+    font-size:13px!important;
+    line-height:1.2!important;
+  }
+  .dashboard-desktop-view .dashboard-quote4-stats>button small{
+    font-size:10px!important;
+    line-height:1.25!important;
+    margin-top:3px!important;
+  }
+  .dashboard-desktop-view .dashboard-quote4-stats>button i{
+    font-size:24px!important;
+  }
+  .dashboard-desktop-view .quote4-quick-grid{
+    gap:9px!important;
+  }
+  .dashboard-desktop-view .quote4-quick-grid>button{
+    min-height:92px!important;
+    padding:13px!important;
+    border-radius:11px!important;
+  }
+  .dashboard-desktop-view .quote4-quick-grid>button>span{
+    font-size:22px!important;
+  }
+  .dashboard-desktop-view .quote4-quick-grid>button>strong{
+    font-size:11px!important;
+    line-height:1.2!important;
+  }
+  .dashboard-desktop-view .quote4-quick-grid>button>small{
+    font-size:9px!important;
+    line-height:1.3!important;
+  }
+}
