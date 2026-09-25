@@ -112,3 +112,32 @@ test("active finance role can create a finance transaction without client-suppli
     currency: "TZS"
   }));
 });
+
+
+test("finance role can read and create donor registry records", async () => {
+  const db = testEnv.authenticatedContext("finance-user", {
+    email: "finance@example.test",
+    irpaRoles: ["Finance Manager"]
+  }).firestore();
+  await assertSucceeds(db.doc("donorFunders/donor-1").set({
+    name: "Example Funder",
+    recordType: "DONOR_FUNDER_REGISTRY",
+    status: "Prospect"
+  }));
+  await assertSucceeds(db.doc("donorFunders/donor-1").get());
+});
+
+test("ordinary governance members cannot write donor registry or reporting obligations", async () => {
+  const db = testEnv.authenticatedContext("member-user", {
+    email: "member@example.test"
+  }).firestore();
+  await assertFails(db.doc("donorFunders/donor-2").set({
+    name: "Blocked Funder",
+    recordType: "DONOR_FUNDER_REGISTRY"
+  }));
+  await assertFails(db.doc("grantReportingObligations/obligation-1").set({
+    donorId: "donor-1",
+    dueDate: "2026-12-31",
+    recordType: "GRANT_REPORTING_OBLIGATION"
+  }));
+});
