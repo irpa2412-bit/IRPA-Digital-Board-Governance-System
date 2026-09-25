@@ -203,6 +203,14 @@ function firebaseErrorMessage(error) {
   return known[code] ? `${known[code]} (${code})` : `${message}${code ? ` (${code})` : ""}`;
 }
 
+export async function sendMemberInvitationEmail(_email, invitationId, _role, _memberType) {
+  const cleanId = String(invitationId || "").trim();
+  if (!cleanId) throw new Error("The invitation ID is required.");
+  const call = httpsCallable(getFunctions(undefined, "us-central1"), "sendMemberInvitation");
+  const result = await call({ invitationId: cleanId });
+  return result.data || {};
+}
+
 export async function sendEmployeeRegistrationEmail(email, employeeNumber) {
   const cleanEmail = String(email || "").trim().toLowerCase();
   const cleanEmployeeNumber = String(employeeNumber || "").trim();
