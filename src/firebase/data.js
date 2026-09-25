@@ -301,3 +301,11 @@ export async function linkInductionRegistration(requestId){
     throw new Error(error?.message||"The administrator LINK could not provision the approved applicant.");
   }
 }
+
+export async function synchronizeRegisteredIdentityUids(){
+  if(!auth.currentUser?.uid) throw new Error("Administrator authentication is required.");
+  const functions=getFunctions(undefined,"us-central1");
+  const call=httpsCallable(functions,"synchronizeRegisteredIdentityUids");
+  const result=await call({});
+  return result.data;
+}
