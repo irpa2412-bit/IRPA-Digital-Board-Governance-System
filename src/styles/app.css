@@ -4200,15 +4200,13 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   }
 }
 
-/* PORTAL CONTENT NAVIGATION ROLLER — 2026-09-25
-   The roller is deliberately scoped to the currently open portal.
-   It never exposes the application's global navigation list.
-   Desktop and mobile share the same portal-content data source; presentation
-   is device-specific. */
-.desktop-portal-content-roller{
+/* WEB APP NAVIGATION ROLLER — 2026-09-25
+   Desktop-only navigation control. It exposes the authenticated user's
+   available web-app modules, while the in-portal roller remains mobile-only. */
+.desktop-webapp-navigation-roller{
   position:relative;
   display:grid;
-  grid-template-columns:auto minmax(160px,1fr) minmax(220px,360px) 34px;
+  grid-template-columns:auto minmax(160px,1fr) minmax(240px,380px) 34px;
   align-items:center;
   gap:10px;
   box-sizing:border-box;
@@ -4222,7 +4220,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   box-shadow:0 6px 16px rgba(0,0,0,.16);
   overflow:hidden;
 }
-.desktop-portal-content-roller .portal-content-roller-kicker{
+.desktop-webapp-navigation-roller .webapp-navigation-roller-kicker{
   color:#9fd2ff;
   font-size:9px;
   line-height:1;
@@ -4230,7 +4228,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   letter-spacing:.1em;
   white-space:nowrap;
 }
-.desktop-portal-content-roller strong{
+.desktop-webapp-navigation-roller strong{
   min-width:0;
   overflow:hidden;
   text-overflow:ellipsis;
@@ -4239,7 +4237,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   font-size:13px;
   line-height:1.2;
 }
-.desktop-portal-content-roller select{
+.desktop-webapp-navigation-roller select{
   width:100%;
   min-width:0;
   height:34px;
@@ -4252,7 +4250,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   font-weight:800;
   cursor:pointer;
 }
-.desktop-portal-content-roller .portal-content-roller-chevron{
+.desktop-webapp-navigation-roller .webapp-navigation-roller-chevron{
   display:grid;
   place-items:center;
   width:30px;
