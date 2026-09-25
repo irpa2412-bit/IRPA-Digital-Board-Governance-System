@@ -3196,3 +3196,26 @@
     opacity:1!important;
   }
 }
+
+/* IRPA DESKTOP DASHBOARD FINAL VISUAL GUARD V4 */
+@media(min-width:761px){
+  .dashboard-quote4-stats>button,
+  .quote4-quick-grid>button{
+    background:#ffffff!important;
+    background-image:none!important;
+    color:#193b2e!important;
+    border-color:#d9e5df!important;
+    box-shadow:0 5px 16px rgba(27,68,50,.055)!important;
+  }
+  .dashboard-quote4-stats>button strong,.dashboard-quote4-stats>button b,.dashboard-quote4-stats>button small,
+  .quote4-quick-grid>button strong,.quote4-quick-grid>button small,.quote4-quick-grid>button b{
+    color:#193b2e!important;
+    opacity:1!important;
+  }
+  .quote4-quick-grid>button>span{color:#176943!important;opacity:1!important}
+  .quote4-empty{min-height:190px;display:flex!important;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;padding:24px!important;color:#5f756a!important}
+  .quote4-empty>strong{font-size:15px;color:#173f2f!important}
+  .quote4-empty>span{font-size:11px;max-width:560px}
+  .quote4-empty-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:7px;margin-top:8px}
+  .quote4-empty-actions button{border:1px solid #9bc7b0!important;background:#eef8f2!important;color:#176943!important;border-radius:8px!important;padding:7px 10px!important;font-size:10px!important;font-weight:800!important;cursor:pointer!important}
+}
