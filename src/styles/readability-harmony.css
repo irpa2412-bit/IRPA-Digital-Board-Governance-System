@@ -721,38 +721,71 @@ textarea:focus-visible{
 
 
 /* OPEN PORTAL NAVIGATION STATE — 2026-09-25
-   Inactive navigation stays in the established dark-green language.
-   Only the currently open portal receives the blue active treatment. */
+   Inactive navigation follows the clearly visible IRPA dark-green language.
+   Only the currently open portal receives the IRPA blue active treatment.
+   Desktop sidebar width is increased slightly so portal names remain readable. */
+@media(min-width:1101px){
+  .sidebar{
+    width:312px!important;
+  }
+  .main-area{
+    margin-left:312px!important;
+  }
+}
 .sidebar .nav-item{
-  background:linear-gradient(145deg,#0c241b,#102c21)!important;
-  border-color:#2b5140!important;
-  color:#edf6f2!important;
+  background:linear-gradient(145deg,#063d2a,#0a4b33)!important;
+  border-color:#1b6848!important;
+  color:#f3faf7!important;
+  font-size:14px!important;
+  line-height:1.4!important;
+  font-weight:700!important;
+  min-height:44px!important;
+  padding:10px 12px!important;
+  text-shadow:none!important;
 }
 .sidebar .nav-item:hover{
-  background:linear-gradient(145deg,#123a2b,#164632)!important;
-  border-color:#4b765f!important;
+  background:linear-gradient(145deg,#0b4e36,#0f5d40)!important;
+  border-color:#4f8d70!important;
   color:#ffffff!important;
 }
 .sidebar .nav-item.active{
-  background:#0b5fa8!important;
-  border-color:#2f86cf!important;
+  background:linear-gradient(145deg,#0b5fa8,#1674c4)!important;
+  border-color:#4da0df!important;
   color:#ffffff!important;
-  box-shadow:inset 3px 0 #f4c84a,0 3px 10px rgba(0,0,0,.12)!important;
+  box-shadow:inset 4px 0 #f4c84a,0 4px 12px rgba(0,0,0,.16)!important;
 }
 .sidebar .nav-child{
-  background:linear-gradient(145deg,#0a2118,#0d2a1f)!important;
-  border-color:#244838!important;
-  color:#d8e6e0!important;
+  background:linear-gradient(145deg,#073722,#0a432f)!important;
+  border-color:#195d41!important;
+  color:#e8f5ef!important;
+  font-size:13px!important;
+  min-height:42px!important;
 }
 .sidebar .nav-child:hover{
-  background:#123a2b!important;
-  border-color:#4b765f!important;
+  background:#0d5239!important;
+  border-color:#4f8d70!important;
   color:#ffffff!important;
 }
 .sidebar .nav-child.active{
-  background:#0b5fa8!important;
-  border-color:#2f86cf!important;
+  background:linear-gradient(145deg,#0b5fa8,#1674c4)!important;
+  border-color:#4da0df!important;
   color:#ffffff!important;
+  box-shadow:inset 4px 0 #f4c84a!important;
+}
+.sidebar .nav-item-content>span{
+  white-space:normal!important;
+  overflow:visible!important;
+  text-overflow:clip!important;
+  overflow-wrap:normal!important;
+  word-break:normal!important;
+}
+.sidebar .nav-item-content{
+  min-width:0!important;
+}
+.sidebar .nav-item-content .nav-item-icon,
+.sidebar .nav-item-content .nav-svg-icon{
+  color:inherit!important;
+  opacity:1!important;
 }
 
 /* Dynamic open-portal panel: the dashboard hero reuses the date-card space,
