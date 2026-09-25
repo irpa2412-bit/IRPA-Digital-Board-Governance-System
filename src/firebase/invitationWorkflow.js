@@ -104,7 +104,7 @@ export async function provisionCurrentMemberFromInvitationV2(invitationId) {
     // Keep the institutional Board Member document as the canonical member record;
     // do not create a duplicate members/{uid} document.
     await updateRecord(COLLECTIONS.invitations, invitation.id, {
-      status:"Accepted",acceptedUid:uid,acceptedAt:new Date().toISOString(),accountActivated:true,activationCompleted:true
+      status:"Activated",acceptedUid:uid,acceptedAt:new Date().toISOString(),accountActivated:true,activationCompleted:true
     }, {touchUpdatedAt:false, audit:false});
     return { employee: boardMember, invitationId: invitation.id, uid };
   } else if (invitation.employeeId || invitation.institutionalRecordType === "Employee" || EMPLOYEE_ROLES.includes(role)) {
@@ -191,7 +191,7 @@ export async function provisionCurrentMemberFromInvitationV2(invitationId) {
   }
 
   await updateRecord(COLLECTIONS.invitations, invitation.id, {
-    status: "Accepted",
+    status: "Activated",
     acceptedUid: uid,
     acceptedAt: new Date().toISOString(),
     accountActivated: true,
