@@ -817,7 +817,6 @@ textarea:focus-visible{
   min-width:0!important;
   display:grid!important;
   grid-template-columns:repeat(2,minmax(0,1fr))!important;
-  grid-template-rows:repeat(2,91px)!important;
   gap:10px!important;
   align-items:center!important;
 }
@@ -1456,9 +1455,9 @@ textarea:focus-visible{
   width:100%!important;
   max-width:none!important;
   min-width:0!important;
-  height:220px!important;
-  min-height:220px!important;
-  max-height:220px!important;
+  height:160px!important;
+  min-height:160px!important;
+  max-height:160px!important;
   margin:0!important;
   padding:14px 22px!important;
   box-sizing:border-box!important;
