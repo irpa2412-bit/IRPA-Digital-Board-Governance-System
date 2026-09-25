@@ -19,7 +19,7 @@ import {
 import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { auth, db, firebaseConfig, googleProvider, applicantAuth } from "./config";
-import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
+import { addDoc, collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
 
 // The administrator gateway uses a dedicated OAuth Auth instance pinned to
@@ -201,6 +201,47 @@ function firebaseErrorMessage(error) {
     "auth/expired-action-code": "This sign-in link has expired. Request a fresh IRPA invitation/sign-in link."
   };
   return known[code] ? `${known[code]} (${code})` : `${message}${code ? ` (${code})` : ""}`;
+}
+
+export async function sendEmployeeRegistrationEmail(email, employeeNumber) {
+  const cleanEmail = String(email || "").trim().toLowerCase();
+  const cleanEmployeeNumber = String(employeeNumber || "").trim();
+  if (!cleanEmail || !cleanEmployeeNumber) throw new Error("Employee email and employee number are required.");
+
+  const employeeQuery = await getDocs(query(
+    collection(db, "employees"),
+    where("employeeNumber", "==", cleanEmployeeNumber),
+    where("email", "==", cleanEmail)
+  ));
+  if (employeeQuery.empty) throw new Error("The Employee Register record could not be verified for this invitation.");
+
+  const employeeDoc = employeeQuery.docs[0];
+  const employee = employeeDoc.data() || {};
+  let invitationId = String(employee.invitationId || "").trim();
+
+  if (!invitationId) {
+    const invitationRef = await addDoc(collection(db, "invitations"), {
+      email: cleanEmail,
+      name: String(employee.name || "").trim(),
+      role: String(employee.role || "Employee").trim(),
+      memberType: String(employee.memberType || "Management").trim(),
+      department: employee.department || null,
+      unit: employee.unit || null,
+      employeeId: employeeDoc.id,
+      institutionalRecordType: "Employee",
+      institutionalRecordId: employeeDoc.id,
+      source: "Employees' Register",
+      status: "Pending",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+    invitationId = invitationRef.id;
+    await updateDoc(employeeDoc.ref, { invitationId, invitationDeliveryMode: "Dedicated Invitation Token", updatedAt: serverTimestamp() });
+  }
+
+  const call = httpsCallable(getFunctions(undefined, "us-central1"), "sendMemberInvitation");
+  const result = await call({ invitationId });
+  return { ...(result.data || {}), invitationId, accountCreated: false };
 }
 
 // Invitation delivery is handled by the server-side dedicated invitation-token workflow.
