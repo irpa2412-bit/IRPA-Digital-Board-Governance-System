@@ -1,4 +1,4 @@
-const fs = require("fs");
+import fs from "node:fs";
 const storage = fs.readFileSync("storage.rules","utf8");
 const firebase = JSON.parse(fs.readFileSync("firebase.json","utf8"));
 const functions = fs.readFileSync("functions/index.js","utf8");
