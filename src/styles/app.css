@@ -1350,7 +1350,7 @@
   padding:10px 14px!important;
   border:1px solid #a9c9b8!important;
   border-radius:8px!important;
-  background:#0b5fa8!important;
+  background:#e8f4ed!important;
   color:#ffffff!important;
   font-size:12px!important;
   font-weight:800!important;
@@ -1364,8 +1364,8 @@
 }
 .unified-control-tab:hover,
 .unified-control-tab:focus-visible{
-  background:#1672bf!important;
-  border-color:#4d9ddd!important;
+  background:#dceee4!important;
+  border-color:#6fa487!important;
   color:#ffffff!important;
   transform:translateY(-1px);
 }
@@ -1396,7 +1396,7 @@
   padding:10px 14px!important;
   border:1px solid #a9c9b8!important;
   border-radius:8px!important;
-  background:#0b5fa8!important;
+  background:#e8f4ed!important;
   color:#ffffff!important;
   font-size:12px!important;
   font-weight:800!important;
@@ -1407,8 +1407,8 @@
 .signature-portal-nav .signature-nav-button:hover,
 .signature-portal-nav .signature-nav-button:focus-visible,
 .signature-portal-nav .signature-nav-button.active{
-  background:#1672bf!important;
-  border-color:#4d9ddd!important;
+  background:#dceee4!important;
+  border-color:#6fa487!important;
   color:#ffffff!important;
 }
 .signature-portal-nav .signature-nav-button.active{
@@ -1439,7 +1439,7 @@
   padding:10px 15px!important;
   border:1px solid #2f86cf!important;
   border-radius:9px!important;
-  background:#0b5fa8!important;
+  background:#e8f4ed!important;
   color:#ffffff!important;
   font-size:12px!important;
   font-weight:800!important;
@@ -1458,8 +1458,8 @@
 .content-area .page .form-actions button:not(.danger-button):not(.delete-button):hover,
 .content-area .page .unified-control-tab:hover,
 .content-area .page .signature-portal-nav .signature-nav-button:hover{
-  background:#1672bf!important;
-  border-color:#4d9ddd!important;
+  background:#dceee4!important;
+  border-color:#6fa487!important;
   color:#ffffff!important;
   transform:translateY(-1px)!important;
 }
@@ -1469,10 +1469,10 @@
 .content-area .page .unified-control-tab.active,
 .content-area .page .unified-control-tab[aria-selected="true"],
 .content-area .page .signature-portal-nav .signature-nav-button.active{
-  background:#0b5fa8!important;
-  border-color:#2f86cf!important;
+  background:#197343!important;
+  border-color:#197343!important;
   color:#ffffff!important;
-  box-shadow:inset 0 -3px #ffffff!important;
+  box-shadow:inset 0 -3px #d6a52c!important;
 }
 .content-area .page button:not(.danger-button):not(.delete-button):not(.text-button):focus-visible,
 .content-area .page a.secondary-button:focus-visible,
@@ -1491,13 +1491,13 @@
   min-height:40px!important;
   border-radius:8px!important;
   color:#ffffff!important;
-  background:#0b5fa8!important;
+  background:#e8f4ed!important;
   border:1px solid #a9c9b8!important;
   font-weight:800!important;
 }
 .content-area .page .text-button:hover{
-  background:#1672bf!important;
-  border-color:#4d9ddd!important;
+  background:#1d1d1d!important;
+  border-color:#707070!important;
 }
 
 /* The four finance-control tabs shown in the approved reference image use the same
@@ -1527,8 +1527,8 @@
 .content-area .page .dashboard-function-button,
 .content-area .page .signature-profile-primary-button,
 .content-area .page .signature-profile-secondary-button{
-  background:#0b5fa8!important;
-  border-color:#2f86cf!important;
+  background:#111111!important;
+  border-color:#4b4b4b!important;
   color:#ffffff!important;
 }
 .content-area .page .module-interlink-list button:hover,
@@ -1537,27 +1537,27 @@
 .content-area .page .dashboard-function-button:hover,
 .content-area .page .signature-profile-primary-button:hover,
 .content-area .page .signature-profile-secondary-button:hover{
-  background:#1672bf!important;
-  border-color:#4d9ddd!important;
+  background:#dceee4!important;
+  border-color:#6fa487!important;
   color:#ffffff!important;
 }
 .content-area .page .module-interlink-list button.active,
 .content-area .page .workflow-portal-parent.active,
 .content-area .page .workflow-portal-children button.active,
 .content-area .page .dashboard-function-button.active{
-  background:#0b5fa8!important;
-  border-color:#2f86cf!important;
+  background:#197343!important;
+  border-color:#197343!important;
   color:#ffffff!important;
-  box-shadow:inset 0 -3px #ffffff!important;
+  box-shadow:inset 0 -3px #d6a52c!important;
 }
 .content-area .page .signature-profile-primary-button{
-  background:#0b5fa8!important;
-  border-color:#2f86cf!important;
+  background:#111111!important;
+  border-color:#4b4b4b!important;
   color:#ffffff!important;
 }
 .content-area .page .signature-profile-secondary-button{
-  background:#0b5fa8!important;
-  border-color:#2f86cf!important;
+  background:#111111!important;
+  border-color:#4b4b4b!important;
   color:#ffffff!important;
 }
 .content-area .page .dashboard-function-button{
@@ -1589,7 +1589,7 @@
   padding:10px 16px!important;
   border:1px solid #2f86cf!important;
   border-radius:9px!important;
-  background:#0b5fa8!important;
+  background:#e8f4ed!important;
   color:#ffffff!important;
   font-family:inherit!important;
   font-size:12px!important;
@@ -1606,8 +1606,8 @@
 .content-area .page a.button:not(.danger-button):not(.delete-button):hover,
 .content-area .page a.secondary-button:hover,
 .content-area .page a.primary-button:hover{
-  background:#1672bf!important;
-  border-color:#4d9ddd!important;
+  background:#dceee4!important;
+  border-color:#6fa487!important;
   color:#ffffff!important;
   transform:translateY(-1px)!important;
 }
@@ -1627,15 +1627,15 @@
 .content-area .page button[aria-selected="true"]:not(.danger-button):not(.delete-button),
 .content-area .page button[aria-pressed="true"]:not(.danger-button):not(.delete-button),
 .content-area .page a.active:not(.danger-button):not(.delete-button){
-  background:#0b5fa8!important;
-  border-color:#2f86cf!important;
+  background:#197343!important;
+  border-color:#197343!important;
   color:#ffffff!important;
-  box-shadow:inset 0 -3px #ffffff!important;
+  box-shadow:inset 0 -3px #d6a52c!important;
 }
 /* Submit/primary actions use the same blue institutional control surface. */
 .content-area .page button[type="submit"]:not(.danger-button):not(.delete-button){
-  background:#0b5fa8!important;
-  border-color:#2f86cf!important;
+  background:#111111!important;
+  border-color:#4b4b4b!important;
   color:#ffffff!important;
 }
 /* Destructive actions remain deliberately distinct for operational safety. */
@@ -1651,33 +1651,33 @@
   padding:9px 13px!important;
   border:1px solid #2f86cf!important;
   border-radius:9px!important;
-  background:#0b5fa8!important;
+  background:#e8f4ed!important;
   color:#ffffff!important;
   font-weight:800!important;
 }
 .content-area .page .text-button:hover{
-  background:#1672bf!important;
-  border-color:#4d9ddd!important;
+  background:#dceee4!important;
+  border-color:#6fa487!important;
   color:#ffffff!important;
 }
 /* Prevent special dashboard tiles from reverting to unrelated button palettes. */
 .content-area .page .dashboard-function-button{
   min-height:42px!important;
   border-radius:9px!important;
-  background:#0b5fa8!important;
-  border:1px solid #2f86cf!important;
-  color:#ffffff!important;
+  background:#261c1a!important;
+  border:1px solid #50352f!important;
+  color:#d9b5ab!important;
 }
 .content-area .page .dashboard-function-button:hover{
-  background:#1672bf!important;
-  border-color:#4d9ddd!important;
+  background:#dceee4!important;
+  border-color:#6fa487!important;
   color:#ffffff!important;
 }
 .content-area .page .dashboard-function-button.active{
-  background:#0b5fa8!important;
-  border-color:#2f86cf!important;
+  background:#197343!important;
+  border-color:#197343!important;
   color:#ffffff!important;
-  box-shadow:inset 0 -3px #ffffff!important;
+  box-shadow:inset 0 -3px #d6a52c!important;
 }
 
 
@@ -2197,7 +2197,7 @@
   .nav-item.active .nav-item-icon{color:#fff!important}
   .sidebar-footer{border-top:1px solid rgba(255,255,255,.13)!important}
   .secure-label{color:#91b5a6!important}
-  .sidebar .logout-button{background:#0b5fa8!important;color:#fff!important;border:1px solid #2f86cf!important}
+  .sidebar .logout-button{background:#fff!important;color:#fff!important;border:0!important}
   .topbar{
     min-height:70px!important;
     padding:12px 25px!important;
@@ -2221,7 +2221,7 @@
     background:#e6f3ec!important;color:#11613e!important;overflow:hidden!important;
   }
   .user-avatar img{width:100%;height:100%;object-fit:cover}
-  .topbar .logout-button{background:#0b5fa8!important;color:#fff!important;border:1px solid #2f86cf!important}
+  .topbar .logout-button{background:#fff!important;color:#fff!important;border:1px solid #e4c7c1!important}
 
   .dashboard-content-area{
     padding:22px 27px 38px!important;
@@ -3326,7 +3326,10 @@
 }
 
 
-/* BLUE TAB / SIGN-OUT STANDARD — approved desktop visual language. */
-@media(min-width:761px){
-  .desktop-quote4-hero em{color:#fff!important;font-style:normal!important;}
-}
+/* Artwork restoration: original control surfaces retained; button wording stays white. */
+.content-area .page .unified-control-tab,
+.content-area .page .signature-portal-nav .signature-nav-button,
+.content-area .page .dashboard-function-button,
+.content-area .page .signature-profile-primary-button,
+.content-area .page .signature-profile-secondary-button,
+.content-area .page button:not(.danger-button):not(.delete-button):not(.text-button){color:#fff!important;}
