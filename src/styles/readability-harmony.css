@@ -2242,3 +2242,112 @@ textarea:focus-visible{
     margin:0!important;
   }
 }
+
+
+/* FINANCE PORTAL BUTTON STANDARDIZATION — 2026-09-25
+   Apply the same compact, readable control standard used across the governance
+   interface. Finance actions remain semantically unchanged. */
+.finance-portal .unified-control-tabs{
+  display:flex!important;
+  flex-wrap:wrap!important;
+  align-items:center!important;
+  gap:6px!important;
+  margin:0!important;
+  padding:0!important;
+  overflow:visible!important;
+}
+
+.finance-portal .unified-control-tabs .unified-control-tab{
+  box-sizing:border-box!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  min-height:38px!important;
+  height:38px!important;
+  max-height:38px!important;
+  min-width:0!important;
+  padding:7px 11px!important;
+  border-radius:8px!important;
+  font-size:12px!important;
+  line-height:1.2!important;
+  font-weight:800!important;
+  text-align:center!important;
+  white-space:nowrap!important;
+  overflow:visible!important;
+}
+
+.finance-portal .unified-control-tabs .unified-control-tab.active,
+.finance-portal .unified-control-tabs .unified-control-tab[aria-selected="true"]{
+  background:#0b5fa8!important;
+  border-color:#2f86cf!important;
+  color:#fff!important;
+  box-shadow:inset 0 -3px #fff!important;
+}
+
+.finance-portal .form-actions{
+  display:flex!important;
+  flex-wrap:wrap!important;
+  align-items:center!important;
+  gap:8px!important;
+}
+
+.finance-portal .form-actions button,
+.finance-portal .payment-post-portal button.secondary-button,
+.finance-portal table button.secondary-button{
+  box-sizing:border-box!important;
+  min-height:38px!important;
+  height:38px!important;
+  padding:7px 12px!important;
+  border-radius:8px!important;
+  font-size:12px!important;
+  line-height:1.25!important;
+  font-weight:800!important;
+  white-space:nowrap!important;
+  text-align:center!important;
+}
+
+.finance-portal .form-actions button:not(.secondary-button):not(.danger-button){
+  background:#0b5fa8!important;
+  border:1px solid #2f86cf!important;
+  color:#fff!important;
+  box-shadow:0 3px 10px rgba(0,45,90,.14)!important;
+}
+
+.finance-portal .form-actions button:not(.secondary-button):not(.danger-button):hover{
+  background:#1672bf!important;
+  border-color:#fff!important;
+}
+
+.finance-portal button.secondary-button{
+  background:#15382c!important;
+  border:1px solid #4b715f!important;
+  color:#e6f0ec!important;
+}
+
+.finance-portal button.secondary-button:hover:not(:disabled){
+  background:#1b4939!important;
+  border-color:#6b9580!important;
+}
+
+.finance-portal button:disabled{
+  cursor:not-allowed!important;
+}
+
+@media(max-width:760px){
+  .finance-portal .unified-control-tabs{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  }
+  .finance-portal .unified-control-tabs .unified-control-tab{
+    width:100%!important;
+    min-height:42px!important;
+    height:42px!important;
+    max-height:42px!important;
+    padding:8px 9px!important;
+    white-space:normal!important;
+  }
+  .finance-portal .form-actions button{
+    min-height:42px!important;
+    height:42px!important;
+  }
+}
