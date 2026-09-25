@@ -18,7 +18,9 @@ jobs:
         run: node scripts/security-baseline-check.js
       - name: Verify Functions syntax
         run: node --check functions/index.js
+      - name: Install dependencies
+        run: npm install
       - name: Verify web build
-        run: |
-          npm install
-          npm run build
+        run: npm run build
+      - name: Run Firestore security rules regression tests
+        run: npx firebase emulators:exec --only firestore "node tests/firestore.rules.test.cjs"
