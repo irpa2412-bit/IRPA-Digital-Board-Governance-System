@@ -1385,17 +1385,20 @@ textarea:focus-visible{
   z-index:2;
 }
 .operator-signout-slot .logout-button{
-  flex:0 0 360px;
-  width:360px!important;
-  max-width:100%;
-  min-height:54px;
+  flex:0 0 250px;
+  width:250px!important;
+  min-width:250px!important;
+  max-width:250px!important;
+  min-height:40px!important;
+  padding:9px 20px!important;
   margin:0!important;
   box-sizing:border-box;
-  border-radius:14px;
+  border-radius:9px!important;
   background:linear-gradient(145deg,#0b5fa8,#1674c4)!important;
   border:1px solid #2f86cf!important;
   color:#ffffff!important;
-  font-size:16px!important;
+  font-size:12px!important;
+  line-height:1!important;
   font-weight:850!important;
   box-shadow:0 8px 20px rgba(4,40,70,.22);
 }
