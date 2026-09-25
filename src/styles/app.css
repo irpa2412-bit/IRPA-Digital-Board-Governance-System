@@ -1329,3 +1329,54 @@
     padding:10px 11px;
   }
 }
+
+
+/* Unified IRPA tab standard — all horizontal operational tab controls use one consistent geometry, typography and interaction treatment. */
+.unified-control-tabs{
+  display:flex!important;
+  align-items:stretch!important;
+  flex-wrap:wrap!important;
+  gap:8px!important;
+  width:100%;
+}
+.unified-control-tab{
+  box-sizing:border-box!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  min-height:42px!important;
+  min-width:150px!important;
+  flex:1 1 150px!important;
+  padding:10px 14px!important;
+  border:1px solid #a9c9b8!important;
+  border-radius:8px!important;
+  background:#e8f4ed!important;
+  color:#174d36!important;
+  font-size:12px!important;
+  font-weight:800!important;
+  line-height:1.2!important;
+  text-align:center!important;
+  text-decoration:none!important;
+  white-space:nowrap!important;
+  cursor:pointer!important;
+  touch-action:manipulation!important;
+  transition:background .16s ease,border-color .16s ease,box-shadow .16s ease,transform .16s ease!important;
+}
+.unified-control-tab:hover,
+.unified-control-tab:focus-visible{
+  background:#dceee4!important;
+  border-color:#6fa487!important;
+  color:#123f2d!important;
+  transform:translateY(-1px);
+}
+.unified-control-tab:focus-visible{
+  outline:2px solid #d6a52c!important;
+  outline-offset:2px!important;
+}
+.unified-control-tab:active{
+  transform:translateY(0);
+}
+@media(max-width:760px){
+  .unified-control-tabs{display:grid!important;grid-template-columns:1fr 1fr;gap:8px!important}
+  .unified-control-tab{min-width:0!important;width:100%!important;white-space:normal!important}
+}
