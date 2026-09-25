@@ -179,7 +179,7 @@ function LiveWeatherPanel(){
    {latitude:-2.73333,longitude:36.26667},
    {latitude:-3.3697,longitude:36.6881}
   ];
-  const[weather,setWeather]=useState(null),[error,setError]=useState(""),[loading,setLoading]=useState(true);
+  const[weather,setWeather]=useState(null),[error,setError]=useState(""),[loading,setLoading]=useState(true),[lastUpdated,setLastUpdated]=useState("");
   const apiKey=String(import.meta.env.VITE_GOOGLE_WEATHER_API_KEY||"").trim();
   useEffect(()=>{
    const loadWeather=async()=>{
@@ -189,13 +189,14 @@ function LiveWeatherPanel(){
      const requests=WEATHER_POINTS.map(point=>{
       const params=new URLSearchParams({key:apiKey,"location.latitude":String(point.latitude),"location.longitude":String(point.longitude),unitsSystem:"METRIC"});
       const currentUrl="https://weather.googleapis.com/v1/currentConditions:lookup?"+params.toString();
+      const hourlyUrl="https://weather.googleapis.com/v1/forecast/hours:lookup?"+params.toString()+"&hours=96";
       const dailyUrl="https://weather.googleapis.com/v1/forecast/days:lookup?"+params.toString()+"&days=4";
-      return Promise.all([fetch(currentUrl,{cache:"no-store"}),fetch(dailyUrl,{cache:"no-store"})]);
+      return Promise.all([fetch(currentUrl,{cache:"no-store"}),fetch(hourlyUrl,{cache:"no-store"}),fetch(dailyUrl,{cache:"no-store"})]);
      });
      const responses=await Promise.all(requests);
-     if(responses.some(([currentResponse,dailyResponse])=>!currentResponse.ok||!dailyResponse.ok)) throw new Error("Google Weather service unavailable");
-     const payloads=await Promise.all(responses.map(async([currentResponse,dailyResponse])=>[await currentResponse.json(),await dailyResponse.json()]));
-     const valid=payloads.filter(([current,daily])=>current?.weatherCondition&&daily?.forecastDays?.length);
+     if(responses.some(([currentResponse,hourlyResponse,dailyResponse])=>!currentResponse.ok||!hourlyResponse.ok||!dailyResponse.ok)) throw new Error("Google Weather service unavailable");
+     const payloads=await Promise.all(responses.map(async([currentResponse,hourlyResponse,dailyResponse])=>[await currentResponse.json(),await hourlyResponse.json(),await dailyResponse.json()]));
+     const valid=payloads.filter(([current,hourly,daily])=>current?.weatherCondition&&hourly?.forecastHours?.length&&daily?.forecastDays?.length);
      if(!valid.length) throw new Error("Incomplete Google Weather response");
 
      const average=numbers=>{
@@ -208,6 +209,8 @@ function LiveWeatherPanel(){
       return [...counts.entries()].sort((a,b)=>b[1]-a[1])[0]?.[0]||"";
      };
      const currentRows=valid.map(([current])=>current);
+     const googleUpdateTimes=currentRows.map(row=>row.currentTime).filter(Boolean).sort();
+     setLastUpdated(googleUpdateTimes[googleUpdateTimes.length-1]||new Date().toISOString());
      const current={
       weatherCondition:{type:mode(currentRows.map(row=>row.weatherCondition?.type)),description:{text:mode(currentRows.map(row=>row.weatherCondition?.description?.text))||"Regional conditions"}},
       temperature:{degrees:average(currentRows.map(row=>row.temperature?.degrees))},
@@ -218,7 +221,7 @@ function LiveWeatherPanel(){
      };
 
      const dailyByDay=new Map();
-     valid.forEach(([,daily])=>daily.forecastDays.slice(0,4).forEach((day,index)=>{
+     valid.forEach(([,hourly,daily])=>daily.forecastDays.slice(0,4).forEach((day,index)=>{
       const key=day.interval?.startTime||String(index);
       if(!dailyByDay.has(key)) dailyByDay.set(key,[]);
       dailyByDay.get(key).push(day);
@@ -259,7 +262,7 @@ function LiveWeatherPanel(){
     <div className="live-weather-metrics"><span>💧 {Number.isFinite(current?.relativeHumidity)?Math.round(current.relativeHumidity):"—"}%</span><span>💨 {Number.isFinite(current?.wind?.speed?.value)?Math.round(current.wind.speed.value):"—"} km/h</span><span>🌧️ {Number.isFinite(rain)?Math.round(rain):"—"}% rain</span></div>
    </div>
    <div className="live-weather-days">{daily.map((day,index)=>{const forecast=day.daytimeForecast||day.nighttimeForecast||{};const high=day.maxTemperature?.degrees,low=day.minTemperature?.degrees,type=forecast.weatherCondition?.type,text=forecast.weatherCondition?.description?.text||"Regional forecast",p=forecast.precipitation?.probability?.percent;return <div className="live-weather-day" key={day.interval?.startTime||index}><strong>{index===0?"Today":new Intl.DateTimeFormat("en-GB",{weekday:"short",day:"2-digit",month:"short",timeZone:"Africa/Nairobi"}).format(new Date(day.interval?.startTime||Date.now()))}</strong><button type="button" className="live-weather-day-condition live-weather-word-trigger" aria-label={"Regional forecast condition: "+text} title={text}><span className="live-weather-day-icon" aria-hidden="true">{icon(type)}</span><span className="live-weather-word-popup" role="tooltip">{text}</span></button><b>{high!=null?Math.round(high):"—"}° / {low!=null?Math.round(low):"—"}°</b><small>Rain {p!=null?Math.round(p):"—"}%</small></div>})}</div>
-   <div className="live-weather-attribution"><span>GOOGLE WEATHER · GENERAL REGIONAL OUTLOOK</span><small>Aggregated area-wide conditions update automatically approximately every 15 minutes.</small></div>
+   <div className="live-weather-attribution"><span>GOOGLE WEATHER · LIVE REGIONAL OUTLOOK</span><small>{lastUpdated?`Google data updated ${new Intl.DateTimeFormat("en-GB",{dateStyle:"medium",timeStyle:"short",timeZone:"Africa/Nairobi"}).format(new Date(lastUpdated))} · current conditions refresh approximately every 15 minutes.`:"Waiting for Google Weather data…"}</small></div>
   </div>;
 }
 function Shell({user,profile,admin,employee,inductionComplete,onInductionComplete}){const financePortalAccess=admin||isFinancePortalMember(profile,employee);const[mobileNav,setMobileNav]=useState("");const[shellLiveNow,setShellLiveNow]=useState(()=>new Date());useEffect(()=>{const clockId=setInterval(()=>setShellLiveNow(new Date()),1000);return()=>clearInterval(clockId)},[]);const liveDate=new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Nairobi",day:"2-digit",month:"long",year:"numeric"}).format(shellLiveNow);const liveDay=new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Nairobi",weekday:"long"}).format(shellLiveNow);const liveTime=new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Nairobi",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false}).format(shellLiveNow);const procurementPortalAccess=admin||isProcurementPortalMember(profile,employee);const signatureProfileAccess=!admin&&(profile?.status==="Active"||employee?.status==="Active"||employee?.employmentStatus==="Active"||employee?.registrationStatus==="Activated");const meetingProfileAccess=!admin&&(profile?.status==="Active"||employee?.status==="Active"||employee?.employmentStatus==="Active"||employee?.registrationStatus==="Activated");const[active,setActive]=useState(()=>{const params=new URLSearchParams(window.location.search);const requested=params.get("adminModule");const induction=params.get("induction")==="1";return admin&&requested&&ALL_MODULES.includes(requested)?requested:induction?"Induction and Orientation":"Dashboard"}),modules=admin?ALL_MODULES:memberModules(profile,employee);useEffect(()=>{const handler=()=>onInductionComplete?.();window.addEventListener("irpa:induction-completed",handler);return()=>window.removeEventListener("irpa:induction-completed",handler)},[onInductionComplete]);useEffect(()=>{if(!modules.includes(active))setActive(modules[0]||"Dashboard")},[modules,active]);useEffect(()=>{const navigate=e=>{const detail=e?.detail;const target=typeof detail==="string"?detail:detail?.module;if(target&&modules.includes(target))setActive(target)};window.addEventListener("irpa:navigate",navigate);return()=>window.removeEventListener("irpa:navigate",navigate)},[modules]);const groups=Object.entries(NAV).map(([title,items])=>[title,items.filter(x=>modules.includes(x))]).filter(([,items])=>items.length);const NAV_ICONS={Dashboard:"home","Board Members Registration":"groups","Members & Personnel":"groups",Invitations:"mail",Meetings:"calendar",Resolutions:"check",Voting:"vote",Participants:"person-add","Authorization & Approvals":"check","Signature Platform":"signature","Induction and Orientation":"person-add","Induction Applications":"clipboard",Downloads:"download","Finance Portfolio":"finance",Procurement:"cart","Employee Payments":"finance",Reports:"analytics","Audit Trail":"audit",Settings:"settings","Add Administrator":"person-add",Documents:"document",Actions:"list","Risk Register":"risk"};
