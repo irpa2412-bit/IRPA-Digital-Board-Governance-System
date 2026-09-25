@@ -3134,3 +3134,37 @@
   .mobile-nav-sheet-header button,.mobile-nav-sheet-list button{color:#fff!important;background:#0b3e6d!important;border-color:rgba(255,255,255,.2)!important}
   .mobile-nav-sheet-list button b{color:#fff!important}
 }
+
+/* IRPA MOBILE BUTTON COLOR CORRECTION V2 */
+@media(max-width:760px){
+  .dashboard-content-area .mobile-quote1-stats>button,
+  .dashboard-content-area .mobile-quote1-grid>button,
+  .dashboard-content-area .mobile-quote1-heading>button{
+    background:#0b5fa8!important;
+    color:#fff!important;
+    border:1px solid rgba(255,255,255,.42)!important;
+    box-shadow:0 6px 18px rgba(0,45,90,.28)!important;
+  }
+  .dashboard-content-area .mobile-quote1-stats>button:hover,
+  .dashboard-content-area .mobile-quote1-stats>button:focus-visible,
+  .dashboard-content-area .mobile-quote1-grid>button:hover,
+  .dashboard-content-area .mobile-quote1-grid>button:focus-visible,
+  .dashboard-content-area .mobile-quote1-heading>button:hover,
+  .dashboard-content-area .mobile-quote1-heading>button:focus-visible{
+    background:#1672bf!important;
+    color:#fff!important;
+    border-color:#fff!important;
+  }
+  .dashboard-content-area .mobile-quote1-stats>button strong,
+  .dashboard-content-area .mobile-quote1-stats>button b,
+  .dashboard-content-area .mobile-quote1-stats>button small,
+  .dashboard-content-area .mobile-quote1-stats>button i,
+  .dashboard-content-area .mobile-quote1-grid>button strong,
+  .dashboard-content-area .mobile-quote1-grid>button b,
+  .dashboard-content-area .mobile-quote1-heading>button{
+    color:#fff!important;
+  }
+  .dashboard-content-area .mobile-quote1-grid>button>span{
+    color:#fff!important;
+  }
+}
