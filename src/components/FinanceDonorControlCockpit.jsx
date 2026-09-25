@@ -71,11 +71,11 @@ export default function FinanceDonorControlCockpit(){
   {error&&<div className="error-message action-feedback">{error}</div>}
   <section className="panel" aria-label="Unified finance controls">
    <div className="panel-header"><div><span className="eyebrow">UNIFIED CONTROL NAVIGATION</span><h3>Operational Finance Registers</h3><p className="panel-description">The new control layer is now the management entry point; the existing operational registers remain the authoritative transaction layer. Navigation below moves directly to those existing controls without copying or replacing their data.</p></div></div>
-   <div className="member-actions">
-    <a className="secondary-button" href="#finance-operational-registers">Financial Registers</a>
-    <a className="secondary-button" href="#procurement-finance-handoff">Procurement → Finance</a>
-    <a className="secondary-button" href="#finance-traceability">Payment Trace</a>
-    <a className="secondary-button" href="#finance-entry">Controlled Entry</a>
+   <div className="member-actions unified-control-tabs" role="tablist" aria-label="Operational Finance Registers">
+    <a className="unified-control-tab" href="#finance-operational-registers" role="tab">Financial Registers</a>
+    <a className="unified-control-tab" href="#procurement-finance-handoff" role="tab">Procurement → Finance</a>
+    <a className="unified-control-tab" href="#finance-traceability" role="tab">Payment Trace</a>
+    <a className="unified-control-tab" href="#finance-entry" role="tab">Controlled Entry</a>
    </div>
   </section>
   <div className="dashboard-grid">
