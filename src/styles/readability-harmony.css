@@ -800,6 +800,35 @@ textarea:focus-visible{
   color:#ffffff!important;
   box-shadow:0 7px 20px rgba(0,0,0,.22)!important;
 }
+.dashboard-primary-navigators{
+  width:100%!important;
+  min-height:220px!important;
+  box-sizing:border-box!important;
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  align-items:center!important;
+  gap:18px!important;
+  padding:24px!important;
+  margin:0 0 16px!important;
+  background:#F8FAF9!important;
+  border:1px solid #dfe8e3!important;
+  border-radius:12px!important;
+}
+.dashboard-primary-navigators .desktop-blue-nav-button{
+  width:100%!important;
+  min-width:0!important;
+  min-height:91px!important;
+  height:91px!important;
+  max-height:91px!important;
+  padding:11px 13px!important;
+  box-sizing:border-box!important;
+}
+@media(max-width:760px){
+  .dashboard-primary-navigators{
+    display:none!important;
+  }
+}
+
 .dashboard-live-date-slot .desktop-date-card.open-portal-panel{
   display:flex!important;
   flex-direction:row!important;
@@ -811,24 +840,6 @@ textarea:focus-visible{
   flex:1 1 auto!important;
   min-width:0!important;
   text-align:left!important;
-}
-.dashboard-live-date-slot .live-date-stat-buttons{
-  flex:0 0 50%!important;
-  min-width:0!important;
-  display:grid!important;
-  grid-template-columns:repeat(2,minmax(0,1fr))!important;
-  grid-template-rows:repeat(2,91px)!important;
-  gap:10px!important;
-  align-items:center!important;
-}
-.dashboard-live-date-slot .live-date-stat-buttons .desktop-blue-nav-button{
-  min-height:91px!important;
-  height:91px!important;
-  max-height:91px!important;
-  width:100%!important;
-  min-width:0!important;
-  padding:11px 13px!important;
-  box-sizing:border-box!important;
 }
 .desktop-date-card.open-portal-panel{
   min-width:340px!important;
