@@ -4199,3 +4199,88 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     display:none!important;
   }
 }
+
+/* MOBILE PORTAL ORIENTATION ROLLER — 2026-09-25
+   Mobile-only navigation aid: identifies the current portal at the top of every
+   page and provides a compact scroll/drop-down portal selector. Desktop is untouched. */
+.mobile-portal-indicator{display:none;}
+@media(max-width:760px){
+  .mobile-portal-indicator{
+    position:fixed!important;
+    top:calc(150px + env(safe-area-inset-top))!important;
+    left:8px!important;
+    right:8px!important;
+    z-index:10000!important;
+    box-sizing:border-box!important;
+    min-height:46px!important;
+    height:46px!important;
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr) 38px!important;
+    align-items:center!important;
+    gap:6px!important;
+    padding:5px 7px 5px 10px!important;
+    border:1px solid #2f86cf!important;
+    border-radius:12px!important;
+    background:#062b4c!important;
+    color:#fff!important;
+    box-shadow:0 7px 18px rgba(0,0,0,.24)!important;
+    overflow:hidden!important;
+  }
+  .mobile-portal-indicator-label{
+    min-width:0!important;
+    display:flex!important;
+    flex-direction:column!important;
+    justify-content:center!important;
+    gap:1px!important;
+    pointer-events:none!important;
+  }
+  .mobile-portal-indicator-label span{
+    font-size:8px!important;
+    line-height:1!important;
+    font-weight:900!important;
+    letter-spacing:.12em!important;
+    color:#9fd2ff!important;
+  }
+  .mobile-portal-indicator-label strong{
+    min-width:0!important;
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
+    white-space:nowrap!important;
+    font-size:13px!important;
+    line-height:1.2!important;
+    font-weight:900!important;
+    color:#fff!important;
+  }
+  .mobile-portal-indicator select{
+    position:absolute!important;
+    inset:0!important;
+    width:100%!important;
+    height:100%!important;
+    opacity:0!important;
+    cursor:pointer!important;
+    z-index:2!important;
+  }
+  .mobile-portal-indicator-chevron{
+    grid-column:2!important;
+    grid-row:1!important;
+    justify-self:center!important;
+    display:grid!important;
+    place-items:center!important;
+    width:30px!important;
+    height:30px!important;
+    border:1px solid rgba(255,255,255,.42)!important;
+    border-radius:8px!important;
+    background:#0b5fa8!important;
+    color:#fff!important;
+    font-size:20px!important;
+    line-height:1!important;
+    font-weight:900!important;
+    pointer-events:none!important;
+  }
+  .content-area{
+    padding-top:108px!important;
+  }
+  .dashboard-content-area{
+    padding-top:108px!important;
+  }
+}
