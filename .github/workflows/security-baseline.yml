@@ -22,5 +22,10 @@ jobs:
         run: npm install
       - name: Verify web build
         run: npm run build
+      - name: Setup Java for Firebase Emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
       - name: Run Firestore security rules regression tests
         run: npx firebase emulators:exec --only firestore "node tests/firestore.rules.test.cjs"
