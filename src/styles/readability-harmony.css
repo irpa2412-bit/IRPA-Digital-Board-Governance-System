@@ -1,0 +1,397 @@
+/* IRPA READABILITY & VISUAL HARMONY LAYER — 2026-09-25
+   Purpose: improve text legibility and harmonise light/dark surfaces without
+   changing routes, data, component structure, control behaviour or layout logic.
+   Loaded after app.css so it is a single, deliberate final cascade layer. */
+
+:root{
+  --irpa-green-950:#06130e;
+  --irpa-green-900:#07140f;
+  --irpa-green-800:#0b2118;
+  --irpa-green-700:#123a2b;
+  --irpa-green-500:#197343;
+  --irpa-blue-700:#0b5fa8;
+  --irpa-blue-600:#1674c4;
+  --irpa-blue-200:#b9d9ef;
+  --irpa-gold:#d6a52c;
+  --irpa-text:#edf5f1;
+  --irpa-text-soft:#c8d8d2;
+  --irpa-text-muted:#9db2aa;
+  --irpa-light:#f6f9f7;
+  --irpa-light-2:#edf4f0;
+  --irpa-light-text:#173b2d;
+  --irpa-light-muted:#526b60;
+  --irpa-border:#294c3d;
+}
+
+/* Baseline reading rhythm */
+html{font-size:16px;}
+body{
+  font-size:15px!important;
+  line-height:1.55!important;
+  text-rendering:optimizeLegibility;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+}
+h1,h2,h3,h4,h5,h6{
+  text-wrap:balance;
+  line-height:1.25;
+}
+p,li,td,th,label,small,button,input,select,textarea{
+  text-wrap:pretty;
+}
+
+/* Dark institutional surfaces: white/near-white body copy, muted secondary copy. */
+.sidebar,.topbar,.auth-card,.loading-screen,.welcome-panel,.module-panel,.panel,
+.authority-card,.identity-card,.stat-card,.record-details{
+  --surface-text:var(--irpa-text);
+  --surface-muted:var(--irpa-text-soft);
+}
+.sidebar-brand-copy span,
+.authority-card strong,
+.topbar h2,
+.welcome-panel h1,
+.module-header h1,
+.page-header h1,
+.panel-header h2,
+.stat-card strong{
+  color:var(--irpa-text)!important;
+}
+.sidebar-brand-copy small,
+.authority-card small,
+.topbar p,
+.welcome-panel p,
+.module-header p,
+.page-header p,
+.panel-description,
+.module-panel>p,
+.stat-card small{
+  color:var(--irpa-text-soft)!important;
+  opacity:1!important;
+}
+
+/* Navigation hierarchy: clearer group titles, labels and active state. */
+.nav-group-title{
+  color:#9bb1a9!important;
+  font-size:10px!important;
+  line-height:1.35!important;
+  letter-spacing:.14em!important;
+}
+.nav-item{
+  color:#cbd9d4!important;
+  font-size:13px!important;
+  line-height:1.4!important;
+}
+.nav-item:hover{
+  color:#ffffff!important;
+  background:#102f25!important;
+}
+.nav-item.active{
+  background:var(--irpa-blue-700)!important;
+  border-color:#2f86cf!important;
+  color:#ffffff!important;
+  box-shadow:inset 3px 0 #f4c84a!important;
+}
+.nav-child{
+  color:#b4c5be!important;
+  font-size:12px!important;
+}
+.nav-child.active{
+  color:#ffffff!important;
+}
+
+/* Page copy and form labels. */
+.content-area .page p,
+.content-area .panel-description,
+.content-area .module-panel>p,
+.content-area .welcome-panel p,
+.content-area .module-header p,
+.content-area .page-header p{
+  font-size:15px!important;
+  line-height:1.6!important;
+  color:#c8d8d2!important;
+  opacity:1!important;
+}
+.content-area .page label,
+.content-area .page .form-field label{
+  font-size:14px!important;
+  line-height:1.45!important;
+  font-weight:700!important;
+  color:#dce8e3!important;
+  opacity:1!important;
+}
+.content-area .field-help,
+.content-area .submit-status{
+  font-size:13px!important;
+  line-height:1.5!important;
+  opacity:1!important;
+}
+
+/* Forms: consistent readable controls without changing their dimensions materially. */
+.content-area input,
+.content-area select,
+.content-area textarea,
+.table-search{
+  font-size:15px!important;
+  line-height:1.5!important;
+  color:#f0f7f4!important;
+}
+.content-area input::placeholder,
+.content-area textarea::placeholder,
+.table-search::placeholder{
+  color:#a7bbb3!important;
+  opacity:1!important;
+}
+.content-area input:focus,
+.content-area select:focus,
+.content-area textarea:focus,
+.table-search:focus{
+  border-color:#4d94c9!important;
+  box-shadow:0 0 0 2px rgba(22,116,196,.18)!important;
+}
+
+/* Primary controls: use the established IRPA blue for interactive emphasis,
+   while preserving green/gold institutional accents elsewhere. */
+.content-area button:not(.text-button):not(.danger-button):not(.secondary-button),
+.auth-card form>button,
+.logout-button{
+  color:#fff!important;
+}
+.logout-button{
+  background:var(--irpa-blue-700)!important;
+  border-color:#2f86cf!important;
+}
+.logout-button:hover{
+  background:var(--irpa-blue-600)!important;
+}
+.content-area button:focus-visible,
+.auth-card button:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible{
+  outline:3px solid #f4c84a!important;
+  outline-offset:2px!important;
+}
+
+/* Secondary controls stay quiet and readable. */
+.secondary-button{
+  color:#e6f0ec!important;
+  background:#15382c!important;
+  border-color:#4b715f!important;
+}
+.secondary-button:hover{
+  background:#1b4939!important;
+  border-color:#6b9580!important;
+}
+.text-button{
+  color:#b9d9ef!important;
+  font-size:13px!important;
+  line-height:1.45!important;
+}
+.text-button:hover{
+  color:#ffffff!important;
+  text-decoration:underline;
+}
+
+/* Tables: stronger header/body separation and readable row text. */
+.content-area table th{
+  color:#b7c9c2!important;
+  font-size:12px!important;
+  line-height:1.4!important;
+  font-weight:800!important;
+}
+.content-area table td{
+  color:#d4e1dc!important;
+  font-size:14px!important;
+  line-height:1.5!important;
+}
+.content-area table tr:hover td{
+  background:rgba(25,115,67,.08);
+}
+.content-area .status-badge{
+  font-size:12px!important;
+  font-weight:750!important;
+  line-height:1.35!important;
+}
+
+/* Light surfaces: dark text is mandatory so inherited white text cannot disappear. */
+.module-interlink-bar,
+.dashboard-command,
+.detail-grid>div,
+.identity-card,
+.content-area .page .stat-card,
+.content-area .page .workflow-stage,
+.content-area .page .unified-control-tabs .unified-control-tab{
+  color:var(--irpa-light-text)!important;
+}
+.module-interlink-bar p,
+.module-interlink-bar span,
+.module-interlink-bar small,
+.module-interlink-bar strong,
+.dashboard-command p,
+.dashboard-command span,
+.dashboard-command small,
+.dashboard-command strong,
+.detail-grid>div span,
+.detail-grid>div strong,
+.identity-card span,
+.identity-card strong,
+.content-area .page .stat-card span,
+.content-area .page .stat-card strong,
+.content-area .page .stat-card small,
+.content-area .page .workflow-stage span,
+.content-area .page .workflow-stage strong,
+.content-area .page .workflow-stage small,
+.content-area .page .unified-control-tabs .unified-control-tab *{
+  opacity:1!important;
+}
+.module-interlink-heading span{
+  color:#315746!important;
+}
+.module-interlink-heading small{
+  color:var(--irpa-light-muted)!important;
+}
+.detail-grid>div span,
+.identity-card span{
+  color:#526b60!important;
+}
+.detail-grid>div strong,
+.identity-card strong,
+.content-area .page .stat-card strong,
+.content-area .page .workflow-stage strong{
+  color:#173a2b!important;
+}
+.content-area .page .stat-card span,
+.content-area .page .workflow-stage span{
+  color:#355247!important;
+}
+.content-area .page .stat-card small,
+.content-area .page .workflow-stage small{
+  color:#526b60!important;
+}
+
+/* Existing blue navigation/tab language is retained and made consistent. */
+.module-interlink-bar .module-interlink-list>button,
+.module-interlink-bar .workflow-portal-parent,
+.module-interlink-bar .workflow-portal-children button{
+  background:var(--irpa-blue-700)!important;
+  border-color:#2f86cf!important;
+  color:#fff!important;
+  font-size:13px!important;
+  line-height:1.4!important;
+  font-weight:800!important;
+}
+.module-interlink-bar .module-interlink-list>button:hover,
+.module-interlink-bar .module-interlink-list>button.active,
+.module-interlink-bar .workflow-portal-parent:hover,
+.module-interlink-bar .workflow-portal-parent.active,
+.module-interlink-bar .workflow-portal-children button:hover,
+.module-interlink-bar .workflow-portal-children button.active{
+  background:var(--irpa-blue-600)!important;
+  border-color:#ffffff!important;
+  color:#fff!important;
+}
+
+/* Finance/control tabs: readable neutral state + established blue active state. */
+.content-area .page .unified-control-tabs .unified-control-tab{
+  background:#e8f4ed!important;
+  border-color:#a9c9b8!important;
+  text-shadow:none!important;
+}
+.content-area .page .unified-control-tabs .unified-control-tab:hover,
+.content-area .page .unified-control-tabs .unified-control-tab:focus-visible{
+  background:#dceee4!important;
+  border-color:#6fa487!important;
+}
+.content-area .page .unified-control-tabs .unified-control-tab.active,
+.content-area .page .unified-control-tabs .unified-control-tab[aria-selected="true"]{
+  background:var(--irpa-blue-700)!important;
+  border-color:#2f86cf!important;
+  color:#fff!important;
+  box-shadow:inset 0 -3px #fff!important;
+}
+.content-area .page .unified-control-tabs .unified-control-tab.active *,
+.content-area .page .unified-control-tabs .unified-control-tab[aria-selected="true"] *{
+  color:#fff!important;
+}
+
+/* Inline white cards/documents must never inherit dark-surface text. */
+.content-area [style*="background:#fff"],
+.content-area [style*="background: #fff"],
+.content-area [style*="background:#FFFFFF"],
+.content-area [style*="background: #FFFFFF"],
+.content-area [style*="background:white"],
+.content-area [style*="background: white"]{
+  color:var(--irpa-light-text)!important;
+}
+.content-area [style*="background:#fff"] *,
+.content-area [style*="background: #fff"] *,
+.content-area [style*="background:#FFFFFF"] *,
+.content-area [style*="background: #FFFFFF"] *,
+.content-area [style*="background:white"] *,
+.content-area [style*="background: white"] *{
+  opacity:1!important;
+}
+
+/* Authentication/readability: make the opening gateway easier to scan. */
+.auth-brand h1{
+  font-size:clamp(24px,4vw,32px)!important;
+  line-height:1.2!important;
+}
+.auth-brand p{
+  font-size:15px!important;
+  line-height:1.6!important;
+  color:#d0ded9!important;
+}
+.auth-card label{
+  font-size:14px!important;
+  line-height:1.45!important;
+}
+.auth-card input{
+  font-size:15px!important;
+  line-height:1.5!important;
+}
+.auth-message{
+  font-size:14px!important;
+  line-height:1.55!important;
+}
+
+/* Mobile: increase legibility without changing the established mobile layout. */
+@media(max-width:760px){
+  body{font-size:15px!important;}
+  .topbar h2{font-size:18px!important;line-height:1.25!important;}
+  .topbar p{font-size:12px!important;line-height:1.5!important;}
+  .content-area .page p,
+  .content-area .panel-description,
+  .content-area .module-panel>p,
+  .content-area .welcome-panel p,
+  .content-area .module-header p,
+  .content-area .page-header p{
+    font-size:14px!important;
+    line-height:1.6!important;
+  }
+  .content-area .page label,
+  .content-area .page .form-field label{
+    font-size:14px!important;
+  }
+  .content-area input,
+  .content-area select,
+  .content-area textarea{
+    font-size:16px!important;
+    line-height:1.45!important;
+  }
+  .content-area button{font-size:13px!important;line-height:1.4!important;}
+  .content-area table th{font-size:11px!important;}
+  .content-area table td{font-size:13px!important;}
+  .auth-card{padding:24px!important;}
+}
+
+/* Respect users who reduce motion. */
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    scroll-behavior:auto!important;
+    transition-duration:.01ms!important;
+    animation-duration:.01ms!important;
+    animation-iteration-count:1!important;
+  }
+}
