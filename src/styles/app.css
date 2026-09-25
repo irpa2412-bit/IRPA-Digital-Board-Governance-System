@@ -1918,3 +1918,61 @@
     min-height:58px!important;
   }
 }
+
+
+/* FINAL DASHBOARD-SPECIFIC OVERRIDES — dashboard cards are not generic action buttons. */
+@media(min-width:761px){
+  .content-area.dashboard-content-area .page .dashboard-desktop-view .dashboard-gauge,
+  .content-area.dashboard-content-area .page .dashboard-desktop-view .dashboard-function-button{
+    background:#fff!important;
+    color:#183129!important;
+    border-color:#d2e1d9!important;
+  }
+  .content-area.dashboard-content-area .page .dashboard-desktop-view .dashboard-gauge:hover,
+  .content-area.dashboard-content-area .page .dashboard-desktop-view .dashboard-function-button:hover{
+    background:#f5faf7!important;
+    border-color:#8ebaa3!important;
+  }
+  .content-area.dashboard-content-area .page .dashboard-desktop-view .dashboard-gauge>span:not(.dashboard-gauge-icon),
+  .content-area.dashboard-content-area .page .dashboard-desktop-view .dashboard-gauge>strong,
+  .content-area.dashboard-content-area .page .dashboard-desktop-view .dashboard-gauge>small,
+  .content-area.dashboard-content-area .page .dashboard-desktop-view .dashboard-gauge>b,
+  .content-area.dashboard-content-area .page .dashboard-desktop-view .dashboard-function-button>span,
+  .content-area.dashboard-content-area .page .dashboard-desktop-view .dashboard-function-button>small,
+  .content-area.dashboard-content-area .page .dashboard-desktop-view .dashboard-function-button>b{
+    color:#183129!important;
+  }
+}
+@media(max-width:760px){
+  .content-area.dashboard-content-area .page .dashboard-mobile-view button.mobile-profile-chip,
+  .content-area.dashboard-content-area .page .dashboard-mobile-view button.mobile-stat-card,
+  .content-area.dashboard-content-area .page .dashboard-mobile-view .mobile-section-heading>button,
+  .content-area.dashboard-content-area .page .dashboard-mobile-view .mobile-priority-list>button,
+  .content-area.dashboard-content-area .page .dashboard-mobile-view .mobile-quick-grid>button{
+    background:#fff!important;
+    color:#18382c!important;
+    border-color:#d5e3dc!important;
+    box-shadow:0 5px 18px rgba(25,66,49,.05)!important;
+  }
+  .content-area.dashboard-content-area .page .dashboard-mobile-view button.mobile-profile-chip{
+    background:rgba(255,255,255,.085)!important;
+    color:#fff!important;
+    border-color:rgba(214,165,44,.32)!important;
+    box-shadow:none!important;
+  }
+  .content-area.dashboard-content-area .page .dashboard-mobile-view button.mobile-profile-chip strong,
+  .content-area.dashboard-content-area .page .dashboard-mobile-view button.mobile-profile-chip small,
+  .content-area.dashboard-content-area .page .dashboard-mobile-view button.mobile-profile-chip>b{
+    color:inherit!important;
+  }
+  .content-area.dashboard-content-area .page .dashboard-mobile-view .mobile-section-heading>button{
+    color:#176344!important;
+    min-width:auto!important;
+  }
+  .content-area.dashboard-content-area .page .dashboard-mobile-view button.mobile-stat-card:hover,
+  .content-area.dashboard-content-area .page .dashboard-mobile-view .mobile-priority-list>button:hover,
+  .content-area.dashboard-content-area .page .dashboard-mobile-view .mobile-quick-grid>button:hover{
+    background:#f9fcfa!important;
+    color:#18382c!important;
+  }
+}
