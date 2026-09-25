@@ -1096,8 +1096,8 @@ textarea:focus-visible{
 }
 
 /* INDEPENDENT TOPBAR PANEL LAYOUT — 2026-09-25
-   The Open Portal panel must occupy its own layout column. It must never
-   overlay the title, access category, sign-out control, or dashboard content. */
+   Keep the OPEN PORTAL label anchored at the panel's upper-left while
+   centering the complete popup within the available topbar space. */
 @media(min-width:1101px){
   .topbar-heading-row{
     display:grid!important;
@@ -1121,7 +1121,8 @@ textarea:focus-visible{
     transform:none!important;
     grid-column:2!important;
     grid-row:1!important;
-    width:100%!important;
+    justify-self:center!important;
+    width:78%!important;
     min-width:0!important;
     min-height:62px!important;
     height:62px!important;
@@ -1131,17 +1132,24 @@ textarea:focus-visible{
     pointer-events:none!important;
     overflow:hidden!important;
     box-sizing:border-box!important;
+    text-align:left!important;
+  }
+  .topbar .open-portal-panel span{
+    display:block!important;
+    text-align:left!important;
+  }
+  .topbar .open-portal-panel strong{
+    display:block!important;
+    text-align:left!important;
+    white-space:nowrap!important;
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
   }
   .topbar-access-category{
     grid-column:3!important;
     grid-row:1!important;
     min-width:0!important;
     width:100%!important;
-  }
-  .topbar .open-portal-panel strong{
-    white-space:nowrap!important;
-    overflow:hidden!important;
-    text-overflow:ellipsis!important;
   }
 }
 @media(min-width:761px) and (max-width:1100px){
@@ -1158,12 +1166,17 @@ textarea:focus-visible{
     top:auto!important;
     bottom:auto!important;
     transform:none!important;
-    flex:1 1 320px!important;
+    flex:0 1 78%!important;
     min-width:180px!important;
-    max-width:none!important;
+    max-width:78%!important;
     height:58px!important;
-    margin:0!important;
+    margin:0 auto!important;
     z-index:1!important;
+    text-align:left!important;
+  }
+  .topbar .open-portal-panel span,
+  .topbar .open-portal-panel strong{
+    text-align:left!important;
   }
   .topbar-title-block{
     flex:1 1 260px!important;
