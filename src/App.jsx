@@ -99,6 +99,8 @@ function Dashboard({user,admin,employee,profile,onNavigate}){
     <section className="mobile-quote1-hero">
       <div className="mobile-quote1-image"></div><div className="mobile-quote1-shade"></div>
       <div className="mobile-quote1-top">
+        <img src="/irpa-brand.svg" alt="IRPA"/>
+
         
         <div><strong>IMPROVEMENT OF RANGELAND</strong><small>IN PASTORAL AREAS</small></div>
         <button type="button" onClick={()=>go("Alerts")} aria-label="Notifications" className="mobile-quote1-notification"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg><i>1</i></button>
