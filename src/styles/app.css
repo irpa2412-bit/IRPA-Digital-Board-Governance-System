@@ -3196,3 +3196,38 @@
     opacity:1!important;
   }
 }
+
+/* IRPA MOBILE DASHBOARD BLUE BUTTON HARD OVERRIDE V4 — ONLY BUTTON BACKGROUND/COLOR */
+@media screen and (max-width:760px){
+  .dashboard-content-area .mobile-quote1-stats button.mobile-blue-nav-button,
+  .dashboard-content-area .mobile-quote1-quick .mobile-quote1-heading button.mobile-blue-nav-button,
+  .dashboard-content-area .mobile-quote1-grid button.mobile-blue-nav-button{
+    background:#0b5fa8!important;
+    background-color:#0b5fa8!important;
+    background-image:none!important;
+    color:#fff!important;
+    border-color:rgba(255,255,255,.45)!important;
+  }
+  .dashboard-content-area .mobile-quote1-stats button.mobile-blue-nav-button:hover,
+  .dashboard-content-area .mobile-quote1-stats button.mobile-blue-nav-button:focus,
+  .dashboard-content-area .mobile-quote1-stats button.mobile-blue-nav-button:active,
+  .dashboard-content-area .mobile-quote1-quick .mobile-quote1-heading button.mobile-blue-nav-button:hover,
+  .dashboard-content-area .mobile-quote1-quick .mobile-quote1-heading button.mobile-blue-nav-button:focus,
+  .dashboard-content-area .mobile-quote1-quick .mobile-quote1-heading button.mobile-blue-nav-button:active,
+  .dashboard-content-area .mobile-quote1-grid button.mobile-blue-nav-button:hover,
+  .dashboard-content-area .mobile-quote1-grid button.mobile-blue-nav-button:focus,
+  .dashboard-content-area .mobile-quote1-grid button.mobile-blue-nav-button:active{
+    background:#1672bf!important;
+    background-color:#1672bf!important;
+    background-image:none!important;
+    color:#fff!important;
+  }
+  .dashboard-content-area .mobile-quote1-stats button.mobile-blue-nav-button strong,
+  .dashboard-content-area .mobile-quote1-stats button.mobile-blue-nav-button b,
+  .dashboard-content-area .mobile-quote1-stats button.mobile-blue-nav-button small,
+  .dashboard-content-area .mobile-quote1-stats button.mobile-blue-nav-button i,
+  .dashboard-content-area .mobile-quote1-grid button.mobile-blue-nav-button strong,
+  .dashboard-content-area .mobile-quote1-quick .mobile-quote1-heading button.mobile-blue-nav-button{
+    color:#fff!important;
+  }
+}
