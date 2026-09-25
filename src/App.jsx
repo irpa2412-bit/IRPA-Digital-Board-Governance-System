@@ -105,14 +105,11 @@ function Dashboard({user,admin,employee,profile,onNavigate}){
         <path fill="#1B4332" d="M0 259c70-12 143-9 210 4 70 13 127 8 191-6 76-17 141-14 207 2 65 16 128 15 192-1v22H0Z"/>
       </svg>
       <div className="mobile-quote1-shade"></div>
-      <div className="mobile-quote1-top">
-        <img src="/irpa-brand.svg" alt="IRPA"/>
-
-        
-        <div><strong>IMPROVEMENT OF RANGELAND</strong><small>IN PASTORAL AREAS</small></div>
+      <div className="mobile-quote1-user mobile-app-head">
+        <div className="mobile-quote1-photo" aria-label="IRPA application logo">{photo?<img src={photo} alt={displayName}/>:<img src="/irpa-brand.svg" alt="IRPA"/>}</div>
+        <div className="mobile-app-head-copy"><span>GOOD MORNING,</span><h1>{displayName}</h1><p>{profileTitle}{registrationNo?" · "+registrationNo:""}</p><em>{admin?"Administrator":profileTitle}</em></div>
         <button type="button" onClick={()=>go("Alerts")} aria-label="Notifications" className="mobile-quote1-notification"><i className="fa-solid fa-bell" aria-hidden="true"></i><b>1</b></button>
       </div>
-      <div className="mobile-quote1-user"><div className="mobile-quote1-photo">{photo?<img src={photo} alt={displayName}/>:<span>{initials}</span>}</div><div><span>GOOD MORNING,</span><h1>{displayName}</h1><p>{profileTitle}{registrationNo?" · "+registrationNo:""}</p><em>{admin?"Administrator":profileTitle}</em></div></div>
     </section>
     <section className="mobile-quote1-stats">{cards.map(([label,value,sub,target])=><button key={label} type="button" onClick={()=>go(target)}><span>{iconFor(label)}</span><strong>{busy?"—":value}</strong><b>{label}</b><small>{sub}</small><i>›</i></button>)}</section>
     <section className="mobile-quote1-quick"><div className="mobile-quote1-heading"><h2>Quick Access</h2><button type="button" onClick={()=>go("Meetings")}>View all ›</button></div><div className="mobile-quote1-grid">{quick.slice(0,6).map(([label,target,desc,ico])=><button key={target} type="button" onClick={()=>go(target)}><span>{iconFor(ico)}</span><strong>{label}</strong></button>)}</div></section>
