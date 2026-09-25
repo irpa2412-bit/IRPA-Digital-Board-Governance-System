@@ -3931,3 +3931,53 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     min-width:0!important;
   }
 }
+
+
+/* MOBILE APP OVERHEAD + ACCESS AUTHORITY STANDARD — 2026-09-25
+   Mobile-only correction: remove the dashboard overhead/topbar surface that
+   appears above the mobile dashboard, and normalize the mobile access-authority
+   panel footprint. No desktop rules are changed. */
+@media(max-width:760px){
+  .main-area>.dashboard-topbar{
+    display:none!important;
+    height:0!important;
+    min-height:0!important;
+    max-height:0!important;
+    padding:0!important;
+    margin:0!important;
+    border:0!important;
+    box-shadow:none!important;
+    overflow:hidden!important;
+  }
+
+  .topbar-access-category{
+    box-sizing:border-box!important;
+    flex:0 0 180px!important;
+    width:180px!important;
+    min-width:180px!important;
+    max-width:180px!important;
+    height:48px!important;
+    min-height:48px!important;
+    max-height:48px!important;
+    padding:6px 8px!important;
+    overflow:hidden!important;
+    display:flex!important;
+    flex-direction:column!important;
+    justify-content:center!important;
+  }
+
+  .topbar-access-category>span{
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
+    white-space:nowrap!important;
+  }
+
+  .topbar-access-category [aria-label="Login category"]{
+    min-width:0!important;
+    margin-top:2px!important;
+  }
+
+  .topbar-access-category [aria-label="Login category"]>div{
+    min-width:0!important;
+  }
+}
