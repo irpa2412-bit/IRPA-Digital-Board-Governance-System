@@ -859,10 +859,10 @@ textarea:focus-visible{
 }
 .topbar .open-portal-panel{
   position:absolute!important;
-  left:24%!important;
+  left:16%!important;
   right:235px!important;
-  top:9px!important;
-  bottom:9px!important;
+  top:6px!important;
+  bottom:6px!important;
   z-index:3!important;
   min-width:0!important;
   min-height:0!important;
@@ -873,7 +873,7 @@ textarea:focus-visible{
   justify-content:center!important;
   align-items:flex-start!important;
   text-align:left!important;
-  pointer-events:none!important;
+  pointer-events:auto!important;
   overflow:hidden!important;
 }
 .topbar .open-portal-panel span{
