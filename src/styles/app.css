@@ -4200,12 +4200,77 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   }
 }
 
-/* MOBILE PORTAL ORIENTATION ROLLER — 2026-09-25
-   Mobile-only navigation aid: identifies the current portal at the top of every
-   page and provides a compact scroll/drop-down portal selector. Desktop is untouched. */
-.mobile-portal-indicator{display:none;}
+/* PORTAL CONTENT NAVIGATION ROLLER — 2026-09-25
+   The roller is deliberately scoped to the currently open portal.
+   It never exposes the application's global navigation list.
+   Desktop and mobile share the same portal-content data source; presentation
+   is device-specific. */
+.desktop-portal-content-roller{
+  position:relative;
+  display:grid;
+  grid-template-columns:auto minmax(160px,1fr) minmax(220px,360px) 34px;
+  align-items:center;
+  gap:10px;
+  box-sizing:border-box;
+  margin:0 0 14px;
+  min-height:48px;
+  padding:7px 10px;
+  border:1px solid #2f86cf;
+  border-radius:10px;
+  background:#062b4c;
+  color:#fff;
+  box-shadow:0 6px 16px rgba(0,0,0,.16);
+  overflow:hidden;
+}
+.desktop-portal-content-roller .portal-content-roller-kicker{
+  color:#9fd2ff;
+  font-size:9px;
+  line-height:1;
+  font-weight:900;
+  letter-spacing:.1em;
+  white-space:nowrap;
+}
+.desktop-portal-content-roller strong{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:#fff;
+  font-size:13px;
+  line-height:1.2;
+}
+.desktop-portal-content-roller select{
+  width:100%;
+  min-width:0;
+  height:34px;
+  padding:5px 34px 5px 9px;
+  border:1px solid rgba(255,255,255,.35);
+  border-radius:8px;
+  background:#0b5fa8;
+  color:#fff;
+  font-size:12px;
+  font-weight:800;
+  cursor:pointer;
+}
+.desktop-portal-content-roller .portal-content-roller-chevron{
+  display:grid;
+  place-items:center;
+  width:30px;
+  height:30px;
+  border:1px solid rgba(255,255,255,.42);
+  border-radius:8px;
+  background:#0b5fa8;
+  color:#fff;
+  font-size:18px;
+  line-height:1;
+  font-weight:900;
+  pointer-events:none;
+}
+.mobile-portal-content-roller{display:none;}
+
 @media(max-width:760px){
-  .mobile-portal-indicator{
+  .desktop-portal-content-roller{display:none!important;}
+  .mobile-portal-content-roller{
     position:fixed!important;
     top:calc(150px + env(safe-area-inset-top))!important;
     left:8px!important;
@@ -4226,7 +4291,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     box-shadow:0 7px 18px rgba(0,0,0,.24)!important;
     overflow:hidden!important;
   }
-  .mobile-portal-indicator-label{
+  .mobile-portal-content-roller-label{
     min-width:0!important;
     display:flex!important;
     flex-direction:column!important;
@@ -4234,14 +4299,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     gap:1px!important;
     pointer-events:none!important;
   }
-  .mobile-portal-indicator-label span{
+  .mobile-portal-content-roller-label span{
     font-size:8px!important;
     line-height:1!important;
     font-weight:900!important;
     letter-spacing:.12em!important;
     color:#9fd2ff!important;
   }
-  .mobile-portal-indicator-label strong{
+  .mobile-portal-content-roller-label strong{
     min-width:0!important;
     overflow:hidden!important;
     text-overflow:ellipsis!important;
@@ -4251,7 +4316,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     font-weight:900!important;
     color:#fff!important;
   }
-  .mobile-portal-indicator select{
+  .mobile-portal-content-roller select{
     position:absolute!important;
     inset:0!important;
     width:100%!important;
@@ -4260,7 +4325,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     cursor:pointer!important;
     z-index:2!important;
   }
-  .mobile-portal-indicator-chevron{
+  .mobile-portal-content-roller-chevron{
     grid-column:2!important;
     grid-row:1!important;
     justify-self:center!important;
