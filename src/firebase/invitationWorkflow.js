@@ -57,6 +57,9 @@ export async function provisionCurrentMemberFromInvitationV2(invitationId) {
   if (invitation.status === "Cancelled") {
     throw new Error("This member invitation has been cancelled.");
   }
+  if (["Accepted","Activated"].includes(invitation.status) && invitation.acceptedUid && invitation.acceptedUid !== uid) {
+    throw new Error("This member invitation has already been activated for another Firebase account.");
+  }
 
   const role = invitation.role || "Board Member";
   const memberType = invitation.memberType || "Governance Member";
