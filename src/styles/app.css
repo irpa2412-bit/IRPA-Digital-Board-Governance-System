@@ -3329,3 +3329,71 @@
 .content-area .page .signature-profile-secondary-button,
 .content-area .page .form-actions button:not(.danger-button):not(.delete-button),
 .content-area .page button[type="submit"]:not(.danger-button):not(.delete-button){color:#fff!important;}
+
+
+/* IRPA-DGBS DESKTOP BLUE CONTROL STANDARD — requested 2026-09-25
+   Scope: desktop operational tabs + Sign Out. Destructive controls excluded.
+   Existing functionality, markup, routes and authorization logic are untouched. */
+@media screen and (min-width:761px){
+  .dashboard-desktop-view .unified-control-tab,
+  .dashboard-desktop-view .signature-portal-nav .signature-nav-button,
+  .dashboard-desktop-view .signature-profile-primary-button,
+  .dashboard-desktop-view .signature-profile-secondary-button,
+  .dashboard-desktop-view .dashboard-function-button,
+  .dashboard-desktop-view .module-interlink-list button,
+  .dashboard-desktop-view .workflow-portal-children button,
+  .dashboard-desktop-view .form-actions button:not(.danger-button):not(.delete-button),
+  .dashboard-desktop-view button[type="submit"]:not(.danger-button):not(.delete-button),
+  .dashboard-desktop-view .logout-button,
+  .dashboard-desktop-view .topbar .logout-button,
+  .dashboard-desktop-view .sidebar .logout-button{
+    background:#0b5fa8!important;
+    background-color:#0b5fa8!important;
+    background-image:none!important;
+    color:#fff!important;
+    border-color:#2f86cf!important;
+  }
+
+  .dashboard-desktop-view .unified-control-tab:hover,
+  .dashboard-desktop-view .unified-control-tab:focus-visible,
+  .dashboard-desktop-view .signature-portal-nav .signature-nav-button:hover,
+  .dashboard-desktop-view .signature-portal-nav .signature-nav-button:focus-visible,
+  .dashboard-desktop-view .signature-profile-primary-button:hover,
+  .dashboard-desktop-view .signature-profile-secondary-button:hover,
+  .dashboard-desktop-view .dashboard-function-button:hover,
+  .dashboard-desktop-view .module-interlink-list button:hover,
+  .dashboard-desktop-view .workflow-portal-children button:hover,
+  .dashboard-desktop-view .form-actions button:not(.danger-button):not(.delete-button):hover,
+  .dashboard-desktop-view button[type="submit"]:not(.danger-button):not(.delete-button):hover,
+  .dashboard-desktop-view .logout-button:hover{
+    background:#1672bf!important;
+    background-color:#1672bf!important;
+    color:#fff!important;
+    border-color:#fff!important;
+  }
+
+  .dashboard-desktop-view .unified-control-tab.active,
+  .dashboard-desktop-view .unified-control-tab[aria-selected="true"],
+  .dashboard-desktop-view .signature-portal-nav .signature-nav-button.active,
+  .dashboard-desktop-view .dashboard-function-button.active,
+  .dashboard-desktop-view .workflow-portal-children button.active{
+    background:#0b5fa8!important;
+    background-color:#0b5fa8!important;
+    color:#fff!important;
+    border-color:#2f86cf!important;
+    box-shadow:inset 0 -3px #fff!important;
+  }
+
+  /* The overhead Administrator wording follows attachment 1: white. */
+  .dashboard-desktop-view .desktop-quote4-hero h1,
+  .dashboard-desktop-view .desktop-quote4-hero em,
+  .dashboard-desktop-view .desktop-quote4-hero p{
+    color:#fff!important;
+  }
+
+  /* Desktop Sign Out label is always white on the blue control. */
+  .dashboard-desktop-view .logout-button,
+  .dashboard-desktop-view .logout-button *{
+    color:#fff!important;
+  }
+}
