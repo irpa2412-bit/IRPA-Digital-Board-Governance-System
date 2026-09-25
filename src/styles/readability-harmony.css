@@ -661,7 +661,7 @@ textarea:focus-visible{
 .sidebar .nav-item-content{
   display:flex!important;
   align-items:center!important;
-  gap:10px!important;
+  gap:12px!important;
   flex:1 1 auto!important;
   min-width:0!important;
 }
@@ -726,10 +726,10 @@ textarea:focus-visible{
    Desktop sidebar width is increased slightly so portal names remain readable. */
 @media(min-width:1101px){
   .sidebar{
-    width:312px!important;
+    width:350px!important;
   }
   .main-area{
-    margin-left:312px!important;
+    margin-left:350px!important;
   }
 }
 .sidebar .nav-item{
@@ -740,7 +740,7 @@ textarea:focus-visible{
   line-height:1.4!important;
   font-weight:700!important;
   min-height:44px!important;
-  padding:10px 12px!important;
+  padding:10px 14px!important;
   text-shadow:none!important;
 }
 .sidebar .nav-item:hover{
