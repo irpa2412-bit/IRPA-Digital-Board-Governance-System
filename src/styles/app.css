@@ -101,7 +101,7 @@
 
 .topbar-heading-row{position:relative;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:12px;flex:1 1 auto;min-width:0}.topbar-title-block{order:2}.topbar-access-category{order:1}
 .topbar-title-block{min-width:0;flex:0 1 auto}
-.topbar-title-line{display:flex;align-items:center;gap:10px;min-width:0}
+.topbar-title-line{display:flex;align-items:center;gap:0;min-width:0}
 .topbar-title-line h2{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .topbar-inline-logout{width:auto!important;flex:0 0 auto;min-height:30px!important;padding:6px 12px!important;font-size:10px!important;line-height:1!important;border-radius:8px!important}
 .topbar-access-category{flex:0 0 250px;width:250px;min-height:34px;max-height:58px;overflow:hidden;padding:6px 9px;background:rgba(255,255,255,.075);border:1px solid rgba(255,255,255,.14);border-radius:9px;color:#e7f4ee;box-sizing:border-box}.topbar-access-category>span{display:block;color:#f7cf61;font-size:8px;font-weight:850;letter-spacing:.11em;white-space:nowrap}.topbar-access-category [aria-label="Login category"]{margin-top:2px!important}.topbar-access-category [aria-label="Login category"]>span{color:#e7f4ee!important;font-size:9px!important;white-space:nowrap}.topbar-access-category [aria-label="Login category"] span{color:#f7cf61}.topbar-access-category [aria-label="Login category"] small,.topbar-access-category [aria-label="Login category"] strong{color:#e7f4ee}.topbar-access-category [aria-label="Login category"]>div:last-child{display:none!important}
