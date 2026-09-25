@@ -4264,6 +4264,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   font-weight:900;
   pointer-events:none;
 }
+/* Legacy desktop portal-roller safeguard: the current mobile in-portal roller is the only portal roller rendered. */
+.desktop-portal-content-roller{display:none!important;}
 .mobile-portal-content-roller{display:none;}
 
 @media(max-width:760px){
