@@ -1369,6 +1369,31 @@ textarea:focus-visible{
    the topbar/Open Portal panel. It is right-aligned and cannot overlap another
    panel because it occupies its own layout row. */
 .operator-signout-slot{
+  flex-direction:column!important;
+  align-items:flex-end!important;
+  gap:12px!important;
+}
+.dashboard-live-date-slot{
+  width:100%!important;
+  display:flex!important;
+  justify-content:flex-end!important;
+  box-sizing:border-box!important;
+}
+.dashboard-live-date-slot .desktop-date-card.open-portal-panel{
+  position:relative!important;
+  top:auto!important;
+  right:auto!important;
+  left:auto!important;
+  bottom:auto!important;
+  width:min(100%,1080px)!important;
+  min-width:0!important;
+  min-height:132px!important;
+  margin:0!important;
+  padding:20px 26px!important;
+  box-sizing:border-box!important;
+  overflow:hidden!important;
+}
+
   width:100%;
   display:flex;
   justify-content:flex-end;
