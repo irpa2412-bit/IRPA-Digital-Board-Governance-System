@@ -598,7 +598,11 @@ exports.sendMemberInvitation = onCall({region:"us-central1"}, async request => {
   if(!memberType) memberType="Governance Member";
 
   const origin=process.env.IRPA_LOGIN_URL||"https://irpa-digital-board-governance.web.app";
-  const subscriptionLink=origin+"/?induction=1&applicant=1&route=subscription&memberInvite="+encodeURIComponent(invitationId);
+  const invitationSecret=crypto.randomBytes(32).toString("base64url");
+  const invitationSecretHash=crypto.createHash("sha256").update(invitationSecret).digest("hex");
+  const invitationExpiresAt=new Date(Date.now()+72*60*60*1000);
+  const invitationUrl=origin+"/?invitationToken="+encodeURIComponent(invitationId+"."+invitationSecret");
+  const subscriptionLink=invitationUrl;
   const assistanceLink=origin+"/?induction=1&applicant=1&route=assistance&memberInvite="+encodeURIComponent(invitationId);
   const loginLink=origin+"/?induction=1&applicant=1&route=login";
   const subject="IRPA Invitation — "+role;
@@ -607,6 +611,11 @@ exports.sendMemberInvitation = onCall({region:"us-central1"}, async request => {
   const mailId=await queueInductionEmail(email,subject,text,html);
   await ref.set({
     role,memberType,department:department||null,unit:unit||null,
+    invitationTokenHash:invitationSecretHash,
+    invitationExpiresAt:invitationExpiresAt,
+    invitationRedeemedAt:null,
+    invitationRedeemedUid:null,
+    invitationTokenVersion:"2",
     status:"Queued",deliveryStatus:"Queued — awaiting SMTP transport",
     deliveryProvider:"Firebase Firestore mail queue → SMTP transport",
     mailQueueId:mailId,mailQueuedAt:FieldValue.serverTimestamp(),
@@ -618,6 +627,47 @@ exports.sendMemberInvitation = onCall({region:"us-central1"}, async request => {
     actorUid:uid,actorEmail,createdAt:FieldValue.serverTimestamp()
   });
   return {ok:true,email,role,memberType,sourceLabel,deliveryStatus:"Queued — awaiting SMTP transport",mailQueueId:mailId};
+});
+
+exports.redeemInvitationToken = onCall({region:"us-central1"}, async request => {
+  const raw=String(request.data?.token||"").trim();
+  const parts=raw.split(".");
+  if(parts.length!==2) throw new HttpsError("invalid-argument","The invitation token is invalid.");
+  const invitationId=parts[0];
+  const secret=parts[1];
+  if(!invitationId||!secret) throw new HttpsError("invalid-argument","The invitation token is invalid.");
+  const ref=db.collection("invitations").doc(invitationId);
+  const snap=await ref.get();
+  if(!snap.exists) throw new HttpsError("not-found","This IRPA invitation no longer exists.");
+  const invitation=snap.data()||{};
+  if(invitation.status==="Cancelled") throw new HttpsError("failed-precondition","This IRPA invitation has been cancelled.");
+  if(invitation.invitationTokenVersion!=="2"||!invitation.invitationTokenHash) throw new HttpsError("failed-precondition","This invitation was issued under an older invitation mechanism. Ask an administrator to issue a fresh invitation.");
+  const expiresAt=invitation.invitationExpiresAt?.toDate?invitation.invitationExpiresAt.toDate():new Date(invitation.invitationExpiresAt||0);
+  if(!expiresAt.getTime()||expiresAt.getTime()<=Date.now()) throw new HttpsError("deadline-exceeded","This IRPA invitation has expired. Ask an administrator to issue a fresh invitation.");
+  const suppliedHash=crypto.createHash("sha256").update(secret).digest("hex");
+  const expectedHash=String(invitation.invitationTokenHash||"");
+  if(!crypto.timingSafeEqual(Buffer.from(suppliedHash),Buffer.from(expectedHash))) throw new HttpsError("permission-denied","The invitation token is invalid.");
+  const email=String(invitation.email||"").trim().toLowerCase();
+  if(!email||!email.includes("@")) throw new HttpsError("failed-precondition","The invitation has no valid recipient email.");
+  const authAdmin=getAuth();
+  let user;
+  try {
+    user=await authAdmin.getUserByEmail(email);
+  } catch(error) {
+    if(error?.code!=="auth/user-not-found") throw error;
+    user=await authAdmin.createUser({email,emailVerified:false,displayName:String(invitation.name||email.split("@")[0]),disabled:false});
+  }
+  if(invitation.invitationRedeemedUid && invitation.invitationRedeemedUid!==user.uid) {
+    throw new HttpsError("already-exists","This invitation has already been redeemed for another Firebase account.");
+  }
+  await ref.set({
+    invitationRedeemedUid:user.uid,
+    invitationRedeemedAt:invitation.invitationRedeemedAt||FieldValue.serverTimestamp(),
+    invitationRedemptionStatus:"Redeemed — Awaiting Activation",
+    updatedAt:FieldValue.serverTimestamp()
+  },{merge:true});
+  const customToken=await authAdmin.createCustomToken(user.uid,{irpaInvitationId:invitationId,irpaInvitationRedeemed:true});
+  return {ok:true,customToken,invitationId,uid:user.uid,email};
 });
 
 exports.submitInductionApplication = onCall({region:"us-central1"}, async request => {
