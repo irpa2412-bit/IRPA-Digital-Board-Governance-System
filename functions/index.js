@@ -683,12 +683,13 @@ exports.redeemInvitationToken = onCall({region:"us-central1"}, async request => 
   if(!snap.exists) throw new HttpsError("not-found","This IRPA invitation no longer exists.");
   const invitation=snap.data()||{};
   if(invitation.status==="Cancelled") throw new HttpsError("failed-precondition","This IRPA invitation has been cancelled.");
+  if(invitation.invitationRedeemedAt) throw new HttpsError("already-exists","This IRPA invitation token has already been redeemed. Ask an administrator to issue a fresh invitation.");
   if(invitation.invitationTokenVersion!=="2"||!invitation.invitationTokenHash) throw new HttpsError("failed-precondition","This invitation was issued under an older invitation mechanism. Ask an administrator to issue a fresh invitation.");
   const expiresAt=invitation.invitationExpiresAt?.toDate?invitation.invitationExpiresAt.toDate():new Date(invitation.invitationExpiresAt||0);
   if(!expiresAt.getTime()||expiresAt.getTime()<=Date.now()) throw new HttpsError("deadline-exceeded","This IRPA invitation has expired. Ask an administrator to issue a fresh invitation.");
   const suppliedHash=crypto.createHash("sha256").update(secret).digest("hex");
   const expectedHash=String(invitation.invitationTokenHash||"");
-  if(!crypto.timingSafeEqual(Buffer.from(suppliedHash),Buffer.from(expectedHash))) throw new HttpsError("permission-denied","The invitation token is invalid.");
+  if(expectedHash.length!==suppliedHash.length || !crypto.timingSafeEqual(Buffer.from(suppliedHash),Buffer.from(expectedHash))) throw new HttpsError("permission-denied","The invitation token is invalid.");
   const email=String(invitation.email||"").trim().toLowerCase();
   if(!email||!email.includes("@")) throw new HttpsError("failed-precondition","The invitation has no valid recipient email.");
   const authAdmin=getAuth();
