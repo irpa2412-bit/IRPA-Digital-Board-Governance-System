@@ -1973,3 +1973,108 @@ textarea:focus-visible{
     align-self:start!important;
   }
 }
+
+
+/* LIVE WEATHER FORECAST WORD POP-UPS — 2026-09-25
+   Keep the compact weather icons visible while presenting descriptive forecast
+   wording in accessible hover/focus pop-ups. Touch/keyboard users can focus the
+   same trigger; no forecast data or refresh behavior is changed. */
+.topbar .google-weather-panel .live-weather-word-trigger{
+  position:relative!important;
+  appearance:none!important;
+  -webkit-appearance:none!important;
+  border:0!important;
+  margin:0!important;
+  padding:0!important;
+  background:transparent!important;
+  color:inherit!important;
+  font:inherit!important;
+  cursor:help!important;
+  outline:none!important;
+}
+.topbar .google-weather-panel .live-weather-current-word{
+  flex:0 0 42px!important;
+  width:42px!important;
+  height:42px!important;
+  display:block!important;
+}
+.topbar .google-weather-panel .live-weather-current-word .live-weather-icon{
+  width:42px!important;
+  height:42px!important;
+}
+.topbar .google-weather-panel .live-weather-word-popup{
+  position:absolute!important;
+  left:50%!important;
+  bottom:calc(100% + 8px)!important;
+  transform:translateX(-50%) translateY(4px)!important;
+  z-index:20!important;
+  width:max-content!important;
+  max-width:220px!important;
+  padding:7px 10px!important;
+  border-radius:9px!important;
+  background:#ffffff!important;
+  color:#202124!important;
+  border:1px solid #8ab4f8!important;
+  box-shadow:0 7px 18px rgba(60,64,67,.20)!important;
+  font-size:11px!important;
+  line-height:1.25!important;
+  font-weight:800!important;
+  text-align:center!important;
+  white-space:normal!important;
+  opacity:0!important;
+  visibility:hidden!important;
+  pointer-events:none!important;
+  transition:opacity .16s ease,transform .16s ease,visibility .16s ease!important;
+}
+.topbar .google-weather-panel .live-weather-word-popup::after{
+  content:""!important;
+  position:absolute!important;
+  left:50%!important;
+  top:100%!important;
+  transform:translateX(-50%)!important;
+  border:6px solid transparent!important;
+  border-top-color:#ffffff!important;
+}
+.topbar .google-weather-panel .live-weather-word-trigger:hover .live-weather-word-popup,
+.topbar .google-weather-panel .live-weather-word-trigger:focus-visible .live-weather-word-popup{
+  opacity:1!important;
+  visibility:visible!important;
+  transform:translateX(-50%) translateY(0)!important;
+}
+.topbar .google-weather-panel .live-weather-day-condition{
+  position:relative!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  width:auto!important;
+  min-width:26px!important;
+  min-height:22px!important;
+  margin-top:3px!important;
+  padding:0!important;
+  border:0!important;
+  background:transparent!important;
+  color:#3c4043!important;
+  cursor:help!important;
+}
+.topbar .google-weather-panel .live-weather-day-condition .live-weather-day-icon{
+  display:inline-grid!important;
+  place-items:center!important;
+  width:24px!important;
+  height:22px!important;
+  font-size:15px!important;
+}
+.topbar .google-weather-panel .live-weather-day-condition .live-weather-word-popup{
+  left:0!important;
+  bottom:calc(100% + 6px)!important;
+  transform:translateY(4px)!important;
+  max-width:180px!important;
+  text-align:left!important;
+}
+.topbar .google-weather-panel .live-weather-day-condition .live-weather-word-popup::after{
+  left:16px!important;
+  transform:none!important;
+}
+.topbar .google-weather-panel .live-weather-day-condition:hover .live-weather-word-popup,
+.topbar .google-weather-panel .live-weather-day-condition:focus-visible .live-weather-word-popup{
+  transform:translateY(0)!important;
+}
