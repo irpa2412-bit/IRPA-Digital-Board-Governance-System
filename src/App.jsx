@@ -106,7 +106,7 @@ function Dashboard({user,admin,employee,profile,onNavigate}){
       </svg>
       <div className="mobile-quote1-shade"></div>
       <div className="mobile-quote1-user mobile-app-head">
-        <div className="mobile-quote1-photo" aria-label="IRPA application logo">{photo?<img src={photo} alt={displayName}/>:<img src="/irpa-brand.svg" alt="IRPA"/>}</div>
+        <div className="mobile-quote1-photo" aria-label="IRPA application logo"><img src="/irpa-brand.svg" alt="IRPA"/></div>
         <div className="mobile-app-head-copy"><span>GOOD MORNING,</span><h1>{displayName}</h1><p>{profileTitle}{registrationNo?" · "+registrationNo:""}</p><em>{admin?"Administrator":profileTitle}</em></div>
         <button type="button" onClick={()=>go("Alerts")} aria-label="Notifications" className="mobile-quote1-notification"><i className="fa-solid fa-bell" aria-hidden="true"></i><b>1</b></button>
       </div>
