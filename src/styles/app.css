@@ -3250,3 +3250,41 @@
     color:#fff!important;
   }
 }
+
+/* IRPA DESKTOP FRONT DASHBOARD BLUE/WHITE FINAL ENFORCEMENT V5 */
+@media screen and (min-width:761px){
+  /* Front-dashboard navigation/stat cards */
+  .dashboard-quote4-stats>button,
+  .quote4-quick-grid>button{
+    background:#0b5fa8!important;
+    background-color:#0b5fa8!important;
+    background-image:none!important;
+    color:#fff!important;
+    border:1px solid rgba(255,255,255,.45)!important;
+    box-shadow:0 5px 16px rgba(0,45,90,.22)!important;
+  }
+  .dashboard-quote4-stats>button:hover,
+  .dashboard-quote4-stats>button:focus-visible,
+  .quote4-quick-grid>button:hover,
+  .quote4-quick-grid>button:focus-visible{
+    background:#1672bf!important;
+    background-color:#1672bf!important;
+    background-image:none!important;
+    color:#fff!important;
+    border-color:#fff!important;
+  }
+  .dashboard-quote4-stats>button strong,
+  .dashboard-quote4-stats>button b,
+  .dashboard-quote4-stats>button small,
+  .dashboard-quote4-stats>button i,
+  .quote4-quick-grid>button strong,
+  .quote4-quick-grid>button small,
+  .quote4-quick-grid>button b,
+  .quote4-quick-grid>button span{
+    color:#fff!important;
+  }
+  .desktop-quote4-hero p{
+    color:#fff!important;
+    text-shadow:0 1px 2px rgba(0,0,0,.45)!important;
+  }
+}
