@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { browserSupportsPush, listenForForegroundMessages, notificationPermissionState, requestPushPermission } from "../firebase/messaging";
 import { startGoogleDriveAuthorization } from "../firebase/signatureStorage";
 import { resetDocumentTrialData, resetEmployeeTrialData, resetMemberTrialData, resetSignatureEnvelopeTrialData, createExternalAuditorProfile } from "../firebase/data";
-import { createAdministrator } from "../firebase/functions";
+import { createAdministrator, reconcileRegisteredIdentityUids } from "../firebase/functions";
 
 export default function Settings({ admin = false, section = "settings" }) {
   const [supported, setSupported] = useState(false);
@@ -188,6 +188,61 @@ export default function Settings({ admin = false, section = "settings" }) {
               aria-busy={adminResult.working ? "true" : "false"}
             >
               {adminResult.message}
+            </div>
+          )}
+        </section>
+      )}
+
+      {admin && section === "settings" && (
+        <section className="panel">
+          <div className="panel-header">
+            <div>
+              <span className="eyebrow">IDENTITY CONTROL</span>
+              <h2>Member & Employee UID Reconciliation</h2>
+              <p className="panel-description">Safely reconcile registered Member and Employee records with existing Firebase Authentication accounts. Matching is performed only by exact normalized email address.</p>
+            </div>
+          </div>
+          <div className="stat-card" style={{ marginBottom: 18 }}>
+            <span>Safety controls</span>
+            <strong>Existing UIDs are never overwritten</strong>
+            <small>No Firebase accounts are created. Records without an exact Authentication email match remain unresolved for manual review.</small>
+          </div>
+          <div className="form-actions">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={async () => {
+                if (!window.confirm("Run the UID reconciliation for all registered Members and Employees? Existing UIDs will not be changed, and no new Firebase Authentication accounts will be created.")) return;
+                setBusy(true);
+                setMessage("");
+                setResult(null);
+                try {
+                  const data = await reconcileRegisteredIdentityUids();
+                  setResult({ type: "uid-reconciliation", ...data });
+                  const assigned = Number(data?.members?.assigned||0) + Number(data?.employees?.assigned||0);
+                  const unresolved = Number(data?.members?.unmatched||0) + Number(data?.employees?.unmatched||0);
+                  const conflicts = Number(data?.members?.conflicts||0) + Number(data?.employees?.conflicts||0);
+                  setMessage(`UID reconciliation completed: ${assigned} record(s) assigned, ${unresolved} unresolved, ${conflicts} conflict(s) preserved for review.`);
+                } catch (error) {
+                  setMessage(error?.message || "UID reconciliation failed. No success confirmation was received.");
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              {busy ? "Reconciling UIDs…" : "Reconcile Member & Employee UIDs"}
+            </button>
+          </div>
+          {result?.type === "uid-reconciliation" && (
+            <div className="detail-grid" style={{ marginTop: 18 }}>
+              <div><span>Members assigned</span><strong>{result.members?.assigned||0}</strong></div>
+              <div><span>Members already assigned</span><strong>{result.members?.alreadyAssigned||0}</strong></div>
+              <div><span>Members unresolved</span><strong>{result.members?.unmatched||0}</strong></div>
+              <div><span>Employees assigned</span><strong>{result.employees?.assigned||0}</strong></div>
+              <div><span>Employees already assigned</span><strong>{result.employees?.alreadyAssigned||0}</strong></div>
+              <div><span>Employees unresolved</span><strong>{result.employees?.unmatched||0}</strong></div>
+              <div><span>Conflicts preserved</span><strong>{(result.members?.conflicts||0)+(result.employees?.conflicts||0)}</strong></div>
+              <div><span>Firebase accounts scanned</span><strong>{result.authUsers||0}</strong></div>
             </div>
           )}
         </section>
