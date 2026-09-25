@@ -2981,14 +2981,14 @@
     position:relative!important;box-sizing:border-box!important;display:block!important;
     width:100%!important;height:112px!important;min-height:112px!important;min-width:0!important;
     margin:0!important;padding:14px!important;overflow:hidden!important;
-    background:#FFFFFF!important;color:#111827!important;border:1px solid #eef0f2!important;
+    background:#0b5fa8!important;color:#fff!important;border:1px solid rgba(255,255,255,.45)!important;
     border-radius:16px!important;box-shadow:0 2px 8px rgba(0,0,0,.08)!important;
     text-align:left!important;transform:none!important;
   }
   .content-area .dashboard-command .mobile-quote1-stats>button:hover,
   .content-area .dashboard-command .mobile-quote1-stats>button:focus{
-    background:#FFFFFF!important;color:#111827!important;transform:none!important;
-    border-color:#e3e7eb!important;
+    background:#1672bf!important;color:#fff!important;transform:none!important;
+    border-color:#fff!important;
   }
   .content-area .dashboard-command .mobile-quote1-stats>button>span{
     position:absolute!important;left:14px!important;top:14px!important;
@@ -3026,7 +3026,7 @@
   }
   .content-area .dashboard-command .mobile-quote1-heading button{
     min-width:0!important;min-height:32px!important;height:32px!important;padding:0!important;
-    background:transparent!important;border:0!important;box-shadow:none!important;color:#2E8B57!important;
+    background:#0b5fa8!important;border:1px solid rgba(255,255,255,.45)!important;box-shadow:none!important;color:#fff!important;
     font-size:11px!important;font-weight:900!important;
   }
   .content-area .dashboard-command .mobile-quote1-grid{
@@ -3037,13 +3037,13 @@
     box-sizing:border-box!important;display:flex!important;flex-direction:column!important;
     align-items:center!important;justify-content:center!important;gap:8px!important;
     width:100%!important;height:104px!important;min-height:104px!important;min-width:0!important;
-    padding:9px 4px!important;margin:0!important;background:#FFFFFF!important;color:#111827!important;
+    padding:9px 4px!important;margin:0!important;background:#0b5fa8!important;color:#fff!important;
     border:1px solid #eef0f2!important;border-radius:16px!important;
     box-shadow:0 2px 8px rgba(0,0,0,.08)!important;transform:none!important;
   }
   .content-area .dashboard-command .mobile-quote1-grid>button:hover,
   .content-area .dashboard-command .mobile-quote1-grid>button:focus{
-    background:#FFFFFF!important;color:#111827!important;transform:none!important;
+    background:#1672bf!important;color:#fff!important;transform:none!important;
   }
   .content-area .dashboard-command .mobile-quote1-grid>button>span{
     display:grid!important;place-items:center!important;width:44px!important;height:44px!important;
