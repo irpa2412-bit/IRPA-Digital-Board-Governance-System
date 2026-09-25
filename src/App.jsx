@@ -209,7 +209,7 @@ function LiveWeatherPanel(){
      };
      const currentRows=valid.map(([current])=>current);
      const current={
-      weatherCondition:{type:mode(currentRows.map(row=>row.weatherCondition?.type)),description:{text:"Regional conditions"}},
+      weatherCondition:{type:mode(currentRows.map(row=>row.weatherCondition?.type)),description:{text:mode(currentRows.map(row=>row.weatherCondition?.description?.text))||"Regional conditions"}},
       temperature:{degrees:average(currentRows.map(row=>row.temperature?.degrees))},
       feelsLikeTemperature:{degrees:average(currentRows.map(row=>row.feelsLikeTemperature?.degrees))},
       relativeHumidity:average(currentRows.map(row=>row.relativeHumidity)),
