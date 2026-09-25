@@ -8,6 +8,82 @@ const crypto = require("crypto");
 initializeApp(); const db = getFirestore();
 async function stableId(v){return crypto.createHash("sha256").update(String(v)).digest("hex");}
 async function notify({recipientUids,type,title,body,module,recordId,route="/",priority="normal",eventKey}){for(const recipientUid of [...new Set((recipientUids||[]).filter(Boolean).map(String))]){const id=await stableId(`${eventKey}|${recipientUid}`);await db.collection("notifications").doc(id).set({recipientUid,type,title,body,module,recordId:recordId||null,route,priority,read:false,createdByUid:"system",createdAt:FieldValue.serverTimestamp()},{merge:true});}}
+
+// Central financial reference control. References are issued only after an approval
+// state is reached, by a server-side Firestore trigger. A yearly counter is updated
+// transactionally so concurrent approvals cannot receive the same reference.
+const FINANCIAL_APPROVALS={
+  staffPaymentRequests:data=>data?.status==="Authorized",
+  financeTransactions:data=>data?.status==="Approved",
+  financeApprovals:data=>data?.status==="Approved",
+  financeBudgets:data=>data?.status==="Board Approved",
+  financeReports:data=>data?.status==="Approved"
+};
+function financialApprovalLabel(collectionName,data){
+  return FINANCIAL_APPROVALS[collectionName]?.(data)===true;
+}
+async function assignFinancialReference(collectionName,docId){
+  const sourceRef=db.collection(collectionName).doc(docId);
+  const sourceSnap=await sourceRef.get();
+  if(!sourceSnap.exists)return null;
+  const source=sourceSnap.data()||{};
+  if(!financialApprovalLabel(collectionName,source))return null;
+  if(String(source.referenceNumber||"").trim())return String(source.referenceNumber).trim();
+
+  const year=new Date().getUTCFullYear();
+  const counterRef=db.collection("financialReferenceCounters").doc(String(year));
+  return db.runTransaction(async tx=>{
+    const currentSource=await tx.get(sourceRef);
+    if(!currentSource.exists)return null;
+    const current=currentSource.data()||{};
+    if(String(current.referenceNumber||"").trim())return String(current.referenceNumber).trim();
+    const counterSnap=await tx.get(counterRef);
+    let nextNumber=Math.max(1,Number(counterSnap.exists?(counterSnap.data()?.nextNumber||1):1));
+    let reference="";
+    let registryRef=null;
+    let registrySnap=null;
+    for(let attempt=0;attempt<25;attempt++){
+      reference=`IRPA-FIN-${year}-${String(nextNumber).padStart(5,"0")}`;
+      registryRef=db.collection("financeReferenceRegistry").doc(reference);
+      registrySnap=await tx.get(registryRef);
+      if(!registrySnap.exists)break;
+      nextNumber++;
+    }
+    if(registrySnap?.exists)throw new Error("Financial reference registry collision could not be resolved.");
+    const issuedAt=FieldValue.serverTimestamp();
+    tx.set(sourceRef,{referenceNumber:reference,referenceStatus:"System Generated",referenceIssuedAt:issuedAt,referenceIssuedBy:"SYSTEM",financialReferenceVersion:"1.0"},{merge:true});
+    tx.set(registryRef,{
+      referenceNumber:reference,referenceYear:year,sequenceNumber:nextNumber,
+      sourceCollection:collectionName,sourceRecordId:docId,
+      sourceTitle:current.title||current.description||current.type||current.employeeName||null,
+      employeeUid:current.employeeUid||null,employeeNumber:current.employeeNumber||null,employeeName:current.employeeName||null,
+      payee:current.payee||null,amount:Number(current.amount||0),currency:current.currency||"TZS",
+      approvalStatus:current.status||null,workflowStage:current.workflowStage||null,
+      issuedAt,issuedBy:"SYSTEM",controlStatus:"Active",createdAt:issuedAt,updatedAt:issuedAt
+    });
+    tx.set(counterRef,{nextNumber:nextNumber+1,currentNumber:nextNumber,updatedAt:issuedAt},{merge:true});
+    return reference;
+  });
+}
+async function financialReferenceTrigger(event,collectionName){
+  const after=event.data?.after?.data?.()||{};
+  if(!event.data?.after?.exists)return null;
+  if(String(after.referenceNumber||"").trim())return null;
+  if(!financialApprovalLabel(collectionName,after))return null;
+  try{
+    await assignFinancialReference(collectionName,event.params.docId);
+    return null;
+  }catch(error){
+    console.error(`Financial reference allocation failed for ${collectionName}/${event.params.docId}`,error);
+    throw error;
+  }
+}
+exports.assignStaffPaymentFinancialReference=onDocumentUpdated({document:"staffPaymentRequests/{docId}",region:"us-central1"},event=>financialReferenceTrigger(event,"staffPaymentRequests"));
+exports.assignFinanceTransactionFinancialReference=onDocumentUpdated({document:"financeTransactions/{docId}",region:"us-central1"},event=>financialReferenceTrigger(event,"financeTransactions"));
+exports.assignFinanceApprovalFinancialReference=onDocumentUpdated({document:"financeApprovals/{docId}",region:"us-central1"},event=>financialReferenceTrigger(event,"financeApprovals"));
+exports.assignFinanceBudgetFinancialReference=onDocumentUpdated({document:"financeBudgets/{docId}",region:"us-central1"},event=>financialReferenceTrigger(event,"financeBudgets"));
+exports.assignFinanceReportFinancialReference=onDocumentUpdated({document:"financeReports/{docId}",region:"us-central1"},event=>financialReferenceTrigger(event,"financeReports"));
+
 async function meetingRecipients(meetingId,meeting={}){if(!meetingId)return[];const ids=new Set([...(meeting.participantUids||[]),...(meeting.attendeeUids||[]),...(meeting.memberUids||[])].filter(Boolean));const snap=await db.collection("meetingSubscriptions").where("meetingId","==",meetingId).get();snap.forEach(d=>{const x=d.data();[x.uid,x.userId,x.memberUid].filter(Boolean).forEach(v=>ids.add(v));});return[...ids];}
 
 async function deleteCollectionDocs(collectionName){
