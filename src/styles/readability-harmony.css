@@ -877,7 +877,7 @@ textarea:focus-visible{
   pointer-events:auto!important;
   overflow:hidden!important;
 }
-.topbar .open-portal-panel span{
+.topbar .open-portal-panel > span{
   display:block!important;
   color:#f4d474!important;
   font-size:10px!important;
@@ -885,7 +885,7 @@ textarea:focus-visible{
   font-weight:850!important;
   letter-spacing:.14em!important;
 }
-.topbar .open-portal-panel strong{
+.topbar .open-portal-panel > strong{
   display:block!important;
   margin-top:4px!important;
   color:#ffffff!important;
@@ -1213,8 +1213,8 @@ textarea:focus-visible{
     z-index:1!important;
     text-align:left!important;
   }
-  .topbar .open-portal-panel span,
-  .topbar .open-portal-panel strong{
+  .topbar .open-portal-panel > span,
+  .topbar .open-portal-panel > strong{
     text-align:left!important;
   }
   .topbar-title-block{
