@@ -1026,3 +1026,85 @@ textarea:focus-visible{
     stroke-width:2.4!important;
   }
 }
+
+
+/* INDEPENDENT TOPBAR PANEL LAYOUT — 2026-09-25
+   The Open Portal panel must occupy its own layout column. It must never
+   overlay the title, access category, sign-out control, or dashboard content. */
+@media(min-width:1101px){
+  .topbar-heading-row{
+    display:grid!important;
+    grid-template-columns:minmax(240px,1fr) minmax(260px,1.35fr) minmax(190px,250px)!important;
+    align-items:center!important;
+    gap:12px!important;
+    min-width:0!important;
+    flex:1 1 auto!important;
+  }
+  .topbar-title-block{
+    grid-column:1!important;
+    grid-row:1!important;
+    min-width:0!important;
+  }
+  .topbar .open-portal-panel{
+    position:relative!important;
+    left:auto!important;
+    right:auto!important;
+    top:auto!important;
+    bottom:auto!important;
+    transform:none!important;
+    grid-column:2!important;
+    grid-row:1!important;
+    width:100%!important;
+    min-width:0!important;
+    min-height:62px!important;
+    height:62px!important;
+    margin:0!important;
+    padding:10px 18px!important;
+    z-index:1!important;
+    pointer-events:none!important;
+    overflow:hidden!important;
+    box-sizing:border-box!important;
+  }
+  .topbar-access-category{
+    grid-column:3!important;
+    grid-row:1!important;
+    min-width:0!important;
+    width:100%!important;
+  }
+  .topbar .open-portal-panel strong{
+    white-space:nowrap!important;
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
+  }
+}
+@media(min-width:761px) and (max-width:1100px){
+  .topbar-heading-row{
+    display:flex!important;
+    align-items:center!important;
+    gap:10px!important;
+    min-width:0!important;
+  }
+  .topbar .open-portal-panel{
+    position:relative!important;
+    left:auto!important;
+    right:auto!important;
+    top:auto!important;
+    bottom:auto!important;
+    transform:none!important;
+    flex:1 1 320px!important;
+    min-width:180px!important;
+    max-width:none!important;
+    height:58px!important;
+    margin:0!important;
+    z-index:1!important;
+  }
+  .topbar-title-block{
+    flex:1 1 260px!important;
+    min-width:0!important;
+  }
+  .topbar-access-category{
+    flex:0 1 210px!important;
+    width:auto!important;
+    min-width:160px!important;
+  }
+}
