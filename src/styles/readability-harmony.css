@@ -1540,3 +1540,23 @@ textarea:focus-visible{
     aspect-ratio:auto!important;
   }
 }
+
+/* LIVE GOOGLE WEATHER PANEL — automatic current conditions and forecast */
+.topbar .google-weather-panel{cursor:default!important;pointer-events:auto!important;}
+.topbar .google-weather-panel .live-weather-content{width:100%;min-width:0;color:#eef7f3;}
+.topbar .google-weather-panel .live-weather-current{display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;}
+.topbar .google-weather-panel .live-weather-current-main{display:flex;align-items:center;gap:10px;min-width:0;}
+.topbar .google-weather-panel .live-weather-icon{width:40px;height:40px;display:grid;place-items:center;flex:0 0 40px;font-size:25px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.22);border-radius:10px;}
+.topbar .google-weather-panel .live-weather-current-main div{min-width:0;}
+.topbar .google-weather-panel .live-weather-current-main strong{display:block;margin:0;color:#fff;font-size:19px;line-height:1.1;font-weight:850;}
+.topbar .google-weather-panel .live-weather-current-main span{display:block;margin-top:2px;color:#f4d474;font-size:11px;line-height:1.2;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.topbar .google-weather-panel .live-weather-current-main small{display:block;margin-top:2px;color:#cfe1d9;font-size:9px;line-height:1.2;white-space:nowrap;}
+.topbar .google-weather-panel .live-weather-metrics{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:7px;color:#dcebe5;font-size:9px;line-height:1.2;}
+.topbar .google-weather-panel .live-weather-days{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:7px;width:100%;}
+.topbar .google-weather-panel .live-weather-day{min-width:0;padding:5px 6px;background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.1);border-radius:7px;}
+.topbar .google-weather-panel .live-weather-day strong{display:block;color:#f4d474;font-size:8px;line-height:1.1;}
+.topbar .google-weather-panel .live-weather-day span{display:block;margin-top:2px;color:#eaf4f0;font-size:8px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.topbar .google-weather-panel .live-weather-day b{display:block;margin-top:2px;color:#fff;font-size:9px;line-height:1.1;}
+.topbar .google-weather-panel .live-weather-day small{display:block;margin-top:2px;color:#c9ddd5;font-size:7px;line-height:1.1;}
+.topbar .google-weather-panel .live-weather-attribution{display:flex;justify-content:space-between;gap:8px;margin-top:4px;color:#a9c1b8;font-size:7px;line-height:1.1;}
+.topbar .google-weather-panel .live-weather-attribution small{margin:0;color:#a9c1b8;font-size:7px;line-height:1.1;}
