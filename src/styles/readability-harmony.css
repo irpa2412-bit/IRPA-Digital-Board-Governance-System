@@ -1816,3 +1816,124 @@ textarea:focus-visible{
   line-height:1.2!important;
   font-weight:700!important;
 }
+
+/* WEATHER LOCATION POPUP — 2026-09-25 */
+.topbar .google-weather-panel .live-weather-location-bar{
+  position:relative!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  gap:10px!important;
+  min-width:0!important;
+  margin:0 0 7px!important;
+}
+.topbar .google-weather-panel .live-weather-location-bar>span{
+  margin:0!important;
+  color:#0b57d0!important;
+  font-size:12px!important;
+  line-height:1.25!important;
+  font-weight:900!important;
+  letter-spacing:.11em!important;
+  white-space:nowrap!important;
+}
+.topbar .google-weather-panel .live-weather-location-picker{
+  position:relative!important;
+  flex:0 0 auto!important;
+  z-index:20!important;
+}
+.topbar .google-weather-panel .live-weather-location-trigger{
+  appearance:none!important;
+  border:1px solid rgba(26,115,232,.28)!important;
+  background:rgba(255,255,255,.88)!important;
+  color:#0b57d0!important;
+  border-radius:999px!important;
+  min-height:30px!important;
+  padding:5px 10px!important;
+  font:800 11px/1.2 Arial,sans-serif!important;
+  cursor:pointer!important;
+  box-shadow:0 2px 8px rgba(60,64,67,.08)!important;
+}
+.topbar .google-weather-panel .live-weather-location-trigger:hover,
+.topbar .google-weather-panel .live-weather-location-trigger:focus-visible{
+  background:#ffffff!important;
+  border-color:#1a73e8!important;
+  outline:2px solid rgba(26,115,232,.22)!important;
+  outline-offset:2px!important;
+}
+.topbar .google-weather-panel .live-weather-location-popup{
+  position:absolute!important;
+  top:calc(100% + 7px)!important;
+  right:0!important;
+  width:230px!important;
+  max-width:min(230px,calc(100vw - 28px))!important;
+  padding:10px!important;
+  border:1px solid #8ab4f8!important;
+  border-radius:12px!important;
+  background:#ffffff!important;
+  box-shadow:0 14px 30px rgba(32,33,36,.22)!important;
+  z-index:100!important;
+  box-sizing:border-box!important;
+}
+.topbar .google-weather-panel .live-weather-location-popup>strong{
+  display:block!important;
+  color:#0b1f33!important;
+  font-size:12px!important;
+  line-height:1.25!important;
+  font-weight:900!important;
+}
+.topbar .google-weather-panel .live-weather-location-popup>small{
+  display:block!important;
+  margin:3px 0 7px!important;
+  color:#5f6368!important;
+  font-size:9px!important;
+  line-height:1.25!important;
+  font-weight:700!important;
+}
+.topbar .google-weather-panel .live-weather-location-popup>button{
+  width:100%!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:flex-start!important;
+  gap:2px!important;
+  margin:3px 0!important;
+  padding:7px 8px!important;
+  border:1px solid transparent!important;
+  border-radius:8px!important;
+  background:#f7fbff!important;
+  color:#17324d!important;
+  text-align:left!important;
+  cursor:pointer!important;
+  font:800 11px/1.2 Arial,sans-serif!important;
+}
+.topbar .google-weather-panel .live-weather-location-popup>button>span{
+  color:#17324d!important;
+  font-size:11px!important;
+  font-weight:850!important;
+}
+.topbar .google-weather-panel .live-weather-location-popup>button>small{
+  margin:0!important;
+  color:#5f6368!important;
+  font-size:8px!important;
+  font-weight:700!important;
+}
+.topbar .google-weather-panel .live-weather-location-popup>button:hover,
+.topbar .google-weather-panel .live-weather-location-popup>button:focus-visible,
+.topbar .google-weather-panel .live-weather-location-popup>button.active{
+  background:#e8f0fe!important;
+  border-color:#8ab4f8!important;
+  outline:none!important;
+}
+@media(max-width:760px){
+  .topbar .google-weather-panel .live-weather-location-bar{
+    align-items:flex-start!important;
+  }
+  .topbar .google-weather-panel .live-weather-location-trigger{
+    min-height:28px!important;
+    padding:5px 8px!important;
+    font-size:10px!important;
+  }
+  .topbar .google-weather-panel .live-weather-location-popup{
+    right:auto!important;
+    left:0!important;
+  }
+}
