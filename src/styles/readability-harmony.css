@@ -854,6 +854,12 @@ textarea:focus-visible{
   flex:1 1 auto!important;
 }
 .dashboard-live-date-slot .live-date-stat-buttons .desktop-blue-nav-button .quote4-stat-icon{
+  display:grid!important;
+  place-items:center!important;
+  align-self:center!important;
+  justify-self:center!important;
+  margin-top:0!important;
+  margin-bottom:0!important;
   background:#ffffff!important;
   color:#0b5fa8!important;
   border:2px solid rgba(11,95,168,.35)!important;
