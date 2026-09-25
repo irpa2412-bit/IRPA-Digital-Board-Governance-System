@@ -3678,3 +3678,55 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   background:#e5f3eb!important;
   border-color:#b9d8c5!important;
 }
+
+/* IRPA READABILITY FIX — LIGHT-SURFACE FINAL OVERRIDE — 2026-09-25 */
+ /* This is deliberately the final cascade layer so later legacy card rules cannot
+    reintroduce white-on-white text. Interaction, routes, data and card geometry are unchanged. */
+.content-area .page .stat-card,
+.content-area .page .workflow-stage{
+  background:#f3f6f4!important;
+  color:#24362f!important;
+  border-color:#d7e1dc!important;
+}
+.content-area .page .stat-card span,
+.content-area .page .workflow-stage span{
+  color:#355247!important;
+  opacity:1!important;
+}
+.content-area .page .stat-card strong,
+.content-area .page .workflow-stage strong{
+  color:#173a2b!important;
+  opacity:1!important;
+}
+.content-area .page .stat-card small,
+.content-area .page .workflow-stage small{
+  color:#526b60!important;
+  opacity:1!important;
+}
+.content-area .page .stat-card button,
+.content-area .page .workflow-stage button,
+.content-area .page .stat-card a,
+.content-area .page .workflow-stage a{
+  opacity:1!important;
+}
+.content-area .page .stat-card.zero-value-card,
+.content-area .page .workflow-stage.zero-value-card{
+  background:#f2f4f3!important;
+  color:#34463e!important;
+}
+.content-area .page .stat-card.zero-value-card span,
+.content-area .page .stat-card.zero-value-card strong,
+.content-area .page .stat-card.zero-value-card small,
+.content-area .page .workflow-stage.zero-value-card span,
+.content-area .page .workflow-stage.zero-value-card strong,
+.content-area .page .workflow-stage.zero-value-card small{
+  color:#34463e!important;
+}
+@media(max-width:760px){
+  .content-area .page .stat-card span,
+  .content-area .page .workflow-stage span{font-size:12px!important;}
+  .content-area .page .stat-card strong,
+  .content-area .page .workflow-stage strong{font-size:22px!important;}
+  .content-area .page .stat-card small,
+  .content-area .page .workflow-stage small{font-size:11px!important;line-height:1.4!important;}
+}
