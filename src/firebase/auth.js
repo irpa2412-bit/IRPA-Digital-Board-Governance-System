@@ -203,73 +203,8 @@ function firebaseErrorMessage(error) {
   return known[code] ? `${known[code]} (${code})` : `${message}${code ? ` (${code})` : ""}`;
 }
 
-async function sendAuthResetEmailWithSecondaryApp(email, actionCodeSettings, appPrefix) {
-  const cleanEmail = email.trim().toLowerCase();
-  const secondaryName = `${appPrefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const secondaryApp = initializeApp(firebaseConfig, secondaryName);
-  const secondaryAuth = getAuth(secondaryApp);
-  let accountCreated = false;
-  try {
-    try {
-      await createUserWithEmailAndPassword(secondaryAuth, cleanEmail, generateTemporaryPassword());
-      accountCreated = true;
-    } catch (error) {
-      if (error?.code !== "auth/email-already-in-use") throw new Error(firebaseErrorMessage(error));
-    }
-    await sendPasswordResetEmail(secondaryAuth, cleanEmail, actionCodeSettings);
-    return { email: cleanEmail, accountCreated, emailRequested: true, provider: "Firebase Authentication", deliveryStatus: "Accepted by Firebase Authentication" };
-  } catch (error) {
-    throw new Error(firebaseErrorMessage(error));
-  } finally {
-    await deleteApp(secondaryApp);
-  }
-}
-
-export async function sendEmployeeRegistrationEmail(email, employeeNumber) {
-  if (!email || !employeeNumber) throw new Error("Employee email and Employee Number are required.");
-  const cleanEmail = email.trim().toLowerCase();
-  const actionCodeSettings = { url: window.location.origin + "/?employeeNumber=" + encodeURIComponent(employeeNumber) + "&email=" + encodeURIComponent(cleanEmail), handleCodeInApp: false };
-  return sendAuthResetEmailWithSecondaryApp(cleanEmail, actionCodeSettings, "employee-registration");
-}
-
-export async function sendMemberInvitationEmail(email, invitationId, role = "", memberType = "") {
-  if (!email || !invitationId) throw new Error("Member email and invitation ID are required.");
-  const cleanEmail = String(email).trim().toLowerCase();
-  const origin = window.location.origin;
-  const continueUrl = origin + "/?induction=1&applicant=1&route=subscription&memberInvite=" + encodeURIComponent(invitationId);
-
-  // Mail delivery is intentionally delegated to Firebase Authentication's
-  // configured custom SMTP relay. This removes the invitation-mail path from
-  // Cloud Functions/Cloud Build/Artifact Registry while retaining the
-  // configured IRPA SMTP server (mail.irpa.or.tz) at the Firebase Auth layer.
-  const actionCodeSettings = {
-    url: continueUrl,
-    handleCodeInApp: false
-  };
-
-  try {
-    const result = await sendAuthResetEmailWithSecondaryApp(
-      cleanEmail,
-      actionCodeSettings,
-      "member-invitation"
-    );
-
-    return {
-      email: cleanEmail,
-      emailRequested: true,
-      provider: "Firebase Authentication → configured IRPA custom SMTP",
-      deliveryStatus: "Accepted by Firebase Authentication; SMTP delivery not yet confirmed",
-      messageId: null,
-      role: String(role || "").trim(),
-      memberType: String(memberType || "").trim(),
-      sourceLabel: "Authoritative IRPA Register"
-    };
-  } catch (error) {
-    const rawMessage = String(error?.message || "Firebase Authentication could not request the invitation email.");
-    const code = error?.code || "";
-    throw new Error(code ? rawMessage + " (" + code + ")" : rawMessage);
-  }
-}
+// Invitation delivery is handled by the server-side dedicated invitation-token workflow.
+// Password-reset email remains available only through sendPasswordReset() for self-service recovery.
 export function observeAuthState(callback) {
   return onAuthStateChanged(auth, callback);
 }
