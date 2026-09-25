@@ -98,7 +98,7 @@ function Dashboard({user,admin,employee,profile,onNavigate}){
    <div className="dashboard-mobile-view" aria-label="Mobile IRPA governance dashboard">
     <section className="mobile-quote1-hero">
       <div className="mobile-quote1-image"></div><div className="mobile-quote1-shade"></div>
-      <div className="mobile-quote1-top"><img src="/irpa-logo.jpg" alt="IRPA"/><div><strong>IMPROVEMENT OF RANGELAND</strong><small>IN PASTORAL AREAS</small></div><button type="button" onClick={()=>go("Alerts")} aria-label="Notifications">●</button></div>
+      <div className="mobile-quote1-top"><img src="/irpa-brand.svg" alt="IRPA"/><div><strong>IMPROVEMENT OF RANGELAND</strong><small>IN PASTORAL AREAS</small></div><button type="button" onClick={()=>go("Alerts")} aria-label="Notifications">●</button></div>
       <div className="mobile-quote1-user"><div className="mobile-quote1-photo">{photo?<img src={photo} alt={displayName}/>:<span>{initials}</span>}</div><div><span>GOOD MORNING,</span><h1>{displayName}</h1><p>{profileTitle}{registrationNo?" · "+registrationNo:""}</p><em>{admin?"Administrator":profileTitle}</em></div></div>
     </section>
     <section className="mobile-quote1-stats">{cards.map(([label,value,sub,target])=><button key={label} type="button" onClick={()=>go(target)}><span>{iconFor(label)}</span><strong>{busy?"—":value}</strong><b>{label}</b><small>{sub}</small><i>›</i></button>)}</section>
