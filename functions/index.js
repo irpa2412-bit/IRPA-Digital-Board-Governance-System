@@ -101,6 +101,135 @@ async function deleteCollectionDocs(collectionName){
   return deleted;
 }
 
+
+async function requireActiveAdministratorCallable(request){
+  const uid=request.auth?.uid;
+  const email=String(request.auth?.token?.email||"").trim().toLowerCase();
+  if(!uid) throw new HttpsError("unauthenticated","Administrator authentication is required.");
+  if(email==="irpa2412@gmail.com") return {uid,email};
+  const snap=await db.collection("adminProfiles").doc(uid).get();
+  if(!snap.exists||snap.data()?.active!==true) throw new HttpsError("permission-denied","Administrator authorization is required.");
+  return {uid,email};
+}
+
+exports.synchronizeRegisteredIdentityUids = onCall({region:"us-central1",timeoutSeconds:120}, async request => {
+  const actor=await requireActiveAdministratorCallable(request);
+  const [memberSnap,employeeSnap]=await Promise.all([
+    db.collection("members").get(),
+    db.collection("employees").get()
+  ]);
+  const results=[];
+  const emailCache=new Map();
+  const processedUids=new Set();
+
+  async function authForEmail(email,name){
+    if(emailCache.has(email)) return emailCache.get(email);
+    let user=null,created=false;
+    try{
+      user=await getAuth().getUserByEmail(email);
+    }catch(error){
+      if(error?.code!=="auth/user-not-found") throw error;
+      user=await getAuth().createUser({
+        email,
+        emailVerified:false,
+        displayName:name||email.split("@")[0],
+        disabled:false
+      });
+      created=true;
+    }
+    const value={user,created};
+    emailCache.set(email,value);
+    return value;
+  }
+
+  async function syncCollection(snapshot,collectionName){
+    for(const item of snapshot.docs){
+      const data=item.data()||{};
+      const email=String(data.email||"").trim().toLowerCase();
+      const currentUid=String(data.uid||"").trim();
+      if(!email||!email.includes("@")){
+        results.push({collection:collectionName,id:item.id,name:data.name||"",email:"",uid:null,status:"UID Pending — Invalid or missing email",action:"blocked"});
+        continue;
+      }
+      try{
+        let user=null,created=false;
+        if(currentUid){
+          try{
+            user=await getAuth().getUser(currentUid);
+            const authEmail=String(user.email||"").trim().toLowerCase();
+            if(authEmail&&authEmail!==email){
+              user=null;
+              results.push({collection:collectionName,id:item.id,name:data.name||"",email,uid:currentUid,status:"UID Conflict — UID belongs to another email",action:"conflict"});
+              continue;
+            }
+          }catch(error){
+            if(error?.code!=="auth/user-not-found") throw error;
+          }
+        }
+        if(!user){
+          const resolved=await authForEmail(email,data.name);
+          user=resolved.user;
+          created=resolved.created;
+        }
+        if(processedUids.has(user.uid)){
+          // The same Firebase identity may legitimately be represented in both
+          // the member and employee registers. Keep both records linked.
+        }
+        processedUids.add(user.uid);
+        const status=String(data.status||data.employmentStatus||"Active");
+        const assignmentStatus=created?"UID Assigned — Firebase Account Created":"UID Linked — Existing Firebase Account";
+        const patch={
+          uid:user.uid,
+          uidAssignmentStatus:assignmentStatus,
+          uidAssignedAt:FieldValue.serverTimestamp(),
+          uidAssignedByUid:actor.uid,
+          uidAssignedByEmail:actor.email||null,
+          firebaseAuthEmail:String(user.email||email).trim().toLowerCase(),
+          firebaseAuthDisabled:user.disabled===true,
+          updatedAt:FieldValue.serverTimestamp()
+        };
+        if(collectionName==="employees" && !data.registrationEmailStatus){
+          patch.registrationEmailStatus=created?"UID Assigned — Activation Pending":"UID Linked";
+        }
+        await db.collection(collectionName).doc(item.id).set(patch,{merge:true});
+        await db.collection("audit").add({
+          action:"REGISTERED_IDENTITY_UID_SYNCHRONIZED",
+          collection:collectionName,
+          recordId:item.id,
+          details:{uid:user.uid,email,createdAuthAccount:created,existingStatus:status,uidAssignmentStatus:assignmentStatus},
+          actorUid:actor.uid,actorEmail:actor.email||null,createdAt:FieldValue.serverTimestamp()
+        });
+        results.push({collection:collectionName,id:item.id,name:data.name||"",email,uid:user.uid,status,action:created?"created":"linked"});
+      }catch(error){
+        console.error("UID synchronization failed",collectionName,item.id,error);
+        results.push({collection:collectionName,id:item.id,name:data.name||"",email,uid:null,status:"UID Pending — Synchronization error",action:"error",error:String(error?.message||error)});
+      }
+    }
+  }
+
+  await syncCollection(memberSnap,"members");
+  await syncCollection(employeeSnap,"employees");
+
+  const summary={
+    members:results.filter(x=>x.collection==="members"),
+    employees:results.filter(x=>x.collection==="employees"),
+    total:results.length,
+    linked:results.filter(x=>x.action==="linked").length,
+    created:results.filter(x=>x.action==="created").length,
+    conflicts:results.filter(x=>x.action==="conflict").length,
+    blocked:results.filter(x=>x.action==="blocked").length,
+    errors:results.filter(x=>x.action==="error").length
+  };
+  await db.collection("audit").add({
+    action:"REGISTERED_IDENTITY_UID_SYNCHRONIZATION_COMPLETED",
+    collection:"members+employees",
+    recordId:"UID_SYNC",
+    details:{total:summary.total,linked:summary.linked,created:summary.created,conflicts:summary.conflicts,blocked:summary.blocked,errors:summary.errors},
+    actorUid:actor.uid,actorEmail:actor.email||null,createdAt:FieldValue.serverTimestamp()
+  });
+  return {ok:true,summary};
+});
+
 exports.bootstrapPrimaryAdministrator = onCall({region:"us-central1"}, async request => {
   const uid=request.auth?.uid;
   const email=String(request.auth?.token?.email||"").trim().toLowerCase();
