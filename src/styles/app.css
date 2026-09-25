@@ -2277,17 +2277,17 @@
   .dashboard-quote4-stats>button{
     position:relative!important;display:flex!important;align-items:center!important;gap:11px!important;
     min-height:77px!important;padding:11px 13px!important;text-align:left!important;
-    background:#fff!important;color:#193b2e!important;border:1px solid #d9e5df!important;
-    border-radius:12px!important;box-shadow:0 5px 16px rgba(27,68,50,.055)!important;
+    background:#0b5fa8!important;color:#fff!important;border:1px solid rgba(255,255,255,.42)!important;
+    border-radius:12px!important;box-shadow:0 5px 16px rgba(0,45,90,.22)!important;
   }
-  .dashboard-quote4-stats>button:hover{transform:translateY(-2px)!important;border-color:#8ebca6!important;background:#fbfefd!important}
+  .dashboard-quote4-stats>button:hover{transform:translateY(-2px)!important;border-color:#fff!important;background:#1672bf!important;color:#fff!important}
   .quote4-stat-icon{display:grid;place-items:center;width:39px;height:39px;flex:0 0 39px;border-radius:11px;background:#e5f3eb;color:#176943;font-size:19px;font-weight:900}
   .dashboard-quote4-stats>button:nth-child(2) .quote4-stat-icon{background:#e7f1fb;color:#2573ae}
   .dashboard-quote4-stats>button:nth-child(3) .quote4-stat-icon{background:#fff2dc;color:#b86f1d}
   .dashboard-quote4-stats>button:nth-child(4) .quote4-stat-icon{background:#efe8fa;color:#704ca9}
   .dashboard-quote4-stats strong,.dashboard-quote4-stats b,.dashboard-quote4-stats small{display:block}
-  .dashboard-quote4-stats strong{font-size:23px;color:#123f2d}.dashboard-quote4-stats b{font-size:10px;color:#25483a}.dashboard-quote4-stats small{font-size:8px;color:#71857c;margin-top:2px}
-  .dashboard-quote4-stats i{margin-left:auto;color:#1d7b50;font-style:normal;font-size:20px}
+  .dashboard-quote4-stats strong{font-size:23px;color:#fff}.dashboard-quote4-stats b{font-size:10px;color:#fff}.dashboard-quote4-stats small{font-size:8px;color:#e5f1fa;margin-top:2px}
+  .dashboard-quote4-stats i{margin-left:auto;color:#fff;font-style:normal;font-size:20px}
   .dashboard-quote4-main{display:grid!important;grid-template-columns:minmax(0,1.65fr) minmax(300px,.85fr);gap:13px!important}
   .dashboard-quote4-main .panel{
     background:#fff!important;border:1px solid #d9e5df!important;border-radius:14px!important;
@@ -2313,13 +2313,14 @@
   .quote4-quick-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   .quote4-quick-grid>button{
     min-height:91px!important;padding:11px!important;text-align:left!important;display:flex!important;flex-direction:column!important;align-items:flex-start!important;
-    background:#f8fbf9!important;color:#214538!important;border:1px solid #dbe7e1!important;border-radius:11px!important;
+    background:#0b5fa8!important;color:#fff!important;border:1px solid rgba(255,255,255,.42)!important;border-radius:11px!important;
+    box-shadow:0 5px 16px rgba(0,45,90,.18)!important;
   }
-  .quote4-quick-grid>button:hover{background:#eef8f2!important;border-color:#9fc8b2!important;transform:translateY(-1px)!important}
-  .quote4-quick-grid>button>span{font-size:20px;color:#1a7a4f!important}
-  .quote4-quick-grid>button>strong{margin-top:7px;font-size:10px;color:#214538!important}
-  .quote4-quick-grid>button>small{margin-top:3px;font-size:8px;line-height:1.25;color:#71857c!important}
-  .quote4-quick-grid>button>b{margin-top:auto;align-self:flex-end;color:#1a7a4f!important}
+  .quote4-quick-grid>button:hover{background:#1672bf!important;border-color:#fff!important;transform:translateY(-1px)!important}
+  .quote4-quick-grid>button>span{font-size:20px;color:#fff!important}
+  .quote4-quick-grid>button>strong{margin-top:7px;font-size:10px;color:#fff!important}
+  .quote4-quick-grid>button>small{margin-top:3px;font-size:8px;line-height:1.25;color:#e5f1fa!important}
+  .quote4-quick-grid>button>b{margin-top:auto;align-self:flex-end;color:#fff!important}
 }
 
 /* ---------- MOBILE QUOTE 1: hero banner + 2x2 stats + 3-column access ---------- */
