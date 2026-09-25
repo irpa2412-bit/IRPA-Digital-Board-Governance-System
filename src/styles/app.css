@@ -3897,3 +3897,37 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .content-area .page .unified-control-tabs .unified-control-tab[aria-selected="true"] *{
   color:#fff!important;
 }
+
+
+/* IRPA DESKTOP NAVIGATION COMPRESSION — 2026-09-25
+   Keep the operator navigation anchored to the left while reducing its horizontal footprint.
+   This changes only desktop navigation sizing/positioning; routes, labels, permissions and actions remain unchanged. */
+@media screen and (min-width:761px){
+  .sidebar{
+    width:170px!important;
+    left:0!important;
+    right:auto!important;
+  }
+  .main-area{
+    margin-left:170px!important;
+    margin-right:0!important;
+  }
+  .sidebar nav{
+    padding-left:6px!important;
+    padding-right:6px!important;
+  }
+  .sidebar .nav-item{
+    margin-left:2px!important;
+    margin-right:2px!important;
+    width:calc(100% - 4px)!important;
+    padding-left:8px!important;
+    padding-right:8px!important;
+  }
+  .sidebar .nav-item-content{
+    min-width:0!important;
+    gap:7px!important;
+  }
+  .sidebar .nav-item-content>span{
+    min-width:0!important;
+  }
+}
