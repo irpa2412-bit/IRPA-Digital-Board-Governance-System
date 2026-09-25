@@ -3,12 +3,12 @@
 .module-interlink-list{align-items:stretch;flex-wrap:wrap;overflow-x:auto}
 .workflow-portal-group{display:flex;align-items:center;gap:4px;padding:3px 4px;border:1px solid rgba(255,255,255,.28);border-radius:9px;background:rgba(255,255,255,.08)}
 .workflow-portal-group.active-group{border-color:rgba(255,255,255,.65);background:rgba(255,255,255,.14)}
-.workflow-portal-parent{font-weight:850!important;color:#fff!important;border-color:rgba(255,255,255,.45)!important;background:#256b4a!important}
-.workflow-portal-parent:hover{background:#1f5f42!important;color:#fff!important}
+.workflow-portal-parent{font-weight:850!important;color:#fff!important;border-color:rgba(255,255,255,.45)!important;background:#0b5fa8!important}
+.workflow-portal-parent:hover{background:#09528f!important;color:#fff!important}
 .workflow-portal-children{display:flex;align-items:center;gap:4px;padding-left:3px;border-left:1px solid rgba(255,255,255,.30)}
-.workflow-portal-children button{font-size:11px!important;padding:6px 8px!important;color:#fff!important;border-color:rgba(255,255,255,.32)!important;background:#347f5b!important}
-.workflow-portal-children button:hover{background:#2a704f!important;border-color:rgba(255,255,255,.70)!important;color:#fff!important}
-.workflow-portal-children button.active{font-weight:850;color:#fff!important;background:#1f6244!important;border-color:#fff!important;box-shadow:inset 0 -2px #fff}
+.workflow-portal-children button{font-size:11px!important;padding:6px 8px!important;color:#fff!important;border-color:rgba(255,255,255,.32)!important;background:#1672bf!important}
+.workflow-portal-children button:hover{background:#0f62a7!important;border-color:rgba(255,255,255,.70)!important;color:#fff!important}
+.workflow-portal-children button.active{font-weight:850;color:#fff!important;background:#0b5fa8!important;border-color:#fff!important;box-shadow:inset 0 -2px #fff}
 @media(max-width:900px){.workflow-portal-group{width:100%;align-items:flex-start;flex-direction:column}.workflow-portal-children{width:100%;border-left:0;border-top:1px solid rgba(255,255,255,.30);padding:5px 0 0;flex-wrap:wrap}.workflow-portal-parent{width:100%;text-align:left}}
 /* Unified IRPA portal navigation palette — every portal button uses the same green/white architecture. */
 .module-interlink-list > button{
@@ -17,16 +17,16 @@
   color:#fff!important;
   border:1px solid rgba(255,255,255,.38)!important;
   border-radius:8px!important;
-  background:#347f5b!important;
+  background:#1672bf!important;
   font-weight:750!important;
 }
 .module-interlink-list > button:hover{
-  background:#2a704f!important;
+  background:#0f62a7!important;
   border-color:rgba(255,255,255,.72)!important;
   color:#fff!important;
 }
 .module-interlink-list > button.active{
-  background:#1f6244!important;
+  background:#0b5fa8!important;
   border-color:#fff!important;
   color:#fff!important;
   font-weight:900!important;
@@ -38,9 +38,9 @@
 .module-interlink-list > button,
 .workflow-portal-parent,
 .workflow-portal-children button{
-  background:#347d55!important;
+  background:#0b5fa8!important;
   color:#f7fff9!important;
-  border:1px solid #5fa77b!important;
+  border:1px solid #2f86cf!important;
 }
 .module-interlink-list > button:hover,
 .module-interlink-list > button.active,
@@ -48,7 +48,7 @@
 .workflow-portal-parent.active,
 .workflow-portal-children button:hover,
 .workflow-portal-children button.active{
-  background:#347d55!important;
+  background:#0b5fa8!important;
   color:#ffffff!important;
   border-color:#ffffff!important;
 }
