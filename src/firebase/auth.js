@@ -6,6 +6,7 @@ import {
   signInAnonymously,
   signInWithPopup,
   signInWithCredential,
+  signInWithCustomToken,
   GoogleAuthProvider,
   signInWithRedirect,
   getRedirectResult,
@@ -275,6 +276,25 @@ export function observeAuthState(callback) {
 
 export function isMagicLink(url = window.location.href) {
   return isSignInWithEmailLink(auth, url);
+}
+
+export async function completeInvitationToken(token) {
+  const cleanToken = String(token || "").trim();
+  if (!cleanToken) throw new Error("The IRPA invitation token is missing.");
+  const call = httpsCallable(getFunctions(undefined, "us-central1"), "redeemInvitationToken");
+  try {
+    const result = await call({ token: cleanToken });
+    const data = result.data || {};
+    if (!data.customToken || !data.invitationId) throw new Error("The invitation redemption response was incomplete.");
+    const signedIn = await signInWithCustomToken(auth, data.customToken);
+    const { provisionCurrentMemberFromInvitationV2 } = await import("./invitationWorkflow");
+    await provisionCurrentMemberFromInvitationV2(data.invitationId);
+    window.localStorage.removeItem("irpaEmailForSignIn");
+    window.localStorage.removeItem("irpaMemberEmailForSignIn");
+    return signedIn.user;
+  } catch (error) {
+    throw new Error(error?.message || "The IRPA invitation could not be redeemed.");
+  }
 }
 
 export async function completeMagicLink(email, url = window.location.href) {
