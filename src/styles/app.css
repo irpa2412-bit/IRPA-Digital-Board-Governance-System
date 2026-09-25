@@ -3231,3 +3231,21 @@
     color:#fff!important;
   }
 }
+
+/* IRPA MOBILE ACTIVE TAB BLUE SAFETY OVERRIDE */
+@media screen and (max-width:760px){
+  .main-area>.mobile-global-nav button.active,
+  .mobile-global-nav button.active{
+    background:#0b5fa8!important;
+    background-color:#0b5fa8!important;
+    background-image:none!important;
+    color:#fff!important;
+    box-shadow:inset 0 3px #fff!important;
+  }
+  .main-area>.mobile-global-nav button.active .mobile-nav-icon .svg-inline--fa,
+  .main-area>.mobile-global-nav button.active .mobile-nav-icon>i,
+  .mobile-global-nav button.active .mobile-nav-icon .svg-inline--fa,
+  .mobile-global-nav button.active .mobile-nav-icon>i{
+    color:#fff!important;
+  }
+}
