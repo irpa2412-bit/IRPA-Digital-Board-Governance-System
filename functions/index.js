@@ -1077,6 +1077,109 @@ exports.approveCredentialInterview = onCall({region:"us-central1"}, async reques
   return {ok:true,email:item.email,uid:user.uid,loginApproved:true};
 });
 
+
+exports.reconcileRegisteredIdentityUids = onCall({region:"us-central1"}, async request => {
+  const uid=request.auth?.uid;
+  if(!uid) throw new HttpsError("unauthenticated","Administrator authentication is required.");
+  const adminSnap=await db.collection("adminProfiles").doc(uid).get();
+  const actorEmail=String(request.auth?.token?.email||adminSnap.data()?.email||"").trim().toLowerCase();
+  if(actorEmail!=="irpa2412@gmail.com" && (!adminSnap.exists||adminSnap.data()?.active!==true)){
+    throw new HttpsError("permission-denied","Administrator authorization is required.");
+  }
+
+  const [memberSnap,employeeSnap]=await Promise.all([
+    db.collection("members").get(),
+    db.collection("employees").get()
+  ]);
+  const authUsers=[];
+  let pageToken;
+  do{
+    const page=await getAuth().listUsers(1000,pageToken);
+    authUsers.push(...page.users);
+    pageToken=page.pageToken;
+  }while(pageToken);
+
+  const byEmail=new Map();
+  for(const user of authUsers){
+    const email=String(user.email||"").trim().toLowerCase();
+    if(email){
+      const list=byEmail.get(email)||[];
+      list.push(user);
+      byEmail.set(email,list);
+    }
+  }
+
+  const summary={
+    members:{total:memberSnap.size,alreadyAssigned:0,assigned:0,unmatched:0,conflicts:0},
+    employees:{total:employeeSnap.size,alreadyAssigned:0,assigned:0,unmatched:0,conflicts:0},
+    authUsers:authUsers.length,assignedRecords:[],unresolvedRecords:[],conflictRecords:[]
+  };
+
+  async function reconcile(collectionName,docs,kind){
+    for(const record of docs){
+      const data=record.data()||{};
+      const recordEmail=String(data.email||"").trim().toLowerCase();
+      const existingUid=String(data.uid||"").trim();
+      const bucket=summary[kind];
+
+      if(existingUid){
+        const existingUser=authUsers.find(user=>user.uid===existingUid);
+        if(existingUser){
+          const authEmail=String(existingUser.email||"").trim().toLowerCase();
+          if(!recordEmail||authEmail===recordEmail) bucket.alreadyAssigned++;
+          else{
+            bucket.conflicts++;
+            summary.conflictRecords.push({collection:collectionName,recordId:record.id,name:data.name||"",email:recordEmail,existingUid,reason:"Existing UID belongs to a different Firebase Authentication email. No change made."});
+          }
+        }else{
+          bucket.conflicts++;
+          summary.conflictRecords.push({collection:collectionName,recordId:record.id,name:data.name||"",email:recordEmail,existingUid,reason:"Existing UID is not present in Firebase Authentication. No change made."});
+        }
+        continue;
+      }
+
+      if(!recordEmail){
+        bucket.unmatched++;
+        summary.unresolvedRecords.push({collection:collectionName,recordId:record.id,name:data.name||"",email:"",reason:"No email address is recorded, so a safe identity match is impossible."});
+        continue;
+      }
+
+      const matches=byEmail.get(recordEmail)||[];
+      if(matches.length!==1){
+        bucket.unmatched++;
+        summary.unresolvedRecords.push({collection:collectionName,recordId:record.id,name:data.name||"",email:recordEmail,reason:matches.length===0?"No Firebase Authentication account exists for this email.":"Multiple Firebase Authentication identities were returned for this email; no automatic assignment was made."});
+        continue;
+      }
+
+      const matched=matches[0];
+      await record.ref.set({
+        uid:matched.uid,
+        uidAssignedAt:FieldValue.serverTimestamp(),
+        uidAssignedByUid:uid,
+        uidAssignedByEmail:actorEmail||null,
+        uidAssignmentMethod:"ADMIN_RECONCILIATION_EXACT_EMAIL_MATCH"
+      },{merge:true});
+      bucket.assigned++;
+      summary.assignedRecords.push({collection:collectionName,recordId:record.id,name:data.name||"",email:recordEmail,uid:matched.uid});
+    }
+  }
+
+  await reconcile("members",memberSnap.docs,"members");
+  await reconcile("employees",employeeSnap.docs,"employees");
+
+  const auditRef=db.collection("audit").doc();
+  await auditRef.set({
+    action:"REGISTERED_IDENTITY_UID_RECONCILIATION",
+    category:"SYSTEM_ADMINISTRATION",
+    description:"Administrator-controlled reconciliation of registered Member and Employee records to existing Firebase Authentication UIDs using exact email matching.",
+    performedByUid:uid,performedByEmail:actorEmail||null,
+    memberSummary:summary.members,employeeSummary:summary.employees,authUsersScanned:summary.authUsers,
+    assignedRecords:summary.assignedRecords,unresolvedRecords:summary.unresolvedRecords,conflictRecords:summary.conflictRecords,
+    accountCreationPerformed:false,existingUidsOverwritten:false,createdAt:FieldValue.serverTimestamp()
+  });
+  return {success:true,auditId:auditRef.id,...summary,safety:{accountCreationPerformed:false,existingUidsOverwritten:false,exactEmailMatchOnly:true}};
+});
+
 exports.resetTrialData = onCall({region:"us-central1"}, async request => {
   const uid=request.auth?.uid;
   if(!uid) throw new HttpsError("unauthenticated","Authentication is required.");
