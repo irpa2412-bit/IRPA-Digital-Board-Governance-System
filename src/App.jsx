@@ -84,7 +84,7 @@ function Dashboard({user,admin,employee,profile,onNavigate}){
       </div>
       <div className="desktop-date-card"><strong>{new Date().toLocaleDateString(undefined,{weekday:"long"})}</strong><span>{new Date().toLocaleDateString(undefined,{day:"2-digit",month:"long",year:"numeric"})}</span><small>IRPA Digital Governance Workspace</small></div>
     </section>
-    <section className="dashboard-quote4-stats">{cards.map(([label,value,sub,target])=><button key={label} type="button" onClick={()=>go(target)}><span className="quote4-stat-icon">{iconFor(label)}</span><div><strong>{busy?"—":value}</strong><b>{label}</b><small>{sub}</small></div><i>›</i></button>)}</section>
+    <section className="dashboard-quote4-stats">{cards.map(([label,value,sub,target])=><button className="desktop-blue-nav-button" key={label} type="button" onClick={()=>go(target)}><span className="quote4-stat-icon">{iconFor(label)}</span><div><strong>{busy?"—":value}</strong><b>{label}</b><small>{sub}</small></div><i>›</i></button>)}</section>
     <section className="dashboard-quote4-main">
       <div className="dashboard-quote4-activity panel">
        <div className="quote4-heading"><div><span className="eyebrow">LIVE GOVERNANCE CONTROL</span><h2>Recent Activities</h2></div><button type="button" onClick={()=>go("Reports")}>View all activities ›</button></div>
@@ -92,7 +92,7 @@ function Dashboard({user,admin,employee,profile,onNavigate}){
       </div>
       <div className="dashboard-quote4-quick panel">
        <div className="quote4-heading"><div><span className="eyebrow">WORKSPACE</span><h2>Quick Access</h2></div></div>
-       <div className="quote4-quick-grid">{quick.slice(0,6).map(([label,target,desc,ico])=><button key={target} type="button" onClick={()=>go(target)}><span>{iconFor(ico)}</span><strong>{label}</strong><small>{desc}</small><b>›</b></button>)}</div>
+       <div className="quote4-quick-grid">{quick.slice(0,6).map(([label,target,desc,ico])=><button className="desktop-blue-nav-button" key={target} type="button" onClick={()=>go(target)}><span>{iconFor(ico)}</span><strong>{label}</strong><small>{desc}</small><b>›</b></button>)}</div>
       </div>
     </section>
    </div>
