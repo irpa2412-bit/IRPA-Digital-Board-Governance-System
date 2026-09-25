@@ -1308,3 +1308,49 @@ textarea:focus-visible{
     word-break:normal!important;
   }
 }
+
+
+/* OPERATOR SIGN-OUT SLOT — 2026-09-25
+   Sign Out is deliberately placed in normal document flow immediately below
+   the topbar/Open Portal panel. It is right-aligned and cannot overlap another
+   panel because it occupies its own layout row. */
+.operator-signout-slot{
+  width:100%;
+  display:flex;
+  justify-content:flex-end;
+  align-items:center;
+  box-sizing:border-box;
+  margin:0 0 14px;
+  min-height:54px;
+  position:relative;
+  z-index:2;
+}
+.operator-signout-slot .logout-button{
+  flex:0 0 360px;
+  width:360px!important;
+  max-width:100%;
+  min-height:54px;
+  margin:0!important;
+  box-sizing:border-box;
+  border-radius:14px;
+  background:linear-gradient(145deg,#0b5fa8,#1674c4)!important;
+  border:1px solid #2f86cf!important;
+  color:#ffffff!important;
+  font-size:16px!important;
+  font-weight:850!important;
+  box-shadow:0 8px 20px rgba(4,40,70,.22);
+}
+.operator-signout-slot .logout-button:hover{
+  background:linear-gradient(145deg,#1674c4,#0b5fa8)!important;
+}
+@media(max-width:760px){
+  .operator-signout-slot{
+    margin:0 0 12px;
+    min-height:50px;
+  }
+  .operator-signout-slot .logout-button{
+    flex-basis:100%;
+    width:100%!important;
+    min-height:50px;
+  }
+}
