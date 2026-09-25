@@ -3175,3 +3175,24 @@
   .mobile-blue-nav-button:hover,.mobile-blue-nav-button:focus-visible,.mobile-blue-nav-button:active{background:#1672bf!important;color:#fff!important;border-color:#fff!important}
   .mobile-blue-nav-button strong,.mobile-blue-nav-button b,.mobile-blue-nav-button small,.mobile-blue-nav-button i{color:#fff!important}
 }
+
+/* IRPA MOBILE BLUE NAVIGATION FINAL GUARANTEE V3 */
+@media screen and (max-width:760px){
+  .dashboard-content-area section.mobile-quote1-quick .mobile-quote1-grid button.mobile-blue-nav-button,
+  .dashboard-content-area section.mobile-quote1-stats button.mobile-blue-nav-button,
+  .dashboard-content-area section.mobile-quote1-quick .mobile-quote1-heading button.mobile-blue-nav-button{
+    background-color:#0b5fa8!important;
+    background-image:none!important;
+    color:#ffffff!important;
+    border-color:rgba(255,255,255,.45)!important;
+  }
+  .dashboard-content-area section.mobile-quote1-quick .mobile-quote1-grid button.mobile-blue-nav-button strong,
+  .dashboard-content-area section.mobile-quote1-stats button.mobile-blue-nav-button strong,
+  .dashboard-content-area section.mobile-quote1-stats button.mobile-blue-nav-button b,
+  .dashboard-content-area section.mobile-quote1-stats button.mobile-blue-nav-button small,
+  .dashboard-content-area section.mobile-quote1-stats button.mobile-blue-nav-button i,
+  .dashboard-content-area section.mobile-quote1-quick .mobile-quote1-heading button.mobile-blue-nav-button{
+    color:#ffffff!important;
+    opacity:1!important;
+  }
+}
