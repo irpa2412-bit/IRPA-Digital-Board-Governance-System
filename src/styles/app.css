@@ -1976,3 +1976,161 @@
     color:#18382c!important;
   }
 }
+
+
+/* ================================================================
+   MOBILE DASHBOARD CONTRAST / CHROME REPAIR
+   The mobile dashboard uses a bright, high-contrast visual system.
+   Desktop chrome is removed from the dashboard route on phones.
+   ================================================================ */
+@media(max-width:760px){
+  .main-area>.dashboard-topbar{display:none!important}
+  .dashboard-content-area{
+    padding:0 0 94px!important;
+    background:#f7faf8!important;
+    color:#17372b!important;
+  }
+  .dashboard-content-area .dashboard-command{
+    background:#f7faf8!important;
+  }
+  .dashboard-content-area .dashboard-mobile-view{
+    color:#17372b!important;
+  }
+
+  /* Strongly legible hero: no translucent text over the page. */
+  .dashboard-content-area .mobile-dashboard-hero{
+    background:linear-gradient(145deg,#063a29 0%,#087047 68%,#0b8050 100%)!important;
+    color:#fff!important;
+    box-shadow:0 12px 30px rgba(6,58,41,.22)!important;
+  }
+  .dashboard-content-area .mobile-dashboard-greeting h1,
+  .dashboard-content-area .mobile-dashboard-greeting p,
+  .dashboard-content-area .mobile-dashboard-brand strong,
+  .dashboard-content-area .mobile-dashboard-brand .mobile-brand-kicker,
+  .dashboard-content-area .mobile-dashboard-greeting>span{
+    opacity:1!important;
+    text-shadow:none!important;
+  }
+  .dashboard-content-area .mobile-dashboard-greeting h1{color:#fff!important}
+  .dashboard-content-area .mobile-dashboard-greeting p{color:#e7f5ee!important}
+  .dashboard-content-area .mobile-dashboard-greeting>span{color:#ffe39a!important}
+  .dashboard-content-area .mobile-brand-kicker{color:#ffe39a!important}
+  .dashboard-content-area .mobile-brand-mark{
+    background:#ffd45a!important;
+    color:#073323!important;
+  }
+
+  /* Cards: white surfaces + deep text. Never pale text on pale surfaces. */
+  .dashboard-content-area .mobile-stat-card,
+  .dashboard-content-area .mobile-priority-list>button,
+  .dashboard-content-area .mobile-quick-grid>button{
+    background:#ffffff!important;
+    color:#17372b!important;
+    border:1px solid #cbded4!important;
+    box-shadow:0 7px 20px rgba(24,71,53,.08)!important;
+    opacity:1!important;
+  }
+  .dashboard-content-area .mobile-stat-card:hover,
+  .dashboard-content-area .mobile-priority-list>button:hover,
+  .dashboard-content-area .mobile-quick-grid>button:hover{
+    background:#f5fbf8!important;
+    border-color:#76ae93!important;
+  }
+  .dashboard-content-area .mobile-stat-icon,
+  .dashboard-content-area .mobile-priority-icon,
+  .dashboard-content-area .mobile-quick-icon{
+    background:#e4f3eb!important;
+    color:#075f3d!important;
+    opacity:1!important;
+  }
+  .dashboard-content-area .mobile-stat-card strong,
+  .dashboard-content-area .mobile-stat-card>b,
+  .dashboard-content-area .mobile-priority-list strong,
+  .dashboard-content-area .mobile-priority-list em,
+  .dashboard-content-area .mobile-quick-grid strong{
+    color:#084f36!important;
+    opacity:1!important;
+    text-shadow:none!important;
+  }
+  .dashboard-content-area .mobile-stat-card small,
+  .dashboard-content-area .mobile-priority-list small,
+  .dashboard-content-area .mobile-quick-grid small{
+    color:#526c61!important;
+    opacity:1!important;
+  }
+  .dashboard-content-area .mobile-stat-card>i,
+  .dashboard-content-area .mobile-priority-list>b,
+  .dashboard-content-area .mobile-quick-grid b{
+    color:#168153!important;
+    opacity:1!important;
+  }
+
+  /* Clear section hierarchy. */
+  .dashboard-content-area .mobile-section-kicker{
+    color:#28765a!important;
+    opacity:1!important;
+  }
+  .dashboard-content-area .mobile-dashboard-attention h2,
+  .dashboard-content-area .mobile-section-heading h2{
+    color:#153d2f!important;
+    opacity:1!important;
+  }
+  .dashboard-content-area .mobile-live-dot{
+    background:#fff!important;
+    color:#315d4c!important;
+    border-color:#c4d9ce!important;
+  }
+  .dashboard-content-area .mobile-live-dot i{
+    background:#15925c!important;
+  }
+
+  /* Compact profile control remains intentionally dark-green, but readable. */
+  .dashboard-content-area .mobile-profile-chip{
+    background:rgba(0,31,21,.24)!important;
+    border-color:rgba(255,224,128,.55)!important;
+    color:#fff!important;
+  }
+  .dashboard-content-area .mobile-profile-chip strong{color:#fff!important}
+  .dashboard-content-area .mobile-profile-chip small{color:#d9eee5!important}
+  .dashboard-content-area .mobile-profile-chip>b{color:#ffe08a!important}
+
+  /* View-all is a compact outlined control, not a black generic button. */
+  .dashboard-content-area .mobile-section-heading>button{
+    min-width:auto!important;
+    min-height:34px!important;
+    padding:7px 11px!important;
+    background:#ffffff!important;
+    color:#075f3d!important;
+    border:1px solid #a9cbbb!important;
+    box-shadow:0 3px 10px rgba(24,71,53,.06)!important;
+  }
+
+  .dashboard-content-area .mobile-dashboard-status{
+    background:#e5f4ec!important;
+    border-color:#b9d8c9!important;
+  }
+  .dashboard-content-area .mobile-dashboard-status strong{color:#0d5037!important}
+  .dashboard-content-area .mobile-dashboard-status small{color:#4c6b5d!important}
+
+  /* Bottom navigation: light navigation surface with unmistakable active state. */
+  .dashboard-content-area~*{}
+  .dashboard-content-area + .mobile-global-nav,
+  .main-area>.mobile-global-nav{
+    background:#ffffff!important;
+    border-top:1px solid #cbded4!important;
+    box-shadow:0 -10px 28px rgba(15,55,40,.13)!important;
+  }
+  .main-area>.mobile-global-nav button{
+    background:#ffffff!important;
+    color:#557168!important;
+    border-radius:0!important;
+    border:0!important;
+    box-shadow:none!important;
+  }
+  .main-area>.mobile-global-nav button.active{
+    background:#e7f4ed!important;
+    color:#075f3d!important;
+    box-shadow:inset 0 3px #d6a52c!important;
+    font-weight:900!important;
+  }
+}
