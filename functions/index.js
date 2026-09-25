@@ -148,7 +148,9 @@ async function requireActiveAdministratorCallable(request){
   const uid=request.auth?.uid;
   const email=String(request.auth?.token?.email||"").trim().toLowerCase();
   if(!uid) throw new HttpsError("unauthenticated","Administrator authentication is required.");
-  if(email==="irpa2412@gmail.com") return {uid,email};
+  // Continuity safeguard: an existing server-controlled admin claim remains a valid
+  // administrator session even if the profile registry is temporarily incomplete.
+  if(email==="irpa2412@gmail.com" || request.auth?.token?.admin===true) return {uid,email};
   const snap=await db.collection("adminProfiles").doc(uid).get();
   if(!snap.exists||snap.data()?.active!==true) throw new HttpsError("permission-denied","Administrator authorization is required.");
   return {uid,email};
