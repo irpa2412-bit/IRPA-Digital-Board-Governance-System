@@ -661,7 +661,7 @@ textarea:focus-visible{
 .sidebar .nav-item-content{
   display:flex!important;
   align-items:center!important;
-  gap:12px!important;
+  gap:9px!important;
   flex:1 1 auto!important;
   min-width:0!important;
 }
@@ -726,21 +726,21 @@ textarea:focus-visible{
    Desktop sidebar width is increased slightly so portal names remain readable. */
 @media(min-width:1101px){
   .sidebar{
-    width:350px!important;
+    width:320px!important;
   }
   .main-area{
-    margin-left:350px!important;
+    margin-left:320px!important;
   }
 }
 .sidebar .nav-item{
   background:linear-gradient(145deg,#063d2a,#0a4b33)!important;
   border-color:#1b6848!important;
   color:#f3faf7!important;
-  font-size:14px!important;
-  line-height:1.4!important;
+  font-size:13.5px!important;
+  line-height:1.32!important;
   font-weight:700!important;
-  min-height:44px!important;
-  padding:10px 14px!important;
+  min-height:42px!important;
+  padding:8px 10px!important;
   text-shadow:none!important;
 }
 .sidebar .nav-item:hover{
@@ -945,5 +945,25 @@ textarea:focus-visible{
   .dashboard-desktop-view .quote4-quick-grid>button:hover>span i,
   .dashboard-desktop-view .quote4-quick-grid>button:focus-visible>span i{
     color:#084f8d!important;
+  }
+}
+
+
+/* DESKTOP SIDEBAR COMPRESSION — 2026-09-25
+   Keep navigation anchored toward the left while preserving readable wrapping. */
+@media(min-width:1101px){
+  .sidebar nav{
+    padding-left:4px!important;
+    padding-right:4px!important;
+  }
+  .sidebar .nav-item-content{
+    justify-content:flex-start!important;
+  }
+  .sidebar .nav-item-icon{
+    flex:0 0 34px!important;
+    width:34px!important;
+    min-width:34px!important;
+    display:grid!important;
+    place-items:center!important;
   }
 }
