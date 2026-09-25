@@ -4351,3 +4351,29 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     padding-top:108px!important;
   }
 }
+
+/* FINANCIAL TECHNOLOGY ENGINE — 2026-09-25
+   Presentation layer for the controlled accounting/formula workspace.
+   No existing finance workflow or register styles are overridden. */
+.finance-accounting-engine{scroll-margin-top:24px}
+.finance-engine-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 18px;padding:8px;border:1px solid #d8e3dd;border-radius:12px;background:#f7faf8}
+.finance-engine-tabs button{background:#e8f4ed;color:#173b2d;border:1px solid #a9c9b8;padding:9px 12px;border-radius:8px;font-size:12px;font-weight:800}
+.finance-engine-tabs button.active{background:#0b5fa8;color:#fff;border-color:#2f86cf}
+.finance-engine-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.finance-engine-card,.finance-formula-card{min-width:0;padding:16px;background:#fff;color:#173b2d;border:1px solid #d8e3dd;border-radius:12px;box-shadow:0 5px 16px rgba(24,61,45,.05)}
+.finance-engine-card>span{display:block;color:#557268;font-size:11px;font-weight:800}
+.finance-engine-card>strong{display:block;margin-top:8px;color:#173b2d;font-size:24px}
+.finance-engine-card>small{display:block;margin-top:5px;color:#65776f;font-size:10px}
+.finance-formula-card h3,.finance-engine-card h3{margin:0 0 12px;color:#173b2d;font-size:15px}
+.finance-formula-card code{display:block;margin:7px 0;padding:8px 9px;border-radius:7px;background:#f3f7f5;color:#21483a;font-size:11px;white-space:normal}
+.finance-formula-card ul{margin:0;padding-left:18px;color:#496158;font-size:12px;line-height:1.55}
+.finance-engine-section{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(280px,1fr);gap:14px}
+.finance-engine-section .finance-engine-card{overflow:hidden}
+.finance-engine-card table{color:#173b2d}
+.finance-engine-card th{color:#557268}
+.finance-engine-card td{color:#29473c}
+.finance-engine-card input,.finance-engine-card select{background:#fff;color:#173b2d;border-color:#b8cdc3}
+.finance-engine-card .form-field label{color:#29473c}
+.finance-engine-card .secondary-button{background:#eef4f1;color:#23483b;border-color:#c6d7cf}
+@media(max-width:1000px){.finance-engine-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.finance-engine-section{grid-template-columns:1fr}}
+@media(max-width:760px){.finance-engine-grid{grid-template-columns:1fr}.finance-engine-tabs{overflow-x:auto;flex-wrap:nowrap}.finance-engine-tabs button{white-space:nowrap}.finance-engine-section{grid-template-columns:1fr}.finance-engine-card,.finance-formula-card{padding:13px}.finance-engine-card>strong{font-size:20px}.finance-formula-card code{font-size:10px}}
