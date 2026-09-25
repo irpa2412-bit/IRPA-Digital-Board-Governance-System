@@ -7,7 +7,8 @@ const types=["Governance Member","General Member","Institutional Member","Youth 
 export default function Members(){
  const[records,setRecords]=useState([]),[form,setForm]=useState(empty),[editing,setEditing]=useState(null),[viewing,setViewing]=useState(null),[busy,setBusy]=useState(false),[uidBusy,setUidBusy]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState(""),[search,setSearch]=useState("");
  async function load(){try{const all=await getRecords(COLLECTIONS.members);setRecords(all.filter(x=>!x.boardMember&&x.role!=="Board Member"&&!x.boardPosition))}catch(e){setError(e.message||"Unable to load Member register.")}}
- useEffect(()=>{load()},[]);\n async function syncUids(){setUidBusy(true);setError("");setMessage("");try{const result=await synchronizeRegisteredIdentityUids();const s=result?.summary||{};setMessage(`✓ UID synchronization completed: ${s.linked||0} linked, ${s.created||0} Firebase accounts created, ${s.conflicts||0} conflicts, ${s.blocked||0} blocked, ${s.errors||0} errors.`);await load()}catch(e){setError(e.message||"Unable to synchronize Firebase UIDs.")}finally{setUidBusy(false)}}
+ useEffect(()=>{load()},[]);
+ async function syncUids(){setUidBusy(true);setError("");setMessage("");try{const result=await synchronizeRegisteredIdentityUids();const s=result?.summary||{};setMessage(`✓ UID synchronization completed: ${s.linked||0} linked, ${s.created||0} Firebase accounts created, ${s.conflicts||0} conflicts, ${s.blocked||0} blocked, ${s.errors||0} errors.`);await load()}catch(e){setError(e.message||"Unable to synchronize Firebase UIDs.")}finally{setUidBusy(false)}}
  const change=e=>setForm({...form,[e.target.name]:e.target.value});
  function reset(){setEditing(null);setForm(empty)}
  function edit(r){setEditing(r);setViewing(null);setForm({...empty,...r})}
