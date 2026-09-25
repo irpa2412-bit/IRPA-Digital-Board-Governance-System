@@ -3397,3 +3397,64 @@
     color:#fff!important;
   }
 }
+
+
+/* SAFE DESKTOP SIDEBAR ↔ HEADER VISUAL INVERSION */
+/* Visual-only inversion from the supplied desktop references.
+   Functional structure, navigation handlers, permissions, routes and
+   responsive/mobile breakpoints remain untouched. */
+@media screen and (min-width:1101px){
+  .sidebar{
+    background:#ffffff!important;
+    border-right:1px solid #dce7e1!important;
+    box-shadow:8px 0 30px rgba(23,64,47,.10)!important;
+  }
+  .sidebar-brand{
+    background:#ffffff!important;
+    border-bottom:1px solid #dce7e1!important;
+  }
+  .sidebar-brand-copy strong{color:#17633f!important}
+  .sidebar-brand-copy span{color:#315a4a!important}
+  .sidebar-brand-copy small{color:#71867d!important}
+  .authority-card{
+    background:linear-gradient(135deg,#f4faf7,#e8f4ee)!important;
+    border:1px solid #b9d7c8!important;
+  }
+  .authority-card span{color:#17633f!important}
+  .authority-card strong{color:#173b2d!important}
+  .authority-card small{color:#5f776d!important}
+  .nav-group-title{color:#5d786e!important}
+  .nav-item{color:#31584a!important}
+  .nav-item:hover{
+    background:#eaf5ef!important;
+    color:#174d36!important;
+    border-color:#c4ded0!important;
+  }
+  .nav-item.active{
+    background:#0b5fa8!important;
+    color:#ffffff!important;
+    border-color:#2f86cf!important;
+    box-shadow:inset 3px 0 #ffffff!important;
+  }
+  .sidebar-footer{border-top:1px solid #dce7e1!important}
+  .secure-label{color:#617a70!important}
+
+  .topbar{
+    min-height:92px!important;
+    padding:17px 34px!important;
+    background:linear-gradient(135deg,#06130e 0%,#0b2b1e 55%,#061a12 100%)!important;
+    border-bottom:1px solid #234436!important;
+    box-shadow:0 6px 25px rgba(0,0,0,.16)!important;
+  }
+  .topbar-kicker{color:#f3cf65!important}
+  .topbar h2{color:#ffffff!important}
+  .topbar p{color:#cfe0d8!important}
+  .user-info{color:#ffffff!important}
+  .user-info strong{color:#ffffff!important}
+  .user-info span{color:#f3cf65!important}
+  .user-avatar{
+    border-color:rgba(255,255,255,.45)!important;
+    background:linear-gradient(135deg,#1b7b48,#d6a52c)!important;
+    color:#06130e!important;
+  }
+}
