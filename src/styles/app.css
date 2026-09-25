@@ -3168,3 +3168,10 @@
     color:#fff!important;
   }
 }
+
+/* IRPA MOBILE BLUE BUTTON FINAL ENFORCEMENT */
+@media(max-width:760px){
+  .mobile-blue-nav-button{background:#0b5fa8!important;color:#fff!important;border:1px solid rgba(255,255,255,.45)!important}
+  .mobile-blue-nav-button:hover,.mobile-blue-nav-button:focus-visible,.mobile-blue-nav-button:active{background:#1672bf!important;color:#fff!important;border-color:#fff!important}
+  .mobile-blue-nav-button strong,.mobile-blue-nav-button b,.mobile-blue-nav-button small,.mobile-blue-nav-button i{color:#fff!important}
+}
