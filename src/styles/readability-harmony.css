@@ -395,3 +395,151 @@ textarea:focus-visible{
     animation-iteration-count:1!important;
   }
 }
+
+
+/* Portal-by-portal readability correction
+   Keeps the dashboard's dark institutional language intact while correcting
+   light portal surfaces that were inheriting light-on-light text. */
+.content-area:not(.dashboard-content-area) .page{
+  color:#173b2d!important;
+}
+.content-area:not(.dashboard-content-area) .page > .welcome-panel,
+.content-area:not(.dashboard-content-area) .page > .module-panel,
+.content-area:not(.dashboard-content-area) .page > .panel{
+  color:#173b2d!important;
+}
+.content-area:not(.dashboard-content-area) .page > .welcome-panel p,
+.content-area:not(.dashboard-content-area) .page > .module-panel>p,
+.content-area:not(.dashboard-content-area) .page > .panel>p,
+.content-area:not(.dashboard-content-area) .page .panel-description,
+.content-area:not(.dashboard-content-area) .page .table-subtext,
+.content-area:not(.dashboard-content-area) .page .muted,
+.content-area:not(.dashboard-content-area) .page .field-help,
+.content-area:not(.dashboard-content-area) .page .module-status{
+  color:#526b60!important;
+  opacity:1!important;
+  line-height:1.6!important;
+}
+.content-area:not(.dashboard-content-area) .page .eyebrow{
+  color:#176b46!important;
+  opacity:1!important;
+  font-weight:850!important;
+}
+.content-area:not(.dashboard-content-area) .page .form-field label,
+.content-area:not(.dashboard-content-area) .page > .panel label.field,
+.content-area:not(.dashboard-content-area) .page .field>span{
+  color:#385248!important;
+  opacity:1!important;
+}
+.content-area:not(.dashboard-content-area) .page input,
+.content-area:not(.dashboard-content-area) .page select,
+.content-area:not(.dashboard-content-area) .page textarea,
+.content-area:not(.dashboard-content-area) .page .table-search{
+  color:#173b2d!important;
+  background:#fff!important;
+  border-color:#78968a!important;
+}
+.content-area:not(.dashboard-content-area) .page input::placeholder,
+.content-area:not(.dashboard-content-area) .page textarea::placeholder,
+.content-area:not(.dashboard-content-area) .page .table-search::placeholder{
+  color:#526b60!important;
+  opacity:1!important;
+}
+.content-area:not(.dashboard-content-area) .page table th,
+.content-area:not(.dashboard-content-area) .page .data-table th{
+  color:#385248!important;
+  background:#edf4f0!important;
+}
+.content-area:not(.dashboard-content-area) .page table td,
+.content-area:not(.dashboard-content-area) .page .data-table td{
+  color:#173b2d!important;
+}
+.content-area:not(.dashboard-content-area) .page .stat-card span,
+.content-area:not(.dashboard-content-area) .page .stat-card small,
+.content-area:not(.dashboard-content-area) .page .detail-grid span{
+  color:#526b60!important;
+  opacity:1!important;
+}
+.content-area:not(.dashboard-content-area) .page .status-badge{
+  color:#0b4b31!important;
+  background:#dceee4!important;
+  border:1px solid #7caf94!important;
+}
+.content-area:not(.dashboard-content-area) .page .text-button{
+  color:#0b5fa8!important;
+  opacity:1!important;
+}
+.content-area:not(.dashboard-content-area) .page .panel-header button svg,
+.content-area:not(.dashboard-content-area) .page .form-actions button svg{
+  opacity:1!important;
+}
+.content-area:not(.dashboard-content-area) .page [role="dialog"],
+.content-area:not(.dashboard-content-area) .page [role="dialog"] p,
+.content-area:not(.dashboard-content-area) .page [role="dialog"] small,
+.content-area:not(.dashboard-content-area) .page [role="dialog"] label{
+  color:#edf5f1!important;
+  opacity:1!important;
+}
+.content-area:not(.dashboard-content-area) .page .administrator-removal-protocol,
+.content-area:not(.dashboard-content-area) .page .administrator-removal-protocol p,
+.content-area:not(.dashboard-content-area) .page .administrator-removal-protocol .panel-description,
+.content-area:not(.dashboard-content-area) .page .administrator-removal-protocol .muted{
+  color:#edf5f1!important;
+  opacity:1!important;
+}
+.content-area:not(.dashboard-content-area) .page .administrator-removal-protocol .eyebrow{
+  color:#f0c451!important;
+}
+.content-area:not(.dashboard-content-area) .page .administrator-removal-protocol input{
+  color:#fff!important;
+  background:#120c0a!important;
+  border-color:#8b5a50!important;
+}
+.content-area:not(.dashboard-content-area) .page .pdf-designer,
+.content-area:not(.dashboard-content-area) .page .pdf-designer p,
+.content-area:not(.dashboard-content-area) .page .pdf-designer small,
+.content-area:not(.dashboard-content-area) .page .pdf-designer label{
+  color:#f8fafc!important;
+  opacity:1!important;
+}
+.content-area:not(.dashboard-content-area) .page .pdf-designer small{
+  color:#cbd5e1!important;
+}
+.nav-item svg,
+.nav-child svg{
+  opacity:1!important;
+}
+.desktop-date-card strong{
+  font-size:15px!important;
+  line-height:1.3!important;
+  color:#fff!important;
+}
+.desktop-date-card span{
+  font-size:13px!important;
+  line-height:1.4!important;
+  color:#f7d36a!important;
+  opacity:1!important;
+}
+.desktop-date-card small{
+  font-size:11px!important;
+  line-height:1.4!important;
+  color:#e6f0ec!important;
+  opacity:1!important;
+}
+[aria-label="Login category"] > span:first-child,
+[aria-label="Login category"] small{
+  opacity:1!important;
+}
+[aria-label="Login category"] > span:first-child{
+  color:#dce8e3!important;
+  font-size:11px!important;
+}
+[aria-label="Login category"] small{
+  color:#b9d9ef!important;
+  font-size:10px!important;
+}
+@media(max-width:760px){
+  .desktop-date-card strong{font-size:14px!important;}
+  .desktop-date-card span{font-size:12px!important;}
+  .desktop-date-card small{font-size:10px!important;}
+}
