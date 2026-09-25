@@ -837,12 +837,32 @@ textarea:focus-visible{
   font-weight:600!important;
   opacity:1!important;
 }
+.topbar .google-weather-panel{
+  text-decoration:none!important;
+  cursor:pointer!important;
+  pointer-events:auto!important;
+  align-items:flex-start!important;
+  justify-content:center!important;
+  text-align:left!important;
+}
+.topbar .google-weather-panel:hover,
+.topbar .google-weather-panel:focus-visible{
+  border-color:#5b8f78!important;
+  box-shadow:0 8px 24px rgba(0,0,0,.28)!important;
+}
+.topbar .google-weather-panel small{
+  display:block!important;
+  margin-top:6px!important;
+  color:#d8e9e2!important;
+  font-size:13px!important;
+  line-height:1.35!important;
+}
 .topbar .open-portal-panel{
   position:absolute!important;
-  left:24%!important;
+  left:16%!important;
   right:235px!important;
-  top:9px!important;
-  bottom:9px!important;
+  top:6px!important;
+  bottom:6px!important;
   z-index:3!important;
   min-width:0!important;
   min-height:0!important;
@@ -853,7 +873,7 @@ textarea:focus-visible{
   justify-content:center!important;
   align-items:flex-start!important;
   text-align:left!important;
-  pointer-events:none!important;
+  pointer-events:auto!important;
   overflow:hidden!important;
 }
 .topbar .open-portal-panel span{
