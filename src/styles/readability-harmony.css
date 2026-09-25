@@ -718,3 +718,124 @@ textarea:focus-visible{
     font-size:13px!important;
   }
 }
+
+
+/* OPEN PORTAL NAVIGATION STATE — 2026-09-25
+   Inactive navigation stays in the established dark-green language.
+   Only the currently open portal receives the blue active treatment. */
+.sidebar .nav-item{
+  background:linear-gradient(145deg,#0c241b,#102c21)!important;
+  border-color:#2b5140!important;
+  color:#edf6f2!important;
+}
+.sidebar .nav-item:hover{
+  background:linear-gradient(145deg,#123a2b,#164632)!important;
+  border-color:#4b765f!important;
+  color:#ffffff!important;
+}
+.sidebar .nav-item.active{
+  background:#0b5fa8!important;
+  border-color:#2f86cf!important;
+  color:#ffffff!important;
+  box-shadow:inset 3px 0 #f4c84a,0 3px 10px rgba(0,0,0,.12)!important;
+}
+.sidebar .nav-child{
+  background:linear-gradient(145deg,#0a2118,#0d2a1f)!important;
+  border-color:#244838!important;
+  color:#d8e6e0!important;
+}
+.sidebar .nav-child:hover{
+  background:#123a2b!important;
+  border-color:#4b765f!important;
+  color:#ffffff!important;
+}
+.sidebar .nav-child.active{
+  background:#0b5fa8!important;
+  border-color:#2f86cf!important;
+  color:#ffffff!important;
+}
+
+/* Dynamic open-portal panel: the dashboard hero reuses the date-card space,
+   while the compact topbar version remains visible after entering a portal. */
+.open-portal-panel{
+  background:linear-gradient(145deg,#06130e,#0b2118)!important;
+  border:1px solid #315746!important;
+  color:#ffffff!important;
+  box-shadow:0 7px 20px rgba(0,0,0,.22)!important;
+}
+.desktop-date-card.open-portal-panel{
+  min-width:210px!important;
+  padding:15px 17px!important;
+  right:24px!important;
+  top:24px!important;
+  backdrop-filter:blur(8px);
+}
+.desktop-date-card.open-portal-panel span{
+  display:block!important;
+  margin:0!important;
+  color:#f4d474!important;
+  font-size:10px!important;
+  line-height:1.35!important;
+  font-weight:850!important;
+  letter-spacing:.12em!important;
+}
+.desktop-date-card.open-portal-panel strong{
+  display:block!important;
+  margin-top:5px!important;
+  color:#ffffff!important;
+  font-size:17px!important;
+  line-height:1.3!important;
+  font-weight:850!important;
+}
+.desktop-date-card.open-portal-panel small{
+  display:block!important;
+  margin-top:8px!important;
+  color:#c7ddd3!important;
+  font-size:10px!important;
+  line-height:1.4!important;
+}
+.topbar .open-portal-panel{
+  position:absolute!important;
+  right:110px!important;
+  top:50%!important;
+  transform:translateY(-50%)!important;
+  z-index:4!important;
+  min-width:170px!important;
+  padding:8px 12px!important;
+  border-radius:10px!important;
+  text-align:left!important;
+  pointer-events:none!important;
+}
+.topbar .open-portal-panel span{
+  display:block!important;
+  color:#f4d474!important;
+  font-size:8px!important;
+  line-height:1.25!important;
+  font-weight:850!important;
+  letter-spacing:.12em!important;
+}
+.topbar .open-portal-panel strong{
+  display:block!important;
+  margin-top:2px!important;
+  color:#ffffff!important;
+  font-size:12px!important;
+  line-height:1.3!important;
+  font-weight:800!important;
+}
+@media(max-width:1050px){
+  .topbar .open-portal-panel{
+    right:92px!important;
+    min-width:145px!important;
+  }
+}
+@media(max-width:760px){
+  .topbar .open-portal-panel{
+    display:none!important;
+  }
+  .desktop-date-card.open-portal-panel{
+    position:relative!important;
+    right:auto!important;
+    top:auto!important;
+    min-width:0!important;
+  }
+}
