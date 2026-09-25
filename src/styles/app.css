@@ -113,7 +113,7 @@
   .topbar-access-category{flex-basis:180px;width:180px;min-height:34px;max-height:50px;padding:5px 7px}
   .topbar-access-category [aria-label="Login category"]>span{font-size:7px!important}
   .topbar-access-category [aria-label="Login category"] span{font-size:9px!important}
-  .topbar-title-line{gap:6px}
+  .topbar-title-line{gap:0!important}
   .topbar-inline-logout{min-height:30px!important;padding:6px 8px!important;font-size:9px!important}
   .global-home-button{min-height:36px;padding:7px 9px;font-size:10px}
   .topbar-heading-row>div{min-width:0}
