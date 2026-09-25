@@ -66,3 +66,11 @@ Before IRPA relies on the system for sensitive production records at institution
 
 ## 11. Control Philosophy
 IRPA-DGBS should evolve by preserving the existing finance and governance control model while adding functionality around it. Fundraising features must not weaken authorization boundaries merely to make external communication easier.
+
+## Fundraising and Donor-Relations Boundary
+
+The Donor / Funder Relations module is a separate management layer alongside the governance and finance-control core. It maintains donor/funder relationship records and grant reporting obligations, while the existing financeGrants, financeTransactions, procurement, authorization, payment-trace and financial-reference registers remain authoritative for financial control. Donor-ready exports are derived from those controlled registers and are explicitly management reports, not statutory accounts or audit opinions.
+
+Grant reporting deadlines are recorded with a responsible owner, due date and submission status. The interface flags overdue and near-term obligations for management action. This control does not grant the donor-relations module authority to approve payments, alter financial references, bypass procurement, change governance decisions, or weaken existing role-based controls.
+
+This module implements the forensic review's fundraising-enablement sequence while preserving separation between donor relationship management and the tightly controlled governance/finance core.
