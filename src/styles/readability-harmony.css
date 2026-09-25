@@ -1385,10 +1385,10 @@ textarea:focus-visible{
   z-index:2;
 }
 .operator-signout-slot .logout-button{
-  flex:0 0 250px;
-  width:250px!important;
-  min-width:250px!important;
-  max-width:250px!important;
+  flex:0 0 180px;
+  width:180px!important;
+  min-width:180px!important;
+  max-width:180px!important;
   min-height:40px!important;
   padding:9px 20px!important;
   margin:0!important;
