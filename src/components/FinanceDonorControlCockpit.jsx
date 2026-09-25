@@ -75,6 +75,7 @@ export default function FinanceDonorControlCockpit(){
     <a className="unified-control-tab" href="#finance-operational-registers" role="tab">Financial Registers</a>
     <a className="unified-control-tab" href="#procurement-finance-handoff" role="tab">Procurement → Finance</a>
     <a className="unified-control-tab" href="#finance-traceability" role="tab">Payment Trace</a>
+    <a className="unified-control-tab" href="#finance-reference-control" role="tab">Financial Reference Control</a>
     <a className="unified-control-tab" href="#finance-payment-post" role="tab">Payment Post Portal</a>
     <a className="unified-control-tab" href="#finance-operational-registers" role="tab">Staff Payments & Payroll</a>
     <a className="unified-control-tab" href="#finance-entry" role="tab">Controlled Entry</a>
