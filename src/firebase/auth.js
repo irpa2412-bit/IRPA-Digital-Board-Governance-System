@@ -158,7 +158,12 @@ export async function sendPasswordReset(email) {
   }
 }
 
-export async function logout(options = {}) {\n  if (!options.preserveRecovery) {\n    try { window.localStorage.removeItem("irpaSessionRecovery"); } catch (_) {}\n  }\n  await signOut(auth);\n}
+export async function logout(options = {}) {
+  if (!options.preserveRecovery) {
+    try { window.localStorage.removeItem("irpaSessionRecovery"); } catch (_) {}
+  }
+  await signOut(auth);
+}
 
 export async function sendAdminMagicLink(email, invitationId = "") {
   const cleanEmail = email.trim().toLowerCase();
