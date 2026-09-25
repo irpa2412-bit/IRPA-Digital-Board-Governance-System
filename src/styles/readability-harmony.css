@@ -839,6 +839,20 @@ textarea:focus-visible{
   min-width:0!important;
   flex:1 1 auto!important;
 }
+.dashboard-live-date-slot .live-date-stat-buttons .desktop-blue-nav-button .quote4-stat-icon{
+  background:#ffffff!important;
+  color:#0b5fa8!important;
+  border:2px solid rgba(11,95,168,.35)!important;
+  box-shadow:0 2px 8px rgba(0,0,0,.18)!important;
+}
+.dashboard-live-date-slot .live-date-stat-buttons .desktop-blue-nav-button .quote4-stat-icon svg,
+.dashboard-live-date-slot .live-date-stat-buttons .desktop-blue-nav-button .quote4-stat-icon .svg-inline--fa{
+  display:block!important;
+  width:24px!important;
+  height:24px!important;
+  color:#0b5fa8!important;
+  fill:currentColor!important;
+}
 .dashboard-live-date-slot .live-date-stat-buttons .desktop-blue-nav-button strong{
   font-size:23px!important;
   line-height:1.1!important;
