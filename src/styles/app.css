@@ -1679,3 +1679,242 @@
   color:#ffffff!important;
   box-shadow:inset 0 -3px #d6a52c!important;
 }
+
+
+/* ================================================================
+   IRPA RESPONSIVE DASHBOARD EXPERIENCE
+   Desktop and mobile deliberately use different information
+   architectures. Mobile is a task-oriented control centre rather
+   than a compressed desktop dashboard.
+   ================================================================ */
+.dashboard-mobile-view{display:none}
+.dashboard-desktop-view{display:block}
+
+@media(min-width:761px){
+  .dashboard-content-area{
+    background:linear-gradient(180deg,#eef6f1 0%,#f7faf8 46%,#edf5f1 100%)!important;
+  }
+  .dashboard-content-area .dashboard-hero{
+    position:relative;
+    overflow:hidden;
+    border:1px solid #c8ddd1!important;
+    background:linear-gradient(135deg,#073c2a 0%,#0d5b40 58%,#154f3c 100%)!important;
+    color:#fff!important;
+    box-shadow:0 18px 42px rgba(7,60,42,.16)!important;
+  }
+  .dashboard-content-area .dashboard-hero:after{
+    content:"";
+    position:absolute;
+    width:260px;height:260px;
+    right:-70px;top:-105px;
+    border:1px solid rgba(214,165,44,.35);
+    border-radius:50%;
+    box-shadow:0 0 0 32px rgba(214,165,44,.06),0 0 0 66px rgba(214,165,44,.035);
+    pointer-events:none;
+  }
+  .dashboard-content-area .dashboard-hero h1{color:#fff!important;letter-spacing:-.02em}
+  .dashboard-content-area .dashboard-hero p{color:#dcece5!important}
+  .dashboard-content-area .dashboard-hero .eyebrow{color:#d6a52c!important}
+  .dashboard-content-area .dashboard-gauge{
+    background:#fff!important;
+    color:#183129!important;
+    border:1px solid #d2e1d9!important;
+    border-radius:16px!important;
+    min-height:126px!important;
+    box-shadow:0 7px 22px rgba(21,66,49,.07)!important;
+  }
+  .dashboard-content-area .dashboard-gauge:hover{
+    background:#f7fbf9!important;
+    border-color:#8ebaa3!important;
+    transform:translateY(-3px)!important;
+    box-shadow:0 13px 30px rgba(21,66,49,.12)!important;
+  }
+  .dashboard-content-area .dashboard-gauge .dashboard-gauge-icon{
+    width:42px!important;height:42px!important;
+    border-radius:12px!important;
+    background:#e9f4ee!important;
+    color:#176b46!important;
+  }
+  .dashboard-content-area .dashboard-gauge>span:not(.dashboard-gauge-icon){color:#29453a!important}
+  .dashboard-content-area .dashboard-gauge>strong{color:#0d5036!important}
+  .dashboard-content-area .dashboard-gauge>small{color:#62736c!important}
+  .dashboard-content-area .dashboard-gauge>b{color:#176b46!important}
+  .dashboard-content-area .dashboard-function-button{
+    background:#fff!important;
+    color:#183129!important;
+    border:1px solid #d2e1d9!important;
+    border-radius:14px!important;
+    box-shadow:0 6px 18px rgba(21,66,49,.06)!important;
+    min-height:74px!important;
+  }
+  .dashboard-content-area .dashboard-function-button:hover{
+    background:#f4faf7!important;
+    border-color:#8ebaa3!important;
+    transform:translateY(-2px)!important;
+  }
+  .dashboard-content-area .dashboard-function-button>span,
+  .dashboard-content-area .dashboard-function-button>small,
+  .dashboard-content-area .dashboard-function-button>b{color:#183129!important}
+  .dashboard-content-area .dashboard-function-button .dashboard-function-icon{
+    background:#eaf4ef!important;
+    color:#176b46!important;
+  }
+  .dashboard-content-area .dashboard-feed{
+    border:1px solid #d2e1d9!important;
+    border-radius:16px!important;
+    box-shadow:0 6px 18px rgba(21,66,49,.05)!important;
+  }
+}
+
+@media(max-width:760px){
+  html,body,#root{background:#f2f7f4!important}
+  body{overflow-x:hidden}
+  .dashboard-content-area{
+    padding:0 0 88px!important;
+    background:#f2f7f4!important;
+  }
+  .dashboard-content-area>.module-interlink-bar{display:none!important}
+  .dashboard-content-area .dashboard-desktop-view{display:none!important}
+  .dashboard-content-area .dashboard-mobile-view{display:block!important}
+  .dashboard-command{width:100%!important;max-width:none!important;margin:0!important;padding:0 14px 28px!important}
+  .dashboard-mobile-view{color:#19372b}
+  .mobile-dashboard-hero{
+    margin:0 -14px;
+    padding:18px 17px 19px;
+    background:linear-gradient(145deg,#052e22 0%,#0a4633 57%,#0d5a40 100%);
+    border-radius:0 0 28px 28px;
+    color:#fff;
+    box-shadow:0 10px 30px rgba(4,48,34,.20);
+  }
+  .mobile-dashboard-brand{display:flex;align-items:center;gap:10px}
+  .mobile-brand-mark{
+    display:grid;place-items:center;
+    width:39px;height:39px;border-radius:12px;
+    background:#d6a52c;color:#082017;
+    font-weight:950;font-size:12px;letter-spacing:-.04em;
+    box-shadow:0 5px 16px rgba(214,165,44,.22);
+  }
+  .mobile-brand-kicker{display:block;font-size:9px;letter-spacing:.18em;color:#d6a52c;font-weight:900}
+  .mobile-dashboard-brand strong{display:block;font-size:14px;letter-spacing:.01em}
+  .mobile-dashboard-greeting{margin-top:24px}
+  .mobile-dashboard-greeting>span,.mobile-section-kicker{font-size:9px;letter-spacing:.15em;font-weight:900;color:#5f8d78}
+  .mobile-dashboard-greeting>span{color:#a8cbb9}
+  .mobile-dashboard-greeting h1{margin:4px 0 3px;color:#fff;font-size:26px;line-height:1.05;letter-spacing:-.035em}
+  .mobile-dashboard-greeting p{margin:0;color:#d1e5dc;font-size:13px;font-weight:650}
+  .mobile-profile-chip{
+    width:100%!important;
+    margin-top:17px!important;
+    min-height:57px!important;
+    display:flex!important;align-items:center!important;gap:10px!important;
+    padding:8px 10px!important;
+    border:1px solid rgba(214,165,44,.32)!important;
+    border-radius:15px!important;
+    background:rgba(255,255,255,.085)!important;
+    color:#fff!important;
+    text-align:left!important;
+    box-shadow:none!important;
+  }
+  .mobile-profile-chip:hover{background:rgba(255,255,255,.13)!important;transform:none!important}
+  .mobile-profile-avatar{
+    flex:0 0 37px;display:grid;place-items:center;width:37px;height:37px;
+    border-radius:11px;background:#e9f4ef;color:#126340;font-weight:950
+  }
+  .mobile-profile-chip>span:nth-child(2){display:flex;flex:1;min-width:0;flex-direction:column}
+  .mobile-profile-chip strong{font-size:11px;color:#fff}
+  .mobile-profile-chip small{font-size:9px;color:#b9d5c8;margin-top:2px}
+  .mobile-profile-chip>b{font-size:22px;color:#d6a52c;font-weight:500}
+  .mobile-dashboard-attention{
+    display:flex;justify-content:space-between;align-items:end;
+    margin:22px 2px 11px;
+  }
+  .mobile-dashboard-attention h2,.mobile-section-heading h2{
+    margin:2px 0 0;font-size:19px;line-height:1.05;color:#18382c;letter-spacing:-.02em
+  }
+  .mobile-live-dot{
+    display:inline-flex;align-items:center;gap:5px;
+    padding:6px 9px;border:1px solid #c9ddd3;border-radius:999px;
+    background:#fff;color:#527266;font-size:8px;font-weight:900;letter-spacing:.08em
+  }
+  .mobile-live-dot i{width:6px;height:6px;border-radius:50%;background:#1c9b62;box-shadow:0 0 0 3px rgba(28,155,98,.12)}
+  .mobile-dashboard-stats{
+    display:grid;grid-template-columns:1fr 1fr;gap:10px;
+  }
+  .mobile-stat-card{
+    position:relative!important;
+    min-height:122px!important;
+    padding:13px 13px 12px!important;
+    display:flex!important;flex-direction:column!important;align-items:flex-start!important;
+    border:1px solid #d5e3dc!important;border-radius:17px!important;
+    background:#fff!important;color:#18382c!important;
+    box-shadow:0 6px 18px rgba(25,66,49,.055)!important;
+    text-align:left!important;
+    overflow:hidden;
+  }
+  .mobile-stat-card:before{
+    content:"";position:absolute;right:-23px;top:-23px;width:72px;height:72px;
+    border-radius:50%;background:#edf6f1
+  }
+  .mobile-stat-card:hover{transform:translateY(-2px)!important;background:#fff!important;border-color:#9fc4af!important}
+  .mobile-stat-icon{
+    position:relative;z-index:1;display:grid;place-items:center;
+    width:32px;height:32px;border-radius:10px;background:#edf5f1;color:#1c6b4a;
+    font-size:14px;font-weight:900;margin-bottom:9px
+  }
+  .mobile-stat-card strong{font-size:27px;line-height:1;color:#0b5b3d;letter-spacing:-.04em}
+  .mobile-stat-card>b{margin-top:5px;font-size:11px;color:#23483a;font-weight:850}
+  .mobile-stat-card small{margin-top:3px;font-size:9px;line-height:1.25;color:#71837c;font-weight:650;max-width:95px}
+  .mobile-stat-card>i{position:absolute;right:12px;bottom:11px;color:#1a7650;font-style:normal;font-size:20px;font-weight:400}
+  .mobile-dashboard-priority,.mobile-dashboard-quick{margin-top:25px}
+  .mobile-section-heading{display:flex;align-items:end;justify-content:space-between;margin:0 2px 10px}
+  .mobile-section-heading>button{
+    min-height:32px!important;padding:6px 10px!important;border:1px solid #bdd5c9!important;
+    border-radius:9px!important;background:#fff!important;color:#176344!important;font-size:9px!important;font-weight:900!important
+  }
+  .mobile-priority-list{display:flex;flex-direction:column;gap:8px}
+  .mobile-priority-list>button{
+    display:flex!important;align-items:center!important;gap:10px!important;width:100%!important;
+    min-height:61px!important;padding:9px 10px!important;
+    border:1px solid #d5e3dc!important;border-radius:14px!important;
+    background:#fff!important;color:#18382c!important;text-align:left!important;
+    box-shadow:0 4px 14px rgba(25,66,49,.045)!important;
+  }
+  .mobile-priority-list>button:hover{transform:none!important;background:#f9fcfa!important}
+  .mobile-priority-icon{
+    flex:0 0 37px;display:grid;place-items:center;width:37px;height:37px;border-radius:11px;
+    background:#edf5f1;color:#1a6d4b;font-weight:900
+  }
+  .mobile-priority-list>button>span:nth-child(2){display:flex;flex:1;min-width:0;flex-direction:column}
+  .mobile-priority-list strong{font-size:11px;color:#214638}
+  .mobile-priority-list small{font-size:8.5px;color:#778982;margin-top:2px}
+  .mobile-priority-list em{font-style:normal;font-size:20px;font-weight:900;color:#0d5c3e}
+  .mobile-priority-list>b{font-size:20px;color:#8aa79b;font-weight:400}
+  .mobile-quick-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .mobile-quick-grid>button{
+    min-height:112px!important;padding:12px!important;
+    display:flex!important;flex-direction:column!important;align-items:flex-start!important;
+    border:1px solid #d5e3dc!important;border-radius:15px!important;
+    background:#fff!important;color:#18382c!important;text-align:left!important;
+    box-shadow:0 5px 16px rgba(25,66,49,.045)!important;
+  }
+  .mobile-quick-grid>button:hover{transform:translateY(-2px)!important;background:#f9fcfa!important}
+  .mobile-quick-icon{display:grid;place-items:center;width:31px;height:31px;border-radius:9px;background:#f0f6f3;color:#1a6d4b;font-weight:900;margin-bottom:9px}
+  .mobile-quick-grid strong{font-size:10px;color:#214638;line-height:1.15}
+  .mobile-quick-grid small{font-size:8px;line-height:1.25;color:#778982;margin-top:4px}
+  .mobile-quick-grid b{align-self:flex-end;margin-top:auto;color:#1a7650;font-size:16px}
+  .mobile-dashboard-status{
+    margin-top:22px;padding:14px 15px;border-radius:15px;
+    background:#e8f3ed;border:1px solid #c7ded2;
+    display:flex;flex-direction:column;gap:3px
+  }
+  .mobile-dashboard-status .mobile-section-kicker{color:#36735a}
+  .mobile-dashboard-status strong{font-size:11px;color:#184535}
+  .mobile-dashboard-status small{font-size:8.5px;line-height:1.35;color:#60776d}
+  .dashboard-content-area .topbar{display:none!important}
+  .dashboard-content-area .module-interlink-bar{display:none!important}
+  .dashboard-content-area .mobile-global-nav{
+    box-shadow:0 -10px 30px rgba(4,34,25,.12)!important;
+  }
+  .dashboard-content-area .mobile-global-nav button{
+    min-height:58px!important;
+  }
+}
