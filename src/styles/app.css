@@ -3465,36 +3465,90 @@
 }
 
 /* IRPA SYSTEM-WIDE READABILITY STANDARD — 2026-09-25
-   Readability-only layer. Preserves routes, actions, data, and layout structure. */
+   Contrast-first, readability-only layer.
+   No routes, actions, data structures, spacing, or interaction behavior are changed. */
+
 body{
   font-size:15px;
   line-height:1.5;
+  -webkit-text-size-adjust:100%;
 }
-.topbar,
+
+/* Core text scale */
+.topbar,.sidebar,.content-area{font-size:15px;}
+.topbar-kicker{font-size:10px!important;line-height:1.3!important;}
+.topbar h2{font-size:23px!important;line-height:1.2!important;}
+.topbar p{font-size:13px!important;line-height:1.45!important;}
+.nav-group-title{font-size:10px!important;line-height:1.3!important;}
+.nav-item{font-size:13px!important;line-height:1.35!important;}
+.nav-child{font-size:12px!important;line-height:1.4!important;}
+
+/* Dark surfaces: never allow low-contrast inherited text. */
 .sidebar,
-.content-area{
-  font-size:15px;
+.topbar,
+.auth-screen,
+.loading-screen,
+.dashboard-content-area,
+.mobile-quote1-top{
+  color:#f7fbf9!important;
 }
-.topbar-kicker{
-  font-size:10px!important;
+.sidebar p,.sidebar span,.sidebar small,.sidebar strong,.sidebar b,.sidebar label,
+.topbar p,.topbar span,.topbar small,.topbar strong,.topbar b,.topbar label,
+.dashboard-content-area p,.dashboard-content-area span,.dashboard-content-area small,
+.dashboard-content-area strong,.dashboard-content-area b,.dashboard-content-area label{
+  opacity:1!important;
 }
-.topbar h2{
-  font-size:23px!important;
+
+/* Light surfaces: force a dark readable text system. */
+.module-interlink-bar,
+.dashboard-command,
+.dashboard-desktop-view .dashboard-quote4-stats>button,
+.dashboard-desktop-view .dashboard-quote4-main .panel,
+.dashboard-desktop-view .quote4-activity-table>button,
+.dashboard-desktop-view .quote4-quick-grid>button,
+.mobile-quote1-stats>button,
+.mobile-quote1-grid>button,
+.main-area>.mobile-global-nav,
+.detail-grid>div,
+.identity-card,
+.table-wrapper{
+  color:#173b2d!important;
 }
-.topbar p{
-  font-size:13px!important;
-  line-height:1.4!important;
+
+.module-interlink-bar p,.module-interlink-bar span,.module-interlink-bar small,
+.module-interlink-bar strong,.module-interlink-bar b,
+.dashboard-desktop-view .dashboard-quote4-stats>button strong,
+.dashboard-desktop-view .dashboard-quote4-stats>button b,
+.dashboard-desktop-view .dashboard-quote4-stats>button small,
+.dashboard-desktop-view .dashboard-quote4-main .panel p,
+.dashboard-desktop-view .dashboard-quote4-main .panel span,
+.dashboard-desktop-view .dashboard-quote4-main .panel small,
+.dashboard-desktop-view .dashboard-quote4-main .panel strong,
+.dashboard-desktop-view .dashboard-quote4-main .panel b,
+.dashboard-desktop-view .quote4-activity-table>button span,
+.dashboard-desktop-view .quote4-activity-table>button small,
+.dashboard-desktop-view .quote4-activity-table>button strong,
+.dashboard-desktop-view .quote4-quick-grid>button strong,
+.dashboard-desktop-view .quote4-quick-grid>button small,
+.mobile-quote1-stats>button b,
+.mobile-quote1-stats>button small,
+.mobile-quote1-grid>button strong,
+.identity-card span,.identity-card strong,
+.detail-grid>div span,.detail-grid>div strong{
+  opacity:1!important;
 }
-.nav-group-title{
-  font-size:10px!important;
-}
-.nav-item{
-  font-size:13px!important;
-  line-height:1.3!important;
-}
-.nav-child{
-  font-size:12px!important;
-  line-height:1.35!important;
+
+/* Readable body copy and form labels throughout application pages. */
+.content-area .page p,
+.content-area .panel-description,
+.content-area .module-panel>p,
+.content-area .welcome-panel p,
+.content-area .module-header p,
+.content-area .page-header p,
+.content-area .page label,
+.content-area .page .form-field label{
+  line-height:1.55!important;
+  opacity:1!important;
 }
 .content-area .page p,
 .content-area .panel-description,
@@ -3503,105 +3557,96 @@ body{
 .content-area .module-header p,
 .content-area .page-header p{
   font-size:15px!important;
-  line-height:1.55!important;
-  color:#a9bbb4!important;
+  color:#c5d5cf!important;
 }
 .content-area .page label,
 .content-area .page .form-field label{
   font-size:14px!important;
-  line-height:1.4!important;
+  color:#d7e4df!important;
 }
+
+/* Inputs remain high-contrast on both the normal dark forms and light form cards. */
 .content-area input,
 .content-area select,
 .content-area textarea{
   font-size:15px!important;
   line-height:1.45!important;
+  opacity:1!important;
 }
-.content-area button{
-  font-size:13px!important;
-  line-height:1.35!important;
+.content-area input::placeholder,
+.content-area textarea::placeholder{
+  opacity:1!important;
+  color:#8ea69d!important;
 }
-.content-area .member-actions button,
-.content-area .form-actions button{
-  font-size:13px!important;
-}
-.content-area table th{
-  font-size:11px!important;
-  line-height:1.35!important;
-}
-.content-area table td{
-  font-size:14px!important;
-  line-height:1.45!important;
-}
-.content-area .status-badge{
-  font-size:12px!important;
-}
+
+/* Tables, records, statuses and identifiers. */
+.content-area table th{font-size:11px!important;line-height:1.35!important;color:#a9c0b7!important;opacity:1!important;}
+.content-area table td{font-size:14px!important;line-height:1.45!important;color:#d0ded9!important;opacity:1!important;}
+.content-area .status-badge{font-size:12px!important;opacity:1!important;}
 .content-area .detail-grid span,
 .content-area .identity-card span,
-.content-area .detail-grid small{
-  font-size:11px!important;
-  line-height:1.35!important;
-}
+.content-area .detail-grid small{font-size:11px!important;line-height:1.35!important;opacity:1!important;}
 .content-area .detail-grid strong,
-.content-area .identity-card strong{
-  font-size:15px!important;
+.content-area .identity-card strong{font-size:15px!important;line-height:1.4!important;opacity:1!important;}
+
+/* Any explicitly white/light card must expose its text instead of inheriting white text. */
+.content-area [style*="background:#fff"],
+.content-area [style*="background: #fff"],
+.content-area [style*="background:#FFFFFF"],
+.content-area [style*="background: #FFFFFF"],
+.content-area [style*="background:white"],
+.content-area [style*="background: white"]{
+  color:#173b2d!important;
+}
+.content-area [style*="background:#fff"] span,
+.content-area [style*="background:#fff"] strong,
+.content-area [style*="background:#fff"] small,
+.content-area [style*="background:#fff"] b,
+.content-area [style*="background:#fff"] label,
+.content-area [style*="background: #fff"] span,
+.content-area [style*="background: #fff"] strong,
+.content-area [style*="background: #fff"] small,
+.content-area [style*="background: #fff"] b,
+.content-area [style*="background: #fff"] label{
+  color:#173b2d!important;
+  opacity:1!important;
+}
+
+/* Controls: readable text without changing their geometry or behavior. */
+.content-area button{
+  font-size:13px!important;
   line-height:1.4!important;
+  opacity:1!important;
 }
-.module-interlink-heading span{
-  font-size:11px!important;
+.content-area .member-actions button,
+.content-area .form-actions button{font-size:13px!important;}
+.module-interlink-heading span{font-size:11px!important;}
+.module-interlink-heading small{font-size:12px!important;opacity:1!important;}
+.module-interlink-list button{font-size:13px!important;line-height:1.4!important;}
+
+/* Keyboard focus must remain obvious. */
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{
+  outline:3px solid #f4c84a!important;
+  outline-offset:2px!important;
 }
-.module-interlink-heading small{
-  font-size:12px!important;
-}
-.module-interlink-list button{
-  font-size:13px!important;
-  line-height:1.35!important;
-  padding:8px 11px!important;
-}
-.dashboard-desktop-view .quote4-quick-grid>button>strong{
-  font-size:13px!important;
-  line-height:1.3!important;
-}
-.dashboard-desktop-view .quote4-quick-grid>button>small{
-  font-size:11px!important;
-  line-height:1.35!important;
-}
+
+/* Mobile readability: keep the same contrast standard while respecting the existing layout. */
 @media screen and (max-width:760px){
-  body{
-    font-size:15px;
-  }
-  .topbar h2{
-    font-size:18px!important;
-  }
-  .topbar p{
-    font-size:11px!important;
-  }
+  body{font-size:15px;}
+  .topbar h2{font-size:18px!important;}
+  .topbar p{font-size:11px!important;}
   .content-area .page p,
   .content-area .panel-description,
   .content-area .module-panel>p,
   .content-area .welcome-panel p,
   .content-area .module-header p,
-  .content-area .page-header p{
-    font-size:14px!important;
-  }
-  .content-area button{
-    font-size:13px!important;
-  }
-  .dashboard-content-area .mobile-quote1-stats>button>b{
-    font-size:12px!important;
-  }
-  .dashboard-content-area .mobile-quote1-stats>button>small{
-    font-size:11px!important;
-  }
-  .dashboard-content-area .mobile-quote1-grid>button>strong{
-    font-size:12px!important;
-  }
-  .dashboard-content-area .mobile-quote1-grid>button>small{
-    font-size:11px!important;
-  }
+  .content-area .page-header p{font-size:14px!important;}
+  .content-area button{font-size:13px!important;}
+  .dashboard-content-area .mobile-quote1-stats>button>b{font-size:12px!important;}
+  .dashboard-content-area .mobile-quote1-stats>button>small{font-size:11px!important;}
+  .dashboard-content-area .mobile-quote1-grid>button>strong{font-size:12px!important;}
+  .dashboard-content-area .mobile-quote1-grid>button>small{font-size:11px!important;}
 }
-
-
 /* IRPA READABILITY FIX — UNIFIED CONTROL NAVIGATION — 2026-09-25 */
 .module-interlink-bar .module-interlink-list > button,
 .module-interlink-bar .workflow-portal-parent,
