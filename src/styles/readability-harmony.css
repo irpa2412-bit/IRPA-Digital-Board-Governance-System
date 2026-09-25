@@ -543,3 +543,81 @@ textarea:focus-visible{
   .desktop-date-card span{font-size:12px!important;}
   .desktop-date-card small{font-size:10px!important;}
 }
+
+
+/* Final contrast correction for light governance portals.
+   Keeps blue action/stat surfaces, but guarantees their text and symbols stay
+   bright and readable. Also strengthens copy on white portal panels. */
+.content-area:not(.dashboard-content-area) .page .stat-card,
+.content-area:not(.dashboard-content-area) .page button.stat-card{
+  background:linear-gradient(145deg,#0b5fa8,#1674c4)!important;
+  border:1px solid #2f86cf!important;
+  color:#fff!important;
+  text-shadow:none!important;
+  opacity:1!important;
+}
+.content-area:not(.dashboard-content-area) .page .stat-card:hover,
+.content-area:not(.dashboard-content-area) .page button.stat-card:hover,
+.content-area:not(.dashboard-content-area) .page .stat-card:focus-visible,
+.content-area:not(.dashboard-content-area) .page button.stat-card:focus-visible{
+  background:linear-gradient(145deg,#084f8d,#0b67b3)!important;
+  border-color:#d6a52c!important;
+  color:#fff!important;
+}
+.content-area:not(.dashboard-content-area) .page .stat-card.active,
+.content-area:not(.dashboard-content-area) .page button.stat-card.active{
+  background:linear-gradient(145deg,#084f8d,#0b67b3)!important;
+  border-color:#d6a52c!important;
+  box-shadow:inset 0 0 0 2px rgba(214,165,44,.38),0 8px 20px rgba(11,95,168,.18)!important;
+  color:#fff!important;
+}
+.content-area:not(.dashboard-content-area) .page .stat-card span,
+.content-area:not(.dashboard-content-area) .page .stat-card strong,
+.content-area:not(.dashboard-content-area) .page .stat-card small,
+.content-area:not(.dashboard-content-area) .page button.stat-card span,
+.content-area:not(.dashboard-content-area) .page button.stat-card strong,
+.content-area:not(.dashboard-content-area) .page button.stat-card small{
+  color:#fff!important;
+  opacity:1!important;
+  text-shadow:none!important;
+}
+.content-area:not(.dashboard-content-area) .page .stat-card strong{
+  font-size:18px!important;
+  line-height:1.35!important;
+  font-weight:800!important;
+}
+.content-area:not(.dashboard-content-area) .page .stat-card small{
+  color:#e8f4ff!important;
+  font-size:11px!important;
+  line-height:1.45!important;
+  font-weight:650!important;
+}
+.content-area:not(.dashboard-content-area) .page .stat-card:after{
+  background:#f7d36a!important;
+  opacity:1!important;
+}
+.content-area:not(.dashboard-content-area) .page .stat-card svg,
+.content-area:not(.dashboard-content-area) .page button.stat-card svg{
+  color:#fff!important;
+  fill:currentColor!important;
+  opacity:1!important;
+}
+.content-area:not(.dashboard-content-area) .page > .panel p,
+.content-area:not(.dashboard-content-area) .page > .welcome-panel p,
+.content-area:not(.dashboard-content-area) .page > .module-panel p{
+  color:#334f44!important;
+  opacity:1!important;
+  text-shadow:none!important;
+}
+.content-area:not(.dashboard-content-area) .page > .panel .panel-description,
+.content-area:not(.dashboard-content-area) .page > .panel .auth-message,
+.content-area:not(.dashboard-content-area) .page > .panel .field-help{
+  color:#334f44!important;
+  opacity:1!important;
+}
+.content-area:not(.dashboard-content-area) .page .panel-header h2,
+.content-area:not(.dashboard-content-area) .page .page-header h1,
+.content-area:not(.dashboard-content-area) .page .welcome-panel h1{
+  color:#173b2d!important;
+  opacity:1!important;
+}
