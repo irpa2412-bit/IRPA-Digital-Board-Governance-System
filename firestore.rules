@@ -3,7 +3,7 @@ service cloud.firestore {
  match /databases/{database}/documents {
   function signedIn(){return request.auth!=null;}
   function self(uid){return signedIn()&&request.auth.uid==uid;}
-  function primaryAdmin(){return signedIn()&&request.auth.token.email=="irpa2412@gmail.com";}
+  function primaryAdmin(){return signedIn()&&(request.auth.token.admin==true||request.auth.token.email=="irpa2412@gmail.com");}
   function adminProfileExists(){return signedIn()&&exists(/databases/$(database)/documents/adminProfiles/$(request.auth.uid));}
   function admin(){return primaryAdmin()||(adminProfileExists()&&get(/databases/$(database)/documents/adminProfiles/$(request.auth.uid)).data.active==true);}
   function memberProfileExists(){return signedIn()&&exists(/databases/$(database)/documents/members/$(request.auth.uid));}
@@ -12,7 +12,7 @@ service cloud.firestore {
   function signatureProfileOwner(){return signedIn()&&self(request.auth.uid)&&request.auth.token.email is string;} function signatureProfileUser(){return signatureProfileOwner();}
   function meetingUser(){return admin()||activeMember()||activeEmployee();}
   function role(r){return activeMember()&&get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role==r;}
-  function anyMemberRole(roles){return activeMember()&&roles.hasAny([get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role]);}
+  function anyMemberRole(roles){return signedIn()&&((request.auth.token.irpaRoles is list&&request.auth.token.irpaRoles.hasAny(roles))||(activeMember()&&roles.hasAny([get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role])));}
   function auditor(){return signedIn()&&exists(/databases/$(database)/documents/auditorProfiles/$(request.auth.token.email))&&get(/databases/$(database)/documents/auditorProfiles/$(request.auth.token.email)).data.active==true&&get(/databases/$(database)/documents/auditorProfiles/$(request.auth.token.email)).data.email==request.auth.token.email;}
   function governanceUser(){return admin()||activeMember();}
   function authorityRoleRegistered(record,authorityRole){return record.get("role","")==authorityRole||record.get("boardPosition","")==authorityRole||record.get("unit","")==authorityRole||record.get("unitName","")==authorityRole||(record.get("roles",[]) is list&&record.get("roles",[]).hasAny([authorityRole]))||(record.get("assignedRoles",[]) is list&&record.get("assignedRoles",[]).hasAny([authorityRole]))||(record.get("selectedRoles",[]) is list&&record.get("selectedRoles",[]) .hasAny([authorityRole]))||(record.get("roleAssignments",[]) is list&&record.get("roleAssignments",[]).hasAny([authorityRole]));}
