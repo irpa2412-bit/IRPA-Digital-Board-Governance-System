@@ -4272,6 +4272,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
 @media(max-width:760px){
   .desktop-portal-content-roller{display:none!important;}
+  /* Mobile in-portal navigation roller: remain frozen while page content scrolls. */
   .mobile-portal-content-roller{
     position:fixed!important;
     top:calc(150px + env(safe-area-inset-top))!important;
@@ -4292,6 +4293,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     color:#fff!important;
     box-shadow:0 7px 18px rgba(0,0,0,.24)!important;
     overflow:hidden!important;
+    contain:layout paint!important;
+    isolation:isolate!important;
+    will-change:transform!important;
+    transform:translate3d(0,0,0)!important;
+    -webkit-backface-visibility:hidden!important;
+    backface-visibility:hidden!important;
   }
   .mobile-portal-content-roller-label{
     min-width:0!important;
