@@ -1095,14 +1095,13 @@ textarea:focus-visible{
   }
 }
 
-/* TOPBAR ACTION/PANEL POSITION EXCHANGE — 2026-09-25
-   Sign Out occupies the former Open Portal action position and the
-   Open Portal popup occupies its own adjacent column. All four header
-   elements remain in one controlled grid so nothing overlaps. */
+/* INDEPENDENT TOPBAR PANEL LAYOUT — 2026-09-25
+   Keep the OPEN PORTAL label anchored at the panel's upper-left while
+   centering the complete popup within the available topbar space. */
 @media(min-width:1101px){
   .topbar-heading-row{
     display:grid!important;
-    grid-template-columns:minmax(300px,1fr) minmax(210px,250px) minmax(280px,330px) minmax(190px,250px)!important;
+    grid-template-columns:minmax(240px,1fr) minmax(260px,1.35fr) minmax(190px,250px)!important;
     align-items:center!important;
     gap:12px!important;
     min-width:0!important;
@@ -1113,29 +1112,17 @@ textarea:focus-visible{
     grid-row:1!important;
     min-width:0!important;
   }
-  .topbar .topbar-inline-logout{
-    grid-column:2!important;
-    grid-row:1!important;
-    position:relative!important;
-    width:100%!important;
-    min-width:0!important;
-    max-width:none!important;
-    min-height:40px!important;
-    margin:0!important;
-    box-sizing:border-box!important;
-    z-index:2!important;
-  }
   .topbar .open-portal-panel{
-    grid-column:3!important;
-    grid-row:1!important;
     position:relative!important;
     left:auto!important;
     right:auto!important;
     top:auto!important;
     bottom:auto!important;
     transform:none!important;
+    grid-column:2!important;
+    grid-row:1!important;
     justify-self:center!important;
-    width:100%!important;
+    width:78%!important;
     min-width:0!important;
     min-height:62px!important;
     height:62px!important;
@@ -1159,7 +1146,7 @@ textarea:focus-visible{
     text-overflow:ellipsis!important;
   }
   .topbar-access-category{
-    grid-column:4!important;
+    grid-column:3!important;
     grid-row:1!important;
     min-width:0!important;
     width:100%!important;
@@ -1167,61 +1154,38 @@ textarea:focus-visible{
 }
 @media(min-width:761px) and (max-width:1100px){
   .topbar-heading-row{
-    display:grid!important;
-    grid-template-columns:minmax(220px,1fr) minmax(170px,220px) minmax(190px,260px)!important;
+    display:flex!important;
     align-items:center!important;
     gap:10px!important;
     min-width:0!important;
   }
-  .topbar-title-block{
-    grid-column:1!important;
-    grid-row:1!important;
-    min-width:0!important;
-  }
-  .topbar .topbar-inline-logout{
-    grid-column:2!important;
-    grid-row:1!important;
-    position:relative!important;
-    width:100%!important;
-    min-width:0!important;
-    max-width:none!important;
-    margin:0!important;
-    box-sizing:border-box!important;
-  }
   .topbar .open-portal-panel{
-    grid-column:3!important;
-    grid-row:1!important;
     position:relative!important;
     left:auto!important;
     right:auto!important;
     top:auto!important;
     bottom:auto!important;
     transform:none!important;
-    width:100%!important;
-    min-width:0!important;
-    max-width:none!important;
+    flex:0 1 78%!important;
+    min-width:180px!important;
+    max-width:78%!important;
     height:58px!important;
-    margin:0!important;
-    box-sizing:border-box!important;
+    margin:0 auto!important;
+    z-index:1!important;
     text-align:left!important;
-  }
-  .topbar-access-category{
-    display:none!important;
   }
   .topbar .open-portal-panel span,
   .topbar .open-portal-panel strong{
     text-align:left!important;
   }
-}
-@media(max-width:760px){
-  .topbar .topbar-inline-logout{
-    position:relative!important;
-    width:100%!important;
+  .topbar-title-block{
+    flex:1 1 260px!important;
     min-width:0!important;
-    max-width:none!important;
   }
-  .topbar .open-portal-panel{
-    display:none!important;
+  .topbar-access-category{
+    flex:0 1 210px!important;
+    width:auto!important;
+    min-width:160px!important;
   }
 }
 
