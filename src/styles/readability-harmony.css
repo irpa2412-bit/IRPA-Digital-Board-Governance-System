@@ -358,6 +358,10 @@ textarea:focus-visible{
 
 /* Mobile: increase legibility without changing the established mobile layout. */
 @media(max-width:760px){
+  .dashboard-live-date-slot{
+    display:none!important;
+  }
+
   body{font-size:15px!important;}
   .topbar h2{font-size:18px!important;line-height:1.25!important;}
   .topbar p{font-size:12px!important;line-height:1.5!important;}
@@ -1365,14 +1369,15 @@ textarea:focus-visible{
 
 
 /* OPERATOR SIGN-OUT SLOT — 2026-09-25
-   Sign Out is deliberately placed in normal document flow immediately below
-   the topbar/Open Portal panel. It is right-aligned and cannot overlap another
-   panel because it occupies its own layout row. */
+   Sign Out occupies its own row. On Dashboard, the live date portal is placed
+   directly beneath it in the same flow, so the two controls cannot overlap. */
 .operator-signout-slot{
   width:100%;
   display:flex;
-  justify-content:flex-end;
-  align-items:center;
+  flex-direction:column!important;
+  justify-content:flex-start;
+  align-items:flex-end!important;
+  gap:12px!important;
   box-sizing:border-box;
   margin:0 0 14px;
   min-height:54px;
@@ -1396,6 +1401,23 @@ textarea:focus-visible{
 }
 .operator-signout-slot .logout-button:hover{
   background:linear-gradient(145deg,#1674c4,#0b5fa8)!important;
+}
+.dashboard-live-date-slot{
+  width:100%!important;
+  display:flex!important;
+  justify-content:flex-end!important;
+  box-sizing:border-box!important;
+}
+.dashboard-live-date-slot .desktop-date-card.open-portal-panel{
+  position:relative!important;
+  inset:auto!important;
+  width:min(100%,1080px)!important;
+  min-width:0!important;
+  min-height:132px!important;
+  margin:0!important;
+  padding:20px 26px!important;
+  box-sizing:border-box!important;
+  overflow:hidden!important;
 }
 @media(max-width:760px){
   .operator-signout-slot{
