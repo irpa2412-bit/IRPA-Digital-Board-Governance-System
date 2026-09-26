@@ -473,3 +473,129 @@
 .finance-portal th{
   overflow-wrap:break-word;
 }
+
+
+
+/* FINANCE ENTRY — FIELD NAVIGATOR + HIGH-CONTRAST FORM READABILITY — 2026-09-26
+   Safety scope: presentation and in-page navigation only. This layer does not
+   change financial records, validation rules, workflow stages, permissions,
+   routing, Firebase calls, calculations, or approval controls. */
+.finance-portal #finance-entry .form-field{
+  color:#173b2d!important;
+  font-size:14px!important;
+  font-weight:850!important;
+  line-height:1.4!important;
+}
+.finance-portal #finance-entry .finance-field-label{
+  display:block!important;
+  margin-bottom:6px!important;
+  color:#173b2d!important;
+  font-size:14px!important;
+  font-weight:900!important;
+  line-height:1.4!important;
+  letter-spacing:0!important;
+  opacity:1!important;
+}
+.finance-portal #finance-entry .form-field input,
+.finance-portal #finance-entry .form-field select,
+.finance-portal #finance-entry .form-field textarea{
+  color:#102f24!important;
+  background:#fff!important;
+  border:2px solid #6f9282!important;
+  border-radius:9px!important;
+  box-shadow:inset 0 1px 2px rgba(0,0,0,.04)!important;
+}
+.finance-portal #finance-entry .form-field input:focus,
+.finance-portal #finance-entry .form-field select:focus,
+.finance-portal #finance-entry .form-field textarea:focus{
+  border-color:#0b5fa8!important;
+  box-shadow:0 0 0 3px rgba(11,95,168,.16)!important;
+}
+.finance-field-roller{
+  position:sticky;
+  top:8px;
+  z-index:80;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(260px,360px);
+  align-items:center;
+  gap:14px;
+  margin:0 0 18px;
+  padding:11px 13px;
+  border:2px solid #2f86cf;
+  border-radius:12px;
+  background:#062b4c;
+  color:#fff;
+  box-shadow:0 8px 20px rgba(0,0,0,.18);
+}
+.finance-field-roller-kicker{
+  display:block;
+  color:#9fd2ff;
+  font-size:9px;
+  line-height:1.1;
+  font-weight:900;
+  letter-spacing:.12em;
+}
+.finance-field-roller strong{
+  display:block;
+  margin-top:3px;
+  color:#fff!important;
+  font-size:14px;
+  line-height:1.3;
+}
+.finance-field-roller small{
+  display:block;
+  margin-top:3px;
+  color:#d7eaff!important;
+  font-size:11px;
+  line-height:1.35;
+}
+.finance-field-roller-control{
+  position:relative;
+  min-width:0;
+}
+.finance-field-roller-control select{
+  width:100%;
+  min-height:44px;
+  padding:9px 38px 9px 11px;
+  border:2px solid rgba(255,255,255,.65);
+  border-radius:9px;
+  background:#0b5fa8;
+  color:#fff;
+  font-size:14px;
+  font-weight:850;
+  cursor:pointer;
+}
+.finance-field-roller-control>span{
+  position:absolute;
+  right:11px;
+  top:50%;
+  transform:translateY(-50%);
+  color:#fff;
+  pointer-events:none;
+  font-size:18px;
+  font-weight:900;
+}
+.finance-portal #finance-entry .form-field{
+  scroll-margin-top:95px;
+}
+@media(max-width:760px){
+  .finance-field-roller{
+    position:sticky;
+    top:78px;
+    grid-template-columns:1fr;
+    gap:8px;
+    padding:10px;
+  }
+  .finance-field-roller strong{font-size:13px}
+  .finance-field-roller small{font-size:10px}
+  .finance-field-roller-control select{min-height:46px;font-size:16px}
+  .finance-portal #finance-entry .finance-field-label{
+    font-size:14px!important;
+  }
+  .finance-portal #finance-entry .form-field input,
+  .finance-portal #finance-entry .form-field select,
+  .finance-portal #finance-entry .form-field textarea{
+    min-height:48px!important;
+    font-size:16px!important;
+  }
+}
