@@ -4961,3 +4961,73 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     box-shadow:0 0 0 3px rgba(23,107,71,.14)!important;
   }
 }
+
+/* LIVE WEATHER LOCATION SWITCHER + LIVE METRICS */
+.live-weather-location-switcher{
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:8px 10px;
+  margin:8px 0 12px;
+}
+.live-weather-location-modes{
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  padding:3px;
+  border:1px solid #b8c9c2;
+  border-radius:10px;
+  background:#f5f8f6;
+}
+.live-weather-location-modes button{
+  min-height:34px;
+  padding:7px 12px;
+  border:1px solid transparent;
+  border-radius:8px;
+  background:transparent;
+  color:#24463a;
+  font-size:12px;
+  font-weight:800;
+}
+.live-weather-location-modes button.active{
+  background:#0f6b47;
+  color:#fff;
+  border-color:#0f6b47;
+}
+.live-weather-location-switcher select{
+  min-height:36px;
+  min-width:190px;
+  padding:7px 30px 7px 10px;
+  border:1px solid #9bb8aa;
+  border-radius:9px;
+  background:#fff;
+  color:#173b2d;
+  font-size:12px;
+  font-weight:700;
+}
+.live-weather-location-switcher select:focus{
+  outline:none;
+  border-color:#176b47;
+  box-shadow:0 0 0 3px rgba(23,107,71,.14);
+}
+.live-weather-location-status{
+  flex:1 1 220px;
+  color:#526c61;
+  font-size:11px;
+  line-height:1.35;
+}
+@media(max-width:760px){
+  .live-weather-location-switcher{
+    align-items:stretch;
+    flex-direction:column;
+  }
+  .live-weather-location-modes{
+    width:100%;
+  }
+  .live-weather-location-modes button{
+    flex:1 1 0;
+  }
+  .live-weather-location-switcher select{
+    width:100%;
+  }
+}
