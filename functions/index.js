@@ -355,11 +355,14 @@ exports.resolveAuthenticatedLoginContext = onCall({region:"us-central1",timeoutS
   if(admin?.active===true)addAuthority("Administrator",admin,"Administrator Registry");
   members.forEach(record=>{
     const values=[...(Array.isArray(record?.roles)?record.roles:[]),record?.role,record?.boardPosition].flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean));
-    values.forEach(role=>addAuthority(role,record,"Member Register"));
+    const guaranteed=values.length?values:[String(record?.boardPosition||"Board Member").trim()];
+    guaranteed.filter(Boolean).forEach(role=>addAuthority(role,record,"Member Register"));
   });
   employees.forEach(record=>{
     const values=[...(Array.isArray(record?.roles)?record.roles:[]),record?.role,...(Array.isArray(record?.assignedRoles)?record.assignedRoles:[]),...(Array.isArray(record?.selectedRoles)?record.selectedRoles:[]),...(Array.isArray(record?.roleAssignments)?record.roleAssignments:[])].flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean));
-    values.forEach(role=>addAuthority(role,record,"Employee Register"));
+    const institutionalFallback=String(record?.jobTitle||record?.position||record?.designation||record?.title||record?.department||"Employee").trim();
+    const guaranteed=values.length?values:[institutionalFallback];
+    guaranteed.filter(Boolean).forEach(role=>addAuthority(role,record,"Employee Register"));
   });
   employeeRoles.forEach(role=>addAuthority(role,employee,"Employee Register"));
   const authorities=[...authorityMap.values()];
