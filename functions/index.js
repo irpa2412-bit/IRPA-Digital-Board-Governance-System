@@ -238,6 +238,9 @@ exports.resolveAuthenticatedLoginContext = onCall({region:"us-central1",timeoutS
   };
   const normalized=v=>String(v||"").toLowerCase().replace(/\s+/g," ").trim();
 
+  // Resolve the direct UID records first. Email/linked-identity lookups are
+  // fallback paths only; the previous implementation performed six Firestore
+  // queries on every login even when the UID records already existed.
   const [adminSnap,memberDirect,employeeDirect]=await Promise.all([
     db.collection("adminProfiles").doc(uid).get(),
     db.collection("members").doc(uid).get(),
@@ -249,38 +252,49 @@ exports.resolveAuthenticatedLoginContext = onCall({region:"us-central1",timeoutS
   if(memberDirect.exists) memberRecords.push(clean(memberDirect));
   if(employeeDirect.exists) employeeRecords.push(clean(employeeDirect));
 
-  if(email){
-    const [memberByEmail,employeeByEmail,memberByAuthEmail,employeeByAuthEmail,memberByUid,employeeByUid]=await Promise.all([
+  const fallbackQueries=[];
+  if(email&&!memberDirect.exists){
+    fallbackQueries.push(
       db.collection("members").where("email","==",email).limit(10).get(),
+      db.collection("members").where("firebaseAuthEmail","==",email).limit(10).get()
+    );
+  }
+  if(email&&!employeeDirect.exists){
+    fallbackQueries.push(
       db.collection("employees").where("email","==",email).limit(10).get(),
-      db.collection("members").where("firebaseAuthEmail","==",email).limit(10).get(),
-      db.collection("employees").where("firebaseAuthEmail","==",email).limit(10).get(),
-      db.collection("members").where("uid","==",uid).limit(10).get(),
-      db.collection("employees").where("uid","==",uid).limit(10).get()
-    ]);
-    memberByEmail.forEach(s=>memberRecords.push(clean(s)));
-    employeeByEmail.forEach(s=>employeeRecords.push(clean(s)));
-    memberByAuthEmail.forEach(s=>memberRecords.push(clean(s)));
-    employeeByAuthEmail.forEach(s=>employeeRecords.push(clean(s)));
-    memberByUid.forEach(s=>memberRecords.push(clean(s)));
-    employeeByUid.forEach(s=>employeeRecords.push(clean(s)));
+      db.collection("employees").where("firebaseAuthEmail","==",email).limit(10).get()
+    );
+  }
+  if(fallbackQueries.length){
+    const fallbackSnaps=await Promise.all(fallbackQueries);
+    fallbackSnaps.forEach((snap)=>{
+      snap.forEach(docSnap=>{
+        const record=clean(docSnap);
+        if(!record)return;
+        const isEmployee=Object.prototype.hasOwnProperty.call(record,"employeeNumber")||Object.prototype.hasOwnProperty.call(record,"employmentStatus")||Object.prototype.hasOwnProperty.call(record,"employeeType");
+        (isEmployee?employeeRecords:memberRecords).push(record);
+      });
+    });
   }
 
-  if(admin?.active===true){
-    for(const field of ["administratorUid","adminUid","linkedAdministratorUid"]){
-      const snap=await db.collection("employees").where(field,"==",uid).limit(10).get();
+  if(admin?.active===true&&!employeeRecords.length){
+    const linkedFields=["administratorUid","adminUid","linkedAdministratorUid"];
+    const linkedSnaps=await Promise.all(
+      linkedFields.map(field=>db.collection("employees").where(field,"==",uid).limit(10).get())
+    );
+    for(const snap of linkedSnaps){
       snap.forEach(s=>employeeRecords.push(clean(s)));
-      if(snap.size) break;
+      if(snap.size)break;
     }
 
     if(!employeeRecords.length){
-      const identityName=normalized(admin.name||admin.details?.name||request.auth?.token?.name||"");
+      const identityName=String(admin.name||admin.details?.name||request.auth?.token?.name||"").trim();
       if(identityName){
-        const all=await db.collection("employees").get();
-        const matches=all.docs
-          .map(clean)
-          .filter(record=>activeRecord(record)&&normalized(record.name)===identityName);
-        if(matches.length===1) employeeRecords.push(matches[0]);
+        // Exact-name lookup is a bounded fallback. Avoid scanning the entire
+        // Employees Register during login.
+        const snap=await db.collection("employees").where("name","==",identityName).limit(2).get();
+        const matches=snap.docs.map(clean).filter(record=>activeRecord(record)&&normalized(record.name)===normalized(identityName));
+        if(matches.length===1)employeeRecords.push(matches[0]);
       }
     }
   }
@@ -293,10 +307,15 @@ exports.resolveAuthenticatedLoginContext = onCall({region:"us-central1",timeoutS
     ...(Array.isArray(record?.roles)?record.roles:[]),record?.role,
     ...(Array.isArray(record?.assignedRoles)?record.assignedRoles:[]),
     ...(Array.isArray(record?.selectedRoles)?record.selectedRoles:[]),
-    ...(Array.isArray(record?.roleAssignments)?record.roleAssignments:[])
+    ...(Array.isArray(record?.roleAssignments)?record.roleAssignments:[]
   ]).flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean)))];
-  const contextValues=employees.flatMap(record=>[record?.department,record?.unit,record?.jobTitle,record?.position,record?.title,record?.designation]).map(normalized).filter(Boolean);
-  if(contextValues.some(v=>v==="it"||v==="it unit"||v.includes("information technology")||v.includes("it specialist")||v.includes("information technology officer"))&&!employeeRoles.some(r=>["IT Specialist","Information Technology Officer"].includes(r))) employeeRoles.push("IT Specialist");
+  const contextValues=employees.flatMap(record=>[
+    record?.department,record?.unit,record?.jobTitle,record?.position,record?.title,record?.designation
+  ]).map(normalized).filter(Boolean);
+  if(
+    contextValues.some(v=>v==="it"||v==="it unit"||v.includes("information technology")||v.includes("it specialist")||v.includes("information technology officer")) &&
+    !employeeRoles.some(r=>["IT Specialist","Information Technology Officer"].includes(r))
+  ) employeeRoles.push("IT Specialist");
 
   return {
     ok:true,
