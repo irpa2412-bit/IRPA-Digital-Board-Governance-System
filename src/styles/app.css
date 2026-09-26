@@ -4909,3 +4909,55 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     z-index:9999!important;
   }
 }
+
+/* IRPA PARTICIPANT SELECTION READABILITY — 2026-09-27 */
+@media screen{
+  /* The two participant-source radio choices must remain clearly readable
+     against the light participant-entry surface. */
+  .content-area .page .form-actions label{
+    display:inline-flex!important;
+    align-items:center!important;
+    gap:8px!important;
+    min-height:32px!important;
+    color:#173b2d!important;
+    font-size:14px!important;
+    font-weight:750!important;
+    line-height:1.4!important;
+    opacity:1!important;
+    cursor:pointer!important;
+  }
+
+  .content-area .page .form-actions input[type="radio"]{
+    width:18px!important;
+    height:18px!important;
+    min-width:18px!important;
+    min-height:18px!important;
+    margin:0!important;
+    flex:0 0 18px!important;
+    accent-color:#176b47!important;
+    opacity:1!important;
+  }
+
+  /* Keep the closed select control and its native dropdown options high
+     contrast, including on browsers that inherit the application's dark
+     global form palette. */
+  .content-area .page .form-field select{
+    color:#173b2d!important;
+    background:#ffffff!important;
+    border-color:#9bb8aa!important;
+    font-weight:650!important;
+    opacity:1!important;
+  }
+
+  .content-area .page .form-field select option{
+    color:#173b2d!important;
+    background:#ffffff!important;
+    font-size:14px!important;
+    font-weight:600!important;
+  }
+
+  .content-area .page .form-field select:focus{
+    border-color:#176b47!important;
+    box-shadow:0 0 0 3px rgba(23,107,71,.14)!important;
+  }
+}
