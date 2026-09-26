@@ -519,7 +519,8 @@ useEffect(()=>{
         // official Employee Register email. When the authenticated Administrator is
         // also an employee, recover the employee capacity only through one exact
         // registered-name match; never union ambiguous employee records.
-        const adminEmployee=adminEmployeeDirect||await getCurrentEmployeeProfile({fallbackName:adminDirect?.name}).catch(()=>null);
+        const administratorIdentityName=String(adminDirect?.name||adminDirect?.details?.name||u.displayName||"").trim();
+        const adminEmployee=adminEmployeeDirect||await getCurrentEmployeeProfile({fallbackName:administratorIdentityName}).catch(()=>null);
         const adminMemberAuthorized=Boolean(adminMember)&&(["active","activated"].includes(String(adminMember?.status||"").trim().toLowerCase())||String(adminMember?.registrationStatus||"").trim().toLowerCase()==="activated");
         const adminEmployeeAuthorized=Boolean(adminEmployee)&&(["active","activated"].includes(String(adminEmployee?.status||"").trim().toLowerCase())||String(adminEmployee?.employmentStatus||"").trim().toLowerCase()==="active"||String(adminEmployee?.registrationStatus||"").trim().toLowerCase()==="activated");
         const verifiedProfile=adminMemberAuthorized?adminMember:null,verifiedEmployee=adminEmployeeAuthorized?adminEmployee:null;
