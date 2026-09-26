@@ -250,12 +250,20 @@ exports.resolveAuthenticatedLoginContext = onCall({region:"us-central1",timeoutS
   if(employeeDirect.exists) employeeRecords.push(clean(employeeDirect));
 
   if(email){
-    const [memberByEmail,employeeByEmail]=await Promise.all([
+    const [memberByEmail,employeeByEmail,memberByAuthEmail,employeeByAuthEmail,memberByUid,employeeByUid]=await Promise.all([
       db.collection("members").where("email","==",email).limit(10).get(),
-      db.collection("employees").where("email","==",email).limit(10).get()
+      db.collection("employees").where("email","==",email).limit(10).get(),
+      db.collection("members").where("firebaseAuthEmail","==",email).limit(10).get(),
+      db.collection("employees").where("firebaseAuthEmail","==",email).limit(10).get(),
+      db.collection("members").where("uid","==",uid).limit(10).get(),
+      db.collection("employees").where("uid","==",uid).limit(10).get()
     ]);
     memberByEmail.forEach(s=>memberRecords.push(clean(s)));
     employeeByEmail.forEach(s=>employeeRecords.push(clean(s)));
+    memberByAuthEmail.forEach(s=>memberRecords.push(clean(s)));
+    employeeByAuthEmail.forEach(s=>employeeRecords.push(clean(s)));
+    memberByUid.forEach(s=>memberRecords.push(clean(s)));
+    employeeByUid.forEach(s=>employeeRecords.push(clean(s)));
   }
 
   if(admin?.active===true){
@@ -277,18 +285,17 @@ exports.resolveAuthenticatedLoginContext = onCall({region:"us-central1",timeoutS
     }
   }
 
-  const uniqueById=list=>[...new Map(list.filter(Boolean).map(x=>[String(x.id||x.uid),x])).values()];
+  const uniqueById=list=>[...new Map(list.filter(Boolean).map(x=>[String(x.id||x.uid||x.employeeNumber||x.email),x])).values()];
   const members=uniqueById(memberRecords).filter(activeRecord);
   const employees=uniqueById(employeeRecords).filter(activeRecord);
   const employee=employees[0]||null;
-  const employeeRoles=[...new Set([
-    ...(Array.isArray(employee?.roles)?employee.roles:[]),
-    employee?.role,
-    ...(Array.isArray(employee?.assignedRoles)?employee.assignedRoles:[]),
-    ...(Array.isArray(employee?.selectedRoles)?employee.selectedRoles:[]),
-    ...(Array.isArray(employee?.roleAssignments)?employee.roleAssignments:[])
-  ].flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean)))];
-  const contextValues=[employee?.department,employee?.unit,employee?.jobTitle,employee?.position,employee?.title,employee?.designation].map(normalized).filter(Boolean);
+  const employeeRoles=[...new Set(employees.flatMap(record=>[
+    ...(Array.isArray(record?.roles)?record.roles:[]),record?.role,
+    ...(Array.isArray(record?.assignedRoles)?record.assignedRoles:[]),
+    ...(Array.isArray(record?.selectedRoles)?record.selectedRoles:[]),
+    ...(Array.isArray(record?.roleAssignments)?record.roleAssignments:[])
+  ]).flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean)))];
+  const contextValues=employees.flatMap(record=>[record?.department,record?.unit,record?.jobTitle,record?.position,record?.title,record?.designation]).map(normalized).filter(Boolean);
   if(contextValues.some(v=>v==="it"||v==="it unit"||v.includes("information technology")||v.includes("it specialist")||v.includes("information technology officer"))&&!employeeRoles.some(r=>["IT Specialist","Information Technology Officer"].includes(r))) employeeRoles.push("IT Specialist");
 
   return {
