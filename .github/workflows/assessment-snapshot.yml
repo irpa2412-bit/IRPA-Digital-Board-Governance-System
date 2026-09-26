@@ -11,18 +11,17 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Checkout exact assessment snapshot
+      - name: Checkout exact current main system commit
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          ref: 62fdd3c000f491ee5712e6e4f11d17430b648ce6
+          fetch-depth: 1
       - name: Package repository
         run: |
-          rm -rf .git
-          rm -f .github/workflows/assessment-snapshot.yml
-          zip -qr IRPA-DBGS-System-Assessment-Snapshot-2026-09-27.zip . -x "node_modules/*" "dist/*"
+          zip -qr IRPA-DBGS-System-Assessment-Snapshot-2026-09-27.zip . -x ".git/*" "node_modules/*" "dist/*"
       - name: Upload assessment ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: IRPA-DBGS-System-Assessment-Snapshot-2026-09-27
+          name: IRPA-DBGS-System-Assessment-Snapshot-2026-09-27-main
           path: IRPA-DBGS-System-Assessment-Snapshot-2026-09-27.zip
           if-no-files-found: error
