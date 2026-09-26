@@ -4834,3 +4834,33 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     margin-top:0!important;
   }
 }
+
+
+/* IRPA DESKTOP SESSION-RECOVERY ALIGNMENT — 2026-09-26 */
+@media screen and (min-width:761px){
+  /* Remove the separate Sign Out band below Back/Next. Authentication remains
+     available through the existing top-level/sidebar controls. */
+  .content-area > .operator-signout-slot,
+  .dashboard-content-area > .operator-signout-slot{
+    display:none!important;
+    width:0!important;
+    min-height:0!important;
+    height:0!important;
+    margin:0!important;
+    padding:0!important;
+    border:0!important;
+  }
+
+  /* The first recovery/dashboard surface now meets the lower edge of the
+     Back/Next navigation with no intervening blank band. */
+  .content-area > .page-back-next-navigation,
+  .dashboard-content-area > .page-back-next-navigation{
+    margin-bottom:0!important;
+  }
+  .dashboard-content-area{
+    padding-top:48px!important;
+  }
+  .dashboard-content-area > .dashboard-command{
+    margin-top:0!important;
+  }
+}
