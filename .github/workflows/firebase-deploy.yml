@@ -277,15 +277,59 @@ jobs:
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
 
-      # Keep the login resolver deployment independent from unrelated functions.
+      # Cloud Functions deployment is a separate billing-gated operation. Keep the
+      # production Hosting/Firestore release from being marked failed when Google
+      # blocks function deployment because the project's billing account is closed.
+      # A retained resolver is accepted only after its live callable endpoint is
+      # verified; a missing resolver remains a hard failure.
       - name: Deploy login authorization resolver
+        id: login_resolver_deploy
+        continue-on-error: true
         uses: w9jds/firebase-action@v14.17.0
         with:
           args: deploy --project irpa-digital-board-governance --only functions:resolveAuthenticatedLoginContext
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
 
+      - name: Verify retained login authorization resolver
+        id: login_resolver_verify
+        if: steps.login_resolver_deploy.outcome == 'failure'
+        shell: bash
+        run: |
+          set -euo pipefail
+          ENDPOINT="https://us-central1-irpa-digital-board-governance.cloudfunctions.net/resolveAuthenticatedLoginContext"
+          HTTP_STATUS="$(curl -L --silent --show-error --output /tmp/irpa-login-resolver.json \
+            --write-out '%{http_code}' --retry 5 --retry-delay 3 --max-time 30 \
+            -X POST -H 'Content-Type: application/json' \
+            --data '{"data":{}}' "$ENDPOINT")"
+          echo "LOGIN_RESOLVER_HTTP_STATUS=$HTTP_STATUS"
+          cat /tmp/irpa-login-resolver.json || true
+
+          # A deployed onCall resolver with no Firebase ID token must reject the
+          # request as UNAUTHENTICATED (401). A 404 means the resolver is absent.
+          if [ "$HTTP_STATUS" = "401" ]; then
+            echo "Existing login authorization resolver is reachable; deployment was retained."
+            echo "resolver_state=retained" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "$HTTP_STATUS" = "404" ]; then
+            echo "ERROR: login authorization resolver is not deployed."
+            exit 1
+          fi
+
+          echo "ERROR: login authorization resolver health check returned unexpected HTTP $HTTP_STATUS."
+          exit 1
+
+      - name: Record deferred Firebase Functions deployment
+        if: steps.login_resolver_deploy.outcome == 'failure'
+        run: |
+          echo "::warning::Firebase Cloud Functions deployment was deferred because the resolver deployment did not complete. The workflow remains successful only when the retained resolver endpoint is reachable."
+          echo "FUNCTION_DEPLOYMENT=DEFERRED_OR_RETAINED" >> "$GITHUB_STEP_SUMMARY"
+          echo "Login resolver source remains in the repository; redeployment requires an active Google Cloud Billing account."
+
       - name: Deploy authentication security and document-reference functions
+        if: steps.login_resolver_deploy.outcome == 'success'
         uses: w9jds/firebase-action@v14.17.0
         with:
           args: deploy --project irpa-digital-board-governance --only functions:checkPasswordAttemptState,functions:recordPasswordFailure,functions:clearPasswordAttemptState,functions:preparePasswordResetPhone,functions:nextDocumentReference
