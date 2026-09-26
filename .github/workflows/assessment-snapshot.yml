@@ -1,0 +1,28 @@
+name: Create External Assessment Snapshot
+
+on:
+  push:
+    branches:
+      - assessment/snapshot-20260927
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact assessment snapshot
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Package repository
+        run: |
+          rm -rf .git
+          rm -f .github/workflows/assessment-snapshot.yml
+          zip -qr ../IRPA-DBGS-System-Assessment-Snapshot-2026-09-27.zip . -x "node_modules/*" "dist/*"
+      - name: Upload assessment ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: IRPA-DBGS-System-Assessment-Snapshot-2026-09-27
+          path: ../IRPA-DBGS-System-Assessment-Snapshot-2026-09-27.zip
+          if-no-files-found: error
