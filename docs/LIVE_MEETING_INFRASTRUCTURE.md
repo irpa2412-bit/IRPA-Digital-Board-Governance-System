@@ -1,4 +1,4 @@
-# IRPA-DGBS Live Meeting Infrastructure
+# IRPA-DGBS Meeting Room — Live Meeting Infrastructure
 
 ## Purpose
 This document defines the production architecture for the IRPA-owned live meeting service. It is separated from the Firebase governance datastore so the media layer can be deployed, tested, upgraded, or rolled back without disabling governance records or current administrators.
@@ -9,7 +9,7 @@ IRPA-DGBS remains the authoritative governance system: Firebase Authentication f
 Recommended media engine: self-hosted LiveKit OSS. It supports self-hosted realtime audio/video/data, end-to-end encryption, webhooks, and separately deployed Egress for recording/streaming.
 
 ## Production topology
-IRPA-DGBS -> Meeting Control API -> authorization and room/token lifecycle -> self-hosted LiveKit SFU/TURN -> WebRTC participants. Optional Egress handles authorized recording/streaming. Optional transcription/AI services support proceedings but never replace human approval.
+IRPA-DGBS Meeting Room -> Meeting Control API -> authorization and room/token lifecycle -> self-hosted LiveKit SFU/TURN -> WebRTC participants. Optional Egress handles authorized recording/streaming. Optional transcription/AI services support proceedings but never replace human approval.
 
 ## Ownership principle
 IRPA should operate the self-hosted media infrastructure and control DNS, credentials, encryption configuration, recording storage, monitoring and deployment lifecycle. Never expose LiveKit API secrets to the browser.
@@ -56,7 +56,7 @@ Authenticated participant can join an authorized meeting; unauthorized participa
 WebRTC media must use authenticated/encrypted transport. Do not deploy plain RTP/RTCP. TLS certificates, API secrets, TURN credentials and recording-storage credentials remain server-side.
 
 ## Current repository boundary
-At repository commit 16c03442979d815f9454140b00c1b4f75d895b2c, IRPA-DGBS contains a substantial governance meeting workspace but no verified implementation of RTCPeerConnection/getUserMedia or a media SFU. This document therefore defines the missing production media layer without claiming it is already installed.
+Before the current IRPA-DGBS Meeting Room media tranche, IRPA-DGBS contained a substantial governance meeting workspace but no verified implementation of RTCPeerConnection/getUserMedia or a media SFU. The current repository now contains the server-side token gateway and Meeting Room client integration, but production media infrastructure is not yet deployed. This document therefore defines the missing production media layer without claiming it is already installed.
 
 ## Next deployment gate
 Do not publish a live meeting endpoint until the infrastructure host is provisioned, DNS and TLS are valid, firewall rules are reviewed, LiveKit is deployed, the meeting-control gateway is deployed, short-lived token issuance is tested, mobile/restrictive-network tests pass, and security/rollback tests pass.
