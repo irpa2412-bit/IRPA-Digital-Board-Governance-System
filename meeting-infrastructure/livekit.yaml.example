@@ -1,0 +1,21 @@
+# Example only. Do not put production credentials in source control.
+port: 7880
+
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 60000
+
+turn:
+  enabled: true
+  udp_port: 3478
+  tls_port: 5349
+  domain: turn.meet.irpa.or.tz
+  cert_file: /etc/letsencrypt/live/turn.meet.irpa.or.tz/fullchain.pem
+  key_file: /etc/letsencrypt/live/turn.meet.irpa.or.tz/privkey.pem
+
+redis:
+  address: redis:6379
+
+keys:
+  REPLACE_WITH_SERVER_GENERATED_KEY: REPLACE_WITH_SERVER_GENERATED_SECRET
