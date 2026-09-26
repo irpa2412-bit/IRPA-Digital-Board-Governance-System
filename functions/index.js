@@ -5,6 +5,7 @@ const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getMessaging } = require("firebase-admin/messaging");
 const { getAuth } = require("firebase-admin/auth");
 const crypto = require("crypto");
+require("./passwordSecurity");
 initializeApp(); const db = getFirestore();
 async function stableId(v){return crypto.createHash("sha256").update(String(v)).digest("hex");}
 async function writeServerAuditEvent(event){
