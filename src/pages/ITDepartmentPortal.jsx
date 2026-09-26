@@ -98,6 +98,13 @@ export default function ITDepartmentPortal({user,profile,employee,selectedAuthor
   </section>
 
   <section className="panel" style={{marginTop:18}}>
+   <div className="panel-heading"><div><span className="eyebrow">IT DEPARTMENT UNITS</span><h2>Departments / Operational Units</h2><p className="muted">These are the eight visible operational units of the Information Technology Department. Select any unit to open its connected workspace.</p></div></div>
+   <div className="dashboard-grid" style={{marginTop:16}}>
+    {UNITS.map(([u,d],i)=>{const b=BRANCHES.find(x=>x.units.includes(u));return <button key={u} type="button" className="stat-card" onClick={()=>{if(b){setBranch(b.name);setUnit(u);setForm(f=>({...f,branch:b.name,unit:u}));}setTab("overview")}} style={{textAlign:"left",cursor:"pointer",outline:unit===u?"2px solid currentColor":"none"}}><span>IT UNIT {String(i+1).padStart(2,"0")}</span><strong>{u}</strong><small>{d}</small><small style={{marginTop:8}}>Branch: <b>{b?.name||"IT Department"}</b></small></button>})}
+   </div>
+  </section>
+
+  <section className="panel" style={{marginTop:18}}>
    <div className="panel-heading"><div><span className="eyebrow">BRANCH WORKSPACE</span><h2>{branch}</h2><p className="muted">{BRANCHES.find(b=>b.name===branch)?.description}</p></div></div>
    <div className="dashboard-grid" style={{marginTop:14}}>
     {(BRANCHES.find(b=>b.name===branch)?.units||[]).map(u=>{const d=UNITS.find(x=>x[0]===u)?.[1]||"";return <button key={u} type="button" className="stat-card" onClick={()=>{setUnit(u);setForm(f=>({...f,branch,unit:u}));setTab("overview")}} style={{textAlign:"left",cursor:"pointer",outline:unit===u?"2px solid currentColor":"none"}}><span>CONNECTED UNIT</span><strong>{u}</strong><small>{d}</small></button>})}
