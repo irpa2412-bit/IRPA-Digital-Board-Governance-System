@@ -584,7 +584,7 @@ useEffect(()=>{
         const claimsProfile={roles:serverRoles};
         const assignedRoles=[...new Set([...resolveLoginCategories(verifiedProfile,verifiedEmployee,false),...resolveLoginCategories(claimsProfile,null,false),...resolveLoginCategories(adminDirect,null,false),"Administrator"].filter(role=>String(role||"").trim()))];
         setEmployee(verifiedEmployee);
-        setProfile({... (verifiedProfile||verifiedEmployee||adminDirect||{}),uid:u.uid,email:u.email||resolvedMember?.email||adminEmployee?.email||adminDirect?.email||"",role:assignedRoles[0]||"Administrator",roles:assignedRoles,serverAuthorizedRoles:serverRoles,administratorAvailable:true,authorizationType:"member",enrollmentType:verifiedEmployee&&!verifiedProfile?"employee":"member",identityResolution:loginContext?.identityResolution||null});
+        setProfile({... (verifiedProfile||verifiedEmployee||adminDirect||{}),uid:u.uid,email:u.email||resolvedMember?.email||adminEmployee?.email||adminDirect?.email||"",role:assignedRoles[0]||"Administrator",roles:assignedRoles,serverAuthorizedRoles:serverRoles,authorities:Array.isArray(loginContext?.authorities)?loginContext.authorities:[],administratorAvailable:true,authorizationType:"member",enrollmentType:verifiedEmployee&&!verifiedProfile?"employee":"member",identityResolution:loginContext?.identityResolution||null});
         return;
       }
 
@@ -667,6 +667,7 @@ useEffect(()=>{
         role:resolvedRegisteredRoles[0]||canonicalProfile?.role||"",
         roles:resolvedRegisteredRoles,
         serverAuthorizedRoles:serverContextRoles,
+        authorities:Array.isArray(loginContext?.authorities)?loginContext.authorities:[],
         identityResolution:loginContext?.identityResolution||null
       });
       setEmployee(activeEmployee);
