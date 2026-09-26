@@ -77,9 +77,19 @@ export async function loginWithEmail(email, password) {
     await clearFailures({ email: cleanEmail });
     return result.user;
   } catch (error) {
-    try { await recordFailure({ email: cleanEmail }); } catch (_) {}
+    let failureState = null;
+    try {
+      const failureResult = await recordFailure({ email: cleanEmail });
+      failureState = failureResult?.data || null;
+    } catch (_) {}
     const wrapped = new Error(firebaseErrorMessage(error));
     wrapped.code = error?.code || "";
+    if (failureState) {
+      wrapped.passwordAttemptStatus = failureState.status || "";
+      wrapped.passwordRemainingAttempts = Number(failureState.remainingAttempts ?? 0);
+      wrapped.passwordResetRequired = failureState.resetRequired === true;
+      wrapped.passwordRetryAfterSeconds = Number(failureState.retryAfterSeconds || 0);
+    }
     throw wrapped;
   }
 }
