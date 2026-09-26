@@ -536,10 +536,17 @@ useEffect(()=>{
     }
     try{
       // All standard users authenticate through one sign-in gateway. Verified registered roles are presented by the access-authority gate; IT is an assigned operating capacity, not a separate login gateway.
-      const adminDirect=await Promise.race([
+      // Start every institutional identity lookup together. The previous flow waited
+      // up to 3 seconds for the Administrator profile before starting the server resolver,
+      // which could make the 7-second login watchdog fire before IT/Employee authorization
+      // had even been evaluated.
+      const adminDirectPromise=Promise.race([
         getAdminProfile(u.uid),
         new Promise((_,reject)=>window.setTimeout(()=>reject(new Error("Administrator authorization lookup timed out.")),3000))
-      ]);
+      ]).catch(error=>{
+        console.warn("Administrator authorization lookup unavailable.",error);
+        return null;
+      });
       const tokenResult=await u.getIdTokenResult(true).catch(()=>null);
       const tokenRoles=Array.isArray(tokenResult?.claims?.irpaRoles)?tokenResult.claims.irpaRoles:[];
       // Resolve server identity and registered Member/Employee records concurrently.
@@ -558,17 +565,17 @@ useEffect(()=>{
         console.warn("Registered identity lookup unavailable.",error);
         return [null,null];
       });
-      const [loginContext,[memberDirect,employeeDirect]]=await Promise.all([loginContextPromise,registerContextPromise]);
+      const [adminDirect,[loginContext,[memberDirect,employeeDirect]]]=await Promise.all([
+        adminDirectPromise,
+        Promise.all([loginContextPromise,registerContextPromise])
+      ]);
       const serverRoles=[...new Set([...(Array.isArray(loginContext?.roles)?loginContext.roles:[]),...tokenRoles])];
       if(adminDirect?.active===true){
-        const withAuthorizationTimeout=(promise,ms,label)=>Promise.race([promise,new Promise((_,reject)=>window.setTimeout(()=>reject(new Error(label)),ms))]);
-        const [adminMember,adminEmployeeDirect]=await Promise.all([
-          withAuthorizationTimeout(getCurrentMemberProfile().catch(()=>null),5000,"Administrator member authorization lookup timed out."),
-          withAuthorizationTimeout(getCurrentEmployeeProfile().catch(()=>null),5000,"Administrator employee authorization lookup timed out.")
-        ]);
-        const administratorIdentityName=String(adminDirect?.name||adminDirect?.details?.name||u.displayName||"").trim();
-        const adminEmployee=loginContext?.employee||adminEmployeeDirect||await getCurrentEmployeeProfile({administratorUid:u.uid,fallbackName:administratorIdentityName}).catch(()=>null);
-        const resolvedMember=loginContext?.member||adminMember;
+        // Reuse the already completed resolver/register results. Do not issue a
+        // second round of member/employee reads inside the Administrator branch.
+        // This is critical for dual-capacity accounts such as Administrator + IT.
+        const resolvedMember=loginContext?.member||memberDirect;
+        const adminEmployee=loginContext?.employee||employeeDirect;
         const adminMemberAuthorized=Boolean(resolvedMember)&&(["active","activated"].includes(String(resolvedMember?.status||"").trim().toLowerCase())||String(resolvedMember?.registrationStatus||"").trim().toLowerCase()==="activated");
         const adminEmployeeAuthorized=Boolean(adminEmployee)&&(["active","activated"].includes(String(adminEmployee?.status||"").trim().toLowerCase())||String(adminEmployee?.employmentStatus||"").trim().toLowerCase()==="active"||String(adminEmployee?.registrationStatus||"").trim().toLowerCase()==="activated");
         const verifiedProfile=adminMemberAuthorized?resolvedMember:null,verifiedEmployee=adminEmployeeAuthorized?adminEmployee:null;
@@ -691,10 +698,10 @@ useEffect(()=>{
   const timer=window.setTimeout(()=>{
     if(profile!==undefined)return;
     console.error("IRPA login watchdog: authorization did not complete.");
-    setError("Authentication completed, but IRPA authorization verification did not complete within 7 seconds. The session remains signed in and no dashboard has been opened. Retry Secure Session.");
+    setError("Authentication completed, but IRPA authorization verification did not complete within the extended verification window. The session remains signed in and no dashboard has been opened. Retry Secure Session.");
     setEmployee(null);
     setProfile(null);
-  },7000);
+  },20000);
   return()=>window.clearTimeout(timer);
 },[user,profile]);
 useEffect(()=>{async function magic(){
