@@ -1,0 +1,24 @@
+# IRPA-DGBS Cloudflare deployment template.
+# This is an example only. Populate IDs only from verified Cloudflare configuration.
+name = "irpa-dgbs"
+main = "src/cloudflare/worker.js"
+compatibility_date = "2026-09-24"
+
+[vars]
+IRPA_DGBS_ENV = "migration"
+
+# Add verified bindings only after Gate 1 inventory:
+# [[d1_databases]]
+# binding = "IRPA_DB"
+# database_name = "<verified-name>"
+# database_id = "<verified-id>"
+
+# [[r2_buckets]]
+# binding = "IRPA_DOCUMENTS"
+# bucket_name = "<verified-bucket>"
+
+# [[kv_namespaces]]
+# binding = "IRPA_KV"
+# id = "<verified-id>"
+
+# Never place API tokens, private keys, OAuth secrets or SMTP passwords here.
