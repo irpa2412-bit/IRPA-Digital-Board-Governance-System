@@ -4555,3 +4555,90 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   .dashboard-command .mobile-quote1-user p{color:#cbd5e1!important}
   .dashboard-command .mobile-quote1-user em{background:#1e293b!important;color:#e2e8f0!important;border:1px solid #475569!important}
 }
+
+/* IRPA DASHBOARD PROFILE PANEL — READABILITY REFINEMENT 2026-09-26 */
+@media (min-width: 761px){
+  .dashboard-command .desktop-quote4-hero{
+    height:154px!important;
+    min-height:154px!important;
+    margin-bottom:10px!important;
+    overflow:hidden!important;
+    border-radius:14px!important;
+    background:#0b1220!important;
+    border:1px solid #334155!important;
+    box-shadow:0 10px 24px rgba(0,0,0,.22)!important;
+  }
+
+  .dashboard-command .desktop-quote4-hero-image{
+    opacity:.10!important;
+    filter:brightness(.42) saturate(.45)!important;
+  }
+
+  .dashboard-command .desktop-quote4-hero-overlay{
+    background:linear-gradient(90deg,rgba(7,12,22,.985) 0%,rgba(11,18,32,.965) 68%,rgba(15,23,42,.90) 100%)!important;
+  }
+
+  .dashboard-command .desktop-quote4-hero-content{
+    height:100%!important;
+    min-height:0!important;
+    box-sizing:border-box!important;
+    padding:18px 22px!important;
+    display:flex!important;
+    align-items:center!important;
+    gap:16px!important;
+  }
+
+  .dashboard-command .desktop-profile-photo{
+    width:68px!important;
+    height:68px!important;
+    flex:0 0 68px!important;
+    border-width:3px!important;
+    box-shadow:0 7px 18px rgba(0,0,0,.35)!important;
+  }
+
+  .dashboard-command .desktop-quote4-hero h1{
+    margin:1px 0 4px!important;
+    font-size:25px!important;
+    line-height:1.12!important;
+    letter-spacing:-.025em!important;
+  }
+
+  .dashboard-command .desktop-quote4-hero p{
+    margin:0!important;
+    font-size:12px!important;
+    line-height:1.35!important;
+    font-weight:750!important;
+  }
+
+  .dashboard-command .desktop-motto{
+    margin-top:6px!important;
+    font-size:9px!important;
+    line-height:1.3!important;
+  }
+
+  .dashboard-command .desktop-quote4-hero .dashboard-authority-context{
+    display:inline-flex!important;
+    align-items:center!important;
+    gap:8px!important;
+    margin-top:7px!important;
+    padding:5px 9px!important;
+    border-radius:7px!important;
+    background:#111827!important;
+    border:1px solid #475569!important;
+    box-shadow:none!important;
+  }
+
+  .dashboard-command .desktop-quote4-hero .dashboard-authority-context small{
+    margin:0!important;
+    font-size:8px!important;
+    line-height:1.2!important;
+    letter-spacing:.08em!important;
+  }
+
+  .dashboard-command .desktop-quote4-hero .dashboard-authority-context strong{
+    font-size:10px!important;
+    line-height:1.2!important;
+    white-space:nowrap!important;
+  }
+}
+
