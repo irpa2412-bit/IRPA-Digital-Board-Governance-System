@@ -225,6 +225,92 @@ async function requireActiveAdministratorCallable(request){
   return {uid,email};
 }
 
+exports.resolveAuthenticatedLoginContext = onCall({region:"us-central1",timeoutSeconds:30}, async request => {
+  const uid=String(request.auth?.uid||"").trim();
+  const email=String(request.auth?.token?.email||"").trim().toLowerCase();
+  if(!uid) throw new HttpsError("unauthenticated","Authentication is required to resolve the IRPA login context.");
+
+  const clean=snap=>snap?.exists?{id:snap.id,...snap.data()}:null;
+  const activeRecord=record=>{
+    if(!record)return false;
+    const status=String(record.status||record.employmentStatus||record.registrationStatus||"Active").trim().toLowerCase();
+    return !["inactive","disabled","suspended","expired","revoked"].includes(status);
+  };
+  const normalized=v=>String(v||"").toLowerCase().replace(/\s+/g," ").trim();
+
+  const [adminSnap,memberDirect,employeeDirect]=await Promise.all([
+    db.collection("adminProfiles").doc(uid).get(),
+    db.collection("members").doc(uid).get(),
+    db.collection("employees").doc(uid).get()
+  ]);
+  const admin=clean(adminSnap);
+  const memberRecords=[];
+  const employeeRecords=[];
+  if(memberDirect.exists) memberRecords.push(clean(memberDirect));
+  if(employeeDirect.exists) employeeRecords.push(clean(employeeDirect));
+
+  if(email){
+    const [memberByEmail,employeeByEmail]=await Promise.all([
+      db.collection("members").where("email","==",email).limit(10).get(),
+      db.collection("employees").where("email","==",email).limit(10).get()
+    ]);
+    memberByEmail.forEach(s=>memberRecords.push(clean(s)));
+    employeeByEmail.forEach(s=>employeeRecords.push(clean(s)));
+  }
+
+  if(admin?.active===true){
+    for(const field of ["administratorUid","adminUid","linkedAdministratorUid"]){
+      const snap=await db.collection("employees").where(field,"==",uid).limit(10).get();
+      snap.forEach(s=>employeeRecords.push(clean(s)));
+      if(snap.size) break;
+    }
+
+    if(!employeeRecords.length){
+      const identityName=normalized(admin.name||admin.details?.name||request.auth?.token?.name||"");
+      if(identityName){
+        const all=await db.collection("employees").get();
+        const matches=all.docs
+          .map(clean)
+          .filter(record=>activeRecord(record)&&normalized(record.name)===identityName);
+        if(matches.length===1) employeeRecords.push(matches[0]);
+      }
+    }
+  }
+
+  const uniqueById=list=>[...new Map(list.filter(Boolean).map(x=>[String(x.id||x.uid),x])).values()];
+  const members=uniqueById(memberRecords).filter(activeRecord);
+  const employees=uniqueById(employeeRecords).filter(activeRecord);
+  const employee=employees[0]||null;
+  const employeeRoles=[...new Set([
+    ...(Array.isArray(employee?.roles)?employee.roles:[]),
+    employee?.role,
+    ...(Array.isArray(employee?.assignedRoles)?employee.assignedRoles:[]),
+    ...(Array.isArray(employee?.selectedRoles)?employee.selectedRoles:[]),
+    ...(Array.isArray(employee?.roleAssignments)?employee.roleAssignments:[])
+  ].flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean)))];
+  const contextValues=[employee?.department,employee?.unit,employee?.jobTitle,employee?.position,employee?.title,employee?.designation].map(normalized).filter(Boolean);
+  if(contextValues.some(v=>v==="it"||v==="it unit"||v.includes("information technology")||v.includes("it specialist")||v.includes("information technology officer"))&&!employeeRoles.some(r=>["IT Specialist","Information Technology Officer"].includes(r))) employeeRoles.push("IT Specialist");
+
+  return {
+    ok:true,
+    uid,
+    email,
+    administrator:admin?.active===true?{id:admin.id||uid,...admin}:null,
+    member:members[0]||null,
+    employee,
+    roles:employeeRoles,
+    identityResolution:employee
+      ? (String(employee.uid||"")===uid
+          ?"UID"
+          :String(employee.email||"").trim().toLowerCase()===email
+            ?"EMAIL"
+            :employee.administratorUid===uid||employee.adminUid===uid||employee.linkedAdministratorUid===uid
+              ?"ADMINISTRATOR_LINK"
+              :"UNIQUE_NAME")
+      : "NONE"
+  };
+});
+
 exports.synchronizeRegisteredIdentityUids = onCall({region:"us-central1",timeoutSeconds:120}, async request => {
   const actor=await requireActiveAdministratorCallable(request);
   const [memberSnap,employeeSnap]=await Promise.all([
