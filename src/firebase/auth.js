@@ -255,6 +255,12 @@ export async function logout(options = {}) {
   if (!options.preserveRecovery) {
     try { window.localStorage.removeItem("irpaSessionRecovery"); } catch (_) {}
   }
+  // Access authority is valid only for the current authenticated login session.
+  // Never carry a previously declared operating role into the next sign-in.
+  try {
+    window.sessionStorage.removeItem("irpaActiveAccessAuthority");
+    window.sessionStorage.removeItem("irpaAccessAuthoritySelectionState");
+  } catch (_) {}
   await signOut(auth);
 }
 
