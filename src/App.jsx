@@ -67,7 +67,33 @@ function AuthScreen(){const params=new URLSearchParams(window.location.search);c
 function Loading(){const[slow,setSlow]=useState(false);useEffect(()=>{const t=setTimeout(()=>setSlow(true),8000);return()=>clearTimeout(t)},[]);return <div className="loading-screen"><div><strong>IRPA Digital Governance</strong><div className="loading-sub">{slow?"Authorization check is taking longer than expected.":"Establishing secure IRPA session..."}</div>{slow&&<button onClick={()=>window.location.reload()}>Retry Secure Session</button>}</div></div>}
 function AccessDenied({user,reason}){return <main className="auth-screen"><section className="auth-card"><h1>Access Not Authorised</h1><p>{reason||"No active IRPA authorization profile was found."}</p><p className="muted">{user?.email}</p><button type="button" className="logout-button" onClick={logout} aria-label="Sign out of IRPA Digital Governance">Sign Out</button></section></main>}
 function profileLabel(admin,employee){return admin?"Administrator":employee?.employeeNumber?("Authorized employee • "+employee.employeeNumber):"Authorized IRPA user"}
-function resolveLoginCategories(profile,employee,admin){const administratorAvailable=admin||profile?.administratorAvailable===true||profile?.authorizationType==="administrator_candidate";const boardPosition=String(profile?.boardPosition||employee?.boardPosition||"").trim();const boardRoles=["Board Chairperson","Board Vice Chairperson","Board Secretary","Board Treasurer","Board Member"];const normalize=v=>String(v||"").trim();const values=[...(Array.isArray(profile?.roles)?profile.roles:[]),...(Array.isArray(profile?.assignedRoles)?profile.assignedRoles:[]),...(Array.isArray(profile?.selectedRoles)?profile.selectedRoles:[]),...(Array.isArray(profile?.roleAssignments)?profile.roleAssignments:[]),profile?.role,employee?.role,...(Array.isArray(employee?.roles)?employee.roles:[]),...(Array.isArray(employee?.assignedRoles)?employee.assignedRoles:[]),...(Array.isArray(employee?.selectedRoles)?employee.selectedRoles:[]),...(Array.isArray(employee?.roleAssignments)?employee.roleAssignments:[])].map(normalize).filter(Boolean);const filtered=values.filter(v=>!(boardPosition&&boardRoles.includes(v)&&v!==boardPosition));const departmentValues=[profile?.department,employee?.department,profile?.unit,employee?.unit].map(normalize).filter(Boolean);const itAssignment=departmentValues.some(v=>{const n=v.toLowerCase();return n==="information technology"||n==="information technology unit"||n==="it"||n.includes("information technology")||n.includes("it unit");});if(administratorAvailable&&itAssignment)filtered.push("Information Technology");if(boardPosition)filtered.unshift(boardPosition);if(administratorAvailable)filtered.unshift("Administrator");return [...new Set(filtered)];}
+function resolveLoginCategories(profile,employee,admin){
+ const administratorAvailable=admin||profile?.administratorAvailable===true||profile?.authorizationType==="administrator_candidate";
+ const normalize=v=>String(v||"").trim();
+ const canonicalBoardPosition=v=>{
+  const n=normalize(v).toLowerCase();
+  const map={"chairperson":"Board Chairperson","board chairperson":"Board Chairperson","vice chairperson":"Board Vice Chairperson","board vice chairperson":"Board Vice Chairperson","secretary":"Board Secretary","board secretary":"Board Secretary","treasurer":"Board Treasurer","board treasurer":"Board Treasurer","board member":"Board Member"};
+  return map[n]||normalize(v);
+ };
+ const boardPosition=canonicalBoardPosition(profile?.boardPosition||employee?.boardPosition);
+ const boardRoles=["Board Chairperson","Board Vice Chairperson","Board Secretary","Board Treasurer","Board Member"];
+ const values=[
+  ...(Array.isArray(profile?.roles)?profile.roles:[]),
+  ...(Array.isArray(profile?.assignedRoles)?profile.assignedRoles:[]),
+  ...(Array.isArray(profile?.selectedRoles)?profile.selectedRoles:[]),
+  ...(Array.isArray(profile?.roleAssignments)?profile.roleAssignments:[]),
+  profile?.role,
+  ...(Array.isArray(employee?.roles)?employee.roles:[]),
+  ...(Array.isArray(employee?.assignedRoles)?employee.assignedRoles:[]),
+  ...(Array.isArray(employee?.selectedRoles)?employee.selectedRoles:[]),
+  ...(Array.isArray(employee?.roleAssignments)?employee.roleAssignments:[]),
+  employee?.role
+ ].flatMap(v=>String(v||"").split(",").map(normalize).filter(Boolean));
+ const filtered=values.filter(v=>!(boardRoles.includes(v)&&boardPosition&&v!==boardPosition));
+ if(boardPosition)filtered.unshift(boardPosition);
+ if(administratorAvailable)filtered.unshift("Administrator");
+ return [...new Set(filtered)];
+}
 function LoginCategoryBadges({profile,employee,admin,selectedAuthority}){const categories=resolveLoginCategories(profile,employee,admin);const memberNumber=String(profile?.memberNumber||"").trim();const employeeNumber=String(employee?.employeeNumber||"").trim();return <div aria-label="Login category" style={{marginTop:4}}><span style={{fontSize:10,fontWeight:800,letterSpacing:".08em",opacity:.72,display:"block"}}>AUTHORIZED USER · ACCESS CATEGORIES</span><div style={{display:"flex",flexWrap:"wrap",gap:7,marginTop:4,alignItems:"flex-start"}}>{categories.length?categories.map(category=><div key={category} style={{display:"inline-flex",flexDirection:"column",alignItems:"flex-start",gap:3}}><span style={{display:"inline-flex",alignItems:"center",padding:"3px 7px",borderRadius:999,fontSize:11,fontWeight:700,border:"1px solid currentColor",lineHeight:1.2}}>{category}</span></div>):<span style={{fontSize:11,opacity:.72}}>Authorized IRPA User</span>}</div>{(memberNumber||employeeNumber)&&<div style={{display:"flex",flexWrap:"wrap",gap:10,marginTop:7,paddingTop:6,borderTop:"1px solid rgba(255,255,255,.12)"}}>{memberNumber&&<div><small style={{display:"block",fontSize:8,letterSpacing:".06em",opacity:.62}}>MEMBER NUMBER</small><strong style={{fontSize:10}}>{memberNumber}</strong></div>}{employeeNumber&&<div><small style={{display:"block",fontSize:8,letterSpacing:".06em",opacity:.62}}>EMPLOYEE NUMBER</small><strong style={{fontSize:10}}>{employeeNumber}</strong></div>}</div>}<small style={{display:"block",fontSize:9,lineHeight:1.25,opacity:.62,marginTop:6}}>Access categories and institutional identifiers only — the current signing authority is selected separately in the Signing Identity · Registered Capacity panel.</small></div>}
 function Dashboard({user,admin,employee,profile,onNavigate,selectedAuthority,authorityCategories}){
  const[liveNow,setLiveNow]=useState(()=>new Date());
