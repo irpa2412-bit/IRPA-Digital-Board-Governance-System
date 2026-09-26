@@ -4606,3 +4606,42 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   .dashboard-command .mobile-quote1-user p{color:#cbd5e1!important}
   .dashboard-command .mobile-quote1-user em{background:#1e293b!important;color:#e2e8f0!important;border:1px solid #475569!important}
 }
+
+/* DASHBOARD NAVIGATION SPACING REPAIR — 2026-09-26 */
+/* Presentation-only repair:
+   - reduce the reserved space beneath the fixed desktop/mobile web navigation;
+   - keep Sign Out close to the overhead navigation surface;
+   - place Back / current-page / Next in a conventional full-width navigation row.
+   Routing, authority selection and permissions are unchanged. */
+@media screen and (min-width:761px){
+  .content-area:has(> .desktop-webapp-navigation-roller){
+    padding-top:62px!important;
+  }
+  .content-area.dashboard-content-area:has(> .desktop-webapp-navigation-roller){
+    padding-top:62px!important;
+  }
+  .page-back-next-navigation{
+    width:min(100%,920px)!important;
+    margin:0 auto 12px!important;
+    grid-template-columns:150px minmax(0,1fr) 150px!important;
+    gap:12px!important;
+    padding:6px!important;
+  }
+  .page-back-next-button{
+    width:100%!important;
+    min-width:0!important;
+  }
+}
+@media screen and (max-width:760px){
+  .content-area,
+  .dashboard-content-area{
+    padding-top:125px!important;
+  }
+  .page-back-next-navigation{
+    left:10px!important;
+    right:10px!important;
+    width:auto!important;
+    grid-template-columns:minmax(88px,1fr) minmax(0,1.35fr) minmax(88px,1fr)!important;
+    gap:6px!important;
+  }
+}
