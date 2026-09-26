@@ -79,7 +79,19 @@ function Dashboard({user,admin,employee,profile,onNavigate,selectedAuthority,aut
  const isMember=!admin&&!employee?.employeeNumber&&/member|board/.test(role);
  const displayName=profile?.name||employee?.name||employee?.fullName||user?.displayName||profile?.email||user?.email||"IRPA User";
  const profileTitle=admin?"Administrator":(selectedAuthority||profile?.title||profile?.jobTitle||profile?.position||employee?.jobTitle||employee?.position||profile?.role||"Authorized User");
- const registrationNo=employee?.employeeNumber||employee?.registrationNumber||profile?.registrationNumber||profile?.memberNumber||profile?.employeeNumber||"";
+ const boardAuthorityRoles=["Board Chairperson","Board Vice Chairperson","Board Secretary","Board Treasurer","Board Member"];
+ const selectedAuthorityName=String(selectedAuthority||"").trim();
+ const employeeAuthorityRoles=roleValues(employee?.roles||employee?.role);
+ const memberAuthorityRoles=roleValues(profile?.roles||profile?.role);
+ const authorityUsesMemberRegister=boardAuthorityRoles.includes(selectedAuthorityName)||(
+   selectedAuthorityName&&memberAuthorityRoles.includes(selectedAuthorityName)&&!employeeAuthorityRoles.includes(selectedAuthorityName)
+ );
+ const authorityUsesEmployeeRegister=Boolean(selectedAuthorityName)&&employeeAuthorityRoles.includes(selectedAuthorityName)&&!authorityUsesMemberRegister;
+ const registrationNo=admin?"":authorityUsesMemberRegister
+   ?String(profile?.memberNumber||profile?.registrationNumber||"").trim()
+   :authorityUsesEmployeeRegister
+     ?String(employee?.employeeNumber||employee?.registrationNumber||"").trim()
+     :String(selectedAuthorityName&&employee?.employeeNumber?employee.employeeNumber:profile?.memberNumber||profile?.registrationNumber||employee?.registrationNumber||employee?.employeeNumber||"").trim();
  const photo=profile?.photoUrl||profile?.photoURL||profile?.avatarUrl||profile?.profilePhotoUrl||employee?.photoUrl||employee?.photoURL||employee?.avatarUrl||user?.photoURL||"";
  const initials=displayName.split(/\\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join("").toUpperCase()||"IR";
  useEffect(()=>{const clockId=setInterval(()=>setLiveNow(new Date()),1000);return()=>clearInterval(clockId)},[]);
