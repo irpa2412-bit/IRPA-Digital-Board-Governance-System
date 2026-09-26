@@ -1,0 +1,171 @@
+/* IRPA Finance Portal — mobile/desktop uniform presentation layer
+   Safety scope: presentation only. This file does not change Finance data,
+   workflow stages, permissions, Firebase calls, routing, or approval controls.
+   The same FinancePortfolio component is used by the responsive web UI and
+   the Capacitor Android wrapper; this layer keeps the financial controls,
+   hierarchy and interaction sizing consistent across both surfaces. */
+
+.finance-portal{
+  --finance-text:#173b2d;
+  --finance-muted:#526b60;
+  --finance-border:#b8cdc3;
+  --finance-panel:#ffffff;
+  --finance-soft:#eef5f1;
+  --finance-active:#0b5fa8;
+  --finance-active-border:#2f86cf;
+  --finance-focus:#d6a52c;
+}
+
+/* Shared hierarchy: the same readable scale on desktop and mobile. */
+.finance-portal .panel-header h2,
+.finance-portal .panel h2{
+  color:var(--finance-text)!important;
+  line-height:1.3!important;
+}
+.finance-portal .panel-description{
+  color:var(--finance-muted)!important;
+  font-size:14px!important;
+  line-height:1.6!important;
+}
+.finance-portal .action-feedback{
+  color:var(--finance-text)!important;
+  font-size:14px!important;
+  line-height:1.55!important;
+}
+
+/* Shared financial entry controls. */
+.finance-portal #finance-entry .form-grid{
+  align-items:start;
+}
+.finance-portal #finance-entry .form-field{
+  min-width:0!important;
+}
+.finance-portal #finance-entry input,
+.finance-portal #finance-entry select,
+.finance-portal #finance-entry textarea{
+  width:100%!important;
+  box-sizing:border-box!important;
+  min-height:44px!important;
+  border:2px solid var(--finance-border)!important;
+  border-radius:8px!important;
+}
+.finance-portal #finance-entry input:focus,
+.finance-portal #finance-entry select:focus,
+.finance-portal #finance-entry textarea:focus{
+  border-color:var(--finance-active)!important;
+  outline:3px solid rgba(11,95,168,.18)!important;
+  outline-offset:1px!important;
+}
+.finance-portal #finance-entry input:focus-visible,
+.finance-portal #finance-entry select:focus-visible,
+.finance-portal #finance-entry textarea:focus-visible{
+  outline:3px solid var(--finance-focus)!important;
+  outline-offset:2px!important;
+}
+
+/* Register navigation: identical control language, with wrapping rather than
+   changing the available registers or their order. */
+.finance-portal .unified-control-tabs{
+  display:flex!important;
+  flex-wrap:wrap!important;
+  align-items:stretch!important;
+  gap:8px!important;
+}
+.finance-portal .unified-control-tab{
+  min-height:44px!important;
+  padding:9px 12px!important;
+  border-radius:8px!important;
+  color:var(--finance-text)!important;
+  background:var(--finance-soft)!important;
+  border:2px solid #6f9282!important;
+  font-size:13px!important;
+  font-weight:800!important;
+  line-height:1.3!important;
+  text-shadow:none!important;
+}
+.finance-portal .unified-control-tab.active,
+.finance-portal .unified-control-tab[aria-selected="true"]{
+  color:#fff!important;
+  background:var(--finance-active)!important;
+  border-color:var(--finance-active-border)!important;
+  box-shadow:inset 0 -3px var(--finance-focus)!important;
+}
+
+/* Tables retain the same information architecture. Narrow screens scroll the
+   table instead of hiding, truncating, or reordering financial columns. */
+.finance-portal .table-wrapper{
+  width:100%!important;
+  overflow-x:auto!important;
+  -webkit-overflow-scrolling:touch;
+}
+.finance-portal .table-wrapper table{
+  min-width:760px;
+}
+.finance-portal .table-wrapper th{
+  color:var(--finance-text)!important;
+  background:#e7f0eb!important;
+  font-size:12px!important;
+  font-weight:850!important;
+  line-height:1.4!important;
+}
+.finance-portal .table-wrapper td{
+  color:var(--finance-text)!important;
+  font-size:14px!important;
+  line-height:1.5!important;
+}
+
+/* Financial action buttons share one touch/desktop target size. */
+.finance-portal button.secondary-button,
+.finance-portal .form-actions button{
+  min-height:44px!important;
+  font-size:14px!important;
+  font-weight:800!important;
+}
+.finance-portal button:focus-visible,
+.finance-portal a:focus-visible{
+  outline:3px solid var(--finance-focus)!important;
+  outline-offset:2px!important;
+}
+
+/* Desktop: preserve the full register workspace while using the same control
+   proportions as the mobile financial interface. */
+@media(min-width:761px){
+  .finance-portal .dashboard-grid{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+  .finance-portal #finance-entry .form-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .finance-portal .unified-control-tabs .unified-control-tab{
+    flex:0 0 auto;
+  }
+}
+
+/* Mobile: same hierarchy and controls, with only space-driven reflow. */
+@media(max-width:760px){
+  .finance-portal .dashboard-grid{
+    grid-template-columns:1fr!important;
+    gap:10px!important;
+  }
+  .finance-portal #finance-entry .form-grid{
+    grid-template-columns:1fr!important;
+  }
+  .finance-portal .unified-control-tabs{
+    flex-wrap:nowrap!important;
+    overflow-x:auto!important;
+    padding-bottom:3px;
+    scrollbar-width:thin;
+  }
+  .finance-portal .unified-control-tabs .unified-control-tab{
+    flex:0 0 auto!important;
+    min-height:46px!important;
+    font-size:13px!important;
+  }
+  .finance-portal .table-wrapper table{
+    min-width:760px!important;
+  }
+  .finance-portal .panel-description,
+  .finance-portal .action-feedback{
+    font-size:13px!important;
+  }
+}
