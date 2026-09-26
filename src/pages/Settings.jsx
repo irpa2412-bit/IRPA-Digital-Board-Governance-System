@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { browserSupportsPush, listenForForegroundMessages, notificationPermissionState, requestPushPermission } from "../firebase/messaging";
+import SystemResetControl from "../components/SystemResetControl";
 import { startGoogleDriveAuthorization } from "../firebase/signatureStorage";
 import { resetDocumentTrialData, resetEmployeeTrialData, resetMemberTrialData, resetSignatureEnvelopeTrialData, createExternalAuditorProfile } from "../firebase/data";
 import { createAdministrator, reconcileRegisteredIdentityUids } from "../firebase/functions";
@@ -304,7 +305,7 @@ export default function Settings({ admin = false, section = "settings" }) {
       </section>
       )}
 
-      {admin && section === "settings" && (
+      {admin && section === "settings" && <SystemResetControl/>}\n\n      {admin && section === "settings" && (
         <section className="panel" style={{ marginTop: 20 }}>
           <div className="panel-header">
             <div>
