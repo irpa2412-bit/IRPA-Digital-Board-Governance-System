@@ -4509,6 +4509,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .authority-capacity-feedback span{font-size:11px;color:#cbdad4;line-height:1.45}
 .authority-capacity-confirm{width:100%;margin-top:16px;min-height:44px}
 .authority-capacity-confirm:disabled{opacity:.45;cursor:not-allowed}
+.authority-capacity-signout{width:100%;margin-top:8px;min-height:40px;background:transparent!important;border:1px solid #5c786b!important;color:#dce9e3!important}
 .authority-capacity-note{display:block;margin-top:10px;color:#789187;font-size:9px;line-height:1.45;text-align:center}
 .mobile-fixed-signout{display:none}
 
