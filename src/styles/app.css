@@ -4807,3 +4807,30 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   }
 }
 
+
+
+/* IRPA DESKTOP NAVIGATION — TIGHT OVERHEAD ALIGNMENT — 2026-09-26 */
+@media screen and (min-width:761px){
+  /* The overhead navigation roller is 48px high. Start the content band
+     exactly at its lower boundary so Back/Next touches it without a gap. */
+  .content-area{
+    padding-top:48px!important;
+  }
+  .dashboard-content-area{
+    padding-top:48px!important;
+    padding-bottom:28px!important;
+  }
+
+  /* Keep the navigation surface flush with the overhead panel and move the
+     following dashboard content upward with it. */
+  .content-area > .page-back-next-navigation,
+  .dashboard-content-area > .page-back-next-navigation{
+    margin-top:0!important;
+  }
+  .dashboard-content-area > .operator-signout-slot{
+    margin-bottom:6px!important;
+  }
+  .dashboard-content-area > .dashboard-command{
+    margin-top:0!important;
+  }
+}
