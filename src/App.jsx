@@ -132,7 +132,10 @@ function AuthScreen(){const params=new URLSearchParams(window.location.search);c
     console.warn("Registered identity fallback unavailable.",error);
     return [null,null];
   });
-  const [administrator,context,[m,e]]=await Promise.all([administratorPromise,contextPromise,registerPromise]);
+  let [administrator,context,[m,e]]=await Promise.all([administratorPromise,contextPromise,registerPromise]);
+  // The employee record is refreshed during invitation activation, so keep this
+  // authorization variable mutable and explicitly initialized for normal login.
+  let activeEmployee=e;
   const resolvedMember=context?.member||m;
   const resolvedEmployee=context?.employee||e;
   const memberAuthorized=Boolean(resolvedMember)&&(["active","activated"].includes(String(resolvedMember?.status||"").trim().toLowerCase())||String(resolvedMember?.registrationStatus||"").trim().toLowerCase()==="activated");
