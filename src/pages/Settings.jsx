@@ -305,7 +305,9 @@ export default function Settings({ admin = false, section = "settings" }) {
       </section>
       )}
 
-      {admin && section === "settings" && <SystemResetControl/>}\n\n      {admin && section === "settings" && (
+      {admin && section === "settings" && <SystemResetControl/>}
+
+      {admin && section === "settings" && (
         <section className="panel" style={{ marginTop: 20 }}>
           <div className="panel-header">
             <div>
