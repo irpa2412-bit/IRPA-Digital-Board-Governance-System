@@ -169,3 +169,307 @@
     font-size:13px!important;
   }
 }
+
+
+/* FINANCE PORTAL — WORD-LEVEL READABILITY PASS — 2026-09-26
+   Safety scope: presentation only. This layer does not alter financial records,
+   calculations, workflow stages, permissions, routing, Firebase calls, or actions.
+   It makes every visible Finance word easier to scan, wrap, and read on desktop
+   and mobile, including long references and evidence/status text. */
+
+/* 1. Page titles, section headings and explanatory copy. */
+.finance-portal .welcome-panel h1{
+  color:var(--finance-text)!important;
+  font-size:clamp(24px,2.4vw,34px)!important;
+  line-height:1.2!important;
+  letter-spacing:-.01em!important;
+  text-wrap:balance;
+}
+.finance-portal .welcome-panel p,
+.finance-portal .panel-description,
+.finance-portal .panel-header p{
+  max-width:78ch!important;
+  color:var(--finance-muted)!important;
+  font-size:15px!important;
+  line-height:1.6!important;
+  letter-spacing:0!important;
+  overflow-wrap:break-word!important;
+}
+.finance-portal .panel h2,
+.finance-portal .panel-header h2{
+  font-size:clamp(18px,1.8vw,24px)!important;
+  line-height:1.3!important;
+  letter-spacing:0!important;
+  text-wrap:balance;
+}
+.finance-portal .eyebrow{
+  color:#315f4e!important;
+  font-size:11px!important;
+  line-height:1.3!important;
+  font-weight:900!important;
+  letter-spacing:.08em!important;
+}
+
+/* 2. Dashboard/stat cards: label, value and supporting text remain distinct. */
+.finance-portal .stat-card{
+  min-width:0!important;
+}
+.finance-portal .stat-card>span{
+  display:block!important;
+  color:#315f4e!important;
+  font-size:12px!important;
+  line-height:1.35!important;
+  font-weight:850!important;
+  overflow-wrap:break-word!important;
+}
+.finance-portal .stat-card>strong{
+  display:block!important;
+  color:var(--finance-text)!important;
+  font-size:clamp(20px,2vw,28px)!important;
+  line-height:1.2!important;
+  margin-top:5px!important;
+  overflow-wrap:anywhere!important;
+}
+.finance-portal .stat-card>small{
+  display:block!important;
+  color:#526b60!important;
+  font-size:12px!important;
+  line-height:1.5!important;
+  margin-top:6px!important;
+  overflow-wrap:break-word!important;
+}
+
+/* 3. Forms: labels and entered values are readable without changing field meaning. */
+.finance-portal .form-field{
+  min-width:0!important;
+  color:var(--finance-text)!important;
+  font-size:13px!important;
+  line-height:1.4!important;
+  font-weight:800!important;
+}
+.finance-portal .form-field input,
+.finance-portal .form-field select,
+.finance-portal .form-field textarea{
+  font-size:15px!important;
+  line-height:1.45!important;
+  color:#173b2d!important;
+  background:#fff!important;
+}
+.finance-portal .form-field input::placeholder,
+.finance-portal .form-field textarea::placeholder{
+  color:#63786e!important;
+  opacity:1!important;
+}
+.finance-portal .form-field textarea{
+  min-height:96px!important;
+  resize:vertical!important;
+}
+.finance-portal .form-field input[type="date"]{
+  min-width:0!important;
+}
+.finance-portal .form-field-wide{
+  min-width:0!important;
+}
+
+/* 4. Register tabs and action controls: readable labels without clipping. */
+.finance-portal .unified-control-tab,
+.finance-portal .secondary-button,
+.finance-portal .form-actions button{
+  white-space:normal!important;
+  overflow-wrap:break-word!important;
+  text-align:center!important;
+}
+.finance-portal .unified-control-tab{
+  min-width:0!important;
+  letter-spacing:0!important;
+}
+.finance-portal .secondary-button{
+  line-height:1.35!important;
+  padding:10px 14px!important;
+}
+
+/* 5. Tables: readable cells, explicit wrapping for human text and long IDs.
+   Horizontal scrolling remains available for the full financial record. */
+.finance-portal .table-wrapper table{
+  border-collapse:separate!important;
+  border-spacing:0!important;
+}
+.finance-portal .table-wrapper th{
+  padding:10px 11px!important;
+  white-space:normal!important;
+  overflow-wrap:break-word!important;
+  word-break:normal!important;
+  text-align:left!important;
+  letter-spacing:0!important;
+}
+.finance-portal .table-wrapper td{
+  padding:10px 11px!important;
+  white-space:normal!important;
+  overflow-wrap:break-word!important;
+  word-break:normal!important;
+  vertical-align:top!important;
+}
+.finance-portal .table-wrapper td strong{
+  color:#173b2d!important;
+  font-weight:850!important;
+  overflow-wrap:anywhere!important;
+}
+.finance-portal .table-subtext{
+  display:block!important;
+  margin-top:3px!important;
+  color:#5b7167!important;
+  font-size:12px!important;
+  line-height:1.4!important;
+  overflow-wrap:anywhere!important;
+}
+.finance-portal .status-badge{
+  display:inline-block!important;
+  max-width:100%!important;
+  white-space:normal!important;
+  overflow-wrap:break-word!important;
+  line-height:1.35!important;
+  font-size:12px!important;
+  font-weight:800!important;
+}
+.finance-portal .table-wrapper a{
+  color:#075b9d!important;
+  font-weight:800!important;
+  text-decoration:underline!important;
+  text-decoration-thickness:1px!important;
+  text-underline-offset:2px!important;
+  overflow-wrap:anywhere!important;
+}
+.finance-portal .muted{
+  color:#60766c!important;
+}
+
+/* 6. Control/identity cards and operational finance engines. */
+.finance-portal .identity-card,
+.finance-portal .finance-engine-card,
+.finance-portal .finance-formula-card{
+  min-width:0!important;
+}
+.finance-portal .identity-card span,
+.finance-portal .identity-card small,
+.finance-portal .finance-engine-card>span,
+.finance-portal .finance-engine-card>small{
+  line-height:1.45!important;
+  overflow-wrap:break-word!important;
+}
+.finance-portal .finance-engine-card h3,
+.finance-portal .finance-formula-card h3{
+  line-height:1.35!important;
+  text-wrap:balance;
+}
+.finance-portal .finance-formula-card code,
+.finance-portal .finance-operation-result{
+  overflow-wrap:anywhere!important;
+  word-break:normal!important;
+  line-height:1.5!important;
+}
+
+/* 7. Mobile: increase legibility while preserving the existing one-column/reflow
+   architecture. Nothing is hidden or renamed. */
+@media(max-width:760px){
+  .finance-portal .welcome-panel h1{
+    font-size:25px!important;
+    line-height:1.22!important;
+  }
+  .finance-portal .welcome-panel p,
+  .finance-portal .panel-description,
+  .finance-portal .panel-header p{
+    font-size:14px!important;
+    line-height:1.6!important;
+  }
+  .finance-portal .panel h2,
+  .finance-portal .panel-header h2{
+    font-size:19px!important;
+    line-height:1.3!important;
+  }
+  .finance-portal .eyebrow{
+    font-size:10px!important;
+    line-height:1.35!important;
+  }
+  .finance-portal .form-field{
+    font-size:13px!important;
+    line-height:1.45!important;
+  }
+  .finance-portal .form-field input,
+  .finance-portal .form-field select,
+  .finance-portal .form-field textarea{
+    min-height:46px!important;
+    font-size:16px!important;
+    line-height:1.45!important;
+  }
+  .finance-portal .form-field textarea{
+    min-height:110px!important;
+  }
+  .finance-portal .stat-card>span{
+    font-size:12px!important;
+  }
+  .finance-portal .stat-card>strong{
+    font-size:23px!important;
+  }
+  .finance-portal .stat-card>small{
+    font-size:12px!important;
+    line-height:1.5!important;
+  }
+  .finance-portal .table-wrapper th{
+    font-size:12px!important;
+    line-height:1.45!important;
+    padding:10px!important;
+  }
+  .finance-portal .table-wrapper td{
+    font-size:14px!important;
+    line-height:1.5!important;
+    padding:10px!important;
+  }
+  .finance-portal .table-subtext,
+  .finance-portal .status-badge{
+    font-size:12px!important;
+    line-height:1.4!important;
+  }
+  .finance-portal .unified-control-tab{
+    font-size:13px!important;
+    line-height:1.35!important;
+    padding:10px 13px!important;
+  }
+  .finance-portal .secondary-button,
+  .finance-portal .form-actions button{
+    font-size:14px!important;
+    line-height:1.35!important;
+  }
+}
+
+/* 8. Large/desktop screens: use the additional space for comfortable line
+   lengths without making text unnecessarily small. */
+@media(min-width:761px){
+  .finance-portal .panel-description,
+  .finance-portal .panel-header p{
+    font-size:14px!important;
+  }
+  .finance-portal .table-wrapper th{
+    font-size:12px!important;
+  }
+  .finance-portal .table-wrapper td{
+    font-size:14px!important;
+  }
+}
+
+/* 9. Respect user font scaling and avoid clipping text at every Finance surface. */
+.finance-portal,
+.finance-portal *{
+  max-inline-size:100%;
+}
+.finance-portal p,
+.finance-portal h1,
+.finance-portal h2,
+.finance-portal h3,
+.finance-portal h4,
+.finance-portal small,
+.finance-portal span,
+.finance-portal label,
+.finance-portal td,
+.finance-portal th{
+  overflow-wrap:break-word;
+}
