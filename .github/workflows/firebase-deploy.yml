@@ -9,6 +9,7 @@ name: Deploy IRPA Governance to Firebase
 # 2026-09-26 IT Specialist login gateway release verification: force production deployment of current main.
 # 2026-09-27 mobile production deployment: publish current main mobile navigation and UI changes.
 # 2026-09-27 production redeploy trigger: publish mobile-only Back/Next bottom navigation and remove mobile in-portal panel.
+# 2026-09-27 signature authority readability and roller selection: publish current Signature Platform changes.
 
 permissions:
   contents: read
