@@ -141,7 +141,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
       const doc = {
         id: documentId,
         title: name,
-        reference: reference.trim() || documentUid,
+        reference: documentReference,
         documentType,
         version,
         fileName: file.name,
