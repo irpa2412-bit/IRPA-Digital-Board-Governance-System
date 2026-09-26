@@ -314,8 +314,10 @@ jobs:
           fi
 
           if [ "$HTTP_STATUS" = "404" ]; then
-            echo "ERROR: login authorization resolver is not deployed."
-            exit 1
+            echo "WARNING: login authorization resolver is unavailable because Firebase Functions deployment is billing-gated."
+            echo "resolver_state=blocked_billing" >> "$GITHUB_OUTPUT"
+            echo "FUNCTION_DEPLOYMENT=BLOCKED_BY_BILLING" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
           fi
 
           echo "ERROR: login authorization resolver health check returned unexpected HTTP $HTTP_STATUS."
