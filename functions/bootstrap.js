@@ -1,5 +1,6 @@
 module.exports = {
   ...require("./index"),
-  ...require("./authorizationFunctions")
+  ...require("./authorizationFunctions"),
+  ...require("./liveMeeting")
 };
 
