@@ -116,7 +116,19 @@ jobs:
               const snap = await db.collection(collection).get();
               for (const doc of snap.docs) {
                 const data = doc.data() || {};
-                const uid = String(data.uid || doc.id || "").trim();
+                let uid = String(data.uid || doc.id || "").trim();
+                const registeredEmail = String(data.email || "").trim().toLowerCase();
+                if (registeredEmail) {
+                  try {
+                    const authUser = await auth.getUserByEmail(registeredEmail);
+                    uid = authUser.uid;
+                    if (String(data.uid || "").trim() !== uid) {
+                      await doc.ref.set({uid,firebaseAuthEmail:registeredEmail,uidAssignmentStatus:"UID Linked — Deployment Claim Synchronization"}, {merge:true});
+                    }
+                  } catch (error) {
+                    if (error?.code !== "auth/user-not-found") throw error;
+                  }
+                }
                 const active = String(data.status || data.employmentStatus || data.registrationStatus || "").toLowerCase();
                 if (uid && active !== "inactive" && active !== "disabled") addRoles(uid, data);
               }
