@@ -4425,3 +4425,68 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     .content-area{padding-top:94px!important;}
   }
 }
+
+
+/* PAGE BACK/NEXT NAVIGATION — 2026-09-26
+   Shared navigation surface for every authenticated live portal page.
+   Routing remains controlled by the existing Shell/data-gate handlers. */
+.page-back-next-navigation{
+  display:grid;
+  grid-template-columns:minmax(110px,160px) minmax(160px,1fr) minmax(110px,160px);
+  align-items:center;
+  gap:10px;
+  width:100%;
+  box-sizing:border-box;
+  margin:0 0 14px;
+  padding:7px;
+  border:1px solid #c9d8e5;
+  border-radius:10px;
+  background:#f7fafc;
+  box-shadow:0 4px 12px rgba(7,43,76,.08);
+}
+.page-back-next-button{
+  min-height:38px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  padding:8px 12px;
+  border:1px solid #2f86cf;
+  border-radius:8px;
+  background:#0b5fa8;
+  color:#fff;
+  font-size:12px;
+  line-height:1;
+  font-weight:900;
+  cursor:pointer;
+}
+.page-back-next-button:hover:not(:disabled){filter:brightness(1.08)}
+.page-back-next-button:focus-visible{outline:3px solid rgba(47,134,207,.35);outline-offset:2px}
+.page-back-next-button:disabled{opacity:.42;cursor:not-allowed;background:#71808c;border-color:#71808c}
+.page-back-next-status{min-width:0;text-align:center;display:grid;gap:2px}
+.page-back-next-status span{font-size:8px;line-height:1;font-weight:900;letter-spacing:.12em;color:#557084}
+.page-back-next-status strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;line-height:1.2;color:#07385f}
+.page-back-next-status small{font-size:9px;line-height:1;color:#687d8d;font-weight:700}
+
+@media(max-width:760px){
+  .page-back-next-navigation{
+    position:fixed!important;
+    top:calc(204px + env(safe-area-inset-top))!important;
+    left:8px!important;
+    right:8px!important;
+    z-index:9998!important;
+    width:auto!important;
+    min-height:48px!important;
+    margin:0!important;
+    padding:5px!important;
+    grid-template-columns:minmax(78px,1fr) minmax(0,1.45fr) minmax(78px,1fr);
+    gap:5px;
+    border-radius:10px!important;
+    box-shadow:0 7px 18px rgba(0,0,0,.22)!important;
+  }
+  .page-back-next-button{min-height:36px;font-size:11px;padding:7px 8px}
+  .page-back-next-status span{font-size:7px}
+  .page-back-next-status strong{font-size:10px}
+  .page-back-next-status small{font-size:8px}
+  .content-area,.dashboard-content-area{padding-top:164px!important}
+}
