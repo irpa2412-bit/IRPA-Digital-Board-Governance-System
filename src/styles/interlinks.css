@@ -66,3 +66,66 @@
 @media(min-width:901px){
   .module-interlink-list{overflow-x:visible!important;}
 }
+
+
+/* MIXED IRPA WORKFLOW PALETTE
+   Distinct functional colours reduce the monotony of the former all-blue row
+   while preserving one consistent typography and interaction language. */
+.module-interlink-list > button,
+.workflow-portal-parent,
+.workflow-portal-children button{
+  transition:background-color .16s ease,border-color .16s ease,box-shadow .16s ease,transform .12s ease!important;
+}
+.workflow-portal-parent.meeting-parent{
+  background:#145da0!important;
+  border-color:#4b91d1!important;
+}
+.workflow-portal-parent.finance-parent{
+  background:#176b47!important;
+  border-color:#4aa879!important;
+}
+.workflow-portal-children .meeting-child{
+  background:#238b8b!important;
+  border-color:#61b7b0!important;
+}
+.workflow-portal-children .finance-child{
+  background:#7a6417!important;
+  border-color:#c6ad4c!important;
+}
+.module-interlink-list > button.core-documents,
+.module-interlink-list > button.core-signature-platform{
+  background:#6842a5!important;
+  border-color:#a887d4!important;
+}
+.module-interlink-list > button.core-authorization-approvals{
+  background:#8a4b2d!important;
+  border-color:#c58a6b!important;
+}
+.module-interlink-list > button.core-employee-payments{
+  background:#246b8f!important;
+  border-color:#68a9c8!important;
+}
+.module-interlink-list > button.core-reports{
+  background:#3f6470!important;
+  border-color:#79a5b0!important;
+}
+.module-interlink-list > button.core-actions{
+  background:#a65327!important;
+  border-color:#d58c63!important;
+}
+.module-interlink-list > button:hover,
+.workflow-portal-parent:hover,
+.workflow-portal-children button:hover{
+  filter:brightness(1.08)!important;
+  transform:translateY(-1px);
+  color:#fff!important;
+  border-color:#fff!important;
+}
+.module-interlink-list > button.active,
+.workflow-portal-parent.active,
+.workflow-portal-children button.active{
+  filter:brightness(1.08)!important;
+  color:#fff!important;
+  border-color:#fff!important;
+  box-shadow:0 0 0 2px rgba(255,255,255,.24),0 3px 8px rgba(0,0,0,.16)!important;
+}
