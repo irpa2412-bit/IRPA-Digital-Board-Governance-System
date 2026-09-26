@@ -36,30 +36,33 @@ export default {
         return await oauthCallback(request, env);
       }
 
-      if (url.pathname === "/api/upload" && request.method === "POST") {
+      // Normalize trailing slashes so portal upload/archive actions cannot be blocked by URL formatting.
+      const pathname = url.pathname.replace(/\\/+$/, "") || "/";
+
+      if (pathname === "/api/upload" && request.method === "POST") {
         return await upload(request, env);
       }
 
-      if ((url.pathname === "/api/upload-controlled-document" || url.pathname === "/api/upload-controlled-document/") && request.method === "POST") {
+      if (pathname === "/api/upload-controlled-document" && request.method === "POST") {
         return await uploadControlledDocument(request, env);
       }
 
-      if (url.pathname === "/api/signature-profile/folder" && request.method === "POST") {
+      if (pathname === "/api/signature-profile/folder" && request.method === "POST") {
         return await ensureSignatureProfileFolder(request, env);
       }
-      if (url.pathname === "/api/signature-profile/finalize" && request.method === "POST") {
+      if (pathname === "/api/signature-profile/finalize" && request.method === "POST") {
         return await finalizeSignatureProfileArchives(request, env);
       }
-      if (url.pathname === "/api/document-archive/folder" && request.method === "POST") {
+      if (pathname === "/api/document-archive/folder" && request.method === "POST") {
         return await ensureDocumentArchiveFolder(request, env);
       }
-      if (url.pathname === "/api/document-archive/provision" && request.method === "POST") {
+      if (pathname === "/api/document-archive/provision" && request.method === "POST") {
         return await provisionDocumentArchive(request, env);
       }
-      if (url.pathname === "/api/signed-document/archive" && request.method === "POST") {
+      if (pathname === "/api/signed-document/archive" && request.method === "POST") {
         return await ensureSignedDocumentArchive(request, env);
       }
-      if (url.pathname === "/api/signature-workflow/folder" && request.method === "POST") {
+      if (pathname === "/api/signature-workflow/folder" && request.method === "POST") {
         return await ensureSignatureWorkflowFolder(request, env);
       }
 
