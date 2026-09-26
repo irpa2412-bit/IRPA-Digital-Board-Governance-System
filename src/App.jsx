@@ -482,6 +482,7 @@ useEffect(()=>{
             ...adminDirect,
             uid:u.uid,
             email:u.email||adminMember?.email||adminEmployee?.email||"",
+            role:operationalRoles.find(role=>role!=="Administrator")||operationalEmployee?.role||operationalProfile?.role||"Authorized IRPA User",
             roles:[...new Set([...operationalRoles,"Administrator"])],
             administratorAvailable:true,
             authorizationType:"administrator_candidate"
