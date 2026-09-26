@@ -20,6 +20,6 @@ if (!existsSync("node_modules") && !existsSync("functions/node_modules")) {
 }
 
 run("Firebase CLI", bin("firebase"), ["--version"]);
-run("Wrangler CLI", bin("wrangler"), ["--version"], "drive-gateway");
+run("Wrangler CLI", isWindows ? "node_modules\\.bin\\wrangler.cmd" : "./node_modules/.bin/wrangler", ["--version"], "drive-gateway");
 
 console.log("IRPA-DBGS operational software preflight: PASS");
