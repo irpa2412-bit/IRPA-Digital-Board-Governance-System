@@ -86,7 +86,7 @@ export default function ITDepartmentPortal({user,profile,employee,selectedAuthor
   <section className="panel" style={{marginTop:18}}>
    <div className="panel-heading"><div><span className="eyebrow">DEPARTMENT ARCHITECTURE</span><h2>IT Branches & Units</h2><p className="muted">Branches are the primary departmental operating junctions. Each branch connects to its responsible IT units and to the shared DBGS platforms.</p></div></div>
    <div className="dashboard-grid it-branch-grid" style={{marginTop:16}}>
-    {BRANCHES.map(b=><button key={b.id} type="button" className="stat-card it-branch-card" onClick={()=>{setBranch(b.name);const next=b.units.includes(unit)?unit:b.units[0];setUnit(next);setForm(f=>({...f,branch:b.name,unit:next}));setTab("overview")}} style={{textAlign:"left",cursor:"pointer",outline:branch===b.name?"2px solid currentColor":"none"}}>
+    {BRANCHES.map(b=><button key={b.id} type="button" className="stat-card it-branch-card" onClick={()=>{setBranch(b.name);const next=b.units.includes(unit)?unit:b.units[0];setUnit(next);setForm(f=>({...f,branch:b.name,unit:next}));setTab("overview");onNavigate?.(next)}} style={{textAlign:"left",cursor:"pointer",outline:branch===b.name?"2px solid currentColor":"none"}}>
       <span>IT BRANCH</span><strong>{b.name}</strong><small>{b.description}</small><small style={{marginTop:8}}><b>{b.units.length}</b> connected unit{b.units.length===1?"":"s"}</small>
     </button>)}
    </div>
@@ -107,7 +107,7 @@ export default function ITDepartmentPortal({user,profile,employee,selectedAuthor
   <section className="panel" style={{marginTop:18}}>
    <div className="panel-heading"><div><span className="eyebrow">BRANCH WORKSPACE</span><h2>{branch}</h2><p className="muted">{BRANCHES.find(b=>b.name===branch)?.description}</p></div></div>
    <div className="dashboard-grid" style={{marginTop:14}}>
-    {(BRANCHES.find(b=>b.name===branch)?.units||[]).map(u=>{const d=UNITS.find(x=>x[0]===u)?.[1]||"";return <button key={u} type="button" className="stat-card" onClick={()=>{setUnit(u);setForm(f=>({...f,branch,unit:u}));setTab("overview")}} style={{textAlign:"left",cursor:"pointer",outline:unit===u?"2px solid currentColor":"none"}}><span>CONNECTED UNIT</span><strong>{u}</strong><small>{d}</small></button>})}
+    {(BRANCHES.find(b=>b.name===branch)?.units||[]).map(u=>{const d=UNITS.find(x=>x[0]===u)?.[1]||"";return <button key={u} type="button" className="stat-card" onClick={()=>{setUnit(u);setForm(f=>({...f,branch,unit:u}));setTab("overview");onNavigate?.(u)}} style={{textAlign:"left",cursor:"pointer",outline:unit===u?"2px solid currentColor":"none"}}><span>CONNECTED UNIT</span><strong>{u}</strong><small>{d}</small></button>})}
    </div>
   </section>
 
