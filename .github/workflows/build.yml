@@ -16,8 +16,12 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - name: Install dependencies
-        run: npm install
+      - name: Install main application dependencies
+        run: npm install --include=dev
+      - name: Install Cloudflare gateway tooling
+        run: npm --prefix drive-gateway install --include=dev
+      - name: Verify operational software
+        run: npm run ops:verify
       - name: Production build
         run: npm run build
       - name: Verify Firebase Hosting output
