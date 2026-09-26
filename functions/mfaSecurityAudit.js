@@ -55,7 +55,7 @@ function escapeHtml(value) {
 function configurationLinks() {
   const app = APP_URL.replace(/\/$/, "");
   return {
-    app: app + "/?security=mfa",
+    app: app,
     firebaseMfa: "https://firebase.google.com/docs/auth/web/multi-factor",
     firebaseTotp: "https://firebase.google.com/docs/auth/web/totp-mfa"
   };
@@ -71,7 +71,7 @@ The IRPA Digital Board Governance System security audit has identified that your
 For account protection, please complete the two-way verification setup using your existing IRPA registered account.
 
 Configuration:
-IRPA security setup: ${links.app}
+Open IRPA-DBGS: ${links.app}
 Firebase MFA guidance: ${links.firebaseMfa}
 TOTP authenticator guidance: ${links.firebaseTotp}
 
@@ -91,7 +91,7 @@ Audit reference: ${auditId}`;
 <p>The IRPA Digital Board Governance System security audit has identified that your active, fully registered IRPA account does not currently have a second verification factor configured.</p>
 <p><strong>Action required:</strong> configure two-way verification using your existing IRPA registered account.</p>
 <ul>
-<li><a href="${links.app}">Open IRPA security setup</a></li>
+<li><a href="${links.app}">Open IRPA-DBGS</a></li>
 <li><a href="${links.firebaseMfa}">Firebase MFA guidance</a></li>
 <li><a href="${links.firebaseTotp}">TOTP authenticator guidance</a></li>
 </ul>
