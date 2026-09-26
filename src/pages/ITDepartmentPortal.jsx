@@ -90,7 +90,7 @@ export default function ITDepartmentPortal({user,profile,employee,selectedAuthor
       <span>IT BRANCH</span><strong>{b.name}</strong><small>{b.description}</small><small style={{marginTop:8}}><b>{b.units.length}</b> connected unit{b.units.length===1?"":"s"}</small>
     </button>)}
    </div>
-   <div className="auth-message" style={{marginTop:16}}>
+   <div className="it-architecture-note" style={{marginTop:16}}>
     <strong>Connectivity architecture</strong><br/>
     IT Department → Branch → Unit → Work Item → Approval / Change Control → Deployment → Audit Evidence → Connected DBGS Platform.
     Shared junctions include Documents, Reports, Audit Trail, Settings, authentication/access control, website communications, data/backup controls and release verification.
