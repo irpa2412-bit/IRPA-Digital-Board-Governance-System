@@ -4864,3 +4864,26 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     margin-top:0!important;
   }
 }
+
+
+/* IRPA DESKTOP CONTENT LIFT — REMOVE NAVIGATION-TO-OVERHEAD GAP — 2026-09-26 */
+@media screen and (min-width:761px){
+  /* The desktop overhead navigator is fixed at viewport top and is 48px tall.
+     Lift the authenticated content layer by the 92px topbar height so the
+     Back/Next navigation begins exactly at the navigator's lower boundary. */
+  .content-area{
+    margin-top:-92px!important;
+    padding-top:48px!important;
+  }
+  .dashboard-content-area{
+    margin-top:-92px!important;
+    padding-top:48px!important;
+  }
+
+  /* Keep the first content surface flush with Back/Next after the lift. */
+  .content-area > .page-back-next-navigation,
+  .dashboard-content-area > .page-back-next-navigation{
+    margin-top:0!important;
+    margin-bottom:0!important;
+  }
+}
