@@ -6,6 +6,7 @@ name: Deploy IRPA Governance to Firebase
 # Signature Profile save authorization redeploy trigger: 2026-09-24T16:51Z
 # Safe production deployment verification marker: 2026-09-25T19:54Z — deploy current main (includes 56f7df3) without changing application behavior.
 # 2026-09-26 document-reference repair: deploy the secure server-side document reference callable together with hosting/firestore so normal portal users are not blocked by admin-only counter rules.
+# 2026-09-26 IT Specialist login gateway release verification: force production deployment of current main.
 
 on:
   push:
@@ -272,3 +273,4 @@ jobs:
           set -e
           curl --fail --silent --show-error --retry 5 --retry-delay 3 \
             https://irpa-digital-board-governance.web.app/
+NODE
