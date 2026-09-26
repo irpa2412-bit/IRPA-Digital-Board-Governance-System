@@ -518,7 +518,11 @@ useEffect(()=>{
       const loginContext=await Promise.race([resolveAuthenticatedLoginContext(),new Promise((_,reject)=>window.setTimeout(()=>reject(new Error("Server login context timed out.")),5000))]).catch(error=>{console.warn("Server login context unavailable; using registered identity fallback.",error);return null;});
       const serverRoles=[...new Set([...(Array.isArray(loginContext?.roles)?loginContext.roles:[]),...tokenRoles])];
       if(adminDirect?.active===true){
-        const [adminMember,adminEmployeeDirect]=await Promise.all([getCurrentMemberProfile().catch(()=>null),getCurrentEmployeeProfile().catch(()=>null)]);
+        const withAuthorizationTimeout=(promise,ms,label)=>Promise.race([promise,new Promise((_,reject)=>window.setTimeout(()=>reject(new Error(label)),ms))]);
+        const [adminMember,adminEmployeeDirect]=await Promise.all([
+          withAuthorizationTimeout(getCurrentMemberProfile().catch(()=>null),5000,"Administrator member authorization lookup timed out."),
+          withAuthorizationTimeout(getCurrentEmployeeProfile().catch(()=>null),5000,"Administrator employee authorization lookup timed out.")
+        ]);
         const administratorIdentityName=String(adminDirect?.name||adminDirect?.details?.name||u.displayName||"").trim();
         const adminEmployee=loginContext?.employee||adminEmployeeDirect||await getCurrentEmployeeProfile({administratorUid:u.uid,fallbackName:administratorIdentityName}).catch(()=>null);
         const resolvedMember=loginContext?.member||adminMember;
@@ -641,13 +645,12 @@ useEffect(()=>{
   const isPrimaryAdmin=String(user?.email||"").trim().toLowerCase()==="irpa2412@gmail.com";
   const isAdminGateway=new URLSearchParams(window.location.search).get("")==="1";
   if(inductionMode||user===undefined||profile!==undefined||isPrimaryAdmin||isAdminGateway)return;
-  const timer=window.setTimeout(async()=>{
+  const timer=window.setTimeout(()=>{
     if(profile!==undefined)return;
     console.error("IRPA login watchdog: authorization did not complete.");
-    try{await logout();}catch(_){}
+    setError("Authentication completed, but IRPA authorization verification did not complete within 7 seconds. The session remains signed in and no dashboard has been opened. Retry Secure Session.");
     setEmployee(null);
     setProfile(null);
-    setUser(null);
   },7000);
   return()=>window.clearTimeout(timer);
 },[user,profile]);
