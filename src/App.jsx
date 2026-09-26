@@ -87,11 +87,29 @@ function Dashboard({user,admin,employee,profile,onNavigate,selectedAuthority,aut
    selectedAuthorityName&&memberAuthorityRoles.includes(selectedAuthorityName)&&!employeeAuthorityRoles.includes(selectedAuthorityName)
  );
  const authorityUsesEmployeeRegister=Boolean(selectedAuthorityName)&&employeeAuthorityRoles.includes(selectedAuthorityName)&&!authorityUsesMemberRegister;
+ const[boardRegisterNumber,setBoardRegisterNumber]=useState("");
+ useEffect(()=>{
+   let active=true;
+   if(!authorityUsesMemberRegister){setBoardRegisterNumber("");return()=>{active=false};}
+   (async()=>{
+     try{
+       // Board capacities must always resolve against the Board Members Register.
+       // Never reuse an Employee Register number for a Board authority.
+       const memberRegister=await getCurrentMemberProfile();
+       const candidate=String(memberRegister?.memberNumber||memberRegister?.registrationNumber||"").trim();
+       if(active&&/^IRPA-MEM-\\d{4,}$/i.test(candidate))setBoardRegisterNumber(candidate);
+       else if(active)setBoardRegisterNumber("");
+     }catch{
+       if(active)setBoardRegisterNumber("");
+     }
+   })();
+   return()=>{active=false};
+ },[authorityUsesMemberRegister,user?.uid]);
  const registrationNo=admin?"":authorityUsesMemberRegister
-   ?String(profile?.memberNumber||profile?.registrationNumber||"").trim()
+   ?boardRegisterNumber
    :authorityUsesEmployeeRegister
-     ?String(employee?.employeeNumber||employee?.registrationNumber||"").trim()
-     :String(selectedAuthorityName&&employee?.employeeNumber?employee.employeeNumber:profile?.memberNumber||profile?.registrationNumber||employee?.registrationNumber||employee?.employeeNumber||"").trim();
+     ?String(employee?.employeeNumber||"").trim()
+     :"";
  const photo=profile?.photoUrl||profile?.photoURL||profile?.avatarUrl||profile?.profilePhotoUrl||employee?.photoUrl||employee?.photoURL||employee?.avatarUrl||user?.photoURL||"";
  const initials=displayName.split(/\\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join("").toUpperCase()||"IR";
  useEffect(()=>{const clockId=setInterval(()=>setLiveNow(new Date()),1000);return()=>clearInterval(clockId)},[]);
