@@ -7,6 +7,9 @@ const { getAuth } = require("firebase-admin/auth");
 const crypto = require("crypto");
 initializeApp(); const db = getFirestore();
 require("./passwordSecurity");
+const { runMfaSecurityAuditScheduled, runMfaSecurityAuditNow } = require("./mfaSecurityAudit");
+exports.runMfaSecurityAuditScheduled = runMfaSecurityAuditScheduled;
+exports.runMfaSecurityAuditNow = runMfaSecurityAuditNow;
 async function stableId(v){return crypto.createHash("sha256").update(String(v)).digest("hex");}
 async function writeServerAuditEvent(event){
   const path=String(event.params?.document||"");
