@@ -7,6 +7,7 @@ import { uploadControlledDocumentRouted } from "../firebase/signatureStorage";
 export default function ControlledDocumentUpload({ purpose = "Controlled Document", onUploaded }) {
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState("");
+  const [generatedReference, setGeneratedReference] = useState("");
   const [documentType, setDocumentType] = useState("Governance Document");
   const [allowDualRoleDocumentTypes, setAllowDualRoleDocumentTypes] = useState(false);
   const [version, setVersion] = useState("1.0");
@@ -60,6 +61,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
     setBusy(true);
     setMessage("Preparing PDF upload…");
     setError("");
+    setGeneratedReference("");
 
     try {
       if (!auth.currentUser) throw new Error("You must be signed in.");
@@ -167,7 +169,8 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         authorizedUids: [auth.currentUser.uid]
       };
 
-      setMessage(`Document uploaded successfully to Google Drive: ${name}. Primary category and Board of Directors Governance archive routing completed.`);
+      setGeneratedReference(documentReference);
+      setMessage(`Document uploaded successfully to Google Drive: ${name}. System reference ${documentReference} assigned. Primary category and Board of Directors Governance archive routing completed.`);
       setFile(null);
       setTitle("");
       setDocumentType("Governance Document");
@@ -216,7 +219,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
             <label>Document Title</label>
             <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Enter document title" />
           </div>
-          <div className="form-field"><label>Document Reference / Identification No.</label><input value="System generated when the PDF is uploaded" readOnly aria-readonly="true" /><small className="muted" style={{display:"block",marginTop:6}}>The identifier is generated transactionally by IRPA-DBGS and cannot be manually entered or changed.</small></div>
+          <div className="form-field"><label>Document Reference / Identification No.</label><div className="auth-message" role="status" aria-live="polite"><strong>{generatedReference || "Assigned automatically at upload"}</strong><small style={{display:"block",marginTop:6}}>The identifier is generated transactionally by IRPA-DBGS. There is no manual reference-entry field.</small></div></div>
           <div className="form-field">
             <label>Document Type</label>
             {allowDualRoleDocumentTypes ? (
