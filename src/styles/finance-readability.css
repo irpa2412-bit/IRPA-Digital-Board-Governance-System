@@ -1,0 +1,203 @@
+/* IRPA Finance Portal — targeted readability correction
+   Scope: Finance Portal only. No data, workflow, routing, or control logic changes.
+   Focus: labels, inputs, placeholders, help text, tabs, lifecycle states and
+   table readability on the light Finance surfaces shown in the Finance Entry view. */
+
+.finance-portal,
+.finance-portal .panel,
+.finance-portal .welcome-panel{
+  color:#173b2d;
+}
+
+.finance-portal .welcome-panel p,
+.finance-portal .panel-description,
+.finance-portal .action-feedback,
+.finance-portal .table-subtext,
+.finance-portal .muted{
+  color:#405c50 !important;
+  opacity:1 !important;
+  text-shadow:none !important;
+}
+
+.finance-portal .eyebrow{
+  color:#0b5f3a !important;
+  font-weight:850 !important;
+  letter-spacing:.12em !important;
+  opacity:1 !important;
+}
+
+/* Finance Entry: labels must remain visibly associated with their controls. */
+.finance-portal #finance-entry .form-field{
+  color:#173b2d !important;
+  font-size:14px !important;
+  font-weight:750 !important;
+  line-height:1.45 !important;
+  opacity:1 !important;
+}
+
+.finance-portal #finance-entry .form-field > span,
+.finance-portal #finance-entry label{
+  color:#173b2d !important;
+  opacity:1 !important;
+}
+
+.finance-portal #finance-entry input,
+.finance-portal #finance-entry select,
+.finance-portal #finance-entry textarea{
+  box-sizing:border-box;
+  min-height:44px;
+  background:#ffffff !important;
+  color:#173b2d !important;
+  border:2px solid #668579 !important;
+  border-radius:8px;
+  font-size:16px !important;
+  font-weight:550 !important;
+  line-height:1.45 !important;
+  opacity:1 !important;
+  text-shadow:none !important;
+}
+
+.finance-portal #finance-entry input::placeholder,
+.finance-portal #finance-entry textarea::placeholder{
+  color:#526b60 !important;
+  opacity:1 !important;
+  font-weight:500 !important;
+}
+
+.finance-portal #finance-entry input:focus,
+.finance-portal #finance-entry select:focus,
+.finance-portal #finance-entry textarea:focus{
+  border-color:#0b5fa8 !important;
+  outline:3px solid rgba(11,95,168,.22) !important;
+  outline-offset:1px !important;
+  box-shadow:0 0 0 2px rgba(11,95,168,.12) !important;
+}
+
+.finance-portal #finance-entry input:focus-visible,
+.finance-portal #finance-entry select:focus-visible,
+.finance-portal #finance-entry textarea:focus-visible{
+  outline:3px solid #d6a52c !important;
+  outline-offset:2px !important;
+}
+
+.finance-portal #finance-entry .form-actions{
+  margin-top:18px;
+}
+
+.finance-portal #finance-entry .form-actions button{
+  min-height:44px;
+  font-size:15px !important;
+  font-weight:800 !important;
+}
+
+/* Register tabs: stronger separation between inactive and active states. */
+.finance-portal .unified-control-tabs{
+  gap:10px !important;
+}
+
+.finance-portal .unified-control-tabs .unified-control-tab{
+  min-height:44px;
+  color:#173b2d !important;
+  background:#eef5f1 !important;
+  border:2px solid #6f9282 !important;
+  font-size:14px !important;
+  font-weight:800 !important;
+  opacity:1 !important;
+  text-shadow:none !important;
+}
+
+.finance-portal .unified-control-tabs .unified-control-tab:hover{
+  color:#0b3f2b !important;
+  background:#dcece4 !important;
+  border-color:#3f735d !important;
+}
+
+.finance-portal .unified-control-tabs .unified-control-tab.active,
+.finance-portal .unified-control-tabs .unified-control-tab[aria-selected="true"]{
+  color:#ffffff !important;
+  background:#0b5fa8 !important;
+  border-color:#0b5fa8 !important;
+  box-shadow:inset 0 -3px #f4c84a !important;
+}
+
+/* Tables: make headings and records readable without changing their data. */
+.finance-portal .table-wrapper table th{
+  color:#173b2d !important;
+  background:#e7f0eb !important;
+  font-size:12px !important;
+  font-weight:850 !important;
+  line-height:1.4 !important;
+  opacity:1 !important;
+}
+
+.finance-portal .table-wrapper table td{
+  color:#173b2d !important;
+  font-size:14px !important;
+  line-height:1.5 !important;
+  opacity:1 !important;
+}
+
+.finance-portal .table-wrapper table td strong{
+  color:#123a2b !important;
+  font-weight:800 !important;
+}
+
+.finance-portal .status-badge{
+  color:#0b4b31 !important;
+  background:#dceee4 !important;
+  border:1px solid #6f9c84 !important;
+  font-weight:800 !important;
+  opacity:1 !important;
+}
+
+.finance-portal .table-wrapper a{
+  color:#075a9d !important;
+  font-weight:750 !important;
+  text-decoration:underline;
+}
+
+.finance-portal .table-wrapper a:focus-visible{
+  outline:3px solid #d6a52c !important;
+  outline-offset:2px !important;
+}
+
+/* Keep the existing blue action language, but guarantee readable button text. */
+.finance-portal button.secondary-button{
+  color:#ffffff !important;
+  background:#0b5fa8 !important;
+  border:2px solid #2f86cf !important;
+  font-size:14px !important;
+  font-weight:800 !important;
+}
+
+.finance-portal button.secondary-button:hover:not(:disabled){
+  background:#084f8d !important;
+  border-color:#d6a52c !important;
+}
+
+.finance-portal button:disabled{
+  opacity:.68;
+}
+
+/* Mobile: preserve the app structure while preventing tiny finance controls. */
+@media(max-width:760px){
+  .finance-portal #finance-entry .form-field{
+    font-size:14px !important;
+  }
+
+  .finance-portal #finance-entry input,
+  .finance-portal #finance-entry select,
+  .finance-portal #finance-entry textarea{
+    min-height:46px;
+    font-size:16px !important;
+  }
+
+  .finance-portal .unified-control-tabs .unified-control-tab{
+    min-height:46px;
+    font-size:14px !important;
+  }
+
+  .finance-portal .table-wrapper table td{
+    font-size:13px !important;
+  }
+}
