@@ -32,12 +32,12 @@ export default function ModuleInterlinkBar({active,onNavigate,admin=false,role="
     <div className="module-interlink-heading"><span>CONNECTED WORKFLOW</span><small>Move directly between linked institutional records</small>{label&&<strong className="workflow-context-chip">Linked record: {label}</strong>}</div>
     <div className="module-interlink-list">
       {PORTAL_GROUPS.filter(group=>group.target!=="Finance Portfolio"||finance).map(group=><div key={group.target} className={"workflow-portal-group"+(active===group.target||group.children.some(([,target])=>target===active)?" active-group":"")}>
-        <button type="button" className={"workflow-portal-parent"+(active===group.target?" active":"")} onClick={()=>go(group.target)}>{group.label}</button>
+        <button type="button" className={"workflow-portal-parent "+(group.target==="Meetings"?"meeting-parent":"finance-parent")+(active===group.target?" active":"")} onClick={()=>go(group.target)}>{group.label}</button>
         <div className="workflow-portal-children">
-          {group.children.map(([itemLabel,target])=><button key={target} type="button" className={target===active?"active":""} onClick={()=>go(target)}>{itemLabel}</button>)}
+          {group.children.map(([itemLabel,target])=><button key={target} type="button" className={(group.target==="Meetings"?"meeting-child":"finance-child")+(target===active?" active":"")} onClick={()=>go(target)}>{itemLabel}</button>)}
         </div>
       </div>)}
-      {CORE.map(([itemLabel,target])=><button key={target} type="button" className={target===active?"active":""} onClick={()=>go(target)}>{itemLabel}</button>)}
+      {CORE.map(([itemLabel,target])=><button key={target} type="button" className={"core-"+target.toLowerCase().replace(/[^a-z0-9]+/g,"-")+(target===active?" active":"")} onClick={()=>go(target)}>{itemLabel}</button>)}
     </div>
     {linked.length>0&&<div className="workflow-linked-records"><span>ACTIVE LINKS</span>{linked.map(link=><button key={link.module+"-"+(link.id||link.reference)} type="button" className={link.module===active?"linked-active":""} onClick={()=>go(link.module)}>{link.module}: {link.reference}</button>)}</div>}
   </section>;
