@@ -600,13 +600,31 @@ useEffect(()=>{
       // up to 3 seconds for the Administrator profile before starting the server resolver,
       // which could make the 7-second login watchdog fire before IT/Employee authorization
       // had even been evaluated.
-      const adminDirectPromise=Promise.race([
+      const adminDirect=await Promise.race([
         getAdminProfile(u.uid),
         new Promise((_,reject)=>window.setTimeout(()=>reject(new Error("Administrator authorization lookup timed out.")),3000))
       ]).catch(error=>{
         console.warn("Administrator authorization lookup unavailable.",error);
         return null;
       });
+      if(adminDirect?.active===true){
+        const adminRoles=[...new Set(["Administrator",...roleValues(adminDirect?.roles||adminDirect?.role)])].filter(Boolean);
+        setProfile({
+          ...adminDirect,
+          uid:u.uid,
+          email:u.email||adminDirect?.email||"",
+          authorizationType:"administrator",
+          enrollmentType:"administrator",
+          role:"Administrator",
+          roles:adminRoles,
+          serverAuthorizedRoles:[],
+          authorities:[],
+          administratorAvailable:true,
+          identityResolution:"ADMINISTRATOR_UID"
+        });
+        setEmployee(null);
+        return;
+      }
       const tokenResult=await u.getIdTokenResult(true).catch(()=>null);
       const tokenRoles=Array.isArray(tokenResult?.claims?.irpaRoles)?tokenResult.claims.irpaRoles:[];
       // Resolve server identity and registered Member/Employee records concurrently.
@@ -625,9 +643,9 @@ useEffect(()=>{
         console.warn("Registered identity lookup unavailable.",error);
         return [null,null];
       });
-      const [adminDirect,[loginContext,[memberDirect,employeeDirect]]]=await Promise.all([
-        adminDirectPromise,
-        Promise.all([loginContextPromise,registerContextPromise])
+      const [loginContext,[memberDirect,employeeDirect]]=await Promise.all([
+        loginContextPromise,
+        registerContextPromise
       ]);
       const serverRoles=[...new Set([...(Array.isArray(loginContext?.roles)?loginContext.roles:[]),...tokenRoles])];
       if(adminDirect?.active===true){
