@@ -5,7 +5,7 @@ name: Deploy IRPA Governance to Firebase
 # V3 Meeting Centre safety hardening redeploy trigger: 2026-09-24T08:46Z
 # Signature Profile save authorization redeploy trigger: 2026-09-24T16:51Z
 # Safe production deployment verification marker: 2026-09-25T19:54Z — deploy current main (includes 56f7df3) without changing application behavior.
-# 2026-09-26 billing-gate safeguard: functions are unchanged in the current repair chain; deploy hosting/firestore only so a closed Google Cloud billing account cannot block today’s web/rules release. Function deployment remains a separate operation once Artifact Registry billing is restored.
+# 2026-09-26 document-reference repair: deploy the secure server-side document reference callable together with hosting/firestore so normal portal users are not blocked by admin-only counter rules.
 
 on:
   push:
@@ -256,7 +256,7 @@ jobs:
       - name: Deploy Hosting and Firestore
         uses: w9jds/firebase-action@v14.17.0
         with:
-          args: deploy --project irpa-digital-board-governance --only hosting,firestore
+          args: deploy --project irpa-digital-board-governance --only hosting,firestore,functions:nextDocumentReference
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
 
