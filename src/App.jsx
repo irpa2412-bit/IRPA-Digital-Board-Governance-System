@@ -497,14 +497,16 @@ useEffect(()=>{
           withTimeout(getCurrentMemberProfile().catch(()=>null),5000,"Firebase member authorization lookup timed out."),
           withTimeout(getCurrentEmployeeProfile().catch(()=>null),5000,"Firebase employee authorization lookup timed out.")
         ]);
-        if(!memberDirect&&!employeeDirect)throw new Error("No active IRPA authorization profile was found.");
+        const memberAuthorized=Boolean(memberDirect)&&((String(memberDirect?.status||"").trim().toLowerCase()==="active")||(String(memberDirect?.status||"").trim().toLowerCase()==="activated")||(String(memberDirect?.registrationStatus||"").trim().toLowerCase()==="activated"));
+        const employeeAuthorized=Boolean(employeeDirect)&&((String(employeeDirect?.status||"").trim().toLowerCase()==="active")||(String(employeeDirect?.employmentStatus||"").trim().toLowerCase()==="active")||(String(employeeDirect?.registrationStatus||"").trim().toLowerCase()==="activated"));
+        if(!memberAuthorized&&!employeeAuthorized)throw new Error("No active IRPA authorization profile was found.");
         return {
           ok:true,
           uid:u.uid,
           email:u.email||memberDirect?.email||employeeDirect?.email||"",
           admin:null,
-          member:memberDirect?.status==="Active"?memberDirect:null,
-          employee:employeeDirect||null,
+          member:memberAuthorized?memberDirect:null,
+          employee:employeeAuthorized?employeeDirect:null,
           authorizationSource:"firebase"
         };
       };
@@ -524,8 +526,10 @@ useEffect(()=>{
         activeEmployee=refreshed[1];
         window.history.replaceState({},document.title,window.location.pathname+window.location.hash);
       }
-      const activeMember = m?.status === "Active" ? m : null;
-      if(!activeEmployee && session.employee) activeEmployee=session.employee;
+      const memberIsAuthorized=Boolean(m)&&((String(m?.status||"").trim().toLowerCase()==="active")||(String(m?.status||"").trim().toLowerCase()==="activated")||(String(m?.registrationStatus||"").trim().toLowerCase()==="activated"));
+      const employeeIsAuthorized=Boolean(activeEmployee)&&((String(activeEmployee?.status||"").trim().toLowerCase()==="active")||(String(activeEmployee?.employmentStatus||"").trim().toLowerCase()==="active")||(String(activeEmployee?.registrationStatus||"").trim().toLowerCase()==="activated"));
+      const activeMember = memberIsAuthorized ? m : null;
+      if(!employeeIsAuthorized) activeEmployee=null;
       if(!activeMember && !activeEmployee){
         setError("This account has no active IRPA enrollment record.");
         setProfile(null);
