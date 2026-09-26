@@ -2,6 +2,15 @@ import React,{useEffect,useMemo,useState}from"react";
 import{addDoc,collection,getDocs,orderBy,query,serverTimestamp,where}from"firebase/firestore";
 import{auth,db}from"../firebase/config";
 
+const BRANCHES=[
+ {id:"service-operations",name:"IT Service & Operations Branch",description:"Front-line support, infrastructure, networks, cloud services and IT assets.",units:["Service Desk & User Support","Infrastructure, Network & Cloud","IT Asset & Vendor Management"]},
+ {id:"security",name:"Cybersecurity & Access Branch",description:"Identity, access control, security monitoring, incidents and protection of DBGS services.",units:["Cybersecurity & Access Management"]},
+ {id:"digital-systems",name:"Digital Systems & Applications Branch",description:"DBGS applications, integrations, testing, releases and technical application support.",units:["Applications & Digital Systems"]},
+ {id:"website-digital",name:"Website & Digital Communications Branch",description:"IRPA website updates, repairs, maintenance, content publishing and DBGS-to-website connectivity.",units:["Website, Communications & Digital Content"]},
+ {id:"data-continuity",name:"Data, Continuity & Recovery Branch",description:"Data quality, backup, restoration, disaster recovery and operational continuity.",units:["Data, Backup & Recovery"]},
+ {id:"governance-qa",name:"IT Governance, QA & Change Branch",description:"IT policy, standards, change control, quality assurance, release evidence and audit readiness.",units:["IT Governance, QA & Change Control"]}
+];
+
 const UNITS=[
  ["Service Desk & User Support","User accounts, support requests, devices and user training"],
  ["Infrastructure, Network & Cloud","Hosting, DNS, networks, cloud services and availability"],
@@ -26,12 +35,14 @@ export default function ITDepartmentPortal({user,profile,employee,selectedAuthor
  const role=selectedAuthority||employee?.role||profile?.role||"IT Specialist";
  const department=employee?.department||profile?.department||"Information Technology";
  const assignedUnit=employee?.unit||employee?.unitName||profile?.unit||"";
- const [unit,setUnit]=useState(assignedUnit||UNITS[0][0]);
+ const assignedBranch=employee?.branch||employee?.branchName||profile?.branch||BRANCHES.find(b=>b.units.includes(assignedUnit))?.name||BRANCHES[0].name;
+ const [branch,setBranch]=useState(assignedBranch);
+ const [unit,setUnit]=useState(assignedUnit||BRANCHES.find(b=>b.name===assignedBranch)?.units?.[0]||UNITS[0][0]);
  const [tab,setTab]=useState("overview");
  const [records,setRecords]=useState([]);
  const [loading,setLoading]=useState(false);
  const [notice,setNotice]=useState("");
- const [form,setForm]=useState({type:"Service Request",title:"",description:"",priority:"Normal",unit:assignedUnit||UNITS[0][0],status:"Open",publicNotice:false,scheduledAt:""});
+ const [form,setForm]=useState({type:"Service Request",title:"",description:"",priority:"Normal",branch:assignedBranch,unit:assignedUnit||BRANCHES.find(b=>b.name===assignedBranch)?.units?.[0]||UNITS[0][0],status:"Open",publicNotice:false,scheduledAt:""});
  const [noticeForm,setNoticeForm]=useState({title:"",message:"",severity:"Information",status:"Draft",publishFrom:"",publishUntil:""});
  const canEdit=true;
  const unitDescription=useMemo(()=>UNITS.find(x=>x[0]===unit)?.[1]||"",[unit]);
@@ -49,7 +60,7 @@ export default function ITDepartmentPortal({user,profile,employee,selectedAuthor
  const submit=async e=>{
   e.preventDefault();if(!form.title.trim()||!form.description.trim())return setNotice("Title and description are required.");
   try{
-   const x=actor();await addDoc(collection(db,"itOperations"),{...form,title:form.title.trim(),description:form.description.trim(),department:"Information Technology",unit,createdByUid:x.uid,createdByEmail:x.email,createdAt:serverTimestamp(),updatedAt:serverTimestamp(),auditStatus:"Recorded"});
+   const x=actor();await addDoc(collection(db,"itOperations"),{...form,title:form.title.trim(),description:form.description.trim(),department:"Information Technology",branch,unit,createdByUid:x.uid,createdByEmail:x.email,createdAt:serverTimestamp(),updatedAt:serverTimestamp(),auditStatus:"Recorded"});
    setForm({...form,title:"",description:"",publicNotice:false,scheduledAt:""});setNotice("IT work item recorded successfully.");await load();
   }catch(e){setNotice(e?.message||"Unable to save the IT work item.");}
  };
@@ -73,16 +84,28 @@ export default function ITDepartmentPortal({user,profile,employee,selectedAuthor
   {notice&&<div className="auth-message" style={{marginTop:16}}>{notice}</div>}
 
   <section className="panel" style={{marginTop:18}}>
-   <div className="panel-heading"><div><span className="eyebrow">DEPARTMENT CONTROL</span><h2>IT Units</h2><p className="muted">Select the operational unit for the current work context. Records remain attributable to the authenticated IT user.</p></div></div>
+   <div className="panel-heading"><div><span className="eyebrow">DEPARTMENT ARCHITECTURE</span><h2>IT Branches & Units</h2><p className="muted">Branches are the primary departmental operating junctions. Each branch connects to its responsible IT units and to the shared DBGS platforms.</p></div></div>
    <div className="dashboard-grid" style={{marginTop:16}}>
-    {UNITS.map(([u,d])=><button key={u} type="button" className="stat-card" onClick={()=>{setUnit(u);setForm(f=>({...f,unit:u}));setTab("overview")}} style={{textAlign:"left",cursor:"pointer",outline:unit===u?"2px solid currentColor":"none"}}>
-      <span>IT UNIT</span><strong>{u}</strong><small>{d}</small>
+    {BRANCHES.map(b=><button key={b.id} type="button" className="stat-card" onClick={()=>{setBranch(b.name);const next=b.units.includes(unit)?unit:b.units[0];setUnit(next);setForm(f=>({...f,branch:b.name,unit:next}));setTab("overview")}} style={{textAlign:"left",cursor:"pointer",outline:branch===b.name?"2px solid currentColor":"none"}}>
+      <span>IT BRANCH</span><strong>{b.name}</strong><small>{b.description}</small><small style={{marginTop:8}}><b>{b.units.length}</b> connected unit{b.units.length===1?"":"s"}</small>
     </button>)}
+   </div>
+   <div className="auth-message" style={{marginTop:16}}>
+    <strong>Connectivity architecture</strong><br/>
+    IT Department → Branch → Unit → Work Item → Approval / Change Control → Deployment → Audit Evidence → Connected DBGS Platform.
+    Shared junctions include Documents, Reports, Audit Trail, Settings, authentication/access control, website communications, data/backup controls and release verification.
    </div>
   </section>
 
   <section className="panel" style={{marginTop:18}}>
-   <div className="panel-heading"><div><span className="eyebrow">CURRENT UNIT</span><h2>{unit}</h2><p className="muted">{unitDescription}</p></div></div>
+   <div className="panel-heading"><div><span className="eyebrow">BRANCH WORKSPACE</span><h2>{branch}</h2><p className="muted">{BRANCHES.find(b=>b.name===branch)?.description}</p></div></div>
+   <div className="dashboard-grid" style={{marginTop:14}}>
+    {(BRANCHES.find(b=>b.name===branch)?.units||[]).map(u=>{const d=UNITS.find(x=>x[0]===u)?.[1]||"";return <button key={u} type="button" className="stat-card" onClick={()=>{setUnit(u);setForm(f=>({...f,branch,unit:u}));setTab("overview")}} style={{textAlign:"left",cursor:"pointer",outline:unit===u?"2px solid currentColor":"none"}}><span>CONNECTED UNIT</span><strong>{u}</strong><small>{d}</small></button>})}
+   </div>
+  </section>
+
+  <section className="panel" style={{marginTop:18}}>
+   <div className="panel-heading"><div><span className="eyebrow">CURRENT BRANCH / UNIT</span><h2>{unit}</h2><p className="muted">{unitDescription}</p></div></div>
    <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:14}}>
     {["overview","work","website","governance"].map(x=><button key={x} type="button" className={tab===x?"":"secondary-button"} onClick={()=>setTab(x)}>{x==="overview"?"Overview":x==="work"?"IT Work Queue":x==="website"?"Website Bridge":"Governance & QA"}</button>)}
    </div>
@@ -101,7 +124,8 @@ export default function ITDepartmentPortal({user,profile,employee,selectedAuthor
    <div className="panel-heading"><div><span className="eyebrow">IT SERVICE MANAGEMENT</span><h2>Create IT Work Item</h2></div></div>
    <form onSubmit={submit} className="form-grid" style={{marginTop:16}}>
     <label className="field"><span>Work Type</span><select value={form.type} onChange={e=>setForm({...form,type:e.target.value})}>{WORK_TYPES.map(x=><option key={x}>{x}</option>)}</select></label>
-    <label className="field"><span>Unit</span><select value={form.unit} onChange={e=>{setUnit(e.target.value);setForm({...form,unit:e.target.value})}}>{UNITS.map(([x])=><option key={x}>{x}</option>)}</select></label>
+    <label className="field"><span>Branch</span><select value={form.branch} onChange={e=>{const b=BRANCHES.find(x=>x.name===e.target.value);const next=b?.units?.[0]||form.unit;setBranch(e.target.value);setUnit(next);setForm({...form,branch:e.target.value,unit:next})}}>{BRANCHES.map(x=><option key={x.name}>{x.name}</option>)}</select></label>
+    <label className="field"><span>Unit</span><select value={form.unit} onChange={e=>{setUnit(e.target.value);setForm({...form,unit:e.target.value})}}>{(BRANCHES.find(b=>b.name===form.branch)?.units||UNITS.map(x=>x[0])).map(x=><option key={x}>{x}</option>)}</select></label>
     <label className="field"><span>Priority</span><select value={form.priority} onChange={e=>setForm({...form,priority:e.target.value})}>{PRIORITIES.map(x=><option key={x}>{x}</option>)}</select></label>
     <label className="field"><span>Status</span><select value={form.status} onChange={e=>setForm({...form,status:e.target.value})}>{STATUSES.map(x=><option key={x}>{x}</option>)}</select></label>
     <label className="field" style={{gridColumn:"1/-1"}}><span>Title</span><input value={form.title} onChange={e=>setForm({...form,title:e.target.value})} placeholder="Describe the IT work item"/></label>
@@ -110,7 +134,7 @@ export default function ITDepartmentPortal({user,profile,employee,selectedAuthor
     <label className="field" style={{display:"flex",alignItems:"center",gap:10}}><input type="checkbox" checked={form.publicNotice} onChange={e=>setForm({...form,publicNotice:e.target.checked})}/><span>Prepare for website communication</span></label>
     <button type="submit" disabled={!canEdit}>Record IT Work Item</button>
    </form>
-   <div style={{marginTop:24}}><h3>Recent IT Work</h3>{loading?<p className="muted">Loading…</p>:records.length===0?<p className="muted">No IT work records yet.</p>:<div className="table-wrap"><table><thead><tr><th>Type</th><th>Title</th><th>Unit</th><th>Priority</th><th>Status</th></tr></thead><tbody>{records.slice(0,30).map(r=><tr key={r.id}><td><span className={"status-badge "+badge(r.status)}>{r.type}</span></td><td>{r.title}</td><td>{r.unit}</td><td>{r.priority}</td><td>{r.status}</td></tr>)}</tbody></table></div>}</div>
+   <div style={{marginTop:24}}><h3>Recent IT Work</h3>{loading?<p className="muted">Loading…</p>:records.length===0?<p className="muted">No IT work records yet.</p>:<div className="table-wrap"><table><thead><tr><th>Type</th><th>Title</th><th>Branch</th><th>Unit</th><th>Priority</th><th>Status</th></tr></thead><tbody>{records.slice(0,30).map(r=><tr key={r.id}><td><span className={"status-badge "+badge(r.status)}>{r.type}</span></td><td>{r.title}</td><td>{r.branch||"—"}</td><td>{r.unit}</td><td>{r.priority}</td><td>{r.status}</td></tr>)}</tbody></table></div>}</div>
   </section>}
 
   {tab==="website"&&<section className="panel" style={{marginTop:18}}>
