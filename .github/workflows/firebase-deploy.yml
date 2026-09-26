@@ -277,10 +277,18 @@ jobs:
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
 
+      # Keep the login resolver deployment independent from unrelated functions.
+      - name: Deploy login authorization resolver
+        uses: w9jds/firebase-action@v14.17.0
+        with:
+          args: deploy --project irpa-digital-board-governance --only functions:resolveAuthenticatedLoginContext
+        env:
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+
       - name: Deploy authentication security and document-reference functions
         uses: w9jds/firebase-action@v14.17.0
         with:
-          args: deploy --project irpa-digital-board-governance --only functions:checkPasswordAttemptState,functions:recordPasswordFailure,functions:clearPasswordAttemptState,functions:preparePasswordResetPhone,functions:nextDocumentReference,functions:resolveAuthenticatedLoginContext
+          args: deploy --project irpa-digital-board-governance --only functions:checkPasswordAttemptState,functions:recordPasswordFailure,functions:clearPasswordAttemptState,functions:preparePasswordResetPhone,functions:nextDocumentReference
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
 
