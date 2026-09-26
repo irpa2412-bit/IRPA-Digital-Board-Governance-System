@@ -14,7 +14,9 @@ import {
   sendSignInLinkToEmail,
   isSignInWithEmailLink,
   signInWithEmailLink,
-  onAuthStateChanged
+  onAuthStateChanged,
+  RecaptchaVerifier,
+  signInWithPhoneNumber
 } from "firebase/auth";
 import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
@@ -33,6 +35,9 @@ const adminOAuthApp = initializeApp(
 );
 const adminOAuthAuth = getAuth(adminOAuthApp);
 const adminGoogleProvider = new GoogleAuthProvider();
+const recoveryPhoneApp = initializeApp({ ...firebaseConfig }, "irpa-password-recovery-phone");
+const recoveryPhoneAuth = getAuth(recoveryPhoneApp);
+
 adminGoogleProvider.setCustomParameters({
   prompt: "select_account",
   login_hint: "select_account"
@@ -53,11 +58,29 @@ export async function registerWithEmail(email, password, options = {}) {
 export async function loginWithEmail(email, password) {
   const cleanEmail = email.trim().toLowerCase();
   if (!cleanEmail || !password) throw new Error("Email address and password are required.");
+  const check = httpsCallable(getFunctions(undefined, "us-central1"), "checkPasswordAttemptState");
+  const recordFailure = httpsCallable(getFunctions(undefined, "us-central1"), "recordPasswordFailure");
+  const clearFailures = httpsCallable(getFunctions(undefined, "us-central1"), "clearPasswordAttemptState");
+  const state = await check({ email: cleanEmail });
+  if (state.data?.allowed === false) {
+    const error = new Error(
+      state.data?.status === "SUSPENDED"
+        ? "Password access is suspended after six unsuccessful password entries. Use Forgot password? to complete mobile verification and request the registered email reset link."
+        : "Password entry is temporarily locked for 5 minutes after three unsuccessful trials. Please wait before trying again."
+    );
+    error.code = state.data?.status === "SUSPENDED" ? "auth/password-suspended" : "auth/password-locked";
+    error.retryAfterSeconds = state.data?.retryAfterSeconds || 300;
+    throw error;
+  }
   try {
     const result = await signInWithEmailAndPassword(auth, cleanEmail, password);
+    await clearFailures({ email: cleanEmail });
     return result.user;
   } catch (error) {
-    throw new Error(firebaseErrorMessage(error));
+    try { await recordFailure({ email: cleanEmail }); } catch (_) {}
+    const wrapped = new Error(firebaseErrorMessage(error));
+    wrapped.code = error?.code || "";
+    throw wrapped;
   }
 }
 
@@ -156,6 +179,34 @@ export async function sendPasswordReset(email) {
   } catch (error) {
     throw new Error(firebaseErrorMessage(error));
   }
+}
+
+let passwordRecoveryRecaptcha = null;
+
+export async function beginPasswordResetMobileVerification(email) {
+  const cleanEmail = String(email || "").trim().toLowerCase();
+  if (!cleanEmail) throw new Error("Enter your registered IRPA email address first.");
+  const prepare = httpsCallable(getFunctions(undefined, "us-central1"), "preparePasswordResetPhone");
+  const result = await prepare({ email: cleanEmail });
+  if (passwordRecoveryRecaptcha) {
+    try { passwordRecoveryRecaptcha.clear(); } catch (_) {}
+    passwordRecoveryRecaptcha = null;
+  }
+  passwordRecoveryRecaptcha = new RecaptchaVerifier(recoveryPhoneAuth, "password-reset-recaptcha", { size: "invisible" });
+  const confirmation = await signInWithPhoneNumber(recoveryPhoneAuth, result.data.phoneNumber, passwordRecoveryRecaptcha);
+  return { confirmation, maskedPhone: result.data.maskedPhone, email: cleanEmail };
+}
+
+export async function verifyPasswordResetMobileOtp(confirmation, code) {
+  const cleanCode = String(code || "").trim();
+  if (!confirmation || !/^\d{6}$/.test(cleanCode)) throw new Error("Enter the six-digit mobile verification code.");
+  await confirmation.confirm(cleanCode);
+  try { await signOut(recoveryPhoneAuth); } catch (_) {}
+  if (passwordRecoveryRecaptcha) {
+    try { passwordRecoveryRecaptcha.clear(); } catch (_) {}
+    passwordRecoveryRecaptcha = null;
+  }
+  return true;
 }
 
 export async function logout(options = {}) {
