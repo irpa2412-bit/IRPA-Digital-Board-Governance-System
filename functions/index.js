@@ -305,7 +305,7 @@ exports.resolveAuthenticatedLoginContext = onCall({region:"us-central1",timeoutS
     ...(Array.isArray(record?.roles)?record.roles:[]),record?.role,
     ...(Array.isArray(record?.assignedRoles)?record.assignedRoles:[]),
     ...(Array.isArray(record?.selectedRoles)?record.selectedRoles:[]),
-    ...(Array.isArray(record?.roleAssignments)?record.roleAssignments:[]
+    ...(Array.isArray(record?.roleAssignments)?record.roleAssignments:[])
   ]).flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean)))];
   const contextValues=employees.flatMap(record=>[
     record?.department,record?.unit,record?.jobTitle,record?.position,record?.title,record?.designation
