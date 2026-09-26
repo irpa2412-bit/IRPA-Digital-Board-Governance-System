@@ -1,4 +1,13 @@
 {
-  "indexes": [],
+  "indexes": [
+    {
+      "collectionGroup": "itOperations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath":"department","order":"ASCENDING"},
+        {"fieldPath":"createdAt","order":"DESCENDING"}
+      ]
+    }
+  ],
   "fieldOverrides": []
 }
