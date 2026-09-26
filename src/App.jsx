@@ -521,21 +521,26 @@ useEffect(()=>{
         const operationalSourceProfile=operationalProfile||(
           registryOperationalRoles.length>0?adminDirect:null
         );
-        if(operationalRoles.length>0){
-          setEmployee(operationalEmployee);
-          setProfile({
-            ...(operationalSourceProfile||operationalEmployee||{}),
-            ...adminDirect,
-            uid:u.uid,
-            email:u.email||adminMember?.email||adminEmployee?.email||"",
-            role:operationalRoles.find(role=>role!=="Administrator")||operationalEmployee?.role||operationalProfile?.role||"Authorized IRPA User",
-            roles:[...new Set([...operationalRoles,"Administrator"])],
-            administratorAvailable:true,
-            authorizationType:"administrator_candidate"
-          });
-        }else{
-          setProfile({...adminDirect,uid:u.uid,email:u.email||"",authorizationType:"administrator"});
-        }
+        // Generic login must never silently enter an Administrator dashboard.
+        // Every Administrator Registry account must pass through the same explicit
+        // operating-role declaration gate. The dedicated admin gateway remains the
+        // only path that may establish the primary Administrator session directly.
+        const declaredRoles=[...new Set([
+          ...operationalRoles,
+          ...roleValues(adminDirect?.roles||adminDirect?.assignedRoles||adminDirect?.selectedRoles||adminDirect?.roleAssignments||adminDirect?.role)
+        ].filter(role=>String(role||"").trim()&&role!=="ADMINISTRATOR"&&role!=="Administrator"))];
+        const candidateRoles=[...new Set([...declaredRoles,"Administrator"])];
+        setEmployee(operationalEmployee);
+        setProfile({
+          ...(operationalSourceProfile||operationalEmployee||{}),
+          ...adminDirect,
+          uid:u.uid,
+          email:u.email||adminMember?.email||adminEmployee?.email||"",
+          role:declaredRoles[0]||"Administrator",
+          roles:candidateRoles,
+          administratorAvailable:true,
+          authorizationType:"administrator_candidate"
+        });
         return;
       }
 
