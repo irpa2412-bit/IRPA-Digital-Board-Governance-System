@@ -90,6 +90,22 @@ function resolveLoginCategories(profile,employee,admin){
   employee?.role
  ].flatMap(v=>String(v||"").split(",").map(normalize).filter(Boolean));
  const filtered=values.filter(v=>!(boardRoles.includes(v)&&boardPosition&&v!==boardPosition));
+ // Institutional capacity may be stored in the Employee Register without being
+ // duplicated into the roles array. Reconcile the verified employment context
+ // so an IT Specialist who is also an Administrator is offered both capacities.
+ const identityContext=[
+  profile?.department,employee?.department,
+  profile?.unit,employee?.unit,
+  profile?.jobTitle,employee?.jobTitle,
+  profile?.position,employee?.position,
+  profile?.title,employee?.title,
+  profile?.designation,employee?.designation
+ ].map(normalize).filter(Boolean);
+ const itContext=identityContext.some(v=>{
+  const n=v.toLowerCase();
+  return n==="it"||n==="it unit"||n.includes("information technology")||n.includes("it specialist")||n.includes("information technology officer");
+ });
+ if(itContext&&!filtered.some(v=>["IT Specialist","Information Technology Officer"].includes(v)))filtered.push("IT Specialist");
  if(boardPosition)filtered.unshift(boardPosition);
  if(administratorAvailable)filtered.unshift("Administrator");
  return [...new Set(filtered)];
