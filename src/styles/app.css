@@ -4396,13 +4396,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 @media screen and (min-width:761px){
   .desktop-webapp-navigation-roller{
     position:fixed!important;
-    top:106px!important;
+    top:0!important;
     left:calc(170px + 20px)!important;
-    right:20px!important;
-    z-index:950!important;
+    right:0!important;
+    z-index:9999!important;
     width:auto!important;
     margin:0!important;
     max-width:none!important;
+    border-radius:0 0 12px 12px!important;
+    box-shadow:0 10px 28px rgba(0,0,0,.30)!important;
     isolation:isolate!important;
     will-change:transform!important;
     transform:translate3d(0,0,0)!important;
@@ -4410,8 +4412,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     backface-visibility:hidden!important;
   }
 
-  /* Reserve the frozen roller's vertical footprint so it never covers the
-     first Finance/portal content while the page itself scrolls underneath. */
+  /* Keep page content clear of the pop-up navigation surface. */
   .content-area:has(> .desktop-webapp-navigation-roller){
     padding-top:94px!important;
   }
