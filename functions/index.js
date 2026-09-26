@@ -1,4 +1,4 @@
-const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
+const { onDocumentUpdated, onDocumentWritten } = require("firebase-functions/v2/firestore");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
@@ -7,6 +7,34 @@ const { getAuth } = require("firebase-admin/auth");
 const crypto = require("crypto");
 initializeApp(); const db = getFirestore();
 async function stableId(v){return crypto.createHash("sha256").update(String(v)).digest("hex");}
+async function writeServerAuditEvent(event){
+  const path=String(event.params?.document||"");
+  const parts=path.split("/").filter(Boolean);
+  if(parts.length<2)return null;
+  const collectionName=parts[parts.length-2];
+  const recordId=parts[parts.length-1];
+  if(["audit","systemResetPlans"].includes(collectionName))return null;
+  const before=event.data?.before;
+  const after=event.data?.after;
+  const beforeExists=Boolean(before?.exists);
+  const afterExists=Boolean(after?.exists);
+  if(!beforeExists&&!afterExists)return null;
+  const beforeData=beforeExists?(before.data()||{}):{};
+  const afterData=afterExists?(after.data()||{}):{};
+  const changedKeys=[...new Set([...Object.keys(beforeData),...Object.keys(afterData)])]
+    .filter(key=>JSON.stringify(beforeData[key])!==JSON.stringify(afterData[key]))
+    .slice(0,120);
+  const action=!beforeExists&&afterExists?"SERVER_CREATE":beforeExists&&!afterExists?"SERVER_DELETE":"SERVER_UPDATE";
+  await db.collection("audit").add({
+    action,collection:collectionName,recordId,
+    details:{source:"SERVER_FIRESTORE_TRIGGER",changedKeys,beforeExists,afterExists},
+    actorUid:afterData.updatedByUid||afterData.createdByUid||beforeData.updatedByUid||beforeData.createdByUid||null,
+    actorEmail:afterData.updatedByEmail||afterData.createdByEmail||beforeData.updatedByEmail||beforeData.createdByEmail||null,
+    createdAt:FieldValue.serverTimestamp()
+  });
+  return null;
+}
+exports.captureServerAuditEvent=onDocumentWritten({document:"{document=**}",region:"us-central1"},writeServerAuditEvent);
 async function notify({recipientUids,type,title,body,module,recordId,route="/",priority="normal",eventKey}){for(const recipientUid of [...new Set((recipientUids||[]).filter(Boolean).map(String))]){const id=await stableId(`${eventKey}|${recipientUid}`);await db.collection("notifications").doc(id).set({recipientUid,type,title,body,module,recordId:recordId||null,route,priority,read:false,createdByUid:"system",createdAt:FieldValue.serverTimestamp()},{merge:true});}}
 
 // Central financial reference control. References are issued only after an approval
