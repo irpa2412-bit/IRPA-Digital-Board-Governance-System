@@ -5031,3 +5031,66 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     width:100%;
   }
 }
+
+/* IRPA MOBILE BACK/NEXT — DESKTOP NAVIGATION PARITY — 2026-09-27
+   Mobile counterpart of the desktop ceiling-frozen Back/Next navigator.
+   The mobile portal roller occupies the 150px–196px ceiling band, so the
+   Back/Next surface freezes immediately beneath it without covering content. */
+@media screen and (max-width:760px){
+  .content-area > .page-back-next-navigation,
+  .dashboard-content-area > .page-back-next-navigation{
+    position:sticky!important;
+    top:calc(196px + env(safe-area-inset-top))!important;
+    z-index:9998!important;
+    width:100%!important;
+    box-sizing:border-box!important;
+    margin-top:0!important;
+    margin-bottom:12px!important;
+    padding:5px!important;
+    min-height:48px!important;
+    background:rgba(247,250,252,.98)!important;
+    border:1px solid #c9d8e5!important;
+    border-radius:0 0 10px 10px!important;
+    box-shadow:0 7px 18px rgba(7,43,76,.16)!important;
+    backdrop-filter:blur(5px)!important;
+    -webkit-backdrop-filter:blur(5px)!important;
+  }
+
+  .content-area > .page-back-next-navigation .page-back-next-button,
+  .dashboard-content-area > .page-back-next-navigation .page-back-next-button{
+    min-height:36px!important;
+    padding:7px 9px!important;
+    border-radius:8px!important;
+    background:#0b5fa8!important;
+    border:1px solid #2f86cf!important;
+    color:#fff!important;
+    font-size:11px!important;
+    font-weight:900!important;
+    box-shadow:0 3px 8px rgba(7,43,76,.12)!important;
+  }
+
+  .content-area > .page-back-next-navigation .page-back-next-button:hover:not(:disabled),
+  .content-area > .page-back-next-navigation .page-back-next-button:focus-visible,
+  .dashboard-content-area > .page-back-next-navigation .page-back-next-button:hover:not(:disabled),
+  .dashboard-content-area > .page-back-next-navigation .page-back-next-button:focus-visible{
+    background:#1672bf!important;
+    border-color:#fff!important;
+  }
+
+  .content-area > .page-back-next-navigation .page-back-next-status strong,
+  .dashboard-content-area > .page-back-next-navigation .page-back-next-status strong{
+    color:#07385f!important;
+    font-size:10px!important;
+    font-weight:900!important;
+  }
+  .content-area > .page-back-next-navigation .page-back-next-status span,
+  .dashboard-content-area > .page-back-next-navigation .page-back-next-status span{
+    color:#557084!important;
+    font-size:7px!important;
+  }
+  .content-area > .page-back-next-navigation .page-back-next-status small,
+  .dashboard-content-area > .page-back-next-navigation .page-back-next-status small{
+    color:#687d8d!important;
+    font-size:8px!important;
+  }
+}
