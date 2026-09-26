@@ -4887,3 +4887,25 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     margin-bottom:0!important;
   }
 }
+/* IRPA DESKTOP BACK/NEXT — STICK AT OVERHEAD NAVIGATION CEILING — 2026-09-26 */
+@media screen and (min-width:761px){
+  /* Keep Back/Next in normal document flow until scrolling brings its
+     top edge to the lower edge of the fixed 48px overhead navigator. */
+  .content-area > .page-back-next-navigation,
+  .dashboard-content-area > .page-back-next-navigation{
+    position:sticky!important;
+    top:48px!important;
+    z-index:9998!important;
+    box-sizing:border-box!important;
+    width:100%!important;
+    margin-top:0!important;
+    margin-bottom:0!important;
+    background:#f7fafc!important;
+    box-shadow:0 8px 18px rgba(7,43,76,.16)!important;
+  }
+
+  /* The overhead navigator remains above the frozen Back/Next controls. */
+  .desktop-webapp-navigation-roller{
+    z-index:9999!important;
+  }
+}
