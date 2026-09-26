@@ -5094,3 +5094,82 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     font-size:8px!important;
   }
 }
+
+
+/* IRPA DASHBOARD FOUR-STAT COLOUR MIX — 2026-09-27
+   Semantic colours distinguish the primary dashboard workstreams while
+   preserving one shared control language and accessible white typography. */
+.dashboard-quote4-stats > button.dashboard-stat-meetings,
+.live-date-stat-buttons > button.dashboard-stat-meetings,
+.mobile-quote1-stats > button.dashboard-stat-meetings{
+  background:#176b8c!important;
+  border-color:#5fb3ce!important;
+}
+.dashboard-quote4-stats > button.dashboard-stat-actions,
+.live-date-stat-buttons > button.dashboard-stat-actions,
+.mobile-quote1-stats > button.dashboard-stat-actions{
+  background:#a65327!important;
+  border-color:#dc936b!important;
+}
+.dashboard-quote4-stats > button.dashboard-stat-authorization-approvals,
+.live-date-stat-buttons > button.dashboard-stat-authorization-approvals,
+.mobile-quote1-stats > button.dashboard-stat-authorization-approvals{
+  background:#6b4aa5!important;
+  border-color:#aa8bd8!important;
+}
+.dashboard-quote4-stats > button.dashboard-stat-employee-payments,
+.live-date-stat-buttons > button.dashboard-stat-employee-payments,
+.mobile-quote1-stats > button.dashboard-stat-employee-payments{
+  background:#26734a!important;
+  border-color:#67b487!important;
+}
+.dashboard-quote4-stats > button.dashboard-stat-members,
+.live-date-stat-buttons > button.dashboard-stat-members,
+.mobile-quote1-stats > button.dashboard-stat-members{
+  background:#2d5f8b!important;
+  border-color:#72a7cf!important;
+}
+.dashboard-quote4-stats > button.dashboard-stat-reports,
+.live-date-stat-buttons > button.dashboard-stat-reports,
+.mobile-quote1-stats > button.dashboard-stat-reports{
+  background:#3f6470!important;
+  border-color:#79aab5!important;
+}
+
+.dashboard-quote4-stats > button[class*="dashboard-stat-"]:hover,
+.dashboard-quote4-stats > button[class*="dashboard-stat-"]:focus-visible,
+.live-date-stat-buttons > button[class*="dashboard-stat-"]:hover,
+.live-date-stat-buttons > button[class*="dashboard-stat-"]:focus-visible,
+.mobile-quote1-stats > button[class*="dashboard-stat-"]:hover,
+.mobile-quote1-stats > button[class*="dashboard-stat-"]:focus-visible{
+  filter:brightness(1.1)!important;
+  border-color:#fff!important;
+}
+.dashboard-quote4-stats > button[class*="dashboard-stat-"] .quote4-stat-icon,
+.dashboard-quote4-stats > button[class*="dashboard-stat-"] strong,
+.dashboard-quote4-stats > button[class*="dashboard-stat-"] b,
+.dashboard-quote4-stats > button[class*="dashboard-stat-"] small,
+.dashboard-quote4-stats > button[class*="dashboard-stat-"] i,
+.live-date-stat-buttons > button[class*="dashboard-stat-"] .quote4-stat-icon,
+.live-date-stat-buttons > button[class*="dashboard-stat-"] strong,
+.live-date-stat-buttons > button[class*="dashboard-stat-"] b,
+.live-date-stat-buttons > button[class*="dashboard-stat-"] small,
+.live-date-stat-buttons > button[class*="dashboard-stat-"] i,
+.mobile-quote1-stats > button[class*="dashboard-stat-"] span,
+.mobile-quote1-stats > button[class*="dashboard-stat-"] strong,
+.mobile-quote1-stats > button[class*="dashboard-stat-"] b,
+.mobile-quote1-stats > button[class*="dashboard-stat-"] small,
+.mobile-quote1-stats > button[class*="dashboard-stat-"] i{
+  color:#fff!important;
+}
+
+/* Preserve the semantic palette on small screens; remove the former
+   inline blue declaration's visual dominance. */
+@media(max-width:760px){
+  .mobile-quote1-stats > button.dashboard-stat-meetings{background:#176b8c!important}
+  .mobile-quote1-stats > button.dashboard-stat-actions{background:#a65327!important}
+  .mobile-quote1-stats > button.dashboard-stat-authorization-approvals{background:#6b4aa5!important}
+  .mobile-quote1-stats > button.dashboard-stat-employee-payments{background:#26734a!important}
+  .mobile-quote1-stats > button.dashboard-stat-members{background:#2d5f8b!important}
+  .mobile-quote1-stats > button.dashboard-stat-reports{background:#3f6470!important}
+}
