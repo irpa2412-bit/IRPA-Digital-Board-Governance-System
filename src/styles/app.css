@@ -4755,3 +4755,55 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   }
 }
 
+/* IRPA DASHBOARD NAVIGATION PLACEMENT — 2026-09-26 */
+@media screen and (min-width:761px){
+  /* The Back/Next controls now occupy the upper content band immediately
+     beneath the frozen overhead navigation and before Sign Out. */
+  .content-area > .page-back-next-navigation{
+    margin:0 0 8px!important;
+    padding:6px!important;
+    min-height:48px!important;
+  }
+  .content-area > .page-back-next-navigation .page-back-next-button{
+    min-height:36px!important;
+    padding:7px 12px!important;
+  }
+  .content-area > .page-back-next-navigation .page-back-next-status{
+    gap:1px!important;
+  }
+
+  /* Keep Sign Out directly below the navigation rather than consuming the
+     large blank band shown in the live dashboard. */
+  .content-area > .operator-signout-slot{
+    display:flex!important;
+    justify-content:center!important;
+    align-items:center!important;
+    width:100%!important;
+    min-height:44px!important;
+    margin:0 0 10px!important;
+    padding:0!important;
+    box-sizing:border-box!important;
+  }
+  .content-area > .operator-signout-slot .logout-button{
+    min-width:300px!important;
+    min-height:42px!important;
+    margin:0!important;
+  }
+
+  /* On Dashboard, reclaim the vertical space formerly left between the
+     overhead panel, Sign Out and the dashboard panels. */
+  .dashboard-content-area{
+    padding-top:76px!important;
+    padding-bottom:28px!important;
+  }
+  .dashboard-content-area > .page-back-next-navigation{
+    margin-bottom:7px!important;
+  }
+  .dashboard-content-area > .operator-signout-slot{
+    margin-bottom:8px!important;
+  }
+  .dashboard-content-area > .dashboard-command{
+    margin-top:0!important;
+  }
+}
+
