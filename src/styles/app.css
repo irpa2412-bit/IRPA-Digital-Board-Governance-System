@@ -4387,3 +4387,40 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
 .finance-technology-operations{margin-top:20px}.finance-technology-operations .finance-engine-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}.finance-technology-operations .finance-engine-tabs button{border:1px solid #2f86cf;border-radius:8px;padding:9px 12px;background:#fff;color:#07385f;font-weight:700;cursor:pointer}.finance-operation-result{white-space:pre-wrap;overflow:auto;max-height:420px;background:#f5f8fb;border:1px solid #d8e4ef;border-radius:8px;padding:12px;font-size:12px}.finance-technology-operations .secondary-button{display:inline-flex;align-items:center;justify-content:center;cursor:pointer}.finance-technology-operations input[type=file]{display:none}
 @media(max-width:760px){.finance-technology-operations .finance-engine-tabs{display:grid;grid-template-columns:1fr 1fr}.finance-technology-operations .finance-engine-tabs button{min-height:44px}.finance-technology-operations .form-actions{display:grid;grid-template-columns:1fr;gap:8px}.finance-operation-result{font-size:11px}}
+
+
+/* WEB NAVIGATION ROLLER — FROZEN DURING DESKTOP NAVIGATION — 2026-09-26
+   Safety scope: presentation/positioning only. The roller remains the same
+   navigation control and continues to use the existing authenticated module
+   list and routing handlers. No navigation permissions or destinations change. */
+@media screen and (min-width:761px){
+  .desktop-webapp-navigation-roller{
+    position:fixed!important;
+    top:106px!important;
+    left:calc(170px + 20px)!important;
+    right:20px!important;
+    z-index:950!important;
+    width:auto!important;
+    margin:0!important;
+    max-width:none!important;
+    isolation:isolate!important;
+    will-change:transform!important;
+    transform:translate3d(0,0,0)!important;
+    -webkit-backface-visibility:hidden!important;
+    backface-visibility:hidden!important;
+  }
+
+  /* Reserve the frozen roller's vertical footprint so it never covers the
+     first Finance/portal content while the page itself scrolls underneath. */
+  .content-area:has(> .desktop-webapp-navigation-roller){
+    padding-top:94px!important;
+  }
+}
+
+/* When browser support for :has() is unavailable, keep the fixed roller usable
+   without changing its controls. */
+@supports not selector(.content-area:has(> .desktop-webapp-navigation-roller)){
+  @media screen and (min-width:761px){
+    .content-area{padding-top:94px!important;}
+  }
+}
