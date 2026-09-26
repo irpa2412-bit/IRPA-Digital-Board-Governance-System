@@ -588,9 +588,18 @@ useEffect(()=>{
         };
       };
 
+      // The server resolver is authoritative for the authenticated identity context.
+      // Carry its complete registered role set into the client gate so an administrator
+      // who is also an IT Specialist is not reduced to "Administrator" locally.
+      const serverContextMember=loginContext?.member||null;
+      const serverContextEmployee=loginContext?.employee||null;
+      const serverContextRoles=[...new Set([
+        ...(Array.isArray(loginContext?.roles)?loginContext.roles:[]),
+        ...tokenRoles
+      ].flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean)))];
       const session=await loadMemberSession();
-      let m=session.member;
-      let activeEmployee=session.employee||null;
+      let m=serverContextMember||session.member;
+      let activeEmployee=serverContextEmployee||session.employee||null;
       const invitationId=new URLSearchParams(window.location.search).get("memberInvite");
       // An authenticated invitation activation must complete institutional
       // enrollment before the normal authorization gate is evaluated. Do this
@@ -616,7 +625,20 @@ useEffect(()=>{
       // a duplicate members/{uid} authorization document. Use the employee
       // record as the canonical application profile when no member profile exists.
       const canonicalProfile = activeMember || activeEmployee;
-      setProfile({...canonicalProfile, authorizationType:"member", enrollmentType:activeEmployee && !activeMember ? "employee" : "member"});
+      const resolvedRegisteredRoles=[...new Set([
+        ...roleValues(canonicalProfile?.roles||canonicalProfile?.role),
+        ...roleValues(activeEmployee?.roles||activeEmployee?.role),
+        ...serverContextRoles
+      ])].filter(Boolean);
+      setProfile({
+        ...canonicalProfile,
+        authorizationType:"member",
+        enrollmentType:activeEmployee && !activeMember ? "employee" : "member",
+        role:resolvedRegisteredRoles[0]||canonicalProfile?.role||"",
+        roles:resolvedRegisteredRoles,
+        serverAuthorizedRoles:serverContextRoles,
+        identityResolution:loginContext?.identityResolution||null
+      });
       setEmployee(activeEmployee);
       try{
         const induction=await Promise.race([
