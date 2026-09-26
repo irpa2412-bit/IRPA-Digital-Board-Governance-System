@@ -481,22 +481,53 @@ useEffect(()=>{
       return;
     }
     try{
-      // The designated primary administrator is resolved immediately after
-      // Firebase authentication, independently of all member workflows.
-      if(String(u.email||"").trim().toLowerCase()==="irpa2412@gmail.com"){
+      // Administrator and operational-role gateways are deliberately separate.
+      // The dedicated Administrator Gateway is the only generic entry path that
+      // establishes the Administrator session. A person who also holds IT (or
+      // another operational role) uses the normal sign-in pathway and is resolved
+      // only to that operational role.
+      const primaryAdminEmail=String(u.email||"").trim().toLowerCase()==="irpa2412@gmail.com";
+      if(primaryAdminEmail&&adminGatewayMode){
         setProfile({
           uid:u.uid,
           email:"irpa2412@gmail.com",
           name:"IRPA Primary Administrator",
           role:"Administrator",
+          roles:["Administrator"],
           active:true,
           authorizationType:"administrator"
         });
+        setEmployee(null);
         window.sessionStorage.removeItem("irpaExpectedGoogleAdminEmail");
         window.sessionStorage.removeItem("irpaAdminRedirectPending");
-        if(new URLSearchParams(window.location.search).get("adminGateway")==="1"){
-          window.history.replaceState({},document.title,window.location.pathname);
+        window.history.replaceState({},document.title,window.location.pathname);
+        return;
+      }
+      if(primaryAdminEmail&&!adminGatewayMode){
+        const [primaryMember,primaryEmployee]=await Promise.all([
+          getCurrentMemberProfile().catch(()=>null),
+          getCurrentEmployeeProfile().catch(()=>null)
+        ]);
+        const primaryRoles=[...new Set([
+          ...resolveLoginCategories(primaryMember,primaryEmployee,false),
+          ...roleValues(primaryEmployee?.roles||primaryEmployee?.assignedRoles||primaryEmployee?.selectedRoles||primaryEmployee?.roleAssignments||primaryEmployee?.role)
+        ].filter(role=>String(role||"").trim()&&role!=="ADMINISTRATOR"&&role!=="Administrator"))];
+        if(!primaryRoles.length){
+          setError("Administrator access uses the separate Administrator Gateway. This account has no registered operational role for standard sign-in.");
+          setProfile(null);
+          return;
         }
+        setEmployee(primaryEmployee);
+        setProfile({
+          ...(primaryMember||primaryEmployee||{}),
+          uid:u.uid,
+          email:u.email||"",
+          role:primaryRoles[0],
+          roles:primaryRoles,
+          administratorAvailable:false,
+          authorizationType:"member",
+          enrollmentType:primaryEmployee&&!primaryMember?"employee":"member"
+        });
         return;
       }
 
@@ -505,11 +536,29 @@ useEffect(()=>{
         new Promise((_,reject)=>window.setTimeout(()=>reject(new Error("Administrator authorization lookup timed out.")),3000))
       ]);
       if(adminDirect?.active===true){
-        // An administrator may also hold operational roles (for example IT).
-        // Do not collapse a dual-role account into Administrator merely because
-        // the UID exists in the administrator registry. Resolve all active
-        // member/employee authorities first and let the authenticated session
-        // explicitly declare its operating role.
+        // Dedicated Administrator Gateway: direct Administrator session, no
+        // operating-role declaration gate. This is intentionally separate from
+        // the normal IT/employee gateway.
+        if(adminGatewayMode){
+          setEmployee(null);
+          setProfile({
+            ...adminDirect,
+            uid:u.uid,
+            email:u.email||adminDirect?.email||"",
+            role:"Administrator",
+            roles:["Administrator"],
+            active:true,
+            administratorAvailable:true,
+            authorizationType:"administrator"
+          });
+          window.history.replaceState({},document.title,window.location.pathname);
+          return;
+        }
+
+        // Normal sign-in for an Administrator+IT account is an operational
+        // gateway. Administrator is deliberately excluded from this role list;
+        // the user must enter the Administrator Gateway when Administrator
+        // authority is required.
         const [adminMember,adminEmployee]=await Promise.all([
           getCurrentMemberProfile().catch(()=>null),
           getCurrentEmployeeProfile().catch(()=>null)
@@ -525,39 +574,31 @@ useEffect(()=>{
         );
         const operationalProfile=adminMemberAuthorized?adminMember:null;
         const operationalEmployee=adminEmployeeAuthorized?adminEmployee:null;
-        // The administrator registry itself may carry an operational assignment
-        // (for example IT). Include those registered roles in the same authority
-        // resolution so an Administrator+IT account cannot be collapsed into a
-        // pure Administrator session before the declaration gate is reached.
         const registryOperationalRoles=resolveLoginCategories(adminDirect,null,false)
-          .filter(role=>role!=="Administrator");
+          .filter(role=>role!=="Administrator"&&role!=="ADMINISTRATOR");
         const operationalRoles=[...new Set([
           ...resolveLoginCategories(operationalProfile,operationalEmployee,false)
-            .filter(role=>role!=="Administrator"),
+            .filter(role=>role!=="Administrator"&&role!=="ADMINISTRATOR"),
           ...registryOperationalRoles
         ])];
+        if(!operationalRoles.length){
+          setError("Administrator access uses the separate Administrator Gateway. This account has no registered operational role for standard sign-in.");
+          setProfile(null);
+          return;
+        }
         const operationalSourceProfile=operationalProfile||(
           registryOperationalRoles.length>0?adminDirect:null
         );
-        // Generic login must never silently enter an Administrator dashboard.
-        // Every Administrator Registry account must pass through the same explicit
-        // operating-role declaration gate. The dedicated admin gateway remains the
-        // only path that may establish the primary Administrator session directly.
-        const declaredRoles=[...new Set([
-          ...operationalRoles,
-          ...roleValues(adminDirect?.roles||adminDirect?.assignedRoles||adminDirect?.selectedRoles||adminDirect?.roleAssignments||adminDirect?.role)
-        ].filter(role=>String(role||"").trim()&&role!=="ADMINISTRATOR"&&role!=="Administrator"))];
-        const candidateRoles=[...new Set([...declaredRoles,"Administrator"])];
         setEmployee(operationalEmployee);
         setProfile({
           ...(operationalSourceProfile||operationalEmployee||{}),
-          ...adminDirect,
           uid:u.uid,
           email:u.email||adminMember?.email||adminEmployee?.email||"",
-          role:declaredRoles[0]||"Administrator",
-          roles:candidateRoles,
-          administratorAvailable:true,
-          authorizationType:"administrator_candidate"
+          role:operationalRoles[0],
+          roles:operationalRoles,
+          administratorAvailable:false,
+          authorizationType:"member",
+          enrollmentType:operationalEmployee&&!operationalProfile?"employee":"member"
         });
         return;
       }
