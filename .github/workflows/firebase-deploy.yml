@@ -273,4 +273,3 @@ jobs:
           set -e
           curl --fail --silent --show-error --retry 5 --retry-delay 3 \
             https://irpa-digital-board-governance.web.app/
-NODE
