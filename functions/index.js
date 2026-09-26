@@ -138,6 +138,39 @@ async function requirePrimaryAdministratorCallable(request){
   throw new HttpsError("permission-denied","Primary administrator authorization is required.");
 }
 
+exports.nextDocumentReference = onCall({region:"us-central1"}, async request => {
+  const uid=request.auth?.uid;
+  if(!uid) throw new HttpsError("unauthenticated","Authentication is required to generate a document reference.");
+  const email=String(request.auth?.token?.email||"").trim().toLowerCase();
+  const year=new Date().getUTCFullYear();
+  const counterRef=db.collection("systemSettings").doc("documentCounters");
+  const registryRefPrefix="IRPA-DOC-"+year+"-";
+  const reference=await db.runTransaction(async tx=>{
+    const counterSnap=await tx.get(counterRef);
+    let nextNumber=Math.max(1,Number(counterSnap.exists?(counterSnap.data()?.documentReference||0):0)+1);
+    let candidate="";
+    let candidateRef=null;
+    let candidateSnap=null;
+    for(let attempt=0;attempt<25;attempt++){
+      candidate=registryRefPrefix+String(nextNumber).padStart(5,"0");
+      candidateRef=db.collection("documentReferenceRegistry").doc(candidate);
+      candidateSnap=await tx.get(candidateRef);
+      if(!candidateSnap.exists)break;
+      nextNumber++;
+    }
+    if(candidateSnap?.exists) throw new Error("Document reference registry collision could not be resolved.");
+    const issuedAt=FieldValue.serverTimestamp();
+    tx.set(counterRef,{documentReference:nextNumber,updatedAt:issuedAt},{merge:true});
+    tx.set(candidateRef,{
+      referenceNumber:candidate,referenceYear:year,sequenceNumber:nextNumber,
+      issuedByUid:uid,issuedByEmail:email||null,issuedBy:"SYSTEM",
+      controlStatus:"Active",createdAt:issuedAt,updatedAt:issuedAt
+    });
+    return candidate;
+  });
+  return {ok:true,reference,year,issuedBy:"SYSTEM"};
+});
+
 exports.setAdministratorAccess = onCall({region:"us-central1"}, async request => {
   const actor=await requirePrimaryAdministratorCallable(request);
   const targetEmail=String(request.data?.email||"").trim().toLowerCase();
