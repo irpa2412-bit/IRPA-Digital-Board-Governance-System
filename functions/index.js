@@ -1556,3 +1556,36 @@ exports.resetTrialData = onCall({region:"us-central1"}, async request => {
     throw new HttpsError("internal","The trial-data reset failed. The audit record has been retained.");
   }
 });
+
+// IT Department -> Public Website Bridge.
+// Only sanitized records explicitly marked Published cross this boundary.
+// Internal IT tickets, credentials, audit metadata and work notes remain private.
+exports.publishWebsiteCommunication = onDocumentWritten({document:"websiteCommunications/{noticeId}",region:"us-central1"}, async event => {
+  const after=event.data?.after;
+  const noticeId=event.params.noticeId;
+  const publicRef=db.collection("websitePublicNotices").doc(noticeId);
+  if(!after?.exists){
+    await publicRef.delete().catch(()=>{});
+    return null;
+  }
+  const data=after.data()||{};
+  if(String(data.status||"").trim()!=="Published"){
+    await publicRef.delete().catch(()=>{});
+    return null;
+  }
+  const allowed={
+    title:String(data.title||"").trim(),
+    message:String(data.message||"").trim(),
+    severity:String(data.severity||"Information").trim(),
+    publishFrom:data.publishFrom||null,
+    publishUntil:data.publishUntil||null,
+    source:"IRPA-DBGS",
+    updatedAt:FieldValue.serverTimestamp()
+  };
+  if(!allowed.title||!allowed.message){
+    await publicRef.delete().catch(()=>{});
+    return null;
+  }
+  await publicRef.set(allowed,{merge:true});
+  return null;
+});
