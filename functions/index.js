@@ -1,5 +1,6 @@
 const { onDocumentUpdated, onDocumentWritten } = require("firebase-functions/v2/firestore");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getMessaging } = require("firebase-admin/messaging");
@@ -11,9 +12,13 @@ exports.checkPasswordAttemptState = checkPasswordAttemptState;
 exports.recordPasswordFailure = recordPasswordFailure;
 exports.clearPasswordAttemptState = clearPasswordAttemptState;
 exports.preparePasswordResetPhone = preparePasswordResetPhone;
-const { runMfaSecurityAuditScheduled, runMfaSecurityAuditNow } = require("./mfaSecurityAudit");
+const { runMfaSecurityAuditScheduled, runMfaSecurityAuditNow, refreshMfaEnrollmentClaim } = require("./mfaSecurityAudit");
+const { grantReportingDeadlineAuditScheduled, grantReportingDeadlineAuditNow } = require("./grantReportingDeadlines");
 exports.runMfaSecurityAuditScheduled = runMfaSecurityAuditScheduled;
 exports.runMfaSecurityAuditNow = runMfaSecurityAuditNow;
+exports.refreshMfaEnrollmentClaim = refreshMfaEnrollmentClaim;
+exports.grantReportingDeadlineAuditScheduled = grantReportingDeadlineAuditScheduled;
+exports.grantReportingDeadlineAuditNow = grantReportingDeadlineAuditNow;
 async function stableId(v){return crypto.createHash("sha256").update(String(v)).digest("hex");}
 async function writeServerAuditEvent(event){
   const path=String(event.params?.document||"");
@@ -138,6 +143,13 @@ async function deleteCollectionDocs(collectionName){
 }
 
 
+async function requireMfaAuthenticated(request, message="Multi-factor authentication is required for this security-sensitive action.") {
+  const uid=request.auth?.uid;
+  if(!uid) throw new HttpsError("unauthenticated","Authentication is required.");
+  if(request.auth?.token?.mfaEnrolled!==true) throw new HttpsError("failed-precondition",message);
+  return {uid,email:String(request.auth?.token?.email||"").trim().toLowerCase()};
+}
+
 async function requirePrimaryAdministratorCallable(request){
   const uid=request.auth?.uid;
   const email=String(request.auth?.token?.email||"").trim().toLowerCase();
@@ -180,6 +192,7 @@ exports.nextDocumentReference = onCall({region:"us-central1"}, async request => 
 });
 
 exports.setAdministratorAccess = onCall({region:"us-central1"}, async request => {
+  await requireMfaAuthenticated(request);
   const actor=await requirePrimaryAdministratorCallable(request);
   const targetEmail=String(request.data?.email||"").trim().toLowerCase();
   const enabled=request.data?.enabled===true;
@@ -527,6 +540,7 @@ exports.bootstrapPrimaryAdministrator = onCall({region:"us-central1"}, async req
 });
 
 exports.updateSignerAuthority = onCall({region:"us-central1"}, async request => {
+  await requireMfaAuthenticated(request, "Multi-factor authentication is required before changing signing authority.");
   const uid=request.auth?.uid;
   const email=String(request.auth?.token?.email||"").trim().toLowerCase();
   if(!uid) throw new HttpsError("unauthenticated","Authentication is required.");
@@ -631,6 +645,7 @@ exports.updateSignerAuthority = onCall({region:"us-central1"}, async request => 
 });
 
 exports.createAdministrator = onCall({region:"us-central1"}, async request => {
+  await requireMfaAuthenticated(request);
   const uid=request.auth?.uid;
   if(!uid) throw new HttpsError("unauthenticated","Administrator authentication is required.");
   const actorSnap=await db.collection("adminProfiles").doc(uid).get();
@@ -695,6 +710,7 @@ exports.listAdministrators = onCall({region:"us-central1"}, async request => {
 });
 
 exports.removeAdministrator = onCall({region:"us-central1"}, async request => {
+  await requireMfaAuthenticated(request);
   const uid=request.auth?.uid;
   if(!uid) throw new HttpsError("unauthenticated","Administrator authentication is required.");
   const actorSnap=await db.collection("adminProfiles").doc(uid).get();

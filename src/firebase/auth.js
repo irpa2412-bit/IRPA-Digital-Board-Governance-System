@@ -38,6 +38,19 @@ const adminGoogleProvider = new GoogleAuthProvider();
 const recoveryPhoneApp = initializeApp({ ...firebaseConfig }, "irpa-password-recovery-phone");
 const recoveryPhoneAuth = getAuth(recoveryPhoneApp);
 
+async function refreshMfaSecurityClaimBestEffort(user) {
+  if (!user) return null;
+  try {
+    const call = httpsCallable(getFunctions(undefined, "us-central1"), "refreshMfaEnrollmentClaim");
+    const result = await call({});
+    await user.getIdToken(true);
+    return result.data || null;
+  } catch (error) {
+    console.warn("IRPA MFA claim synchronization unavailable; authentication continues.", error);
+    return null;
+  }
+}
+
 adminGoogleProvider.setCustomParameters({
   prompt: "select_account",
   login_hint: "select_account"
@@ -96,6 +109,7 @@ export async function loginWithEmail(email, password) {
         console.warn("IRPA password-attempt clear endpoint unavailable after successful Firebase Authentication.", securityError);
       }
     }
+    await refreshMfaSecurityClaimBestEffort(result.user);
     return result.user;
   } catch (error) {
     let failureState = null;
@@ -176,6 +190,7 @@ export async function loginWithGoogle(expectedEmail = "", options = {}) {
     await signOut(auth);
     throw new Error(`Use the designated IRPA administrator Google account: ${expected}.`);
   }
+  await refreshMfaSecurityClaimBestEffort(result.user);
   return result.user;
 }
 
@@ -379,6 +394,7 @@ export async function completeInvitationToken(token) {
     await provisionCurrentMemberFromInvitationV2(data.invitationId);
     window.localStorage.removeItem("irpaEmailForSignIn");
     window.localStorage.removeItem("irpaMemberEmailForSignIn");
+    await refreshMfaSecurityClaimBestEffort(signedIn.user);
     return signedIn.user;
   } catch (error) {
     throw new Error(error?.message || "The IRPA invitation could not be redeemed.");

@@ -52,6 +52,24 @@ function escapeHtml(value) {
   }[c]));
 }
 
+async function synchronizeMfaEnrollmentClaim(authUser, configured, actorUid="SYSTEM", actorEmail="system") {
+  const currentClaims = { ...(authUser.customClaims || {}) };
+  const current = currentClaims.mfaEnrolled === true;
+  if (current === configured) return false;
+  const nextClaims = { ...currentClaims };
+  if (configured) nextClaims.mfaEnrolled = true;
+  else delete nextClaims.mfaEnrolled;
+  await getAuth().setCustomUserClaims(authUser.uid, nextClaims);
+  await db.collection("audit").add({
+    action: configured ? "MFA_ENROLLMENT_CLAIM_ENABLED" : "MFA_ENROLLMENT_CLAIM_REMOVED",
+    collection: "users",
+    recordId: authUser.uid,
+    details: { uid: authUser.uid, factorCount: authUser.multiFactor?.enrolledFactors?.length || 0, mfaEnrolled: configured, source: "MFA_SECURITY_AUDIT" },
+    actorUid, actorEmail, createdAt: FieldValue.serverTimestamp()
+  });
+  return true;
+}
+
 function configurationLinks() {
   const app = APP_URL.replace(/\/$/, "");
   return {
@@ -186,6 +204,7 @@ async function runMfaSecurityAudit({ forceReminder = false, actorUid = "SYSTEM",
 
     const factors = authUser.multiFactor?.enrolledFactors || [];
     const configured = factors.length > 0;
+    await synchronizeMfaEnrollmentClaim(authUser, configured, actorUid, actorEmail);
     const stateRef = db.collection(AUDIT_STATE).doc(identity.uid);
     const stateSnap = await stateRef.get();
     const state = stateSnap.exists ? (stateSnap.data() || {}) : {};
@@ -269,6 +288,17 @@ async function runMfaSecurityAudit({ forceReminder = false, actorUid = "SYSTEM",
 
   return { ok: true, auditId: audit.id, summary, findings };
 }
+
+exports.refreshMfaEnrollmentClaim = onCall({ region: "us-central1", timeoutSeconds: 30 }, async request => {
+  const uid = request.auth?.uid;
+  const email = cleanEmail(request.auth?.token?.email);
+  if (!uid) throw new (require("firebase-functions/v2/https").HttpsError)("unauthenticated", "Authentication is required.");
+  const authUser = await getAuth().getUser(uid);
+  const configured = (authUser.multiFactor?.enrolledFactors || []).length > 0;
+  const changed = await synchronizeMfaEnrollmentClaim(authUser, configured, uid, email || "user");
+  await db.collection(AUDIT_STATE).doc(uid).set({ uid, mfaConfigured: configured, mfaClaimLastSyncedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  return { ok: true, uid, mfaEnrolled: configured, changed, factorCount: authUser.multiFactor?.enrolledFactors?.length || 0 };
+});
 
 exports.runMfaSecurityAuditScheduled = onSchedule(
   { schedule: "0 8 * * *", timeZone: "Africa/Dar_es_Salaam", region: "us-central1" },

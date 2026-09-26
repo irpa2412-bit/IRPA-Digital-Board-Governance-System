@@ -45,6 +45,9 @@ beforeEach(async () => {
       currency: "TZS",
       referenceNumber: "IRPA-FIN-2026-00001"
     });
+    await db.doc("signatureEnvelopes/env-1").set({
+      envelopeReference: "IRPA-SIG-2026-00001", status: "In Progress", participantUids: ["finance-user"], actionUids: ["finance-user"], signingMode: "Parallel", senderUid: "admin-user", ownerUid: "admin-user", ownerEmail: "admin@example.test", documentId: "doc-1", documentUrl: "https://example.test/doc.pdf", documentReference: "IRPA-DOC-2026-00001"
+    });
     await db.doc("audit/audit-1").set({
       action: "TEST",
       actorUid: "admin-user"
@@ -140,4 +143,22 @@ test("ordinary governance members cannot write donor registry or reporting oblig
     dueDate: "2026-12-31",
     recordType: "GRANT_REPORTING_OBLIGATION"
   }));
+});
+test("finance approval update requires the MFA custom claim", async () => {
+  const withoutMfa=testEnv.authenticatedContext("finance-user",{email:"finance@example.test",irpaRoles:["Finance Manager"]}).firestore();
+  await assertFails(withoutMfa.doc("financeTransactions/tx-1").update({status:"Rejected"}));
+  const withMfa=testEnv.authenticatedContext("finance-user",{email:"finance@example.test",irpaRoles:["Finance Manager"],mfaEnrolled:true}).firestore();
+  await assertSucceeds(withMfa.doc("financeTransactions/tx-1").update({status:"Rejected"}));
+});
+test("signature mutation requires the MFA custom claim", async () => {
+  const withoutMfa=testEnv.authenticatedContext("finance-user",{email:"finance@example.test"}).firestore();
+  await assertFails(withoutMfa.doc("signatureEnvelopes/env-1").update({status:"Completed",lastSignedByUid:"finance-user"}));
+  const withMfa=testEnv.authenticatedContext("finance-user",{email:"finance@example.test",mfaEnrolled:true}).firestore();
+  await assertSucceeds(withMfa.doc("signatureEnvelopes/env-1").update({status:"Completed",lastSignedByUid:"finance-user"}));
+});
+test("administrator invitation creation requires an MFA-enabled administrator", async () => {
+  const withoutMfa=testEnv.authenticatedContext("admin-user",{email:"admin@example.test",admin:true}).firestore();
+  await assertFails(withoutMfa.doc("adminInvitations/inv-1").set({email:"new-admin@example.test",name:"New Administrator",role:"Administrator",status:"Pending",createdByUid:"admin-user"}));
+  const withMfa=testEnv.authenticatedContext("admin-user",{email:"admin@example.test",admin:true,mfaEnrolled:true}).firestore();
+  await assertSucceeds(withMfa.doc("adminInvitations/inv-1").set({email:"new-admin@example.test",name:"New Administrator",role:"Administrator",status:"Pending",createdByUid:"admin-user"}));
 });
