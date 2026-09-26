@@ -40,7 +40,7 @@ export default {
         return await upload(request, env);
       }
 
-      if (url.pathname === "/api/upload-controlled-document" && request.method === "POST") {
+      if ((url.pathname === "/api/upload-controlled-document" || url.pathname === "/api/upload-controlled-document/") && request.method === "POST") {
         return await uploadControlledDocument(request, env);
       }
 
