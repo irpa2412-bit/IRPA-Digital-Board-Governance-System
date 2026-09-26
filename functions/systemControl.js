@@ -150,6 +150,7 @@ exports.executeDataReset = onCall({region:"us-central1",timeoutSeconds:540,secre
 exports.getDataResetStatus = onCall({region:"us-central1",secrets:[resetDeveloperSecret]}, async request=>{
   requireAdministrator(request);
   await verifyDeveloperSecret(request);
-  const snap=await db.collection("systemResetPlans").where("status","==","PENDING_GRACE").orderBy("requestedAt","desc").limit(10).get();
-  return {ok:true,plans:snap.docs.map(d=>({id:d.id,...d.data(),executeAfter:d.data().executeAfter?.toDate?.()?.toISOString?.()||null}))};
+  const snap=await db.collection("systemResetPlans").where("status","==","PENDING_GRACE").limit(20).get();
+  const plans=snap.docs.map(d=>({id:d.id,...d.data(),executeAfter:d.data().executeAfter?.toDate?.()?.toISOString?.()||null})).sort((a,b)=>String(b.requestedAt||"").localeCompare(String(a.requestedAt||""))).slice(0,10);
+  return {ok:true,plans};
 });
