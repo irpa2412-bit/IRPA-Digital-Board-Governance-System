@@ -4431,6 +4431,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
    Shared navigation surface for every authenticated live portal page.
    Routing remains controlled by the existing Shell/data-gate handlers. */
 .page-back-next-navigation{
+  position:sticky;
+  top:0;
+  z-index:9998;
   display:grid;
   grid-template-columns:minmax(110px,160px) minmax(160px,1fr) minmax(110px,160px);
   align-items:center;
@@ -4488,23 +4491,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   .page-back-next-status span{font-size:7px}
   .page-back-next-status strong{font-size:10px}
   .page-back-next-status small{font-size:8px}
-  /* Dashboard starts directly below the overhead panel. The dashboard's
-     Back/Next navigator stays in normal flow so it follows Sign Out instead
-     of creating a large reserved blank area. */
-  .dashboard-content-area{
-    padding-top:18px!important;
-  }
-  .dashboard-content-area .page-back-next-navigation{
-    position:static!important;
-    top:auto!important;
-    left:auto!important;
-    right:auto!important;
-    z-index:auto!important;
-    width:100%!important;
-    min-height:48px!important;
-    margin:8px 0 14px!important;
-    padding:5px!important;
-    box-shadow:0 4px 12px rgba(7,43,76,.08)!important;
+  /* Keep the Back/Next navigator frozen at the top of the content
+     panel, immediately before the dashboard overhead panel. */
+  .page-back-next-navigation{
+    position:fixed!important;
   }
 }
 
