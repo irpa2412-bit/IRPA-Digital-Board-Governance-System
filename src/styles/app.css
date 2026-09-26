@@ -5190,3 +5190,25 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   .it-branch-card > strong{font-size:19px!important}
   .it-unit-card > strong{font-size:16px!important}
 }
+
+
+/* IT ARCHITECTURE PANEL — HIGH-CONTRAST READABILITY */
+.it-architecture-note{
+  box-sizing:border-box!important;
+  padding:16px 18px!important;
+  border-radius:12px!important;
+  background:linear-gradient(135deg,#f3f8f5,#e5f0ea)!important;
+  border:1px solid #9abca9!important;
+  color:#294b3d!important;
+  box-shadow:0 5px 14px rgba(16,57,42,.08)!important;
+  font-size:13px!important;
+  line-height:1.55!important;
+}
+.it-architecture-note strong{
+  display:block!important;
+  margin-bottom:6px!important;
+  color:#123d2d!important;
+  font-size:14px!important;
+  font-weight:850!important;
+  letter-spacing:.02em!important;
+}
