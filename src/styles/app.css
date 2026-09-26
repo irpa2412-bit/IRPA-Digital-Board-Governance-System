@@ -4578,3 +4578,31 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     margin:0!important;
   }
 }
+
+
+/* IRPA PROFILE MODULE — DARK SURFACE */
+.dashboard-command .desktop-quote4-hero{
+  background:#0b1220!important;border:1px solid #263246!important;
+  box-shadow:0 16px 36px rgba(0,0,0,.28)!important;
+}
+.dashboard-command .desktop-quote4-hero-image{opacity:.18!important;filter:brightness(.48) saturate(.55)!important}
+.dashboard-command .desktop-quote4-hero-overlay{background:linear-gradient(90deg,rgba(7,12,22,.98) 0%,rgba(11,18,32,.94) 58%,rgba(15,23,42,.82) 100%)!important}
+.dashboard-command .desktop-quote4-hero-content{color:#f8fafc!important}
+.dashboard-command .desktop-profile-photo{background:#172033!important;color:#e5e7eb!important;border-color:#475569!important;box-shadow:0 8px 22px rgba(0,0,0,.38)!important}
+.dashboard-command .desktop-quote4-hero .eyebrow{color:#94a3b8!important}
+.dashboard-command .desktop-quote4-hero h1{color:#f8fafc!important}
+.dashboard-command .desktop-quote4-hero p{color:#cbd5e1!important;text-shadow:none!important}
+.dashboard-command .desktop-motto{color:#94a3b8!important}
+.dashboard-command .desktop-quote4-hero .dashboard-authority-context{background:rgba(15,23,42,.78)!important;border:1px solid #334155!important;color:#e2e8f0!important}
+.dashboard-command .desktop-quote4-hero .dashboard-authority-context small{color:#94a3b8!important}
+.dashboard-command .desktop-quote4-hero .dashboard-authority-context strong{color:#f8fafc!important}
+@media(max-width:760px){
+  .dashboard-command .mobile-quote1-hero{background:#0b1220!important;box-shadow:0 12px 28px rgba(0,0,0,.28)!important}
+  .dashboard-command .mobile-quote1-image{opacity:.14!important;filter:brightness(.42) saturate(.5)!important}
+  .dashboard-command .mobile-quote1-shade{background:linear-gradient(180deg,rgba(7,12,22,.94),rgba(11,18,32,.98))!important}
+  .dashboard-command .mobile-quote1-photo{background:#172033!important;color:#e5e7eb!important;border-color:#475569!important}
+  .dashboard-command .mobile-quote1-user span{color:#94a3b8!important}
+  .dashboard-command .mobile-quote1-user h1{color:#f8fafc!important}
+  .dashboard-command .mobile-quote1-user p{color:#cbd5e1!important}
+  .dashboard-command .mobile-quote1-user em{background:#1e293b!important;color:#e2e8f0!important;border:1px solid #475569!important}
+}
