@@ -4275,7 +4275,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   /* Mobile in-portal navigation roller: remain frozen while page content scrolls. */
   .mobile-portal-content-roller{
     position:fixed!important;
-    top:calc(150px + env(safe-area-inset-top))!important;
+    top:calc(78px + env(safe-area-inset-top))!important;
     left:8px!important;
     right:8px!important;
     z-index:10000!important;
