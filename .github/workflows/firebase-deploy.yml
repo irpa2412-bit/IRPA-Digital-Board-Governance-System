@@ -7,6 +7,7 @@ name: Deploy IRPA Governance to Firebase
 # Safe production deployment verification marker: 2026-09-25T19:54Z — deploy current main (includes 56f7df3) without changing application behavior.
 # 2026-09-26 document-reference repair: deploy the secure server-side document reference callable together with hosting/firestore so normal portal users are not blocked by admin-only counter rules.
 # 2026-09-26 IT Specialist login gateway release verification: force production deployment of current main.
+# 2026-09-27 mobile production deployment: publish current main mobile navigation and UI changes.
 
 permissions:
   contents: read
