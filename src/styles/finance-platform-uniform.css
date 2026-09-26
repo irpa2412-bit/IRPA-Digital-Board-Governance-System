@@ -599,3 +599,69 @@
     font-size:16px!important;
   }
 }
+
+
+
+/* FINANCE PORTAL — FORM LABEL CONTRAST CORRECTION — 2026-09-26
+   Safety scope: presentation/readability only. No data, workflow, permissions,
+   routing, calculations, Firebase calls, or financial controls are changed. */
+.finance-portal .form-field{
+  color:#173b2d!important;
+  opacity:1!important;
+  font-size:14px!important;
+  font-weight:900!important;
+  line-height:1.4!important;
+  text-shadow:none!important;
+}
+.finance-portal .form-field>label,
+.finance-portal .form-field>span,
+.finance-portal .finance-engine-card .form-field,
+.finance-portal .finance-engine-card .form-field>label{
+  color:#173b2d!important;
+  opacity:1!important;
+  font-size:14px!important;
+  font-weight:900!important;
+  line-height:1.4!important;
+}
+.finance-portal .form-field input,
+.finance-portal .form-field select,
+.finance-portal .form-field textarea{
+  color:#102f24!important;
+  background:#fff!important;
+  border:2px solid #6f9282!important;
+  opacity:1!important;
+  font-size:15px!important;
+  font-weight:650!important;
+  line-height:1.45!important;
+}
+.finance-portal .form-field input::placeholder,
+.finance-portal .form-field textarea::placeholder{
+  color:#60766c!important;
+  opacity:1!important;
+}
+.finance-portal .form-field input:focus,
+.finance-portal .form-field select:focus,
+.finance-portal .form-field textarea:focus{
+  border-color:#0b5fa8!important;
+  outline:3px solid rgba(11,95,168,.18)!important;
+  outline-offset:1px!important;
+}
+.finance-portal .finance-engine-card h3,
+.finance-portal .finance-formula-card h3{
+  color:#173b2d!important;
+  opacity:1!important;
+}
+@media(max-width:760px){
+  .finance-portal .form-field,
+  .finance-portal .form-field>label,
+  .finance-portal .form-field>span,
+  .finance-portal .finance-engine-card .form-field{
+    font-size:14px!important;
+  }
+  .finance-portal .form-field input,
+  .finance-portal .form-field select,
+  .finance-portal .form-field textarea{
+    min-height:48px!important;
+    font-size:16px!important;
+  }
+}
