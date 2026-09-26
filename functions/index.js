@@ -255,24 +255,22 @@ exports.resolveAuthenticatedLoginContext = onCall({region:"us-central1",timeoutS
   const fallbackQueries=[];
   if(email&&!memberDirect.exists){
     fallbackQueries.push(
-      db.collection("members").where("email","==",email).limit(10).get(),
-      db.collection("members").where("firebaseAuthEmail","==",email).limit(10).get()
+      ["member",db.collection("members").where("email","==",email).limit(10).get()],
+      ["member",db.collection("members").where("firebaseAuthEmail","==",email).limit(10).get()]
     );
   }
   if(email&&!employeeDirect.exists){
     fallbackQueries.push(
-      db.collection("employees").where("email","==",email).limit(10).get(),
-      db.collection("employees").where("firebaseAuthEmail","==",email).limit(10).get()
+      ["employee",db.collection("employees").where("email","==",email).limit(10).get()],
+      ["employee",db.collection("employees").where("firebaseAuthEmail","==",email).limit(10).get()]
     );
   }
   if(fallbackQueries.length){
-    const fallbackSnaps=await Promise.all(fallbackQueries);
-    fallbackSnaps.forEach((snap)=>{
+    const fallbackResults=await Promise.all(fallbackQueries.map(async ([kind,promise])=>[kind,await promise]));
+    fallbackResults.forEach(([kind,snap])=>{
       snap.forEach(docSnap=>{
         const record=clean(docSnap);
-        if(!record)return;
-        const isEmployee=Object.prototype.hasOwnProperty.call(record,"employeeNumber")||Object.prototype.hasOwnProperty.call(record,"employmentStatus")||Object.prototype.hasOwnProperty.call(record,"employeeType");
-        (isEmployee?employeeRecords:memberRecords).push(record);
+        if(record)(kind==="employee"?employeeRecords:memberRecords).push(record);
       });
     });
   }
