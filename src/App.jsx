@@ -649,9 +649,7 @@ useEffect(()=>{async function magic(){
 
     window.localStorage.removeItem("irpaEmailForSignIn");
     window.localStorage.removeItem("irpaMemberEmailForSignIn");
-    if(){
-      window.history.replaceState({},document.title,window.location.pathname+window.location.hash);
-    }
+
   }catch(x){
     console.error(x);
     window.alert(x.message||"Unable to open the signing invitation.");
