@@ -32,7 +32,7 @@ function WebAppNavigationRoller({active,modules,onNavigate}){const portalItems=g
 
 function PortalContentRoller({active,modules,onNavigate}){const items=getPortalContentItems(active,modules);if(!items.length)return null;const label=PORTAL_LABELS[active]||displayModuleName(active);return <div className="mobile-portal-content-roller" aria-label="Current portal content navigator"><div className="mobile-portal-content-roller-label"><span>IN-PORTAL CONTENT</span><strong>{label}</strong></div><select aria-label="Navigate within current portal" value={active} onChange={e=>onNavigate(e.target.value)}>{items.map(item=><option key={item} value={item}>{PORTAL_LABELS[item]||displayModuleName(item)}</option>)}</select><span className="mobile-portal-content-roller-chevron" aria-hidden="true">⌄</span></div>}
 
-import React,{useEffect,useMemo,useState}from"react";import Invitations from"./pages/Invitations";import Employees from"./pages/Employees";import BoardMembers from"./pages/BoardMembers";import Members from"./pages/Members";import EmployeePayments from"./pages/EmployeePayments";import Meetings from"./pages/Meetings";import Resolutions from"./pages/Resolutions";import Voting from"./pages/Voting";import OperationalGateways from"./pages/OperationalGateways";import OperationalGatewaysParticipants from"./pages/OperationalGatewaysParticipants";import AuthorizationApprovals from"./pages/AuthorizationApprovals";import SignaturePlatformWithUpload from"./pages/SignaturePlatformWithUpload";import FinancePortfolio from"./pages/FinancePortfolio";import ProcurementPortal from"./pages/ProcurementPortal";import Settings from"./pages/Settings";import InductionOrientation from"./pages/InductionOrientation";import InductionAdmin from"./pages/InductionAdmin";import ExternalAuditorPortal from"./pages/ExternalAuditorPortal";import AddAdministratorPortal from"./pages/AddAdministratorPortal";import ModuleInterlinkBar from"./components/ModuleInterlinkBar";import{observeAuthState,loginWithEmail,loginWithGoogle,completeGoogleRedirect,registerWithEmail,sendPasswordReset,sendAdminMagicLink,isMagicLink,completeMagicLink,completeInvitationToken,logout,beginPasswordResetMobileVerification,verifyPasswordResetMobileOtp,clearPasswordAttemptState}from"./firebase/auth";import{getAdminProfile,getCurrentMemberProfile,getCurrentEmployeeProfile,getCurrentInductionContext,getRecords,COLLECTIONS}from"./firebase/data";import{getSignatureEnvelope}from"./firebase/signaturePlatform";import{provisionCurrentMemberFromInvitationV2}from"./firebase/invitationWorkflow";import{doc,getDoc}from"firebase/firestore";import{auth,db}from"./firebase/config";
+import React,{useEffect,useMemo,useRef,useState}from"react";import Invitations from"./pages/Invitations";import Employees from"./pages/Employees";import BoardMembers from"./pages/BoardMembers";import Members from"./pages/Members";import EmployeePayments from"./pages/EmployeePayments";import Meetings from"./pages/Meetings";import Resolutions from"./pages/Resolutions";import Voting from"./pages/Voting";import OperationalGateways from"./pages/OperationalGateways";import OperationalGatewaysParticipants from"./pages/OperationalGatewaysParticipants";import AuthorizationApprovals from"./pages/AuthorizationApprovals";import SignaturePlatformWithUpload from"./pages/SignaturePlatformWithUpload";import FinancePortfolio from"./pages/FinancePortfolio";import ProcurementPortal from"./pages/ProcurementPortal";import Settings from"./pages/Settings";import InductionOrientation from"./pages/InductionOrientation";import InductionAdmin from"./pages/InductionAdmin";import ExternalAuditorPortal from"./pages/ExternalAuditorPortal";import AddAdministratorPortal from"./pages/AddAdministratorPortal";import ModuleInterlinkBar from"./components/ModuleInterlinkBar";import{observeAuthState,loginWithEmail,loginWithGoogle,completeGoogleRedirect,registerWithEmail,sendPasswordReset,sendAdminMagicLink,isMagicLink,completeMagicLink,completeInvitationToken,logout,beginPasswordResetMobileVerification,verifyPasswordResetMobileOtp,clearPasswordAttemptState}from"./firebase/auth";import{getAdminProfile,getCurrentMemberProfile,getCurrentEmployeeProfile,getCurrentInductionContext,getRecords,COLLECTIONS}from"./firebase/data";import{getSignatureEnvelope}from"./firebase/signaturePlatform";import{provisionCurrentMemberFromInvitationV2}from"./firebase/invitationWorkflow";import{doc,getDoc}from"firebase/firestore";import{auth,db}from"./firebase/config";
 // TEMPORARY BUILD/STABILISATION CONTROL: keep true until the web app is fully built and stabilised; then review and remove/disable this gate deliberately.
 const IRPA_TEMPORARY_DATA_GATE_ENABLED=true;
 function DataEnvironmentGate({target,onContinue}){const[choice,setChoice]=useState("");const[confirmed,setConfirmed]=useState(false);const label=target==="Dashboard"?"Dashboard":String(target||"Portal");useEffect(()=>{setChoice("");setConfirmed(false)},[target]);const continueGate=()=>{if(!choice)return;if(choice==="ACTUAL"&&!confirmed)return;try{window.sessionStorage.setItem("irpaDataEnvironment",choice);window.sessionStorage.setItem("irpaDataEnvironmentTarget",label);window.sessionStorage.setItem("irpaDataEnvironmentSelectedAt",new Date().toISOString())}catch{}onContinue?.(choice)};return <div role="dialog" aria-modal="true" aria-labelledby="data-environment-gate-title" className="auth-screen" style={{position:"fixed",inset:0,zIndex:20000,overflowY:"auto"}}><section className="auth-card" style={{maxWidth:620}}><div className="auth-brand"><div className="brand-kicker">IRPA-DGBS DATA CONTROL</div><h1 id="data-environment-gate-title">Data Environment Gate</h1><p>Before entering <strong>{label}</strong>, identify whether this session will work with trial/test records or actual institutional records.</p></div><div className="auth-divider"><span>GATE ENTRY REQUIRED</span></div><div className="form-grid"><button type="button" className={choice==="TRIAL"?"":"secondary-button"} onClick={()=>{setChoice("TRIAL");setConfirmed(false)}} style={{minHeight:110,textAlign:"left"}}><strong>TRIAL DATA</strong><small style={{display:"block",marginTop:7}}>Testing, demonstrations, training and controlled trial records.</small></button><button type="button" className={choice==="ACTUAL"?"":"secondary-button"} onClick={()=>setChoice("ACTUAL")} style={{minHeight:110,textAlign:"left"}}><strong>ACTUAL DATA</strong><small style={{display:"block",marginTop:7}}>Live institutional records. Changes are subject to IRPA governance controls.</small></button></div>{choice==="ACTUAL"&&<label className="field" style={{display:"flex",gap:10,alignItems:"flex-start",marginTop:16}}><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/><span>I understand that this gate opens the actual-data environment and that entries, approvals, signatures, financial records and other changes may affect IRPA's live institutional records.</span></label>}{choice==="TRIAL"&&<div className="auth-message" style={{marginTop:16}}><strong>TRIAL ENVIRONMENT SELECTED.</strong><br/>Use only designated test/trial records. Do not enter confidential live information into a trial record.</div>}{choice==="ACTUAL"&&confirmed&&<div className="auth-message" style={{marginTop:16}}><strong>ACTUAL DATA ENVIRONMENT SELECTED.</strong><br/>The system will continue to apply the user's existing role, authority and server-side controls.</div>}<button type="button" disabled={!choice||(choice==="ACTUAL"&&!confirmed)} onClick={continueGate} style={{marginTop:18}}>Enter {choice==="ACTUAL"?"Actual Data":"Trial Data"} Gate</button></section></div>}
@@ -428,6 +428,16 @@ useEffect(()=>{
     setEmployee(null);
     setInductionComplete(false);
     setError("");
+    // Every new Firebase authentication-state session starts with no operating
+    // role declaration. A previous browser/session choice must never authorize
+    // the next login or allow the user to enter Shell without re-declaring.
+    if(u){
+      try{
+        window.sessionStorage.removeItem("irpaActiveAccessAuthority");
+        window.sessionStorage.removeItem("irpaAccessAuthoritySelectionState");
+        window.sessionStorage.removeItem("irpaPendingAccessAuthority");
+      }catch{}
+    }
     if(!u){
       // A Firebase auth session ending must also end the operating-role declaration.
       // This prevents the previous login's IT/Administrator choice from being
@@ -484,11 +494,24 @@ useEffect(()=>{
         );
         const operationalProfile=adminMemberAuthorized?adminMember:null;
         const operationalEmployee=adminEmployeeAuthorized?adminEmployee:null;
-        const operationalRoles=resolveLoginCategories(operationalProfile,operationalEmployee,false);
+        // The administrator registry itself may carry an operational assignment
+        // (for example IT). Include those registered roles in the same authority
+        // resolution so an Administrator+IT account cannot be collapsed into a
+        // pure Administrator session before the declaration gate is reached.
+        const registryOperationalRoles=resolveLoginCategories(adminDirect,null,false)
+          .filter(role=>role!=="Administrator");
+        const operationalRoles=[...new Set([
+          ...resolveLoginCategories(operationalProfile,operationalEmployee,false)
+            .filter(role=>role!=="Administrator"),
+          ...registryOperationalRoles
+        ])];
+        const operationalSourceProfile=operationalProfile||(
+          registryOperationalRoles.length>0?adminDirect:null
+        );
         if(operationalRoles.length>0){
           setEmployee(operationalEmployee);
           setProfile({
-            ...(operationalProfile||operationalEmployee||{}),
+            ...(operationalSourceProfile||operationalEmployee||{}),
             ...adminDirect,
             uid:u.uid,
             email:u.email||adminMember?.email||adminEmployee?.email||"",
