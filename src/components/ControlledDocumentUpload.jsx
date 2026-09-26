@@ -1,13 +1,12 @@
 import React, { useRef, useState, useEffect } from "react";
 import { auth } from "../firebase/config";
-import { createRecord, getRecord, COLLECTIONS, getCurrentMemberProfile, getCurrentEmployeeProfile } from "../firebase/data";
+import { createRecord, getRecord, COLLECTIONS, getCurrentMemberProfile, getCurrentEmployeeProfile, nextDocumentReference } from "../firebase/data";
 import { readWorkflowContext, withWorkflowLinks } from "../firebase/workflowLinks";
 import { uploadControlledDocumentRouted } from "../firebase/signatureStorage";
 
 export default function ControlledDocumentUpload({ purpose = "Controlled Document", onUploaded }) {
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState("");
-  const [reference, setReference] = useState("");
   const [documentType, setDocumentType] = useState("Governance Document");
   const [allowDualRoleDocumentTypes, setAllowDualRoleDocumentTypes] = useState(false);
   const [version, setVersion] = useState("1.0");
@@ -69,12 +68,15 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
       if (file.size > 10 * 1024 * 1024) throw new Error("PDF must not exceed 10 MB.");
 
       const name = (title.trim() || file.name.replace(/\.pdf$/i, "")).slice(0, 160);
-      const documentUid = `IRPA-DOC-${crypto.randomUUID()}`;
+      const documentReference = await nextDocumentReference();
+      const documentUid = documentReference;
       setMessage("Routing the PDF into its selected archive and Board of Directors Governance archive…");
       const routed = await uploadControlledDocumentRouted({
         documentId: documentUid,
         title: name,
-        reference: reference.trim() || documentUid,
+        reference: documentReference,
+        documentReference,
+        documentReferenceType: "Controlled Document",
         documentType,
         archiveCategory,
         classification,
@@ -87,7 +89,8 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
       setMessage("Google Drive dual-channel upload complete. Registering the document…");
       const documentPayload = withWorkflowLinks({
         title: name,
-        reference: reference.trim() || documentUid,
+        reference: documentReference,
+        documentReference,
         documentType,
         version,
         documentUid,
@@ -167,7 +170,6 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
       setMessage(`Document uploaded successfully to Google Drive: ${name}. Primary category and Board of Directors Governance archive routing completed.`);
       setFile(null);
       setTitle("");
-      setReference("");
       setDocumentType("Governance Document");
       setVersion("1.0");
       setArchiveCategory("Administrative Documents");
@@ -214,7 +216,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
             <label>Document Title</label>
             <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Enter document title" />
           </div>
-          <div className="form-field"><label>Document Reference / Identification No.</label><input value={reference} onChange={e => setReference(e.target.value)} placeholder="Enter document reference / identification number" /></div>
+          <div className="form-field"><label>Document Reference / Identification No.</label><input value="System generated when the PDF is uploaded" readOnly aria-readonly="true" /><small className="muted" style={{display:"block",marginTop:6}}>The identifier is generated transactionally by IRPA-DBGS and cannot be manually entered or changed.</small></div>
           <div className="form-field">
             <label>Document Type</label>
             {allowDualRoleDocumentTypes ? (
