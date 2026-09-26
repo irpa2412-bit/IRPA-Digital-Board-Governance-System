@@ -171,6 +171,13 @@ export async function bootstrapPrimaryAdministrator() {
   return result.data;
 }
 
+export async function clearPasswordAttemptState(email) {
+  const cleanEmail = String(email || "").trim().toLowerCase();
+  if (!cleanEmail) return;
+  const clear = httpsCallable(getFunctions(undefined, "us-central1"), "clearPasswordAttemptState");
+  await clear({ email: cleanEmail });
+}
+
 export async function sendPasswordReset(email) {
   const cleanEmail = email.trim().toLowerCase();
   if (!cleanEmail) throw new Error("Enter your email address first.");
