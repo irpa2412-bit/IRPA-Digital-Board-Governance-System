@@ -58,30 +58,55 @@ export async function registerWithEmail(email, password, options = {}) {
 export async function loginWithEmail(email, password) {
   const cleanEmail = email.trim().toLowerCase();
   if (!cleanEmail || !password) throw new Error("Email address and password are required.");
-  const check = httpsCallable(getFunctions(undefined, "us-central1"), "checkPasswordAttemptState");
-  const recordFailure = httpsCallable(getFunctions(undefined, "us-central1"), "recordPasswordFailure");
-  const clearFailures = httpsCallable(getFunctions(undefined, "us-central1"), "clearPasswordAttemptState");
-  const state = await check({ email: cleanEmail });
-  if (state.data?.allowed === false) {
-    const error = new Error(
-      state.data?.status === "SUSPENDED"
-        ? "Password access is suspended after six unsuccessful password entries. Use Forgot password? to complete mobile verification and request the registered email reset link."
-        : "Password entry is temporarily locked for 5 minutes after three unsuccessful trials. Please wait before trying again."
-    );
-    error.code = state.data?.status === "SUSPENDED" ? "auth/password-suspended" : "auth/password-locked";
-    error.retryAfterSeconds = state.data?.retryAfterSeconds || 300;
-    throw error;
+  const functions = getFunctions(undefined, "us-central1");
+  const check = httpsCallable(functions, "checkPasswordAttemptState");
+  const recordFailure = httpsCallable(functions, "recordPasswordFailure");
+  const clearFailures = httpsCallable(functions, "clearPasswordAttemptState");
+
+  // Password-attempt controls are an additive security layer. Firebase
+  // Authentication remains the authoritative credential check and must not be
+  // made unavailable to registered members merely because the optional
+  // password-security Functions endpoint is temporarily unavailable (for
+  // example, while Cloud Functions deployment is blocked by billing).
+  let passwordSecurityAvailable = true;
+  try {
+    const state = await check({ email: cleanEmail });
+    if (state.data?.allowed === false) {
+      const error = new Error(
+        state.data?.status === "SUSPENDED"
+          ? "Password access is suspended after six unsuccessful password entries. Use Forgot password? to complete mobile verification and request the registered email reset link."
+          : "Password entry is temporarily locked for 5 minutes after three unsuccessful trials. Please wait before trying again."
+      );
+      error.code = state.data?.status === "SUSPENDED" ? "auth/password-suspended" : "auth/password-locked";
+      error.retryAfterSeconds = state.data?.retryAfterSeconds || 300;
+      throw error;
+    }
+  } catch (error) {
+    if (error?.code === "auth/password-locked" || error?.code === "auth/password-suspended") throw error;
+    passwordSecurityAvailable = false;
+    console.warn("IRPA password-attempt security endpoint unavailable; continuing with Firebase Authentication.", error);
   }
+
   try {
     const result = await signInWithEmailAndPassword(auth, cleanEmail, password);
-    await clearFailures({ email: cleanEmail });
+    if (passwordSecurityAvailable) {
+      try {
+        await clearFailures({ email: cleanEmail });
+      } catch (securityError) {
+        console.warn("IRPA password-attempt clear endpoint unavailable after successful Firebase Authentication.", securityError);
+      }
+    }
     return result.user;
   } catch (error) {
     let failureState = null;
-    try {
-      const failureResult = await recordFailure({ email: cleanEmail });
-      failureState = failureResult?.data || null;
-    } catch (_) {}
+    if (passwordSecurityAvailable) {
+      try {
+        const failureResult = await recordFailure({ email: cleanEmail });
+        failureState = failureResult?.data || null;
+      } catch (securityError) {
+        console.warn("IRPA password-attempt recording endpoint unavailable after failed Firebase Authentication.", securityError);
+      }
+    }
     const wrapped = new Error(firebaseErrorMessage(error));
     wrapped.code = error?.code || "";
     if (failureState) {
