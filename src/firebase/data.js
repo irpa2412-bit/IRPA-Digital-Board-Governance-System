@@ -99,12 +99,28 @@ function hasInstitutionalRole(record){
 function mergeInstitutionalRecords(records=[]){
   const valid=records.filter(Boolean);
   if(!valid.length)return null;
-  const base=valid.find(hasInstitutionalRole)||valid[0];
+  const statusRank=record=>{
+    const status=String(record?.status||record?.employmentStatus||record?.registrationStatus||"").trim().toLowerCase();
+    return status==="active"||status==="activated"?2:status==="on leave"?1:0;
+  };
+  const base=[...valid].sort((a,b)=>statusRank(b)-statusRank(a))[0]||valid[0];
   const roles=[...new Set(valid.flatMap(institutionalRoleValues))];
   const merged={...base};
   if(roles.length){
     merged.roles=roles;
-    if(!merged.role)merged.role=roles[0];
+    if(!merged.role||!roles.includes(String(merged.role).trim()))merged.role=roles[0];
+  }
+  for(const field of ["department","unit","unitName","boardPosition","memberNumber","employeeNumber","registrationNumber"]){
+    if(!merged[field]){
+      const source=valid.find(record=>String(record?.[field]||"").trim());
+      if(source)merged[field]=source[field];
+    }
+  }
+  const activeRecord=valid.find(record=>statusRank(record)===2);
+  if(activeRecord){
+    merged.status=activeRecord.status||merged.status;
+    if(activeRecord.employmentStatus)merged.employmentStatus=activeRecord.employmentStatus;
+    if(activeRecord.registrationStatus)merged.registrationStatus=activeRecord.registrationStatus;
   }
   return merged;
 }
