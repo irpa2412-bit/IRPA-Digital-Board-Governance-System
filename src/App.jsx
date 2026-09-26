@@ -753,13 +753,11 @@ useEffect(()=>{
   return()=>{disposed=true;unsubscribe()};
 },[]);;
 
-// Login watchdog: authorization must never leave the application permanently
-// on the loading screen. The primary administrator is explicitly excluded:
-// member/employee/induction authorization must never log out the administrator.
+// Login watchdog: every authenticated institutional identity, including
+// Administrators, must complete the same authorization-resolution lifecycle.
+// No administrator email or gateway flag is exempt from verification.
 useEffect(()=>{
-  const isPrimaryAdmin=String(user?.email||"").trim().toLowerCase()==="irpa2412@gmail.com";
-  const isAdminGateway=new URLSearchParams(window.location.search).get("")==="1";
-  if(inductionMode||user===undefined||profile!==undefined||isPrimaryAdmin||isAdminGateway)return;
+  if(inductionMode||user===undefined||profile!==undefined)return;
   const timer=window.setTimeout(()=>{
     if(profile!==undefined)return;
     console.error("IRPA login watchdog: authorization did not complete.");
