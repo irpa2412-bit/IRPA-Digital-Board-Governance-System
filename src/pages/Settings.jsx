@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { browserSupportsPush, listenForForegroundMessages, notificationPermissionState, requestPushPermission } from "../firebase/messaging";
 import SystemResetControl from "../components/SystemResetControl";
 import { startGoogleDriveAuthorization } from "../firebase/signatureStorage";
-import { resetDocumentTrialData, resetEmployeeTrialData, resetMemberTrialData, resetSignatureEnvelopeTrialData, createExternalAuditorProfile } from "../firebase/data";
+import { resetDocumentTrialData, resetEmployeeTrialData, resetMemberTrialData, resetSignatureEnvelopeTrialData, createExternalAuditorProfile, getRecords, COLLECTIONS, linkAdministratorToEmployee } from "../firebase/data";
 import { createAdministrator, reconcileRegisteredIdentityUids } from "../firebase/functions";
 
 export default function Settings({ admin = false, section = "settings" }) {
@@ -20,9 +20,25 @@ export default function Settings({ admin = false, section = "settings" }) {
   const [adminBusy, setAdminBusy] = useState(false);
   const [adminResult, setAdminResult] = useState(null);
   const [auditorName, setAuditorName] = useState("");
+  const [identityEmployees, setIdentityEmployees] = useState([]);
+  const [identityEmployeeId, setIdentityEmployeeId] = useState("");
+  const [identityBusy, setIdentityBusy] = useState(false);
+  const [identityResult, setIdentityResult] = useState(null);
   const [auditorEmail, setAuditorEmail] = useState("");
   const [auditorBusy, setAuditorBusy] = useState(false);
   const [auditorResult, setAuditorResult] = useState(null);
+
+  useEffect(() => {
+    if (!admin || section !== "settings") return;
+    (async () => {
+      try {
+        const rows = await getRecords(COLLECTIONS.employees);
+        setIdentityEmployees(Array.isArray(rows) ? rows.filter(x => String(x.status || x.employmentStatus || x.registrationStatus || "Active").toLowerCase() !== "inactive") : []);
+      } catch (error) {
+        setIdentityResult({ ok: false, message: error?.message || "Unable to load Employee Register for identity linking." });
+      }
+    })();
+  }, [admin, section]);
 
   useEffect(() => {
     let unsubscribe = () => {};
@@ -246,6 +262,46 @@ export default function Settings({ admin = false, section = "settings" }) {
               <div><span>Firebase accounts scanned</span><strong>{result.authUsers||0}</strong></div>
             </div>
           )}
+        </section>
+      )}
+
+      {admin && section === "settings" && (
+        <section className="panel">
+          <div className="panel-header">
+            <div>
+              <span className="eyebrow">INSTITUTIONAL IDENTITY LINK</span>
+              <h2>Administrator ↔ Employee Capacity</h2>
+              <p className="panel-description">Explicitly link this authenticated Administrator identity to the correct Employee Register record when the same person holds both Administrator and an operational employee capacity. This removes reliance on name matching and does not grant additional privileges.</p>
+            </div>
+          </div>
+          <div className="stat-card" style={{ marginBottom: 18 }}>
+            <span>Purpose</span>
+            <strong>Stable identity linkage</strong>
+            <small>The selected Employee record will carry this Administrator UID as its institutional identity link. The next fresh login can then resolve both registered capacities.</small>
+          </div>
+          <label className="field" style={{ display: "block" }}>
+            <span>Employee Register record</span>
+            <select value={identityEmployeeId} onChange={e => setIdentityEmployeeId(e.target.value)} disabled={identityBusy} style={{ width: "100%" }}>
+              <option value="">Select the employee capacity held by this Administrator</option>
+              {identityEmployees.map(employee => (
+                <option key={employee.id} value={employee.id}>
+                  {employee.name || "Unnamed employee"} · {employee.employeeNumber || employee.email || employee.id} · {employee.role || (Array.isArray(employee.roles) ? employee.roles.join(", ") : "Employee")}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="form-actions" style={{ marginTop: 14 }}>
+            <button type="button" disabled={identityBusy || !identityEmployeeId} onClick={async () => {
+              setIdentityBusy(true); setIdentityResult(null);
+              try {
+                const linked = await linkAdministratorToEmployee(identityEmployeeId);
+                setIdentityResult({ ok: true, message: `Identity linked to ${linked.employeeNumber || "the selected Employee Register record"} (${linked.role || "Employee"}). Sign out and sign in again so the role gateway rebuilds the authenticated role set.` });
+              } catch (error) {
+                setIdentityResult({ ok: false, message: error?.message || "The Administrator ↔ Employee identity link could not be created." });
+              } finally { setIdentityBusy(false); }
+            }}>{identityBusy ? "Linking identity…" : "Link Administrator to Employee Capacity"}</button>
+          </div>
+          {identityResult && <div className={identityResult.ok ? "success-message" : "auth-message"} style={{ marginTop: 16 }} role="status">{identityResult.message}</div>}
         </section>
       )}
 
