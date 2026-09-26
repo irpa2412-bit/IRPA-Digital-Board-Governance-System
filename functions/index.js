@@ -315,6 +315,55 @@ exports.resolveAuthenticatedLoginContext = onCall({region:"us-central1",timeoutS
     !employeeRoles.some(r=>["IT Specialist","Information Technology Officer"].includes(r))
   ) employeeRoles.push("IT Specialist");
 
+  const slug=v=>String(v||"").toUpperCase().replace(/[^A-Z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,48);
+  const pathwayFor=(role,record)=>{
+    const n=normalized(role);
+    const d=normalized(record?.department);
+    if(n==="administrator")return "Executive Office Department";
+    if(n==="executive director")return "Executive Office Department";
+    if(n.includes("internal oversight"))return "Internal Oversight Department";
+    if(n.includes("finance"))return "Finance & Administration Department";
+    if(n.includes("human resources")||n.startsWith("hr "))return "Human Resources Department";
+    if(n.includes("livestock"))return "Livestock Department";
+    if(n.includes("environment")||n.includes("rangeland"))return "Environment & Rangeland Department";
+    if(n.includes("outreach")||n.includes("community development"))return "Outreach & Community Development Department";
+    if(n.includes("field"))return "Field Operations Department";
+    if(n.includes("procurement"))return "Finance & Administration Department · Procurement Unit";
+    if(n.includes("it")||n.includes("information technology"))return "Information Technology Department";
+    if(d)return String(record?.department||"").trim()+" Department";
+    return "Institutional Governance Workspace";
+  };
+  const authorityMap=new Map();
+  const addAuthority=(role,record,source)=>{
+    const cleanRole=String(role||"").trim();
+    if(!cleanRole)return;
+    const suppliedId=String(record?.accessAuthorityId||record?.authorityId||"").trim();
+    const authorityId=suppliedId||"IRPA-AUTH-"+slug(cleanRole)+(record?.unit?"-"+slug(record.unit):"");
+    const existing=authorityMap.get(authorityId);
+    const authority={
+      id:authorityId,
+      authorityId,
+      role:cleanRole,
+      pathway:pathwayFor(cleanRole,record),
+      department:record?.department||null,
+      unit:record?.unit||null,
+      source,
+      active:true
+    };
+    authorityMap.set(authorityId,existing?{...existing,...authority}:authority);
+  };
+  if(admin?.active===true)addAuthority("Administrator",admin,"Administrator Registry");
+  members.forEach(record=>{
+    const values=[...(Array.isArray(record?.roles)?record.roles:[]),record?.role,record?.boardPosition].flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean));
+    values.forEach(role=>addAuthority(role,record,"Member Register"));
+  });
+  employees.forEach(record=>{
+    const values=[...(Array.isArray(record?.roles)?record.roles:[]),record?.role,...(Array.isArray(record?.assignedRoles)?record.assignedRoles:[]),...(Array.isArray(record?.selectedRoles)?record.selectedRoles:[]),...(Array.isArray(record?.roleAssignments)?record.roleAssignments:[])].flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean));
+    values.forEach(role=>addAuthority(role,record,"Employee Register"));
+  });
+  employeeRoles.forEach(role=>addAuthority(role,employee,"Employee Register"));
+  const authorities=[...authorityMap.values()];
+
   return {
     ok:true,
     uid,
@@ -323,6 +372,7 @@ exports.resolveAuthenticatedLoginContext = onCall({region:"us-central1",timeoutS
     member:members[0]||null,
     employee,
     roles:employeeRoles,
+    authorities,
     identityResolution:employee
       ? (String(employee.uid||"")===uid
           ?"UID"
