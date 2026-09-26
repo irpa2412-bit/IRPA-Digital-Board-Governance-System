@@ -39,6 +39,7 @@ export const PROCUREMENT_GOODS_SERVICES=[
 export const PROCUREMENT_DEPARTMENTS=[
  "Executive Office",
  "Internal Oversight",
+ "Governance",
  "Livestock Development",
  "Environment & Sustainable Rangeland Management",
  "Finance & Administration",
@@ -49,6 +50,7 @@ export const PROCUREMENT_DEPARTMENTS=[
  "Operations"
 ];
 export const PROCUREMENT_UNITS_BY_DEPARTMENT={
+ "Governance":["Governance Unit","Board Governance Unit"],
  "Executive Office":["Executive Director's Office","Management Coordination Unit"],
  "Internal Oversight":["Internal Oversight Unit","Compliance & Assurance Unit"],
  "Livestock Development":["Livestock Production Unit","Veterinary Services Unit","Breeding & Genetics Unit","Livestock Infrastructure Unit"],
