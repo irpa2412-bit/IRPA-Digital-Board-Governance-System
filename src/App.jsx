@@ -428,7 +428,17 @@ useEffect(()=>{
     setEmployee(null);
     setInductionComplete(false);
     setError("");
-    if(!u){setProfile(null);return}
+    if(!u){
+      // A Firebase auth session ending must also end the operating-role declaration.
+      // This prevents the previous login's IT/Administrator choice from being
+      // silently reused on the next authentication.
+      try{
+        window.sessionStorage.removeItem("irpaActiveAccessAuthority");
+        window.sessionStorage.removeItem("irpaAccessAuthoritySelectionState");
+      }catch{}
+      setProfile(null);
+      return;
+    }
     try{
       // The designated primary administrator is resolved immediately after
       // Firebase authentication, independently of all member workflows.
