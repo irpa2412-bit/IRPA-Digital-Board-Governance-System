@@ -113,12 +113,17 @@ export default function ITDepartmentPortal({user,profile,employee,selectedAuthor
 
   <section className="panel" style={{marginTop:18}}>
    <div className="panel-heading"><div><span className="eyebrow">CURRENT BRANCH / UNIT</span><h2>{unit}</h2><p className="muted">{unitDescription}</p></div></div>
-   <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:14}}>
-    {["overview","work","website","governance"].map(x=><button key={x} type="button" className={tab===x?"":"secondary-button"} onClick={()=>setTab(x)}>{x==="overview"?"Overview":x==="work"?"IT Work Queue":x==="website"?"Website Bridge":"Governance & QA"}</button>)}
+   <div className="it-tabbar" role="tablist" aria-label="IT Operations workspaces" style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:14}}>
+    {[
+      ["overview","Overview","Open the selected unit dashboard"],
+      ["work","IT Work Queue","Create and review IT work items"],
+      ["website","Website Bridge","Manage controlled website communications"],
+      ["governance","Governance & QA","Open IT controls and release governance"]
+    ].map(([x,label,description])=><button key={x} type="button" role="tab" aria-selected={tab===x} aria-controls={`it-tab-panel-${x}`} className={`it-operation-tab ${tab===x?"is-active":""}`} onClick={()=>{setTab(x);setNotice("");}} onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();setTab(x);setNotice("");}}} title={description}>{label}<span aria-hidden="true">›</span></button>)}
    </div>
   </section>
 
-  {tab==="overview"&&<section className="dashboard-grid" style={{marginTop:18}}>
+  {tab==="overview"&&<section id="it-tab-panel-overview" role="tabpanel" className="dashboard-grid it-operation-panel" style={{marginTop:18}}>
     <div className="stat-card"><span>OPEN WORK</span><strong>{counts.open}</strong><small>Open, active, pending or scheduled IT items.</small></div>
     <div className="stat-card"><span>CRITICAL</span><strong>{counts.critical}</strong><small>Critical-priority items requiring controlled response.</small></div>
     <div className="stat-card"><span>WEBSITE</span><strong>{counts.website}</strong><small>Website update, repair and maintenance records.</small></div>
@@ -127,7 +132,7 @@ export default function ITDepartmentPortal({user,profile,employee,selectedAuthor
     <button type="button" className="stat-card" onClick={()=>setTab("website")} style={{textAlign:"left",cursor:"pointer"}}><span>WEBSITE</span><strong>Website Bridge</strong><small>Prepare controlled website updates, repair notices and maintenance communications.</small></button>
   </section>}
 
-  {tab==="work"&&<section className="panel" style={{marginTop:18}}>
+  {tab==="work"&&<section id="it-tab-panel-work" role="tabpanel" className="panel it-operation-panel" style={{marginTop:18}}>
    <div className="panel-heading"><div><span className="eyebrow">IT SERVICE MANAGEMENT</span><h2>Create IT Work Item</h2></div></div>
    <form onSubmit={submit} className="form-grid" style={{marginTop:16}}>
     <label className="field"><span>Work Type</span><select value={form.type} onChange={e=>setForm({...form,type:e.target.value})}>{WORK_TYPES.map(x=><option key={x}>{x}</option>)}</select></label>
@@ -144,7 +149,7 @@ export default function ITDepartmentPortal({user,profile,employee,selectedAuthor
    <div style={{marginTop:24}}><h3>Recent IT Work</h3>{loading?<p className="muted">Loading…</p>:records.length===0?<p className="muted">No IT work records yet.</p>:<div className="table-wrap"><table><thead><tr><th>Type</th><th>Title</th><th>Branch</th><th>Unit</th><th>Priority</th><th>Status</th></tr></thead><tbody>{records.slice(0,30).map(r=><tr key={r.id}><td><span className={"status-badge "+badge(r.status)}>{r.type}</span></td><td>{r.title}</td><td>{r.branch||"—"}</td><td>{r.unit}</td><td>{r.priority}</td><td>{r.status}</td></tr>)}</tbody></table></div>}</div>
   </section>}
 
-  {tab==="website"&&<section className="panel" style={{marginTop:18}}>
+  {tab==="website"&&<section id="it-tab-panel-website" role="tabpanel" className="panel it-operation-panel" style={{marginTop:18}}>
    <div className="panel-heading"><div><span className="eyebrow">IRPA WEBSITE COMMUNICATION BRIDGE</span><h2>Updates, Repairs & Maintenance</h2><p className="muted">The DBGS becomes the controlled source for website maintenance notices and approved public updates. Website administrators can consume the published feed without receiving DBGS administrative privileges.</p></div></div>
    <form onSubmit={publishNotice} className="form-grid" style={{marginTop:16}}>
     <label className="field"><span>Notice Type</span><select value={noticeForm.severity} onChange={e=>setNoticeForm({...noticeForm,severity:e.target.value})}><option>Information</option><option>Maintenance</option><option>Service Interruption</option><option>Security Notice</option></select></label>
@@ -158,7 +163,7 @@ export default function ITDepartmentPortal({user,profile,employee,selectedAuthor
    <div className="auth-message" style={{marginTop:18}}><strong>Website integration boundary</strong><br/>DBGS records the approved communication, publication window and audit identity. A public website connector should consume only records explicitly marked <strong>Published</strong>; it must never expose private IT tickets, credentials, audit details or internal work notes.</div>
   </section>}
 
-  {tab==="governance"&&<section className="dashboard-grid" style={{marginTop:18}}>
+  {tab==="governance"&&<section id="it-tab-panel-governance" role="tabpanel" className="dashboard-grid it-operation-panel" style={{marginTop:18}}>
    {[
     ["Change Control","Every production change should carry a request, test evidence, approval, deployment record and live verification."],
     ["Cybersecurity","Access changes, incidents and security-sensitive work require traceable ownership and audit evidence."],
