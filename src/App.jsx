@@ -42,15 +42,14 @@ function MobileSystemPortalNavigator({active,modules,onNavigate}){const items=[.
         if(el.disabled||el.type==="hidden")return false;
         return el.getClientRects().length>0;
       });
-      const next=[];const seen=new Set();
+      const next=[];
       controls.forEach((el,index)=>{
         const labelledBy=String(el.getAttribute("aria-labelledby")||"").split(/\\s+/).filter(Boolean).map(id=>document.getElementById(id)?.textContent||"").join(" ").trim();
         const closestLabel=el.closest("label");
         const financeLabel=closestLabel?.querySelector(".finance-field-label")?.textContent?.trim()||"";
         const labelText=financeLabel||labelledBy||closestLabel?.textContent?.replace(el.value||"","").replace(/\\s+/g," ").trim()||String(el.getAttribute("aria-label")||"").trim()||String(el.getAttribute("placeholder")||"").trim()||String(el.getAttribute("name")||el.id||"").trim();
         if(!labelText)return;
-        const key=el.id||el.name||String(index);
-        if(seen.has(key))return;seen.add(key);
+        const key="field-"+String(index);
         const required=el.required||el.getAttribute("aria-required")==="true";
         next.push({key,label:(required?"Required · ":"")+labelText,element:el});
       });
