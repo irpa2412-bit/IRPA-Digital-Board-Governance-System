@@ -19,29 +19,44 @@ async function authHeaders() {
   };
 }
 
+const GATEWAY_REQUEST_TIMEOUT_MS = 90000;
+
+function isRetryableGatewayStatus(status) {
+  return status === 408 || status === 429 || status >= 500;
+}
+
 async function gatewayPost(path, payload) {
-  let lastError=null;
-  for(let attempt=1;attempt<=3;attempt+=1){
-    try{
+  let lastError = null;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), GATEWAY_REQUEST_TIMEOUT_MS);
+    try {
       const response = await fetch(`${requireGateway()}${path}`, {
         method: "POST",
         headers: await authHeaders(),
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+        cache: "no-store"
       });
       const data = await response.json().catch(() => ({}));
-      if(response.ok && data.ok !== false) return data;
-      const status=Number(response.status||0);
-      const error=new Error(data.error || `Google Drive gateway request failed (${status||"unknown"}).`);
-      if(!(status===408||status===429||status>=500)||attempt>=3) throw error;
-      lastError=error;
-    }catch(error){
-      lastError=error;
-      const status=Number(error?.status||0);
-      if((status && status!==408 && status!==429 && status<500)||attempt>=3) throw error;
+      if (response.ok && data.ok !== false) return data;
+
+      const status = Number(response.status || 0);
+      const error = new Error(data.error || `Google Drive gateway request failed (${status || "unknown"}).`);
+      error.status = status;
+      if (!isRetryableGatewayStatus(status) || attempt >= 3) throw error;
+      lastError = error;
+    } catch (error) {
+      lastError = error;
+      const status = Number(error?.status || 0);
+      const retryableNetworkError = error?.name === "AbortError" || error?.name === "TypeError" || !status;
+      if ((!retryableNetworkError && !isRetryableGatewayStatus(status)) || attempt >= 3) throw error;
+    } finally {
+      clearTimeout(timeout);
     }
-    await new Promise(resolve=>setTimeout(resolve,450*Math.pow(2,attempt-1)));
+    await new Promise(resolve => setTimeout(resolve, 700 * Math.pow(2, attempt - 1)));
   }
-  throw lastError||new Error("Google Drive gateway request failed.");
+  throw lastError || new Error("Google Drive gateway request failed after three attempts.");
 }
 
 export const storage = { provider: "Google Drive" };
