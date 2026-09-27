@@ -11,6 +11,11 @@ on:
 permissions:
   contents: read
 
+env:
+  # Cloudflare account ID is non-secret deployment metadata.
+  # The API token remains GitHub Actions secret-only.
+  CLOUDFLARE_ACCOUNT_ID: "2993bb51b9a54d5b38830ec8e88caed5"
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -26,7 +31,7 @@ jobs:
       - name: Recover existing production DRIVE_KV binding safely
         env:
           CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || env.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
           test -n "$CF_API_TOKEN"
@@ -87,7 +92,7 @@ jobs:
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || env.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: drive-gateway
           command: deploy --keep-vars
 
