@@ -5970,3 +5970,132 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     padding-top:102px!important;
   }
 }
+
+
+/* MOBILE PORTAL SPACING STANDARD — COMPACT, CONSISTENT, ALL PAGES */
+@media screen and (max-width:760px){
+  /* The portal roller is fixed; it must not create a phantom 100px+ blank band
+     in the normal document flow below the weather/topbar. */
+  main.content-area:not(.dashboard-content-area){
+    padding-top:8px!important;
+    padding-left:8px!important;
+    padding-right:8px!important;
+    padding-bottom:112px!important;
+    box-sizing:border-box!important;
+  }
+
+  /* Keep the fixed roller visually separate without reserving document space. */
+  main.content-area:not(.dashboard-content-area) > .desktop-webapp-navigation-roller{
+    margin:0!important;
+  }
+
+  /* Standard vertical rhythm between major portal surfaces. */
+  main.content-area:not(.dashboard-content-area) > *{
+    margin-top:0!important;
+    margin-bottom:8px!important;
+  }
+  main.content-area:not(.dashboard-content-area) > .operator-signout-slot{
+    min-height:42px!important;
+    height:42px!important;
+    margin:0 0 8px!important;
+    padding:0!important;
+  }
+  main.content-area:not(.dashboard-content-area) > .operator-signout-slot .logout-button{
+    width:min(100%,300px)!important;
+    min-width:0!important;
+    max-width:300px!important;
+    height:40px!important;
+    min-height:40px!important;
+    max-height:40px!important;
+    padding:7px 14px!important;
+    margin:0 auto!important;
+    box-sizing:border-box!important;
+    border-radius:9px!important;
+  }
+
+  /* Recovery/access messages: compact but still readable and touch-safe. */
+  main.content-area:not(.dashboard-content-area) > .auth-message{
+    margin:0 0 8px!important;
+    padding:12px!important;
+    border-radius:11px!important;
+    box-sizing:border-box!important;
+    line-height:1.45!important;
+  }
+  main.content-area:not(.dashboard-content-area) > .auth-message > div[style*="display:flex"]{
+    gap:6px!important;
+    margin-top:8px!important;
+  }
+  main.content-area:not(.dashboard-content-area) > .auth-message button{
+    min-height:40px!important;
+    padding:8px 10px!important;
+    border-radius:8px!important;
+    font-size:11px!important;
+  }
+
+  /* Standardize portal panels/cards/forms without changing their desktop layout. */
+  main.content-area:not(.dashboard-content-area) .panel{
+    margin-bottom:8px!important;
+    border-radius:12px!important;
+  }
+  main.content-area:not(.dashboard-content-area) .panel + .panel{
+    margin-top:0!important;
+  }
+  main.content-area:not(.dashboard-content-area) .panel-header{
+    margin-bottom:8px!important;
+  }
+  main.content-area:not(.dashboard-content-area) .panel-header h2{
+    margin:0!important;
+  }
+  main.content-area:not(.dashboard-content-area) .form-field{
+    margin-bottom:9px!important;
+  }
+  main.content-area:not(.dashboard-content-area) .form-actions{
+    gap:6px!important;
+  }
+  main.content-area:not(.dashboard-content-area) button:not(.page-back-next-button){
+    box-sizing:border-box!important;
+  }
+  main.content-area:not(.dashboard-content-area) input,
+  main.content-area:not(.dashboard-content-area) select{
+    box-sizing:border-box!important;
+  }
+
+  /* Prevent nested grids and action rows from producing excessive whitespace. */
+  main.content-area:not(.dashboard-content-area) .dashboard-grid{
+    gap:8px!important;
+    margin-top:8px!important;
+  }
+  main.content-area:not(.dashboard-content-area) .detail-grid{
+    gap:8px!important;
+    margin-bottom:8px!important;
+  }
+  main.content-area:not(.dashboard-content-area) .form-actions{
+    margin-top:8px!important;
+    margin-bottom:0!important;
+  }
+
+  /* Keep the fixed Back/Next dock clear of the phone's system navigation. */
+  main.content-area:not(.dashboard-content-area) > nav.page-back-next-navigation{
+    bottom:calc(62px + env(safe-area-inset-bottom))!important;
+  }
+}
+@media screen and (max-width:380px){
+  main.content-area:not(.dashboard-content-area){
+    padding-left:6px!important;
+    padding-right:6px!important;
+    padding-top:6px!important;
+  }
+  main.content-area:not(.dashboard-content-area) > .auth-message{
+    padding:10px!important;
+  }
+  main.content-area:not(.dashboard-content-area) > .operator-signout-slot{
+    height:40px!important;
+    min-height:40px!important;
+  }
+  main.content-area:not(.dashboard-content-area) > .operator-signout-slot .logout-button{
+    height:38px!important;
+    min-height:38px!important;
+    max-height:38px!important;
+    font-size:11px!important;
+  }
+}
