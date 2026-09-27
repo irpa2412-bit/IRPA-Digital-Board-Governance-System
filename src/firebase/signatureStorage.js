@@ -20,16 +20,28 @@ async function authHeaders() {
 }
 
 async function gatewayPost(path, payload) {
-  const response = await fetch(`${requireGateway()}${path}`, {
-    method: "POST",
-    headers: await authHeaders(),
-    body: JSON.stringify(payload)
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok || data.ok === false) {
-    throw new Error(data.error || "Google Drive gateway request failed.");
+  let lastError=null;
+  for(let attempt=1;attempt<=3;attempt+=1){
+    try{
+      const response = await fetch(`${requireGateway()}${path}`, {
+        method: "POST",
+        headers: await authHeaders(),
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json().catch(() => ({}));
+      if(response.ok && data.ok !== false) return data;
+      const status=Number(response.status||0);
+      const error=new Error(data.error || `Google Drive gateway request failed (${status||"unknown"}).`);
+      if(!(status===408||status===429||status>=500)||attempt>=3) throw error;
+      lastError=error;
+    }catch(error){
+      lastError=error;
+      const status=Number(error?.status||0);
+      if((status && status!==408 && status!==429 && status<500)||attempt>=3) throw error;
+    }
+    await new Promise(resolve=>setTimeout(resolve,450*Math.pow(2,attempt-1)));
   }
-  return data;
+  throw lastError||new Error("Google Drive gateway request failed.");
 }
 
 export const storage = { provider: "Google Drive" };
@@ -48,6 +60,7 @@ export async function uploadBytes(target, file, metadata = {}) {
 
   const result = await gatewayPost("/api/upload", {
     path: target.path,
+    storagePath: target.path,
     fileName: target.path.split("/").pop() || "IRPA-document.pdf",
     contentType: metadata.contentType || file.type || "application/pdf",
     fileSize: bytes.length,
