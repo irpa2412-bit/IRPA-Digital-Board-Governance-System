@@ -6329,3 +6329,104 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     filter:brightness(1.15)!important;
   }
 }
+
+
+/* MOBILE ONLY — OUTER SYSTEM PORTALS ABOVE, INNER PAGE NAVIGATION BELOW */
+.mobile-system-portal-navigator{display:none!important;}
+@media screen and (max-width:760px){
+  .mobile-system-portal-navigator{
+    position:fixed!important;
+    display:grid!important;
+    top:64px!important;
+    left:5px!important;
+    right:5px!important;
+    width:auto!important;
+    max-width:none!important;
+    min-width:0!important;
+    min-height:40px!important;
+    max-height:44px!important;
+    padding:4px 6px!important;
+    box-sizing:border-box!important;
+    grid-template-columns:minmax(62px,76px) minmax(0,1fr) minmax(100px,1.15fr) 28px!important;
+    gap:5px!important;
+    align-items:center!important;
+    overflow:hidden!important;
+    border-radius:8px!important;
+    background:#063b67!important;
+    color:#fff!important;
+    box-shadow:0 10px 24px rgba(0,0,0,.30)!important;
+    z-index:1550!important;
+  }
+  .mobile-system-portal-navigator .mobile-system-portal-kicker,
+  .mobile-system-portal-navigator strong{
+    min-width:0!important;
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
+    white-space:nowrap!important;
+  }
+  .mobile-system-portal-navigator .mobile-system-portal-kicker{
+    font-size:7px!important;
+    letter-spacing:.08em!important;
+    font-weight:900!important;
+  }
+  .mobile-system-portal-navigator strong{font-size:10px!important}
+  .mobile-system-portal-navigator select{
+    width:100%!important;
+    min-width:0!important;
+    height:30px!important;
+    min-height:30px!important;
+    padding:4px 22px 4px 7px!important;
+    box-sizing:border-box!important;
+    font-size:10px!important;
+    border-radius:7px!important;
+  }
+  .mobile-system-portal-navigator .mobile-system-portal-arrow{
+    width:28px!important;
+    height:28px!important;
+    min-width:28px!important;
+    min-height:28px!important;
+    margin:0!important;
+    padding:0!important;
+    display:flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    border:1px solid rgba(255,255,255,.5)!important;
+    border-radius:7px!important;
+    background:#0b5fa8!important;
+    color:#fff!important;
+    font-size:16px!important;
+    font-weight:900!important;
+  }
+  /* Hide the old mobile overhead roller; desktop version remains untouched. */
+  main.content-area:not(.dashboard-content-area) > .desktop-webapp-navigation-roller{
+    display:none!important;
+  }
+  /* Bottom navigator remains the inner portal/page navigator. */
+  main.content-area:not(.dashboard-content-area) > nav.page-back-next-navigation{
+    display:grid!important;
+  }
+  main.content-area:not(.dashboard-content-area){
+    padding-top:8px!important;
+  }
+}
+@media screen and (max-width:380px){
+  .mobile-system-portal-navigator{
+    top:60px!important;
+    left:3px!important;
+    right:3px!important;
+    padding:3px 4px!important;
+    grid-template-columns:minmax(50px,62px) minmax(0,1fr) minmax(84px,1fr) 24px!important;
+    gap:3px!important;
+    min-height:36px!important;
+    max-height:40px!important;
+  }
+  .mobile-system-portal-navigator .mobile-system-portal-arrow{
+    width:23px!important;
+    height:23px!important;
+    min-width:23px!important;
+    min-height:23px!important;
+    font-size:13px!important;
+  }
+  .mobile-system-portal-navigator strong{font-size:9px!important}
+  .mobile-system-portal-navigator select{height:28px!important;min-height:28px!important;font-size:9px!important}
+}
