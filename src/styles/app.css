@@ -5276,3 +5276,352 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   font-weight:850!important;
   letter-spacing:.02em!important;
 }
+
+
+/* IRPA MOBILE SCREEN-FIT PASS — 2026-09-27
+   Final responsive containment layer for phones (including narrow 320–430px
+   screens). Prevents horizontal overflow, clipped headings, oversized
+   controls, and competing fixed navigation surfaces. */
+@media screen and (max-width:760px){
+  html,body,#root,.app-shell,.main-area{
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    overflow-x:hidden!important;
+  }
+
+  .main-area{
+    padding-bottom:82px!important;
+  }
+
+  .topbar{
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+    min-height:64px!important;
+    height:auto!important;
+    padding:9px 10px!important;
+    gap:7px!important;
+    overflow:hidden!important;
+  }
+  .topbar-heading-row{
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+    flex-wrap:nowrap!important;
+    gap:6px!important;
+  }
+  .topbar-access-category{
+    flex:0 1 42%!important;
+    width:auto!important;
+    min-width:0!important;
+    max-width:46%!important;
+    min-height:34px!important;
+    max-height:44px!important;
+    overflow:hidden!important;
+  }
+  .topbar-access-category>span,
+  .topbar-access-category [aria-label="Login category"]>span{
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
+    white-space:nowrap!important;
+  }
+  .topbar-title-block{
+    flex:1 1 auto!important;
+    min-width:0!important;
+    max-width:100%!important;
+  }
+  .topbar-title-line{
+    min-width:0!important;
+    max-width:100%!important;
+  }
+  .topbar-title-line h2{
+    max-width:100%!important;
+    font-size:15px!important;
+    line-height:1.2!important;
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
+    white-space:nowrap!important;
+  }
+  .topbar p{
+    max-width:100%!important;
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
+    white-space:nowrap!important;
+  }
+  .topbar-inline-logout{
+    display:none!important;
+  }
+  .user-info{
+    display:none!important;
+  }
+
+  .content-area,
+  .dashboard-content-area{
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    margin-left:0!important;
+    margin-right:0!important;
+    padding:12px 10px 88px!important;
+    overflow-x:hidden!important;
+  }
+  .page{
+    width:100%!important;
+    min-width:0!important;
+    gap:12px!important;
+  }
+  .page-header,
+  .panel-header,
+  .welcome-panel{
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+  }
+  .welcome-panel{
+    padding:16px!important;
+    min-height:auto!important;
+    gap:12px!important;
+  }
+  .welcome-panel h1,
+  .module-header h1,
+  .page-header h1{
+    font-size:21px!important;
+    line-height:1.2!important;
+    overflow-wrap:anywhere!important;
+  }
+  .welcome-panel p,
+  .module-header p,
+  .page-header p,
+  .panel-description,
+  .module-panel>p{
+    font-size:12px!important;
+    line-height:1.5!important;
+    overflow-wrap:anywhere!important;
+  }
+
+  .panel,
+  .module-panel,
+  .welcome-panel{
+    box-sizing:border-box!important;
+    overflow:hidden!important;
+    border-radius:12px!important;
+    padding:14px!important;
+  }
+  .panel-header h2{
+    font-size:17px!important;
+    line-height:1.25!important;
+  }
+
+  .form-grid,
+  .detail-grid{
+    grid-template-columns:1fr!important;
+    width:100%!important;
+    min-width:0!important;
+  }
+  .form-field,
+  .form-field-wide,
+  .full-field{
+    min-width:0!important;
+    width:100%!important;
+  }
+  .form-field input,
+  .form-field select,
+  .form-field textarea,
+  .table-search{
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    box-sizing:border-box!important;
+    font-size:16px!important;
+  }
+  .form-actions{
+    width:100%!important;
+    min-width:0!important;
+  }
+  .form-actions button{
+    min-height:44px!important;
+    max-width:100%!important;
+  }
+
+  .dashboard-grid,
+  .dashboard-gauge-grid,
+  .dashboard-function-grid,
+  .dashboard-lower-grid{
+    width:100%!important;
+    min-width:0!important;
+    grid-template-columns:1fr!important;
+    gap:9px!important;
+  }
+  .dashboard-gauge,
+  .dashboard-function-button,
+  .stat-card{
+    width:100%!important;
+    min-width:0!important;
+    box-sizing:border-box!important;
+    min-height:88px!important;
+    padding:13px!important;
+    overflow:hidden!important;
+  }
+  .dashboard-gauge>strong,
+  .dashboard-function-button>span,
+  .stat-card strong{
+    font-size:18px!important;
+    line-height:1.2!important;
+    overflow-wrap:anywhere!important;
+  }
+  .dashboard-gauge>small,
+  .dashboard-function-button>small,
+  .stat-card small{
+    font-size:10px!important;
+    line-height:1.4!important;
+    white-space:normal!important;
+  }
+
+  .module-interlink-bar{
+    width:100%!important;
+    max-width:100%!important;
+    box-sizing:border-box!important;
+    overflow:hidden!important;
+  }
+  .module-interlink-list{
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    overflow-x:auto!important;
+    overflow-y:hidden!important;
+    -webkit-overflow-scrolling:touch!important;
+  }
+
+  .table-wrapper{
+    width:100%!important;
+    max-width:100%!important;
+    overflow-x:auto!important;
+    -webkit-overflow-scrolling:touch!important;
+  }
+  .table-wrapper table{
+    min-width:680px!important;
+  }
+
+  .record-details{
+    max-width:100%!important;
+    overflow:auto!important;
+    overflow-wrap:anywhere!important;
+  }
+
+  .mobile-dashboard-only,
+  .mobile-dashboard-search,
+  .mobile-dashboard-section,
+  .mobile-quick-list,
+  .mobile-attention-list,
+  .mobile-portal-directory{
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    box-sizing:border-box!important;
+  }
+  .mobile-stat-grid{
+    grid-template-columns:1fr 1fr!important;
+    width:100%!important;
+  }
+  .mobile-stat-card{
+    min-width:0!important;
+    overflow:hidden!important;
+  }
+
+  .live-weather-content,
+  .live-weather-current,
+  .live-weather-days{
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    box-sizing:border-box!important;
+  }
+  .live-weather-current{
+    flex-wrap:wrap!important;
+    gap:10px!important;
+  }
+  .live-weather-metrics{
+    width:100%!important;
+    flex-wrap:wrap!important;
+  }
+  .live-weather-metrics span{
+    flex:1 1 30%!important;
+    min-width:88px!important;
+  }
+  .live-weather-days{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:7px!important;
+  }
+  .live-weather-day{
+    min-width:0!important;
+  }
+
+  .it-branch-grid,
+  .it-unit-grid{
+    width:100%!important;
+    min-width:0!important;
+    grid-template-columns:1fr!important;
+  }
+  .it-branch-card,
+  .it-unit-card{
+    width:100%!important;
+    min-width:0!important;
+    min-height:0!important;
+    padding:14px!important;
+  }
+  .it-branch-card>strong,
+  .it-unit-card>strong{
+    font-size:17px!important;
+    line-height:1.25!important;
+    overflow-wrap:anywhere!important;
+  }
+
+  .auth-card{
+    width:calc(100% - 20px)!important;
+    max-width:520px!important;
+    padding:20px!important;
+    margin:10px!important;
+  }
+
+  /* Bottom Back/Next must not cover the global mobile navigation. */
+  .content-area>.page-back-next-navigation,
+  .dashboard-content-area>.page-back-next-navigation{
+    left:7px!important;
+    right:7px!important;
+    bottom:calc(68px + env(safe-area-inset-bottom))!important;
+    width:auto!important;
+    max-width:none!important;
+  }
+  .content-area>.page-back-next-navigation .page-back-next-status{
+    min-width:0!important;
+    overflow:hidden!important;
+  }
+  .content-area>.page-back-next-navigation .page-back-next-status strong{
+    max-width:140px!important;
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
+    white-space:nowrap!important;
+  }
+  .content-area>.page-back-next-navigation .page-back-next-button{
+    min-width:0!important;
+    flex:1 1 0!important;
+  }
+
+  .mobile-global-nav{
+    height:62px!important;
+    padding-bottom:env(safe-area-inset-bottom)!important;
+    box-sizing:content-box!important;
+  }
+}
+
+@media screen and (max-width:380px){
+  .topbar{padding:8px!important}
+  .topbar-access-category{flex-basis:39%!important;max-width:43%!important}
+  .topbar-title-line h2{font-size:13px!important}
+  .content-area,.dashboard-content-area{padding-left:8px!important;padding-right:8px!important}
+  .panel,.module-panel,.welcome-panel{padding:12px!important}
+  .mobile-stat-grid{grid-template-columns:1fr!important}
+  .live-weather-days{grid-template-columns:1fr!important}
+  .live-weather-metrics span{min-width:0!important;flex-basis:100%!important}
+}
