@@ -930,59 +930,6 @@ async function getSessionProfile(request, env) {
   },200,corsHeaders(request));
 }
 
-async function lookupInductionRegistration(request, env) {
-  const claims = await authenticateFirebaseRequest(request);
-  const data = await request.json();
-  const enteredName = String(data.fullName || "").trim();
-  if (enteredName.length < 2) return json({ok:true,matched:false,reason:"Enter at least 2 characters."},200,corsHeaders(request));
-
-  const normalize = value => String(value || "").trim().toLowerCase().replace(/\\s+/g," ");
-  const target = normalize(enteredName);
-  const member = await getFirestoreDocument(env, `members/${cleanId(claims.user_id)}`, claims.token);
-  const employee = await getFirestoreDocument(env, `employees/${cleanId(claims.user_id)}`, claims.token);
-  const invitationRows = await queryFirestoreByEmail(env, "invitations", "email", claims.email || "", claims.token);
-
-  const memberFields = member?.fields || {};
-  const employeeFields = employee?.fields || {};
-  const invitationRecords = invitationRows.map(row => row.document).filter(Boolean);
-  const invitation = invitationRecords
-    .map(doc => firestoreDocumentToPlain(doc))
-    .filter(x => normalize(x.email) === normalize(claims.email) && normalize(x.name) === target)
-    .sort((a,b) => Number(b.updatedAt?.timestampValue ? Date.parse(b.updatedAt.timestampValue) : 0) - Number(a.updatedAt?.timestampValue ? Date.parse(a.updatedAt.timestampValue) : 0))[0] || null;
-
-  const memberPlain = firestoreDocumentToPlain(member);
-  const employeePlain = firestoreDocumentToPlain(employee);
-  const ownNames = [employeePlain?.name, memberPlain?.name].filter(Boolean).map(normalize);
-  const nameMatchesOwnRecord = ownNames.includes(target);
-  if (!nameMatchesOwnRecord && !invitation) {
-    return json({ok:true,matched:false,reason:"No registration record matching the entered full name was found for the authenticated IRPA account."},200,corsHeaders(request));
-  }
-
-  const number = employeeFields.employeeNumber?.stringValue || memberFields.memberNumber?.stringValue || "";
-  const merged = {
-    fullName: employeePlain?.name || memberPlain?.name || invitation?.name || enteredName,
-    email: claims.email || employeePlain?.email || memberPlain?.email || invitation?.email || "",
-    registrationNumber: number,
-    employeeNumber: employeeFields.employeeNumber?.stringValue || "",
-    memberNumber: memberFields.memberNumber?.stringValue || "",
-    role: employeePlain?.role || memberPlain?.role || invitation?.role || "",
-    department: employeePlain?.department || memberPlain?.department || invitation?.department || "",
-    unit: employeePlain?.unit || memberPlain?.unit || invitation?.unit || "",
-    memberType: memberPlain?.memberType || invitation?.memberType || "",
-    employmentType: employeePlain?.employmentType || invitation?.employmentType || "",
-    employmentStatus: employeePlain?.status || employeePlain?.employmentStatus || "",
-    memberStatus: memberPlain?.status || "",
-    invitationStatus: invitation?.status || "",
-    invitationId: invitation?.id || "",
-    sources: [
-      memberPlain ? "Members Registration" : null,
-      employeePlain ? "Employees & Personnel Registration" : null,
-      invitation ? "Member & Personnel Invitations" : null
-    ].filter(Boolean)
-  };
-  return json({ok:true,matched:true,registration:merged},200,corsHeaders(request));
-}
-
 async function sendRegistrationNumber(request, env) {
   const claims = await authenticateFirebaseRequest(request);
   const data = await request.json();
