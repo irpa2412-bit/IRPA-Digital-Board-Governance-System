@@ -20,6 +20,26 @@ exports.refreshMfaEnrollmentClaim = refreshMfaEnrollmentClaim;
 exports.grantReportingDeadlineAuditScheduled = grantReportingDeadlineAuditScheduled;
 exports.grantReportingDeadlineAuditNow = grantReportingDeadlineAuditNow;
 async function stableId(v){return crypto.createHash("sha256").update(String(v)).digest("hex");}
+async function queueInductionEmail(to,subject,text,html){
+  const recipient=String(to||"").trim().toLowerCase();
+  const cleanSubject=String(subject||"").trim();
+  const cleanText=String(text||"").trim();
+  const cleanHtml=String(html||"").trim();
+  if(!recipient||!recipient.includes("@")) throw new HttpsError("invalid-argument","A valid email recipient is required.");
+  if(!cleanSubject) throw new HttpsError("invalid-argument","An email subject is required.");
+  if(!cleanText&&!cleanHtml) throw new HttpsError("invalid-argument","Email content is required.");
+  const mailRef=db.collection("mail").doc();
+  await mailRef.set({
+    to:[recipient],
+    message:{subject:cleanSubject,text:cleanText||undefined,html:cleanHtml||undefined},
+    status:"queued",
+    source:"IRPA-DBGS invitation and induction mail service",
+    queuedAt:FieldValue.serverTimestamp(),
+    createdAt:FieldValue.serverTimestamp(),
+    updatedAt:FieldValue.serverTimestamp()
+  });
+  return mailRef.id;
+}
 async function writeServerAuditEvent(event){
   const path=String(event.params?.document||"");
   const parts=path.split("/").filter(Boolean);
