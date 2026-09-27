@@ -330,13 +330,79 @@ function firebaseErrorMessage(error) {
   return known[code] ? `${known[code]} (${code})` : `${message}${code ? ` (${code})` : ""}`;
 }
 
+function invitationHtml(value) {
+  return String(value || "").replace(/[&<>"']/g, character => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[character]));
+}
+
+async function queueMemberInvitationFromClient(invitationId) {
+  const ref = doc(db, "invitations", invitationId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) throw new Error("The invitation record could not be found.");
+  const invitation = snap.data() || {};
+  const email = String(invitation.email || "").trim().toLowerCase();
+  const name = String(invitation.name || "").trim();
+  const role = String(invitation.role || "Board Member").trim();
+  const memberType = String(invitation.memberType || "Governance Member").trim();
+  const department = String(invitation.department || "").trim();
+  const unit = String(invitation.unit || "").trim();
+  if (!email || !email.includes("@")) throw new Error("The invitation has no valid addressee email.");
+  if (!name) throw new Error("The invitation has no addressee name.");
+  if (!globalThis.crypto?.getRandomValues || !globalThis.crypto?.subtle) throw new Error("Secure invitation token generation is unavailable in this browser.");
+
+  const bytes = new Uint8Array(32);
+  globalThis.crypto.getRandomValues(bytes);
+  let binary = "";
+  bytes.forEach(byte => { binary += String.fromCharCode(byte); });
+  const secret = btoa(binary).replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/g, "");
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(secret));
+  const hashBytes = new Uint8Array(digest);
+  const invitationSecretHash = Array.from(hashBytes).map(byte => byte.toString(16).padStart(2, "0")).join("");
+  const invitationExpiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000);
+  const invitationUrl = window.location.origin + "/?invitationToken=" + encodeURIComponent(invitationId + "." + secret);
+  const assistanceLink = window.location.origin + "/?induction=1&applicant=1&route=assistance&memberInvite=" + encodeURIComponent(invitationId);
+  const loginLink = window.location.origin + "/?induction=1&applicant=1&route=login";
+  const subject = "IRPA Invitation — " + role;
+  const text = "Dear " + name + ",\\n\\nYou have been invited to access the IRPA Digital Board Governance System.\\n\\nAssigned IRPA role: " + role + "\\nMember type: " + memberType + (department ? "\\nDepartment: " + department : "") + (unit ? "\\nUnit: " + unit : "") + "\\n\\nComplete your Induction & Orientation / subscription pathway here:\\n" + invitationUrl + "\\n\\nIf you need login assistance:\\n" + assistanceLink + "\\n\\nNormal login route:\\n" + loginLink + "\\n\\nThis invitation is addressed to " + email + ".\\n\\nImprovement of Rangeland in Pastoral Areas (IRPA)";
+  const html = "<p>Dear " + invitationHtml(name) + ",</p><p>You have been invited to access the IRPA Digital Board Governance System.</p><p><strong>Assigned IRPA role:</strong> " + invitationHtml(role) + "<br><strong>Member type:</strong> " + invitationHtml(memberType) + (department ? "<br><strong>Department:</strong> " + invitationHtml(department) : "") + (unit ? "<br><strong>Unit:</strong> " + invitationHtml(unit) : "") + "</p><p><a href='" + invitationHtml(invitationUrl) + "'>Complete Induction &amp; Orientation / Subscription</a></p><p><a href='" + invitationHtml(assistanceLink) + "'>Login assistance</a></p><p><a href='" + invitationHtml(loginLink) + "'>Normal login</a></p><p>This invitation is addressed to " + invitationHtml(email) + ".</p><p>Improvement of Rangeland in Pastoral Areas (IRPA)</p>";
+
+  await updateDoc(ref, {
+    invitationTokenHash: invitationSecretHash,
+    invitationExpiresAt,
+    invitationRedeemedAt: null,
+    invitationRedeemedUid: null,
+    invitationTokenVersion: "2",
+    status: "Queued",
+    deliveryStatus: "Queued — awaiting SMTP transport",
+    deliveryProvider: "Firebase Firestore mail queue → SMTP transport",
+    updatedAt: serverTimestamp()
+  });
+  const mailRef = await addDoc(collection(db, "mail"), {
+    to: [email],
+    message: { subject, text, html },
+    source: "IRPA-DBGS invitation fallback mail queue",
+    invitationId,
+    queuedAt: serverTimestamp(),
+    createdAt: serverTimestamp()
+  });
+  return { ok: true, email, role, memberType, deliveryStatus: "Queued — awaiting SMTP transport", mailQueueId: mailRef.id, fallback: true };
+}
+
 export async function sendMemberInvitationEmail(_email, invitationId, _role, _memberType) {
   const cleanId = String(invitationId || "").trim();
   if (!cleanId) throw new Error("The invitation ID is required.");
-  const call = httpsCallable(getFunctions(undefined, "us-central1"), "sendMemberInvitation");
-  const result = await call({ invitationId: cleanId });
-  return result.data || {};
+  try {
+    const call = httpsCallable(getFunctions(undefined, "us-central1"), "sendMemberInvitation");
+    const result = await call({ invitationId: cleanId });
+    return result.data || {};
+  } catch (error) {
+    const code = String(error?.code || "").toLowerCase();
+    const message = String(error?.message || "").toLowerCase();
+    const serverUnavailable = code === "functions/internal" || code === "functions/unavailable" || code === "functions/not-found" || /internal|unavailable|not[- ]found|failed to fetch|network/.test(message);
+    if (!serverUnavailable) throw error;
+    return await queueMemberInvitationFromClient(cleanId);
+  }
 }
+
 
 export async function sendEmployeeRegistrationEmail(email, employeeNumber) {
   const cleanEmail = String(email || "").trim().toLowerCase();
