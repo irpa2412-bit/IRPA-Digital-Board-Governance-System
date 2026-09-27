@@ -10,7 +10,7 @@ function currentActor(){return{uid:auth.currentUser?.uid||null,email:auth.curren
 async function writeAudit(action,collectionName,recordId,details={}){const a=currentActor();const anonymous=action.startsWith("ANONYMOUS_VOTE_");await addDoc(collection(db,COLLECTIONS.audit),{action,collection:collectionName,recordId,details,actorUid:anonymous?null:a.uid,actorEmail:anonymous?null:a.email,createdAt:serverTimestamp()});}
 function auditData(action,collectionName,recordId,details={}){const a=currentActor();const anonymous=action.startsWith("ANONYMOUS_VOTE_");return{action,collection:collectionName,recordId,details,actorUid:anonymous?null:a.uid,actorEmail:anonymous?null:a.email,createdAt:serverTimestamp()};}
 export async function nextDocumentReference(){if(!auth.currentUser)throw new Error("Authentication is required to generate a document reference.");const call=httpsCallable(getFunctions(undefined,"us-central1"),"nextDocumentReference");const result=await call({});const reference=String(result.data?.reference||"").trim();if(!reference)throw new Error("The server did not return a document reference.");return reference}
-const isRetryableFirestoreError=error=>["unavailable","deadline-exceeded","aborted","internal","resource-exhausted"].includes(String(error?.code||"").replace(/^firestore\\//,""));
+const isRetryableFirestoreError=error=>["unavailable","deadline-exceeded","aborted","internal","resource-exhausted"].includes(String(error?.code||"").replace(/^firestore\//,""));
 async function retryFirestoreWrite(operation,label,{attempts=3,baseDelay=450}={}){
   let lastError=null;
   for(let attempt=1;attempt<=attempts;attempt+=1){
