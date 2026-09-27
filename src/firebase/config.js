@@ -20,7 +20,7 @@ const app = initializeApp(firebaseConfig);
 // invitation-based assistance can never replace or poison the primary login session.
 export const applicantApp = initializeApp(firebaseConfig, "irpa-applicant-enrollment");
 export const applicantAuth = getAuth(applicantApp);
-const createPersistentFirestore = (firebaseApp) => {
+ = (firebaseApp) => {
   try {
     return initializeFirestore(firebaseApp, {
       localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
@@ -33,8 +33,10 @@ const createPersistentFirestore = (firebaseApp) => {
   }
 };
 
+export const applicantDb = createPersistentFirestore(applicantApp);
+
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+export const db = createPersistentFirestore(app);
 export const googleProvider = new GoogleAuthProvider();
 
 googleProvider.setCustomParameters({
