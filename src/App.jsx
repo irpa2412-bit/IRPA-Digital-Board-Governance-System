@@ -16,13 +16,13 @@ function PageBackNextNavigation({active,modules,onNavigate}){
   const next=index<items.length-1?items[index+1]:null;
   const label=PORTAL_LABELS[active]||displayModuleName(active);
   return <nav className="page-back-next-navigation" aria-label="Page Back and Next navigation">
-    <button type="button" className="page-back-next-button" disabled={!previous} onClick={()=>previous&&onNavigate(previous)} aria-label={previous?"Back to "+(PORTAL_LABELS[previous]||displayModuleName(previous)):"Back unavailable"}>
+    <button type="button" className={"page-back-next-button"+(!previous?" page-nav-end page-nav-start-end":"")} disabled={!previous} onClick={()=>previous&&onNavigate(previous)} aria-label={previous?"Back to "+(PORTAL_LABELS[previous]||displayModuleName(previous)):"Back unavailable"}>
       <span aria-hidden="true">←</span><span>Back</span>
     </button>
     <div className="page-back-next-status" aria-live="polite">
       <span>PAGE NAVIGATION</span><strong>{label}</strong><small>{index+1} of {items.length}</small>
     </div>
-    <button type="button" className="page-back-next-button" disabled={!next} onClick={()=>next&&onNavigate(next)} aria-label={next?"Next to "+(PORTAL_LABELS[next]||displayModuleName(next)):"Next unavailable"}>
+    <button type="button" className={"page-back-next-button"+(!next?" page-nav-end page-nav-last-end":"")} disabled={!next} onClick={()=>next&&onNavigate(next)} aria-label={next?"Next to "+(PORTAL_LABELS[next]||displayModuleName(next)):"Next unavailable"}>
       <span>Next</span><span aria-hidden="true">→</span>
     </button>
   </nav>
