@@ -1,0 +1,2 @@
+IRPA-DBGS production gateway deployment trigger
+2026-09-27: publish idempotent Google Drive uploads, transient retry handling, and controlled-document archive reliability.
