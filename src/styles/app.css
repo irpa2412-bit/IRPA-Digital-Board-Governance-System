@@ -5735,7 +5735,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 }
 
 
-/* PORTAL NAVIGATION ROLLER — PERMANENT PINNED POP-UP MODE */
+/* MOBILE-ONLY PORTAL NAVIGATION ROLLER — PERMANENT PINNED POP-UP MODE */
 @media screen and (max-width:760px){
   .portal-navigation-roller{
     position:fixed!important;
