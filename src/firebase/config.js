@@ -20,7 +20,18 @@ const app = initializeApp(firebaseConfig);
 // invitation-based assistance can never replace or poison the primary login session.
 export const applicantApp = initializeApp(firebaseConfig, "irpa-applicant-enrollment");
 export const applicantAuth = getAuth(applicantApp);
-const createPersistentFirestore = (firebaseApp) => {\n  try {\n    return initializeFirestore(firebaseApp, {\n      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })\n    });\n  } catch (error) {\n    // Persistence can be unavailable in restricted/private browser contexts.\n    // Fall back to the normal Firestore client rather than blocking the portal.\n    console.warn("IRPA-DBGS persistent Firestore cache unavailable; using standard Firestore:", error);\n    return getFirestore(firebaseApp);\n  }\n};\n\nexport const applicantDb = createPersistentFirestore(applicantApp);
+const createPersistentFirestore = (firebaseApp) => {
+  try {
+    return initializeFirestore(firebaseApp, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+    });
+  } catch (error) {
+    // Persistence can be unavailable in restricted/private browser contexts.
+    // Fall back to the normal Firestore client rather than blocking the portal.
+    console.warn("IRPA-DBGS persistent Firestore cache unavailable; using standard Firestore:", error);
+    return getFirestore(firebaseApp);
+  }
+};
 
 export const auth = getAuth(app);
 export const db = getFirestore(app);
