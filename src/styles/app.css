@@ -6136,3 +6136,54 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     border-color:#b99951!important;
   }
 }
+
+
+/* MOBILE-ONLY NAVIGATION ENDPOINT STATES — 2026-09-27 */
+@media screen and (max-width:760px){
+  /* Endpoint appearance is intentionally mobile-only. */
+  nav.page-back-next-navigation .page-back-next-button.page-nav-start-end{
+    background:#56656e!important;
+    border-color:#8b9aa3!important;
+    color:#eef3f5!important;
+    opacity:1!important;
+    cursor:not-allowed!important;
+    filter:none!important;
+  }
+  nav.page-back-next-navigation .page-back-next-button.page-nav-last-end{
+    background:#705923!important;
+    border-color:#b99951!important;
+    color:#fff8df!important;
+    opacity:1!important;
+    cursor:not-allowed!important;
+    filter:none!important;
+  }
+  nav.page-back-next-navigation .page-back-next-button.page-nav-start-end span:last-child::after{
+    content:" · START";
+    font-size:.72em;
+    font-weight:900;
+    letter-spacing:.04em;
+  }
+  nav.page-back-next-navigation .page-back-next-button.page-nav-last-end span:first-child::after{
+    content:" · END";
+    font-size:.72em;
+    font-weight:900;
+    letter-spacing:.04em;
+  }
+}
+@media screen and (min-width:761px){
+  /* Desktop keeps the existing standard disabled endpoint appearance. */
+  nav.page-back-next-navigation .page-back-next-button.page-nav-start-end,
+  nav.page-back-next-navigation .page-back-next-button.page-nav-last-end{
+    background:inherit!important;
+    border-color:inherit!important;
+    color:inherit!important;
+    opacity:.55!important;
+    cursor:not-allowed!important;
+    filter:none!important;
+    box-shadow:none!important;
+  }
+  nav.page-back-next-navigation .page-back-next-button.page-nav-start-end span:last-child::after,
+  nav.page-back-next-navigation .page-back-next-button.page-nav-last-end span:first-child::after{
+    content:none!important;
+  }
+}
