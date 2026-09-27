@@ -10,7 +10,31 @@ function currentActor(){return{uid:auth.currentUser?.uid||null,email:auth.curren
 async function writeAudit(action,collectionName,recordId,details={}){const a=currentActor();const anonymous=action.startsWith("ANONYMOUS_VOTE_");await addDoc(collection(db,COLLECTIONS.audit),{action,collection:collectionName,recordId,details,actorUid:anonymous?null:a.uid,actorEmail:anonymous?null:a.email,createdAt:serverTimestamp()});}
 function auditData(action,collectionName,recordId,details={}){const a=currentActor();const anonymous=action.startsWith("ANONYMOUS_VOTE_");return{action,collection:collectionName,recordId,details,actorUid:anonymous?null:a.uid,actorEmail:anonymous?null:a.email,createdAt:serverTimestamp()};}
 export async function nextDocumentReference(){if(!auth.currentUser)throw new Error("Authentication is required to generate a document reference.");const call=httpsCallable(getFunctions(undefined,"us-central1"),"nextDocumentReference");const result=await call({});const reference=String(result.data?.reference||"").trim();if(!reference)throw new Error("The server did not return a document reference.");return reference}
-export async function createRecord(collectionName,data){const protectedData=collectionName===COLLECTIONS.documents?{...data,recordOrigin:data.recordOrigin||"PRODUCTION"}:data;const ref=await addDoc(collection(db,collectionName),{...protectedData,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});await writeAudit("CREATE",collectionName,ref.id,protectedData);return ref.id;}
+const isRetryableFirestoreError=error=>["unavailable","deadline-exceeded","aborted","internal","resource-exhausted"].includes(String(error?.code||"").replace(/^firestore\\//,""));
+async function retryFirestoreWrite(operation,label,{attempts=3,baseDelay=450}={}){
+  let lastError=null;
+  for(let attempt=1;attempt<=attempts;attempt+=1){
+    try{return await operation();}
+    catch(error){lastError=error;if(attempt>=attempts||!isRetryableFirestoreError(error))throw error;await new Promise(resolve=>setTimeout(resolve,baseDelay*Math.pow(2,attempt-1)));}
+  }
+  throw lastError||new Error(label+" failed.");
+}
+async function auditBestEffort(action,collectionName,recordId,details={}){
+  try{await retryFirestoreWrite(()=>writeAudit(action,collectionName,recordId,details),"Audit write",{attempts:3,baseDelay:300});}
+  catch(error){console.error("IRPA-DBGS audit write deferred after primary persistence succeeded:",{action,collectionName,recordId,error});}
+}
+export async function createRecord(collectionName,data){
+  const protectedData=collectionName===COLLECTIONS.documents?{...data,recordOrigin:data.recordOrigin||"PRODUCTION"}:data;
+  // Use a client-generated document reference so retries are idempotent. A transient
+  // acknowledgement failure must never create a second institutional record.
+  const ref=doc(collection(db,collectionName));
+  const payload={...protectedData,createdAt:serverTimestamp(),updatedAt:serverTimestamp()};
+  await retryFirestoreWrite(()=>setDoc(ref,payload),"Primary record save");
+  const persisted=await retryFirestoreWrite(()=>getDoc(ref),"Primary record verification");
+  if(!persisted.exists())throw new Error("The IRPA record could not be verified after save.");
+  await auditBestEffort("CREATE",collectionName,ref.id,protectedData);
+  return ref.id;
+}
 export async function upsertFinancePaymentTrace(traceId,data={}){if(!auth.currentUser)throw new Error("Authentication is required.");if(!traceId)throw new Error("A finance trace ID is required.");const ref=doc(db,COLLECTIONS.financePaymentTrace,traceId);const existing=await getDoc(ref);const actor=currentActor();const payload={...data,lastUpdatedByUid:actor.uid,lastUpdatedByEmail:actor.email,updatedAt:serverTimestamp()};if(!existing.exists()){payload.createdAt=serverTimestamp();payload.createdByUid=actor.uid;payload.createdByEmail=actor.email;await setDoc(ref,payload);await writeAudit("CREATE_FINANCE_PAYMENT_TRACE",COLLECTIONS.financePaymentTrace,traceId,data);}else{await updateDoc(ref,payload);await writeAudit("UPDATE_FINANCE_PAYMENT_TRACE",COLLECTIONS.financePaymentTrace,traceId,data);}return traceId;}
 async function getHighestRegistrationNumber(collectionName,fieldName){const snap=await getDocs(collection(db,collectionName));let highest=0;for(const item of snap.docs){const value=Number(String(item.data()?.[fieldName]||"").split("-").pop());if(Number.isInteger(value)&&value>highest)highest=value;}return highest;}
 async function requireActiveAdmin(){const user=auth.currentUser;if(!user?.uid)throw new Error("Authentication is required.");const email=String(user.email||"").trim().toLowerCase();if(email==="irpa2412@gmail.com")return user.uid;const snap=await getDoc(doc(db,COLLECTIONS.adminProfiles,user.uid));if(!snap.exists()||snap.data()?.active!==true)throw new Error("Administrator authorization is required.");return user.uid;}
@@ -79,7 +103,15 @@ export async function castAnonymousVote({votingIssueId,outcome,votingMethod="Mee
 export async function hasVotedOnIssue(votingIssueId){const uid=auth.currentUser?.uid;if(!uid||!votingIssueId)return false;const snap=await getDoc(doc(db,COLLECTIONS.votingIssues,votingIssueId,"participants",uid));return snap.exists();}
 export async function closeVotingIssue(votingIssueId,result="Pending"){if(!votingIssueId)throw new Error("A voting issue is required.");const ref=doc(db,COLLECTIONS.votingIssues,votingIssueId);const resultValue=["Passed","Rejected","Pending"].includes(result)?result:"Pending";let issue;await runTransaction(db,async tx=>{const snap=await tx.get(ref);if(!snap.exists())throw new Error("Voting issue not found.");issue=snap.data();if(issue.status!=="Open")throw new Error("This voting issue is already closed.");tx.update(ref,{status:"Closed",result:resultValue,closedAt:serverTimestamp(),updatedAt:serverTimestamp()});if(issue.resolutionId){const resolutionRef=doc(db,COLLECTIONS.resolutions,issue.resolutionId);const resolutionSnap=await tx.get(resolutionRef);if(!resolutionSnap.exists())throw new Error("The linked resolution no longer exists.");tx.update(resolutionRef,{status:resultValue,votingStatus:"Completed",votingResult:resultValue,votingIssueId,updatedAt:serverTimestamp()});}});await writeAudit("VOTING_ISSUE_CLOSED",COLLECTIONS.votingIssues,votingIssueId,{result:resultValue,resolutionId:issue?.resolutionId||null});return resultValue;}
 export async function createVoteCorrection({voteId,reason,correctionNote}){if(!voteId||!reason?.trim()||!correctionNote?.trim())throw new Error("Vote, correction reason and correction note are required.");const ref=doc(collection(db,COLLECTIONS.voteCorrections));const auditRef=doc(collection(db,COLLECTIONS.audit));await runTransaction(db,async tx=>{const voteSnap=await tx.get(doc(db,COLLECTIONS.votes,voteId));if(!voteSnap.exists())throw new Error("The original vote could not be found.");tx.set(ref,{voteId,reason:reason.trim(),correctionNote:correctionNote.trim(),originalVotePreserved:true,auditRequired:true,requestedByUid:auth.currentUser?.uid||null,requestedAt:serverTimestamp(),status:"Administrative Review",createdAt:serverTimestamp()});tx.set(auditRef,auditData("VOTE_CORRECTION_REQUEST_CREATED",COLLECTIONS.voteCorrections,ref.id,{voteId,reason:reason.trim(),originalVotePreserved:true,auditRequired:true}));});return ref.id;}
-export async function updateRecord(collectionName,id,data,options={}){const touchUpdatedAt=options.touchUpdatedAt!==false;const audit=options.audit!==false;const payload=touchUpdatedAt?{...data,updatedAt:serverTimestamp()}:data;await updateDoc(doc(db,collectionName,id),payload);if(audit)await writeAudit("UPDATE",collectionName,id,data);}
+export async function updateRecord(collectionName,id,data,options={}){
+  const touchUpdatedAt=options.touchUpdatedAt!==false;
+  const audit=options.audit!==false;
+  const payload=touchUpdatedAt?{...data,updatedAt:serverTimestamp()}:data;
+  await retryFirestoreWrite(()=>updateDoc(doc(db,collectionName,id),payload),"Primary record update");
+  const persisted=await retryFirestoreWrite(()=>getDoc(doc(db,collectionName,id)),"Primary record verification");
+  if(!persisted.exists())throw new Error("The IRPA record could not be verified after update.");
+  if(audit)await auditBestEffort("UPDATE",collectionName,id,data);
+}
 export async function processPaymentRequest(id,changes){const actor=currentActor();await updateDoc(doc(db,COLLECTIONS.staffPaymentRequests,id),{...changes,actionByUid:actor.uid,actionByEmail:actor.email,actionAt:serverTimestamp(),updatedAt:serverTimestamp()});await writeAudit("PAYMENT_WORKFLOW_ACTION",COLLECTIONS.staffPaymentRequests,id,{...changes,actorUid:actor.uid,actorEmail:actor.email});}
 export async function deleteRecord(collectionName,id){await deleteDoc(doc(db,collectionName,id));await writeAudit("DELETE",collectionName,id);}
 export async function getAdminProfile(uid){return uid?getRecord(COLLECTIONS.adminProfiles,uid):null;}
