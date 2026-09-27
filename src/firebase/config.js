@@ -1,5 +1,11 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import {
+  getAuth,
+  GoogleAuthProvider,
+  setPersistence,
+  indexedDBLocalPersistence,
+  browserLocalPersistence
+} from "firebase/auth";
 import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 
 export const firebaseConfig = {
@@ -20,6 +26,7 @@ const app = initializeApp(firebaseConfig);
 // invitation-based assistance can never replace or poison the primary login session.
 export const applicantApp = initializeApp(firebaseConfig, "irpa-applicant-enrollment");
 export const applicantAuth = getAuth(applicantApp);
+
 const createPersistentFirestore = (firebaseApp) => {
   try {
     return initializeFirestore(firebaseApp, {
@@ -34,7 +41,6 @@ const createPersistentFirestore = (firebaseApp) => {
 };
 
 export const applicantDb = createPersistentFirestore(applicantApp);
-
 export const auth = getAuth(app);
 export const db = createPersistentFirestore(app);
 export const googleProvider = new GoogleAuthProvider();
@@ -42,6 +48,22 @@ export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({
   prompt: "select_account",
   login_hint: "irpa2412@gmail.com"
+});
+
+// Explicit durable browser authentication persistence. IndexedDB is preferred
+// for mobile/desktop PWAs and WebViews, with browser-local persistence as a
+// fallback. This is initialized once before any portal authentication action.
+export const authPersistenceReady = setPersistence(auth, indexedDBLocalPersistence).catch((error) => {
+  console.warn("IRPA indexedDB Auth persistence unavailable; falling back to browser-local persistence.", error);
+  return setPersistence(auth, browserLocalPersistence);
+});
+
+export const applicantAuthPersistenceReady = setPersistence(
+  applicantAuth,
+  indexedDBLocalPersistence
+).catch((error) => {
+  console.warn("IRPA applicant Auth indexedDB persistence unavailable; using browser-local persistence.", error);
+  return setPersistence(applicantAuth, browserLocalPersistence);
 });
 
 export default app;
