@@ -266,6 +266,24 @@ async function upload(request, env) {
     purposeId = await findOrCreateFolder(env, accessToken, purpose, documentsId);
   }
 
+  const existingFile=await findDriveFileByIdentity(env,accessToken,purposeId,fileName,{
+    storagePath:String(data.storagePath||data.path||""),
+    ownerUid,
+    purpose
+  });
+  if(existingFile?.id){
+    return json({
+      ok:true,
+      fileId:existingFile.id,
+      fileName:existingFile.name||fileName,
+      fileSize:Number(existingFile.size||fileSize),
+      webViewLink:existingFile.webViewLink||`https://drive.google.com/file/d/${existingFile.id}/view`,
+      uploadedByUid:claims.user_id,
+      storageProvider:"Google Drive",
+      idempotent:true
+    },200,corsHeaders(request));
+  }
+
   const metadata = {
     name: fileName,
     parents: [purposeId],
@@ -275,6 +293,7 @@ async function upload(request, env) {
       uploadedByUid: claims.user_id,
       purpose,
       ownerUid,
+      storagePath:String(data.storagePath||data.path||""),
       driveFolderId: purpose === "Signature Profile" ? purposeId : null
     })
   };
@@ -396,6 +415,21 @@ async function uploadControlledDocument(request, env) {
   }
 
   const uploadToFolder = async (folderId, purposeLabel, archiveChannel) => {
+    const existingFile=await findDriveFileByIdentity(env,accessToken,folderId,fileName,{
+      documentId,
+      archiveChannel
+    });
+    if(existingFile?.id){
+      return {
+        fileId:existingFile.id,
+        fileName:existingFile.name||fileName,
+        fileSize:Number(existingFile.size||fileSize),
+        webViewLink:existingFile.webViewLink||`https://drive.google.com/file/d/${existingFile.id}/view`,
+        folderId,
+        archiveChannel,
+        idempotent:true
+      };
+    }
     const metadata = {
       name:fileName,
       parents:[folderId],
@@ -1224,6 +1258,22 @@ async function ensureSignatureFolderPermission(env, accessToken, folderId, email
     console.warn("Signature folder sharing was not completed", normalizedEmail, error?.message || error);
     return false;
   }
+}
+
+async function findDriveFileByIdentity(env, accessToken, folderId, fileName, identity={}) {
+  const safeName=String(fileName||"").replace(/'/g,"\\'");
+  const q=[`name='${safeName}'`,"trashed=false",`'${folderId}' in parents`].join(" and ");
+  const listed=await driveFetch(env,accessToken,`/drive/v3/files?q=${encodeURIComponent(q)}&spaces=drive&pageSize=20&fields=files(id,name,mimeType,size,webViewLink,createdTime,parents,description)`);
+  const expectedPath=String(identity.storagePath||"");
+  const expectedDocumentId=String(identity.documentId||"");
+  const expectedChannel=String(identity.archiveChannel||"");
+  const expectedOwner=String(identity.ownerUid||"");
+  return (listed.files||[]).find(file=>{
+    const d=parseDescription(file.description);
+    if(expectedPath && d.storagePath===expectedPath)return true;
+    if(expectedDocumentId && d.documentId===expectedDocumentId && (!expectedChannel || d.archiveChannel===expectedChannel))return true;
+    return Boolean(expectedOwner && d.ownerUid===expectedOwner && d.purpose===identity.purpose && !expectedPath && !expectedDocumentId);
+  })||null;
 }
 
 async function findOrCreateFolder(env, accessToken, name, parentId = null, descriptionData = null) {
