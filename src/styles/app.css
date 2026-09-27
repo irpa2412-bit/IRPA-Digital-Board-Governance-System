@@ -6302,3 +6302,30 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 @media screen and (min-width:761px){
   .system-back-next-navigation{display:none!important}
 }
+
+
+/* MOBILE PORTAL ROLLER — OUTER SYSTEM NAVIGATION ARROW */
+@media screen and (max-width:760px){
+  .portal-navigation-roller .webapp-navigation-roller-chevron{
+    appearance:none!important;
+    -webkit-appearance:none!important;
+    border:1px solid rgba(255,255,255,.45)!important;
+    background:#0b5fa8!important;
+    color:#fff!important;
+    display:flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    margin:0!important;
+    padding:0!important;
+    box-sizing:border-box!important;
+    border-radius:7px!important;
+    cursor:pointer!important;
+    touch-action:manipulation!important;
+    font-weight:900!important;
+    line-height:1!important;
+  }
+  .portal-navigation-roller .webapp-navigation-roller-chevron:active{
+    transform:scale(.96)!important;
+    filter:brightness(1.15)!important;
+  }
+}
