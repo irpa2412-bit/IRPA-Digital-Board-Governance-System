@@ -395,11 +395,26 @@ export async function sendMemberInvitationEmail(_email, invitationId, _role, _me
     const result = await call({ invitationId: cleanId });
     return result.data || {};
   } catch (error) {
-    const code = String(error?.code || "").toLowerCase();
+    const rawCode = String(error?.code || "").toLowerCase();
+    const code = rawCode.replace(/^functions\//, "");
     const message = String(error?.message || "").toLowerCase();
-    const serverUnavailable = code === "functions/internal" || code === "functions/unavailable" || code === "functions/not-found" || /internal|unavailable|not[- ]found|failed to fetch|network/.test(message);
+    // Firebase callable errors can surface as either "functions/internal" or
+    // the normalized "internal" code depending on the SDK/runtime path.
+    // The production invitation function is currently subject to deferred
+    // Cloud Functions deployment, so internal/unavailable transport failures
+    // must enter the durable Firestore mail-queue fallback rather than leaving
+    // the invitation in a Failed state.
+    const serverUnavailable =
+      ["internal","unavailable","not-found"].includes(code) ||
+      /internal|unavailable|not[- ]found|failed to fetch|network|deadline|timeout|transport/.test(message);
     if (!serverUnavailable) throw error;
-    return await queueMemberInvitationFromClient(cleanId);
+    try {
+      return await queueMemberInvitationFromClient(cleanId);
+    } catch (fallbackError) {
+      const fallbackMessage = String(fallbackError?.message || "").trim();
+      const detail = fallbackMessage || "The invitation mail queue could not be written.";
+      throw new Error("Invitation delivery fallback failed: " + detail);
+    }
   }
 }
 
