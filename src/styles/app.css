@@ -6494,3 +6494,56 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     word-break:normal!important;
   }
 }
+
+
+/* UNIVERSAL PORTAL FIELD NAVIGATOR — ALL GOVERNANCE PORTALS / WEB VERSIONS */
+.portal-field-navigator{
+  width:min(100%,980px);
+  margin:8px auto 14px;
+  padding:12px 14px;
+  box-sizing:border-box;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(260px,420px);
+  gap:14px;
+  align-items:center;
+  position:sticky;
+  top:8px;
+  z-index:1200;
+  border:2px solid #1675bd;
+  border-radius:14px;
+  background:linear-gradient(135deg,#062f54,#0b4775);
+  color:#fff;
+  box-shadow:0 10px 24px rgba(0,0,0,.18);
+}
+.portal-field-navigator-copy{min-width:0;display:grid;gap:2px}
+.portal-field-navigator-copy>span{font-size:11px;font-weight:900;letter-spacing:.12em;color:#9fd2f6}
+.portal-field-navigator-copy>strong{font-size:17px;line-height:1.2;color:#fff}
+.portal-field-navigator-copy>small{font-size:11px;line-height:1.35;color:rgba(255,255,255,.72)}
+.portal-field-navigator-control{position:relative;min-width:0}
+.portal-field-navigator-control select{
+  width:100%;height:48px;min-height:48px;box-sizing:border-box;
+  padding:8px 42px 8px 14px;border:3px solid #e0a914;border-radius:12px;
+  background:#fff;color:#173a2d;-webkit-text-fill-color:#173a2d;color-scheme:light;
+  font-size:15px;font-weight:750;outline:none;appearance:auto;-webkit-appearance:auto;
+}
+.portal-field-navigator-control>span{
+  position:absolute;right:13px;top:50%;transform:translateY(-50%);
+  pointer-events:none;color:#173a2d;font-size:18px;font-weight:900;
+}
+.portal-field-navigator-control select:focus{box-shadow:0 0 0 3px rgba(255,255,255,.28)}
+@media screen and (max-width:760px){
+  .portal-field-navigator{
+    width:100%;margin:52px 0 10px;padding:10px 11px;
+    grid-template-columns:1fr;gap:8px;border-radius:12px;
+    position:sticky;top:112px;z-index:1200;
+  }
+  .portal-field-navigator-copy>span{font-size:9px}
+  .portal-field-navigator-copy>strong{font-size:15px}
+  .portal-field-navigator-copy>small{font-size:10px}
+  .portal-field-navigator-control select{height:52px;min-height:52px;font-size:16px;border-width:3px;border-radius:11px}
+}
+@media screen and (max-width:380px){
+  .portal-field-navigator{margin-top:48px;padding:9px;top:102px}
+  .portal-field-navigator-copy>strong{font-size:14px}
+  .portal-field-navigator-control select{height:48px;min-height:48px;font-size:15px}
+}
