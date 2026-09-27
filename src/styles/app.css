@@ -5920,3 +5920,53 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   .content-area,
   .dashboard-content-area{padding-bottom:108px!important}
 }
+
+
+/* ALL MOBILE PORTALS AND PAGES NAVIGATION — PERMANENT SCREEN-FIT */
+@media screen and (max-width:760px){
+  /* Every non-dashboard page receives the same compact pinned navigation roller. */
+  main.content-area:not(.dashboard-content-area) > .desktop-webapp-navigation-roller{
+    position:fixed!important;
+    top:64px!important;
+    left:5px!important;
+    right:5px!important;
+    width:auto!important;
+    max-width:none!important;
+    min-width:0!important;
+    margin:0!important;
+    padding:4px 6px!important;
+    min-height:40px!important;
+    max-height:44px!important;
+    box-sizing:border-box!important;
+    display:grid!important;
+    grid-template-columns:minmax(56px,72px) minmax(0,1fr) minmax(100px,1.15fr) 26px!important;
+    gap:5px!important;
+    overflow:hidden!important;
+    border-radius:8px!important;
+    z-index:1500!important;
+  }
+  main.content-area:not(.dashboard-content-area){
+    padding-top:112px!important;
+  }
+  main.content-area.dashboard-content-area > .desktop-webapp-navigation-roller{
+    display:none!important;
+  }
+  main.content-area:not(.dashboard-content-area) > nav.page-back-next-navigation{
+    bottom:calc(62px + env(safe-area-inset-bottom))!important;
+  }
+}
+@media screen and (max-width:380px){
+  main.content-area:not(.dashboard-content-area) > .desktop-webapp-navigation-roller{
+    top:60px!important;
+    left:3px!important;
+    right:3px!important;
+    min-height:36px!important;
+    max-height:40px!important;
+    padding:3px 4px!important;
+    grid-template-columns:minmax(48px,62px) minmax(0,1fr) minmax(84px,1fr) 23px!important;
+    gap:3px!important;
+  }
+  main.content-area:not(.dashboard-content-area){
+    padding-top:102px!important;
+  }
+}
