@@ -20,7 +20,7 @@ import {
 } from "firebase/auth";
 import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { auth, db, firebaseConfig, googleProvider, applicantAuth } from "./config";
+import { auth, db, firebaseConfig, googleProvider, applicantAuth, authPersistenceReady, applicantAuthPersistenceReady } from "./config";
 import { addDoc, collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
 
@@ -57,18 +57,21 @@ adminGoogleProvider.setCustomParameters({
 });
 
 export async function ensureInvitationApplicantSession() {
+  await applicantAuthPersistenceReady;
   if (applicantAuth.currentUser) return applicantAuth.currentUser;
   const result = await signInAnonymously(applicantAuth);
   return result.user;
 }
 
 export async function registerWithEmail(email, password, options = {}) {
+  await authPersistenceReady;
   const result = await createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
   if (options.verify !== false) await sendEmailVerification(result.user);
   return result.user;
 }
 
 export async function loginWithEmail(email, password) {
+  await authPersistenceReady;
   const cleanEmail = email.trim().toLowerCase();
   if (!cleanEmail || !password) throw new Error("Email address and password are required.");
   const functions = getFunctions(undefined, "us-central1");
@@ -134,6 +137,7 @@ export async function loginWithEmail(email, password) {
 }
 
 export async function loginWithGoogle(expectedEmail = "", options = {}) {
+  await authPersistenceReady;
   const expected = String(expectedEmail || "").trim().toLowerCase();
 
   // Administrator Gateway: use a direct popup while the action still has
@@ -196,6 +200,7 @@ export async function loginWithGoogle(expectedEmail = "", options = {}) {
 }
 
 export async function completeGoogleRedirect(expectedEmail = "") {
+  await authPersistenceReady;
   const result = await getRedirectResult(auth);
   if (!result?.user) return null;
   const expected = String(expectedEmail || window.localStorage.getItem("irpaExpectedGoogleAdminEmail") || "").trim().toLowerCase();
@@ -385,6 +390,7 @@ export function isMagicLink(url = window.location.href) {
 }
 
 export async function completeInvitationToken(token) {
+  await authPersistenceReady;
   const cleanToken = String(token || "").trim();
   if (!cleanToken) throw new Error("The IRPA invitation token is missing.");
   const call = httpsCallable(getFunctions(undefined, "us-central1"), "redeemInvitationToken");
@@ -405,6 +411,7 @@ export async function completeInvitationToken(token) {
 }
 
 export async function completeMagicLink(email, url = window.location.href) {
+  await authPersistenceReady;
   const cleanEmail = email.trim().toLowerCase();
   const params = new URL(url, window.location.origin).searchParams;
   const adminInvitationId = params.get("adminInvite");
