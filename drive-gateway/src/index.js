@@ -47,6 +47,10 @@ export default {
         return await uploadControlledDocument(request, env);
       }
 
+      if (pathname === "/api/communication-media/upload" && request.method === "POST") {
+        return await uploadCommunicationMedia(request, env);
+      }
+
       if (pathname === "/api/signature-profile/folder" && request.method === "POST") {
         return await ensureSignatureProfileFolder(request, env);
       }
@@ -321,6 +325,115 @@ async function upload(request, env) {
     uploadedByUid: claims.user_id,
     storageProvider: "Google Drive"
   }, 200, corsHeaders(request));
+}
+
+async function uploadCommunicationMedia(request, env) {
+  const claims = await authenticateFirebaseRequest(request);
+  const { memberRecord, employeeRecord } = await getInstitutionalProfileForUser(env, claims);
+  const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
+  const communicationRoles = new Set([
+    "Communications Officer","Director Outreach","Outreach Director",
+    "Director Community Development","Community Development Director","Executive Director"
+  ]);
+  const roleValues = record => {
+    if (!record?.fields) return [];
+    const values = [];
+    const direct = ["role","boardPosition","unit","unitName"];
+    direct.forEach(key => {
+      const value = record.fields[key]?.stringValue;
+      if (value) values.push(value);
+    });
+    ["roles","assignedRoles","selectedRoles","roleAssignments"].forEach(key => {
+      values.push(...firestoreStringArray(record.fields[key]));
+    });
+    return values.map(v => String(v).trim()).filter(Boolean);
+  };
+  const authorized = Boolean(adminRecord?.fields?.active?.booleanValue)
+    || roleValues(memberRecord).some(r => communicationRoles.has(r))
+    || roleValues(employeeRecord).some(r => communicationRoles.has(r));
+  if (!authorized) {
+    return json({ok:false,error:"Communication & Media authorization is required for media asset upload."},403,corsHeaders(request));
+  }
+
+  const data = await request.json();
+  const fileName = cleanName(data.fileName || "IRPA-media-asset");
+  const contentType = String(data.contentType || "").toLowerCase();
+  const fileSize = Number(data.fileSize || 0);
+  const base64 = String(data.base64 || "");
+  const assetId = cleanId(data.assetId || `IRPA-MEDIA-${crypto.randomUUID()}`);
+  const assetType = cleanName(data.assetType || "Media Asset");
+  const title = cleanName(data.title || fileName);
+
+  const allowedTypes = new Set(["application/pdf","image/png","image/jpeg","image/webp"]);
+  if (!allowedTypes.has(contentType)) {
+    return json({ok:false,error:"Communication media uploads currently support PDF, PNG, JPEG and WEBP files."},400,corsHeaders(request));
+  }
+  if (!Number.isFinite(fileSize) || fileSize <= 0 || fileSize > MAX_BYTES) {
+    return json({ok:false,error:"Communication media files must not exceed 10 MB."},400,corsHeaders(request));
+  }
+  const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+  if (bytes.length !== fileSize) {
+    return json({ok:false,error:"The media file size could not be verified."},400,corsHeaders(request));
+  }
+
+  const accessToken = await getDriveAccessToken(env);
+  const rootId = await findOrCreateFolder(env, accessToken, "IRPA Governance System");
+  const mediaRootId = await findOrCreateFolder(env, accessToken, "Communication & Media", rootId, {
+    irpaGovernanceArchive:true,
+    irpaCommunicationMediaArchive:true,
+    purpose:"Communication & Media Assets"
+  });
+  const typeFolderId = await findOrCreateFolder(env, accessToken, assetType, mediaRootId, {
+    irpaGovernanceArchive:true,
+    irpaCommunicationMediaArchive:true,
+    assetType,
+    purpose:"Communication & Media Asset Type"
+  });
+
+  const existingFile = await findDriveFileByIdentity(env, accessToken, typeFolderId, fileName, {
+    assetId,
+    storagePath:`communication-media/${assetId}/${fileName}`
+  });
+  if (existingFile?.id) {
+    return json({
+      ok:true, assetId, fileId:existingFile.id, fileName:existingFile.name || fileName,
+      fileSize:Number(existingFile.size || fileSize),
+      webViewLink:existingFile.webViewLink || `https://drive.google.com/file/d/${existingFile.id}/view`,
+      storageProvider:"Google Drive", idempotent:true
+    },200,corsHeaders(request));
+  }
+
+  const metadata = {
+    name:fileName,
+    parents:[typeFolderId],
+    mimeType:contentType,
+    description:JSON.stringify({
+      irpaGovernance:true,
+      irpaCommunicationMedia:true,
+      assetId,
+      assetType,
+      title,
+      uploadedByUid:claims.user_id,
+      ownerUid:claims.user_id,
+      storagePath:`communication-media/${assetId}/${fileName}`,
+      purpose:"Communication & Media"
+    })
+  };
+  const boundary = `irpa-media-${crypto.randomUUID()}`;
+  const body = buildMultipartBody(boundary, metadata, bytes, contentType);
+  const response = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType,size,webViewLink,createdTime,parents", {
+    method:"POST",
+    headers:{Authorization:`Bearer ${accessToken}`,"Content-Type":`multipart/related; boundary=${boundary}`},
+    body
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error?.message || "Google Drive media upload failed.");
+
+  return json({
+    ok:true, assetId, fileId:result.id, fileName:result.name, fileSize:Number(result.size || fileSize),
+    webViewLink:result.webViewLink || `https://drive.google.com/file/d/${result.id}/view`,
+    storageProvider:"Google Drive"
+  },200,corsHeaders(request));
 }
 
 async function uploadControlledDocument(request, env) {

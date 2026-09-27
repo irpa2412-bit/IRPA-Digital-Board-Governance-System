@@ -14,6 +14,9 @@ requireText(drive,/encryptText\(tokens\.refresh_token, env\.GOOGLE_DRIVE_TOKEN_E
 requireText(drive,/AUTHORIZED_DRIVE_EMAIL\.toLowerCase\(\)/,"Drive OAuth is bound to the authorized institutional account.");
 requireText(drive,/requestedFolderId/,"Drive upload routes validate controlled folder identifiers.");
 requireText(drive,/irpaGovernanceArchive/,"Drive archive metadata boundary is present.");
+requireText(drive,/\/api\/communication-media\/upload/,"Communication media upload route is explicitly registered.");
+requireText(drive,/Communication & Media authorization is required for media asset upload/,"Communication media upload is server-side role protected.");
+requireText(drive,/fileSize > MAX_BYTES/,"Communication media upload enforces the existing file-size boundary.");
 if(/GOOGLE_DRIVE_CLIENT_SECRET\s*[:=]\s*["'][^"'\n]+/.test(drive))throw new Error("SECURITY SUBSYSTEM GATE FAILED: literal Drive client secret found.");
 const infra=read("meeting-infrastructure/README.md");
 requireText(infra,/API secrets remain on the meeting-control server/,"Live meeting docs keep API secrets server-side.");

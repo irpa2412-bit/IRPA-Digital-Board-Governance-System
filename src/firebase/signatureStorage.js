@@ -90,6 +90,32 @@ export async function uploadBytes(target, file, metadata = {}) {
   return { ref: target, metadata: result };
 }
 
+export async function uploadCommunicationMediaAsset({assetId,title,assetType="Media Asset",file}={}) {
+  if (!file) throw new Error("A media file is required.");
+  const allowed = new Set(["application/pdf","image/png","image/jpeg","image/webp"]);
+  if (!allowed.has(String(file.type||"").toLowerCase())) {
+    throw new Error("Communication media uploads support PDF, PNG, JPEG and WEBP files.");
+  }
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  if (!bytes.length || bytes.length > 10 * 1024 * 1024) throw new Error("Communication media files must not exceed 10 MB.");
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + chunkSize, bytes.length)));
+  }
+  const safeAssetId = String(assetId || "").trim();
+  if (!safeAssetId) throw new Error("A media asset ID is required.");
+  return gatewayPost("/api/communication-media/upload", {
+    assetId: safeAssetId,
+    title: String(title || file.name || "IRPA Media Asset").trim(),
+    assetType: String(assetType || "Media Asset").trim(),
+    fileName: file.name,
+    contentType: String(file.type || "").toLowerCase(),
+    fileSize: bytes.length,
+    base64: btoa(binary)
+  });
+}
+
 export async function uploadControlledDocumentRouted({
   documentId,title,reference,documentType="Governance Document",archiveCategory="Administrative Documents",
   classification="Public",file
