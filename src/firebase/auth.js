@@ -353,7 +353,7 @@ async function queueMemberInvitationFromClient(invitationId) {
   globalThis.crypto.getRandomValues(bytes);
   let binary = "";
   bytes.forEach(byte => { binary += String.fromCharCode(byte); });
-  const secret = btoa(binary).replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/g, "");
+  let secret = btoa(binary).split("+").join("-").split("/").join("_"); while(secret.endsWith("=")) secret = secret.slice(0, -1);
   const digest = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(secret));
   const hashBytes = new Uint8Array(digest);
   const invitationSecretHash = Array.from(hashBytes).map(byte => byte.toString(16).padStart(2, "0")).join("");
