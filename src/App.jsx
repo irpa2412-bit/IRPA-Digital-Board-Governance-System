@@ -647,8 +647,11 @@ useEffect(()=>{
       const memberAuthorized=Boolean(memberDirect)&&((String(memberDirect?.status||"").trim().toLowerCase()==="active")||(String(memberDirect?.status||"").trim().toLowerCase()==="activated")||(String(memberDirect?.registrationStatus||"").trim().toLowerCase()==="activated"));
       const employeeAuthorized=Boolean(employeeDirect)&&((String(employeeDirect?.status||"").trim().toLowerCase()==="active")||(String(employeeDirect?.employmentStatus||"").trim().toLowerCase()==="active")||(String(employeeDirect?.registrationStatus||"").trim().toLowerCase()==="activated"));
       const administratorAuthorized=adminDirect?.active===true;
-      if(!memberAuthorized&&!employeeAuthorized&&!administratorAuthorized&&!(Array.isArray(loginContext?.roles)&&loginContext.roles.length)){
-        setError("Authentication succeeded, but no active IRPA authorization record was resolved from the Administrator, Member or Employee register.");
+      const configuredGatewayAuthority=Boolean(tokenResult?.claims?.admin===true)||
+        (Array.isArray(tokenRoles)&&tokenRoles.length>0)||
+        (Array.isArray(loginContext?.roles)&&loginContext.roles.length>0);
+      if(!configuredGatewayAuthority){
+        setError("Authentication succeeded, but no configured IRPA Gateway authority is assigned to this account.");
         setProfile(null);
         return;
       }
