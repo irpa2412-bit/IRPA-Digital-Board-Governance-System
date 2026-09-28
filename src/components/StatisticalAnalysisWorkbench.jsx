@@ -1,5 +1,5 @@
 import React,{useMemo,useState}from"react";
-import{jStat}from"jstat";
+import jStat from"jstat";
 import{centroid,distance,point}from"@turf/turf";
 
 const clean=v=>String(v??"").trim();
