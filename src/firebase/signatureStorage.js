@@ -62,9 +62,26 @@ export async function uploadBytes(target, file, metadata = {}) {
   return { ref: target, metadata: result };
 }
 
+export function buildDocumentArchiveDestination({documentType="Governance Document",uploadedAt=null,archiveCategory="Administrative Documents",classification="Public"}={}) {
+  const timestamp = uploadedAt ? new Date(uploadedAt) : new Date();
+  const validTime = Number.isNaN(timestamp.getTime()) ? new Date() : timestamp;
+  const year = validTime.getUTCFullYear();
+  const month = String(validTime.getUTCMonth()+1).padStart(2,"0");
+  const day = String(validTime.getUTCDate()).padStart(2,"0");
+  const type = String(documentType||"Governance Document").trim() || "Governance Document";
+  return {
+    documentType:type,
+    uploadedAt:validTime.toISOString(),
+    uploadYear:String(year),
+    uploadMonth:month,
+    uploadDay:day,
+    destinationKey:[String(archiveCategory||"Administrative Documents").trim(),String(classification||"Public").trim(),type,String(year),month,day].filter(Boolean).join("/")
+  };
+}
+
 export async function uploadControlledDocumentRouted({
   documentId,title,reference,documentType="Governance Document",archiveCategory="Administrative Documents",
-  classification="Public",file
+  classification="Public",uploadedAt=null,file
 }={}) {
   if (!file) throw new Error("A PDF file is required.");
   if (file.type !== "application/pdf") throw new Error("Only PDF documents are accepted.");
@@ -75,8 +92,14 @@ export async function uploadControlledDocumentRouted({
   for (let i = 0; i < bytes.length; i += chunkSize) {
     binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + chunkSize, bytes.length)));
   }
+  const destination = buildDocumentArchiveDestination({documentType,uploadedAt,archiveCategory,classification});
   const result = await gatewayPost("/api/upload-controlled-document", {
     documentId,title,reference,documentType,archiveCategory,classification,
+    uploadedAt:destination.uploadedAt,
+    uploadYear:destination.uploadYear,
+    uploadMonth:destination.uploadMonth,
+    uploadDay:destination.uploadDay,
+    destinationKey:destination.destinationKey,
     fileName:file.name,contentType:"application/pdf",fileSize:bytes.length,base64:btoa(binary)
   });
   if (!result.categoryArchive?.folderId || !result.categoryArchive?.file?.fileId) {
@@ -93,8 +116,17 @@ export async function provisionDocumentArchive({documentId,title,reference,archi
   return result;
 }
 
-export async function ensureSignedDocumentArchive({documentId,title,reference,archiveCategory,classification}={}) {
-  const result = await gatewayPost("/api/signed-document/archive", { documentId, title, reference, archiveCategory, classification });
+export async function ensureSignedDocumentArchive({documentId,title,reference,documentType,uploadedAt,archiveCategory,classification}={}) {
+  const destination = buildDocumentArchiveDestination({documentType,uploadedAt,archiveCategory,classification});
+  const result = await gatewayPost("/api/signed-document/archive", {
+    documentId,title,reference,archiveCategory,classification,
+    documentType:destination.documentType,
+    uploadedAt:destination.uploadedAt,
+    uploadYear:destination.uploadYear,
+    uploadMonth:destination.uploadMonth,
+    uploadDay:destination.uploadDay,
+    destinationKey:destination.destinationKey
+  });
   if (!result.folderId || !result.archiveUidLink) throw new Error("Google Drive did not return the signed-document archive.");
   return result;
 }
