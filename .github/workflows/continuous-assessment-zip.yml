@@ -1,0 +1,33 @@
+name: Continuous Assessment ZIP
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package-source:
+    name: Package complete source snapshot
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact development state
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create source ZIP
+        run: |
+          git archive --format=zip --output="IRPA-DBGS-continuous-assessment-${GITHUB_SHA}.zip" HEAD
+          test -s "IRPA-DBGS-continuous-assessment-${GITHUB_SHA}.zip"
+          unzip -t "IRPA-DBGS-continuous-assessment-${GITHUB_SHA}.zip" >/dev/null
+
+      - name: Upload continuous assessment ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: IRPA-DBGS-continuous-assessment-${{ github.sha }}
+          path: IRPA-DBGS-continuous-assessment-${{ github.sha }}.zip
+          if-no-files-found: error
+          retention-days: 30
