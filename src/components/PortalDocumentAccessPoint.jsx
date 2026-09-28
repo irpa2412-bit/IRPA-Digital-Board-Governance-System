@@ -1,5 +1,6 @@
-import React,{useState}from"react";
-import ControlledDocumentUpload from"./ControlledDocumentUpload";import DocumentReader from"./DocumentReader";
+import React,{Suspense,useState}from"react";
+import ControlledDocumentUpload from"./ControlledDocumentUpload";
+const DocumentReader=React.lazy(()=>import("./DocumentReader"));
 
 export default function PortalDocumentAccessPoint({portal="Current Portal",allowRestrictedUpload=false}){
   const [open,setOpen]=useState(false);
@@ -18,5 +19,5 @@ export default function PortalDocumentAccessPoint({portal="Current Portal",allow
       <ControlledDocumentUpload purpose={`${label} — Document Upload`} allowRestrictedUpload={allowRestrictedUpload} onUploaded={doc=>{setUploaded(doc);}}/>
     </div>}
     {uploaded&&<><div className="success-message action-feedback" role="status" style={{marginTop:12}}>Document ready in the IRPA controlled-document register: <strong>{uploaded.title||uploaded.fileName}</strong> · {uploaded.reference||"Reference assigned"}.</div><div className="form-actions" style={{marginTop:8}}>{uploaded.fileId&&<button type="button" onClick={()=>setReaderOpen(true)}>Open in IRPA Reader</button>}</div></>}
-  {readerOpen&&<DocumentReader document={uploaded} onClose={()=>setReaderOpen(false)}/>}</section>;
+  {readerOpen&&<Suspense fallback={<div className="panel" role="status">Opening IRPA Document Reader…</div>}><DocumentReader document={uploaded} onClose={()=>setReaderOpen(false)}/></Suspense>}</section>;
 }
