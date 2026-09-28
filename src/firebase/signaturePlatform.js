@@ -377,4 +377,50 @@ async function releaseNextSigner(envelope,nextRecipient){
 }
 
 export async function recordSignatureAdoption({documentId,documentReference,fieldId,signatureProfile}){const u=user(),r=doc(collection(db,"signatures"));await setDoc(r,{documentId:documentId||null,documentReference:documentReference||"",fieldId:fieldId||"",signerUid:u.uid,signerEmail:u.email||"",signerName:signatureProfile?.displayName||u.displayName||"",signatureMethod:signatureProfile?.method||"Upload",signatureSha256:signatureProfile?.signatureSha256||null,status:"Signed",signedAt:serverTimestamp(),createdAt:serverTimestamp(),immutable:true});return r.id;}
-export async function createCompletionCertificate(envelope){const u=user();const pdf=await PDFDocument.create();const page=pdf.addPage([595,842]);const font=await pdf.embedFont(StandardFonts.Helvetica);const bold=await pdf.embedFont(StandardFonts.HelveticaBold);page.drawText("IRPA DIGITAL GOVERNANCE SYSTEM",{x:48,y:790,size:11,font:bold,color:rgb(.15,.2,.3)});page.drawText("CERTIFICATE OF COMPLETION",{x:48,y:750,size:24,font:bold});const rows=[["Envelope",envelope.envelopeReference],["Subject",envelope.title],["Document",envelope.documentReference],["Status",envelope.status],["Completed",new Date().toISOString()],["Final document hash",envelope.latestDocumentHash||"—"]];let y=700;for(const [a,b]of rows){page.drawText(a,{x:48,y,size:10,font:bold});page.drawText(String(b),{x:190,y,size:10,font});y-=34;}page.drawText("SIGNER EVENTS",{x:48,y:y-10,size:13,font:bold});y-=40;for(const r of envelope.recipients||[]){page.drawText(`${r.name||r.email} — ${r.email||""}`,{x:48,y,size:10,font});y-=20;}page.drawText("This certificate records the signing transaction captured by the IRPA Signature Platform. It is an electronic transaction record, not a PKI certificate.",{x:48,y:80,size:8,font,maxWidth:500});const bytes=await pdf.save();const certificateHash=await hashBytes(bytes);const path=`signatureEnvelopes/${envelope.id}/certificate-${certificateHash}.pdf`;const r=ref(null,path);await uploadBytes(r,bytes,{contentType:"application/pdf",customMetadata:{envelopeId:envelope.id,certificateHash}});const url=await getDownloadURL(r);await updateDoc(doc(db,ENVELOPE_COLLECTION,envelope.id),{certificatePath:path,certificateUrl:url,certificateHash,updatedAt:serverTimestamp()});await recordEnvelopeEvent(envelope.id,"Certificate Generated",{certificateHash,actorUid:u.uid});return url;}
+export async function createCompletionCertificate(envelope){
+  const u=user();
+  if(!envelope?.id)throw new Error("A signing envelope is required.");
+  if(envelope.status!=="Completed")throw new Error("The completion certificate can only be archived after all required signing actions are completed.");
+  const pdf=await PDFDocument.create();
+  const page=pdf.addPage([595,842]);
+  const font=await pdf.embedFont(StandardFonts.Helvetica);
+  const bold=await pdf.embedFont(StandardFonts.HelveticaBold);
+  page.drawText("IRPA DIGITAL GOVERNANCE SYSTEM",{x:48,y:790,size:11,font:bold,color:rgb(.15,.2,.3)});
+  page.drawText("CERTIFICATE OF COMPLETION",{x:48,y:750,size:24,font:bold});
+  const rows=[["Envelope",envelope.envelopeReference],["Subject",envelope.title],["Document",envelope.documentReference],["Status",envelope.status],["Completed",new Date().toISOString()],["Final document hash",envelope.latestDocumentHash||"—"]];
+  let y=700;
+  for(const [a,b]of rows){page.drawText(a,{x:48,y,size:10,font:bold});page.drawText(String(b),{x:190,y,size:10,font});y-=34;}
+  page.drawText("SIGNER EVENTS",{x:48,y:y-10,size:13,font:bold});y-=40;
+  for(const r of envelope.recipients||[]){page.drawText(`${r.name||r.email} — ${r.email||""}`,{x:48,y,size:10,font});y-=20;}
+  page.drawText("This certificate records the signing transaction captured by the IRPA Signature Platform. It is an electronic transaction record, not a PKI certificate.",{x:48,y:80,size:8,font,maxWidth:500});
+  const bytes=await pdf.save();
+  const certificateHash=await hashBytes(bytes);
+  const path=`signatureEnvelopes/${envelope.id}/certificate-${certificateHash}.pdf`;
+  const r=ref(null,path);
+  await uploadBytes(r,bytes,{contentType:"application/pdf",purpose:"Signature Certificate",customMetadata:{envelopeId:envelope.id,certificateHash,finalDocumentHash:envelope.latestDocumentHash||""}});
+  const url=await getDownloadURL(r);
+  const archive=await ensureSignedDocumentArchive({
+    documentId:envelope.documentId,
+    title:envelope.title,
+    reference:envelope.documentReference,
+    archiveCategory:envelope.documentArchiveCategory||"Administrative Documents",
+    classification:envelope.documentClassification||"Public"
+  });
+  const archivePath=`signatureEnvelopes/${envelope.id}/certificate-archive-${certificateHash}.pdf`;
+  const archiveRef=ref(null,archivePath);
+  await uploadBytes(archiveRef,bytes,{contentType:"application/pdf",purpose:"Signature Certificate Archive",folderId:archive.folderId,customMetadata:{envelopeId:envelope.id,certificateHash,finalDocumentHash:envelope.latestDocumentHash||"",archiveFolderId:archive.folderId,archiveUidLink:archive.archiveUidLink,archiveProtocol:"IRPA-SIGNATURE-CERTIFICATE-V1"}});
+  const archiveUrl=await getDownloadURL(archiveRef);
+  await updateDoc(doc(db,ENVELOPE_COLLECTION,envelope.id),{
+    certificatePath:path,
+    certificateUrl:url,
+    certificateHash,
+    certificateArchivePath:archivePath,
+    certificateArchiveUrl:archiveUrl,
+    certificateArchiveFolderId:archive.folderId,
+    certificateArchiveFolderLink:archive.archiveUidLink||null,
+    certificateArchiveProtocol:"IRPA-SIGNATURE-CERTIFICATE-V1",
+    updatedAt:serverTimestamp()
+  });
+  await recordEnvelopeEvent(envelope.id,"Certificate Generated and Archived",{certificateHash,archiveFolderId:archive.folderId,archiveUrl,actorUid:u.uid});
+  return url;
+}
