@@ -117,13 +117,14 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         documentType,
         documentTypeSelectedAt: uploadedAt,
         documentUploadDestinationKey: destination.destinationKey,
+        documentUploadArchiveCategory: effectiveArchiveCategory,
         documentUploadYear: destination.uploadYear,
         documentUploadMonth: destination.uploadMonth,
         documentUploadDay: destination.uploadDay,
         version,
         documentUid,
-        archiveCategory,
-        classification,
+        archiveCategory: effectiveArchiveCategory,
+        classification: effectiveClassification,
         archiveFolderId: archive.folderId,
         archiveUidLink: archive.archiveUidLink,
         archivePath: archive.archivePath,
@@ -184,8 +185,8 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         webViewLink: archive.file?.webViewLink || null,
         fileUrl: archive.file?.fileId ? `drive://${archive.file.fileId}` : null,
         purpose,
-        archiveCategory,
-        classification,
+        archiveCategory: effectiveArchiveCategory,
+        classification: effectiveClassification,
         archiveFolderId: archive.folderId,
         archiveUidLink: archive.archiveUidLink,
         archivePath: archive.archivePath,
@@ -205,9 +206,9 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
       setMessage(`Document uploaded successfully to Google Drive: ${name}. System reference ${documentReference} assigned. Archive routing completed.`);
       setFile(null);
       setTitle("");
-      setDocumentType("Governance Document");
+      setDocumentType("");
       setVersion("1.0");
-      setArchiveCategory("Administrative Documents");
+      setArchiveCategory("");
       setClassification("Public");
       e.target.reset();
       onUploaded?.(doc);
