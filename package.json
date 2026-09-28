@@ -20,7 +20,8 @@
     "xlsx": "^0.18.5",
     "livekit-client": "^2.22.3",
     "mammoth": "^1.11.0",
-    "pptx-viewer": "^0.2.2"
+    "pptx-viewer": "^0.2.2",
+    "dompurify": "^3.3.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^5.0.2",
