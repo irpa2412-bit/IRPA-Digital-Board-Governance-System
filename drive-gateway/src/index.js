@@ -2,7 +2,14 @@ const FIREBASE_PROJECT_ID = "irpa-digital-board-governance";
 const AUTHORIZED_DRIVE_EMAIL = "irpa2412@gmail.com";
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const MAX_BYTES = 10 * 1024 * 1024;
-const ALLOWED_CONTENT_TYPES = new Set(["application/pdf","image/png","image/jpeg","image/webp"]);
+const ALLOWED_CONTENT_TYPES = new Set([
+  "application/pdf","application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint","application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/vnd.oasis.opendocument.text","application/vnd.oasis.opendocument.spreadsheet","application/vnd.oasis.opendocument.presentation",
+  "application/rtf","text/plain","text/csv","text/tab-separated-values","text/markdown","text/html","application/xhtml+xml",
+  "application/epub+zip","application/json","application/xml","text/xml","image/png","image/jpeg","image/webp","image/svg+xml"
+]);
 const OAUTH_STATE_TTL = 600;
 const SMTP_HOST = "mail.irpa.or.tz";
 const SMTP_PORT = 465;
@@ -230,7 +237,7 @@ async function upload(request, env) {
   }
 
   if (!ALLOWED_CONTENT_TYPES.has(contentType)) {
-    return json({ ok: false, error: "Only PDF, PNG, JPEG or WEBP files are accepted." }, 400, corsHeaders(request));
+    return json({ ok: false, error: "This document format is not supported. Use PDF, Word, Excel, PowerPoint, OpenDocument, text/CSV, or supported image formats." }, 400, corsHeaders(request));
   }
   if (!Number.isFinite(fileSize) || fileSize <= 0 || fileSize > MAX_BYTES) {
     return json({ ok: false, error: "Uploaded files must not exceed 10 MB." }, 400, corsHeaders(request));
@@ -324,15 +331,15 @@ async function uploadControlledDocument(request, env) {
   const classification = String(data.classification || "Public").trim();
   const governanceArchive = data.governanceArchive !== false && /governance/i.test(documentType);
 
-  const allowedCategories = ["Finance Documents","Procurement Documents","Governance Documents","Administrative Documents"];
+  const allowedCategories = ["Finance Documents","Procurement Documents","Governance Documents","Administrative Documents","Administrator Documents"];
   const allowedClassifications = ["Public","Internal","Confidential","Restricted"];
   if (!allowedCategories.includes(archiveCategory)) return json({ok:false,error:"Invalid document archive category."},400,corsHeaders(request));
   if (!allowedClassifications.includes(classification)) return json({ok:false,error:"Invalid document access classification."},400,corsHeaders(request));
-  if (contentType !== "application/pdf") return json({ok:false,error:"Only PDF documents are accepted for controlled-document routing."},400,corsHeaders(request));
-  if (!Number.isFinite(fileSize) || fileSize <= 0 || fileSize > MAX_BYTES) return json({ok:false,error:"Uploaded PDFs must not exceed 10 MB."},400,corsHeaders(request));
+  if (!ALLOWED_CONTENT_TYPES.has(contentType)) return json({ok:false,error:"This document format is not supported for controlled-document routing."},400,corsHeaders(request));
+  if (!Number.isFinite(fileSize) || fileSize <= 0 || fileSize > MAX_BYTES) return json({ok:false,error:"Uploaded documents must not exceed 10 MB."},400,corsHeaders(request));
 
   const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-  if (bytes.length !== fileSize) return json({ok:false,error:"Uploaded PDF size could not be verified."},400,corsHeaders(request));
+  if (bytes.length !== fileSize) return json({ok:false,error:"Uploaded document size could not be verified."},400,corsHeaders(request));
 
   const accessToken = await getDriveAccessToken(env);
   const rootId = await findOrCreateFolder(env, accessToken, "IRPA Governance System");
