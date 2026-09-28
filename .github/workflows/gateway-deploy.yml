@@ -60,3 +60,5 @@ jobs:
         run: |
           set -e
           curl --fail --silent --show-error --retry 5 --retry-delay 3             https://irpa-google-drive-gateway.irpa-governance.workers.dev/health
+
+# Native document-format uploads from every IRPA portal: 2026-09-29T00:00Z
