@@ -365,3 +365,5 @@ jobs:
 # Universal portal document access point: PDF and native Word/Excel/PowerPoint/OpenDocument/text/image formats: 2026-09-29T00:00Z
 
 # IRPA universal document reader installed: PDF.js + Mammoth + SheetJS + PPTX Viewer + native-format fallback: 2026-09-29T00:00Z
+
+# Research, Statistics and Knowledge Portal: study registry, dataset registry, statistical engine, knowledge repository, research outputs and secured Firestore collections: 2026-09-29T00:00Z
