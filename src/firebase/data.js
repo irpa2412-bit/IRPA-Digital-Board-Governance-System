@@ -37,40 +37,33 @@ export async function getRecords(collectionName){const s=await getDocs(query(col
 // query. This keeps the Signature Portal resilient to legacy document records
 // that may not contain createdAt, while preserving the existing Firestore
 // authorization rules on the documents collection.
-export async function getControlledDocumentsForSigning(){
+export async function getControlledDocumentsForSigning({portal="Signature Portal"}={}){
   if(!auth.currentUser)throw new Error("Authentication is required.");
   const uid=auth.currentUser.uid;
-  const querySpecs=[
-    query(collection(db,COLLECTIONS.documents),where("uploadedByUid","==",uid)),
-    query(collection(db,COLLECTIONS.documents),where("authorizedUids","array-contains",uid))
-  ];
-  const results=[];
-  const errors=[];
-  for(const q of querySpecs){
-    try{
-      const snap=await getDocs(q);
-      results.push(...snap.docs.map(x=>({id:x.id,...x.data()})));
-    }catch(error){
-      errors.push(error);
-    }
-  }
-  if(!results.length && errors.length===querySpecs.length){
-    throw errors[0] || new Error("Controlled document list could not be loaded.");
-  }
+  const normalizedPortal=String(portal||"").trim().toLowerCase();
+  const unrestrictedPortals=new Set(["governance","governance portal","meeting","meeting portal","meeting room","meeting room portal","meetings","resolutions","voting","actions","decisions","documents","documents portal"]);
+  const isUnrestrictedPortal=unrestrictedPortals.has(normalizedPortal);
+  const querySpecs=isUnrestrictedPortal
+    ? [query(collection(db,COLLECTIONS.documents),orderBy("uploadedAt","desc"))]
+    : [
+        query(collection(db,COLLECTIONS.documents),where("uploadedByUid","==",uid)),
+        query(collection(db,COLLECTIONS.documents),where("authorizedUids","array-contains",uid))
+      ];
+  const results=[];const errors=[];
+  for(const q of querySpecs){try{const snap=await getDocs(q);results.push(...snap.docs.map(x=>({id:x.id,...x.data()})));}catch(error){errors.push(error);}}
+  if(!results.length&&errors.length===querySpecs.length)throw errors[0]||new Error("Controlled document list could not be loaded.");
   const byId=new Map(results.map(d=>[d.id,d]));
   const usable=[...byId.values()].filter(d=>{
     if(String(d?.recordOrigin||"PRODUCTION").toUpperCase()==="TRIAL"||d?.trialData===true||d?.isTrial===true)return false;
-    const contentType=String(d?.contentType||"application/pdf").toLowerCase();
-    if(contentType!=="application/pdf")return false;
-    const link=String(d?.webViewLink||"");
-    const driveId=d?.fileId||((link.match(/\/d\/([a-zA-Z0-9_-]+)/)||[])[1])||((link.match(/[?&]id=([a-zA-Z0-9_-]+)/)||[])[1])||"";
-    return Boolean(d?.fileUrl||d?.documentUrl||d?.storageUrl||d?.pdfUrl||driveId);
+    const contentType=String(d?.contentType||"application/pdf").toLowerCase();if(contentType!=="application/pdf")return false;
+    const link=String(d?.webViewLink||"");const driveId=d?.fileId||((link.match(/\\/d\\/([a-zA-Z0-9_-]+)/)||[])[1])||((link.match(/[?&]id=([a-zA-Z0-9_-]+)/)||[])[1])||"";
+    if(!(d?.fileUrl||d?.documentUrl||d?.storageUrl||d?.pdfUrl||driveId))return false;
+    const classification=String(d?.classification||"Public").trim().toLowerCase();
+    // Governance and Meeting portals can access every classification. Every other portal can access all categories, but not Confidential or Restricted.
+    if(!isUnrestrictedPortal&&["confidential","restricted"].includes(classification))return false;
+    return true;
   });
-  return usable.sort((a,b)=>{
-    const at=a.createdAt?.seconds?Number(a.createdAt.seconds):Date.parse(a.createdAt||0)||0;
-    const bt=b.createdAt?.seconds?Number(b.createdAt.seconds):Date.parse(b.createdAt||0)||0;
-    return bt-at;
-  });
+  return usable.sort((a,b)=>{const at=a.createdAt?.seconds?Number(a.createdAt.seconds):Date.parse(a.createdAt||a.uploadedAt||0)||0;const bt=b.createdAt?.seconds?Number(b.createdAt.seconds):Date.parse(b.createdAt||b.uploadedAt||0)||0;return bt-at;});
 }
 export async function getEmployeePaymentRequests(employeeUid){const s=await getDocs(query(collection(db,COLLECTIONS.staffPaymentRequests),where("employeeUid","==",employeeUid),orderBy("createdAt","desc")));return s.docs.map(x=>({id:x.id,...x.data()}));}
 async function digestKey(value){const bytes=new TextEncoder().encode(value);const digest=await crypto.subtle.digest("SHA-256",bytes);return Array.from(new Uint8Array(digest)).map(b=>b.toString(16).padStart(2,"0")).join("");}
