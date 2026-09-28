@@ -17,6 +17,6 @@ export default function PortalDocumentAccessPoint({portal="Current Portal",allow
     {open&&<div style={{marginTop:12}}>
       <ControlledDocumentUpload purpose={`${label} — Document Upload`} allowRestrictedUpload={allowRestrictedUpload} onUploaded={doc=>{setUploaded(doc);}}/>
     </div>}
-    {uploaded&&<div className="success-message action-feedback" role="status" style={{marginTop:12}}>Document ready in the IRPA controlled-document register: <strong>{uploaded.title||uploaded.fileName}</strong> · {uploaded.reference||"Reference assigned"}.</div><div className="form-actions" style={{marginTop:8}}>{uploaded.fileId&&<button type="button" onClick={()=>setReaderOpen(true)}>Open in IRPA Reader</button>}</div>}
+    {uploaded&&<><div className="success-message action-feedback" role="status" style={{marginTop:12}}>Document ready in the IRPA controlled-document register: <strong>{uploaded.title||uploaded.fileName}</strong> · {uploaded.reference||"Reference assigned"}.</div><div className="form-actions" style={{marginTop:8}}>{uploaded.fileId&&<button type="button" onClick={()=>setReaderOpen(true)}>Open in IRPA Reader</button>}</div></>}
   {readerOpen&&<DocumentReader document={uploaded} onClose={()=>setReaderOpen(false)}/>}</section>;
 }
