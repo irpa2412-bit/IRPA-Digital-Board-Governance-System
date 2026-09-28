@@ -174,14 +174,23 @@ export async function getCurrentInductionContext(){
     const invitationId=String(params.get("memberInvite")||"").trim();
     let invitation=null;
     if(invitationId){
-      const snap=await getDoc(doc(activeDb,COLLECTIONS.invitations,invitationId));
-      if(snap.exists()){
-        const value=snap.data();
-        if(String(value.status||"").toLowerCase()!=="cancelled") invitation={id:snap.id,...value};
+      try{
+        const snap=await getDoc(doc(activeDb,COLLECTIONS.invitations,invitationId));
+        if(snap.exists()){
+          const value=snap.data();
+          if(String(value.status||"").toLowerCase()!=="cancelled") invitation={id:snap.id,...value};
+        }
+      }catch(error){
+        console.warn("Invitation lookup unavailable; continuing applicant entry without invitation dependency.",error);
       }
     }
-    const existingSnap=await getDoc(doc(activeDb,COLLECTIONS.registrationRequests,uid));
-    const existingRequest=existingSnap.exists()?existingSnap.data():null;
+    let existingRequest=null;
+    try{
+      const existingSnap=await getDoc(doc(activeDb,COLLECTIONS.registrationRequests,uid));
+      existingRequest=existingSnap.exists()?existingSnap.data():null;
+    }catch(error){
+      console.warn("Applicant registration-request lookup unavailable; continuing applicant entry.",error);
+    }
     const invitationEmail=String(invitation?.email||"").trim().toLowerCase();
     const invitationName=String(invitation?.name||"").trim();
     let registerMatches={employees:[],members:[],exactNameMatch:false};
