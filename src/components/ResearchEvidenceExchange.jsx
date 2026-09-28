@@ -55,7 +55,7 @@ export default function ResearchEvidenceExchange({active,onNavigate}){
  useEffect(()=>{if(open)refresh()},[open,refresh]);
 
  const consumable=useMemo(()=>RESEARCH_SOURCES.flatMap(source=>(research[source.key]||[]).filter(isConsumable).map(record=>({...record,_source:source.label}))).sort((a,b)=>timestamp(b)-timestamp(a)),[research]);
- const institutionalRows=useMemo(()=>INSTITUTIONAL_SOURCES.flatMap(source=>(institutional[source.key]||[]).map(record=>({...record,_source:source.label}))).sort((a,b)=>timestamp(b)-timestamp(a)),[institutional]);
+ const institutionalRows=useMemo(()=>INSTITUTIONAL_SOURCES.flatMap(source=>(institutional[source.key]||[]).filter(record=>{if(source.key==="documents"){const classification=clean(record?.classification||"Public").toLowerCase();if(["confidential","restricted"].includes(classification))return false;}return true}).map(record=>({...record,_source:source.label}))).sort((a,b)=>timestamp(b)-timestamp(a)),[institutional]);
 
  const openResearch=()=>{setOpen(true);if(onNavigate&&active!=="Research, Statistics and Knowledge"){}};
  return <section className="panel research-evidence-exchange" style={{margin:"12px 0",boxShadow:"none",border:"1px solid rgba(31,90,65,.18)"}}>
