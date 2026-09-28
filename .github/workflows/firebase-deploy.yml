@@ -341,3 +341,5 @@ jobs:
                 : "Production Firebase Hosting did not return HTTP 200.",
               target_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
             });
+
+# 2026-09-28 restored Gateway pre-blocker production release.
