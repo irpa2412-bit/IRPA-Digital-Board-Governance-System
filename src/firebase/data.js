@@ -56,7 +56,7 @@ export async function getControlledDocumentsForSigning({portal="Signature Portal
   const usable=[...byId.values()].filter(d=>{
     if(String(d?.recordOrigin||"PRODUCTION").toUpperCase()==="TRIAL"||d?.trialData===true||d?.isTrial===true)return false;
     const contentType=String(d?.contentType||"application/pdf").toLowerCase();if(contentType!=="application/pdf")return false;
-    const link=String(d?.webViewLink||"");const driveId=d?.fileId||((link.match(/\\/d\\/([a-zA-Z0-9_-]+)/)||[])[1])||((link.match(/[?&]id=([a-zA-Z0-9_-]+)/)||[])[1])||"";
+    const link=String(d?.webViewLink||"");const driveId=d?.fileId||((link.match(/\/d\/([a-zA-Z0-9_-]+)/)||[])[1])||((link.match(/[?&]id=([a-zA-Z0-9_-]+)/)||[])[1])||"";
     if(!(d?.fileUrl||d?.documentUrl||d?.storageUrl||d?.pdfUrl||driveId))return false;
     const classification=String(d?.classification||"Public").trim().toLowerCase();
     // Governance and Meeting portals can access every classification. Every other portal can access all categories, but not Confidential or Restricted.
