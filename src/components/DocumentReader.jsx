@@ -1,7 +1,7 @@
 import React,{useEffect,useRef,useState}from"react";
 import{downloadDriveBytes}from"../firebase/signatureStorage";
 import*as pdfjsLib from"pdfjs-dist";
-import mammoth from"mammoth";
+import mammoth from"mammoth";import DOMPurify from"dompurify";
 import*as XLSX from"xlsx";
 import{PPTXViewer}from"pptx-viewer";
 
@@ -36,4 +36,4 @@ export default function DocumentReader({document:doc,onClose}){
  else body=<div className="panel"><strong>IRPA Reader compatibility fallback</strong><p>The original {e.toUpperCase()||"document"} is securely retrieved. This format is retained without conversion so its native structure is preserved.</p><button type="button" onClick={save}>Open / Download Original</button></div>;
  return <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label={`IRPA Document Reader — ${name}`}><div className="modal" style={{maxWidth:1100,width:"96%",maxHeight:"92vh",overflow:"auto"}}><div className="panel-header"><div><span className="eyebrow">IRPA DOCUMENT READER</span><h2>{name}</h2><p className="panel-description">{type} · native archive file · no conversion of the stored original</p></div><div style={{display:"flex",gap:8}}><button type="button" onClick={save} disabled={!bytes}>Download Original</button><button type="button" onClick={onClose}>Close</button></div></div>{body}</div></div>
 }
-function DocxReader({bytes}){const[html,setHtml]=useState("");const[error,setError]=useState("");useEffect(()=>{mammoth.convertToHtml({arrayBuffer:bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength)}).then(r=>setHtml(r.value)).catch(e=>setError(e.message||"DOCX reader failed."))},[bytes]);if(error)return <div className="error-message">{error}</div>;return <article style={{background:"#fff",color:"#111",padding:"40px 48px",minHeight:650,lineHeight:1.6}} dangerouslySetInnerHTML={{__html:html}}/>}
+function DocxReader({bytes}){const[html,setHtml]=useState("");const[error,setError]=useState("");useEffect(()=>{mammoth.convertToHtml({arrayBuffer:bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength)}).then(r=>setHtml(r.value)).catch(e=>setError(e.message||"DOCX reader failed."))},[bytes]);if(error)return <div className="error-message">{error}</div>;return <article style={{background:"#fff",color:"#111",padding:"40px 48px",minHeight:650,lineHeight:1.6}} dangerouslySetInnerHTML={{__html:DOMPurify.sanitize(html)}}/>}
