@@ -1,6 +1,7 @@
 import React,{useEffect,useState}from"react";
 import{readWorkflowContext,navigateWorkflow,workflowLinkEntries}from"../firebase/workflowLinks";
 import"../styles/interlinks.css";
+import ResearchEvidenceExchange from"./ResearchEvidenceExchange";
 
 const PORTAL_GROUPS=[
   {label:"Meeting Portal",target:"Meetings",children:[
@@ -28,7 +29,7 @@ export default function ModuleInterlinkBar({active,onNavigate,admin=false,role="
   };
   const label=contextLabel(context);
   const linked=workflowLinkEntries(context||{});
-  return <section className="module-interlink-bar" aria-label="Related governance modules">{feedback&&<div className="action-feedback" role="status" aria-live="polite">{feedback}</div>}
+  return <><ResearchEvidenceExchange active={active} onNavigate={onNavigate}/><section className="module-interlink-bar" aria-label="Related governance modules">{feedback&&<div className="action-feedback" role="status" aria-live="polite">{feedback}</div>}
     <div className="module-interlink-heading"><span>CONNECTED WORKFLOW</span><small>Move directly between linked institutional records</small>{label&&<strong className="workflow-context-chip">Linked record: {label}</strong>}</div>
     <div className="module-interlink-list">
       {PORTAL_GROUPS.filter(group=>group.target!=="Finance Portfolio"||finance).map(group=><div key={group.target} className={"workflow-portal-group"+(active===group.target||group.children.some(([,target])=>target===active)?" active-group":"")}>
@@ -40,5 +41,5 @@ export default function ModuleInterlinkBar({active,onNavigate,admin=false,role="
       {CORE.map(([itemLabel,target])=><button key={target} type="button" className={target===active?"active":""} onClick={()=>go(target)}>{itemLabel}</button>)}
     </div>
     {linked.length>0&&<div className="workflow-linked-records"><span>ACTIVE LINKS</span>{linked.map(link=><button key={link.module+"-"+(link.id||link.reference)} type="button" className={link.module===active?"linked-active":""} onClick={()=>go(link.module)}>{link.module}: {link.reference}</button>)}</div>}
-  </section>;
+  </section></>;
 }
