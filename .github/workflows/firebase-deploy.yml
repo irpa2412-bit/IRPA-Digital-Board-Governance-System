@@ -363,3 +363,5 @@ jobs:
 # Document access policy: Governance/Meeting unrestricted; all other portals exclude Confidential/Restricted: 2026-09-29T00:24:00+03:00
 
 # Universal portal document access point: PDF and native Word/Excel/PowerPoint/OpenDocument/text/image formats: 2026-09-29T00:00Z
+
+# IRPA universal document reader installed: PDF.js + Mammoth + SheetJS + PPTX Viewer + native-format fallback: 2026-09-29T00:00Z
