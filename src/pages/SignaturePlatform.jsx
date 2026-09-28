@@ -5,6 +5,7 @@ import{auth}from"../firebase/config";
 import{getMySignerIdentity}from"../firebase/signerIdentity";
 import{createCompletionCertificate,createSignatureEnvelope,getMySignatureProfile,getSignatureEnvelope,getSignatureEnvelopes,getMySignedDocuments,saveMySignatureProfile,signEnvelope,saveSignatureWorkflowDraft,finalizeSignatureWorkflowDraft,startSignatureWorkflow,verifyManualSigningAuthority}from"../firebase/signaturePlatform";
 import{updateMySignerAuthority}from"../firebase/signerIdentity";
+import{readWorkflowContext}from"../firebase/workflowLinks";
 import*as pdfjsLib from"pdfjs-dist";
 import pdfWorker from"pdfjs-dist/build/pdf.worker.min.mjs?url";
 
@@ -311,6 +312,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
     }
   })()},[signerOnly,signingEnvelopeId]);
  useEffect(()=>{if(initialDocument?.id){setDocs(prev=>[initialDocument,...prev.filter(d=>d.id!==initialDocument.id)]);setDocumentId(initialDocument.id);setTab("Prepare Envelope");setMessage(`Document "${initialDocument.title||initialDocument.fileName||initialDocument.id}" is ready for selection and signing.`)}},[initialDocument]);
+ useEffect(()=>{if(signerOnly||initialDocument?.id)return;const context=readWorkflowContext();if(context?.documentId){setDocumentId(context.documentId);setTab("Prepare Envelope");setMessage(`Signing initiated from ${context.module||"a governance portal"} for document ${context.documentReference||context.documentId}.`)}else if(context?.meetingId||context?.authorizationRequestId){setTab("Prepare Envelope");setMessage(`Signing initiated from ${context.module||"a governance portal"}. Select the controlled document to prepare for signing.`)}},[signerOnly,initialDocument]);
  const selectedDoc=useMemo(()=>docs.find(x=>x.id===documentId),[docs,documentId]);
  const documentOwner=useMemo(()=>({uid:auth.currentUser?.uid,name:auth.currentUser?.displayName||auth.currentUser?.email||"Document Owner",email:auth.currentUser?.email||"",role:"Document Owner",routingOrder:1,status:"Owner"}),[auth.currentUser?.uid,auth.currentUser?.displayName,auth.currentUser?.email]);
  const workflowRecipients=useMemo(()=>[documentOwner,...recipients.filter(r=>r.uid!==documentOwner.uid).map((r,i)=>({...r,routingOrder:signingMode==="Sequential"?i+2:r.routingOrder||1}))],[documentOwner,recipients,signingMode]);
