@@ -1,5 +1,6 @@
 const { onDocumentUpdated, onDocumentWritten } = require("firebase-functions/v2/firestore");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onCall: onCallV1 } = require("firebase-functions/v1/https");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getMessaging } = require("firebase-admin/messaging");
@@ -225,7 +226,7 @@ async function requireActiveAdministratorCallable(request){
   return {uid,email};
 }
 
-exports.resolveAuthenticatedLoginContext = onCall({region:"us-central1",timeoutSeconds:30}, async request => {
+exports.resolveAuthenticatedLoginContext = onCallV1({region:"us-central1",timeoutSeconds:30}, async request => {
   const uid=String(request.auth?.uid||"").trim();
   const email=String(request.auth?.token?.email||"").trim().toLowerCase();
   if(!uid) throw new HttpsError("unauthenticated","Authentication is required to resolve the IRPA login context.");
