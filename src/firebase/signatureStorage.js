@@ -84,10 +84,10 @@ export async function uploadControlledDocumentRouted({
   documentId,title,reference,documentType="Governance Document",archiveCategory="Administrative Documents",
   classification="Public",uploadedAt=null,file
 }={}) {
-  if (!file) throw new Error("A PDF file is required.");
-  if (file.type !== "application/pdf") throw new Error("Only PDF documents are accepted.");
+  if (!file) throw new Error("A document file is required.");
+  const contentType = String(file.type || "application/octet-stream").toLowerCase();
   const bytes = new Uint8Array(await file.arrayBuffer());
-  if (!bytes.length || bytes.length > 10 * 1024 * 1024) throw new Error("PDF must not exceed 10 MB.");
+  if (!bytes.length || bytes.length > 10 * 1024 * 1024) throw new Error("Documents must not exceed 10 MB.");
   let binary = "";
   const chunkSize = 0x8000;
   for (let i = 0; i < bytes.length; i += chunkSize) {
@@ -101,10 +101,10 @@ export async function uploadControlledDocumentRouted({
     uploadMonth:destination.uploadMonth,
     uploadDay:destination.uploadDay,
     destinationKey:destination.destinationKey,
-    fileName:file.name,contentType:"application/pdf",fileSize:bytes.length,base64:btoa(binary)
+    fileName:file.name,contentType,fileSize:bytes.length,base64:btoa(binary)
   });
   if (!result.categoryArchive?.folderId || !result.categoryArchive?.file?.fileId) {
-    throw new Error("The controlled PDF was not returned with its primary archive route.");
+    throw new Error("The controlled document was not returned with its primary archive route.");
   }
   return result;
 }
