@@ -1,9 +1,9 @@
 import React,{useState}from"react";
-import ControlledDocumentUpload from"./ControlledDocumentUpload";
+import ControlledDocumentUpload from"./ControlledDocumentUpload";import DocumentReader from"./DocumentReader";
 
 export default function PortalDocumentAccessPoint({portal="Current Portal",allowRestrictedUpload=false}){
   const [open,setOpen]=useState(false);
-  const [uploaded,setUploaded]=useState(null);
+  const [uploaded,setUploaded]=useState(null);const [readerOpen,setReaderOpen]=useState(false);
   const label=String(portal||"Current Portal").trim()||"Current Portal";
   return <section className="portal-document-access-point" aria-label={`Document access for ${label}`} style={{marginBottom:16}}>
     <div className="panel" style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
@@ -17,6 +17,6 @@ export default function PortalDocumentAccessPoint({portal="Current Portal",allow
     {open&&<div style={{marginTop:12}}>
       <ControlledDocumentUpload purpose={`${label} — Document Upload`} allowRestrictedUpload={allowRestrictedUpload} onUploaded={doc=>{setUploaded(doc);}}/>
     </div>}
-    {uploaded&&<div className="success-message action-feedback" role="status" style={{marginTop:12}}>Document ready in the IRPA controlled-document register: <strong>{uploaded.title||uploaded.fileName}</strong> · {uploaded.reference||"Reference assigned"}.</div>}
-  </section>;
+    {uploaded&&<div className="success-message action-feedback" role="status" style={{marginTop:12}}>Document ready in the IRPA controlled-document register: <strong>{uploaded.title||uploaded.fileName}</strong> · {uploaded.reference||"Reference assigned"}.</div><div className="form-actions" style={{marginTop:8}}>{uploaded.fileId&&<button type="button" onClick={()=>setReaderOpen(true)}>Open in IRPA Reader</button>}</div>}
+  {readerOpen&&<DocumentReader document={uploaded} onClose={()=>setReaderOpen(false)}/>}</section>;
 }
