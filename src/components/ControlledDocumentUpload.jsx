@@ -4,7 +4,7 @@ import { createRecord, getRecord, COLLECTIONS, getCurrentMemberProfile, getCurre
 import { readWorkflowContext, withWorkflowLinks } from "../firebase/workflowLinks";
 import { uploadControlledDocumentRouted, buildDocumentArchiveDestination } from "../firebase/signatureStorage";
 
-export default function ControlledDocumentUpload({ purpose = "Controlled Document", onUploaded }) {
+export default function ControlledDocumentUpload({ purpose = "Controlled Document", onUploaded, allowRestrictedUpload = false }) {
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState("");
   const [generatedReference, setGeneratedReference] = useState("");
@@ -76,6 +76,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
       const uploadedAt = new Date().toISOString();
       const effectiveArchiveCategory = documentType;
       const effectiveClassification = documentType === "Administrator" ? "Restricted" : classification;
+      if (classification === "Restricted" && !allowRestrictedUpload) throw new Error("Restricted document upload requires special permission.");
       const destination = buildDocumentArchiveDestination({documentType,uploadedAt,archiveCategory:effectiveArchiveCategory,classification:effectiveClassification});
       setMessage("Routing the PDF into its selected document-type and upload-time destination…");
       const routed = await uploadControlledDocumentRouted({
@@ -236,7 +237,9 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
           </div>
           <div className="form-field">
             <label>Access Classification</label>
-            {documentType === "Administrator" ? <div className="auth-message" role="status"><strong>Restricted</strong><small style={{display:"block",marginTop:6}}>Administrator documents are restricted from normal document accessibility; authorized upload remains permitted.</small></div> : <select value={classification} onChange={e => setClassification(e.target.value)}><option>Public</option><option>Internal</option><option>Confidential</option><option>Restricted</option></select>}
+            {documentType === "Administrator" ? <div className="auth-message" role="status"><strong>Restricted</strong><small style={{display:"block",marginTop:6}}>Administrator documents are restricted from normal document accessibility; authorized upload remains permitted.</small></div> : <select value={classification} onChange={e => { const value=e.target.value; if(value === "Restricted" && !allowRestrictedUpload){setError("Restricted document upload requires special permission."); return;} setClassification(value); }}><option>Public</option><option>Internal</option><option>Confidential</option>{allowRestrictedUpload&&<option>Restricted</option>}</select>}
+            {documentType !== "Administrator" && !allowRestrictedUpload && <small className="muted" style={{display:"block",marginTop:6}}>Restricted classification is locked. Special permission is required to upload Restricted documents.</small>}
+            {documentType !== "Administrator" && allowRestrictedUpload && <small className="muted" style={{display:"block",marginTop:6}}>Special permission active: Restricted classification is available for this authorized uploader.</small>}
           </div>
           <div className="form-field">
             <label>Document Title</label>
