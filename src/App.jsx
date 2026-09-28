@@ -658,6 +658,29 @@ useEffect(()=>{
         ...(Array.isArray(loginContext?.roles)?loginContext.roles:[]),
         ...tokenRoles
       ].flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean)))];
+      // Configuration-only Gateway entry: if an authenticated account has a
+      // configured authority but no register record, it may still enter. The
+      // registers enrich the profile after entry; they do not decide entry.
+      const configuredGatewayEntry=serverContextRoles.length>0||tokenResult?.claims?.admin===true;
+      if(configuredGatewayEntry&&!memberAuthorized&&!employeeAuthorized&&!administratorAuthorized){
+        const configuredAuthorities=Array.isArray(loginContext?.authorities)?loginContext.authorities:[];
+        const configuredProfile={
+          uid:u.uid,
+          email:u.email||"",
+          name:u.displayName||u.email||"IRPA Authorized User",
+          role:serverContextRoles[0]||"Administrator",
+          roles:serverContextRoles,
+          serverAuthorizedRoles:serverContextRoles,
+          authorities:configuredAuthorities,
+          administratorAvailable:Boolean(tokenResult?.claims?.admin===true),
+          authorizationType:tokenResult?.claims?.admin===true?"administrator":"member",
+          identityResolution:"GATEWAY_CONFIGURATION"
+        };
+        setEmployee(null);
+        setProfile(configuredProfile);
+        setInductionComplete(false);
+        return;
+      }
       const invitationId=new URLSearchParams(window.location.search).get("memberInvite");
       // An authenticated invitation activation must complete institutional
       // enrollment before the normal authorization gate is evaluated. Do this
