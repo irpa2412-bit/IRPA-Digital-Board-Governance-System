@@ -8,10 +8,10 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState("");
   const [generatedReference, setGeneratedReference] = useState("");
-  const [documentType, setDocumentType] = useState("Governance Document");
+  const DOCUMENT_TYPES = ["Governance", "Administrative", "Finance", "Procurement", "Administrator"];\n  const [documentType, setDocumentType] = useState("");
   const [allowDualRoleDocumentTypes, setAllowDualRoleDocumentTypes] = useState(false);
   const [version, setVersion] = useState("1.0");
-  const [archiveCategory, setArchiveCategory] = useState("Administrative Documents");
+  const [archiveCategory, setArchiveCategory] = useState("");
   const [classification, setClassification] = useState("Public");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -73,7 +73,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
       const documentReference = await nextDocumentReference();
       const documentUid = documentReference;
       const uploadedAt = new Date().toISOString();
-      const destination = buildDocumentArchiveDestination({documentType,uploadedAt,archiveCategory,classification});
+      const effectiveArchiveCategory = documentType;\n      const effectiveClassification = documentType === "Administrator" ? "Restricted" : classification;\n      const destination = buildDocumentArchiveDestination({documentType,uploadedAt,archiveCategory:effectiveArchiveCategory,classification:effectiveClassification});
       setMessage("Routing the PDF into its selected document-type and upload-time destination…");
       const routed = await uploadControlledDocumentRouted({
         documentId: documentUid,
@@ -81,9 +81,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         reference: documentReference,
         documentReference,
         documentReferenceType: "Controlled Document",
-        documentType,
-        archiveCategory,
-        classification,
+        documentType,\n        archiveCategory: effectiveArchiveCategory,\n        classification: effectiveClassification,
         uploadedAt,
         file
       });
@@ -227,38 +225,12 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
       </div>
       <form onSubmit={submit}>
         <div className="form-grid">
-          <div className="form-field"><label>Document Archive</label><select value={archiveCategory} onChange={e => setArchiveCategory(e.target.value)}><option>Finance Documents</option><option>Procurement Documents</option><option>Governance Documents</option><option>Administrative Documents</option></select></div>
-          <div className="form-field"><label>Access Classification</label><select value={classification} onChange={e => setClassification(e.target.value)}><option>Public</option><option>Internal</option><option>Confidential</option><option>Restricted</option></select></div>
-          <div className="form-field">
+          <div className="form-field">\n            <label>Document Routing</label>\n            <div className="auth-message" role="status"><strong>{documentType ? `Final destination: ${documentType}` : "Select a document type first"}</strong><small style={{display:"block",marginTop:6}}>The selected document type determines the final archive destination at upload time.</small></div>\n          </div>\n          <div className="form-field">\n            <label>Access Classification</label>\n            {documentType === "Administrator" ? <div className="auth-message" role="status"><strong>Restricted</strong><small style={{display:"block",marginTop:6}}>Administrator documents are restricted from normal document accessibility; authorized upload remains permitted.</small></div> : <select value={classification} onChange={e => setClassification(e.target.value)}><option>Public</option><option>Internal</option><option>Confidential</option><option>Restricted</option></select>}\n          </div>\n          <div className="form-field">
             <label>Document Title</label>
             <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Enter document title" />
           </div>
           <div className="form-field"><label>Document Reference / Identification No.</label><div className="auth-message" role="status" aria-live="polite"><strong>{generatedReference || "Assigned automatically at upload"}</strong><small style={{display:"block",marginTop:6}}>The identifier is generated transactionally by IRPA-DBGS. There is no manual reference-entry field.</small></div></div>
-          <div className="form-field">
-            <label>Document Type</label>
-            {allowDualRoleDocumentTypes ? (
-              <select
-                value={documentType}
-                onChange={e => setDocumentType(e.target.value)}
-                aria-label="Document Type"
-              >
-                <option>Governance Document</option>
-                <option>Administrative Document</option>
-              </select>
-            ) : (
-              <input
-                value={documentType}
-                onChange={e => setDocumentType(e.target.value)}
-                placeholder="e.g. Policy, Invoice, Procurement Record"
-              />
-            )}
-            {allowDualRoleDocumentTypes && (
-              <small className="muted" style={{display:"block",marginTop:6}}>
-                Dual-role access: Governance and Administrative document types are available.
-              </small>
-            )}
-          </div>
-          <div className="form-field"><label>Version</label><input value={version} onChange={e => setVersion(e.target.value)} placeholder="e.g. 1.0" />
+          <div className="form-field">\n            <label>Document Type</label>\n            <select value={documentType} onChange={e => { const value=e.target.value; setDocumentType(value); setArchiveCategory(value); }} aria-label="Document Type" required>\n              <option value="">Select document type</option>\n              {DOCUMENT_TYPES.map(type => <option key={type} value={type}>{type}{type === "Governance" ? " — Sensitive" : type === "Administrator" ? " — Restricted" : ""}</option>)}\n            </select>\n            <small className="muted" style={{display:"block",marginTop:6}}>Five canonical document types only. Governance is sensitive; Administrator is restricted.</small>\n          </div>\n<div className="form-field"><label>Version</label><input value={version} onChange={e => setVersion(e.target.value)} placeholder="e.g. 1.0" />
           </div>
           <div className="form-field">
             <label>PDF File</label>
@@ -291,7 +263,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         <div className="form-actions">
           <button
             type="submit"
-            disabled={busy || !file}
+            disabled={busy || !file || !documentType}
             aria-busy={busy ? "true" : "false"}
           >
             {busy ? "Uploading to Google Drive…" : file ? "Upload Controlled PDF" : "Select a PDF first"}
