@@ -4,11 +4,23 @@ import { createRecord, getRecord, COLLECTIONS, getCurrentMemberProfile, getCurre
 import { readWorkflowContext, withWorkflowLinks } from "../firebase/workflowLinks";
 import { uploadControlledDocumentRouted, buildDocumentArchiveDestination } from "../firebase/signatureStorage";
 
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+const DOCUMENT_TYPES = ["Governance", "Administrative", "Finance", "Procurement", "Administrator"];
+const ARCHIVE_CATEGORIES = { Governance: "Governance Documents", Administrative: "Administrative Documents", Finance: "Finance Documents", Procurement: "Procurement Documents", Administrator: "Administrator Documents" };
+const DOCUMENT_ACCEPT = ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp,.rtf,.txt,.csv,.tsv,.md,.html,.epub,.json,.xml,.jpg,.jpeg,.png,.webp,.svg";
+const MIME_BY_EXTENSION = { pdf:"application/pdf", doc:"application/msword", docx:"application/vnd.openxmlformats-officedocument.wordprocessingml.document", xls:"application/vnd.ms-excel", xlsx:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ppt:"application/vnd.ms-powerpoint", pptx:"application/vnd.openxmlformats-officedocument.presentationml.presentation", odt:"application/vnd.oasis.opendocument.text", ods:"application/vnd.oasis.opendocument.spreadsheet", odp:"application/vnd.oasis.opendocument.presentation", rtf:"application/rtf", txt:"text/plain", csv:"text/csv", tsv:"text/tab-separated-values", md:"text/markdown", html:"text/html", epub:"application/epub+zip", json:"application/json", xml:"application/xml", jpg:"image/jpeg", jpeg:"image/jpeg", png:"image/png", webp:"image/webp", svg:"image/svg+xml" };
+
+function resolveContentType(file) {
+  const reported = String(file?.type || "").trim().toLowerCase();
+  if (reported) return reported;
+  const ext = String(file?.name || "").split(".").pop()?.toLowerCase();
+  return MIME_BY_EXTENSION[ext] || "application/octet-stream";
+}
+
 export default function ControlledDocumentUpload({ purpose = "Controlled Document", onUploaded, allowRestrictedUpload = false }) {
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState("");
   const [generatedReference, setGeneratedReference] = useState("");
-  const DOCUMENT_TYPES = ["Governance", "Administrative", "Finance", "Procurement", "Administrator"];
   const [documentType, setDocumentType] = useState("");
   const [allowDualRoleDocumentTypes, setAllowDualRoleDocumentTypes] = useState(false);
   const [version, setVersion] = useState("1.0");
@@ -53,32 +65,34 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
 
   function chooseFile() {
     setError("");
-    setMessage("Opening the PDF file selector…");
+    setMessage("Opening the document file selector…");
     fileInputRef.current?.click();
   }
 
   async function submit(e) {
     e.preventDefault();
     setBusy(true);
-    setMessage("Preparing PDF upload…");
+    setMessage("Preparing document upload…");
     setError("");
     setGeneratedReference("");
 
     try {
       if (!auth.currentUser) throw new Error("You must be signed in.");
-      if (!file) throw new Error("Select a PDF document to upload.");
-      if (file.type !== "application/pdf") throw new Error("Only PDF documents are accepted.");
-      if (file.size > 10 * 1024 * 1024) throw new Error("PDF must not exceed 10 MB.");
+      if (!file) throw new Error("Select a document file to upload.");
+      if (file.size <= 0) throw new Error("The selected document is empty.");
+      if (file.size > MAX_UPLOAD_BYTES) throw new Error("Documents must not exceed 10 MB.");
+      const contentType = resolveContentType(file);
+      if (contentType === "application/octet-stream") throw new Error("The selected file format is not supported. Choose PDF, Word, Excel, PowerPoint, OpenDocument, text/CSV, or an image document.");
 
       const name = (title.trim() || file.name.replace(/\.pdf$/i, "")).slice(0, 160);
       const documentReference = await nextDocumentReference();
       const documentUid = documentReference;
       const uploadedAt = new Date().toISOString();
-      const effectiveArchiveCategory = documentType;
+      const effectiveArchiveCategory = ARCHIVE_CATEGORIES[documentType] || documentType;
       const effectiveClassification = documentType === "Administrator" ? "Restricted" : classification;
       if (effectiveClassification === "Restricted" && !allowRestrictedUpload) throw new Error("Restricted document upload requires special permission.");
       const destination = buildDocumentArchiveDestination({documentType,uploadedAt,archiveCategory:effectiveArchiveCategory,classification:effectiveClassification});
-      setMessage("Routing the PDF into its selected document-type and upload-time destination…");
+      setMessage("Routing the document into its selected document-type and upload-time destination…");
       const routed = await uploadControlledDocumentRouted({
         documentId: documentUid,
         title: name,
@@ -129,7 +143,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         storagePath: `document-archives/${archiveCategory}/${classification}/${documentUid}/${file.name}`,
         webViewLink: archive.file?.webViewLink || null,
         fileUrl: archive.file?.fileId ? `drive://${archive.file.fileId}` : null,
-        contentType: "application/pdf",
+        contentType,
         fileSize: file.size,
         purpose,
         status: "Draft",
@@ -148,7 +162,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
           if (!persisted) throw new Error("The controlled-document register record could not be verified after creation.");
           break;
         } catch (error) {
-          if (attempt === 2) throw new Error(`PDF archive upload completed, but the PDF could not be saved to the IRPA controlled-document register: ${error?.message || "Firestore registration failed."}`);
+          if (attempt === 2) throw new Error(`Document archive upload completed, but the document could not be saved to the IRPA controlled-document register: ${error?.message || "Firestore registration failed."}`);
         }
       }
 
@@ -188,7 +202,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
       };
 
       setGeneratedReference(documentReference);
-      setMessage(`Document uploaded successfully to Google Drive: ${name}. System reference ${documentReference} assigned. Primary category and Board of Directors Governance archive routing completed.`);
+      setMessage(`Document uploaded successfully to Google Drive: ${name}. System reference ${documentReference} assigned. Archive routing completed.`);
       setFile(null);
       setTitle("");
       setDocumentType("Governance Document");
@@ -212,7 +226,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
           <span className="eyebrow">CONTROLLED DOCUMENT UPLOAD</span>
           <h2>{purpose}</h2>
           <p className="panel-description">
-            Upload the source PDF into the controlled IRPA document register. Files are stored in the configured IRPA Google Drive account and governance metadata remains in Firestore.
+            Upload PDF and other supported document formats into the controlled IRPA document register. Files retain their native format in the configured IRPA Google Drive account and governance metadata remains in Firestore.
           </p>
         </div>
       </div>
@@ -226,6 +240,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
           <li><strong>Procurement Documents</strong> — procurement records, quotations, evaluations and purchase documentation.</li>
           <li><strong>Governance Documents</strong> — Board, committee, resolutions, decisions and other governance records.</li>
           <li><strong>Administrative Documents</strong> — policies, governance, HR and general administrative records.</li>
+          <li><strong>Administrator Documents</strong> — restricted administrator records (special permission required).</li>
         </ul>
         <div style={{marginTop:6}}>Each archive is separated by <strong>Public, Internal, Confidential</strong> or <strong>Restricted</strong> classification. The selected route is recorded with the document UID and archive link.</div>
       </div>
@@ -248,7 +263,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
           <div className="form-field"><label>Document Reference / Identification No.</label><div className="auth-message" role="status" aria-live="polite"><strong>{generatedReference || "Assigned automatically at upload"}</strong><small style={{display:"block",marginTop:6}}>The identifier is generated transactionally by IRPA-DBGS. There is no manual reference-entry field.</small></div></div>
           <div className="form-field">
             <label>Document Type</label>
-            <select value={documentType} onChange={e => { const value=e.target.value; setDocumentType(value); setArchiveCategory(value); }} aria-label="Document Type" required>
+            <select value={documentType} onChange={e => { const value=e.target.value; setDocumentType(value); setArchiveCategory(ARCHIVE_CATEGORIES[value] || value); }} aria-label="Document Type" required>
               <option value="">Select document type</option>
               {DOCUMENT_TYPES.map(type => <option key={type} value={type}>{type}{type === "Governance" ? " — Sensitive" : type === "Administrator" ? " — Restricted" : ""}</option>)}
             </select>
@@ -257,16 +272,16 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
 <div className="form-field"><label>Version</label><input value={version} onChange={e => setVersion(e.target.value)} placeholder="e.g. 1.0" />
           </div>
           <div className="form-field">
-            <label>PDF File</label>
+            <label>Document File</label>
             <input
               ref={fileInputRef}
               type="file"
-              accept="application/pdf,.pdf"
+              accept={DOCUMENT_ACCEPT}
               onChange={e => {
                 const selected = e.target.files?.[0] || null;
                 setFile(selected);
                 setError("");
-                setMessage(selected ? `PDF selected: ${selected.name}. Click “Upload Controlled PDF” to continue.` : "No PDF selected.");
+                setMessage(selected ? `${selected.name} selected. Click “Upload Document” to continue.` : "No document selected.");
               }}
               required
               style={{ display: "none" }}
@@ -277,10 +292,10 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
               onClick={chooseFile}
               disabled={busy}
             >
-              Choose PDF from This Device
+              Choose Document File from This Device
             </button>
             <div className="muted" style={{ marginTop: 8 }}>
-              {file ? `Selected: ${file.name}` : "Select a PDF directly from this device."}
+              {file ? `Selected: ${file.name} (${resolveContentType(file)})` : "Select a PDF or another supported document format directly from this device."}
             </div>
           </div>
         </div>
@@ -290,7 +305,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
             disabled={busy || !file || !documentType || (documentType === "Administrator" && !allowRestrictedUpload)}
             aria-busy={busy ? "true" : "false"}
           >
-            {busy ? "Uploading to Google Drive…" : file ? "Upload Controlled PDF" : "Select a PDF first"}
+            {busy ? "Uploading to Google Drive…" : file ? "Upload Document" : "Select a Document File"}
           </button>
         </div>
       </form>
