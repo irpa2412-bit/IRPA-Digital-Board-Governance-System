@@ -62,20 +62,21 @@ export async function uploadBytes(target, file, metadata = {}) {
   return { ref: target, metadata: result };
 }
 
-export function buildDocumentArchiveDestination({documentType="Governance Document",uploadedAt=null,archiveCategory="Administrative Documents",classification="Public"}={}) {
-  const timestamp = uploadedAt ? new Date(uploadedAt) : new Date();
-  const validTime = Number.isNaN(timestamp.getTime()) ? new Date() : timestamp;
-  const year = validTime.getUTCFullYear();
-  const month = String(validTime.getUTCMonth()+1).padStart(2,"0");
-  const day = String(validTime.getUTCDate()).padStart(2,"0");
-  const type = String(documentType||"Governance Document").trim() || "Governance Document";
+export function buildDocumentArchiveDestination({documentType="Governance Document",uploadedAt=null,archiveCategory="Administrative Documents",classification="Public"}={}){
+  const type=String(documentType||"").trim();
+  if(!type) throw new Error("Select the document type before uploading. The selected type determines the final document destination.");
+  const timestamp=uploadedAt?new Date(uploadedAt):new Date();
+  if(Number.isNaN(timestamp.getTime())) throw new Error("A valid document upload timestamp is required.");
+  const year=String(timestamp.getUTCFullYear());
+  const month=String(timestamp.getUTCMonth()+1).padStart(2,"0");
+  const day=String(timestamp.getUTCDate()).padStart(2,"0");
   return {
     documentType:type,
-    uploadedAt:validTime.toISOString(),
-    uploadYear:String(year),
+    uploadedAt:timestamp.toISOString(),
+    uploadYear:year,
     uploadMonth:month,
     uploadDay:day,
-    destinationKey:[String(archiveCategory||"Administrative Documents").trim(),String(classification||"Public").trim(),type,String(year),month,day].filter(Boolean).join("/")
+    destinationKey:[String(archiveCategory||"Administrative Documents").trim(),String(classification||"Public").trim(),type,year,month,day].filter(Boolean).join("/")
   };
 }
 
