@@ -684,6 +684,7 @@ useEffect(()=>{
         setInductionComplete(false);
         return;
       }
+      let m=memberDirect, activeEmployee=employeeDirect;
       const invitationId=new URLSearchParams(window.location.search).get("memberInvite");
       // An authenticated invitation activation must complete institutional
       // enrollment before the normal authorization gate is evaluated. Do this
