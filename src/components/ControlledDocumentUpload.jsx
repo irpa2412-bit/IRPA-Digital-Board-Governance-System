@@ -76,7 +76,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
       const uploadedAt = new Date().toISOString();
       const effectiveArchiveCategory = documentType;
       const effectiveClassification = documentType === "Administrator" ? "Restricted" : classification;
-      if (classification === "Restricted" && !allowRestrictedUpload) throw new Error("Restricted document upload requires special permission.");
+      if (effectiveClassification === "Restricted" && !allowRestrictedUpload) throw new Error("Restricted document upload requires special permission.");
       const destination = buildDocumentArchiveDestination({documentType,uploadedAt,archiveCategory:effectiveArchiveCategory,classification:effectiveClassification});
       setMessage("Routing the PDF into its selected document-type and upload-time destination…");
       const routed = await uploadControlledDocumentRouted({
@@ -237,7 +237,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
           </div>
           <div className="form-field">
             <label>Access Classification</label>
-            {documentType === "Administrator" ? <div className="auth-message" role="status"><strong>Restricted</strong><small style={{display:"block",marginTop:6}}>Administrator documents are restricted from normal document accessibility; authorized upload remains permitted.</small></div> : <select value={classification} onChange={e => { const value=e.target.value; if(value === "Restricted" && !allowRestrictedUpload){setError("Restricted document upload requires special permission."); return;} setClassification(value); }}><option>Public</option><option>Internal</option><option>Confidential</option>{allowRestrictedUpload&&<option>Restricted</option>}</select>}
+            {documentType === "Administrator" ? <div className="auth-message" role="status"><strong>Restricted</strong><small style={{display:"block",marginTop:6}}>{allowRestrictedUpload ? "Special permission active: Administrator/restricted documents may be uploaded." : "Administrator/restricted documents require special permission and are locked for this uploader."}</small></div> : <select value={classification} onChange={e => { const value=e.target.value; if(value === "Restricted" && !allowRestrictedUpload){setError("Restricted document upload requires special permission."); return;} setClassification(value); }}><option>Public</option><option>Internal</option><option>Confidential</option>{allowRestrictedUpload&&<option>Restricted</option>}</select>}
             {documentType !== "Administrator" && !allowRestrictedUpload && <small className="muted" style={{display:"block",marginTop:6}}>Restricted classification is locked. Special permission is required to upload Restricted documents.</small>}
             {documentType !== "Administrator" && allowRestrictedUpload && <small className="muted" style={{display:"block",marginTop:6}}>Special permission active: Restricted classification is available for this authorized uploader.</small>}
           </div>
@@ -287,7 +287,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         <div className="form-actions">
           <button
             type="submit"
-            disabled={busy || !file || !documentType}
+            disabled={busy || !file || !documentType || (documentType === "Administrator" && !allowRestrictedUpload)}
             aria-busy={busy ? "true" : "false"}
           >
             {busy ? "Uploading to Google Drive…" : file ? "Upload Controlled PDF" : "Select a PDF first"}
