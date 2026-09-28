@@ -353,3 +353,5 @@ jobs:
 # Upload-initiated signing connectors from Meeting Room and Authorisation & Approval: 2026-09-28T21:00:03.408Z
 
 # Sign-a-Document gateway: upload/archive selection -> Prepare Envelope -> field palette -> signing circle: 2026-09-28T21:06:00.195Z
+
+# Direct Sign-a-Document transition to Signature Portal after upload/archive selection: 2026-09-28T21:10:06.449Z
