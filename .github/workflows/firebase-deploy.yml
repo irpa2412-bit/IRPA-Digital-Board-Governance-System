@@ -367,3 +367,5 @@ jobs:
 # IRPA universal document reader installed: PDF.js + Mammoth + SheetJS + PPTX Viewer + native-format fallback: 2026-09-29T00:00Z
 
 # Research, Statistics and Knowledge Portal: study registry, dataset registry, statistical engine, knowledge repository, research outputs and secured Firestore collections: 2026-09-29T00:00Z
+
+# Build verification marker: 2026-09-29T00:20Z
