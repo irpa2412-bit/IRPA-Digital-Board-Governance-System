@@ -12,7 +12,9 @@ export const LINK_DEFINITIONS = [
   ["authorizationRequestId", "authorizationReference", "Authorization & Approvals"],
   ["employeeUid", "employeeNumber", "Employee Payments"],
   ["procurementId", "procurementReference", "Procurement"],
-  ["reportId", "reportReference", "Reports"]
+  ["reportId", "reportReference", "Reports"],
+  ["researchStudyId", "researchReference", "Research, Statistics and Knowledge"],
+  ["researchDatasetId", "datasetReference", "Research, Statistics and Knowledge"]
 ];
 
 export const LINK_FIELDS = LINK_DEFINITIONS.flatMap(([idField, referenceField]) => [idField, referenceField]);
