@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from "react";
 import { auth } from "../firebase/config";
 import { createRecord, getRecord, COLLECTIONS, getCurrentMemberProfile, getCurrentEmployeeProfile, nextDocumentReference } from "../firebase/data";
 import { readWorkflowContext, withWorkflowLinks } from "../firebase/workflowLinks";
-import { uploadControlledDocumentRouted } from "../firebase/signatureStorage";
+import { uploadControlledDocumentRouted, buildDocumentArchiveDestination } from "../firebase/signatureStorage";
 
 export default function ControlledDocumentUpload({ purpose = "Controlled Document", onUploaded }) {
   const [file, setFile] = useState(null);
@@ -72,7 +72,9 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
       const name = (title.trim() || file.name.replace(/\.pdf$/i, "")).slice(0, 160);
       const documentReference = await nextDocumentReference();
       const documentUid = documentReference;
-      setMessage("Routing the PDF into its selected archive and Board of Directors Governance archive…");
+      const uploadedAt = new Date().toISOString();
+      const destination = buildDocumentArchiveDestination({documentType,uploadedAt,archiveCategory,classification});
+      setMessage("Routing the PDF into its selected document-type and upload-time destination…");
       const routed = await uploadControlledDocumentRouted({
         documentId: documentUid,
         title: name,
@@ -82,6 +84,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         documentType,
         archiveCategory,
         classification,
+        uploadedAt,
         file
       });
       const archive = routed.categoryArchive;
@@ -94,6 +97,11 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         reference: documentReference,
         documentReference,
         documentType,
+        documentTypeSelectedAt: uploadedAt,
+        documentUploadDestinationKey: destination.destinationKey,
+        documentUploadYear: destination.uploadYear,
+        documentUploadMonth: destination.uploadMonth,
+        documentUploadDay: destination.uploadDay,
         version,
         documentUid,
         archiveCategory,
@@ -125,7 +133,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         authorizedUids: [auth.currentUser.uid],
         uploadedByUid: auth.currentUser.uid,
         uploadedByEmail: auth.currentUser.email || null,
-        uploadedAt: now,
+        uploadedAt: uploadedAt,
         uploadedAtDisplay: new Date(now).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "medium", hour12: false })
       }, workflowContext || {});
       let documentId = "";
@@ -145,6 +153,12 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         title: name,
         reference: documentReference,
         documentType,
+        documentTypeSelectedAt: uploadedAt,
+        documentUploadDestinationKey: destination.destinationKey,
+        documentUploadYear: destination.uploadYear,
+        documentUploadMonth: destination.uploadMonth,
+        documentUploadDay: destination.uploadDay,
+        uploadedAt,
         version,
         fileName: file.name,
         fileId: archive.file?.fileId || null,
