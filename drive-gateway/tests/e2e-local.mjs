@@ -46,7 +46,8 @@ async function setDoc(collection, id, fields) {
   const response = await fetch(`${FIRESTORE}/v1/projects/${PROJECT}/databases/(default)/documents/${collection}?documentId=${encodeURIComponent(id)}`, {
     method: "POST",
     headers: { "Authorization": "Bearer owner", "Content-Type": "application/json" },
-    body: JSON.stringify({ fields })
+    body: JSON.stringify({ fields }),
+    signal: AbortSignal.timeout(30000)
   });
   const body = await response.text();
   if (!response.ok) throw new Error(`Firestore seed ${response.status}: ${body}`);
@@ -70,7 +71,8 @@ async function request(path, { uid = "authorized-user", email = "authorized@exam
       "Content-Type": "application/json",
       ...headers
     },
-    ...(body === undefined ? {} : { body: JSON.stringify(body) })
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    signal: AbortSignal.timeout(30000)
   });
   const text = await response.text();
   let parsed = {};
