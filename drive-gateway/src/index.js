@@ -185,8 +185,8 @@ async function oauthCallback(request, env) {
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       code,
-      client_id: env.GOOGLE_DRIVE_CLIENT_ID,
-      client_secret: env.GOOGLE_DRIVE_CLIENT_SECRET,
+      client_id: clientId,
+      client_secret: clientSecret,
       redirect_uri: redirectUri,
       grant_type: "authorization_code"
     })
@@ -1279,10 +1279,16 @@ async function deleteDriveFile(request, env) {
 
 async function getDriveAccessToken(env) {
   if (env.DRIVE_MOCK === "true") return "mock-token";
-  const stored = await env.DRIVE_KV.get("google-drive-refresh-token", "json");
-  if (!stored?.encrypted) throw new Error("Google Drive has not yet been authorized.");
-
-  const refreshToken = await decryptText(stored.encrypted, env.GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY);
+  const isStaging = String(env.ENVIRONMENT || "") === "staging";
+  const stagingRefreshToken = String(env.STAGING_GOOGLE_DRIVE_REFRESH_TOKEN || "").trim();
+  const clientId = isStaging && stagingRefreshToken ? env.STAGING_GOOGLE_DRIVE_CLIENT_ID : env.GOOGLE_DRIVE_CLIENT_ID;
+  const clientSecret = isStaging && stagingRefreshToken ? env.STAGING_GOOGLE_DRIVE_CLIENT_SECRET : env.GOOGLE_DRIVE_CLIENT_SECRET;
+  let refreshToken = stagingRefreshToken;
+  if (!refreshToken) {
+    const stored = await env.DRIVE_KV.get("google-drive-refresh-token", "json");
+    if (!stored?.encrypted) throw new Error("Google Drive has not yet been authorized.");
+    refreshToken = await decryptText(stored.encrypted, env.GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY);
+  }
   const response = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
