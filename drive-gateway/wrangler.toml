@@ -40,7 +40,7 @@ ENVIRONMENT = "staging"
 
 [[env.staging.kv_namespaces]]
 binding = "DRIVE_KV"
-id = "ccdbffa662ac48bfbdf7f4b1f62ca941"
+id = "STAGING_DRIVE_KV_NAMESPACE_ID_REQUIRED"
 
 [env.staging.triggers]
 crons = ["0 * * * *"]
