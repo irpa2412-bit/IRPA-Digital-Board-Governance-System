@@ -19,7 +19,8 @@ class AppBootBoundary extends Component{
     console.error("IRPA AppBootBoundary startup error:",error?.message||error);
     console.error("IRPA AppBootBoundary startup stack:",error?.stack||"(no stack)");
     console.error("IRPA AppBootBoundary component stack:",info?.componentStack||"(no component stack)");
-  }\n  handleReload=()=>window.location.reload();
+  }
+  handleReload=()=>window.location.reload();
   handleSafeLogin=async()=>{
     try{await logout();}catch(error){console.error("IRPA safe-login session reset:",error);}
     try{
