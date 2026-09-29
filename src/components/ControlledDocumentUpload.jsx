@@ -17,7 +17,7 @@ function resolveContentType(file) {
   return MIME_BY_EXTENSION[ext] || "application/octet-stream";
 }
 
-export default function ControlledDocumentUpload({ purpose = "Controlled Document", onUploaded, allowRestrictedUpload = false, submitLabel = "Upload Document", compact = false, deferSave = false }) {
+export default function ControlledDocumentUpload({ purpose = "Controlled Document", onUploaded, allowRestrictedUpload = false, submitLabel = "Upload Document", compact = false, deferSave = false, showSaveButton = false }) {
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState("");
   const [generatedReference, setGeneratedReference] = useState("");
@@ -344,15 +344,25 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
             </div>
           </div>
         </div>
-        <div className="form-actions">
+        <div className="form-actions" style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
           <button
-            type={deferSave && pendingDocument ? "button" : "submit"}
-            onClick={deferSave && pendingDocument ? savePendingDocument : undefined}
-            disabled={busy || (!pendingDocument && (!file || !documentType || (documentType === "Administrator" && !allowRestrictedUpload)))}
+            type="submit"
+            disabled={busy || !!pendingDocument || !file || !documentType || (documentType === "Administrator" && !allowRestrictedUpload)}
             aria-busy={busy ? "true" : "false"}
           >
-            {busy ? "Saving…" : (deferSave && pendingDocument ? "Save Document" : submitLabel)}
+            {busy ? "Uploading…" : submitLabel}
           </button>
+          {showSaveButton && (
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={savePendingDocument}
+              disabled={busy || !pendingDocument}
+              aria-busy={busy ? "true" : "false"}
+            >
+              Save Document
+            </button>
+          )}
         </div>
       </form>
     </section>
