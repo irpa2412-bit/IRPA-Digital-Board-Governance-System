@@ -23,6 +23,7 @@ const MOCK_DRIVE_CONTROL = { secondChannelFailure: false, rollbackDeleteFailure:
 
 export default {
   async fetch(request, env) {
+    globalThis.__IRPA_LOCAL_TEST_MODE = env.LOCAL_TEST_MODE === "true";
     const url = new URL(request.url);
 
     if (request.method === "OPTIONS") {
