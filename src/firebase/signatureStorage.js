@@ -82,10 +82,10 @@ export function buildDocumentArchiveDestination({documentType="Governance Docume
 
 export async function uploadControlledDocumentRouted({
   documentId,title,reference,documentType="Governance Document",archiveCategory="Administrative Documents",
-  classification="Public",uploadedAt=null,file
+  classification="Public",uploadedAt=null,file,contentType=null
 }={}) {
   if (!file) throw new Error("A document file is required.");
-  const contentType = String(file.type || "application/octet-stream").toLowerCase();
+  const resolvedContentType = String(contentType || file.type || "application/octet-stream").toLowerCase();
   const bytes = new Uint8Array(await file.arrayBuffer());
   if (!bytes.length || bytes.length > 10 * 1024 * 1024) throw new Error("Documents must not exceed 10 MB.");
   let binary = "";
@@ -101,7 +101,7 @@ export async function uploadControlledDocumentRouted({
     uploadMonth:destination.uploadMonth,
     uploadDay:destination.uploadDay,
     destinationKey:destination.destinationKey,
-    fileName:file.name,contentType,fileSize:bytes.length,base64:btoa(binary)
+    fileName:file.name,contentType:resolvedContentType,fileSize:bytes.length,base64:btoa(binary)
   });
   if (!result.categoryArchive?.folderId || !result.categoryArchive?.file?.fileId) {
     throw new Error("The controlled document was not returned with its primary archive route.");
