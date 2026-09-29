@@ -1,4 +1,4 @@
-name: Staging Gateway E2E and Deploy
+name: Staging Gateway E2E Isolation
 
 on:
   push:
@@ -15,10 +15,10 @@ permissions:
   contents: read
 
 jobs:
-  local-e2e:
+  staging-isolation:
     if: github.ref == 'refs/heads/repair-document-signature-pathway-20260929' || github.head_ref == 'repair-document-signature-pathway-20260929'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
     steps:
       - name: Checkout branch
         uses: actions/checkout@v4
@@ -28,86 +28,120 @@ jobs:
         with:
           node-version: 22
 
+      - name: Install Wrangler
+        working-directory: drive-gateway
+        run: npm install --no-audit --no-fund
+
+      - name: Require Cloudflare credentials for namespace inspection
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+
+      - name: Create or reuse isolated staging DRIVE_KV
+        id: staging_kv
+        working-directory: drive-gateway
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          title="IRPA-DBGS-STAGING-DRIVE-KV"
+          list="$(npx wrangler kv namespace list --json)"
+          id="$(printf '%s' "$list" | jq -r --arg title "$title" '.[] | select(.title == $title) | .id' | head -n1)"
+          if [ -z "$id" ]; then
+            output="$(npx wrangler kv namespace create "$title" --binding DRIVE_KV --env staging 2>&1)"
+            printf '%s
+' "$output"
+            id="$(printf '%s
+' "$output" | grep -Eo '[0-9a-f]{32}' | tail -n1)"
+          fi
+          test -n "$id"
+          echo "STAGING_DRIVE_KV_ID=$id"
+          echo "staging_kv_id=$id" >> "$GITHUB_OUTPUT"
+
+      - name: Generate staging dry-run config
+        id: config
+        working-directory: drive-gateway
+        env:
+          STAGING_KV_ID: ${{ steps.staging_kv.outputs.staging_kv_id }}
+        run: |
+          set -euo pipefail
+          cp wrangler.toml wrangler.staging.generated.toml
+          python - <<'PY'
+          from pathlib import Path
+          import os
+          p=Path("wrangler.staging.generated.toml")
+          s=p.read_text()
+          marker='id = "STAGING_DRIVE_KV_NAMESPACE_ID_REQUIRED"'
+          s=s.replace(marker, f'id = "{os.environ["STAGING_KV_ID"]}"')
+          p.write_text(s)
+          PY
+          grep -n -A2 -B1 'kv_namespaces' wrangler.staging.generated.toml
+
+      - name: Production Wrangler dry-run binding list
+        working-directory: drive-gateway
+        run: |
+          set -euo pipefail
+          npx wrangler deploy --dry-run --config wrangler.toml 2>&1 | tee production-dry-run.txt
+          ! grep -q 'LOCAL_TEST_MODE' production-dry-run.txt || { echo "FAIL: production dry-run exposed LOCAL_TEST_MODE"; exit 1; }
+          grep -E 'DRIVE_KV|FIRESTORE_COLLECTION_PREFIX|ENVIRONMENT|bindings' production-dry-run.txt || true
+
+      - name: Staging Wrangler dry-run binding list
+        working-directory: drive-gateway
+        run: |
+          set -euo pipefail
+          npx wrangler deploy --dry-run --config wrangler.staging.generated.toml --env staging 2>&1 | tee staging-dry-run.txt
+          grep -E 'DRIVE_KV|FIRESTORE_COLLECTION_PREFIX|ENVIRONMENT|bindings' staging-dry-run.txt || true
+          if grep -q 'id = "ccdbffa662ac48bfbdf7f4b1f62ca941"' wrangler.staging.generated.toml; then
+            echo "FAIL: staging DRIVE_KV reused production namespace ID"
+            exit 1
+          fi
+
+      - name: Upload dry-run binding evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-binding-dry-run
+          path: |
+            drive-gateway/production-dry-run.txt
+            drive-gateway/staging-dry-run.txt
+            drive-gateway/wrangler.staging.generated.toml
+
+  local-e2e:
+    if: github.ref == 'refs/heads/repair-document-signature-pathway-20260929' || github.head_ref == 'repair-document-signature-pathway-20260929'
+    needs: staging-isolation
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
-
       - name: Verify Java runtime
         run: java -version
-
       - name: Install application dependencies
         run: npm install --no-audit --no-fund
-
       - name: Install gateway dependencies
         working-directory: drive-gateway
         run: npm install --no-audit --no-fund
-
       - name: Run Wrangler local Worker with Firebase Firestore emulator
         run: |
           set -o pipefail
-          npx firebase-tools@15.29.0 emulators:exec             --project demo-irpa-staging             --only firestore             "npm --prefix drive-gateway run test:e2e:local" | tee e2e-output.ndjson
-
+          timeout 6m npx firebase-tools@15.29.0 emulators:exec --project demo-irpa-staging --only firestore "npm --prefix drive-gateway run test:e2e:local" | tee e2e-output.ndjson
       - name: Upload raw E2E output
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: staging-gateway-e2e-raw-output
           path: e2e-output.ndjson
-
-  deploy-staging:
-    needs: local-e2e
-    if: github.ref == 'refs/heads/repair-document-signature-pathway-20260929'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - name: Checkout branch
-        uses: actions/checkout@v4
-
-      - name: Verify staging-only deployment boundary
-        run: |
-          set -euo pipefail
-          test "${GITHUB_REF}" = "refs/heads/repair-document-signature-pathway-20260929"
-
-      - name: Require isolated staging Drive credentials
-        env:
-          STAGING_CLIENT_ID: ${{ secrets.STAGING_GOOGLE_DRIVE_CLIENT_ID }}
-          STAGING_CLIENT_SECRET: ${{ secrets.STAGING_GOOGLE_DRIVE_CLIENT_SECRET }}
-          STAGING_REFRESH_TOKEN: ${{ secrets.STAGING_GOOGLE_DRIVE_REFRESH_TOKEN }}
-        run: |
-          set -euo pipefail
-          test -n "$STAGING_CLIENT_ID" || { echo "Missing STAGING_GOOGLE_DRIVE_CLIENT_ID"; exit 1; }
-          test -n "$STAGING_CLIENT_SECRET" || { echo "Missing STAGING_GOOGLE_DRIVE_CLIENT_SECRET"; exit 1; }
-          test -n "$STAGING_REFRESH_TOKEN" || { echo "Missing STAGING_GOOGLE_DRIVE_REFRESH_TOKEN"; exit 1; }
-
-      - name: Materialize staging secrets for Wrangler
-        env:
-          STAGING_CLIENT_ID: ${{ secrets.STAGING_GOOGLE_DRIVE_CLIENT_ID }}
-          STAGING_CLIENT_SECRET: ${{ secrets.STAGING_GOOGLE_DRIVE_CLIENT_SECRET }}
-          STAGING_REFRESH_TOKEN: ${{ secrets.STAGING_GOOGLE_DRIVE_REFRESH_TOKEN }}
-        working-directory: drive-gateway
-        run: |
-          set -euo pipefail
-          umask 077
-          cat > .staging-secrets <<EOF
-STAGING_GOOGLE_DRIVE_CLIENT_ID=${STAGING_CLIENT_ID}
-STAGING_GOOGLE_DRIVE_CLIENT_SECRET=${STAGING_CLIENT_SECRET}
-STAGING_GOOGLE_DRIVE_REFRESH_TOKEN=${STAGING_REFRESH_TOKEN}
-EOF
-
-      - name: Deploy staging Worker only
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: drive-gateway
-          command: deploy --config wrangler.toml --env staging --secrets-file .staging-secrets
-
-      - name: Verify exact staging URL
-        run: |
-          set -euo pipefail
-          url="https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev/health"
-          echo "STAGING_URL=$url"
-          curl --fail --silent --show-error --retry 5 --retry-delay 2 "$url" | tee staging-health.json
-          grep -q '"ok":true' staging-health.json
