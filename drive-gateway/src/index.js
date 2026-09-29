@@ -1049,11 +1049,12 @@ async function sendSignatureInvitation(request, env) {
   if (!recipient) return json({ok:false,error:"The requested signer is not a participant in this envelope."},403,corsHeaders(request));
   const baseUrl = String(env.IRPA_APP_URL || new URL(request.url).origin).replace(/\/$/,"");
   const invite = createSignatureInvite({envelopeId,documentId,recipientUid,recipientEmail:requestedEmail,baseUrl});
-  await updateFirestoreDocument(env, `signatureInvitationTokens/${invite.tokenHash}`, {
-    envelopeId:stringValue(envelopeId),documentId:stringValue(documentId),recipientUid:stringValue(recipientUid),
-    recipientEmail:stringValue(requestedEmail),tokenHash:stringValue(invite.tokenHash),expiresAt:stringValue(invite.expiresAt),
-    createdAt:stringValue(new Date().toISOString()),status:stringValue("Pending")
-  }, claims.token);
+  await env.DRIVE_KV.put(`signature-invite:${invite.tokenHash}`, JSON.stringify({
+    envelopeId,documentId,recipientUid,recipientEmail:requestedEmail,tokenHash:invite.tokenHash,
+    expiresAt:invite.expiresAt,status:"Pending",title,reference:String(document.fields?.reference?.stringValue||""),
+    classification:String(document.fields?.classification?.stringValue||document.fields?.documentClassification?.stringValue||"Restricted"),
+    documentUrl:String(document.fields?.documentUrl?.stringValue||document.fields?.storageUrl?.stringValue||document.fields?.fileUrl?.stringValue||"")
+  }), {expirationTtl:72*60*60});
   const title = fields.title?.stringValue || document.fields?.title?.stringValue || documentId;
   const subject = "IRPA Digital Board Governance — Document Signing Invitation";
   const text = `Dear ${recipient.name || requestedEmail},\\n\\nYou have been invited to review/sign the IRPA document "${title}".\\n\\nOpen your assigned document using this secure invitation link:\\n${invite.url}\\n\\nThis link is restricted to the assigned document and signer and expires in 72 hours.\\n\\nRegards,\\nIRPA Administration\\ninfo@irpa.or.tz`;
@@ -1061,10 +1062,10 @@ async function sendSignatureInvitation(request, env) {
   try {
     const sent = await sendWithRetry(() => smtpSend(env,{to:requestedEmail,subject,text,html:htmlBody}),{}, {attempts:3,delayMs:300,logger:console});
     const messageId = sent?.messageId || sent?.response || String(sent || "");
-    await updateFirestoreDocument(env, `signatureInvitationTokens/${invite.tokenHash}`, {status:stringValue("Sent"),messageId:stringValue(messageId),sentAt:stringValue(new Date().toISOString())}, claims.token);
+    await env.DRIVE_KV.put(`signature-invite:${invite.tokenHash}`, JSON.stringify({...await env.DRIVE_KV.get(`signature-invite:${invite.tokenHash}`,"json"),status:"Sent",messageId,sentAt:new Date().toISOString()}), {expirationTtl:72*60*60});
     return json({ok:true,envelopeId,documentId,recipientUid,recipientEmail:requestedEmail,provider:"IRPA Mail Server",deliveryStatus:"Submitted to mail.irpa.or.tz",messageId,inviteUrl:invite.url,expiresAt:invite.expiresAt},200,corsHeaders(request));
   } catch (error) {
-    await updateFirestoreDocument(env, `signatureInvitationTokens/${invite.tokenHash}`, {status:stringValue("Provider Failed"),lastError:stringValue(String(error?.message || error))}, claims.token);
+    await env.DRIVE_KV.put(`signature-invite:${invite.tokenHash}`, JSON.stringify({...await env.DRIVE_KV.get(`signature-invite:${invite.tokenHash}`,"json"),status:"Provider Failed",lastError:String(error?.message || error)}), {expirationTtl:72*60*60});
     console.error("SIGNATURE_INVITATION_PROVIDER_FAILED", {envelopeId,documentId,recipientUid,error:String(error?.message||error)});
     throw error;
   }
@@ -1075,16 +1076,12 @@ async function openSignatureInvitation(request, env) {
   const parts = String(token).split(".");
   if (parts.length !== 4) return json({ok:false,error:"Invalid invitation token."},401,corsHeaders(request));
   const tokenHash = await sha256Hex(decodeURIComponent(parts[3]));
-  const record = await getFirestoreDocument(env, `signatureInvitationTokens/${tokenHash}`, null);
+  const record = await env.DRIVE_KV.get(`signature-invite:${tokenHash}`,"json");
   if (!record) return json({ok:false,error:"Invalid invitation token."},401,corsHeaders(request));
-  const f = record.fields || {};
-  const expected = {envelopeId:String(f.envelopeId?.stringValue||""),documentId:String(f.documentId?.stringValue||""),recipientUid:String(f.recipientUid?.stringValue||""),recipientEmail:String(f.recipientEmail?.stringValue||""),tokenHash:String(f.tokenHash?.stringValue||""),expiresAt:String(f.expiresAt?.stringValue||"")};
+  const expected = {envelopeId:record.envelopeId,documentId:record.documentId,recipientUid:record.recipientUid,recipientEmail:record.recipientEmail,tokenHash:record.tokenHash,expiresAt:record.expiresAt};
   const verified = verifySignatureInvite({token,expected});
   if (!verified.ok) return json(verified,verified.status,corsHeaders(request));
-  const document = await getFirestoreDocument(env, `documents/${verified.documentId}`, null);
-  if (!document) return json({ok:false,error:"The assigned document no longer exists."},404,corsHeaders(request));
-  const fields = document.fields || {};
-  return json({ok:true,invitation:{envelopeId:verified.envelopeId,documentId:verified.documentId,recipientUid:verified.recipientUid,recipientEmail:verified.recipientEmail,expiresAt:expected.expiresAt},document:{id:verified.documentId,title:fields.title?.stringValue||fields.fileName?.stringValue||verified.documentId,reference:fields.reference?.stringValue||"",classification:fields.classification?.stringValue||fields.documentClassification?.stringValue||"Restricted",documentUrl:fields.documentUrl?.stringValue||fields.storageUrl?.stringValue||fields.fileUrl?.stringValue||""}},200,corsHeaders(request));
+  return json({ok:true,invitation:{envelopeId:verified.envelopeId,documentId:verified.documentId,recipientUid:verified.recipientUid,recipientEmail:verified.recipientEmail,expiresAt:expected.expiresAt},document:{id:verified.documentId,title:record.title||verified.documentId,reference:record.reference||"",classification:record.classification||"Restricted",documentUrl:record.documentUrl||""}},200,corsHeaders(request));
 }
 
 async function renderSignatureInvitation(request, env) {
