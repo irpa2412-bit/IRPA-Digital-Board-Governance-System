@@ -1,0 +1,43 @@
+name: Staging Signature Invitation Proof
+
+on:
+  push:
+    branches:
+      - staging-invitation-proof-20260929
+    paths:
+      - "drive-gateway/**"
+      - "src/firebase/signaturePlatform.js"
+      - "src/firebase/signatureStorage.js"
+      - ".github/workflows/staging-signature-invitation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  invitation-core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout staging proof branch
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install gateway dependencies
+        working-directory: drive-gateway
+        run: npm install --no-audit --no-fund
+      - name: Run mocked provider and token security tests
+        working-directory: drive-gateway
+        run: npm run test:signature-invitation
+
+  staging-deployment-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Assert staging-only branch
+        run: |
+          test "${GITHUB_REF}" = "refs/heads/staging-invitation-proof-20260929"
+      - name: Assert no production deployment is requested
+        run: |
+          ! grep -R "wrangler deploy --config wrangler.toml$" . 2>/dev/null || true
