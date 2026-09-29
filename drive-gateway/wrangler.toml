@@ -22,6 +22,7 @@ id = "ccdbffa662ac48bfbdf7f4b1f62ca941"
 
 [env.staging]
 name = "irpa-google-drive-gateway-staging"
+compatibility_date = "2026-09-24"
 workers_dev = true
 
 [env.staging.vars]
