@@ -1,0 +1,9 @@
+{
+  "name": "irpa-dbgs-transaction-routing-baseline",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-29",
+  "workers_dev": true,
+  "vars": {
+    "IRPA_FIREBASE_ORIGIN": ""
+  }
+}
