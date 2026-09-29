@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, unlinkSync, writeFileSync, readFileSync } from "node:fs";
 
 const ROOT = new URL("../../", import.meta.url).pathname;
 const GATEWAY = new URL("../", import.meta.url).pathname;
@@ -84,8 +84,8 @@ async function request(path, { uid = "authorized-user", email = "authorized@exam
 
 const workerEnv = `DRIVE_MOCK="true"\nLOCAL_TEST_MODE="true"\nFIREBASE_PROJECT_ID="${PROJECT}"\nFIRESTORE_EMULATOR_HOST="127.0.0.1:8080"\nFIRESTORE_COLLECTION_PREFIX="staging_"\nDRIVE_ROOT_FOLDER_NAME="IRPA Governance System - STAGING"\n`;
 writeFileSync(DEV_VARS, workerEnv);
-const wranglerTemplate = await (await fetch(new URL("../wrangler.toml", import.meta.url))).text().catch(()=>null);
-if (wranglerTemplate) writeFileSync(LOCAL_WRANGLER, wranglerTemplate.replace("STAGING_DRIVE_KV_NAMESPACE_ID_REQUIRED","00000000000000000000000000000000"));
+const wranglerTemplate = readFileSync(`${GATEWAY}/wrangler.toml`, "utf8");
+writeFileSync(LOCAL_WRANGLER, wranglerTemplate.replace("STAGING_DRIVE_KV_NAMESPACE_ID_REQUIRED","00000000000000000000000000000000"));
 
 const worker = spawn("npx", ["wrangler", "dev", "--config", "wrangler.local.toml", "--env", "staging", "--local", "--test-scheduled", "--port", String(PORT), "--log-level", "error"], {
   cwd: GATEWAY,
