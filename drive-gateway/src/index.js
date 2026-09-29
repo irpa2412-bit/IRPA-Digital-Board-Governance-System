@@ -33,7 +33,7 @@ export default {
     try {
       if (url.pathname === "/__test__/state" && request.method === "GET" && env.LOCAL_TEST_MODE === "true" && env.DRIVE_MOCK === "true") {
         const pending = await env.DRIVE_KV.list({prefix:"pending-drive-rollback:"});
-        return json({ok:true,objects:Array.from(MOCK_DRIVE_OBJECTS.values()).filter(o=>o.mimeType!=="application/vnd.google-apps.folder").map(o=>({id:o.id,name:o.name,size:o.size})),pending:pending.keys.map(k=>k.name)},200,corsHeaders(request));
+        return json({ok:true,objects:Array.from(MOCK_DRIVE_OBJECTS.values()).filter(o=>o.mimeType!=="application/vnd.google-apps.folder").map(o=>({id:o.id,name:o.name,size:o.size,description:o.description,archiveChannel:o.archiveChannel})),pending:pending.keys.map(k=>k.name)},200,corsHeaders(request));
       }
 
       if (url.pathname === "/health") {
@@ -600,7 +600,7 @@ async function finalizeSignatureProfileArchives(request, env) {
       const completedFolderId = await findOrCreateFolder(env, accessToken, "Completed Signed Documents", folderId, {irpaGovernanceSignatureProfileArchive:true,ownerUid:uid,folderUid:uid,purpose:"Completed Documents Signed by Profile Owner"});
       const fileName = `completed-${envelopeId}-${finalHash}.pdf`;
       const metadata = {name:fileName,parents:[completedFolderId],mimeType:"application/pdf",description:JSON.stringify({irpaGovernance:true,uploadedByUid:claims.user_id,purpose:"Signature Profile",ownerUid:uid,envelopeId,signerUid:uid,finalSignerUid:claims.user_id,originalHash,finalHash,archiveProtocol:"IRPA-SIGNER-COPY-V2",archiveState:"Final Completed Document"})};
-      if (env.DRIVE_MOCK === "true" && MOCK_DRIVE_CONTROL.signatureProviderFailure) { MOCK_DRIVE_CONTROL.signatureProviderFailure=false; throw new Error("Mocked signature-provider failure."); }
+      if (env.DRIVE_MOCK === "true" && MOCK_DRIVE_CONTROL.signatureProviderFailure && createdFileIds.length >= 1) { MOCK_DRIVE_CONTROL.signatureProviderFailure=false; throw new Error("Mocked signature-provider failure after first archive."); }
       const boundary=`irpa-${crypto.randomUUID()}`;
       const result=await uploadDriveObject(env,metadata,bytes,"application/pdf",buildMultipartBody(boundary,metadata,bytes,"application/pdf"),boundary,"Signature Profile");
       createdFileIds.push(result.id);
