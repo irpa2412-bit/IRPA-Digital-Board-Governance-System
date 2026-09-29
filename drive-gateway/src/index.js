@@ -17,6 +17,9 @@ const SMTP_FROM = "info@irpa.or.tz";
 
 let jwksCache = null;
 let jwksFetchedAt = 0;
+const MOCK_DRIVE_OBJECTS = new Map();
+let MOCK_DRIVE_COUNTER = 0;
+const MOCK_DRIVE_CONTROL = { secondChannelFailure: false, rollbackDeleteFailure: false };
 
 export default {
   async fetch(request, env) {
@@ -110,6 +113,9 @@ export default {
         error: message
       }, isAuthError ? 401 : 500, corsHeaders(request));
     }
+  },
+  async scheduled(controller, env) {
+    await cleanupPendingDriveRollbacks(env);
   }
 };
 
@@ -249,7 +255,7 @@ async function upload(request, env) {
   }
 
   const accessToken = await getDriveAccessToken(env);
-  const rootId = await findOrCreateFolder(env, accessToken, "IRPA Governance System");
+  const rootId = await findOrCreateFolder(env, accessToken, stagingRootName(env));
   let purposeId;
   if (purpose === "Signature Profile" || purpose === "Signed Documents Archive" || purpose === "Documents Portal" || purpose === "Controlled Documents") {
     const folderMeta = await driveFetch(env, accessToken, `/drive/v3/files/${encodeURIComponent(requestedFolderId)}?fields=id,name,mimeType,description,trashed`);
@@ -312,6 +318,11 @@ async function upload(request, env) {
 }
 
 async function uploadControlledDocument(request, env) {
+  const testFailure = request.headers.get("X-IRPA-Test-Failure") || "";
+  if (env.DRIVE_MOCK === "true") {
+    MOCK_DRIVE_CONTROL.secondChannelFailure = testFailure === "second-channel" || testFailure === "second-channel-delete";
+    MOCK_DRIVE_CONTROL.rollbackDeleteFailure = testFailure === "second-channel-delete";
+  }
   const claims = await authenticateFirebaseRequest(request);
   const { memberRecord, employeeRecord } = await getInstitutionalProfileForUser(env, claims);
   const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
@@ -346,7 +357,7 @@ async function uploadControlledDocument(request, env) {
   }
 
   const accessToken = await getDriveAccessToken(env);
-  const rootId = await findOrCreateFolder(env, accessToken, "IRPA Governance System");
+  const rootId = await findOrCreateFolder(env, accessToken, stagingRootName(env));
 
   const archiveRootId = await findOrCreateFolder(env, accessToken, "Document Archives", rootId, {
     irpaGovernanceArchive:true,
@@ -427,13 +438,11 @@ async function uploadControlledDocument(request, env) {
     };
     const boundary=`irpa-${crypto.randomUUID()}`;
     const body=buildMultipartBody(boundary,metadata,bytes,contentType);
-    const response=await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType,size,webViewLink,createdTime,parents",{
-      method:"POST",
-      headers:{Authorization:`Bearer ${accessToken}`,"Content-Type":`multipart/related; boundary=${boundary}`},
-      body
-    });
-    const result=await response.json();
-    if(!response.ok) throw new Error(result.error?.message || `Google Drive upload failed for ${archiveChannel}.`);
+    if (env.DRIVE_MOCK === "true" && archiveChannel === "Board of Directors Governance Archive" && MOCK_DRIVE_CONTROL.secondChannelFailure) {
+      MOCK_DRIVE_CONTROL.secondChannelFailure = false;
+      throw new Error("Mocked second-channel upload failure.");
+    }
+    const result = await uploadDriveObject(env, metadata, bytes, contentType, body, boundary, archiveChannel);
     return {
       fileId:result.id,
       fileName:result.name,
@@ -453,10 +462,10 @@ async function uploadControlledDocument(request, env) {
       : null;
   } catch (error) {
     if (categoryFile?.fileId) {
-      try { await deleteDriveFileById(env, categoryFile.fileId); } catch (cleanupError) { console.error("Controlled-document rollback failed", cleanupError); }
+      try { await deleteDriveFileById(env, categoryFile.fileId); } catch (cleanupError) { await recordPendingRollback(env,{documentId,fileId:categoryFile.fileId,createdAt:new Date().toISOString(),reason:cleanupError?.message || "rollback delete failed"}); console.error("Controlled-document rollback failed", cleanupError); }
     }
     if (governanceFile?.fileId) {
-      try { await deleteDriveFileById(env, governanceFile.fileId); } catch (cleanupError) { console.error("Governance archive rollback failed", cleanupError); }
+      try { await deleteDriveFileById(env, governanceFile.fileId); } catch (cleanupError) { await recordPendingRollback(env,{documentId,fileId:governanceFile.fileId,createdAt:new Date().toISOString(),reason:cleanupError?.message || "rollback delete failed"}); console.error("Governance archive rollback failed", cleanupError); }
     }
     throw error;
   }
@@ -519,12 +528,7 @@ async function download(request, env) {
   const size = Number(metadata.size || 0);
   if (size > MAX_BYTES) return json({ ok: false, error: "The requested file exceeds the 10 MB limit." }, 400, corsHeaders(request));
 
-  const media = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`, {
-    headers: { Authorization: `Bearer ${accessToken}` }
-  });
-  if (!media.ok) throw new Error("Google Drive download failed.");
-
-  const buffer = new Uint8Array(await media.arrayBuffer());
+  const buffer = await downloadDriveObject(env, fileId, accessToken);
   return json({
     ok: true,
     fileId,
@@ -537,6 +541,14 @@ async function download(request, env) {
 
 
 async function deleteDriveFileById(env, fileId) {
+  if (env.DRIVE_MOCK === "true") {
+    if (MOCK_DRIVE_CONTROL.rollbackDeleteFailure) {
+      MOCK_DRIVE_CONTROL.rollbackDeleteFailure = false;
+      throw new Error("Mocked rollback-delete failure.");
+    }
+    MOCK_DRIVE_OBJECTS.delete(fileId);
+    return;
+  }
   const accessToken = await getDriveAccessToken(env);
   const response = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`, {
     method: "DELETE",
@@ -578,7 +590,7 @@ async function finalizeSignatureProfileArchives(request, env) {
   if (bytes.length !== fileSize) return json({ok:false,error:"Completed signed PDF size could not be verified."},400,corsHeaders(request));
 
   const accessToken = await getDriveAccessToken(env);
-  const rootId = await findOrCreateFolder(env, accessToken, "IRPA Governance System");
+  const rootId = await findOrCreateFolder(env, accessToken, stagingRootName(env));
   const signaturesId = await findOrCreateFolder(env, accessToken, "Signature Profiles", rootId);
   const deliveries = {};
 
@@ -669,7 +681,7 @@ async function ensureSignatureProfileFolder(request, env) {
   }
 
   const accessToken = await getDriveAccessToken(env);
-  const rootId = await findOrCreateFolder(env, accessToken, "IRPA Governance System");
+  const rootId = await findOrCreateFolder(env, accessToken, stagingRootName(env));
   const signaturesId = await findOrCreateFolder(env, accessToken, "Signature Profiles", rootId);
   const folderName = `IRPA-SIGNATURE-${requestedUid}`;
   const folderId = await findOrCreateFolder(env, accessToken, folderName, signaturesId, {
@@ -732,7 +744,7 @@ async function ensureDocumentArchiveFolder(request, env) {
   const isPublic = classification === "Public";
   const accessToken = await getDriveAccessToken(env);
 
-  const rootId = await findOrCreateFolder(env, accessToken, "IRPA Governance System");
+  const rootId = await findOrCreateFolder(env, accessToken, stagingRootName(env));
   const archiveRootId = await findOrCreateFolder(env, accessToken, "Document Archives", rootId, {
     irpaGovernanceArchive:true,
     purpose:"Controlled Document Archives"
@@ -842,7 +854,7 @@ async function ensureSignedDocumentArchive(request, env) {
   if (!allowedClassifications.includes(classification)) return json({ok:false,error:"Invalid document access classification."},400,corsHeaders(request));
 
   const accessToken = await getDriveAccessToken(env);
-  const rootId = await findOrCreateFolder(env, accessToken, "IRPA Governance System");
+  const rootId = await findOrCreateFolder(env, accessToken, stagingRootName(env));
   const signedRootId = await findOrCreateFolder(env, accessToken, "Signed Documents Archive", rootId, {
     irpaGovernanceArchive:true,
     purpose:"Signed Documents Archive"
@@ -930,7 +942,7 @@ async function ensureSignatureWorkflowFolder(request, env) {
   const envelopeId = cleanId(data.envelopeId || "");
   if (!envelopeId) return json({ok:false,error:"Signature workflow ID is required."},400,corsHeaders(request));
   const accessToken = await getDriveAccessToken(env);
-  const rootId = await findOrCreateFolder(env, accessToken, "IRPA Governance System");
+  const rootId = await findOrCreateFolder(env, accessToken, stagingRootName(env));
   const workflowsId = await findOrCreateFolder(env, accessToken, "Signature Workflows", rootId, {
     irpaGovernanceSignatureWorkflow:true,
     purpose:"Signature Workflow Working Files"
@@ -1260,6 +1272,7 @@ async function deleteDriveFile(request, env) {
 
 
 async function getDriveAccessToken(env) {
+  if (env.DRIVE_MOCK === "true") return "mock-token";
   const stored = await env.DRIVE_KV.get("google-drive-refresh-token", "json");
   if (!stored?.encrypted) throw new Error("Google Drive has not yet been authorized.");
 
@@ -1314,6 +1327,74 @@ async function ensureSignatureFolderPermission(env, accessToken, folderId, email
   }
 }
 
+function stagingRootName(env) {
+  return String(env.DRIVE_ROOT_FOLDER_NAME || "IRPA Governance System").trim() || "IRPA Governance System";
+}
+
+function firestoreBaseUrl(env) {
+  const host = String(env.FIRESTORE_EMULATOR_HOST || "").trim();
+  return host ? `http://${host}` : "https://firestore.googleapis.com";
+}
+
+async function uploadDriveObject(env, metadata, bytes, contentType, body, boundary, archiveChannel) {
+  if (env.DRIVE_MOCK === "true") {
+    const id = `mock-file-${++MOCK_DRIVE_COUNTER}`;
+    MOCK_DRIVE_OBJECTS.set(id, { id, name: metadata.name, mimeType: contentType, size: bytes.length, description: metadata.description, parents: metadata.parents, bytes: new Uint8Array(bytes), archiveChannel });
+    return { id, name: metadata.name, mimeType: contentType, size: bytes.length, webViewLink: `mock://drive/${id}`, parents: metadata.parents };
+  }
+  const response = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType,size,webViewLink,createdTime,parents", { method:"POST", headers:{Authorization:`Bearer ${await getDriveAccessToken(env)}`, "Content-Type":`multipart/related; boundary=${boundary}`}, body });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error?.message || `Google Drive upload failed for ${archiveChannel}.`);
+  return result;
+}
+
+async function downloadDriveObject(env, fileId, accessToken) {
+  if (env.DRIVE_MOCK === "true") {
+    const object = MOCK_DRIVE_OBJECTS.get(fileId);
+    if (!object) throw new Error("Google Drive download failed.");
+    return new Uint8Array(object.bytes);
+  }
+  const media = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`, { headers:{Authorization:`Bearer ${accessToken}`} });
+  if (!media.ok) throw new Error("Google Drive download failed.");
+  return new Uint8Array(await media.arrayBuffer());
+}
+
+async function mockDriveFetch(path, options = {}) {
+  const method = String(options.method || "GET").toUpperCase();
+  const url = new URL(`https://mock.local${path}`);
+  const filesMatch = url.pathname.match(/^\\/drive\\/v3\\/files\\/([^/]+)$/);
+  if (method === "GET" && filesMatch) {
+    const object = MOCK_DRIVE_OBJECTS.get(decodeURIComponent(filesMatch[1]));
+    if (!object) throw new Error("Google Drive file not found.");
+    return object;
+  }
+  if (method === "GET" && url.pathname === "/drive/v3/files") {
+    const q = url.searchParams.get("q") || "";
+    const files = Array.from(MOCK_DRIVE_OBJECTS.values()).filter(o => o.mimeType === "application/vnd.google-apps.folder" && (!q || q.includes(o.name)));
+    return {files:files.slice(0,10).map(o=>({id:o.id,name:o.name,parents:o.parents,mimeType:o.mimeType,description:o.description,trashed:false}))};
+  }
+  if (method === "POST" && url.pathname === "/drive/v3/files") {
+    const body=JSON.parse(options.body || "{}"); const id=`mock-folder-${++MOCK_DRIVE_COUNTER}`;
+    const object={id,name:body.name,mimeType:body.mimeType,size:0,description:body.description || "{}",parents:body.parents || [],bytes:new Uint8Array()}; MOCK_DRIVE_OBJECTS.set(id,object); return {id,name:object.name,mimeType:object.mimeType,parents:object.parents};
+  }
+  if (/\\/permissions$/.test(url.pathname)) return method === "GET" ? {permissions:[]} : {id:"mock-permission"};
+  return {};
+}
+
+async function recordPendingRollback(env, payload) {
+  await env.DRIVE_KV.put(`pending-drive-rollback:${payload.documentId}:${payload.fileId}`, JSON.stringify(payload));
+}
+
+async function cleanupPendingDriveRollbacks(env) {
+  const listed = await env.DRIVE_KV.list({prefix:"pending-drive-rollback:"});
+  for (const key of listed.keys || []) {
+    const payload = await env.DRIVE_KV.get(key.name,"json");
+    if (!payload?.fileId) { await env.DRIVE_KV.delete(key.name); continue; }
+    try { await deleteDriveFileById(env,payload.fileId); await env.DRIVE_KV.delete(key.name); }
+    catch(error) { console.error("Pending Drive rollback cleanup failed",key.name,error?.message || error); }
+  }
+}
+
 async function findOrCreateFolder(env, accessToken, name, parentId = null, descriptionData = null) {
   const safeName = name.replace(/'/g, "\\'");
   const q = [
@@ -1338,6 +1419,7 @@ async function findOrCreateFolder(env, accessToken, name, parentId = null, descr
 }
 
 async function driveFetch(env, accessToken, path, options = {}) {
+  if (env.DRIVE_MOCK === "true") return mockDriveFetch(path, options);
   const response = await fetch(`https://www.googleapis.com${path}`, {
     ...options,
     headers: {
@@ -1355,6 +1437,8 @@ async function driveFetch(env, accessToken, path, options = {}) {
 
 async function authenticateFirebaseRequest(request) {
   const header = request.headers.get("Authorization") || "";
+  const localMatch = header.match(/^Bearer\\s+test:([^:]+):?(.*)$/i);
+  if (localMatch && globalThis.__IRPA_LOCAL_TEST_MODE === true) return { token:"local-test-token", user_id:localMatch[1], email:localMatch[2] || null };
   const match = header.match(/^Bearer\s+(.+)$/i);
   if (!match) throw new Error("Firebase authentication is required.");
 
@@ -1482,8 +1566,11 @@ async function lookupInductionRegistration(request, env) {
 
 async function queryFirestoreByEmail(env, collectionName, fieldName, email, firebaseToken) {
   const value = String(email || "").trim().toLowerCase();
+  const projectId = env.FIREBASE_PROJECT_ID || FIREBASE_PROJECT_ID;
+  const prefix = String(env.FIRESTORE_COLLECTION_PREFIX || "").trim();
+  collectionName = prefix + collectionName;
   if (!value) return [];
-  const response = await fetch(`https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:runQuery`, {
+  const response = await fetch(`${firestoreBaseUrl(env)}/v1/projects/${projectId}/databases/(default)/documents:runQuery`, {
     method:"POST",
     headers:{"Authorization":`Bearer ${firebaseToken}`,"Content-Type":"application/json"},
     body:JSON.stringify({
@@ -1521,9 +1608,12 @@ function firestoreDocumentToPlain(document) {
  
 async function getFirestoreDocumentsByEmail(env, collectionName, email, firebaseToken) {
   const normalizedEmail = String(email || "").trim().toLowerCase();
+  const projectId = env.FIREBASE_PROJECT_ID || FIREBASE_PROJECT_ID;
+  const prefix = String(env.FIRESTORE_COLLECTION_PREFIX || "").trim();
+  collectionName = prefix + collectionName;
   if (!normalizedEmail) return [];
   const response = await fetch(
-    `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:runQuery`,
+    `${firestoreBaseUrl(env)}/v1/projects/${projectId}/databases/(default)/documents:runQuery`,
     {
       method: "POST",
       headers: {
@@ -1567,7 +1657,12 @@ async function getInstitutionalProfileForUser(env, claims) {
 }
 
 async function getFirestoreDocument(env, path, firebaseToken) {
-  const response = await fetch(`https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/${path}`, {
+  const projectId = env.FIREBASE_PROJECT_ID || FIREBASE_PROJECT_ID;
+  const prefix = String(env.FIRESTORE_COLLECTION_PREFIX || "").trim();
+  const parts = String(path).split("/");
+  if (prefix && parts.length) parts[0] = prefix + parts[0];
+  const resolvedPath = parts.join("/");
+  const response = await fetch(`${firestoreBaseUrl(env)}/v1/projects/${projectId}/databases/(default)/documents/${resolvedPath}`, {
     headers: { Authorization: `Bearer ${firebaseToken}` }
   });
   if (response.status === 404) return null;
