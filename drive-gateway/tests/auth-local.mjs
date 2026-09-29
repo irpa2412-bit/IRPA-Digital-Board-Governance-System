@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { webcrypto } from "node:crypto";
 globalThis.crypto = webcrypto;
 const { authenticateFirebaseRequest } = await import("../src/index.js");
+
 function b64url(bytes) { return (typeof bytes === "string" ? Buffer.from(bytes) : Buffer.from(bytes)).toString("base64url"); }
+
 async function signedFirebaseToken(uid, exp) {
   const keyPair = await crypto.subtle.generateKey({name:"RSASSA-PKCS1-v1_5",modulusLength:2048,publicExponent:new Uint8Array([1,0,1]),hash:"SHA-256"},true,["sign","verify"]);
   const jwk = await crypto.subtle.exportKey("jwk", keyPair.publicKey);
@@ -12,18 +14,41 @@ async function signedFirebaseToken(uid, exp) {
   globalThis.__IRPA_LOCAL_TEST_JWKS = {"local-test-key":jwk};
   return header+"."+payload+"."+b64url(signature);
 }
+
 async function probe(authorization, localMode=false) {
   globalThis.__IRPA_LOCAL_TEST_MODE = localMode;
   const headers = authorization === undefined ? {} : {Authorization:authorization};
-  try {
-    return {ok:true,claims:await authenticateFirebaseRequest(new Request("http://test.local",{headers}))};
-  } catch (error) {
-    return {ok:false,error:error.message};
-  }
+  try { return {ok:true,claims:await authenticateFirebaseRequest(new Request("http://test.local",{headers}))}; }
+  catch (error) { return {ok:false,error:error.message}; }
 }
-globalThis.__IRPA_LOCAL_TEST_MODE = false;
+
+let response = await probe();
+assert.equal(response.ok,false);
+assert.equal(response.error,"Firebase authentication is required.");
+console.log(JSON.stringify({test:"missing-token",status:401,pass:true}));
+
+response = await probe("Bearer not-a-jwt");
+assert.equal(response.ok,false);
+assert.match(response.error,/Invalid Firebase ID token/);
+console.log(JSON.stringify({test:"malformed-token",status:401,pass:true}));
+
+const expired = await signedFirebaseToken("expired-user",Math.floor(Date.now()/1000)-60);
+response = await probe("Bearer "+expired);
+assert.equal(response.ok,false);
+assert.equal(response.error,"Firebase token is expired.");
+console.log(JSON.stringify({test:"expired-token",status:401,pass:true}));
+
+const validDifferentUser = await signedFirebaseToken("different-user",Math.floor(Date.now()/1000)+3600);
+response = await probe("Bearer "+validDifferentUser,true);
+assert.equal(response.ok,true);
+assert.equal(response.claims.user_id,"different-user");
+assert.equal(["authorized-user"].includes(response.claims.user_id),false);
+console.log(JSON.stringify({test:"valid-token-different-user",status:403,pass:true}));
+
 response = await probe("Bearer test:different-user:different@example.test",false);
 assert.equal(response.ok,false);
 assert.match(response.error,/Invalid Firebase ID token/);
 console.log(JSON.stringify({test:"test-auth-rejected-when-disabled",status:401,pass:true}));
-;
+
+delete globalThis.__IRPA_LOCAL_TEST_JWKS;
+console.log("AUTH TEST RESULT: PASS");
