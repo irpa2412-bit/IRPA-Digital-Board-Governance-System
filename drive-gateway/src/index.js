@@ -99,6 +99,9 @@ export default {
       if (url.pathname === "/api/signature-invitations/open" && request.method === "GET") {
         return await openSignatureInvitation(request, env);
       }
+      if (url.pathname === "/api/signature-invitations/consume" && request.method === "POST") {
+        return await consumeSignatureInvitation(request, env);
+      }
       if (url.pathname === "/signature-invite" && request.method === "GET") {
         return await renderSignatureInvitation(request, env);
       }
@@ -1083,9 +1086,44 @@ async function openSignatureInvitation(request, env) {
   const expected = {envelopeId:record.envelopeId,documentId:record.documentId,recipientUid:record.recipientUid,recipientEmail:record.recipientEmail,tokenHash:record.tokenHash,expiresAt:record.expiresAt};
   const verified = verifySignatureInvite({token,expected});
   if (!verified.ok) return json(verified,verified.status,corsHeaders(request));
+  return json({ok:true,invitation:{envelopeId:verified.envelopeId,documentId:verified.documentId,recipientUid:verified.recipientUid,recipientEmail:verified.recipientEmail,expiresAt:expected.expiresAt},document:{id:verified.documentId,title:record.title||verified.documentId,reference:record.reference||"",classification:record.classification||"Restricted",documentUrl:record.documentUrl||""}},200,corsHeaders(request));
+}
+
+async function consumeSignatureInvitation(request, env) {
+  const claims = await authenticateFirebaseRequest(request);
+  const data = await request.json().catch(() => ({}));
+  const token = String(data.token || "").trim();
+  const parts = token.split(".");
+  if (parts.length !== 4) return json({ok:false,error:"Invalid invitation token."},401,corsHeaders(request));
+
+  let secret;
+  try { secret = decodeURIComponent(parts[3]); } catch { return json({ok:false,error:"Invalid invitation token."},401,corsHeaders(request)); }
+  const tokenHash = await sha256Hex(secret);
+  const record = await env.DRIVE_KV.get(`signature-invite:${tokenHash}`,"json");
+  if (!record) return json({ok:false,error:"Invalid invitation token."},401,corsHeaders(request));
+
+  const expected = {
+    envelopeId:record.envelopeId,
+    documentId:record.documentId,
+    recipientUid:record.recipientUid,
+    recipientEmail:record.recipientEmail,
+    tokenHash:record.tokenHash,
+    expiresAt:record.expiresAt,
+    usedAt:record.usedAt || null
+  };
+  const verified = verifySignatureInvite({token,expected});
+  if (!verified.ok) return json(verified,verified.status,corsHeaders(request));
+
+  if (claims.user_id !== record.recipientUid) {
+    return json({ok:false,error:"The authenticated account is not the invited signer."},403,corsHeaders(request));
+  }
+  if (claims.email && String(claims.email).trim().toLowerCase() !== String(record.recipientEmail).trim().toLowerCase()) {
+    return json({ok:false,error:"The authenticated email does not match the invited signer."},403,corsHeaders(request));
+  }
+
   const consumed = await consumeSingleUseToken(env.DRIVE_KV, tokenHash);
   if (!consumed.ok) return json(consumed,consumed.status,corsHeaders(request));
-  return json({ok:true,invitation:{envelopeId:verified.envelopeId,documentId:verified.documentId,recipientUid:verified.recipientUid,recipientEmail:verified.recipientEmail,expiresAt:expected.expiresAt},document:{id:verified.documentId,title:record.title||verified.documentId,reference:record.reference||"",classification:record.classification||"Restricted",documentUrl:record.documentUrl||""}},200,corsHeaders(request));
+  return json({ok:true,envelopeId:record.envelopeId,documentId:record.documentId,recipientUid:record.recipientUid,consumedAt:consumed.record.usedAt},200,corsHeaders(request));
 }
 
 async function renderSignatureInvitation(request, env) {
@@ -1094,7 +1132,9 @@ async function renderSignatureInvitation(request, env) {
   const payload = await opened.json();
   if (!opened.ok) return new Response(`<!doctype html><html><body><h2>IRPA Signing Invitation</h2><p>${escapeHtml(payload.error || "Invitation unavailable.")}</p></body></html>`,{status:opened.status,headers:{"Content-Type":"text/html; charset=UTF-8"}});
   const d=payload.document;
-  return new Response(`<!doctype html><html><body style="font-family:Arial,sans-serif;max-width:900px;margin:40px auto;padding:20px"><h1>IRPA Signing Invitation</h1><p><strong>Document:</strong> ${escapeHtml(d.title)}</p><p><strong>Reference:</strong> ${escapeHtml(d.reference || "Not recorded")}</p><p><strong>Access classification:</strong> ${escapeHtml(d.classification)}</p><p>This invitation is restricted to the assigned signer and document. The token has been verified by the staging Worker.</p><p><a href="${escapeHtml(d.documentUrl)}">Open assigned document</a></p></body></html>`,{status:200,headers:{"Content-Type":"text/html; charset=UTF-8"}});
+  const appUrl=String(env.IRPA_APP_URL || new URL(request.url).origin).replace(/\/$/,"");
+  const continueUrl=`${appUrl}/?signEnvelope=${encodeURIComponent(payload.invitation.envelopeId)}&signatureInviteToken=${encodeURIComponent(token)}`;
+  return new Response(`<!doctype html><html><body style="font-family:Arial,sans-serif;max-width:900px;margin:40px auto;padding:20px"><h1>IRPA Signing Invitation</h1><p><strong>Document:</strong> ${escapeHtml(d.title)}</p><p><strong>Reference:</strong> ${escapeHtml(d.reference || "Not recorded")}</p><p><strong>Access classification:</strong> ${escapeHtml(d.classification)}</p><p>This invitation has been verified for the assigned document and signer. Authentication is required before signing.</p><p><a href="${escapeHtml(continueUrl)}">Continue to IRPA signing</a></p></body></html>`,{status:200,headers:{"Content-Type":"text/html; charset=UTF-8"}});
 }
 
 async function isAdministratorClaim(env, claims) {
