@@ -167,7 +167,7 @@ service cloud.firestore {
   }
   match /documentReferenceRegistry/{id}{
     allow create:if signedIn()&&request.resource.data.referenceNumber==id&&request.resource.data.sequenceNumber is int&&request.resource.data.sequenceNumber>0&&request.resource.data.issuedByUid==request.auth.uid&&request.resource.data.controlStatus=="Active"&&getAfter(/databases/$(database)/documents/systemSettings/documentCounters).data.documentReference==request.resource.data.sequenceNumber;
-    allow read:if admin()||resource.data.issuedByUid==request.auth.uid;
+    allow get:if signedIn();
     allow update,delete:if admin();
   }
   match /inductionRecords/{uid}{allow read:if self(uid)||admin();allow create,update:if self(uid)&&request.resource.data.uid==request.auth.uid&&(activeMember()||request.auth.token.firebase.sign_in_provider=="anonymous");allow delete:if admin();}
