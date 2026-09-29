@@ -230,6 +230,8 @@ async function oauthCallback(request, env) {
 
 async function upload(request, env) {
   const claims = await authenticateFirebaseRequest(request);
+  const rate = await checkInvitationRateLimit(env.DRIVE_KV, claims.user_id || request.headers.get("CF-Connecting-IP") || "unknown");
+  if (!rate.ok) return json({ok:false,error:"Invitation send rate limit exceeded.",retryAfter:rate.retryAfter},429,{...corsHeaders(request),"Retry-After":String(rate.retryAfter)});
   const data = await request.json();
   const fileName = cleanName(data.fileName || "IRPA-document");
   const contentType = String(data.contentType || "application/pdf").toLowerCase();
@@ -1081,6 +1083,8 @@ async function openSignatureInvitation(request, env) {
   const expected = {envelopeId:record.envelopeId,documentId:record.documentId,recipientUid:record.recipientUid,recipientEmail:record.recipientEmail,tokenHash:record.tokenHash,expiresAt:record.expiresAt};
   const verified = verifySignatureInvite({token,expected});
   if (!verified.ok) return json(verified,verified.status,corsHeaders(request));
+  const consumed = await consumeSingleUseToken(env.DRIVE_KV, tokenHash);
+  if (!consumed.ok) return json(consumed,consumed.status,corsHeaders(request));
   return json({ok:true,invitation:{envelopeId:verified.envelopeId,documentId:verified.documentId,recipientUid:verified.recipientUid,recipientEmail:verified.recipientEmail,expiresAt:expected.expiresAt},document:{id:verified.documentId,title:record.title||verified.documentId,reference:record.reference||"",classification:record.classification||"Restricted",documentUrl:record.documentUrl||""}},200,corsHeaders(request));
 }
 
