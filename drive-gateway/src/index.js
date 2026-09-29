@@ -1049,13 +1049,13 @@ async function sendSignatureInvitation(request, env) {
   if (!recipient) return json({ok:false,error:"The requested signer is not a participant in this envelope."},403,corsHeaders(request));
   const baseUrl = String(env.IRPA_APP_URL || new URL(request.url).origin).replace(/\/$/,"");
   const invite = createSignatureInvite({envelopeId,documentId,recipientUid,recipientEmail:requestedEmail,baseUrl});
+  const title = fields.title?.stringValue || document.fields?.title?.stringValue || documentId;
   await env.DRIVE_KV.put(`signature-invite:${invite.tokenHash}`, JSON.stringify({
     envelopeId,documentId,recipientUid,recipientEmail:requestedEmail,tokenHash:invite.tokenHash,
     expiresAt:invite.expiresAt,status:"Pending",title,reference:String(document.fields?.reference?.stringValue||""),
     classification:String(document.fields?.classification?.stringValue||document.fields?.documentClassification?.stringValue||"Restricted"),
     documentUrl:String(document.fields?.documentUrl?.stringValue||document.fields?.storageUrl?.stringValue||document.fields?.fileUrl?.stringValue||"")
   }), {expirationTtl:72*60*60});
-  const title = fields.title?.stringValue || document.fields?.title?.stringValue || documentId;
   const subject = "IRPA Digital Board Governance — Document Signing Invitation";
   const text = `Dear ${recipient.name || requestedEmail},\\n\\nYou have been invited to review/sign the IRPA document "${title}".\\n\\nOpen your assigned document using this secure invitation link:\\n${invite.url}\\n\\nThis link is restricted to the assigned document and signer and expires in 72 hours.\\n\\nRegards,\\nIRPA Administration\\ninfo@irpa.or.tz`;
   const htmlBody = `<!doctype html><html><body style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937"><h2>IRPA Digital Board Governance</h2><p>Dear ${escapeHtml(recipient.name || requestedEmail)},</p><p>You have been invited to review/sign the IRPA document <strong>${escapeHtml(title)}</strong>.</p><p><a href="${escapeHtml(invite.url)}">Open Assigned Document</a></p><p>This link is restricted to the assigned document and signer and expires in 72 hours.</p><p>Regards,<br>IRPA Administration</p></body></html>`;
