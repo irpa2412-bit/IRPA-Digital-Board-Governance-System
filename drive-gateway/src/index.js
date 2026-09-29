@@ -19,7 +19,7 @@ let jwksCache = null;
 let jwksFetchedAt = 0;
 const MOCK_DRIVE_OBJECTS = new Map();
 let MOCK_DRIVE_COUNTER = 0;
-const MOCK_DRIVE_CONTROL = { secondChannelFailure: false, rollbackDeleteFailure: false };
+const MOCK_DRIVE_CONTROL = { secondChannelFailure: false, rollbackDeleteFailure: false, signatureProviderFailure: false };
 
 export default {
   async fetch(request, env) {
@@ -574,6 +574,10 @@ async function finalizeSignatureProfileArchives(request, env) {
   const originalHash = String(data.originalHash || "").trim();
   const base64 = String(data.base64 || "");
   const fileSize = Number(data.fileSize || 0);
+  const injectedFailure = request.headers.get("X-IRPA-Test-Failure") || "";
+  if (env.DRIVE_MOCK === "true") {
+    MOCK_DRIVE_CONTROL.signatureProviderFailure = injectedFailure === "signature-provider";
+  }
   if (!envelopeId || !finalHash || !base64 || !Number.isFinite(fileSize) || fileSize <= 0 || fileSize > MAX_BYTES) {
     return json({ok:false,error:"Completed signature archive data is incomplete."},400,corsHeaders(request));
   }
@@ -584,6 +588,12 @@ async function finalizeSignatureProfileArchives(request, env) {
   const lastSignedByUid = fields.lastSignedByUid?.stringValue || "";
   if (status !== "Completed" || lastSignedByUid !== claims.user_id) {
     return json({ok:false,error:"Final signer authorization is required before distributing the completed document to signer archives."},403,corsHeaders(request));
+  }
+
+  const alreadyFinalizedHash = String(fields.signatureArchiveFinalHash?.stringValue || "").trim();
+  const existingFileIds = firestoreStringArray(fields.signatureArchiveFileIds);
+  if (alreadyFinalizedHash && alreadyFinalizedHash === finalHash) {
+    return json({ok:true,envelopeId,deliveries:{},idempotent:true,fileIds:existingFileIds,originalHash:String(fields.signatureArchiveOriginalHash?.stringValue || originalHash)},200,corsHeaders(request));
   }
 
   const recipients = firestoreMapArray(fields.recipients);
@@ -599,1160 +609,116 @@ async function finalizeSignatureProfileArchives(request, env) {
   const rootId = await findOrCreateFolder(env, accessToken, stagingRootName(env));
   const signaturesId = await findOrCreateFolder(env, accessToken, "Signature Profiles", rootId);
   const deliveries = {};
+  const createdFileIds = [];
 
-  for (const recipient of actionRecipients) {
-    const uid = cleanId(recipient.uid);
-    const email = String(recipient.email || "").trim().toLowerCase();
-    if (!uid) continue;
-    const folderName = `IRPA-SIGNATURE-${uid}`;
-    const folderId = await findOrCreateFolder(env, accessToken, folderName, signaturesId, {
-      irpaGovernanceSignatureFolder: true,
-      ownerUid: uid,
-      folderUid: uid,
-      purpose: "Member Signature Profile"
-    });
-    if (email) await ensureSignatureFolderPermission(env, accessToken, folderId, email);
-    const completedFolderId = await findOrCreateFolder(env, accessToken, "Completed Signed Documents", folderId, {
-      irpaGovernanceSignatureProfileArchive: true,
-      ownerUid: uid,
-      folderUid: uid,
-      purpose: "Completed Documents Signed by Profile Owner"
-    });
-    const fileName = `completed-${envelopeId}-${finalHash}.pdf`;
-    const metadata = {
-      name: fileName,
-      parents: [completedFolderId],
-      mimeType: "application/pdf",
-      description: JSON.stringify({
-        irpaGovernance: true,
-        uploadedByUid: claims.user_id,
-        purpose: "Signature Profile",
+  try {
+    for (const recipient of actionRecipients) {
+      const uid = cleanId(recipient.uid);
+      const email = String(recipient.email || "").trim().toLowerCase();
+      if (!uid) continue;
+      const folderName = `IRPA-SIGNATURE-${uid}`;
+      const folderId = await findOrCreateFolder(env, accessToken, folderName, signaturesId, {
+        irpaGovernanceSignatureFolder: true,
         ownerUid: uid,
-        envelopeId,
-        signerUid: uid,
-        finalSignerUid: claims.user_id,
-        originalHash,
-        finalHash,
-        archiveProtocol: "IRPA-SIGNER-COPY-V2",
-        archiveState: "Final Completed Document"
-      })
-    };
-    const boundary = `irpa-${crypto.randomUUID()}`;
-    const body = buildMultipartBody(boundary, metadata, bytes, "application/pdf");
-    const response = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType,size,webViewLink,createdTime,parents", {
-      method:"POST",
-      headers:{Authorization:`Bearer ${accessToken}`,"Content-Type":`multipart/related; boundary=${boundary}`},
-      body
-    });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error?.message || `Unable to archive completed document for signer ${uid}.`);
-    deliveries[uid] = {
-      fileId: result.id,
-      fileName: result.name,
-      webViewLink: result.webViewLink || `https://drive.google.com/file/d/${result.id}/view`,
-      folderId: completedFolderId,
-      folderLink: `https://drive.google.com/drive/folders/${encodeURIComponent(completedFolderId)}`,
-      myDocumentsPortal: "My Documents",
-      myDocumentsPortalPath: `My Documents/Completed Signed Documents/${fileName}`,
-      finalHash,
-      archiveProtocol: "IRPA-SIGNER-COPY-V2"
-    };
-  }
-
-  return json({ok:true,envelopeId,deliveries},200,corsHeaders(request));
-}
-
-async function ensureSignatureProfileFolder(request, env) {
-  const claims = await authenticateFirebaseRequest(request);
-  const { memberRecord, employeeRecord } = await getInstitutionalProfileForUser(env, claims);
-  const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
-  const isSignatureProfileOwner = Boolean(memberRecord) || Boolean(employeeRecord);
-  const isAdmin = Boolean(adminRecord?.fields?.active?.booleanValue);
-  if (!isSignatureProfileOwner && !isAdmin) {
-    return json({ ok: false, error: "A registered IRPA member or employee profile is required before a Signature Profile archive can be created." }, 403, corsHeaders(request));
-  }
-
-  const data = await request.json();
-  const requestedUid = cleanId(data.uid || claims.user_id);
-  const requestedEmail = String(data.email || claims.email || "").trim().toLowerCase();
-  if (!requestedUid) return json({ ok: false, error: "Member UID is required." }, 400, corsHeaders(request));
-  if (requestedUid === claims.user_id && requestedEmail && requestedEmail !== String(claims.email || "").trim().toLowerCase()) {
-    return json({ ok: false, error: "The signature-folder email does not match the authenticated account." }, 403, corsHeaders(request));
-  }
-
-  const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
-  if (!isAdmin && requestedUid !== claims.user_id) {
-    return json({ ok: false, error: "You may only provision your own signature folder." }, 403, corsHeaders(request));
-  }
-
-  const accessToken = await getDriveAccessToken(env);
-  const rootId = await findOrCreateFolder(env, accessToken, stagingRootName(env));
-  const signaturesId = await findOrCreateFolder(env, accessToken, "Signature Profiles", rootId);
-  const folderName = `IRPA-SIGNATURE-${requestedUid}`;
-  const folderId = await findOrCreateFolder(env, accessToken, folderName, signaturesId, {
-    irpaGovernanceSignatureFolder: true,
-    ownerUid: requestedUid,
-    folderUid: requestedUid,
-    purpose: "Member Signature Profile"
-  });
-
-  // Prescribed personal archive for every completed signing action by this profile.
-  // It is a child of the established Signature Profile and is never a loose folder.
-  const completedDocumentsFolderId = await findOrCreateFolder(
-    env,
-    accessToken,
-    "Completed Signed Documents",
-    folderId,
-    {
-      irpaGovernanceSignatureProfileArchive: true,
-      ownerUid: requestedUid,
-      folderUid: requestedUid,
-      purpose: "Completed Documents Signed by Profile Owner"
-    }
-  );
-
-  let folderShared = false;
-  if (requestedEmail) {
-    folderShared = await ensureSignatureFolderPermission(env, accessToken, folderId, requestedEmail);
-  }
-
-  return json({
-    ok: true,
-    uid: requestedUid,
-    folderId,
-    folderName,
-    parentFolderId: signaturesId,
-    completedDocumentsFolderId,
-    completedDocumentsFolderName: "Completed Signed Documents",
-    completedDocumentsFolderPath: `IRPA Governance System/Signature Profiles/${folderName}/Completed Signed Documents`,
-    completedDocumentsFolderLink: `https://drive.google.com/drive/folders/${completedDocumentsFolderId}`,
-    folderShared,
-    path: `IRPA Governance System/Signature Profiles/${folderName}`
-  }, 200, corsHeaders(request));
-}
-
-async function ensureDocumentArchiveFolder(request, env) {
-  const claims = await authenticateFirebaseRequest(request);
-  const data = await request.json();
-  const documentId = cleanId(data.documentId || "");
-  if (!documentId) return json({ok:false,error:"Document UID is required."},400,corsHeaders(request));
-
-  const classification = String(data.classification || "Public").trim();
-  const archiveCategory = String(data.archiveCategory || "Administrative Documents").trim();
-  const allowedCategories = ["Finance Documents","Procurement Documents","Governance Documents","Administrative Documents"];
-  const allowedClassifications = ["Public","Internal","Confidential","Restricted"];
-  if (!allowedCategories.includes(archiveCategory)) return json({ok:false,error:"Invalid document archive category."},400,corsHeaders(request));
-  if (!allowedClassifications.includes(classification)) return json({ok:false,error:"Invalid document access classification."},400,corsHeaders(request));
-
-  const title = cleanName(data.title || documentId);
-  const reference = cleanName(data.reference || documentId);
-  const isPublic = classification === "Public";
-  const accessToken = await getDriveAccessToken(env);
-
-  const rootId = await findOrCreateFolder(env, accessToken, stagingRootName(env));
-  const archiveRootId = await findOrCreateFolder(env, accessToken, "Document Archives", rootId, {
-    irpaGovernanceArchive:true,
-    purpose:"Controlled Document Archives"
-  });
-  const categoryId = await findOrCreateFolder(env, accessToken, archiveCategory, archiveRootId, {
-    irpaGovernanceArchive:true,
-    archiveCategory,
-    purpose:"Controlled Document Category"
-  });
-  const classificationId = await findOrCreateFolder(env, accessToken, classification, categoryId, {
-    irpaGovernanceArchive:true,
-    archiveCategory,
-    classification,
-    purpose:"Controlled Document Classification"
-  });
-  const folderName = `IRPA-DOC-${documentId}`;
-  const folderId = await findOrCreateFolder(env, accessToken, folderName, classificationId, {
-    irpaGovernanceArchive:true,
-    purpose:"Controlled Document",
-    documentId,
-    documentUid:documentId,
-    documentTitle:title,
-    documentReference:reference,
-    archiveCategory,
-    classification,
-    publicAccess:isPublic
-  });
-
-  if (isPublic) await ensureAnyoneReaderPermission(env, accessToken, folderId);
-
-  return json({
-    ok:true,
-    documentUid:documentId,
-    folderId,
-    folderName,
-    archiveRootId,
-    categoryId,
-    classificationId,
-    archiveCategory,
-    classification,
-    archivePath:`IRPA Governance System/Document Archives/${archiveCategory}/${classification}/${folderName}`,
-    archiveUidLink:`https://drive.google.com/drive/folders/${folderId}`,
-    archiveCategoryUidLink:`https://drive.google.com/drive/folders/${categoryId}`,
-    archiveAccess:isPublic?"Public":"Restricted",
-    createdByUid:claims.user_id
-  },200,corsHeaders(request));
-}
-
-async function provisionDocumentArchive(request, env) {
-  const claims = await authenticateFirebaseRequest(request);
-  const data = await request.json();
-  const documentId = cleanId(data.documentId || "");
-  if (!documentId) return json({ok:false,error:"Document ID is required."},400,corsHeaders(request));
-  const document = await getFirestoreDocument(env, `documents/${documentId}`, claims.token);
-  if (!document) return json({ok:false,error:"Document registry record was not found."},404,corsHeaders(request));
-  const archive = await ensureDocumentArchiveFolder(new Request(request.url,{method:"POST",headers:request.headers,body:JSON.stringify(data)}),env);
-  const fileId = document.fields?.fileId?.stringValue || "";
-  let archivedFileId = "";
-  let archivedFileLink = "";
-  if (fileId) {
-    const accessToken = await getDriveAccessToken(env);
-    const copied = await driveFetch(env,accessToken,`/drive/v3/files/${encodeURIComponent(fileId)}/copy?supportsAllDrives=true`,{
-      method:"POST",
-      body:JSON.stringify({name:cleanName(document.fields?.fileName?.stringValue||document.fields?.title?.stringValue||"Controlled Document.pdf"),parents:[archive.folderId]})
-    });
-    archivedFileId=copied.id||"";
-    archivedFileLink=archivedFileId?`https://drive.google.com/file/d/${archivedFileId}/view`:"";
-    if(archive.archiveAccess==="Public"&&archivedFileId) await ensureAnyoneReaderPermission(env,accessToken,archivedFileId);
-  }
-  return json({...archive,archivedFileId,archivedFileLink},200,corsHeaders(request));
-}
-
-async function ensureAnyoneReaderPermission(env, accessToken, folderId) {
-  const existing = await driveFetch(
-    env,
-    accessToken,
-    `/drive/v3/files/${encodeURIComponent(folderId)}/permissions?fields=permissions(id,type,role)&pageSize=100`
-  );
-  if ((existing.permissions || []).some(p => p.type === "anyone" && ["reader","commenter","writer"].includes(p.role))) {
-    return true;
-  }
-  await driveFetch(env, accessToken, `/drive/v3/files/${encodeURIComponent(folderId)}/permissions?sendNotificationEmail=false`, {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({type:"anyone",role:"reader"})
-  });
-  return true;
-}
-
-async function ensureSignedDocumentArchive(request, env) {
-  const claims = await authenticateFirebaseRequest(request);
-  const data = await request.json();
-  const documentId = cleanId(data.documentId || "");
-  if (!documentId) return json({ok:false,error:"Document UID is required."},400,corsHeaders(request));
-  const document = await getFirestoreDocument(env, `documents/${documentId}`, claims.token);
-  if (!document) return json({ok:false,error:"Document registry record was not found."},404,corsHeaders(request));
-  const fields = document.fields || {};
-  const classification = String(data.classification || fields.classification?.stringValue || "Public").trim();
-  const archiveCategory = String(data.archiveCategory || fields.archiveCategory?.stringValue || "Administrative Documents").trim();
-  const title = cleanName(data.title || fields.title?.stringValue || documentId);
-  const reference = cleanName(data.reference || fields.reference?.stringValue || documentId);
-  const documentType = String(fields.documentType?.stringValue || data.documentType || "Administrative Document").trim();
-  const governanceArchive = /governance/i.test(documentType);
-  const allowedCategories = ["Finance Documents","Procurement Documents","Governance Documents","Administrative Documents"];
-  const allowedClassifications = ["Public","Internal","Confidential","Restricted"];
-  if (!allowedCategories.includes(archiveCategory)) return json({ok:false,error:"Invalid document archive category."},400,corsHeaders(request));
-  if (!allowedClassifications.includes(classification)) return json({ok:false,error:"Invalid document access classification."},400,corsHeaders(request));
-
-  const accessToken = await getDriveAccessToken(env);
-  const rootId = await findOrCreateFolder(env, accessToken, stagingRootName(env));
-  const signedRootId = await findOrCreateFolder(env, accessToken, "Signed Documents Archive", rootId, {
-    irpaGovernanceArchive:true,
-    purpose:"Signed Documents Archive"
-  });
-  const categoryId = await findOrCreateFolder(env, accessToken, archiveCategory, signedRootId, {
-    irpaGovernanceArchive:true,
-    archiveCategory,
-    purpose:"Signed Document Category"
-  });
-  const classificationId = await findOrCreateFolder(env, accessToken, classification, categoryId, {
-    irpaGovernanceArchive:true,
-    archiveCategory,
-    classification,
-    purpose:"Signed Document Classification"
-  });
-  const folderName = `IRPA-DOC-${documentId}`;
-  const folderId = await findOrCreateFolder(env, accessToken, folderName, classificationId, {
-    irpaGovernanceArchive:true,
-    purpose:"Signed Document",
-    documentId,
-    documentUid:documentId,
-    documentTitle:title,
-    documentReference:reference,
-    archiveCategory,
-    classification,
-    publicAccess:classification==="Public"
-  });
-  if (classification==="Public") await ensureAnyoneReaderPermission(env,accessToken,folderId);
-
-  let governanceRootId=null;
-  let governanceClassificationId=null;
-  let governanceFolderId=null;
-  if (governanceArchive) {
-    governanceRootId = await findOrCreateFolder(env, accessToken, "Board of Directors Governance Archive", rootId, {
-      irpaGovernanceArchive:true,
-      irpaBoardGovernanceArchive:true,
-      purpose:"Board of Directors Governance Documents"
-    });
-    governanceClassificationId = await findOrCreateFolder(env, accessToken, classification, governanceRootId, {
-      irpaGovernanceArchive:true,
-      irpaBoardGovernanceArchive:true,
-      classification,
-      purpose:"Board of Directors Governance Signed Documents"
-    });
-    governanceFolderId = await findOrCreateFolder(env, accessToken, folderName, governanceClassificationId, {
-      irpaGovernanceArchive:true,
-      irpaBoardGovernanceArchive:true,
-      purpose:"Board of Directors Governance Signed Document",
-      documentId,
-      documentUid:documentId,
-      documentTitle:title,
-      documentReference:reference,
-      archiveCategory,
-      classification
-    });
-    if (classification==="Public") await ensureAnyoneReaderPermission(env,accessToken,governanceFolderId);
-  }
-
-  return json({
-    ok:true,
-    documentUid:documentId,
-    folderId,
-    archiveRootId:signedRootId,
-    categoryId,
-    classificationId,
-    archiveCategory,
-    classification,
-    archivePath:`IRPA Governance System/Signed Documents Archive/${archiveCategory}/${classification}/${folderName}`,
-    archiveUidLink:`https://drive.google.com/drive/folders/${encodeURIComponent(folderId)}`,
-    archiveCategoryUidLink:`https://drive.google.com/drive/folders/${encodeURIComponent(categoryId)}`,
-    archiveAccess:classification==="Public"?"Public":"Restricted",
-    governanceArchive:governanceFolderId ? {
-      rootId:governanceRootId,
-      classificationId:governanceClassificationId,
-      folderId:governanceFolderId,
-      archivePath:`IRPA Governance System/Board of Directors Governance Archive/${classification}/Signed Documents/${folderName}`,
-      archiveUidLink:`https://drive.google.com/drive/folders/${encodeURIComponent(governanceFolderId)}`
-    } : null
-  },200,corsHeaders(request));
-}
-
-async function ensureSignatureWorkflowFolder(request, env) {
-  const claims = await authenticateFirebaseRequest(request);
-  const data = await request.json();
-  const envelopeId = cleanId(data.envelopeId || "");
-  if (!envelopeId) return json({ok:false,error:"Signature workflow ID is required."},400,corsHeaders(request));
-  const accessToken = await getDriveAccessToken(env);
-  const rootId = await findOrCreateFolder(env, accessToken, stagingRootName(env));
-  const workflowsId = await findOrCreateFolder(env, accessToken, "Signature Workflows", rootId, {
-    irpaGovernanceSignatureWorkflow:true,
-    purpose:"Signature Workflow Working Files"
-  });
-  const folderName = `IRPA-WORKFLOW-${envelopeId}`;
-  const folderId = await findOrCreateFolder(env, accessToken, folderName, workflowsId, {
-    irpaGovernanceSignatureWorkflow:true,
-    envelopeId,
-    ownerUid:claims.user_id,
-    purpose:"Signature Workflow Working File"
-  });
-  return json({ok:true,envelopeId,folderId,folderName,archiveAccess:"Restricted",path:`IRPA Governance System/Signature Workflows/${folderName}`},200,corsHeaders(request));
-}
-
-async function getSessionProfile(request, env) {
-  const claims = await authenticateFirebaseRequest(request);
-  const [adminDoc, memberDoc, employeeDoc] = await Promise.all([
-    getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token),
-    getFirestoreDocument(env, `members/${claims.user_id}`, claims.token),
-    getFirestoreDocument(env, `employees/${claims.user_id}`, claims.token)
-  ]);
-  const admin = firestoreDocumentToPlain(adminDoc);
-  const member = firestoreDocumentToPlain(memberDoc);
-  const employee = firestoreDocumentToPlain(employeeDoc);
-  return json({
-    ok:true,
-    uid:claims.user_id,
-    email:claims.email || member?.email || employee?.email || "",
-    admin: admin && admin.active === true ? admin : null,
-    member: member && member.status === "Active" ? member : null,
-    employee: employee || null
-  },200,corsHeaders(request));
-}
-
-async function lookupInductionRegistration(request, env) {
-  const claims = await authenticateFirebaseRequest(request);
-  const data = await request.json();
-  const enteredName = String(data.fullName || "").trim();
-  if (enteredName.length < 2) return json({ok:true,matched:false,reason:"Enter at least 2 characters."},200,corsHeaders(request));
-
-  const normalize = value => String(value || "").trim().toLowerCase().replace(/\s+/g," ");
-  const target = normalize(enteredName);
-  const member = await getFirestoreDocument(env, `members/${cleanId(claims.user_id)}`, claims.token);
-  const employee = await getFirestoreDocument(env, `employees/${cleanId(claims.user_id)}`, claims.token);
-  const invitationRows = await queryFirestoreByEmail(env, "invitations", "email", claims.email || "", claims.token);
-
-  const memberFields = member?.fields || {};
-  const employeeFields = employee?.fields || {};
-  const invitationRecords = invitationRows.map(row => row.document).filter(Boolean);
-  const invitation = invitationRecords
-    .map(doc => firestoreDocumentToPlain(doc))
-    .filter(x => normalize(x.email) === normalize(claims.email) && normalize(x.name) === target)
-    .sort((a,b) => Number(b.updatedAt?.timestampValue ? Date.parse(b.updatedAt.timestampValue) : 0) - Number(a.updatedAt?.timestampValue ? Date.parse(a.updatedAt.timestampValue) : 0))[0] || null;
-
-  const memberPlain = firestoreDocumentToPlain(member);
-  const employeePlain = firestoreDocumentToPlain(employee);
-  const ownNames = [employeePlain?.name, memberPlain?.name].filter(Boolean).map(normalize);
-  const nameMatchesOwnRecord = ownNames.includes(target);
-  if (!nameMatchesOwnRecord && !invitation) {
-    return json({ok:true,matched:false,reason:"No registration record matching the entered full name was found for the authenticated IRPA account."},200,corsHeaders(request));
-  }
-
-  const number = employeeFields.employeeNumber?.stringValue || memberFields.memberNumber?.stringValue || "";
-  const merged = {
-    fullName: employeePlain?.name || memberPlain?.name || invitation?.name || enteredName,
-    email: claims.email || employeePlain?.email || memberPlain?.email || invitation?.email || "",
-    registrationNumber: number,
-    employeeNumber: employeeFields.employeeNumber?.stringValue || "",
-    memberNumber: memberFields.memberNumber?.stringValue || "",
-    role: employeePlain?.role || memberPlain?.role || invitation?.role || "",
-    department: employeePlain?.department || memberPlain?.department || invitation?.department || "",
-    unit: employeePlain?.unit || memberPlain?.unit || invitation?.unit || "",
-    memberType: memberPlain?.memberType || invitation?.memberType || "",
-    employmentType: employeePlain?.employmentType || invitation?.employmentType || "",
-    employmentStatus: employeePlain?.status || employeePlain?.employmentStatus || "",
-    memberStatus: memberPlain?.status || "",
-    invitationStatus: invitation?.status || "",
-    invitationId: invitation?.id || "",
-    sources: [
-      memberPlain ? "Members Registration" : null,
-      employeePlain ? "Employees & Personnel Registration" : null,
-      invitation ? "Member & Personnel Invitations" : null
-    ].filter(Boolean)
-  };
-  return json({ok:true,matched:true,registration:merged},200,corsHeaders(request));
-}
-
-async function sendRegistrationNumber(request, env) {
-  const claims = await authenticateFirebaseRequest(request);
-  const data = await request.json();
-  const uid = cleanId(data.uid || claims.user_id);
-  if (uid !== claims.user_id) return json({ok:false,error:"Registration-number email may only be requested for the authenticated account."},403,corsHeaders(request));
-  const member = await getFirestoreDocument(env, `members/${uid}`, claims.token);
-  const employee = await getFirestoreDocument(env, `employees/${uid}`, claims.token);
-  const memberFields = member?.fields || {};
-  const employeeFields = employee?.fields || {};
-  const number = employeeFields.employeeNumber?.stringValue || memberFields.memberNumber?.stringValue || "";
-  const email = String(claims.email || employeeFields.email?.stringValue || memberFields.email?.stringValue || "").trim().toLowerCase();
-  const name = employeeFields.name?.stringValue || memberFields.name?.stringValue || "IRPA Member/Employee";
-  if (!number) return json({ok:false,error:"No IRPA member/employee registration number is currently assigned to this account."},409,corsHeaders(request));
-  if (!email) return json({ok:false,error:"No official email address is available for this account."},409,corsHeaders(request));
-  const subject = "IRPA Digital Board Governance — Registration Number Confirmation";
-  const text = `Dear ${name},
-
-Your IRPA Digital Board Governance induction form has been saved successfully.
-
-Your existing IRPA registration number is: ${number}
-
-This number was retrieved from the IRPA registration system and was not entered or changed during induction. Keep it for your IRPA Digital Governance System records.
-
-Your completed induction has been routed to the registered department/unit for role and duties assignment.
-
-Regards,
-IRPA Administration
-info@irpa.or.tz`;
-  const htmlBody = `<!doctype html><html><body style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937"><h2>IRPA Digital Board Governance</h2><p>Dear ${escapeHtml(name)},</p><p>Your IRPA Digital Board Governance induction form has been saved successfully.</p><p><strong>Your IRPA registration number: ${escapeHtml(number)}</strong></p><p>This number was retrieved from the IRPA registration system and was not entered or changed during induction.</p><p>Your completed induction has been routed to the registered department/unit for role and duties assignment.</p><p>Regards,<br>IRPA Administration<br><a href="mailto:info@irpa.or.tz">info@irpa.or.tz</a></p></body></html>`;
-  const messageId = await smtpSend(env,{to:email,subject,text,html:htmlBody});
-  return json({ok:true,email,registrationNumber:number,emailRequested:true,provider:"IRPA Mail Server",deliveryStatus:"Submitted to mail.irpa.or.tz",messageId},200,corsHeaders(request));
-}
-
-async function sendMemberInvitation(request, env) {
-  const claims = await authenticateFirebaseRequest(request);
-  const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
-  if (!admin?.fields?.active?.booleanValue) {
-    return json({ ok:false, error:"Administrator authorization is required." },403,corsHeaders(request));
-  }
-  const data = await request.json();
-  const invitationId = cleanId(data.invitationId || "");
-  if (!invitationId) return json({ok:false,error:"Invitation ID is required."},400,corsHeaders(request));
-  const invitation = await getFirestoreDocument(env, `invitations/${invitationId}`, claims.token);
-  if (!invitation) return json({ok:false,error:"Invitation record was not found."},404,corsHeaders(request));
-  const fields = invitation.fields || {};
-  const email = String(fields.email?.stringValue || "").trim().toLowerCase();
-  const name = String(fields.name?.stringValue || "").trim();
-  const role = String(fields.role?.stringValue || "IRPA Member");
-  if (!email) return json({ok:false,error:"Invitation email address is missing."},400,corsHeaders(request));
-  const appUrl = String(env.IRPA_APP_URL || "https://irpa-digital-board-governance.web.app").replace(/\/$/,"");
-  const link = `${appUrl}/?memberInvite=${encodeURIComponent(invitationId)}`;
-  const subject = "IRPA Digital Board Governance — Invitation to Activate Your Account";
-  const text = `Dear ${name || "IRPA Member"},\\n\\nYou have been invited to access the IRPA Digital Board Governance System as ${role}.\\n\\nActivate your account using this secure invitation link:\\n${link}\\n\\nOn the activation page, use your invited email address and create your permanent password. After activation, you can sign in normally using your email address and password.\\n\\nIf you did not expect this invitation, please contact Improvement of Rangeland in Pastoral Areas (IRPA).\\n\\nRegards,\\nIRPA Administration\\ninfo@irpa.or.tz`;
-  const htmlBody = `<!doctype html><html><body style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937"><h2>IRPA Digital Board Governance</h2><p>Dear ${escapeHtml(name || "IRPA Member")},</p><p>You have been invited to access the <strong>IRPA Digital Board Governance System</strong> as <strong>${escapeHtml(role)}</strong>.</p><p><a href="${escapeHtml(link)}" style="display:inline-block;padding:12px 18px;background:#0f766e;color:#fff;text-decoration:none;border-radius:6px">Activate Your IRPA Account</a></p><p>On the activation page, use your invited email address and create your permanent password.</p><p>If you did not expect this invitation, please contact <a href="mailto:info@irpa.or.tz">info@irpa.or.tz</a>.</p><p>Regards,<br>IRPA Administration</p></body></html>`;
-  const messageId = await smtpSend(env, {to:email, subject, text, html:htmlBody});
-  return json({ok:true,email,emailRequested:true,provider:"IRPA Mail Server",deliveryStatus:"Submitted to mail.irpa.or.tz",messageId},200,corsHeaders(request));
-}
-
-async function smtpSend(env,{to,subject,text,html}) {
-  if (!env.SMTP_PASSWORD) throw new Error("IRPA SMTP password is not configured in the deployment environment.");
-  const { connect } = await import("cloudflare:sockets");
-  const socket = connect({hostname:SMTP_HOST,port:SMTP_PORT},{secureTransport:"on"});
-  const reader = socket.readable.getReader();
-  const writer = socket.writable.getWriter();
-  let buffer = "";
-  async function readResponse() {
-    while (true) {
-      const {value,done}=await reader.read();
-      if (done) throw new Error("SMTP server closed the connection.");
-      buffer += new TextDecoder().decode(value);
-      const lines=buffer.split("\\r\\n");
-      buffer=lines.pop() || "";
-      for (let i=0;i<lines.length;i++) {
-        const line=lines[i];
-        if (/^\\d{3} /.test(line)) {
-          const code=Number(line.slice(0,3));
-          if (code>=400) throw new Error(`IRPA SMTP error ${code}: ${line.slice(4)}`);
-          return line;
-        }
-      }
-    }
-  }
-  async function command(value, expectedClass) {
-    await writer.write(new TextEncoder().encode(value+"\\r\\n"));
-    const line=await readResponse();
-    if (expectedClass && !line.startsWith(String(expectedClass))) throw new Error("Unexpected SMTP response: "+line);
-    return line;
-  }
-  try {
-    await readResponse();
-    await command("EHLO irpa-digital-board-governance","2");
-    await command("AUTH PLAIN "+btoa("\\0"+SMTP_FROM+"\\0"+env.SMTP_PASSWORD),"2");
-    await command(`MAIL FROM:<${SMTP_FROM}>`,"2");
-    await command(`RCPT TO:<${to}>`,"2");
-    await command("DATA","3");
-    const boundary="IRPA-"+crypto.randomUUID();
-    const mime=[
-      `From: "IRPA Administration" <${SMTP_FROM}>`,
-      `To: <${to}>`,
-      `Subject: ${subject}`,
-      "MIME-Version: 1.0",
-      `Content-Type: multipart/alternative; boundary="${boundary}"`,
-      "",
-      `--${boundary}`,
-      "Content-Type: text/plain; charset=UTF-8",
-      "Content-Transfer-Encoding: 8bit",
-      "",
-      text,
-      "",
-      `--${boundary}`,
-      "Content-Type: text/html; charset=UTF-8",
-      "Content-Transfer-Encoding: 8bit",
-      "",
-      html,
-      "",
-      `--${boundary}--`,
-      ""
-    ].join("\\r\\n").replace(/\\r?\\n/g,"\\r\\n");
-    await writer.write(new TextEncoder().encode(mime+"\\r\\n.\\r\\n"));
-    const accepted=await readResponse();
-    if (!accepted.startsWith("2")) throw new Error("SMTP message was not accepted: "+accepted);
-    await command("QUIT","2");
-    return accepted;
-  } finally {
-    try { reader.releaseLock(); } catch {}
-    try { writer.releaseLock(); } catch {}
-    try { socket.close(); } catch {}
-  }
-}
-
-async function deleteDriveFile(request, env) {
-  const claims = await authenticateFirebaseRequest(request);
-  const data = await request.json();
-
-  const fileId = String(data.fileId || "").trim();
-  const documentId = String(data.documentId || "").trim();
-
-  if (!fileId) {
-    return json(
-      { ok: false, error: "Google Drive file ID is required." },
-      400,
-      corsHeaders(request)
-    );
-  }
-
-  if (!documentId) {
-    return json(
-      { ok: false, error: "Firestore document ID is required." },
-      400,
-      corsHeaders(request)
-    );
-  }
-
-  const admin = await getFirestoreDocument(
-    env,
-    `adminProfiles/${claims.user_id}`,
-    claims.token
-  );
-
-  if (!admin?.fields?.active?.booleanValue) {
-    return json(
-      { ok: false, error: "Administrator authorization is required." },
-      403,
-      corsHeaders(request)
-    );
-  }
-
-  const document = await getFirestoreDocument(
-    env,
-    `documents/${documentId}`,
-    claims.token
-  );
-
-  if (!document) {
-    return json(
-      { ok: false, error: "The controlled document record was not found." },
-      404,
-      corsHeaders(request)
-    );
-  }
-
-  const storedFileId = document?.fields?.fileId?.stringValue || "";
-
-  if (!storedFileId || storedFileId !== fileId) {
-    return json(
-      { ok: false, error: "The supplied Drive file does not match the controlled document record." },
-      409,
-      corsHeaders(request)
-    );
-  }
-
-  const accessToken = await getDriveAccessToken(env);
-
-  const metadata = await driveFetch(
-    env,
-    accessToken,
-    `/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,name,mimeType,size,description,trashed`
-  );
-
-  const description = parseDescription(metadata.description);
-
-  if (!description?.irpaGovernance) {
-    return json(
-      { ok: false, error: "The requested file is not an IRPA governance document." },
-      403,
-      corsHeaders(request)
-    );
-  }
-
-  const response = await fetch(
-    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`,
-    {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${accessToken}`
-      }
-    }
-  );
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(
-      `Google Drive deletion failed (${response.status}): ${errorText.slice(0, 500)}`
-    );
-  }
-
-  return json(
-    {
-      ok: true,
-      fileId,
-      fileName: metadata.name || "Document",
-      documentId,
-      deletedByUid: claims.user_id
-    },
-    200,
-    corsHeaders(request)
-  );
-}
-
-
-
-async function getDriveAccessToken(env) {
-  if (env.DRIVE_MOCK === "true") return "mock-token";
-  const isStaging = String(env.ENVIRONMENT || "") === "staging";
-  const stagingRefreshToken = String(env.STAGING_GOOGLE_DRIVE_REFRESH_TOKEN || "").trim();
-  const clientId = isStaging && stagingRefreshToken ? env.STAGING_GOOGLE_DRIVE_CLIENT_ID : env.GOOGLE_DRIVE_CLIENT_ID;
-  const clientSecret = isStaging && stagingRefreshToken ? env.STAGING_GOOGLE_DRIVE_CLIENT_SECRET : env.GOOGLE_DRIVE_CLIENT_SECRET;
-  let refreshToken = stagingRefreshToken;
-  if (!refreshToken) {
-    const stored = await env.DRIVE_KV.get("google-drive-refresh-token", "json");
-    if (!stored?.encrypted) throw new Error("Google Drive has not yet been authorized.");
-    refreshToken = await decryptText(stored.encrypted, env.GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY);
-  }
-  const response = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: env.GOOGLE_DRIVE_CLIENT_ID,
-      client_secret: env.GOOGLE_DRIVE_CLIENT_SECRET,
-      refresh_token: refreshToken,
-      grant_type: "refresh_token"
-    })
-  });
-  const tokens = await response.json();
-  if (!response.ok || !tokens.access_token) throw new Error(tokens.error_description || "Google Drive access token refresh failed.");
-  return tokens.access_token;
-}
-
-async function ensureSignatureFolderPermission(env, accessToken, folderId, email) {
-  const normalizedEmail = String(email || "").trim().toLowerCase();
-  if (!folderId || !normalizedEmail) return false;
-
-  try {
-    const listed = await driveFetch(
-      env,
-      accessToken,
-      `/drive/v3/files/${encodeURIComponent(folderId)}/permissions?fields=permissions(id,type,emailAddress,role)&pageSize=100`
-    );
-    const existing = (listed.permissions || []).find(
-      p => p.type === "user" && String(p.emailAddress || "").trim().toLowerCase() === normalizedEmail
-    );
-    if (existing) return true;
-
-    await driveFetch(
-      env,
-      accessToken,
-      `/drive/v3/files/${encodeURIComponent(folderId)}/permissions?sendNotificationEmail=false&supportsAllDrives=true`,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          type: "user",
-          role: "reader",
-          emailAddress: normalizedEmail
+        folderUid: uid,
+        purpose: "Member Signature Profile"
+      });
+      if (email) await ensureSignatureFolderPermission(env, accessToken, folderId, email);
+      const completedFolderId = await findOrCreateFolder(env, accessToken, "Completed Signed Documents", folderId, {
+        irpaGovernanceSignatureProfileArchive: true,
+        ownerUid: uid,
+        folderUid: uid,
+        purpose: "Completed Documents Signed by Profile Owner"
+      });
+      const fileName = `completed-${envelopeId}-${finalHash}.pdf`;
+      const metadata = {
+        name: fileName,
+        parents: [completedFolderId],
+        mimeType: "application/pdf",
+        description: JSON.stringify({
+          irpaGovernance: true,
+          uploadedByUid: claims.user_id,
+          purpose: "Signature Profile",
+          ownerUid: uid,
+          envelopeId,
+          signerUid: uid,
+          finalSignerUid: claims.user_id,
+          originalHash,
+          finalHash,
+          archiveProtocol: "IRPA-SIGNER-COPY-V2",
+          archiveState: "Final Completed Document"
         })
+      };
+      if (env.DRIVE_MOCK === "true" && MOCK_DRIVE_CONTROL.signatureProviderFailure) {
+        MOCK_DRIVE_CONTROL.signatureProviderFailure = false;
+        throw new Error("Mocked signature-provider failure.");
       }
-    );
-    return true;
+      const boundary = `irpa-${crypto.randomUUID()}`;
+      const body = buildMultipartBody(boundary, metadata, bytes, "application/pdf");
+      const result = await uploadDriveObject(env, metadata, bytes, "application/pdf", body, boundary, "Signature Profile");
+      createdFileIds.push(result.id);
+      deliveries[uid] = {
+        fileId: result.id,
+        fileName: result.name,
+        webViewLink: result.webViewLink || `https://drive.google.com/file/d/${result.id}/view`,
+        folderId: completedFolderId,
+        folderLink: `https://drive.google.com/drive/folders/${encodeURIComponent(completedFolderId)}`,
+        myDocumentsPortal: "My Documents",
+        myDocumentsPortalPath: `My Documents/Completed Signed Documents/${fileName}`,
+        finalHash,
+        originalHash,
+        archiveProtocol: "IRPA-SIGNER-COPY-V2"
+      };
+    }
   } catch (error) {
-    console.warn("Signature folder sharing was not completed", normalizedEmail, error?.message || error);
-    return false;
-  }
-}
-
-function stagingRootName(env) {
-  return String(env.DRIVE_ROOT_FOLDER_NAME || "IRPA Governance System").trim() || "IRPA Governance System";
-}
-
-function firestoreBaseUrl(env) {
-  const host = String(env.FIRESTORE_EMULATOR_HOST || "").trim();
-  return host ? `http://${host}` : "https://firestore.googleapis.com";
-}
-
-function firestoreAuthToken(env, firebaseToken) {
-  return env.LOCAL_TEST_MODE === "true" && String(env.FIRESTORE_EMULATOR_HOST || "").trim()
-    ? "owner"
-    : firebaseToken;
-}
-
-async function uploadDriveObject(env, metadata, bytes, contentType, body, boundary, archiveChannel) {
-  if (env.DRIVE_MOCK === "true") {
-    const id = `mock-file-${++MOCK_DRIVE_COUNTER}`;
-    MOCK_DRIVE_OBJECTS.set(id, { id, name: metadata.name, mimeType: contentType, size: bytes.length, description: metadata.description, parents: metadata.parents, bytes: new Uint8Array(bytes), archiveChannel });
-    return { id, name: metadata.name, mimeType: contentType, size: bytes.length, webViewLink: `mock://drive/${id}`, parents: metadata.parents };
-  }
-  const response = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType,size,webViewLink,createdTime,parents", { method:"POST", headers:{Authorization:`Bearer ${await getDriveAccessToken(env)}`, "Content-Type":`multipart/related; boundary=${boundary}`}, body });
-  const result = await response.json();
-  if (!response.ok) throw new Error(result.error?.message || `Google Drive upload failed for ${archiveChannel}.`);
-  return result;
-}
-
-async function downloadDriveObject(env, fileId, accessToken) {
-  if (env.DRIVE_MOCK === "true") {
-    const object = MOCK_DRIVE_OBJECTS.get(fileId);
-    if (!object) throw new Error("Google Drive download failed.");
-    return new Uint8Array(object.bytes);
-  }
-  const media = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`, { headers:{Authorization:`Bearer ${accessToken}`} });
-  if (!media.ok) throw new Error("Google Drive download failed.");
-  return new Uint8Array(await media.arrayBuffer());
-}
-
-async function mockDriveFetch(path, options = {}) {
-  const method = String(options.method || "GET").toUpperCase();
-  const url = new URL(`https://mock.local${path}`);
-  const filesMatch = url.pathname.match(/^\/drive\/v3\/files\/([^/]+)$/);
-  if (method === "GET" && filesMatch) {
-    const object = MOCK_DRIVE_OBJECTS.get(decodeURIComponent(filesMatch[1]));
-    if (!object) throw new Error("Google Drive file not found.");
-    return object;
-  }
-  if (method === "GET" && url.pathname === "/drive/v3/files") {
-    const q = url.searchParams.get("q") || "";
-    const files = Array.from(MOCK_DRIVE_OBJECTS.values()).filter(o => o.mimeType === "application/vnd.google-apps.folder" && (!q || q.includes(o.name)));
-    return {files:files.slice(0,10).map(o=>({id:o.id,name:o.name,parents:o.parents,mimeType:o.mimeType,description:o.description,trashed:false}))};
-  }
-  if (method === "POST" && url.pathname === "/drive/v3/files") {
-    const body=JSON.parse(options.body || "{}"); const id=`mock-folder-${++MOCK_DRIVE_COUNTER}`;
-    const object={id,name:body.name,mimeType:body.mimeType,size:0,description:body.description || "{}",parents:body.parents || [],bytes:new Uint8Array()}; MOCK_DRIVE_OBJECTS.set(id,object); return {id,name:object.name,mimeType:object.mimeType,parents:object.parents};
-  }
-  if (/\/permissions$/.test(url.pathname)) return method === "GET" ? {permissions:[]} : {id:"mock-permission"};
-  return {};
-}
-
-async function recordPendingRollback(env, payload) {
-  await env.DRIVE_KV.put(`pending-drive-rollback:${payload.documentId}:${payload.fileId}`, JSON.stringify(payload));
-}
-
-async function cleanupPendingDriveRollbacks(env) {
-  const listed = await env.DRIVE_KV.list({prefix:"pending-drive-rollback:"});
-  for (const key of listed.keys || []) {
-    const payload = await env.DRIVE_KV.get(key.name,"json");
-    if (!payload?.fileId) { await env.DRIVE_KV.delete(key.name); continue; }
-    try { await deleteDriveFileById(env,payload.fileId); await env.DRIVE_KV.delete(key.name); }
-    catch(error) { console.error("Pending Drive rollback cleanup failed",key.name,error?.message || error); }
-  }
-}
-
-async function findOrCreateFolder(env, accessToken, name, parentId = null, descriptionData = null) {
-  const safeName = name.replace(/'/g, "\\'");
-  const q = [
-    `name='${safeName}'`,
-    "mimeType='application/vnd.google-apps.folder'",
-    "trashed=false",
-    parentId ? `'${parentId}' in parents` : null
-  ].filter(Boolean).join(" and ");
-  const listed = await driveFetch(env, accessToken, `/drive/v3/files?q=${encodeURIComponent(q)}&spaces=drive&pageSize=10&fields=files(id,name,parents)`);
-  if (listed.files?.[0]?.id) return listed.files[0].id;
-
-  const created = await driveFetch(env, accessToken, "/drive/v3/files", {
-    method: "POST",
-    body: JSON.stringify({
-      name,
-      mimeType: "application/vnd.google-apps.folder",
-      ...(parentId ? { parents: [parentId] } : {}),
-      description: JSON.stringify(descriptionData || { irpaGovernanceFolder: true })
-    })
-  });
-  return created.id;
-}
-
-async function driveFetch(env, accessToken, path, options = {}) {
-  if (env.DRIVE_MOCK === "true") return mockDriveFetch(path, options);
-  const response = await fetch(`https://www.googleapis.com${path}`, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-      ...(options.headers || {})
+    for (const fileId of createdFileIds) {
+      try { await deleteDriveFileById(env, fileId); } catch (cleanupError) { console.error("Signature archive rollback failed", fileId, cleanupError?.message || cleanupError); }
     }
-  });
-  const text = await response.text();
-  let data = {};
-  try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
-  if (!response.ok) throw new Error(data.error?.message || "Google Drive API request failed.");
-  return data;
-}
-
-async function authenticateFirebaseRequest(request) {
-  const header = request.headers.get("Authorization") || "";
-  const localMatch = header.match(/^Bearer\s+test:([^:]+):?(.*)$/i);
-  if (localMatch && globalThis.__IRPA_LOCAL_TEST_MODE === true) return { token:"local-test-token", user_id:localMatch[1], email:localMatch[2] || null };
-  const match = header.match(/^Bearer\s+(.+)$/i);
-  if (!match) throw new Error("Firebase authentication is required.");
-
-  const token = match[1];
-  const parts = token.split(".");
-  if (parts.length !== 3) throw new Error("Invalid Firebase ID token.");
-
-  const headerPart = JSON.parse(base64UrlDecode(parts[0]));
-  const payload = JSON.parse(base64UrlDecode(parts[1]));
-  const now = Math.floor(Date.now() / 1000);
-  if (payload.iss !== `https://securetoken.google.com/${FIREBASE_PROJECT_ID}`) throw new Error("Invalid Firebase token issuer.");
-  if (payload.aud !== FIREBASE_PROJECT_ID) throw new Error("Invalid Firebase token audience.");
-  if (!payload.sub || Number(payload.exp || 0) <= now) throw new Error("Firebase token is expired.");
-
-  const jwks = await getFirebaseJwks();
-  const jwk = jwks[headerPart.kid];
-  if (!jwk) throw new Error("Firebase token signing key not found.");
-
-  const key = await crypto.subtle.importKey(
-    "jwk",
-    jwk,
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    false,
-    ["verify"]
-  );
-  const valid = await crypto.subtle.verify(
-    "RSASSA-PKCS1-v1_5",
-    key,
-    base64UrlBytes(parts[2]),
-    new TextEncoder().encode(`${parts[0]}.${parts[1]}`)
-  );
-  if (!valid) throw new Error("Invalid Firebase ID token signature.");
-
-  return { token, user_id: payload.user_id || payload.sub, email: payload.email || null };
-}
-
-async function getFirebaseJwks() {
-  if (jwksCache && Date.now() - jwksFetchedAt < 60 * 60 * 1000) {
-    return jwksCache;
+    throw error;
   }
 
-  const response = await fetch(
-    "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com"
-  );
+  await updateFirestoreDocument(env, `signatureEnvelopes/${envelopeId}`, {
+    signatureArchiveFinalHash: {stringValue: finalHash},
+    signatureArchiveOriginalHash: {stringValue: originalHash},
+    signatureArchiveFileIds: {arrayValue:{values:createdFileIds.map(stringValue)}},
+    signatureArchiveCompleted: {booleanValue:true},
+    signatureArchiveProtocol: {stringValue:"IRPA-SIGNER-COPY-V2"}
+  }, claims.token);
 
-  if (!response.ok) {
-    throw new Error("Unable to retrieve Firebase signing keys.");
-  }
-
-  const data = await response.json();
-
-  if (!Array.isArray(data.keys) || data.keys.length === 0) {
-    throw new Error("Firebase signing keys were not returned.");
-  }
-
-  jwksCache = Object.fromEntries(
-    data.keys.map((key) => [key.kid, key])
-  );
-
-  jwksFetchedAt = Date.now();
-
-  return jwksCache;
+  return json({ok:true,envelopeId,deliveries,idempotent:false,fileIds:createdFileIds,originalHash},200,corsHeaders(request));
 }
-
-async function queryFirestoreByEmail(env, collectionName, fieldName, email, firebaseToken) {
-  const value = String(email || "").trim().toLowerCase();
-  const projectId = env.FIREBASE_PROJECT_ID || FIREBASE_PROJECT_ID;
+function firestoreCollectionName(env, collectionName) {
+  const logical = String(collectionName || "").replace(/^\/+|\/+$/g, "");
+  if (!logical) throw new Error("Firestore collection name is required.");
   const prefix = String(env.FIRESTORE_COLLECTION_PREFIX || "").trim();
-  collectionName = prefix + collectionName;
-  if (!value) return [];
-  const response = await fetch(`${firestoreBaseUrl(env)}/v1/projects/${projectId}/databases/(default)/documents:runQuery`, {
-    method:"POST",
+  if (String(env.ENVIRONMENT || "") === "staging" && !prefix) {
+    throw new Error("Staging Firestore access requires a collection prefix.");
+  }
+  const resolved = prefix + logical;
+  if (String(env.ENVIRONMENT || "") === "staging" && !resolved.startsWith(prefix)) {
+    throw new Error("Staging Firestore collection escaped the required prefix.");
+  }
+  return resolved;
+}
+
+function firestoreDocumentPath(env, path) {
+  const parts = String(path || "").split("/");
+  if (!parts[0]) throw new Error("Firestore document path is required.");
+  parts[0] = firestoreCollectionName(env, parts[0]);
+  return parts.join("/");
+}
+
+async function updateFirestoreDocument(env, path, fields, firebaseToken) {
+  const projectId = env.FIREBASE_PROJECT_ID || FIREBASE_PROJECT_ID;
+  const resolvedPath = firestoreDocumentPath(env, path);
+  const updateMask = Object.keys(fields).map(key => `updateMask.fieldPaths=${encodeURIComponent(key)}`).join("&");
+  const response = await fetch(`${firestoreBaseUrl(env)}/v1/projects/${projectId}/databases/(default)/documents/${resolvedPath}?${updateMask}`, {
+    method:"PATCH",
     headers:{"Authorization":`Bearer ${firestoreAuthToken(env, firebaseToken)}`,"Content-Type":"application/json"},
-    body:JSON.stringify({
-      structuredQuery:{
-        from:[{collectionId:collectionName}],
-        where:{fieldFilter:{field:{fieldPath:fieldName},op:"EQUAL",value:{stringValue:value}}},
-        limit:10
-      }
-    })
+    body:JSON.stringify({fields})
   });
-  if (!response.ok) {
-    if (response.status === 403) return [];
-    throw new Error("Unable to query the IRPA registration records.");
-  }
-  const rows=await response.json();
-  return Array.isArray(rows)?rows:[];
-}
-
-function firestoreDocumentToPlain(document) {
-  if (!document?.fields) return null;
-  const convert = field => {
-    if (!field) return null;
-    if ("stringValue" in field) return field.stringValue;
-    if ("booleanValue" in field) return field.booleanValue;
-    if ("integerValue" in field) return Number(field.integerValue);
-    if ("doubleValue" in field) return field.doubleValue;
-    if ("timestampValue" in field) return field.timestampValue;
-    if ("nullValue" in field) return null;
-    if ("arrayValue" in field) return (field.arrayValue.values || []).map(convert);
-    if ("mapValue" in field) return Object.fromEntries(Object.entries(field.mapValue.fields || {}).map(([k,v])=>[k,convert(v)]));
-    return null;
-  };
-  return Object.fromEntries(Object.entries(document.fields).map(([k,v])=>[k,convert(v)]));
-}
- 
-async function getFirestoreDocumentsByEmail(env, collectionName, email, firebaseToken) {
-  const normalizedEmail = String(email || "").trim().toLowerCase();
-  const projectId = env.FIREBASE_PROJECT_ID || FIREBASE_PROJECT_ID;
-  const prefix = String(env.FIRESTORE_COLLECTION_PREFIX || "").trim();
-  collectionName = prefix + collectionName;
-  if (!normalizedEmail) return [];
-  const response = await fetch(
-    `${firestoreBaseUrl(env)}/v1/projects/${projectId}/databases/(default)/documents:runQuery`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${firestoreAuthToken(env, firebaseToken)}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        structuredQuery: {
-          from: [{ collectionId: collectionName }],
-          where: {
-            fieldFilter: {
-              field: { fieldPath: "email" },
-              op: "EQUAL",
-              value: { stringValue: normalizedEmail }
-            }
-          },
-          limit: 5
-        }
-      })
-    }
-  );
-  if (!response.ok) throw new Error("Unable to verify the Firestore institutional profile.");
-  const rows = await response.json();
-  return rows.filter(row => row.document).map(row => row.document);
-}
-
-async function getInstitutionalProfileForUser(env, claims) {
-  const uid = claims.user_id;
-  const email = String(claims.email || "").trim().toLowerCase();
-  const directMember = await getFirestoreDocument(env, `members/${uid}`, claims.token);
-  const directEmployee = await getFirestoreDocument(env, `employees/${uid}`, claims.token);
-  if (directMember || directEmployee) return { memberRecord: directMember, employeeRecord: directEmployee };
-  const [memberMatches, employeeMatches] = await Promise.all([
-    getFirestoreDocumentsByEmail(env, "members", email, claims.token),
-    getFirestoreDocumentsByEmail(env, "employees", email, claims.token)
-  ]);
-  return {
-    memberRecord: memberMatches[0] || null,
-    employeeRecord: employeeMatches[0] || null
-  };
-}
-
-async function getFirestoreDocument(env, path, firebaseToken) {
-  const projectId = env.FIREBASE_PROJECT_ID || FIREBASE_PROJECT_ID;
-  const prefix = String(env.FIRESTORE_COLLECTION_PREFIX || "").trim();
-  const parts = String(path).split("/");
-  if (prefix && parts.length) parts[0] = prefix + parts[0];
-  const resolvedPath = parts.join("/");
-  const response = await fetch(`${firestoreBaseUrl(env)}/v1/projects/${projectId}/databases/(default)/documents/${resolvedPath}`, {
-    headers: { Authorization: `Bearer ${firestoreAuthToken(env, firebaseToken)}` }
-  });
-  if (response.status === 404) return null;
-  if (!response.ok) throw new Error("Unable to verify the Firestore authorization record.");
+  if (!response.ok) throw new Error("Unable to update the Firestore record.");
   return response.json();
 }
 
-function firestoreMapArray(field) {
-  if (!Array.isArray(field?.arrayValue?.values)) return [];
-  return field.arrayValue.values.map(v => {
-    const m = v?.mapValue?.fields || {};
-    const value = key => {
-      const x = m[key];
-      if (x?.stringValue !== undefined) return x.stringValue;
-      if (x?.booleanValue !== undefined) return x.booleanValue;
-      if (x?.integerValue !== undefined) return Number(x.integerValue);
-      return null;
-    };
-    return {
-      uid:value("uid"),
-      email:value("email"),
-      name:value("name"),
-      role:value("role"),
-      accessOnly:Boolean(value("accessOnly"))
-    };
-  });
-}
 
-function firestoreStringArray(field) {
-  return field?.arrayValue?.values?.map(v => v.stringValue).filter(Boolean) || [];
-}
-
-async function encryptText(plaintext, secret) {
-  const key = await crypto.subtle.importKey("raw", base64Bytes(secret), "AES-GCM", false, ["encrypt"]);
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ciphertext = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, new TextEncoder().encode(plaintext)));
-  return JSON.stringify({
-    iv: uint8ToBase64(iv),
-    ciphertext: uint8ToBase64(ciphertext)
-  });
-}
-
-async function decryptText(record, secret) {
-  const parsed = typeof record === "string" ? JSON.parse(record) : record;
-  const key = await crypto.subtle.importKey("raw", base64Bytes(secret), "AES-GCM", false, ["decrypt"]);
-  const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv: base64Bytes(parsed.iv) }, key, base64Bytes(parsed.ciphertext));
-  return new TextDecoder().decode(plaintext);
-}
-
-function buildMultipartBody(boundary, metadata, bytes, contentType) {
-  const encoder = new TextEncoder();
-  const head = encoder.encode(
-    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n--${boundary}\r\nContent-Type: ${contentType}\r\n\r\n`
-  );
-  const tail = encoder.encode(`\r\n--${boundary}--`);
-  const body = new Uint8Array(head.length + bytes.length + tail.length);
-  body.set(head, 0);
-  body.set(bytes, head.length);
-  body.set(tail, head.length + bytes.length);
-  return body;
-}
-
-function cleanName(value) {
-  return String(value).trim().replace(/[\\/:*?"<>|]/g, "-").slice(0, 160) || "Document";
-}
-
-function cleanId(value) {
-  return String(value).replace(/[^a-zA-Z0-9_-]/g, "");
-}
-
-function randomBase64Url(size) {
-  const bytes = crypto.getRandomValues(new Uint8Array(size));
-  return uint8ToBase64(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-
-async function sha256Hex(value) {
-  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
-  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, "0")).join("");
-}
-
-function base64UrlDecode(value) {
-  return new TextDecoder().decode(base64UrlBytes(value));
-}
-
-function base64UrlBytes(value) {
-  const normalized = value.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - value.length % 4) % 4);
-  return Uint8Array.from(atob(normalized), c => c.charCodeAt(0));
-}
-
-function base64Bytes(value) {
-  return Uint8Array.from(atob(String(value)), c => c.charCodeAt(0));
-}
-
-function uint8ToBase64(bytes) {
-  let binary = "";
-  const chunk = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunk) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
-  }
-  return btoa(binary);
-}
-
-function parseDescription(value) {
-  try { return JSON.parse(value || "{}"); } catch { return {}; }
-}
-
-function json(data, status = 200, headers = {}) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-      ...headers
-    }
-  });
-}
-
-function html(message, status = 200) {
-  return new Response(`<!doctype html><html><head><meta charset="utf-8"><title>IRPA Google Drive</title></head><body><h2>${escapeHtml(message)}</h2></body></html>`, {
-    status,
-    headers: { "Content-Type": "text/html; charset=utf-8" }
-  });
-}
-
-function escapeHtml(value) {
-  return String(value).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-}
-
-function corsHeaders(request) {
-  const origin = request.headers.get("Origin") || "";
-  const allowed = origin === "https://irpa.or.tz" || origin === "https://www.irpa.or.tz" || origin === "https://irpa-digital-board-governance.web.app" || origin === "https://irpa-digital-board-governance.firebaseapp.com" || origin === "http://localhost:5173";
-  return {
-    "Access-Control-Allow-Origin": allowed ? origin : "https://irpa.or.tz",
-    "Access-Control-Allow-Headers": "Authorization, Content-Type, X-IRPA-Invitation-Version",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Vary": "Origin"
-  };
-}
