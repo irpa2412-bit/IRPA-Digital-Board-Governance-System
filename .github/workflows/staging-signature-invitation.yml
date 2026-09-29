@@ -38,6 +38,15 @@ jobs:
       - name: Assert staging-only branch
         run: |
           test "${GITHUB_REF}" = "refs/heads/staging-invitation-proof-20260929"
+      - name: Assert staging KV is isolated from production
+        working-directory: drive-gateway
+        run: |
+          prod_id=$(awk '/^\[\[kv_namespaces\]\]/{f=1;next} f&&/^id =/{gsub(/"/,"",$3);print $3;exit}' wrangler.toml)
+          staging_id=$(awk '/^\[\[env\.staging\.kv_namespaces\]\]/{f=1;next} f&&/^id =/{gsub(/"/,"",$3);print $3;exit}' wrangler.toml)
+          test -n "$prod_id"
+          test -n "$staging_id"
+          test "$staging_id" != "STAGING_DRIVE_KV_NAMESPACE_ID_REQUIRED"
+          test "$prod_id" != "$staging_id"
       - name: Assert no production deployment is requested
         run: |
           ! grep -R "wrangler deploy --config wrangler.toml$" . 2>/dev/null || true
