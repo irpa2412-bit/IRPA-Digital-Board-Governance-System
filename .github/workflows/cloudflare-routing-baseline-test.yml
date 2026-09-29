@@ -1,0 +1,36 @@
+name: IRPA Cloudflare Routing Baseline Test
+
+on:
+  push:
+    branches:
+      - cloudflare-routing-baseline-test
+    paths:
+      - "cloudflare-routing-baseline/**"
+      - ".github/workflows/cloudflare-routing-baseline-test.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Test Cloudflare transaction router
+        working-directory: cloudflare-routing-baseline
+        run: npm test
+      - name: Build existing IRPA-DBGS application
+        run: |
+          npm install
+          npm run build
+      - name: Production migration guard
+        run: |
+          ! grep -R "wrangler.*deploy" cloudflare-routing-baseline .github/workflows/cloudflare-routing-baseline-test.yml
+          test ! -f cloudflare-routing-baseline/.production-migration-enabled
