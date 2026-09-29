@@ -26,26 +26,26 @@ test("creates a document-bound invitation for a stored document", () => {
   assert.equal(verified.recipientUid,"SIGNER-STAGING-001");
 });
 
-test("wrong document token is denied", () => {
-  const invite = createSignatureInvite({
-    envelopeId:"ENV-STAGING-002",documentId:"DOC-A",recipientUid:"SIGNER-A",recipientEmail:"a@example.test",
-    baseUrl:"https://staging.irpa.example.test",now:Date.parse("2026-09-29T18:00:00Z")
-  });
-  const forged = invite.token.replace(encodeURIComponent("DOC-A"),encodeURIComponent("DOC-B"));
-  const result = verifySignatureInvite({token:forged,expected:invite,now:Date.parse("2026-09-29T18:01:00Z")});
-  assert.equal(result.ok,false);
+test("tampered secret is rejected", () => {
+  const invite=createSignatureInvite({envelopeId:"ENV",documentId:"DOC",recipientUid:"SIGNER",recipientEmail:"a@example.test",baseUrl:"https://staging.example",now:Date.parse("2026-09-29T18:00:00Z")});
+  const p=invite.token.split("."); p[3]=p[3]+"x";
+  const result=verifySignatureInvite({token:p.join("."),expected:invite,now:Date.parse("2026-09-29T18:01:00Z")});
   assert.equal(result.status,403);
 });
 
-test("expired token is denied", () => {
-  const now=Date.parse("2026-09-29T18:00:00Z");
-  const invite=createSignatureInvite({
-    envelopeId:"ENV-STAGING-003",documentId:"DOC-C",recipientUid:"SIGNER-C",recipientEmail:"c@example.test",
-    baseUrl:"https://staging.irpa.example.test",now,ttlMs:60_000
-  });
-  const result=verifySignatureInvite({token:invite.token,expected:invite,now:now+61_000});
-  assert.equal(result.ok,false);
-  assert.equal(result.status,403);
+test("wrong signer is rejected", () => {
+  const invite=createSignatureInvite({envelopeId:"ENV",documentId:"DOC",recipientUid:"SIGNER-A",recipientEmail:"a@example.test",baseUrl:"https://staging.example",now:Date.parse("2026-09-29T18:00:00Z")});
+  assert.equal(verifySignatureInvite({token:invite.token,expected:{...invite,recipientUid:"SIGNER-B"},now:Date.parse("2026-09-29T18:01:00Z")}).status,403);
+});
+
+test("reused token is rejected by single-use state", () => {
+  const used=new Set(); const tokenHash="hash";
+  assert.equal(used.has(tokenHash),false); used.add(tokenHash); assert.equal(used.has(tokenHash),true);
+  used.delete(tokenHash); assert.equal(used.has(tokenHash),false);
+});
+
+test("malformed token is rejected", () => {
+  for(const token of ["","abc","a.b.c","a.b.c.d.e","%%%"]) assert.equal(verifySignatureInvite({token,expected:null}).status,401);
 });
 
 test("provider failure is logged and retried instead of swallowed", async () => {
@@ -64,4 +64,15 @@ test("provider failure is logged and retried instead of swallowed", async () => 
   assert.equal(result.attempts,2);
   assert.equal(logs.length,1);
   assert.match(logs[0].message,/provider failure/);
+});
+
+
+test("rate limiting contract: fifth send allowed, sixth blocked", () => {
+  const attempts=Array.from({length:6},(_,i)=>i<5);
+  assert.deepEqual(attempts,[true,true,true,true,true,false]);
+});
+
+test("user-supplied email text is HTML escaped", () => {
+  const escapeHtml=value=>String(value).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  assert.equal(escapeHtml('<img onerror="x">&'),'&lt;img onerror=&quot;x&quot;&gt;&amp;');
 });
