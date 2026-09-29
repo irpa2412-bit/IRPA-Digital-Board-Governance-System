@@ -23,6 +23,7 @@ jobs:
         shell: bash
         run: |
           set +e
+          git show "${GITHUB_SHA}:tests/signature-platform-startup.test.jsx" > /tmp/signature-platform-startup.test.jsx
           refs=(
             543b090ffccf36876fca39fd83bfa0e3289038c1
             ccb13fca931a75d58ffb0073e1991c2e3fb0263f
@@ -32,16 +33,26 @@ jobs:
           )
           failures=()
           for ref in "${refs[@]}"; do
-            echo "=== HISTORICAL BUILD: $ref ==="
+            echo "=== HISTORICAL BUILD + SIGNATURE RENDER TEST: $ref ==="
             git checkout --detach "$ref"
             npm install
+            npm install --no-save vitest@^3.2.4 @testing-library/react@^16.3.0 @testing-library/jest-dom@^6.8.0 jsdom@^26.1.0
+            mkdir -p tests
+            cp /tmp/signature-platform-startup.test.jsx tests/signature-platform-startup.test.jsx
             npm run build
             rc=$?
             if [ "$rc" -ne 0 ]; then
               failures+=("$ref")
               echo "HISTORICAL_BUILD_FAIL $ref"
+              continue
+            fi
+            npx vitest run tests/signature-platform-startup.test.jsx --environment jsdom
+            rc=$?
+            if [ "$rc" -ne 0 ]; then
+              failures+=("$ref")
+              echo "HISTORICAL_SIGNATURE_RENDER_TEST_FAIL $ref"
             else
-              echo "HISTORICAL_BUILD_PASS $ref"
+              echo "HISTORICAL_BUILD_AND_SIGNATURE_RENDER_TEST_PASS $ref"
             fi
           done
           echo "=== HISTORICAL BUILD SUMMARY ==="
