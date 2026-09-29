@@ -491,7 +491,12 @@ export default function App(){
     [signingEnvelopeId,setSigningEnvelopeId]=useState(
       ()=>window.sessionStorage.getItem("irpaSigningEnvelopeId")||
         new URLSearchParams(window.location.search).get("signEnvelope")||null
-    );useEffect(()=>{
+    );
+useEffect(()=>{
+  const inviteToken=new URLSearchParams(window.location.search).get("signatureInviteToken");
+  if(inviteToken)window.sessionStorage.setItem("irpaSignatureInviteToken",inviteToken);
+},[]);
+useEffect(()=>{
   const handler=e=>{
     const id=e?.detail?.envelopeId;
     if(id)setSigningEnvelopeId(id);
