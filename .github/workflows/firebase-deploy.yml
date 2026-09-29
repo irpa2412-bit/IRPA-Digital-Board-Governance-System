@@ -393,3 +393,4 @@ jobs:
 # Restore authorized portal and data-environment gates: 1790634501892
 
 # 2026-09-29 dashboard/data-environment restoration deployment trigger: security-scoped application changes merged in e4a8d4339a85adc32e40e518d3f1dac5fbbbe486
+# Production deployment trigger: offline all-apps + mobile dashboard screen-fit
