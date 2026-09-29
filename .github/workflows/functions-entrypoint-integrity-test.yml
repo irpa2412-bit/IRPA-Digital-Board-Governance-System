@@ -21,3 +21,28 @@ jobs:
         run: node --check functions/authorizationFunctions.js
       - name: Verify reset gate remains trial-only
         run: node scripts/verify-functions-entrypoint-integrity.js
+
+  gateway-e2e:
+    if: github.ref == 'refs/heads/repair-document-signature-pathway-20260929' || github.head_ref == 'repair-document-signature-pathway-20260929'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install root dependencies
+        run: npm install --no-audit --no-fund
+      - name: Install gateway dependencies
+        working-directory: drive-gateway
+        run: npm install --no-audit --no-fund
+      - name: Run Wrangler local Worker with Firestore emulator
+        run: |
+          set -o pipefail
+          npx firebase emulators:exec --project demo-irpa-staging --only firestore "npm --prefix drive-gateway run test:e2e:local" | tee gateway-e2e-output.ndjson
+      - name: Upload raw gateway E2E output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gateway-e2e-raw-output
+          path: gateway-e2e-output.ndjson
