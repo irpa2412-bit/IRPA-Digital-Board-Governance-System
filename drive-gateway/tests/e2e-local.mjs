@@ -206,7 +206,7 @@ try {
     hash:stringValue(originalHash), status:stringValue("Saved"), authorizedUids:arrayValue(["authorized-user"])
   });
   await setDoc("staging_signatureEnvelopes", envelopeId, {
-    status:stringValue("Completed"), lastSignedByUid:stringValue("authorized-user"), originalDocumentId:stringValue(signingDocumentId),
+    status:stringValue("Completed"), lastSignedByUid:stringValue("authorized-user"), originalDocumentId:stringValue(signingDocumentId), documentId:stringValue(signingDocumentId),
     recipients:arrayValue([]),
     recipients: {arrayValue:{values:[
       mapValue({uid:stringValue("authorized-user"),email:stringValue("authorized@example.test"),role:stringValue("Document Owner")}),
@@ -221,8 +221,11 @@ try {
     body:{envelopeId,originalHash,finalHash:signedHash,fileSize:signedBytes.length,base64:Buffer.from(signedBytes).toString("base64")}
   });
   const afterSigning = await request("/__test__/state",{method:"GET"});
-  log("signing-envelope-created-and-archived",{httpStatus:signingResult.status,response:signingResult.body,beforeCount:(beforeSigning.body?.objects||[]).length,afterCount:(afterSigning.body?.objects||[]).length,originalHashUnchanged:originalHash===String(originalHash)});
-  if (signingResult.status!==200 || Object.keys(signingResult.body?.deliveries||{}).length!==2) throw new Error("Signing archive assertion failed.");
+  const signingEnvelope = await firestore("staging_signatureEnvelopes/"+envelopeId,{method:"GET"});
+  const sourceAfterSigning = await firestore("staging_documents/"+signingDocumentId,{method:"GET"});
+  const sourceHashAfterSigning = sourceAfterSigning?.fields?.hash?.stringValue || "";
+  log("signing-envelope-created-and-archived",{httpStatus:signingResult.status,response:signingResult.body,beforeCount:(beforeSigning.body?.objects||[]).length,afterCount:(afterSigning.body?.objects||[]).length,originalHashUnchanged:sourceHashAfterSigning===originalHash,envelopeLinkedToStoredDocument:signingEnvelope?.fields?.documentId?.stringValue===signingDocumentId});
+  if (signingResult.status!==200 || Object.keys(signingResult.body?.deliveries||{}).length!==2 || sourceHashAfterSigning!==originalHash || signingEnvelope?.fields?.documentId?.stringValue!==signingDocumentId) throw new Error("Signing envelope/archive/source-document assertion failed.");
   const signingObjects=(afterSigning.body?.objects||[]).filter(o=>String(o.description||"").includes(envelopeId));
   if(signingObjects.length!==2 || !signingObjects.every(o=>String(o.description||"").includes(originalHash))) throw new Error("Signed PDF archive linkage/hash assertion failed.");
 
