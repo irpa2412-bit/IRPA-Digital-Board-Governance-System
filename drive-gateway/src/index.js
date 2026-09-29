@@ -18,6 +18,7 @@ const SMTP_FROM = "info@irpa.or.tz";
 let jwksCache = null;
 let jwksFetchedAt = 0;
 const MOCK_DRIVE_OBJECTS = new Map();
+const MOCK_DOCUMENT_LOCKS = new Set();
 let MOCK_DRIVE_COUNTER = 0;
 const MOCK_DRIVE_CONTROL = { secondChannelFailure: false, rollbackDeleteFailure: false, signatureProviderFailure: false };
 
@@ -343,6 +344,10 @@ async function uploadControlledDocument(request, env) {
   const title = cleanName(data.title || fileName.replace(/\.pdf$/i, ""));
   const reference = cleanName(data.reference || "");
   const documentId = cleanId(data.documentId || `IRPA-DOC-${crypto.randomUUID()}`);
+  if (env.DRIVE_MOCK === "true") {
+    if (MOCK_DOCUMENT_LOCKS.has(documentId)) return json({ok:false,error:"A document upload with this document ID is already in progress or has already been accepted."},409,corsHeaders(request));
+    MOCK_DOCUMENT_LOCKS.add(documentId);
+  }
   const documentType = cleanName(data.documentType || "Governance Document");
   const archiveCategory = String(data.archiveCategory || "Administrative Documents").trim();
   const classification = String(data.classification || "Public").trim();
