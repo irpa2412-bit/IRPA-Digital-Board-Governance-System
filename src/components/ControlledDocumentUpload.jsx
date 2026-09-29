@@ -17,7 +17,7 @@ function resolveContentType(file) {
   return MIME_BY_EXTENSION[ext] || "application/octet-stream";
 }
 
-export default function ControlledDocumentUpload({ purpose = "Controlled Document", onUploaded, allowRestrictedUpload = false, submitLabel = "Upload Document", compact = false }) {
+export default function ControlledDocumentUpload({ purpose = "Controlled Document", onUploaded, allowRestrictedUpload = false, submitLabel = "Upload Document", compact = false, deferSave = false }) {
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState("");
   const [generatedReference, setGeneratedReference] = useState("");
@@ -29,6 +29,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [pendingDocument, setPendingDocument] = useState(null);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -67,6 +68,44 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
     setError("");
     setMessage("Opening the document file selector…");
     fileInputRef.current?.click();
+  }
+
+  async function savePendingDocument() {
+    if (!pendingDocument) return;
+    setBusy(true);
+    setError("");
+    setMessage("Saving document to the IRPA controlled-document register…");
+    try {
+      if (!auth.currentUser) throw new Error("You must be signed in.");
+      let documentId = "";
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
+        try {
+          documentId = await createRecord(COLLECTIONS.documents, pendingDocument.documentPayload);
+          const persisted = await getRecord(COLLECTIONS.documents, documentId);
+          if (!persisted) throw new Error("The controlled-document register record could not be verified after creation.");
+          break;
+        } catch (error) {
+          if (attempt === 2) throw new Error(`Document upload completed, but the document could not be saved to the IRPA controlled-document register: ${error?.message || "Firestore registration failed."}`);
+        }
+      }
+      const doc = {...pendingDocument.doc, id: documentId};
+      setGeneratedReference(pendingDocument.documentReference);
+      setMessage(`Document saved successfully. System reference ${pendingDocument.documentReference} is now registered in the IRPA controlled-document register.`);
+      setPendingDocument(null);
+      setFile(null);
+      setTitle("");
+      setDocumentType("");
+      setVersion("1.0");
+      setArchiveCategory("");
+      setClassification("Public");
+      fileInputRef.current?.form?.reset?.();
+      onUploaded?.(doc);
+    } catch (x) {
+      setError(x.message || "Unable to save document.");
+      setMessage("");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function submit(e) {
@@ -109,7 +148,6 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
       const governanceArchive = routed.governanceArchive;
       const now = new Date().toISOString();
       const workflowContext = readWorkflowContext();
-      setMessage("Google Drive dual-channel upload complete. Registering the document…");
       const documentPayload = withWorkflowLinks({
         title: name,
         reference: documentReference,
@@ -155,20 +193,8 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         uploadedAt: uploadedAt,
         uploadedAtDisplay: new Date(now).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "medium", hour12: false })
       }, workflowContext || {});
-      let documentId = "";
-      for (let attempt = 1; attempt <= 2; attempt += 1) {
-        try {
-          documentId = await createRecord(COLLECTIONS.documents, documentPayload);
-          const persisted = await getRecord(COLLECTIONS.documents, documentId);
-          if (!persisted) throw new Error("The controlled-document register record could not be verified after creation.");
-          break;
-        } catch (error) {
-          if (attempt === 2) throw new Error(`Document archive upload completed, but the document could not be saved to the IRPA controlled-document register: ${error?.message || "Firestore registration failed."}`);
-        }
-      }
-
       const doc = {
-        id: documentId,
+        id: null,
         title: name,
         reference: documentReference,
         documentType,
@@ -191,7 +217,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         archiveFolderId: archive.folderId,
         archiveUidLink: archive.archiveUidLink,
         archivePath: archive.archivePath,
-        archiveAccess: archive.archiveAccess || (classification === "Public" ? "Public" : "Restricted"),
+        archiveAccess: archive.archiveAccess || (effectiveClassification === "Public" ? "Public" : "Restricted"),
         governanceArchiveFolderId: governanceArchive?.folderId || null,
         governanceArchiveUidLink: governanceArchive?.archiveUidLink || null,
         governanceArchivePath: governanceArchive?.archivePath || null,
@@ -202,17 +228,33 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         authorizationStatus: "Draft",
         authorizedUids: [auth.currentUser.uid]
       };
-
-      setGeneratedReference(documentReference);
-      setMessage(`Document uploaded successfully to Google Drive: ${name}. System reference ${documentReference} assigned. Archive routing completed.`);
-      setFile(null);
-      setTitle("");
-      setDocumentType("");
-      setVersion("1.0");
-      setArchiveCategory("");
-      setClassification("Public");
-      e.target.reset();
-      onUploaded?.(doc);
+      if (deferSave) {
+        setPendingDocument({documentPayload,doc,documentReference});
+        setGeneratedReference(documentReference);
+        setMessage(`Document uploaded successfully to Google Drive: ${name}. Click “Save Document” to register it in the IRPA controlled-document archive.`);
+      } else {
+        let documentId = "";
+        for (let attempt = 1; attempt <= 2; attempt += 1) {
+          try {
+            documentId = await createRecord(COLLECTIONS.documents, documentPayload);
+            const persisted = await getRecord(COLLECTIONS.documents, documentId);
+            if (!persisted) throw new Error("The controlled-document register record could not be verified after creation.");
+            break;
+          } catch (error) {
+            if (attempt === 2) throw new Error(`Document archive upload completed, but the document could not be saved to the IRPA controlled-document register: ${error?.message || "Firestore registration failed."}`);
+          }
+        }
+        setGeneratedReference(documentReference);
+        setMessage(`Document uploaded successfully to Google Drive: ${name}. System reference ${documentReference} assigned. Archive routing completed.`);
+        setFile(null);
+        setTitle("");
+        setDocumentType("");
+        setVersion("1.0");
+        setArchiveCategory("");
+        setClassification("Public");
+        e.target.reset();
+        onUploaded?.({...doc,id:documentId});
+      }
     } catch (x) {
       setError(x.message || "Unable to upload document to Google Drive.");
       setMessage("");
@@ -220,7 +262,6 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
       setBusy(false);
     }
   }
-
   return (
     <section className="panel controlled-document-upload-panel">
       <div className="panel-header">
@@ -308,7 +349,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
             disabled={busy || !file || !documentType || (documentType === "Administrator" && !allowRestrictedUpload)}
             aria-busy={busy ? "true" : "false"}
           >
-            {busy ? "Saving…" : submitLabel}
+            {busy ? "Saving…" : (deferSave && pendingDocument ? "Save Document" : submitLabel)}
           </button>
         </div>
       </form>
