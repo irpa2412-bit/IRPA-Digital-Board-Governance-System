@@ -135,6 +135,12 @@ jobs:
       - name: Install gateway dependencies
         working-directory: drive-gateway
         run: npm install --no-audit --no-fund
+      - name: Run auth matrix tests
+        working-directory: drive-gateway
+        run: npm run test:auth
+      - name: Run Firestore isolation test
+        working-directory: drive-gateway
+        run: npm run test:firestore-isolation
       - name: Run Wrangler local Worker with Firebase Firestore emulator
         run: |
           set -o pipefail
