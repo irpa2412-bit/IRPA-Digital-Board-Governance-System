@@ -1347,6 +1347,12 @@ function firestoreBaseUrl(env) {
   return host ? `http://${host}` : "https://firestore.googleapis.com";
 }
 
+function firestoreAuthToken(env, firebaseToken) {
+  return env.LOCAL_TEST_MODE === "true" && String(env.FIRESTORE_EMULATOR_HOST || "").trim()
+    ? "owner"
+    : firebaseToken;
+}
+
 async function uploadDriveObject(env, metadata, bytes, contentType, body, boundary, archiveChannel) {
   if (env.DRIVE_MOCK === "true") {
     const id = `mock-file-${++MOCK_DRIVE_COUNTER}`;
@@ -1522,7 +1528,7 @@ async function queryFirestoreByEmail(env, collectionName, fieldName, email, fire
   if (!value) return [];
   const response = await fetch(`${firestoreBaseUrl(env)}/v1/projects/${projectId}/databases/(default)/documents:runQuery`, {
     method:"POST",
-    headers:{"Authorization":`Bearer ${firebaseToken}`,"Content-Type":"application/json"},
+    headers:{"Authorization":`Bearer ${firestoreAuthToken(env, firebaseToken)}`,"Content-Type":"application/json"},
     body:JSON.stringify({
       structuredQuery:{
         from:[{collectionId:collectionName}],
@@ -1567,7 +1573,7 @@ async function getFirestoreDocumentsByEmail(env, collectionName, email, firebase
     {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${firebaseToken}`,
+        Authorization: `Bearer ${firestoreAuthToken(env, firebaseToken)}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
@@ -1613,7 +1619,7 @@ async function getFirestoreDocument(env, path, firebaseToken) {
   if (prefix && parts.length) parts[0] = prefix + parts[0];
   const resolvedPath = parts.join("/");
   const response = await fetch(`${firestoreBaseUrl(env)}/v1/projects/${projectId}/databases/(default)/documents/${resolvedPath}`, {
-    headers: { Authorization: `Bearer ${firebaseToken}` }
+    headers: { Authorization: `Bearer ${firestoreAuthToken(env, firebaseToken)}` }
   });
   if (response.status === 404) return null;
   if (!response.ok) throw new Error("Unable to verify the Firestore authorization record.");
