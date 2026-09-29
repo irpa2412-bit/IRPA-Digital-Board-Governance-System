@@ -86,6 +86,7 @@ writeFileSync(DEV_VARS, workerEnv);
 const worker = spawn("npx", ["wrangler", "dev", "--config", "wrangler.toml", "--env", "staging", "--local", "--test-scheduled", "--port", String(PORT), "--log-level", "error"], {
   cwd: GATEWAY,
   stdio: ["ignore", "pipe", "pipe"],
+  detached: process.platform !== "win32",
   env: { ...process.env }
 });
 worker.stdout.on("data", chunk => process.stdout.write(`[wrangler] ${chunk}`));
@@ -194,6 +195,14 @@ try {
 
   console.log("E2E RESULT: PASS");
 } finally {
-  worker.kill("SIGTERM");
+  try {
+    if (process.platform !== "win32" && worker.pid) process.kill(-worker.pid, "SIGTERM");
+    else worker.kill("SIGTERM");
+  } catch {}
+  await new Promise(resolve => setTimeout(resolve, 500));
+  try {
+    if (process.platform !== "win32" && worker.pid && worker.exitCode === null) process.kill(-worker.pid, "SIGKILL");
+    else if (worker.exitCode === null) worker.kill("SIGKILL");
+  } catch {}
   if (existsSync(DEV_VARS)) unlinkSync(DEV_VARS);
 }
