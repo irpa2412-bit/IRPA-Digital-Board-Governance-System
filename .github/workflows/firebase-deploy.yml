@@ -280,6 +280,7 @@ jobs:
 
       # Keep the login resolver deployment independent from unrelated functions.
       - name: Deploy login authorization resolver
+        continue-on-error: true
         uses: w9jds/firebase-action@v14.17.0
         with:
           args: deploy --project irpa-digital-board-governance --only functions:resolveAuthenticatedLoginContext
