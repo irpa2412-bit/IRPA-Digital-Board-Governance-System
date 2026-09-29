@@ -30,7 +30,7 @@ async function waitFor(url, timeoutMs = 30000) {
 async function firestore(path, init = {}) {
   const response = await fetch(`${FIRESTORE}/v1/projects/${PROJECT}/databases/(default)/documents/${path}`, {
     ...init,
-    headers: { "Content-Type": "application/json", ...(init.headers || {}) }
+    headers: { "Authorization": "Bearer owner", "Content-Type": "application/json", ...(init.headers || {}) }
   });
   const body = await response.text();
   let parsed = {};
