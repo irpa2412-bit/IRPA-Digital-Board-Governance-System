@@ -31,6 +31,11 @@ export default {
     }
 
     try {
+      if (url.pathname === "/__test__/state" && request.method === "GET" && env.LOCAL_TEST_MODE === "true" && env.DRIVE_MOCK === "true") {
+        const pending = await env.DRIVE_KV.list({prefix:"pending-drive-rollback:"});
+        return json({ok:true,objects:Array.from(MOCK_DRIVE_OBJECTS.values()).filter(o=>o.mimeType!=="application/vnd.google-apps.folder").map(o=>({id:o.id,name:o.name,size:o.size})),pending:pending.keys.map(k=>k.name)},200,corsHeaders(request));
+      }
+
       if (url.pathname === "/health") {
         return json({
           ok: true,
