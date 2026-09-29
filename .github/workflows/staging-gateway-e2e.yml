@@ -1,4 +1,5 @@
 name: Staging Gateway E2E Isolation
+# Trigger-path proof: this workflow-file change intentionally exercises the branch push trigger.
 
 on:
   push:
