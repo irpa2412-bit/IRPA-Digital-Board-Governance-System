@@ -45,7 +45,7 @@ jobs:
       - name: Run Wrangler local Worker with Firestore emulator
         run: |
           set -o pipefail
-          npx firebase-tools@15.29.0 emulators:exec --project demo-irpa-staging --only firestore "npm --prefix drive-gateway run test:e2e:local" | tee gateway-e2e-output.ndjson
+          timeout 6m npx firebase-tools@15.29.0 emulators:exec --project demo-irpa-staging --only firestore "npm --prefix drive-gateway run test:e2e:local" | tee gateway-e2e-output.ndjson
       - name: Upload raw gateway E2E output
         if: always()
         uses: actions/upload-artifact@v4
