@@ -1463,6 +1463,7 @@ async function authenticateFirebaseRequest(request) {
 }
 
 async function getFirebaseJwks() {
+  if (globalThis.__IRPA_LOCAL_TEST_JWKS && globalThis.__IRPA_LOCAL_TEST_MODE === true) return globalThis.__IRPA_LOCAL_TEST_JWKS;
   if (jwksCache && Date.now() - jwksFetchedAt < 60 * 60 * 1000) {
     return jwksCache;
   }
@@ -1723,3 +1724,5 @@ function corsHeaders(request) {
     "Vary": "Origin"
   };
 }
+
+export { authenticateFirebaseRequest };
