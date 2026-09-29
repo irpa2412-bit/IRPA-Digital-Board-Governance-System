@@ -93,6 +93,15 @@ export default {
       if (url.pathname === "/api/invitations/send" && request.method === "POST") {
         return await sendMemberInvitation(request, env);
       }
+      if (url.pathname === "/api/signature-invitations/send" && request.method === "POST") {
+        return await sendSignatureInvitation(request, env);
+      }
+      if (url.pathname === "/api/signature-invitations/open" && request.method === "GET") {
+        return await openSignatureInvitation(request, env);
+      }
+      if (url.pathname === "/signature-invite" && request.method === "GET") {
+        return await renderSignatureInvitation(request, env);
+      }
 
       if (url.pathname === "/api/induction/lookup" && request.method === "POST") {
         return await lookupInductionRegistration(request, env);
@@ -1017,6 +1026,79 @@ info@irpa.or.tz`;
   const htmlBody = `<!doctype html><html><body style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937"><h2>IRPA Digital Board Governance</h2><p>Dear ${escapeHtml(name)},</p><p>Your IRPA Digital Board Governance induction form has been saved successfully.</p><p><strong>Your IRPA registration number: ${escapeHtml(number)}</strong></p><p>This number was retrieved from the IRPA registration system and was not entered or changed during induction.</p><p>Your completed induction has been routed to the registered department/unit for role and duties assignment.</p><p>Regards,<br>IRPA Administration<br><a href="mailto:info@irpa.or.tz">info@irpa.or.tz</a></p></body></html>`;
   const messageId = await smtpSend(env,{to:email,subject,text,html:htmlBody});
   return json({ok:true,email,registrationNumber:number,emailRequested:true,provider:"IRPA Mail Server",deliveryStatus:"Submitted to mail.irpa.or.tz",messageId},200,corsHeaders(request));
+}
+
+async function sendSignatureInvitation(request, env) {
+  const claims = await authenticateFirebaseRequest(request);
+  const data = await request.json();
+  const envelopeId = cleanId(data.envelopeId || "");
+  const recipientUid = cleanId(data.recipientUid || "");
+  const requestedEmail = String(data.recipientEmail || "").trim().toLowerCase();
+  if (!envelopeId || !recipientUid || !requestedEmail) return json({ok:false,error:"Envelope, signer UID and signer email are required."},400,corsHeaders(request));
+  const envelope = await getFirestoreDocument(env, `signatureEnvelopes/${envelopeId}`, claims.token);
+  if (!envelope) return json({ok:false,error:"Signing envelope was not found."},404,corsHeaders(request));
+  const fields = envelope.fields || {};
+  const senderUid = String(fields.senderUid?.stringValue || fields.ownerUid?.stringValue || "").trim();
+  if (senderUid !== claims.user_id && !(await isAdministratorClaim(env, claims))) return json({ok:false,error:"Only the document owner or administrator may send a signing invitation."},403,corsHeaders(request));
+  const documentId = String(fields.documentId?.stringValue || "").trim();
+  if (!documentId) return json({ok:false,error:"The signing envelope is not tied to a stored document."},409,corsHeaders(request));
+  const document = await getFirestoreDocument(env, `documents/${documentId}`, claims.token);
+  if (!document) return json({ok:false,error:"The stored signing document was not found."},404,corsHeaders(request));
+  const recipients = firestoreMapArray(fields.recipients);
+  const recipient = recipients.find(r => String(r.uid || "") === recipientUid && String(r.email || "").trim().toLowerCase() === requestedEmail);
+  if (!recipient) return json({ok:false,error:"The requested signer is not a participant in this envelope."},403,corsHeaders(request));
+  const baseUrl = String(env.IRPA_APP_URL || new URL(request.url).origin).replace(/\/$/,"");
+  const invite = createSignatureInvite({envelopeId,documentId,recipientUid,recipientEmail:requestedEmail,baseUrl});
+  await updateFirestoreDocument(env, `signatureInvitationTokens/${invite.tokenHash}`, {
+    envelopeId:stringValue(envelopeId),documentId:stringValue(documentId),recipientUid:stringValue(recipientUid),
+    recipientEmail:stringValue(requestedEmail),tokenHash:stringValue(invite.tokenHash),expiresAt:stringValue(invite.expiresAt),
+    createdAt:stringValue(new Date().toISOString()),status:stringValue("Pending")
+  }, claims.token);
+  const title = fields.title?.stringValue || document.fields?.title?.stringValue || documentId;
+  const subject = "IRPA Digital Board Governance — Document Signing Invitation";
+  const text = `Dear ${recipient.name || requestedEmail},\\n\\nYou have been invited to review/sign the IRPA document "${title}".\\n\\nOpen your assigned document using this secure invitation link:\\n${invite.url}\\n\\nThis link is restricted to the assigned document and signer and expires in 72 hours.\\n\\nRegards,\\nIRPA Administration\\ninfo@irpa.or.tz`;
+  const htmlBody = `<!doctype html><html><body style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937"><h2>IRPA Digital Board Governance</h2><p>Dear ${escapeHtml(recipient.name || requestedEmail)},</p><p>You have been invited to review/sign the IRPA document <strong>${escapeHtml(title)}</strong>.</p><p><a href="${escapeHtml(invite.url)}">Open Assigned Document</a></p><p>This link is restricted to the assigned document and signer and expires in 72 hours.</p><p>Regards,<br>IRPA Administration</p></body></html>`;
+  try {
+    const sent = await sendWithRetry(() => smtpSend(env,{to:requestedEmail,subject,text,html:htmlBody}),{}, {attempts:3,delayMs:300,logger:console});
+    const messageId = sent?.messageId || sent?.response || String(sent || "");
+    await updateFirestoreDocument(env, `signatureInvitationTokens/${invite.tokenHash}`, {status:stringValue("Sent"),messageId:stringValue(messageId),sentAt:stringValue(new Date().toISOString())}, claims.token);
+    return json({ok:true,envelopeId,documentId,recipientUid,recipientEmail:requestedEmail,provider:"IRPA Mail Server",deliveryStatus:"Submitted to mail.irpa.or.tz",messageId,inviteUrl:invite.url,expiresAt:invite.expiresAt},200,corsHeaders(request));
+  } catch (error) {
+    await updateFirestoreDocument(env, `signatureInvitationTokens/${invite.tokenHash}`, {status:stringValue("Provider Failed"),lastError:stringValue(String(error?.message || error))}, claims.token);
+    console.error("SIGNATURE_INVITATION_PROVIDER_FAILED", {envelopeId,documentId,recipientUid,error:String(error?.message||error)});
+    throw error;
+  }
+}
+
+async function openSignatureInvitation(request, env) {
+  const token = new URL(request.url).searchParams.get("token") || "";
+  const parts = String(token).split(".");
+  if (parts.length !== 4) return json({ok:false,error:"Invalid invitation token."},401,corsHeaders(request));
+  const tokenHash = await sha256Hex(decodeURIComponent(parts[3]));
+  const record = await getFirestoreDocument(env, `signatureInvitationTokens/${tokenHash}`, null);
+  if (!record) return json({ok:false,error:"Invalid invitation token."},401,corsHeaders(request));
+  const f = record.fields || {};
+  const expected = {envelopeId:String(f.envelopeId?.stringValue||""),documentId:String(f.documentId?.stringValue||""),recipientUid:String(f.recipientUid?.stringValue||""),recipientEmail:String(f.recipientEmail?.stringValue||""),tokenHash:String(f.tokenHash?.stringValue||""),expiresAt:String(f.expiresAt?.stringValue||"")};
+  const verified = verifySignatureInvite({token,expected});
+  if (!verified.ok) return json(verified,verified.status,corsHeaders(request));
+  const document = await getFirestoreDocument(env, `documents/${verified.documentId}`, null);
+  if (!document) return json({ok:false,error:"The assigned document no longer exists."},404,corsHeaders(request));
+  const fields = document.fields || {};
+  return json({ok:true,invitation:{envelopeId:verified.envelopeId,documentId:verified.documentId,recipientUid:verified.recipientUid,recipientEmail:verified.recipientEmail,expiresAt:expected.expiresAt},document:{id:verified.documentId,title:fields.title?.stringValue||fields.fileName?.stringValue||verified.documentId,reference:fields.reference?.stringValue||"",classification:fields.classification?.stringValue||fields.documentClassification?.stringValue||"Restricted",documentUrl:fields.documentUrl?.stringValue||fields.storageUrl?.stringValue||fields.fileUrl?.stringValue||""}},200,corsHeaders(request));
+}
+
+async function renderSignatureInvitation(request, env) {
+  const token = new URL(request.url).searchParams.get("token") || "";
+  const opened = await openSignatureInvitation(new Request(`${new URL(request.url).origin}/api/signature-invitations/open?token=${encodeURIComponent(token)}`,{headers:request.headers}),env);
+  const payload = await opened.json();
+  if (!opened.ok) return new Response(`<!doctype html><html><body><h2>IRPA Signing Invitation</h2><p>${escapeHtml(payload.error || "Invitation unavailable.")}</p></body></html>`,{status:opened.status,headers:{"Content-Type":"text/html; charset=UTF-8"}});
+  const d=payload.document;
+  return new Response(`<!doctype html><html><body style="font-family:Arial,sans-serif;max-width:900px;margin:40px auto;padding:20px"><h1>IRPA Signing Invitation</h1><p><strong>Document:</strong> ${escapeHtml(d.title)}</p><p><strong>Reference:</strong> ${escapeHtml(d.reference || "Not recorded")}</p><p><strong>Access classification:</strong> ${escapeHtml(d.classification)}</p><p>This invitation is restricted to the assigned signer and document. The token has been verified by the staging Worker.</p><p><a href="${escapeHtml(d.documentUrl)}">Open assigned document</a></p></body></html>`,{status:200,headers:{"Content-Type":"text/html; charset=UTF-8"}});
+}
+
+async function isAdministratorClaim(env, claims) {
+  const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
+  return Boolean(admin?.fields?.active?.booleanValue);
 }
 
 async function sendMemberInvitation(request, env) {
