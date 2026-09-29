@@ -345,8 +345,9 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         </div>
         <div className="form-actions">
           <button
-            type="submit"
-            disabled={busy || !file || !documentType || (documentType === "Administrator" && !allowRestrictedUpload)}
+            type={deferSave && pendingDocument ? "button" : "submit"}
+            onClick={deferSave && pendingDocument ? savePendingDocument : undefined}
+            disabled={busy || (!pendingDocument && (!file || !documentType || (documentType === "Administrator" && !allowRestrictedUpload)))}
             aria-busy={busy ? "true" : "false"}
           >
             {busy ? "Saving…" : (deferSave && pendingDocument ? "Save Document" : submitLabel)}
