@@ -340,7 +340,7 @@ async function uploadControlledDocument(request, env) {
   const contentType = String(data.contentType || "application/pdf").toLowerCase();
   const fileSize = Number(data.fileSize || 0);
   const base64 = String(data.base64 || "");
-  const title = cleanName(data.title || fileName.replace(/\\.pdf$/i, ""));
+  const title = cleanName(data.title || fileName.replace(/\.pdf$/i, ""));
   const reference = cleanName(data.reference || "");
   const documentId = cleanId(data.documentId || `IRPA-DOC-${crypto.randomUUID()}`);
   const documentType = cleanName(data.documentType || "Governance Document");
@@ -681,7 +681,6 @@ async function ensureSignatureProfileFolder(request, env) {
   }
 
   const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
-  const isAdmin = Boolean(admin?.fields?.active?.booleanValue);
   if (!isAdmin && requestedUid !== claims.user_id) {
     return json({ ok: false, error: "You may only provision your own signature folder." }, 403, corsHeaders(request));
   }
@@ -989,7 +988,7 @@ async function lookupInductionRegistration(request, env) {
   const enteredName = String(data.fullName || "").trim();
   if (enteredName.length < 2) return json({ok:true,matched:false,reason:"Enter at least 2 characters."},200,corsHeaders(request));
 
-  const normalize = value => String(value || "").trim().toLowerCase().replace(/\\s+/g," ");
+  const normalize = value => String(value || "").trim().toLowerCase().replace(/\s+/g," ");
   const target = normalize(enteredName);
   const member = await getFirestoreDocument(env, `members/${cleanId(claims.user_id)}`, claims.token);
   const employee = await getFirestoreDocument(env, `employees/${cleanId(claims.user_id)}`, claims.token);
@@ -1374,7 +1373,7 @@ async function downloadDriveObject(env, fileId, accessToken) {
 async function mockDriveFetch(path, options = {}) {
   const method = String(options.method || "GET").toUpperCase();
   const url = new URL(`https://mock.local${path}`);
-  const filesMatch = url.pathname.match(/^\\/drive\\/v3\\/files\\/([^/]+)$/);
+  const filesMatch = url.pathname.match(/^\/drive\/v3\/files\/([^/]+)$/);
   if (method === "GET" && filesMatch) {
     const object = MOCK_DRIVE_OBJECTS.get(decodeURIComponent(filesMatch[1]));
     if (!object) throw new Error("Google Drive file not found.");
@@ -1449,7 +1448,7 @@ async function driveFetch(env, accessToken, path, options = {}) {
 
 async function authenticateFirebaseRequest(request) {
   const header = request.headers.get("Authorization") || "";
-  const localMatch = header.match(/^Bearer\\s+test:([^:]+):?(.*)$/i);
+  const localMatch = header.match(/^Bearer\s+test:([^:]+):?(.*)$/i);
   if (localMatch && globalThis.__IRPA_LOCAL_TEST_MODE === true) return { token:"local-test-token", user_id:localMatch[1], email:localMatch[2] || null };
   const match = header.match(/^Bearer\s+(.+)$/i);
   if (!match) throw new Error("Firebase authentication is required.");
