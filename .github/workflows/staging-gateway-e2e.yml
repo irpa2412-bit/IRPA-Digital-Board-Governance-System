@@ -8,6 +8,7 @@ on:
       - "drive-gateway/**"
       - "firebase.json"
       - ".github/workflows/staging-gateway-e2e.yml"
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -15,7 +16,7 @@ permissions:
 
 jobs:
   local-e2e:
-    if: github.ref == 'refs/heads/repair-document-signature-pathway-20260929'
+    if: github.ref == 'refs/heads/repair-document-signature-pathway-20260929' || github.head_ref == 'repair-document-signature-pathway-20260929'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
