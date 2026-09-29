@@ -95,9 +95,11 @@ jobs:
 
       - name: Deploy Hosting preview only
         env:
-          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
         run: |
           set -o pipefail
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > /tmp/firebase-sa.json
+          export GOOGLE_APPLICATION_CREDENTIALS=/tmp/firebase-sa.json
           npx firebase-tools hosting:channel:deploy signature-startup-fix-20260929 --project irpa-digital-board-governance --expires 7d 2>&1 | tee /tmp/firebase-preview.log
           url=$(grep -Eo 'https://[^[:space:]]+' /tmp/firebase-preview.log | grep -- '--signature-startup-fix-20260929' | tail -1)
           test -n "$url"
