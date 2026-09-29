@@ -123,6 +123,7 @@ jobs:
             drive-gateway/production-dry-run.txt
             drive-gateway/staging-dry-run.txt
             drive-gateway/wrangler.staging.generated.toml
+            drive-gateway/binding-proof-status.txt
 
   local-e2e:
     if: always()
