@@ -230,8 +230,6 @@ async function oauthCallback(request, env) {
 
 async function upload(request, env) {
   const claims = await authenticateFirebaseRequest(request);
-  const rate = await checkInvitationRateLimit(env.DRIVE_KV, claims.user_id || request.headers.get("CF-Connecting-IP") || "unknown");
-  if (!rate.ok) return json({ok:false,error:"Invitation send rate limit exceeded.",retryAfter:rate.retryAfter},429,{...corsHeaders(request),"Retry-After":String(rate.retryAfter)});
   const data = await request.json();
   const fileName = cleanName(data.fileName || "IRPA-document");
   const contentType = String(data.contentType || "application/pdf").toLowerCase();
@@ -1032,6 +1030,8 @@ info@irpa.or.tz`;
 
 async function sendSignatureInvitation(request, env) {
   const claims = await authenticateFirebaseRequest(request);
+  const rate = await checkInvitationRateLimit(env.DRIVE_KV, claims.user_id || request.headers.get("CF-Connecting-IP") || "unknown");
+  if (!rate.ok) return json({ok:false,error:"Invitation send rate limit exceeded.",retryAfter:rate.retryAfter},429,{...corsHeaders(request),"Retry-After":String(rate.retryAfter)});
   const data = await request.json();
   const envelopeId = cleanId(data.envelopeId || "");
   const recipientUid = cleanId(data.recipientUid || "");
