@@ -17,6 +17,7 @@ permissions:
 
 jobs:
   staging-isolation:
+    environment: staging
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -168,6 +169,7 @@ jobs:
 
 
   deploy-staging:
+    environment: staging
     needs: [staging-isolation, local-e2e]
     if: needs.staging-isolation.result == 'success' && needs.local-e2e.result == 'success' && github.ref == 'refs/heads/repair-document-signature-pathway-20260929'
     runs-on: ubuntu-latest
