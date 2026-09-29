@@ -35,7 +35,7 @@ export default function ModuleInterlinkBar({active,onNavigate,admin=false,role="
       {PORTAL_GROUPS.filter(group=>group.target!=="Finance Portfolio"||finance).map(group=><div key={group.target} className={"workflow-portal-group"+(active===group.target||group.children.some(([,target])=>target===active)?" active-group":"")}>
         <button type="button" className={"workflow-portal-parent"+(active===group.target?" active":"")} onClick={()=>go(group.target)}>{group.label}</button>
         <div className="workflow-portal-children">
-          {group.children.map(([itemLabel,target])=><button key={target} type="button" className={target===active?"active":""} onClick={()=>go(target)}>{itemLabel}</button>)}
+          {group.children.map(([itemLabel,target])=><React.Fragment key={target}>{target==="Actions"&&<span className="workflow-row-break" aria-hidden="true"/>}<button type="button" className={target===active?"active workflow-action-portal":"workflow-action-portal"} onClick={()=>go(target)}>{itemLabel}</button></React.Fragment>)}
         </div>
       </div>)}
       {CORE.map(([itemLabel,target])=><button key={target} type="button" className={target===active?"active":""} onClick={()=>go(target)}>{itemLabel}</button>)}
