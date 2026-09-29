@@ -34,6 +34,7 @@ jobs:
           failures=()
           for ref in "${refs[@]}"; do
             echo "=== HISTORICAL BUILD + SIGNATURE RENDER TEST: $ref ==="
+            rm -f tests/signature-platform-startup.test.jsx
             git checkout --detach "$ref"
             npm install
             npm install --no-save vitest@^3.2.4 @testing-library/react@^16.3.0 @testing-library/jest-dom@^6.8.0 jsdom@^26.1.0
@@ -62,6 +63,7 @@ jobs:
             printf 'FIRST_FAIL_IN_REQUESTED_ORDER=%s\n' "${failures[0]}"
             printf 'ALL_FAILING_REFS=%s\n' "${failures[*]}"
           fi
+          rm -f tests/signature-platform-startup.test.jsx
           git checkout --detach "${GITHUB_SHA}"
           if [ "${#failures[@]}" -ne 0 ]; then exit 1; fi
 
