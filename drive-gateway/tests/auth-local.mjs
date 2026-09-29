@@ -1,6 +1,4 @@
 import assert from "node:assert/strict";
-import { webcrypto } from "node:crypto";
-globalThis.crypto = webcrypto;
 const { authenticateFirebaseRequest } = await import("../src/index.js");
 
 function b64url(bytes) { return (typeof bytes === "string" ? Buffer.from(bytes) : Buffer.from(bytes)).toString("base64url"); }
