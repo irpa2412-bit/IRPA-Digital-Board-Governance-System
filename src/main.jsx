@@ -14,7 +14,11 @@ if ("serviceWorker" in navigator) {
 
 class AppBootBoundary extends Component{
   constructor(props){super(props);this.state={error:null};}
-  static getDerivedStateFromError(error){\n    console.error("IRPA workspace startup error:", error?.message || String(error));\n    console.error("IRPA workspace startup error stack:", error?.stack || "(no stack available)");\n    return{error};\n  }
+  static getDerivedStateFromError(error){
+    console.error("IRPA workspace startup error:", error?.message || String(error));
+    console.error("IRPA workspace startup error stack:", error?.stack || "(no stack available)");
+    return{error};
+  }
   handleReload=()=>window.location.reload();
   handleSafeLogin=async()=>{
     try{await logout();}catch(error){console.error("IRPA safe-login session reset:",error);}
