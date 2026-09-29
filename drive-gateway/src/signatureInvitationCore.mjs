@@ -17,7 +17,13 @@ export function createSignatureInvite({ envelopeId, documentId, recipientUid, re
 export function verifySignatureInvite({ token, expected, now = Date.now() }) {
   const parts = String(token || "").split(".");
   if (parts.length !== 4) return { ok:false, status:401, error:"Invalid invitation token." };
-  const [envelopeId, documentId, recipientUid, secret] = parts.map(decodeURIComponent);
+  let decoded;
+  try {
+    decoded = parts.map(decodeURIComponent);
+  } catch {
+    return { ok:false, status:401, error:"Invalid invitation token." };
+  }
+  const [envelopeId, documentId, recipientUid, secret] = decoded;
   if (!envelopeId || !documentId || !recipientUid || !secret) return { ok:false, status:401, error:"Invalid invitation token." };
   if (!expected || expected.envelopeId !== envelopeId || expected.documentId !== documentId || expected.recipientUid !== recipientUid) {
     return { ok:false, status:403, error:"This invitation token is not valid for this document or signer." };
