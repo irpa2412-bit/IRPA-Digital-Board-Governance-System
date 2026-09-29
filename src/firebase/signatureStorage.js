@@ -32,6 +32,10 @@ async function gatewayPost(path, payload) {
   return data;
 }
 
+export async function sendSignatureInvitationViaGateway({envelopeId,recipientUid,recipientEmail}) {
+  return gatewayPost("/api/signature-invitations/send",{envelopeId,recipientUid,recipientEmail});
+}
+
 export const storage = { provider: "Google Drive" };
 
 export function ref(_storage, path) {
