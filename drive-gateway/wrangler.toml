@@ -13,7 +13,6 @@ SMTP_FROM = "info@irpa.or.tz"
 DRIVE_ROOT_FOLDER_NAME = "IRPA Governance System"
 FIRESTORE_COLLECTION_PREFIX = ""
 DRIVE_MOCK = "false"
-LOCAL_TEST_MODE = "false"
 ENVIRONMENT = "production"
 
 [[kv_namespaces]]
