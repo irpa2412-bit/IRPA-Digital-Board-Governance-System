@@ -1164,10 +1164,13 @@ async function smtpSend(env,{to,subject,text,html}) {
     await command(`RCPT TO:<${to}>`,"2");
     await command("DATA","3");
     const boundary="IRPA-"+crypto.randomUUID();
+    const messageId=`<${crypto.randomUUID()}@irpa.or.tz>`;
     const mime=[
       `From: "IRPA Administration" <${SMTP_FROM}>`,
       `To: <${to}>`,
       `Subject: ${subject}`,
+      `Message-ID: ${messageId}`,
+      `Date: ${new Date().toUTCString()}`,
       "MIME-Version: 1.0",
       `Content-Type: multipart/alternative; boundary="${boundary}"`,
       "",
@@ -1190,7 +1193,7 @@ async function smtpSend(env,{to,subject,text,html}) {
     const accepted=await readResponse();
     if (!accepted.startsWith("2")) throw new Error("SMTP message was not accepted: "+accepted);
     await command("QUIT","2");
-    return accepted;
+    return { messageId, smtpResponse: accepted };
   } finally {
     try { reader.releaseLock(); } catch {}
     try { writer.releaseLock(); } catch {}
