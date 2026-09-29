@@ -45,7 +45,7 @@ function arrayValue(values) { return { arrayValue: { values: values.map(stringVa
 async function setDoc(collection, id, fields) {
   const response = await fetch(`${FIRESTORE}/v1/projects/${PROJECT}/databases/(default)/documents/${collection}?documentId=${encodeURIComponent(id)}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Authorization": "Bearer owner", "Content-Type": "application/json" },
     body: JSON.stringify({ fields })
   });
   const body = await response.text();
