@@ -4563,3 +4563,36 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   .page-back-next-navigation{display:none!important;}
   .content-area,.dashboard-content-area{padding-top:0!important;}
 }
+
+
+/* MOBILE OVERHEAD PANE ARRANGEMENT — 2026-09-29
+   Presentation-only: separates the mobile header and in-portal navigation
+   surface so neither obscures the other or the dashboard content. */
+@media(max-width:760px){
+  .topbar{
+    min-height:64px!important;
+    height:64px!important;
+    padding:8px 12px!important;
+    box-sizing:border-box!important;
+    position:sticky!important;
+    top:0!important;
+    z-index:900!important;
+  }
+  .topbar h2{font-size:16px!important;line-height:1.15!important;margin:0!important;}
+  .topbar p{font-size:9px!important;line-height:1.2!important;margin:2px 0 0!important;}
+  .mobile-portal-content-roller{
+    top:calc(72px + env(safe-area-inset-top))!important;
+    left:10px!important;
+    right:10px!important;
+    min-height:44px!important;
+    height:44px!important;
+    border-radius:10px!important;
+    box-shadow:0 5px 14px rgba(0,0,0,.18)!important;
+  }
+  .mobile-portal-content-roller-label strong{font-size:12px!important;}
+  .content-area:not(.dashboard-content-area){padding-top:126px!important;}
+  .dashboard-content-area{padding-top:126px!important;}
+  .dashboard-content-area .dashboard-mobile-view{padding-top:0!important;}
+  .mobile-global-nav{z-index:3200!important;}
+  .mobile-nav-sheet{z-index:3300!important;}
+}
