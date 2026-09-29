@@ -28,6 +28,7 @@ export function verifySignatureInvite({ token, expected, now = Date.now() }) {
     return { ok:false, status:403, error:"Invalid invitation token." };
   }
   if (new Date(expected.expiresAt).getTime() <= now) return { ok:false, status:403, error:"This invitation token has expired." };
+  if (expected.usedAt) return { ok:false, status:403, error:"This invitation token has already been used." };
   return { ok:true, envelopeId, documentId, recipientUid, recipientEmail:expected.recipientEmail };
 }
 
@@ -44,4 +45,23 @@ export async function sendWithRetry(provider, payload, { attempts = 3, delayMs =
     }
   }
   throw lastError;
+}
+
+export async function consumeSingleUseToken(kv, tokenHash, ttlSeconds = 72 * 60 * 60) {
+  const key=`signature-invite:${tokenHash}`;
+  const record=await kv.get(key,"json");
+  if(!record) return {ok:false,status:401,error:"Invalid invitation token."};
+  if(record.usedAt) return {ok:false,status:403,error:"This invitation token has already been used."};
+  record.usedAt=new Date().toISOString();
+  await kv.put(key,JSON.stringify(record),{expirationTtl:ttlSeconds});
+  return {ok:true,record};
+}
+
+export async function checkInvitationRateLimit(kv, identity, limit=5, windowSeconds=600) {
+  const key=`signature-invite-rate:${sha256(identity)}`;
+  const current=await kv.get(key,"json") || {count:0};
+  if(Number(current.count)>=limit) return {ok:false,status:429,retryAfter:windowSeconds};
+  const next={count:Number(current.count)+1};
+  await kv.put(key,JSON.stringify(next),{expirationTtl:windowSeconds});
+  return {ok:true,count:next.count};
 }
