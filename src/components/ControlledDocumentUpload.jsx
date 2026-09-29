@@ -139,6 +139,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         documentReference,
         documentReferenceType: "Controlled Document",
         documentType,
+        contentType,
         archiveCategory: effectiveArchiveCategory,
         classification: effectiveClassification,
         uploadedAt,
