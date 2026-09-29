@@ -53,7 +53,7 @@ export default {
       }
 
       // Normalize trailing slashes so portal upload/archive actions cannot be blocked by URL formatting.
-      const pathname = url.pathname.replace(/\\/+$/, "") || "/";
+      const pathname = url.pathname.replace(/\/+$/, "") || "/";
 
       if (pathname === "/api/upload" && request.method === "POST") {
         return await upload(request, env);
