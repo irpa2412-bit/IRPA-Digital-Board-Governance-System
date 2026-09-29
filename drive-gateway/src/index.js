@@ -340,6 +340,10 @@ async function uploadControlledDocument(request, env) {
 
   const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
   if (bytes.length !== fileSize) return json({ok:false,error:"Uploaded document size could not be verified."},400,corsHeaders(request));
+  if (contentType === "application/pdf") {
+    const magic = new TextDecoder().decode(bytes.slice(0, 5));
+    if (magic !== "%PDF-") return json({ok:false,error:"The uploaded file is not a valid PDF."},400,corsHeaders(request));
+  }
 
   const accessToken = await getDriveAccessToken(env);
   const rootId = await findOrCreateFolder(env, accessToken, "IRPA Governance System");
@@ -440,10 +444,22 @@ async function uploadControlledDocument(request, env) {
     };
   };
 
-  const categoryFile=await uploadToFolder(categoryFolderId,"Controlled Documents",archiveCategory);
-  const governanceFile=governanceFolderId
-    ? await uploadToFolder(governanceFolderId,"Board of Directors Governance Documents","Board of Directors Governance Archive")
-    : null;
+  let categoryFile = null;
+  let governanceFile = null;
+  try {
+    categoryFile = await uploadToFolder(categoryFolderId,"Controlled Documents",archiveCategory);
+    governanceFile = governanceFolderId
+      ? await uploadToFolder(governanceFolderId,"Board of Directors Governance Documents","Board of Directors Governance Archive")
+      : null;
+  } catch (error) {
+    if (categoryFile?.fileId) {
+      try { await deleteDriveFileById(env, categoryFile.fileId); } catch (cleanupError) { console.error("Controlled-document rollback failed", cleanupError); }
+    }
+    if (governanceFile?.fileId) {
+      try { await deleteDriveFileById(env, governanceFile.fileId); } catch (cleanupError) { console.error("Governance archive rollback failed", cleanupError); }
+    }
+    throw error;
+  }
 
   return json({
     ok:true,
@@ -519,6 +535,18 @@ async function download(request, env) {
 }
 
 
+
+async function deleteDriveFileById(env, fileId) {
+  const accessToken = await getDriveAccessToken(env);
+  const response = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${accessToken}` }
+  });
+  if (!response.ok && response.status !== 404) {
+    const body = await response.text();
+    throw new Error(`Drive rollback failed (${response.status}): ${body.slice(0, 300)}`);
+  }
+}
 
 async function finalizeSignatureProfileArchives(request, env) {
   const claims = await authenticateFirebaseRequest(request);
