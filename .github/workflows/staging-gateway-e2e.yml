@@ -125,7 +125,7 @@ jobs:
             drive-gateway/binding-proof-status.txt
 
   local-e2e:
-    if: always()
+    if: needs.staging-isolation.result == 'success'
     needs: staging-isolation
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -167,8 +167,8 @@ jobs:
 
 
   deploy-staging:
-    needs: local-e2e
-    if: success() && github.ref == 'refs/heads/repair-document-signature-pathway-20260929'
+    needs: [staging-isolation, local-e2e]
+    if: needs.staging-isolation.result == 'success' && needs.local-e2e.result == 'success' && github.ref == 'refs/heads/repair-document-signature-pathway-20260929'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
