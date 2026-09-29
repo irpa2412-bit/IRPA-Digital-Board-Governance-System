@@ -1,6 +1,6 @@
 import { arrayUnion, collection, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, setDoc, updateDoc, where, writeBatch } from "firebase/firestore";
 import { sendSignInLinkToEmail } from "firebase/auth";
-import { downloadDriveBytes, ensureSignatureWorkflowFolder, ensureSignedDocumentArchive, ensureSignatureProfileFolder, finalizeSignatureProfileArchives, getDownloadURL, ref, uploadBytes } from "./signatureStorage";
+import { downloadDriveBytes, ensureSignatureWorkflowFolder, ensureSignedDocumentArchive, ensureSignatureProfileFolder, finalizeSignatureProfileArchives, getDownloadURL, ref, uploadBytes, sendSignatureInvitationViaGateway } from "./signatureStorage";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { auth, db } from "./config";
 import { ensureMySignerIdentity, getMySignerIdentity, recordSignerAuthenticationEvidence, IRPA_ORGANISATION } from "./signerIdentity";
@@ -247,51 +247,29 @@ export async function getSignatureEnvelopes(){const u=user();const q=query(colle
 export async function getMySignedDocuments(){const u=user();const q=query(collection(db,"signatures"),where("signerUid","==",u.uid));const s=await getDocs(q);const rows=await Promise.all(s.docs.map(async x=>{const data=x.data();if(data.signerArchiveUrl)return{id:x.id,...data};if(!data.envelopeId)return null;try{const envelopeSnap=await getDoc(doc(db,ENVELOPE_COLLECTION,data.envelopeId));if(!envelopeSnap.exists())return null;const envelope={id:envelopeSnap.id,...envelopeSnap.data()};const delivery=envelope.signerArchiveDeliveries?.[u.uid];if(!delivery?.webViewLink)return null;return{id:x.id,...data,signerArchiveUrl:delivery.webViewLink,signerArchiveFolderId:delivery.folderId||null,signerArchiveFolderLink:delivery.folderLink||null,myDocumentsPortal:delivery.myDocumentsPortal||"My Documents",myDocumentsPortalPath:delivery.myDocumentsPortalPath||null,signerArchiveFinalHash:delivery.finalHash||envelope.signerArchiveFinalHash||null,archivePending:false,archiveProtocol:delivery.archiveProtocol||"IRPA-SIGNER-COPY-V2",archiveState:"Final Completed Document"};}catch(error){console.warn("Unable to resolve completed signer archive delivery:",error);return null;}}));return rows.filter(x=>x&&x.status==="Signed"&&x.signerArchiveUrl).sort((a,b)=>{const at=a.signedAt?.seconds?Number(a.signedAt.seconds):Date.parse(a.signedAt||0);const bt=b.signedAt?.seconds?Number(b.signedAt.seconds):Date.parse(b.signedAt||0);return bt-at;});}
 export async function sendSignatureInvitation(envelope, recipient) {
   const u = user();
-
   if (!envelope?.id) throw new Error("A valid signing envelope is required.");
-  if (!recipient?.uid || !recipient?.email) {
-    throw new Error("The signer must have a valid account UID and email address.");
-  }
-
-  if (!(envelope.participantUids || []).includes(recipient.uid)) {
-    throw new Error("The selected signer is not a participant in this envelope.");
-  }
-
+  if (!recipient?.uid || !recipient?.email) throw new Error("The signer must have a valid account UID and email address.");
+  if (!(envelope.participantUids || []).includes(recipient.uid)) throw new Error("The selected signer is not a participant in this envelope.");
   const cleanEmail = String(recipient.email).trim().toLowerCase();
-
-  const actionCodeSettings = {
-    url:
-      window.location.origin +
-      "/?signEnvelope=" +
-      encodeURIComponent(envelope.id),
-    handleCodeInApp: true
-  };
-
-  await sendSignInLinkToEmail(auth, cleanEmail, actionCodeSettings);
-
+  const result = await sendSignatureInvitationViaGateway({envelopeId:envelope.id,recipientUid:recipient.uid,recipientEmail:cleanEmail});
   await updateDoc(doc(db, ENVELOPE_COLLECTION, envelope.id), {
     status: envelope.status === "Draft" ? "Sent" : envelope.status,
     invitationStatus: "Sent",
     invitationSentAt: serverTimestamp(),
     invitationSentByUid: u.uid,
     invitationSentByEmail: u.email || "",
+    invitationProvider: result.provider || "IRPA Mail Server",
+    invitationDeliveryStatus: result.deliveryStatus || "Submitted",
+    invitationDocumentId: result.documentId || envelope.documentId || "",
+    invitationExpiresAt: result.expiresAt || null,
     updatedAt: serverTimestamp()
   });
-
   await recordEnvelopeEvent(envelope.id, "Signing Invitation Sent", {
-    signerUid: recipient.uid,
-    signerEmail: cleanEmail,
-    signerName: recipient.name || "",
-    deliveryStatus: "Accepted by Firebase Authentication"
+    signerUid: recipient.uid, signerEmail:cleanEmail, signerName:recipient.name||"",
+    documentId:result.documentId||envelope.documentId||"",
+    deliveryStatus:result.deliveryStatus||"Submitted", provider:result.provider||"IRPA Mail Server"
   });
-
-  return {
-    envelopeId: envelope.id,
-    signerUid: recipient.uid,
-    signerEmail: cleanEmail,
-    emailRequested: true,
-    deliveryStatus: "Accepted by Firebase Authentication"
-  };
+  return {envelopeId:envelope.id,documentId:result.documentId||envelope.documentId||"",signerUid:recipient.uid,signerEmail:cleanEmail,emailRequested:true,deliveryStatus:result.deliveryStatus||"Submitted",provider:result.provider||"IRPA Mail Server",inviteUrl:result.inviteUrl||"",expiresAt:result.expiresAt||null,messageId:result.messageId||""};
 }
 
 export async function saveSignatureWorkflowDraft({envelopeId,title,documentId,documentReference,documentUrl,documentClassification="Public",documentArchiveCategory="Administrative Documents",documentType="Governance Document",documentUploadedAt=null,signingMode,recipients,fields,ownerSigningEnabled=true}){const u=user();if(!title?.trim())throw new Error("Envelope title is required.");if(!documentId||!documentUrl)throw new Error("Select a controlled PDF before saving the workflow.");const sourceDocument=await getDoc(doc(db,"documents",documentId));if(!sourceDocument.exists())throw new Error("The selected controlled document could not be found.");const sourceDocumentData=sourceDocument.data()||{};const recordOrigin=String(sourceDocumentData.recordOrigin||"PRODUCTION").toUpperCase()==="TRIAL"?"TRIAL":"PRODUCTION";const owner={uid:u.uid,name:u.displayName||u.email||"Document Owner",email:u.email||"",role:"Document Owner",routingOrder:1,status:"Pending",optionalSigning:!ownerSigningEnabled,actionRequired:ownerSigningEnabled};const supplied=(recipients||[]).filter(r=>r?.uid&&r.uid!==u.uid).map((r,i)=>({...r,accessOnly:isViewOnlyRecipient(r),routingOrder:signingMode==="Sequential"?i+2:r.routingOrder||1}));const orderedRecipients=[owner,...supplied];const participantUids=orderedRecipients.map(r=>r.uid).filter(Boolean);const actionUids=[...new Set((fields||[]).map(f=>f?.signerUid).filter(Boolean))];const viewOnlyUids=new Set(orderedRecipients.filter(isViewOnlyRecipient).map(r=>r.uid));if((fields||[]).some(f=>f?.signerUid&&viewOnlyUids.has(f.signerUid)))throw new Error("View-only recipients cannot receive action fields.");const id=envelopeId||`IRPA-ENV-${new Date().getFullYear()}-${Date.now().toString().slice(-8)}`;const payload={envelopeReference:id,title:title.trim(),documentId,documentReference:documentReference||"",documentUrl,senderUid:u.uid,senderEmail:u.email||"",ownerUid:u.uid,ownerName:owner.name,ownerEmail:owner.email,recordOrigin,trialData:recordOrigin==="TRIAL",documentClassification:documentClassification||"Public",status:"Draft",signingMode:signingMode||"Sequential",recipients:orderedRecipients,fields:fields||[],participantUids,actionUids,currentSignerUid:ownerSigningEnabled?u.uid:(orderedRecipients.find(isActionRecipient)?.uid||null),ownerSectionSaved:true,documentClassification:documentClassification||"Public",documentArchiveCategory:documentArchiveCategory||"Administrative Documents",documentType:documentType||"Governance Document",documentUploadedAt:documentUploadedAt||sourceDocumentData.uploadedAt||sourceDocumentData.documentTypeSelectedAt||null,documentUploadDestinationKey:sourceDocumentData.documentUploadDestinationKey||null,updatedAt:serverTimestamp()};if(!envelopeId)payload.createdAt=serverTimestamp();await setDoc(doc(db,ENVELOPE_COLLECTION,id),payload,{merge:true});await updateDoc(doc(db,"documents",documentId),{signatureEnvelopeId:id,signatureReference:id,signatureStatus:"Draft",signatureOwnerUid:u.uid,workflowOwnerSectionSaved:true,updatedAt:serverTimestamp()});await recordEnvelopeEvent(id,"Owner Section Saved",{ownerUid:u.uid,ownerSigningEnabled,fieldCount:(fields||[]).filter(f=>f.signerUid===u.uid).length,recipientCount:orderedRecipients.length});return{id,...payload};}
