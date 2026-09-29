@@ -7,7 +7,7 @@ async function signedFirebaseToken(uid, exp) {
   const keyPair = await crypto.subtle.generateKey({name:"RSASSA-PKCS1-v1_5",modulusLength:2048,publicExponent:new Uint8Array([1,0,1]),hash:"SHA-256"},true,["sign","verify"]);
   const jwk = await crypto.subtle.exportKey("jwk", keyPair.publicKey);
   const header = b64url(JSON.stringify({alg:"RS256",kid:"local-test-key",typ:"JWT"}));
-  const payload = b64url(JSON.stringify({sub:uid,user_id:uid,email:uid+"@example.test",aud:"demo-irpa-staging",iss:"https://securetoken.google.com/demo-irpa-staging",exp}));
+  const payload = b64url(JSON.stringify({sub:uid,user_id:uid,email:uid+"@example.test",aud:"irpa-digital-board-governance",iss:"https://securetoken.google.com/irpa-digital-board-governance",exp}));
   const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5",keyPair.privateKey,new TextEncoder().encode(header+"."+payload));
   globalThis.__IRPA_LOCAL_TEST_JWKS = {"local-test-key":jwk};
   return header+"."+payload+"."+b64url(signature);
