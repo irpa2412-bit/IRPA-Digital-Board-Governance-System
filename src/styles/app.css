@@ -4612,3 +4612,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     box-sizing:border-box!important;
   }
 }
+
+/* FREEZE BACK/NEXT SESSION NAVIGATORS — 2026-09-29
+   Presentation-only: keeps the page navigator visible at the authenticated
+   workspace boundary while the page content scrolls underneath it. */
+@media screen and (min-width:761px){
+  .content-area > .page-back-next-navigation{
+    position:sticky!important;
+    top:48px!important;
+    z-index:9997!important;
+    margin-top:0!important;
+  }
+}
