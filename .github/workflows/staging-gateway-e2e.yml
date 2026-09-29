@@ -16,7 +16,6 @@ permissions:
 
 jobs:
   staging-isolation:
-    if: github.ref == 'refs/heads/repair-document-signature-pathway-20260929' || github.head_ref == 'repair-document-signature-pathway-20260929'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -112,7 +111,6 @@ jobs:
             drive-gateway/wrangler.staging.generated.toml
 
   local-e2e:
-    if: github.ref == 'refs/heads/repair-document-signature-pathway-20260929' || github.head_ref == 'repair-document-signature-pathway-20260929'
     needs: staging-isolation
     runs-on: ubuntu-latest
     timeout-minutes: 25
