@@ -1,0 +1,62 @@
+name: Signature startup preview verification
+on:
+  push:
+    branches:
+      - fix/signature-startup-boundary-20260929
+permissions:
+  contents: read
+jobs:
+  historical-builds:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ref:
+          - "543b090ffccf36876fca39fd83bfa0e3289038c1"
+          - "ccb13fca931a75d58ffb0073e1991c2e3fb0263f"
+          - "79395397a984ac5015c495500ec346e7c57487f1"
+          - "079f23f7eeaaa600b220a961070121fe012c460f"
+          - "ac29406fe88e79d2a7f249205b3ca14ed6137aa9"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm install
+      - run: npm run build
+
+  current-tests-and-preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm install
+      - run: npm install --no-save vitest@^3.2.4 @testing-library/react@^16.3.0 @testing-library/jest-dom@^6.8.0 jsdom@^26.1.0
+      - run: npm run build
+      - name: Signature workspace render test
+        run: npx vitest run tests/signature-platform-startup.test.jsx --environment jsdom
+      - name: Clean URL source-routing test
+        run: node - <<'NODE'
+          const fs=require("fs");
+          const s=fs.readFileSync("src/App.jsx","utf8");
+          if(s.includes("params.get(\"workspace\")") || s.includes("location.hash") && s.includes("Signature Platform")) process.exit(1);
+          const m=s.match(/const\[active,setActive\]=useState\(\(\)=>\{const params=new URLSearchParams\(window.location.search\);const requested=params.get\(\"adminModule\"\)/);
+          if(!m) throw new Error("adminModule routing initializer not found");
+          console.log("CLEAN_URL_ROUTING_SOURCE_TEST: PASS");
+          console.log("HASH_WORKSPACE_ROUTING_SOURCE_TEST: PASS (hash is not consumed by Shell initializer)");
+        NODE
+      - name: Deploy Hosting preview only
+        env:
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+        run: |
+          set -o pipefail
+          npx firebase-tools hosting:channel:deploy signature-startup-fix-20260929 --project irpa-digital-board-governance --expires 7d 2>&1 | tee /tmp/firebase-preview.log
+          grep -Eo 'https://[^ ]+--signature-startup-fix-20260929[^ ]*' /tmp/firebase-preview.log | tail -1 > /tmp/preview-url.txt
+          test -s /tmp/preview-url.txt
+          echo "PREVIEW_URL=$(cat /tmp/preview-url.txt)"
