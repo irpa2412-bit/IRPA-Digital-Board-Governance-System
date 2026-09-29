@@ -4462,6 +4462,19 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   }
 }
 
+/* SESSION NAVIGATORS — FIXED SCROLL POSITION
+   Desktop navigation remains anchored beneath the overhead navigation pane
+   while the workspace scrolls. Mobile already uses the fixed arrangement. */
+@media screen and (min-width:761px){
+  .content-area > .page-back-next-navigation{
+    position:sticky!important;
+    top:48px!important;
+    z-index:9997!important;
+    width:100%!important;
+    box-sizing:border-box!important;
+    margin-top:0!important;
+  }
+}
 /* PAGE BACK/NEXT NAVIGATION — 2026-09-26
    Shared navigation surface for every authenticated live portal page.
    Routing remains controlled by the existing Shell/data-gate handlers. */
