@@ -4,6 +4,14 @@ import App from"./App";
 import { logout } from "./firebase/auth";
 import "./styles/app.css";
 
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch((error) => {
+      console.warn("IRPA offline application shell registration failed:", error);
+    });
+  });
+}
+
 class AppBootBoundary extends Component{
   constructor(props){super(props);this.state={error:null};}
   static getDerivedStateFromError(error){return{error};}
