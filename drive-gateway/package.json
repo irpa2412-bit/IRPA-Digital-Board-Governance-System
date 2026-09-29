@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "deploy": "wrangler deploy",
-    "test:e2e:local": "node tests/e2e-local.mjs"
+    "test:e2e:local": "node tests/e2e-local.mjs",
+    "test:auth": "node tests/auth-local.mjs",
+    "test:firestore-isolation": "node tests/firestore-isolation.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"
