@@ -141,7 +141,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         fileName: file.name,
         fileId: archive.file?.fileId || null,
         storageProvider: "Google Drive",
-        storagePath: `document-archives/${archiveCategory}/${classification}/${documentUid}/${file.name}`,
+        storagePath: `document-archives/${effectiveArchiveCategory}/${effectiveClassification}/${documentUid}/${file.name}`,
         webViewLink: archive.file?.webViewLink || null,
         fileUrl: archive.file?.fileId ? `drive://${archive.file.fileId}` : null,
         contentType,
