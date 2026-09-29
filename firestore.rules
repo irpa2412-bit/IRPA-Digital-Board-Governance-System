@@ -159,6 +159,17 @@ service cloud.firestore {
   match /authorizationRequests/{id}{allow read:if admin()||authorizationParticipant(resource);allow create:if admin()||authorizationUser();allow update:if admin()||authorizationParticipant(resource)||authorizationParticipant(request.resource);allow delete:if admin();}
   match /workflowActions/{id}{allow read:if admin()||(resource.data.workflowType=="Authorization"&&authorizationParticipant(resource))||workflowParticipant(resource);allow create:if admin()||validAuthorizationCreate();allow update:if admin()||((resource.data.workflowType=="Authorization"&&authorizationParticipant(resource))||workflowParticipant(resource))&&validWorkflowRecord(request.resource)&&!workflowTerminal()&&(request.resource.data.workflowType!="Authorization"||authorizationTransitionAllowed());allow delete:if admin();}
   match /systemSettings/{id}{allow read,create,update,delete:if admin();}
+  match /systemSettings/documentCounters{
+    allow get:if signedIn();
+    allow create:if signedIn()&&request.resource.data.documentReference==1&&request.resource.data.keys().hasOnly(["documentReference","updatedAt"]);
+    allow update:if signedIn()&&resource.data.documentReference is int&&request.resource.data.documentReference==resource.data.documentReference+1&&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["documentReference","updatedAt"]);
+    allow delete:if admin();
+  }
+  match /documentReferenceRegistry/{id}{
+    allow create:if signedIn()&&request.resource.data.referenceNumber==id&&request.resource.data.sequenceNumber is int&&request.resource.data.sequenceNumber>0&&request.resource.data.issuedByUid==request.auth.uid&&request.resource.data.controlStatus=="Active"&&getAfter(/databases/$(database)/documents/systemSettings/documentCounters).data.documentReference==request.resource.data.sequenceNumber;
+    allow get:if signedIn();
+    allow update,delete:if admin();
+  }
   match /inductionRecords/{uid}{allow read:if self(uid)||admin();allow create,update:if self(uid)&&request.resource.data.uid==request.auth.uid&&(activeMember()||request.auth.token.firebase.sign_in_provider=="anonymous");allow delete:if admin();}
   match /{document=**}{allow read,write:if false;}
  }
