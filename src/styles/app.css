@@ -4598,3 +4598,17 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   .page-back-next-navigation{display:none!important;}
   .content-area,.dashboard-content-area{padding-top:0!important;}
 }
+
+/* DASHBOARD STANDARD PANE SPACING — 2026-09-29
+   Presentation-only: apply the same controlled vertical spacing used by the
+   dashboard statistics and lower panels to the profile and live-date panes. */
+@media screen and (min-width:761px){
+  .dashboard-desktop-view > .desktop-quote4-hero{
+    margin-bottom:13px!important;
+  }
+  .dashboard-desktop-view > .dashboard-live-date-slot{
+    margin:0 0 13px!important;
+    width:100%!important;
+    box-sizing:border-box!important;
+  }
+}
