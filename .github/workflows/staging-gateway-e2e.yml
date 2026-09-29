@@ -88,7 +88,6 @@ jobs:
           grep -n -A2 -B1 'kv_namespaces' wrangler.staging.generated.toml
 
       - name: Production Wrangler dry-run binding list
-        if: steps.cloudflare.outputs.available == 'true'
         working-directory: drive-gateway
         run: |
           set -euo pipefail
