@@ -36,6 +36,11 @@ export async function sendSignatureInvitationViaGateway({envelopeId,recipientUid
   return gatewayPost("/api/signature-invitations/send",{envelopeId,recipientUid,recipientEmail});
 }
 
+export async function consumeSignatureInvitationViaGateway(token) {
+  if (!token) return {ok:false,skipped:true};
+  return gatewayPost("/api/signature-invitations/consume",{token});
+}
+
 export const storage = { provider: "Google Drive" };
 
 export function ref(_storage, path) {
