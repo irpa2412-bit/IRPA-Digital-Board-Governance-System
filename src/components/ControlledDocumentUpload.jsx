@@ -308,7 +308,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
             disabled={busy || !file || !documentType || (documentType === "Administrator" && !allowRestrictedUpload)}
             aria-busy={busy ? "true" : "false"}
           >
-            {busy ? "Saving…" : file ? submitLabel : "Select a file"}
+            {busy ? "Saving…" : submitLabel}
           </button>
         </div>
       </form>
