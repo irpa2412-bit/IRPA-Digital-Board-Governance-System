@@ -41,6 +41,7 @@ async function firestore(path, init = {}) {
 function stringValue(value) { return { stringValue: String(value) }; }
 function boolValue(value) { return { booleanValue: Boolean(value) }; }
 function arrayValue(values) { return { arrayValue: { values: values.map(stringValue) } }; }
+function mapValue(fields) { return { mapValue: { fields } }; }
 
 async function setDoc(collection, id, fields) {
   const response = await fetch(`${FIRESTORE}/v1/projects/${PROJECT}/databases/(default)/documents/${collection}?documentId=${encodeURIComponent(id)}`, {
@@ -170,6 +171,77 @@ try {
   });
   log("oversized-rejected", { httpStatus: oversized.status, response: oversized.body });
   if (oversized.status !== 400) throw new Error("Oversized file was not rejected.");
+
+  const exact10 = makePdf(10 * 1024 * 1024);
+  const exact10Hash = createHash("sha256").update(exact10).digest("hex");
+  log("before-exact-10mb", {});
+  const exact10Result = await request("/api/upload-controlled-document", { body: { ...common, documentId:"E2E-EXACT-10MB", fileName:"exact-10mb.pdf", fileSize:exact10.length, base64:Buffer.from(exact10).toString("base64") } });
+  log("exact-10mb-accepted", { httpStatus:exact10Result.status, response:exact10Result.body, sha256:exact10Hash });
+  if (exact10Result.status !== 200) throw new Error("Exactly 10 MB PDF was not accepted.");
+
+  const plusOne = new Uint8Array(10 * 1024 * 1024 + 1);
+  plusOne.set(exact10);
+  log("before-exact-10mb-plus-one", {});
+  const plusOneResult = await request("/api/upload-controlled-document", { body: { ...common, documentId:"E2E-10MB-PLUS-ONE", fileName:"10mb-plus-one.pdf", fileSize:plusOne.length, base64:Buffer.from(plusOne).toString("base64") } });
+  log("exact-10mb-plus-one-rejected", { httpStatus:plusOneResult.status, response:plusOneResult.body });
+  if (plusOneResult.status !== 400) throw new Error("10 MB + 1 byte was not rejected.");
+
+  log("before-concurrent-same-document-id", {});
+  const concurrentId = "E2E-CONCURRENT-SAME-ID";
+  const [concurrentA, concurrentB] = await Promise.all([
+    request("/api/upload-controlled-document", { body:{...common,documentId:concurrentId,fileName:"concurrent-a.pdf"} }),
+    request("/api/upload-controlled-document", { body:{...common,documentId:concurrentId,fileName:"concurrent-b.pdf"} })
+  ]);
+  log("concurrent-same-document-id", { requestA:{status:concurrentA.status,response:concurrentA.body}, requestB:{status:concurrentB.status,response:concurrentB.body} });
+  if (![200,409].includes(concurrentA.status) || ![200,409].includes(concurrentB.status) || concurrentA.status===concurrentB.status) throw new Error("Concurrent same-document-ID test did not produce one accepted request and one conflict.");
+
+  log("before-signing-envelope", {});
+  const signingDocumentId = "E2E-SIGN-DOC-001";
+  const envelopeId = "IRPA-ENV-TEST-001";
+  await setDoc("staging_documents", signingDocumentId, {
+    fileId:stringValue(fileId), documentUrl:stringValue("drive://"+fileId), storageUrl:stringValue("drive://"+fileId),
+    hash:stringValue(originalHash), status:stringValue("Saved"), authorizedUids:arrayValue(["authorized-user"])
+  });
+  await setDoc("staging_signatureEnvelopes", envelopeId, {
+    status:stringValue("Completed"), lastSignedByUid:stringValue("authorized-user"), originalDocumentId:stringValue(signingDocumentId),
+    recipients:arrayValue([]),
+    recipients: {arrayValue:{values:[
+      mapValue({uid:stringValue("authorized-user"),email:stringValue("authorized@example.test"),role:stringValue("Document Owner")}),
+      mapValue({uid:stringValue("second-signer"),email:stringValue("second@example.test"),role:stringValue("Board Member")})
+    ]}}
+  });
+  const signedBytes = new Uint8Array(pdf);
+  signedBytes[100] = (signedBytes[100] + 1) % 255;
+  const signedHash = createHash("sha256").update(signedBytes).digest("hex");
+  const beforeSigning = await request("/__test__/state",{method:"GET"});
+  const signingResult = await request("/api/signature-profile/finalize", {
+    body:{envelopeId,originalHash,finalHash:signedHash,fileSize:signedBytes.length,base64:Buffer.from(signedBytes).toString("base64")}
+  });
+  const afterSigning = await request("/__test__/state",{method:"GET"});
+  log("signing-envelope-created-and-archived",{httpStatus:signingResult.status,response:signingResult.body,beforeCount:(beforeSigning.body?.objects||[]).length,afterCount:(afterSigning.body?.objects||[]).length,originalHashUnchanged:originalHash===String(originalHash)});
+  if (signingResult.status!==200 || Object.keys(signingResult.body?.deliveries||{}).length!==2) throw new Error("Signing archive assertion failed.");
+  const signingObjects=(afterSigning.body?.objects||[]).filter(o=>String(o.description||"").includes(envelopeId));
+  if(signingObjects.length!==2 || !signingObjects.every(o=>String(o.description||"").includes(originalHash))) throw new Error("Signed PDF archive linkage/hash assertion failed.");
+
+  const duplicateSigning = await request("/api/signature-profile/finalize", {
+    body:{envelopeId,originalHash,finalHash:signedHash,fileSize:signedBytes.length,base64:Buffer.from(signedBytes).toString("base64")}
+  });
+  const afterDuplicate = await request("/__test__/state",{method:"GET"});
+  log("duplicate-signature-callback-idempotent",{httpStatus:duplicateSigning.status,response:duplicateSigning.body,objectCountUnchanged:(afterDuplicate.body?.objects||[]).length===(afterSigning.body?.objects||[]).length});
+  if(duplicateSigning.status!==200 || duplicateSigning.body?.idempotent!==true || (afterDuplicate.body?.objects||[]).length!==(afterSigning.body?.objects||[]).length) throw new Error("Duplicate signature callback was not idempotent.");
+
+  await setDoc("staging_signatureEnvelopes","IRPA-ENV-SIGN-FAIL-001",{
+    status:stringValue("Completed"),lastSignedByUid:stringValue("authorized-user"),
+    recipients:{arrayValue:{values:[
+      mapValue({uid:stringValue("authorized-user"),email:stringValue("authorized@example.test"),role:stringValue("Document Owner")}),
+      mapValue({uid:stringValue("second-signer"),email:stringValue("second@example.test"),role:stringValue("Board Member")})
+    ]}}
+  });
+  const beforeSignatureFailure = await request("/__test__/state",{method:"GET"});
+  const signatureFailure = await request("/api/signature-profile/finalize",{headers:{"X-IRPA-Test-Failure":"signature-provider"},body:{envelopeId:"IRPA-ENV-SIGN-FAIL-001",originalHash,finalHash:signedHash,fileSize:signedBytes.length,base64:Buffer.from(signedBytes).toString("base64")}});
+  const afterSignatureFailure = await request("/__test__/state",{method:"GET"});
+  log("signature-provider-failure-no-orphan",{httpStatus:signatureFailure.status,response:signatureFailure.body,beforeCount:(beforeSignatureFailure.body?.objects||[]).length,afterCount:(afterSignatureFailure.body?.objects||[]).length});
+  if(signatureFailure.status!==500 || (afterSignatureFailure.body?.objects||[]).length!==(beforeSignatureFailure.body?.objects||[]).length) throw new Error("Signature-provider failure left an orphaned object.");
 
   log("before-rollback-baseline", {});
   const beforeRollback = await request("/__test__/state", { method: "GET" });
