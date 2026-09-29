@@ -4427,6 +4427,38 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 }
 
 
+/* DESKTOP NAVIGATION EDGE ALIGNMENT — 2026-09-29
+   Keeps the Back/Next pane flush with the lower edge of the overhead workspace
+   pane while preserving readable internal spacing. */
+@media screen and (min-width:761px){
+  .content-area > .page-back-next-navigation{
+    margin-top:-30px!important;
+    margin-bottom:14px!important;
+    width:100%!important;
+    box-sizing:border-box!important;
+  }
+  .content-area > .page-back-next-navigation + .mobile-portal-content-roller{
+    margin-top:0!important;
+  }
+  .content-area > .page-back-next-navigation .page-back-next-button{
+    min-height:40px!important;
+    padding:8px 14px!important;
+  }
+  .content-area > .page-back-next-navigation .page-back-next-status{
+    gap:3px!important;
+    padding:0 10px!important;
+  }
+  .content-area > .page-back-next-navigation .page-back-next-status span{
+    line-height:1.1!important;
+  }
+  .content-area > .page-back-next-navigation .page-back-next-status strong{
+    line-height:1.25!important;
+  }
+  .content-area > .page-back-next-navigation .page-back-next-status small{
+    line-height:1.1!important;
+  }
+}
+
 /* PAGE BACK/NEXT NAVIGATION — 2026-09-26
    Shared navigation surface for every authenticated live portal page.
    Routing remains controlled by the existing Shell/data-gate handlers. */
