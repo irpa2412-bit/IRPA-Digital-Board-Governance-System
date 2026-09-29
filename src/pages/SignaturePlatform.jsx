@@ -3,7 +3,7 @@ import{getCurrentEmployeeProfile,getCurrentMemberProfile,getCurrentSigningAuthor
 import{downloadDriveBytes}from"../firebase/signatureStorage";
 import{auth}from"../firebase/config";
 import{getMySignerIdentity}from"../firebase/signerIdentity";
-import{createCompletionCertificate,createSignatureEnvelope,getMySignatureProfile,getSignatureEnvelope,getSignatureEnvelopes,getMySignedDocuments,saveMySignatureProfile,signEnvelope,saveSignatureWorkflowDraft,finalizeSignatureWorkflowDraft,startSignatureWorkflow,verifyManualSigningAuthority}from"../firebase/signaturePlatform";
+import{createCompletionCertificate,createSignatureEnvelope,getMySignatureProfile,getSignatureEnvelope,getSignatureEnvelopes,getMySignedDocuments,saveMySignatureProfile,signEnvelope,saveSignatureWorkflowDraft,finalizeSignatureWorkflowDraft,startSignatureWorkflow,verifyManualSigningAuthority,revokeSignatureApplication,migrateExistingSignatureProfile}from"../firebase/signaturePlatform";
 import{updateMySignerAuthority}from"../firebase/signerIdentity";
 import ControlledDocumentUpload from"../components/ControlledDocumentUpload";
 import{readWorkflowContext}from"../firebase/workflowLinks";
@@ -166,6 +166,12 @@ function SigningDocumentViewer({url,documentId,fields,profile,fieldValues,setFie
  const mine=(fields||[]).filter(f=>Number(f.page||1)===pageNum&&f.signerUid===auth.currentUser?.uid);
  const setValue=(f,v)=>setFieldValues(prev=>({...prev,[f.fieldId]:v}));
  const activate=(f)=>{if(f.type==="Date"){setValue(f,new Date().toLocaleString([], {year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit"}));return;}if((f.type==="Signature"||f.type==="Initials")){const src=f.type==="Signature"?profile?.signatureUrl:profile?.initialsUrl;if(src){setValue(f,src);}else{setError?.("Your Signature Profile does not contain a saved "+f.type.toLowerCase()+" specimen.");}}};
+ const inkPoint=(e)=>{const c=inkCanvasRef.current;const r=c.getBoundingClientRect();return{x:(e.clientX-r.left)*(c.width/Math.max(1,r.width)),y:(e.clientY-r.top)*(c.height/Math.max(1,r.height))}};
+ const prepareInk=(c)=>{const ctx=c.getContext("2d");if(c.__inkReady)return ctx;ctx.fillStyle="#fff";ctx.fillRect(0,0,c.width,c.height);ctx.lineWidth=4;ctx.lineCap="round";ctx.lineJoin="round";ctx.strokeStyle="#111827";c.__inkReady=true;return ctx};
+ const startInk=(e)=>{const c=inkCanvasRef.current;if(!c)return;e.preventDefault();const ctx=prepareInk(c);const p=inkPoint(e);c.__inkLast=p;c.__inkDirty=true;try{c.setPointerCapture?.(e.pointerId)}catch(_e){}ctx.beginPath();ctx.arc(p.x,p.y,2,0,Math.PI*2);ctx.fillStyle="#111827";ctx.fill();setDrawing(true)};
+ const moveInk=(e)=>{const c=inkCanvasRef.current;if(!c||!drawing||!c.__inkLast)return;e.preventDefault();const ctx=prepareInk(c);const p=inkPoint(e);ctx.beginPath();ctx.moveTo(c.__inkLast.x,c.__inkLast.y);ctx.lineTo(p.x,p.y);ctx.stroke();c.__inkLast=p};
+ const clearInk=()=>{const c=inkCanvasRef.current;if(!c)return;c.__inkReady=false;c.__inkDirty=false;c.__inkLast=null;prepareInk(c);setError("")};
+ const saveInk=()=>{const c=inkCanvasRef.current;if(!c||!inkField)return;if(!c.__inkDirty){setError("Please write your "+String(inkField.type||"signature").toLowerCase()+" in the box before tapping Use Handwritten Ink.");return}setValue(inkField,c.toDataURL("image/png"));setInkField(null);setDrawing(false);setError("")};
  return <div className="panel mobile-signing-panel" style={{marginBottom:18}}>
   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,marginBottom:10}}><div><strong>Document you are signing</strong><div className="muted" style={{fontSize:12}}>Review the actual PDF below. Only fields assigned to you are active.</div></div><div style={{display:"flex",gap:6}}><button type="button" className="text-button" disabled={!pdf||pageNum<=1} onClick={()=>setPageNum(p=>p-1)}>‹</button><span style={{padding:"7px 8px",fontSize:12}}>Page {pageNum} / {pdf?.numPages||0}</span><button type="button" className="text-button" disabled={!pdf||pageNum>=pdf.numPages} onClick={()=>setPageNum(p=>p+1)}>›</button></div></div>
   {loading&&<div className="auth-message">Loading the actual controlled PDF…</div>}{error&&<div className="error-message action-feedback">{error}</div>}

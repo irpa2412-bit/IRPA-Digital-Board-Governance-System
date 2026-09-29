@@ -12,7 +12,8 @@ export function inferMeetingPolicy(meetingType="Board Meeting"){
 }
 
 export function normalizeMeetingForV3(meeting={}){
-  // Legacy records without an explicit meeting type must not inherit Board privileges.\n  const policy=inferMeetingPolicy(meeting.meetingType||"Other");
+  // Legacy records without an explicit meeting type must not inherit Board privileges.
+  const policy=inferMeetingPolicy(meeting.meetingType||"Other");
   return {
     ...meeting,
     meetingCategory:meeting.meetingCategory||policy.id,
