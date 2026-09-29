@@ -4431,8 +4431,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
    Keeps the Back/Next pane flush with the lower edge of the overhead workspace
    pane while preserving readable internal spacing. */
 @media screen and (min-width:761px){
+  .content-area:has(> .desktop-webapp-navigation-roller){
+    padding-top:0!important;
+  }
   .content-area > .page-back-next-navigation{
-    margin-top:-30px!important;
+    margin-top:0!important;
     margin-bottom:14px!important;
     width:100%!important;
     box-sizing:border-box!important;
