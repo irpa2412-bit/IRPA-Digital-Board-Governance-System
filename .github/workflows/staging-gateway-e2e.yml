@@ -28,6 +28,15 @@ jobs:
         with:
           node-version: 22
 
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Verify Java runtime
+        run: java -version
+
       - name: Install application dependencies
         run: npm install --no-audit --no-fund
 
@@ -38,7 +47,7 @@ jobs:
       - name: Run Wrangler local Worker with Firebase Firestore emulator
         run: |
           set -o pipefail
-          npx firebase emulators:exec             --project demo-irpa-staging             --only firestore             "npm --prefix drive-gateway run test:e2e:local" | tee e2e-output.ndjson
+          npx firebase-tools@15.29.0 emulators:exec             --project demo-irpa-staging             --only firestore             "npm --prefix drive-gateway run test:e2e:local" | tee e2e-output.ndjson
 
       - name: Upload raw E2E output
         if: always()
