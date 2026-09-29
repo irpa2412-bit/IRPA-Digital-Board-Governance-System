@@ -687,6 +687,8 @@ async function finalizeSignatureProfileArchives(request, env) {
 
   return json({ok:true,envelopeId,deliveries,idempotent:false,fileIds:createdFileIds,originalHash},200,corsHeaders(request));
 }
+function stringValue(value) { return {stringValue:String(value)}; }
+
 function firestoreCollectionName(env, collectionName) {
   const logical = String(collectionName || "").replace(/^\/+|\/+$/g, "");
   if (!logical) throw new Error("Firestore collection name is required.");
