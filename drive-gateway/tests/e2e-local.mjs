@@ -9,6 +9,7 @@ const FIRESTORE = "http://127.0.0.1:8080";
 const PROJECT = "demo-irpa-staging";
 const WORKER = `http://127.0.0.1:${PORT}`;
 const DEV_VARS = `${GATEWAY}/.dev.vars.staging`;
+const LOCAL_WRANGLER = `${GATEWAY}/wrangler.local.toml`;
 
 function log(label, value) {
   console.log(JSON.stringify({ step: label, ...value }));
@@ -83,8 +84,10 @@ async function request(path, { uid = "authorized-user", email = "authorized@exam
 
 const workerEnv = `DRIVE_MOCK="true"\nLOCAL_TEST_MODE="true"\nFIREBASE_PROJECT_ID="${PROJECT}"\nFIRESTORE_EMULATOR_HOST="127.0.0.1:8080"\nFIRESTORE_COLLECTION_PREFIX="staging_"\nDRIVE_ROOT_FOLDER_NAME="IRPA Governance System - STAGING"\n`;
 writeFileSync(DEV_VARS, workerEnv);
+const wranglerTemplate = await (await fetch(new URL("../wrangler.toml", import.meta.url))).text().catch(()=>null);
+if (wranglerTemplate) writeFileSync(LOCAL_WRANGLER, wranglerTemplate.replace("STAGING_DRIVE_KV_NAMESPACE_ID_REQUIRED","00000000000000000000000000000000"));
 
-const worker = spawn("npx", ["wrangler", "dev", "--config", "wrangler.toml", "--env", "staging", "--local", "--test-scheduled", "--port", String(PORT), "--log-level", "error"], {
+const worker = spawn("npx", ["wrangler", "dev", "--config", "wrangler.local.toml", "--env", "staging", "--local", "--test-scheduled", "--port", String(PORT), "--log-level", "error"], {
   cwd: GATEWAY,
   stdio: ["ignore", "pipe", "pipe"],
   detached: process.platform !== "win32",
@@ -277,4 +280,5 @@ try {
     else if (worker.exitCode === null) worker.kill("SIGKILL");
   } catch {}
   if (existsSync(DEV_VARS)) unlinkSync(DEV_VARS);
+  if (existsSync(LOCAL_WRANGLER)) unlinkSync(LOCAL_WRANGLER);
 }
