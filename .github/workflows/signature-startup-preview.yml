@@ -86,7 +86,6 @@ jobs:
           const initializer=s.match(/const\[active,setActive\]=useState\(\(\)=>\{const params=new URLSearchParams\(window\.location\.search\);const requested=params\.get\("adminModule"\)/);
           if(!initializer) throw new Error("adminModule routing initializer not found");
           if(s.includes('params.get("workspace")')) throw new Error("Unexpected workspace query routing found");
-          if(!s.includes('window.location.hash')) console.log("HASH_NOT_READ_BY_SHELL=PASS");
           console.log("CLEAN_URL_EXPECTED_MODULE=Dashboard");
           console.log("ADMIN_MODULE_ONLY_EXPECTED_MODULE=Requested adminModule when authorized");
           console.log("DUAL_URL_EXPECTED_MODULE=Add Administrator because Shell consumes adminModule and does not consume #workspace");
@@ -94,6 +93,7 @@ jobs:
           NODE
 
       - name: Deploy Hosting preview only
+        id: preview
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
         run: |
@@ -105,3 +105,19 @@ jobs:
           test -n "$url"
           echo "PREVIEW_URL=$url"
           echo "preview_url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: External preview smoke test
+        env:
+          PREVIEW_URL: ${{ steps.preview.outputs.preview_url }}
+        run: |
+          set -euo pipefail
+          echo "Testing preview from GitHub runner: $PREVIEW_URL"
+          curl --fail --location --silent --show-error --max-time 30 "$PREVIEW_URL/" -o /tmp/preview.html
+          test -s /tmp/preview.html
+          grep -Eiq '<title>|IRPA|root' /tmp/preview.html
+          for path in '/?adminModule=Add%20Administrator' '/#workspace=Signature%20Platform' '/?adminModule=Add%20Administrator#workspace=Signature%20Platform'; do
+            code=$(curl --location --silent --output /dev/null --write-out '%{http_code}' --max-time 30 "$PREVIEW_URL$path")
+            test "$code" = "200"
+            echo "PREVIEW_HTTP_200 $path"
+          done
+          echo "EXTERNAL_PREVIEW_SMOKE_TEST: PASS"
