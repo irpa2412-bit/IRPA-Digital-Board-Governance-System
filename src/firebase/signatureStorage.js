@@ -181,6 +181,14 @@ export async function getDownloadURL(target) {
   return `drive://${target.fileId}`;
 }
 
+export function resolveControlledDocumentUrl(document = {}) {
+  const explicit = String(document.fileUrl || document.documentUrl || document.storageUrl || document.pdfUrl || "").trim();
+  if (explicit) return explicit;
+  const link = String(document.webViewLink || "").trim();
+  const driveId = String(document.fileId || ((link.match(/\\/d\\/([a-zA-Z0-9_-]+)/)||[])[1]) || ((link.match(/[?&]id=([a-zA-Z0-9_-]+)/)||[])[1]) || "").trim();
+  return driveId ? `drive://${driveId}` : "";
+}
+
 export async function downloadDriveBytes(fileId, documentId = null) {
   const result = await gatewayPost("/api/download", { fileId, documentId });
   const base64 = result.base64;
