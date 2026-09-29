@@ -246,7 +246,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         </ul>
         <div style={{marginTop:6}}>Each archive is separated by <strong>Public, Internal, Confidential</strong> or <strong>Restricted</strong> classification. The selected route is recorded with the document UID and archive link.</div>
       </div>}
-      {compact && <div className="identity-card" style={{marginBottom:14}}><span>Archive is selected before Save</span><small>Choose the document type and access classification, then select the file. The Save action commits the document to the selected archive.</small></div>
+      {compact && <div className="identity-card" style={{marginBottom:14}}><span>Archive is selected before Save</span><small>Choose the document type and access classification, then select the file. The Save action commits the document to the selected archive.</small></div>}
       <form onSubmit={submit}>
         <div className="form-grid">
           <div className="form-field">
