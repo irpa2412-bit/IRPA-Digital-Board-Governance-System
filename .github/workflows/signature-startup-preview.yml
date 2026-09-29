@@ -101,6 +101,7 @@ jobs:
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > /tmp/firebase-sa.json
           export GOOGLE_APPLICATION_CREDENTIALS=/tmp/firebase-sa.json
           npx firebase-tools hosting:channel:deploy signature-startup-fix-20260929 --project irpa-digital-board-governance --expires 7d 2>&1 | tee /tmp/firebase-preview.log
-          url=$(grep -Eo 'https://[^[:space:]]+' /tmp/firebase-preview.log | grep -- '--signature-startup-fix-20260929' | tail -1)
+          url=$(awk '/Channel URL/ {print $NF}' /tmp/firebase-preview.log | tail -1)
           test -n "$url"
           echo "PREVIEW_URL=$url"
+          echo "preview_url=$url" >> "$GITHUB_OUTPUT"
