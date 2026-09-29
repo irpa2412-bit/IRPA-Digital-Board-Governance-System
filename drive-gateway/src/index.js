@@ -1388,7 +1388,7 @@ async function mockDriveFetch(path, options = {}) {
     const body=JSON.parse(options.body || "{}"); const id=`mock-folder-${++MOCK_DRIVE_COUNTER}`;
     const object={id,name:body.name,mimeType:body.mimeType,size:0,description:body.description || "{}",parents:body.parents || [],bytes:new Uint8Array()}; MOCK_DRIVE_OBJECTS.set(id,object); return {id,name:object.name,mimeType:object.mimeType,parents:object.parents};
   }
-  if (/\\/permissions$/.test(url.pathname)) return method === "GET" ? {permissions:[]} : {id:"mock-permission"};
+  if (/\/permissions$/.test(url.pathname)) return method === "GET" ? {permissions:[]} : {id:"mock-permission"};
   return {};
 }
 
@@ -1531,7 +1531,7 @@ async function lookupInductionRegistration(request, env) {
   const member = firestoreDocumentToPlain(memberDoc) || {};
   const employee = firestoreDocumentToPlain(employeeDoc) || {};
   const invitationRows = invitations.map(firestoreDocumentToPlain).filter(Boolean);
-  const normalize = value => String(value || "").trim().toLowerCase().replace(/\\s+/g," ");
+  const normalize = value => String(value || "").trim().toLowerCase().replace(/\s+/g," ");
   const entered = normalize(fullName);
   const memberName = normalize(member.name || member.fullName);
   const employeeName = normalize(employee.name || employee.fullName);
