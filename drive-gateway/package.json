@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "test:e2e:local": "node tests/e2e-local.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"
