@@ -95,7 +95,7 @@ try {
   await waitFor(`${WORKER}/health`);
   log("worker-ready", { status: 200 });
 
-  await fetch(`${FIRESTORE}/emulator/v1/projects/${PROJECT}/databases/(default)/documents`, { method: "DELETE" });
+  await fetch(`${FIRESTORE}/emulator/v1/projects/${PROJECT}/databases/(default)/documents`, { method: "DELETE", signal: AbortSignal.timeout(30000) });
   await setDoc("staging_members", "authorized-user", {
     status: stringValue("Active"),
     email: stringValue("authorized@example.test"),
@@ -119,11 +119,13 @@ try {
     base64
   };
 
+  log("before-valid-pdf", {});
   const valid = await request("/api/upload-controlled-document", { body: common });
   log("valid-pdf-accepted", { httpStatus: valid.status, response: valid.body });
   if (valid.status !== 200 || !valid.body?.documentId || !valid.body?.categoryArchive?.file?.fileId || !valid.body?.governanceArchive?.file?.fileId) throw new Error("Valid PDF upload assertion failed.");
 
   const fileId = valid.body.categoryArchive.file.fileId;
+  log("before-metadata-record", {});
   await setDoc("staging_documents", documentId, {
     fileId: stringValue(fileId),
     fileName: stringValue("staging-e2e.pdf"),
@@ -135,20 +137,24 @@ try {
   });
   log("metadata-record", { documentId, fileId, documentUrl: `drive://${fileId}`, storageUrl: `drive://${fileId}`, hash: originalHash, status: "Saved" });
 
+  log("before-authorized-retrieval", {});
   const authorized = await request("/api/download", { body: { documentId, fileId } });
   const retrieved = Buffer.from(authorized.body?.base64 || "", "base64");
   const retrievedHash = createHash("sha256").update(retrieved).digest("hex");
   log("authorized-retrieval-sha256", { httpStatus: authorized.status, originalSha256: originalHash, retrievedSha256: retrievedHash, match: retrievedHash === originalHash });
   if (authorized.status !== 200 || retrievedHash !== originalHash) throw new Error("Authorized retrieval/hash assertion failed.");
 
+  log("before-unauthorized-retrieval", {});
   const unauthorized = await request("/api/download", { uid: "unauthorized-user", email: "unauthorized@example.test", body: { documentId, fileId } });
   log("unauthorized-retrieval-denied", { httpStatus: unauthorized.status, response: unauthorized.body });
   if (unauthorized.status !== 403) throw new Error("Unauthorized retrieval was not denied.");
 
+  log("before-wrong-document-id", {});
   const wrongId = await request("/api/download", { body: { documentId: "WRONG-DOCUMENT-ID", fileId } });
   log("wrong-document-id-denied", { httpStatus: wrongId.status, response: wrongId.body });
   if (wrongId.status !== 403) throw new Error("Wrong document ID was not denied.");
 
+  log("before-renamed-non-pdf", {});
   const renamed = await request("/api/upload-controlled-document", {
     body: { ...common, documentId: "E2E-RENAMED-NON-PDF", fileName: "renamed.pdf", fileSize: 4, base64: Buffer.from("PK\x03\x04").toString("base64") }
   });
@@ -157,24 +163,29 @@ try {
 
   const oversizedBytes = new Uint8Array(10 * 1024 * 1024 + 1);
   oversizedBytes[0] = 0x25; oversizedBytes[1] = 0x50; oversizedBytes[2] = 0x44; oversizedBytes[3] = 0x46; oversizedBytes[4] = 0x2D;
+  log("before-oversized", {});
   const oversized = await request("/api/upload-controlled-document", {
     body: { ...common, documentId: "E2E-OVERSIZED", fileName: "oversized.pdf", fileSize: oversizedBytes.length, base64: Buffer.from(oversizedBytes).toString("base64") }
   });
   log("oversized-rejected", { httpStatus: oversized.status, response: oversized.body });
   if (oversized.status !== 400) throw new Error("Oversized file was not rejected.");
 
+  log("before-rollback-baseline", {});
   const beforeRollback = await request("/__test__/state", { method: "GET" });
   log("rollback-baseline", { httpStatus: beforeRollback.status, state: beforeRollback.body });
+  log("before-second-channel-failure", {});
   const rollback = await request("/api/upload-controlled-document", { headers: { "X-IRPA-Test-Failure": "second-channel" }, body: { ...common, documentId: "E2E-ROLLBACK-001" } });
   const afterRollback = await request("/__test__/state", { method: "GET" });
   log("second-channel-failure-rolls-back-first-object", { httpStatus: rollback.status, response: rollback.body, stateAfter: afterRollback.body });
   if (rollback.status !== 500 || (afterRollback.body?.objects || []).length !== (beforeRollback.body?.objects || []).length || (afterRollback.body?.pending || []).length !== 0) throw new Error("Second-channel rollback assertion failed.");
 
+  log("before-rollback-delete-failure", {});
   const pendingFailure = await request("/api/upload-controlled-document", { headers: { "X-IRPA-Test-Failure": "second-channel-delete" }, body: { ...common, documentId: "E2E-PENDING-001" } });
   const pendingState = await request("/__test__/state", { method: "GET" });
   log("rollback-delete-failure-recorded-for-cleanup", { httpStatus: pendingFailure.status, response: pendingFailure.body, stateAfter: pendingState.body });
   if (pendingFailure.status !== 500 || (pendingState.body?.pending || []).length !== 1) throw new Error("Pending rollback record assertion failed.");
 
+  log("before-cleanup-job", {});
   const cleanup = await fetch(`${WORKER}/cdn-cgi/local/scheduled?format=json`);
   const cleanupText = await cleanup.text();
   const cleanupState = await request("/__test__/state", { method: "GET" });
