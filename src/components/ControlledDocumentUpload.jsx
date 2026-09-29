@@ -17,7 +17,7 @@ function resolveContentType(file) {
   return MIME_BY_EXTENSION[ext] || "application/octet-stream";
 }
 
-export default function ControlledDocumentUpload({ purpose = "Controlled Document", onUploaded, allowRestrictedUpload = false }) {
+export default function ControlledDocumentUpload({ purpose = "Controlled Document", onUploaded, allowRestrictedUpload = false, submitLabel = "Upload Document", compact = false }) {
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState("");
   const [generatedReference, setGeneratedReference] = useState("");
@@ -234,7 +234,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
       </div>
       {message && <div className="success-message action-feedback">{message}</div>}
       {error && <div className="error-message action-feedback">{error}</div>}
-      <div className="archive-routing-panel" style={{marginBottom:16}}>
+      {!compact && <div className="archive-routing-panel" style={{marginBottom:16}}>
         <strong>Google Drive Archive Routing</strong>
         <div style={{marginTop:6}}>Choose where this document will be stored:</div>
         <ul style={{margin:"6px 0 0 20px"}}>
@@ -245,7 +245,8 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
           <li><strong>Administrator Documents</strong> — restricted administrator records (special permission required).</li>
         </ul>
         <div style={{marginTop:6}}>Each archive is separated by <strong>Public, Internal, Confidential</strong> or <strong>Restricted</strong> classification. The selected route is recorded with the document UID and archive link.</div>
-      </div>
+      </div>}
+      {compact && <div className="identity-card" style={{marginBottom:14}}><span>Archive is selected before Save</span><small>Choose the document type and access classification, then select the file. The Save action commits the document to the selected archive.</small></div>
       <form onSubmit={submit}>
         <div className="form-grid">
           <div className="form-field">
@@ -294,7 +295,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
               onClick={chooseFile}
               disabled={busy}
             >
-              Choose Document File from This Device
+              Select a file
             </button>
             <div className="muted" style={{ marginTop: 8 }}>
               {file ? `Selected: ${file.name} (${resolveContentType(file)})` : "Select a PDF or another supported document format directly from this device."}
@@ -307,7 +308,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
             disabled={busy || !file || !documentType || (documentType === "Administrator" && !allowRestrictedUpload)}
             aria-busy={busy ? "true" : "false"}
           >
-            {busy ? "Uploading to Google Drive…" : file ? "Upload Document" : "Select a Document File"}
+            {busy ? "Saving…" : file ? submitLabel : "Select a file"}
           </button>
         </div>
       </form>
