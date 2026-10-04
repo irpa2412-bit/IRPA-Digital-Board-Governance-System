@@ -11,9 +11,10 @@ async function retry(fn, { attempts = 3, delayMs = 300, logger = console, should
   } throw lastErr;
 }
 function cleanError(error){ return String(error?.message||error).replace(/[\r\n]/g," ").slice(0,200); }
-async function queueInductionEmail(inputOrEmail, subject, text, html, options = {}) {
+async function queueInductionEmail(inputOrEmail, subjectOrOptions, text, html, options = {}) {
   const legacy = typeof inputOrEmail === "string";
-  const input = legacy ? { recipientEmail: inputOrEmail, subject, text, html, invitedByUid:null } : (inputOrEmail || {});
+  if (!legacy && subjectOrOptions && typeof subjectOrOptions === "object") options = subjectOrOptions;
+  const input = legacy ? { recipientEmail: inputOrEmail, subject: subjectOrOptions, text, html, invitedByUid:null } : (inputOrEmail || {});
   const { db, invitationId, recipientEmail, recipientName, invitedByUid, logger=console, fetchFn=fetch, env=process.env, sleep=(ms)=>new Promise(r=>setTimeout(r,ms)) } = options;
   const firestore = db || require("firebase-admin/firestore").getFirestore();
   if (!recipientEmail && input.recipientEmail) Object.assign(input,{recipientEmail:input.recipientEmail});
