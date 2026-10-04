@@ -16,6 +16,9 @@ const SMTP_PORT = 465;
 const SMTP_FROM = "info@irpa.or.tz";
 import { escapeHtml as escapeMailHtml, normalizeRecipientEmail, recipientDomain, safeMailError, sendWithRetry, validateMailHeader } from "./mailDelivery.js";
 import { sendInvitationEmail, buildInvitationMessage, validateRecipient } from "./invitationEmail.mjs";
+import { route as esignRoute } from "./router.mjs";
+import { buildEsignContext, EsignRecordDurableObject } from "./esignContext.mjs";
+import { runCleanup } from "./upload.mjs";
 
 let jwksCache = null;
 let jwksFetchedAt = 0;
@@ -101,6 +104,42 @@ export default {
 
       if (url.pathname === "/api/session/profile" && request.method === "POST") {
         return await getSessionProfile(request, env);
+      }
+
+      if (env.ESIGN_MODULE_ENABLED === "true") {
+        if (pathname === "/api/esign/cleanup" && request.method === "POST") {
+          const claims = await authenticateFirebaseRequest(request);
+          const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
+          if (!admin?.fields?.active?.booleanValue) return json({ok:false,error:"Administrator authorization is required."},403,corsHeaders(request));
+          const ctx = buildEsignContext({env,verifyUser:async()=>({uid:claims.user_id,isAdmin:true}),sendInvitation:async()=>{throw new Error("Cleanup context does not send invitations.");},logger:console,driveHelpers:{getDriveAccessToken,driveFetch}});
+          return json(await runCleanup(ctx),200,corsHeaders(request));
+        }
+        const isEsignPath =
+          pathname === "/api/documents" ||
+          /^\/api\/documents\/[A-Za-z0-9_-]{3,64}\/pdf$/.test(pathname) ||
+          pathname === "/api/envelopes" ||
+          /^\/api\/envelopes\/[A-Za-z0-9_-]{3,64}(?:\/void|\/retry-completion)?$/.test(pathname) ||
+          pathname === "/api/sign/open" ||
+          pathname === "/api/sign/pdf" ||
+          pathname === "/api/sign/submit" ||
+          pathname === "/api/sign/decline";
+        if (isEsignPath) {
+          const ctx = buildEsignContext({
+            env,
+            verifyUser: async req => {
+              const claims = await authenticateFirebaseRequest(req);
+              const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
+              return {uid:claims.user_id,isAdmin:Boolean(admin?.fields?.active?.booleanValue)};
+            },
+            sendInvitation: async ({to,name,link}) => sendInvitationEmail({email:to,name,link,smtpSend:async ({to:recipient,subject,text,html})=>smtpSend(env,{to:recipient,subject,text,html}),logger:console}),
+            logger: console,
+            driveHelpers: {getDriveAccessToken,driveFetch}
+          });
+          const response = await esignRoute(request,ctx);
+          const headers = new Headers(response.headers);
+          for (const [k,v] of Object.entries(corsHeaders(request))) headers.set(k,v);
+          return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+        }
       }
 
       return json({ ok: false, error: "Not found." }, 404, corsHeaders(request));
@@ -1733,8 +1772,10 @@ function corsHeaders(request) {
   const allowed = origin === "https://irpa.or.tz" || origin === "https://www.irpa.or.tz" || origin === "https://irpa-digital-board-governance.web.app" || origin === "https://irpa-digital-board-governance.firebaseapp.com" || origin === "http://localhost:5173";
   return {
     "Access-Control-Allow-Origin": allowed ? origin : "https://irpa.or.tz",
-    "Access-Control-Allow-Headers": "Authorization, Content-Type, X-IRPA-Invitation-Version",
+    "Access-Control-Allow-Headers": "Authorization, Content-Type, X-IRPA-Invitation-Version, x-signing-token",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Vary": "Origin"
   };
 }
+
+export { EsignRecordDurableObject };
