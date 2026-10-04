@@ -1,0 +1,25 @@
+name: PDF E-Signature Tests
+on:
+  push:
+    branches: ["fix/member-signature-invitation-email-20261004"]
+    paths:
+      - "drive-gateway/**"
+  pull_request:
+    paths:
+      - "drive-gateway/**"
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        working-directory: drive-gateway
+        run: npm ci
+      - name: Run 18 PDF/e-signature tests
+        working-directory: drive-gateway
+        run: npm test

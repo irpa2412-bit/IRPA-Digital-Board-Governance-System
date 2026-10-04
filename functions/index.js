@@ -1,5 +1,6 @@
 const { onDocumentUpdated, onDocumentWritten } = require("firebase-functions/v2/firestore");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { defineSecret } = require("firebase-functions/params");
 const { onCall: onCallV1 } = require("firebase-functions/v1/https");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
@@ -7,6 +8,8 @@ const { getMessaging } = require("firebase-admin/messaging");
 const { getAuth } = require("firebase-admin/auth");
 const crypto = require("crypto");
 initializeApp(); const db = getFirestore();
+const INVITE_SERVICE_KEY = defineSecret("INVITE_SERVICE_KEY");
+const { queueInductionEmail } = require("./queueInductionEmail");
 const { checkPasswordAttemptState, recordPasswordFailure, clearPasswordAttemptState, preparePasswordResetPhone } = require("./passwordSecurity");
 exports.checkPasswordAttemptState = checkPasswordAttemptState;
 exports.recordPasswordFailure = recordPasswordFailure;
@@ -850,7 +853,7 @@ function scoreInductionApplication(item, records){
   return {percentage,correct,total,threshold,advanced:percentage>=threshold,issues,reasons,scoreItems};
 }
 
-exports.sendMemberInvitation = onCall({region:"us-central1"}, async request => {
+exports.sendMemberInvitation = onCall({region:"us-central1", secrets:[INVITE_SERVICE_KEY]}, async request => {
   const uid=request.auth?.uid;
   const actorEmail=String(request.auth?.token?.email||"").trim().toLowerCase();
   if(!uid) throw new HttpsError("unauthenticated","Administrator authentication is required.");
@@ -911,7 +914,8 @@ exports.sendMemberInvitation = onCall({region:"us-central1"}, async request => {
   const subject="IRPA Invitation — "+role;
   const text="Dear "+name+",\\n\\nYou have been invited to access the IRPA Digital Board Governance System.\\n\\nAssigned IRPA role: "+role+"\\nMember type: "+memberType+"\\nSource register: "+sourceLabel+(department?"\\nDepartment: "+department:"")+(unit?"\\nUnit: "+unit:"")+"\\n\\nComplete your Induction & Orientation / subscription pathway here:\\n"+subscriptionLink+"\\n\\nIf you need login assistance:\\n"+assistanceLink+"\\n\\nNormal login route:\\n"+loginLink+"\\n\\nThis invitation is addressed to "+email+".\\n\\nImprovement of Rangeland in Pastoral Areas (IRPA)";
   const html="<p>Dear "+name+",</p><p>You have been invited to access the IRPA Digital Board Governance System.</p><p><strong>Assigned IRPA role:</strong> "+role+"<br><strong>Member type:</strong> "+memberType+"<br><strong>Source register:</strong> "+sourceLabel+(department?"<br><strong>Department:</strong> "+department:"")+(unit?"<br><strong>Unit:</strong> "+unit:"")+"</p><p><a href='"+subscriptionLink+"'>Complete Induction &amp; Orientation / Subscription</a></p><p><a href='"+assistanceLink+"'>Login assistance</a></p><p><a href='"+loginLink+"'>Normal login</a></p><p>This invitation is addressed to "+email+".</p><p>Improvement of Rangeland in Pastoral Areas (IRPA)</p>";
-  const mailId=await queueInductionEmail(email,subject,text,html);
+  const mailOutcome=await queueInductionEmail({db,invitationId,recipientEmail:email,recipientName:name,subject,text,html,invitedByUid:uid},{db,env:process.env});
+  const mailId=invitationId;
   await ref.set({
     role,memberType,department:department||null,unit:unit||null,
     invitationTokenHash:invitationSecretHash,
@@ -919,7 +923,7 @@ exports.sendMemberInvitation = onCall({region:"us-central1"}, async request => {
     invitationRedeemedAt:null,
     invitationRedeemedUid:null,
     invitationTokenVersion:"2",
-    status:"Queued",deliveryStatus:"Queued — awaiting SMTP transport",
+    status:mailOutcome.status,deliveryStatus:mailOutcome.status,
     deliveryProvider:"Firebase Firestore mail queue → SMTP transport",
     mailQueueId:mailId,mailQueuedAt:FieldValue.serverTimestamp(),
     invitationRoleSource:sourceLabel,updatedAt:FieldValue.serverTimestamp()
@@ -929,7 +933,8 @@ exports.sendMemberInvitation = onCall({region:"us-central1"}, async request => {
     details:{email,role,memberType,sourceLabel,mailQueueId:mailId},
     actorUid:uid,actorEmail,createdAt:FieldValue.serverTimestamp()
   });
-  return {ok:true,email,role,memberType,sourceLabel,deliveryStatus:"Queued — awaiting SMTP transport",mailQueueId:mailId};
+  if(!mailOutcome.ok) throw new HttpsError("unavailable","Invitation email could not be sent.");
+  return {ok:true,email,role,memberType,sourceLabel,deliveryStatus:"Sent",mailQueueId:mailId};
 });
 
 exports.redeemInvitationToken = onCall({region:"us-central1"}, async request => {

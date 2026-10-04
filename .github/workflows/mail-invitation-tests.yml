@@ -1,0 +1,25 @@
+name: Mail Invitation Tests
+on:
+  push:
+    branches: ["fix/member-signature-invitation-email-20261004"]
+  pull_request:
+    paths:
+      - "drive-gateway/**"
+      - "src/firebase/signaturePlatform.js"
+      - "src/firebase/auth.js"
+      - ".github/workflows/mail-invitation-tests.yml"
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Install gateway dependencies
+        working-directory: drive-gateway
+        run: npm ci
+      - name: Run mocked SMTP invitation tests
+        working-directory: drive-gateway
+        run: node tests/mail-invitation.unit.mjs

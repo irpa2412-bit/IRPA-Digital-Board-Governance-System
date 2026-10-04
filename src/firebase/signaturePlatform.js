@@ -1,11 +1,24 @@
 import { arrayUnion, collection, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, setDoc, updateDoc, where, writeBatch } from "firebase/firestore";
-import { sendSignInLinkToEmail } from "firebase/auth";
 import { downloadDriveBytes, ensureSignatureWorkflowFolder, ensureSignedDocumentArchive, ensureSignatureProfileFolder, finalizeSignatureProfileArchives, getDownloadURL, ref, uploadBytes } from "./signatureStorage";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { auth, db } from "./config";
 import { ensureMySignerIdentity, getMySignerIdentity, recordSignerAuthenticationEvidence, IRPA_ORGANISATION } from "./signerIdentity";
 import { getCurrentSigningAuthorityRegisterEntries } from "./data";
 const PROFILE_COLLECTION="signatureProfiles";const ENVELOPE_COLLECTION="signatureEnvelopes";const EVENT_COLLECTION="signatureEvents";
+const GATEWAY_URL=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").replace(/\/$/,"");
+async function sendSignatureMail(envelope,recipient){
+  if(!auth.currentUser) throw new Error("Authentication is required. Sign in again before sending the signing invitation.");
+  try{
+    const token=await auth.currentUser.getIdToken();
+    const response=await fetch(`${GATEWAY_URL}/api/signature-invitations/send`,{method:"POST",headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},body:JSON.stringify({envelopeId:envelope.id,signerUid:recipient.uid,signerEmail:recipient.email,signerName:recipient.name,role:recipient.role})});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok||data.ok===false) throw new Error(data.error||"The IRPA mail server could not send the signature invitation.");
+    return data;
+  }catch(error){
+    console.error("IRPA signature invitation sender error",{firebaseErrorCode:error?.code||""});
+    throw new Error(error?.message||"The signature invitation could not be sent. Check the invitation status and try again.");
+  }
+}
 const VIEW_ONLY_ROLES=["View Only","Read Only","Information / FYI","Observer"];
 const BOARD_SIGNING_ROLES=["Board Chairperson","Board Vice Chairperson","Board Secretary","Board Treasurer","Board Member"];
 function isBoardSigningRole(role,recipient){const values=[role,recipient?.institutionalRole].map(v=>String(v||"").trim()).filter(Boolean);return values.some(v=>BOARD_SIGNING_ROLES.includes(v));}
@@ -247,51 +260,24 @@ export async function getSignatureEnvelopes(){const u=user();const q=query(colle
 export async function getMySignedDocuments(){const u=user();const q=query(collection(db,"signatures"),where("signerUid","==",u.uid));const s=await getDocs(q);const rows=await Promise.all(s.docs.map(async x=>{const data=x.data();if(data.signerArchiveUrl)return{id:x.id,...data};if(!data.envelopeId)return null;try{const envelopeSnap=await getDoc(doc(db,ENVELOPE_COLLECTION,data.envelopeId));if(!envelopeSnap.exists())return null;const envelope={id:envelopeSnap.id,...envelopeSnap.data()};const delivery=envelope.signerArchiveDeliveries?.[u.uid];if(!delivery?.webViewLink)return null;return{id:x.id,...data,signerArchiveUrl:delivery.webViewLink,signerArchiveFolderId:delivery.folderId||null,signerArchiveFolderLink:delivery.folderLink||null,myDocumentsPortal:delivery.myDocumentsPortal||"My Documents",myDocumentsPortalPath:delivery.myDocumentsPortalPath||null,signerArchiveFinalHash:delivery.finalHash||envelope.signerArchiveFinalHash||null,archivePending:false,archiveProtocol:delivery.archiveProtocol||"IRPA-SIGNER-COPY-V2",archiveState:"Final Completed Document"};}catch(error){console.warn("Unable to resolve completed signer archive delivery:",error);return null;}}));return rows.filter(x=>x&&x.status==="Signed"&&x.signerArchiveUrl).sort((a,b)=>{const at=a.signedAt?.seconds?Number(a.signedAt.seconds):Date.parse(a.signedAt||0);const bt=b.signedAt?.seconds?Number(b.signedAt.seconds):Date.parse(b.signedAt||0);return bt-at;});}
 export async function sendSignatureInvitation(envelope, recipient) {
   const u = user();
-
   if (!envelope?.id) throw new Error("A valid signing envelope is required.");
-  if (!recipient?.uid || !recipient?.email) {
-    throw new Error("The signer must have a valid account UID and email address.");
-  }
-
-  if (!(envelope.participantUids || []).includes(recipient.uid)) {
-    throw new Error("The selected signer is not a participant in this envelope.");
-  }
-
+  if (!recipient?.uid || !recipient?.email) throw new Error("The signer must have a valid account UID and email address.");
+  if (!(envelope.participantUids || []).includes(recipient.uid)) throw new Error("The selected signer is not a participant in this envelope.");
   const cleanEmail = String(recipient.email).trim().toLowerCase();
-
-  const actionCodeSettings = {
-    url:
-      window.location.origin +
-      "/?signEnvelope=" +
-      encodeURIComponent(envelope.id),
-    handleCodeInApp: true
-  };
-
-  await sendSignInLinkToEmail(auth, cleanEmail, actionCodeSettings);
-
+  const result = await sendSignatureMail(envelope, recipient);
   await updateDoc(doc(db, ENVELOPE_COLLECTION, envelope.id), {
     status: envelope.status === "Draft" ? "Sent" : envelope.status,
-    invitationStatus: "Sent",
+    invitationStatus: result.deliveryStatus || "Sent",
     invitationSentAt: serverTimestamp(),
     invitationSentByUid: u.uid,
     invitationSentByEmail: u.email || "",
     updatedAt: serverTimestamp()
   });
-
   await recordEnvelopeEvent(envelope.id, "Signing Invitation Sent", {
-    signerUid: recipient.uid,
-    signerEmail: cleanEmail,
-    signerName: recipient.name || "",
-    deliveryStatus: "Accepted by Firebase Authentication"
+    signerUid: recipient.uid, signerEmail: cleanEmail, signerName: recipient.name || "",
+    deliveryStatus: result.deliveryStatus || "Sent"
   });
-
-  return {
-    envelopeId: envelope.id,
-    signerUid: recipient.uid,
-    signerEmail: cleanEmail,
-    emailRequested: true,
-    deliveryStatus: "Accepted by Firebase Authentication"
-  };
+  return {...result,envelopeId:envelope.id,signerUid:recipient.uid,signerEmail:cleanEmail,emailRequested:true};
 }
 
 export async function saveSignatureWorkflowDraft({envelopeId,title,documentId,documentReference,documentUrl,documentClassification="Public",documentArchiveCategory="Administrative Documents",documentType="Governance Document",documentUploadedAt=null,signingMode,recipients,fields,ownerSigningEnabled=true}){const u=user();if(!title?.trim())throw new Error("Envelope title is required.");if(!documentId||!documentUrl)throw new Error("Select a controlled PDF before saving the workflow.");const sourceDocument=await getDoc(doc(db,"documents",documentId));if(!sourceDocument.exists())throw new Error("The selected controlled document could not be found.");const sourceDocumentData=sourceDocument.data()||{};const recordOrigin=String(sourceDocumentData.recordOrigin||"PRODUCTION").toUpperCase()==="TRIAL"?"TRIAL":"PRODUCTION";const owner={uid:u.uid,name:u.displayName||u.email||"Document Owner",email:u.email||"",role:"Document Owner",routingOrder:1,status:"Pending",optionalSigning:!ownerSigningEnabled,actionRequired:ownerSigningEnabled};const supplied=(recipients||[]).filter(r=>r?.uid&&r.uid!==u.uid).map((r,i)=>({...r,accessOnly:isViewOnlyRecipient(r),routingOrder:signingMode==="Sequential"?i+2:r.routingOrder||1}));const orderedRecipients=[owner,...supplied];const participantUids=orderedRecipients.map(r=>r.uid).filter(Boolean);const actionUids=[...new Set((fields||[]).map(f=>f?.signerUid).filter(Boolean))];const viewOnlyUids=new Set(orderedRecipients.filter(isViewOnlyRecipient).map(r=>r.uid));if((fields||[]).some(f=>f?.signerUid&&viewOnlyUids.has(f.signerUid)))throw new Error("View-only recipients cannot receive action fields.");const id=envelopeId||`IRPA-ENV-${new Date().getFullYear()}-${Date.now().toString().slice(-8)}`;const payload={envelopeReference:id,title:title.trim(),documentId,documentReference:documentReference||"",documentUrl,senderUid:u.uid,senderEmail:u.email||"",ownerUid:u.uid,ownerName:owner.name,ownerEmail:owner.email,recordOrigin,trialData:recordOrigin==="TRIAL",documentClassification:documentClassification||"Public",status:"Draft",signingMode:signingMode||"Sequential",recipients:orderedRecipients,fields:fields||[],participantUids,actionUids,currentSignerUid:ownerSigningEnabled?u.uid:(orderedRecipients.find(isActionRecipient)?.uid||null),ownerSectionSaved:true,documentClassification:documentClassification||"Public",documentArchiveCategory:documentArchiveCategory||"Administrative Documents",documentType:documentType||"Governance Document",documentUploadedAt:documentUploadedAt||sourceDocumentData.uploadedAt||sourceDocumentData.documentTypeSelectedAt||null,documentUploadDestinationKey:sourceDocumentData.documentUploadDestinationKey||null,updatedAt:serverTimestamp()};if(!envelopeId)payload.createdAt=serverTimestamp();await setDoc(doc(db,ENVELOPE_COLLECTION,id),payload,{merge:true});await updateDoc(doc(db,"documents",documentId),{signatureEnvelopeId:id,signatureReference:id,signatureStatus:"Draft",signatureOwnerUid:u.uid,workflowOwnerSectionSaved:true,updatedAt:serverTimestamp()});await recordEnvelopeEvent(id,"Owner Section Saved",{ownerUid:u.uid,ownerSigningEnabled,fieldCount:(fields||[]).filter(f=>f.signerUid===u.uid).length,recipientCount:orderedRecipients.length});return{id,...payload};}
@@ -388,15 +374,25 @@ if(completed){
 }
 
 const actionFields=signerFields.map(field=>({fieldId:field.fieldId,type:field.type,responsibility:field.responsibility||"Action",required:!!field.required,value:fieldValues[field.fieldId]??(field.type==="Name"?(profile?.displayName||u.displayName||u.email||""):field.type==="Date"?new Date().toLocaleDateString():"")}));const commentEntries=actionFields.filter(x=>x.type==="Comment"||x.responsibility==="Comment").map(x=>({fieldId:x.fieldId,value:x.value}));const completedAt=new Date().toISOString();const actionRecord={uid:u.uid,name:profile?.displayName||u.displayName||u.email||"Signer",email:u.email||"",role:recipient.role||"Action",completedAt,fields:actionFields,comments:commentEntries,manualAuthorityIdentification:authorityVerification.manualAuthorityIdentification,authorityRole:authorityVerification.authorityRole,authorityVerificationStatus:"Verified",authorityVerificationMethod:authorityVerification.verificationMethod,authoritySourceCollection:authorityVerification.authoritySourceCollection,authoritySourceRecordId:authorityVerification.authoritySourceRecordId};const progressionRecipients=(envelope.recipients||[]).map(r=>r.uid===u.uid?{...r,status:"Signed",completedAt}:(!completed&&nextRecipient&&r.uid===nextRecipient.uid?{...r,status:"Current",releasedAt:completedAt}:{...r,status:r.status||"Pending"}));const update={status:completed?"Completed":"In Progress",lastSignedByUid:u.uid,lastSignedAt:serverTimestamp(),signedDocumentPath:path,signedDocumentUrl:completed?archiveSignedUrl:signedUrl,ownerCompletedDocumentPath:path,ownerCompletedDocumentUrl:completed?archiveSignedUrl:signedUrl,ownerRecordStatus:completed?"Completed":"In Progress",originalDocumentHash:originalHash,latestDocumentHash:finalHash,workflowHistory:arrayUnion(actionRecord),signerArchiveDeliveries:envelope.signerArchiveDeliveries||{},signerArchiveFinalHash:envelope.signerArchiveFinalHash||null,signerArchiveStatus:completed?"Final Document Pending Archive Delivery":"Tracking Until Final Signature",recipients:progressionRecipients,documentCustodianUid:completed&&isBoardSigningRole(recipient.role,recipient)?u.uid:(envelope.documentCustodianUid||null),documentCustodianRole:completed&&isBoardSigningRole(recipient.role,recipient)?(recipient.institutionalRole||recipient.role||"Board Member"):(envelope.documentCustodianRole||null),documentCustodyStatus:completed&&isBoardSigningRole(recipient.role,recipient)?"Board Custody":(envelope.documentCustodyStatus||null),documentCustodyAssignedAt:completed&&isBoardSigningRole(recipient.role,recipient)?serverTimestamp():(envelope.documentCustodyAssignedAt||null),updatedAt:serverTimestamp()};if(!completed&&envelope.signingMode!=="Parallel")update.currentSignerUid=nextRecipient.uid;if(completed)update.completedAt=serverTimestamp();else if(envelope.signingMode==="Parallel")update.currentSignerUid=null;await updateDoc(doc(db,ENVELOPE_COLLECTION,envelope.id),update);if(completed){const delivery=await finalizeSignatureProfileArchives({envelopeId:envelope.id,signedBytes,finalHash,originalHash});signerArchiveDeliveries=delivery.deliveries||{};await updateDoc(doc(db,ENVELOPE_COLLECTION,envelope.id),{signerArchiveDeliveries,signerArchiveFinalHash:finalHash,signerArchiveStatus:"Final Completed Document Delivered",updatedAt:serverTimestamp()});}const role=String(recipient.role||"").toLowerCase();const workflowStatus=role.includes("final authorization")||role==="authorization"?"Authorized":role.includes("approval")?"Approved":role.includes("review")?"Reviewed":role.includes("signature")?"Signed":"Action Completed";await updateDoc(doc(db,"documents",envelope.documentId),{workflowActionStatus:workflowStatus,lastWorkflowAction:recipient.role||"Action",lastWorkflowActionUid:u.uid,lastWorkflowActionAt:serverTimestamp(),authorizationStatus:role.includes("authorization")?"Authorized":role.includes("approval")?"Approved":"In Workflow",completedDocumentUrl:signedUrl,ownerCompletedDocumentUrl:signedUrl,ownerCompletedDocumentPath:path,ownerRecordStatus:completed?"Completed":"In Progress",lastCompletedDocumentHash:finalHash,documentArchiveUid:envelope.documentId,documentArchiveFolderId:archive?.folderId||envelope.documentArchiveFolderId||null,documentArchiveUidLink:archive?.archiveUidLink||envelope.documentArchiveUidLink||null,documentArchivePath:archive?.archivePath||envelope.documentArchivePath||null,documentArchiveAccess:archive?.archiveAccess||envelope.documentArchiveAccess||"Restricted",documentArchiveCategory:envelope.documentArchiveCategory||"Administrative Documents",documentType:envelope.documentType||"Governance Document",documentUploadedAt:envelope.documentUploadedAt||null,documentUploadDestinationKey:envelope.documentUploadDestinationKey||null,governanceArchiveFolderId:archive?.governanceArchive?.folderId||envelope.governanceArchiveFolderId||null,governanceArchiveUidLink:archive?.governanceArchive?.archiveUidLink||envelope.governanceArchiveUidLink||null,governanceArchivePath:archive?.governanceArchive?.archivePath||envelope.governanceArchivePath||null,governanceArchiveSignedUrl:governanceArchiveSignedUrl||envelope.governanceArchiveSignedUrl||null,documentClassification:envelope.documentClassification||"Public",documentCustodianUid:isBoardSigningRole(recipient.role,recipient)?u.uid:(envelope.documentCustodianUid||null),documentCustodianRole:isBoardSigningRole(recipient.role,recipient)?(recipient.institutionalRole||recipient.role||"Board Member"):(envelope.documentCustodianRole||null),documentCustodyStatus:isBoardSigningRole(recipient.role,recipient)?"Board Custody":(envelope.documentCustodyStatus||"Owner Custody"),documentCustodyAssignedAt:isBoardSigningRole(recipient.role,recipient)?serverTimestamp():(envelope.documentCustodyAssignedAt||null),updatedAt:serverTimestamp()});if(!completed&&envelope.signingMode!=="Parallel"&&nextRecipient){try{await releaseNextSigner({...envelope,...update},nextRecipient);}catch(error){await recordEnvelopeEvent(envelope.id,"Next Signer Release Failed",{signerUid:nextRecipient.uid,signerEmail:nextRecipient.email||"",error:error?.message||"Unable to release next signer"});}}await recordEnvelopeEvent(envelope.id,"Workflow Action Completed",{signerUid:u.uid,signerName:profile?.displayName||u.displayName||u.email,workflowRole:recipient.role||"Action",originalDocumentHash:originalHash,signedDocumentHash:finalHash,status:completed?"Completed":"In Progress",signingMode:envelope.signingMode,requiredActionCount:actionable.length,comments:commentEntries,nextSignerUid:nextRecipient?.uid||null,nextSignerName:nextRecipient?.name||"",nextSignerRole:nextRecipient?.role||""});return{...envelope,...update,id:envelope.id,signerArchiveDeliveries,signerArchiveFinalHash:completed?finalHash:(envelope.signerArchiveFinalHash||null),signerArchiveStatus:completed?"Final Completed Document Delivered":"Tracking Until Final Signature"};}
-async function releaseViewOnlyRecipient(envelope,recipient){if(!recipient?.email)return{sent:false};const cleanEmail=String(recipient.email).trim().toLowerCase();const actionCodeSettings={url:window.location.origin+"/?signEnvelope="+encodeURIComponent(envelope.id),handleCodeInApp:true};await sendSignInLinkToEmail(auth,cleanEmail,actionCodeSettings);await recordEnvelopeEvent(envelope.id,"View-Only Access Released",{signerUid:recipient.uid,signerEmail:cleanEmail,signerName:recipient.name||"",role:recipient.role||"View Only",deliveryStatus:"Accepted by Firebase Authentication"});return{sent:true,email:cleanEmail};}
+async function releaseViewOnlyRecipient(envelope,recipient){
+  if(!recipient?.email)return{sent:false};
+  const result=await sendSignatureMail(envelope,recipient);
+  await recordEnvelopeEvent(envelope.id,"View-Only Access Released",{signerUid:recipient.uid,signerEmail:recipient.email,signerName:recipient.name||"",role:recipient.role||"View Only",deliveryStatus:result.deliveryStatus||"Sent"});
+  return{sent:true,email:recipient.email,deliveryStatus:result.deliveryStatus||"Sent"};
+}
+
 async function releaseNextSigner(envelope,nextRecipient){
   if(!nextRecipient?.email)return {sent:false};
-  const cleanEmail=String(nextRecipient.email).trim().toLowerCase();
-  const actionCodeSettings={url:window.location.origin+"/?signEnvelope="+encodeURIComponent(envelope.id),handleCodeInApp:true};
-  await sendSignInLinkToEmail(auth,cleanEmail,actionCodeSettings);
-  await updateDoc(doc(db,ENVELOPE_COLLECTION,envelope.id),{currentSignerEmail:cleanEmail,currentSignerName:nextRecipient.name||"",currentSignerInvitationStatus:"Sent",currentSignerInvitationSentAt:serverTimestamp(),updatedAt:serverTimestamp()});
-  await recordEnvelopeEvent(envelope.id,"Next Signer Released",{signerUid:nextRecipient.uid,signerEmail:cleanEmail,signerName:nextRecipient.name||"",routingOrder:nextRecipient.routingOrder,deliveryStatus:"Accepted by Firebase Authentication"});
-  return {sent:true,email:cleanEmail};
+  try{
+    const result=await sendSignatureMail(envelope,nextRecipient);
+    const cleanEmail=String(nextRecipient.email).trim().toLowerCase();
+    await updateDoc(doc(db,ENVELOPE_COLLECTION,envelope.id),{currentSignerEmail:cleanEmail,currentSignerName:nextRecipient.name||"",currentSignerInvitationStatus:result.deliveryStatus||"Sent",currentSignerInvitationSentAt:serverTimestamp(),updatedAt:serverTimestamp()});
+    await recordEnvelopeEvent(envelope.id,"Next Signer Released",{signerUid:nextRecipient.uid,signerEmail:cleanEmail,signerName:nextRecipient.name||"",routingOrder:nextRecipient.routingOrder,deliveryStatus:result.deliveryStatus||"Sent"});
+    return {sent:true,email:cleanEmail,deliveryStatus:result.deliveryStatus||"Sent"};
+  }catch(error){
+    console.error("IRPA next-signer invitation sender error",{firebaseErrorCode:error?.code||""});
+    throw new Error(error?.message||"The next signer invitation could not be sent. The workflow was not silently advanced.");
+  }
 }
 
 export async function recordSignatureAdoption({documentId,documentReference,fieldId,signatureProfile}){const u=user(),r=doc(collection(db,"signatures"));await setDoc(r,{documentId:documentId||null,documentReference:documentReference||"",fieldId:fieldId||"",signerUid:u.uid,signerEmail:u.email||"",signerName:signatureProfile?.displayName||u.displayName||"",signatureMethod:signatureProfile?.method||"Upload",signatureSha256:signatureProfile?.signatureSha256||null,status:"Signed",signedAt:serverTimestamp(),createdAt:serverTimestamp(),immutable:true});return r.id;}

@@ -72,3 +72,8 @@ Before production use, verify Firebase Authentication providers, authorized doma
 <!-- Induction questions consolidated deployment trigger: 2026-09-23 -->
 
 <!-- Gateway pathway/data audit deployment trigger: 2026-09-23 -->
+
+
+## PDF Upload and E-Signature Module
+
+The controlled repair branch contains the isolated PDF upload/e-signature implementation under `drive-gateway/src/`. Run `cd drive-gateway && npm install && npm test` for the 18-case CI suite. The module remains isolated until adapter and Worker-route integration is explicitly approved.
