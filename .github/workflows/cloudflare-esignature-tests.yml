@@ -94,8 +94,10 @@ jobs:
             cat "$RUNNER_TEMP/wrangler-on.log"
             exit 1
           fi
-          code="$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:8788/api/sign/open)"
-          test "$code" = "401"
+          sign_code="$(curl --silent --show-error --output "$RUNNER_TEMP/sign-open-body.txt" --write-out '%{http_code}' http://127.0.0.1:8788/api/sign/open)"
+          sign_body="$(cat "$RUNNER_TEMP/sign-open-body.txt")"
+          echo "Sign-open HTTP $sign_code: $sign_body"
+          test "$sign_code" = "401"
           auth_state_code="$(curl --silent --show-error --output "$RUNNER_TEMP/auth-state-body.txt" --write-out '%{http_code}' -X POST -H 'content-type: application/json' --data '{"email":"runtime@example.com"}' http://127.0.0.1:8788/api/auth/password-attempt-state)"
           auth_state="$(cat "$RUNNER_TEMP/auth-state-body.txt")"
           echo "Auth-state HTTP $auth_state_code: $auth_state"
