@@ -122,7 +122,11 @@ export default {
           pathname === "/api/sign/open" ||
           pathname === "/api/sign/pdf" ||
           pathname === "/api/sign/submit" ||
-          pathname === "/api/sign/decline";
+          pathname === "/api/sign/decline" ||
+          pathname === "/api/auth/password-attempt-state" ||
+          pathname === "/api/auth/password-failure" ||
+          pathname === "/api/auth/password-attempt-clear" ||
+          pathname === "/api/documents/next-reference";
         if (isEsignPath) {
           const ctx = buildEsignContext({
             env,
