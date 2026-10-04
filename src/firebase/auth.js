@@ -310,9 +310,22 @@ function firebaseErrorMessage(error) {
 export async function sendMemberInvitationEmail(_email, invitationId, _role, _memberType) {
   const cleanId = String(invitationId || "").trim();
   if (!cleanId) throw new Error("The invitation ID is required.");
-  const call = httpsCallable(getFunctions(undefined, "us-central1"), "sendMemberInvitation");
-  const result = await call({ invitationId: cleanId });
-  return result.data || {};
+  if (!auth.currentUser) throw new Error("Administrator authentication is required.");
+  const gateway = String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL || "https://irpa-google-drive-gateway.irpa-governance.workers.dev").replace(/\/$/,"");
+  try {
+    const token = await auth.currentUser.getIdToken();
+    const response = await fetch(`${gateway}/api/invitations/send`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ invitationId: cleanId })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.ok === false) throw new Error(data.error || "The IRPA mail server could not send the invitation.");
+    return data;
+  } catch (error) {
+    console.error("IRPA member invitation sender error", { firebaseErrorCode: error?.code || "" });
+    throw new Error(error?.message || "The IRPA invitation email could not be sent. Please try again.");
+  }
 }
 
 export async function sendEmployeeRegistrationEmail(email, employeeNumber) {
