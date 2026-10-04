@@ -14,7 +14,16 @@ DRIVE_ROOT_FOLDER_NAME = "IRPA Governance System"
 FIRESTORE_COLLECTION_PREFIX = ""
 DRIVE_MOCK = "false"
 LOCAL_TEST_MODE = "false"
+ESIGN_MODULE_ENABLED = "true"
 
 [[kv_namespaces]]
 binding = "DRIVE_KV"
 id = "ccdbffa662ac48bfbdf7f4b1f62ca941"
+
+[[durable_objects.bindings]]
+name = "ESIGN_DO"
+class_name = "EsignRecordDurableObject"
+
+[[migrations]]
+tag = "esign-do-v1"
+new_sqlite_classes = ["EsignRecordDurableObject"]
