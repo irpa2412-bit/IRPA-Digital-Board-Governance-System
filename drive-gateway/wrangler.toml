@@ -18,7 +18,3 @@ LOCAL_TEST_MODE = "false"
 [[kv_namespaces]]
 binding = "DRIVE_KV"
 id = "ccdbffa662ac48bfbdf7f4b1f62ca941"
-
-# Staging is intentionally not defined here.
-# The staging workflow provisions a dedicated KV namespace and generates
-# a staging-only config with a non-production Firebase project ID.
