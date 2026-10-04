@@ -39,3 +39,38 @@ The refresh token is encrypted with AES-256-GCM before being stored in Workers K
 6. Configure the web application with the Worker base URL as `VITE_GOOGLE_DRIVE_GATEWAY_URL`.
 
 Do not commit secret values.
+
+
+## Controlled invitation redemption migration
+
+The Worker contains a controlled replacement for the Firebase Cloud Function
+`redeemInvitationToken`. It is deliberately disabled in production and enabled
+only in the staging Wrangler environment until a fresh invitation redemption
+has passed.
+
+The staged endpoint is:
+
+`POST /api/invitations/redeem`
+
+The migration preserves the existing Firebase Authentication accounts and UIDs,
+the existing `invitations` Firestore records, the existing custom-token claims,
+and the existing client-side `provisionCurrentMemberFromInvitationV2()` flow.
+The original Firebase callable remains deployed as the rollback path.
+
+### Credential boundary
+
+The staging implementation uses the existing Firebase/GCP service-account
+credential already held by GitHub as `GCP_SA_KEY`. The deployment workflow
+copies that credential into the Cloudflare staging Worker secret
+`FIREBASE_ADMIN_SERVICE_ACCOUNT_JSON` without printing its value.
+
+The credential is used only to obtain Google OAuth access for Identity Toolkit
+user lookup/creation, Firestore redemption transactions, and local Firebase
+custom-token signing. No credential is committed to the repository.
+
+The production Worker has
+`CLOUDFLARE_INVITATION_REDEMPTION_ENABLED = "false"`.
+The staging Worker has it set to `"true"`.
+
+Do not enable the production frontend flag or production Worker route until
+staging has completed one fresh invitation redemption successfully.

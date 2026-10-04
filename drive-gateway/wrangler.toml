@@ -7,6 +7,7 @@ compatibility_date = "2026-09-29"
 workers_dev = true
 
 [vars]
+CLOUDFLARE_INVITATION_REDEMPTION_ENABLED = "false"
 FIREBASE_PROJECT_ID = "irpa-digital-board-governance"
 AUTHORIZED_DRIVE_EMAIL = "irpa2412@gmail.com"
 IRPA_APP_URL = "https://irpa-digital-board-governance.web.app"
@@ -39,6 +40,8 @@ workers_dev = true
 
 [env.staging.vars]
 IRPA_ENVIRONMENT = "staging"
+CLOUDFLARE_INVITATION_REDEMPTION_ENABLED = "true"
+FIREBASE_WEB_API_KEY = "AIzaSyC2aMdxHD14nMnGiRyf4mSL1ixXdzBoOtE"
 FIREBASE_PROJECT_ID = "irpa-digital-board-governance"
 AUTHORIZED_DRIVE_EMAIL = "irpa2412@gmail.com"
 IRPA_APP_URL = "https://irpa-digital-board-governance.web.app"
