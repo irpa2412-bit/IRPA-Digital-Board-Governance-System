@@ -15,6 +15,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
+      - name: Install gateway dependencies
+        working-directory: drive-gateway
+        run: npm ci
+      - name: Validate Worker bundle without deployment
+        working-directory: drive-gateway
+        run: npx wrangler deploy --dry-run
       - name: Run mocked SMTP invitation tests
         working-directory: drive-gateway
         run: node tests/mail-invitation.unit.mjs
