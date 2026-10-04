@@ -15,6 +15,7 @@ FIRESTORE_COLLECTION_PREFIX = ""
 DRIVE_MOCK = "false"
 LOCAL_TEST_MODE = "false"
 ESIGN_MODULE_ENABLED = "true"
+CLOUDFLARE_AUTH_FUNCTIONS_ENABLED = "false"
 
 [[kv_namespaces]]
 binding = "DRIVE_KV"
