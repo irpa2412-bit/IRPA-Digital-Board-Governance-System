@@ -96,6 +96,10 @@ jobs:
           body="$(curl --fail --silent --show-error --retry 8 --retry-delay 2 "$base/health")"
           echo "$body"
           echo "$body" | grep -q '"ok":true'
+          echo "$body" | grep -q '"environment":"staging"'
+          echo "$body" | grep -q '"esignModuleEnabled":true'
+          echo "$body" | grep -q '"authFunctionsEnabled":true'
+          echo "$body" | grep -q '"driveMock":false'
 
       - name: Verify migrated authentication runtime
         run: |
