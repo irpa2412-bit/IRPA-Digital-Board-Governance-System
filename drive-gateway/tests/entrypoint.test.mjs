@@ -59,3 +59,32 @@ test("regression: /health remains available", async () => {
   assert.equal(r.status, 200);
   assert.equal((await r.json()).ok, true);
 });
+test("regression: /api/upload-controlled-document remains authentication-gated", async () => {
+  const r = await call("/api/upload-controlled-document", {
+    method:"POST",
+    env:{ESIGN_MODULE_ENABLED:"true", DRIVE_MOCK:"true"},
+    headers:{"content-type":"application/json"},
+    body:"{}"
+  });
+  assert.equal(r.status, 401);
+});
+
+test("regression: /api/signature-invitations/send remains authentication-gated", async () => {
+  const r = await call("/api/signature-invitations/send", {
+    method:"POST",
+    env:{ESIGN_MODULE_ENABLED:"true", DRIVE_MOCK:"true"},
+    headers:{"content-type":"application/json"},
+    body:"{}"
+  });
+  assert.equal(r.status, 401);
+});
+
+test("regression: /api/invitations/send remains authentication-gated", async () => {
+  const r = await call("/api/invitations/send", {
+    method:"POST",
+    env:{ESIGN_MODULE_ENABLED:"true", DRIVE_MOCK:"true"},
+    headers:{"content-type":"application/json"},
+    body:"{}"
+  });
+  assert.equal(r.status, 401);
+});
