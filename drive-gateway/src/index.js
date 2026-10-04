@@ -19,6 +19,7 @@ import { sendInvitationEmail, buildInvitationMessage, validateRecipient } from "
 import { route as esignRoute } from "./router.mjs";
 import { buildEsignContext, EsignRecordDurableObject } from "./esignContext.mjs";
 import { runCleanup } from "./upload.mjs";
+import { redeemInvitation } from "./invitationRedemption.mjs";
 
 let jwksCache = null;
 let jwksFetchedAt = 0;
@@ -91,6 +92,17 @@ export default {
 
       if (url.pathname === "/api/delete" && request.method === "POST") {
         return await deleteDriveFile(request, env);
+      }
+
+      if (url.pathname === "/api/invitations/redeem" && request.method === "POST") {
+        if (env.CLOUDFLARE_INVITATION_REDEMPTION_ENABLED !== "true") {
+          return json({ ok: false, error: "IRPA invitation redemption is not enabled in this environment." }, 404, corsHeaders(request));
+        }
+        try {
+          return json(await redeemInvitation(request, env), 200, corsHeaders(request));
+        } catch (error) {
+          return json({ ok: false, error: error?.message || "The IRPA invitation could not be redeemed." }, Number(error?.httpStatus) || 500, corsHeaders(request));
+        }
       }
 
       if (url.pathname === "/api/send-invitation-email" && request.method === "POST") {
