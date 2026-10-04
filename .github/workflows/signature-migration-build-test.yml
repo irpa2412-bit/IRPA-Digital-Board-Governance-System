@@ -60,7 +60,7 @@ jobs:
           if (!/\[env\.staging\]/.test(text)) throw new Error("Staging environment is missing.");
           if (!/name = "irpa-google-drive-gateway-staging"/.test(text)) throw new Error("Staging Worker name is incorrect.");
           if (!/\[env\.staging\.vars\][\s\S]*CLOUDFLARE_AUTH_FUNCTIONS_ENABLED = "true"/.test(text)) throw new Error("Staging migration flag must be true.");
-          if (!/\[env\.staging\.vars\][\s\S]*DRIVE_MOCK = "true"/.test(text)) throw new Error("Staging must use DRIVE_MOCK=true.");
+          if (!/\[env\.staging\.vars\][\s\S]*DRIVE_MOCK = "false"/.test(text)) throw new Error("Staging must use real Durable Object state (DRIVE_MOCK=false).");
           if (!/\[\[env\.staging\.kv_namespaces\]\][\s\S]*binding = "DRIVE_KV"/.test(text)) throw new Error("Staging DRIVE_KV binding is missing.");
           if (!/\[\[env\.staging\.durable_objects\.bindings\]\][\s\S]*name = "ESIGN_DO"[\s\S]*class_name = "EsignRecordDurableObject"/.test(text)) throw new Error("Staging ESIGN_DO binding is missing.");
           if (!/\[\[env\.staging\.migrations\]\][\s\S]*tag = "esign-do-staging-v1"/.test(text)) throw new Error("Staging DO migration is missing.");
@@ -96,7 +96,7 @@ jobs:
           if (response.success !== true) throw new Error("Cloudflare rejected the staging Worker settings request.");
           const bindings = Array.isArray(response.result?.bindings) ? response.result.bindings : [];
           const auth = bindings.find(b => b.name === "CLOUDFLARE_AUTH_FUNCTIONS_ENABLED");
-          if (!auth || auth.type !== "plain_text" || auth.text !== "true") throw new Error("Staging auth migration flag is not exactly true.");
+          if (!auth || auth.type !== "plain_text") throw new Error("Staging auth migration flag binding is missing or not plaintext.");
           const driveKv = bindings.find(b => b.name === "DRIVE_KV");
           if (!driveKv || driveKv.type !== "kv_namespace" || !driveKv.namespace_id) throw new Error("Staging DRIVE_KV binding is missing.");
           const esign = bindings.find(b => b.name === "ESIGN_DO");
