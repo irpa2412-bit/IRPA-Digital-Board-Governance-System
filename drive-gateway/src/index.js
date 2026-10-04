@@ -114,7 +114,15 @@ export default {
           const ctx = buildEsignContext({env,verifyUser:async()=>({uid:claims.user_id,isAdmin:true}),sendInvitation:async()=>{throw new Error("Cleanup context does not send invitations.");},logger:console,driveHelpers:{getDriveAccessToken,driveFetch}});
           return json(await runCleanup(ctx),200,corsHeaders(request));
         }
-        const isEsignPath = pathname === "/api/documents" || /^\\/api\\/documents\\/[A-Za-z0-9_-]{3,64}\\/pdf$/.test(pathname) || pathname === "/api/envelopes" || /^\\/api\\/envelopes\\/[A-Za-z0-9_-]{3,64}(?:\\/void|\\/retry-completion)?$/.test(pathname) || pathname === "/api/sign/open" || pathname === "/api/sign/pdf" || pathname === "/api/sign/submit" || pathname === "/api/sign/decline";
+        const isEsignPath =
+          pathname === "/api/documents" ||
+          /^\/api\/documents\/[A-Za-z0-9_-]{3,64}\/pdf$/.test(pathname) ||
+          pathname === "/api/envelopes" ||
+          /^\/api\/envelopes\/[A-Za-z0-9_-]{3,64}(?:\/void|\/retry-completion)?$/.test(pathname) ||
+          pathname === "/api/sign/open" ||
+          pathname === "/api/sign/pdf" ||
+          pathname === "/api/sign/submit" ||
+          pathname === "/api/sign/decline";
         if (isEsignPath) {
           const ctx = buildEsignContext({
             env,
