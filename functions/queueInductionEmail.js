@@ -19,7 +19,7 @@ async function queueInductionEmail(inputOrEmail, subject, text, html, options = 
   const firestore = db || getFirestore();
   if (!recipientEmail && input.recipientEmail) Object.assign(input,{recipientEmail:input.recipientEmail});
   const to=input.recipientEmail || recipientEmail; if(!to) throw new Error("recipientEmail is required");
-  const queueRef = inputOrEmail && !legacy && input.invitationId ? firestore.collection("emailQueue").doc(input.invitationId) : db.collection("emailQueue").doc();
+  const queueRef = input.invitationId ? firestore.collection("emailQueue").doc(input.invitationId) : firestore.collection("emailQueue").doc();
   const domain=String(to).split("@")[1]||"unknown";
   await queueRef.set({status:"Queued",recipientEmail:to,invitedByUid:input.invitedByUid||invitedByUid||null,createdAt:new Date().toISOString()});
   try {
