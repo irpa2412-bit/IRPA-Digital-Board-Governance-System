@@ -297,6 +297,17 @@ jobs:
           args: deploy --project irpa-digital-board-governance --only functions:preparePasswordResetPhone
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+      # Invitation redemption is a retained Firebase callable. Keep this deployment
+      # isolated from the controlled Cloudflare auth-function migration and do not alter
+      # Firebase security rules or credentials. Billing closure may still block activation.
+      - name: Deploy invitation redemption function
+        continue-on-error: true
+        uses: w9jds/firebase-action@v14.17.0
+        with:
+          args: deploy --project irpa-digital-board-governance --only functions:redeemInvitationToken
+        env:
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+
       - name: Verify live Firebase application
         run: |
           set -e
