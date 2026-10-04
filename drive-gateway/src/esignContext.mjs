@@ -110,7 +110,7 @@ export function buildEsignContext({env,verifyUser,sendInvitation,logger,now,driv
     sendInvitation,
     logger:logger||console,
     now:now||(()=>new Date()),
-    config:{appUrl:String(env.IRPA_APP_URL||"https://irpa-digital-board-governance.web.app").replace(/\\/$/,""),ttlDays:14},
+    config:{appUrl:String(env.IRPA_APP_URL||"https://irpa-digital-board-governance.web.app").replace(/\/$/,""),ttlDays:14},
     allowReturnTokens:env.DRIVE_MOCK==="true"
   };
 }
