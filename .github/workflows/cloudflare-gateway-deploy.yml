@@ -37,17 +37,25 @@ jobs:
           node - "$response" <<'NODE'
           const fs = require("fs");
           const response = JSON.parse(process.argv[2]);
-          if (response.success !== true) throw new Error("Cloudflare rejected the production Worker settings request.");
-
-          const bindings = Array.isArray(response.result?.bindings) ? response.result.bindings : [];
-          const unsupported = bindings.filter(b => !(b && b.type === "kv_namespace" && b.name === "DRIVE_KV"));
-          if (unsupported.length) {
-            throw new Error("Safety stop: the existing production Worker has bindings other than the expected DRIVE_KV binding. No deployment was attempted.");
+          if (response.success !== true) {
+            throw new Error("Cloudflare rejected the production Worker settings request.");
           }
 
-          const driveKv = bindings.find(b => b && b.type === "kv_namespace" && b.name === "DRIVE_KV");
-          if (!driveKv || !/^[a-f0-9]{32}$/.test(String(driveKv.namespace_id || ""))) {
-            throw new Error("Safety stop: existing production DRIVE_KV binding was not returned with a valid namespace ID.");
+          const bindings = Array.isArray(response.result?.bindings) ? response.result.bindings : [];
+          const kvBindings = bindings.filter(b => b && b.type === "kv_namespace");
+
+          if (kvBindings.length !== 1 || kvBindings[0].name !== "DRIVE_KV") {
+            throw new Error(
+              "Safety stop: production Worker must contain exactly one KV binding named DRIVE_KV. " +
+              "Existing non-KV bindings are preserved and are not treated as deployment errors."
+            );
+          }
+
+          const driveKv = kvBindings[0];
+          if (!/^[a-f0-9]{32}$/.test(String(driveKv.namespace_id || ""))) {
+            throw new Error(
+              "Safety stop: existing production DRIVE_KV binding was not returned with a valid namespace ID."
+            );
           }
 
           const config = {
