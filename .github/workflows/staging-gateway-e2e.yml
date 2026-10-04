@@ -210,10 +210,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          subdomain_json="$(curl --fail --silent --show-error \\
-            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \\
-            -H "Accept: application/json" \\
-            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain")"
+          subdomain_json="$(curl --fail --silent --show-error -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Accept: application/json" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain")"
           subdomain="$(node -e 'const a=JSON.parse(process.argv[1]); if(!a.success || !a.result?.subdomain) process.exit(1); process.stdout.write(a.result.subdomain)' "$subdomain_json")"
           test -n "$subdomain"
           url="https://irpa-google-drive-gateway-staging.$subdomain.workers.dev/health"
