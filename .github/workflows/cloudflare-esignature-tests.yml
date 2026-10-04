@@ -2,7 +2,7 @@ name: Cloudflare E-Signature Runtime Tests
 
 on:
   push:
-    branches: ["repair/esign-production-entrypoint-20261004"]
+    branches: ["repair/esign-production-entrypoint-20261004", "repair/cloudflare-auth-functions-20261004"]
     paths:
       - "drive-gateway/**"
       - "firebase.json"
@@ -49,12 +49,14 @@ jobs:
           test "$code" = "404"
           code="$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:8787/api/sign/open)"
           test "$code" = "404"
+          code="$(curl --silent --output /dev/null --write-out '%{http_code}' -X POST -H 'content-type: application/json' --data '{"email":"off@example.com"}' http://127.0.0.1:8787/api/auth/password-attempt-state)"
+          test "$code" = "404"
           kill "$(cat "$RUNNER_TEMP/wrangler-off.pid")" || true
       - name: Start Wrangler local worker with e-signature flag ON
         working-directory: drive-gateway
         run: |
           set -euo pipefail
-          npx wrangler dev --local --port 8788 --var ESIGN_MODULE_ENABLED:true --var DRIVE_MOCK:true > "$RUNNER_TEMP/wrangler-on.log" 2>&1 &
+          npx wrangler dev --local --port 8788 --var ESIGN_MODULE_ENABLED:true --var CLOUDFLARE_AUTH_FUNCTIONS_ENABLED:true --var DRIVE_MOCK:true > "$RUNNER_TEMP/wrangler-on.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/wrangler-on.pid"
           for i in $(seq 1 30); do
             if curl --silent --fail http://127.0.0.1:8788/health >/dev/null; then break; fi
@@ -62,6 +64,13 @@ jobs:
           done
           code="$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:8788/api/sign/open)"
           test "$code" = "401"
+          auth_state="$(curl --silent --show-error -X POST -H 'content-type: application/json' --data '{"email":"runtime@example.com"}' http://127.0.0.1:8788/api/auth/password-attempt-state)"
+          echo "$auth_state"
+          echo "$auth_state" | grep -q '"status":"FIRST"'
+          auth_failure="$(curl --silent --show-error -X POST -H 'content-type: application/json' --data '{"email":"runtime@example.com"}' http://127.0.0.1:8788/api/auth/password-failure)"
+          echo "$auth_failure" | grep -q '"remainingAttempts":2'
+          next_code="$(curl --silent --output /dev/null --write-out '%{http_code}' -X POST http://127.0.0.1:8788/api/documents/next-reference)"
+          test "$next_code" = "401"
           headers="$(curl --silent --dump-header - --output /dev/null -X OPTIONS -H 'Origin: https://irpa-digital-board-governance.web.app' http://127.0.0.1:8788/api/sign/open)"
           printf '%s\n' "$headers" | grep -qi 'x-signing-token'
           kill "$(cat "$RUNNER_TEMP/wrangler-on.pid")" || true
