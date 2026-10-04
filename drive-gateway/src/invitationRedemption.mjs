@@ -125,7 +125,7 @@ export async function redeemInvitation(request, env) {
   };
 }
 
-function validateInvitation(invitation, secret) {
+async function validateInvitation(invitation, secret) {
   if (invitation.status === "Cancelled") {
     throw invitationError(412, "This IRPA invitation has been cancelled.");
   }
@@ -297,12 +297,9 @@ async function redeemInvitationTransaction(accessToken, invitationId, uid) {
     throw invitationError(409, "This invitation has already been redeemed for another Firebase account.");
   }
 
-  const nowField = { timestampValue: new Date().toISOString() };
   const updateFields = {
     invitationRedeemedUid: { stringValue: uid },
-    invitationRedeemedAt: nowField,
-    invitationRedemptionStatus: { stringValue: "Redeemed — Awaiting Activation" },
-    updatedAt: nowField
+    invitationRedemptionStatus: { stringValue: "Redeemed — Awaiting Activation" }
   };
 
   const commitResponse = await fetch(
@@ -323,11 +320,13 @@ async function redeemInvitationTransaction(accessToken, invitationId, uid) {
           updateMask: {
             fieldPaths: [
               "invitationRedeemedUid",
-              "invitationRedeemedAt",
-              "invitationRedemptionStatus",
-              "updatedAt"
+              "invitationRedemptionStatus"
             ]
-          }
+          },
+          updateTransforms: [
+            { fieldPath: "invitationRedeemedAt", setToServerValue: "REQUEST_TIME" },
+            { fieldPath: "updatedAt", setToServerValue: "REQUEST_TIME" }
+          ]
         }]
       })
     }
@@ -452,12 +451,6 @@ function firestoreDocumentToPlain(document) {
     return null;
   };
   return Object.fromEntries(Object.entries(document?.fields || {}).map(([k,v]) => [k, convert(v)]));
-}
-
-function sha256HexSync(value) {
-  // Web Crypto is asynchronous; token validation therefore uses the async helper
-  // below through a small deterministic Promise bridge.
-  throw new Error("sha256HexSync must not be called directly.");
 }
 
 function timingSafeEqualHex(a, b) {
