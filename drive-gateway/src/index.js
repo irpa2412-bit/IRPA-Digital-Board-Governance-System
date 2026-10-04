@@ -489,7 +489,7 @@ async function download(request, env) {
     const fields = document?.fields || {};
     const authorizedUids = firestoreStringArray(fields.authorizedUids);
     const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
-    const isAdminForRequest = Boolean(admin?.fields?.active?.booleanValue);
+    const isAdmin = Boolean(admin?.fields?.active?.booleanValue);
     if (!isAdmin && !authorizedUids.includes(claims.user_id)) {
       return json({ ok: false, error: "You are not authorized to retrieve this document." }, 403, corsHeaders(request));
     }
