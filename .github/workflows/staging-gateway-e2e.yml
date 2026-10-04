@@ -173,3 +173,5 @@ jobs:
           url="https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev/health"
           curl --fail --silent --show-error --retry 5 --retry-delay 2 "$url" | tee staging-health.json
           grep -q '"ok":true' staging-health.json
+
+# Staging proof execution trigger — 2026-10-04
