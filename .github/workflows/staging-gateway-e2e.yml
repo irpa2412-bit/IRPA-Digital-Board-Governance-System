@@ -71,10 +71,8 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           set -euo pipefail
-          response="$(curl --silent --show-error --write-out '
-%{http_code}' -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/user/tokens/verify")"
-          code="$(printf '%s' "$response" | tail -n1)"
-          body="$(printf '%s' "$response" | sed '$d')"
+          code="$(curl --silent --show-error --output "$RUNNER_TEMP/cf-verify.json" --write-out '%{http_code}' -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/user/tokens/verify")"
+          body="$(cat "$RUNNER_TEMP/cf-verify.json")"
           if [ "$code" != "200" ]; then
             echo "CLOUDFLARE_TOKEN_VALID=false"
             echo "Cloudflare token verification HTTP status: $code"
