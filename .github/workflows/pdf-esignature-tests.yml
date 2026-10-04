@@ -1,7 +1,7 @@
 name: PDF E-Signature Tests
 on:
   push:
-    branches: ["fix/member-signature-invitation-email-20261004"]
+    branches: ["fix/member-signature-invitation-email-20261004", "repair/esign-production-entrypoint-20261004"]
     paths:
       - "drive-gateway/**"
   pull_request:
