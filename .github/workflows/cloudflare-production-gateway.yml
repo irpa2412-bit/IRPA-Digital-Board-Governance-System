@@ -1,0 +1,113 @@
+name: Deploy IRPA Gateway to Cloudflare Production
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-production-gateway
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout controlled revision
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: drive-gateway/package-lock.json
+
+      - name: Verify production gateway configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f drive-gateway/wrangler.toml
+          grep -q '^name = "irpa-google-drive-gateway"$' drive-gateway/wrangler.toml
+          grep -q '^FIREBASE_PROJECT_ID = "irpa-digital-board-governance"$' drive-gateway/wrangler.toml
+          grep -q '^DRIVE_MOCK = "false"$' drive-gateway/wrangler.toml
+          grep -q '^LOCAL_TEST_MODE = "false"$' drive-gateway/wrangler.toml
+          grep -q 'binding = "DRIVE_KV"' drive-gateway/wrangler.toml
+          if grep -q 'staging' drive-gateway/wrangler.toml; then
+            echo "Production wrangler.toml must not contain staging configuration."
+            exit 1
+          fi
+
+      - name: Install gateway dependencies
+        working-directory: drive-gateway
+        run: npm ci
+
+      - name: Run gateway E2E tests
+        working-directory: drive-gateway
+        run: npm test
+
+      - name: Verify Cloudflare credentials without exposing values
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            "https://api.cloudflare.com/client/v4/user/tokens/verify" >/tmp/token.json
+          node -e 'const x=require("/tmp/token.json"); if(!x.success) process.exit(1);'
+
+      - name: Inject production Worker secrets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          GOOGLE_DRIVE_CLIENT_ID: ${{ secrets.GOOGLE_DRIVE_CLIENT_ID }}
+          GOOGLE_DRIVE_CLIENT_SECRET: ${{ secrets.GOOGLE_DRIVE_CLIENT_SECRET }}
+          GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY: ${{ secrets.GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for pair in \
+            "GOOGLE_DRIVE_CLIENT_ID:$GOOGLE_DRIVE_CLIENT_ID" \
+            "GOOGLE_DRIVE_CLIENT_SECRET:$GOOGLE_DRIVE_CLIENT_SECRET" \
+            "GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY:$GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY" \
+            "SMTP_PASSWORD:$SMTP_PASSWORD"; do
+            name="${pair%%:*}"
+            value="${pair#*:}"
+            test -n "$value"
+            printf '%s' "$value" | npx --yes wrangler secret put "$name" --config drive-gateway/wrangler.toml
+          done
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Deploy production Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        working-directory: drive-gateway
+        run: npx wrangler deploy --config wrangler.toml
+
+      - name: Resolve Worker hostname and run health gate
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Accept: application/json" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain" >/tmp/subdomain.json
+          subdomain="$(node -e 'const x=require("/tmp/subdomain.json"); const s=x?.result?.subdomain; if(!s) process.exit(1); process.stdout.write(s);')"
+          url="https://irpa-google-drive-gateway.${subdomain}.workers.dev/health"
+          echo "Checking Cloudflare production gateway health."
+          curl --fail --silent --show-error "$url"
+          echo
