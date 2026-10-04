@@ -125,7 +125,7 @@ export async function redeemInvitation(request, env) {
   };
 }
 
-async async function validateInvitation(invitation, secret) {
+async function validateInvitation(invitation, secret) {
   if (invitation.status === "Cancelled") {
     throw invitationError(412, "This IRPA invitation has been cancelled.");
   }
