@@ -4,6 +4,7 @@ on:
     branches: ["fix/member-signature-invitation-email-20261004", "repair/esign-production-entrypoint-20261004"]
     paths:
       - "drive-gateway/**"
+      - ".github/workflows/pdf-esignature-tests.yml"
   pull_request:
     paths:
       - "drive-gateway/**"
