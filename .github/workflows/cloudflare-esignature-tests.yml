@@ -96,10 +96,15 @@ jobs:
           fi
           code="$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:8788/api/sign/open)"
           test "$code" = "401"
-          auth_state="$(curl --silent --show-error -X POST -H 'content-type: application/json' --data '{"email":"runtime@example.com"}' http://127.0.0.1:8788/api/auth/password-attempt-state)"
-          echo "$auth_state"
+          auth_state_code="$(curl --silent --show-error --output "$RUNNER_TEMP/auth-state-body.txt" --write-out '%{http_code}' -X POST -H 'content-type: application/json' --data '{"email":"runtime@example.com"}' http://127.0.0.1:8788/api/auth/password-attempt-state)"
+          auth_state="$(cat "$RUNNER_TEMP/auth-state-body.txt")"
+          echo "Auth-state HTTP $auth_state_code: $auth_state"
+          test "$auth_state_code" = "200"
           echo "$auth_state" | grep -q '"status":"FIRST"'
-          auth_failure="$(curl --silent --show-error -X POST -H 'content-type: application/json' --data '{"email":"runtime@example.com"}' http://127.0.0.1:8788/api/auth/password-failure)"
+          auth_failure_code="$(curl --silent --show-error --output "$RUNNER_TEMP/auth-failure-body.txt" --write-out '%{http_code}' -X POST -H 'content-type: application/json' --data '{"email":"runtime@example.com"}' http://127.0.0.1:8788/api/auth/password-failure)"
+          auth_failure="$(cat "$RUNNER_TEMP/auth-failure-body.txt")"
+          echo "Auth-failure HTTP $auth_failure_code: $auth_failure"
+          test "$auth_failure_code" = "200"
           echo "$auth_failure" | grep -q '"remainingAttempts":2'
           next_code="$(curl --silent --output /dev/null --write-out '%{http_code}' -X POST http://127.0.0.1:8788/api/documents/next-reference)"
           test "$next_code" = "401"
