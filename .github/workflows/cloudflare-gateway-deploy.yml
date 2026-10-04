@@ -37,10 +37,7 @@ jobs:
           node - "$response" <<'NODE'
           const fs = require("fs");
           const response = JSON.parse(process.argv[2]);
-
-          if (response.success !== true) {
-            throw new Error("Cloudflare rejected the production Worker settings request.");
-          }
+          if (response.success !== true) throw new Error("Cloudflare rejected the production Worker settings request.");
 
           const bindings = Array.isArray(response.result?.bindings) ? response.result.bindings : [];
           const managed = new Map([
@@ -48,22 +45,9 @@ jobs:
             ["ESIGN_DO", "durable_object_namespace"]
           ]);
           const resourceTypes = new Set([
-            "kv_namespace",
-            "durable_object_namespace",
-            "r2_bucket",
-            "d1",
-            "service",
-            "ai",
-            "ai_search",
-            "analytics_engine",
-            "browser",
-            "hyperdrive",
-            "queue",
-            "dispatch_namespace",
-            "workflow",
-            "secrets_store",
-            "vectorize",
-            "vpc_service"
+            "kv_namespace", "durable_object_namespace", "r2_bucket", "d1", "service",
+            "ai", "ai_search", "analytics_engine", "browser", "hyperdrive", "queue",
+            "dispatch_namespace", "workflow", "secrets_store", "vectorize", "vpc_service"
           ]);
           const variableTypes = new Set(["plain_text", "secret_text"]);
 
@@ -71,123 +55,57 @@ jobs:
             const name = String(binding?.name || "");
             const type = String(binding?.type || "");
             const expectedType = managed.get(name);
-
             if (expectedType) {
-              if (type !== expectedType) {
-                throw new Error(
-                  `Safety stop: binding "${name}" has type "${type}", expected "${expectedType}".`
-                );
-              }
+              if (type !== expectedType) throw new Error(`Safety stop: binding "${name}" has type "${type}", expected "${expectedType}".`);
               continue;
             }
-
             if (resourceTypes.has(type)) {
-              throw new Error(
-                `Safety stop: unmanaged production resource binding "${name}" of type "${type}" would not be reproduced by this release.`
-              );
+              throw new Error(`Safety stop: unmanaged production resource binding "${name}" of type "${type}" would not be reproduced by this release.`);
             }
-
             if (!variableTypes.has(type)) {
-              throw new Error(
-                `Safety stop: unmanaged production binding "${name}" has unsupported type "${type}".`
-              );
+              throw new Error(`Safety stop: unmanaged production binding "${name}" has unsupported type "${type}".`);
             }
           }
 
           const toml = fs.readFileSync("wrangler.toml", "utf8");
-          const tomlLines = toml.split(/\r?\n/);
-          let inDriveKv = false;
-          let configuredDriveKvId = null;
-          for (const line of tomlLines) {
-            const trimmed = line.trim();
-            if (trimmed === "[[kv_namespaces]]") {
-              inDriveKv = false;
-              continue;
-            }
-            if (trimmed.startsWith("[[") && trimmed.endsWith("]]")) {
-              inDriveKv = false;
-              continue;
-            }
-            if (inDriveKv && trimmed.includes('id = "')) {
-              const match = trimmed.match(/"([a-f0-9]{32})"/i);
-              if (match) {
-                configuredDriveKvId = match[1].toLowerCase();
-                break;
-              }
-            }
-            if (trimmed === 'binding = "DRIVE_KV"') {
-              inDriveKv = true;
-            }
-          }
-          if (!configuredDriveKvId) {
-            throw new Error("Safety stop: repository production wrangler.toml does not contain a valid DRIVE_KV ID.");
-          }
+          const match = toml.match(/\[\[kv_namespaces\]\][\s\S]*?binding\s*=\s*"DRIVE_KV"[\s\S]*?id\s*=\s*"([a-f0-9]{32})"/i);
+          if (!match) throw new Error("Safety stop: repository production wrangler.toml does not contain a valid DRIVE_KV ID.");
+          const configuredDriveKvId = match[1].toLowerCase();
 
           const driveKvBindings = bindings.filter(b => b.name === "DRIVE_KV");
-          let driveKvId = configuredDriveKvId;
-
-          if (driveKvBindings.length > 1) {
-            throw new Error("Safety stop: production Worker contains more than one DRIVE_KV binding.");
-          }
+          if (driveKvBindings.length > 1) throw new Error("Safety stop: production Worker contains more than one DRIVE_KV binding.");
           if (driveKvBindings.length === 1) {
             const remoteId = String(driveKvBindings[0].namespace_id || "").toLowerCase();
-            if (!/^[a-f0-9]{32}$/.test(remoteId)) {
-              throw new Error("Safety stop: existing production DRIVE_KV binding has an invalid namespace ID.");
-            }
-            if (remoteId !== configuredDriveKvId) {
-              throw new Error("Safety stop: production DRIVE_KV differs from the controlled repository DRIVE_KV ID.");
-            }
-            driveKvId = remoteId;
+            if (!/^[a-f0-9]{32}$/.test(remoteId)) throw new Error("Safety stop: existing production DRIVE_KV binding has an invalid namespace ID.");
+            if (remoteId !== configuredDriveKvId) throw new Error("Safety stop: production DRIVE_KV differs from the controlled repository DRIVE_KV ID.");
           }
 
           const esignBindings = bindings.filter(b => b.name === "ESIGN_DO");
-          if (esignBindings.length > 1) {
-            throw new Error("Safety stop: production Worker contains more than one ESIGN_DO binding.");
-          }
-
-          if (esignBindings.length === 1 &&
-              String(esignBindings[0].class_name || "") !== "EsignRecordDurableObject") {
-            throw new Error(
-              'Safety stop: existing ESIGN_DO must target class "EsignRecordDurableObject".'
-            );
+          if (esignBindings.length > 1) throw new Error("Safety stop: production Worker contains more than one ESIGN_DO binding.");
+          if (esignBindings.length === 1 && String(esignBindings[0].class_name || "") !== "EsignRecordDurableObject") {
+            throw new Error('Safety stop: existing ESIGN_DO must target class "EsignRecordDurableObject".');
           }
 
           const flagBindings = bindings.filter(b => b.name === "ESIGN_MODULE_ENABLED");
-          if (flagBindings.length > 1) {
-            throw new Error("Safety stop: production Worker contains more than one ESIGN_MODULE_ENABLED variable.");
-          }
+          if (flagBindings.length > 1) throw new Error("Safety stop: production Worker contains more than one ESIGN_MODULE_ENABLED variable.");
           if (flagBindings.length === 1 && String(flagBindings[0].type || "") !== "plain_text") {
-            throw new Error(
-              'Safety stop: ESIGN_MODULE_ENABLED must be a plaintext Worker variable for this release; secret values are never modified.'
-            );
+            throw new Error('Safety stop: ESIGN_MODULE_ENABLED must be plaintext; secret values are never modified.');
           }
 
           const config = {
             name: "irpa-google-drive-gateway",
             main: "src/index.js",
             compatibility_date: "2026-09-24",
-            vars: {
-              ESIGN_MODULE_ENABLED: "true"
-            },
-            kv_namespaces: [
-              { binding: "DRIVE_KV", id: driveKvId }
-            ],
+            vars: { ESIGN_MODULE_ENABLED: "true" },
+            kv_namespaces: [{ binding: "DRIVE_KV", id: configuredDriveKvId }],
             durable_objects: {
-              bindings: [
-                {
-                  name: "ESIGN_DO",
-                  class_name: "EsignRecordDurableObject"
-                }
-              ]
+              bindings: [{ name: "ESIGN_DO", class_name: "EsignRecordDurableObject" }]
             },
-            migrations: [
-              {
-                tag: "esign-do-v1",
-                new_sqlite_classes: ["EsignRecordDurableObject"]
-              }
-            ]
+            migrations: [{
+              tag: "esign-do-v1",
+              new_sqlite_classes: ["EsignRecordDurableObject"]
+            }]
           };
-
           fs.writeFileSync("wrangler.json", JSON.stringify(config, null, 2) + "\n");
           NODE
 
@@ -199,44 +117,25 @@ jobs:
           node <<'NODE'
           const fs = require("fs");
           const c = JSON.parse(fs.readFileSync("wrangler.json", "utf8"));
-
-          if (c.name !== "irpa-google-drive-gateway") {
-            throw new Error("Worker identity mismatch.");
-          }
-
-          if (c.vars?.ESIGN_MODULE_ENABLED !== "true") {
-            throw new Error("Production e-signature flag is not exactly true. Deployment blocked.");
-          }
-
+          if (c.name !== "irpa-google-drive-gateway") throw new Error("Worker identity mismatch.");
+          if (c.vars?.ESIGN_MODULE_ENABLED !== "true") throw new Error("Production e-signature flag is not exactly true. Deployment blocked.");
           const kv = Array.isArray(c.kv_namespaces) ? c.kv_namespaces : [];
           if (kv.length !== 1 || kv[0]?.binding !== "DRIVE_KV" || !/^[a-f0-9]{32}$/.test(String(kv[0]?.id || ""))) {
             throw new Error("Production DRIVE_KV binding is invalid. Deployment blocked.");
           }
-
           const doBindings = c.durable_objects?.bindings || [];
-          if (doBindings.length !== 1 ||
-              doBindings[0]?.name !== "ESIGN_DO" ||
-              doBindings[0]?.class_name !== "EsignRecordDurableObject") {
+          if (doBindings.length !== 1 || doBindings[0]?.name !== "ESIGN_DO" || doBindings[0]?.class_name !== "EsignRecordDurableObject") {
             throw new Error("Production ESIGN_DO binding is invalid. Deployment blocked.");
           }
-
           const migrations = Array.isArray(c.migrations) ? c.migrations : [];
           const migration = migrations.find(m => m?.tag === "esign-do-v1");
-          if (!migration ||
-              !Array.isArray(migration.new_sqlite_classes) ||
-              migration.new_sqlite_classes.length !== 1 ||
+          if (!migration || !Array.isArray(migration.new_sqlite_classes) || migration.new_sqlite_classes.length !== 1 ||
               migration.new_sqlite_classes[0] !== "EsignRecordDurableObject") {
             throw new Error("ESIGN_DO migration is missing or invalid. Deployment blocked.");
           }
-
-          const topLevelKeys = new Set([
-            "name", "main", "compatibility_date", "vars", "kv_namespaces",
-            "durable_objects", "migrations"
-          ]);
+          const topLevelKeys = new Set(["name", "main", "compatibility_date", "vars", "kv_namespaces", "durable_objects", "migrations"]);
           for (const key of Object.keys(c)) {
-            if (!topLevelKeys.has(key)) {
-              throw new Error(`Safety stop: unexpected generated Wrangler configuration key "${key}".`);
-            }
+            if (!topLevelKeys.has(key)) throw new Error(`Safety stop: unexpected generated Wrangler configuration key "${key}".`);
           }
           NODE
 
