@@ -7,6 +7,7 @@ compatibility_date = "2026-09-29"
 workers_dev = true
 
 [vars]
+CLOUDFLARE_INVITATION_REDEMPTION_ENABLED = "false"
 FIREBASE_PROJECT_ID = "irpa-digital-board-governance"
 AUTHORIZED_DRIVE_EMAIL = "irpa2412@gmail.com"
 IRPA_APP_URL = "https://irpa-digital-board-governance.web.app"
