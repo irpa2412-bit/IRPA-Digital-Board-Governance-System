@@ -1,53 +1,70 @@
+import test from "node:test";
 import assert from "node:assert/strict";
-import { normalizeRecipientEmail, validateMailHeader, escapeHtml, sendWithRetry, isAuthorizedInviteCaller } from "../src/mailDelivery.js";
-import { validateRecipient, validateName, buildInvitationMessage, sendInvitationEmail } from "../src/invitationEmail.mjs";
-const sleep = async () => {};
-async function testSuccess() {
-  let calls = 0;
-  const result = await sendWithRetry(async () => { calls += 1; return "250 OK"; }, { onFailure: sleep });
-  assert.equal(result, "250 OK"); assert.equal(calls, 1); console.log("PASS success");
-}
-async function testRetrySuccess() {
-  let calls = 0;
-  const result = await sendWithRetry(async () => { calls += 1; if (calls === 1) throw new Error("provider temporary failure"); return "250 OK"; }, { backoffMs: [0, 0], onFailure: sleep });
-  assert.equal(result, "250 OK"); assert.equal(calls, 2); console.log("PASS provider failure then retry success");
-}
-async function testFinalFailure() {
-  let calls = 0; const failures = [];
-  await assert.rejects(() => sendWithRetry(async () => { calls += 1; throw new Error("provider final failure"); }, { backoffMs: [0, 0], onFailure: async (error, attempt) => failures.push({error, attempt}) }));
-  assert.equal(calls, 3); assert.deepEqual(failures.map(x => x.attempt), [1, 2, 3]); console.log("PASS final failure after 3 attempts");
-}
-async function testValidation() {
-  assert.equal(normalizeRecipientEmail(" Test@Example.COM "), "test@example.com");
-  assert.throws(() => normalizeRecipientEmail("bad"), /valid recipient/);
-  assert.throws(() => normalizeRecipientEmail("a\nb@example.com"), /valid recipient/);
-  assert.throws(() => validateMailHeader("x\r\ny", "Subject"), /newline/);
-  assert.equal(escapeHtml('<b>"x"&'), "&lt;b&gt;&quot;x&quot;&amp;");
-  console.log("PASS invalid recipient and header injection rejection");
-}
-async function testAuthorization() {
-  assert.equal(isAuthorizedInviteCaller({user_id:"u1"}, {senderUid:"u1"}), true);
-  assert.equal(isAuthorizedInviteCaller({user_id:"u2"}, {senderUid:"u1"}), false);
-  console.log("PASS unauthorized caller denied");
-}
-await testSuccess(); await testRetrySuccess(); await testFinalFailure(); await testValidation(); await testAuthorization();
-console.log("ALL MAIL INVITATION TESTS PASSED");
+import { handleSendInvitationEmail } from "../src/invitationEmail.mjs";
+import { queueInductionEmail } from "../../functions/queueInductionEmail.mjs";
 
-async function testIsolatedInvitationModule() {
-  assert.equal(validateRecipient(" Person@example.com "), "Person@example.com");
-  assert.equal(validateName("Member"), "Member");
-  assert.equal(validateName(undefined), "Member");
-  assert.equal(validateRecipient("bad"), null);
-  assert.equal(validateRecipient("a\nb@example.com"), null);
-  const message=buildInvitationMessage({name:"A <Member>",link:"https://irpa-digital-board-governance.web.app/?invitationToken=test"});
-  assert.match(message.html,/A &lt;Member&gt;/);
-  let attempts=0;
-  const result=await sendInvitationEmail({
-    email:"test@example.com",name:"Member",link:"https://irpa-digital-board-governance.web.app/?invitationToken=test",
-    smtpSend:async ({to,subject,html})=>{attempts++; assert.equal(to,"test@example.com"); assert.ok(subject); assert.ok(html); if(attempts===1) throw new Error("temporary"); return {messageId:"mock-1"};},
-    sleep:async()=>{}
-  });
-  assert.equal(result.messageId,"mock-1"); assert.equal(attempts,2);
-  console.log("PASS isolated invitationEmail.mjs sender and escaping");
+const quiet = { error() {}, log() {} };
+const sleep = async () => {};
+
+function makeEnv() {
+  const store = new Map();
+  return {
+    INVITE_SERVICE_KEY: "test-key",
+    IRPA_APP_URL: "https://app.example.test",
+    DRIVE_KV: {
+      get: async (k) => store.get(k) ?? null,
+      put: async (k, v) => void store.set(k, v),
+    },
+  };
 }
-await testIsolatedInvitationModule();
+function req(body, key = "test-key") {
+  return new Request("https://gw.test/api/send-invitation-email", {
+    method: "POST", headers: key ? { "x-irpa-service-key": key } : {},
+    body: JSON.stringify(body),
+  });
+}
+const good = { to:"a@example.org", name:"Amina", link:"https://app.example.test/?invite=abc" };
+
+test("rejects missing or wrong service key", async () => {
+  const smtpSend=async()=>({});
+  assert.equal((await handleSendInvitationEmail(req(good,null),makeEnv(),{smtpSend,logger:quiet})).status,401);
+  assert.equal((await handleSendInvitationEmail(req(good,"bad"),makeEnv(),{smtpSend,logger:quiet})).status,401);
+});
+test("fails closed when no service key is configured", async () => {
+  const env=makeEnv(); delete env.INVITE_SERVICE_KEY;
+  assert.equal((await handleSendInvitationEmail(req(good,"anything"),env,{smtpSend:async()=>({}),logger:quiet})).status,401);
+});
+test("rejects invalid recipient and header injection", async () => {
+  const d={smtpSend:async()=>({}),logger:quiet};
+  assert.equal((await handleSendInvitationEmail(req({...good,to:"not-an-email"}),makeEnv(),d)).status,400);
+  assert.equal((await handleSendInvitationEmail(req({...good,to:"a@example.org\r\nBcc: x@y.z"}),makeEnv(),d)).status,400);
+  assert.equal((await handleSendInvitationEmail(req({...good,name:"Bob\r\nBcc: x@y.z"}),makeEnv(),d)).status,400);
+});
+test("rejects links to other origins", async () => {
+  assert.equal((await handleSendInvitationEmail(req({...good,link:"https://evil.test/?invite=abc"}),makeEnv(),{smtpSend:async()=>({}),logger:quiet})).status,400);
+});
+test("sends once, escapes HTML, returns message id", async () => {
+  const calls=[]; const smtpSend=async(_env,msg)=>{calls.push(msg);return{messageId:"m-1"}};
+  const res=await handleSendInvitationEmail(req({...good,name:"<b>Eve</b>"}),makeEnv(),{smtpSend,logger:quiet});
+  assert.equal(res.status,200); assert.equal((await res.json()).messageId,"m-1"); assert.equal(calls.length,1);
+  assert.ok(!calls[0].html.includes("<b>Eve</b>")); assert.ok(calls[0].html.includes("&lt;b&gt;Eve&lt;/b&gt;"));
+});
+test("retries after a provider failure then succeeds", async () => {
+  let n=0; const smtpSend=async()=>{if(++n===1)throw new Error("boom");return{messageId:"m-2"}};
+  assert.equal((await handleSendInvitationEmail(req(good),makeEnv(),{smtpSend,logger:quiet,sleep})).status,200); assert.equal(n,2);
+});
+test("returns 502 after final provider failure", async () => {
+  let n=0; const smtpSend=async()=>{n++;throw new Error("down")};
+  assert.equal((await handleSendInvitationEmail(req(good),makeEnv(),{smtpSend,logger:quiet,sleep})).status,502); assert.equal(n,3);
+});
+test("rate limits repeated sends to one address", async () => {
+  const env=makeEnv(), d={smtpSend:async()=>({messageId:"x"}),logger:quiet,sleep};
+  for(let i=0;i<5;i++) assert.equal((await handleSendInvitationEmail(req(good),env,d)).status,200);
+  assert.equal((await handleSendInvitationEmail(req(good),env,d)).status,429);
+});
+function fakeDb(){const docs=new Map();return{docs,collection:c=>({doc:id=>({set:async d=>void docs.set(`${c}/${id}`,{...d}),update:async d=>void docs.set(`${c}/${id}`,{...docs.get(`${c}/${id}`),...d})})})}};
+const base=db=>({db,invitationId:"INV-1",recipientEmail:"a@example.org",recipientName:"Amina",link:"https://app.example.test/?invite=abc",invitedByUid:"u1"});
+const fenv={GATEWAY_URL:"https://gw.test",INVITE_SERVICE_KEY:"k"};
+test("queueInductionEmail marks Sent on success",async()=>{const db=fakeDb();const fetchFn=async()=>({ok:true,status:200,json:async()=>({ok:true,messageId:"m-9"})});const out=await queueInductionEmail(base(db),{fetchFn,env:fenv,logger:quiet,sleep});assert.equal(out.status,"Sent");assert.equal(db.docs.get("emailQueue/INV-1").status,"Sent")});
+test("queueInductionEmail retries 5xx then marks Failed",async()=>{const db=fakeDb();let n=0;const fetchFn=async()=>{n++;return{ok:false,status:502,json:async()=>({})}};const out=await queueInductionEmail(base(db),{fetchFn,env:fenv,logger:quiet,sleep});assert.equal(out.status,"Failed");assert.equal(n,3);assert.equal(db.docs.get("emailQueue/INV-1").status,"Failed")});
+test("queueInductionEmail does not retry 4xx",async()=>{const db=fakeDb();let n=0;const fetchFn=async()=>{n++;return{ok:false,status:400,json:async()=>({})}};const out=await queueInductionEmail(base(db),{fetchFn,env:fenv,logger:quiet,sleep});assert.equal(out.status,"Failed");assert.equal(n,1)});
