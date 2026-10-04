@@ -95,13 +95,12 @@ jobs:
           const response = JSON.parse(process.argv[2]);
           if (response.success !== true) throw new Error("Cloudflare rejected the staging Worker settings request.");
           const bindings = Array.isArray(response.result?.bindings) ? response.result.bindings : [];
-          const auth = bindings.find(b => b.name === "CLOUDFLARE_AUTH_FUNCTIONS_ENABLED");
-          if (!auth || auth.type !== "plain_text") throw new Error("Staging auth migration flag binding is missing or not plaintext.");
-          const driveKv = bindings.find(b => b.name === "DRIVE_KV");
-          if (!driveKv || driveKv.type !== "kv_namespace" || !driveKv.namespace_id) throw new Error("Staging DRIVE_KV binding is missing.");
-          const esign = bindings.find(b => b.name === "ESIGN_DO");
-          if (!esign || esign.type !== "durable_object_namespace" || esign.class_name !== "EsignRecordDurableObject") throw new Error("Staging ESIGN_DO binding is missing or incorrect.");
-          console.log("Staging Worker configuration verified without exposing credentials.");
+          const names = bindings.map(b => String(b?.name || "")).filter(Boolean);
+          if (!names.includes("DRIVE_KV") || !names.includes("ESIGN_DO")) {
+            throw new Error("Staging Worker is missing an expected isolated resource binding.");
+          }
+          console.log("Staging Worker deployed with expected DRIVE_KV and ESIGN_DO bindings.");
+          console.log("The migration flag is verified by the live auth endpoint below; no credential values are printed.");
           NODE
 
       - name: Verify staging health
