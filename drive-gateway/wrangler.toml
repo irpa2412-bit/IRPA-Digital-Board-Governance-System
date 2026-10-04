@@ -35,6 +35,7 @@ name = "irpa-google-drive-gateway-staging"
 workers_dev = true
 
 [env.staging.vars]
+IRPA_ENVIRONMENT = "staging"
 FIREBASE_PROJECT_ID = "irpa-digital-board-governance"
 AUTHORIZED_DRIVE_EMAIL = "irpa2412@gmail.com"
 IRPA_APP_URL = "https://irpa-digital-board-governance.web.app"
