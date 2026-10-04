@@ -119,7 +119,15 @@ export async function routeCloudflareAuth(request, env, authenticate) {
 
   if (pathname === "/api/documents/next-reference") {
     if (typeof authenticate !== "function") throw new HttpError(500, "Firebase authentication verifier was not provided.");
-    const claims = await authenticate(request);
+    let claims;
+    try { claims = await authenticate(request); }
+    catch (error) {
+      const message = String(error?.message || error);
+      if (message === "Firebase authentication is required." || message.startsWith("Invalid Firebase") || message === "Firebase token is expired." || message === "Firebase token signing key not found.") {
+        throw new HttpError(401, "Authentication is required to generate a document reference.");
+      }
+      throw error;
+    }
     const result = env.DRIVE_MOCK === "true"
       ? { reference: "IRPA-DOC-" + new Date().getUTCFullYear() + "-" + String(++mockReference).padStart(5, "0"), year: new Date().getUTCFullYear() }
       : await doCall(env, "next-reference", { key: "document-reference-counter" });
