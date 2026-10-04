@@ -1,0 +1,89 @@
+name: Deploy IRPA Invitation Redemption to Cloudflare Staging
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-invitation-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: staging
+    defaults:
+      run:
+        working-directory: drive-gateway
+
+    steps:
+      - name: Checkout controlled revision
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: drive-gateway/package-lock.json
+
+      - name: Verify controlled credential inputs
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$GCP_SA_KEY"
+          node -e 'JSON.parse(process.env.GCP_SA_KEY);'
+          echo "Required credentials are present and the Firebase service-account value is valid JSON. Values are not printed."
+
+      - name: Install gateway dependencies
+        run: npm ci
+
+      - name: Run gateway tests
+        run: npm test
+
+      - name: Install Wrangler
+        run: npm install --no-save wrangler@4
+
+      - name: Provision the existing Firebase service credential into Cloudflare staging
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' "$GCP_SA_KEY" | npx wrangler secret put FIREBASE_ADMIN_SERVICE_ACCOUNT_JSON --env staging
+          echo "Firebase Admin credential provisioned to Cloudflare staging without exposing its value."
+
+      - name: Deploy invitation gateway to Cloudflare staging
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy --env staging
+
+      - name: Verify staging gateway
+        shell: bash
+        run: |
+          set -euo pipefail
+          body="$(curl --fail --silent --show-error --retry 5 --retry-delay 2 https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev/health)"
+          echo "$body"
+          echo "$body" | grep -q '"ok":true'
+          echo "$body" | grep -q '"environment":"staging"'
+          echo "$body" | grep -q '"authFunctionsEnabled":true'
+
+      - name: Verify invitation route is enabled only in staging
+        shell: bash
+        run: |
+          set -euo pipefail
+          code="$(curl --silent --show-error -o /tmp/invitation.json -w "%{http_code}"             -H "Content-Type: application/json"             -d '{"token":"invalid"}'             https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev/api/invitations/redeem)"
+          cat /tmp/invitation.json
+          test "$code" = "400"
+          grep -q '"error":"The invitation token is invalid."' /tmp/invitation.json
