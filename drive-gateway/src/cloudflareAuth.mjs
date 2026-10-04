@@ -2,7 +2,6 @@ import { HttpError, json } from "./util.mjs";
 
 const mockState = new Map();
 let mockReference = 0;
-let authenticateFirebaseRequestForAuthRoute = null;
 
 const LOCK_MS = 5 * 60 * 1000;
 const FIRST_STAGE_LIMIT = 3;
@@ -79,7 +78,7 @@ async function expireLockToSecondStage(env, key) {
   await doCall(env, "auth-expire-lock", { key });
 }
 
-export async function routeCloudflareAuth(request, env) {
+export async function routeCloudflareAuth(request, env, authenticate) {
   const url = new URL(request.url);
   const pathname = url.pathname.replace(/\/+$/, "") || "/";
   if (env.CLOUDFLARE_AUTH_FUNCTIONS_ENABLED !== "true") return null;
@@ -119,10 +118,8 @@ export async function routeCloudflareAuth(request, env) {
   }
 
   if (pathname === "/api/documents/next-reference") {
-    if (typeof authenticateFirebaseRequestForAuthRoute !== "function") {
-      throw new HttpError(500, "Firebase authentication verifier was not provided.");
-    }
-    const claims = await authenticateFirebaseRequestForAuthRoute(request);
+    if (typeof authenticate !== "function") throw new HttpError(500, "Firebase authentication verifier was not provided.");
+    const claims = await authenticate(request);
     const result = env.DRIVE_MOCK === "true"
       ? { reference: "IRPA-DOC-" + new Date().getUTCFullYear() + "-" + String(++mockReference).padStart(5, "0"), year: new Date().getUTCFullYear() }
       : await doCall(env, "next-reference", { key: "document-reference-counter" });
@@ -130,8 +127,4 @@ export async function routeCloudflareAuth(request, env) {
   }
 
   return null;
-}
-
-export function buildCloudflareAuthContext({ authenticate }) {
-  authenticateFirebaseRequestForAuthRoute = authenticate;
 }
