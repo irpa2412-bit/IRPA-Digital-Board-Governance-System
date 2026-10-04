@@ -2,6 +2,7 @@ import { HttpError, json } from "./util.mjs";
 
 const mockState = new Map();
 let mockReference = 0;
+let authenticateFirebaseRequestForAuthRoute = null;
 
 const LOCK_MS = 5 * 60 * 1000;
 const FIRST_STAGE_LIMIT = 3;
@@ -17,7 +18,7 @@ async function sha256Hex(value) {
 }
 
 function validEmail(email) {
-  return email && email.includes("@");
+  return Boolean(email && email.includes("@"));
 }
 
 async function doCall(env, operation, payload = {}) {
@@ -70,11 +71,18 @@ async function clearState(env, key) {
   return doCall(env, "auth-clear", { key });
 }
 
+async function expireLockToSecondStage(env, key) {
+  if (env.DRIVE_MOCK === "true") {
+    mockState.set(key, { stage: "SECOND", failedAttempts: 0, lockUntilMs: 0 });
+    return;
+  }
+  await doCall(env, "auth-expire-lock", { key });
+}
+
 export async function routeCloudflareAuth(request, env) {
   const url = new URL(request.url);
   const pathname = url.pathname.replace(/\/+$/, "") || "/";
   if (env.CLOUDFLARE_AUTH_FUNCTIONS_ENABLED !== "true") return null;
-
   if (request.method !== "POST") return json({ ok: false, error: "Method not allowed." }, 405);
 
   if (pathname === "/api/auth/password-attempt-state") {
@@ -85,9 +93,8 @@ export async function routeCloudflareAuth(request, env) {
     let state = await getState(env, key);
     const now = Date.now();
     if (Number(state.lockUntilMs || 0) && Number(state.lockUntilMs) <= now && state.stage === "LOCKED") {
-      await clearState(env, key);
+      await expireLockToSecondStage(env, key);
       state = { stage: "SECOND", failedAttempts: 0, lockUntilMs: 0 };
-      if (env.DRIVE_MOCK !== "true") await doCall(env, "auth-set", { key, state });
     }
     if (state.stage === "SUSPENDED") return json(200, { allowed: false, status: "SUSPENDED", remainingAttempts: 0, resetRequired: true });
     if (Number(state.lockUntilMs || 0) > now) {
@@ -112,6 +119,9 @@ export async function routeCloudflareAuth(request, env) {
   }
 
   if (pathname === "/api/documents/next-reference") {
+    if (typeof authenticateFirebaseRequestForAuthRoute !== "function") {
+      throw new HttpError(500, "Firebase authentication verifier was not provided.");
+    }
     const claims = await authenticateFirebaseRequestForAuthRoute(request);
     const result = env.DRIVE_MOCK === "true"
       ? { reference: "IRPA-DOC-" + new Date().getUTCFullYear() + "-" + String(++mockReference).padStart(5, "0"), year: new Date().getUTCFullYear() }
@@ -120,16 +130,6 @@ export async function routeCloudflareAuth(request, env) {
   }
 
   return null;
-}
-
-async function authenticateFirebaseRequestForAuthRoute(request) {
-  const authorization = request.headers.get("Authorization") || "";
-  if (!authorization.startsWith("Bearer ")) throw new HttpError(401, "Authentication is required to generate a document reference.");
-  const token = authorization.slice(7).trim();
-  if (!token) throw new HttpError(401, "Authentication is required to generate a document reference.");
-  // The production gateway's Firebase verifier is intentionally supplied by index.js.
-  // This function is replaced with the verifier wrapper before route dispatch.
-  throw new HttpError(500, "Firebase authentication verifier was not provided.");
 }
 
 export function buildCloudflareAuthContext({ authenticate }) {
