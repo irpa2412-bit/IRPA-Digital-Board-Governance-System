@@ -19,7 +19,7 @@ jobs:
         with: { node-version: 22 }
       - name: Install gateway dependencies
         working-directory: drive-gateway
-        run: npm install
+        run: npm ci
       - name: Run mocked SMTP invitation tests
         working-directory: drive-gateway
         run: node tests/mail-invitation.unit.mjs
