@@ -104,9 +104,6 @@ jobs:
           if(c.vars.FIREBASE_PROJECT_ID==="irpa-digital-board-governance") throw new Error("Production Firebase project forbidden.");
           fs.writeFileSync("wrangler.staging.generated.json",JSON.stringify(c,null,2)+"\n");
           NODE
-        env:
-          PROJECT: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
-          APP_URL: ${{ secrets.STAGING_IRPA_APP_URL }}
 
       - name: Verify staging configuration
         working-directory: drive-gateway
