@@ -1,5 +1,7 @@
 name: Mail Invitation Tests
 on:
+  push:
+    branches: ["fix/member-signature-invitation-email-20261004"]
   pull_request:
     paths:
       - "drive-gateway/**"
