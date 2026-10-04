@@ -164,7 +164,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: drive-gateway
-          command: deploy --keep-vars
+          command: deploy --keep-vars --var ESIGN_MODULE_ENABLED:true --var CLOUDFLARE_AUTH_FUNCTIONS_ENABLED:true --var IRPA_PRODUCTION_CUTOVER:true
 
       - name: Verify production gateway
         run: |
