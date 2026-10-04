@@ -83,7 +83,7 @@ export default {
         return await deleteDriveFile(request, env);
       }
 
-      if (url.pathname === "/api/invitations/send" && request.method === "POST") {
+      if (url.pathname === "/api/send-invitation-email" && request.method === "POST") {\n        return await sendGatewayInvitationEmail(request, env);\n      }\n\n      if (url.pathname === "/api/invitations/send" && request.method === "POST") {
         return await sendMemberInvitation(request, env);
       }
 
@@ -1027,6 +1027,29 @@ info@irpa.or.tz`;
   const htmlBody = `<!doctype html><html><body style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937"><h2>IRPA Digital Board Governance</h2><p>Dear ${escapeHtml(name)},</p><p>Your IRPA Digital Board Governance induction form has been saved successfully.</p><p><strong>Your IRPA registration number: ${escapeHtml(number)}</strong></p><p>This number was retrieved from the IRPA registration system and was not entered or changed during induction.</p><p>Your completed induction has been routed to the registered department/unit for role and duties assignment.</p><p>Regards,<br>IRPA Administration<br><a href="mailto:info@irpa.or.tz">info@irpa.or.tz</a></p></body></html>`;
   const messageId = await smtpSend(env,{to:email,subject,text,html:htmlBody});
   return json({ok:true,email,registrationNumber:number,emailRequested:true,provider:"IRPA Mail Server",deliveryStatus:"Submitted to mail.irpa.or.tz",messageId},200,corsHeaders(request));
+}
+
+async function sendGatewayInvitationEmail(request, env) {
+  const supplied=String(request.headers.get("x-irpa-service-key")||"");
+  const expected=String(env.INVITE_SERVICE_KEY||"");
+  if(!supplied||!expected) return json({ok:false,error:"Unauthorized"},401,corsHeaders(request));
+  const a=new TextEncoder().encode(supplied), b=new TextEncoder().encode(expected);
+  let diff=a.length^b.length; const n=Math.max(a.length,b.length);
+  for(let j=0;j<n;j++) diff|=(a[j%Math.max(1,a.length)]||0)^(b[j%Math.max(1,b.length)]||0);
+  if(diff!==0) return json({ok:false,error:"Unauthorized"},401,corsHeaders(request));
+  let data; try{data=await request.json();}catch{return json({ok:false,error:"Invalid JSON"},400,corsHeaders(request));}
+  const to=validateRecipient(data?.to);
+  if(!to) return json({ok:false,error:"Invalid recipient"},400,corsHeaders(request));
+  const subject=validateMailHeader(String(data?.subject||""),"Subject");
+  if(!subject) return json({ok:false,error:"Invalid subject"},400,corsHeaders(request));
+  if(typeof data?.text!=="string"||typeof data?.html!=="string") return json({ok:false,error:"Invalid message body"},400,corsHeaders(request));
+  try{
+    const messageId=await sendWithRetry(()=>smtpSend(env,{to,subject,text:data.text,html:data.html}),{onFailure:async(error,attempt)=>console.error("IRPA invitation gateway SMTP failure",{recipientDomain:recipientDomain(to),attempt,error:safeMailError(error)})});
+    return json({ok:true,messageId:String(messageId||"")},200,corsHeaders(request));
+  }catch(error){
+    console.error("INVITATION_GATEWAY_PROVIDER_FAILED",{recipientDomain:recipientDomain(to),error:safeMailError(error)});
+    return json({ok:false,error:"EMAIL_PROVIDER_FAILED"},502,corsHeaders(request));
+  }
 }
 
 async function sendMemberInvitation(request, env) {
