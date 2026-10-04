@@ -23,7 +23,7 @@ async function queueInductionEmail(inputOrEmail, subject, text, html, options = 
   await queueRef.set({status:"Queued",recipientEmail:to,invitedByUid:input.invitedByUid||invitedByUid||null,createdAt:new Date().toISOString()});
   try {
     const result=await retry(async()=>{
-      const payload=(!legacy && input.invitationId) ? {invitationId:input.invitationId} : {to,name:input.recipientName||recipientName||"Member",subject:input.subject||subject,text:input.text||text,html:input.html||html};
+      const payload={to,name:input.recipientName||recipientName||"Member",subject:input.subject||subject,text:input.text||text,html:input.html||html,invitationId:input.invitationId||null};
       const res=await fetchFn(env.GATEWAY_URL+"/api/send-invitation-email",{method:"POST",headers:{"content-type":"application/json","x-irpa-service-key":env.INVITE_SERVICE_KEY},body:JSON.stringify(payload)});
       if(!res.ok){const err=new Error("Gateway responded "+res.status);err.status=res.status;throw err;} return res.json();
     },{logger,sleep,shouldRetry:(e)=>!(e?.status>=400&&e?.status<500)});
