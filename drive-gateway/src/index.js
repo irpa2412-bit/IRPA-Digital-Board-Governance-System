@@ -1057,7 +1057,7 @@ async function sendGatewayInvitationEmail(request, env) {
 
 async function sendMemberInvitation(request, env) {
   const claims = await authenticateFirebaseRequest(request);
-  const admin = await getFirestoreDocument(env, \`adminProfiles/\${claims.user_id}\`, claims.token);
+  const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
   if (!admin?.fields?.active?.booleanValue) return json({ok:false,error:"Administrator authorization is required to send member invitations."},403,corsHeaders(request));
   await enforceMailRateLimit(env, claims.user_id);
   const data = await request.json();
