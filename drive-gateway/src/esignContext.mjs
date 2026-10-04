@@ -157,6 +157,7 @@ function driveStorage(env, helpers) {
 }
 export function buildEsignContext({env,verifyUser,sendInvitation,logger,now,driveHelpers}) {
   return {
+    env,
     meta:env.DRIVE_MOCK==="true"?mockMeta():doMeta(env),
     storage:driveStorage(env,driveHelpers),
     verifyUser,
