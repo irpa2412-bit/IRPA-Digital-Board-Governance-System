@@ -23,184 +23,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Recover existing production bindings and prepare ESIGN_DO safely
-        env:
-          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Verify controlled production Worker configuration
         run: |
           set -euo pipefail
-          test -n "$CF_API_TOKEN"
-          test -n "$CF_ACCOUNT_ID"
-
-          response="$(curl --fail --silent --show-error             -H "Authorization: Bearer $CF_API_TOKEN"             -H "Accept: application/json"             "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/workers/scripts/irpa-google-drive-gateway/settings")"
-
-          node - "$response" <<'NODE'
-          const fs = require("fs");
-          const response = JSON.parse(process.argv[2]);
-
-          if (response.success !== true) {
-            throw new Error("Cloudflare rejected the production Worker settings request.");
-          }
-
-          const bindings = Array.isArray(response.result?.bindings) ? response.result.bindings : [];
-          const managed = new Map([
-            ["DRIVE_KV", "kv_namespace"],
-            ["ESIGN_DO", "durable_object_namespace"]
-          ]);
-          const resourceTypes = new Set([
-            "kv_namespace",
-            "durable_object_namespace",
-            "r2_bucket",
-            "d1",
-            "service",
-            "ai",
-            "vectorize",
-            "hyperdrive",
-            "queue",
-            "dispatch_namespace",
-            "workflow",
-            "secrets_store"
-          ]);
-          const variableTypes = new Set(["plain_text", "secret_text"]);
-
-          for (const binding of bindings) {
-            const name = String(binding?.name || "");
-            const type = String(binding?.type || "");
-            const expectedType = managed.get(name);
-
-            if (expectedType) {
-              if (type !== expectedType) {
-                throw new Error(
-                  `Safety stop: binding "${name}" has type "${type}", expected "${expectedType}".`
-                );
-              }
-              continue;
-            }
-
-            if (resourceTypes.has(type)) {
-              throw new Error(
-                `Safety stop: unmanaged production resource binding "${name}" of type "${type}" would not be reproduced by this release.`
-              );
-            }
-
-            if (!variableTypes.has(type)) {
-              throw new Error(
-                `Safety stop: unmanaged production binding "${name}" has unsupported type "${type}".`
-              );
-            }
-          }
-
-          const driveKvBindings = bindings.filter(b => b.name === "DRIVE_KV");
-          if (driveKvBindings.length !== 1) {
-            throw new Error("Safety stop: production Worker must contain exactly one DRIVE_KV binding.");
-          }
-
-          const driveKv = driveKvBindings[0];
-          if (!/^[a-f0-9]{32}$/.test(String(driveKv.namespace_id || ""))) {
-            throw new Error(
-              "Safety stop: existing production DRIVE_KV binding was not returned with a valid namespace ID."
-            );
-          }
-
-          const esignBindings = bindings.filter(b => b.name === "ESIGN_DO");
-          if (esignBindings.length > 1) {
-            throw new Error("Safety stop: production Worker contains more than one ESIGN_DO binding.");
-          }
-
-          if (esignBindings.length === 1 &&
-              String(esignBindings[0].class_name || "") !== "EsignRecordDurableObject") {
-            throw new Error(
-              'Safety stop: existing ESIGN_DO must target class "EsignRecordDurableObject".'
-            );
-          }
-
-          const flagBindings = bindings.filter(b => b.name === "ESIGN_MODULE_ENABLED");
-          if (flagBindings.length > 1) {
-            throw new Error("Safety stop: production Worker contains more than one ESIGN_MODULE_ENABLED variable.");
-          }
-          if (flagBindings.length === 1 && String(flagBindings[0].type || "") !== "plain_text") {
-            throw new Error(
-              'Safety stop: ESIGN_MODULE_ENABLED must be a plaintext Worker variable for this release; secret values are never modified.'
-            );
-          }
-
-          const config = {
-            name: "irpa-google-drive-gateway",
-            main: "src/index.js",
-            compatibility_date: "2026-09-24",
-            vars: {
-              ESIGN_MODULE_ENABLED: "true"
-            },
-            kv_namespaces: [
-              { binding: "DRIVE_KV", id: driveKv.namespace_id }
-            ],
-            durable_objects: {
-              bindings: [
-                {
-                  name: "ESIGN_DO",
-                  class_name: "EsignRecordDurableObject"
-                }
-              ]
-            },
-            migrations: [
-              {
-                tag: "esign-do-v1",
-                new_sqlite_classes: ["EsignRecordDurableObject"]
-              }
-            ]
-          };
-
-          fs.writeFileSync("wrangler.json", JSON.stringify(config, null, 2) + "\n");
-          NODE
-
-          echo "Prepared production DRIVE_KV, ESIGN_DO, and ESIGN_MODULE_ENABLED configuration. IDs and credentials are intentionally not printed."
-
-      - name: Verify production Worker configuration
-        run: |
-          set -euo pipefail
-          node <<'NODE'
-          const fs = require("fs");
-          const c = JSON.parse(fs.readFileSync("wrangler.json", "utf8"));
-
-          if (c.name !== "irpa-google-drive-gateway") {
-            throw new Error("Worker identity mismatch.");
-          }
-
-          if (c.vars?.ESIGN_MODULE_ENABLED !== "true") {
-            throw new Error("Production e-signature flag is not exactly true. Deployment blocked.");
-          }
-
-          const kv = Array.isArray(c.kv_namespaces) ? c.kv_namespaces : [];
-          if (kv.length !== 1 || kv[0]?.binding !== "DRIVE_KV" || !/^[a-f0-9]{32}$/.test(String(kv[0]?.id || ""))) {
-            throw new Error("Production DRIVE_KV binding is invalid. Deployment blocked.");
-          }
-
-          const doBindings = c.durable_objects?.bindings || [];
-          if (doBindings.length !== 1 ||
-              doBindings[0]?.name !== "ESIGN_DO" ||
-              doBindings[0]?.class_name !== "EsignRecordDurableObject") {
-            throw new Error("Production ESIGN_DO binding is invalid. Deployment blocked.");
-          }
-
-          const migrations = Array.isArray(c.migrations) ? c.migrations : [];
-          const migration = migrations.find(m => m?.tag === "esign-do-v1");
-          if (!migration ||
-              !Array.isArray(migration.new_sqlite_classes) ||
-              migration.new_sqlite_classes.length !== 1 ||
-              migration.new_sqlite_classes[0] !== "EsignRecordDurableObject") {
-            throw new Error("ESIGN_DO migration is missing or invalid. Deployment blocked.");
-          }
-
-          const topLevelKeys = new Set([
-            "name", "main", "compatibility_date", "vars", "kv_namespaces",
-            "durable_objects", "migrations"
-          ]);
-          for (const key of Object.keys(c)) {
-            if (!topLevelKeys.has(key)) {
-              throw new Error(`Safety stop: unexpected generated Wrangler configuration key "${key}".`);
-            }
-          }
-          NODE
+          test -f wrangler.toml
+          grep -q '^name = "irpa-google-drive-gateway"$' wrangler.toml
+          grep -q '^FIREBASE_PROJECT_ID = "irpa-digital-board-governance"$' wrangler.toml
+          grep -q '^DRIVE_MOCK = "false"$' wrangler.toml
+          grep -q '^LOCAL_TEST_MODE = "false"$' wrangler.toml
+          grep -q '^ESIGN_MODULE_ENABLED = "true"$' wrangler.toml
+          grep -q 'binding = "DRIVE_KV"' wrangler.toml
+          grep -q 'name = "ESIGN_DO"' wrangler.toml
+          grep -q 'class_name = "EsignRecordDurableObject"' wrangler.toml
+          grep -q 'tag = "esign-do-v1"' wrangler.toml
+          grep -q 'new_sqlite_classes = \["EsignRecordDurableObject"\]' wrangler.toml
+          if grep -qi 'staging' wrangler.toml; then
+            echo "Safety stop: production wrangler.toml contains staging configuration."
+            exit 1
+          fi
 
       - name: Verify governance application build
         working-directory: .
@@ -215,7 +55,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: drive-gateway
-          command: deploy --keep-vars
+          command: deploy --config wrangler.toml --keep-vars
 
       - name: Verify production gateway
         run: |
