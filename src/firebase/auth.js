@@ -384,7 +384,7 @@ export async function completeInvitationToken(token) {
   if (!cleanToken) throw new Error("The IRPA invitation token is missing.");
 
   const cloudflareEnabled = import.meta.env.VITE_IRPA_INVITATION_CLOUDFLARE_ENABLED === "true";
-  const cloudflareBase = String(import.meta.env.VITE_IRPA_INVITATION_GATEWAY_URL || "").trim().replace(/\\/$/, "");
+  const cloudflareBase = String(import.meta.env.VITE_IRPA_INVITATION_GATEWAY_URL || "").trim().replace(/\/+$/, "");
 
   try {
     let data;
