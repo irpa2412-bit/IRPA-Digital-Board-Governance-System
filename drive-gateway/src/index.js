@@ -83,7 +83,11 @@ export default {
         return await deleteDriveFile(request, env);
       }
 
-      if (url.pathname === "/api/send-invitation-email" && request.method === "POST") {\n        return await sendGatewayInvitationEmail(request, env);\n      }\n\n      if (url.pathname === "/api/invitations/send" && request.method === "POST") {
+      if (url.pathname === "/api/send-invitation-email" && request.method === "POST") {
+        return await sendGatewayInvitationEmail(request, env);
+      }
+
+      if (url.pathname === "/api/invitations/send" && request.method === "POST") {
         return await sendMemberInvitation(request, env);
       }
 
