@@ -17,7 +17,7 @@ const SMTP_FROM = "info@irpa.or.tz";
 import { escapeHtml as escapeMailHtml, normalizeRecipientEmail, recipientDomain, safeMailError, sendWithRetry, validateMailHeader } from "./mailDelivery.js";
 import { sendInvitationEmail, buildInvitationMessage, validateRecipient } from "./invitationEmail.mjs";
 import { route as esignRoute } from "./router.mjs";
-import { buildEsignContext, EsignRecordDurableObject, EsignIndexDurableObject } from "./esignContext.mjs";
+import { buildEsignContext, EsignRecordDurableObject } from "./esignContext.mjs";
 import { runCleanup } from "./upload.mjs";
 
 let jwksCache = null;
@@ -1770,4 +1770,4 @@ function corsHeaders(request) {
   };
 }
 
-export { EsignRecordDurableObject, EsignIndexDurableObject };
+export { EsignRecordDurableObject };
