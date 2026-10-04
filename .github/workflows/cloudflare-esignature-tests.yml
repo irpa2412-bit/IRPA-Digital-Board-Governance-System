@@ -38,12 +38,28 @@ jobs:
         working-directory: drive-gateway
         run: |
           set -euo pipefail
-          npx wrangler dev --local --port 8787 --var ESIGN_MODULE_ENABLED:false --var DRIVE_MOCK:true > "$RUNNER_TEMP/wrangler-off.log" 2>&1 &
-          echo $! > "$RUNNER_TEMP/wrangler-off.pid"
+          rm -f "$RUNNER_TEMP/wrangler-off.log"
+          npx wrangler dev --local --config wrangler.toml --port 8787 --var ESIGN_MODULE_ENABLED:false --var DRIVE_MOCK:true > "$RUNNER_TEMP/wrangler-off.log" 2>&1 &
+          pid=$!
+          echo "$pid" > "$RUNNER_TEMP/wrangler-off.pid"
+          ready=false
           for i in $(seq 1 30); do
-            if curl --silent --fail http://127.0.0.1:8787/health >/dev/null; then break; fi
+            if ! kill -0 "$pid" 2>/dev/null; then
+              echo "Wrangler OFF exited before becoming ready."
+              cat "$RUNNER_TEMP/wrangler-off.log"
+              exit 1
+            fi
+            if curl --silent --fail http://127.0.0.1:8787/health >/dev/null; then
+              ready=true
+              break
+            fi
             sleep 1
           done
+          if [ "$ready" != "true" ]; then
+            echo "Wrangler OFF did not become ready within 30 seconds."
+            cat "$RUNNER_TEMP/wrangler-off.log"
+            exit 1
+          fi
           curl --silent --show-error --fail http://127.0.0.1:8787/health
           code="$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:8787/api/envelopes)"
           test "$code" = "404"
@@ -56,12 +72,28 @@ jobs:
         working-directory: drive-gateway
         run: |
           set -euo pipefail
-          npx wrangler dev --local --port 8788 --var ESIGN_MODULE_ENABLED:true --var CLOUDFLARE_AUTH_FUNCTIONS_ENABLED:true --var DRIVE_MOCK:true > "$RUNNER_TEMP/wrangler-on.log" 2>&1 &
-          echo $! > "$RUNNER_TEMP/wrangler-on.pid"
+          rm -f "$RUNNER_TEMP/wrangler-on.log"
+          npx wrangler dev --local --config wrangler.toml --port 8788 --var ESIGN_MODULE_ENABLED:true --var CLOUDFLARE_AUTH_FUNCTIONS_ENABLED:true --var DRIVE_MOCK:true > "$RUNNER_TEMP/wrangler-on.log" 2>&1 &
+          pid=$!
+          echo "$pid" > "$RUNNER_TEMP/wrangler-on.pid"
+          ready=false
           for i in $(seq 1 30); do
-            if curl --silent --fail http://127.0.0.1:8788/health >/dev/null; then break; fi
+            if ! kill -0 "$pid" 2>/dev/null; then
+              echo "Wrangler ON exited before becoming ready."
+              cat "$RUNNER_TEMP/wrangler-on.log"
+              exit 1
+            fi
+            if curl --silent --fail http://127.0.0.1:8788/health >/dev/null; then
+              ready=true
+              break
+            fi
             sleep 1
           done
+          if [ "$ready" != "true" ]; then
+            echo "Wrangler ON did not become ready within 30 seconds."
+            cat "$RUNNER_TEMP/wrangler-on.log"
+            exit 1
+          fi
           code="$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:8788/api/sign/open)"
           test "$code" = "401"
           auth_state="$(curl --silent --show-error -X POST -H 'content-type: application/json' --data '{"email":"runtime@example.com"}' http://127.0.0.1:8788/api/auth/password-attempt-state)"
