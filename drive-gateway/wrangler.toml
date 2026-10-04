@@ -28,3 +28,32 @@ class_name = "EsignRecordDurableObject"
 [[migrations]]
 tag = "esign-do-v1"
 new_sqlite_classes = ["EsignRecordDurableObject"]
+
+[env.staging]
+name = "irpa-google-drive-gateway-staging"
+workers_dev = true
+
+[env.staging.vars]
+FIREBASE_PROJECT_ID = "irpa-digital-board-governance"
+AUTHORIZED_DRIVE_EMAIL = "irpa2412@gmail.com"
+IRPA_APP_URL = "https://irpa-digital-board-governance.web.app"
+SMTP_HOST = "mail.irpa.or.tz"
+SMTP_PORT = "465"
+SMTP_FROM = "info@irpa.or.tz"
+DRIVE_ROOT_FOLDER_NAME = "IRPA Governance System"
+FIRESTORE_COLLECTION_PREFIX = ""
+DRIVE_MOCK = "true"
+LOCAL_TEST_MODE = "false"
+ESIGN_MODULE_ENABLED = "true"
+CLOUDFLARE_AUTH_FUNCTIONS_ENABLED = "true"
+
+[[env.staging.kv_namespaces]]
+binding = "DRIVE_KV"
+
+[[env.staging.durable_objects.bindings]]
+name = "ESIGN_DO"
+class_name = "EsignRecordDurableObject"
+
+[[env.staging.migrations]]
+tag = "esign-do-staging-v1"
+new_sqlite_classes = ["EsignRecordDurableObject"]
