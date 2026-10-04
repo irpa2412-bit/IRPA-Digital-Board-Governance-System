@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { normalizeRecipientEmail, validateMailHeader, escapeHtml, sendWithRetry, isAuthorizedInviteCaller } from "../src/mailDelivery.js";
+import { validateRecipient, validateName, buildInvitationMessage, sendInvitationEmail } from "../src/invitationEmail.mjs";
 const sleep = async () => {};
 async function testSuccess() {
   let calls = 0;
@@ -31,3 +32,22 @@ async function testAuthorization() {
 }
 await testSuccess(); await testRetrySuccess(); await testFinalFailure(); await testValidation(); await testAuthorization();
 console.log("ALL MAIL INVITATION TESTS PASSED");
+
+async function testIsolatedInvitationModule() {
+  assert.equal(validateRecipient(" Person@example.com "), "Person@example.com");
+  assert.equal(validateName("Member"), "Member");
+  assert.equal(validateName(undefined), "Member");
+  assert.equal(validateRecipient("bad"), null);
+  assert.equal(validateRecipient("a\nb@example.com"), null);
+  const message=buildInvitationMessage({name:"A <Member>",link:"https://irpa-digital-board-governance.web.app/?invitationToken=test"});
+  assert.match(message.html,/A &lt;Member&gt;/);
+  let attempts=0;
+  const result=await sendInvitationEmail({
+    email:"test@example.com",name:"Member",link:"https://irpa-digital-board-governance.web.app/?invitationToken=test",
+    smtpSend:async ({to,subject,html})=>{attempts++; assert.equal(to,"test@example.com"); assert.ok(subject); assert.ok(html); if(attempts===1) throw new Error("temporary"); return {messageId:"mock-1"};},
+    sleep:async()=>{}
+  });
+  assert.equal(result.messageId,"mock-1"); assert.equal(attempts,2);
+  console.log("PASS isolated invitationEmail.mjs sender and escaping");
+}
+await testIsolatedInvitationModule();
