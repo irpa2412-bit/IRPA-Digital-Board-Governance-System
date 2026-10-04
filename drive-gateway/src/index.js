@@ -1074,7 +1074,7 @@ async function sendMemberInvitation(request, env) {
   const invitationSecret=randomBase64Url(32);
   const invitationTokenHash=await sha256Hex(invitationSecret);
   const invitationExpiresAt=new Date(Date.now()+72*60*60*1000).toISOString();
-  const link=\`\${appUrl}/?invitationToken=\${encodeURIComponent(invitationId+"."+invitationSecret)}\`;
+  const link=`${appUrl}/?invitationToken=${encodeURIComponent(invitationId+"."+invitationSecret)}`;
   await updateFirestoreDocument(env,\`invitations/\${invitationId}\`,claims.token,{
     invitationTokenHash:{stringValue:invitationTokenHash},invitationTokenVersion:{stringValue:"2"},invitationExpiresAt:{timestampValue:invitationExpiresAt},invitationRedeemedAt:{nullValue:null},invitationRedeemedUid:{nullValue:null},
     deliveryStatus:{stringValue:"Queued"},deliveryQueuedAt:{timestampValue:new Date().toISOString()},deliveryError:{stringValue:""},deliveryProvider:{stringValue:"IRPA Mail Server via Cloudflare Worker"}
