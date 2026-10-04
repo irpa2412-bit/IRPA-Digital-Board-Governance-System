@@ -14,6 +14,12 @@ export class EsignRecordDurableObject {
     return this.state.blockConcurrencyWhile(async () => {
       const key = String(body.key || "");
       if (!key) return Response.json({ ok:false, error:"Missing record key." }, {status:400});
+      if (key === "__index__") {
+        const keys = (await this.state.storage.get("keys")) || {};
+        if (body.op === "add") { keys[body.recordKey] = true; await this.state.storage.put("keys",keys); return Response.json({ok:true}); }
+        if (body.op === "remove") { delete keys[body.recordKey]; await this.state.storage.put("keys",keys); return Response.json({ok:true}); }
+        if (body.op === "list") return Response.json({ok:true,keys:Object.keys(keys)});
+      }
       if (body.op === "get") return Response.json({ok:true, value:await this.state.storage.get("record") || null});
       if (body.op === "create") {
         if (await this.state.storage.get("record")) return Response.json({ok:false,error:"exists"},{status:409});
@@ -31,20 +37,6 @@ export class EsignRecordDurableObject {
         await this.state.storage.delete("record");
         return Response.json({ok:true});
       }
-      return Response.json({ok:false,error:"Unsupported operation."},{status:400});
-    });
-  }
-}
-
-export class EsignIndexDurableObject {
-  constructor(state) { this.state = state; }
-  async fetch(request) {
-    const body = await request.json();
-    return this.state.blockConcurrencyWhile(async () => {
-      const keys = (await this.state.storage.get("keys")) || {};
-      if (body.op === "add") { keys[body.key] = true; await this.state.storage.put("keys",keys); return Response.json({ok:true}); }
-      if (body.op === "remove") { delete keys[body.key]; await this.state.storage.put("keys",keys); return Response.json({ok:true}); }
-      if (body.op === "list") return Response.json({ok:true,keys:Object.keys(keys)});
       return Response.json({ok:false,error:"Unsupported operation."},{status:400});
     });
   }
@@ -74,10 +66,10 @@ function doMeta(env) {
   const index=env.ESIGN_DO.idFromName("__index__");
   return {
     async get(c,id){ const r=await doCall(env.ESIGN_DO,c+"/"+id,{op:"get",key:c+"/"+id}); return r.value; },
-    async create(c,id,d){ await doCall(env.ESIGN_DO,c+"/"+id,{op:"create",key:c+"/"+id,value:d}); await doCall(env.ESIGN_DO,"__index__",{op:"add",key:c+"/"+id}); },
+    async create(c,id,d){ await doCall(env.ESIGN_DO,c+"/"+id,{op:"create",key:c+"/"+id,value:d}); await doCall(env.ESIGN_DO,"__index__",{op:"add",recordKey:c+"/"+id,key:"__index__"}); },
     async update(c,id,p,o={}){ await doCall(env.ESIGN_DO,c+"/"+id,{op:"update",key:c+"/"+id,patch:p,ifVersion:o.ifVersion}); },
-    async delete(c,id){ await doCall(env.ESIGN_DO,c+"/"+id,{op:"delete",key:c+"/"+id}); await doCall(env.ESIGN_DO,"__index__",{op:"remove",key:c+"/"+id}); },
-    async list(c){ const keys=(await doCall(env.ESIGN_DO,"__index__",{op:"list"})).keys.filter(k=>k.startsWith(c+"/")); const out=[]; for(const k of keys){const r=await doCall(env.ESIGN_DO,k,{op:"get",key:k}); if(r.value) out.push({id:k.slice(c.length+1),...r.value});} return out; }
+    async delete(c,id){ await doCall(env.ESIGN_DO,c+"/"+id,{op:"delete",key:c+"/"+id}); await doCall(env.ESIGN_DO,"__index__",{op:"remove",recordKey:c+"/"+id,key:"__index__"}); },
+    async list(c){ const keys=(await doCall(env.ESIGN_DO,"__index__",{op:"list",key:"__index__"})).keys.filter(k=>k.startsWith(c+"/")); const out=[]; for(const k of keys){const r=await doCall(env.ESIGN_DO,k,{op:"get",key:k}); if(r.value) out.push({id:k.slice(c.length+1),...r.value});} return out; }
   };
 }
 async function driveFolder(env, accessToken, path) {
