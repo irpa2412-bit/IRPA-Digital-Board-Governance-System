@@ -944,6 +944,7 @@ exports.redeemInvitationToken = onCall({region:"us-central1"}, async request => 
   const invitationId=parts[0];
   const secret=parts[1];
   if(!invitationId||!secret) throw new HttpsError("invalid-argument","The invitation token is invalid.");
+
   const ref=db.collection("invitations").doc(invitationId);
   const snap=await ref.get();
   if(!snap.exists) throw new HttpsError("not-found","This IRPA invitation no longer exists.");
@@ -951,31 +952,100 @@ exports.redeemInvitationToken = onCall({region:"us-central1"}, async request => 
   if(invitation.status==="Cancelled") throw new HttpsError("failed-precondition","This IRPA invitation has been cancelled.");
   if(invitation.invitationRedeemedAt) throw new HttpsError("already-exists","This IRPA invitation token has already been redeemed. Ask an administrator to issue a fresh invitation.");
   if(invitation.invitationTokenVersion!=="2"||!invitation.invitationTokenHash) throw new HttpsError("failed-precondition","This invitation was issued under an older invitation mechanism. Ask an administrator to issue a fresh invitation.");
+
   const expiresAt=invitation.invitationExpiresAt?.toDate?invitation.invitationExpiresAt.toDate():new Date(invitation.invitationExpiresAt||0);
   if(!expiresAt.getTime()||expiresAt.getTime()<=Date.now()) throw new HttpsError("deadline-exceeded","This IRPA invitation has expired. Ask an administrator to issue a fresh invitation.");
+
   const suppliedHash=crypto.createHash("sha256").update(secret).digest("hex");
   const expectedHash=String(invitation.invitationTokenHash||"");
-  if(expectedHash.length!==suppliedHash.length || !crypto.timingSafeEqual(Buffer.from(suppliedHash),Buffer.from(expectedHash))) throw new HttpsError("permission-denied","The invitation token is invalid.");
+  if(expectedHash.length!==suppliedHash.length || !crypto.timingSafeEqual(Buffer.from(suppliedHash),Buffer.from(expectedHash))) {
+    throw new HttpsError("permission-denied","The invitation token is invalid.");
+  }
+
   const email=String(invitation.email||"").trim().toLowerCase();
   if(!email||!email.includes("@")) throw new HttpsError("failed-precondition","The invitation has no valid recipient email.");
+
   const authAdmin=getAuth();
   let user;
   try {
     user=await authAdmin.getUserByEmail(email);
   } catch(error) {
-    if(error?.code!=="auth/user-not-found") throw error;
-    user=await authAdmin.createUser({email,emailVerified:false,displayName:String(invitation.name||email.split("@")[0]),disabled:false});
+    if(error?.code!=="auth/user-not-found") {
+      console.error("Invitation redemption: getUserByEmail failed",{
+        invitationId,email,code:error?.code||null,message:error?.message||null
+      });
+      throw new HttpsError("internal","The invitation could not be validated against Firebase Authentication.");
+    }
+    try {
+      user=await authAdmin.createUser({
+        email,
+        emailVerified:false,
+        displayName:String(invitation.name||email.split("@")[0]),
+        disabled:false
+      });
+    } catch(createError) {
+      if(createError?.code==="auth/email-already-exists") {
+        try {
+          user=await authAdmin.getUserByEmail(email);
+        } catch(refetchError) {
+          console.error("Invitation redemption: existing-user lookup failed",{
+            invitationId,email,code:refetchError?.code||null,message:refetchError?.message||null
+          });
+          throw new HttpsError("internal","The invitation could not be linked to the existing Firebase account.");
+        }
+      } else {
+        console.error("Invitation redemption: createUser failed",{
+          invitationId,email,code:createError?.code||null,message:createError?.message||null
+        });
+        throw new HttpsError("internal","The invitation could not create the Firebase account.");
+      }
+    }
   }
+
   if(invitation.invitationRedeemedUid && invitation.invitationRedeemedUid!==user.uid) {
     throw new HttpsError("already-exists","This invitation has already been redeemed for another Firebase account.");
   }
-  await ref.set({
-    invitationRedeemedUid:user.uid,
-    invitationRedeemedAt:invitation.invitationRedeemedAt||FieldValue.serverTimestamp(),
-    invitationRedemptionStatus:"Redeemed — Awaiting Activation",
-    updatedAt:FieldValue.serverTimestamp()
-  },{merge:true});
-  const customToken=await authAdmin.createCustomToken(user.uid,{irpaInvitationId:invitationId,irpaInvitationRedeemed:true});
+
+  let customToken;
+  try {
+    customToken=await authAdmin.createCustomToken(user.uid,{
+      irpaInvitationId:invitationId,
+      irpaInvitationRedeemed:true
+    });
+  } catch(error) {
+    console.error("Invitation redemption: custom token creation failed",{
+      invitationId,uid:user.uid,code:error?.code||null,message:error?.message||null
+    });
+    throw new HttpsError("internal","The invitation account was found, but the activation session could not be created. Please ask an administrator to issue a fresh invitation.");
+  }
+
+  try {
+    await db.runTransaction(async tx => {
+      const currentSnap=await tx.get(ref);
+      if(!currentSnap.exists) throw new HttpsError("not-found","This IRPA invitation no longer exists.");
+      const current=currentSnap.data()||{};
+      if(current.status==="Cancelled") throw new HttpsError("failed-precondition","This IRPA invitation has been cancelled.");
+      if(current.invitationRedeemedAt) {
+        throw new HttpsError("already-exists","This IRPA invitation token has already been redeemed. Ask an administrator to issue a fresh invitation.");
+      }
+      if(current.invitationRedeemedUid && current.invitationRedeemedUid!==user.uid) {
+        throw new HttpsError("already-exists","This invitation has already been redeemed for another Firebase account.");
+      }
+      tx.set(ref,{
+        invitationRedeemedUid:user.uid,
+        invitationRedeemedAt:FieldValue.serverTimestamp(),
+        invitationRedemptionStatus:"Redeemed — Awaiting Activation",
+        updatedAt:FieldValue.serverTimestamp()
+      },{merge:true});
+    });
+  } catch(error) {
+    if(error instanceof HttpsError) throw error;
+    console.error("Invitation redemption: Firestore redemption update failed",{
+      invitationId,uid:user.uid,code:error?.code||null,message:error?.message||null
+    });
+    throw new HttpsError("internal","The invitation was validated, but its redemption record could not be completed. Please try again or ask an administrator for a fresh invitation.");
+  }
+
   return {ok:true,customToken,invitationId,uid:user.uid,email};
 });
 
