@@ -2,7 +2,7 @@ name: Cloudflare E-Signature Runtime Tests
 
 on:
   push:
-    branches: ["repair/esign-production-entrypoint-20261004"]
+    branches: ["repair/esign-production-entrypoint-20261004", "repair/cloudflare-auth-functions-20261004"]
     paths:
       - "drive-gateway/**"
       - "firebase.json"
@@ -38,30 +38,78 @@ jobs:
         working-directory: drive-gateway
         run: |
           set -euo pipefail
-          npx wrangler dev --local --port 8787 --var ESIGN_MODULE_ENABLED:false --var DRIVE_MOCK:true > "$RUNNER_TEMP/wrangler-off.log" 2>&1 &
-          echo $! > "$RUNNER_TEMP/wrangler-off.pid"
+          rm -f "$RUNNER_TEMP/wrangler-off.log"
+          npx wrangler dev --local --config wrangler.toml --compatibility-date 2026-09-24 --port 8787 --var ESIGN_MODULE_ENABLED:false --var DRIVE_MOCK:true > "$RUNNER_TEMP/wrangler-off.log" 2>&1 &
+          pid=$!
+          echo "$pid" > "$RUNNER_TEMP/wrangler-off.pid"
+          ready=false
           for i in $(seq 1 30); do
-            if curl --silent --fail http://127.0.0.1:8787/health >/dev/null; then break; fi
+            if ! kill -0 "$pid" 2>/dev/null; then
+              echo "Wrangler OFF exited before becoming ready."
+              cat "$RUNNER_TEMP/wrangler-off.log"
+              exit 1
+            fi
+            if curl --silent --fail http://127.0.0.1:8787/health >/dev/null; then
+              ready=true
+              break
+            fi
             sleep 1
           done
+          if [ "$ready" != "true" ]; then
+            echo "Wrangler OFF did not become ready within 30 seconds."
+            cat "$RUNNER_TEMP/wrangler-off.log"
+            exit 1
+          fi
           curl --silent --show-error --fail http://127.0.0.1:8787/health
           code="$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:8787/api/envelopes)"
           test "$code" = "404"
           code="$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:8787/api/sign/open)"
+          test "$code" = "404"
+          code="$(curl --silent --output /dev/null --write-out '%{http_code}' -X POST -H 'content-type: application/json' --data '{"email":"off@example.com"}' http://127.0.0.1:8787/api/auth/password-attempt-state)"
           test "$code" = "404"
           kill "$(cat "$RUNNER_TEMP/wrangler-off.pid")" || true
       - name: Start Wrangler local worker with e-signature flag ON
         working-directory: drive-gateway
         run: |
           set -euo pipefail
-          npx wrangler dev --local --port 8788 --var ESIGN_MODULE_ENABLED:true --var DRIVE_MOCK:true > "$RUNNER_TEMP/wrangler-on.log" 2>&1 &
-          echo $! > "$RUNNER_TEMP/wrangler-on.pid"
+          rm -f "$RUNNER_TEMP/wrangler-on.log"
+          npx wrangler dev --local --config wrangler.toml --env staging --compatibility-date 2026-09-24 --port 8788 --var DRIVE_MOCK:true > "$RUNNER_TEMP/wrangler-on.log" 2>&1 &
+          pid=$!
+          echo "$pid" > "$RUNNER_TEMP/wrangler-on.pid"
+          ready=false
           for i in $(seq 1 30); do
-            if curl --silent --fail http://127.0.0.1:8788/health >/dev/null; then break; fi
+            if ! kill -0 "$pid" 2>/dev/null; then
+              echo "Wrangler ON exited before becoming ready."
+              cat "$RUNNER_TEMP/wrangler-on.log"
+              exit 1
+            fi
+            if curl --silent --fail http://127.0.0.1:8788/health >/dev/null; then
+              ready=true
+              break
+            fi
             sleep 1
           done
-          code="$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:8788/api/sign/open)"
-          test "$code" = "401"
+          if [ "$ready" != "true" ]; then
+            echo "Wrangler ON did not become ready within 30 seconds."
+            cat "$RUNNER_TEMP/wrangler-on.log"
+            exit 1
+          fi
+          sign_code="$(curl --silent --show-error --output "$RUNNER_TEMP/sign-open-body.txt" --write-out '%{http_code}' http://127.0.0.1:8788/api/sign/open)"
+          sign_body="$(cat "$RUNNER_TEMP/sign-open-body.txt")"
+          echo "Sign-open HTTP $sign_code: $sign_body"
+          test "$sign_code" = "401"
+          auth_state_code="$(curl --silent --show-error --output "$RUNNER_TEMP/auth-state-body.txt" --write-out '%{http_code}' -X POST -H 'content-type: application/json' --data '{"email":"runtime@example.com"}' http://127.0.0.1:8788/api/auth/password-attempt-state)"
+          auth_state="$(cat "$RUNNER_TEMP/auth-state-body.txt")"
+          echo "Auth-state HTTP $auth_state_code: $auth_state"
+          test "$auth_state_code" = "200"
+          echo "$auth_state" | grep -q '"status":"FIRST"'
+          auth_failure_code="$(curl --silent --show-error --output "$RUNNER_TEMP/auth-failure-body.txt" --write-out '%{http_code}' -X POST -H 'content-type: application/json' --data '{"email":"runtime@example.com"}' http://127.0.0.1:8788/api/auth/password-failure)"
+          auth_failure="$(cat "$RUNNER_TEMP/auth-failure-body.txt")"
+          echo "Auth-failure HTTP $auth_failure_code: $auth_failure"
+          test "$auth_failure_code" = "200"
+          echo "$auth_failure" | grep -q '"remainingAttempts":2'
+          next_code="$(curl --silent --output /dev/null --write-out '%{http_code}' -X POST http://127.0.0.1:8788/api/documents/next-reference)"
+          test "$next_code" = "401"
           headers="$(curl --silent --dump-header - --output /dev/null -X OPTIONS -H 'Origin: https://irpa-digital-board-governance.web.app' http://127.0.0.1:8788/api/sign/open)"
           printf '%s\n' "$headers" | grep -qi 'x-signing-token'
           kill "$(cat "$RUNNER_TEMP/wrangler-on.pid")" || true

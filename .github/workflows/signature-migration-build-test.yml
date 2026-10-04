@@ -38,3 +38,100 @@ jobs:
           VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
           VITE_GOOGLE_DRIVE_GATEWAY_URL: ${{ secrets.VITE_GOOGLE_DRIVE_GATEWAY_URL }}
         run: npm run build
+
+
+  deploy-cloudflare-staging:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: drive-gateway
+    steps:
+      - name: Checkout controlled repair branch
+        uses: actions/checkout@v4
+
+      - name: Verify isolated staging configuration
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require("fs");
+          const text = fs.readFileSync("wrangler.toml", "utf8");
+          if (!/\[env\.staging\]/.test(text)) throw new Error("Staging environment is missing.");
+          if (!/name = "irpa-google-drive-gateway-staging"/.test(text)) throw new Error("Staging Worker name is incorrect.");
+          if (!/\[env\.staging\.vars\][\s\S]*CLOUDFLARE_AUTH_FUNCTIONS_ENABLED = "true"/.test(text)) throw new Error("Staging migration flag must be true.");
+          if (!/\[env\.staging\.vars\][\s\S]*DRIVE_MOCK = "false"/.test(text)) throw new Error("Staging must use real Durable Object state (DRIVE_MOCK=false).");
+          if (!/\[\[env\.staging\.kv_namespaces\]\][\s\S]*binding = "DRIVE_KV"/.test(text)) throw new Error("Staging DRIVE_KV binding is missing.");
+          if (!/\[\[env\.staging\.durable_objects\.bindings\]\][\s\S]*name = "ESIGN_DO"[\s\S]*class_name = "EsignRecordDurableObject"/.test(text)) throw new Error("Staging ESIGN_DO binding is missing.");
+          if (!/\[\[env\.staging\.migrations\]\][\s\S]*tag = "esign-do-staging-v1"/.test(text)) throw new Error("Staging DO migration is missing.");
+          const top = text.split("[env.staging]")[0];
+          if (!/CLOUDFLARE_AUTH_FUNCTIONS_ENABLED = "true"/.test(top)) throw new Error("Production/top-level migration flag must be explicitly enabled after cutover.");
+          if (!/IRPA_PRODUCTION_CUTOVER = "true"/.test(top)) throw new Error("Explicit production cutover marker is missing.");
+          NODE
+
+      - name: Install gateway dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Validate staging configuration
+        run: npx wrangler deploy --env staging --dry-run
+
+      - name: Deploy isolated Cloudflare staging Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: drive-gateway
+          command: deploy --env staging
+
+      - name: Confirm deployed staging environment
+        run: |
+          set -euo pipefail
+          echo "Cloudflare staging Worker deployed as irpa-google-drive-gateway-staging."
+          echo "Environment-specific DRIVE_KV and ESIGN_DO bindings were validated before deployment by the Wrangler dry-run."
+          echo "Live endpoint checks below are the authoritative runtime verification."
+          
+      - name: Verify staging health
+        run: |
+          set -euo pipefail
+          base="https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
+          body="$(curl --fail --silent --show-error --retry 8 --retry-delay 2 "$base/health")"
+          echo "$body"
+          echo "$body" | grep -q '"ok":true'
+          echo "$body" | grep -q '"environment":"staging"'
+          echo "$body" | grep -q '"esignModuleEnabled":true'
+          echo "$body" | grep -q '"authFunctionsEnabled":true'
+          echo "$body" | grep -q '"driveMock":false'
+
+      - name: Verify migrated authentication runtime
+        run: |
+          set -euo pipefail
+          base="https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
+          email="staging-runtime-$(date +%s)-$RANDOM@example.com"
+          state="$(curl --fail --silent --show-error -H "Content-Type: application/json" -d "{\"email\":\"$email\"}" "$base/api/auth/password-attempt-state")"
+          echo "$state"
+          echo "$state" | grep -q '"status":"FIRST"'
+          for expected in 2 1; do
+            failure="$(curl --fail --silent --show-error -H "Content-Type: application/json" -d "{\"email\":\"$email\"}" "$base/api/auth/password-failure")"
+            echo "$failure"
+            echo "$failure" | grep -q "\"remainingAttempts\":$expected"
+          done
+          locked="$(curl --fail --silent --show-error -H "Content-Type: application/json" -d "{\"email\":\"$email\"}" "$base/api/auth/password-failure")"
+          echo "$locked"
+          echo "$locked" | grep -q '"status":"LOCKED"'
+          cleared="$(curl --fail --silent --show-error -H "Content-Type: application/json" -d "{\"email\":\"$email\"}" "$base/api/auth/password-attempt-clear")"
+          echo "$cleared"
+          echo "$cleared" | grep -q '"ok":true'
+          reset="$(curl --fail --silent --show-error -H "Content-Type: application/json" -d "{\"email\":\"$email\"}" "$base/api/auth/password-attempt-state")"
+          echo "$reset"
+          echo "$reset" | grep -q '"status":"FIRST"'
+
+      - name: Verify document-reference authentication gate and CORS
+        run: |
+          set -euo pipefail
+          base="https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
+          code="$(curl --silent --show-error -o /tmp/ref.json -w "%{http_code}" -H "Content-Type: application/json" -d "{}" "$base/api/documents/next-reference")"
+          cat /tmp/ref.json
+          test "$code" = "401"
+          headers="$(curl --silent --show-error -D - -o /dev/null -X OPTIONS -H "Origin: https://irpa-digital-board-governance.web.app" "$base/api/sign/open")"
+          echo "$headers" | grep -i '^access-control-allow-headers:' | grep -qi 'x-signing-token'
+          echo "Cloudflare staging runtime verification passed."

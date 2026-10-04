@@ -68,6 +68,12 @@ jobs:
           }
 
           const toml = fs.readFileSync("wrangler.toml", "utf8");
+          if (!/CLOUDFLARE_AUTH_FUNCTIONS_ENABLED = "true"/.test(toml)) {
+            throw new Error("Safety stop: production cutover flag is not explicitly enabled in the controlled configuration.");
+          }
+          if (!/IRPA_PRODUCTION_CUTOVER = "true"/.test(toml)) {
+            throw new Error("Safety stop: explicit IRPA production cutover marker is missing.");
+          }
           const match = toml.match(/\[\[kv_namespaces\]\][\s\S]*?binding\s*=\s*"DRIVE_KV"[\s\S]*?id\s*=\s*"([a-f0-9]{32})"/i);
           if (!match) throw new Error("Safety stop: repository production wrangler.toml does not contain a valid DRIVE_KV ID.");
           const configuredDriveKvId = match[1].toLowerCase();
@@ -89,14 +95,18 @@ jobs:
           const flagBindings = bindings.filter(b => b.name === "ESIGN_MODULE_ENABLED");
           if (flagBindings.length > 1) throw new Error("Safety stop: production Worker contains more than one ESIGN_MODULE_ENABLED variable.");
           if (flagBindings.length === 1 && String(flagBindings[0].type || "") !== "plain_text") {
-            throw new Error('Safety stop: ESIGN_MODULE_ENABLED must be plaintext; secret values are never modified.');
+            throw new Error("Safety stop: ESIGN_MODULE_ENABLED must be plaintext; secret values are never modified.");
           }
 
           const config = {
             name: "irpa-google-drive-gateway",
             main: "src/index.js",
             compatibility_date: "2026-09-24",
-            vars: { ESIGN_MODULE_ENABLED: "true" },
+            vars: {
+              ESIGN_MODULE_ENABLED: "true",
+              CLOUDFLARE_AUTH_FUNCTIONS_ENABLED: "true",
+              IRPA_PRODUCTION_CUTOVER: "true"
+            },
             kv_namespaces: [{ binding: "DRIVE_KV", id: configuredDriveKvId }],
             durable_objects: {
               bindings: [{ name: "ESIGN_DO", class_name: "EsignRecordDurableObject" }]
@@ -109,9 +119,9 @@ jobs:
           fs.writeFileSync("wrangler.json", JSON.stringify(config, null, 2) + "\n");
           NODE
 
-          echo "Prepared production DRIVE_KV, ESIGN_DO, and ESIGN_MODULE_ENABLED configuration. IDs and credentials are intentionally not printed."
+          echo "Prepared production cutover configuration. IDs and credentials are intentionally not printed."
 
-      - name: Verify production Worker configuration
+      - name: Verify explicit production cutover configuration
         run: |
           set -euo pipefail
           node <<'NODE'
@@ -119,6 +129,8 @@ jobs:
           const c = JSON.parse(fs.readFileSync("wrangler.json", "utf8"));
           if (c.name !== "irpa-google-drive-gateway") throw new Error("Worker identity mismatch.");
           if (c.vars?.ESIGN_MODULE_ENABLED !== "true") throw new Error("Production e-signature flag is not exactly true. Deployment blocked.");
+          if (c.vars?.CLOUDFLARE_AUTH_FUNCTIONS_ENABLED !== "true") throw new Error("Production Cloudflare authentication cutover flag is not exactly true. Deployment blocked.");
+          if (c.vars?.IRPA_PRODUCTION_CUTOVER !== "true") throw new Error("Explicit production cutover marker is missing. Deployment blocked.");
           const kv = Array.isArray(c.kv_namespaces) ? c.kv_namespaces : [];
           if (kv.length !== 1 || kv[0]?.binding !== "DRIVE_KV" || !/^[a-f0-9]{32}$/.test(String(kv[0]?.id || ""))) {
             throw new Error("Production DRIVE_KV binding is invalid. Deployment blocked.");
@@ -146,7 +158,7 @@ jobs:
           npm install
           npm run build
 
-      - name: Deploy existing production Worker
+      - name: Deploy production Worker — authorized cutover
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -161,3 +173,34 @@ jobs:
           echo "$body"
           echo "$body" | grep -q '"ok":true'
           echo "$body" | grep -q '"storageProvider":"Google Drive"'
+
+      - name: Verify migrated authentication runtime is live
+        run: |
+          set -euo pipefail
+          base="https://irpa-google-drive-gateway.irpa-governance.workers.dev"
+          email="production-cutover-$(date +%s)-$RANDOM@example.com"
+          state="$(curl --fail --silent --show-error -H "Content-Type: application/json" -d "{\"email\":\"$email\"}" "$base/api/auth/password-attempt-state")"
+          echo "$state"
+          echo "$state" | grep -q '"status":"FIRST"'
+          for expected in 2 1; do
+            failure="$(curl --fail --silent --show-error -H "Content-Type: application/json" -d "{\"email\":\"$email\"}" "$base/api/auth/password-failure")"
+            echo "$failure"
+            echo "$failure" | grep -q "\"remainingAttempts\":$expected"
+          done
+          locked="$(curl --fail --silent --show-error -H "Content-Type: application/json" -d "{\"email\":\"$email\"}" "$base/api/auth/password-failure")"
+          echo "$locked"
+          echo "$locked" | grep -q '"status":"LOCKED"'
+          cleared="$(curl --fail --silent --show-error -H "Content-Type: application/json" -d "{\"email\":\"$email\"}" "$base/api/auth/password-attempt-clear")"
+          echo "$cleared"
+          echo "$cleared" | grep -q '"ok":true'
+          reset="$(curl --fail --silent --show-error -H "Content-Type: application/json" -d "{\"email\":\"$email\"}" "$base/api/auth/password-attempt-state")"
+          echo "$reset"
+          echo "$reset" | grep -q '"status":"FIRST"'
+
+      - name: Verify production document-reference auth gate
+        run: |
+          set -euo pipefail
+          base="https://irpa-google-drive-gateway.irpa-governance.workers.dev"
+          code="$(curl --silent --show-error -o /tmp/ref.json -w "%{http_code}" -H "Content-Type: application/json" -d "{}" "$base/api/documents/next-reference")"
+          cat /tmp/ref.json
+          test "$code" = "401"

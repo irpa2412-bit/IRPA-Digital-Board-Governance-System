@@ -88,3 +88,69 @@ test("regression: /api/invitations/send remains authentication-gated", async () 
   });
   assert.equal(r.status, 401);
 });
+
+
+test("Cloudflare auth migration flag-off keeps password attempt state unavailable", async () => {
+  const r = await call("/api/auth/password-attempt-state", {
+    method:"POST",
+    env:{ESIGN_MODULE_ENABLED:"true", CLOUDFLARE_AUTH_FUNCTIONS_ENABLED:"false", DRIVE_MOCK:"true"},
+    headers:{"content-type":"application/json"},
+    body:JSON.stringify({email:"test@example.com"})
+  });
+  assert.equal(r.status, 404);
+});
+
+test("Cloudflare auth migration flag-on returns initial password attempt state", async () => {
+  const r = await call("/api/auth/password-attempt-state", {
+    method:"POST",
+    env:{ESIGN_MODULE_ENABLED:"true", CLOUDFLARE_AUTH_FUNCTIONS_ENABLED:"true", DRIVE_MOCK:"true"},
+    headers:{"content-type":"application/json"},
+    body:JSON.stringify({email:"cloudflare-migration@example.com"})
+  });
+  assert.equal(r.status, 200);
+  assert.deepEqual(await r.json(), {allowed:true,status:"FIRST",remainingAttempts:3,resetRequired:false});
+});
+
+test("Cloudflare auth migration preserves three-attempt lock semantics", async () => {
+  const env={ESIGN_MODULE_ENABLED:"true", CLOUDFLARE_AUTH_FUNCTIONS_ENABLED:"true", DRIVE_MOCK:"true"};
+  const headers={"content-type":"application/json"};
+  for (let i=1;i<=2;i++) {
+    const r=await call("/api/auth/password-failure",{method:"POST",env,headers,body:JSON.stringify({email:"lock-test@example.com"})});
+    assert.equal(r.status,200);
+    const body=await r.json();
+    assert.equal(body.status,"FIRST");
+    assert.equal(body.remainingAttempts,3-i);
+  }
+  const locked=await call("/api/auth/password-failure",{method:"POST",env,headers,body:JSON.stringify({email:"lock-test@example.com"})});
+  assert.equal(locked.status,200);
+  assert.equal((await locked.json()).status,"LOCKED");
+});
+
+test("Cloudflare auth migration clears password attempt state", async () => {
+  const env={ESIGN_MODULE_ENABLED:"true", CLOUDFLARE_AUTH_FUNCTIONS_ENABLED:"true", DRIVE_MOCK:"true"};
+  const headers={"content-type":"application/json"};
+  await call("/api/auth/password-failure",{method:"POST",env,headers,body:JSON.stringify({email:"clear-test@example.com"})});
+  const cleared=await call("/api/auth/password-attempt-clear",{method:"POST",env,headers,body:JSON.stringify({email:"clear-test@example.com"})});
+  assert.equal(cleared.status,200);
+  assert.deepEqual(await cleared.json(),{ok:true});
+  const state=await call("/api/auth/password-attempt-state",{method:"POST",env,headers,body:JSON.stringify({email:"clear-test@example.com"})});
+  assert.equal((await state.json()).status,"FIRST");
+});
+
+test("Cloudflare document-reference migration remains authentication-gated", async () => {
+  const r=await call("/api/documents/next-reference",{
+    method:"POST",
+    env:{ESIGN_MODULE_ENABLED:"true", CLOUDFLARE_AUTH_FUNCTIONS_ENABLED:"true", DRIVE_MOCK:"true"}
+  });
+  assert.equal(r.status,401);
+});
+
+test("Cloudflare auth migration rejects malformed password-state input", async () => {
+  const r=await call("/api/auth/password-attempt-state",{
+    method:"POST",
+    env:{ESIGN_MODULE_ENABLED:"true", CLOUDFLARE_AUTH_FUNCTIONS_ENABLED:"true", DRIVE_MOCK:"true"},
+    headers:{"content-type":"application/json"},
+    body:JSON.stringify({email:"not-an-email"})
+  });
+  assert.equal(r.status,400);
+});

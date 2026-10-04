@@ -14,12 +14,66 @@ export class EsignRecordDurableObject {
     return this.state.blockConcurrencyWhile(async () => {
       const key = String(body.key || "");
       if (!key) return Response.json({ ok:false, error:"Missing record key." }, {status:400});
+
       if (key === "__index__") {
         const keys = (await this.state.storage.get("keys")) || {};
         if (body.op === "add") { keys[body.recordKey] = true; await this.state.storage.put("keys",keys); return Response.json({ok:true}); }
         if (body.op === "remove") { delete keys[body.recordKey]; await this.state.storage.put("keys",keys); return Response.json({ok:true}); }
         if (body.op === "list") return Response.json({ok:true,keys:Object.keys(keys)});
       }
+
+      if (body.operation === "auth-get") {
+        return Response.json({ok:true,state:await this.state.storage.get("authState") || {}});
+      }
+
+      if (body.operation === "auth-set") {
+        await this.state.storage.put("authState", body.state || {});
+        return Response.json({ok:true});
+      }
+
+      if (body.operation === "auth-expire-lock") {
+        const current = await this.state.storage.get("authState") || {};
+        await this.state.storage.put("authState",{stage:"SECOND",failedAttempts:0,lockUntilMs:0,updatedAt:Date.now()});
+        return Response.json({ok:true,previousStage:current.stage || null});
+      }
+
+      if (body.operation === "auth-clear") {
+        await this.state.storage.put("authState",{stage:"FIRST",failedAttempts:0,lockUntilMs:0,updatedAt:Date.now()});
+        return Response.json({ok:true});
+      }
+
+      if (body.operation === "auth-record-failure") {
+        const current = await this.state.storage.get("authState") || {};
+        const now = Date.now();
+        if (current.stage === "SUSPENDED") return Response.json({ok:true,status:"SUSPENDED",resetRequired:true,remainingAttempts:0});
+        if (current.stage === "LOCKED" && Number(current.lockUntilMs || 0) > now) {
+          return Response.json({ok:true,status:"LOCKED",retryAfterSeconds:Math.ceil((current.lockUntilMs-now)/1000),remainingAttempts:0,resetRequired:false});
+        }
+        const stage = String(current.stage || "FIRST");
+        const limit = stage === "SECOND" ? 3 : 3;
+        const failedAttempts = Number(current.failedAttempts || 0) + 1;
+        if (failedAttempts < limit) {
+          await this.state.storage.put("authState",{stage,failedAttempts,lockUntilMs:0,updatedAt:now});
+          return Response.json({ok:true,status:stage,remainingAttempts:limit-failedAttempts,resetRequired:false});
+        }
+        if (stage === "FIRST") {
+          await this.state.storage.put("authState",{stage:"LOCKED",failedAttempts:0,lockUntilMs:now+5*60*1000,updatedAt:now});
+          return Response.json({ok:true,status:"LOCKED",retryAfterSeconds:300,remainingAttempts:0,resetRequired:false});
+        }
+        await this.state.storage.put("authState",{stage:"SUSPENDED",failedAttempts,lockUntilMs:0,updatedAt:now});
+        return Response.json({ok:true,status:"SUSPENDED",remainingAttempts:0,resetRequired:true});
+      }
+
+      if (body.operation === "next-reference") {
+        const current = await this.state.storage.get("documentReferenceCounter") || {};
+        const year = new Date().getUTCFullYear();
+        const currentYear = Number(current.year || 0);
+        const nextNumber = currentYear === year ? Number(current.nextNumber || 1) : 1;
+        const reference = "IRPA-DOC-" + year + "-" + String(nextNumber).padStart(5,"0");
+        await this.state.storage.put("documentReferenceCounter",{year,nextNumber:nextNumber+1,updatedAt:Date.now()});
+        return Response.json({ok:true,reference,year});
+      }
+
       if (body.op === "get") return Response.json({ok:true, value:await this.state.storage.get("record") || null});
       if (body.op === "create") {
         if (await this.state.storage.get("record")) return Response.json({ok:false,error:"exists"},{status:409});
@@ -63,7 +117,6 @@ async function doCall(ns,name,body) {
   const x=await r.json(); if(!r.ok) { if(x.error==="exists") throw new Conflict(); if(x.error==="version conflict") throw new VersionConflict(); throw new Error(x.error||"Durable Object error"); } return x;
 }
 function doMeta(env) {
-  const index=env.ESIGN_DO.idFromName("__index__");
   return {
     async get(c,id){ const r=await doCall(env.ESIGN_DO,c+"/"+id,{op:"get",key:c+"/"+id}); return r.value; },
     async create(c,id,d){ await doCall(env.ESIGN_DO,c+"/"+id,{op:"create",key:c+"/"+id,value:d}); await doCall(env.ESIGN_DO,"__index__",{op:"add",recordKey:c+"/"+id,key:"__index__"}); },
@@ -104,6 +157,7 @@ function driveStorage(env, helpers) {
 }
 export function buildEsignContext({env,verifyUser,sendInvitation,logger,now,driveHelpers}) {
   return {
+    env,
     meta:env.DRIVE_MOCK==="true"?mockMeta():doMeta(env),
     storage:driveStorage(env,driveHelpers),
     verifyUser,
