@@ -14,7 +14,7 @@ const OAUTH_STATE_TTL = 600;
 const SMTP_HOST = "mail.irpa.or.tz";
 const SMTP_PORT = 465;
 const SMTP_FROM = "info@irpa.or.tz";
-import { escapeHtml, normalizeRecipientEmail, recipientDomain, safeMailError, sendWithRetry, validateMailHeader } from "./mailDelivery.js";
+import { escapeHtml as escapeMailHtml, normalizeRecipientEmail, recipientDomain, safeMailError, sendWithRetry, validateMailHeader } from "./mailDelivery.js";
 
 let jwksCache = null;
 let jwksFetchedAt = 0;
@@ -1048,7 +1048,7 @@ async function sendMemberInvitation(request, env) {
   const appUrl = String(env.IRPA_APP_URL || "https://irpa-digital-board-governance.web.app").replace(/\/$/,"");
   const link = `\${appUrl}/?memberInvite=\${encodeURIComponent(invitationId)}`;
   const text = `Dear \${name || "IRPA Member"},\\n\\nYou have been invited to access the IRPA Digital Board Governance System as \${role}.\\n\\nActivate your account using this secure invitation link:\\n\${link}\\n\\nOn the activation page, use your invited email address and create your permanent password.\\n\\nIf you did not expect this invitation, please contact Improvement of Rangeland in Pastoral Areas (IRPA).\\n\\nRegards,\\nIRPA Administration\\ninfo@irpa.or.tz`;
-  const htmlBody = `<!doctype html><html><body style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937"><h2>IRPA Digital Board Governance</h2><p>Dear \${escapeHtml(name || "IRPA Member")},</p><p>You have been invited to access the <strong>IRPA Digital Board Governance System</strong> as <strong>\${escapeHtml(role)}</strong>.</p><p><a href="\${escapeHtml(link)}" style="display:inline-block;padding:12px 18px;background:#0f766e;color:#fff;text-decoration:none;border-radius:6px">Activate Your IRPA Account</a></p><p>On the activation page, use your invited email address and create your permanent password.</p><p>If you did not expect this invitation, please contact <a href="mailto:info@irpa.or.tz">info@irpa.or.tz</a>.</p><p>Regards,<br>IRPA Administration</p></body></html>`;
+  const htmlBody = `<!doctype html><html><body style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937"><h2>IRPA Digital Board Governance</h2><p>Dear \${escapeMailHtml(name || "IRPA Member")},</p><p>You have been invited to access the <strong>IRPA Digital Board Governance System</strong> as <strong>\${escapeMailHtml(role)}</strong>.</p><p><a href="\${escapeMailHtml(link)}" style="display:inline-block;padding:12px 18px;background:#0f766e;color:#fff;text-decoration:none;border-radius:6px">Activate Your IRPA Account</a></p><p>On the activation page, use your invited email address and create your permanent password.</p><p>If you did not expect this invitation, please contact <a href="mailto:info@irpa.or.tz">info@irpa.or.tz</a>.</p><p>Regards,<br>IRPA Administration</p></body></html>`;
   const queuedAt = new Date().toISOString();
   await updateFirestoreDocument(env, `invitations/\${invitationId}`, claims.token, {
     deliveryStatus:{stringValue:"Queued"},
@@ -1109,7 +1109,7 @@ async function sendSignatureInvitation(request, env) {
   const appUrl = String(env.IRPA_APP_URL || "https://irpa-digital-board-governance.web.app").replace(/\/$/,"");
   const link = `\${appUrl}/?signEnvelope=\${encodeURIComponent(envelopeId)}`;
   const text = `Dear \${name || "IRPA Signer"},\\n\\nYou have been invited to participate in a document-signing workflow in the IRPA Digital Board Governance System.\\n\\nAssigned action: \${role}\\n\\nOpen the secure signing invitation:\\n\${link}\\n\\nRegards,\\nIRPA Administration\\ninfo@irpa.or.tz`;
-  const htmlBody = `<!doctype html><html><body style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937"><h2>IRPA Digital Board Governance</h2><p>Dear \${escapeHtml(name || "IRPA Signer")},</p><p>You have been invited to participate in a document-signing workflow.</p><p><strong>Assigned action:</strong> \${escapeHtml(role)}</p><p><a href="\${escapeHtml(link)}">Open Secure Signing Invitation</a></p><p>Regards,<br>IRPA Administration</p></body></html>`;
+  const htmlBody = `<!doctype html><html><body style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937"><h2>IRPA Digital Board Governance</h2><p>Dear \${escapeMailHtml(name || "IRPA Signer")},</p><p>You have been invited to participate in a document-signing workflow.</p><p><strong>Assigned action:</strong> \${escapeMailHtml(role)}</p><p><a href="\${escapeMailHtml(link)}">Open Secure Signing Invitation</a></p><p>Regards,<br>IRPA Administration</p></body></html>`;
   const queuedAt = new Date().toISOString();
   await updateFirestoreDocument(env, `signatureEnvelopes/\${envelopeId}`, claims.token, {
     invitationDeliveryStatus:{stringValue:"Queued"},
