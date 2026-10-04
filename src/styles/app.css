@@ -4637,3 +4637,60 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     margin-top:0!important;
   }
 }
+
+
+/* MOBILE DOCUMENTS PORTAL SCREEN-FIT — 2026-10-04 */
+@media screen and (max-width:760px){
+  .content-area:not(.dashboard-content-area) .page{
+    width:100%!important;min-width:0!important;max-width:100vw!important;overflow-x:hidden!important;
+  }
+  .content-area:not(.dashboard-content-area) .page .dashboard-grid,
+  .content-area:not(.dashboard-content-area) .page .workflow-stage-grid{
+    display:grid!important;grid-template-columns:minmax(0,1fr)!important;width:100%!important;min-width:0!important;max-width:100%!important;margin-left:0!important;margin-right:0!important;gap:12px!important;box-sizing:border-box!important;overflow:hidden!important;
+  }
+  .content-area:not(.dashboard-content-area) .page .workflow-stage,
+  .content-area:not(.dashboard-content-area) .page button.stat-card{
+    display:block!important;width:100%!important;min-width:0!important;max-width:100%!important;margin:0!important;box-sizing:border-box!important;overflow:hidden!important;text-align:left!important;white-space:normal!important;
+  }
+  .content-area:not(.dashboard-content-area) .page .workflow-stage span,
+  .content-area:not(.dashboard-content-area) .page .workflow-stage strong,
+  .content-area:not(.dashboard-content-area) .page .workflow-stage small,
+  .content-area:not(.dashboard-content-area) .page button.stat-card span,
+  .content-area:not(.dashboard-content-area) .page button.stat-card strong,
+  .content-area:not(.dashboard-content-area) .page button.stat-card small{
+    display:block!important;width:100%!important;min-width:0!important;max-width:100%!important;overflow-wrap:anywhere!important;word-break:break-word!important;
+  }
+  .content-area:not(.dashboard-content-area) .page .controlled-document-upload-panel{
+    width:100%!important;min-width:0!important;max-width:100%!important;margin-left:0!important;margin-right:0!important;box-sizing:border-box!important;overflow:hidden!important;
+  }
+  .content-area:not(.dashboard-content-area) .page .controlled-document-upload-panel form,
+  .content-area:not(.dashboard-content-area) .page .controlled-document-upload-panel .form-grid,
+  .content-area:not(.dashboard-content-area) .page .controlled-document-upload-panel .form-field,
+  .content-area:not(.dashboard-content-area) .page .controlled-document-upload-panel .form-actions{
+    width:100%!important;min-width:0!important;max-width:100%!important;box-sizing:border-box!important;
+  }
+  .content-area:not(.dashboard-content-area) .page .controlled-document-upload-panel .form-grid{
+    grid-template-columns:minmax(0,1fr)!important;gap:0!important;
+  }
+  .content-area:not(.dashboard-content-area) .page .controlled-document-upload-panel .form-field>*,
+  .content-area:not(.dashboard-content-area) .page .controlled-document-upload-panel .form-actions>*{
+    max-width:100%!important;box-sizing:border-box!important;
+  }
+  .content-area:not(.dashboard-content-area) .page .controlled-document-upload-panel .form-field input,
+  .content-area:not(.dashboard-content-area) .page .controlled-document-upload-panel .form-field select,
+  .content-area:not(.dashboard-content-area) .page .controlled-document-upload-panel .form-field textarea,
+  .content-area:not(.dashboard-content-area) .page .controlled-document-upload-panel .form-field button{
+    width:100%!important;min-width:0!important;max-width:100%!important;box-sizing:border-box!important;
+  }
+  .content-area:not(.dashboard-content-area) .page .controlled-document-upload-panel .form-actions{
+    display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:8px!important;
+  }
+  .content-area:not(.dashboard-content-area) .page .controlled-document-upload-panel .form-actions button{
+    width:100%!important;min-width:0!important;max-width:100%!important;min-height:46px!important;
+  }
+  .content-area:not(.dashboard-content-area) .page .controlled-document-upload-panel .muted,
+  .content-area:not(.dashboard-content-area) .page .controlled-document-upload-panel .panel-description,
+  .content-area:not(.dashboard-content-area) .page .controlled-document-upload-panel li{
+    max-width:100%!important;overflow-wrap:anywhere!important;word-break:break-word!important;
+  }
+}
