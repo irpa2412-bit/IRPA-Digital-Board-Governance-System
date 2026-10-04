@@ -287,10 +287,10 @@ jobs:
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
 
-      - name: Deploy authentication security and document-reference functions
+      - name: Deploy retained Firebase password-reset function
         uses: w9jds/firebase-action@v14.17.0
         with:
-          args: deploy --project irpa-digital-board-governance --only functions:checkPasswordAttemptState,functions:recordPasswordFailure,functions:clearPasswordAttemptState,functions:preparePasswordResetPhone,functions:nextDocumentReference
+          args: deploy --project irpa-digital-board-governance --only functions:preparePasswordResetPhone
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
 
