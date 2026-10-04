@@ -65,7 +65,8 @@ jobs:
           if (!/\[\[env\.staging\.durable_objects\.bindings\]\][\s\S]*name = "ESIGN_DO"[\s\S]*class_name = "EsignRecordDurableObject"/.test(text)) throw new Error("Staging ESIGN_DO binding is missing.");
           if (!/\[\[env\.staging\.migrations\]\][\s\S]*tag = "esign-do-staging-v1"/.test(text)) throw new Error("Staging DO migration is missing.");
           const top = text.split("[env.staging]")[0];
-          if (!/CLOUDFLARE_AUTH_FUNCTIONS_ENABLED = "false"/.test(top)) throw new Error("Production/top-level migration flag must remain false.");
+          if (!/CLOUDFLARE_AUTH_FUNCTIONS_ENABLED = "true"/.test(top)) throw new Error("Production/top-level migration flag must be explicitly enabled after cutover.");
+          if (!/IRPA_PRODUCTION_CUTOVER = "true"/.test(top)) throw new Error("Explicit production cutover marker is missing.");
           NODE
 
       - name: Install gateway dependencies
