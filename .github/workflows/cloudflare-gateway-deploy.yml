@@ -43,22 +43,49 @@ jobs:
           }
 
           const bindings = Array.isArray(response.result?.bindings) ? response.result.bindings : [];
-          const allowed = new Map([
+          const managed = new Map([
             ["DRIVE_KV", "kv_namespace"],
             ["ESIGN_DO", "durable_object_namespace"]
           ]);
+          const resourceTypes = new Set([
+            "kv_namespace",
+            "durable_object_namespace",
+            "r2_bucket",
+            "d1",
+            "service",
+            "ai",
+            "vectorize",
+            "hyperdrive",
+            "queue",
+            "dispatch_namespace",
+            "workflow",
+            "secrets_store"
+          ]);
+          const variableTypes = new Set(["plain_text", "secret_text"]);
 
           for (const binding of bindings) {
             const name = String(binding?.name || "");
-            const expectedType = allowed.get(name);
-            if (!expectedType) {
+            const type = String(binding?.type || "");
+            const expectedType = managed.get(name);
+
+            if (expectedType) {
+              if (type !== expectedType) {
+                throw new Error(
+                  `Safety stop: binding "${name}" has type "${type}", expected "${expectedType}".`
+                );
+              }
+              continue;
+            }
+
+            if (resourceTypes.has(type)) {
               throw new Error(
-                `Safety stop: unexpected production Worker binding "${name}". This workflow may manage only DRIVE_KV and ESIGN_DO.`
+                `Safety stop: unmanaged production resource binding "${name}" of type "${type}" would not be reproduced by this release.`
               );
             }
-            if (binding.type !== expectedType) {
+
+            if (!variableTypes.has(type)) {
               throw new Error(
-                `Safety stop: binding "${name}" has type "${binding.type}", expected "${expectedType}".`
+                `Safety stop: unmanaged production binding "${name}" has unsupported type "${type}".`
               );
             }
           }
@@ -80,19 +107,30 @@ jobs:
             throw new Error("Safety stop: production Worker contains more than one ESIGN_DO binding.");
           }
 
-          if (esignBindings.length === 1) {
-            const esign = esignBindings[0];
-            if (String(esign.class_name || "") !== "EsignRecordDurableObject") {
-              throw new Error(
-                'Safety stop: existing ESIGN_DO must target class "EsignRecordDurableObject".'
-              );
-            }
+          if (esignBindings.length === 1 &&
+              String(esignBindings[0].class_name || "") !== "EsignRecordDurableObject") {
+            throw new Error(
+              'Safety stop: existing ESIGN_DO must target class "EsignRecordDurableObject".'
+            );
+          }
+
+          const flagBindings = bindings.filter(b => b.name === "ESIGN_MODULE_ENABLED");
+          if (flagBindings.length > 1) {
+            throw new Error("Safety stop: production Worker contains more than one ESIGN_MODULE_ENABLED variable.");
+          }
+          if (flagBindings.length === 1 && String(flagBindings[0].type || "") !== "plain_text") {
+            throw new Error(
+              'Safety stop: ESIGN_MODULE_ENABLED must be a plaintext Worker variable for this release; secret values are never modified.'
+            );
           }
 
           const config = {
             name: "irpa-google-drive-gateway",
             main: "src/index.js",
             compatibility_date: "2026-09-24",
+            vars: {
+              ESIGN_MODULE_ENABLED: "true"
+            },
             kv_namespaces: [
               { binding: "DRIVE_KV", id: driveKv.namespace_id }
             ],
@@ -115,7 +153,7 @@ jobs:
           fs.writeFileSync("wrangler.json", JSON.stringify(config, null, 2) + "\n");
           NODE
 
-          echo "Prepared DRIVE_KV and ESIGN_DO configuration. IDs and credentials are intentionally not printed."
+          echo "Prepared production DRIVE_KV, ESIGN_DO, and ESIGN_MODULE_ENABLED configuration. IDs and credentials are intentionally not printed."
 
       - name: Verify production Worker configuration
         run: |
@@ -126,6 +164,10 @@ jobs:
 
           if (c.name !== "irpa-google-drive-gateway") {
             throw new Error("Worker identity mismatch.");
+          }
+
+          if (c.vars?.ESIGN_MODULE_ENABLED !== "true") {
+            throw new Error("Production e-signature flag is not exactly true. Deployment blocked.");
           }
 
           const kv = Array.isArray(c.kv_namespaces) ? c.kv_namespaces : [];
@@ -150,7 +192,7 @@ jobs:
           }
 
           const topLevelKeys = new Set([
-            "name", "main", "compatibility_date", "kv_namespaces",
+            "name", "main", "compatibility_date", "vars", "kv_namespaces",
             "durable_objects", "migrations"
           ]);
           for (const key of Object.keys(c)) {
