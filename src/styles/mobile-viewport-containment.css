@@ -1,0 +1,286 @@
+/* IRPA MOBILE VIEWPORT CONTAINMENT — 2026-10-04
+   Presentation-only repair for narrow phone screens.
+   Keeps desktop/tablet layout and application behaviour unchanged.
+   No routes, roles, claims, security rules, data access or workflow logic are changed. */
+
+@media screen and (max-width:760px){
+  html,
+  body,
+  #root{
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+    margin:0!important;
+    overflow-x:hidden!important;
+  }
+
+  .app-shell,
+  .main-area,
+  .content-area,
+  .dashboard-content-area{
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+    margin-left:0!important;
+    margin-right:0!important;
+    box-sizing:border-box!important;
+    overflow-x:hidden!important;
+  }
+
+  .topbar{
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+    box-sizing:border-box!important;
+    overflow:hidden!important;
+  }
+
+  .topbar-heading-row{
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr)!important;
+    gap:7px!important;
+    box-sizing:border-box!important;
+  }
+
+  .topbar-title-block,
+  .topbar-access-category{
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+    flex:none!important;
+    box-sizing:border-box!important;
+  }
+
+  .topbar-title-line,
+  .topbar-title-line h2{
+    min-width:0!important;
+    max-width:100%!important;
+  }
+
+  .topbar-title-line h2{
+    white-space:normal!important;
+    overflow-wrap:anywhere!important;
+  }
+
+  .topbar-access-category{
+    min-height:0!important;
+    max-height:none!important;
+    height:auto!important;
+    overflow:hidden!important;
+    padding:6px 8px!important;
+  }
+
+  .topbar-access-category [aria-label="Login category"],
+  .topbar-access-category [aria-label="Login category"]>div{
+    min-width:0!important;
+    max-width:100%!important;
+  }
+
+  .topbar .google-weather-panel,
+  .topbar .open-portal-panel{
+    position:static!important;
+    left:auto!important;
+    right:auto!important;
+    top:auto!important;
+    bottom:auto!important;
+    transform:none!important;
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+    box-sizing:border-box!important;
+  }
+
+  .content-area{
+    padding-left:10px!important;
+    padding-right:10px!important;
+    padding-bottom:90px!important;
+  }
+
+  .content-area .page,
+  .content-area .page>*,
+  .content-area .panel,
+  .content-area .module-panel,
+  .content-area .welcome-panel,
+  .content-area .portal-document-access-point,
+  .content-area .portal-document-access-point>*{
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+    box-sizing:border-box!important;
+  }
+
+  .content-area .page>*,
+  .content-area .panel>*,
+  .content-area .module-panel>*,
+  .content-area .welcome-panel>*{
+    min-width:0!important;
+    max-width:100%!important;
+  }
+
+  .content-area .panel,
+  .content-area .module-panel,
+  .content-area .welcome-panel{
+    overflow-x:hidden!important;
+  }
+
+  .content-area .page [style*="width:"],
+  .content-area .page [style*="min-width:"],
+  .content-area .panel [style*="width:"],
+  .content-area .panel [style*="min-width:"]{
+    max-width:100%!important;
+    min-width:0!important;
+    box-sizing:border-box!important;
+  }
+
+  .content-area .page button,
+  .content-area .page input,
+  .content-area .page select,
+  .content-area .page textarea,
+  .content-area .page a,
+  .content-area .page label{
+    max-width:100%!important;
+    box-sizing:border-box!important;
+  }
+
+  .content-area .page button,
+  .content-area .page a{
+    overflow-wrap:anywhere!important;
+    white-space:normal!important;
+  }
+
+  .content-area .page input,
+  .content-area .page select,
+  .content-area .page textarea{
+    width:100%!important;
+    min-width:0!important;
+  }
+
+  .form-grid,
+  .detail-grid,
+  .form-actions{
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+    grid-template-columns:1fr!important;
+    box-sizing:border-box!important;
+  }
+
+  .form-actions{
+    display:flex!important;
+    flex-direction:column!important;
+    align-items:stretch!important;
+  }
+
+  .form-actions>*{
+    width:100%!important;
+    max-width:100%!important;
+  }
+
+  .table-wrapper{
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    overflow-x:auto!important;
+  }
+
+  .table-wrapper table{
+    width:max-content!important;
+    min-width:760px!important;
+    max-width:none!important;
+  }
+
+  /* The in-portal selector is fixed to the viewport, never to content width. */
+  .mobile-portal-content-roller{
+    left:10px!important;
+    right:10px!important;
+    width:auto!important;
+    max-width:calc(100vw - 20px)!important;
+    min-width:0!important;
+    box-sizing:border-box!important;
+    grid-template-columns:minmax(0,1fr) 34px!important;
+    overflow:hidden!important;
+  }
+
+  .mobile-portal-content-roller-label{
+    min-width:0!important;
+    max-width:100%!important;
+    overflow:hidden!important;
+  }
+
+  .mobile-portal-content-roller-label strong{
+    min-width:0!important;
+    max-width:100%!important;
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
+    white-space:nowrap!important;
+  }
+
+  .mobile-portal-content-roller select{
+    min-width:0!important;
+    max-width:100%!important;
+  }
+
+  /* Prevent the floating sign-out control from creating a wider layout box. */
+  .mobile-fixed-signout{
+    right:10px!important;
+    max-width:calc(100vw - 20px)!important;
+    box-sizing:border-box!important;
+  }
+
+  /* The mobile navigation itself is viewport-bound, not content-bound. */
+  .mobile-global-nav{
+    left:0!important;
+    right:0!important;
+    width:100%!important;
+    max-width:100%!important;
+    box-sizing:border-box!important;
+    overflow:hidden!important;
+  }
+
+  .mobile-global-nav button{
+    min-width:0!important;
+    max-width:100%!important;
+    box-sizing:border-box!important;
+  }
+
+  .mobile-nav-sheet{
+    left:10px!important;
+    right:10px!important;
+    width:auto!important;
+    max-width:calc(100vw - 20px)!important;
+    box-sizing:border-box!important;
+    overflow-x:hidden!important;
+  }
+
+  .mobile-nav-sheet-list button{
+    min-width:0!important;
+    max-width:100%!important;
+    box-sizing:border-box!important;
+  }
+
+  /* Long text/data may wrap; only the dedicated table wrapper remains horizontally scrollable. */
+  .content-area .page p,
+  .content-area .page h1,
+  .content-area .page h2,
+  .content-area .page h3,
+  .content-area .page h4,
+  .content-area .page span,
+  .content-area .page strong,
+  .content-area .page small,
+  .content-area .page td,
+  .content-area .page th{
+    overflow-wrap:anywhere!important;
+  }
+
+  .content-area .page img,
+  .content-area .page video,
+  .content-area .page canvas,
+  .content-area .page iframe{
+    width:auto!important;
+    max-width:100%!important;
+    height:auto!important;
+  }
+}

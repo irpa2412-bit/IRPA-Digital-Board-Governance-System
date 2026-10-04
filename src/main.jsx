@@ -3,6 +3,7 @@ import ReactDOM from"react-dom/client";
 import App from"./App";
 import { logout } from "./firebase/auth";
 import "./styles/app.css";
+import "./styles/mobile-viewport-containment.css";
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
