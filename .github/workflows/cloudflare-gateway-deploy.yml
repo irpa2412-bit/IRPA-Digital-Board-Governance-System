@@ -95,11 +95,33 @@ jobs:
           }
 
           const toml = fs.readFileSync("wrangler.toml", "utf8");
-          const kvMatch = toml.match(/\[\[kv_namespaces\]\][\\s\\S]*?binding\s*=\s*"DRIVE_KV"[\\s\\S]*?id\s*=\s*"([a-f0-9]{32})"/i);
-          if (!kvMatch) {
+          const tomlLines = toml.split(/\r?\n/);
+          let inDriveKv = false;
+          let configuredDriveKvId = null;
+          for (const line of tomlLines) {
+            const trimmed = line.trim();
+            if (trimmed === "[[kv_namespaces]]") {
+              inDriveKv = false;
+              continue;
+            }
+            if (trimmed.startsWith("[[") && trimmed.endsWith("]]")) {
+              inDriveKv = false;
+              continue;
+            }
+            if (inDriveKv && trimmed.includes('id = "')) {
+              const match = trimmed.match(/"([a-f0-9]{32})"/i);
+              if (match) {
+                configuredDriveKvId = match[1].toLowerCase();
+                break;
+              }
+            }
+            if (trimmed === 'binding = "DRIVE_KV"') {
+              inDriveKv = true;
+            }
+          }
+          if (!configuredDriveKvId) {
             throw new Error("Safety stop: repository production wrangler.toml does not contain a valid DRIVE_KV ID.");
           }
-          const configuredDriveKvId = kvMatch[1].toLowerCase();
 
           const driveKvBindings = bindings.filter(b => b.name === "DRIVE_KV");
           let driveKvId = configuredDriveKvId;
