@@ -33,11 +33,18 @@ export default {
 
     try {
       if (url.pathname === "/health") {
-        return json({
+        const health = {
           ok: true,
           service: "IRPA Google Drive Gateway",
           storageProvider: "Google Drive"
-        }, 200, corsHeaders(request));
+        };
+        if (env.IRPA_ENVIRONMENT === "staging") {
+          health.environment = "staging";
+          health.esignModuleEnabled = env.ESIGN_MODULE_ENABLED === "true";
+          health.authFunctionsEnabled = env.CLOUDFLARE_AUTH_FUNCTIONS_ENABLED === "true";
+          health.driveMock = env.DRIVE_MOCK === "true";
+        }
+        return json(health, 200, corsHeaders(request));
       }
 
       if (url.pathname === "/oauth/start" && request.method === "POST") {
