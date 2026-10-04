@@ -645,7 +645,6 @@ async function ensureSignatureProfileFolder(request, env) {
   }
 
   const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
-  const isAdmin = Boolean(admin?.fields?.active?.booleanValue);
   if (!isAdminForRequest && requestedUid !== claims.user_id) {
     return json({ ok: false, error: "You may only provision your own signature folder." }, 403, corsHeaders(request));
   }
