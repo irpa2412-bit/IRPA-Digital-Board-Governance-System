@@ -48,3 +48,53 @@ export async function sendInvitationEmail({email,name,link,smtpSend,logger=conso
   const message=buildInvitationMessage({name,link});
   return sendWithRetry(()=>smtpSend({to,...message}),{logger,sleep});
 }
+
+
+export async function handleSendInvitationEmail(request, env, deps = {}) {
+  const { smtpSend, logger = console, sleep } = deps;
+  const json = (status, body) => new Response(JSON.stringify(body), {
+    status, headers: { "content-type": "application/json" }
+  });
+  const supplied = request.headers.get("x-irpa-service-key");
+  const expected = env?.INVITE_SERVICE_KEY;
+  if (!supplied || !expected || supplied !== expected) return json(401, { ok:false, error:"Unauthorized" });
+
+  let body;
+  try { body = await request.json(); } catch { return json(400, { ok:false, error:"Invalid JSON" }); }
+
+  const to = validateRecipient(body?.to);
+  if (!to) return json(400, { ok:false, error:"Invalid recipient" });
+  const name = validateName(body?.name);
+  if (!name) return json(400, { ok:false, error:"Invalid name" });
+
+  let link;
+  try {
+    const u = new URL(body?.link);
+    const allowed = new URL(env.IRPA_APP_URL);
+    if (u.protocol !== "https:" || u.origin !== allowed.origin) throw new Error("origin");
+    link = u.toString();
+  } catch { return json(400, { ok:false, error:"Invalid link" }); }
+
+  const store = env.DRIVE_KV;
+  if (store) {
+    const key = "invite-rate:" + to.toLowerCase();
+    const count = Number((await store.get(key)) || 0);
+    if (count >= 5) return json(429, { ok:false, error:"Too many invitations to this address" });
+    await store.put(key, String(count + 1), { expirationTtl: 3600 });
+  }
+
+  const message = buildInvitationMessage({ name, link });
+  try {
+    const result = await sendWithRetry(
+      () => smtpSend(env, { to, ...message }),
+      { logger, sleep }
+    );
+    return json(200, { ok:true, messageId:result?.messageId || result || null });
+  } catch (error) {
+    logger.error("SIGNATURE_INVITATION_PROVIDER_FAILED", {
+      recipientDomain: to.split("@")[1] || "unknown",
+      message: String(error?.message || error).slice(0, 200)
+    });
+    return json(502, { ok:false, error:"EMAIL_PROVIDER_FAILED" });
+  }
+}
