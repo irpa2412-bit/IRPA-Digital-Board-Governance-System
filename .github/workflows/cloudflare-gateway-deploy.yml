@@ -96,7 +96,7 @@ jobs:
             name: "irpa-google-drive-gateway",
             main: "src/index.js",
             compatibility_date: "2026-09-24",
-            vars: { ESIGN_MODULE_ENABLED: "true" },
+            vars: { ESIGN_MODULE_ENABLED: "true", CLOUDFLARE_AUTH_FUNCTIONS_ENABLED: "false" },
             kv_namespaces: [{ binding: "DRIVE_KV", id: configuredDriveKvId }],
             durable_objects: {
               bindings: [{ name: "ESIGN_DO", class_name: "EsignRecordDurableObject" }]
@@ -119,6 +119,7 @@ jobs:
           const c = JSON.parse(fs.readFileSync("wrangler.json", "utf8"));
           if (c.name !== "irpa-google-drive-gateway") throw new Error("Worker identity mismatch.");
           if (c.vars?.ESIGN_MODULE_ENABLED !== "true") throw new Error("Production e-signature flag is not exactly true. Deployment blocked.");
+          if (c.vars?.CLOUDFLARE_AUTH_FUNCTIONS_ENABLED !== "false") throw new Error("Cloudflare authentication migration flag must remain OFF during the controlled migration stage.");
           const kv = Array.isArray(c.kv_namespaces) ? c.kv_namespaces : [];
           if (kv.length !== 1 || kv[0]?.binding !== "DRIVE_KV" || !/^[a-f0-9]{32}$/.test(String(kv[0]?.id || ""))) {
             throw new Error("Production DRIVE_KV binding is invalid. Deployment blocked.");
