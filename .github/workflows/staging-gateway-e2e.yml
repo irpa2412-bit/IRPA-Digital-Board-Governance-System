@@ -32,7 +32,7 @@ jobs:
       - name: Firestore emulator E2E
         run: |
           set -o pipefail
-          npx firebase emulators:exec --project demo-irpa-staging --only firestore "npm --prefix drive-gateway run test:e2e:local" | tee e2e-output.ndjson
+          npx firebase emulators:exec --project demo-irpa-staging --only firestore "npm --prefix drive-gateway test" | tee e2e-output.ndjson
       - if: always()
         uses: actions/upload-artifact@v4
         with:
