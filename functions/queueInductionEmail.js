@@ -1,3 +1,4 @@
+const { getFirestore } = require("firebase-admin/firestore");
 // functions/queueInductionEmail.js
 // CommonJS bridge for the existing functions/index.js runtime.
 async function retry(fn, { attempts = 3, delayMs = 300, logger = console, shouldRetry = () => true, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
@@ -15,10 +16,10 @@ async function queueInductionEmail(inputOrEmail, subject, text, html, options = 
   const legacy = typeof inputOrEmail === "string";
   const input = legacy ? { recipientEmail: inputOrEmail, subject, text, html, invitedByUid:null } : (inputOrEmail || {});
   const { db, invitationId, recipientEmail, recipientName, invitedByUid, logger=console, fetchFn=fetch, env=process.env, sleep=(ms)=>new Promise(r=>setTimeout(r,ms)) } = options;
-  if (!db) throw new Error("db is required");
+  const firestore = db || getFirestore();
   if (!recipientEmail && input.recipientEmail) Object.assign(input,{recipientEmail:input.recipientEmail});
   const to=input.recipientEmail || recipientEmail; if(!to) throw new Error("recipientEmail is required");
-  const queueRef = inputOrEmail && !legacy && input.invitationId ? db.collection("emailQueue").doc(input.invitationId) : db.collection("emailQueue").doc();
+  const queueRef = inputOrEmail && !legacy && input.invitationId ? firestore.collection("emailQueue").doc(input.invitationId) : db.collection("emailQueue").doc();
   const domain=String(to).split("@")[1]||"unknown";
   await queueRef.set({status:"Queued",recipientEmail:to,invitedByUid:input.invitedByUid||invitedByUid||null,createdAt:new Date().toISOString()});
   try {
