@@ -1063,7 +1063,7 @@ async function sendMemberInvitation(request, env) {
   const data = await request.json();
   const invitationId = cleanId(data.invitationId || "");
   if (!invitationId) return json({ok:false,error:"Invitation ID is required."},400,corsHeaders(request));
-  const invitation = await getFirestoreDocument(env, \`invitations/\${invitationId}\`, claims.token);
+  const invitation = await getFirestoreDocument(env, `invitations/${invitationId}`, claims.token);
   if (!invitation) return json({ok:false,error:"Invitation record was not found."},404,corsHeaders(request));
   const fields=invitation.fields||{};
   const email=validateRecipient(fields.email?.stringValue||"");
