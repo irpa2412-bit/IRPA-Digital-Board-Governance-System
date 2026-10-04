@@ -54,12 +54,16 @@ jobs:
             "d1",
             "service",
             "ai",
-            "vectorize",
+            "ai_search",
+            "analytics_engine",
+            "browser",
             "hyperdrive",
             "queue",
             "dispatch_namespace",
             "workflow",
-            "secrets_store"
+            "secrets_store",
+            "vectorize",
+            "vpc_service"
           ]);
           const variableTypes = new Set(["plain_text", "secret_text"]);
 
@@ -90,16 +94,28 @@ jobs:
             }
           }
 
-          const driveKvBindings = bindings.filter(b => b.name === "DRIVE_KV");
-          if (driveKvBindings.length !== 1) {
-            throw new Error("Safety stop: production Worker must contain exactly one DRIVE_KV binding.");
+          const toml = fs.readFileSync("wrangler.toml", "utf8");
+          const kvMatch = toml.match(/\[\[kv_namespaces\]\][\\s\\S]*?binding\s*=\s*"DRIVE_KV"[\\s\\S]*?id\s*=\s*"([a-f0-9]{32})"/i);
+          if (!kvMatch) {
+            throw new Error("Safety stop: repository production wrangler.toml does not contain a valid DRIVE_KV ID.");
           }
+          const configuredDriveKvId = kvMatch[1].toLowerCase();
 
-          const driveKv = driveKvBindings[0];
-          if (!/^[a-f0-9]{32}$/.test(String(driveKv.namespace_id || ""))) {
-            throw new Error(
-              "Safety stop: existing production DRIVE_KV binding was not returned with a valid namespace ID."
-            );
+          const driveKvBindings = bindings.filter(b => b.name === "DRIVE_KV");
+          let driveKvId = configuredDriveKvId;
+
+          if (driveKvBindings.length > 1) {
+            throw new Error("Safety stop: production Worker contains more than one DRIVE_KV binding.");
+          }
+          if (driveKvBindings.length === 1) {
+            const remoteId = String(driveKvBindings[0].namespace_id || "").toLowerCase();
+            if (!/^[a-f0-9]{32}$/.test(remoteId)) {
+              throw new Error("Safety stop: existing production DRIVE_KV binding has an invalid namespace ID.");
+            }
+            if (remoteId !== configuredDriveKvId) {
+              throw new Error("Safety stop: production DRIVE_KV differs from the controlled repository DRIVE_KV ID.");
+            }
+            driveKvId = remoteId;
           }
 
           const esignBindings = bindings.filter(b => b.name === "ESIGN_DO");
@@ -132,7 +148,7 @@ jobs:
               ESIGN_MODULE_ENABLED: "true"
             },
             kv_namespaces: [
-              { binding: "DRIVE_KV", id: driveKv.namespace_id }
+              { binding: "DRIVE_KV", id: driveKvId }
             ],
             durable_objects: {
               bindings: [
