@@ -1,5 +1,6 @@
 # IRPA controlled deployment configuration
 # Production cutover explicitly authorized on 2026-10-04.
+# Deployment verification retriggered from main after controlled cutover merge.
 name = "irpa-google-drive-gateway"
 main = "src/index.js"
 compatibility_date = "2026-09-29"
