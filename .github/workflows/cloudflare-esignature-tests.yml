@@ -1,0 +1,72 @@
+name: Cloudflare E-Signature Runtime Tests
+
+on:
+  push:
+    branches: ["repair/esign-production-entrypoint-20261004"]
+    paths:
+      - "drive-gateway/**"
+      - "firebase.json"
+      - ".github/workflows/cloudflare-esignature-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install application dependencies
+        run: npm install --no-audit --no-fund
+      - name: Install gateway dependencies
+        working-directory: drive-gateway
+        run: npm ci --no-audit --no-fund
+      - name: Run e-signature suite with Firestore emulator and DRIVE_MOCK
+        run: |
+          set -o pipefail
+          npx firebase emulators:exec --project demo-irpa-staging --only firestore "DRIVE_MOCK=true npm --prefix drive-gateway test" | tee e2e-firestore-output.txt
+      - name: Start Wrangler local worker with e-signature flag OFF
+        working-directory: drive-gateway
+        run: |
+          set -euo pipefail
+          npx wrangler dev --local --port 8787 --var ESIGN_MODULE_ENABLED:false --var DRIVE_MOCK:true > "$RUNNER_TEMP/wrangler-off.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/wrangler-off.pid"
+          for i in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:8787/health >/dev/null; then break; fi
+            sleep 1
+          done
+          curl --silent --show-error --fail http://127.0.0.1:8787/health
+          code="$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:8787/api/envelopes)"
+          test "$code" = "404"
+          code="$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:8787/api/sign/open)"
+          test "$code" = "404"
+          kill "$(cat "$RUNNER_TEMP/wrangler-off.pid")" || true
+      - name: Start Wrangler local worker with e-signature flag ON
+        working-directory: drive-gateway
+        run: |
+          set -euo pipefail
+          npx wrangler dev --local --port 8788 --var ESIGN_MODULE_ENABLED:true --var DRIVE_MOCK:true > "$RUNNER_TEMP/wrangler-on.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/wrangler-on.pid"
+          for i in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:8788/health >/dev/null; then break; fi
+            sleep 1
+          done
+          code="$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:8788/api/sign/open)"
+          test "$code" = "401"
+          headers="$(curl --silent --dump-header - --output /dev/null -X OPTIONS -H 'Origin: https://irpa-digital-board-governance.web.app' http://127.0.0.1:8788/api/sign/open)"
+          printf '%s\n' "$headers" | grep -qi 'x-signing-token'
+          kill "$(cat "$RUNNER_TEMP/wrangler-on.pid")" || true
+      - name: Upload runtime diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloudflare-esignature-runtime-diagnostics
+          path: |
+            e2e-firestore-output.txt
+            ${{ runner.temp }}/wrangler-off.log
+            ${{ runner.temp }}/wrangler-on.log
