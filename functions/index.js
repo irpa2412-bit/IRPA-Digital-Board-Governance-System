@@ -946,20 +946,39 @@ exports.redeemInvitationToken = onCall({region:"us-central1"}, async request => 
   if(!invitationId||!secret) throw new HttpsError("invalid-argument","The invitation token is invalid.");
 
   const ref=db.collection("invitations").doc(invitationId);
-  const snap=await ref.get();
-  if(!snap.exists) throw new HttpsError("not-found","This IRPA invitation no longer exists.");
-  const invitation=snap.data()||{};
-  if(invitation.status==="Cancelled") throw new HttpsError("failed-precondition","This IRPA invitation has been cancelled.");
-  if(invitation.invitationRedeemedAt) throw new HttpsError("already-exists","This IRPA invitation token has already been redeemed. Ask an administrator to issue a fresh invitation.");
-  if(invitation.invitationTokenVersion!=="2"||!invitation.invitationTokenHash) throw new HttpsError("failed-precondition","This invitation was issued under an older invitation mechanism. Ask an administrator to issue a fresh invitation.");
+  let invitation;
+  try {
+    const snap=await ref.get();
+    if(!snap.exists) throw new HttpsError("not-found","This IRPA invitation no longer exists.");
+    invitation=snap.data()||{};
+  } catch(error) {
+    if(error instanceof HttpsError) throw error;
+    console.error("Invitation redemption: invitation document retrieval failed",{
+      invitationId,code:error?.code||null,message:error?.message||null
+    });
+    throw new HttpsError("internal","The invitation could not be retrieved from the IRPA invitation registry.");
+  }
 
-  const expiresAt=invitation.invitationExpiresAt?.toDate?invitation.invitationExpiresAt.toDate():new Date(invitation.invitationExpiresAt||0);
-  if(!expiresAt.getTime()||expiresAt.getTime()<=Date.now()) throw new HttpsError("deadline-exceeded","This IRPA invitation has expired. Ask an administrator to issue a fresh invitation.");
+  try {
+    if(invitation.status==="Cancelled") throw new HttpsError("failed-precondition","This IRPA invitation has been cancelled.");
+    if(invitation.invitationRedeemedAt) throw new HttpsError("already-exists","This IRPA invitation token has already been redeemed. Ask an administrator to issue a fresh invitation.");
+    if(invitation.invitationTokenVersion!=="2"||!invitation.invitationTokenHash) throw new HttpsError("failed-precondition","This invitation was issued under an older invitation mechanism. Ask an administrator to issue a fresh invitation.");
 
-  const suppliedHash=crypto.createHash("sha256").update(secret).digest("hex");
-  const expectedHash=String(invitation.invitationTokenHash||"");
-  if(expectedHash.length!==suppliedHash.length || !crypto.timingSafeEqual(Buffer.from(suppliedHash),Buffer.from(expectedHash))) {
-    throw new HttpsError("permission-denied","The invitation token is invalid.");
+    const expiryValue=invitation.invitationExpiresAt;
+    const expiresAt=expiryValue?.toDate?expiryValue.toDate():new Date(expiryValue||0);
+    if(Number.isNaN(expiresAt.getTime())||expiresAt.getTime()<=Date.now()) throw new HttpsError("deadline-exceeded","This IRPA invitation has expired. Ask an administrator to issue a fresh invitation.");
+
+    const suppliedHash=crypto.createHash("sha256").update(secret).digest("hex");
+    const expectedHash=String(invitation.invitationTokenHash||"");
+    if(expectedHash.length!==suppliedHash.length || !crypto.timingSafeEqual(Buffer.from(suppliedHash),Buffer.from(expectedHash))) {
+      throw new HttpsError("permission-denied","The invitation token is invalid.");
+    }
+  } catch(error) {
+    if(error instanceof HttpsError) throw error;
+    console.error("Invitation redemption: invitation validation failed",{
+      invitationId,code:error?.code||null,message:error?.message||null
+    });
+    throw new HttpsError("internal","The invitation could not be validated.");
   }
 
   const email=String(invitation.email||"").trim().toLowerCase();
