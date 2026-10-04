@@ -154,3 +154,25 @@ test("Cloudflare auth migration rejects malformed password-state input", async (
   });
   assert.equal(r.status,400);
 });
+
+
+test("Cloudflare invitation redemption remains disabled when the cutover flag is off", async () => {
+  const r = await call("/api/invitations/redeem", {
+    method:"POST",
+    env:{CLOUDFLARE_INVITATION_REDEMPTION_ENABLED:"false", DRIVE_MOCK:"true"},
+    headers:{"content-type":"application/json"},
+    body:JSON.stringify({token:"invalid"})
+  });
+  assert.equal(r.status,404);
+});
+
+test("Cloudflare invitation redemption validates the token before using admin credentials", async () => {
+  const r = await call("/api/invitations/redeem", {
+    method:"POST",
+    env:{CLOUDFLARE_INVITATION_REDEMPTION_ENABLED:"true", DRIVE_MOCK:"true"},
+    headers:{"content-type":"application/json"},
+    body:JSON.stringify({token:"invalid"})
+  });
+  assert.equal(r.status,400);
+  assert.deepEqual(await r.json(),{ok:false,error:"The invitation token is invalid."});
+});
