@@ -71,7 +71,44 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           set -euo pipefail
+          node <<'NODE'
+          const token=process.env.CLOUDFLARE_API_TOKEN||"";
+          const report={
+            length:token.length,
+            hasCR:token.includes("\r"),
+            hasLF:token.includes("\n"),
+            hasLeadingWhitespace:/^\s/.test(token),
+            hasTrailingWhitespace:/\s$/.test(token),
+            hasNonAscii:/[^\x20-\x7E]/.test(token),
+            isPrintableAscii:/^[\x20-\x7E]*$/.test(token)
+          };
+          console.log("CLOUDFLARE_TOKEN_SHAPE="+JSON.stringify(report));
+          if(!token || !report.isPrintableAscii || report.hasCR || report.hasLF || report.hasLeadingWhitespace || report.hasTrailingWhitespace) {
+            throw new Error("Cloudflare staging token has invalid/hidden characters; token value intentionally not printed.");
+          }
+          NODE
+          set +e
           code="$(curl --silent --show-error --output "$RUNNER_TEMP/cf-verify.json" --write-out '%{http_code}' -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/user/tokens/verify")"
+          curl_rc=$?
+          set -e
+          if [ "$curl_rc" -ne 0 ]; then
+            echo "Cloudflare curl verification failed with exit code: $curl_rc; retrying the same verification via Node HTTPS (no token output)."
+            node <<'NODE'
+          const https=require("https");
+          const token=process.env.CLOUDFLARE_API_TOKEN;
+          const req=https.request("https://api.cloudflare.com/client/v4/user/tokens/verify",{method:"GET",headers:{Authorization:"Bearer "+token,Accept:"application/json"}},res=>{
+            let body=""; res.setEncoding("utf8"); res.on("data",c=>body+=c); res.on("end",()=>{
+              let a; try { a=JSON.parse(body); } catch(e) { console.error("Cloudflare verification returned non-JSON response; HTTP status="+res.statusCode); process.exit(1); }
+              const valid=res.statusCode===200 && a?.success===true && a?.result?.status==="active";
+              console.log("CLOUDFLARE_TOKEN_VALID="+valid);
+              if(!valid) { console.error("Cloudflare token verification failed; HTTP status="+res.statusCode); process.exit(1); }
+            });
+          });
+          req.on("error",e=>{ console.error("Cloudflare Node HTTPS verification failed: "+e.message); process.exit(1); });
+          req.end();
+          NODE
+            exit 0
+          fi
           body="$(cat "$RUNNER_TEMP/cf-verify.json")"
           if [ "$code" != "200" ]; then
             echo "CLOUDFLARE_TOKEN_VALID=false"
