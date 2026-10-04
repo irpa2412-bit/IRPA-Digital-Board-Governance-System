@@ -1,0 +1,534 @@
+diff --git a/.github/workflows/cloudflare-gateway-deploy.yml b/.github/workflows/cloudflare-gateway-deploy.yml
+index 8d7f17e..8eab71a 100644
+--- a/.github/workflows/cloudflare-gateway-deploy.yml
++++ b/.github/workflows/cloudflare-gateway-deploy.yml
+@@ -11,6 +11,10 @@ on:
+ permissions:
+   contents: read
+ 
++concurrency:
++  group: irpa-gateway-production-deploy
++  cancel-in-progress: false
++
+ jobs:
+   deploy:
+     runs-on: ubuntu-latest
+@@ -76,6 +80,12 @@ jobs:
+           }
+           NODE
+ 
++      - name: Validate Worker bundle (no deploy)
++        run: |
++          set -euo pipefail
++          npm ci
++          npx wrangler deploy --dry-run
++
+       - name: Verify governance application build
+         working-directory: .
+         run: |
+diff --git a/.github/workflows/gateway-deploy.yml b/.github/workflows/gateway-deploy.yml
+index 02c6efb..9abde89 100644
+--- a/.github/workflows/gateway-deploy.yml
++++ b/.github/workflows/gateway-deploy.yml
+@@ -1,11 +1,11 @@
+ name: Deploy IRPA Mail and Drive Gateway
+ 
++# MANUAL ONLY. This workflow deploys the repository wrangler.json, which has no
++# KV binding and no variables, and it does not use --keep-vars. Running it
++# automatically alongside cloudflare-gateway-deploy.yml could overwrite the
++# production bindings. The supported production deploy is
++# cloudflare-gateway-deploy.yml (recovers DRIVE_KV and keeps variables).
+ on:
+-  push:
+-    branches: [main]
+-    paths:
+-      - "drive-gateway/**"
+-      - ".github/workflows/gateway-deploy.yml"
+   workflow_dispatch:
+ 
+ jobs:
+diff --git a/.github/workflows/workflow-lint.yml b/.github/workflows/workflow-lint.yml
+new file mode 100644
+index 0000000..92aa9f9
+--- /dev/null
++++ b/.github/workflows/workflow-lint.yml
+@@ -0,0 +1,22 @@
++name: Workflow Lint
++
++on:
++  push:
++    paths:
++      - ".github/workflows/**"
++  pull_request:
++    paths:
++      - ".github/workflows/**"
++
++permissions:
++  contents: read
++
++jobs:
++  actionlint:
++    runs-on: ubuntu-latest
++    steps:
++      - uses: actions/checkout@v4
++      - name: Download and run actionlint
++        run: |
++          bash <(curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.7/scripts/download-actionlint.bash) 1.7.7
++          ./actionlint -color
+diff --git a/drive-gateway/package.json b/drive-gateway/package.json
+index 06c30df..cd038b7 100644
+--- a/drive-gateway/package.json
++++ b/drive-gateway/package.json
+@@ -5,7 +5,7 @@
+   "type": "module",
+   "scripts": {
+     "deploy": "wrangler deploy",
+-    "test": "node --test tests/e2e.test.mjs"
++    "test": "node --test tests/e2e.test.mjs tests/e2e-extended.test.mjs"
+   },
+   "devDependencies": {
+     "wrangler": "^4.0.0"
+diff --git a/drive-gateway/src/index.js b/drive-gateway/src/index.js
+index 720c929..2ce46c7 100644
+--- a/drive-gateway/src/index.js
++++ b/drive-gateway/src/index.js
+@@ -83,7 +83,11 @@ export default {
+         return await deleteDriveFile(request, env);
+       }
+ 
+-      if (url.pathname === "/api/send-invitation-email" && request.method === "POST") {\n        return await sendGatewayInvitationEmail(request, env);\n      }\n\n      if (url.pathname === "/api/invitations/send" && request.method === "POST") {
++      if (url.pathname === "/api/send-invitation-email" && request.method === "POST") {
++        return await sendGatewayInvitationEmail(request, env);
++      }
++
++      if (url.pathname === "/api/invitations/send" && request.method === "POST") {
+         return await sendMemberInvitation(request, env);
+       }
+ 
+@@ -641,7 +645,7 @@ async function ensureSignatureProfileFolder(request, env) {
+   }
+ 
+   const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
+-  const isAdmin = Boolean(admin?.fields?.active?.booleanValue);
++  const isAdminForRequest = Boolean(admin?.fields?.active?.booleanValue);
+   if (!isAdminForRequest && requestedUid !== claims.user_id) {
+     return json({ ok: false, error: "You may only provision your own signature folder." }, 403, corsHeaders(request));
+   }
+@@ -1054,13 +1058,13 @@ async function sendGatewayInvitationEmail(request, env) {
+ 
+ async function sendMemberInvitation(request, env) {
+   const claims = await authenticateFirebaseRequest(request);
+-  const admin = await getFirestoreDocument(env, \`adminProfiles/\${claims.user_id}\`, claims.token);
++  const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
+   if (!admin?.fields?.active?.booleanValue) return json({ok:false,error:"Administrator authorization is required to send member invitations."},403,corsHeaders(request));
+   await enforceMailRateLimit(env, claims.user_id);
+   const data = await request.json();
+   const invitationId = cleanId(data.invitationId || "");
+   if (!invitationId) return json({ok:false,error:"Invitation ID is required."},400,corsHeaders(request));
+-  const invitation = await getFirestoreDocument(env, \`invitations/\${invitationId}\`, claims.token);
++  const invitation = await getFirestoreDocument(env, `invitations/${invitationId}`, claims.token);
+   if (!invitation) return json({ok:false,error:"Invitation record was not found."},404,corsHeaders(request));
+   const fields=invitation.fields||{};
+   const email=validateRecipient(fields.email?.stringValue||"");
+@@ -1071,8 +1075,8 @@ async function sendMemberInvitation(request, env) {
+   const invitationSecret=randomBase64Url(32);
+   const invitationTokenHash=await sha256Hex(invitationSecret);
+   const invitationExpiresAt=new Date(Date.now()+72*60*60*1000).toISOString();
+-  const link=\`\${appUrl}/?invitationToken=\${encodeURIComponent(invitationId+"."+invitationSecret)}\`;
+-  await updateFirestoreDocument(env,\`invitations/\${invitationId}\`,claims.token,{
++  const link=`${appUrl}/?invitationToken=${encodeURIComponent(invitationId+"."+invitationSecret)}`;
++  await updateFirestoreDocument(env,`invitations/${invitationId}`,claims.token,{
+     invitationTokenHash:{stringValue:invitationTokenHash},invitationTokenVersion:{stringValue:"2"},invitationExpiresAt:{timestampValue:invitationExpiresAt},invitationRedeemedAt:{nullValue:null},invitationRedeemedUid:{nullValue:null},
+     deliveryStatus:{stringValue:"Queued"},deliveryQueuedAt:{timestampValue:new Date().toISOString()},deliveryError:{stringValue:""},deliveryProvider:{stringValue:"IRPA Mail Server via Cloudflare Worker"}
+   },["invitationTokenHash","invitationTokenVersion","invitationExpiresAt","invitationRedeemedAt","invitationRedeemedUid","deliveryStatus","deliveryQueuedAt","deliveryError","deliveryProvider"]);
+@@ -1081,11 +1085,11 @@ async function sendMemberInvitation(request, env) {
+     const result=await sendInvitationEmail({email,name:name||"Member",link,smtpSend:async ({to,subject,text,html})=>smtpSend(env,{to,subject,text,html}),logger:{error:(label,meta)=>console.error(label,{recipientDomain:recipientDomain(email),attempt:meta?.attempt})}});
+     const sentAt=new Date().toISOString();
+     const messageId=result?.messageId||result;
+-    await updateFirestoreDocument(env,\`invitations/\${invitationId}\`,claims.token,{status:{stringValue:"Sent"},deliveryStatus:{stringValue:"Sent"},deliverySentAt:{timestampValue:sentAt},deliveryError:{stringValue:""},deliveryMessageId:{stringValue:String(messageId||"")} },["status","deliveryStatus","deliverySentAt","deliveryError","deliveryMessageId"]);
++    await updateFirestoreDocument(env,`invitations/${invitationId}`,claims.token,{status:{stringValue:"Sent"},deliveryStatus:{stringValue:"Sent"},deliverySentAt:{timestampValue:sentAt},deliveryError:{stringValue:""},deliveryMessageId:{stringValue:String(messageId||"")} },["status","deliveryStatus","deliverySentAt","deliveryError","deliveryMessageId"]);
+     return json({ok:true,email,deliveryStatus:"Sent",sentAt,messageId,message},200,corsHeaders(request));
+   }catch(error){
+     const failedAt=new Date().toISOString(), safeError=safeMailError(error);
+-    await updateFirestoreDocument(env,\`invitations/\${invitationId}\`,claims.token,{status:{stringValue:"Failed"},deliveryStatus:{stringValue:"Failed"},deliveryFailedAt:{timestampValue:failedAt},deliveryError:{stringValue:safeError}},["status","deliveryStatus","deliveryFailedAt","deliveryError"]);
++    await updateFirestoreDocument(env,`invitations/${invitationId}`,claims.token,{status:{stringValue:"Failed"},deliveryStatus:{stringValue:"Failed"},deliveryFailedAt:{timestampValue:failedAt},deliveryError:{stringValue:safeError}},["status","deliveryStatus","deliveryFailedAt","deliveryError"]);
+     console.error("IRPA member invitation delivery failed",{recipientDomain:recipientDomain(email),error:safeError});
+     return json({ok:false,error:"EMAIL_PROVIDER_FAILED",deliveryStatus:"Failed"},502,corsHeaders(request));
+   }
+@@ -1497,7 +1501,7 @@ async function getFirebaseJwks() {
+   return jwksCache;
+ }
+ 
+-async function lookupInductionRegistration(request, env) {
++async function lookupInductionRegistrationV2(request, env) {
+   const claims = await authenticateFirebaseRequest(request);
+   const body = await request.json().catch(() => ({}));
+   const fullName = String(body.fullName || "").trim();
+diff --git a/drive-gateway/tests/e2e-extended.test.mjs b/drive-gateway/tests/e2e-extended.test.mjs
+new file mode 100644
+index 0000000..347e2aa
+--- /dev/null
++++ b/drive-gateway/tests/e2e-extended.test.mjs
+@@ -0,0 +1,362 @@
++import test from "node:test";
++import assert from "node:assert/strict";
++import { PDFDocument } from "pdf-lib";
++import { memoryMeta, memoryStorage } from "../src/adapters.mjs";
++import { makeContext, route } from "../src/router.mjs";
++import { runCleanup } from "../src/upload.mjs";
++import { verifyChain } from "../src/signing.mjs";
++import { MAX_PDF_BYTES } from "../src/pdf.mjs";
++import { sha256Hex } from "../src/util.mjs";
++
++const quiet = { error() {}, log() {} };
++const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
++const USERS = { u1: { uid: "u1" }, u2: { uid: "u2" }, admin: { uid: "admin", isAdmin: true } };
++
++function setup() {
++  const storage = memoryStorage();
++  const meta = memoryMeta();
++  const invites = [];
++  const clock = { t: new Date("2026-10-04T10:00:00Z") };
++  const ctx = makeContext({
++    storage, meta, logger: quiet, now: () => new Date(clock.t),
++    verifyUser: async (req) => USERS[(req.headers.get("authorization") || "").replace("Bearer ", "")] || null,
++    sendInvitation: async (i) => { invites.push(i); },
++    config: { appUrl: "https://app.example.test", ttlDays: 14 },
++  });
++  const tokenFor = (email) => new URL(invites.find((i) => i.to === email).link).searchParams.get("token");
++  return { ctx, storage, meta, invites, clock, tokenFor };
++}
++
++async function makePdf(pages = 1) {
++  const d = await PDFDocument.create();
++  for (let i = 0; i < pages; i++) d.addPage().drawText(`Page ${i + 1}`, { x: 50, y: 700 });
++  return await d.save();
++}
++
++function uploadReq(bytes, o = {}) {
++  const f = new FormData();
++  f.set("file", new Blob([bytes], { type: o.type || "application/pdf" }), o.name || "doc.pdf");
++  if (o.documentId) f.set("documentId", o.documentId);
++  f.set("title", "Test Doc");
++  f.set("classification", o.classification || "Restricted");
++  f.set("archives", JSON.stringify(o.archives || ["administrative-documents", "board-governance"]));
++  return new Request("https://gw.test/api/documents", {
++    method: "POST", headers: { authorization: `Bearer ${o.user || "u1"}` }, body: f,
++  });
++}
++
++const post = (path, body, user) =>
++  new Request(`https://gw.test${path}`, {
++    method: "POST",
++    headers: { "content-type": "application/json", ...(user ? { authorization: `Bearer ${user}` } : {}) },
++    body: JSON.stringify(body),
++  });
++const get = (path, { user, token } = {}) =>
++  new Request(`https://gw.test${path}`, {
++    headers: { ...(user ? { authorization: `Bearer ${user}` } : {}), ...(token ? { "x-signing-token": token } : {}) },
++  });
++
++async function uploadDoc(s, id = "DOC-001", opts = {}) {
++  const bytes = await makePdf(2);
++  const res = await route(uploadReq(bytes, { documentId: id, ...opts }), s.ctx);
++  assert.equal(res.status, 201);
++  return { bytes, hash: await sha256Hex(bytes) };
++}
++
++const signers2 = [
++  { name: "Amina", email: "a@example.org", order: 1 },
++  { name: "Juma", email: "j@example.org", order: 2 },
++];
++const sign1 = (token, extra = {}) =>
++  post("/api/sign/submit", { token, consent: true, signature: { type: "typed", value: "Amina K" }, ...extra });
++
++async function makeEnvelope(s, signers = signers2, archives = ["legal-contracts", "board-governance"]) {
++  await uploadDoc(s);
++  const res = await route(post("/api/envelopes", { documentId: "DOC-001", signers, archives }, "u1"), s.ctx);
++  assert.equal(res.status, 201);
++  return (await res.json()).envelopeId;
++}
++
++// ---------------- upload ----------------
++test("valid PDF is stored in every selected archive with matching hash", async () => {
++  const s = setup();
++  const { hash } = await uploadDoc(s);
++  assert.equal(s.storage.objs.size, 2);
++  const doc = await s.meta.get("documents", "DOC-001");
++  assert.equal(doc.status, "Stored");
++  assert.equal(doc.hash, hash);
++  const paths = [...s.storage.objs.values()].map((o) => o.path);
++  assert.ok(paths.some((p) => p.includes("/Administrative Documents/Restricted/DOC-001/")));
++  assert.ok(paths.some((p) => p.includes("/Board of Directors Governance Archive/Restricted/DOC-001/")));
++});
++
++test("rejects renamed non-PDF, truncated PDF, empty file, oversize, bad archive", async () => {
++  const s = setup();
++  const txt = new TextEncoder().encode("hello world, not a pdf");
++  assert.equal((await route(uploadReq(txt, { name: "x.pdf" }), s.ctx)).status, 400);
++  const good = await makePdf();
++  assert.equal((await route(uploadReq(good.slice(0, good.length - 200)), s.ctx)).status, 400);
++  assert.equal((await route(uploadReq(new Uint8Array(0)), s.ctx)).status, 400);
++  const big = new Uint8Array(MAX_PDF_BYTES + 1);
++  big.set(new TextEncoder().encode("%PDF-1.7"));
++  assert.equal((await route(uploadReq(big), s.ctx)).status, 413);
++  assert.equal((await route(uploadReq(good, { archives: ["nope"] }), s.ctx)).status, 400);
++  assert.equal((await route(uploadReq(good, { classification: "Secret" }), s.ctx)).status, 400);
++  assert.equal(s.storage.objs.size, 0);
++});
++
++test("exactly 10 MB is accepted", async () => {
++  const s = setup();
++  const good = await makePdf();
++  const tail = new TextEncoder().encode("\n%%EOF\n");
++  const filler = MAX_PDF_BYTES - good.length - tail.length;
++  const bytes = new Uint8Array(MAX_PDF_BYTES);
++  bytes.set(good);
++  bytes.fill(0x0a, good.length, good.length + filler);
++  bytes.set(tail, good.length + filler);
++  assert.equal(bytes.length, MAX_PDF_BYTES);
++  assert.equal((await route(uploadReq(bytes, { documentId: "DOC-BIG" }), s.ctx)).status, 201);
++});
++
++test("unauthenticated upload is rejected", async () => {
++  const s = setup();
++  assert.equal((await route(uploadReq(await makePdf(), { user: "nobody" }), s.ctx)).status, 401);
++});
++
++test("duplicate and concurrent uploads of the same ID: one wins, one gets 409", async () => {
++  const s = setup();
++  const bytes = await makePdf();
++  const [a, b] = await Promise.all([
++    route(uploadReq(bytes, { documentId: "DOC-RACE" }), s.ctx),
++    route(uploadReq(bytes, { documentId: "DOC-RACE" }), s.ctx),
++  ]);
++  assert.deepEqual([a.status, b.status].sort(), [201, 409]);
++  assert.equal(s.storage.objs.size, 2);
++});
++
++test("second-archive failure rolls back the first object and releases the ID", async () => {
++  const s = setup();
++  s.storage.failPutWhen = (n) => n === 2;
++  const bytes = await makePdf();
++  assert.equal((await route(uploadReq(bytes, { documentId: "DOC-RB" }), s.ctx)).status, 502);
++  assert.equal(s.storage.objs.size, 0);
++  assert.equal(await s.meta.get("documents", "DOC-RB"), null);
++  s.storage.failPutWhen = null;
++  assert.equal((await route(uploadReq(bytes, { documentId: "DOC-RB" }), s.ctx)).status, 201);
++});
++
++test("rollback-delete failure is recorded and the cleanup job removes it", async () => {
++  const s = setup();
++  s.storage.failPutWhen = (n) => n === 2;
++  s.storage.failDelete = true;
++  assert.equal((await route(uploadReq(await makePdf(), { documentId: "DOC-CL" }), s.ctx)).status, 502);
++  assert.equal(s.storage.objs.size, 1);
++  assert.equal((await s.meta.list("pendingCleanup")).length, 1);
++  s.storage.failDelete = false;
++  assert.deepEqual(await runCleanup(s.ctx), { removed: 1 });
++  assert.equal(s.storage.objs.size, 0);
++  assert.equal((await s.meta.list("pendingCleanup")).length, 0);
++});
++
++// ---------------- retrieval ----------------
++test("retrieval: owner ok with matching hash; others and wrong IDs denied", async () => {
++  const s = setup();
++  const { hash } = await uploadDoc(s);
++  const ok = await route(get("/api/documents/DOC-001/pdf", { user: "u1" }), s.ctx);
++  assert.equal(ok.status, 200);
++  assert.equal(await sha256Hex(new Uint8Array(await ok.arrayBuffer())), hash);
++  assert.equal((await route(get("/api/documents/DOC-001/pdf", { user: "u2" }), s.ctx)).status, 403);
++  assert.equal((await route(get("/api/documents/NOPE-999/pdf", { user: "u1" }), s.ctx)).status, 403);
++  assert.equal((await route(get("/api/documents/DOC-001/pdf"), s.ctx)).status, 401);
++});
++
++test("retrieval fails when stored bytes were tampered with", async () => {
++  const s = setup();
++  await uploadDoc(s);
++  const doc = await s.meta.get("documents", "DOC-001");
++  s.storage.objs.get(doc.primaryStorageId).bytes[20] ^= 0xff;
++  assert.equal((await route(get("/api/documents/DOC-001/pdf", { user: "u1" }), s.ctx)).status, 500);
++});
++
++// ---------------- envelopes ----------------
++test("envelope creation: only the owner; refuses to hand tokens to the creator", async () => {
++  const s = setup();
++  await uploadDoc(s);
++  const body = { documentId: "DOC-001", signers: signers2, archives: ["legal-contracts"] };
++  assert.equal((await route(post("/api/envelopes", body, "u2"), s.ctx)).status, 403);
++  const noTransport = makeContext({ storage: s.storage, meta: s.meta, verifyUser: s.ctx.verifyUser, logger: quiet });
++  assert.equal((await route(post("/api/envelopes", body, "u1"), noTransport)).status, 500);
++  const bad = { ...body, signers: [{ name: "X", email: "x@e.org\r\nBcc: y@z.z" }] };
++  assert.equal((await route(post("/api/envelopes", bad, "u1"), s.ctx)).status, 400);
++  assert.equal((await route(post("/api/envelopes", { ...body, archives: [] }, "u1"), s.ctx)).status, 400);
++  assert.equal(s.invites.length, 0);
++});
++
++// ---------------- full signing protocol ----------------
++test("two sequential signers: order enforced, completed PDF saved to every archive and copy", async () => {
++  const s = setup();
++  const id = await makeEnvelope(s);
++  const t1 = s.tokenFor("a@example.org");
++  const t2 = s.tokenFor("j@example.org");
++  const objsBefore = s.storage.objs.size; // 2 originals
++
++  const early = await route(post("/api/sign/submit", { token: t2, consent: true, signature: { type: "typed", value: "Juma M" } }), s.ctx);
++  assert.equal(early.status, 409);
++
++  const noConsent = await route(post("/api/sign/submit", { token: t1, consent: false, signature: { type: "typed", value: "Amina K" } }), s.ctx);
++  assert.equal(noConsent.status, 400);
++
++  const r1 = await route(sign1(t1), s.ctx);
++  assert.deepEqual(await r1.json(), { ok: true, status: "InProgress", completed: false });
++
++  const r2 = await route(post("/api/sign/submit", { token: t2, consent: true, signature: { type: "drawn", value: PNG } }), s.ctx);
++  const out2 = await r2.json();
++  assert.equal(r2.status, 200);
++  assert.equal(out2.completed, true);
++
++  const status = await (await route(get(`/api/envelopes/${id}`, { user: "u1" }), s.ctx)).json();
++  assert.equal(status.status, "Completed");
++  assert.equal(status.auditChainValid, true);
++  // 2 selected archives + owner copy + 2 signer copies
++  assert.equal(status.completion.files.length, 5);
++  assert.equal(s.storage.objs.size, objsBefore + 5);
++  assert.deepEqual(status.completion.files.filter((f) => f.kind === "archive").map((f) => f.archiveKey).sort(), ["board-governance", "legal-contracts"]);
++
++  // original untouched; final PDF = original pages + certificate page, hash matches the record
++  const doc = await s.meta.get("documents", "DOC-001");
++  assert.equal(await sha256Hex(await s.storage.get(doc.primaryStorageId)), doc.hash);
++  const final = await s.storage.get(status.completion.files[0].id);
++  assert.equal(await sha256Hex(final), status.completion.finalHash);
++  assert.equal((await PDFDocument.load(final)).getPageCount(), 3);
++
++  // signer can download the completed copy with their link
++  const dl = await route(get("/api/sign/pdf", { token: t1 }), s.ctx);
++  assert.equal(dl.status, 200);
++  assert.equal(dl.headers.get("x-document-sha256"), status.completion.finalHash);
++
++  // duplicate callback is idempotent and creates nothing new
++  const count = s.storage.objs.size;
++  const dup = await route(sign1(t1), s.ctx);
++  assert.equal((await dup.json()).idempotent, true);
++  assert.equal(s.storage.objs.size, count);
++});
++
++test("token security: malformed 401, tampered 403, expired 403, wrong signer account 403", async () => {
++  const s = setup();
++  await uploadDoc(s);
++  await route(post("/api/envelopes", {
++    documentId: "DOC-001", archives: ["legal-contracts"],
++    signers: [{ name: "Amina", email: "a@example.org", order: 1 }, { name: "Linked", email: "l@example.org", order: 2, uid: "u2" }],
++  }, "u1"), s.ctx);
++  const t1 = s.tokenFor("a@example.org");
++  const tl = s.tokenFor("l@example.org");
++  assert.equal((await route(sign1("garbage"), s.ctx)).status, 401);
++  const parts = t1.split(".");
++  assert.equal((await route(sign1(`${parts[0]}.${parts[1]}.${"0".repeat(64)}`), s.ctx)).status, 403);
++  assert.equal((await route(get("/api/sign/open", { token: t1 }), s.ctx)).status, 200);
++
++  await route(sign1(t1), s.ctx); // signer 1 done so signer 2 is up
++  const asWrong = new Request("https://gw.test/api/sign/submit", {
++    method: "POST", headers: { "content-type": "application/json", authorization: "Bearer u1" },
++    body: JSON.stringify({ token: tl, consent: true, signature: { type: "typed", value: "Linked L" } }),
++  });
++  assert.equal((await route(asWrong, s.ctx)).status, 403);
++  const asRight = new Request("https://gw.test/api/sign/submit", {
++    method: "POST", headers: { "content-type": "application/json", authorization: "Bearer u2" },
++    body: JSON.stringify({ token: tl, consent: true, signature: { type: "typed", value: "Linked L" } }),
++  });
++  assert.equal((await route(asRight, s.ctx)).status, 200);
++
++  const s2 = setup();
++  await makeEnvelope(s2);
++  const tok = s2.tokenFor("a@example.org");
++  s2.clock.t = new Date("2026-11-01T00:00:00Z");
++  assert.equal((await route(sign1(tok), s2.ctx)).status, 403);
++});
++
++test("signing fails if the stored original was altered after the envelope was created", async () => {
++  const s = setup();
++  await makeEnvelope(s);
++  const doc = await s.meta.get("documents", "DOC-001");
++  s.storage.objs.get(doc.primaryStorageId).bytes[30] ^= 0xff;
++  assert.equal((await route(sign1(s.tokenFor("a@example.org")), s.ctx)).status, 409);
++});
++
++test("invalid signature input is rejected", async () => {
++  const s = setup();
++  await makeEnvelope(s);
++  const t1 = s.tokenFor("a@example.org");
++  for (const signature of [
++    { type: "typed", value: "x" }, { type: "typed", value: "<script>" },
++    { type: "drawn", value: "data:image/png;base64,AAAA" }, { type: "drawn", value: "data:image/jpeg;base64,AAAA" },
++    { type: "other", value: "x" }, null,
++  ]) {
++    assert.equal((await route(post("/api/sign/submit", { token: t1, consent: true, signature }), s.ctx)).status, 400);
++  }
++});
++
++test("completion failure leaves no orphan files and can be retried", async () => {
++  const s = setup();
++  const id = await makeEnvelope(s, [{ name: "Amina", email: "a@example.org" }]);
++  const before = s.storage.objs.size;
++  s.storage.failPutWhen = (n, args) => args.metadata?.state === "Final Completed Document" && args.metadata.archive === "board-governance";
++  const r = await route(sign1(s.tokenFor("a@example.org")), s.ctx);
++  const out = await r.json();
++  assert.equal(out.completed, false);
++  assert.equal(out.status, "CompletionFailed");
++  assert.equal(s.storage.objs.size, before);
++
++  s.storage.failPutWhen = null;
++  const retry = await route(post(`/api/envelopes/${id}/retry-completion`, {}, "u1"), s.ctx);
++  assert.equal(retry.status, 200);
++  assert.equal((await retry.json()).completed, true);
++  assert.equal(s.storage.objs.size, before + 4); // 2 archives + owner + 1 signer
++  assert.equal((await route(post(`/api/envelopes/${id}/retry-completion`, {}, "u2"), s.ctx)).status, 403);
++  const st = await (await route(get(`/api/envelopes/${id}`, { user: "u1" }), s.ctx)).json();
++  assert.equal(st.auditChainValid, true);
++});
++
++test("parallel signers: exactly one completion, no duplicate final files", async () => {
++  const s = setup();
++  const id = await makeEnvelope(s, [
++    { name: "Amina", email: "a@example.org", order: 1 },
++    { name: "Juma", email: "j@example.org", order: 1 },
++  ]);
++  const before = s.storage.objs.size;
++  const [a, b] = await Promise.all([
++    route(sign1(s.tokenFor("a@example.org")), s.ctx),
++    route(post("/api/sign/submit", { token: s.tokenFor("j@example.org"), consent: true, signature: { type: "typed", value: "Juma M" } }), s.ctx),
++  ]);
++  assert.equal(a.status, 200);
++  assert.equal(b.status, 200);
++  const st = await (await route(get(`/api/envelopes/${id}`, { user: "u1" }), s.ctx)).json();
++  assert.equal(st.status, "Completed");
++  assert.equal(s.storage.objs.size, before + 5);
++  assert.equal(st.auditChainValid, true);
++});
++
++test("decline and void block further signing", async () => {
++  const s = setup();
++  const id = await makeEnvelope(s);
++  const t1 = s.tokenFor("a@example.org");
++  const t2 = s.tokenFor("j@example.org");
++  assert.equal((await route(post("/api/sign/decline", { token: t1, reason: "Not agreed" }), s.ctx)).status, 200);
++  assert.equal((await route(sign1(t1), s.ctx)).status, 403);
++
++  const s2 = setup();
++  const id2 = await makeEnvelope(s2);
++  assert.equal((await route(post(`/api/envelopes/${id2}/void`, { reason: "Wrong file" }, "u2"), s2.ctx)).status, 403);
++  assert.equal((await route(post(`/api/envelopes/${id2}/void`, { reason: "Wrong file" }, "u1"), s2.ctx)).status, 200);
++  assert.equal((await route(sign1(s2.tokenFor("a@example.org")), s2.ctx)).status, 403);
++  assert.ok(id && id2 && t2);
++});
++
++test("audit chain detects tampering", async () => {
++  const s = setup();
++  const id = await makeEnvelope(s, [{ name: "Amina", email: "a@example.org" }]);
++  await route(sign1(s.tokenFor("a@example.org")), s.ctx);
++  const env = await s.meta.get("envelopes", id);
++  assert.equal(await verifyChain(env.events), true);
++  env.events[1].ip = "6.6.6.6";
++  assert.equal(await verifyChain(env.events), false);
++});

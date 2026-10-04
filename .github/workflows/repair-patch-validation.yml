@@ -1,0 +1,23 @@
+name: Validate attached IRPA repair patch
+on:
+  push:
+    branches: ["validate/repair-patch-20261004"]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Apply patch with git 3-way
+        run: |
+          set -euo pipefail
+          git apply --3way --check irpa-repair.patch
+          git apply --3way irpa-repair.patch
+      - name: npm ci and npm test
+        working-directory: drive-gateway
+        run: |
+          set -euo pipefail
+          npm ci
+          npm test
