@@ -39,7 +39,7 @@ jobs:
         run: |
           set -euo pipefail
           rm -f "$RUNNER_TEMP/wrangler-off.log"
-          npx wrangler dev --local --config wrangler.toml --port 8787 --var ESIGN_MODULE_ENABLED:false --var DRIVE_MOCK:true > "$RUNNER_TEMP/wrangler-off.log" 2>&1 &
+          npx wrangler dev --local --config wrangler.toml --compatibility-date 2026-09-24 --port 8787 --var ESIGN_MODULE_ENABLED:false --var DRIVE_MOCK:true > "$RUNNER_TEMP/wrangler-off.log" 2>&1 &
           pid=$!
           echo "$pid" > "$RUNNER_TEMP/wrangler-off.pid"
           ready=false
@@ -73,7 +73,7 @@ jobs:
         run: |
           set -euo pipefail
           rm -f "$RUNNER_TEMP/wrangler-on.log"
-          npx wrangler dev --local --config wrangler.toml --port 8788 --var ESIGN_MODULE_ENABLED:true --var CLOUDFLARE_AUTH_FUNCTIONS_ENABLED:true --var DRIVE_MOCK:true > "$RUNNER_TEMP/wrangler-on.log" 2>&1 &
+          npx wrangler dev --local --config wrangler.toml --compatibility-date 2026-09-24 --port 8788 --var ESIGN_MODULE_ENABLED:true --var CLOUDFLARE_AUTH_FUNCTIONS_ENABLED:true --var DRIVE_MOCK:true > "$RUNNER_TEMP/wrangler-on.log" 2>&1 &
           pid=$!
           echo "$pid" > "$RUNNER_TEMP/wrangler-on.pid"
           ready=false
