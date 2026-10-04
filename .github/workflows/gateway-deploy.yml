@@ -1,37 +1,18 @@
-name: Deploy IRPA Mail and Drive Gateway
+name: Validate IRPA Mail and Drive Gateway
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "drive-gateway/**"
-      - ".github/workflows/gateway-deploy.yml"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  deploy-gateway:
+  validate-gateway:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Verify Cloudflare deployment credentials and resolve account
-        id: cloudflare
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID_SECRET: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          set -e
-          test -n "$CLOUDFLARE_API_TOKEN" || { echo "CLOUDFLARE_API_TOKEN is not available to this workflow."; exit 1; }
-          if [ -n "$CLOUDFLARE_ACCOUNT_ID_SECRET" ]; then
-            ACCOUNT_ID="$CLOUDFLARE_ACCOUNT_ID_SECRET"
-          else
-            ACCOUNT_ID="$(curl --fail --silent --show-error -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" https://api.cloudflare.com/client/v4/accounts | python -c 'import json,sys; d=json.load(sys.stdin); a=d.get("result",[]); print(a[0]["id"] if a else "")')"
-          fi
-          test -n "$ACCOUNT_ID" || { echo "Unable to resolve a Cloudflare account ID from the supplied API token."; exit 1; }
-          echo "account_id=$ACCOUNT_ID" >> "$GITHUB_OUTPUT"
-          echo "Cloudflare account resolved."
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -44,21 +25,16 @@ jobs:
         working-directory: drive-gateway
         run: npm ci
 
-      - name: Validate Worker bundle
+      - name: Validate Worker bundle without deployment
         working-directory: drive-gateway
-        run: npx wrangler deploy --dry-run
+        run: npx wrangler deploy --dry-run --keep-vars
 
-      - name: Deploy Cloudflare Worker
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ steps.cloudflare.outputs.account_id }}
-          workingDirectory: drive-gateway
-          command: deploy
+      - name: Run gateway E2E tests
+        working-directory: drive-gateway
+        run: npm test
 
       - name: Verify live gateway
         run: |
-          set -e
+          set -euo pipefail
           curl --fail --silent --show-error --retry 5 --retry-delay 3             https://irpa-google-drive-gateway.irpa-governance.workers.dev/health
-
-# Native document-format uploads from every IRPA portal: 2026-09-29T00:00Z
+          echo
