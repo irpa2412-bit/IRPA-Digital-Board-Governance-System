@@ -1,0 +1,12 @@
+export class HttpError extends Error { constructor(status,message){super(message);this.status=status;} }
+export const json=(status,body,extra={})=>new Response(JSON.stringify(body),{status,headers:{"content-type":"application/json","cache-control":"no-store",...extra}});
+export const ID_RE=/^[A-Za-z0-9_-]{3,64}$/; const EMAIL_RE=/^[^\s@<>"',;\\]+@[^\s@<>"',;\\]+\.[^\s@<>"',;\\]+$/; const CRLF_RE=/[\r\n\u2028\u2029]/;
+export function safeEqual(a,b){if(typeof a!=="string"||typeof b!=="string"||!a||!b)return false;const x=new TextEncoder().encode(a),y=new TextEncoder().encode(b);if(x.length!==y.length)return false;let d=0;for(let i=0;i<x.length;i++)d|=x[i]^y[i];return d===0;}
+export async function sha256Hex(data){const b=typeof data==="string"?new TextEncoder().encode(data):data;const x=await crypto.subtle.digest("SHA-256",b);return [...new Uint8Array(x)].map(v=>v.toString(16).padStart(2,"0")).join("");}
+export function randomHex(n=32){const a=new Uint8Array(n);crypto.getRandomValues(a);return [...a].map(v=>v.toString(16).padStart(2,"0")).join("");}
+export function canonicalJson(v){if(v===null||typeof v!=="object")return JSON.stringify(v);if(Array.isArray(v))return "["+v.map(canonicalJson).join(",")+"]";return "{"+Object.keys(v).sort().filter(k=>v[k]!==undefined).map(k=>JSON.stringify(k)+":"+canonicalJson(v[k])).join(",")+"}";}
+export function cleanSegment(s,max=80){const v=String(s??"").normalize("NFKC").replace(/[^A-Za-z0-9._ -]/g,"_").replace(/\.{2,}/g,"_").trim().slice(0,max);if(!v||v==="."||v==="..")throw new HttpError(400,"Invalid name.");return v;}
+export function cleanText(s,max=200){return String(s??"").replace(/[\u0000-\u001f\u007f]/g," ").trim().slice(0,max);}
+export function validateEmail(email){const v=typeof email==="string"?email.trim():"";if(!v||v.length>254||CRLF_RE.test(v)||!EMAIL_RE.test(v))throw new HttpError(400,"Invalid email address.");return v;}
+export function validateName(name){if(typeof name!=="string"||!name.trim()||name.length>100||CRLF_RE.test(name))throw new HttpError(400,"Invalid name.");return name.trim();}
+export async function requireUser(request,ctx){const u=await ctx.verifyUser(request);if(!u?.uid)throw new HttpError(401,"Authentication required.");return u;}
