@@ -19,7 +19,7 @@ jobs:
           node-version: 22
       - name: Install dependencies
         working-directory: drive-gateway
-        run: npm install
+        run: npm ci
       - name: Run 18 PDF/e-signature tests
         working-directory: drive-gateway
         run: npm test
