@@ -16,7 +16,7 @@ async function queueInductionEmail(inputOrEmail, subjectOrOptions, text, html, o
   if (!legacy && subjectOrOptions && typeof subjectOrOptions === "object") options = subjectOrOptions;
   const input = legacy ? { recipientEmail: inputOrEmail, subject: subjectOrOptions, text, html, invitedByUid:null } : (inputOrEmail || {});
   const { db, invitationId, recipientEmail, recipientName, invitedByUid, logger=console, fetchFn=fetch, env=process.env, sleep=(ms)=>new Promise(r=>setTimeout(r,ms)) } = options;
-  const firestore = db || require("firebase-admin/firestore").getFirestore();
+  const firestore = db || input.db || require("firebase-admin/firestore").getFirestore();
   if (!recipientEmail && input.recipientEmail) Object.assign(input,{recipientEmail:input.recipientEmail});
   const to=input.recipientEmail || recipientEmail; if(!to) throw new Error("recipientEmail is required");
   const queueRef = input.invitationId ? firestore.collection("emailQueue").doc(input.invitationId) : firestore.collection("emailQueue").doc();
