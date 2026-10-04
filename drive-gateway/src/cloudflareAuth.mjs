@@ -82,7 +82,14 @@ export async function routeCloudflareAuth(request, env, authenticate) {
   const url = new URL(request.url);
   const pathname = url.pathname.replace(/\/+$/, "") || "/";
   if (env.CLOUDFLARE_AUTH_FUNCTIONS_ENABLED !== "true") return null;
-  if (request.method !== "POST") return json({ ok: false, error: "Method not allowed." }, 405);
+
+  const isMigratedAuthPath =
+    pathname === "/api/auth/password-attempt-state" ||
+    pathname === "/api/auth/password-failure" ||
+    pathname === "/api/auth/password-attempt-clear" ||
+    pathname === "/api/documents/next-reference";
+  if (!isMigratedAuthPath) return null;
+  if (request.method !== "POST") return json(405, { ok: false, error: "Method not allowed." });
 
   if (pathname === "/api/auth/password-attempt-state") {
     const body = await request.json().catch(() => ({}));
