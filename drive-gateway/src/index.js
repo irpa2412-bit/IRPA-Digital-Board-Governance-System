@@ -15,6 +15,7 @@ const SMTP_HOST = "mail.irpa.or.tz";
 const SMTP_PORT = 465;
 const SMTP_FROM = "info@irpa.or.tz";
 import { escapeHtml as escapeMailHtml, normalizeRecipientEmail, recipientDomain, safeMailError, sendWithRetry, validateMailHeader } from "./mailDelivery.js";
+import { sendInvitationEmail, buildInvitationMessage, validateRecipient } from "./invitationEmail.mjs";
 
 let jwksCache = null;
 let jwksFetchedAt = 0;
@@ -1030,67 +1031,40 @@ info@irpa.or.tz`;
 
 async function sendMemberInvitation(request, env) {
   const claims = await authenticateFirebaseRequest(request);
-  const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
-  if (!admin?.fields?.active?.booleanValue) {
-    return json({ ok:false, error:"Administrator authorization is required to send member invitations." },403,corsHeaders(request));
-  }
+  const admin = await getFirestoreDocument(env, \`adminProfiles/\${claims.user_id}\`, claims.token);
+  if (!admin?.fields?.active?.booleanValue) return json({ok:false,error:"Administrator authorization is required to send member invitations."},403,corsHeaders(request));
   await enforceMailRateLimit(env, claims.user_id);
   const data = await request.json();
   const invitationId = cleanId(data.invitationId || "");
   if (!invitationId) return json({ok:false,error:"Invitation ID is required."},400,corsHeaders(request));
-  const invitation = await getFirestoreDocument(env, `invitations/${invitationId}`, claims.token);
+  const invitation = await getFirestoreDocument(env, \`invitations/\${invitationId}\`, claims.token);
   if (!invitation) return json({ok:false,error:"Invitation record was not found."},404,corsHeaders(request));
-  const fields = invitation.fields || {};
-  const email = normalizeRecipientEmail(fields.email?.stringValue || "");
-  const name = String(fields.name?.stringValue || "").trim();
-  const role = String(fields.role?.stringValue || "IRPA Member").trim();
-  const subject = validateMailHeader("IRPA Digital Board Governance — Invitation to Activate Your Account", "Subject");
-  const appUrl = String(env.IRPA_APP_URL || "https://irpa-digital-board-governance.web.app").replace(/\/$/,"");
-  const invitationSecret = randomBase64Url(32);
-  const invitationTokenHash = await sha256Hex(invitationSecret);
-  const invitationExpiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString();
-  const link = `${appUrl}/?invitationToken=${encodeURIComponent(invitationId + "." + invitationSecret)}`;
-  await updateFirestoreDocument(env, `invitations/${invitationId}`, claims.token, {
-    invitationTokenHash:{stringValue:invitationTokenHash},
-    invitationTokenVersion:{stringValue:"2"},
-    invitationExpiresAt:{timestampValue:invitationExpiresAt},
-    invitationRedeemedAt:{nullValue:null},
-    invitationRedeemedUid:{nullValue:null}
-  }, ["invitationTokenHash","invitationTokenVersion","invitationExpiresAt","invitationRedeemedAt","invitationRedeemedUid"]);
-  const text = `Dear ${name || "IRPA Member"},\\n\\nYou have been invited to access the IRPA Digital Board Governance System as ${role}.\\n\\nActivate your account using this secure invitation link:\\n${link}\\n\\nOn the activation page, use your invited email address and create your permanent password.\\n\\nIf you did not expect this invitation, please contact Improvement of Rangeland in Pastoral Areas (IRPA).\\n\\nRegards,\\nIRPA Administration\\ninfo@irpa.or.tz`;
-  const htmlBody = `<!doctype html><html><body style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937"><h2>IRPA Digital Board Governance</h2><p>Dear ${escapeMailHtml(name || "IRPA Member")},</p><p>You have been invited to access the <strong>IRPA Digital Board Governance System</strong> as <strong>${escapeMailHtml(role)}</strong>.</p><p><a href="${escapeMailHtml(link)}" style="display:inline-block;padding:12px 18px;background:#0f766e;color:#fff;text-decoration:none;border-radius:6px">Activate Your IRPA Account</a></p><p>On the activation page, use your invited email address and create your permanent password.</p><p>If you did not expect this invitation, please contact <a href="mailto:info@irpa.or.tz">info@irpa.or.tz</a>.</p><p>Regards,<br>IRPA Administration</p></body></html>`;
-  const queuedAt = new Date().toISOString();
-  await updateFirestoreDocument(env, `invitations/${invitationId}`, claims.token, {
-    deliveryStatus:{stringValue:"Queued"},
-    deliveryQueuedAt:{timestampValue:queuedAt},
-    deliveryError:{stringValue:""},
-    deliveryProvider:{stringValue:"IRPA Mail Server via Cloudflare Worker"}
-  }, ["deliveryStatus","deliveryQueuedAt","deliveryError","deliveryProvider"]);
-  try {
-    const messageId = await sendWithRetry(
-      () => smtpSend(env,{to:email,subject,text,html:htmlBody}),
-      { onFailure: async (error, attempt) => console.error("IRPA member invitation SMTP failure", {recipientDomain:recipientDomain(email),attempt,error:safeMailError(error)}) }
-    );
-    const sentAt = new Date().toISOString();
-    await updateFirestoreDocument(env, `invitations/${invitationId}`, claims.token, {
-      status:{stringValue:"Sent"},
-      deliveryStatus:{stringValue:"Sent"},
-      deliverySentAt:{timestampValue:sentAt},
-      deliveryError:{stringValue:""},
-      deliveryMessageId:{stringValue:String(messageId)}
-    }, ["status","deliveryStatus","deliverySentAt","deliveryError","deliveryMessageId"]);
-    return json({ok:true,email,deliveryStatus:"Sent",sentAt,messageId},200,corsHeaders(request));
-  } catch (error) {
-    const failedAt = new Date().toISOString();
-    const safeError = safeMailError(error);
-    await updateFirestoreDocument(env, `invitations/${invitationId}`, claims.token, {
-      status:{stringValue:"Failed"},
-      deliveryStatus:{stringValue:"Failed"},
-      deliveryFailedAt:{timestampValue:failedAt},
-      deliveryError:{stringValue:safeError}
-    }, ["status","deliveryStatus","deliveryFailedAt","deliveryError"]);
-    console.error("IRPA member invitation delivery failed", {recipientDomain:recipientDomain(email),error:safeError});
-    throw error;
+  const fields=invitation.fields||{};
+  const email=validateRecipient(fields.email?.stringValue||"");
+  if(!email) return json({ok:false,error:"Invalid recipient"},400,corsHeaders(request));
+  const name=String(fields.name?.stringValue||"").trim();
+  const role=String(fields.role?.stringValue||"IRPA Member").trim();
+  const appUrl=String(env.IRPA_APP_URL||"https://irpa-digital-board-governance.web.app").replace(/\/$/,"");
+  const invitationSecret=randomBase64Url(32);
+  const invitationTokenHash=await sha256Hex(invitationSecret);
+  const invitationExpiresAt=new Date(Date.now()+72*60*60*1000).toISOString();
+  const link=\`\${appUrl}/?invitationToken=\${encodeURIComponent(invitationId+"."+invitationSecret)}\`;
+  await updateFirestoreDocument(env,\`invitations/\${invitationId}\`,claims.token,{
+    invitationTokenHash:{stringValue:invitationTokenHash},invitationTokenVersion:{stringValue:"2"},invitationExpiresAt:{timestampValue:invitationExpiresAt},invitationRedeemedAt:{nullValue:null},invitationRedeemedUid:{nullValue:null},
+    deliveryStatus:{stringValue:"Queued"},deliveryQueuedAt:{timestampValue:new Date().toISOString()},deliveryError:{stringValue:""},deliveryProvider:{stringValue:"IRPA Mail Server via Cloudflare Worker"}
+  },["invitationTokenHash","invitationTokenVersion","invitationExpiresAt","invitationRedeemedAt","invitationRedeemedUid","deliveryStatus","deliveryQueuedAt","deliveryError","deliveryProvider"]);
+  const message=buildInvitationMessage({name:name||"Member",link});
+  try{
+    const result=await sendInvitationEmail({email,name:name||"Member",link,smtpSend:async ({to,subject,text,html})=>smtpSend(env,{to,subject,text,html}),logger:{error:(label,meta)=>console.error(label,{recipientDomain:recipientDomain(email),attempt:meta?.attempt})}});
+    const sentAt=new Date().toISOString();
+    const messageId=result?.messageId||result;
+    await updateFirestoreDocument(env,\`invitations/\${invitationId}\`,claims.token,{status:{stringValue:"Sent"},deliveryStatus:{stringValue:"Sent"},deliverySentAt:{timestampValue:sentAt},deliveryError:{stringValue:""},deliveryMessageId:{stringValue:String(messageId||"")} },["status","deliveryStatus","deliverySentAt","deliveryError","deliveryMessageId"]);
+    return json({ok:true,email,deliveryStatus:"Sent",sentAt,messageId,message},200,corsHeaders(request));
+  }catch(error){
+    const failedAt=new Date().toISOString(), safeError=safeMailError(error);
+    await updateFirestoreDocument(env,\`invitations/\${invitationId}\`,claims.token,{status:{stringValue:"Failed"},deliveryStatus:{stringValue:"Failed"},deliveryFailedAt:{timestampValue:failedAt},deliveryError:{stringValue:safeError}},["status","deliveryStatus","deliveryFailedAt","deliveryError"]);
+    console.error("IRPA member invitation delivery failed",{recipientDomain:recipientDomain(email),error:safeError});
+    return json({ok:false,error:"EMAIL_PROVIDER_FAILED",deliveryStatus:"Failed"},502,corsHeaders(request));
   }
 }
 
