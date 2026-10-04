@@ -59,10 +59,13 @@ jobs:
           INVITE: ${{ secrets.STAGING_INVITE_SERVICE_KEY }}
         run: |
           set -euo pipefail
-          test -n "$CF_TOKEN" && test -n "$CF_ACCOUNT"
-          test -n "$PROJECT" && test "$PROJECT" != "irpa-digital-board-governance"
-          test -n "$APP_URL" && test -n "$DRIVE_ID" && test -n "$DRIVE_SECRET"
-          test -n "$DRIVE_KEY" && test -n "$SMTP" && test -n "$INVITE"
+          missing=0
+          for pair in             "CLOUDFLARE_API_TOKEN:$CF_TOKEN"             "CLOUDFLARE_ACCOUNT_ID:$CF_ACCOUNT"             "STAGING_FIREBASE_PROJECT_ID:$PROJECT"             "STAGING_IRPA_APP_URL:$APP_URL"             "STAGING_GOOGLE_DRIVE_CLIENT_ID:$DRIVE_ID"             "STAGING_GOOGLE_DRIVE_CLIENT_SECRET:$DRIVE_SECRET"             "STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY:$DRIVE_KEY"             "STAGING_SMTP_PASSWORD:$SMTP"             "STAGING_INVITE_SERVICE_KEY:$INVITE"; do
+            name="${pair%%:*}"; value="${pair#*:}"
+            if [ -z "$value" ]; then echo "Missing staging secret: $name"; missing=1; fi
+          done
+          test "$PROJECT" != "irpa-digital-board-governance"
+          test "$missing" -eq 0
 
       - name: Provision or reuse dedicated staging KV
         env:
