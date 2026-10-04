@@ -278,7 +278,10 @@ jobs:
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
 
-      # Keep the login resolver deployment independent from unrelated functions.
+      # Keep Firebase function deployments independent from Hosting/Firestore.
+      # Google Cloud billing is currently closed for this project, so new Cloud Functions
+      # deployments cannot activate Cloud Build/Artifact Registry. Existing deployed
+      # functions remain untouched; deployment can be re-enabled when billing is restored.
       - name: Deploy login authorization resolver
         continue-on-error: true
         uses: w9jds/firebase-action@v14.17.0
@@ -288,12 +291,12 @@ jobs:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
 
       - name: Deploy retained Firebase password-reset function
+        continue-on-error: true
         uses: w9jds/firebase-action@v14.17.0
         with:
           args: deploy --project irpa-digital-board-governance --only functions:preparePasswordResetPhone
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
-
       - name: Verify live Firebase application
         run: |
           set -e
