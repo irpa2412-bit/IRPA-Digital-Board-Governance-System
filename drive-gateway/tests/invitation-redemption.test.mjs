@@ -64,7 +64,6 @@ test("Cloudflare invitation redemption creates/signs Firebase custom token and r
     });
     assert.equal(response.status,200);
     const body=await response.json();
-    console.log("REDEMPTION_BODY",JSON.stringify(body));
     assert.equal(body.ok,true);
     assert.equal(body.invitationId,"test-invitation");
     assert.equal(body.uid,"firebase-test-uid");
@@ -75,7 +74,7 @@ test("Cloudflare invitation redemption creates/signs Firebase custom token and r
     const payload=decodePart(payloadPart);
     assert.equal(header.alg,"RS256");
     assert.equal(payload.uid,"firebase-test-uid");
-    assert.equal(payload.irpaInvitationId,"test-invitation");
+    assert.equal(payload.claims.irpaInvitationId,"test-invitation");
     assert.equal(payload.claims.irpaInvitationRedeemed,true);
 
     const verifier=createVerify("RSA-SHA256");
