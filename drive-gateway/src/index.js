@@ -19,7 +19,7 @@ import { sendInvitationEmail, buildInvitationMessage, validateRecipient } from "
 import { route as esignRoute } from "./router.mjs";
 import { buildEsignContext, EsignRecordDurableObject } from "./esignContext.mjs";
 import { runCleanup } from "./upload.mjs";
-import { InvitationRedemptionError, redeemInvitationToken } from "./invitationRedemption.mjs";
+import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPasswordSetup } from "./invitationRedemption.mjs";
 
 let jwksCache = null;
 let jwksFetchedAt = 0;
@@ -106,6 +106,16 @@ export default {
         }
       }
 
+      if (url.pathname === "/api/invitations/password-set" && request.method === "POST") {
+        try {
+          const claims = await authenticateFirebaseRequest(request, env, {skipActivation:true});
+          return json(await confirmInvitationPasswordSetup(request, env, claims), 200, corsHeaders(request));
+        } catch (error) {
+          if (error instanceof InvitationRedemptionError) return json({ok:false,error:error.message}, error.status, corsHeaders(request));
+          console.error("Invitation password verification failure", error);
+          return json({ok:false,error:"The IRPA invitation password could not be verified."}, 500, corsHeaders(request));
+        }
+      }
       if (url.pathname === "/api/send-invitation-email" && request.method === "POST") {
         return await sendGatewayInvitationEmail(request, env);
       }
@@ -1497,7 +1507,7 @@ async function driveFetch(env, accessToken, path, options = {}) {
   return data;
 }
 
-async function authenticateFirebaseRequest(request, env) {
+async function authenticateFirebaseRequest(request, env, options = {}) {
   const header = request.headers.get("Authorization") || "";
   const match = header.match(/^Bearer\s+(.+)$/i);
   if (!match) throw new Error("Firebase authentication is required.");
@@ -1533,7 +1543,7 @@ async function authenticateFirebaseRequest(request, env) {
   if (!valid) throw new Error("Invalid Firebase ID token signature.");
 
   const claims = { token, user_id: payload.user_id || payload.sub, email: payload.email || null };
-  await assertActivatedPortalUser(claims, env);
+  if (options.skipActivation !== true) await assertActivatedPortalUser(claims, env);
   return claims;
 }
 
