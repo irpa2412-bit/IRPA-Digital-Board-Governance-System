@@ -114,6 +114,4 @@ test("Cloudflare invitation redemption rejects malformed tokens before contactin
   }
 });
 
-// Isolated CI gate.
 
-// CI gate refresh.
