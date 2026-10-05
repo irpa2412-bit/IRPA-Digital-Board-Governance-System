@@ -6,6 +6,9 @@ on:
     paths:
       - "drive-gateway/**"
       - "firebase.json"
+      - "src/App.jsx"
+      - "src/firebase/auth.js"
+      - "src/firebase/invitationWorkflow.js"
       - ".github/workflows/staging-gateway-e2e.yml"
   workflow_dispatch:
 
