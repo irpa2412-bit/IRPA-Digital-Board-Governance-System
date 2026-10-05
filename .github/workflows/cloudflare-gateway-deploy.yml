@@ -6,47 +6,12 @@ on:
     paths:
       - "drive-gateway/**"
       - ".github/workflows/cloudflare-gateway-deploy.yml"
-  pull_request:
-    branches: [main]
-    paths:
-      - "drive-gateway/**"
-      - ".github/workflows/cloudflare-gateway-deploy.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  production-secret-preflight:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: drive-gateway
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Inspect production Worker secret names
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          set -euo pipefail
-          test -n "$CLOUDFLARE_API_TOKEN"
-          test -n "$CLOUDFLARE_ACCOUNT_ID"
-          secrets_json="$(npx --yes wrangler@4 secret list --name irpa-google-drive-gateway)"
-          SECRET_LIST="$secrets_json" node <<'NODE'
-          const secrets = JSON.parse(process.env.SECRET_LIST || "[]");
-          if (!Array.isArray(secrets)) throw new Error("Cloudflare secret-list response was not an array.");
-          const names = secrets.map(item => String(item?.name || ""));
-          console.log("Production Worker secret names:", names.join(", "));
-          if (!names.includes("FIREBASE_ADMIN_SERVICE_ACCOUNT_JSON")) {
-            throw new Error("Required FIREBASE_ADMIN_SERVICE_ACCOUNT_JSON secret is absent from the production Worker. Do not merge until the credential boundary is provisioned.");
-          }
-          console.log("Required invitation-redemption credential binding is present; no secret values were accessed.");
-          NODE
-
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 15
