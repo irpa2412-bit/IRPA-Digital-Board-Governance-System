@@ -304,6 +304,38 @@ test("Cloudflare invitation redemption rate-limits the sixth attempt for one inv
   } finally { global.fetch=originalFetch; }
 });
 
+test("password-set is idempotent when invitation is already PROVISIONING_PENDING", async()=>{
+  const originalFetch=global.fetch;
+  const jwk=publicKey.export({format:"jwk"});
+  const idToken=makeFirebaseIdToken("provisioning-pending-uid");
+  let patchCalled=false;
+  global.fetch=async(url,options={})=>{
+    const target=String(url);
+    if(target.includes("securetoken@system.gserviceaccount.com")) return new Response(JSON.stringify({keys:[{...jwk,kid:"invitation-test-key",alg:"RS256",use:"sig"}]}),{status:200});
+    if(target.includes("/databases/(default)/documents/invitations/provisioning-pending")) return new Response(JSON.stringify({
+      fields:{
+        invitationRedeemedUid:{stringValue:"provisioning-pending-uid"},
+        invitationRedemptionState:{stringValue:"PROVISIONING_PENDING"},
+        invitationPasswordSetupExpiresAt:{timestampValue:"2099-01-01T00:00:00Z"}
+      },
+      updateTime:"2026-10-05T08:00:00.000000Z"
+    }),{status:200});
+    if(target.includes("/accounts:lookup")) return new Response(JSON.stringify({users:[{localId:"provisioning-pending-uid",providerUserInfo:[{providerId:"password"}]}]}),{status:200});
+    if(options.method==="PATCH") patchCalled=true;
+    throw new Error("Unexpected external request: "+target);
+  };
+  try{
+    const response=await handler.fetch(new Request("https://gw.test/api/invitations/password-set",{
+      method:"POST",
+      headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"},
+      body:JSON.stringify({invitationId:"provisioning-pending"})
+    }),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)});
+    assert.equal(response.status,200);
+    assert.deepEqual(await response.json(),{ok:true,invitationId:"provisioning-pending",uid:"provisioning-pending-uid",state:"PROVISIONING_PENDING"});
+    assert.equal(patchCalled,false);
+  } finally { global.fetch=originalFetch; }
+});
+
 test("portal activation gate rejects a valid Firebase ID token whose member record is not Activated", async()=>{
   const originalFetch=global.fetch;
   const jwk=publicKey.export({format:"jwk"});
