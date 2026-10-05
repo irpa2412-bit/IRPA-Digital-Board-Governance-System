@@ -138,6 +138,33 @@ test("Cloudflare invitation redemption rejects malformed tokens before contactin
 });
 
 
+test("password-set returns 401 when Firebase authentication is missing", async()=>{
+  const response=await handler.fetch(new Request("https://gw.test/api/invitations/password-set",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({invitationId:"missing-auth"})
+  }),{
+    FIREBASE_PROJECT_ID:"irpa-digital-board-governance",
+    FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)
+  });
+  assert.equal(response.status,401);
+  assert.deepEqual(await response.json(),{ok:false,error:"Firebase authentication is required."});
+});
+
+test("session-state returns 401 when Firebase authentication is missing", async()=>{
+  const response=await handler.fetch(new Request("https://gw.test/api/invitations/session-state",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:"{}"
+  }),{
+    FIREBASE_PROJECT_ID:"irpa-digital-board-governance",
+    FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)
+  });
+  assert.equal(response.status,401);
+  assert.deepEqual(await response.json(),{ok:false,error:"Firebase authentication is required."});
+});
+
+
 
 
 function makeFirebaseIdToken(uid){
