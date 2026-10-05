@@ -95,11 +95,11 @@ async function sha256Hex(value) {
 }
 
 async function importServiceAccountKey(serviceAccount) {
-  const pem = String(serviceAccount.private_key || "").replace(/\\n/g, "\\n");
+  const pem = String(serviceAccount.private_key || "").replace(/\\n/g, "\n");
   const base64 = pem
     .replace("-----BEGIN PRIVATE KEY-----", "")
     .replace("-----END PRIVATE KEY-----", "")
-    .replace(/\\s+/g, "");
+    .replace(/\s+/g, "");
   return crypto.subtle.importKey(
     "pkcs8",
     fromBase64(base64),
