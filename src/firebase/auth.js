@@ -12,6 +12,7 @@ import {
   getRedirectResult,
   signOut,
   sendSignInLinkToEmail,
+  updatePassword,
   isSignInWithEmailLink,
   signInWithEmailLink,
   onAuthStateChanged,
@@ -379,6 +380,15 @@ export function isMagicLink(url = window.location.href) {
   return isSignInWithEmailLink(auth, url);
 }
 
+export async function configureInvitationPassword(password) {
+  const cleanPassword = String(password || "");
+  if (!auth.currentUser) throw new Error("The invitation account session is not active. Open the invitation email again.");
+  if (cleanPassword.length < 8) throw new Error("Use a password with at least 8 characters.");
+  await updatePassword(auth.currentUser, cleanPassword);
+  window.sessionStorage.removeItem("irpaInvitationPasswordSetup");
+  return true;
+}
+
 export async function completeInvitationToken(token) {
   const cleanToken = String(token || "").trim();
   if (!cleanToken) throw new Error("The IRPA invitation token is missing.");
@@ -390,6 +400,7 @@ export async function completeInvitationToken(token) {
     const signedIn = await signInWithCustomToken(auth, data.customToken);
     const { provisionCurrentMemberFromInvitationV2 } = await import("./invitationWorkflow");
     await provisionCurrentMemberFromInvitationV2(data.invitationId);
+    window.sessionStorage.setItem("irpaInvitationPasswordSetup", "1");
     window.localStorage.removeItem("irpaEmailForSignIn");
     window.localStorage.removeItem("irpaMemberEmailForSignIn");
     return signedIn.user;
