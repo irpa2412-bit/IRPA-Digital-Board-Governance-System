@@ -310,7 +310,9 @@ export async function confirmInvitationPasswordSetup(request, env, claims) {
   if (!document) throw new InvitationRedemptionError(404, "This IRPA invitation no longer exists.");
   const invitation = firestoreDocumentToPlain(document.fields || {});
   if (String(invitation.invitationRedeemedUid || "") !== String(claims.user_id || "")) throw new InvitationRedemptionError(403, "This invitation is not assigned to the authenticated account.");
-  if (String(invitation.invitationRedemptionState || "") !== "PASSWORD_SETUP_PENDING") throw new InvitationRedemptionError(409, "This invitation is not waiting for password setup.");
+  const redemptionState = String(invitation.invitationRedemptionState || "");
+  if (!["PASSWORD_SETUP_PENDING", "PROVISIONING_PENDING"].includes(redemptionState)) throw new InvitationRedemptionError(409, "This invitation is not waiting for password setup or resumable provisioning.");
+  if (redemptionState === "PROVISIONING_PENDING") return {ok:true,invitationId,uid:claims.user_id,state:"PROVISIONING_PENDING"};
   if (new Date(invitation.invitationPasswordSetupExpiresAt || 0).getTime() <= Date.now()) throw new InvitationRedemptionError(410, "The invitation password-setup window has expired. Ask an Administrator to issue a fresh invitation.");
   const lookupResponse = await fetch(`https://identitytoolkit.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/accounts:lookup`, {method:"POST",headers:{Authorization:"Bearer " + accessToken,"Content-Type":"application/json"},body:JSON.stringify({localId:[claims.user_id]})});
   const lookup = await lookupResponse.json().catch(() => ({}));
