@@ -392,8 +392,15 @@ export async function configureInvitationPassword(password) {
   const hasPasswordProvider = Array.isArray(user.providerData) && user.providerData.some(provider => provider.providerId === "password");
   if (!hasPasswordProvider) {
     const credential = EmailAuthProvider.credential(String(user.email || "").trim().toLowerCase(), cleanPassword);
-    try { await linkWithCredential(user, credential); }
-    catch (error) { if (error?.code !== "auth/provider-already-linked") throw error; }
+    try {
+      await linkWithCredential(user, credential);
+    } catch (error) {
+      if (error?.code !== "auth/provider-already-linked") throw error;
+      // A second tab/request may have linked the provider between the check and link.
+      // Explicitly apply the password requested in this attempt instead of silently
+      // retaining an unknown password from the racing request.
+      await updatePassword(user, cleanPassword);
+    }
   } else {
     await updatePassword(user, cleanPassword);
   }
