@@ -19,7 +19,7 @@ import { sendInvitationEmail, buildInvitationMessage, validateRecipient } from "
 import { route as esignRoute } from "./router.mjs";
 import { buildEsignContext, EsignRecordDurableObject } from "./esignContext.mjs";
 import { runCleanup } from "./upload.mjs";
-import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPasswordSetup } from "./invitationRedemption.mjs";
+import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPasswordSetup, getInvitationSessionState } from "./invitationRedemption.mjs";
 
 let jwksCache = null;
 let jwksFetchedAt = 0;
@@ -103,6 +103,17 @@ export default {
           }
           console.error("Invitation redemption backend failure", error);
           return json({ok:false,error:"The IRPA invitation could not be redeemed."}, 500, corsHeaders(request));
+        }
+      }
+
+      if (url.pathname === "/api/invitations/session-state" && request.method === "POST") {
+        try {
+          const claims = await authenticateFirebaseRequest(request, env, {skipActivation:true});
+          return json(await getInvitationSessionState(env, claims), 200, corsHeaders(request));
+        } catch (error) {
+          if (error instanceof InvitationRedemptionError) return json({ok:false,error:error.message}, error.status, corsHeaders(request));
+          console.error("Invitation session-state failure", error);
+          return json({ok:false,error:"Unable to resolve the invitation session state."}, 500, corsHeaders(request));
         }
       }
 
