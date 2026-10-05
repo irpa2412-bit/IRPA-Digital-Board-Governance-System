@@ -89,3 +89,5 @@ test("invalid email is rejected without creating state", async () => {
   const response = await call("/api/auth/password-failure", { email: "not-an-email" }, env());
   assert.equal(response.status, 400);
 });
+
+// CI gate refresh.
