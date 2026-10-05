@@ -8,6 +8,8 @@ import {
   signInWithCredential,
   signInWithCustomToken,
   updatePassword,
+  linkWithCredential,
+  EmailAuthProvider,
   GoogleAuthProvider,
   signInWithRedirect,
   getRedirectResult,
@@ -382,58 +384,50 @@ export function isMagicLink(url = window.location.href) {
 
 export async function configureInvitationPassword(password) {
   const cleanPassword = String(password || "");
-  if (!auth.currentUser) throw new Error("The invitation account session is not active. Open the invitation email again.");
+  const user = auth.currentUser;
+  const invitationId = String(window.sessionStorage.getItem("irpaInvitationId") || "").trim();
+  if (!user) throw new Error("The invitation account session is not active. Open the invitation email again.");
+  if (!invitationId) throw new Error("The invitation activation context is missing. Open the invitation email again.");
   if (cleanPassword.length < 8) throw new Error("Use a password with at least 8 characters.");
-  await updatePassword(auth.currentUser, cleanPassword);
+  const hasPasswordProvider = Array.isArray(user.providerData) && user.providerData.some(provider => provider.providerId === "password");
+  if (!hasPasswordProvider) {
+    const credential = EmailAuthProvider.credential(String(user.email || "").trim().toLowerCase(), cleanPassword);
+    try { await linkWithCredential(user, credential); }
+    catch (error) { if (error?.code !== "auth/provider-already-linked") throw error; }
+  }
+  const idToken = await user.getIdToken(true);
+  const gatewayOrigin = window.location.hostname.endsWith(".workers.dev") ? window.location.origin : "https://irpa-google-drive-gateway.irpa-governance.workers.dev";
+  const response = await fetch(`${gatewayOrigin}/api/invitations/password-set`, {
+    method:"POST",
+    headers:{Authorization:`Bearer ${idToken}`,"Content-Type":"application/json"},
+    body:JSON.stringify({invitationId})
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data.ok !== true) throw new Error(data.error || "The server could not verify the new password.");
   window.sessionStorage.removeItem("irpaInvitationPasswordSetup");
-  return true;
+  window.sessionStorage.setItem("irpaInvitationProvisioningPending","1");
+  return data;
 }
 
 export async function completeInvitationToken(token) {
   const cleanToken = String(token || "").trim();
   if (!cleanToken) throw new Error("The IRPA invitation token is missing.");
-
-  // Invitation-token redemption is served by the existing Cloudflare gateway so
-  // this flow no longer depends on a Firebase Cloud Function deployment/billing.
-  const gatewayOrigin = window.location.hostname.endsWith(".workers.dev")
-    ? window.location.origin
-    : "https://irpa-google-drive-gateway.irpa-governance.workers.dev";
+  const gatewayOrigin = window.location.hostname.endsWith(".workers.dev") ? window.location.origin : "https://irpa-google-drive-gateway.irpa-governance.workers.dev";
   const endpoint = `${gatewayOrigin}/api/invitations/redeem`;
-
   try {
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-IRPA-Invitation-Version": "2"
-      },
-      body: JSON.stringify({ token: cleanToken })
-    });
-
+    const response = await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json","X-IRPA-Invitation-Version":"2"},body:JSON.stringify({token:cleanToken})});
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(data?.error || "The IRPA invitation could not be redeemed.");
-    }
-    if ((!data.customToken && !data.invitationPassword) || !data.invitationId) {
-      throw new Error("The invitation redemption response was incomplete.");
-    }
-
+    if (!response.ok) throw new Error(data?.error || "The IRPA invitation could not be redeemed.");
+    if ((!data.customToken && !data.invitationPassword) || !data.invitationId) throw new Error("The invitation redemption response was incomplete.");
     let signedIn;
-    if (data.customToken) {
-      signedIn = await signInWithCustomToken(auth, data.customToken);
-    } else {
-      signedIn = await loginWithEmail(data.email || "", data.invitationPassword);
-    }
-
-    const { provisionCurrentMemberFromInvitationV2 } = await import("./invitationWorkflow");
-    await provisionCurrentMemberFromInvitationV2(data.invitationId);
-    window.sessionStorage.setItem("irpaInvitationPasswordSetup", "1");
+    if (data.customToken) signedIn = await signInWithCustomToken(auth,data.customToken);
+    else signedIn = await loginWithEmail(data.email || "",data.invitationPassword);
+    window.sessionStorage.setItem("irpaInvitationId",data.invitationId);
+    window.sessionStorage.setItem("irpaInvitationPasswordSetup","1");
     window.localStorage.removeItem("irpaEmailForSignIn");
     window.localStorage.removeItem("irpaMemberEmailForSignIn");
     return signedIn.user;
-  } catch (error) {
-    throw new Error(error?.message || "The IRPA invitation could not be redeemed.");
-  }
+  } catch (error) { throw new Error(error?.message || "The IRPA invitation could not be redeemed."); }
 }
 export async function completeMagicLink(email, url = window.location.href) {
   const cleanEmail = email.trim().toLowerCase();
