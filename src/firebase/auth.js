@@ -394,9 +394,12 @@ export async function configureInvitationPassword(password) {
     const credential = EmailAuthProvider.credential(String(user.email || "").trim().toLowerCase(), cleanPassword);
     try { await linkWithCredential(user, credential); }
     catch (error) { if (error?.code !== "auth/provider-already-linked") throw error; }
+  } else {
+    await updatePassword(user, cleanPassword);
   }
   const idToken = await user.getIdToken(true);
-  const gatewayOrigin = window.location.hostname.endsWith(".workers.dev") ? window.location.origin : "https://irpa-google-drive-gateway.irpa-governance.workers.dev";
+  const gatewayOrigin = String(import.meta.env.VITE_GATEWAY_ORIGIN || "").trim().replace(/\/$/,"");
+  if (!gatewayOrigin) throw new Error("IRPA gateway origin is not configured for this build.");
   const response = await fetch(`${gatewayOrigin}/api/invitations/password-set`, {
     method:"POST",
     headers:{Authorization:`Bearer ${idToken}`,"Content-Type":"application/json"},
@@ -405,14 +408,16 @@ export async function configureInvitationPassword(password) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data.ok !== true) throw new Error(data.error || "The server could not verify the new password.");
   window.sessionStorage.removeItem("irpaInvitationPasswordSetup");
-  window.sessionStorage.setItem("irpaInvitationProvisioningPending","1");
+  window.sessionStorage.removeItem("irpaInvitationProvisioningPending");
+  if (data.state === "ACTIVATED") window.sessionStorage.removeItem("irpaInvitationId");
   return data;
 }
 
 export async function completeInvitationToken(token) {
   const cleanToken = String(token || "").trim();
   if (!cleanToken) throw new Error("The IRPA invitation token is missing.");
-  const gatewayOrigin = window.location.hostname.endsWith(".workers.dev") ? window.location.origin : "https://irpa-google-drive-gateway.irpa-governance.workers.dev";
+  const gatewayOrigin = String(import.meta.env.VITE_GATEWAY_ORIGIN || "").trim().replace(/\/$/,"");
+  if (!gatewayOrigin) throw new Error("IRPA gateway origin is not configured for this build.");
   const endpoint = `${gatewayOrigin}/api/invitations/redeem`;
   try {
     const response = await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json","X-IRPA-Invitation-Version":"2"},body:JSON.stringify({token:cleanToken})});
@@ -429,6 +434,22 @@ export async function completeInvitationToken(token) {
     return signedIn.user;
   } catch (error) { throw new Error(error?.message || "The IRPA invitation could not be redeemed."); }
 }
+export async function getInvitationSessionState() {
+  const user = auth.currentUser;
+  if (!user) return {state:null, invitationId:null};
+  const gatewayOrigin = String(import.meta.env.VITE_GATEWAY_ORIGIN || "").trim().replace(/\/$/,"");
+  if (!gatewayOrigin) throw new Error("IRPA gateway origin is not configured for this build.");
+  const idToken = await user.getIdToken();
+  const response = await fetch(`${gatewayOrigin}/api/invitations/session-state`, {
+    method:"POST",
+    headers:{Authorization:`Bearer ${idToken}`,"Content-Type":"application/json"},
+    body:"{}"
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data.ok === false) throw new Error(data.error || "Unable to resolve the invitation session state.");
+  return {state:data.state || null, invitationId:data.invitationId || null};
+}
+
 export async function completeMagicLink(email, url = window.location.href) {
   const cleanEmail = email.trim().toLowerCase();
   const params = new URL(url, window.location.origin).searchParams;
