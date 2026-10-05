@@ -1,3 +1,9 @@
+// Legacy staging Durable Object compatibility symbol. The current gateway does not bind or route new traffic to this class.
+export class EsignRecordDurableObject {
+  constructor(state, env) { this.state = state; this.env = env; }
+  async fetch() { return new Response("Legacy e-signature Durable Object is not active."); }
+}
+
 const FIREBASE_PROJECT_ID = "irpa-digital-board-governance";
 const AUTHORIZED_DRIVE_EMAIL = "irpa2412@gmail.com";
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
