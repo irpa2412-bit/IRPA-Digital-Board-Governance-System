@@ -1,0 +1,30 @@
+name: Invitation Redemption Isolated Tests
+
+on:
+  push:
+    branches:
+      - feat/cloudflare-invitation-redemption-20261005
+    paths:
+      - "drive-gateway/**"
+      - "src/firebase/auth.js"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: drive-gateway/package-lock.json
+      - name: Install gateway dependencies
+        working-directory: drive-gateway
+        run: npm ci --no-audit --no-fund
+      - name: Run existing gateway tests plus invitation redemption test
+        working-directory: drive-gateway
+        run: npm test
