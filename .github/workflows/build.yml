@@ -2,7 +2,7 @@ name: IRPA Release Build
 
 on:
   push:
-    branches: [main]
+    branches: [main, fix/member-signature-invitation-email-20261004]
   workflow_dispatch:
 
 jobs:
