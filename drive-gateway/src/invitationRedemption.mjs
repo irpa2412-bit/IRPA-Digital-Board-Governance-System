@@ -302,7 +302,7 @@ async function enforceRedeemRateLimit(request, env) {
 export async function redeemInvitationToken(request, env) {
   if (request.method !== "POST") return json({ ok: false, error: "Method not allowed." }, 405, corsHeaders(request, env));
   const origin = String(request.headers.get("Origin") || "");
-  const allowedOrigin = String(env.IRPA_APP_URL || "https://irpa-digital-board-governance.web.app").replace(/\\/$/, "");
+  const allowedOrigin = String(env.IRPA_APP_URL || "https://irpa-digital-board-governance.web.app").replace(/\/$/, "");
   if (origin && origin !== allowedOrigin) {
     return json({ ok: false, error: "Origin not authorized." }, 403, corsHeaders(request, env));
   }
