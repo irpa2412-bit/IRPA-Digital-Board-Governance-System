@@ -1564,7 +1564,7 @@ async function assertActivatedPortalUser(claims, env) {
   const member = await getFirestoreDocument(env, `members/${claims.user_id}`, claims.token);
   const employee = await getFirestoreDocument(env, `employees/${claims.user_id}`, claims.token);
   const memberActivated = member && (member.fields?.registrationStatus?.stringValue === "Activated" || member.fields?.status?.stringValue === "Activated" || member.fields?.accountActivated?.booleanValue === true);
-  const employeeActive = employee && (employee.fields?.registrationStatus?.stringValue === "Activated" || employee.fields?.status?.stringValue === "Active" || employee.fields?.employmentStatus?.stringValue === "Active" || employee.fields?.accountActivated?.booleanValue === true);
+  const employeeActive = employee && (employee.fields?.registrationStatus?.stringValue === "Activated" || employee.fields?.status?.stringValue === "Active" || employee.fields?.employmentStatus?.stringValue === "Active") && employee.fields?.accountActivated?.booleanValue !== false;
   if (!memberActivated && !employeeActive) {
     const error = new Error("IRPA_INVITATION_FAILURE:PORTAL_ACTIVATION_REQUIRED");
     error.status = 403;
