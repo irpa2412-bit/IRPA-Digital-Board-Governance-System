@@ -4,6 +4,10 @@ const OAUTH_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const CUSTOM_TOKEN_AUDIENCE = "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit";
 
 let accessTokenCache = null;
+const INVITATION_PENDING_WINDOW_MS = 60 * 60 * 1000;
+const redemptionAttempts = new Map();
+const REDEMPTION_RATE_WINDOW_MS = 5 * 60 * 1000;
+const REDEMPTION_RATE_LIMIT = 5;
 
 export class InvitationRedemptionError extends Error {
   constructor(status, message) {
@@ -55,6 +59,7 @@ export async function redeemInvitationToken(request, env) {
 
   const invitationId = parts[0];
   const secret = parts[1];
+  enforceRedemptionRateLimit(invitationId);
   const documentPath = `projects/${projectId}/databases/(default)/documents/invitations/${encodeURIComponent(invitationId)}`;
 
   let stage = "GOOGLE_ACCESS_TOKEN";
@@ -106,8 +111,23 @@ export async function redeemInvitationToken(request, env) {
     throw new InvitationRedemptionError(403, "This Firebase account is disabled. Ask an Administrator to reactivate the account.");
   }
 
+  const hasPasswordProvider = Array.isArray(user.providerUserInfo) && user.providerUserInfo.some(provider => String(provider.providerId || "") === "password");
+  if (hasPasswordProvider) {
+    throw new InvitationRedemptionError(409, "This email already has a password account. Use the normal IRPA login or Forgot Password flow to continue with this invitation.");
+  }
+  const currentState = String(invitation.invitationRedemptionState || "PENDING");
+  const pendingUntil = new Date(invitation.invitationPasswordSetupExpiresAt || 0).getTime();
+  if (currentState === "EXPIRED" || (currentState === "PASSWORD_SETUP_PENDING" && pendingUntil && pendingUntil <= Date.now())) {
+    throw new InvitationRedemptionError(410, "The invitation password-setup window has expired. Ask an Administrator to issue a fresh invitation.");
+  }
+  if (["CANCELLED","ACTIVATED"].includes(currentState)) {
+    throw new InvitationRedemptionError(409, "This invitation is no longer available for password setup.");
+  }
+  if (invitation.invitationRedeemedUid && invitation.invitationRedeemedUid !== user.localId) {
+    throw new InvitationRedemptionError(409, "This invitation has already been associated with another Firebase account.");
+  }
   const customToken = await createFirebaseCustomToken(serviceAccount, user.localId, invitationId);
-  await redeemFirestoreInvitation(documentPath, invitationDocument, user.localId, googleAccessToken);
+  await markPasswordSetupPending(documentPath, invitationDocument, user.localId, googleAccessToken);
 
   return {
     ok: true,
@@ -229,11 +249,8 @@ async function getOrCreateFirebaseUser(projectId, email, displayName, accessToke
 }
 
 function validateInvitation(invitation, invitationId, secret) {
-  if (invitation.status === "Cancelled") {
+  if (invitation.status === "Cancelled" || invitation.invitationRedemptionState === "CANCELLED") {
     throw new InvitationRedemptionError(412, "This IRPA invitation has been cancelled.");
-  }
-  if (invitation.invitationRedeemedAt) {
-    throw new InvitationRedemptionError(409, "This IRPA invitation token has already been redeemed. Ask an administrator to issue a fresh invitation.");
   }
   if (invitation.invitationTokenVersion !== "2" || !invitation.invitationTokenHash) {
     throw new InvitationRedemptionError(412, "This invitation was issued under an older invitation mechanism. Ask an administrator to issue a fresh invitation.");
@@ -253,43 +270,32 @@ function validateInvitation(invitation, invitationId, secret) {
   });
 }
 
-async function redeemFirestoreInvitation(documentPath, document, uid, accessToken) {
+async function markPasswordSetupPending(documentPath, document, uid, accessToken) {
   const current = firestoreDocumentToPlain(document.fields || {});
-  if (current.invitationRedeemedAt) {
-    throw new InvitationRedemptionError(409, "This IRPA invitation token has already been redeemed. Ask an administrator to issue a fresh invitation.");
-  }
-  if (current.invitationRedeemedUid && current.invitationRedeemedUid !== uid) {
-    throw new InvitationRedemptionError(409, "This invitation has already been redeemed for another Firebase account.");
-  }
-
+  if (current.invitationRedeemedUid && current.invitationRedeemedUid !== uid) throw new InvitationRedemptionError(409, "This invitation has already been associated with another Firebase account.");
   const now = new Date().toISOString();
+  const pendingUntil = new Date(Date.now() + INVITATION_PENDING_WINDOW_MS).toISOString();
   const fields = {
     invitationRedeemedUid: {stringValue: uid},
-    invitationRedeemedAt: {timestampValue: now},
-    invitationRedemptionStatus: {stringValue: "Redeemed — Awaiting Activation"},
+    invitationRedemptionState: {stringValue: "PASSWORD_SETUP_PENDING"},
+    invitationPasswordSetupExpiresAt: {timestampValue: pendingUntil},
+    invitationRedemptionStatus: {stringValue: "Password Setup Pending"},
     updatedAt: {timestampValue: now}
   };
-
-  const url = new URL(`https://firestore.googleapis.com/v1/${documentPath}`);
+  const url = new URL("https://firestore.googleapis.com/v1/" + documentPath);
   for (const field of Object.keys(fields)) url.searchParams.append("updateMask.fieldPaths", field);
   url.searchParams.set("currentDocument.updateTime", document.updateTime);
+  const response = await fetch(url.toString(), {method:"PATCH",headers:{Authorization:"Bearer " + accessToken,"Content-Type":"application/json"},body:JSON.stringify({fields})});
+  if (response.status === 409 || response.status === 400) throw new InvitationRedemptionError(409, "The invitation changed while it was being redeemed. Please open the invitation again.");
+  if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error?.message || "Unable to record the invitation password-setup state."); }
+}
 
-  const response = await fetch(url.toString(), {
-    method: "PATCH",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({fields})
-  });
-
-  if (response.status === 409 || response.status === 400) {
-    throw new InvitationRedemptionError(409, "This invitation has already been redeemed or changed. Ask an administrator to issue a fresh invitation.");
-  }
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({}));
-    throw new Error(data.error?.message || "Unable to record the invitation redemption in Firestore.");
-  }
+function enforceRedemptionRateLimit(invitationId) {
+  const now = Date.now(), key = String(invitationId || "unknown");
+  const existing = redemptionAttempts.get(key) || {startedAt:now,count:0};
+  if (now - existing.startedAt >= REDEMPTION_RATE_WINDOW_MS) { redemptionAttempts.set(key,{startedAt:now,count:1}); return; }
+  existing.count += 1; redemptionAttempts.set(key,existing);
+  if (existing.count > REDEMPTION_RATE_LIMIT) throw new InvitationRedemptionError(429, "Too many invitation redemption attempts. Please wait a few minutes and try again.");
 }
 
 async function getFirestoreDocument(path, accessToken) {
@@ -331,7 +337,7 @@ async function createFirebaseCustomToken(serviceAccount, uid, invitationId) {
     uid,
     claims: {
       irpaInvitationId: invitationId,
-      irpaInvitationRedeemed: true
+      irpaInvitationRedemptionState: "PASSWORD_SETUP_PENDING"
     }
   }, serviceAccount.private_key);
 }
