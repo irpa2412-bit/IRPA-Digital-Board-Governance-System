@@ -102,7 +102,7 @@ async function importServiceAccountKey(serviceAccount) {
     .replace(/\\s+/g, "");
   return crypto.subtle.importKey(
     "pkcs8",
-    fromBase64Url(b64urlBytes(fromBase64(base64))),
+    fromBase64(base64),
     { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
     false,
     ["sign"]
