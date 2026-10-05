@@ -23,7 +23,10 @@ class MemoryNamespace {
       this.objects.set(id, { object: new EsignRecordDurableObject(state, {}) });
     }
     return {
-      fetch: request => this.objects.get(id).object.fetch(request)
+      fetch: (input, init) => {
+        const request = input instanceof Request ? input : new Request(input, init);
+        return this.objects.get(id).object.fetch(request);
+      }
     };
   }
 }
