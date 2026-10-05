@@ -577,7 +577,6 @@ export async function confirmInvitationPasswordSetup(request, env, claims) {
       invitationRedemptionState:{stringValue:"PROVISIONING_PENDING"},
       invitationRedemptionStatus:{stringValue:"Provisioning Pending"},
       invitationPasswordSetAt:{timestampValue:now},
-      invitationRedeemedAt:{timestampValue:now},
       updatedAt:{timestampValue:now}
     }, accessToken);
     const refreshed = await getFirestoreDocument(documentPath, accessToken);
