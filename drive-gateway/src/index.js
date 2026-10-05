@@ -18,6 +18,7 @@ import { escapeHtml as escapeMailHtml, normalizeRecipientEmail, recipientDomain,
 import { sendInvitationEmail, buildInvitationMessage, validateRecipient } from "./invitationEmail.mjs";
 import { route as esignRoute } from "./router.mjs";
 import { buildEsignContext, EsignRecordDurableObject } from "./esignContext.mjs";
+import { routeCloudflareAuth, AuthStateDurableObject } from "./cloudflareAuth.mjs";
 import { runCleanup } from "./upload.mjs";
 
 let jwksCache = null;
@@ -113,6 +114,19 @@ export default {
         return await getSessionProfile(request, env);
       }
 
+      if (env.CLOUDFLARE_AUTH_FUNCTIONS_ENABLED === "true") {
+        const authResponse = await routeCloudflareAuth(
+          request,
+          env,
+          authenticateFirebaseRequest
+        );
+        if (authResponse) {
+          const headers = new Headers(authResponse.headers);
+          for (const [k,v] of Object.entries(corsHeaders(request))) headers.set(k,v);
+          return new Response(authResponse.body,{status:authResponse.status,statusText:authResponse.statusText,headers});
+        }
+      }
+
       if (env.ESIGN_MODULE_ENABLED === "true") {
         if (pathname === "/api/esign/cleanup" && request.method === "POST") {
           const claims = await authenticateFirebaseRequest(request);
@@ -129,11 +143,7 @@ export default {
           pathname === "/api/sign/open" ||
           pathname === "/api/sign/pdf" ||
           pathname === "/api/sign/submit" ||
-          pathname === "/api/sign/decline" ||
-          pathname === "/api/auth/password-attempt-state" ||
-          pathname === "/api/auth/password-failure" ||
-          pathname === "/api/auth/password-attempt-clear" ||
-          pathname === "/api/documents/next-reference";
+          pathname === "/api/sign/decline";
         if (isEsignPath) {
           const ctx = buildEsignContext({
             env,
