@@ -19,6 +19,7 @@ import { sendInvitationEmail, buildInvitationMessage, validateRecipient } from "
 import { route as esignRoute } from "./router.mjs";
 import { buildEsignContext, EsignRecordDurableObject } from "./esignContext.mjs";
 import { runCleanup } from "./upload.mjs";
+import { redeemInvitationToken } from "./invitationRedemption.mjs";
 
 let jwksCache = null;
 let jwksFetchedAt = 0;
@@ -91,6 +92,10 @@ export default {
 
       if (url.pathname === "/api/delete" && request.method === "POST") {
         return await deleteDriveFile(request, env);
+      }
+
+      if (url.pathname === "/api/invitations/redeem" && request.method === "POST") {
+        return await redeemInvitationToken(request, env);
       }
 
       if (url.pathname === "/api/send-invitation-email" && request.method === "POST") {
