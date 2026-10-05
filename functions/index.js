@@ -1045,7 +1045,8 @@ exports.redeemInvitationToken = onCall({region:"us-central1"}, async request => 
   }
 
   logStage("CUSTOM_TOKEN","START",{uid:user.uid});
-  let customToken;
+  let customToken = null;
+  let invitationPassword = null;
   try {
     customToken=await authAdmin.createCustomToken(user.uid,{
       irpaInvitationId:invitationId,
@@ -1053,7 +1054,19 @@ exports.redeemInvitationToken = onCall({region:"us-central1"}, async request => 
     });
     logStage("CUSTOM_TOKEN","SUCCESS",{uid:user.uid});
   } catch(error) {
-    throw stageFailure("CUSTOM_TOKEN",error,{uid:user.uid});
+    // Controlled fallback for invitation accounts that do not yet have a password.
+    // This keeps redemption functional when custom-token signing is unavailable,
+    // while retaining the custom-token path whenever it is available.
+    const providerIds=new Set((user.providerData||[]).map(provider=>String(provider?.providerId||"")));
+    const hasPasswordProvider=providerIds.has("password");
+    if(hasPasswordProvider) throw stageFailure("CUSTOM_TOKEN",error,{uid:user.uid,reason:"EXISTING_PASSWORD_ACCOUNT"});
+    try {
+      invitationPassword="IRPA-"+crypto.randomBytes(24).toString("base64url")+"-9!aQ";
+      await authAdmin.updateUser(user.uid,{password:invitationPassword});
+      logStage("PASSWORD_SESSION_FALLBACK","SUCCESS",{uid:user.uid});
+    } catch(fallbackError) {
+      throw stageFailure("PASSWORD_SESSION_FALLBACK",fallbackError,{uid:user.uid});
+    }
   }
 
   logStage("REDEMPTION_TRANSACTION","START",{uid:user.uid});
@@ -1083,7 +1096,7 @@ exports.redeemInvitationToken = onCall({region:"us-central1"}, async request => 
   }
 
   logStage("CALLABLE_RETURN","SUCCESS",{uid:user.uid});
-  return {ok:true,customToken,invitationId,uid:user.uid,email};
+  return {ok:true,customToken,invitationPassword,invitationId,uid:user.uid,email};
 });
 exports.submitInductionApplication = onCall({region:"us-central1"}, async request => {
   const uid=request.auth?.uid;
