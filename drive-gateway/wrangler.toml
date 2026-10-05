@@ -28,9 +28,17 @@ id = "ccdbffa662ac48bfbdf7f4b1f62ca941"
 name = "ESIGN_DO"
 class_name = "EsignRecordDurableObject"
 
+[[durable_objects.bindings]]
+name = "AUTH_DO"
+class_name = "AuthStateDurableObject"
+
 [[migrations]]
 tag = "esign-do-v1"
 new_sqlite_classes = ["EsignRecordDurableObject"]
+
+[[migrations]]
+tag = "auth-do-v1"
+new_sqlite_classes = ["AuthStateDurableObject"]
 
 [env.staging]
 name = "irpa-google-drive-gateway-staging"
@@ -58,6 +66,10 @@ binding = "DRIVE_KV"
 [[env.staging.durable_objects.bindings]]
 name = "ESIGN_DO"
 class_name = "EsignRecordDurableObject"
+
+[[env.staging.durable_objects.bindings]]
+name = "AUTH_DO"
+class_name = "AuthStateDurableObject"
 
 [[env.staging.migrations]]
 tag = "esign-do-staging-v1"
