@@ -64,6 +64,7 @@ test("Cloudflare invitation redemption creates/signs Firebase custom token and r
     });
     assert.equal(response.status,200);
     const body=await response.json();
+    console.log("REDEMPTION_BODY",JSON.stringify(body));
     assert.equal(body.ok,true);
     assert.equal(body.invitationId,"test-invitation");
     assert.equal(body.uid,"firebase-test-uid");
