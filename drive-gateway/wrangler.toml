@@ -74,3 +74,6 @@ class_name = "AuthStateDurableObject"
 [[env.staging.migrations]]
 tag = "esign-do-staging-v1"
 new_sqlite_classes = ["EsignRecordDurableObject"]
+\n[[env.staging.migrations]]
+tag = "auth-do-staging-v1"
+new_sqlite_classes = ["AuthStateDurableObject"]
