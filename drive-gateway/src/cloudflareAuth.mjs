@@ -20,15 +20,103 @@ function validEmail(email) {
   return Boolean(email && email.includes("@"));
 }
 
+function jsonBody(response) {
+  return response.json().catch(() => ({}));
+}
+
+export class AuthStateDurableObject {
+  constructor(state) {
+    this.state = state;
+    this.storage = state.storage;
+  }
+
+  async fetch(request) {
+    const body = await request.json().catch(() => ({}));
+    const operation = String(body.operation || "");
+    const key = String(body.key || "");
+    if (!key) return json(400, { ok: false, error: "State key is required." });
+
+    if (operation === "auth-get") {
+      return json(200, { ok: true, state: (await this.storage.get("state")) || {} });
+    }
+
+    if (operation === "auth-record-failure") {
+      const current = (await this.storage.get("state")) || {};
+      const now = Date.now();
+      if (current.stage === "SUSPENDED") {
+        return json(200, { status: "SUSPENDED", resetRequired: true, remainingAttempts: 0 });
+      }
+      if (current.stage === "LOCKED" && Number(current.lockUntilMs || 0) > now) {
+        return json(200, {
+          status: "LOCKED",
+          retryAfterSeconds: Math.ceil((Number(current.lockUntilMs) - now) / 1000),
+          remainingAttempts: 0,
+          resetRequired: false
+        });
+      }
+      const stage = String(current.stage || "FIRST");
+      const limit = stage === "SECOND" ? SECOND_STAGE_LIMIT : FIRST_STAGE_LIMIT;
+      const failedAttempts = Number(current.failedAttempts || 0) + 1;
+      if (failedAttempts < limit) {
+        const next = { stage, failedAttempts, lockUntilMs: 0 };
+        await this.storage.put("state", next);
+        return json(200, { status: stage, remainingAttempts: limit - failedAttempts, resetRequired: false });
+      }
+      if (stage === "FIRST") {
+        const next = { stage: "LOCKED", failedAttempts: 0, lockUntilMs: now + LOCK_MS };
+        await this.storage.put("state", next);
+        return json(200, {
+          status: "LOCKED",
+          retryAfterSeconds: Math.ceil(LOCK_MS / 1000),
+          remainingAttempts: 0,
+          resetRequired: false
+        });
+      }
+      const next = { stage: "SUSPENDED", failedAttempts, lockUntilMs: 0 };
+      await this.storage.put("state", next);
+      return json(200, { status: "SUSPENDED", remainingAttempts: 0, resetRequired: true });
+    }
+
+    if (operation === "auth-clear") {
+      await this.storage.put("state", { stage: "FIRST", failedAttempts: 0, lockUntilMs: 0 });
+      return json(200, { ok: true });
+    }
+
+    if (operation === "auth-expire-lock") {
+      const current = (await this.storage.get("state")) || {};
+      if (current.stage === "LOCKED" && Number(current.lockUntilMs || 0) <= Date.now()) {
+        await this.storage.put("state", { stage: "SECOND", failedAttempts: 0, lockUntilMs: 0 });
+      }
+      return json(200, { ok: true });
+    }
+
+    if (operation === "next-reference") {
+      const year = new Date().getUTCFullYear();
+      const keyName = "document-reference:" + year;
+      const current = Number(await this.storage.get(keyName) || 0);
+      const nextNumber = Math.max(1, current + 1);
+      await this.storage.put(keyName, nextNumber);
+      return json(200, {
+        reference: "IRPA-DOC-" + year + "-" + String(nextNumber).padStart(5, "0"),
+        year,
+        sequenceNumber: nextNumber
+      });
+    }
+
+    return json(400, { ok: false, error: "Unknown Cloudflare authentication state operation." });
+  }
+}
+
 async function doCall(env, operation, payload = {}) {
   const key = String(payload.key || operation);
-  const r = await env.ESIGN_DO.get(env.ESIGN_DO.idFromName(key)).fetch("https://irpa-auth.internal", {
+  const stub = env.AUTH_DO.get(env.AUTH_DO.idFromName(key));
+  const response = await stub.fetch("https://irpa-auth.internal", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ operation, ...payload })
   });
-  const body = await r.json();
-  if (!r.ok) throw new Error(body.error || "Cloudflare authentication state operation failed.");
+  const body = await jsonBody(response);
+  if (!response.ok) throw new Error(body.error || "Cloudflare authentication state operation failed.");
   return body;
 }
 
@@ -127,8 +215,9 @@ export async function routeCloudflareAuth(request, env, authenticate) {
   if (pathname === "/api/documents/next-reference") {
     if (typeof authenticate !== "function") throw new HttpError(500, "Firebase authentication verifier was not provided.");
     let claims;
-    try { claims = await authenticate(request); }
-    catch (error) {
+    try {
+      claims = await authenticate(request);
+    } catch (error) {
       const message = String(error?.message || error);
       if (message === "Firebase authentication is required." || message.startsWith("Invalid Firebase") || message === "Firebase token is expired." || message === "Firebase token signing key not found.") {
         throw new HttpError(401, "Authentication is required to generate a document reference.");
@@ -136,7 +225,7 @@ export async function routeCloudflareAuth(request, env, authenticate) {
       throw error;
     }
     const result = env.DRIVE_MOCK === "true"
-      ? { reference: "IRPA-DOC-" + new Date().getUTCFullYear() + "-" + String(++mockReference).padStart(5, "0"), year: new Date().getUTCFullYear() }
+      ? { reference: "IRPA-DOC-" + new Date().getUTCFullYear() + "-" + String(++mockReference).padStart(5, "0"), year: new Date().getUTCFullYear(), sequenceNumber: mockReference }
       : await doCall(env, "next-reference", { key: "document-reference-counter" });
     return json(200, { ok: true, ...result, issuedBy: "SYSTEM", issuedByUid: claims.user_id, issuedByEmail: claims.email || null });
   }
