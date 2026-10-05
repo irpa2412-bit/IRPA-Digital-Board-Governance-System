@@ -21,11 +21,36 @@ export async function redeemInvitationToken(request, env) {
     throw new InvitationRedemptionError(400, "The invitation token is invalid.");
   }
 
-  const projectId = String(env.FIREBASE_PROJECT_ID || "").trim();
-  const serviceAccount = parseServiceAccount(env.FIREBASE_SERVICE_ACCOUNT_JSON);
-  if (!projectId) throw new Error("Firebase project configuration is missing.");
-  if (!serviceAccount.client_email || !serviceAccount.private_key) {
-    throw new Error("Firebase service-account configuration is incomplete.");
+  let projectId;
+  let serviceAccount;
+  try {
+    projectId = String(env.FIREBASE_PROJECT_ID || "").trim();
+    if (!projectId) throw new Error("Firebase project configuration is missing.");
+  } catch (error) {
+    console.error("Invitation redemption stage failure", {
+      stage: "PROJECT_CONFIGURATION",
+      message: String(error?.message || error)
+    });
+    if (env.IRPA_ENVIRONMENT === "staging") {
+      throw new InvitationRedemptionError(500, "IRPA_INVITATION_RUNTIME_FAILURE:PROJECT_CONFIGURATION");
+    }
+    throw error;
+  }
+
+  try {
+    serviceAccount = parseServiceAccount(env.FIREBASE_SERVICE_ACCOUNT_JSON);
+    if (!serviceAccount.client_email || !serviceAccount.private_key) {
+      throw new Error("Firebase service-account configuration is incomplete.");
+    }
+  } catch (error) {
+    console.error("Invitation redemption stage failure", {
+      stage: "SERVICE_ACCOUNT_CONFIGURATION",
+      message: String(error?.message || error)
+    });
+    if (env.IRPA_ENVIRONMENT === "staging") {
+      throw new InvitationRedemptionError(500, "IRPA_INVITATION_RUNTIME_FAILURE:SERVICE_ACCOUNT_CONFIGURATION");
+    }
+    throw error;
   }
 
   const invitationId = parts[0];
