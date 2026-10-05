@@ -221,4 +221,4 @@ jobs:
           curl --fail --silent --show-error --retry 5 --retry-delay 2 "$url" | tee staging-health.json
           grep -q '"ok":true' staging-health.json
 
-# Staging proof execution trigger — 2026-10-04
+# Controlled staging proof after stale Durable Object migration removal — 2026-10-05
