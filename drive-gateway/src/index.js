@@ -175,10 +175,14 @@ export default {
         message === "Firebase token is expired." ||
         message === "Firebase token signing key not found.";
 
+      const explicitStatus = Number(error?.status);
+      const status = Number.isInteger(explicitStatus) && explicitStatus >= 400 && explicitStatus <= 599
+        ? explicitStatus
+        : (isAuthError ? 401 : 500);
       return json({
         ok: false,
         error: message
-      }, isAuthError ? 401 : 500, corsHeaders(request));
+      }, status, corsHeaders(request));
     }
   }
 };
