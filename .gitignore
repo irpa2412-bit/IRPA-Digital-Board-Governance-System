@@ -141,3 +141,6 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Firebase service account key
+irpa-digital-board-governance-firebase-adminsdk-fbsvc-85043d56c5.json
