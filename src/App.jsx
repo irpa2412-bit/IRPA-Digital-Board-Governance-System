@@ -670,6 +670,9 @@ useEffect(()=>{
               if(recoveredInvitationState.state==="ACTIVATED"){
                 window.sessionStorage.removeItem("irpaInvitationPasswordSetup");
                 window.sessionStorage.removeItem("irpaInvitationProvisioningPending");
+                window.history.replaceState({},document.title,window.location.pathname+window.location.hash);
+                window.location.reload();
+                return;
               }else if(["PASSWORD_SETUP_PENDING","PROVISIONING_PENDING"].includes(recoveredInvitationState.state)){
                 window.sessionStorage.setItem("irpaInvitationPasswordSetup","1");
                 return;
