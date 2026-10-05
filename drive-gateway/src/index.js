@@ -191,7 +191,7 @@ export default {
       return json({
         ok: false,
         error: message
-      }, isAuthError ? 401 : 500, corsHeaders(request));
+      }, Number(error?.status || 0) || (isAuthError ? 401 : 500), corsHeaders(request));
     }
   }
 };
