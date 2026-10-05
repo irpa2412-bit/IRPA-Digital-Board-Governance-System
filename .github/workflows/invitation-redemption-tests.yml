@@ -25,6 +25,9 @@ jobs:
       - name: Install gateway dependencies
         working-directory: drive-gateway
         run: npm ci --no-audit --no-fund
-      - name: Run existing gateway tests plus invitation redemption test
+      - name: Run dedicated invitation redemption test
+        working-directory: drive-gateway
+        run: node --test tests/invitation-redemption.test.mjs
+      - name: Run existing gateway test suite
         working-directory: drive-gateway
         run: npm test
