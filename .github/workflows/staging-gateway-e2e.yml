@@ -164,7 +164,8 @@ jobs:
               FIRESTORE_COLLECTION_PREFIX:"staging_",DRIVE_MOCK:"false",LOCAL_TEST_MODE:"false"
             },
             kv_namespaces:[{binding:"DRIVE_KV",id:process.env.STAGING_KV_ID}],
-            triggers:{crons:["0 * * * *"]}
+            triggers:{crons:["0 * * * *"]},
+            migrations:[{tag:"staging-remove-legacy-esign-record-do-20261005",delete_classes:["EsignRecordDurableObject"]}]
           };
           if(c.vars.FIREBASE_PROJECT_ID==="irpa-digital-board-governance") throw new Error("Production Firebase project forbidden.");
           fs.writeFileSync("wrangler.staging.generated.json",JSON.stringify(c,null,2)+"\n");
@@ -180,6 +181,7 @@ jobs:
           if(c.vars.FIREBASE_PROJECT_ID==="irpa-digital-board-governance") throw new Error("Production Firebase project");
           if(c.kv_namespaces?.[0]?.binding!=="DRIVE_KV") throw new Error("Missing staging KV");
           if(c.triggers?.crons?.[0]!=="0 * * * *") throw new Error("Cleanup cron missing");
+          if(c.migrations?.[0]?.delete_classes?.[0]!=="EsignRecordDurableObject") throw new Error("Legacy staging Durable Object migration missing");
           console.log("STAGING_CONFIGURATION_VALID");
           NODE
 
