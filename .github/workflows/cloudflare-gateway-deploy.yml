@@ -42,7 +42,8 @@ jobs:
           const bindings = Array.isArray(response.result?.bindings) ? response.result.bindings : [];
           const managed = new Map([
             ["DRIVE_KV", "kv_namespace"],
-            ["ESIGN_DO", "durable_object_namespace"]
+            ["ESIGN_DO", "durable_object_namespace"],
+            ["AUTH_DO", "durable_object_namespace"]
           ]);
           const resourceTypes = new Set([
             "kv_namespace", "durable_object_namespace", "r2_bucket", "d1", "service",
@@ -86,6 +87,12 @@ jobs:
             if (remoteId !== configuredDriveKvId) throw new Error("Safety stop: production DRIVE_KV differs from the controlled repository DRIVE_KV ID.");
           }
 
+          const authBindings = bindings.filter(b => b.name === "AUTH_DO");
+          if (authBindings.length > 1) throw new Error("Safety stop: production Worker contains more than one AUTH_DO binding.");
+          if (authBindings.length === 1 && String(authBindings[0].class_name || "") !== "AuthStateDurableObject") {
+            throw new Error('Safety stop: existing AUTH_DO must target class "AuthStateDurableObject".');
+          }
+
           const esignBindings = bindings.filter(b => b.name === "ESIGN_DO");
           if (esignBindings.length > 1) throw new Error("Safety stop: production Worker contains more than one ESIGN_DO binding.");
           if (esignBindings.length === 1 && String(esignBindings[0].class_name || "") !== "EsignRecordDurableObject") {
@@ -109,12 +116,15 @@ jobs:
             },
             kv_namespaces: [{ binding: "DRIVE_KV", id: configuredDriveKvId }],
             durable_objects: {
-              bindings: [{ name: "ESIGN_DO", class_name: "EsignRecordDurableObject" }]
+              bindings: [
+                { name: "ESIGN_DO", class_name: "EsignRecordDurableObject" },
+                { name: "AUTH_DO", class_name: "AuthStateDurableObject" }
+              ]
             },
-            migrations: [{
-              tag: "esign-do-v1",
-              new_sqlite_classes: ["EsignRecordDurableObject"]
-            }]
+            migrations: [
+              { tag: "esign-do-v1", new_sqlite_classes: ["EsignRecordDurableObject"] },
+              { tag: "auth-do-v1", new_sqlite_classes: ["AuthStateDurableObject"] }
+            ]
           };
           fs.writeFileSync("wrangler.json", JSON.stringify(config, null, 2) + "\n");
           NODE
@@ -136,14 +146,22 @@ jobs:
             throw new Error("Production DRIVE_KV binding is invalid. Deployment blocked.");
           }
           const doBindings = c.durable_objects?.bindings || [];
-          if (doBindings.length !== 1 || doBindings[0]?.name !== "ESIGN_DO" || doBindings[0]?.class_name !== "EsignRecordDurableObject") {
-            throw new Error("Production ESIGN_DO binding is invalid. Deployment blocked.");
+          const expectedBindings = new Map([["ESIGN_DO","EsignRecordDurableObject"],["AUTH_DO","AuthStateDurableObject"]]);
+          if (doBindings.length !== expectedBindings.size) {
+            throw new Error("Production Durable Object bindings are invalid. Deployment blocked.");
+          }
+          for (const [name,className] of expectedBindings) {
+            const binding = doBindings.find(b => b?.name === name);
+            if (!binding || binding.class_name !== className) throw new Error(`Production ${name} binding is invalid. Deployment blocked.`);
           }
           const migrations = Array.isArray(c.migrations) ? c.migrations : [];
-          const migration = migrations.find(m => m?.tag === "esign-do-v1");
-          if (!migration || !Array.isArray(migration.new_sqlite_classes) || migration.new_sqlite_classes.length !== 1 ||
-              migration.new_sqlite_classes[0] !== "EsignRecordDurableObject") {
-            throw new Error("ESIGN_DO migration is missing or invalid. Deployment blocked.");
+          const requiredMigrations = new Map([["esign-do-v1","EsignRecordDurableObject"],["auth-do-v1","AuthStateDurableObject"]]);
+          for (const [tag,className] of requiredMigrations) {
+            const migration = migrations.find(m => m?.tag === tag);
+            if (!migration || !Array.isArray(migration.new_sqlite_classes) || migration.new_sqlite_classes.length !== 1 ||
+                migration.new_sqlite_classes[0] !== className) {
+              throw new Error(`${tag} migration is missing or invalid. Deployment blocked.`);
+            }
           }
           const topLevelKeys = new Set(["name", "main", "compatibility_date", "vars", "kv_namespaces", "durable_objects", "migrations"]);
           for (const key of Object.keys(c)) {
