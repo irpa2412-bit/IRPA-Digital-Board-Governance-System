@@ -30,9 +30,39 @@ export async function redeemInvitationToken(request, env) {
 
   const invitationId = parts[0];
   const secret = parts[1];
-  const googleAccessToken = await getGoogleAccessToken(serviceAccount);
   const documentPath = `projects/${projectId}/databases/(default)/documents/invitations/${encodeURIComponent(invitationId)}`;
-  const invitationDocument = await getFirestoreDocument(documentPath, googleAccessToken);
+
+  let stage = "GOOGLE_ACCESS_TOKEN";
+  let googleAccessToken;
+  try {
+    googleAccessToken = await getGoogleAccessToken(serviceAccount);
+    stage = "INVITATION_RETRIEVAL";
+  } catch (error) {
+    console.error("Invitation redemption stage failure", {
+      stage,
+      invitationId,
+      message: String(error?.message || error)
+    });
+    if (env.IRPA_ENVIRONMENT === "staging") {
+      throw new InvitationRedemptionError(500, `IRPA_INVITATION_RUNTIME_FAILURE:${stage}`);
+    }
+    throw error;
+  }
+
+  let invitationDocument;
+  try {
+    invitationDocument = await getFirestoreDocument(documentPath, googleAccessToken);
+  } catch (error) {
+    console.error("Invitation redemption stage failure", {
+      stage,
+      invitationId,
+      message: String(error?.message || error)
+    });
+    if (env.IRPA_ENVIRONMENT === "staging") {
+      throw new InvitationRedemptionError(500, `IRPA_INVITATION_RUNTIME_FAILURE:${stage}`);
+    }
+    throw error;
+  }
 
   if (!invitationDocument) {
     throw new InvitationRedemptionError(404, "This IRPA invitation no longer exists.");
