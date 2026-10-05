@@ -657,6 +657,32 @@ useEffect(()=>{
       const memberAuthorized=Boolean(memberDirect)&&((String(memberDirect?.status||"").trim().toLowerCase()==="active")||(String(memberDirect?.status||"").trim().toLowerCase()==="activated")||(String(memberDirect?.registrationStatus||"").trim().toLowerCase()==="activated"));
       const employeeAuthorized=Boolean(employeeDirect)&&((String(employeeDirect?.status||"").trim().toLowerCase()==="active")||(String(employeeDirect?.employmentStatus||"").trim().toLowerCase()==="active")||(String(employeeDirect?.registrationStatus||"").trim().toLowerCase()==="activated"));
       const administratorAuthorized=adminDirect?.active===true;
+      // If the browser lost invitation context, recover the authoritative state from
+      // the server before allowing an unauthorised authenticated session to continue.
+      // Established Member/Employee/Admin logins are not sent through this path.
+      if(!administratorAuthorized&&!memberAuthorized&&!employeeAuthorized){
+        try{
+          const recoveredInvitationState=await getInvitationSessionState();
+          if(recoveredInvitationState?.state){
+            if(recoveredInvitationState.invitationId) window.sessionStorage.setItem("irpaInvitationId",recoveredInvitationState.invitationId);
+            if(!disposed){
+              setInvitationSessionState(recoveredInvitationState);
+              if(recoveredInvitationState.state==="ACTIVATED"){
+                window.sessionStorage.removeItem("irpaInvitationPasswordSetup");
+                window.sessionStorage.removeItem("irpaInvitationProvisioningPending");
+              }else if(["PASSWORD_SETUP_PENDING","PROVISIONING_PENDING"].includes(recoveredInvitationState.state)){
+                window.sessionStorage.setItem("irpaInvitationPasswordSetup","1");
+                return;
+              }
+            }
+          }else if(!disposed){
+            setInvitationSessionState(null);
+          }
+        }catch(recoveryError){
+          console.warn("Invitation session-state recovery unavailable.",recoveryError);
+          if(!disposed)setInvitationSessionState(null);
+        }
+      }
       const configuredGatewayAuthority=IRPA_GATEWAY_CONNECTED?Boolean(tokenResult?.claims?.admin===true)||
         (Array.isArray(tokenRoles)&&tokenRoles.length>0)||
         (Array.isArray(loginContext?.roles)&&loginContext.roles.length>0):Boolean(tokenResult?.claims?.admin===true)||
