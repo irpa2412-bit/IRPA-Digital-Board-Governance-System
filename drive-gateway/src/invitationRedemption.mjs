@@ -7,7 +7,7 @@ function b64urlBytes(value) {
   for (let i = 0; i < bytes.length; i += 0x8000) {
     binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   }
-  return btoa(binary).replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/g, "");
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
 function b64urlJson(value) {
@@ -36,7 +36,7 @@ function json(data, status = 200, extraHeaders = {}) {
 
 function corsHeaders(request, env) {
   const origin = String(request.headers.get("Origin") || "");
-  const allowed = String(env.IRPA_APP_URL || "https://irpa-digital-board-governance.web.app").replace(/\\/$/, "");
+  const allowed = String(env.IRPA_APP_URL || "https://irpa-digital-board-governance.web.app").replace(/\/$/, "");
   return {
     "Access-Control-Allow-Origin": origin === allowed ? origin : allowed,
     "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -223,15 +223,12 @@ async function firestoreCommitRedemption(path, currentDocument, accessToken, pro
           updateMask: {
             fieldPaths: ["invitationRedeemedUid", "invitationRedemptionStatus", "updatedAt"]
           },
-          currentDocument: { updateTime: currentDocument.updateTime }
-        }, {
-          transform: {
-            document: name,
-            fieldTransforms: [{
-              fieldPath: "invitationRedeemedAt",
-              setToServerValue: "REQUEST_TIME"
-            }]
-          }
+          currentDocument: { updateTime: currentDocument.updateTime },
+          updateTransforms: [{
+            fieldPath: "invitationRedeemedAt",
+            setToServerValue: "REQUEST_TIME"
+          }]
+        }
         }]
       })
     }
