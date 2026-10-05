@@ -228,7 +228,7 @@ async function firestoreCommitRedemption(path, currentDocument, accessToken, pro
             fieldPath: "invitationRedeemedAt",
             setToServerValue: "REQUEST_TIME"
           }]
-        }
+        }]
       })
     }
   );
