@@ -392,17 +392,39 @@ export async function configureInvitationPassword(password) {
 export async function completeInvitationToken(token) {
   const cleanToken = String(token || "").trim();
   if (!cleanToken) throw new Error("The IRPA invitation token is missing.");
-  const call = httpsCallable(getFunctions(undefined, "us-central1"), "redeemInvitationToken");
+
+  // Invitation-token redemption is served by the existing Cloudflare gateway so
+  // this flow no longer depends on a Firebase Cloud Function deployment/billing.
+  const gatewayOrigin = window.location.hostname.endsWith(".workers.dev")
+    ? window.location.origin
+    : "https://irpa-google-drive-gateway.irpa-governance.workers.dev";
+  const endpoint = `${gatewayOrigin}/api/invitations/redeem`;
+
   try {
-    const result = await call({ token: cleanToken });
-    const data = result.data || {};
-    if ((!data.customToken && !data.invitationPassword) || !data.invitationId) throw new Error("The invitation redemption response was incomplete.");
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-IRPA-Invitation-Version": "2"
+      },
+      body: JSON.stringify({ token: cleanToken })
+    });
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data?.error || "The IRPA invitation could not be redeemed.");
+    }
+    if ((!data.customToken && !data.invitationPassword) || !data.invitationId) {
+      throw new Error("The invitation redemption response was incomplete.");
+    }
+
     let signedIn;
     if (data.customToken) {
       signedIn = await signInWithCustomToken(auth, data.customToken);
     } else {
       signedIn = await loginWithEmail(data.email || "", data.invitationPassword);
     }
+
     const { provisionCurrentMemberFromInvitationV2 } = await import("./invitationWorkflow");
     await provisionCurrentMemberFromInvitationV2(data.invitationId);
     window.sessionStorage.setItem("irpaInvitationPasswordSetup", "1");
@@ -413,7 +435,6 @@ export async function completeInvitationToken(token) {
     throw new Error(error?.message || "The IRPA invitation could not be redeemed.");
   }
 }
-
 export async function completeMagicLink(email, url = window.location.href) {
   const cleanEmail = email.trim().toLowerCase();
   const params = new URL(url, window.location.origin).searchParams;
