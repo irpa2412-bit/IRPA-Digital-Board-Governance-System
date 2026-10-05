@@ -19,6 +19,7 @@ import { sendInvitationEmail, buildInvitationMessage, validateRecipient } from "
 import { route as esignRoute } from "./router.mjs";
 import { buildEsignContext, EsignRecordDurableObject } from "./esignContext.mjs";
 import { runCleanup } from "./upload.mjs";
+import { InvitationRedemptionError, redeemInvitationToken } from "./invitationRedemption.mjs";
 
 let jwksCache = null;
 let jwksFetchedAt = 0;
@@ -91,6 +92,18 @@ export default {
 
       if (url.pathname === "/api/delete" && request.method === "POST") {
         return await deleteDriveFile(request, env);
+      }
+
+      if (url.pathname === "/api/invitations/redeem" && request.method === "POST") {
+        try {
+          return json(await redeemInvitationToken(request, env), 200, corsHeaders(request));
+        } catch (error) {
+          if (error instanceof InvitationRedemptionError) {
+            return json({ok:false,error:error.message}, error.status, corsHeaders(request));
+          }
+          console.error("Invitation redemption backend failure", error);
+          return json({ok:false,error:"The IRPA invitation could not be redeemed."}, 500, corsHeaders(request));
+        }
       }
 
       if (url.pathname === "/api/send-invitation-email" && request.method === "POST") {
