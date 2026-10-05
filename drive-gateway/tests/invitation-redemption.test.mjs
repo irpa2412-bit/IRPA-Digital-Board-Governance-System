@@ -212,45 +212,54 @@ test("password-set refuses activation when Firebase Auth has not independently c
   } finally { global.fetch=originalFetch; }
 });
 
-test("password-set verifies Firebase password provider and then moves invitation to PROVISIONING_PENDING", async()=>{
+test("password-set verifies the password provider and activates the invitation on the server", async()=>{
   const originalFetch=global.fetch;
   const calls=[];
   const idToken=makeFirebaseIdToken("password-confirmed-uid");
   const jwk=publicKey.export({format:"jwk"});
+  let invitationState="PASSWORD_SETUP_PENDING";
   global.fetch=async(url,options={})=>{
     calls.push({url:String(url),options});
     const target=String(url);
     if(target.includes("securetoken@system.gserviceaccount.com")) return new Response(JSON.stringify({keys:[{...jwk,kid:"invitation-test-key",alg:"RS256",use:"sig"}]}),{status:200});
-    if(target.includes("/databases/(default)/documents/invitations/password-verification-confirmed")) {
-      if(options.method==="PATCH") return new Response(JSON.stringify({name:"patched"}),{status:200});
+    if(target.includes("/databases/(default)/documents/invitations/password-verification-confirmed")){
+      if(options.method==="PATCH"){
+        const body=JSON.parse(options.body);
+        if(body.fields.invitationRedemptionState?.stringValue==="PROVISIONING_PENDING") invitationState="PROVISIONING_PENDING";
+        if(body.fields.invitationRedemptionState?.stringValue==="ACTIVATED") invitationState="ACTIVATED";
+        return new Response(JSON.stringify({name:"patched"}),{status:200});
+      }
       return new Response(JSON.stringify({
-        fields:{
+        name:"projects/irpa-digital-board-governance/databases/(default)/documents/invitations/password-verification-confirmed",
+        fields:{...invitationFields,
           invitationRedeemedUid:{stringValue:"password-confirmed-uid"},
-          invitationRedemptionState:{stringValue:"PASSWORD_SETUP_PENDING"},
-          invitationPasswordSetupExpiresAt:{timestampValue:"2099-01-01T00:00:00Z"}
+          invitationRedemptionState:{stringValue:invitationState},
+          invitationPasswordSetupExpiresAt:{timestampValue:"2099-01-01T00:00:00Z"},
+          role:{stringValue:"Board Member"},
+          boardMemberId:{stringValue:"board-123"}
         },
         updateTime:"2026-10-05T08:00:00.000000Z"
       }),{status:200});
     }
-    if(target.includes("/accounts:lookup")) {
-      return new Response(JSON.stringify({users:[{localId:"password-confirmed-uid",email:"invitee@example.org",providerUserInfo:[{providerId:"password",federatedId:"invitee@example.org"}]}]}),{status:200});
+    if(target.endsWith("/documents/members/board-123")){
+      if(options.method==="PATCH") return new Response(JSON.stringify({name:"patched"}),{status:200});
+      return new Response(JSON.stringify({name:"projects/irpa-digital-board-governance/databases/(default)/documents/members/board-123",fields:{
+        email:{stringValue:"invitee@example.org"},role:{stringValue:"Board Member"},boardMember:{booleanValue:true}
+      }}),{status:200});
     }
+    if(target.includes("/documents:runQuery")) return new Response(JSON.stringify([]),{status:200});
+    if(target.includes("/accounts:lookup")) return new Response(JSON.stringify({users:[{localId:"password-confirmed-uid",email:"invitee@example.org",providerUserInfo:[{providerId:"password",federatedId:"invitee@example.org"}]}]}),{status:200});
     throw new Error("Unexpected external request: "+target);
   };
   try{
     const response=await handler.fetch(new Request("https://gw.test/api/invitations/password-set",{
-      method:"POST",
-      headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"},
+      method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"},
       body:JSON.stringify({invitationId:"password-verification-confirmed"})
     }),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)});
     assert.equal(response.status,200);
-    assert.deepEqual(await response.json(),{ok:true,invitationId:"password-verification-confirmed",uid:"password-confirmed-uid",state:"PROVISIONING_PENDING"});
-    const patch=calls.find(c=>c.options.method==="PATCH");
-    assert.ok(patch);
-    const body=JSON.parse(patch.options.body);
-    assert.equal(body.fields.invitationRedemptionState.stringValue,"PROVISIONING_PENDING");
-    assert.ok(body.fields.invitationPasswordSetAt.timestampValue);
-    assert.ok(body.fields.invitationRedeemedAt.timestampValue);
+    assert.deepEqual(await response.json(),{ok:true,invitationId:"password-verification-confirmed",uid:"password-confirmed-uid",state:"ACTIVATED",activatedRecords:1});
+    assert.ok(calls.some(c=>c.options.method==="PATCH"&&JSON.parse(c.options.body).fields.invitationRedemptionState?.stringValue==="ACTIVATED"));
+    assert.ok(calls.some(c=>c.options.method==="PATCH"&&JSON.parse(c.options.body).fields.accountActivated?.booleanValue===true));
   } finally { global.fetch=originalFetch; }
 });
 
@@ -354,3 +363,77 @@ test("portal activation gate rejects a valid Firebase ID token whose member reco
     assert.deepEqual(await response.json(),{ok:false,error:"IRPA_INVITATION_FAILURE:PORTAL_ACTIVATION_REQUIRED"});
   } finally { global.fetch=originalFetch; }
 });
+
+test("session-state returns the invitation state for the authenticated UID", async()=>{
+  const originalFetch=global.fetch;
+  const jwk=publicKey.export({format:"jwk"});
+  const idToken=makeFirebaseIdToken("session-state-uid");
+  global.fetch=async(url,options={})=>{
+    const target=String(url);
+    if(target.includes("securetoken@system.gserviceaccount.com")) return new Response(JSON.stringify({keys:[{...jwk,kid:"invitation-test-key",alg:"RS256",use:"sig"}]}),{status:200});
+    if(target.includes("/documents:runQuery")) return new Response(JSON.stringify([{document:{name:"projects/irpa-digital-board-governance/databases/(default)/documents/invitations/session-state-id",fields:{
+      invitationRedeemedUid:{stringValue:"session-state-uid"},invitationRedemptionState:{stringValue:"PASSWORD_SETUP_PENDING"},updatedAt:{timestampValue:"2099-01-01T00:00:00Z"}
+    }}}]),{status:200});
+    throw new Error("Unexpected external request: "+target);
+  };
+  try{
+    const response=await handler.fetch(new Request("https://gw.test/api/invitations/session-state",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"},body:"{}"}),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)});
+    assert.equal(response.status,200);
+    assert.deepEqual(await response.json(),{state:"PASSWORD_SETUP_PENDING",invitationId:"session-state-id"});
+  } finally { global.fetch=originalFetch; }
+});
+
+test("password-set rejects a UID that is not assigned to the invitation", async()=>{
+  const originalFetch=global.fetch;
+  const jwk=publicKey.export({format:"jwk"});
+  const idToken=makeFirebaseIdToken("wrong-uid");
+  global.fetch=async(url,options={})=>{
+    const target=String(url);
+    if(target.includes("securetoken@system.gserviceaccount.com")) return new Response(JSON.stringify({keys:[{...jwk,kid:"invitation-test-key",alg:"RS256",use:"sig"}]}),{status:200});
+    if(target.includes("/documents/invitations/wrong-uid-invitation")) return new Response(JSON.stringify({fields:{...invitationFields,invitationRedeemedUid:{stringValue:"different-uid"},invitationRedemptionState:{stringValue:"PASSWORD_SETUP_PENDING"},invitationPasswordSetupExpiresAt:{timestampValue:"2099-01-01T00:00:00Z"}},updateTime:"2026-10-05T08:00:00.000000Z"}),{status:200});
+    throw new Error("Unexpected external request: "+target);
+  };
+  try{
+    const response=await handler.fetch(new Request("https://gw.test/api/invitations/password-set",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"},body:JSON.stringify({invitationId:"wrong-uid-invitation"})}),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)});
+    assert.equal(response.status,403);
+  } finally { global.fetch=originalFetch; }
+});
+
+test("password-set rejects a Firebase email that does not match the invitation email", async()=>{
+  const originalFetch=global.fetch;
+  const jwk=publicKey.export({format:"jwk"});
+  const idToken=makeFirebaseIdToken("wrong-email-uid");
+  global.fetch=async(url,options={})=>{
+    const target=String(url);
+    if(target.includes("securetoken@system.gserviceaccount.com")) return new Response(JSON.stringify({keys:[{...jwk,kid:"invitation-test-key",alg:"RS256",use:"sig"}]}),{status:200});
+    if(target.includes("/documents/invitations/wrong-email-invitation")) return new Response(JSON.stringify({fields:{...invitationFields,email:{stringValue:"assigned@example.org"},invitationRedeemedUid:{stringValue:"wrong-email-uid"},invitationRedemptionState:{stringValue:"PASSWORD_SETUP_PENDING"},invitationPasswordSetupExpiresAt:{timestampValue:"2099-01-01T00:00:00Z"}},updateTime:"2026-10-05T08:00:00.000000Z"}),{status:200});
+    throw new Error("Unexpected external request: "+target);
+  };
+  try{
+    const response=await handler.fetch(new Request("https://gw.test/api/invitations/password-set",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"},body:JSON.stringify({invitationId:"wrong-email-invitation"})}),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)});
+    assert.equal(response.status,403);
+  } finally { global.fetch=originalFetch; }
+});
+
+test("password-set is idempotent after invitation activation", async()=>{
+  const originalFetch=global.fetch;
+  const jwk=publicKey.export({format:"jwk"});
+  const idToken=makeFirebaseIdToken("repeat-uid");
+  let patchCount=0;
+  global.fetch=async(url,options={})=>{
+    const target=String(url);
+    if(target.includes("securetoken@system.gserviceaccount.com")) return new Response(JSON.stringify({keys:[{...jwk,kid:"invitation-test-key",alg:"RS256",use:"sig"}]}),{status:200});
+    if(target.includes("/documents/invitations/repeat-invitation")) return new Response(JSON.stringify({fields:{...invitationFields,invitationRedeemedUid:{stringValue:"repeat-uid"},invitationRedemptionState:{stringValue:"ACTIVATED"}},updateTime:"2026-10-05T08:00:00.000000Z"}),{status:200});
+    if(options.method==="PATCH"){patchCount++;return new Response(JSON.stringify({name:"patched"}),{status:200});}
+    throw new Error("Unexpected external request: "+target);
+  };
+  try{
+    for(let i=0;i<2;i++){
+      const response=await handler.fetch(new Request("https://gw.test/api/invitations/password-set",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"},body:JSON.stringify({invitationId:"repeat-invitation"})}),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)});
+      assert.equal(response.status,200);
+      assert.deepEqual(await response.json(),{ok:true,invitationId:"repeat-invitation",uid:"repeat-uid",state:"ACTIVATED"});
+    }
+    assert.equal(patchCount,0);
+  } finally { global.fetch=originalFetch; }
+});
+
