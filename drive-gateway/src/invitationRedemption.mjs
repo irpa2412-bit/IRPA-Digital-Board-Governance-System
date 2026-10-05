@@ -383,7 +383,43 @@ function isBoardInvitationRole(role) {
 }
 
 function isEmployeeInvitationRole(role) {
-  return ["Employee","Management","Finance","Human Resources","Operations","Field Officer","Rangeland Officer","Livestock Officer","Outreach Officer","Community Development Officer","IT Officer","Driver","Secretary"].includes(String(role || ""));
+  return [
+    "Executive Director",
+    "Director Human Resources",
+    "Director Livestock",
+    "Director Environment",
+    "Director Outreach",
+    "Director Community Development",
+    "Director Field Operations",
+    "HR Manager",
+    "Director Finance & Administration",
+    "Finance Personnel",
+    "Finance Manager",
+    "Accountant",
+    "Finance Officer",
+    "Director Internal Oversight",
+    "Internal Oversight Officer",
+    "Secretariat",
+    "Procurement Officer",
+    "Programme/Technical Officer",
+    "Management",
+    "Operations Manager",
+    "IT Specialist",
+    "Information Technology Officer",
+    "Driver",
+    "Field Assistant",
+    "Administrative Assistant",
+    "Communications Officer",
+    "Monitoring & Evaluation Officer",
+    "Project Officer",
+    "Rangeland Officer",
+    "Livestock Officer",
+    "Outreach Officer",
+    "Community Development Officer",
+    "Environment Officer",
+    "HR Officer",
+    "Employee"
+  ].includes(String(role || ""));
 }
 
 async function provisionInvitationActivation(invitationId, uid, email, env, accessToken, invitationDocument) {
