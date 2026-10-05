@@ -25,7 +25,7 @@ function decodePart(part){
   return JSON.parse(Buffer.from(part.replace(/-/g,"+").replace(/_/g,"/"),"base64").toString("utf8"));
 }
 
-test("Cloudflare invitation redemption creates/signs Firebase custom token and redeems Firestore record", async()=>{
+test("Cloudflare invitation redemption creates/signs Firebase custom token and records PASSWORD_SETUP_PENDING without consuming invitation", async()=>{
   const originalFetch=global.fetch;
   const calls=[];
   global.fetch=async(url,options={})=>{
@@ -75,7 +75,8 @@ test("Cloudflare invitation redemption creates/signs Firebase custom token and r
     assert.equal(header.alg,"RS256");
     assert.equal(payload.uid,"firebase-test-uid");
     assert.equal(payload.claims.irpaInvitationId,"test-invitation");
-    assert.equal(payload.claims.irpaInvitationRedeemed,true);
+    assert.equal(payload.claims.irpaInvitationRedemptionState,"PASSWORD_SETUP_PENDING");
+    assert.equal(payload.claims.irpaInvitationRedeemed,undefined);
 
     const verifier=createVerify("RSA-SHA256");
     verifier.update(`${headerPart}.${payloadPart}`);
@@ -87,10 +88,32 @@ test("Cloudflare invitation redemption creates/signs Firebase custom token and r
     assert.match(patch.options.headers.Authorization,/Bearer test-google-access-token/);
     const patchBody=JSON.parse(patch.options.body);
     assert.equal(patchBody.fields.invitationRedeemedUid.stringValue,"firebase-test-uid");
-    assert.equal(patchBody.fields.invitationRedemptionStatus.stringValue,"Redeemed — Awaiting Activation");
+    assert.equal(patchBody.fields.invitationRedemptionState.stringValue,"PASSWORD_SETUP_PENDING");
+    assert.equal(patchBody.fields.invitationRedemptionStatus.stringValue,"Password Setup Pending");
+    assert.ok(patchBody.fields.invitationPasswordSetupExpiresAt.timestampValue);
+    assert.equal(patchBody.fields.invitationRedeemedAt,undefined);
   } finally {
     global.fetch=originalFetch;
   }
+});
+
+
+test("Cloudflare invitation redemption refuses an existing password account", async()=>{
+  const originalFetch=global.fetch;
+  const calls=[];
+  global.fetch=async(url,options={})=>{
+    calls.push({url:String(url),options});
+    if(String(url)==="https://oauth2.googleapis.com/token") return new Response(JSON.stringify({access_token:"test-google-access-token",expires_in:3600}),{status:200});
+    if(String(url).includes("/databases/(default)/documents/invitations/")) return new Response(JSON.stringify({fields:invitationFields,updateTime:"2026-10-05T08:00:00.000000Z"}),{status:200});
+    if(String(url).includes("identitytoolkit.googleapis.com/v1/projects/irpa-digital-board-governance/accounts:lookup")) return new Response(JSON.stringify({users:[{localId:"firebase-existing-uid",email:"invitee@example.org",providerUserInfo:[{providerId:"password",federatedId:"invitee@example.org"}]}]}),{status:200});
+    throw new Error("Unexpected external request: "+url);
+  };
+  try{
+    const response=await handler.fetch(new Request("https://gw.test/api/invitations/redeem",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:`test-invitation.${tokenSecret}`})}),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)});
+    assert.equal(response.status,409);
+    assert.match((await response.json()).error,/normal IRPA login/i);
+    assert.equal(calls.some(c=>c.options.method==="PATCH"),false);
+  } finally { global.fetch=originalFetch; }
 });
 
 test("Cloudflare invitation redemption rejects malformed tokens before contacting Firebase", async()=>{
