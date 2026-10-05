@@ -112,8 +112,7 @@ export default {
           return json(await getInvitationSessionState(env, claims), 200, corsHeaders(request));
         } catch (error) {
           if (error instanceof InvitationRedemptionError) return json({ok:false,error:error.message}, error.status, corsHeaders(request));
-          console.error("Invitation session-state failure", error);
-          return json({ok:false,error:"Unable to resolve the invitation session state."}, 500, corsHeaders(request));
+          throw error;
         }
       }
 
@@ -123,8 +122,7 @@ export default {
           return json(await confirmInvitationPasswordSetup(request, env, claims), 200, corsHeaders(request));
         } catch (error) {
           if (error instanceof InvitationRedemptionError) return json({ok:false,error:error.message}, error.status, corsHeaders(request));
-          console.error("Invitation password verification failure", error);
-          return json({ok:false,error:"The IRPA invitation password could not be verified."}, 500, corsHeaders(request));
+          throw error;
         }
       }
       if (url.pathname === "/api/send-invitation-email" && request.method === "POST") {
