@@ -299,6 +299,27 @@ function enforceRedemptionRateLimit(invitationId) {
 }
 
 
+export async function getInvitationSessionState(env, claims) {
+  const projectId = String(env.FIREBASE_PROJECT_ID || "").trim();
+  const serviceAccount = parseServiceAccount(env.FIREBASE_SERVICE_ACCOUNT_JSON);
+  const accessToken = await getGoogleAccessToken(serviceAccount);
+  const uid = String(claims?.user_id || "").trim();
+  if (!uid) throw new InvitationRedemptionError(401, "The authenticated Firebase account is missing a UID.");
+
+  const rows = await queryFirestoreCollection(accessToken, projectId, "invitations", "invitationRedeemedUid", uid);
+  const acceptedRows = rows.length ? rows : await queryFirestoreCollection(accessToken, projectId, "invitations", "acceptedUid", uid);
+  const candidates = acceptedRows
+    .map(row => ({document:row.document, data:firestoreDocumentToPlain(row.document.fields || {})}))
+    .filter(item => ["PENDING","PASSWORD_SETUP_PENDING","PROVISIONING_PENDING","ACTIVATED","CANCELLED","EXPIRED"].includes(String(item.data.invitationRedemptionState || "PENDING")))
+    .sort((a,b) => new Date(b.data.updatedAt || b.data.activatedAt || b.data.createdAt || 0) - new Date(a.data.updatedAt || a.data.activatedAt || a.data.createdAt || 0));
+  if (!candidates.length) return {state:null, invitationId:null};
+  const selected = candidates[0];
+  return {
+    state: String(selected.data.invitationRedemptionState || "PENDING"),
+    invitationId: documentNameToPath(selected.document.name).split("/").pop() || null
+  };
+}
+
 async function queryFirestoreCollection(accessToken, projectId, collectionName, fieldPath, fieldValue) {
   const response = await fetch(
     `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents:runQuery`,
