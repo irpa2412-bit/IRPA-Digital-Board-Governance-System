@@ -1,11 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { AuthStateDurableObject, routeCloudflareAuth } from "../src/cloudflareAuth.mjs";
+import { routeCloudflareAuth } from "../src/cloudflareAuth.mjs";
+import { EsignRecordDurableObject } from "../src/esignContext.mjs";
 
 class MemoryStorage {
   constructor() { this.data = new Map(); }
   async get(key) { return this.data.get(key); }
   async put(key, value) { this.data.set(key, value); }
+  async delete(key) { this.data.delete(key); }
 }
 
 class MemoryNamespace {
@@ -14,7 +16,11 @@ class MemoryNamespace {
   get(id) {
     if (!this.objects.has(id)) {
       const storage = new MemoryStorage();
-      this.objects.set(id, { storage, object: new AuthStateDurableObject({ storage }) });
+      const state = {
+        storage,
+        blockConcurrencyWhile: async fn => fn()
+      };
+      this.objects.set(id, { storage, object: new EsignRecordDurableObject(state, {}) });
     }
     return {
       fetch: request => this.objects.get(id).object.fetch(request)
@@ -26,9 +32,14 @@ function env(overrides = {}) {
   return {
     CLOUDFLARE_AUTH_FUNCTIONS_ENABLED: "true",
     DRIVE_MOCK: "false",
-    AUTH_DO: new MemoryNamespace(),
+    ESIGN_DO: new MemoryNamespace(),
     ...overrides
   };
+}
+
+async function emailKey(email) {
+  const h = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(email));
+  return "auth-state:" + Array.from(new Uint8Array(h)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
 async function call(path, body, environment, authenticate = async () => ({ user_id: "uid-1", email: "admin@example.com" })) {
@@ -70,20 +81,26 @@ test("three failures lock the account for five minutes", async () => {
 
 test("clear resets suspended state back to FIRST", async () => {
   const environment = env();
-  for (let i = 0; i < 3; i++) await call("/api/auth/password-failure", { email: "suspend@example.com" }, environment);
-  const ns = environment.AUTH_DO;
-  const id = ns.idFromName("auth-state:" + await (async () => {
-    const h = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("suspend@example.com"));
-    return Array.from(new Uint8Array(h)).map(b => b.toString(16).padStart(2, "0")).join("");
-  })());
-  const stub = ns.get(id);
-  const suspended = await call("/api/auth/password-failure", { email: "suspend@example.com" }, environment);
+  const email = "suspend@example.com";
+  for (let i = 0; i < 3; i++) await call("/api/auth/password-failure", { email }, environment);
+
+  const key = await emailKey(email);
+  const stub = environment.ESIGN_DO.get(environment.ESIGN_DO.idFromName(key));
+  const expired = await stub.fetch("https://irpa-auth.internal", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ operation: "auth-expire-lock", key })
+  });
+  assert.equal(expired.status, 200);
+
+  for (let i = 0; i < 3; i++) await call("/api/auth/password-failure", { email }, environment);
+  const suspended = await call("/api/auth/password-failure", { email }, environment);
   assert.equal((await suspended.json()).status, "SUSPENDED");
-  const cleared = await call("/api/auth/password-attempt-clear", { email: "suspend@example.com" }, environment);
+
+  const cleared = await call("/api/auth/password-attempt-clear", { email }, environment);
   assert.deepEqual(await cleared.json(), { ok: true });
-  const state = await call("/api/auth/password-attempt-state", { email: "suspend@example.com" }, environment);
+  const state = await call("/api/auth/password-attempt-state", { email }, environment);
   assert.equal((await state.json()).status, "FIRST");
-  void stub;
 });
 
 test("next document reference requires Firebase authentication", async () => {
@@ -102,8 +119,9 @@ test("next document references increment atomically in the dedicated DO", async 
   const b = await second.json();
   assert.equal(first.status, 200);
   assert.equal(second.status, 200);
-  assert.equal(b.sequenceNumber, a.sequenceNumber + 1);
-  assert.match(a.reference, /^IRPA-DOC-\d{4}-\d{5}$/);
+  assert.equal(a.year, b.year);
+  assert.match(a.reference, /^IRPA-DOC-\d{4}-00001$/);
+  assert.match(b.reference, /^IRPA-DOC-\d{4}-00002$/);
 });
 
 test("invalid email is rejected without creating state", async () => {
