@@ -39,7 +39,7 @@ export async function redeemInvitationToken(request, env) {
   }
 
   const invitation = firestoreDocumentToPlain(invitationDocument.fields || {});
-  validateInvitation(invitation, invitationId, secret);
+  await validateInvitation(invitation, invitationId, secret);
 
   const email = String(invitation.email || "").trim().toLowerCase();
   if (!email || !email.includes("@")) {
