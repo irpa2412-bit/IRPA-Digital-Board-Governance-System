@@ -173,7 +173,11 @@ export default {
         message.startsWith("Invalid Firebase ID token") ||
         message.startsWith("Invalid Firebase token") ||
         message === "Firebase token is expired." ||
-        message === "Firebase token signing key not found.";
+        message === "Firebase token signing key not found." ||
+        message === "Authentication is required to generate a document reference.";
+
+      const isCloudflareAuthInputError =
+        message === "A valid registered email address is required.";
 
       const explicitStatus = Number(error?.status);
       const status = Number.isInteger(explicitStatus) && explicitStatus >= 400 && explicitStatus <= 599
