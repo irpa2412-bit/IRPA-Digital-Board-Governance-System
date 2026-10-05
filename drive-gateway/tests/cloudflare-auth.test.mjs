@@ -1,11 +1,32 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { routeCloudflareAuth } from "../src/cloudflareAuth.mjs";
+import { AuthStateDurableObject, routeCloudflareAuth } from "../src/cloudflareAuth.mjs";
+
+class MemoryStorage {
+  constructor() { this.data = new Map(); }
+  async get(key) { return this.data.get(key); }
+  async put(key, value) { this.data.set(key, value); }
+}
+
+class MemoryNamespace {
+  constructor() { this.objects = new Map(); }
+  idFromName(name) { return String(name); }
+  get(id) {
+    if (!this.objects.has(id)) {
+      const storage = new MemoryStorage();
+      this.objects.set(id, { storage, object: new AuthStateDurableObject({ storage }) });
+    }
+    return {
+      fetch: request => this.objects.get(id).object.fetch(request)
+    };
+  }
+}
 
 function env(overrides = {}) {
   return {
     CLOUDFLARE_AUTH_FUNCTIONS_ENABLED: "true",
-    DRIVE_MOCK: "true",
+    DRIVE_MOCK: "false",
+    AUTH_DO: new MemoryNamespace(),
     ...overrides
   };
 }
@@ -89,5 +110,3 @@ test("invalid email is rejected without creating state", async () => {
   const response = await call("/api/auth/password-failure", { email: "not-an-email" }, env());
   assert.equal(response.status, 400);
 });
-
-// CI gate refresh.
