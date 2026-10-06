@@ -86,7 +86,7 @@ test("Cloudflare invitation redemption creates/signs Firebase custom token and r
     verifier.end();
     assert.equal(verifier.verify(publicKeyPem,Buffer.from(signaturePart.replace(/-/g,"+").replace(/_/g,"/"),"base64")),true);
 
-    const commit=calls.find(c=>c.options.url && String(c.options.url).includes("/documents:commit"));
+    const commit=calls.find(c=>c.url && String(c.url).includes("/documents:commit"));
     assert.ok(commit);
   } finally {
     global.fetch=originalFetch;
