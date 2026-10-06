@@ -308,7 +308,7 @@ function invitationExpiry(invitation) {
 
 function normalizeInvitationState(invitation, uid = null) {
   if (!invitation) return INVITATION_STATES.NONE;
-  const status = String(invitation.status || invitation.invitationRedemptionState || "").toUpperCase();
+  const status = String(invitation.invitationRedemptionState || invitation.status || "").toUpperCase();
   if (status === "ACTIVATED" || status === "ACTIVE" || status === "ACCEPTED" && invitation.accountActivated === true) return INVITATION_STATES.ACTIVATED;
   if (status === "PROVISIONING_PENDING" && (!uid || invitation.invitationRedeemedUid === uid)) return INVITATION_STATES.PROVISIONING_PENDING;
   if (invitation.invitationRedeemedUid && (!uid || invitation.invitationRedeemedUid === uid)) return INVITATION_STATES.PASSWORD_SETUP_PENDING;
