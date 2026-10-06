@@ -19,7 +19,7 @@ import { sendInvitationEmail, buildInvitationMessage, validateRecipient } from "
 import { route as esignRoute } from "./router.mjs";
 import { buildEsignContext, EsignRecordDurableObject } from "./esignContext.mjs";
 import { runCleanup } from "./upload.mjs";
-import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPasswordSetup, getInvitationSessionState } from "./invitationRedemption.mjs";
+import { redeemInvitationToken, passwordSet, invitationSessionState } from "./invitationRedemption.mjs";
 
 let jwksCache = null;
 let jwksFetchedAt = 0;
@@ -95,36 +95,17 @@ export default {
       }
 
       if (url.pathname === "/api/invitations/redeem" && request.method === "POST") {
-        try {
-          return json(await redeemInvitationToken(request, env), 200, corsHeaders(request));
-        } catch (error) {
-          if (error instanceof InvitationRedemptionError) {
-            return json({ok:false,error:error.message}, error.status, corsHeaders(request));
-          }
-          console.error("Invitation redemption backend failure", error);
-          return json({ok:false,error:"The IRPA invitation could not be redeemed."}, 500, corsHeaders(request));
-        }
+        return await redeemInvitationToken(request, env);
       }
 
       if (url.pathname === "/api/invitations/session-state" && request.method === "POST") {
-        try {
-          const claims = await authenticateFirebaseRequest(request, env, {skipActivation:true});
-          return json(await getInvitationSessionState(env, claims), 200, corsHeaders(request));
-        } catch (error) {
-          if (error instanceof InvitationRedemptionError) return json({ok:false,error:error.message}, error.status, corsHeaders(request));
-          throw error;
-        }
+        return await invitationSessionState(request, env, (req) => authenticateFirebaseRequest(req, env, {skipActivation:true}));
       }
 
       if (url.pathname === "/api/invitations/password-set" && request.method === "POST") {
-        try {
-          const claims = await authenticateFirebaseRequest(request, env, {skipActivation:true});
-          return json(await confirmInvitationPasswordSetup(request, env, claims), 200, corsHeaders(request));
-        } catch (error) {
-          if (error instanceof InvitationRedemptionError) return json({ok:false,error:error.message}, error.status, corsHeaders(request));
-          throw error;
-        }
+        return await passwordSet(request, env, (req) => authenticateFirebaseRequest(req, env, {skipActivation:true}));
       }
+
       if (url.pathname === "/api/send-invitation-email" && request.method === "POST") {
         return await sendGatewayInvitationEmail(request, env);
       }
@@ -1561,7 +1542,7 @@ async function assertActivatedPortalUser(claims, env) {
   if (admin?.fields?.active?.booleanValue === true) return;
   const member = await getFirestoreDocument(env, `members/${claims.user_id}`, claims.token);
   const employee = await getFirestoreDocument(env, `employees/${claims.user_id}`, claims.token);
-  const memberActivated = member && (member.fields?.registrationStatus?.stringValue === "Activated" || member.fields?.status?.stringValue === "Activated" || member.fields?.accountActivated?.booleanValue === true);
+  const memberActivated = member && (member.fields?.registrationStatus?.stringValue === "Activated" || member.fields?.status?.stringValue === "Activated" || member.fields?.status?.stringValue === "Active" || member.fields?.accountActivated?.booleanValue === true);
   const employeeActive = employee && (employee.fields?.registrationStatus?.stringValue === "Activated" || employee.fields?.status?.stringValue === "Active" || employee.fields?.employmentStatus?.stringValue === "Active") && employee.fields?.accountActivated?.booleanValue !== false;
   if (!memberActivated && !employeeActive) {
     const error = new Error("IRPA_INVITATION_FAILURE:PORTAL_ACTIVATION_REQUIRED");
