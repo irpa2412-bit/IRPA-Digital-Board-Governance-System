@@ -92,7 +92,7 @@ function memberModules(p,e,selectedAuthority){
   if(roles.includes("Executive Director"))m.push(...EXECUTIVE_DIRECTOR_MODULES,"Reports");
   return[...new Set(m)].filter(Boolean);
 }
-function InvitationPasswordSetupScreen({user,invitationId}){
+function InvitationPasswordSetupScreen({user,invitationId,invitationEmail}){
   const[password,setPassword]=useState(""),[confirm,setConfirm]=useState(""),[busy,setBusy]=useState(false),[message,setMessage]=useState(""),[passwordPopup,setPasswordPopup]=useState(null);
   const notifyPasswordPopup=(text,type="info")=>{setPasswordPopup({text,type});window.setTimeout(()=>setPasswordPopup(null),3600)};
   async function save(e){
@@ -101,7 +101,7 @@ function InvitationPasswordSetupScreen({user,invitationId}){
     if(password!==confirm){setMessage("The passwords do not match.");return}
     setBusy(true);
     try{
-      await configureInvitationPassword(password, invitationId);
+      await configureInvitationPassword(password, invitationId, invitationEmail);
       notifyPasswordPopup("Permanent password configured. Opening the IRPA workspace.","success");
       await new Promise(resolve=>window.setTimeout(resolve,700));
       window.location.reload();
@@ -359,7 +359,7 @@ function LiveWeatherPanel(){
    {latitude:-2.73333,longitude:36.26667},
    {latitude:-3.3697,longitude:36.6881}
   ];
-  const[weather,setWeather]=useState(null),[error,setError]=useState(""),[invitationState,setInvitationState]=useState("NONE"),[invitationIdForSetup,setInvitationIdForSetup]=useState(null),[loading,setLoading]=useState(true),[lastUpdated,setLastUpdated]=useState("");
+  const[weather,setWeather]=useState(null),[error,setError]=useState(""),[invitationState,setInvitationState]=useState("NONE"),[invitationIdForSetup,setInvitationIdForSetup]=useState(null),[invitationEmailForSetup,setInvitationEmailForSetup]=useState(null),[loading,setLoading]=useState(true),[lastUpdated,setLastUpdated]=useState("");
   const apiKey=String(import.meta.env.VITE_GOOGLE_WEATHER_API_KEY||"").trim();
   useEffect(()=>{
    const loadWeather=async()=>{
@@ -840,7 +840,7 @@ useEffect(()=>{async function magic(){
     window.alert(x.message||"Unable to open the signing invitation.");
   }
 }magic()},[]);const invitationId=params.get("memberInvite");if(!user)return <AuthScreen/>;if(applicantInductionMode&&profile?.authorizationType!=="administrator")return <InductionOrientation/>;if(inductionMode&&params.get("applicant")==="1"&&entryRoute==="subscription"&&user===undefined)return <MemberActivationScreen invitationId={invitationId}/>;if(inductionMode&&user===undefined)return <AuthScreen/>;if(user===undefined)return <AuthScreen/>;if(profile===undefined)return <Loading message={error}/>;if(!user)return invitationId?<MemberActivationScreen invitationId={invitationId}/>:<AuthScreen/>;
-if(user&&invitationState==="PASSWORD_SETUP_PENDING")return <InvitationPasswordSetupScreen user={user} invitationId={invitationIdForSetup}/>;
+if(user&&invitationState==="PASSWORD_SETUP_PENDING")return <InvitationPasswordSetupScreen user={user} invitationId={invitationIdForSetup} invitationEmail={invitationEmailForSetup}/>;
 if(!profile)return <AccessDenied user={user}reason={error}/>;
 if(profile.authorizationType==="signer"){
   return <SignerShell user={user} profile={profile} signingEnvelopeId={signingEnvelopeId}/>;

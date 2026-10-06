@@ -467,7 +467,7 @@ export async function invitationSessionState(request, env, authenticate) {
     const own = rows
       .filter(row => String(row.invitationRedeemedUid || "") === claims.user_id)
       .sort((a,b) => Date.parse(String(b.updatedAt || "")) - Date.parse(String(a.updatedAt || "")))[0];
-    if (!own) return json({ ok: true, state: INVITATION_STATES.NONE, invitationId: null }, 200);
+    if (!own) return json({ ok: true, state: INVITATION_STATES.NONE, invitationId: null, email: null }, 200);
     const invitationId = own.__name.split("/").pop();
     const rawState = normalizeInvitationState(own, claims.user_id);
     if (rawState === INVITATION_STATES.PROVISIONING_PENDING) {
@@ -481,7 +481,7 @@ export async function invitationSessionState(request, env, authenticate) {
         }, 200);
       }
     }
-    return json({ ok: true, state: rawState, invitationId }, 200);
+    return json({ ok: true, state: rawState, invitationId, email: String(own.email || "").trim().toLowerCase() || null }, 200);
   } catch (error) {
     console.error("Invitation session-state failed", { stage: "SESSION_STATE" });
     return json(invitationFailure("SESSION_STATE", 500, "Invitation session state is temporarily unavailable."), 500);

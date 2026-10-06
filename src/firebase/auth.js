@@ -13,6 +13,8 @@ import {
   signOut,
   sendSignInLinkToEmail,
   updatePassword,
+  EmailAuthProvider,
+  linkWithCredential,
   isSignInWithEmailLink,
   signInWithEmailLink,
   onAuthStateChanged,
@@ -420,14 +422,22 @@ export async function getInvitationSessionState() {
   }
 }
 
-export async function configureInvitationPassword(password, invitationId) {
+export async function configureInvitationPassword(password, invitationId, invitationEmail) {
   const cleanPassword = String(password || "");
+  const cleanInvitationEmail = String(invitationEmail || "").trim().toLowerCase();
   if (!auth.currentUser) throw new Error("The invitation account session is not active. Open the invitation email again.");
   if (cleanPassword.length < 8) throw new Error("Use a password with at least 8 characters.");
-  // Always update the linked password. Never silently skip an already-linked
-  // password provider: the custom-token session is fresh and updatePassword
-  // completes the invitation credential setup.
-  await updatePassword(auth.currentUser, cleanPassword);
+  if (!cleanInvitationEmail) throw new Error("The server did not provide the invitation email. Reopen the invitation email and try again.");
+  const hasPasswordProvider = (auth.currentUser.providerData || [])
+    .some(provider => provider.providerId === "password");
+  if (hasPasswordProvider) {
+    await updatePassword(auth.currentUser, cleanPassword);
+  } else {
+    await linkWithCredential(
+      auth.currentUser,
+      EmailAuthProvider.credential(cleanInvitationEmail, cleanPassword)
+    );
+  }
   const token = await auth.currentUser.getIdToken(true);
   const result = await invitationGateway("/api/invitations/password-set", {
     method: "POST",
