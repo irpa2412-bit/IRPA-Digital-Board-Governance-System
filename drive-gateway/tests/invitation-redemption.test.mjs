@@ -386,14 +386,14 @@ test("session-state returns the invitation state for the authenticated UID", asy
     const target=String(url);
     if(target.includes("securetoken@system.gserviceaccount.com")) return new Response(JSON.stringify({keys:[{...jwk,kid:"invitation-test-key",alg:"RS256",use:"sig"}]}),{status:200});
     if(target.includes("/documents:runQuery")) return new Response(JSON.stringify([{document:{name:"projects/irpa-digital-board-governance/databases/(default)/documents/invitations/session-state-id",fields:{
-      invitationRedeemedUid:{stringValue:"session-state-uid"},invitationRedemptionState:{stringValue:"PASSWORD_SETUP_PENDING"},updatedAt:{timestampValue:"2099-01-01T00:00:00Z"}
+      invitationRedeemedUid:{stringValue:"session-state-uid"},email:{stringValue:"invitee@example.org"},invitationRedemptionState:{stringValue:"PASSWORD_SETUP_PENDING"},updatedAt:{timestampValue:"2099-01-01T00:00:00Z"}
     }}}]),{status:200});
     throw new Error("Unexpected external request: "+target);
   };
   try{
     const response=await handler.fetch(new Request("https://gw.test/api/invitations/session-state",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"},body:"{}"}),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_WEB_API_KEY:"test-web-api-key",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)});
     assert.equal(response.status,200);
-    assert.deepEqual(await response.json(),{ok:true,state:"PASSWORD_SETUP_PENDING",invitationId:"session-state-id"});
+    assert.deepEqual(await response.json(),{ok:true,state:"PASSWORD_SETUP_PENDING",invitationId:"session-state-id",email:"invitee@example.org"});
   } finally { global.fetch=originalFetch; }
 });
 
@@ -575,6 +575,49 @@ test("session-state returns NONE when the authenticated UID has no invitation", 
       method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"},body:"{}"
     }),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance"});
     assert.equal(response.status,200);
-    assert.deepEqual(await response.json(),{ok:true,state:"NONE",invitationId:null});
+    assert.deepEqual(await response.json(),{ok:true,state:"NONE",invitationId:null,email:null});
+  } finally { global.fetch=originalFetch; }
+});
+
+
+test("invitation redemption fails closed when FIREBASE_PROJECT_ID is missing", async()=>{
+  const originalFetch=global.fetch;
+  let calls=0;
+  global.fetch=async()=>{calls++;throw new Error("No external request expected");};
+  try{
+    const response=await handler.fetch(new Request("https://gw.test/api/invitations/redeem",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({token:"test-invitation."+tokenSecret})
+    }),{
+      FIREBASE_WEB_API_KEY:"test-web-api-key",
+      FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)
+    });
+    assert.equal(response.status,500);
+    assert.match((await response.json()).error,/REDEEM_SERVER/);
+    assert.equal(calls,0);
+  } finally { global.fetch=originalFetch; }
+});
+
+test("invitation redemption refuses an email assigned to a different UID even without providers", async()=>{
+  const originalFetch=global.fetch;
+  global.fetch=async(url,options={})=>{
+    const target=String(url);
+    if(target==="https://oauth2.googleapis.com/token") return new Response(JSON.stringify({access_token:"test-google-access-token",expires_in:3600}),{status:200});
+    if(target.includes("/databases/(default)/documents/invitations/test-invitation")) return new Response(JSON.stringify({fields:invitationFields,updateTime:"2026-10-05T08:00:00.000000Z"}),{status:200});
+    if(target.includes("/identitytoolkit.googleapis.com/v1/projects/irpa-digital-board-governance/accounts:lookup")) return new Response(JSON.stringify({users:[{localId:"different-uid",email:"invitee@example.org",providerUserInfo:[]}]}),{status:200});
+    throw new Error("Unexpected external request: "+target);
+  };
+  try{
+    const response=await handler.fetch(new Request("https://gw.test/api/invitations/redeem",{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({token:"test-invitation."+tokenSecret})
+    }),{
+      FIREBASE_PROJECT_ID:"irpa-digital-board-governance",
+      FIREBASE_WEB_API_KEY:"test-web-api-key",
+      FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)
+    });
+    assert.equal(response.status,409);
+    assert.match((await response.json()).error,/REDEEM_EXISTING_ACCOUNT/);
   } finally { global.fetch=originalFetch; }
 });
