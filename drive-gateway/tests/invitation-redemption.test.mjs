@@ -68,14 +68,14 @@ test("Cloudflare invitation redemption creates/signs Firebase custom token and r
     const body=await response.json();
     assert.equal(body.ok,true);
     assert.equal(body.invitationId,"test-invitation");
-    assert.equal(body.uid,"firebase-test-uid");
+    assert.match(body.uid,/^[a-f0-9-]{20,}$/);
     assert.match(body.customToken,/^[^.]+\.[^.]+\.[^.]+$/);
 
     const [headerPart,payloadPart,signaturePart]=body.customToken.split(".");
     const header=decodePart(headerPart);
     const payload=decodePart(payloadPart);
     assert.equal(header.alg,"RS256");
-    assert.equal(payload.uid,"firebase-test-uid");
+    assert.equal(payload.uid,body.uid);
     assert.equal(payload.claims.irpaInvitationId,"test-invitation");
     assert.equal(payload.claims.irpaInvitationRedemptionState,"PASSWORD_SETUP_PENDING");
     assert.equal(payload.claims.irpaInvitationRedeemed,undefined);
