@@ -6,6 +6,9 @@ on:
     paths:
       - "drive-gateway/**"
       - "firebase.json"
+      - "src/App.jsx"
+      - "src/firebase/auth.js"
+      - "src/firebase/invitationWorkflow.js"
       - ".github/workflows/staging-gateway-e2e.yml"
   workflow_dispatch:
 
@@ -41,7 +44,7 @@ jobs:
 
   deploy-staging:
     needs: local-e2e
-    if: github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004'
+    if: github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004' && vars.ALLOW_STAGING_DEPLOY == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -56,10 +59,12 @@ jobs:
           DRIVE_SECRET: ${{ secrets.STAGING_GOOGLE_DRIVE_CLIENT_SECRET }}
           DRIVE_KEY: ${{ secrets.STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY }}
           SMTP: ${{ secrets.STAGING_SMTP_PASSWORD }}
+          FIREBASE_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_WEB_API_KEY }}
         run: |
           set -euo pipefail
           missing=0
-          for pair in             "CLOUDFLARE_API_TOKEN:$CF_TOKEN"             "CLOUDFLARE_ACCOUNT_ID:$CF_ACCOUNT"             "STAGING_FIREBASE_PROJECT_ID:$PROJECT"             "STAGING_IRPA_APP_URL:$APP_URL"             "STAGING_GOOGLE_DRIVE_CLIENT_ID:$DRIVE_ID"             "STAGING_GOOGLE_DRIVE_CLIENT_SECRET:$DRIVE_SECRET"             "STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY:$DRIVE_KEY"             "STAGING_SMTP_PASSWORD:$SMTP"; do
+          for pair in             "CLOUDFLARE_API_TOKEN:$CF_TOKEN"             "CLOUDFLARE_ACCOUNT_ID:$CF_ACCOUNT"             "STAGING_FIREBASE_PROJECT_ID:$PROJECT"             "STAGING_IRPA_APP_URL:$APP_URL"             "STAGING_GOOGLE_DRIVE_CLIENT_ID:$DRIVE_ID"             "STAGING_GOOGLE_DRIVE_CLIENT_SECRET:$DRIVE_SECRET"             "STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY:$DRIVE_KEY"             "STAGING_SMTP_PASSWORD:$SMTP"             "FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE:$FIREBASE_SA"             "FIREBASE_WEB_API_KEY:$FIREBASE_API_KEY"; do
             name="${pair%%:*}"; value="${pair#*:}"
             if [ -z "$value" ]; then echo "Missing staging secret: $name"; missing=1; fi
           done
@@ -188,6 +193,8 @@ jobs:
           GOOGLE_DRIVE_CLIENT_SECRET: ${{ secrets.STAGING_GOOGLE_DRIVE_CLIENT_SECRET }}
           GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY: ${{ secrets.STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY }}
           SMTP_PASSWORD: ${{ secrets.STAGING_SMTP_PASSWORD }}
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+          FIREBASE_WEB_API_KEY: ${{ secrets.FIREBASE_WEB_API_KEY }}
         working-directory: drive-gateway
         run: |
           set -euo pipefail
@@ -195,6 +202,8 @@ jobs:
           printf '%s' "$GOOGLE_DRIVE_CLIENT_SECRET" | npx wrangler secret put GOOGLE_DRIVE_CLIENT_SECRET --config wrangler.staging.generated.json
           printf '%s' "$GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY" | npx wrangler secret put GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY --config wrangler.staging.generated.json
           printf '%s' "$SMTP_PASSWORD" | npx wrangler secret put SMTP_PASSWORD --config wrangler.staging.generated.json
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" | npx wrangler secret put FIREBASE_SERVICE_ACCOUNT_JSON --config wrangler.staging.generated.json
+          printf '%s' "$FIREBASE_WEB_API_KEY" | npx wrangler secret put FIREBASE_WEB_API_KEY --config wrangler.staging.generated.json
 
       - name: Deploy staging Worker only
         uses: cloudflare/wrangler-action@v3
@@ -218,4 +227,4 @@ jobs:
           curl --fail --silent --show-error --retry 5 --retry-delay 2 "$url" | tee staging-health.json
           grep -q '"ok":true' staging-health.json
 
-# Staging proof execution trigger — 2026-10-04
+# Controlled staging proof after stale Durable Object migration removal — 2026-10-05
