@@ -249,6 +249,7 @@ test("password-set verifies the password provider and activates the invitation o
     calls.push({url:String(url),options});
     const target=String(url);
     if(target.includes("securetoken@system.gserviceaccount.com")) return new Response(JSON.stringify({keys:[{...jwk,kid:"invitation-test-key",alg:"RS256",use:"sig"}]}),{status:200});
+    if(target==="https://oauth2.googleapis.com/token") return new Response(JSON.stringify({access_token:"test-google-access-token",expires_in:3600}),{status:200});
     if(target.includes("/databases/(default)/documents/invitations/password-verification-confirmed")){
       if(options.method==="PATCH"){
         const body=JSON.parse(options.body);
@@ -319,7 +320,7 @@ test("Cloudflare invitation redemption rejects a PASSWORD_SETUP_PENDING invitati
 test("Cloudflare invitation redemption enforces the per-invitation rate limit", async()=>{
   const originalFetch=global.fetch;
   const id="rate-limit-invitation";
-  const secret="rate-limit-secret";
+  const secret="rate-limit-invitation-secret-123";
   const hash=createHash("sha256").update(secret).digest("hex");
   const counts=new Map();
   const kv={get:async key=>counts.get(key)||null,put:async(key,value)=>counts.set(key,String(value))};
@@ -411,7 +412,7 @@ test("session-state returns the invitation state for the authenticated UID", asy
   try{
     const response=await handler.fetch(new Request("https://gw.test/api/invitations/session-state",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"},body:"{}"}),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)});
     assert.equal(response.status,200);
-    assert.deepEqual(await response.json(),{state:"PASSWORD_SETUP_PENDING",invitationId:"session-state-id"});
+    assert.deepEqual(await response.json(),{ok:true,state:"PASSWORD_SETUP_PENDING",invitationId:"session-state-id"});
   } finally { global.fetch=originalFetch; }
 });
 
@@ -584,6 +585,7 @@ test("session-state returns NONE when the authenticated UID has no invitation", 
   global.fetch=async(url)=>{
     const target=String(url);
     if(target.includes("securetoken@system.gserviceaccount.com")) return new Response(JSON.stringify({keys:[{...jwk,kid:"invitation-test-key",alg:"RS256",use:"sig"}]}),{status:200});
+    if(target==="https://oauth2.googleapis.com/token") return new Response(JSON.stringify({access_token:"test-google-access-token",expires_in:3600}),{status:200});
     if(target.includes("/documents:runQuery")) return new Response(JSON.stringify([]),{status:200});
     throw new Error("Unexpected external request: "+target);
   };
