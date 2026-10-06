@@ -1,0 +1,30 @@
+name: Deploy IRPA Firestore Rules (separate)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-production-config:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Verify production deployment configuration
+        run: node scripts/verify-deploy-config.mjs --environment production --config drive-gateway/wrangler.toml
+
+  deploy-firestore-rules:
+    needs: verify-production-config
+    if: vars.ALLOW_PRODUCTION_DEPLOY == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Deploy Firestore rules only
+        uses: w9jds/firebase-action@v14.17.0
+        with:
+          args: deploy --project irpa-digital-board-governance --only firestore:rules
+        env:
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
