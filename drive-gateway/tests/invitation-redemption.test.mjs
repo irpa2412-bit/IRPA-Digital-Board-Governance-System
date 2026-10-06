@@ -311,6 +311,7 @@ test("Cloudflare invitation redemption enforces the per-invitation rate limit", 
       fields:{...invitationFields,invitationTokenHash:{stringValue:hash},status:{stringValue:"Pending"}},
       updateTime:"2026-10-05T08:00:00.000000Z"
     }),{status:200});
+    if(target.includes("identitytoolkit.googleapis.com/v1/accounts:createAuthUri")) return new Response(JSON.stringify({registered:true,allProviders:["password"]}),{status:200});
     if(target.includes("/accounts:lookup")) return new Response(JSON.stringify({users:[{localId:"rate-limit-uid",email:"invitee@example.org",providerUserInfo:[{providerId:"password"}]}]}),{status:200});
     throw new Error("Unexpected external request: "+target);
   };
