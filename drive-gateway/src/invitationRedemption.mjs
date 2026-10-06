@@ -411,20 +411,9 @@ export async function invitationSessionState(request, env, authenticate) {
     const invitationId = own.__name.split("/").pop();
     const rawState = normalizeInvitationState(own, claims.user_id);
     if (rawState === INVITATION_STATES.PROVISIONING_PENDING) {
-      const redemptionState = normalizeInvitationState(invitation, claims.user_id);
-    if (redemptionState === INVITATION_STATES.PROVISIONING_PENDING) {
-      return json({ ok: true, invitationId, uid: claims.user_id, state: INVITATION_STATES.PROVISIONING_PENDING }, 200);
-    }
-
-    const account = await authApi(env, "accounts:lookup", { idToken: claims.token });
+      const account = await authApi(env, "accounts:lookup", { idToken: claims.token });
       if (account.response.ok) {
         const providers = (account.data?.users?.[0]?.providerUserInfo || []).map(x => x.providerId);
-    const authUser = account.data?.users?.[0] || {};
-    const authEmail = String(authUser.email || claims.email || "").trim().toLowerCase();
-    const invitationEmail = String(invitation.email || "").trim().toLowerCase();
-    if (invitationEmail && authEmail && invitationEmail !== authEmail) {
-      return json(invitationFailure("PASSWORD_EMAIL", 403, "The authenticated account does not match the invitation email."), 403);
-    }
         return json({
           ok: true,
           state: providers.includes("password") ? INVITATION_STATES.PROVISIONING_PENDING : INVITATION_STATES.PASSWORD_SETUP_PENDING,
@@ -463,8 +452,19 @@ export async function passwordSet(request, env, authenticate) {
       return json({ ok: true, state: INVITATION_STATES.ACTIVATED, invitationId }, 200);
     }
 
+    const redemptionState = normalizeInvitationState(invitation, claims.user_id);
+    if (redemptionState === INVITATION_STATES.PROVISIONING_PENDING) {
+      return json({ ok: true, invitationId, uid: claims.user_id, state: INVITATION_STATES.PROVISIONING_PENDING }, 200);
+    }
+
     const account = await authApi(env, "accounts:lookup", { idToken: claims.token });
     if (!account.response.ok) throw new Error("Firebase account lookup failed.");
+    const authUser = account.data?.users?.[0] || {};
+    const authEmail = String(authUser.email || claims.email || "").trim().toLowerCase();
+    const invitationEmail = String(invitation.email || "").trim().toLowerCase();
+    if (invitationEmail && authEmail && invitationEmail !== authEmail) {
+      return json(invitationFailure("PASSWORD_EMAIL", 403, "The authenticated account does not match the invitation email."), 403);
+    }
     const providers = (account.data?.users?.[0]?.providerUserInfo || []).map(x => x.providerId);
     if (!providers.includes("password")) {
       return json(invitationFailure("PASSWORD_PROVIDER", 409, "The permanent password has not been configured yet. Return to the invitation password screen and save it again."), 409);
