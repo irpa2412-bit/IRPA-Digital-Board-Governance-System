@@ -59,12 +59,12 @@ jobs:
           DRIVE_SECRET: ${{ secrets.STAGING_GOOGLE_DRIVE_CLIENT_SECRET }}
           DRIVE_KEY: ${{ secrets.STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY }}
           SMTP: ${{ secrets.STAGING_SMTP_PASSWORD }}
-          FIREBASE_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+          FIREBASE_SA: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT_JSON }}
           FIREBASE_API_KEY: ${{ secrets.FIREBASE_WEB_API_KEY }}
         run: |
           set -euo pipefail
           missing=0
-          for pair in             "CLOUDFLARE_API_TOKEN:$CF_TOKEN"             "CLOUDFLARE_ACCOUNT_ID:$CF_ACCOUNT"             "STAGING_FIREBASE_PROJECT_ID:$PROJECT"             "STAGING_IRPA_APP_URL:$APP_URL"             "STAGING_GOOGLE_DRIVE_CLIENT_ID:$DRIVE_ID"             "STAGING_GOOGLE_DRIVE_CLIENT_SECRET:$DRIVE_SECRET"             "STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY:$DRIVE_KEY"             "STAGING_SMTP_PASSWORD:$SMTP"             "FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE:$FIREBASE_SA"             "FIREBASE_WEB_API_KEY:$FIREBASE_API_KEY"; do
+          for pair in             "CLOUDFLARE_API_TOKEN:$CF_TOKEN"             "CLOUDFLARE_ACCOUNT_ID:$CF_ACCOUNT"             "STAGING_FIREBASE_PROJECT_ID:$PROJECT"             "STAGING_IRPA_APP_URL:$APP_URL"             "STAGING_GOOGLE_DRIVE_CLIENT_ID:$DRIVE_ID"             "STAGING_GOOGLE_DRIVE_CLIENT_SECRET:$DRIVE_SECRET"             "STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY:$DRIVE_KEY"             "STAGING_SMTP_PASSWORD:$SMTP"             "STAGING_FIREBASE_SERVICE_ACCOUNT_JSON:$FIREBASE_SA"             "FIREBASE_WEB_API_KEY:$FIREBASE_API_KEY"; do
             name="${pair%%:*}"; value="${pair#*:}"
             if [ -z "$value" ]; then echo "Missing staging secret: $name"; missing=1; fi
           done
@@ -124,66 +124,30 @@ jobs:
           echo "CLOUDFLARE_TOKEN_VALID=$valid"
           test "$valid" = "true"
 
-      - name: Provision or reuse dedicated staging KV
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          PROJECT: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
-          APP_URL: ${{ secrets.STAGING_IRPA_APP_URL }}
+      - name: Validate staging configuration
         working-directory: drive-gateway
         run: |
           set -euo pipefail
-          list="$(curl --fail --silent --show-error -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces")"
-          id="$(node - "$list" <<'NODE'
-          const a=JSON.parse(process.argv[2]);
-          if(!a.success) throw new Error("Cloudflare KV namespace list failed");
-          const x=(Array.isArray(a.result)?a.result:[]).find(v=>v.title==="irpa-google-drive-gateway-staging");
-          if(x?.id) process.stdout.write(x.id);
-          NODE
-          )"
-          if [ -z "$id" ]; then
-            created="$(curl --fail --silent --show-error -X POST -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" --data '{"title":"irpa-google-drive-gateway-staging"}' "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces")"
-            id="$(node - "$created" <<'NODE'
-          const a=JSON.parse(process.argv[2]);
-          if(!a.success) throw new Error("Cloudflare KV namespace creation failed");
-          process.stdout.write(a?.result?.id||"");
-          NODE
-            )"
-          fi
-          case "$id" in ''|*[!a-f0-9]*) exit 1;; esac
-          export STAGING_KV_ID="$id"
           node <<'NODE'
           const fs=require("fs");
-          const c={
-            name:"irpa-google-drive-gateway-staging",main:"src/index.js",
-            compatibility_date:"2026-09-29",workers_dev:true,
-            vars:{
-              FIREBASE_PROJECT_ID:process.env.PROJECT,
-              AUTHORIZED_DRIVE_EMAIL:"irpa2412@gmail.com",
-              IRPA_APP_URL:process.env.APP_URL,
-              SMTP_HOST:"mail.irpa.or.tz",SMTP_PORT:"465",SMTP_FROM:"info@irpa.or.tz",
-              DRIVE_ROOT_FOLDER_NAME:"IRPA Governance System - STAGING",
-              FIRESTORE_COLLECTION_PREFIX:"staging_",DRIVE_MOCK:"false",LOCAL_TEST_MODE:"false"
-            },
-            kv_namespaces:[{binding:"DRIVE_KV",id:process.env.STAGING_KV_ID}],
-            triggers:{crons:["0 * * * *"]}
-          };
-          if(c.vars.FIREBASE_PROJECT_ID==="irpa-digital-board-governance") throw new Error("Production Firebase project forbidden.");
-          fs.writeFileSync("wrangler.staging.generated.json",JSON.stringify(c,null,2)+"\n");
+          const text=fs.readFileSync("wrangler.toml","utf8");
+          const staging=text.split("[env.staging]")[1] || "";
+          if (!/\[env\.staging\]/.test(text)) throw new Error("Staging environment is missing.");
+          if (!/name = "irpa-google-drive-gateway-staging"/.test(staging)) throw new Error("Staging Worker name is incorrect.");
+          if (/FIREBASE_PROJECT_ID\s*=\s*"irpa-digital-board-governance"/.test(staging)) throw new Error("Production Firebase project is forbidden in staging.");
+          if (/IRPA_APP_URL\s*=\s*"https:\/\/irpa-digital-board-governance\.web\.app"/.test(staging)) throw new Error("Production IRPA_APP_URL is forbidden in staging.");
+          if (/FIREBASE_PROJECT_ID\s*=/.test(staging)) throw new Error("Staging FIREBASE_PROJECT_ID must not be committed until the separate staging project is provisioned.");
+          if (/IRPA_APP_URL\s*=/.test(staging)) throw new Error("Staging IRPA_APP_URL must not be committed until the separate staging hosting origin is provisioned.");
+          if (!/CLOUDFLARE_AUTH_FUNCTIONS_ENABLED = "true"/.test(staging)) throw new Error("Staging migration flag must be true.");
+          if (!/DRIVE_MOCK = "false"/.test(staging)) throw new Error("Staging must use real Durable Object state (DRIVE_MOCK=false).");
+          if (!/\[\[env\.staging\.kv_namespaces\]\][\s\S]*binding = "DRIVE_KV"/.test(text)) throw new Error("Staging DRIVE_KV binding is missing.");
+          if (!/\[\[env\.staging\.durable_objects\.bindings\]\][\s\S]*name = "ESIGN_DO"[\s\S]*class_name = "EsignRecordDurableObject"/.test(text)) throw new Error("Staging ESIGN_DO binding is missing.");
+          if (!/\[\[env\.staging\.migrations\]\][\s\S]*tag = "esign-do-staging-v1"/.test(text)) throw new Error("Staging DO migration is missing.");
           NODE
 
-      - name: Verify staging configuration
+      - name: Validate staging Worker configuration without deployment
         working-directory: drive-gateway
-        run: |
-          set -euo pipefail
-          node <<'NODE'
-          const c=require("./wrangler.staging.generated.json");
-          if(c.name!=="irpa-google-drive-gateway-staging") throw new Error("Worker boundary mismatch");
-          if(c.vars.FIREBASE_PROJECT_ID==="irpa-digital-board-governance") throw new Error("Production Firebase project");
-          if(c.kv_namespaces?.[0]?.binding!=="DRIVE_KV") throw new Error("Missing staging KV");
-          if(c.triggers?.crons?.[0]!=="0 * * * *") throw new Error("Cleanup cron missing");
-          console.log("STAGING_CONFIGURATION_VALID");
-          NODE
+        run: npx wrangler deploy --env staging --dry-run
 
       - name: Inject staging-only Worker secrets
         env:
@@ -193,17 +157,17 @@ jobs:
           GOOGLE_DRIVE_CLIENT_SECRET: ${{ secrets.STAGING_GOOGLE_DRIVE_CLIENT_SECRET }}
           GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY: ${{ secrets.STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY }}
           SMTP_PASSWORD: ${{ secrets.STAGING_SMTP_PASSWORD }}
-          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT_JSON }}
           FIREBASE_WEB_API_KEY: ${{ secrets.FIREBASE_WEB_API_KEY }}
         working-directory: drive-gateway
         run: |
           set -euo pipefail
-          printf '%s' "$GOOGLE_DRIVE_CLIENT_ID" | npx wrangler secret put GOOGLE_DRIVE_CLIENT_ID --config wrangler.staging.generated.json
-          printf '%s' "$GOOGLE_DRIVE_CLIENT_SECRET" | npx wrangler secret put GOOGLE_DRIVE_CLIENT_SECRET --config wrangler.staging.generated.json
-          printf '%s' "$GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY" | npx wrangler secret put GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY --config wrangler.staging.generated.json
-          printf '%s' "$SMTP_PASSWORD" | npx wrangler secret put SMTP_PASSWORD --config wrangler.staging.generated.json
-          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" | npx wrangler secret put FIREBASE_SERVICE_ACCOUNT_JSON --config wrangler.staging.generated.json
-          printf '%s' "$FIREBASE_WEB_API_KEY" | npx wrangler secret put FIREBASE_WEB_API_KEY --config wrangler.staging.generated.json
+          printf '%s' "$GOOGLE_DRIVE_CLIENT_ID" | npx wrangler secret put GOOGLE_DRIVE_CLIENT_ID --env staging
+          printf '%s' "$GOOGLE_DRIVE_CLIENT_SECRET" | npx wrangler secret put GOOGLE_DRIVE_CLIENT_SECRET --env staging
+          printf '%s' "$GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY" | npx wrangler secret put GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY --env staging
+          printf '%s' "$SMTP_PASSWORD" | npx wrangler secret put SMTP_PASSWORD --env staging
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" | npx wrangler secret put FIREBASE_SERVICE_ACCOUNT_JSON --env staging
+          printf '%s' "$FIREBASE_WEB_API_KEY" | npx wrangler secret put FIREBASE_WEB_API_KEY --env staging
 
       - name: Deploy staging Worker only
         uses: cloudflare/wrangler-action@v3
@@ -211,8 +175,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: drive-gateway
-          command: deploy --config wrangler.staging.generated.json
-
+          command: deploy --env staging
       - name: Verify staging health
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

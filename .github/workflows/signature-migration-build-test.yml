@@ -42,6 +42,8 @@ jobs:
 
   deploy-cloudflare-staging:
     needs: build
+    # Staging deployment is explicitly approval-gated.
+    if: vars.ALLOW_STAGING_DEPLOY == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
@@ -59,6 +61,11 @@ jobs:
           const text = fs.readFileSync("wrangler.toml", "utf8");
           if (!/\[env\.staging\]/.test(text)) throw new Error("Staging environment is missing.");
           if (!/name = "irpa-google-drive-gateway-staging"/.test(text)) throw new Error("Staging Worker name is incorrect.");
+          const staging = text.split("[env.staging]")[1] || "";
+          if (/FIREBASE_PROJECT_ID\s*=\s*"irpa-digital-board-governance"/.test(staging)) throw new Error("Production Firebase project is forbidden in staging.");
+          if (/IRPA_APP_URL\s*=\s*"https:\/\/irpa-digital-board-governance\.web\.app"/.test(staging)) throw new Error("Production IRPA_APP_URL is forbidden in staging.");
+          if (/FIREBASE_PROJECT_ID\s*=/.test(staging)) throw new Error("Staging FIREBASE_PROJECT_ID must not be committed until the separate staging project is provisioned.");
+          if (/IRPA_APP_URL\s*=/.test(staging)) throw new Error("Staging IRPA_APP_URL must not be committed until the separate staging hosting origin is provisioned.");
           if (!/\[env\.staging\.vars\][\s\S]*CLOUDFLARE_AUTH_FUNCTIONS_ENABLED = "true"/.test(text)) throw new Error("Staging migration flag must be true.");
           if (!/\[env\.staging\.vars\][\s\S]*DRIVE_MOCK = "false"/.test(text)) throw new Error("Staging must use real Durable Object state (DRIVE_MOCK=false).");
           if (!/\[\[env\.staging\.kv_namespaces\]\][\s\S]*binding = "DRIVE_KV"/.test(text)) throw new Error("Staging DRIVE_KV binding is missing.");
@@ -71,6 +78,14 @@ jobs:
 
       - name: Install gateway dependencies
         run: npm ci --no-audit --no-fund
+
+      - name: Inject staging-only Firebase service account
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -euo pipefail
+          test -n "$FIREBASE_SERVICE_ACCOUNT_JSON"
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" | npx wrangler secret put FIREBASE_SERVICE_ACCOUNT_JSON --env staging
 
       - name: Validate staging configuration
         run: npx wrangler deploy --env staging --dry-run
