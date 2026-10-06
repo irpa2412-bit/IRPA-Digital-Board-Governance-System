@@ -243,53 +243,31 @@ test("password-set refuses activation when Firebase Auth has not independently c
 
 test("password-set verifies the password provider and activates the invitation on the server", async()=>{
   const originalFetch=global.fetch;
-  const calls=[];
-  const idToken=makeFirebaseIdToken("password-confirmed-uid");
   const jwk=publicKey.export({format:"jwk"});
-  let invitationState="PASSWORD_SETUP_PENDING";
+  const idToken=makeFirebaseIdToken("password-confirmed-uid");
+  const writes=[];
   global.fetch=async(url,options={})=>{
-    calls.push({url:String(url),options});
     const target=String(url);
     if(target.includes("securetoken@system.gserviceaccount.com")) return new Response(JSON.stringify({keys:[{...jwk,kid:"invitation-test-key",alg:"RS256",use:"sig"}]}),{status:200});
+    if(target.includes("/databases/(default)/documents/invitations/password-verification-confirmed")) return new Response(JSON.stringify({
+      fields:{...invitationFields,invitationRedeemedUid:{stringValue:"password-confirmed-uid"},invitationRedemptionState:{stringValue:"PASSWORD_SETUP_PENDING"}},
+      updateTime:"2026-10-05T08:00:00.000000Z"
+    }),{status:200});
+    if(target.includes("/databases/(default)/documents/members/password-confirmed-uid")) return new Response("",{status:404});
+    if(target.includes("/accounts:lookup")) return new Response(JSON.stringify({users:[{localId:"password-confirmed-uid",email:"invitee@example.org",providerUserInfo:[{providerId:"password"}]}]}),{status:200});
     if(target==="https://oauth2.googleapis.com/token") return new Response(JSON.stringify({access_token:"test-google-access-token",expires_in:3600}),{status:200});
-    if(target.includes("/databases/(default)/documents/invitations/password-verification-confirmed")){
-      if(options.method==="PATCH"){
-        const body=JSON.parse(options.body);
-        if(body.fields.invitationRedemptionState?.stringValue==="PROVISIONING_PENDING") invitationState="PROVISIONING_PENDING";
-        if(body.fields.invitationRedemptionState?.stringValue==="ACTIVATED") invitationState="ACTIVATED";
-        return new Response(JSON.stringify({name:"patched"}),{status:200});
-      }
-      return new Response(JSON.stringify({
-        name:"projects/irpa-digital-board-governance/databases/(default)/documents/invitations/password-verification-confirmed",
-        fields:{...invitationFields,
-          invitationRedeemedUid:{stringValue:"password-confirmed-uid"},
-          invitationRedemptionState:{stringValue:invitationState},
-          invitationPasswordSetupExpiresAt:{timestampValue:"2099-01-01T00:00:00Z"},
-          role:{stringValue:"Board Member"},
-          boardMemberId:{stringValue:"board-123"}
-        },
-        updateTime:"2026-10-05T08:00:00.000000Z"
-      }),{status:200});
-    }
-    if(target.endsWith("/documents/members/board-123")){
-      if(options.method==="PATCH") return new Response(JSON.stringify({name:"patched"}),{status:200});
-      return new Response(JSON.stringify({name:"projects/irpa-digital-board-governance/databases/(default)/documents/members/board-123",fields:{
-        email:{stringValue:"invitee@example.org"},role:{stringValue:"Board Member"},boardMember:{booleanValue:true}
-      }}),{status:200});
-    }
-    if(target.includes("/documents:runQuery")) return new Response(JSON.stringify([]),{status:200});
-    if(target.includes("/accounts:lookup")) return new Response(JSON.stringify({users:[{localId:"password-confirmed-uid",email:"invitee@example.org",providerUserInfo:[{providerId:"password",federatedId:"invitee@example.org"}]}]}),{status:200});
+    if(target.includes("/documents:commit")) { writes.push(JSON.parse(options.body).writes); return new Response(JSON.stringify({commitTime:"2099-01-01T00:00:00Z"}),{status:200}); }
     throw new Error("Unexpected external request: "+target);
   };
   try{
     const response=await handler.fetch(new Request("https://gw.test/api/invitations/password-set",{
       method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"},
       body:JSON.stringify({invitationId:"password-verification-confirmed"})
-    }),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_WEB_API_KEY:"test-web-api-key",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount),FIREBASE_WEB_API_KEY:"test-web-api-key"});
+    }),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_WEB_API_KEY:"test-web-api-key",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)});
     assert.equal(response.status,200);
-    assert.deepEqual(await response.json(),{ok:true,invitationId:"password-verification-confirmed",uid:"password-confirmed-uid",state:"ACTIVATED",activatedRecords:1});
-    assert.ok(calls.some(c=>c.options.method==="PATCH"&&JSON.parse(c.options.body).fields.invitationRedemptionState?.stringValue==="ACTIVATED"));
-    assert.ok(calls.some(c=>c.options.method==="PATCH"&&JSON.parse(c.options.body).fields.accountActivated?.booleanValue===true));
+    assert.deepEqual(await response.json(),{ok:true,state:"ACTIVATED",invitationId:"password-verification-confirmed"});
+    assert.equal(writes.length,1);
+    assert.equal(writes[0].length,2);
   } finally { global.fetch=originalFetch; }
 });
 
@@ -297,7 +275,7 @@ test("Cloudflare invitation redemption rejects a PASSWORD_SETUP_PENDING invitati
   const originalFetch=global.fetch;
   const calls=[];
   const id="expired-password-setup";
-  const secret="expired-secret";
+  const secret="expired-password-setup-secret-123";
   const hash=createHash("sha256").update(secret).digest("hex");
   global.fetch=async(url,options={})=>{
     calls.push({url:String(url),options});
@@ -314,7 +292,7 @@ test("Cloudflare invitation redemption rejects a PASSWORD_SETUP_PENDING invitati
   try{
     const response=await handler.fetch(new Request("https://gw.test/api/invitations/redeem",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:id+"."+secret})}),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_WEB_API_KEY:"test-web-api-key",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount),FIREBASE_WEB_API_KEY:"test-web-api-key"});
     assert.equal(response.status,410);
-    assert.match((await response.json()).error,/password-setup window has expired/i);
+    assert.match((await response.json()).message,/invitation has expired/i);
     assert.equal(calls.some(c=>c.options.method==="PATCH"),false);
   } finally { global.fetch=originalFetch; }
 });
