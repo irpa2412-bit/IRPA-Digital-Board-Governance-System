@@ -466,7 +466,6 @@ export async function passwordSet(request, env, authenticate) {
     if (!account.response.ok) throw new Error("Firebase account lookup failed.");
     const authUser = account.data?.users?.[0] || {};
     const authEmail = String(authUser.email || claims.email || "").trim().toLowerCase();
-    const invitationEmail = String(invitation.email || "").trim().toLowerCase();
     if (invitationEmail && authEmail && invitationEmail !== authEmail) {
       return json(invitationFailure("PASSWORD_EMAIL", 403, "The authenticated account does not match the invitation email."), 403);
     }
