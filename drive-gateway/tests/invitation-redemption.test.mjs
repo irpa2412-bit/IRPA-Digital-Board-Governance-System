@@ -51,7 +51,6 @@ test("Cloudflare invitation redemption creates/signs Firebase custom token and r
       return new Response(JSON.stringify({localId:"firebase-test-uid",email:"invitee@example.org"}),{status:200});
     }
     if(String(url).includes("/documents:commit")) return new Response(JSON.stringify({commitTime:"2099-01-01T00:00:00Z"}),{status:200});
-    }
     throw new Error("Unexpected external request: "+url);
   };
 
