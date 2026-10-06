@@ -419,6 +419,12 @@ export async function invitationSessionState(request, env, authenticate) {
     const account = await authApi(env, "accounts:lookup", { idToken: claims.token });
       if (account.response.ok) {
         const providers = (account.data?.users?.[0]?.providerUserInfo || []).map(x => x.providerId);
+    const authUser = account.data?.users?.[0] || {};
+    const authEmail = String(authUser.email || claims.email || "").trim().toLowerCase();
+    const invitationEmail = String(invitation.email || "").trim().toLowerCase();
+    if (invitationEmail && authEmail && invitationEmail !== authEmail) {
+      return json(invitationFailure("PASSWORD_EMAIL", 403, "The authenticated account does not match the invitation email."), 403);
+    }
         return json({
           ok: true,
           state: providers.includes("password") ? INVITATION_STATES.PROVISIONING_PENDING : INVITATION_STATES.PASSWORD_SETUP_PENDING,
