@@ -82,6 +82,15 @@ test("Cloudflare invitation redemption creates/signs Firebase custom token and r
     verifier.end();
     assert.equal(verifier.verify(publicKeyPem,Buffer.from(signaturePart.replace(/-/g,"+").replace(/_/g,"/"),"base64")),true);
 
+    const authCreate=calls.find(c=>String(c.url).includes("/identitytoolkit.googleapis.com/v1/projects/irpa-digital-board-governance/accounts?"));
+    assert.ok(authCreate);
+    const authCreateBody=JSON.parse(authCreate.options.body);
+    assert.equal(authCreateBody.localId,body.uid);
+    assert.equal(authCreateBody.email,"invitee@example.org");
+    assert.equal(authCreateBody.emailVerified,true);
+    const authAuthorization=authCreate.options.headers.Authorization;
+    assert.equal(authAuthorization,"Bearer test-google-access-token");
+
     const commit=calls.find(c=>c.url && String(c.url).includes("/documents:commit"));
     assert.ok(commit);
   } finally {

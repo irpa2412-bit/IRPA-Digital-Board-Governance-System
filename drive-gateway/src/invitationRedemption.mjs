@@ -279,7 +279,7 @@ async function identityToolkitAdminRequest(env, operation, body) {
   const response = await fetch(
     "https://identitytoolkit.googleapis.com/v1/projects/" +
       encodeURIComponent(projectId) +
-      "/accounts:" + operation +
+      "/accounts" + (operation ? ":" + operation : "") +
       "?key=" + encodeURIComponent(key),
     {
       method: "POST",
