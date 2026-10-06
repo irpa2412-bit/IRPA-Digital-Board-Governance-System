@@ -76,6 +76,12 @@ jobs:
           if (!/IRPA_PRODUCTION_CUTOVER = "true"/.test(top)) throw new Error("Explicit production cutover marker is missing.");
           NODE
 
+      - name: Verify deploy configuration safety gate
+        env:
+          FIREBASE_PROJECT_ID: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
+          ALLOWED_ORIGINS: ${{ secrets.STAGING_IRPA_APP_URL }},http://localhost:5173
+        run: node scripts/verify-deploy-config.mjs --environment staging --config drive-gateway/wrangler.toml
+
       - name: Install gateway dependencies
         run: npm ci --no-audit --no-fund
 
