@@ -114,7 +114,10 @@ jobs:
             migrations: [{
               tag: "esign-do-v1",
               new_sqlite_classes: ["EsignRecordDurableObject"]
-            }]
+            }],
+            secrets: {
+              required: ["FIREBASE_ADMIN_SERVICE_ACCOUNT_JSON"]
+            }
           };
           fs.writeFileSync("wrangler.json", JSON.stringify(config, null, 2) + "\n");
           NODE
@@ -145,10 +148,27 @@ jobs:
               migration.new_sqlite_classes[0] !== "EsignRecordDurableObject") {
             throw new Error("ESIGN_DO migration is missing or invalid. Deployment blocked.");
           }
-          const topLevelKeys = new Set(["name", "main", "compatibility_date", "vars", "kv_namespaces", "durable_objects", "migrations"]);
+          const topLevelKeys = new Set(["name", "main", "compatibility_date", "vars", "kv_namespaces", "durable_objects", "migrations", "secrets"]);
           for (const key of Object.keys(c)) {
             if (!topLevelKeys.has(key)) throw new Error(`Safety stop: unexpected generated Wrangler configuration key "${key}".`);
           }
+          NODE
+
+      - name: Inspect required production invitation credential binding
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          secrets_json="$(npx wrangler secret list --name irpa-google-drive-gateway)"
+          SECRET_LIST="$secrets_json" node <<'NODE'
+          const secrets = JSON.parse(process.env.SECRET_LIST || "[]");
+          if (!Array.isArray(secrets) || !secrets.some(item => item?.name === "FIREBASE_ADMIN_SERVICE_ACCOUNT_JSON")) {
+            throw new Error("Required Cloudflare production secret FIREBASE_ADMIN_SERVICE_ACCOUNT_JSON is not configured. Deployment stopped before code activation.");
+          }
+          console.log("Required Cloudflare invitation-redemption secret binding is present; secret values were not requested or printed.");
           NODE
 
       - name: Verify governance application build

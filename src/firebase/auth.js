@@ -392,17 +392,19 @@ export async function configureInvitationPassword(password) {
 export async function completeInvitationToken(token) {
   const cleanToken = String(token || "").trim();
   if (!cleanToken) throw new Error("The IRPA invitation token is missing.");
-  const call = httpsCallable(getFunctions(undefined, "us-central1"), "redeemInvitationToken");
+  const gateway = String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL || "https://irpa-google-drive-gateway.irpa-governance.workers.dev").replace(/\/$/, "");
   try {
-    const result = await call({ token: cleanToken });
-    const data = result.data || {};
-    if ((!data.customToken && !data.invitationPassword) || !data.invitationId) throw new Error("The invitation redemption response was incomplete.");
-    let signedIn;
-    if (data.customToken) {
-      signedIn = await signInWithCustomToken(auth, data.customToken);
-    } else {
-      signedIn = await loginWithEmail(data.email || "", data.invitationPassword);
+    const response = await fetch(`${gateway}/api/invitations/redeem`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: cleanToken })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.ok === false) {
+      throw new Error(data.error || "The IRPA invitation could not be redeemed.");
     }
+    if (!data.customToken || !data.invitationId) throw new Error("The invitation redemption response was incomplete.");
+    const signedIn = await signInWithCustomToken(auth, data.customToken);
     const { provisionCurrentMemberFromInvitationV2 } = await import("./invitationWorkflow");
     await provisionCurrentMemberFromInvitationV2(data.invitationId);
     window.sessionStorage.setItem("irpaInvitationPasswordSetup", "1");
