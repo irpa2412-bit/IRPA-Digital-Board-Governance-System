@@ -37,8 +37,7 @@ jobs:
       - name: Build web application
         env:
           VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
-          VITE_GOOGLE_DRIVE_GATEWAY_URL: ${{ secrets.VITE_GOOGLE_DRIVE_GATEWAY_URL }}
-          VITE_GATEWAY_ORIGIN: ${{ secrets.VITE_GATEWAY_ORIGIN || 'https://irpa-google-drive-gateway.irpa-governance.workers.dev' }}
+          VITE_GATEWAY_ORIGIN: ${{ secrets.VITE_GATEWAY_ORIGIN }}
           VITE_GOOGLE_WEATHER_API_KEY: ${{ secrets.VITE_GOOGLE_WEATHER_API_KEY }}
         run: npm run build
 
@@ -279,10 +278,7 @@ jobs:
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
 
-      # Keep Firebase function deployments independent from Hosting/Firestore.
-      # Google Cloud billing is currently closed for this project, so new Cloud Functions
-      # deployments cannot activate Cloud Build/Artifact Registry. Existing deployed
-      # functions remain untouched; deployment can be re-enabled when billing is restored.
+      # Keep the login resolver deployment independent from unrelated functions.
       - name: Deploy login authorization resolver
         continue-on-error: true
         uses: w9jds/firebase-action@v14.17.0
@@ -291,22 +287,10 @@ jobs:
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
 
-      - name: Deploy retained Firebase password-reset function
-        continue-on-error: true
+      - name: Deploy authentication security and document-reference functions
         uses: w9jds/firebase-action@v14.17.0
         with:
-          args: deploy --project irpa-digital-board-governance --only functions:preparePasswordResetPhone
-        env:
-          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
-      # Invitation redemption is a retained Firebase callable. Keep this deployment
-      # isolated from the controlled Cloudflare auth-function migration and do not alter
-      # Firebase security rules or credentials. Billing closure may still block activation.
-      - name: Deploy invitation redemption function (fail-closed)
-        # This retained callable is a production security boundary. A failed deployment
-        # must fail the workflow rather than silently leaving the previous function live.
-        uses: w9jds/firebase-action@v14.17.0
-        with:
-          args: deploy --project irpa-digital-board-governance --only functions:redeemInvitationToken
+          args: deploy --project irpa-digital-board-governance --only functions:checkPasswordAttemptState,functions:recordPasswordFailure,functions:clearPasswordAttemptState,functions:preparePasswordResetPhone,functions:nextDocumentReference
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
 
