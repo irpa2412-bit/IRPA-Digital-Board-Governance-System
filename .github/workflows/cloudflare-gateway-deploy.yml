@@ -45,6 +45,13 @@ jobs:
             ["DRIVE_KV", "kv_namespace"],
             ["ESIGN_DO", "durable_object_namespace"]
           ]);
+          for (const requiredSecret of ["FIREBASE_SERVICE_ACCOUNT_JSON", "FIREBASE_WEB_API_KEY"]) {
+            const binding = bindings.find(b => b?.name === requiredSecret);
+            if (!binding || String(binding.type || "") !== "secret_text") {
+              throw new Error(`Safety stop: required production Worker secret "${requiredSecret}" is missing or is not secret_text.`);
+            }
+          }
+
           const resourceTypes = new Set([
             "kv_namespace", "durable_object_namespace", "r2_bucket", "d1", "service",
             "ai", "ai_search", "analytics_engine", "browser", "hyperdrive", "queue",
