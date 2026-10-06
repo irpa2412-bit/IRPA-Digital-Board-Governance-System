@@ -32,7 +32,7 @@ function WebAppNavigationRoller({active,modules,onNavigate}){const portalItems=g
 
 function PortalContentRoller({active,modules,onNavigate}){const items=getPortalContentItems(active,modules);if(!items.length)return null;const label=PORTAL_LABELS[active]||displayModuleName(active);return <div className="mobile-portal-content-roller" aria-label="Current portal content navigator"><div className="mobile-portal-content-roller-label"><span>IN-PORTAL CONTENT</span><strong>{label}</strong></div><select aria-label="Navigate within current portal" value={active} onChange={e=>onNavigate(e.target.value)}>{items.map(item=><option key={item} value={item}>{PORTAL_LABELS[item]||displayModuleName(item)}</option>)}</select><span className="mobile-portal-content-roller-chevron" aria-hidden="true">⌄</span></div>}
 
-import React,{useEffect,useMemo,useState}from"react";import Invitations from"./pages/Invitations";import Employees from"./pages/Employees";import BoardMembers from"./pages/BoardMembers";import Members from"./pages/Members";import EmployeePayments from"./pages/EmployeePayments";import Meetings from"./pages/Meetings";import Resolutions from"./pages/Resolutions";import Voting from"./pages/Voting";import OperationalGateways from"./pages/OperationalGateways";import OperationalGatewaysParticipants from"./pages/OperationalGatewaysParticipants";import AuthorizationApprovals from"./pages/AuthorizationApprovals";import SignaturePlatformWithUpload from"./pages/SignaturePlatformWithUpload";import FinancePortfolio from"./pages/FinancePortfolio";import ProcurementPortal from"./pages/ProcurementPortal";import Settings from"./pages/Settings";import ITOperationsPortal from"./pages/ITOperationsPortal";import InductionOrientation from"./pages/InductionOrientation";import InductionAdmin from"./pages/InductionAdmin";import ExternalAuditorPortal from"./pages/ExternalAuditorPortal";const ResearchStatisticsKnowledgePortal=React.lazy(()=>import("./pages/ResearchStatisticsKnowledgePortal"));import AddAdministratorPortal from"./pages/AddAdministratorPortal";import ModuleInterlinkBar from"./components/ModuleInterlinkBar";import PortalDocumentAccessPoint from"./components/PortalDocumentAccessPoint";import{ observeAuthState,loginWithEmail,loginWithGoogle,completeGoogleRedirect,registerWithEmail,sendPasswordReset,sendAdminMagicLink,isMagicLink,completeMagicLink,completeInvitationToken,configureInvitationPassword,logout,beginPasswordResetMobileVerification,verifyPasswordResetMobileOtp,clearPasswordAttemptState}from"./firebase/auth";import{getAdminProfile,getCurrentMemberProfile,getCurrentEmployeeProfile,resolveAuthenticatedLoginContext,getCurrentInductionContext,getRecords,COLLECTIONS}from"./firebase/data";import{provisionCurrentMemberFromInvitationV2}from"./firebase/invitationWorkflow";import{doc,getDoc}from"firebase/firestore";import{auth,db}from"./firebase/config";
+import React,{useEffect,useMemo,useState}from"react";import Invitations from"./pages/Invitations";import Employees from"./pages/Employees";import BoardMembers from"./pages/BoardMembers";import Members from"./pages/Members";import EmployeePayments from"./pages/EmployeePayments";import Meetings from"./pages/Meetings";import Resolutions from"./pages/Resolutions";import Voting from"./pages/Voting";import OperationalGateways from"./pages/OperationalGateways";import OperationalGatewaysParticipants from"./pages/OperationalGatewaysParticipants";import AuthorizationApprovals from"./pages/AuthorizationApprovals";import SignaturePlatformWithUpload from"./pages/SignaturePlatformWithUpload";import FinancePortfolio from"./pages/FinancePortfolio";import ProcurementPortal from"./pages/ProcurementPortal";import Settings from"./pages/Settings";import ITOperationsPortal from"./pages/ITOperationsPortal";import InductionOrientation from"./pages/InductionOrientation";import InductionAdmin from"./pages/InductionAdmin";import ExternalAuditorPortal from"./pages/ExternalAuditorPortal";const ResearchStatisticsKnowledgePortal=React.lazy(()=>import("./pages/ResearchStatisticsKnowledgePortal"));import AddAdministratorPortal from"./pages/AddAdministratorPortal";import ModuleInterlinkBar from"./components/ModuleInterlinkBar";import PortalDocumentAccessPoint from"./components/PortalDocumentAccessPoint";import{ observeAuthState,loginWithEmail,loginWithGoogle,completeGoogleRedirect,registerWithEmail,sendPasswordReset,sendAdminMagicLink,isMagicLink,completeMagicLink,completeInvitationToken,configureInvitationPassword,getInvitationSessionState,completeInvitationActivation,logout,beginPasswordResetMobileVerification,verifyPasswordResetMobileOtp,clearPasswordAttemptState}from"./firebase/auth";import{getAdminProfile,getCurrentMemberProfile,getCurrentEmployeeProfile,resolveAuthenticatedLoginContext,getCurrentInductionContext,getRecords,COLLECTIONS}from"./firebase/data";import{doc,getDoc}from"firebase/firestore";import{auth,db}from"./firebase/config";
 // TEMPORARY BUILD/STABILISATION CONTROL: preserve the gate implementation, but temporarily disconnect it from the gateway so the pre-gateway interface remains usable.
 const IRPA_TEMPORARY_DATA_GATE_ENABLED=true;
 // TEMPORARY GATEWAY DISCONNECT: newer gateway/security code remains in place; only its resolver communication is paused.
@@ -92,7 +92,7 @@ function memberModules(p,e,selectedAuthority){
   if(roles.includes("Executive Director"))m.push(...EXECUTIVE_DIRECTOR_MODULES,"Reports");
   return[...new Set(m)].filter(Boolean);
 }
-function InvitationPasswordSetupScreen({user}){
+function InvitationPasswordSetupScreen({user,invitationId}){
   const[password,setPassword]=useState(""),[confirm,setConfirm]=useState(""),[busy,setBusy]=useState(false),[message,setMessage]=useState(""),[passwordPopup,setPasswordPopup]=useState(null);
   const notifyPasswordPopup=(text,type="info")=>{setPasswordPopup({text,type});window.setTimeout(()=>setPasswordPopup(null),3600)};
   async function save(e){
@@ -101,7 +101,7 @@ function InvitationPasswordSetupScreen({user}){
     if(password!==confirm){setMessage("The passwords do not match.");return}
     setBusy(true);
     try{
-      await configureInvitationPassword(password);
+      await configureInvitationPassword(password, invitationId);
       notifyPasswordPopup("Permanent password configured. Opening the IRPA workspace.","success");
       await new Promise(resolve=>window.setTimeout(resolve,700));
       window.location.reload();
@@ -359,7 +359,7 @@ function LiveWeatherPanel(){
    {latitude:-2.73333,longitude:36.26667},
    {latitude:-3.3697,longitude:36.6881}
   ];
-  const[weather,setWeather]=useState(null),[error,setError]=useState(""),[loading,setLoading]=useState(true),[lastUpdated,setLastUpdated]=useState("");
+  const[weather,setWeather]=useState(null),[error,setError]=useState(""),[invitationState,setInvitationState]=useState("NONE"),[invitationIdForSetup,setInvitationIdForSetup]=useState(null),[loading,setLoading]=useState(true),[lastUpdated,setLastUpdated]=useState("");
   const apiKey=String(import.meta.env.VITE_GOOGLE_WEATHER_API_KEY||"").trim();
   useEffect(()=>{
    const loadWeather=async()=>{
@@ -560,6 +560,8 @@ useEffect(()=>{
     setEmployee(null);
     setInductionComplete(false);
     setError("");
+    setInvitationState("NONE");
+    setInvitationIdForSetup(null);
     // Every new Firebase authentication-state session starts with no operating
     // role declaration. A previous browser/session choice must never authorize
     // the next login or allow the user to enter Shell without re-declaring.
@@ -582,6 +584,25 @@ useEffect(()=>{
       return;
     }
     try{
+      // Invitation state is server authority. It is checked before any portal/profile
+      // resolution so a pending invite can never be routed by browser cache state.
+      const invitationSession = await getInvitationSessionState().catch(error => {
+        console.warn("Invitation session-state unavailable.", error);
+        return { state: "NONE", invitationId: null };
+      });
+      if (invitationSession.state === "PASSWORD_SETUP_PENDING") {
+        setInvitationState(invitationSession.state);
+        setInvitationIdForSetup(invitationSession.invitationId || null);
+        setProfile(null);
+        return;
+      }
+      if (invitationSession.state === "PROVISIONING_PENDING" && invitationSession.invitationId) {
+        const activated = await completeInvitationActivation(invitationSession.invitationId);
+        if (activated?.state === "ACTIVATED") {
+          setInvitationState("ACTIVATED");
+          setInvitationIdForSetup(invitationSession.invitationId);
+        }
+      }
       // All standard users authenticate through one sign-in gateway. Verified registered roles are presented by the access-authority gate; IT is an assigned operating capacity, not a separate login gateway.
       // Start every institutional identity lookup together. The previous flow waited
       // up to 3 seconds for the Administrator profile before starting the server resolver,
@@ -682,15 +703,9 @@ useEffect(()=>{
       }
       let m=memberDirect, activeEmployee=employeeDirect;
       const invitationId=new URLSearchParams(window.location.search).get("memberInvite");
-      // An authenticated invitation activation must complete institutional
-      // enrollment before the normal authorization gate is evaluated. Do this
-      // for both Board Members and Employees; do not rely on the existence of
-      // an unactivated register record as proof of enrollment.
+      // Institutional activation is completed only by the invitation Worker.
+      // The browser never provisions or activates its own member record.
       if(activationMode&&invitationId){
-        await provisionCurrentMemberFromInvitationV2(invitationId);
-        const refreshed=[await getCurrentMemberProfile().catch(()=>null),await getCurrentEmployeeProfile().catch(()=>null)];
-        m=refreshed[0];
-        activeEmployee=refreshed[1];
         window.history.replaceState({},document.title,window.location.pathname+window.location.hash);
       }
       const memberIsAuthorized=Boolean(m)&&((String(m?.status||"").trim().toLowerCase()==="active")||(String(m?.status||"").trim().toLowerCase()==="activated")||(String(m?.registrationStatus||"").trim().toLowerCase()==="activated"));
@@ -825,7 +840,7 @@ useEffect(()=>{async function magic(){
     window.alert(x.message||"Unable to open the signing invitation.");
   }
 }magic()},[]);const invitationId=params.get("memberInvite");if(!user)return <AuthScreen/>;if(applicantInductionMode&&profile?.authorizationType!=="administrator")return <InductionOrientation/>;if(inductionMode&&params.get("applicant")==="1"&&entryRoute==="subscription"&&user===undefined)return <MemberActivationScreen invitationId={invitationId}/>;if(inductionMode&&user===undefined)return <AuthScreen/>;if(user===undefined)return <AuthScreen/>;if(profile===undefined)return <Loading message={error}/>;if(!user)return invitationId?<MemberActivationScreen invitationId={invitationId}/>:<AuthScreen/>;
-if(user&&window.sessionStorage.getItem("irpaInvitationPasswordSetup")==="1")return <InvitationPasswordSetupScreen user={user}/>;
+if(user&&invitationState==="PASSWORD_SETUP_PENDING")return <InvitationPasswordSetupScreen user={user} invitationId={invitationIdForSetup}/>;
 if(!profile)return <AccessDenied user={user}reason={error}/>;
 if(profile.authorizationType==="signer"){
   return <SignerShell user={user} profile={profile} signingEnvelopeId={signingEnvelopeId}/>;
