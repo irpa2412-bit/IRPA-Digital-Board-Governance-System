@@ -20,6 +20,7 @@ LOCAL_TEST_MODE = "false"
 ESIGN_MODULE_ENABLED = "true"
 CLOUDFLARE_AUTH_FUNCTIONS_ENABLED = "true"
 IRPA_PRODUCTION_CUTOVER = "true"
+ALLOWED_ORIGINS = "https://irpa.or.tz,https://www.irpa.or.tz,https://irpa-digital-board-governance.web.app,https://irpa-digital-board-governance.firebaseapp.com,http://localhost:5173"
 
 [[kv_namespaces]]
 binding = "DRIVE_KV"
@@ -49,6 +50,7 @@ LOCAL_TEST_MODE = "false"
 ESIGN_MODULE_ENABLED = "true"
 CLOUDFLARE_AUTH_FUNCTIONS_ENABLED = "true"
 IRPA_PRODUCTION_CUTOVER = "false"
+ALLOWED_ORIGINS = "http://localhost:5173"
 # FIREBASE_PROJECT_ID and IRPA_APP_URL are intentionally absent until the separate staging Firebase project and Hosting origin exist.
 
 [[env.staging.kv_namespaces]]
