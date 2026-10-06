@@ -22,6 +22,7 @@ const SMTP_PORT = 465;
 const SMTP_FROM = "info@irpa.or.tz";
 import { escapeHtml as escapeMailHtml, normalizeRecipientEmail, recipientDomain, safeMailError, sendWithRetry, validateMailHeader } from "./mailDelivery.js";
 import { sendInvitationEmail, buildInvitationMessage, validateRecipient } from "./invitationEmail.mjs";
+import { redeemInvitationToken, passwordSet, invitationSessionState } from "./invitationRedemption.mjs";
 
 let jwksCache = null;
 let jwksFetchedAt = 0;
@@ -947,7 +948,7 @@ async function getSessionProfile(request, env) {
     uid:claims.user_id,
     email:claims.email || member?.email || employee?.email || "",
     admin: admin && admin.active === true ? admin : null,
-    member: member && member.status === "Active" ? member : null,
+    member: member && ["Active","Activated"].includes(String(member.status || "")) && member.accountActivated !== false ? member : null,
     employee: employee || null
   },200,corsHeaders(request));
 }
@@ -1079,7 +1080,7 @@ async function sendMemberInvitation(request, env) {
   const appUrl=String(env.IRPA_APP_URL||"https://irpa-digital-board-governance.web.app").replace(/\/$/,"");
   const invitationSecret=randomBase64Url(32);
   const invitationTokenHash=await sha256Hex(invitationSecret);
-  const invitationExpiresAt=new Date(Date.now()+72*60*60*1000).toISOString();
+  const invitationExpiresAt=new Date(Date.now()+60*60*1000).toISOString();
   const link=`${appUrl}/?invitationToken=${encodeURIComponent(invitationId+"."+invitationSecret)}`;
   await updateFirestoreDocument(env,`invitations/${invitationId}`,claims.token,{
     invitationTokenHash:{stringValue:invitationTokenHash},invitationTokenVersion:{stringValue:"2"},invitationExpiresAt:{timestampValue:invitationExpiresAt},invitationRedeemedAt:{nullValue:null},invitationRedeemedUid:{nullValue:null},
