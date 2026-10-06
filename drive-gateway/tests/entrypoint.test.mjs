@@ -46,7 +46,7 @@ test("entrypoint flag-on: unauthenticated document upload is rejected", async ()
 test("CORS preflight from production web app allows signing token header", async () => {
   const r = await call("/api/sign/open", {
     method:"OPTIONS",
-    env:{ESIGN_MODULE_ENABLED:"true", DRIVE_MOCK:"true"},
+    env:{ESIGN_MODULE_ENABLED:"true", DRIVE_MOCK:"true", ALLOWED_ORIGINS:"https://irpa-digital-board-governance.web.app"},
     headers:{Origin:"https://irpa-digital-board-governance.web.app"}
   });
   assert.equal(r.status, 204);

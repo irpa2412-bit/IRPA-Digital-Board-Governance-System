@@ -593,6 +593,7 @@ useEffect(()=>{
       if (invitationSession.state === "PASSWORD_SETUP_PENDING") {
         setInvitationState(invitationSession.state);
         setInvitationIdForSetup(invitationSession.invitationId || null);
+        setInvitationEmailForSetup(invitationSession.email || null);
         setProfile(null);
         return;
       }
