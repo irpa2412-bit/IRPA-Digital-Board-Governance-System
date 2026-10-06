@@ -1514,7 +1514,7 @@ async function authenticateFirebaseRequest(request, env, options = {}) {
   const payload = JSON.parse(base64UrlDecode(parts[1]));
   const now = Math.floor(Date.now() / 1000);
   if (payload.iss !== `https://securetoken.google.com/${firebaseProjectId(env)}`) throw new Error("Invalid Firebase token issuer.");
-  if (payload.aud !== FIREBASE_PROJECT_ID) throw new Error("Invalid Firebase token audience.");
+  if (payload.aud !== firebaseProjectId(env)) throw new Error("Invalid Firebase token audience.");
   if (!payload.sub || Number(payload.exp || 0) <= now) throw new Error("Firebase token is expired.");
 
   const jwks = await getFirebaseJwks();
