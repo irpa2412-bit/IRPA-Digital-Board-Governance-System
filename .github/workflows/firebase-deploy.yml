@@ -17,9 +17,18 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      deploy_firestore_rules:
+        description: "Deploy Firestore Security Rules separately after Hosting/Functions verification"
+        required: true
+        default: false
+        type: boolean
 
 jobs:
   build-and-deploy:
+    # Production hosting/Functions/Firestore deployment is explicitly approval-gated.
+    # A merge to main may start this workflow, but it must not publish automatically.
+    if: vars.ALLOW_PRODUCTION_DEPLOY == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -37,7 +46,7 @@ jobs:
       - name: Build web application
         env:
           VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
-          VITE_GOOGLE_DRIVE_GATEWAY_URL: ${{ secrets.VITE_GOOGLE_DRIVE_GATEWAY_URL }}
+          VITE_GATEWAY_ORIGIN: ${{ secrets.VITE_GATEWAY_ORIGIN }}
           VITE_GOOGLE_WEATHER_API_KEY: ${{ secrets.VITE_GOOGLE_WEATHER_API_KEY }}
         run: npm run build
 
@@ -271,17 +280,20 @@ jobs:
           });
           NODE
 
-      - name: Deploy Hosting and Firestore
+      - name: Verify deploy configuration safety gate
+        env:
+          FIREBASE_PROJECT_ID: irpa-digital-board-governance
+          ALLOWED_ORIGINS: https://irpa.or.tz,https://www.irpa.or.tz,https://irpa-digital-board-governance.web.app,https://irpa-digital-board-governance.firebaseapp.com,http://localhost:5173
+        run: node scripts/verify-deploy-config.mjs --environment production --config drive-gateway/wrangler.toml
+
+      - name: Deploy Hosting only
         uses: w9jds/firebase-action@v14.17.0
         with:
-          args: deploy --project irpa-digital-board-governance --only hosting,firestore
+          args: deploy --project irpa-digital-board-governance --only hosting
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
 
-      # Keep Firebase function deployments independent from Hosting/Firestore.
-      # Google Cloud billing is currently closed for this project, so new Cloud Functions
-      # deployments cannot activate Cloud Build/Artifact Registry. Existing deployed
-      # functions remain untouched; deployment can be re-enabled when billing is restored.
+      # Keep the login resolver deployment independent from unrelated functions.
       - name: Deploy login authorization resolver
         continue-on-error: true
         uses: w9jds/firebase-action@v14.17.0
@@ -290,22 +302,10 @@ jobs:
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
 
-      - name: Deploy retained Firebase password-reset function
-        continue-on-error: true
+      - name: Deploy authentication security and document-reference functions
         uses: w9jds/firebase-action@v14.17.0
         with:
-          args: deploy --project irpa-digital-board-governance --only functions:preparePasswordResetPhone
-        env:
-          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
-      # Invitation redemption is a retained Firebase callable. Keep this deployment
-      # isolated from the controlled Cloudflare auth-function migration and do not alter
-      # Firebase security rules or credentials. Billing closure may still block activation.
-      - name: Deploy invitation redemption function (fail-closed)
-        # This retained callable is a production security boundary. A failed deployment
-        # must fail the workflow rather than silently leaving the previous function live.
-        uses: w9jds/firebase-action@v14.17.0
-        with:
-          args: deploy --project irpa-digital-board-governance --only functions:redeemInvitationToken
+          args: deploy --project irpa-digital-board-governance --only functions:checkPasswordAttemptState,functions:recordPasswordFailure,functions:clearPasswordAttemptState,functions:preparePasswordResetPhone,functions:nextDocumentReference
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
 
@@ -314,6 +314,28 @@ jobs:
           set -e
           curl --fail --silent --show-error --retry 5 --retry-delay 3 \
             https://irpa-digital-board-governance.web.app/
+
+
+  deploy-firestore-rules:
+    name: Deploy Firestore Security Rules separately
+    needs: build-and-deploy
+    if: github.event_name == 'workflow_dispatch' && inputs.deploy_firestore_rules == true && vars.ALLOW_PRODUCTION_DEPLOY == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Verify deploy configuration safety gate
+        env:
+          FIREBASE_PROJECT_ID: irpa-digital-board-governance
+          ALLOWED_ORIGINS: https://irpa.or.tz,https://www.irpa.or.tz,https://irpa-digital-board-governance.web.app,https://irpa-digital-board-governance.firebaseapp.com,http://localhost:5173
+        run: node scripts/verify-deploy-config.mjs --environment production --config drive-gateway/wrangler.toml
+      - name: Deploy Firestore Security Rules only
+        uses: w9jds/firebase-action@v14.17.0
+        with:
+          args: deploy --project irpa-digital-board-governance --only firestore:rules
+        env:
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+
 
   live-hosting-verification:
     name: Live Hosting Verification and Commit Status
