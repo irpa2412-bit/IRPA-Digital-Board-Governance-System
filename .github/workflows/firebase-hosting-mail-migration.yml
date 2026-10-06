@@ -4,7 +4,16 @@ on:
     branches: [main]
   workflow_dispatch:
 jobs:
+  verify-production-config:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Verify production deployment configuration
+        run: node scripts/verify-deploy-config.mjs --environment production --config drive-gateway/wrangler.toml
+
   deploy-hosting:
+    needs: verify-production-config
     if: vars.ALLOW_PRODUCTION_DEPLOY == 'true'
     runs-on: ubuntu-latest
     steps:
