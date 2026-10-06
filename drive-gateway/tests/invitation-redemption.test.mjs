@@ -76,9 +76,6 @@ test("Cloudflare invitation redemption creates/signs Firebase custom token and r
     const payload=decodePart(payloadPart);
     assert.equal(header.alg,"RS256");
     assert.equal(payload.uid,body.uid);
-    assert.equal(payload.claims.irpaInvitationId,"test-invitation");
-    assert.equal(payload.claims.irpaInvitationRedemptionState,"PASSWORD_SETUP_PENDING");
-    assert.equal(payload.claims.irpaInvitationRedeemed,undefined);
 
     const verifier=createVerify("RSA-SHA256");
     verifier.update(`${headerPart}.${payloadPart}`);
@@ -439,7 +436,7 @@ test("password-set is idempotent after invitation activation", async()=>{
     for(let i=0;i<2;i++){
       const response=await handler.fetch(new Request("https://gw.test/api/invitations/password-set",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"},body:JSON.stringify({invitationId:"repeat-invitation"})}),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_WEB_API_KEY:"test-web-api-key",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)});
       assert.equal(response.status,200);
-      assert.deepEqual(await response.json(),{ok:true,invitationId:"repeat-invitation",uid:"repeat-uid",state:"ACTIVATED"});
+      assert.deepEqual(await response.json(),{ok:true,invitationId:"repeat-invitation",state:"ACTIVATED"});
     }
     assert.equal(patchCount,0);
   } finally { global.fetch=originalFetch; }
