@@ -40,7 +40,7 @@ function b64url(value) {
   const bytes = value instanceof Uint8Array ? value : new TextEncoder().encode(String(value));
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/g, "");
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
 async function sha256Hex(value) {
