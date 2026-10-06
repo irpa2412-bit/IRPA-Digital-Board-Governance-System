@@ -150,7 +150,7 @@ test("password-set returns 401 when Firebase authentication is missing", async()
     FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)
   });
   assert.equal(response.status,401);
-  assert.deepEqual(await response.json(),{ok:false,error:"Firebase authentication is required."});
+  assert.deepEqual(await response.json(),{ok:false,status:401,error:"IRPA_INVITATION_FAILURE:PASSWORD_AUTH",message:"Authentication is required."});
 });
 
 test("session-state returns 401 when Firebase authentication is missing", async()=>{
@@ -163,7 +163,7 @@ test("session-state returns 401 when Firebase authentication is missing", async(
     FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)
   });
   assert.equal(response.status,401);
-  assert.deepEqual(await response.json(),{ok:false,error:"Firebase authentication is required."});
+  assert.deepEqual(await response.json(),{ok:false,status:401,error:"IRPA_INVITATION_FAILURE:SESSION_AUTH",message:"Authentication is required."});
 });
 
 
