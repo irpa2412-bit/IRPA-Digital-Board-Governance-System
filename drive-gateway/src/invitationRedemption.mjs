@@ -85,7 +85,7 @@ async function getGoogleAccessToken(env) {
   const now = Math.floor(Date.now() / 1000);
   const assertion = await signJwt({
     iss: account.client_email,
-    scope: "https://www.googleapis.com/auth/datastore",
+    scope: "https://www.googleapis.com/auth/cloud-platform",
     aud: "https://oauth2.googleapis.com/token",
     iat: now,
     exp: now + 3600,
@@ -271,13 +271,69 @@ async function authApi(env, operation, body) {
   return { response, data };
 }
 
-async function existingAccountProviders(env, email) {
-  const { response, data } = await authApi(env, "accounts:createAuthUri", {
-    identifier: email,
-    continueUri: "https://irpa.or.tz/",
-  });
+async function identityToolkitAdminRequest(env, operation, body) {
+  const projectId = firebaseProjectId(env);
+  const key = env.FIREBASE_WEB_API_KEY;
+  if (!key) throw new Error("Firebase Web API key is not configured.");
+  const token = await getGoogleAccessToken(env);
+  const response = await fetch(
+    "https://identitytoolkit.googleapis.com/v1/projects/" +
+      encodeURIComponent(projectId) +
+      "/accounts:" + operation +
+      "?key=" + encodeURIComponent(key),
+    {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + token,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    },
+  );
+  const data = await response.json().catch(() => ({}));
+  return { response, data };
+}
+
+async function lookupInvitationAuthUser(env, email) {
+  const { response, data } = await identityToolkitAdminRequest(env, "lookup", { email: [email] });
   if (!response.ok) throw new Error("Firebase account lookup failed.");
-  return { registered: data.registered === true, providers: Array.isArray(data.allProviders) ? data.allProviders : [] };
+  const users = Array.isArray(data?.users) ? data.users : [];
+  return users[0] || null;
+}
+
+async function ensureInvitationAuthUser(env, { uid, email }) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  if (!normalizedEmail) throw new Error("Invitation email is missing.");
+  const existing = await lookupInvitationAuthUser(env, normalizedEmail);
+  if (!existing) {
+    const { response } = await identityToolkitAdminRequest(env, "", {
+      localId: uid,
+      email: normalizedEmail,
+      emailVerified: true,
+      disabled: false,
+    });
+    if (!response.ok) throw new Error("Firebase invitation account creation failed.");
+    return { uid, email: normalizedEmail, created: true };
+  }
+
+  const existingUid = String(existing.localId || "");
+  const providers = Array.isArray(existing.providerUserInfo)
+    ? existing.providerUserInfo.map(provider => String(provider.providerId || "")).filter(Boolean)
+    : [];
+  if (existingUid !== uid) {
+    throw new Error("Invitation email is already assigned to a different Firebase user.");
+  }
+  if (providers.length > 0) {
+    throw new Error("Invitation email already has an existing sign-in method.");
+  }
+
+  const { response } = await identityToolkitAdminRequest(env, "update", {
+    localId: uid,
+    email: normalizedEmail,
+    emailVerified: true,
+  });
+  if (!response.ok) throw new Error("Firebase invitation account update failed.");
+  return { uid, email: normalizedEmail, created: false };
 }
 
 async function mintCustomToken(env, uid) {
@@ -393,7 +449,7 @@ export async function redeemInvitationToken(request, env) {
     if (!response.ok) return json(invitationFailure("REDEEM_STATE", 409, "The invitation state changed. Reopen the invitation and try again."), 409);
 
     console.info("Invitation redemption accepted", { stage: "REDEEM_COMPLETE", invitationId, state: nextState });
-    return json({ ok: true, invitationId, uid, state: nextState, customToken: await mintCustomToken(env, uid) }, 200);
+    return json({ ok: true, invitationId, uid, email, state: nextState, customToken: await mintCustomToken(env, uid) }, 200);
   } catch (error) {
     console.error("Invitation redemption failed", { stage: "REDEEM_SERVER", message: String(error?.message || error) });
     return json(invitationFailure("REDEEM_SERVER", 500, "The invitation could not be processed. Please try again."), 500);
