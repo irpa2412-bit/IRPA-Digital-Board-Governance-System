@@ -397,7 +397,20 @@ export async function invitationSessionState(request, env, authenticate) {
       .filter(row => String(row.invitationRedeemedUid || "") === claims.user_id)
       .sort((a,b) => Date.parse(String(b.updatedAt || "")) - Date.parse(String(a.updatedAt || "")))[0];
     if (!own) return json({ ok: true, state: INVITATION_STATES.NONE, invitationId: null }, 200);
-    return json({ ok: true, state: normalizeInvitationState(own, claims.user_id), invitationId: own.__name.split("/").pop() }, 200);
+    const invitationId = own.__name.split("/").pop();
+    const rawState = normalizeInvitationState(own, claims.user_id);
+    if (rawState === INVITATION_STATES.PROVISIONING_PENDING) {
+      const account = await authApi(env, "accounts:lookup", { idToken: claims.token });
+      if (account.response.ok) {
+        const providers = (account.data?.users?.[0]?.providerUserInfo || []).map(x => x.providerId);
+        return json({
+          ok: true,
+          state: providers.includes("password") ? INVITATION_STATES.PROVISIONING_PENDING : INVITATION_STATES.PASSWORD_SETUP_PENDING,
+          invitationId,
+        }, 200);
+      }
+    }
+    return json({ ok: true, state: rawState, invitationId }, 200);
   } catch (error) {
     console.error("Invitation session-state failed", { stage: "SESSION_STATE" });
     return json(invitationFailure("SESSION_STATE", 500, "Invitation session state is temporarily unavailable."), 500);
@@ -428,12 +441,10 @@ export async function passwordSet(request, env, authenticate) {
       return json({ ok: true, state: INVITATION_STATES.ACTIVATED, invitationId }, 200);
     }
 
-    const providers = await authApi(env, "accounts:createAuthUri", {
-      identifier: claims.email || invitation.email || "",
-      continueUri: "https://irpa.or.tz/",
-    });
-    if (!providers.response.ok) throw new Error("Firebase account lookup failed.");
-    if (!(providers.data?.allProviders || []).includes("password")) {
+    const account = await authApi(env, "accounts:lookup", { idToken: claims.token });
+    if (!account.response.ok) throw new Error("Firebase account lookup failed.");
+    const providers = (account.data?.users?.[0]?.providerUserInfo || []).map(x => x.providerId);
+    if (!providers.includes("password")) {
       return json(invitationFailure("PASSWORD_PROVIDER", 409, "The permanent password has not been configured yet. Return to the invitation password screen and save it again."), 409);
     }
 
