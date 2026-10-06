@@ -111,7 +111,7 @@ test("Cloudflare invitation redemption refuses an existing password account", as
     throw new Error("Unexpected external request: "+url);
   };
   try{
-    const response=await handler.fetch(new Request("https://gw.test/api/invitations/redeem",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:`test-invitation.${tokenSecret}`})}),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_WEB_API_KEY:"test-web-api-key",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount),FIREBASE_WEB_API_KEY:"test-web-api-key"});
+    const response=await handler.fetch(new Request("https://gw.test/api/invitations/redeem",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:`test-invitation.${tokenSecret}`})}),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_WEB_API_KEY:"test-web-api-key",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)});
     assert.equal(response.status,409);
     assert.match((await response.json()).error,/normal IRPA login/i);
     assert.equal(calls.some(c=>c.options.method==="PATCH"),false);
@@ -234,9 +234,9 @@ test("password-set refuses activation when Firebase Auth has not independently c
       method:"POST",
       headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"},
       body:JSON.stringify({invitationId:"password-verification-pending"})
-    }),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_WEB_API_KEY:"test-web-api-key",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount),FIREBASE_WEB_API_KEY:"test-web-api-key"});
+    }),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_WEB_API_KEY:"test-web-api-key",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)});
     assert.equal(response.status,409);
-    assert.match((await response.json()).error,/not confirmed a password credential/i);
+    assert.match((await response.json()).error,/PASSWORD_PROVIDER/);
     assert.equal(calls.some(c=>c.options.method==="PATCH"),false);
   } finally { global.fetch=originalFetch; }
 });
@@ -290,7 +290,7 @@ test("Cloudflare invitation redemption rejects a PASSWORD_SETUP_PENDING invitati
     throw new Error("Unexpected external request: "+target);
   };
   try{
-    const response=await handler.fetch(new Request("https://gw.test/api/invitations/redeem",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:id+"."+secret})}),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_WEB_API_KEY:"test-web-api-key",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount),FIREBASE_WEB_API_KEY:"test-web-api-key"});
+    const response=await handler.fetch(new Request("https://gw.test/api/invitations/redeem",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:id+"."+secret})}),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_WEB_API_KEY:"test-web-api-key",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)});
     assert.equal(response.status,410);
     assert.match((await response.json()).message,/invitation has expired/i);
     assert.equal(calls.some(c=>c.options.method==="PATCH"),false);
@@ -351,7 +351,7 @@ test("password-set is idempotent when invitation is already PROVISIONING_PENDING
       method:"POST",
       headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"},
       body:JSON.stringify({invitationId:"provisioning-pending"})
-    }),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_WEB_API_KEY:"test-web-api-key",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount),FIREBASE_WEB_API_KEY:"test-web-api-key"});
+    }),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_WEB_API_KEY:"test-web-api-key",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)});
     assert.equal(response.status,200);
     assert.deepEqual(await response.json(),{ok:true,invitationId:"provisioning-pending",uid:"provisioning-pending-uid",state:"PROVISIONING_PENDING"});
     assert.equal(patchCalled,false);
@@ -390,7 +390,7 @@ test("session-state returns the invitation state for the authenticated UID", asy
     throw new Error("Unexpected external request: "+target);
   };
   try{
-    const response=await handler.fetch(new Request("https://gw.test/api/invitations/session-state",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"},body:"{}"}),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_WEB_API_KEY:"test-web-api-key",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount),FIREBASE_WEB_API_KEY:"test-web-api-key"});
+    const response=await handler.fetch(new Request("https://gw.test/api/invitations/session-state",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"},body:"{}"}),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_WEB_API_KEY:"test-web-api-key",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)});
     assert.equal(response.status,200);
     assert.deepEqual(await response.json(),{ok:true,state:"PASSWORD_SETUP_PENDING",invitationId:"session-state-id"});
   } finally { global.fetch=originalFetch; }
@@ -407,7 +407,7 @@ test("password-set rejects a UID that is not assigned to the invitation", async(
     throw new Error("Unexpected external request: "+target);
   };
   try{
-    const response=await handler.fetch(new Request("https://gw.test/api/invitations/password-set",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"},body:JSON.stringify({invitationId:"wrong-uid-invitation"})}),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_WEB_API_KEY:"test-web-api-key",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount),FIREBASE_WEB_API_KEY:"test-web-api-key"});
+    const response=await handler.fetch(new Request("https://gw.test/api/invitations/password-set",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"},body:JSON.stringify({invitationId:"wrong-uid-invitation"})}),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_WEB_API_KEY:"test-web-api-key",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)});
     assert.equal(response.status,403);
   } finally { global.fetch=originalFetch; }
 });
@@ -423,7 +423,7 @@ test("password-set rejects a Firebase email that does not match the invitation e
     throw new Error("Unexpected external request: "+target);
   };
   try{
-    const response=await handler.fetch(new Request("https://gw.test/api/invitations/password-set",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"},body:JSON.stringify({invitationId:"wrong-email-invitation"})}),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_WEB_API_KEY:"test-web-api-key",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount),FIREBASE_WEB_API_KEY:"test-web-api-key"});
+    const response=await handler.fetch(new Request("https://gw.test/api/invitations/password-set",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"},body:JSON.stringify({invitationId:"wrong-email-invitation"})}),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_WEB_API_KEY:"test-web-api-key",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)});
     assert.equal(response.status,403);
   } finally { global.fetch=originalFetch; }
 });
@@ -442,7 +442,7 @@ test("password-set is idempotent after invitation activation", async()=>{
   };
   try{
     for(let i=0;i<2;i++){
-      const response=await handler.fetch(new Request("https://gw.test/api/invitations/password-set",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"},body:JSON.stringify({invitationId:"repeat-invitation"})}),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_WEB_API_KEY:"test-web-api-key",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount),FIREBASE_WEB_API_KEY:"test-web-api-key"});
+      const response=await handler.fetch(new Request("https://gw.test/api/invitations/password-set",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"},body:JSON.stringify({invitationId:"repeat-invitation"})}),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_WEB_API_KEY:"test-web-api-key",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)});
       assert.equal(response.status,200);
       assert.deepEqual(await response.json(),{ok:true,invitationId:"repeat-invitation",uid:"repeat-uid",state:"ACTIVATED"});
     }
@@ -493,7 +493,7 @@ test("password-set commits member activation and invitation activation atomicall
     const response=await handler.fetch(new Request("https://gw.test/api/invitations/password-set",{
       method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"},
       body:JSON.stringify({invitationId:"atomic-invitation"})
-    }),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_WEB_API_KEY:"test-web-api-key",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount),FIREBASE_WEB_API_KEY:"test-web-api-key"});
+    }),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_WEB_API_KEY:"test-web-api-key",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)});
     assert.equal(response.status,200);
     assert.equal(writes.length,1);
     assert.equal(writes[0].length,2);
@@ -528,7 +528,7 @@ test("password-set refuses to overwrite an existing privileged member record", a
     const response=await handler.fetch(new Request("https://gw.test/api/invitations/password-set",{
       method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"},
       body:JSON.stringify({invitationId:"privileged-invitation"})
-    }),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_WEB_API_KEY:"test-web-api-key",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount),FIREBASE_WEB_API_KEY:"test-web-api-key"});
+    }),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_WEB_API_KEY:"test-web-api-key",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)});
     assert.equal(response.status,409);
     assert.match((await response.json()).error,/PASSWORD_MEMBER_CONFLICT/);
     assert.equal(commitCalled,false);
