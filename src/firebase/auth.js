@@ -429,6 +429,16 @@ export async function configureInvitationPassword(password, invitationId) {
   return result;
 }
 
+export async function completeInvitationActivation(invitationId) {
+  if (!auth.currentUser) throw new Error("IRPA_INVITATION_FAILURE:PASSWORD_AUTH:Invitation account session is not active.");
+  const token = await auth.currentUser.getIdToken(true);
+  return invitationGateway("/api/invitations/password-set", {
+    method: "POST",
+    headers: { Authorization: "Bearer " + token },
+    body: JSON.stringify({ invitationId }),
+  });
+}
+
 export async function completeInvitationToken(token) {
   const cleanToken = String(token || "").trim();
   if (!cleanToken) throw new Error("The IRPA invitation token is missing.");
