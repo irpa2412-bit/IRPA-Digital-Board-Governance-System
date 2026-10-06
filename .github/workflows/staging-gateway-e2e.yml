@@ -149,6 +149,12 @@ jobs:
         working-directory: drive-gateway
         run: npx wrangler deploy --env staging --dry-run
 
+      - name: Verify deploy configuration safety gate
+        env:
+          FIREBASE_PROJECT_ID: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
+          ALLOWED_ORIGINS: ${{ secrets.STAGING_IRPA_APP_URL }},http://localhost:5173
+        run: node scripts/verify-deploy-config.mjs --environment staging --config drive-gateway/wrangler.toml
+
       - name: Inject staging-only Worker secrets
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
