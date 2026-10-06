@@ -308,7 +308,7 @@ function invitationExpiry(invitation) {
 
 function normalizeInvitationState(invitation, uid = null) {
   if (!invitation) return INVITATION_STATES.NONE;
-  const status = String(invitation.status || "").toUpperCase();
+  const status = String(invitation.status || invitation.invitationRedemptionState || "").toUpperCase();
   if (status === "ACTIVATED" || status === "ACTIVE" || status === "ACCEPTED" && invitation.accountActivated === true) return INVITATION_STATES.ACTIVATED;
   if (status === "PROVISIONING_PENDING" && (!uid || invitation.invitationRedeemedUid === uid)) return INVITATION_STATES.PROVISIONING_PENDING;
   if (invitation.invitationRedeemedUid && (!uid || invitation.invitationRedeemedUid === uid)) return INVITATION_STATES.PASSWORD_SETUP_PENDING;
@@ -448,13 +448,18 @@ export async function passwordSet(request, env, authenticate) {
     if (invitationExpiry(invitation) && Date.now() >= invitationExpiry(invitation) && String(invitation.status || "").toUpperCase() !== "ACTIVATED") {
       return json(invitationFailure("PASSWORD_EXPIRED", 410, "This invitation has expired."), 410);
     }
-    if (String(invitation.status || "").toUpperCase() === "ACTIVATED") {
+    const redemptionState = normalizeInvitationState(invitation, claims.user_id);
+    if (redemptionState === INVITATION_STATES.ACTIVATED) {
       return json({ ok: true, state: INVITATION_STATES.ACTIVATED, invitationId }, 200);
     }
-
-    const redemptionState = normalizeInvitationState(invitation, claims.user_id);
     if (redemptionState === INVITATION_STATES.PROVISIONING_PENDING) {
       return json({ ok: true, invitationId, uid: claims.user_id, state: INVITATION_STATES.PROVISIONING_PENDING }, 200);
+    }
+
+    const invitationEmail = String(invitation.email || "").trim().toLowerCase();
+    const claimedEmail = String(claims.email || "").trim().toLowerCase();
+    if (invitationEmail && claimedEmail && invitationEmail !== claimedEmail) {
+      return json(invitationFailure("PASSWORD_EMAIL", 403, "The authenticated account does not match the invitation email."), 403);
     }
 
     const account = await authApi(env, "accounts:lookup", { idToken: claims.token });
