@@ -347,6 +347,17 @@ export async function redeemInvitationToken(request, env) {
     const invitationLimit = await rateLimit(env, "invitation:" + invitationId, INVITATION_RATE_LIMIT);
     if (!invitationLimit.allowed) return json(invitationFailure("REDEEM_RATE_LIMIT_INVITATION", 429, "This invitation has reached its temporary attempt limit. Try again later."), 429);
 
+    if (status === "PROVISIONING_PENDING" && invitation.invitationRedeemedUid) {
+      console.info("Invitation redemption is idempotent", { stage: "REDEEM_IDEMPOTENT", invitationId });
+      return json({
+        ok: true,
+        invitationId,
+        uid: invitation.invitationRedeemedUid,
+        state: INVITATION_STATES.PROVISIONING_PENDING,
+        customToken: await mintCustomToken(env, invitation.invitationRedeemedUid),
+      }, 200);
+    }
+
     const providers = await existingAccountProviders(env, String(invitation.email || "").trim().toLowerCase());
     if (providers.registered) {
       return json(invitationFailure("REDEEM_EXISTING_ACCOUNT", 409, "An existing Firebase account is already registered for this invitation email. Use the normal login or ask an administrator to issue a new invitation."), 409);
