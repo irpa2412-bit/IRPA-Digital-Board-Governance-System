@@ -20,6 +20,9 @@ on:
 
 jobs:
   build-and-deploy:
+    # Production hosting/Functions/Firestore deployment is explicitly approval-gated.
+    # A merge to main may start this workflow, but it must not publish automatically.
+    if: vars.ALLOW_PRODUCTION_DEPLOY == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
