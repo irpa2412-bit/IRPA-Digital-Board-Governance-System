@@ -404,12 +404,20 @@ async function invitationGateway(path, options = {}) {
 
 export async function getInvitationSessionState() {
   if (!auth.currentUser) return { state: "NONE", invitationId: null };
-  const token = await auth.currentUser.getIdToken(true);
-  return invitationGateway("/api/invitations/session-state", {
-    method: "POST",
-    headers: { Authorization: "Bearer " + token },
-    body: "{}",
-  });
+  try {
+    const token = await auth.currentUser.getIdToken(true);
+    return await invitationGateway("/api/invitations/session-state", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + token },
+      body: "{}",
+    });
+  } catch (error) {
+    // Invitation session-state is an enrichment/recovery check, never a normal-login gate.
+    // A 404, Worker outage, malformed response, or other session-state failure therefore
+    // resolves to NONE so established authentication continues normally.
+    console.warn("Invitation session-state unavailable; treating state as NONE.", error);
+    return { state: "NONE", invitationId: null };
+  }
 }
 
 export async function configureInvitationPassword(password, invitationId) {

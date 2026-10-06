@@ -411,7 +411,12 @@ export async function invitationSessionState(request, env, authenticate) {
     const invitationId = own.__name.split("/").pop();
     const rawState = normalizeInvitationState(own, claims.user_id);
     if (rawState === INVITATION_STATES.PROVISIONING_PENDING) {
-      const account = await authApi(env, "accounts:lookup", { idToken: claims.token });
+      const redemptionState = normalizeInvitationState(invitation, claims.user_id);
+    if (redemptionState === INVITATION_STATES.PROVISIONING_PENDING) {
+      return json({ ok: true, invitationId, uid: claims.user_id, state: INVITATION_STATES.PROVISIONING_PENDING }, 200);
+    }
+
+    const account = await authApi(env, "accounts:lookup", { idToken: claims.token });
       if (account.response.ok) {
         const providers = (account.data?.users?.[0]?.providerUserInfo || []).map(x => x.providerId);
         return json({

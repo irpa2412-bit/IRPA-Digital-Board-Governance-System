@@ -23,7 +23,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Recover existing production DRIVE_KV binding safely
+      - name: Recover existing production bindings and prepare ESIGN_DO safely
         env:
           CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -40,39 +40,114 @@ jobs:
           if (response.success !== true) throw new Error("Cloudflare rejected the production Worker settings request.");
 
           const bindings = Array.isArray(response.result?.bindings) ? response.result.bindings : [];
-          const unsupported = bindings.filter(b => !(b && b.type === "kv_namespace" && b.name === "DRIVE_KV"));
-          if (unsupported.length) {
-            throw new Error("Safety stop: the existing production Worker has bindings other than the expected DRIVE_KV binding. No deployment was attempted.");
+          const managed = new Map([
+            ["DRIVE_KV", "kv_namespace"],
+            ["ESIGN_DO", "durable_object_namespace"]
+          ]);
+          const resourceTypes = new Set([
+            "kv_namespace", "durable_object_namespace", "r2_bucket", "d1", "service",
+            "ai", "ai_search", "analytics_engine", "browser", "hyperdrive", "queue",
+            "dispatch_namespace", "workflow", "secrets_store", "vectorize", "vpc_service"
+          ]);
+          const variableTypes = new Set(["plain_text", "secret_text"]);
+
+          for (const binding of bindings) {
+            const name = String(binding?.name || "");
+            const type = String(binding?.type || "");
+            const expectedType = managed.get(name);
+            if (expectedType) {
+              if (type !== expectedType) throw new Error(`Safety stop: binding "${name}" has type "${type}", expected "${expectedType}".`);
+              continue;
+            }
+            if (resourceTypes.has(type)) {
+              throw new Error(`Safety stop: unmanaged production resource binding "${name}" of type "${type}" would not be reproduced by this release.`);
+            }
+            if (!variableTypes.has(type)) {
+              throw new Error(`Safety stop: unmanaged production binding "${name}" has unsupported type "${type}".`);
+            }
           }
 
-          const driveKv = bindings.find(b => b && b.type === "kv_namespace" && b.name === "DRIVE_KV");
-          if (!driveKv || !/^[a-f0-9]{32}$/.test(String(driveKv.namespace_id || ""))) {
-            throw new Error("Safety stop: existing production DRIVE_KV binding was not returned with a valid namespace ID.");
+          const toml = fs.readFileSync("wrangler.toml", "utf8");
+          if (!/CLOUDFLARE_AUTH_FUNCTIONS_ENABLED = "true"/.test(toml)) {
+            throw new Error("Safety stop: production cutover flag is not explicitly enabled in the controlled configuration.");
+          }
+          if (!/IRPA_PRODUCTION_CUTOVER = "true"/.test(toml)) {
+            throw new Error("Safety stop: explicit IRPA production cutover marker is missing.");
+          }
+          const match = toml.match(/\[\[kv_namespaces\]\][\s\S]*?binding\s*=\s*"DRIVE_KV"[\s\S]*?id\s*=\s*"([a-f0-9]{32})"/i);
+          if (!match) throw new Error("Safety stop: repository production wrangler.toml does not contain a valid DRIVE_KV ID.");
+          const configuredDriveKvId = match[1].toLowerCase();
+
+          const driveKvBindings = bindings.filter(b => b.name === "DRIVE_KV");
+          if (driveKvBindings.length > 1) throw new Error("Safety stop: production Worker contains more than one DRIVE_KV binding.");
+          if (driveKvBindings.length === 1) {
+            const remoteId = String(driveKvBindings[0].namespace_id || "").toLowerCase();
+            if (!/^[a-f0-9]{32}$/.test(remoteId)) throw new Error("Safety stop: existing production DRIVE_KV binding has an invalid namespace ID.");
+            if (remoteId !== configuredDriveKvId) throw new Error("Safety stop: production DRIVE_KV differs from the controlled repository DRIVE_KV ID.");
+          }
+
+          const esignBindings = bindings.filter(b => b.name === "ESIGN_DO");
+          if (esignBindings.length > 1) throw new Error("Safety stop: production Worker contains more than one ESIGN_DO binding.");
+          if (esignBindings.length === 1 && String(esignBindings[0].class_name || "") !== "EsignRecordDurableObject") {
+            throw new Error('Safety stop: existing ESIGN_DO must target class "EsignRecordDurableObject".');
+          }
+
+          const flagBindings = bindings.filter(b => b.name === "ESIGN_MODULE_ENABLED");
+          if (flagBindings.length > 1) throw new Error("Safety stop: production Worker contains more than one ESIGN_MODULE_ENABLED variable.");
+          if (flagBindings.length === 1 && String(flagBindings[0].type || "") !== "plain_text") {
+            throw new Error("Safety stop: ESIGN_MODULE_ENABLED must be plaintext; secret values are never modified.");
           }
 
           const config = {
             name: "irpa-google-drive-gateway",
             main: "src/index.js",
             compatibility_date: "2026-09-24",
-            kv_namespaces: [{ binding: "DRIVE_KV", id: driveKv.namespace_id }]
+            vars: {
+              ESIGN_MODULE_ENABLED: "true",
+              CLOUDFLARE_AUTH_FUNCTIONS_ENABLED: "true",
+              IRPA_PRODUCTION_CUTOVER: "true"
+            },
+            kv_namespaces: [{ binding: "DRIVE_KV", id: configuredDriveKvId }],
+            durable_objects: {
+              bindings: [{ name: "ESIGN_DO", class_name: "EsignRecordDurableObject" }]
+            },
+            migrations: [{
+              tag: "esign-do-v1",
+              new_sqlite_classes: ["EsignRecordDurableObject"]
+            }]
           };
-
           fs.writeFileSync("wrangler.json", JSON.stringify(config, null, 2) + "\n");
           NODE
 
-          echo "Recovered the existing production DRIVE_KV binding. Namespace ID is intentionally not printed."
+          echo "Prepared production cutover configuration. IDs and credentials are intentionally not printed."
 
-      - name: Verify production Worker configuration
+      - name: Verify explicit production cutover configuration
         run: |
           set -euo pipefail
           node <<'NODE'
           const fs = require("fs");
           const c = JSON.parse(fs.readFileSync("wrangler.json", "utf8"));
           if (c.name !== "irpa-google-drive-gateway") throw new Error("Worker identity mismatch.");
+          if (c.vars?.ESIGN_MODULE_ENABLED !== "true") throw new Error("Production e-signature flag is not exactly true. Deployment blocked.");
+          if (c.vars?.CLOUDFLARE_AUTH_FUNCTIONS_ENABLED !== "true") throw new Error("Production Cloudflare authentication cutover flag is not exactly true. Deployment blocked.");
+          if (c.vars?.IRPA_PRODUCTION_CUTOVER !== "true") throw new Error("Explicit production cutover marker is missing. Deployment blocked.");
           const kv = Array.isArray(c.kv_namespaces) ? c.kv_namespaces : [];
-          const driveKv = kv.find(x => x && x.binding === "DRIVE_KV");
-          if (!driveKv || !/^[a-f0-9]{32}$/.test(String(driveKv.id || ""))) {
+          if (kv.length !== 1 || kv[0]?.binding !== "DRIVE_KV" || !/^[a-f0-9]{32}$/.test(String(kv[0]?.id || ""))) {
             throw new Error("Production DRIVE_KV binding is invalid. Deployment blocked.");
+          }
+          const doBindings = c.durable_objects?.bindings || [];
+          if (doBindings.length !== 1 || doBindings[0]?.name !== "ESIGN_DO" || doBindings[0]?.class_name !== "EsignRecordDurableObject") {
+            throw new Error("Production ESIGN_DO binding is invalid. Deployment blocked.");
+          }
+          const migrations = Array.isArray(c.migrations) ? c.migrations : [];
+          const migration = migrations.find(m => m?.tag === "esign-do-v1");
+          if (!migration || !Array.isArray(migration.new_sqlite_classes) || migration.new_sqlite_classes.length !== 1 ||
+              migration.new_sqlite_classes[0] !== "EsignRecordDurableObject") {
+            throw new Error("ESIGN_DO migration is missing or invalid. Deployment blocked.");
+          }
+          const topLevelKeys = new Set(["name", "main", "compatibility_date", "vars", "kv_namespaces", "durable_objects", "migrations"]);
+          for (const key of Object.keys(c)) {
+            if (!topLevelKeys.has(key)) throw new Error(`Safety stop: unexpected generated Wrangler configuration key "${key}".`);
           }
           NODE
 
@@ -83,13 +158,13 @@ jobs:
           npm install
           npm run build
 
-      - name: Deploy existing production Worker
+      - name: Deploy production Worker — authorized cutover
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: drive-gateway
-          command: deploy --keep-vars
+          command: deploy --keep-vars --var ESIGN_MODULE_ENABLED:true --var CLOUDFLARE_AUTH_FUNCTIONS_ENABLED:true --var IRPA_PRODUCTION_CUTOVER:true
 
       - name: Verify production gateway
         run: |
@@ -98,3 +173,34 @@ jobs:
           echo "$body"
           echo "$body" | grep -q '"ok":true'
           echo "$body" | grep -q '"storageProvider":"Google Drive"'
+
+      - name: Verify migrated authentication runtime is live
+        run: |
+          set -euo pipefail
+          base="https://irpa-google-drive-gateway.irpa-governance.workers.dev"
+          email="production-cutover-$(date +%s)-$RANDOM@example.com"
+          state="$(curl --fail --silent --show-error -H "Content-Type: application/json" -d "{\"email\":\"$email\"}" "$base/api/auth/password-attempt-state")"
+          echo "$state"
+          echo "$state" | grep -q '"status":"FIRST"'
+          for expected in 2 1; do
+            failure="$(curl --fail --silent --show-error -H "Content-Type: application/json" -d "{\"email\":\"$email\"}" "$base/api/auth/password-failure")"
+            echo "$failure"
+            echo "$failure" | grep -q "\"remainingAttempts\":$expected"
+          done
+          locked="$(curl --fail --silent --show-error -H "Content-Type: application/json" -d "{\"email\":\"$email\"}" "$base/api/auth/password-failure")"
+          echo "$locked"
+          echo "$locked" | grep -q '"status":"LOCKED"'
+          cleared="$(curl --fail --silent --show-error -H "Content-Type: application/json" -d "{\"email\":\"$email\"}" "$base/api/auth/password-attempt-clear")"
+          echo "$cleared"
+          echo "$cleared" | grep -q '"ok":true'
+          reset="$(curl --fail --silent --show-error -H "Content-Type: application/json" -d "{\"email\":\"$email\"}" "$base/api/auth/password-attempt-state")"
+          echo "$reset"
+          echo "$reset" | grep -q '"status":"FIRST"'
+
+      - name: Verify production document-reference auth gate
+        run: |
+          set -euo pipefail
+          base="https://irpa-google-drive-gateway.irpa-governance.workers.dev"
+          code="$(curl --silent --show-error -o /tmp/ref.json -w "%{http_code}" -H "Content-Type: application/json" -d "{}" "$base/api/documents/next-reference")"
+          cat /tmp/ref.json
+          test "$code" = "401"
