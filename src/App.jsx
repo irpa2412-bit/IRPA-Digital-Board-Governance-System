@@ -122,7 +122,7 @@ function MemberActivationScreen({invitationId}) {
       const {loginWithEmail}=await import("./firebase/auth");
       const signedIn=await loginWithEmail(clean,password);
       if(!signedIn?.uid) throw new Error("IRPA account authentication did not return a valid user session.");
-      await provisionCurrentMemberFromInvitationV2(invitationId);
+      await completeInvitationActivation(invitationId);
       window.history.replaceState({},document.title,window.location.pathname+window.location.hash);
       window.location.reload();
     }catch(x){const code=String(x?.code||"");setMessage(code==="auth/invalid-credential"?"The email or password is incorrect. First complete the password setup from the IRPA invitation email, then enter the same email and the new permanent password here.":x.message||"Unable to activate the IRPA account.");}
