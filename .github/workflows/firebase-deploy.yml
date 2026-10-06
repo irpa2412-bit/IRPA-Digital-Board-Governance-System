@@ -17,6 +17,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      deploy_firestore_rules:
+        description: "Deploy Firestore Security Rules separately after Hosting/Functions verification"
+        required: true
+        default: false
+        type: boolean
 
 jobs:
   build-and-deploy:
@@ -274,10 +280,16 @@ jobs:
           });
           NODE
 
-      - name: Deploy Hosting and Firestore
+      - name: Verify deploy configuration safety gate
+        env:
+          FIREBASE_PROJECT_ID: irpa-digital-board-governance
+          ALLOWED_ORIGINS: https://irpa.or.tz,https://www.irpa.or.tz,https://irpa-digital-board-governance.web.app,https://irpa-digital-board-governance.firebaseapp.com,http://localhost:5173
+        run: node scripts/verify-deploy-config.mjs --environment production --config drive-gateway/wrangler.toml
+
+      - name: Deploy Hosting only
         uses: w9jds/firebase-action@v14.17.0
         with:
-          args: deploy --project irpa-digital-board-governance --only hosting,firestore
+          args: deploy --project irpa-digital-board-governance --only hosting
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
 
@@ -302,6 +314,28 @@ jobs:
           set -e
           curl --fail --silent --show-error --retry 5 --retry-delay 3 \
             https://irpa-digital-board-governance.web.app/
+
+
+  deploy-firestore-rules:
+    name: Deploy Firestore Security Rules separately
+    needs: build-and-deploy
+    if: github.event_name == 'workflow_dispatch' && inputs.deploy_firestore_rules == true && vars.ALLOW_PRODUCTION_DEPLOY == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Verify deploy configuration safety gate
+        env:
+          FIREBASE_PROJECT_ID: irpa-digital-board-governance
+          ALLOWED_ORIGINS: https://irpa.or.tz,https://www.irpa.or.tz,https://irpa-digital-board-governance.web.app,https://irpa-digital-board-governance.firebaseapp.com,http://localhost:5173
+        run: node scripts/verify-deploy-config.mjs --environment production --config drive-gateway/wrangler.toml
+      - name: Deploy Firestore Security Rules only
+        uses: w9jds/firebase-action@v14.17.0
+        with:
+          args: deploy --project irpa-digital-board-governance --only firestore:rules
+        env:
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+
 
   live-hosting-verification:
     name: Live Hosting Verification and Commit Status
