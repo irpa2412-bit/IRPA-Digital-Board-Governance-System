@@ -13,6 +13,7 @@ permissions:
 
 jobs:
   deploy:
+    if: vars.ALLOW_PRODUCTION_DEPLOY == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -157,6 +158,12 @@ jobs:
           set -euo pipefail
           npm install
           npm run build
+
+      - name: Verify deploy configuration safety gate
+        env:
+          FIREBASE_PROJECT_ID: irpa-digital-board-governance
+          ALLOWED_ORIGINS: https://irpa.or.tz,https://www.irpa.or.tz,https://irpa-digital-board-governance.web.app,https://irpa-digital-board-governance.firebaseapp.com,http://localhost:5173
+        run: node scripts/verify-deploy-config.mjs --environment production --config drive-gateway/wrangler.json
 
       - name: Deploy production Worker — authorized cutover
         uses: cloudflare/wrangler-action@v3
