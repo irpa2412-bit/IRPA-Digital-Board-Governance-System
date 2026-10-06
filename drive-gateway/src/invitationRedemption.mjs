@@ -407,24 +407,36 @@ export async function redeemInvitationToken(request, env) {
     const invitationLimit = await rateLimit(env, "invitation:" + invitationId, INVITATION_RATE_LIMIT);
     if (!invitationLimit.allowed) return json(invitationFailure("REDEEM_RATE_LIMIT_INVITATION", 429, "This invitation has reached its temporary attempt limit. Try again later."), 429);
 
+    const email = String(invitation.email || "").trim().toLowerCase();
+    if (!email) return json(invitationFailure("REDEEM_EMAIL", 409, "The invitation does not contain a valid email address."), 409);
+
     if (status === "PROVISIONING_PENDING" && invitation.invitationRedeemedUid) {
+      try {
+        await ensureInvitationAuthUser(env, { uid: invitation.invitationRedeemedUid, email });
+      } catch (error) {
+        console.error("Invitation Auth reconciliation failed", { stage: "REDEEM_AUTH_RECONCILE", invitationId, message: String(error?.message || error) });
+        return json(invitationFailure("REDEEM_EXISTING_ACCOUNT", 409, "The invitation email is already associated with another Firebase account or sign-in method."), 409);
+      }
       console.info("Invitation redemption is idempotent", { stage: "REDEEM_IDEMPOTENT", invitationId });
       return json({
         ok: true,
         invitationId,
         uid: invitation.invitationRedeemedUid,
+        email,
         state: INVITATION_STATES.PROVISIONING_PENDING,
         customToken: await mintCustomToken(env, invitation.invitationRedeemedUid),
       }, 200);
     }
 
-    const providers = await existingAccountProviders(env, String(invitation.email || "").trim().toLowerCase());
-    if (providers.registered) {
-      return json(invitationFailure("REDEEM_EXISTING_ACCOUNT", 409, "An existing Firebase account is already registered for this invitation email. Use the normal login or ask an administrator to issue a new invitation."), 409);
+    const uid = invitation.invitationRedeemedUid || crypto.randomUUID().replace(/-/g, "");
+    try {
+      await ensureInvitationAuthUser(env, { uid, email });
+    } catch (error) {
+      console.error("Invitation Auth provisioning rejected", { stage: "REDEEM_AUTH", invitationId, message: String(error?.message || error) });
+      return json(invitationFailure("REDEEM_EXISTING_ACCOUNT", 409, "The invitation email is already associated with another Firebase account or sign-in method."), 409);
     }
 
-    const uid = invitation.invitationRedeemedUid || crypto.randomUUID().replace(/-/g, "");
-    const nextState = invitation.invitationRedeemedUid ? "PROVISIONING_PENDING" : "PROVISIONING_PENDING";
+    const nextState = "PROVISIONING_PENDING";
     const now = new Date().toISOString();
     const token = await getGoogleAccessToken(env);
     const response = await fetch("https://firestore.googleapis.com/v1/projects/" + firebaseProjectId(env) + "/databases/(default)/documents:commit", {
