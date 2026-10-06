@@ -575,3 +575,23 @@ test("portal activation gate accepts member status Active", async()=>{
   } finally { global.fetch=originalFetch; }
 });
 
+
+
+test("session-state returns NONE when the authenticated UID has no invitation", async()=>{
+  const originalFetch=global.fetch;
+  const jwk=publicKey.export({format:"jwk"});
+  const idToken=makeFirebaseIdToken("no-invitation-uid");
+  global.fetch=async(url)=>{
+    const target=String(url);
+    if(target.includes("securetoken@system.gserviceaccount.com")) return new Response(JSON.stringify({keys:[{...jwk,kid:"invitation-test-key",alg:"RS256",use:"sig"}]}),{status:200});
+    if(target.includes("/documents:runQuery")) return new Response(JSON.stringify([]),{status:200});
+    throw new Error("Unexpected external request: "+target);
+  };
+  try{
+    const response=await handler.fetch(new Request("https://gw.test/api/invitations/session-state",{
+      method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"},body:"{}"
+    }),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance"});
+    assert.equal(response.status,200);
+    assert.deepEqual(await response.json(),{ok:true,state:"NONE",invitationId:null});
+  } finally { global.fetch=originalFetch; }
+});
