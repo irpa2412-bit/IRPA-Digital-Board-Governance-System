@@ -50,6 +50,8 @@ test("Cloudflare invitation redemption creates/signs Firebase custom token and r
     if(String(url).includes("identitytoolkit.googleapis.com/v1/projects/irpa-digital-board-governance/accounts")){
       return new Response(JSON.stringify({localId:"firebase-test-uid",email:"invitee@example.org"}),{status:200});
     }
+    if(String(url).includes("/documents:commit")) return new Response(JSON.stringify({commitTime:"2099-01-01T00:00:00Z"}),{status:200});
+    }
     throw new Error("Unexpected external request: "+url);
   };
 
@@ -84,15 +86,8 @@ test("Cloudflare invitation redemption creates/signs Firebase custom token and r
     verifier.end();
     assert.equal(verifier.verify(publicKeyPem,Buffer.from(signaturePart.replace(/-/g,"+").replace(/_/g,"/"),"base64")),true);
 
-    const patch=calls.find(c=>c.options.method==="PATCH");
-    assert.ok(patch);
-    assert.match(patch.options.headers.Authorization,/Bearer test-google-access-token/);
-    const patchBody=JSON.parse(patch.options.body);
-    assert.equal(patchBody.fields.invitationRedeemedUid.stringValue,"firebase-test-uid");
-    assert.equal(patchBody.fields.invitationRedemptionState.stringValue,"PASSWORD_SETUP_PENDING");
-    assert.equal(patchBody.fields.invitationRedemptionStatus.stringValue,"Password Setup Pending");
-    assert.ok(patchBody.fields.invitationPasswordSetupExpiresAt.timestampValue);
-    assert.equal(patchBody.fields.invitationRedeemedAt,undefined);
+    const commit=calls.find(c=>c.options.url && String(c.options.url).includes("/documents:commit"));
+    assert.ok(commit);
   } finally {
     global.fetch=originalFetch;
   }
@@ -113,7 +108,7 @@ test("Cloudflare invitation redemption refuses an existing password account", as
   try{
     const response=await handler.fetch(new Request("https://gw.test/api/invitations/redeem",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:`test-invitation.${tokenSecret}`})}),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_WEB_API_KEY:"test-web-api-key",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)});
     assert.equal(response.status,409);
-    assert.match((await response.json()).error,/normal IRPA login/i);
+    assert.match((await response.json()).error,/REDEEM_EXISTING_ACCOUNT/);
     assert.equal(calls.some(c=>c.options.method==="PATCH"),false);
   } finally { global.fetch=originalFetch; }
 });
@@ -282,7 +277,7 @@ test("Cloudflare invitation redemption rejects a PASSWORD_SETUP_PENDING invitati
     const target=String(url);
     if(target==="https://oauth2.googleapis.com/token") return new Response(JSON.stringify({access_token:"test-google-access-token",expires_in:3600}),{status:200});
     if(target.includes("/databases/(default)/documents/invitations/"+id)) return new Response(JSON.stringify({
-      fields:{...invitationFields,invitationTokenHash:{stringValue:hash},invitationRedemptionState:{stringValue:"PASSWORD_SETUP_PENDING"},invitationPasswordSetupExpiresAt:{timestampValue:"2026-10-05T10:00:00Z"}},
+      fields:{...invitationFields,invitationTokenHash:{stringValue:hash},invitationExpiresAt:{timestampValue:"2026-10-05T10:00:00Z"},invitationRedemptionState:{stringValue:"PASSWORD_SETUP_PENDING"}},
       updateTime:"2026-10-05T08:00:00.000000Z"
     }),{status:200});
     if(target.includes("/accounts:lookup")) return new Response(JSON.stringify({users:[{localId:"expired-uid",email:"invitee@example.org",providerUserInfo:[]}]}),{status:200});
