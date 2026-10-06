@@ -1,5 +1,9 @@
 
-const PROJECT = "irpa-digital-board-governance";
+function firebaseProjectId(env) {
+  const projectId = String(env?.FIREBASE_PROJECT_ID || "").trim();
+  if (!projectId) throw new Error("IRPA_INVITATION_FAILURE:FIREBASE_PROJECT_CONFIG");
+  return projectId;
+}
 const TOKEN_TTL_MS = 60 * 60 * 1000;
 const RATE_WINDOW_SECONDS = 600;
 const INVITATION_RATE_LIMIT = 10;
@@ -137,7 +141,7 @@ function fromFirestoreFields(fields) {
 
 async function firestoreRequest(env, path, options = {}) {
   const token = await getGoogleAccessToken(env);
-  const response = await fetch("https://firestore.googleapis.com/v1/projects/" + PROJECT + "/databases/(default)/documents" + path, {
+  const response = await fetch("https://firestore.googleapis.com/v1/projects/" + firebaseProjectId(env) + "/databases/(default)/documents" + path, {
     ...options,
     headers: {
       Authorization: "Bearer " + token,
@@ -160,7 +164,7 @@ async function getDocument(env, collection, id) {
 
 async function queryDocuments(env, collection, fieldPath, value) {
   const token = await getGoogleAccessToken(env);
-  const response = await fetch("https://firestore.googleapis.com/v1/projects/" + PROJECT + "/databases/(default)/documents:runQuery", {
+  const response = await fetch("https://firestore.googleapis.com/v1/projects/" + firebaseProjectId(env) + "/databases/(default)/documents:runQuery", {
     method: "POST",
     headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -185,8 +189,8 @@ async function queryDocuments(env, collection, fieldPath, value) {
 
 async function commitActivation(env, { invitationId, invitationUpdateTime, uid, email, invitation, existingMember }) {
   const now = new Date().toISOString();
-  const memberPath = "projects/" + PROJECT + "/databases/(default)/documents/members/" + uid;
-  const invitationPath = "projects/" + PROJECT + "/databases/(default)/documents/invitations/" + invitationId;
+  const memberPath = "projects/" + firebaseProjectId(env) + "/databases/(default)/documents/members/" + uid;
+  const invitationPath = "projects/" + firebaseProjectId(env) + "/databases/(default)/documents/invitations/" + invitationId;
 
   const privileged = ["role", "admin", "isAdmin", "administrator", "adminFlags", "permissions", "roleAssignments"];
   if (existingMember) {
@@ -242,7 +246,7 @@ async function commitActivation(env, { invitationId, invitationUpdateTime, uid, 
   };
 
   const token = await getGoogleAccessToken(env);
-  const response = await fetch("https://firestore.googleapis.com/v1/projects/" + PROJECT + "/databases/(default)/documents:commit", {
+  const response = await fetch("https://firestore.googleapis.com/v1/projects/" + firebaseProjectId(env) + "/databases/(default)/documents:commit", {
     method: "POST",
     headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
     body: JSON.stringify({ writes: [memberWrite, invitationWrite] }),
@@ -367,7 +371,7 @@ export async function redeemInvitationToken(request, env) {
     const nextState = invitation.invitationRedeemedUid ? "PROVISIONING_PENDING" : "PROVISIONING_PENDING";
     const now = new Date().toISOString();
     const token = await getGoogleAccessToken(env);
-    const response = await fetch("https://firestore.googleapis.com/v1/projects/" + PROJECT + "/databases/(default)/documents:commit", {
+    const response = await fetch("https://firestore.googleapis.com/v1/projects/" + firebaseProjectId(env) + "/databases/(default)/documents:commit", {
       method: "POST",
       headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
       body: JSON.stringify({
