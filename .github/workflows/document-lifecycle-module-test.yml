@@ -32,7 +32,7 @@ jobs:
             package-lock.json
             drive-gateway/package-lock.json
       - name: Install application dependencies
-        run: npm ci --no-audit --no-fund
+        run: npm install --no-audit --no-fund
       - name: Install gateway dependencies
         working-directory: drive-gateway
         run: npm ci --no-audit --no-fund
