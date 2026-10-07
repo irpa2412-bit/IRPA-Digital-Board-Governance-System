@@ -38,8 +38,8 @@ export function buildInvitationMessage({name,link}) {
   const safeLink=new URL(link).toString();
   return {
     subject: SUBJECT,
-    text:`Dear ${safeName},\\n\\nYou have been invited to the IRPA Digital Board Governance System.\\nOpen this link to accept: ${safeLink}\\n\\nIf you did not expect this email, you can ignore it.`,
-    html:`<p>Dear ${escapeHtml(safeName)},</p><p>You have been invited to the IRPA Digital Board Governance System.</p><p><a href="${escapeHtml(safeLink)}">Accept invitation</a></p><p>If you did not expect this email, you can ignore it.</p>`
+    text:`Dear ${safeName},\\n\\nYou have been invited to access the IRPA Digital Board Governance System workspace.\\n\\nOpen the invitation link to create your password and activate your account:\\n${safeLink}\\n\\nAfter activation, you can sign in directly to your IRPA workspace.\\n\\nIf you did not expect this email, please contact IRPA Administration.`,
+    html:`<p>Dear ${escapeHtml(safeName)},</p><p>You have been invited to access the IRPA Digital Board Governance System workspace.</p><p>Open the invitation link below to create your password and activate your account:</p><p><a href="${escapeHtml(safeLink)}">Activate My Account</a></p><p>After activation, you can sign in directly to your IRPA workspace.</p><p>If you did not expect this email, please contact IRPA Administration.</p>`
   };
 }
 export async function sendInvitationEmail({email,name,link,smtpSend,logger=console,sleep}) {

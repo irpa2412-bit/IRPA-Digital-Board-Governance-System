@@ -1,0 +1,52 @@
+import React,{useEffect,useMemo,useState}from"react";
+import {createRecord,deleteRecord,getRecords,COLLECTIONS,updateRecord}from"../firebase/data";
+import {inviteRegisteredPerson}from"../firebase/auth";
+
+const AUDITOR_PERMISSIONS=["Read","Download","Print"];
+const SPECIAL_PERMISSIONS=["Read","Download","Print","Edit","Upload","Sign","Request","Create","Delete"];
+const empty={name:"",email:"",phone:"",organization:"",title:"",category:"Auditor",assignment:"",status:"Active",permissions:AUDITOR_PERMISSIONS};
+
+export default function AuditorsSpecialInvitees(){
+ const[records,setRecords]=useState([]),[invitations,setInvitations]=useState([]),[form,setForm]=useState(empty),[editing,setEditing]=useState(null),[viewing,setViewing]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState(""),[search,setSearch]=useState("");
+ async function load(){try{const[result,inv]=await Promise.all([getRecords(COLLECTIONS.auditorProfiles),getRecords(COLLECTIONS.invitations)]);setRecords(result);setInvitations(inv);setError("")}catch(e){setError(e?.message||"Unable to load Auditors & Special Invitees register.")}}
+ useEffect(()=>{load()},[]);
+ function reset(){setEditing(null);setViewing(null);setForm(empty)}
+ function change(e){setForm({...form,[e.target.name]:e.target.value})}
+ function startEdit(r){setEditing(r);setViewing(null);setError("");setMessage("");setForm({...empty,...r,permissions:Array.isArray(r.permissions)?r.permissions:(r.category==="Auditor"?AUDITOR_PERMISSIONS:[])}) ;window.scrollTo({top:0,behavior:"smooth"})}
+ function selectCategory(category){setForm(f=>({...f,category,permissions:category==="Auditor"?AUDITOR_PERMISSIONS:["Read","Download","Print"]}))}
+ function togglePermission(permission){setForm(f=>({...f,permissions:f.permissions.includes(permission)?f.permissions.filter(x=>x!==permission):[...f.permissions,permission]}))}
+ async function submit(e){e.preventDefault();setBusy(true);setError("");setMessage("");try{
+   const name=form.name.trim(),email=form.email.trim().toLowerCase(),title=form.title.trim(),organization=form.organization.trim();
+   if(!name||!email||!title||!organization)throw new Error("Full Name, Official Email, Organization / Institution, and Title / Position are required.");
+   const permissions=form.category==="Auditor"?AUDITOR_PERMISSIONS:[...new Set(form.permissions)];
+   if(form.category==="Special Invitee"&&!permissions.length)throw new Error("Assign at least one authority to the Special Invitee.");
+   const data={name,email,phone:form.phone.trim(),organization,title,category:form.category,assignment:form.category==="Special Invitee"?form.assignment.trim():"",status:form.status,permissions,active:form.status==="Active",registrationType:"Auditors & Special Invitees Register"};
+   if(editing){await updateRecord(COLLECTIONS.auditorProfiles,editing.id,data);setMessage("✓ Register entry updated successfully.")}else{const created=await createRecord(COLLECTIONS.auditorProfiles,data);setMessage("✓ Register entry created successfully.")}reset();await load();
+ }catch(e){setError(e?.message||"Unable to save register entry.")}finally{setBusy(false)}}
+ async function invite(r){setBusy(true);setError("");setMessage("");try{await inviteRegisteredPerson({record:r,recordType:r.category||"Auditor",role:r.category||"Auditor",memberType:r.category||"Auditor"});setMessage(`✓ Invitation sent to ${r.email}.`);await load()}catch(e){setError(e?.message||"Unable to send invitation.")}finally{setBusy(false)}}
+ async function deactivate(r){setBusy(true);setError("");setMessage("");try{await updateRecord(COLLECTIONS.auditorProfiles,r.id,{status:"Inactive",active:false});await load();setMessage(`✓ ${r.name} is now inactive.`)}catch(e){setError(e?.message||"Unable to deactivate register entry.")}finally{setBusy(false)}}
+ async function remove(r){if(!window.confirm(`Permanently delete ${r.name}? This cannot be undone.`))return;setBusy(true);setError("");try{await deleteRecord(COLLECTIONS.auditorProfiles,r.id);await load();setMessage("✓ Register entry was deleted.")}catch(e){setError(e?.message||"Unable to delete register entry.")}finally{setBusy(false)}}
+ const filtered=useMemo(()=>records.filter(r=>!search.trim()||[r.name,r.email,r.phone,r.organization,r.title,r.category,r.assignment,r.status].join(" ").toLowerCase().includes(search.trim().toLowerCase())),[records,search]);
+ const invitationByEmail=useMemo(()=>{const m=new Map();for(const i of invitations){const e=String(i.email||"").trim().toLowerCase();if(e)m.set(e,i)}return m},[invitations]);
+ return <div className="page members-personnel-page">
+  <div className="page-header"><div><span className="eyebrow">INSTITUTIONAL REGISTER</span><h1>Auditors &amp; Special Invitees Registration</h1><p>Authoritative register. Registration creates the institutional record first; account invitation and activation use the same IRPA invitation protocol as Employees and Board Members.</p></div><button type="button"onClick={()=>{reset();setError("");setMessage("");window.scrollTo({top:0,behavior:"smooth"})}}>+ Register Auditor / Special Invitee</button></div>
+  {message&&<div className="success-message action-feedback"role="status">{message}</div>}{error&&<div className="error-message action-feedback"role="alert">{error}</div>}
+  <div className="panel"><h2>{editing?`Edit Register Entry`:"Register Auditor / Special Invitee"}</h2><p className="panel-description">Use the same institutional-registration pattern: name and official email are required. Authority is the only difference: Auditor authority is fixed; Special Invitee authority is assigned by the Administrator.</p>
+   <form onSubmit={submit}><div className="form-grid">
+    <div className="form-field"><label>Full Name</label><input name="name"value={form.name}onChange={change}required/></div>
+    <div className="form-field"><label>Official Email</label><input type="email"name="email"value={form.email}onChange={change}required/></div>
+    <div className="form-field"><label>Organization / Institution</label><input name="organization"value={form.organization}onChange={change}required/></div>
+    <div className="form-field"><label>Title / Position</label><input name="title"value={form.title}onChange={change}required/></div>
+    <div className="form-field"><label>Phone</label><input name="phone"value={form.phone}onChange={change}/></div>
+    <div className="form-field"><label>Category</label><select name="category"value={form.category}onChange={e=>selectCategory(e.target.value)}><option>Auditor</option><option>Special Invitee</option></select></div>
+    <div className="form-field"><label>Status</label><select name="status"value={form.status}onChange={change}><option>Active</option><option>Inactive</option></select></div>
+    {form.category==="Special Invitee"&&<div className="form-field form-field-wide"><label>Specific Assignment</label><input name="assignment"value={form.assignment}onChange={change}required/></div>}
+    <div className="form-field form-field-wide"><label>Authority</label><div style={{display:"flex",gap:10,flexWrap:"wrap"}}>{(form.category==="Auditor"?AUDITOR_PERMISSIONS:SPECIAL_PERMISSIONS).map(p=><label key={p}style={{display:"flex",gap:6,alignItems:"center"}}><input type="checkbox"checked={form.permissions.includes(p)}disabled={form.category==="Auditor"}onChange={()=>togglePermission(p)}/>{p}</label>)}</div></div>
+   </div><div className="form-actions"><button type="submit"disabled={busy}>{busy?(editing?"Saving Changes...":"Registering..."):(editing?"Save Changes":"Register")}</button>{editing&&<button type="button"className="secondary-button"onClick={reset}disabled={busy}>Cancel Edit</button>}</div></form>
+  </div>
+  <div className="panel"><div className="panel-header"><div><h2>Official Auditors &amp; Special Invitees Register</h2><span>{filtered.length} of {records.length} registered record(s)</span></div><input className="table-search"placeholder="Search Auditors & Special Invitees..."value={search}onChange={e=>setSearch(e.target.value)}/></div>
+   <div className="table-wrapper"><table><thead><tr><th>Name</th><th>Category</th><th>Title</th><th>Organization</th><th>Official Email</th><th>Status</th><th>Account</th><th>Actions</th></tr></thead><tbody>{filtered.length===0?<tr><td colSpan="8">No Auditors or Special Invitees registered.</td></tr>:filtered.map(r=>{const invitation=invitationByEmail.get(String(r.email||"").trim().toLowerCase());const activated=Boolean(r.uid)||r.accountActivated===true||invitation?.status==="Activated";return <tr key={r.id}><td><strong>{r.name}</strong></td><td>{r.category||"Auditor"}</td><td>{r.title||"—"}</td><td>{r.organization||"—"}</td><td>{r.email||"—"}</td><td><span className="status-badge">{r.status||"—"}</span></td><td><span className="status-badge">{activated?"Activated":invitation?.status||"Account Pending"}</span></td><td><div className="member-actions"><button type="button"onClick={()=>setViewing(r)}disabled={busy}>View</button><button type="button"onClick={()=>startEdit(r)}disabled={busy}>Edit</button>{r.status==="Active"&&!activated&&<button type="button"onClick={()=>invite(r)}disabled={busy}>Invite</button>}{r.status==="Active"&&<button type="button"onClick={()=>deactivate(r)}disabled={busy}>Deactivate</button>}<button type="button"className="danger-button"onClick={()=>remove(r)}disabled={busy}>Delete</button></div></td></tr>})}</tbody></table></div>
+  </div>
+  {viewing&&<section className="panel"><div className="panel-header"><div><h2>Register Entry Details</h2><span>{viewing.name}</span></div><button className="secondary-button"onClick={()=>setViewing(null)}>Close</button></div><div className="detail-grid">{[["Full Name",viewing.name],["Official Email",viewing.email],["Organization / Institution",viewing.organization],["Title / Position",viewing.title],["Phone",viewing.phone],["Category",viewing.category],["Assignment",viewing.assignment],["Status",viewing.status],["Authority",(Array.isArray(viewing.permissions)?viewing.permissions:AUDITOR_PERMISSIONS).join(", ")],["Registration Status",viewing.registrationStatus||"Registered"],["Account UID",viewing.uid||"Not activated"],["Registered By",viewing.registeredByEmail]].map(([a,b])=><div key={a}><span>{a}</span><strong>{b||"—"}</strong></div>)}</div></section>}
+ </div>
+}

@@ -23,3 +23,6 @@ jobs:
       - name: Run mocked SMTP invitation tests
         working-directory: drive-gateway
         run: node tests/mail-invitation.unit.mjs
+      - name: Run invitation redemption tests
+        working-directory: drive-gateway
+        run: node --test tests/invitation-redemption.test.mjs
