@@ -125,6 +125,10 @@ export default {
           return json(await withInvitationRetry(() => confirmInvitationPasswordSetup(request, env, claims), "password-set"), 200, corsHeaders(request));
         } catch (error) {
           if (error instanceof InvitationRedemptionError) return json({ok:false,error:error.message}, error.status, corsHeaders(request));
+          const message=String(error?.message||"");
+          if (message === "Firebase authentication is required." || message.startsWith("Invalid Firebase ID token") || message.startsWith("Invalid Firebase token") || message === "Firebase token is expired.") {
+            return json({ok:false,error:"Your invitation session has expired. Please open the invitation link again."},401,corsHeaders(request));
+          }
           console.error("Invitation password-set backend failure", error);
           return json({ok:false,error:"We could not activate your account right now. Please try again."}, 503, corsHeaders(request));
         }
