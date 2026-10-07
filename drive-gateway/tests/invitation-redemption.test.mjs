@@ -21,6 +21,8 @@ const invitationFields={
   invitationExpiresAt:{timestampValue:"2099-01-01T00:00:00Z"}
 };
 
+function createHandler({fetch}){global.fetch=fetch;return handler;}
+
 function decodePart(part){
   return JSON.parse(Buffer.from(part.replace(/-/g,"+").replace(/_/g,"/"),"base64").toString("utf8"));
 }
@@ -217,6 +219,7 @@ test("password-set refuses activation when Firebase Auth has not independently c
       if(target.includes("/databases/(default)/documents/invitations/password-verification-pending")) {
         return new Response(JSON.stringify({
           fields:{
+            email:{stringValue:"invitee@example.org"},
             invitationRedeemedUid:{stringValue:"password-pending-uid"},
             invitationRedemptionState:{stringValue:"PASSWORD_SETUP_PENDING"},
             invitationPasswordSetupExpiresAt:{timestampValue:"2099-01-01T00:00:00Z"}
@@ -396,7 +399,7 @@ test("password-set is idempotent when invitation is already PROVISIONING_PENDING
       },
       updateTime:"2026-10-05T08:00:00.000000Z"
     }),{status:200});
-    if(target.includes("/accounts:lookup")) return new Response(JSON.stringify({users:[{localId:"provisioning-pending-uid",providerUserInfo:[{providerId:"password"}]}]}),{status:200});
+    if(target.includes("/accounts:lookup")) return new Response(JSON.stringify({users:[{localId:"provisioning-pending-uid",email:"invitee@example.org",providerUserInfo:[{providerId:"password"}]}]}),{status:200});
     if(options.method==="PATCH") patchCalled=true;
     throw new Error("Unexpected external request: "+target);
   };
