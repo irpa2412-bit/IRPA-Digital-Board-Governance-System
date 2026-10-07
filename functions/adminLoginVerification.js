@@ -1,6 +1,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const { getAuth } = require("firebase-admin/auth");
+const { queueInductionEmail } = require("./queueInductionEmail");
 const crypto = require("crypto");
 
 const db = getFirestore();
@@ -103,7 +104,7 @@ exports.beginAdministratorEmailVerification = onCall({ region: "us-central1" }, 
     action: "ADMIN_LOGIN_EMAIL_OTP_ISSUED",
     collection: "adminLoginVerification",
     recordId: uid,
-    details: { notificationAddressPolicy: "IRPA_DOMAIN_EMAIL", expiresAt: expiresAt.toISOString() },
+    details: { notificationAddressPolicy: "ADMINISTRATOR_EMAIL_OTP", expiresAt: expiresAt.toISOString() },
     ...auditDetails(request)
   });
 
@@ -122,20 +123,21 @@ exports.beginAdministratorEmailVerification = onCall({ region: "us-central1" }, 
     updatedAt: FieldValue.serverTimestamp()
   });
 
-  await db.collection("mail").add({
-    to: email,
-    message: {
-      subject: "IRPA Digital Board Governance System — Administrator Login Verification Code",
-      text: "Your IRPA Administrator login verification code is " + code + ". It expires in 10 minutes. If you did not initiate this login, do not use the code and notify the IRPA Administrator.",
-      html: "<p>Your IRPA Administrator login verification code is:</p><p style=\"font-size:28px;font-weight:800;letter-spacing:6px\">" + code + "</p><p>This code expires in 10 minutes.</p><p>If you did not initiate this login, do not use the code and notify the IRPA Administrator.</p>"
-    },
-    systemGenerated: true,
-    notificationType: "ADMIN_LOGIN_EMAIL_OTP",
-    registeredRecipientUid: uid,
-    registeredRecipientEmail: email,
-    notificationAddressPolicy: "IRPA_DOMAIN_EMAIL",
-    createdAt: FieldValue.serverTimestamp()
+  const delivery = await queueInductionEmail({
+    recipientEmail: email,
+    recipientName: profile.name || email,
+    invitedByUid: uid,
+    subject: "IRPA Digital Board Governance System — Administrator Login Verification Code",
+    text: "Your IRPA Administrator login verification code is " + code + ". It expires in 10 minutes. If you did not initiate this login, do not use the code and notify the IRPA Administrator.",
+    html: "<p>Your IRPA Administrator login verification code is:</p><p style=\"font-size:28px;font-weight:800;letter-spacing:6px\">" + code + "</p><p>This code expires in 10 minutes.</p><p>If you did not initiate this login, do not use the code and notify the IRPA Administrator.</p>"
+  }, {
+    db,
+    env: process.env,
+    logger: console
   });
+  if (!delivery?.ok || delivery?.status !== "Sent") {
+    throw new HttpsError("unavailable", "The administrator verification email could not be sent. Please request a new code and try again.");
+  }
 
   return {
     ok: true,
@@ -195,7 +197,7 @@ exports.verifyAdministratorEmailVerification = onCall({ region: "us-central1" },
     action: "ADMIN_LOGIN_SECOND_FACTOR_VERIFIED",
     collection: "adminLoginVerification",
     recordId: uid,
-    details: { method: "EMAIL_OTP", notificationAddressPolicy: "IRPA_DOMAIN_EMAIL" },
+    details: { method: "EMAIL_OTP", notificationAddressPolicy: "ADMINISTRATOR_EMAIL_OTP" },
     ...auditDetails(request)
   });
 
