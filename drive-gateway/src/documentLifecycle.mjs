@@ -1,4 +1,4 @@
-import { canUpload, canRead, canTransition, resolveIdentity, buildDocumentRecord } from "./documentPolicy.mjs";
+import { canUpload, canRead, canTransition, resolveIdentity, buildDocumentRecord, DOCUMENT_FORMAT_REQUIREMENTS } from "./documentPolicy.mjs";
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const CLASSIFICATIONS = new Set(["Public","Internal","Confidential","Restricted"]);
@@ -163,7 +163,8 @@ export function createDocumentLifecycleRouter(deps) {
       if(!bytes.length)return deps.json({ok:false,error:"Document content is required."},400,deps.corsHeaders(request));
       if(bytes.length>MAX_BYTES)return deps.json({ok:false,error:"Documents must not exceed 10 MB."},400,deps.corsHeaders(request));
       if(!deps.allowedContentTypes.has(contentType))return deps.json({ok:false,error:"The selected file format is not supported."},400,deps.corsHeaders(request));
-      const policy=canUpload(identity,data);if(!policy.allowed)return deps.json({ok:false,error:policy.reason},403,deps.corsHeaders(request));
+      const policy=canUpload(identity,{...data,contentType});
+if(!policy.allowed)return deps.json({ok:false,error:policy.reason},403,deps.corsHeaders(request));
       const classification=clean(data.classification||"Internal");const category=clean(data.archiveCategory||"Administrative Documents");
       if(!CLASSIFICATIONS.has(classification)||!ARCHIVE_CATEGORIES.has(category))return deps.json({ok:false,error:"Invalid document archive classification or category."},400,deps.corsHeaders(request));
       const documentId="LIFE-"+crypto.randomUUID().replace(/-/g,"").slice(0,24);
