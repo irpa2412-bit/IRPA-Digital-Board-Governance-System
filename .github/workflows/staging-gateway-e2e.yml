@@ -2,7 +2,7 @@ name: Staging Gateway E2E and Deploy
 
 on:
   push:
-    branches: [fix/member-signature-invitation-email-20261004]
+    branches: [feat/document-lifecycle-module-20261007]
     paths:
       - "drive-gateway/**"
       - "firebase.json"
@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   local-e2e:
-    if: github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004'
+    if: github.ref == 'refs/heads/feat/document-lifecycle-module-20261007'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
