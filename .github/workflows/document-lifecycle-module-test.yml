@@ -1,0 +1,58 @@
+name: Document Lifecycle Module Verification
+
+on:
+  push:
+    branches:
+      - feat/document-lifecycle-module-20261007
+    paths:
+      - "src/pages/DocumentLifecycleModule.jsx"
+      - "src/firebase/documentLifecycle.js"
+      - "drive-gateway/src/documentLifecycle.mjs"
+      - "drive-gateway/src/documentPolicy.mjs"
+      - "drive-gateway/tests/document-*.test.mjs"
+      - "drive-gateway/package*.json"
+      - "package*.json"
+      - ".github/workflows/document-lifecycle-module-test.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            drive-gateway/package-lock.json
+      - name: Install application dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Install gateway dependencies
+        working-directory: drive-gateway
+        run: npm ci --no-audit --no-fund
+      - name: Syntax gate
+        run: |
+          node --check drive-gateway/src/documentPolicy.mjs
+          node --check drive-gateway/src/documentLifecycle.mjs
+          node --check drive-gateway/tests/document-policy.test.mjs
+          node --check drive-gateway/tests/document-lifecycle-router.test.mjs
+      - name: Document lifecycle policy tests
+        working-directory: drive-gateway
+        run: node --test tests/document-policy.test.mjs tests/document-lifecycle-router.test.mjs
+      - name: Existing gateway test suite
+        working-directory: drive-gateway
+        run: npm test
+      - name: Application production build
+        run: npm run build
+      - name: Verify no production deployment commands exist in this workflow
+        run: |
+          if grep -nE 'wrangler deploy|firebase deploy|npm run deploy|cloudflare/wrangler-action' .github/workflows/document-lifecycle-module-test.yml; then
+            echo "Deployment command detected in verification workflow."
+            exit 1
+          fi
