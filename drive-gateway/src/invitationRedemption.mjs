@@ -106,11 +106,6 @@ export async function redeemInvitationToken(request, env) {
     throw new InvitationRedemptionError(400, "The invitation has no valid recipient email.");
   }
 
-  const user = await getOrCreateFirebaseUser(projectId, email, invitation.name, googleAccessToken);
-  if (user.disabled === true) {
-    throw new InvitationRedemptionError(403, "This Firebase account is disabled. Ask an Administrator to reactivate the account.");
-  }
-
   const currentState = String(invitation.invitationRedemptionState || "PENDING");
   const pendingUntil = new Date(invitation.invitationPasswordSetupExpiresAt || 0).getTime();
   if (currentState === "EXPIRED" || (currentState === "PASSWORD_SETUP_PENDING" && pendingUntil && pendingUntil <= Date.now())) {
@@ -121,6 +116,11 @@ export async function redeemInvitationToken(request, env) {
   }
   if (currentState === "CANCELLED") {
     throw new InvitationRedemptionError(412, "This IRPA invitation has been cancelled.");
+  }
+
+  const user = await getOrCreateFirebaseUser(projectId, email, invitation.name, googleAccessToken);
+  if (user.disabled === true) {
+    throw new InvitationRedemptionError(403, "This Firebase account is disabled. Ask an Administrator to reactivate the account.");
   }
   if (invitation.invitationRedeemedUid && invitation.invitationRedeemedUid !== user.localId) {
     throw new InvitationRedemptionError(409, "This invitation has already been associated with another Firebase account.");
