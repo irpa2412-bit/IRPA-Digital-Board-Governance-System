@@ -98,7 +98,12 @@ export default {
         try {
           return json(await withInvitationRetry(() => redeemInvitationToken(request, env), "redeem"), 200, corsHeaders(request));
         } catch (error) {
-          if (error instanceof InvitationRedemptionError) return json({ok:false,error:error.message}, error.status, corsHeaders(request));
+          if (error instanceof InvitationRedemptionError) {
+            if (error.status === 410 && /expired|cancelled/i.test(String(error.message||""))) {
+              await notifyInvitationAdministrator(request, env, error.message);
+            }
+            return json({ok:false,error:error.message}, error.status, corsHeaders(request));
+          }
           console.error("Invitation redemption backend failure", error);
           return json({ok:false,error:"We could not complete this invitation right now. Please try again."}, 503, corsHeaders(request));
         }
@@ -1133,6 +1138,22 @@ async function sendGatewayInvitationEmail(request, env) {
   }catch(error){
     console.error("INVITATION_GATEWAY_PROVIDER_FAILED",{recipientDomain:recipientDomain(to),error:safeMailError(error)});
     return json({ok:false,error:"EMAIL_PROVIDER_FAILED"},502,corsHeaders(request));
+  }
+}
+
+async function notifyInvitationAdministrator(request, env, reason) {
+  try {
+    const body = await request.clone().json().catch(()=>({}));
+    const token = String(body?.token||"").trim();
+    const invitationId = token.split(".")[0] || "unknown";
+    await smtpSend(env,{
+      to: AUTHORIZED_DRIVE_EMAIL,
+      subject: "IRPA invitation requires a new link",
+      text: `Invitation ${invitationId} could not be completed: ${String(reason||"expired or cancelled")}. The invitee has been instructed to request a new link.`,
+      html: `<p>Invitation <strong>${invitationId}</strong> could not be completed: ${String(reason||"expired or cancelled")}. The invitee has been instructed to request a new link.</p>`
+    });
+  } catch (notificationError) {
+    console.error("Invitation administrator notification failed", {message:String(notificationError?.message||notificationError)});
   }
 }
 
