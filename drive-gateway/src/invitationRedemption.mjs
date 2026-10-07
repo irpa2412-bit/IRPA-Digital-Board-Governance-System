@@ -117,7 +117,7 @@ export async function redeemInvitationToken(request, env) {
     throw new InvitationRedemptionError(410, "The invitation password-setup window has expired. Ask an Administrator to issue a fresh invitation.");
   }
   if (["CANCELLED","ACTIVATED"].includes(currentState)) {
-    throw new InvitationRedemptionError(409, "This invitation is no longer available for password setup.");
+    throw new InvitationRedemptionError(409, redemptionState === "ACTIVATED" ? "This invitation has already been used. Please sign in with your IRPA account." : "This invitation is not available for password setup.");
   }
   if (invitation.invitationRedeemedUid && invitation.invitationRedeemedUid !== user.localId) {
     throw new InvitationRedemptionError(409, "This invitation has already been associated with another Firebase account.");
