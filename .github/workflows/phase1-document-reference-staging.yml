@@ -48,7 +48,7 @@ jobs:
           grep -Fq 'irpa.documentReference.path' src/firebase/data.js
           grep -Fq 'nextDocumentReferenceViaFirebase' src/firebase/data.js
           grep -Fq '/api/documents/next-reference' src/firebase/data.js
-          grep -Fq 'systemSettings/documentCounters' functions/index.js
+          grep -Fq 'collection("systemSettings").doc("documentCounters")' functions/index.js
           grep -Fq 'documentReferenceRegistry' functions/index.js
           grep -Fq 'systemSettings/documentCounters' drive-gateway/src/cloudflareAuth.mjs
           grep -Fq 'documentReferenceRegistry' drive-gateway/src/cloudflareAuth.mjs
