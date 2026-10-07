@@ -523,6 +523,35 @@ async function provisionInvitationActivation(invitationId, uid, email, env, acce
         activatedRecords++;
       }
     }
+  } else if (invitation.institutionalRecordType === "Auditor" || invitation.institutionalRecordType === "Special Invitee") {
+    const registerId = String(invitation.institutionalRecordId || "").trim();
+    let registerDocument = registerId
+      ? await getFirestoreDocument(`projects/${projectId}/databases/(default)/documents/auditorProfiles/${encodeURIComponent(registerId)}`, accessToken)
+      : null;
+    let registerRows = registerDocument ? [{document:registerDocument}] : [];
+    if (!registerRows.length) registerRows = await queryFirestoreCollection(accessToken, projectId, "auditorProfiles", "email", invitationEmail);
+    const registered = registerRows.find(row => {
+      const d = firestoreDocumentToPlain(row.document.fields || {});
+      return String(d.email || "").trim().toLowerCase() === invitationEmail &&
+        String(d.category || invitation.institutionalRecordType || "").trim() === invitation.institutionalRecordType;
+    }) || registerRows.find(row => String(firestoreDocumentToPlain(row.document.fields || {}).email || "").trim().toLowerCase() === invitationEmail);
+    if (!registered) throw new InvitationRedemptionError(422, "The registered Auditor or Special Invitee record for this invitation could not be resolved.");
+    const registeredData = firestoreDocumentToPlain(registered.document.fields || {});
+    if (String(registeredData.email || "").trim().toLowerCase() !== invitationEmail) {
+      throw new InvitationRedemptionError(422, "The invitation email does not match the registered Auditor or Special Invitee record.");
+    }
+    const category = String(registeredData.category || invitation.institutionalRecordType || "").trim();
+    if (!["Auditor","Special Invitee"].includes(category)) {
+      throw new InvitationRedemptionError(422, "The invitation category is not valid for the Auditors & Special Invitees Register.");
+    }
+    await patchFirestoreFields(documentNameToPath(registered.document.name), null, {
+      uid:{stringValue:uid},
+      invitationId:{stringValue:invitationId},
+      accountActivated:{booleanValue:true},
+      registrationStatus:{stringValue:"Activated"},
+      activatedAt:{timestampValue:now}
+    }, accessToken);
+    activatedRecords++;
   } else {
     const memberRows=await queryFirestoreCollection(accessToken, projectId, "members", "email", invitationEmail);
     let member=memberRows.find(row=>firestoreDocumentToPlain(row.document.fields || {}).uid===uid);
