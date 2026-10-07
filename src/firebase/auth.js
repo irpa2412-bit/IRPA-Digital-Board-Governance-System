@@ -420,34 +420,27 @@ export async function configureInvitationPassword(password) {
   if (!user) throw new Error("The invitation account session is not active. Open the invitation email again.");
   if (!invitationId) throw new Error("The invitation activation context is missing. Open the invitation email again.");
   if (cleanPassword.length < 8) throw new Error("Use a password with at least 8 characters.");
-  const hasPasswordProvider = Array.isArray(user.providerData) && user.providerData.some(provider => provider.providerId === "password");
-  if (!hasPasswordProvider) {
-    const credential = EmailAuthProvider.credential(String(user.email || "").trim().toLowerCase(), cleanPassword);
-    try {
-      await linkWithCredential(user, credential);
-    } catch (error) {
-      if (error?.code !== "auth/provider-already-linked") throw error;
-      // A second tab/request may have linked the provider between the check and link.
-      // Explicitly apply the password requested in this attempt instead of silently
-      // retaining an unknown password from the racing request.
-      await updatePassword(user, cleanPassword);
-    }
-  } else {
-    await updatePassword(user, cleanPassword);
-  }
   const idToken = await user.getIdToken(true);
   const gatewayOrigin = String(import.meta.env.VITE_GATEWAY_ORIGIN || "").trim().replace(/\/$/,"");
   if (!gatewayOrigin) throw new Error("IRPA gateway origin is not configured for this build.");
   const response = await fetch(`${gatewayOrigin}/api/invitations/password-set`, {
     method:"POST",
     headers:{Authorization:`Bearer ${idToken}`,"Content-Type":"application/json"},
-    body:JSON.stringify({invitationId})
+    body:JSON.stringify({invitationId,password:cleanPassword})
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data.ok !== true) throw new Error(data.error || "The server could not verify the new password.");
   window.sessionStorage.removeItem("irpaInvitationPasswordSetup");
   window.sessionStorage.removeItem("irpaInvitationProvisioningPending");
-  if (data.state === "ACTIVATED") window.sessionStorage.removeItem("irpaInvitationId");
+  if (data.state === "ACTIVATED") {
+    window.sessionStorage.removeItem("irpaInvitationId");
+    try {
+      await signOut(auth);
+      await signInWithEmailAndPassword(auth, String(user.email || "").trim().toLowerCase(), cleanPassword);
+    } catch (error) {
+      throw new Error("Your password was set, but IRPA could not reopen the account session automatically. Please sign in with the new password.");
+    }
+  }
   return data;
 }
 
