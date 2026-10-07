@@ -53,6 +53,7 @@ jobs:
           grep -Fq 'systemSettings/documentCounters' drive-gateway/src/cloudflareAuth.mjs
           grep -Fq 'documentReferenceRegistry' drive-gateway/src/cloudflareAuth.mjs
           changed="$(git diff --name-only origin/main...HEAD)"
+          printf "CHANGED FILES:\n%s\n" "$changed"
           test "$(printf '%s\n' "$changed" | wc -l)" -eq 4
           for file in .github/workflows/phase1-document-reference-staging.yml drive-gateway/src/cloudflareAuth.mjs drive-gateway/tests/cloudflare-auth.test.mjs src/firebase/data.js; do
             printf '%s\n' "$changed" | grep -Fxq "$file"
