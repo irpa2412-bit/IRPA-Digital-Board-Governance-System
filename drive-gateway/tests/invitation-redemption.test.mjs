@@ -385,7 +385,7 @@ test("Cloudflare invitation redemption rate-limits the sixth attempt for one inv
   } finally { global.fetch=originalFetch; }
 });
 
-test("password-set is idempotent when invitation is already PROVISIONING_PENDING", async()=>{
+test("password-set resumes an invitation that is already PROVISIONING_PENDING", async()=>{
   const originalFetch=global.fetch;
   const jwk=publicKey.export({format:"jwk"});
   const idToken=makeFirebaseIdToken("provisioning-pending-uid");
@@ -398,12 +398,19 @@ test("password-set is idempotent when invitation is already PROVISIONING_PENDING
         email:{stringValue:"invitee@example.org"},
         invitationRedeemedUid:{stringValue:"provisioning-pending-uid"},
         invitationRedemptionState:{stringValue:"PROVISIONING_PENDING"},
-        invitationPasswordSetupExpiresAt:{timestampValue:"2099-01-01T00:00:00Z"}
+        invitationPasswordSetupExpiresAt:{timestampValue:"2099-01-01T00:00:00Z"},
+        role:{stringValue:"Board Member"},
+        boardMemberId:{stringValue:"provisioning-board-1"}
       },
       updateTime:"2026-10-05T08:00:00.000000Z"
     }),{status:200});
     if(target.includes("/accounts:lookup")) return new Response(JSON.stringify({users:[{localId:"provisioning-pending-uid",email:"invitee@example.org",providerUserInfo:[{providerId:"password"}]}]}),{status:200});
-    if(options.method==="PATCH") patchCalled=true;
+    if(target.includes("/documents:runQuery")) return new Response(JSON.stringify([]),{status:200});
+    if(target.includes("/documents/members/provisioning-board-1")){
+      if(options.method==="PATCH"){ patchCalled=true; return new Response(JSON.stringify({name:"patched"}),{status:200}); }
+      return new Response(JSON.stringify({name:"projects/irpa-digital-board-governance/databases/(default)/documents/members/provisioning-board-1",fields:{email:{stringValue:"invitee@example.org"},boardMember:{booleanValue:true},role:{stringValue:"Board Member"}}}),{status:200});
+    }
+    if(options.method==="PATCH"){ patchCalled=true; return new Response(JSON.stringify({name:"patched"}),{status:200}); }
     throw new Error("Unexpected external request: "+target);
   };
   try{
@@ -413,8 +420,8 @@ test("password-set is idempotent when invitation is already PROVISIONING_PENDING
       body:JSON.stringify({invitationId:"provisioning-pending"})
     }),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)});
     assert.equal(response.status,200);
-    assert.deepEqual(await response.json(),{ok:true,invitationId:"provisioning-pending",uid:"provisioning-pending-uid",state:"PROVISIONING_PENDING"});
-    assert.equal(patchCalled,false);
+    assert.deepEqual(await response.json(),{ok:true,invitationId:"provisioning-pending",uid:"provisioning-pending-uid",state:"ACTIVATED",activatedRecords:1});
+    assert.equal(patchCalled,true);
   } finally { global.fetch=originalFetch; }
 });
 

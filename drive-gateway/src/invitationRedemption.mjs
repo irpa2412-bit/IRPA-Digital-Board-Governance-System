@@ -622,10 +622,14 @@ export async function confirmInvitationPasswordSetup(request, env, claims) {
   const user = lookup.users[0];
   const authEmail = String(user.email || "").trim().toLowerCase();
   if (authEmail !== invitationEmail) throw new InvitationRedemptionError(403, "The Firebase account email does not match the invitation email.");
+  const hasPasswordProvider = Array.isArray(user.providerUserInfo) && user.providerUserInfo.some(provider => String(provider.providerId || "") === "password");
 
   if (redemptionState === "PASSWORD_SETUP_PENDING") {
-    if (!requestedPassword) throw new InvitationRedemptionError(400, "Create a password with at least 8 characters to activate your IRPA account.");
-    await updateFirebaseUserPassword(projectId, claims.user_id, requestedPassword, accessToken);
+    if (requestedPassword) {
+      await updateFirebaseUserPassword(projectId, claims.user_id, requestedPassword, accessToken);
+    } else if (!hasPasswordProvider) {
+      throw new InvitationRedemptionError(409, "Firebase has not confirmed a password credential for this account yet. Complete password setup and try again.");
+    }
     const now = new Date().toISOString();
     await patchFirestoreFields(documentPath, document.updateTime, {
       invitationRedemptionState:{stringValue:"PROVISIONING_PENDING"},
