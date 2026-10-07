@@ -18,7 +18,7 @@ export function canUpload(identity,{classification="Internal",documentType="Admi
   if(!t||!a)return{allowed:false,reason:"Document type and archive category are required."};
   const roleSet=identity.roles.map(upper);
   if(c==="Restricted"&&identity.actorType!=="ADMINISTRATOR"&&!roleSet.includes("RESTRICTED_DOCUMENT_UPLOAD"))return{allowed:false,reason:"Restricted document upload permission is required."};
-  if(t==="Administrator"&&identity.actorType!=="ADMINISTRATOR"&&!roleSet.includes("ADMINISTRATOR_DOCUMENT_UPLOAD"))return{allowed:false,reason:"Administrator document upload permission is required."};
+  if((t==="Administrator"||a==="Administrator Documents")&&identity.actorType!=="ADMINISTRATOR"&&!roleSet.includes("ADMINISTRATOR_DOCUMENT_UPLOAD"))return{allowed:false,reason:"Administrator document upload permission is required."};
   if(a==="Finance Documents"&&identity.actorType!=="ADMINISTRATOR"&&!identity.roles.some(r=>/finance/i.test(r))&&!/finance/i.test(identity.department))return{allowed:false,reason:"Finance document upload authority is required."};
   if(a==="Procurement Documents"&&identity.actorType!=="ADMINISTRATOR"&&!identity.roles.some(r=>/procurement/i.test(r))&&!/procurement/i.test(identity.department))return{allowed:false,reason:"Procurement document upload authority is required."};
   return{allowed:true};
