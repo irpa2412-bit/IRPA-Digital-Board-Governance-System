@@ -435,7 +435,8 @@ async function provisionInvitationActivation(invitationId, uid, email, env, acce
 
   const currentState = String(invitation.invitationRedemptionState || "PENDING");
   if (currentState === "ACTIVATED") return {ok:true, invitationId, uid, state:"ACTIVATED"};
-  if (!["PROVISIONING_PENDING","PASSWORD_SETUP_PENDING"].includes(currentState)) {
+  if (currentState === "PROVISIONING_PENDING") return {ok:true, invitationId, uid, state:"PROVISIONING_PENDING"};
+  if (currentState !== "PASSWORD_SETUP_PENDING") {
     throw new InvitationRedemptionError(409, "This invitation is not ready for activation.");
   }
 
