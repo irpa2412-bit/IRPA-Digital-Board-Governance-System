@@ -4,6 +4,18 @@ import DocumentReader from "../components/DocumentReader";
 import { listLifecycleDocuments,uploadLifecycleDocument,downloadLifecycleDocument,transitionLifecycleDocument,completeLifecycleSignature,shareLifecycleDocument } from "../firebase/documentLifecycle";
 
 const TYPES=["Governance","Finance","Procurement","Administrative","HR","Research","Project","Other"];
+const FORMAT_REQUIREMENTS={
+ Governance:[".pdf",".doc",".docx",".ppt",".pptx",".txt",".png",".jpg",".jpeg"],
+ Finance:[".pdf",".doc",".docx",".xls",".xlsx",".csv",".txt",".png",".jpg",".jpeg"],
+ Procurement:[".pdf",".doc",".docx",".xls",".xlsx",".csv",".txt",".png",".jpg",".jpeg"],
+ Administrative:[".pdf",".doc",".docx",".xls",".xlsx",".ppt",".pptx",".txt",".csv",".png",".jpg",".jpeg",".webp"],
+ HR:[".pdf",".doc",".docx",".xls",".xlsx",".csv",".txt",".png",".jpg",".jpeg"],
+ Research:[".pdf",".doc",".docx",".xls",".xlsx",".ppt",".pptx",".csv",".txt",".png",".jpg",".jpeg",".webp"],
+ Project:[".pdf",".doc",".docx",".xls",".xlsx",".ppt",".pptx",".csv",".txt",".png",".jpg",".jpeg",".webp"],
+ Other:[".pdf",".doc",".docx",".xls",".xlsx",".ppt",".pptx",".odt",".ods",".odp",".rtf",".txt",".csv",".tsv",".md",".html",".xhtml",".epub",".json",".xml",".png",".jpg",".jpeg",".webp",".svg"]
+};
+const formatAccept=type=>(FORMAT_REQUIREMENTS[type]||FORMAT_REQUIREMENTS.Other).join(",");
+const formatLabel=type=>(FORMAT_REQUIREMENTS[type]||FORMAT_REQUIREMENTS.Other).join(", ");
 const CATEGORIES=["Finance Documents","Procurement Documents","Governance Documents","Administrative Documents","Administrator Documents"];
 const CLASSIFICATIONS=["Public","Internal","Confidential","Restricted"];
 const STAGES=["WORKING","PENDING_SIGNATURE","SIGNED","POST_SIGNATURE","FINAL_ARCHIVE"];
@@ -19,7 +31,7 @@ export default function DocumentLifecycleModule({profile,employee,admin=false}){
  const filtered=useMemo(()=>documents.filter(d=>{const s=readStatus(d);if(tab==="MY_WORK")return d.ownerUid===profile?.uid||d.ownerUid===employee?.uid; if(tab==="DEPARTMENT")return d.department&&(d.department===profile?.department||d.department===employee?.department);if(tab==="SHARED")return Array.isArray(d.authorizedUids)&&d.authorizedUids.includes(profile?.uid||employee?.uid);if(tab==="SIGNATURE")return s==="PENDING_SIGNATURE"||s==="SIGNED";if(tab==="POST")return s==="POST_SIGNATURE";if(tab==="FINAL")return s==="FINAL_ARCHIVE";return true}),[documents,tab,profile,employee]);
  const select=doc=>{setSelected(doc);setMessage("");setError("")};
  const action=async(fn,success)=>{setBusy(true);setError("");setMessage("");try{const r=await fn();setMessage(success||"Document workflow updated.");await load();if(r?.documentId){const fresh=(documents||[]).find(d=>d.documentId===r.documentId);if(fresh)setSelected(fresh)}}catch(e){setError(e.message||"Document action failed.")}finally{setBusy(false)}};
- const upload=async e=>{e.preventDefault();if(!file)return;await action(async()=>{const r=await uploadLifecycleDocument({file,title,documentType,archiveCategory,classification,version});setUploadOpen(false);setFile(null);setTitle("");setDocumentType("");setClassification("Internal");return r},"Document uploaded into the Working Documents archive.");};
+ const upload=async e=>{e.preventDefault();if(!file)return;const allowed=FORMAT_REQUIREMENTS[documentType]||FORMAT_REQUIREMENTS.Other;const extension="."+String(file.name||"").split(".").pop().toLowerCase();if(!allowed.includes(extension)){setError("The selected file format does not meet the requirements for "+documentType+". Allowed: "+allowed.join(", "));return;}await action(async()=>{const r=await uploadLifecycleDocument({file,title,documentType,archiveCategory,classification,version});setUploadOpen(false);setFile(null);setTitle("");setDocumentType("");setClassification("Internal");return r},"Document uploaded into the Working Documents archive.");};
  const currentUid=profile?.uid||employee?.uid;
  return <section className="document-lifecycle-module">
   <div className="panel" style={{marginBottom:14}}>
@@ -35,7 +47,7 @@ export default function DocumentLifecycleModule({profile,employee,admin=false}){
     <div className="form-field"><label>Archive Category</label><select value={archiveCategory} onChange={e=>setArchiveCategory(e.target.value)}>{CATEGORIES.map(x=><option key={x}>{x}</option>)}</select></div>
     <div className="form-field"><label>Classification</label><select value={classification} onChange={e=>setClassification(e.target.value)}>{CLASSIFICATIONS.map(x=><option key={x}>{x}</option>)}</select></div>
     <div className="form-field"><label>Version</label><input value={version} onChange={e=>setVersion(e.target.value)}/></div>
-    <div className="form-field"><label>Document File</label><input type="file" onChange={e=>setFile(e.target.files?.[0]||null)} required/></div>
+    <div className="form-field"><label>Document File</label><input type="file" accept={formatAccept(documentType)} onChange={e=>setFile(e.target.files?.[0]||null)} required/><small style={{display:"block",marginTop:5,opacity:.78}}>Required format(s) for {documentType||"the selected document type"}: {documentType?formatLabel(documentType):"select a document type first"}</small>{file&&<small style={{display:"block",marginTop:4}}>Selected: {file.name} ({file.type||"format not identified"})</small>}</div>
    </div>
    <div className="form-actions"><button type="submit" disabled={busy||!file}>{busy?"Uploading…":"Upload to Working Archive"}</button></div>
   </form>}
