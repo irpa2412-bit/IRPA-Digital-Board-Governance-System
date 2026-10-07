@@ -99,7 +99,7 @@ export default {
           return json(await withInvitationRetry(() => redeemInvitationToken(request, env), "redeem"), 200, corsHeaders(request));
         } catch (error) {
           if (error instanceof InvitationRedemptionError) {
-            if (error.status === 410 && /expired|cancelled/i.test(String(error.message||""))) {
+            if (/expired|cancelled/i.test(String(error.message||""))) {
               await notifyInvitationAdministrator(request, env, error.message);
             }
             return json({ok:false,error:error.message}, error.status, corsHeaders(request));
