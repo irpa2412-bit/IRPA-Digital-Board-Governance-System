@@ -6,7 +6,12 @@ on:
     branches: [feat/signature-trust-platform-20261007]
     paths:
       - "drive-gateway/src/cryptographicGate.mjs"
+      - "drive-gateway/src/signing.mjs"
+      - "drive-gateway/src/esignContext.mjs"
       - "drive-gateway/tests/cryptographic-gate.test.mjs"
+      - "drive-gateway/tests/production-crypto-integration.test.mjs"
+      - "drive-gateway/scripts/provision-crypto-signer-key.mjs"
+      - "drive-gateway/wrangler.toml"
       - "drive-gateway/src/util.mjs"
       - "drive-gateway/package.json"
       - ".github/workflows/cryptographic-gate.yml"
@@ -30,6 +35,9 @@ jobs:
       - name: Run cryptographic acceptance tests
         working-directory: drive-gateway
         run: node --test tests/cryptographic-gate.test.mjs
+      - name: Run production cryptographic integration acceptance tests
+        working-directory: drive-gateway
+        run: node --test tests/production-crypto-integration.test.mjs
       - name: Run complete gateway regression suite
         working-directory: drive-gateway
         run: npm test
