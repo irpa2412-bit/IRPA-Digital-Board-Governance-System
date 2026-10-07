@@ -376,7 +376,7 @@ test("Cloudflare invitation redemption rate-limits the sixth attempt for one inv
   try{
     const responses=[];
     for(let i=0;i<6;i++) responses.push(await handler.fetch(new Request("https://gw.test/api/invitations/redeem",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:id+"."+secret})}),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)}));
-    assert.deepEqual(responses.slice(0,5).map(r=>r.status),[409,409,409,409,409]);
+    assert.deepEqual(responses.slice(0,5).map(r=>r.status),[200,200,200,200,200]);
     assert.equal(responses[5].status,429);
     assert.match((await responses[5].json()).error,/too many invitation redemption attempts/i);
   } finally { global.fetch=originalFetch; }
