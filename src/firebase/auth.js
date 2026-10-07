@@ -305,7 +305,10 @@ function firebaseErrorMessage(error) {
     "auth/weak-password": "The password must contain at least 6 characters.",
     "auth/email-already-in-use": "An account already exists for this email address. Use Forgot password? if you need to reset the password.",
     "auth/invalid-action-code": "This sign-in link is invalid or has expired. Request a fresh IRPA invitation/sign-in link and use the newest email only.",
-    "auth/expired-action-code": "This sign-in link has expired. Request a fresh IRPA invitation/sign-in link."
+    "auth/expired-action-code": "This sign-in link has expired. Request a fresh IRPA invitation/sign-in link.",
+    "auth/internal-error": "IRPA could not establish your invitation session. Your invitation has not been consumed. Please try the invitation again.",
+    "auth/invalid-custom-token": "IRPA could not validate the invitation session. Your invitation has not been consumed. Please try the invitation again.",
+    "auth/custom-token-mismatch": "IRPA could not connect the invitation to the IRPA Firebase project. Please request a fresh invitation link."
   };
   return known[code] ? `${known[code]} (${code})` : `${message}${code ? ` (${code})` : ""}`;
 }
