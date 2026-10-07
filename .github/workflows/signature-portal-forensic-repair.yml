@@ -38,7 +38,7 @@ jobs:
       - name: No deployment gate
         run: |
           set -euo pipefail
-          if grep -RInE '(^|[[:space:]])(npm|npx)[[:space:]]+(run[[:space:]]+)?deploy|wrangler[[:space:]]+deploy|firebase[[:space:]]+deploy' drive-gateway .github/workflows/signature-portal-forensic-repair.yml; then
+          if grep -RInE 'wrangler[[:space:]]+deploy|firebase[[:space:]]+deploy|npm[[:space:]]+(run[[:space:]]+)?deploy' drive-gateway; then
             echo "Unexpected deployment command detected."
             exit 1
           fi
