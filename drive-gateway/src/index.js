@@ -19,10 +19,25 @@ import { sendInvitationEmail, buildInvitationMessage, validateRecipient } from "
 import { route as esignRoute } from "./router.mjs";
 import { buildEsignContext, EsignRecordDurableObject } from "./esignContext.mjs";
 import { runCleanup } from "./upload.mjs";
+import { createDocumentLifecycleRouter } from "./documentLifecycle.mjs";
 import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPasswordSetup, getInvitationSessionState } from "./invitationRedemption.mjs";
 
 let jwksCache = null;
 let jwksFetchedAt = 0;
+
+const documentLifecycleRouter = createDocumentLifecycleRouter({
+  FIREBASE_PROJECT_ID,
+  allowedContentTypes: ALLOWED_CONTENT_TYPES,
+  authenticateFirebaseRequest,
+  getFirestoreDocument,
+  getDriveAccessToken,
+  driveFetch,
+  findOrCreateFolder,
+  updateFirestoreDocument,
+  firestoreDocumentToPlain,
+  json,
+  corsHeaders
+});
 
 export default {
   async fetch(request, env) {
@@ -58,6 +73,11 @@ export default {
 
       // Normalize trailing slashes so portal upload/archive actions cannot be blocked by URL formatting.
       const pathname = url.pathname.replace(/\/+$/, "") || "/";
+
+      if (pathname.startsWith("/api/document-lifecycle/")) {
+        const lifecycleResponse = await documentLifecycleRouter(request, env);
+        if (lifecycleResponse) return lifecycleResponse;
+      }
 
       if (pathname === "/api/upload" && request.method === "POST") {
         return await upload(request, env);
