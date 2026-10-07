@@ -117,7 +117,7 @@ test("Cloudflare invitation redemption self-heals an existing password account",
     assert.equal(body.ok,true);
     assert.equal(body.uid,"firebase-existing-uid");
     assert.ok(body.customToken);
-    assert.equal(calls.some(c=>c.options.method==="PATCH"),false);
+    assert.equal(calls.some(c=>c.options.method==="PATCH"),true);
   } finally { global.fetch=originalFetch; }
 });
 
