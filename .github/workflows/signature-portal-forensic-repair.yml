@@ -1,0 +1,45 @@
+name: Signature Portal Forensic Repair
+
+on:
+  push:
+    branches: [feat/signature-trust-platform-20261007]
+    paths:
+      - "drive-gateway/src/signing.mjs"
+      - "drive-gateway/src/router.mjs"
+      - "drive-gateway/tests/**"
+      - "drive-gateway/package.json"
+      - "src/**"
+      - "package.json"
+      - ".github/workflows/signature-portal-forensic-repair.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  forensic-repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install gateway dependencies
+        working-directory: drive-gateway
+        run: npm ci --no-audit --no-fund
+      - name: Run gateway tests
+        working-directory: drive-gateway
+        run: npm test
+      - name: Root dependency install
+        run: npm install --no-audit --no-fund
+      - name: Production build verification
+        run: npm run build
+      - name: No deployment gate
+        run: |
+          set -euo pipefail
+          if grep -RInE '(^|[[:space:]])(npm|npx)[[:space:]]+(run[[:space:]]+)?deploy|wrangler[[:space:]]+deploy|firebase[[:space:]]+deploy' drive-gateway .github/workflows/signature-portal-forensic-repair.yml; then
+            echo "Unexpected deployment command detected."
+            exit 1
+          fi
+          echo "NO_PRODUCTION_DEPLOYMENT_COMMANDS_DETECTED=true"
