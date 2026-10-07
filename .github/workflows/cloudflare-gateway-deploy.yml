@@ -192,6 +192,29 @@ jobs:
           echo "$body" | grep -q '"ok":true'
           echo "$body" | grep -q '"storageProvider":"Google Drive"'
 
+      - name: Verify production CORS
+        run: |
+          set -euo pipefail
+          headers="$(curl --silent --show-error -D - -o /dev/null -X OPTIONS             -H "Origin: https://irpa-digital-board-governance.web.app"             -H "Access-Control-Request-Method: POST"             -H "Access-Control-Request-Headers: content-type,authorization"             https://irpa-google-drive-gateway.irpa-governance.workers.dev/api/invitations/redeem)"
+          echo "$headers"
+          echo "$headers" | grep -i '^access-control-allow-origin:' | grep -q 'https://irpa-digital-board-governance.web.app'
+          echo "$headers" | grep -i '^access-control-allow-methods:' | grep -qi 'POST'
+          echo "$headers" | grep -i '^access-control-allow-headers:' | grep -qi 'content-type'
+          echo "$headers" | grep -i '^access-control-allow-headers:' | grep -qi 'authorization'
+
+      - name: Roll back Worker immediately if production gate fails
+        if: failure() && env.PRODUCTION_WORKER_ROLLBACK_VERSION != ''
+        working-directory: drive-gateway
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          echo "Rolling production Worker back to $PRODUCTION_WORKER_ROLLBACK_VERSION"
+          npx wrangler versions deploy "$PRODUCTION_WORKER_ROLLBACK_VERSION" --name irpa-google-drive-gateway
+          curl --fail --silent --show-error --retry 5 --retry-delay 2             https://irpa-google-drive-gateway.irpa-governance.workers.dev/health
+          echo
+
       - name: Verify migrated authentication runtime is live
         run: |
           set -euo pipefail
