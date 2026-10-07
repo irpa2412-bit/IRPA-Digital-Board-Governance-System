@@ -1,4 +1,5 @@
 name: Cryptographic Gate
+# Hard acceptance gate for C-G01 through C-G12
 
 on:
   push:
