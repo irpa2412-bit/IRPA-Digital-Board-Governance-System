@@ -1,5 +1,16 @@
 export const CLASSIFICATIONS = ["Public","Internal","Confidential","Restricted"];
 export const WORKFLOW_STAGES = ["WORKING","PENDING_SIGNATURE","SIGNED","POST_SIGNATURE","FINAL_ARCHIVE"];
+
+export const DOCUMENT_FORMAT_REQUIREMENTS = {
+  Governance: ["application/pdf","application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document","application/vnd.ms-powerpoint","application/vnd.openxmlformats-officedocument.presentationml.presentation","text/plain","image/png","image/jpeg"],
+  Finance: ["application/pdf","application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document","application/vnd.ms-excel","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","text/csv","text/plain","image/png","image/jpeg"],
+  Procurement: ["application/pdf","application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document","application/vnd.ms-excel","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","text/csv","text/plain","image/png","image/jpeg"],
+  Administrative: ["application/pdf","application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document","application/vnd.ms-excel","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","application/vnd.ms-powerpoint","application/vnd.openxmlformats-officedocument.presentationml.presentation","text/plain","text/csv","image/png","image/jpeg","image/webp"],
+  HR: ["application/pdf","application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document","application/vnd.ms-excel","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","text/csv","text/plain","image/png","image/jpeg"],
+  Research: ["application/pdf","application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document","application/vnd.ms-excel","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","application/vnd.ms-powerpoint","application/vnd.openxmlformats-officedocument.presentationml.presentation","text/csv","text/plain","image/png","image/jpeg","image/webp"],
+  Project: ["application/pdf","application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document","application/vnd.ms-excel","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","application/vnd.ms-powerpoint","application/vnd.openxmlformats-officedocument.presentationml.presentation","text/csv","text/plain","image/png","image/jpeg","image/webp"],
+  Other: ["application/pdf","application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document","application/vnd.ms-excel","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","application/vnd.ms-powerpoint","application/vnd.openxmlformats-officedocument.presentationml.presentation","application/vnd.oasis.opendocument.text","application/vnd.oasis.opendocument.spreadsheet","application/vnd.oasis.opendocument.presentation","application/rtf","text/plain","text/csv","text/tab-separated-values","text/markdown","text/html","application/xhtml+xml","application/epub+zip","application/json","application/xml","text/xml","image/png","image/jpeg","image/webp","image/svg+xml"]
+};
 const normalize = v => String(v ?? "").trim();
 const upper = v => normalize(v).toUpperCase();
 const list = v => Array.isArray(v) ? v.map(normalize).filter(Boolean) : [];
@@ -12,8 +23,10 @@ export function resolveIdentity({uid,email,member,employee,admin}={}) {
   const roles = [...list(member?.roles),...list(member?.assignedRoles),...list(member?.selectedRoles),member?.role,...list(employee?.roles),...list(employee?.assignedRoles),...list(employee?.selectedRoles),employee?.role].map(normalize).filter(Boolean);
   return {uid:normalize(uid),email:normalize(email).toLowerCase(),actorType:activeAdmin?"ADMINISTRATOR":activeEmployee?"EMPLOYEE":"MEMBER",roles:[...new Set(roles)],department:normalize(employee?.department||member?.department),unit:normalize(employee?.unit||member?.unit)};
 }
-export function canUpload(identity,{classification="Internal",documentType="Administrative",archiveCategory="Administrative Documents"}={}) {
+export function canUpload(identity,{classification="Internal",documentType="Administrative",archiveCategory="Administrative Documents",contentType=""}={}) {
   const c=normalize(classification),t=normalize(documentType),a=normalize(archiveCategory);
+  const requiredFormats=DOCUMENT_FORMAT_REQUIREMENTS[t]||DOCUMENT_FORMAT_REQUIREMENTS.Other;
+  if(contentType&&!requiredFormats.includes(normalize(contentType)))return{allowed:false,reason:"The selected file format does not meet the requirements for this document type."};
   if(!CLASSIFICATIONS.includes(c))return{allowed:false,reason:"Invalid classification."};
   if(!t||!a)return{allowed:false,reason:"Document type and archive category are required."};
   const roleSet=identity.roles.map(upper);
