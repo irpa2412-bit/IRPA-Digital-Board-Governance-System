@@ -282,6 +282,16 @@ export function createCloudflareSignerKeyProvider(env) {
   });
 }
 
+export async function rollbackCryptographicEvidence(meta, envelopeId) {
+  if (!meta?.list || !meta?.delete || !envelopeId) return;
+  const rows = await meta.list("cryptographicEvidence");
+  for (const row of rows || []) {
+    if (row?.envelopeId === envelopeId) {
+      try { await meta.delete("cryptographicEvidence", row.id); } catch {}
+    }
+  }
+}
+
 export async function sealAndPersist({
   meta,
   storage,
@@ -346,6 +356,7 @@ export async function sealAndPersist({
       sealed: true,
       documentHash,
       evidenceIds,
+      createdEvidenceIds: createdEvidence.map(e => e.evidenceId),
       evidence: storedEvidence,
       auditEvents: artifacts,
     };
