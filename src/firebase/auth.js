@@ -367,9 +367,13 @@ export async function sendEmployeeRegistrationEmail(email, employeeNumber) {
     await updateDoc(employeeDoc.ref, { invitationId, invitationDeliveryMode: "Dedicated Invitation Token", updatedAt: serverTimestamp() });
   }
 
-  const call = httpsCallable(getFunctions(undefined, "us-central1"), "sendMemberInvitation");
-  const result = await call({ invitationId });
-  return { ...(result.data || {}), invitationId, accountCreated: false };
+  const result = await sendMemberInvitationEmail(
+    cleanEmail,
+    invitationId,
+    String(employee.role || "Employee").trim(),
+    String(employee.memberType || "Management").trim()
+  );
+  return { ...(result || {}), invitationId, accountCreated: false };
 }
 
 // Invitation delivery is handled by the server-side dedicated invitation-token workflow.
