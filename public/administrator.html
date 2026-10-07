@@ -25,23 +25,24 @@
     <p class="sub">Secure administrator access to the IRPA Digital Board Governance System.</p>
     <form id="loginForm">
       <label for="email">Administrator email</label>
-      <input id="email" type="email" value="irpa2412@gmail.com" readonly autocomplete="username">
+      <input id="email" type="email" value="" autocomplete="username">
       <label for="password">Administrator password</label>
       <input id="password" type="password" required minlength="6" autocomplete="current-password" placeholder="Enter your administrator password">
       <button id="loginButton" type="submit">Administrator Sign In</button>
     </form>
     <button id="resetButton" class="link" type="button">Forgot administrator password?</button>
     <button id="googleButton" class="secondary" type="button">Sign In with Google</button>
-    <div id="message" class="message" role="status" aria-live="polite"></div>
-    <div class="small">Assigned administrator: irpa2412@gmail.com</div>
+    <div id="recaptcha-container" style="margin-top:12px"></div><div id="verificationPanel" style="display:none;margin-top:18px;padding:14px;border:1px solid #c9d8cd;border-radius:12px;background:#f7faf8"><strong id="verificationTitle">Verification required</strong><p id="verificationText" style="color:#5b665f;line-height:1.45"></p><label for="verificationCode">Verification code</label><input id="verificationCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="Enter 6-digit code"><button id="verificationButton" type="button">Verify and Continue</button></div><div id="message" class="message" role="status" aria-live="polite"></div>
+    <div class="small">Only active IRPA Administrators may enter. IRPA institutional addresses receive login verification codes by email; other Administrator accounts use their registered phone MFA.</div>
   </main>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
     import {
       getAuth, setPersistence, browserLocalPersistence,
       signInWithEmailAndPassword, sendPasswordResetEmail,
-      GoogleAuthProvider, signInWithPopup, verifyPasswordResetCode, confirmPasswordReset
+      GoogleAuthProvider, signInWithPopup, verifyPasswordResetCode, confirmPasswordReset, getMultiFactorResolver, PhoneAuthProvider, PhoneMultiFactorGenerator, RecaptchaVerifier
     } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
+    import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js";
 
     const firebaseConfig={
       apiKey:"AIzaSyC2aMdxHD14nMnGiRyf4mSL1ixXdzBoOtE",
@@ -51,14 +52,27 @@
       appId:"1:217055978789:web:937d1f2f781202cc1e26cc",
       measurementId:"G-XDJEBRBEVC"
     };
-    const ADMIN_EMAIL="irpa2412@gmail.com";
     const app=initializeApp(firebaseConfig);
     const auth=getAuth(app);
+    const functions=getFunctions(app,"us-central1");
+    const beginEmailVerification=httpsCallable(functions,"beginAdministratorEmailVerification");
+    const verifyEmailVerification=httpsCallable(functions,"verifyAdministratorEmailVerification");
     const message=document.getElementById("message");
     const loginButton=document.getElementById("loginButton");
     const resetButton=document.getElementById("resetButton");
     const googleButton=document.getElementById("googleButton");
     const password=document.getElementById("password");
+    const email=document.getElementById("email");
+    const verificationPanel=document.getElementById("verificationPanel");
+    const verificationTitle=document.getElementById("verificationTitle");
+    const verificationText=document.getElementById("verificationText");
+    const verificationCode=document.getElementById("verificationCode");
+    const verificationButton=document.getElementById("verificationButton");
+    const recaptchaContainer=document.getElementById("recaptcha-container");
+    let pendingMfaResolver=null;
+    let pendingMfaVerificationId=null;
+    let recaptchaVerifier=null;
+    const isEmailSecondFactor=address=>{const e=String(address||"").trim().toLowerCase();return e.endsWith("@irpa.or.tz")||e==="irpa2412@gmail.com";};
     const params=new URLSearchParams(location.search);
     const resetMode=params.get("mode")==="resetPassword"||params.get("adminReset")==="1";
     const resetCode=params.get("oobCode");
@@ -76,12 +90,65 @@
     const errorText=(e)=>{
       const code=e?.code||"";
       if(code==="auth/invalid-credential"||code==="auth/wrong-password") return "The administrator password was not accepted.";
-      if(code==="auth/user-not-found") return "The assigned administrator account was not found.";
+      if(code==="auth/user-not-found") return "The Administrator account was not found.";
       if(code==="auth/too-many-requests") return "Too many attempts. Wait a moment and try again.";
       if(code==="auth/popup-closed-by-user") return "Google sign-in was closed before authentication completed.";
-      return e?.message?`${e.message}${code?` (${code})`:""}`:"Administrator authentication failed. Check Firebase Authentication configuration.";
+      if(code==="auth/multi-factor-auth-required") return "Phone verification is required to complete this Administrator sign-in.";
+      return e?.message?String(e.message):"Administrator authentication failed.";
     };
-
+    const showVerification=(title,text)=>{
+      verificationTitle.textContent=title;
+      verificationText.textContent=text;
+      verificationPanel.style.display="block";
+      verificationCode.value="";
+      verificationCode.focus();
+    };
+    const clearVerification=()=>{
+      verificationPanel.style.display="none";
+      verificationCode.value="";
+      pendingMfaResolver=null;
+      pendingMfaVerificationId=null;
+      if(recaptchaVerifier){try{recaptchaVerifier.clear()}catch(_){} recaptchaVerifier=null;}
+    };
+    const redirectToWorkspace=()=>{
+      show("Administrator authentication and second-factor verification completed. Opening the governance dashboard...");
+      setTimeout(()=>location.replace(location.origin+"/"),500);
+    };
+    const requestEmailOtp=async()=>{
+      const result=await beginEmailVerification({});
+      const data=result.data||{};
+      if(data.method!=="EMAIL_OTP") throw new Error("This Administrator account must use phone verification through Firebase multi-factor authentication.");
+      showVerification("Email verification required","A six-digit login verification code has been sent to "+(data.maskedEmail||"your registered IRPA email address")+". The code expires in 10 minutes.");
+    };
+    const completePhoneMfa=async error=>{
+      const resolver=getMultiFactorResolver(auth,error);
+      const hint=resolver.hints.find(item=>item.factorId===PhoneMultiFactorGenerator.FACTOR_ID);
+      if(!hint) throw new Error("This Administrator account does not have a registered phone verification factor. Contact an IRPA Administrator to configure phone MFA.");
+      pendingMfaResolver=resolver;
+      if(!recaptchaVerifier) recaptchaVerifier=new RecaptchaVerifier(auth,recaptchaContainer,{size:"invisible"});
+      const provider=new PhoneAuthProvider(auth);
+      pendingMfaVerificationId=await provider.verifyPhoneNumber({multiFactorHint:hint,session:resolver.session},recaptchaVerifier);
+      showVerification("Phone verification required","Enter the six-digit verification code sent to "+(hint.phoneNumber||"the registered phone")+".");
+    };
+    verificationButton.addEventListener("click",async()=>{
+      const code=verificationCode.value.trim();
+      if(!/^\d{6}$/.test(code)){show("Enter the six-digit verification code.");return;}
+      verificationButton.disabled=true;
+      try{
+        if(pendingMfaResolver){
+          const credential=PhoneAuthProvider.credential(pendingMfaVerificationId,code);
+          const assertion=PhoneMultiFactorGenerator.assertion(credential);
+          await pendingMfaResolver.resolveSignIn(assertion);
+          clearVerification();
+          redirectToWorkspace();
+        }else{
+          await verifyEmailVerification({code});
+          clearVerification();
+          redirectToWorkspace();
+        }
+      }catch(error){console.error("IRPA Administrator second-factor verification error:",error);show(error?.message||"Verification failed. Check the code and try again.");}
+      finally{verificationButton.disabled=false;}
+    });
     await setPersistence(auth,browserLocalPersistence);
 
     if(resetMode){
@@ -109,21 +176,20 @@
     }
 
     document.getElementById("loginForm").addEventListener("submit",async(e)=>{
-      e.preventDefault(); show(""); busy(true);
+      e.preventDefault(); show(""); clearVerification(); busy(true);
+      const cleanEmail=String(email.value||"").trim().toLowerCase();
+      if(!cleanEmail){show("Enter the Administrator email address.");busy(false);return;}
       try{
-        if(resetMode){
-          await confirmPasswordReset(auth,resetCode,password.value);
-          show("Administrator password updated successfully. You can now sign in.");
-          setTimeout(()=>location.replace(location.origin+"/administrator.html"),700);
-          return;
-        }
-        const credential=await signInWithEmailAndPassword(auth,ADMIN_EMAIL,password.value);
-        if((credential.user.email||"").toLowerCase()!==ADMIN_EMAIL){
-          await auth.signOut();
-          throw new Error("This account is not the assigned IRPA administrator account.");
-        }
-        show("Administrator authenticated. Opening the governance dashboard...");
-        setTimeout(()=>location.replace(location.origin+"/"),500);
+        let credential;
+        try{credential=await signInWithEmailAndPassword(auth,cleanEmail,password.value);}
+        catch(error){if(error?.code==="auth/multi-factor-auth-required"){busy(false);await completePhoneMfa(error);return;}throw error;}
+        const signedInEmail=(credential.user.email||"").toLowerCase();
+        if(signedInEmail!==cleanEmail){await auth.signOut();throw new Error("The authenticated account does not match the Administrator email entered.");}
+        if(isEmailSecondFactor(signedInEmail)){busy(false);await requestEmailOtp();return;}
+        const factors=credential.user.multiFactor?.enrolledFactors||[];
+        if(!factors.some(f=>f.factorId==="phone")){await auth.signOut();throw new Error("Phone verification is required for non-IRPA Administrator accounts. This Administrator account has no registered phone MFA factor.");}
+        await auth.signOut();
+        throw new Error("This Administrator account requires phone MFA. Start the sign-in again and complete the phone verification challenge when prompted.");
       }catch(err){console.error("IRPA administrator authentication error:",err);show(errorText(err));busy(false)}
     });
 
@@ -140,17 +206,19 @@
     });
 
     googleButton.addEventListener("click",async()=>{
-      busy(true); show("");
+      busy(true); show(""); clearVerification();
       try{
-        const provider=new GoogleAuthProvider();
-        provider.setCustomParameters({prompt:"select_account",login_hint:ADMIN_EMAIL});
-        const credential=await signInWithPopup(auth,provider);
-        if((credential.user.email||"").toLowerCase()!==ADMIN_EMAIL){
-          await auth.signOut();
-          throw new Error("The Google account used is not the assigned IRPA administrator account.");
-        }
-        show("Administrator authenticated. Opening the governance dashboard...");
-        setTimeout(()=>location.replace(location.origin+"/"),500);
+        let credential;
+        try{credential=await signInWithPopup(auth,new GoogleAuthProvider());}
+        catch(error){if(error?.code==="auth/multi-factor-auth-required"){busy(false);await completePhoneMfa(error);return;}throw error;}
+        const signedInEmail=(credential.user.email||"").trim().toLowerCase();
+        if(!signedInEmail) throw new Error("Google authentication did not return an email address.");
+        email.value=signedInEmail;
+        if(isEmailSecondFactor(signedInEmail)){busy(false);await requestEmailOtp();return;}
+        const factors=credential.user.multiFactor?.enrolledFactors||[];
+        if(!factors.some(f=>f.factorId==="phone")){await auth.signOut();throw new Error("Phone verification is required for non-IRPA Administrator accounts. This Administrator account has no registered phone MFA factor.");}
+        await auth.signOut();
+        throw new Error("This Administrator account requires phone MFA. Start the sign-in again and complete the phone verification challenge when prompted.");
       }catch(err){console.error("IRPA administrator Google authentication error:",err);show(errorText(err));busy(false)}
     });
   </script>
