@@ -375,7 +375,7 @@ async function patchFirestoreFields(documentPath, updateTime, fields, accessToke
 }
 
 function documentNameToPath(name) {
-  return String(name || "").replace(/^projects\/[^/]+\/databases\/\(default\)\/documents\//, "");
+  return String(name || "");
 }
 
 function isBoardInvitationRole(role) {
