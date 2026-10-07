@@ -609,6 +609,19 @@ export async function confirmInvitationPasswordSetup(request, env, claims) {
   if (!["PASSWORD_SETUP_PENDING","PROVISIONING_PENDING"].includes(redemptionState)) {
     throw new InvitationRedemptionError(409, "This invitation is not waiting for password setup or resumable provisioning.");
   }
+
+  // A bare PROVISIONING_PENDING state is already idempotently acknowledged.
+  // Only invitations carrying an institutional target may resume provisioning.
+  const hasProvisioningTarget = Boolean(
+    invitation.boardMemberId ||
+    invitation.employeeId ||
+    invitation.institutionalRecordId ||
+    invitation.institutionalRecordType
+  );
+  if (redemptionState === "PROVISIONING_PENDING" && !hasProvisioningTarget) {
+    return {ok:true,invitationId,uid:claims.user_id,state:"PROVISIONING_PENDING"};
+  }
+
   if (redemptionState === "PASSWORD_SETUP_PENDING" && new Date(invitation.invitationPasswordSetupExpiresAt || 0).getTime() <= Date.now()) {
     throw new InvitationRedemptionError(410, "The invitation password-setup window has expired. Ask an Administrator to issue a fresh invitation.");
   }
@@ -623,9 +636,16 @@ export async function confirmInvitationPasswordSetup(request, env, claims) {
   const authEmail = String(user.email || "").trim().toLowerCase();
   if (authEmail !== invitationEmail) throw new InvitationRedemptionError(403, "The Firebase account email does not match the invitation email.");
 
+  const hasPasswordProvider = Array.isArray(user.providerUserInfo) &&
+    user.providerUserInfo.some(provider => String(provider.providerId || "") === "password");
+  if (!hasPasswordProvider) {
+    throw new InvitationRedemptionError(409, "Firebase has not confirmed a password credential for this account yet. Complete password setup and try again.");
+  }
+
   if (redemptionState === "PASSWORD_SETUP_PENDING") {
-    if (!requestedPassword) throw new InvitationRedemptionError(400, "Create a password with at least 8 characters to activate your IRPA account.");
-    await updateFirebaseUserPassword(projectId, claims.user_id, requestedPassword, accessToken);
+    if (requestedPassword) {
+      await updateFirebaseUserPassword(projectId, claims.user_id, requestedPassword, accessToken);
+    }
     const now = new Date().toISOString();
     await patchFirestoreFields(documentPath, document.updateTime, {
       invitationRedemptionState:{stringValue:"PROVISIONING_PENDING"},
@@ -638,9 +658,7 @@ export async function confirmInvitationPasswordSetup(request, env, claims) {
     return await provisionInvitationActivation(invitationId, claims.user_id, invitationEmail, env, accessToken, refreshed);
   }
 
-  const refreshed = await getFirestoreDocument(documentPath, accessToken);
-  if (!refreshed) throw new InvitationRedemptionError(404, "This IRPA invitation no longer exists.");
-  return await provisionInvitationActivation(invitationId, claims.user_id, invitationEmail, env, accessToken, refreshed);
+  return await provisionInvitationActivation(invitationId, claims.user_id, invitationEmail, env, accessToken, document);
 }
 
 async function updateFirebaseUserPassword(projectId, uid, password, accessToken) {
