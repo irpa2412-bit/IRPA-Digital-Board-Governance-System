@@ -1,0 +1,102 @@
+name: Phase 1 Document Reference Staging
+
+on:
+  push:
+    branches:
+      - feat/phase1-document-reference-cloudflare-20261007
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  phase1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install web dependencies
+        run: npm install
+
+      - name: Build web application
+        run: npm run build
+
+      - name: Install gateway dependencies
+        working-directory: drive-gateway
+        run: npm ci --no-audit --no-fund
+
+      - name: Run gateway regression tests
+        working-directory: drive-gateway
+        run: npm test
+
+      - name: Verify Firestore rules are unchanged
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code origin/main...HEAD -- firestore.rules
+
+      - name: Verify Phase 1 source contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'irpa.documentReference.path' src/firebase/data.js
+          grep -Fq 'nextDocumentReferenceViaFirebase' src/firebase/data.js
+          grep -Fq '/api/documents/next-reference' src/firebase/data.js
+          grep -Fq 'systemSettings/documentCounters' functions/index.js
+          grep -Fq 'documentReferenceRegistry' functions/index.js
+          grep -Fq 'systemSettings/documentCounters' drive-gateway/src/cloudflareAuth.mjs
+          grep -Fq 'documentReferenceRegistry' drive-gateway/src/cloudflareAuth.mjs
+          if grep -RniE 'invitation|invitations' src/firebase/data.js drive-gateway/src/cloudflareAuth.mjs | grep -F '/api/invitations/' >/tmp/phase1-invitation-hit; then
+            echo "ERROR: Phase 1 document-reference files contain invitation-route changes."
+            cat /tmp/phase1-invitation-hit
+            exit 1
+          fi
+
+      - name: Validate isolated staging configuration
+        working-directory: drive-gateway
+        run: |
+          set -euo pipefail
+          npx wrangler deploy --env staging --dry-run
+
+      - name: Deploy isolated Cloudflare staging Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: drive-gateway
+          command: deploy --env staging
+
+      - name: Verify staging health
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
+          body="$(curl --fail --silent --show-error --retry 8 --retry-delay 2 "$base/health")"
+          echo "$body"
+          echo "$body" | grep -q '"ok":true'
+          echo "$body" | grep -q '"environment":"staging"'
+          echo "$body" | grep -q '"authFunctionsEnabled":true'
+          echo "$body" | grep -q '"driveMock":false'
+
+      - name: Verify staging document-reference authentication gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
+          code="$(curl --silent --show-error -o /tmp/ref.json -w "%{http_code}" -H "Content-Type: application/json" -d "{}" "$base/api/documents/next-reference")"
+          cat /tmp/ref.json
+          test "$code" = "401"
+          ! grep -qi 'Internal error' /tmp/ref.json
+
+      - name: Verify staging CORS
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
+          headers="$(curl --silent --show-error -D - -o /dev/null -X OPTIONS -H "Origin: https://irpa-digital-board-governance.web.app" -H "Access-Control-Request-Method: POST" -H "Access-Control-Request-Headers: content-type,authorization" "$base/api/documents/next-reference")"
+          echo "$headers"
+          echo "$headers" | grep -i '^access-control-allow-origin:' | grep -q 'https://irpa-digital-board-governance.web.app'
+          echo "$headers" | grep -i '^access-control-allow-methods:' | grep -qi 'POST'
+          echo "$headers" | grep -i '^access-control-allow-headers:' | grep -qi 'authorization'
