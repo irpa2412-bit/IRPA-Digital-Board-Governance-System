@@ -111,10 +111,6 @@ export async function redeemInvitationToken(request, env) {
     throw new InvitationRedemptionError(403, "This Firebase account is disabled. Ask an Administrator to reactivate the account.");
   }
 
-  const hasPasswordProvider = Array.isArray(user.providerUserInfo) && user.providerUserInfo.some(provider => String(provider.providerId || "") === "password");
-  if (hasPasswordProvider) {
-    throw new InvitationRedemptionError(409, "This email already has a password account. Use the normal IRPA login or Forgot Password flow to continue with this invitation.");
-  }
   const currentState = String(invitation.invitationRedemptionState || "PENDING");
   const pendingUntil = new Date(invitation.invitationPasswordSetupExpiresAt || 0).getTime();
   if (currentState === "EXPIRED" || (currentState === "PASSWORD_SETUP_PENDING" && pendingUntil && pendingUntil <= Date.now())) {
