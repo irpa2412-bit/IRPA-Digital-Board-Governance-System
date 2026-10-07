@@ -12,7 +12,7 @@ const ORIGINAL = await (async () => {
   return pdf.save();
 })();
 
-function makeFixture({ signerUid, signerEmail, secondSigner = true } = {}) {
+async function makeFixture({ signerUid, signerEmail, secondSigner = true } = {}) {
   const secret = "a".repeat(64);
   const envelopeId = "ENV-TEST123";
   const signerId = "S1";
@@ -43,7 +43,7 @@ function makeFixture({ signerUid, signerEmail, secondSigner = true } = {}) {
   const envelope = {
     id: envelopeId,
     documentId: "DOC-TEST123",
-    documentHash: await sha256Hex(ORIGINAL),
+    documentHash: null,
     title: "Controlled Signing Test",
     fileName: "controlled-test.pdf",
     classification: "Restricted",
@@ -101,7 +101,7 @@ function makeFixture({ signerUid, signerEmail, secondSigner = true } = {}) {
 }
 
 test("Member: unauthenticated and wrong UID cannot open an institutional signing link", async () => {
-  const fixture = makeFixture({ signerUid: "member-uid", signerEmail: "member@example.org" });
+  const fixture = await makeFixture({ signerUid: "member-uid", signerEmail: "member@example.org" });
   await assert.rejects(
     () => openSigning(fixture.ctx, fixture.token, null),
     error => error.status === 403 && error.message.includes("invited signer")
