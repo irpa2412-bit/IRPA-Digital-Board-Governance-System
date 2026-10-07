@@ -113,7 +113,7 @@ test("Member: unauthenticated and wrong UID cannot open an institutional signing
 });
 
 test("Member: matching Firebase UID can open and retrieve the signing PDF", async () => {
-  const fixture = makeFixture({ signerUid: "member-uid", signerEmail: "member@example.org" });
+  const fixture = await makeFixture({ signerUid: "member-uid", signerEmail: "member@example.org" });
   const opened = await openSigning(fixture.ctx, fixture.token, {
     uid: "member-uid",
     email: "member@example.org"
@@ -130,7 +130,7 @@ test("Member: matching Firebase UID can open and retrieve the signing PDF", asyn
 });
 
 test("Member: matching UID can complete its signing action and the envelope advances", async () => {
-  const fixture = makeFixture({ signerUid: "member-uid", signerEmail: "member@example.org" });
+  const fixture = await makeFixture({ signerUid: "member-uid", signerEmail: "member@example.org" });
   const result = await sign(fixture.ctx, {
     token: fixture.token,
     signature: { type: "typed", value: "Member Signer" },
@@ -146,7 +146,7 @@ test("Member: matching UID can complete its signing action and the envelope adva
 });
 
 test("Employee: matching Firebase UID is accepted; email alone is not an identity substitute", async () => {
-  const fixture = makeFixture({ signerUid: "employee-uid", signerEmail: "employee@example.org" });
+  const fixture = await makeFixture({ signerUid: "employee-uid", signerEmail: "employee@example.org" });
   await assert.rejects(
     () => openSigning(fixture.ctx, fixture.token, { uid: "different-uid", email: "employee@example.org" }),
     error => error.status === 403
@@ -159,7 +159,7 @@ test("Employee: matching Firebase UID is accepted; email alone is not an identit
 });
 
 test("Employee: authenticated router path passes the verified UID to open and submit", async () => {
-  const fixture = makeFixture({ signerUid: "employee-uid", signerEmail: "employee@example.org" });
+  const fixture = await makeFixture({ signerUid: "employee-uid", signerEmail: "employee@example.org" });
   fixture.ctx.verifyUser = async () => ({ uid: "employee-uid", email: "employee@example.org" });
 
   const openRequest = new Request("https://example.test/api/sign/open", {
@@ -188,7 +188,7 @@ test("Employee: authenticated router path passes the verified UID to open and su
 });
 
 test("UID-bound signer can decline only with the matching authenticated UID", async () => {
-  const fixture = makeFixture({ signerUid: "member-uid", signerEmail: "member@example.org" });
+  const fixture = await makeFixture({ signerUid: "member-uid", signerEmail: "member@example.org" });
   await assert.rejects(
     () => declineSigning(fixture.ctx, {
       token: fixture.token,
@@ -207,7 +207,7 @@ test("UID-bound signer can decline only with the matching authenticated UID", as
 });
 
 test("External token signer remains usable without Firebase authentication", async () => {
-  const fixture = makeFixture({ signerUid: null, signerEmail: "external@example.org" });
+  const fixture = await makeFixture({ signerUid: null, signerEmail: "external@example.org" });
   const opened = await openSigning(fixture.ctx, fixture.token, null);
   assert.equal(opened.signer.authenticated, false);
   assert.equal(opened.canSign, true);
