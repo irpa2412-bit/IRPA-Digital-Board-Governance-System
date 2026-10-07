@@ -290,6 +290,44 @@ test("password-set verifies the password provider and activates the invitation o
   } finally { global.fetch=originalFetch; }
 });
 
+test("password-set refuses activation when the registered member record does not exist", async()=>{
+  const idToken=makeFirebaseIdToken("unregistered-member-uid");
+  const invitationId="unregistered-member-invitation";
+  const calls=[];
+  const handler=createHandler({
+    fetch:async(url,options={})=>{
+      const target=String(url);
+      calls.push({target,options});
+      if(target.includes("/documents/invitations/unregistered-member-invitation")) return new Response(JSON.stringify({
+        name:"projects/irpa-digital-board-governance/databases/(default)/documents/invitations/"+invitationId,
+        fields:{
+          ...invitationFields,
+          email:{stringValue:"invitee@example.org"},
+          invitationRedeemedUid:{stringValue:"unregistered-member-uid"},
+          invitationRedemptionState:{stringValue:"PASSWORD_SETUP_PENDING"},
+          invitationPasswordSetupExpiresAt:{timestampValue:"2099-01-01T00:00:00Z"},
+          memberType:{stringValue:"Governance Member"},
+          role:{stringValue:"Board Member"},
+          institutionalRecordType:{stringValue:"Member"}
+        },
+        updateTime:"2026-10-05T08:00:00.000000Z"
+      }),{status:200});
+      if(target.includes("/accounts:lookup")) return new Response(JSON.stringify({users:[{localId:"unregistered-member-uid",email:"invitee@example.org",providerUserInfo:[{providerId:"password"}]}]}),{status:200});
+      if(target.includes("/documents/members?")) return new Response(JSON.stringify({documents:[]}),{status:200});
+      if(target.includes("/documents/members/")) return new Response(JSON.stringify({error:{status:"NOT_FOUND"}}),{status:404});
+      throw new Error("Unexpected request: "+target);
+    }
+  });
+  const response=await handler.fetch(new Request("https://gw.test/api/invitations/password-set",{
+    method:"POST",
+    headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"},
+    body:JSON.stringify({invitationId})
+  }),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)});
+  assert.equal(response.status,422);
+  assert.match((await response.json()).error,/registered IRPA member record/i);
+  assert.equal(calls.some(c=>c.target.includes("/documents/members/")&&c.options.method==="PATCH"),false);
+});
+
 test("Cloudflare invitation redemption rejects a PASSWORD_SETUP_PENDING invitation after its 60-minute window", async()=>{
   const originalFetch=global.fetch;
   const calls=[];
