@@ -43,7 +43,7 @@ function makeFixture({ signerUid, signerEmail, secondSigner = true } = {}) {
   const envelope = {
     id: envelopeId,
     documentId: "DOC-TEST123",
-    documentHash: null,
+    documentHash: await sha256Hex(ORIGINAL),
     title: "Controlled Signing Test",
     fileName: "controlled-test.pdf",
     classification: "Restricted",
