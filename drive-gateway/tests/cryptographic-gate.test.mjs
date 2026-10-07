@@ -189,8 +189,9 @@ test("C-G09 verification after persistence/retrieval remains cryptographically v
 });
 
 test("C-G10 cryptographic failure rolls back partial evidence and never leaves SEALED state", async () => {
-  const { signer, keyRecord, signatureHash } = await fixture();
+  const { signer, keyRecord } = await fixture();
   const signer2 = {...signer, uid:"uid-signer-002", id:"S2"};
+  const signer2Hash = await sha256Hex("Second signer");
   const records = new Map();
   let status = "FULLY_SIGNED";
   const meta = {
@@ -215,7 +216,7 @@ test("C-G10 cryptographic failure rolls back partial evidence and never leaves S
       chainHead,
       signers:[
         signer,
-        {...signer2, signatureValue:"Second signer", signatureHash:await sha256Hex("Second signer")}
+        {...signer2, signatureValue:"Second signer", signatureHash:signer2Hash}
       ]
     },
     document:{id:"doc-1",bytes:originalBytes},
