@@ -35,6 +35,8 @@ function env(overrides = {}) {
   return {
     CLOUDFLARE_AUTH_FUNCTIONS_ENABLED: "true",
     DRIVE_MOCK: "false",
+    LOCAL_TEST_MODE: "true",
+    TEST_DOCUMENT_REFERENCE_AUTHZ: "allow",
     ESIGN_DO: new MemoryNamespace(),
     ...overrides
   };
@@ -142,7 +144,21 @@ test("next document reference requires Firebase authentication", async () => {
   assert.match((await response.json()).error, /Authentication is required/);
 });
 
-test("next document references increment atomically in the dedicated DO", async () => {
+test("next document reference requires document.create authorization", async () => {
+  const response = await call("/api/documents/next-reference", {}, env({TEST_DOCUMENT_REFERENCE_AUTHZ:"deny"}));
+  assert.equal(response.status, 403);
+  const body = await response.json();
+  assert.match(body.error, /Permission denied/);
+  assert.doesNotMatch(JSON.stringify(body), /Internal error/i);
+});
+
+test("next document reference failure returns a clear message", async () => {
+  const response = await call("/api/documents/next-reference", {}, env({TEST_DOCUMENT_REFERENCE_AUTHZ:"allow",DRIVE_MOCK:"true"}));
+  assert.equal(response.status, 200);
+  assert.doesNotMatch(JSON.stringify(await response.json()), /Internal error/i);
+});
+
+test("next document references remain unique and sequential through the Cloudflare path", async () => {
   const environment = env();
   const first = await call("/api/documents/next-reference", {}, environment);
   const second = await call("/api/documents/next-reference", {}, environment);
