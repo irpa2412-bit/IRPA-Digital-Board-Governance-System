@@ -7,7 +7,7 @@ export default function InvitationActivation(){
   const[email,setEmail]=useState("");
   const[password,setPassword]=useState("");
   const[confirm,setConfirm]=useState("");
-  const[error,setError]=useState("");
+  const[error,setError]=useState(""),[retrying,setRetrying]=useState(false),[errorKind,setErrorKind]=useState("");
 
   useEffect(()=>{
     if(started.current)return;
@@ -15,8 +15,8 @@ export default function InvitationActivation(){
     const token=new URL(window.location.href).searchParams.get("invitationToken")||"";
     if(!token){setError("This invitation link is incomplete. Please open the invitation email again.");setStatus("error");return;}
     completeInvitationToken(token)
-      .then(user=>{setEmail(String(user?.email||"").trim().toLowerCase());setStatus("ready");})
-      .catch(err=>{setError(err?.message||"This invitation could not be opened.");setStatus("error");});
+      .then(user=>{setEmail(String(user?.email||"").trim().toLowerCase());setErrorKind("");setStatus("ready");})
+      .catch(err=>{const message=String(err?.message||"This invitation could not be opened.");setError(message);setErrorKind(/expired|cancelled|no longer available/i.test(message)?"renew":/already been used|already activated|already associated/i.test(message)?"used":"retry");setStatus("error");});
   },[]);
 
   async function activate(e){
@@ -35,9 +35,20 @@ export default function InvitationActivation(){
         setStatus("ready");
       }
     }catch(err){
-      setError(err?.message||"The account could not be activated.");
+      const message=String(err?.message||"The account could not be activated.");
+      setError(message);
+      setErrorKind(/expired|cancelled|no longer available/i.test(message)?"renew":/already been used|already activated|already associated/i.test(message)?"used":"retry");
       setStatus("ready");
     }
+  }
+
+  async function retryInvitation(){
+    const token=new URL(window.location.href).searchParams.get("invitationToken")||"";
+    if(!token)return returnToLogin();
+    setRetrying(true);setError("");
+    try{const user=await completeInvitationToken(token);setEmail(String(user?.email||"").trim().toLowerCase());setErrorKind("");setStatus("ready");}
+    catch(err){const message=String(err?.message||"This invitation could not be opened.");setError(message);setErrorKind(/expired|cancelled|no longer available/i.test(message)?"renew":/already been used|already activated|already associated/i.test(message)?"used":"retry");}
+    finally{setRetrying(false);}
   }
 
   async function returnToLogin(){
@@ -50,7 +61,10 @@ export default function InvitationActivation(){
   }
 
   if(status==="error"){
-    return <InvitationShell><div className="irpa-invitation-card"><div style={styles.kicker}>IRPA DIGITAL BOARD GOVERNANCE SYSTEM</div><h1 style={styles.title}>Invitation unavailable</h1><p style={styles.text}>{error}</p><button type="button" onClick={returnToLogin} style={styles.secondary}>Return to Sign In</button></div></InvitationShell>;
+    return <InvitationShell><div className="irpa-invitation-card"><div style={styles.kicker}>IRPA DIGITAL BOARD GOVERNANCE SYSTEM</div><h1 style={styles.title}>Invitation unavailable</h1><p style={styles.text}>{error}</p>{errorKind==="renew"&&<p style={styles.text}>Please request a new invitation link from an IRPA Administrator.</p>}
+      {errorKind==="used"&&<p style={styles.text}>This invitation has already been used. Sign in with the email address that received the invitation.</p>}
+      {errorKind==="retry"&&<button type="button" onClick={retryInvitation} disabled={retrying} style={styles.primary}>{retrying?"Trying again…":"Try Again"}</button>}
+      <button type="button" onClick={returnToLogin} style={styles.secondary}>Return to Sign In</button></div></InvitationShell>;
   }
 
   if(status==="success"){
