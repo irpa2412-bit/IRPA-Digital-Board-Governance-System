@@ -196,11 +196,11 @@
     resetButton.addEventListener("click",async()=>{
       busy(true); show("");
       try{
-        await sendPasswordResetEmail(auth,ADMIN_EMAIL,{
+        await sendPasswordResetEmail(auth,String(email.value||"").trim().toLowerCase(),{
           url: location.origin + "/administrator.html?adminReset=1",
           handleCodeInApp: false
         });
-        show("A password-reset email has been sent to irpa2412@gmail.com.");
+        show("If that address is eligible for Administrator password recovery, a password-reset email has been sent to the registered address.");
       }catch(err){console.error("IRPA administrator reset error:",err);show(errorText(err))}
       finally{busy(false)}
     });
