@@ -23,6 +23,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Record current production Worker version for rollback
+        env:
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          deployments="$(curl --fail --silent --show-error             -H "Authorization: Bearer $CF_API_TOKEN"             -H "Accept: application/json"             "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/workers/scripts/irpa-google-drive-gateway/deployments")"
+          rollback="$(node - "$deployments" <<'NODE'
+          const a=JSON.parse(process.argv[2]);
+          const d=a?.result?.deployments?.[0];
+          const v=d?.versions?.find(x=>Number(x?.percentage)===100)?.version_id;
+          if(!a?.success || !v) throw new Error("Could not resolve the active production Worker version.");
+          process.stdout.write(v);
+          NODE
+          )"
+          echo "PRODUCTION_WORKER_ROLLBACK_VERSION=$rollback"
+          echo "PRODUCTION_WORKER_ROLLBACK_VERSION=$rollback" >> "$GITHUB_ENV"
+
       - name: Recover existing production bindings and prepare ESIGN_DO safely
         env:
           CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
