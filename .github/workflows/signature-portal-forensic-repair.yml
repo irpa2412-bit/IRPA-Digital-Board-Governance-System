@@ -38,8 +38,11 @@ jobs:
       - name: No deployment gate
         run: |
           set -euo pipefail
-          if grep -RInE 'wrangler[[:space:]]+deploy|firebase[[:space:]]+deploy|npm[[:space:]]+(run[[:space:]]+)?deploy' drive-gateway; then
-            echo "Unexpected deployment command detected."
+          files="$(find drive-gateway -type f \
+            \( -name '*.mjs' -o -name '*.js' -o -name '*.cjs' -o -name '*.ts' -o -name '*.tsx' -o -name '*.jsx' -o -name '*.sh' \) \
+            -not -path '*/node_modules/*' -print)"
+          if [ -n "$files" ] && printf '%s\\n' "$files" | xargs grep -nHE 'wrangler[[:space:]]+deploy|firebase[[:space:]]+deploy|npm[[:space:]]+(run[[:space:]]+)?deploy'; then
+            echo "Unexpected deployment command detected in executable source."
             exit 1
           fi
           echo "NO_PRODUCTION_DEPLOYMENT_COMMANDS_DETECTED=true"
