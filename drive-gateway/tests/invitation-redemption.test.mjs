@@ -405,6 +405,7 @@ test("password-set resumes an invitation that is already PROVISIONING_PENDING", 
       updateTime:"2026-10-05T08:00:00.000000Z"
     }),{status:200});
     if(target.includes("/accounts:lookup")) return new Response(JSON.stringify({users:[{localId:"provisioning-pending-uid",email:"invitee@example.org",providerUserInfo:[{providerId:"password"}]}]}),{status:200});
+    if(target.includes("/documents:runQuery")) return new Response(JSON.stringify([]),{status:200});
     if(target.includes("/documents/members/provisioning-board-1")){
       if(options.method==="PATCH"){ patchCalled=true; return new Response(JSON.stringify({name:"patched"}),{status:200}); }
       return new Response(JSON.stringify({name:"projects/irpa-digital-board-governance/databases/(default)/documents/members/provisioning-board-1",fields:{email:{stringValue:"invitee@example.org"},boardMember:{booleanValue:true},role:{stringValue:"Board Member"}}}),{status:200});
