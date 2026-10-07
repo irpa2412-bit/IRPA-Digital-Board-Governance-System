@@ -58,7 +58,7 @@ export async function importPublicKeyJwk(jwk) {
     "jwk",
     { kty: jwk.kty, crv: jwk.crv, x: jwk.x, y: jwk.y, ext: true },
     { name: "ECDSA", namedCurve: "P-256" },
-    false,
+    true,
     ["verify"],
   );
 }
