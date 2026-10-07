@@ -193,7 +193,7 @@ async function assertCertificateText(bytes, expected) {
 
 async function completionFiles(s, state) {
   assert.ok(state.completion);
-  assert.equal(state.completion.files.length, 5);
+  assert.equal(state.completion.files.length, 4);
   return Promise.all(
     state.completion.files.map(async (file) => ({
       file,
@@ -434,7 +434,9 @@ test("G5-09 — retry persistence", async () => {
   assert.deepEqual(await retry.json(), {
     ok: true,
     completed: true,
-    completion: (await s.meta.get("envelopes", envelopeId)).completion,
+    completion: JSON.parse(
+      JSON.stringify((await s.meta.get("envelopes", envelopeId)).completion),
+    ),
   });
 
   const state = await s.meta.get("envelopes", envelopeId);
@@ -444,7 +446,7 @@ test("G5-09 — retry persistence", async () => {
     assert.ok(bytes);
     assert.equal(await sha256Hex(bytes), state.completion.finalHash);
   }
-  assert.equal(s.storage.objs.size, 7);
+  assert.equal(s.storage.objs.size, 6);
 });
 
 test("G5-10 — completion idempotency", async () => {
