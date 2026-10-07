@@ -426,11 +426,16 @@ export async function configureInvitationPassword(password) {
   const idToken = await user.getIdToken(true);
   const gatewayOrigin = String(import.meta.env.VITE_GATEWAY_ORIGIN || "").trim().replace(/\/$/,"");
   if (!gatewayOrigin) throw new Error("IRPA gateway origin is not configured for this build.");
-  const response = await fetch(`${gatewayOrigin}/api/invitations/password-set`, {
-    method:"POST",
-    headers:{Authorization:`Bearer ${idToken}`,"Content-Type":"application/json"},
-    body:JSON.stringify({invitationId,password:cleanPassword})
-  });
+  let response;
+  try {
+    response = await fetch(`${gatewayOrigin}/api/invitations/password-set`, {
+      method:"POST",
+      headers:{Authorization:`Bearer ${idToken}`,"Content-Type":"application/json"},
+      body:JSON.stringify({invitationId,password:cleanPassword})
+    });
+  } catch (error) {
+    throw new Error("IRPA could not reach the invitation activation service. Your invitation remains available. Please try again.");
+  }
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data.ok !== true) throw new Error(data.error || "The server could not verify the new password.");
   window.sessionStorage.removeItem("irpaInvitationPasswordSetup");
@@ -466,7 +471,7 @@ export async function completeInvitationToken(token) {
     window.localStorage.removeItem("irpaEmailForSignIn");
     window.localStorage.removeItem("irpaMemberEmailForSignIn");
     return signedIn.user;
-  } catch (error) { throw new Error(error?.message || "The IRPA invitation could not be redeemed."); }
+  } catch (error) { throw new Error(firebaseErrorMessage(error)); }
 }
 export async function getInvitationSessionState() {
   const user = auth.currentUser;
