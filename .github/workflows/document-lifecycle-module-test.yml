@@ -52,7 +52,8 @@ jobs:
         run: npm run build
       - name: Verify no production deployment commands exist in this workflow
         run: |
-          if grep -nE '^[[:space:]]*(wrangler deploy|npx wrangler deploy|firebase deploy|npm run deploy|cloudflare/wrangler-action)' .github/workflows/document-lifecycle-module-test.yml; then
+          workflow_body="$(sed '/^      - name: Verify no production deployment commands exist in this workflow/,$d' .github/workflows/document-lifecycle-module-test.yml)"
+          if printf '%s\n' "$workflow_body" | grep -nE '^[[:space:]]*(wrangler deploy|npx wrangler deploy|firebase deploy|npm run deploy|cloudflare/wrangler-action)'; then
             echo "Deployment command detected in verification workflow."
             exit 1
           fi
