@@ -1,0 +1,43 @@
+name: Cryptographic Gate
+
+on:
+  push:
+    branches: [feat/signature-trust-platform-20261007]
+    paths:
+      - "drive-gateway/src/cryptographicGate.mjs"
+      - "drive-gateway/tests/cryptographic-gate.test.mjs"
+      - "drive-gateway/src/util.mjs"
+      - "drive-gateway/package.json"
+      - ".github/workflows/cryptographic-gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cryptographic-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install gateway dependencies
+        working-directory: drive-gateway
+        run: npm ci --no-audit --no-fund
+      - name: Run cryptographic acceptance tests
+        working-directory: drive-gateway
+        run: node --test tests/cryptographic-gate.test.mjs
+      - name: Run complete gateway regression suite
+        working-directory: drive-gateway
+        run: npm test
+      - name: Production build verification
+        run: npm install --no-audit --no-fund && npm run build
+      - name: No deployment gate
+        run: |
+          set -euo pipefail
+          if grep -RInE 'wrangler[[:space:]]+deploy|firebase[[:space:]]+deploy|npm[[:space:]]+(run[[:space:]]+)?deploy'             drive-gateway/src/cryptographicGate.mjs             drive-gateway/tests/cryptographic-gate.test.mjs; then
+            echo "Unexpected deployment command detected in cryptographic gate."
+            exit 1
+          fi
