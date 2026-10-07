@@ -96,7 +96,7 @@ export default {
 
       if (url.pathname === "/api/invitations/redeem" && request.method === "POST") {
         try {
-          return json(await withInvitationRetry(() => redeemInvitationToken(request, env), "redeem"), 200, corsHeaders(request));
+          return json(await withInvitationRetry(() => redeemInvitationToken(request.clone(), env), "redeem"), 200, corsHeaders(request));
         } catch (error) {
           if (error instanceof InvitationRedemptionError) {
             if (/expired|cancelled/i.test(String(error.message||""))) {
@@ -122,7 +122,7 @@ export default {
       if (url.pathname === "/api/invitations/password-set" && request.method === "POST") {
         try {
           const claims = await authenticateFirebaseRequest(request, env, {skipActivation:true});
-          return json(await withInvitationRetry(() => confirmInvitationPasswordSetup(request, env, claims), "password-set"), 200, corsHeaders(request));
+          return json(await withInvitationRetry(() => confirmInvitationPasswordSetup(request.clone(), env, claims), "password-set"), 200, corsHeaders(request));
         } catch (error) {
           if (error instanceof InvitationRedemptionError) return json({ok:false,error:error.message}, error.status, corsHeaders(request));
           const message=String(error?.message||"");

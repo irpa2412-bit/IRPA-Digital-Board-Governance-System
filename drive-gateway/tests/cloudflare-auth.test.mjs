@@ -35,6 +35,8 @@ function env(overrides = {}) {
   return {
     CLOUDFLARE_AUTH_FUNCTIONS_ENABLED: "true",
     DRIVE_MOCK: "false",
+    LOCAL_TEST_MODE: "true",
+    TEST_DOCUMENT_REFERENCE_AUTHZ: "allow",
     ESIGN_DO: new MemoryNamespace(),
     ...overrides
   };
@@ -142,18 +144,77 @@ test("next document reference requires Firebase authentication", async () => {
   assert.match((await response.json()).error, /Authentication is required/);
 });
 
-test("next document references increment atomically in the dedicated DO", async () => {
-  const environment = env();
-  const first = await call("/api/documents/next-reference", {}, environment);
-  const second = await call("/api/documents/next-reference", {}, environment);
-  const a = await first.json();
-  const b = await second.json();
+test("next document reference requires document.create authorization", async () => {
+  const response = await call("/api/documents/next-reference", {}, env({TEST_DOCUMENT_REFERENCE_AUTHZ:"deny"}));
+  assert.equal(response.status, 403);
+  const body = await response.json();
+  assert.match(body.error, /Permission denied/);
+  assert.doesNotMatch(JSON.stringify(body), /Internal error/i);
+});
 
-  assert.equal(first.status, 200);
-  assert.equal(second.status, 200);
-  assert.equal(a.year, b.year);
-  assert.match(a.reference, /^IRPA-DOC-\d{4}-00001$/);
-  assert.match(b.reference, /^IRPA-DOC-\d{4}-00002$/);
+test("next document reference failure returns a clear message", async () => {
+  const response = await call("/api/documents/next-reference", {}, env({TEST_DOCUMENT_REFERENCE_AUTHZ:"allow",DRIVE_MOCK:"false",TEST_DOCUMENT_REFERENCE_FAILURE:"true"}));
+  assert.equal(response.status, 503);
+  const body = await response.json();
+  assert.match(body.error, /temporarily unavailable/i);
+  assert.doesNotMatch(JSON.stringify(body), /Internal error/i);
+});
+
+test("next document references remain unique and sequential through the shared Firestore contract", async () => {
+  const environment = env({DRIVE_MOCK:"false"});
+  let counter = 0;
+  const registry = new Set();
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options = {}) => {
+    const target = String(url);
+    const body = options.body ? JSON.parse(options.body) : {};
+    if (target.endsWith("/documents:beginTransaction")) {
+      return new Response(JSON.stringify({transaction:"test-transaction"}), {status:200,headers:{"content-type":"application/json"}});
+    }
+    if (target.endsWith("/documents:batchGet")) {
+      const names = Array.isArray(body.documents) ? body.documents : [];
+      const rows = names.map(name => {
+        if (name.endsWith("/systemSettings/documentCounters") && counter > 0) {
+          return {found:{name,fields:{documentReference:{integerValue:String(counter)}}}};
+        }
+        if (registry.has(name)) {
+          return {found:{name,fields:{referenceNumber:{stringValue:name.split("/").pop()}}}};
+        }
+        return {missing:name};
+      });
+      return new Response(rows.map(row => JSON.stringify(row)).join("\n"), {status:200,headers:{"content-type":"application/json"}});
+    }
+    if (target.endsWith("/documents:commit")) {
+      const writes = Array.isArray(body.writes) ? body.writes : [];
+      for (const write of writes) {
+        const fields = write.update?.fields || {};
+        if (write.update?.name?.endsWith("/systemSettings/documentCounters")) {
+          counter = Number(fields.documentReference?.integerValue || counter);
+        }
+        if (write.update?.name?.includes("/documentReferenceRegistry/")) {
+          registry.add(write.update.name);
+        }
+      }
+      return new Response(JSON.stringify({writeResults:writes.map(()=>({}))}), {status:200,headers:{"content-type":"application/json"}});
+    }
+    return originalFetch(url, options);
+  };
+  try {
+    const authenticate = async () => ({user_id:"authorized-test-user",email:"authorized@example.com"});
+    const first = await call("/api/documents/next-reference", {}, environment, authenticate);
+    const second = await call("/api/documents/next-reference", {}, environment, authenticate);
+    const a = await first.json();
+    const b = await second.json();
+    assert.equal(first.status, 200);
+    assert.equal(second.status, 200);
+    assert.equal(a.year, b.year);
+    assert.match(a.reference, /^IRPA-DOC-\d{4}-00001$/);
+    assert.match(b.reference, /^IRPA-DOC-\d{4}-00002$/);
+    assert.equal(counter, 2);
+    assert.equal(registry.size, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("invalid email is rejected without creating state", async () => {

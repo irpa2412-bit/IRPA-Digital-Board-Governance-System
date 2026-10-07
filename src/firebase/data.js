@@ -9,7 +9,53 @@ export const COLLECTIONS={members:"members",employees:"employees",employeeCounte
 function currentActor(){return{uid:auth.currentUser?.uid||null,email:auth.currentUser?.email||null};}
 async function writeAudit(action,collectionName,recordId,details={}){const a=currentActor();const anonymous=action.startsWith("ANONYMOUS_VOTE_");await addDoc(collection(db,COLLECTIONS.audit),{action,collection:collectionName,recordId,details,actorUid:anonymous?null:a.uid,actorEmail:anonymous?null:a.email,createdAt:serverTimestamp()});}
 function auditData(action,collectionName,recordId,details={}){const a=currentActor();const anonymous=action.startsWith("ANONYMOUS_VOTE_");return{action,collection:collectionName,recordId,details,actorUid:anonymous?null:a.uid,actorEmail:anonymous?null:a.email,createdAt:serverTimestamp()};}
-export async function nextDocumentReference(){if(!auth.currentUser)throw new Error("Authentication is required to generate a document reference.");const call=httpsCallable(getFunctions(undefined,"us-central1"),"nextDocumentReference");let lastError=null;for(let attempt=1;attempt<=2;attempt+=1){try{if(attempt===2)await auth.currentUser.getIdToken(true);const result=await call({});const reference=String(result.data?.reference||"").trim();if(!reference)throw new Error("The server did not return a document reference.");return reference;}catch(error){lastError=error;}}const rawCode=String(lastError?.code||"").trim().toLowerCase();const normalizedCode=rawCode.startsWith("functions/")?rawCode.slice("functions/".length):rawCode;const detail=String(lastError?.message||"").trim();const fallbackCodes=new Set(["internal","not-found","unavailable","deadline-exceeded"]);if(!fallbackCodes.has(normalizedCode)){throw new Error(rawCode?`Document reference service failed (${rawCode}). ${detail||"Please retry the upload."}`:`Document reference service failed. ${detail||"Please retry the upload."}`);}try{const year=new Date().getUTCFullYear();const counterRef=doc(db,"systemSettings","documentCounters");const reference=await runTransaction(db,async tx=>{const counterSnap=await tx.get(counterRef);const current=counterSnap.exists()?Number(counterSnap.data()?.documentReference||0):0;if(!Number.isInteger(current)||current<0)throw new Error("The document reference counter is invalid.");const nextNumber=current+1;const candidate="IRPA-DOC-"+year+"-"+String(nextNumber).padStart(5,"0");const registryRef=doc(db,"documentReferenceRegistry",candidate);const registrySnap=await tx.get(registryRef);if(registrySnap.exists())throw new Error("Document reference registry collision could not be resolved.");const now=serverTimestamp();if(counterSnap.exists())tx.update(counterRef,{documentReference:nextNumber,updatedAt:now});else tx.set(counterRef,{documentReference:1,updatedAt:now});tx.set(registryRef,{referenceNumber:candidate,referenceYear:year,sequenceNumber:nextNumber,issuedByUid:auth.currentUser.uid,issuedByEmail:String(auth.currentUser.email||"").trim().toLowerCase()||null,issuedBy:"FIRESTORE_RULES_FALLBACK",controlStatus:"Active",createdAt:now,updatedAt:now});return candidate;});return reference;}catch(fallbackError){const fallbackCode=String(fallbackError?.code||"").trim();const fallbackDetail=String(fallbackError?.message||"").trim();throw new Error(fallbackCode?`Document reference service failed (${fallbackCode}). ${fallbackDetail||"The secure Firestore reference fallback could not allocate a reference."}`:`Document reference service failed. ${fallbackDetail||"The secure Firestore reference fallback could not allocate a reference."}`)}}
+const DOCUMENT_REFERENCE_PATH_FLAG="irpa.documentReference.path";
+export function getDocumentReferencePathMode(){
+  try{
+    const value=String(window.localStorage.getItem(DOCUMENT_REFERENCE_PATH_FLAG)||"cloudflare").trim().toLowerCase();
+    return value==="firebase"?"firebase":"cloudflare";
+  }catch{ return "cloudflare"; }
+}
+export function setDocumentReferencePathMode(mode){
+  const value=String(mode||"").trim().toLowerCase();
+  if(!["cloudflare","firebase"].includes(value)) throw new Error("Document reference path must be cloudflare or firebase.");
+  window.localStorage.setItem(DOCUMENT_REFERENCE_PATH_FLAG,value);
+  return value;
+}
+async function nextDocumentReferenceViaFirebase(){
+  if(!auth.currentUser)throw new Error("Authentication is required to generate a document reference.");
+  const call=httpsCallable(getFunctions(undefined,"us-central1"),"nextDocumentReference");
+  let lastError=null;
+  for(let attempt=1;attempt<=2;attempt+=1){
+    try{
+      if(attempt===2)await auth.currentUser.getIdToken(true);
+      const result=await call({});
+      const reference=String(result.data?.reference||"").trim();
+      if(!reference)throw new Error("The server did not return a document reference.");
+      return reference;
+    }catch(error){lastError=error;}
+  }
+  const rawCode=String(lastError?.code||"").trim().toLowerCase();
+  const detail=String(lastError?.message||"").trim();
+  throw new Error(rawCode?"Document reference service failed ("+rawCode+"). "+(detail||"Please retry the upload."):"Document reference service failed. "+(detail||"Please retry the upload."));
+}
+async function nextDocumentReferenceViaCloudflare(){
+  if(!auth.currentUser)throw new Error("Authentication is required to generate a document reference.");
+  const gateway=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").replace(/\/$/,"");
+  try{
+    const idToken=await auth.currentUser.getIdToken();
+    const response=await fetch(gateway+"/api/documents/next-reference",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"},body:"{}"});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok||data.ok===false) throw new Error(data.error||"The Cloudflare document reference service could not issue a reference.");
+    const reference=String(data.reference||"").trim();
+    if(!reference) throw new Error("The Cloudflare document reference service did not return a document reference.");
+    return reference;
+  }catch(error){ throw new Error(error?.message||"The Cloudflare document reference service failed. Please retry."); }
+}
+export async function nextDocumentReference(){
+  if(getDocumentReferencePathMode()==="firebase") return nextDocumentReferenceViaFirebase();
+  return nextDocumentReferenceViaCloudflare();
+}
 export async function createRecord(collectionName,data){const protectedData=collectionName===COLLECTIONS.documents?{...data,recordOrigin:data.recordOrigin||"PRODUCTION"}:data;const ref=await addDoc(collection(db,collectionName),{...protectedData,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});await writeAudit("CREATE",collectionName,ref.id,protectedData);return ref.id;}
 export async function upsertFinancePaymentTrace(traceId,data={}){if(!auth.currentUser)throw new Error("Authentication is required.");if(!traceId)throw new Error("A finance trace ID is required.");const ref=doc(db,COLLECTIONS.financePaymentTrace,traceId);const existing=await getDoc(ref);const actor=currentActor();const payload={...data,lastUpdatedByUid:actor.uid,lastUpdatedByEmail:actor.email,updatedAt:serverTimestamp()};if(!existing.exists()){payload.createdAt=serverTimestamp();payload.createdByUid=actor.uid;payload.createdByEmail=actor.email;await setDoc(ref,payload);await writeAudit("CREATE_FINANCE_PAYMENT_TRACE",COLLECTIONS.financePaymentTrace,traceId,data);}else{await updateDoc(ref,payload);await writeAudit("UPDATE_FINANCE_PAYMENT_TRACE",COLLECTIONS.financePaymentTrace,traceId,data);}return traceId;}
 async function getHighestRegistrationNumber(collectionName,fieldName){const snap=await getDocs(collection(db,collectionName));let highest=0;for(const item of snap.docs){const value=Number(String(item.data()?.[fieldName]||"").split("-").pop());if(Number.isInteger(value)&&value>highest)highest=value;}return highest;}
