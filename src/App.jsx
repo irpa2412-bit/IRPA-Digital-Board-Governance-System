@@ -32,7 +32,7 @@ function WebAppNavigationRoller({active,modules,onNavigate}){const portalItems=g
 
 function PortalContentRoller({active,modules,onNavigate}){const items=getPortalContentItems(active,modules);if(!items.length)return null;const label=PORTAL_LABELS[active]||displayModuleName(active);return <div className="mobile-portal-content-roller" aria-label="Current portal content navigator"><div className="mobile-portal-content-roller-label"><span>IN-PORTAL CONTENT</span><strong>{label}</strong></div><select aria-label="Navigate within current portal" value={active} onChange={e=>onNavigate(e.target.value)}>{items.map(item=><option key={item} value={item}>{PORTAL_LABELS[item]||displayModuleName(item)}</option>)}</select><span className="mobile-portal-content-roller-chevron" aria-hidden="true">⌄</span></div>}
 
-import React,{useEffect,useMemo,useState}from"react";import Invitations from"./pages/Invitations";import Employees from"./pages/Employees";import BoardMembers from"./pages/BoardMembers";import Members from"./pages/Members";import EmployeePayments from"./pages/EmployeePayments";import Meetings from"./pages/Meetings";import Resolutions from"./pages/Resolutions";import Voting from"./pages/Voting";import OperationalGateways from"./pages/OperationalGateways";import OperationalGatewaysParticipants from"./pages/OperationalGatewaysParticipants";import AuthorizationApprovals from"./pages/AuthorizationApprovals";import SignaturePlatformWithUpload from"./pages/SignaturePlatformWithUpload";import FinancePortfolio from"./pages/FinancePortfolio";import ProcurementPortal from"./pages/ProcurementPortal";import Settings from"./pages/Settings";import ITOperationsPortal from"./pages/ITOperationsPortal";import InductionOrientation from"./pages/InductionOrientation";import InductionAdmin from"./pages/InductionAdmin";import ExternalAuditorPortal from"./pages/ExternalAuditorPortal";import AuditorsSpecialInvitees from"./pages/AuditorsSpecialInvitees";const ResearchStatisticsKnowledgePortal=React.lazy(()=>import("./pages/ResearchStatisticsKnowledgePortal"));import AddAdministratorPortal from"./pages/AddAdministratorPortal";import ModuleInterlinkBar from"./components/ModuleInterlinkBar";import PortalDocumentAccessPoint from"./components/PortalDocumentAccessPoint";import{observeAuthState,loginWithEmail,loginWithGoogle,completeGoogleRedirect,registerWithEmail,sendPasswordReset,sendAdminMagicLink,isMagicLink,completeMagicLink,completeInvitationToken,configureInvitationPassword,getInvitationSessionState,logout,beginPasswordResetMobileVerification,verifyPasswordResetMobileOtp,clearPasswordAttemptState}from"./firebase/auth";import{getAdminProfile,getCurrentMemberProfile,getCurrentEmployeeProfile,resolveAuthenticatedLoginContext,getCurrentInductionContext,getRecords,COLLECTIONS}from"./firebase/data";import{provisionCurrentMemberFromInvitationV2}from"./firebase/invitationWorkflow";import{doc,getDoc}from"firebase/firestore";import{auth,db}from"./firebase/config";
+import React,{useEffect,useMemo,useState}from"react";import Invitations from"./pages/Invitations";import Employees from"./pages/Employees";import BoardMembers from"./pages/BoardMembers";import Members from"./pages/Members";import EmployeePayments from"./pages/EmployeePayments";import Meetings from"./pages/Meetings";import Resolutions from"./pages/Resolutions";import Voting from"./pages/Voting";import OperationalGateways from"./pages/OperationalGateways";import OperationalGatewaysParticipants from"./pages/OperationalGatewaysParticipants";import AuthorizationApprovals from"./pages/AuthorizationApprovals";import SignaturePlatformWithUpload from"./pages/SignaturePlatformWithUpload";import FinancePortfolio from"./pages/FinancePortfolio";import ProcurementPortal from"./pages/ProcurementPortal";import Settings from"./pages/Settings";import ITOperationsPortal from"./pages/ITOperationsPortal";import InductionOrientation from"./pages/InductionOrientation";import InductionAdmin from"./pages/InductionAdmin";import ExternalAuditorPortal from"./pages/ExternalAuditorPortal";import AuditorsSpecialInvitees from"./pages/AuditorsSpecialInvitees";const ResearchStatisticsKnowledgePortal=React.lazy(()=>import("./pages/ResearchStatisticsKnowledgePortal"));import AddAdministratorPortal from"./pages/AddAdministratorPortal";import ModuleInterlinkBar from"./components/ModuleInterlinkBar";import PortalDocumentAccessPoint from"./components/PortalDocumentAccessPoint";import{observeAuthState,loginWithEmail,loginWithGoogle,completeGoogleRedirect,registerWithEmail,sendPasswordReset,sendAdminMagicLink,isMagicLink,completeMagicLink,completeInvitationToken,configureInvitationPassword,getInvitationSessionState,logout,beginPasswordResetMobileVerification,verifyPasswordResetMobileOtp,clearPasswordAttemptState}from"./firebase/auth";import{getAdminProfile,getCurrentMemberProfile,getCurrentEmployeeProfile,getCurrentAuditorProfile,resolveAuthenticatedLoginContext,getCurrentInductionContext,getRecords,COLLECTIONS}from"./firebase/data";import{provisionCurrentMemberFromInvitationV2}from"./firebase/invitationWorkflow";import{doc,getDoc}from"firebase/firestore";import{auth,db}from"./firebase/config";
 // TEMPORARY BUILD/STABILISATION CONTROL: preserve the gate implementation, but temporarily disconnect it from the gateway so the pre-gateway interface remains usable.
 const IRPA_TEMPORARY_DATA_GATE_ENABLED=true;
 // TEMPORARY GATEWAY DISCONNECT: newer gateway/security code remains in place; only its resolver communication is paused.
@@ -627,11 +627,12 @@ useEffect(()=>{
       const registerContextPromise=Promise.all([
         Promise.race([getCurrentMemberProfile().catch(()=>null),new Promise((_,reject)=>window.setTimeout(()=>reject(new Error("Firebase member authorization lookup timed out.")),5000))]),
         Promise.race([getCurrentEmployeeProfile().catch(()=>null),new Promise((_,reject)=>window.setTimeout(()=>reject(new Error("Firebase employee authorization lookup timed out.")),5000))])
+        Promise.race([getCurrentAuditorProfile().catch(()=>null),new Promise((_,reject)=>window.setTimeout(()=>reject(new Error("Firebase auditor authorization lookup timed out.")),5000))])
       ]).catch(error=>{
         console.warn("Registered identity lookup unavailable.",error);
-        return [null,null];
+        return [null,null,null];
       });
-      const [adminDirect,[loginContext,[memberDirect,employeeDirect]]]=await Promise.all([
+      const [adminDirect,[loginContext,[memberDirect,employeeDirect,auditorDirect]]]=await Promise.all([
         adminDirectPromise,
         Promise.all([loginContextPromise,registerContextPromise])
       ]);
@@ -642,25 +643,29 @@ useEffect(()=>{
         // This is critical for dual-capacity accounts such as Administrator + IT.
         const resolvedMember=loginContext?.member||memberDirect;
         const adminEmployee=loginContext?.employee||employeeDirect;
+        const adminAuditor=loginContext?.auditor||auditorDirect;
         const adminMemberAuthorized=Boolean(resolvedMember)&&(["active","activated"].includes(String(resolvedMember?.status||"").trim().toLowerCase())||String(resolvedMember?.registrationStatus||"").trim().toLowerCase()==="activated");
         const adminEmployeeAuthorized=Boolean(adminEmployee)&&(["active","activated"].includes(String(adminEmployee?.status||"").trim().toLowerCase())||String(adminEmployee?.employmentStatus||"").trim().toLowerCase()==="active"||String(adminEmployee?.registrationStatus||"").trim().toLowerCase()==="activated");
-        const verifiedProfile=adminMemberAuthorized?resolvedMember:null,verifiedEmployee=adminEmployeeAuthorized?adminEmployee:null;
+        const adminAuditorAuthorized=Boolean(adminAuditor)&&adminAuditor.active!==false&&(["active","activated"].includes(String(adminAuditor?.status||"").trim().toLowerCase())||String(adminAuditor?.registrationStatus||"").trim().toLowerCase()==="activated"||adminAuditor.accountActivated===true);
+        const verifiedProfile=adminMemberAuthorized?resolvedMember:null,verifiedEmployee=adminEmployeeAuthorized?adminEmployee:null,verifiedAuditor=adminAuditorAuthorized?adminAuditor:null;
         const claimsProfile={roles:serverRoles};
         const assignedRoles=[...new Set([...resolveLoginCategories(verifiedProfile,verifiedEmployee,false),...resolveLoginCategories(claimsProfile,null,false),...resolveLoginCategories(adminDirect,null,false),"Administrator"].filter(role=>String(role||"").trim()))];
         setEmployee(verifiedEmployee);
-        setProfile({... (verifiedProfile||verifiedEmployee||adminDirect||{}),uid:u.uid,email:u.email||resolvedMember?.email||adminEmployee?.email||adminDirect?.email||"",role:assignedRoles[0]||"Administrator",roles:assignedRoles,serverAuthorizedRoles:serverRoles,authorities:Array.isArray(loginContext?.authorities)?loginContext.authorities:[],administratorAvailable:true,authorizationType:"administrator",enrollmentType:verifiedEmployee&&!verifiedProfile?"employee":"member",identityResolution:loginContext?.identityResolution||null});
+        if(verifiedAuditor)setProfile(prev=>({...prev,...verifiedAuditor}));
+        setProfile({... (verifiedProfile||verifiedEmployee||verifiedAuditor||adminDirect||{}),uid:u.uid,email:u.email||resolvedMember?.email||adminEmployee?.email||adminDirect?.email||"",role:assignedRoles[0]||"Administrator",roles:assignedRoles,serverAuthorizedRoles:serverRoles,authorities:Array.isArray(loginContext?.authorities)?loginContext.authorities:[],administratorAvailable:true,authorizationType:"administrator",enrollmentType:verifiedAuditor&&!verifiedProfile&&!verifiedEmployee?"auditor":verifiedEmployee&&!verifiedProfile?"employee":"member",identityResolution:loginContext?.identityResolution||null});
         return;
       }
 
       // The concurrent register lookup above is the bounded fallback; do not issue
       // the same Firestore reads a second time after the server resolver completes.
       const memberAuthorized=Boolean(memberDirect)&&((String(memberDirect?.status||"").trim().toLowerCase()==="active")||(String(memberDirect?.status||"").trim().toLowerCase()==="activated")||(String(memberDirect?.registrationStatus||"").trim().toLowerCase()==="activated"));
+      const auditorAuthorized=Boolean(auditorDirect)&&auditorDirect.active!==false&&((String(auditorDirect?.status||"").trim().toLowerCase()==="active")||(String(auditorDirect?.status||"").trim().toLowerCase()==="activated")||(String(auditorDirect?.registrationStatus||"").trim().toLowerCase()==="activated")||auditorDirect.accountActivated===true);
       const employeeAuthorized=Boolean(employeeDirect)&&((String(employeeDirect?.status||"").trim().toLowerCase()==="active")||(String(employeeDirect?.employmentStatus||"").trim().toLowerCase()==="active")||(String(employeeDirect?.registrationStatus||"").trim().toLowerCase()==="activated"));
       const administratorAuthorized=adminDirect?.active===true;
       // If the browser lost invitation context, recover the authoritative state from
       // the server before allowing an unauthorised authenticated session to continue.
       // Established Member/Employee/Admin logins are not sent through this path.
-      if(!administratorAuthorized&&!memberAuthorized&&!employeeAuthorized){
+      if(!administratorAuthorized&&!memberAuthorized&&!employeeAuthorized&&!auditorAuthorized){
         try{
           const recoveredInvitationState=await getInvitationSessionState();
           if(recoveredInvitationState?.state){
@@ -689,13 +694,13 @@ useEffect(()=>{
       const configuredGatewayAuthority=IRPA_GATEWAY_CONNECTED?Boolean(tokenResult?.claims?.admin===true)||
         (Array.isArray(tokenRoles)&&tokenRoles.length>0)||
         (Array.isArray(loginContext?.roles)&&loginContext.roles.length>0):Boolean(tokenResult?.claims?.admin===true)||
-        (Array.isArray(tokenRoles)&&tokenRoles.length>0)||memberAuthorized||employeeAuthorized||administratorAuthorized;
+        (Array.isArray(tokenRoles)&&tokenRoles.length>0)||memberAuthorized||employeeAuthorized||auditorAuthorized||administratorAuthorized;
       if(!configuredGatewayAuthority){
         // Authentication is complete. Gateway authority is an access-capacity concern,
         // not a login blocker. Keep the authenticated session in the non-sensitive
         // workspace; downstream portal/data authorization remains enforced.
         setEmployee(null);
-        setProfile({uid:u.uid,email:u.email||"",name:u.displayName||u.email||"Authenticated IRPA User",role:"",roles:[],serverAuthorizedRoles:[],authorities:[],administratorAvailable:false,authorizationType:"authenticated",identityResolution:"AUTHENTICATED_SESSION"});
+        setProfile({...((auditorAuthorized&&auditorDirect)||{}),uid:u.uid,email:u.email||"",name:u.displayName||u.email||"Authenticated IRPA User",role:"",roles:[],serverAuthorizedRoles:[],authorities:[],administratorAvailable:false,authorizationType:"authenticated",identityResolution:"AUTHENTICATED_SESSION"});
         setInductionComplete(false);
         return;
       }
