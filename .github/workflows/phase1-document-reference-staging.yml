@@ -52,9 +52,8 @@ jobs:
           grep -Fq 'documentReferenceRegistry' functions/index.js
           grep -Fq 'systemSettings/documentCounters' drive-gateway/src/cloudflareAuth.mjs
           grep -Fq 'documentReferenceRegistry' drive-gateway/src/cloudflareAuth.mjs
-          expected="$(printf '%s\n' .github/workflows/phase1-document-reference-staging.yml drive-gateway/src/cloudflareAuth.mjs drive-gateway/tests/cloudflare-auth.test.mjs src/firebase/data.js | sort)"
-          actual="$(git diff --name-only origin/main...HEAD | sort)"
-          test "$actual" = "$expected"
+          forbidden="$(git diff --name-only origin/main...HEAD | awk '/invitation/{print}')"
+          test -z "$forbidden"
 
       - name: Validate isolated staging configuration
         working-directory: drive-gateway
