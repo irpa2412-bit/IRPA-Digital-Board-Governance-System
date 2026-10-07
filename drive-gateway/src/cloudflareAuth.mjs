@@ -147,6 +147,10 @@ async function queryFirestore(env,token,collectionName,filters=[],limit=20){
 }
 
 async function authorizeDocumentReferenceGeneration(env,claims){
+  if(env.LOCAL_TEST_MODE==="true"){
+    if(env.TEST_DOCUMENT_REFERENCE_AUTHZ==="deny")throw new HttpError(403,"Permission denied for document reference generation.");
+    return {actor:{uid:claims.user_id,email:claims.email||null,role:"Test",roles:[],active:true},permissions:[DOCUMENT_PERMISSION]};
+  }
   const uid=claims.user_id;
   const [admin,member,employee]=await Promise.all([
     getFirestoreDocument(env,"adminProfiles/"+uid,claims.token),
@@ -317,11 +321,17 @@ export async function routeCloudflareAuth(request, env, authenticate) {
       }
       throw error;
     }
-    const authorization = await authorizeDocumentReferenceGeneration(env, claims);
-    const result = env.DRIVE_MOCK === "true"
+    try {
+      const authorization = await authorizeDocumentReferenceGeneration(env, claims);
+      const result = env.DRIVE_MOCK === "true"
       ? { reference: "IRPA-DOC-" + new Date().getUTCFullYear() + "-" + String(++mockReference).padStart(5, "0"), year: new Date().getUTCFullYear(), issuedBy: "SYSTEM", issuedByUid: claims.user_id, issuedByEmail: claims.email || null }
       : await issueDocumentReferenceFromFirestore(env, claims);
-    return json(200, { ok: true, ...result, authorization: { action: DOCUMENT_PERMISSION, permissions: authorization.permissions } });
+      return json(200, { ok: true, ...result, authorization: { action: DOCUMENT_PERMISSION, permissions: authorization.permissions } });
+    } catch(error) {
+      if(error instanceof HttpError) throw error;
+      console.error("Document reference Cloudflare migration failure", error);
+      throw new HttpError(503, "The document reference service is temporarily unavailable. Please try again.");
+    }
   }
 
   return null;
