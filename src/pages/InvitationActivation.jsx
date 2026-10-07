@@ -16,7 +16,7 @@ export default function InvitationActivation(){
     if(!token){setError("This invitation link is incomplete. Please open the invitation email again.");setStatus("error");return;}
     completeInvitationToken(token)
       .then(user=>{setEmail(String(user?.email||"").trim().toLowerCase());setErrorKind("");setStatus("ready");})
-      .catch(err=>{const message=String(err?.message||"This invitation could not be opened.");setError(message);setErrorKind(/expired|cancelled|no longer available/i.test(message)?"renew":/already been used|already activated|already associated/i.test(message)?"used":"retry");setStatus("error");});
+      .catch(err=>{const message=String(err?.message||"This invitation could not be opened.");setError(message);setErrorKind(/expired|cancelled/i.test(message)?"renew":/already been used|already activated|already associated/i.test(message)?"used":"retry");setStatus("error");});
   },[]);
 
   async function activate(e){
@@ -61,7 +61,7 @@ export default function InvitationActivation(){
   }
 
   if(status==="error"){
-    return <InvitationShell><div className="irpa-invitation-card"><div style={styles.kicker}>IRPA DIGITAL BOARD GOVERNANCE SYSTEM</div><h1 style={styles.title}>Invitation unavailable</h1><p style={styles.text}>{error}</p>{errorKind==="renew"&&<p style={styles.text}>Please request a new invitation link from an IRPA Administrator.</p>}
+    return <InvitationShell><div className="irpa-invitation-card"><div style={styles.kicker}>IRPA DIGITAL BOARD GOVERNANCE SYSTEM</div><h1 style={styles.title}>Invitation unavailable</h1><p style={styles.text}>{error}</p>{errorKind==="renew"&&<><p style={styles.text}>Please request a new invitation link from an IRPA Administrator.</p><button type="button" onClick={returnToLogin} style={styles.primary}>Request a New Link</button></>}
       {errorKind==="used"&&<p style={styles.text}>This invitation has already been used. Sign in with the email address that received the invitation.</p>}
       {errorKind==="retry"&&<button type="button" onClick={retryInvitation} disabled={retrying} style={styles.primary}>{retrying?"Trying again…":"Try Again"}</button>}
       <button type="button" onClick={returnToLogin} style={styles.secondary}>Return to Sign In</button></div></InvitationShell>;
