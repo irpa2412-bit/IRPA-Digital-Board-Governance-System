@@ -161,3 +161,11 @@ export async function reconcileRegisteredIdentityUids(){
     throw new Error(error?.message||"UID reconciliation failed. No success confirmation was received.");
   }
 }
+
+export async function assertAdministratorSecondFactor(){
+  if(!auth.currentUser) throw new Error("Administrator authentication is required.");
+  const functions=getFunctions(undefined,"us-central1");
+  const call=httpsCallable(functions,"assertAdministratorSecondFactor");
+  const result=await call({});
+  return result.data||{};
+}
