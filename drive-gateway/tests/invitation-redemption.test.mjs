@@ -272,7 +272,7 @@ test("password-set verifies the password provider and activates the invitation o
         updateTime:"2026-10-05T08:00:00.000000Z"
       }),{status:200});
     }
-    if(target.endsWith("/documents/members/board-123")){
+    if(target.includes("/documents/members/board-123")){
       if(options.method==="PATCH") return new Response(JSON.stringify({name:"patched"}),{status:200});
       return new Response(JSON.stringify({name:"projects/irpa-digital-board-governance/databases/(default)/documents/members/board-123",fields:{
         email:{stringValue:"invitee@example.org"},role:{stringValue:"Board Member"},boardMember:{booleanValue:true}
@@ -317,8 +317,9 @@ test("password-set refuses activation when the registered member record does not
         updateTime:"2026-10-05T08:00:00.000000Z"
       }),{status:200});
       if(target.includes("/accounts:lookup")) return new Response(JSON.stringify({users:[{localId:"unregistered-member-uid",email:"invitee@example.org",providerUserInfo:[{providerId:"password"}]}]}),{status:200});
-      if(target.includes("/documents/members?")) return new Response(JSON.stringify({documents:[]}),{status:200});
+      if(target.includes("/documents:runQuery")) return new Response(JSON.stringify({documents:[]}),{status:200});
       if(target.includes("/documents/members/")) return new Response(JSON.stringify({error:{status:"NOT_FOUND"}}),{status:404});
+      if(target.includes("/documents:runQuery")) return new Response(JSON.stringify([]),{status:200});
       throw new Error("Unexpected request: "+target);
     }
   });
