@@ -175,7 +175,7 @@ export function createDocumentLifecycleRouter(deps) {
       try {
         uploaded=await uploadToDrive(deps,env,accessToken,{folderId:archive.folderId,fileName,contentType,bytes,description:{irpaGovernance:true,irpaDocumentLifecycle:true,documentId,reference,stage:"WORKING",ownerUid:claims.user_id,classification,archiveCategory:category,sha256:hash}});
         const record=buildDocumentRecord(identity,{...data,reference,classification,archiveCategory},{documentId,fileId:uploaded.id,fileName,fileSize:bytes.length,sha256:hash,archivePath:archive.archivePath});
-        record.archiveFolderId=archive.folderId;record.archiveUidLink="https://drive.google.com/drive/folders/"+encodeURIComponent(archive.folderId);record.archiveFileWebViewLink=uploaded.webViewLink||null;record.recordOrigin=String(data.recordOrigin||"PRODUCTION").toUpperCase()==="TRIAL"?"TRIAL":"PRODUCTION";
+        record.archiveFolderId=archive.folderId;record.archiveUidLink="https://drive.google.com/drive/folders/"+encodeURIComponent(archive.folderId);record.archiveFileWebViewLink=uploaded.webViewLink||null;record.webViewLink=uploaded.webViewLink||null;record.fileUrl=uploaded.id?"drive://"+uploaded.id:null;record.recordOrigin=String(data.recordOrigin||"PRODUCTION").toUpperCase()==="TRIAL"?"TRIAL":"PRODUCTION";
         await putDocument(deps,env,claims,documentId,record);
       } catch(error) {
         if(uploaded?.id)await deleteDriveFile(deps,env,accessToken,uploaded.id);
@@ -201,7 +201,7 @@ export function createDocumentLifecycleRouter(deps) {
       const bytes=new Uint8Array(await media.arrayBuffer());
       const actualHash=await sha256(bytes);
       if(document.sha256&&actualHash!==document.sha256)return deps.json({ok:false,error:"Document integrity verification failed."},409,deps.corsHeaders(request));
-      return deps.json({ok:true,fileId:suppliedFileId,fileName:metadata.name,contentType:metadata.mimeType,base64:btoa(String.fromCharCode(...bytes)),sha256:actualHash},200,deps.corsHeaders(request));
+      let binary="";for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,Math.min(i+0x8000,bytes.length)));return deps.json({ok:true,fileId:suppliedFileId,fileName:metadata.name,contentType:metadata.mimeType,base64:btoa(binary),sha256:actualHash},200,deps.corsHeaders(request));
     }
 
     if(pathname==="/api/document-lifecycle/transition"&&method==="POST"){
