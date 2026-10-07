@@ -364,7 +364,7 @@ export async function sealAndPersist({
     if (statusStore?.set) {
       try { await statusStore.set("FULLY_SIGNED"); } catch {}
     }
-    for (const evidence of storedEvidence) {
+    for (const evidence of createdEvidence) {
       try {
         await meta.delete("cryptographicEvidence", evidence.evidenceId);
       } catch {}
