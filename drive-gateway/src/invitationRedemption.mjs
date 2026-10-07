@@ -636,16 +636,20 @@ export async function confirmInvitationPasswordSetup(request, env, claims) {
   const authEmail = String(user.email || "").trim().toLowerCase();
   if (authEmail !== invitationEmail) throw new InvitationRedemptionError(403, "The Firebase account email does not match the invitation email.");
 
-  const hasPasswordProvider = Array.isArray(user.providerUserInfo) &&
+  let hasPasswordProvider = Array.isArray(user.providerUserInfo) &&
     user.providerUserInfo.some(provider => String(provider.providerId || "") === "password");
+
+  if (redemptionState === "PASSWORD_SETUP_PENDING" && requestedPassword) {
+    const updatedUser = await updateFirebaseUserPassword(projectId, claims.user_id, requestedPassword, accessToken);
+    hasPasswordProvider = Array.isArray(updatedUser?.providerUserInfo) &&
+      updatedUser.providerUserInfo.some(provider => String(provider.providerId || "") === "password");
+  }
+
   if (!hasPasswordProvider) {
     throw new InvitationRedemptionError(409, "Firebase has not confirmed a password credential for this account yet. Complete password setup and try again.");
   }
 
   if (redemptionState === "PASSWORD_SETUP_PENDING") {
-    if (requestedPassword) {
-      await updateFirebaseUserPassword(projectId, claims.user_id, requestedPassword, accessToken);
-    }
     const now = new Date().toISOString();
     await patchFirestoreFields(documentPath, document.updateTime, {
       invitationRedemptionState:{stringValue:"PROVISIONING_PENDING"},
