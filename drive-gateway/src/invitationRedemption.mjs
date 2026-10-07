@@ -116,8 +116,11 @@ export async function redeemInvitationToken(request, env) {
   if (currentState === "EXPIRED" || (currentState === "PASSWORD_SETUP_PENDING" && pendingUntil && pendingUntil <= Date.now())) {
     throw new InvitationRedemptionError(410, "The invitation password-setup window has expired. Ask an Administrator to issue a fresh invitation.");
   }
-  if (["CANCELLED","ACTIVATED"].includes(currentState)) {
-    throw new InvitationRedemptionError(409, redemptionState === "ACTIVATED" ? "This invitation has already been used. Please sign in with your IRPA account." : "This invitation is not available for password setup.");
+  if (currentState === "ACTIVATED") {
+    throw new InvitationRedemptionError(409, "This invitation has already been used. Please sign in with your IRPA account.");
+  }
+  if (currentState === "CANCELLED") {
+    throw new InvitationRedemptionError(412, "This IRPA invitation has been cancelled.");
   }
   if (invitation.invitationRedeemedUid && invitation.invitationRedeemedUid !== user.localId) {
     throw new InvitationRedemptionError(409, "This invitation has already been associated with another Firebase account.");
@@ -583,7 +586,9 @@ async function provisionInvitationActivation(invitationId, uid, email, env, acce
 export async function confirmInvitationPasswordSetup(request, env, claims) {
   const body = await readJson(request);
   const invitationId = String(body?.invitationId || "").trim();
+  const requestedPassword = String(body?.password || "");
   if (!invitationId) throw new InvitationRedemptionError(400, "The invitation ID is required.");
+  if (requestedPassword && requestedPassword.length < 8) throw new InvitationRedemptionError(400, "Use a password with at least 8 characters.");
   const projectId = String(env.FIREBASE_PROJECT_ID || "").trim();
   const serviceAccount = parseServiceAccount(env.FIREBASE_SERVICE_ACCOUNT_JSON);
   const accessToken = await getGoogleAccessToken(serviceAccount);
@@ -617,11 +622,11 @@ export async function confirmInvitationPasswordSetup(request, env, claims) {
   if (!lookupResponse.ok || !lookup.users?.[0]) throw new InvitationRedemptionError(401, "The Firebase account could not be verified.");
   const user = lookup.users[0];
   const authEmail = String(user.email || "").trim().toLowerCase();
-  const hasPasswordProvider = Array.isArray(user.providerUserInfo) && user.providerUserInfo.some(provider => String(provider.providerId || "") === "password");
-  if (!hasPasswordProvider) throw new InvitationRedemptionError(409, "Firebase has not confirmed a password credential for this account yet. Complete password setup and try again.");
   if (authEmail !== invitationEmail) throw new InvitationRedemptionError(403, "The Firebase account email does not match the invitation email.");
 
   if (redemptionState === "PASSWORD_SETUP_PENDING") {
+    if (!requestedPassword) throw new InvitationRedemptionError(400, "Create a password with at least 8 characters to activate your IRPA account.");
+    await updateFirebaseUserPassword(projectId, claims.user_id, requestedPassword, accessToken);
     const now = new Date().toISOString();
     await patchFirestoreFields(documentPath, document.updateTime, {
       invitationRedemptionState:{stringValue:"PROVISIONING_PENDING"},
@@ -634,7 +639,24 @@ export async function confirmInvitationPasswordSetup(request, env, claims) {
     return await provisionInvitationActivation(invitationId, claims.user_id, invitationEmail, env, accessToken, refreshed);
   }
 
-  return await provisionInvitationActivation(invitationId, claims.user_id, invitationEmail, env, accessToken, document);
+  const refreshed = await getFirestoreDocument(documentPath, accessToken);
+  if (!refreshed) throw new InvitationRedemptionError(404, "This IRPA invitation no longer exists.");
+  return await provisionInvitationActivation(invitationId, claims.user_id, invitationEmail, env, accessToken, refreshed);
+}
+
+async function updateFirebaseUserPassword(projectId, uid, password, accessToken) {
+  const response = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/accounts:update`,
+    {method:"POST",headers:{Authorization:`Bearer ${accessToken}`,"Content-Type":"application/json"},body:JSON.stringify({localId:String(uid),password:String(password)})}
+  );
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const code=String(data.error?.message||"");
+    if (/WEAK_PASSWORD/i.test(code)) throw new InvitationRedemptionError(400,"Use a password with at least 8 characters.");
+    if (/PERMISSION_DENIED|INSUFFICIENT_PERMISSION|UNAUTHORIZED/i.test(code)) throw new InvitationRedemptionError(503,"IRPA could not update the account password right now. Please try again.");
+    throw new Error(code || "Firebase could not update the account password.");
+  }
+  return data;
 }
 
 async function getFirestoreDocument(path, accessToken) {
