@@ -153,7 +153,7 @@ test("password-set returns 401 when Firebase authentication is missing", async()
     FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)
   });
   assert.equal(response.status,401);
-  assert.deepEqual(await response.json(),{ok:false,error:"Firebase authentication is required."});
+  assert.deepEqual(await response.json(),{ok:false,error:"Your invitation session has expired. Please open the invitation link again."});
 });
 
 test("session-state returns 401 when Firebase authentication is missing", async()=>{
