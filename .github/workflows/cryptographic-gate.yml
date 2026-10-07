@@ -10,6 +10,7 @@ on:
       - "drive-gateway/src/esignContext.mjs"
       - "drive-gateway/tests/cryptographic-gate.test.mjs"
       - "drive-gateway/tests/production-crypto-integration.test.mjs"
+      - "drive-gateway/tests/staging-crypto-acceptance.test.mjs"
       - "drive-gateway/scripts/provision-crypto-signer-key.mjs"
       - "drive-gateway/wrangler.toml"
       - "drive-gateway/src/util.mjs"
@@ -38,6 +39,9 @@ jobs:
       - name: Run production cryptographic integration acceptance tests
         working-directory: drive-gateway
         run: node --test tests/production-crypto-integration.test.mjs
+      - name: Run staging cryptographic custody acceptance tests
+        working-directory: drive-gateway
+        run: node --test tests/staging-crypto-acceptance.test.mjs
       - name: Run complete gateway regression suite
         working-directory: drive-gateway
         run: npm test
