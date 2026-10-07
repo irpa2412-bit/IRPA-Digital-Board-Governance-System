@@ -143,7 +143,7 @@ export async function createCryptographicEvidence({
   const publicKeyJwk = await exportPublicKeyJwk(publicKey);
   const canonicalPayload = buildCanonicalSigningPayload({
     envelopeId: signer.envelopeId,
-    signerId: signer.signerId,
+    signerId: signer.signerId || signer.id,
     signerUid,
     documentHash,
     signatureHash,
