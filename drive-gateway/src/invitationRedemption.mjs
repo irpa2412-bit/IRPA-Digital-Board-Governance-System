@@ -527,29 +527,17 @@ async function provisionInvitationActivation(invitationId, uid, email, env, acce
     const memberRows=await queryFirestoreCollection(accessToken, projectId, "members", "email", invitationEmail);
     let member=memberRows.find(row=>firestoreDocumentToPlain(row.document.fields || {}).uid===uid);
     if(!member) member=memberRows[0];
-    if(member){
-      await patchFirestoreFields(documentNameToPath(member.document.name), null, {
-        uid:{stringValue:uid}, invitationId:{stringValue:invitationId},
-        accountActivated:{booleanValue:true}, registrationStatus:{stringValue:"Activated"},
-        status:{stringValue:"Active"}, activatedAt:{timestampValue:now}
-      }, accessToken);
-      activatedRecords++;
-    } else {
-      const memberPath=`projects/${projectId}/databases/(default)/documents/members/${encodeURIComponent(uid)}`;
-      const response=await fetch(`https://firestore.googleapis.com/v1/${memberPath}`,{
-        method:"PATCH",
-        headers:{Authorization:`Bearer ${accessToken}`,"Content-Type":"application/json"},
-        body:JSON.stringify({fields:{
-          uid:{stringValue:uid}, invitationId:{stringValue:invitationId}, email:{stringValue:invitationEmail},
-          name:{stringValue:String(invitation.name || "")}, role:{stringValue:role},
-          memberType:{stringValue:String(invitation.memberType || "Governance Member")},
-          status:{stringValue:"Active"}, accountActivated:{booleanValue:true},
-          registrationStatus:{stringValue:"Activated"}, activatedAt:{timestampValue:now}, createdAt:{timestampValue:now}, updatedAt:{timestampValue:now}
-        }})
-      });
-      if(!response.ok) throw new Error("Unable to create the IRPA activation profile.");
-      activatedRecords++;
+    if(!member) throw new InvitationRedemptionError(422, "The registered IRPA member record for this invitation could not be resolved.");
+    const memberData=firestoreDocumentToPlain(member.document.fields || {});
+    if(String(memberData.email || "").trim().toLowerCase() !== invitationEmail) {
+      throw new InvitationRedemptionError(422, "The invitation email does not match the registered IRPA member record.");
     }
+    await patchFirestoreFields(documentNameToPath(member.document.name), null, {
+      uid:{stringValue:uid}, invitationId:{stringValue:invitationId},
+      accountActivated:{booleanValue:true}, registrationStatus:{stringValue:"Activated"},
+      status:{stringValue:"Active"}, activatedAt:{timestampValue:now}
+    }, accessToken);
+    activatedRecords++;
   }
 
   const invitationFields={
