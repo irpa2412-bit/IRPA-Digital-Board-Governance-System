@@ -606,7 +606,6 @@ export async function confirmInvitationPasswordSetup(request, env, claims) {
   }
   const redemptionState = String(invitation.invitationRedemptionState || "");
   if (redemptionState === "ACTIVATED") return {ok:true,invitationId,uid:claims.user_id,state:"ACTIVATED"};
-  if (redemptionState === "PROVISIONING_PENDING") return {ok:true,invitationId,uid:claims.user_id,state:"PROVISIONING_PENDING"};
   if (!["PASSWORD_SETUP_PENDING","PROVISIONING_PENDING"].includes(redemptionState)) {
     throw new InvitationRedemptionError(409, "This invitation is not waiting for password setup or resumable provisioning.");
   }
