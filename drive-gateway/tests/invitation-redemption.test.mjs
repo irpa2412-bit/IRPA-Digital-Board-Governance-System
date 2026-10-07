@@ -311,7 +311,7 @@ test("password-set refuses activation when the registered member record does not
           invitationRedemptionState:{stringValue:"PASSWORD_SETUP_PENDING"},
           invitationPasswordSetupExpiresAt:{timestampValue:"2099-01-01T00:00:00Z"},
           memberType:{stringValue:"Governance Member"},
-          role:{stringValue:"Board Member"},
+          role:{stringValue:"Governance Member"},
           institutionalRecordType:{stringValue:"Member"}
         },
         updateTime:"2026-10-05T08:00:00.000000Z"
