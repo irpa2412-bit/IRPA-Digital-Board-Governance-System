@@ -16,12 +16,8 @@ exports.recordPasswordFailure = recordPasswordFailure;
 exports.clearPasswordAttemptState = clearPasswordAttemptState;
 exports.preparePasswordResetPhone = preparePasswordResetPhone;
 const { runMfaSecurityAuditScheduled, runMfaSecurityAuditNow } = require("./mfaSecurityAudit");
-const { beginAdministratorEmailVerification, verifyAdministratorEmailVerification, assertAdministratorSecondFactor } = require("./adminLoginVerification");
 exports.runMfaSecurityAuditScheduled = runMfaSecurityAuditScheduled;
 exports.runMfaSecurityAuditNow = runMfaSecurityAuditNow;
-exports.beginAdministratorEmailVerification = beginAdministratorEmailVerification;
-exports.verifyAdministratorEmailVerification = verifyAdministratorEmailVerification;
-exports.assertAdministratorSecondFactor = assertAdministratorSecondFactor;
 async function stableId(v){return crypto.createHash("sha256").update(String(v)).digest("hex");}
 async function writeServerAuditEvent(event){
   const path=String(event.params?.document||"");
