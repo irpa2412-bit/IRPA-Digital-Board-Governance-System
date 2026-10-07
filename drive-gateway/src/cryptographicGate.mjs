@@ -154,9 +154,7 @@ export async function createCryptographicEvidence({
   });
   const payloadHash = await sha256Hex(canonicalPayload);
   const signature = await signCanonicalPayload(privateKey, canonicalPayload);
-  const evidenceId = "CRYPTO-" + await sha256Hex(
-    canonicalPayload + "." + signature,
-  );
+  const evidenceId = "CRYPTO-" + payloadHash;
   return Object.freeze({
     evidenceId,
     schema: CRYPTO_EVIDENCE_SCHEMA,
