@@ -100,7 +100,7 @@ test("Cloudflare invitation redemption creates/signs Firebase custom token and r
 });
 
 
-test("Cloudflare invitation redemption refuses an existing password account", async()=>{
+test("Cloudflare invitation redemption self-heals an existing password account", async()=>{
   const originalFetch=global.fetch;
   const calls=[];
   global.fetch=async(url,options={})=>{
@@ -112,8 +112,11 @@ test("Cloudflare invitation redemption refuses an existing password account", as
   };
   try{
     const response=await handler.fetch(new Request("https://gw.test/api/invitations/redeem",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:`test-invitation.${tokenSecret}`})}),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)});
-    assert.equal(response.status,409);
-    assert.match((await response.json()).error,/normal IRPA login/i);
+    assert.equal(response.status,200);
+    const body=await response.json();
+    assert.equal(body.ok,true);
+    assert.equal(body.uid,"firebase-existing-uid");
+    assert.ok(body.customToken);
     assert.equal(calls.some(c=>c.options.method==="PATCH"),false);
   } finally { global.fetch=originalFetch; }
 });
