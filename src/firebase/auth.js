@@ -310,6 +310,33 @@ function firebaseErrorMessage(error) {
   return known[code] ? `${known[code]} (${code})` : `${message}${code ? ` (${code})` : ""}`;
 }
 
+export async function inviteRegisteredPerson({record,recordType,role,memberType}) {
+  if (!record?.id) throw new Error("A registered institutional record is required.");
+  const email=String(record.email||"").trim().toLowerCase();
+  const name=String(record.name||"").trim();
+  if (!name || !email) throw new Error("The registered record must contain a name and official email.");
+  const invitationRef=doc(collection(db,"invitations"));
+  const invitationId=invitationRef.id;
+  const invitationData={
+    email,name,role:String(role||record.role||recordType||"IRPA Member").trim(),
+    memberType:String(memberType||recordType||"IRPA Member").trim(),
+    roles:Array.isArray(record.roles)&&record.roles.length?record.roles:[String(role||record.role||recordType||"IRPA Member").trim()],
+    status:"Pending",deliveryStatus:"Preparing",employeeId:recordType==="Employee"?record.id:null,
+    boardMemberId:recordType==="Board Member"?record.id:null,institutionalRecordId:record.id,
+    institutionalRecordType:String(recordType||"").trim(),source:"Institutional Register",
+    deliveryProvider:"IRPA Mail Server",createdAt:serverTimestamp(),updatedAt:serverTimestamp()
+  };
+  await setDoc(invitationRef,invitationData);
+  try {
+    const result=await sendMemberInvitationEmail(email,invitationId,invitationData.role,invitationData.memberType);
+    await updateDoc(invitationRef,{status:"Invitation Requested",deliveryStatus:result.deliveryStatus||"Accepted",sentAt:new Date().toISOString(),deliveryError:"",updatedAt:serverTimestamp()});
+    return {invitationId,...result};
+  } catch(error) {
+    await updateDoc(invitationRef,{deliveryStatus:"Failed",deliveryError:error?.message||"Invitation request failed.",updatedAt:serverTimestamp()});
+    throw error;
+  }
+}
+
 export async function sendMemberInvitationEmail(_email, invitationId, _role, _memberType) {
   const cleanId = String(invitationId || "").trim();
   if (!cleanId) throw new Error("The invitation ID is required.");
