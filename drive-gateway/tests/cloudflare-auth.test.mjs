@@ -153,9 +153,11 @@ test("next document reference requires document.create authorization", async () 
 });
 
 test("next document reference failure returns a clear message", async () => {
-  const response = await call("/api/documents/next-reference", {}, env({TEST_DOCUMENT_REFERENCE_AUTHZ:"allow",DRIVE_MOCK:"true"}));
-  assert.equal(response.status, 200);
-  assert.doesNotMatch(JSON.stringify(await response.json()), /Internal error/i);
+  const response = await call("/api/documents/next-reference", {}, env({TEST_DOCUMENT_REFERENCE_AUTHZ:"allow",DRIVE_MOCK:"false",TEST_DOCUMENT_REFERENCE_FAILURE:"true"}));
+  assert.equal(response.status, 503);
+  const body = await response.json();
+  assert.match(body.error, /temporarily unavailable/i);
+  assert.doesNotMatch(JSON.stringify(body), /Internal error/i);
 });
 
 test("next document references remain unique and sequential through the Cloudflare path", async () => {
