@@ -136,7 +136,7 @@ async function audit(deps,env,claims,documentId,event,details={}) {
 export function createDocumentLifecycleRouter(deps) {
   return async function routeDocumentLifecycle(request,env) {
     const url=new URL(request.url);
-    const pathname=url.pathname.replace(/\\/+$/,"")||"/";
+    const pathname=url.pathname.replace(/\/+$/,"")||"/";
     const claims=await deps.authenticateFirebaseRequest(request,env);
     const identity=await getIdentity(deps,env,claims);
     const method=request.method;
