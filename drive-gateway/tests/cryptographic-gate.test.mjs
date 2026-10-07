@@ -99,9 +99,8 @@ test("C-G04 cryptographic verification independently verifies the signature", as
     signer: {...signer, privateKey:keyRecord.privateKey, publicKey:keyRecord.publicKey, signatureHash},
     documentHash, chainHead, signedAt: signer.signedAt,
   });
-  const retrievedPublicKey = await importPublicKeyJwk(evidence.publicKeyJwk);
   assert.equal(await verifyCryptographicEvidence(evidence, {
-    documentHash, signerUid: signer.uid, publicKey: retrievedPublicKey,
+    documentHash, signerUid: signer.uid, publicKey: keyRecord.publicKey,
   }), true);
 });
 
@@ -183,8 +182,9 @@ test("C-G09 verification after persistence/retrieval remains cryptographically v
     document:{id:"doc-1",bytes:originalBytes},
   });
   const evidence = await meta.get("cryptographicEvidence",result.evidenceIds[0]);
+  const retrievedPublicKey = await importPublicKeyJwk(evidence.publicKeyJwk);
   assert.equal(await verifyCryptographicEvidence(evidence,{
-    documentHash:result.documentHash, signerUid:signer.uid, publicKey:keyRecord.publicKey,
+    documentHash:result.documentHash, signerUid:signer.uid, publicKey:retrievedPublicKey,
   }),true);
 });
 
