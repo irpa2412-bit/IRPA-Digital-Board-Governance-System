@@ -1,6 +1,7 @@
 import React,{Component}from"react";
 import ReactDOM from"react-dom/client";
 import App from"./App";
+import InvitationActivation from"./pages/InvitationActivation";
 import { logout } from "./firebase/auth";
 import "./styles/app.css";
 import "./styles/mobile-viewport-containment.css";
@@ -47,12 +48,14 @@ class AppBootBoundary extends Component{
   }
 }
 
+const invitationRoute = new URL(window.location.href).searchParams.has("invitationToken");
+
 ReactDOM.createRoot(document.getElementById("root"),{
   onUncaughtError:(error)=>console.error("IRPA application startup error",error)
 }).render(
   <React.StrictMode>
     <AppBootBoundary>
-      <App />
+      {invitationRoute ? <InvitationActivation /> : <App />}
     </AppBootBoundary>
   </React.StrictMode>
 );
