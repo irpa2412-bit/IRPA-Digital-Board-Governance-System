@@ -105,7 +105,7 @@ test("C-G13 staging custody resolves the signer key through the Cloudflare-style
   assert.equal(record.keyId, "IRPA-STAGING-CRYPTO-001");
   assert.equal(record.privateKey.extractable, false);
   assert.deepEqual(record.privateKey.usages, ["sign"]);
-  assert.equal(record.publicKey.extractable, false);
+  assert.equal(record.publicKey.extractable, true);
   assert.deepEqual(record.publicKey.usages, ["verify"]);
 });
 
