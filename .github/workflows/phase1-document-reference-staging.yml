@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - feat/phase1-document-reference-cloudflare-20261007
+  pull_request:
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
 
 permissions:
