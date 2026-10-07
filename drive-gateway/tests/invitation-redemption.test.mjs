@@ -502,3 +502,38 @@ test("password-set is idempotent after invitation activation", async()=>{
   } finally { global.fetch=originalFetch; }
 });
 
+
+
+test("password-set activates a registered Special Invitee from the third register", async()=>{
+  const originalFetch=global.fetch;
+  const jwk=publicKey.export({format:"jwk"});
+  const idToken=makeFirebaseIdToken("special-invitee-uid");
+  const calls=[];
+  global.fetch=async(url,options={})=>{
+    const target=String(url); calls.push({target,options});
+    if(target.includes("securetoken@system.gserviceaccount.com")) return new Response(JSON.stringify({keys:[{...jwk,kid:"invitation-test-key",alg:"RS256",use:"sig"}]}),{status:200});
+    if(target.includes("/documents/invitations/special-invitee-invitation")) return new Response(JSON.stringify({
+      name:"projects/irpa-digital-board-governance/databases/(default)/documents/invitations/special-invitee-invitation",
+      fields:{...invitationFields,email:{stringValue:"special@example.org"},invitationRedeemedUid:{stringValue:"special-invitee-uid"},invitationRedemptionState:{stringValue:"PASSWORD_SETUP_PENDING"},invitationPasswordSetupExpiresAt:{timestampValue:"2099-01-01T00:00:00Z"},institutionalRecordId:{stringValue:"special-profile-1"},institutionalRecordType:{stringValue:"Special Invitee"},role:{stringValue:"Special Invitee"}},
+      updateTime:"2026-10-05T08:00:00.000000Z"
+    }),{status:200});
+    if(target.includes("/accounts:lookup")) return new Response(JSON.stringify({users:[{localId:"special-invitee-uid",email:"special@example.org",providerUserInfo:[{providerId:"password"}]}]}),{status:200});
+    if(target.includes("/documents/auditorProfiles/special-profile-1")) return new Response(JSON.stringify({
+      name:"projects/irpa-digital-board-governance/databases/(default)/documents/auditorProfiles/special-profile-1",
+      fields:{email:{stringValue:"special@example.org"},name:{stringValue:"Special Invitee"},category:{stringValue:"Special Invitee"},permissions:{arrayValue:{values:[{stringValue:"Read"},{stringValue:"Upload"},{stringValue:"Sign"}]}},active:{booleanValue:true}}
+    }),{status:200});
+    if(options.method==="PATCH") return new Response(JSON.stringify({name:"patched"}),{status:200});
+    throw new Error("Unexpected external request: "+target);
+  };
+  try{
+    const response=await handler.fetch(new Request("https://gw.test/api/invitations/password-set",{
+      method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"},
+      body:JSON.stringify({invitationId:"special-invitee-invitation"})
+    }),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)});
+    assert.equal(response.status,200);
+    const body=await response.json();
+    assert.equal(body.state,"ACTIVATED");
+    assert.equal(body.activatedRecords,1);
+    assert.ok(calls.some(c=>c.target.includes("/documents/auditorProfiles/special-profile-1")&&c.options.method==="PATCH"));
+  } finally { global.fetch=originalFetch; }
+});
