@@ -240,6 +240,48 @@ export function createSignerKeyProvider(records = new Map()) {
   });
 }
 
+
+export async function cryptoKeySecretName(signerUid) {
+  const uid = requireIdentity(signerUid);
+  const digest = await sha256Hex(uid);
+  return "IRPA_CRYPTO_KEY_" + digest.slice(0, 32).toUpperCase();
+}
+
+function base64ToBytes(value) {
+  const s = String(value || "").replace(/\s+/g, "");
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(s)) throw new Error("Invalid base64 key material.");
+  return Uint8Array.from(atob(s), c => c.charCodeAt(0));
+}
+
+export function createCloudflareSignerKeyProvider(env) {
+  if (!env) throw new Error("Cloudflare signer-key environment is required.");
+  return createSignerKeyProvider(async signerUid => {
+    const secretName = await cryptoKeySecretName(signerUid);
+    const raw = env[secretName];
+    if (!raw) {
+      throw new Error("No production cryptographic signing key is provisioned for this signer.");
+    }
+    let record;
+    try {
+      record = JSON.parse(raw);
+    } catch {
+      throw new Error("The production cryptographic signing key record is invalid.");
+    }
+    if (record?.version !== 1 || !record?.keyId || !record?.privateKeyPkcs8 || !record?.publicKeyJwk) {
+      throw new Error("The production cryptographic signing key record is incomplete.");
+    }
+    const privateKey = await crypto.subtle.importKey(
+      "pkcs8",
+      base64ToBytes(record.privateKeyPkcs8),
+      { name: "ECDSA", namedCurve: "P-256" },
+      false,
+      ["sign"],
+    );
+    const publicKey = await importPublicKeyJwk(record.publicKeyJwk);
+    return Object.freeze({ keyId: String(record.keyId), privateKey, publicKey });
+  });
+}
+
 export async function sealAndPersist({
   meta,
   storage,
@@ -255,6 +297,7 @@ export async function sealAndPersist({
   const documentHash = await sha256Hex(document.bytes);
   const evidenceIds = [];
   const storedEvidence = [];
+  const createdEvidence = [];
   const artifacts = [];
   try {
     for (const signer of envelope.signers || []) {
@@ -287,6 +330,7 @@ export async function sealAndPersist({
       } else {
         await meta.create("cryptographicEvidence", evidence.evidenceId, evidence);
         storedEvidence.push(evidence);
+        createdEvidence.push(evidence);
       }
       evidenceIds.push(evidence.evidenceId);
       artifacts.push(buildCryptographicAuditEvent(evidence));
