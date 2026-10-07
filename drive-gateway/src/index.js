@@ -96,13 +96,11 @@ export default {
 
       if (url.pathname === "/api/invitations/redeem" && request.method === "POST") {
         try {
-          return json(await redeemInvitationToken(request, env), 200, corsHeaders(request));
+          return json(await withInvitationRetry(() => redeemInvitationToken(request, env), "redeem"), 200, corsHeaders(request));
         } catch (error) {
-          if (error instanceof InvitationRedemptionError) {
-            return json({ok:false,error:error.message}, error.status, corsHeaders(request));
-          }
+          if (error instanceof InvitationRedemptionError) return json({ok:false,error:error.message}, error.status, corsHeaders(request));
           console.error("Invitation redemption backend failure", error);
-          return json({ok:false,error:"The IRPA invitation could not be redeemed."}, 500, corsHeaders(request));
+          return json({ok:false,error:"We could not complete this invitation right now. Please try again."}, 503, corsHeaders(request));
         }
       }
 
@@ -119,10 +117,11 @@ export default {
       if (url.pathname === "/api/invitations/password-set" && request.method === "POST") {
         try {
           const claims = await authenticateFirebaseRequest(request, env, {skipActivation:true});
-          return json(await confirmInvitationPasswordSetup(request, env, claims), 200, corsHeaders(request));
+          return json(await withInvitationRetry(() => confirmInvitationPasswordSetup(request, env, claims), "password-set"), 200, corsHeaders(request));
         } catch (error) {
           if (error instanceof InvitationRedemptionError) return json({ok:false,error:error.message}, error.status, corsHeaders(request));
-          throw error;
+          console.error("Invitation password-set backend failure", error);
+          return json({ok:false,error:"We could not activate your account right now. Please try again."}, 503, corsHeaders(request));
         }
       }
       if (url.pathname === "/api/send-invitation-email" && request.method === "POST") {
@@ -1135,6 +1134,21 @@ async function sendGatewayInvitationEmail(request, env) {
     console.error("INVITATION_GATEWAY_PROVIDER_FAILED",{recipientDomain:recipientDomain(to),error:safeMailError(error)});
     return json({ok:false,error:"EMAIL_PROVIDER_FAILED"},502,corsHeaders(request));
   }
+}
+
+async function withInvitationRetry(operation, stage) {
+  let lastError;
+  for (let attempt=1; attempt<=2; attempt+=1) {
+    try { return await operation(); }
+    catch (error) {
+      if (error instanceof InvitationRedemptionError) throw error;
+      lastError=error;
+      console.error("Invitation operation failure", {stage,attempt,message:String(error?.message||error)});
+      if (attempt===2) break;
+      await new Promise(resolve=>setTimeout(resolve,150));
+    }
+  }
+  throw lastError || new Error("Invitation operation failed.");
 }
 
 async function sendMemberInvitation(request, env) {
