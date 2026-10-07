@@ -41,7 +41,7 @@ jobs:
 
   deploy-staging:
     needs: local-e2e
-    if: github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004'
+    if: github.ref == 'refs/heads/feat/document-lifecycle-module-20261007'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
