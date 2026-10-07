@@ -167,9 +167,9 @@ test("session-state returns 401 when Firebase authentication is missing", async(
 
 
 
-function makeFirebaseIdToken(uid){
+function makeFirebaseIdToken(uid,email="invitee@example.org"){
   const header={alg:"RS256",kid:"invitation-test-key",typ:"JWT"};
-  const payload={iss:"https://securetoken.google.com/irpa-digital-board-governance",aud:"irpa-digital-board-governance",sub:uid,user_id:uid,email:"invitee@example.org",exp:Math.floor(Date.now()/1000)+3600};
+  const payload={iss:"https://securetoken.google.com/irpa-digital-board-governance",aud:"irpa-digital-board-governance",sub:uid,user_id:uid,email,exp:Math.floor(Date.now()/1000)+3600};
   const encode=value=>Buffer.from(JSON.stringify(value)).toString("base64url");
   const unsigned=encode(header)+"."+encode(payload);
   const signer=createSign("RSA-SHA256");
@@ -191,6 +191,7 @@ test("password-set refuses activation when Firebase Auth has not independently c
     if(target.includes("/databases/(default)/documents/invitations/password-verification-pending")) {
       return new Response(JSON.stringify({
         fields:{
+          email:{stringValue:"invitee@example.org"},
           invitationRedeemedUid:{stringValue:"password-pending-uid"},
           invitationRedemptionState:{stringValue:"PASSWORD_SETUP_PENDING"},
           invitationPasswordSetupExpiresAt:{timestampValue:"2099-01-01T00:00:00Z"}
@@ -388,6 +389,7 @@ test("password-set is idempotent when invitation is already PROVISIONING_PENDING
     if(target.includes("securetoken@system.gserviceaccount.com")) return new Response(JSON.stringify({keys:[{...jwk,kid:"invitation-test-key",alg:"RS256",use:"sig"}]}),{status:200});
     if(target.includes("/databases/(default)/documents/invitations/provisioning-pending")) return new Response(JSON.stringify({
       fields:{
+        email:{stringValue:"invitee@example.org"},
         invitationRedeemedUid:{stringValue:"provisioning-pending-uid"},
         invitationRedemptionState:{stringValue:"PROVISIONING_PENDING"},
         invitationPasswordSetupExpiresAt:{timestampValue:"2099-01-01T00:00:00Z"}
@@ -507,7 +509,7 @@ test("password-set is idempotent after invitation activation", async()=>{
 test("password-set activates a registered Special Invitee from the third register", async()=>{
   const originalFetch=global.fetch;
   const jwk=publicKey.export({format:"jwk"});
-  const idToken=makeFirebaseIdToken("special-invitee-uid");
+  const idToken=makeFirebaseIdToken("special-invitee-uid","special@example.org");
   const calls=[];
   global.fetch=async(url,options={})=>{
     const target=String(url); calls.push({target,options});
@@ -555,6 +557,7 @@ async function runRegisteredActivationCase({label,institutionalRecordType,instit
     }),{status:200});
     if(target.includes("/accounts:lookup"))return new Response(JSON.stringify({users:[{localId:uid,email:"invitee@example.org",providerUserInfo:[{providerId:"password"}]}]}),{status:200});
     if(target.includes(`/documents/${recordCollection}/${institutionalRecordId}`))return new Response(JSON.stringify({name:`projects/irpa-digital-board-governance/databases/(default)/documents/${recordCollection}/${institutionalRecordId}`,fields:recordFields}),{status:200});
+    if(target.includes("/documents:runQuery"))return new Response(JSON.stringify([]),{status:200});
     if(options.method==="PATCH")return new Response(JSON.stringify({name:"patched"}),{status:200});
     throw new Error("Unexpected external request: "+target);
   };
