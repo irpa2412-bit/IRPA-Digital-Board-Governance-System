@@ -205,6 +205,7 @@ async function firestoreBatchGetInTransaction(env,token,documents,transaction){
 }
 
 async function issueDocumentReferenceFromFirestore(env,claims){
+  if(env.LOCAL_TEST_MODE==="true"&&env.TEST_DOCUMENT_REFERENCE_FAILURE==="true")throw new Error("simulated document reference failure");
   for(let attempt=1;attempt<=3;attempt+=1){
     let transaction=null;
     try{
