@@ -626,7 +626,7 @@ useEffect(()=>{
       }):Promise.resolve(null);
       const registerContextPromise=Promise.all([
         Promise.race([getCurrentMemberProfile().catch(()=>null),new Promise((_,reject)=>window.setTimeout(()=>reject(new Error("Firebase member authorization lookup timed out.")),5000))]),
-        Promise.race([getCurrentEmployeeProfile().catch(()=>null),new Promise((_,reject)=>window.setTimeout(()=>reject(new Error("Firebase employee authorization lookup timed out.")),5000))])
+        Promise.race([getCurrentEmployeeProfile().catch(()=>null),new Promise((_,reject)=>window.setTimeout(()=>reject(new Error("Firebase employee authorization lookup timed out.")),5000))]),
         Promise.race([getCurrentAuditorProfile().catch(()=>null),new Promise((_,reject)=>window.setTimeout(()=>reject(new Error("Firebase auditor authorization lookup timed out.")),5000))])
       ]).catch(error=>{
         console.warn("Registered identity lookup unavailable.",error);
