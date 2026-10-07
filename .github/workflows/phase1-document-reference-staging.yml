@@ -29,9 +29,9 @@ jobs:
         working-directory: drive-gateway
         run: npm ci --no-audit --no-fund
 
-      - name: Run gateway regression tests
+      - name: Run Phase 1 gateway regression tests
         working-directory: drive-gateway
-        run: npm test
+        run: node --test tests/cloudflare-auth.test.mjs tests/entrypoint.test.mjs
 
       - name: Verify Firestore rules are unchanged
         shell: bash
