@@ -9,7 +9,6 @@ export const CRYPTO_SIGNATURE_ALGORITHM = Object.freeze({
 export const CRYPTO_EVIDENCE_SCHEMA = "IRPA-CRYPTOGRAPHIC-EVIDENCE-1";
 
 const enc = new TextEncoder();
-const dec = new TextDecoder();
 
 function bytesToBase64Url(bytes) {
   let binary = "";
@@ -39,17 +38,28 @@ function requireIdentity(value) {
   return uid;
 }
 
-function requireAlgorithm(algorithm) {
-  if (algorithm?.name !== "ECDSA" || algorithm?.namedCurve !== "P-256" || algorithm?.hash !== "SHA-256") {
-    throw new Error("Unsupported cryptographic signing algorithm.");
-  }
-}
 
 export async function generateSignerKeyPair() {
   return crypto.subtle.generateKey(
     { name: "ECDSA", namedCurve: "P-256" },
     false,
     ["sign", "verify"],
+  );
+}
+
+export async function importPublicKeyJwk(jwk) {
+  if (!jwk?.kty || !jwk?.crv || !jwk?.x || !jwk?.y) {
+    throw new Error("Persisted public signing key is invalid.");
+  }
+  if (jwk.kty !== "EC" || jwk.crv !== "P-256") {
+    throw new Error("Persisted public signing key algorithm is invalid.");
+  }
+  return crypto.subtle.importKey(
+    "jwk",
+    { kty: jwk.kty, crv: jwk.crv, x: jwk.x, y: jwk.y, ext: true },
+    { name: "ECDSA", namedCurve: "P-256" },
+    false,
+    ["verify"],
   );
 }
 
@@ -61,7 +71,7 @@ export async function exportPublicKeyJwk(publicKey) {
     crv: jwk.crv,
     x: jwk.x,
     y: jwk.y,
-    ext: false,
+    ext: true,
   });
 }
 
@@ -214,6 +224,15 @@ export function buildCryptographicAuditEvent(evidence) {
 }
 
 export function createSignerKeyProvider(records = new Map()) {
+  if (typeof records === "function") {
+    return Object.freeze({
+      async getSignerKey(signerUid) {
+        const record = await records(String(signerUid || ""));
+        if (!record) throw new Error("No cryptographic signing key is provisioned for this signer.");
+        return record;
+      },
+    });
+  }
   return Object.freeze({
     async getSignerKey(signerUid) {
       const record = records.get(String(signerUid || ""));
@@ -230,6 +249,7 @@ export async function sealAndPersist({
   envelope,
   document,
   auditEventAppender,
+  statusStore,
 } = {}) {
   if (!meta || !storage || !keyProvider) throw new Error("Cryptographic persistence boundary is incomplete.");
   if (!envelope?.id || !document?.id || !document?.bytes) throw new Error("Cryptographic document context is incomplete.");
@@ -278,6 +298,8 @@ export async function sealAndPersist({
       if (auditEventAppender) await auditEventAppender(event);
     }
 
+    if (statusStore?.set) await statusStore.set("CRYPTOGRAPHICALLY_SEALED");
+
     return {
       sealed: true,
       documentHash,
@@ -286,6 +308,9 @@ export async function sealAndPersist({
       auditEvents: artifacts,
     };
   } catch (error) {
+    if (statusStore?.set) {
+      try { await statusStore.set("FULLY_SIGNED"); } catch {}
+    }
     for (const evidence of storedEvidence) {
       try {
         await meta.delete("cryptographicEvidence", evidence.evidenceId);
