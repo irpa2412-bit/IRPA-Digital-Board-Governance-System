@@ -162,7 +162,7 @@ export async function createCryptographicEvidence({
     algorithm: "ECDSA-P256-SHA256",
     keyId,
     signerUid,
-    signerId: signer.signerId,
+    signerId: signer.signerId || signer.id,
     envelopeId: signer.envelopeId,
     documentHash,
     signatureHash,
