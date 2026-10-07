@@ -537,3 +537,46 @@ test("password-set activates a registered Special Invitee from the third registe
     assert.ok(calls.some(c=>c.target.includes("/documents/auditorProfiles/special-profile-1")&&c.options.method==="PATCH"));
   } finally { global.fetch=originalFetch; }
 });
+
+
+async function runRegisteredActivationCase({label,institutionalRecordType,institutionalRecordId,recordCollection,recordFields,role}) {
+  const originalFetch=global.fetch;
+  const uid=`e2e-${label.toLowerCase().replace(/[^a-z]+/g,"-")}`;
+  const idToken=makeFirebaseIdToken(uid);
+  const invitationId=`e2e-${label.toLowerCase().replace(/[^a-z]+/g,"-")}-invitation`;
+  const calls=[];
+  global.fetch=async(url,options={})=>{
+    const target=String(url);calls.push({target,options});
+    if(target.includes("securetoken@system.gserviceaccount.com"))return new Response(JSON.stringify({invitationTestKey:undefined}),{status:200});
+    if(target.includes(`/documents/invitations/${invitationId}`))return new Response(JSON.stringify({
+      name:`projects/irpa-digital-board-governance/databases/(default)/documents/invitations/${invitationId}`,
+      fields:{email:{stringValue:"invitee@example.org"},invitationRedeemedUid:{stringValue:uid},invitationRedemptionState:{stringValue:"PASSWORD_SETUP_PENDING"},invitationPasswordSetupExpiresAt:{timestampValue:"2099-01-01T00:00:00Z"},institutionalRecordId:{stringValue:institutionalRecordId},institutionalRecordType:{stringValue:institutionalRecordType},role:{stringValue:role}},
+      updateTime:"2026-10-05T08:00:00.000000Z"
+    }),{status:200});
+    if(target.includes("/accounts:lookup"))return new Response(JSON.stringify({users:[{localId:uid,email:"invitee@example.org",providerUserInfo:[{providerId:"password"}]}]}),{status:200});
+    if(target.includes(`/documents/${recordCollection}/${institutionalRecordId}`))return new Response(JSON.stringify({name:`projects/irpa-digital-board-governance/databases/(default)/documents/${recordCollection}/${institutionalRecordId}`,fields:recordFields}),{status:200});
+    if(options.method==="PATCH")return new Response(JSON.stringify({name:"patched"}),{status:200});
+    throw new Error("Unexpected external request: "+target);
+  };
+  try{
+    const response=await handler.fetch(new Request("https://gw.test/api/invitations/password-set",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"},body:JSON.stringify({invitationId})}),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)});
+    assert.equal(response.status,200,`${label} activation failed`);
+    const body=await response.json();
+    assert.equal(body.state,"ACTIVATED");
+    assert.equal(body.activatedRecords,1);
+    assert.ok(calls.some(x=>x.target.includes(`/documents/${recordCollection}/${institutionalRecordId}`)&&x.options.method==="PATCH"),`${label} institutional record was not activated`);
+  } finally {global.fetch=originalFetch;}
+}
+
+test("Board Member uses the identical password-set activation path",async()=>runRegisteredActivationCase({
+  label:"Board Member",institutionalRecordType:"Board Member",institutionalRecordId:"board-e2e-1",recordCollection:"members",
+  recordFields:{email:{stringValue:"invitee@example.org"},boardMember:{booleanValue:true},role:{stringValue:"Board Member"}},role:"Board Member"
+}));
+test("Employee uses the identical password-set activation path",async()=>runRegisteredActivationCase({
+  label:"Employee",institutionalRecordType:"Employee",institutionalRecordId:"employee-e2e-1",recordCollection:"employees",
+  recordFields:{email:{stringValue:"invitee@example.org"},role:{stringValue:"Employee"}},role:"Employee"
+}));
+test("Auditor uses the identical password-set activation path",async()=>runRegisteredActivationCase({
+  label:"Auditor",institutionalRecordType:"Auditor",institutionalRecordId:"auditor-e2e-1",recordCollection:"auditorProfiles",
+  recordFields:{email:{stringValue:"invitee@example.org"},category:{stringValue:"Auditor"},permissions:{arrayValue:{values:[{stringValue:"Read"},{stringValue:"Download"},{stringValue:"Print"}]}},active:{booleanValue:true}},role:"Auditor"
+}));
