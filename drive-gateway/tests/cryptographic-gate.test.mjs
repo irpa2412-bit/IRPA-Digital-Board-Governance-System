@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildCanonicalSigningPayload,
   buildCryptographicAuditEvent,
+  importPublicKeyJwk,
   createCryptographicEvidence,
   createSignerKeyProvider,
   generateSignerKeyPair,
@@ -98,8 +99,9 @@ test("C-G04 cryptographic verification independently verifies the signature", as
     signer: {...signer, privateKey:keyRecord.privateKey, publicKey:keyRecord.publicKey, signatureHash},
     documentHash, chainHead, signedAt: signer.signedAt,
   });
+  const retrievedPublicKey = await importPublicKeyJwk(evidence.publicKeyJwk);
   assert.equal(await verifyCryptographicEvidence(evidence, {
-    documentHash, signerUid: signer.uid, publicKey: keyRecord.publicKey,
+    documentHash, signerUid: signer.uid, publicKey: retrievedPublicKey,
   }), true);
 });
 
@@ -186,23 +188,39 @@ test("C-G09 verification after persistence/retrieval remains cryptographically v
   }),true);
 });
 
-test("C-G10 cryptographic failure rolls back evidence and cannot produce SEALED state", async () => {
-  const { signer } = await fixture();
+test("C-G10 cryptographic failure rolls back partial evidence and never leaves SEALED state", async () => {
+  const { signer, keyRecord, signatureHash } = await fixture();
+  const signer2 = {...signer, uid:"uid-signer-002", id:"S2"};
   const records = new Map();
   let status = "FULLY_SIGNED";
   const meta = {
     async get(c,id){ return records.get(c+"/"+id) || null; },
-    async create(){ throw new Error("persistence failure"); },
+    async create(c,id,v){
+      if (c === "cryptographicEvidence" && records.size > 0) throw new Error("persistence failure");
+      records.set(c+"/"+id, structuredClone(v));
+    },
     async delete(c,id){ records.delete(c+"/"+id); },
   };
-  const keyProvider = createSignerKeyProvider(new Map());
+  const keyProvider = createSignerKeyProvider(new Map([
+    [signer.uid,keyRecord],
+    [signer2.uid,keyRecord],
+  ]));
   await assert.rejects(() => sealAndPersist({
-    meta, storage:{async get(){return originalBytes}},
-    keyProvider, envelope:{id:signer.envelopeId,chainHead,signers:[signer]},
+    meta,
+    storage:{async get(){return originalBytes}},
+    keyProvider,
+    statusStore:{async set(value){status=value}},
+    envelope:{
+      id:signer.envelopeId,
+      chainHead,
+      signers:[
+        signer,
+        {...signer2, signatureValue:"Second signer", signatureHash:await sha256Hex("Second signer")}
+      ]
+    },
     document:{id:"doc-1",bytes:originalBytes},
   }));
-  status = "FULLY_SIGNED";
-  assert.equal(status, "FULLY_SIGNED");
+  assert.equal(status,"FULLY_SIGNED");
   assert.equal([...records.keys()].length,0);
 });
 
