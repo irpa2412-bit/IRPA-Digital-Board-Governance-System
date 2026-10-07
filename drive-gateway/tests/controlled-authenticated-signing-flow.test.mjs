@@ -14,6 +14,8 @@ const ORIGINAL = await (async () => {
 
 async function makeFixture({ signerUid, signerEmail, secondSigner = true } = {}) {
   const secret = "a".repeat(64);
+  const tokenHash = await sha256Hex(secret);
+  const documentHash = await sha256Hex(ORIGINAL);
   const envelopeId = "ENV-TEST123";
   const signerId = "S1";
   const signers = [
@@ -24,7 +26,7 @@ async function makeFixture({ signerUid, signerEmail, secondSigner = true } = {})
       order: 1,
       uid: signerUid,
       status: "Pending",
-      tokenHash: null,
+      tokenHash,
       invitation: "Sent"
     }
   ];
@@ -43,7 +45,7 @@ async function makeFixture({ signerUid, signerEmail, secondSigner = true } = {})
   const envelope = {
     id: envelopeId,
     documentId: "DOC-TEST123",
-    documentHash: null,
+    documentHash,
     title: "Controlled Signing Test",
     fileName: "controlled-test.pdf",
     classification: "Restricted",
@@ -61,7 +63,7 @@ async function makeFixture({ signerUid, signerEmail, secondSigner = true } = {})
     id: envelope.documentId,
     status: "Stored",
     ownerUid: envelope.createdBy,
-    hash: null,
+    hash: documentHash,
     primaryStorageId: "original-1"
   }]]);
   return {
