@@ -52,9 +52,9 @@ jobs:
           grep -Fq 'documentReferenceRegistry' functions/index.js
           grep -Fq 'systemSettings/documentCounters' drive-gateway/src/cloudflareAuth.mjs
           grep -Fq 'documentReferenceRegistry' drive-gateway/src/cloudflareAuth.mjs
-          if grep -RniE 'invitation|invitations' src/firebase/data.js drive-gateway/src/cloudflareAuth.mjs | grep -F '/api/invitations/' >/tmp/phase1-invitation-hit; then
-            echo "ERROR: Phase 1 document-reference files contain invitation-route changes."
-            cat /tmp/phase1-invitation-hit
+          if git diff --unified=0 origin/main...HEAD -- src/firebase/data.js drive-gateway/src/cloudflareAuth.mjs | grep -Ei '^[+].*(invitation|invitations)' >/tmp/phase1-invitation-diff; then
+            echo "ERROR: Phase 1 diff contains invitation-path changes."
+            cat /tmp/phase1-invitation-diff
             exit 1
           fi
 
