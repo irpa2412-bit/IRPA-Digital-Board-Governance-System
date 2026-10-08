@@ -8,19 +8,22 @@ import GovernanceFieldPalette from"../components/GovernanceFieldPalette";import 
 const PROCEEDINGS=["Not Started","In Progress","Transcript Saved","Draft Minutes","Reviewed","Approved","Final"],ATTENDANCE=["Present","Absent","Excused"],ITEM_STATUS=["Pending","In Discussion","Motion Recorded","Voting","Decision Recorded","Deferred","Completed"];
 const emptyMotion={text:"",movedBy:"",secondedBy:""},emptyAction={description:"",responsiblePerson:"",deadline:""};
 function MeetingFacilities({meeting,onNavigate,onRegister,registered}){
- const category=String(meeting?.meetingCategory||meeting?.category||meeting?.meetingType||"General Meeting");
- const board=/board/i.test(category);
+ const capabilities=meetingCapabilities(meeting||{});
+ const policy=capabilities.policy;
  const facilities=[
-  ["Auto Registration",onRegister,registered?"Registered":"Register attendance"],
-  ["Quorum Registration & Assessment",()=>document.getElementById("irpa-meeting-quorum")?.scrollIntoView({behavior:"smooth"}),"Open quorum"],
-  ["Attendance Register",()=>document.getElementById("irpa-meeting-attendance")?.scrollIntoView({behavior:"smooth"}),"Open attendance"],
-  ["Signature Portal",()=>onNavigate?.("Signature Platform",{meetingId:meeting?.id,meetingReference:meeting?.reference||meeting?.title}),"Open Signature"],
-  [board?"Governance Documents":"Meeting Documents",()=>onNavigate?.("Documents",{meetingId:meeting?.id,meetingReference:meeting?.reference||meeting?.title}),"Open Documents"],
-  ["Authorization & Approvals",()=>onNavigate?.("Authorization & Approvals",{meetingId:meeting?.id,meetingReference:meeting?.reference||meeting?.title}),"Open Authorization"],
-  ["Resolutions & Voting",()=>onNavigate?.("Resolutions",{meetingId:meeting?.id,meetingReference:meeting?.reference||meeting?.title}),"Open Resolutions"],
-  ["Decisions & Actions",()=>onNavigate?.("Decisions",{meetingId:meeting?.id,meetingReference:meeting?.reference||meeting?.title}),"Open Decisions"]
+  {key:"autoRegistration",label:"Auto Registration",action:onRegister,enabled:capabilities.facilities.autoRegistration,sub:registered?"Registered":"Register attendance"},
+  {key:"quorum",label:"Quorum Registration & Assessment",action:()=>document.getElementById("irpa-meeting-quorum")?.scrollIntoView({behavior:"smooth"}),enabled:capabilities.facilities.quorum,sub:capabilities.facilities.quorum?"Open quorum assessment":"Not applicable to this category"},
+  {key:"attendance",label:"Attendance Register",action:()=>document.getElementById("irpa-meeting-attendance")?.scrollIntoView({behavior:"smooth"}),enabled:capabilities.facilities.attendance,sub:"Open attendance"},
+  {key:"signature",label:"Signature Portal",action:()=>onNavigate?.("Signature Platform",{meetingId:meeting?.id,meetingReference:meeting?.reference||meeting?.title}),enabled:capabilities.facilities.signature,sub:capabilities.facilities.signature?"Open Signature":"Restricted for this category"},
+  {key:"documents",label:policy.documentsLabel,action:()=>onNavigate?.("Documents",{meetingId:meeting?.id,meetingReference:meeting?.reference||meeting?.title}),enabled:capabilities.facilities.documents,sub:"Open meeting documents"},
+  {key:"authorization",label:"Authorization & Approvals",action:()=>onNavigate?.("Authorization & Approvals",{meetingId:meeting?.id,meetingReference:meeting?.reference||meeting?.title}),enabled:capabilities.facilities.authorization,sub:capabilities.facilities.authorization?"Open authorization workflow":"Restricted for this category"},
+  {key:"resolutions",label:"Resolutions & Voting",action:()=>onNavigate?.("Resolutions",{meetingId:meeting?.id,meetingReference:meeting?.reference||meeting?.title}),enabled:capabilities.facilities.resolutions,sub:capabilities.facilities.resolutions?"Open resolutions and voting":"Restricted for this category"},
+  {key:"decisions",label:"Decisions & Actions",action:()=>onNavigate?.("Decisions",{meetingId:meeting?.id,meetingReference:meeting?.reference||meeting?.title}),enabled:capabilities.facilities.decisions,sub:"Open decisions and actions"}
  ];
- return <section className="panel" style={{marginTop:14}}><div className="panel-header"><div><span className="eyebrow">MEETING FACILITIES & SERVICES</span><h2>{category}</h2><p className="panel-description">Authorised facilities available for this meeting category. Governance Documents are presented for Board Meetings.</p></div></div><div className="dashboard-grid">{facilities.map(([label,fn,text])=><button key={label} type="button" className="secondary-button" onClick={fn} disabled={label==="Auto Registration"&&registered}>{label}<small style={{display:"block",marginTop:5}}>{text}</small></button>)}</div></section>
+ return <section className="panel" style={{marginTop:14}}>
+  <div className="panel-header"><div><span className="eyebrow">MEETING FACILITIES & SERVICES</span><h2>{policy.label}</h2><p className="panel-description">Category-controlled meeting facilities. Access is limited by the selected meeting category; restricted services remain visible for transparency but cannot be opened.</p></div><span className="status-badge">{policy.id}</span></div>
+  <div className="dashboard-grid">{facilities.map(item=><button key={item.key} type="button" className="secondary-button" onClick={item.action} disabled={!item.enabled||(item.key==="autoRegistration"&&registered)} title={!item.enabled?item.sub:""}>{item.label}<small style={{display:"block",marginTop:5}}>{item.sub}</small></button>)}</div>
+ </section>
 }
 function fmt(v){if(!v)return"—";const d=new Date(`${v}T00:00:00`);return Number.isNaN(d.getTime())?v:d.toLocaleDateString(undefined,{day:"2-digit",month:"short",year:"numeric"})}
 function lines(v){return String(v||"").split(/\n+/).map(x=>x.trim()).filter(Boolean)}
