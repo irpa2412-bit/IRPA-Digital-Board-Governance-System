@@ -53,8 +53,18 @@ ESIGN_MODULE_ENABLED = "true"
 CLOUDFLARE_AUTH_FUNCTIONS_ENABLED = "true"
 IRPA_PRODUCTION_CUTOVER = "false"
 
+[env.staging.secrets]
+required = [
+  "GOOGLE_DRIVE_CLIENT_ID",
+  "GOOGLE_DRIVE_CLIENT_SECRET",
+  "GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY",
+  "INVITE_SERVICE_KEY",
+  "SMTP_PASSWORD",
+  "IRPA_CRYPTO_KEY_8864A8364F0D041B6850E60E403B7532",
+]
 [[env.staging.kv_namespaces]]
 binding = "DRIVE_KV"
+id = "7b50627e29fc4fe1abaa8dc8665edd02"
 
 [[env.staging.durable_objects.bindings]]
 name = "ESIGN_DO"
