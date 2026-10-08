@@ -28,3 +28,9 @@ Branch: `audit/app-wide-readability-form-layout-20261008`
 - `src/components/IRPADBGSMeetingRoomMedia.jsx:78` — <div ref={localRef} style={{minHeight:160,borderRadius:12,background:"#0b1727",padding:8,overflow:"hidden"}}>
 - `src/components/IRPADBGSMeetingRoomMedia.jsx:79` — <span style={{color:"#94a3b8"}}>Your camera preview</span>
 
+### src/components/ResearchEvidenceExchange.jsx
+- `src/components/ResearchEvidenceExchange.jsx:61` — return <section className="panel research-evidence-exchange" style={{margin:"12px 0",boxShadow:"none",border:"1px solid rgba(31,90,65,.18)"}}>
+
+### src/components/SystemResetControl.jsx
+- `src/components/SystemResetControl.jsx:33` — {GROUPS.map(([group,items])=><div key={group} className="panel" style={{marginTop:12,boxShadow:"none",border:"1px solid rgba(31,90,65,.12)"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}><strong>{group}</strong><div className="member-actions"><button type="button" className="secondary-button" onClick={()=>selectGroup(items)}>Select group</button><button type="button" className="secondary-button" onClick={()=>clearGroup(items)}>Clear group</button></div></div><div className="form-grid" style={{marginTop:12}}>{items.map(name=><label key={name} className="field" style={{display:"flex",alignItems:"center",gap:9}}><input type="checkbox" checked={selectedSet.has(name)} onChange={()=>toggle(name)} /><span>{labels[name]||name}</span></label>)}</div></div>)}
+
