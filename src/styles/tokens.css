@@ -459,3 +459,37 @@ table td{color:var(--text)}
 .auth-security-instructions{border-color:var(--border);background:var(--surface-raised);color:var(--text-muted)}
 .auth-security-instructions strong{color:var(--focus)}
 .auth-message{background:var(--surface-raised);border-color:var(--border);color:var(--text)}
+
+/* Portal form readability correction — preserves workflow/data behavior. */
+.content-area:not(.dashboard-content-area) .page .form-field{
+  color:var(--text);
+  font-size:15px;
+  line-height:1.45;
+  font-weight:750;
+}
+.content-area:not(.dashboard-content-area) .page .form-field input,
+.content-area:not(.dashboard-content-area) .page .form-field select,
+.content-area:not(.dashboard-content-area) .page .form-field textarea{
+  color:var(--text);
+  background:var(--surface-raised);
+  border-color:var(--border-strong);
+  font-size:16px;
+  line-height:1.5;
+  font-weight:600;
+}
+.content-area:not(.dashboard-content-area) .page .form-field input::placeholder,
+.content-area:not(.dashboard-content-area) .page .form-field textarea::placeholder{
+  color:var(--placeholder);
+  opacity:1;
+}
+.content-area:not(.dashboard-content-area) .page .form-field input:focus,
+.content-area:not(.dashboard-content-area) .page .form-field select:focus,
+.content-area:not(.dashboard-content-area) .page .form-field textarea:focus{
+  border-color:var(--focus);
+  box-shadow:0 0 0 2px var(--focus);
+}
+.content-area:not(.dashboard-content-area) .page .welcome-panel h1,
+.content-area:not(.dashboard-content-area) .page .panel-header h2{
+  color:var(--text);
+  font-weight:800;
+}
