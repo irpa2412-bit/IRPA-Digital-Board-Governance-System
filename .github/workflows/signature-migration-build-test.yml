@@ -6,6 +6,13 @@ on:
       - feature/signer-identity-migration
   pull_request:
     types: [opened, synchronize, reopened]
+  workflow_dispatch:
+    inputs:
+      deploy_staging:
+        description: "Explicitly authorize deployment to isolated Cloudflare staging"
+        required: true
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -41,6 +48,7 @@ jobs:
 
 
   deploy-cloudflare-staging:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_staging == true }}
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 20

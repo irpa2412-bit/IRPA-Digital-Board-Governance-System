@@ -56,9 +56,9 @@ export async function importPublicKeyJwk(jwk) {
   }
   return crypto.subtle.importKey(
     "jwk",
-    { kty: jwk.kty, crv: jwk.crv, x: jwk.x, y: jwk.y, ext: true },
+    { kty: jwk.kty, crv: jwk.crv, x: jwk.x, y: jwk.y, ext: false },
     { name: "ECDSA", namedCurve: "P-256" },
-    true,
+    false,
     ["verify"],
   );
 }
@@ -134,13 +134,29 @@ export async function createCryptographicEvidence({
   documentHash,
   chainHead,
   signedAt,
+  publicKeyJwk: suppliedPublicKeyJwk,
 } = {}) {
   const signerUid = requireIdentity(signer?.uid);
   const publicKey = signer?.publicKey;
   const privateKey = signer?.privateKey;
   const signatureHash = requireHexHash(signer?.signatureHash, "signatureHash");
   if (!publicKey || !privateKey) throw new Error("Signer cryptographic key material is unavailable.");
-  const publicKeyJwk = await exportPublicKeyJwk(publicKey);
+
+  let publicKeyJwk;
+  let verificationKey = publicKey;
+  if (suppliedPublicKeyJwk) {
+    verificationKey = await importPublicKeyJwk(suppliedPublicKeyJwk);
+    publicKeyJwk = Object.freeze({
+      kty: suppliedPublicKeyJwk.kty,
+      crv: suppliedPublicKeyJwk.crv,
+      x: suppliedPublicKeyJwk.x,
+      y: suppliedPublicKeyJwk.y,
+      ext: true,
+    });
+  } else {
+    publicKeyJwk = await exportPublicKeyJwk(publicKey);
+  }
+
   const canonicalPayload = buildCanonicalSigningPayload({
     envelopeId: signer.envelopeId,
     signerId: signer.signerId || signer.id,
@@ -154,6 +170,9 @@ export async function createCryptographicEvidence({
   });
   const payloadHash = await sha256Hex(canonicalPayload);
   const signature = await signCanonicalPayload(privateKey, canonicalPayload);
+  if (suppliedPublicKeyJwk && !await verifyCanonicalPayload(verificationKey, canonicalPayload, signature)) {
+    throw new Error("Supplied public signing key does not match the signer private key.");
+  }
   const evidenceId = "CRYPTO-" + payloadHash;
   return Object.freeze({
     evidenceId,
@@ -278,7 +297,14 @@ export function createCloudflareSignerKeyProvider(env) {
       ["sign"],
     );
     const publicKey = await importPublicKeyJwk(record.publicKeyJwk);
-    return Object.freeze({ keyId: String(record.keyId), privateKey, publicKey });
+    const publicKeyJwk = Object.freeze({
+      kty: record.publicKeyJwk.kty,
+      crv: record.publicKeyJwk.crv,
+      x: record.publicKeyJwk.x,
+      y: record.publicKeyJwk.y,
+      ext: true,
+    });
+    return Object.freeze({ keyId: String(record.keyId), privateKey, publicKey, publicKeyJwk });
   });
 }
 
@@ -323,6 +349,7 @@ export async function sealAndPersist({
           privateKey: keyRecord.privateKey,
           publicKey: keyRecord.publicKey,
         },
+        publicKeyJwk: keyRecord.publicKeyJwk,
         documentHash,
         chainHead: envelope.chainHead,
         signedAt: signer.signedAt,
