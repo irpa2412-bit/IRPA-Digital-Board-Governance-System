@@ -3019,7 +3019,7 @@
   .mobile-quote1-heading>button{background:#082f55;color:#fff;border:1px solid rgba(255,255,255,.3)}
   .mobile-quote1-grid>button{background:#082f55;color:#fff;border:1px solid rgba(255,255,255,.22);box-shadow:0 6px 18px rgba(0,20,50,.28)}
   .mobile-quote1-grid>button:hover,.mobile-quote1-grid>button:focus-visible{background:#0b3e6d;border-color:rgba(255,255,255,.55)}
-  .mobile-quote1-grid>button>strong{color:#fff;
+  .mobile-quote1-grid>button>strong{color:#fff}
   .mobile-global-nav{background:#062b4c;border-bottom-color:rgba(255,255,255,.22)}
   .mobile-global-nav button,.mobile-global-nav button b{color:#fff}
   .mobile-global-nav button.active{color:#fff;background:#0b5fa8;box-shadow:inset 0 3px #fff}
