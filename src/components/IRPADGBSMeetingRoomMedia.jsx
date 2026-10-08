@@ -58,17 +58,17 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
      room.on(RoomEvent.ParticipantConnected,()=>{refreshParticipants(room);setStatus("CONNECTED")});
      room.on(RoomEvent.ParticipantDisconnected,()=>refreshParticipants(room));
      room.on(RoomEvent.DataReceived,(payload,participant)=>{const msg=safeJson(payload);if(msg?.type==="chat")setMessages(v=>[...v,{from:participant?.name||participant?.identity||"Participant",text:String(msg.text||"")}].slice(-30));if(msg?.type==="hand")refreshParticipants(room)});
-     room.on(RoomEvent.Disconnected,()=>{setStatus("DISCONNECTED");setCamera(false);setMuted(true);setScreen(false);setHand(false);setModerator(false);setRecordingAllowed(false);clear(localRef.current);clear(remoteRef.current);setParticipants([]);roomRef.current=null});
+     room.on(RoomEvent.Reconnecting,()=>setStatus("RECONNECTING"));\n     room.on(RoomEvent.Reconnected,()=>{setStatus("CONNECTED");refreshParticipants(room)});\n     room.on(RoomEvent.Disconnected,()=>{setStatus("DISCONNECTED");setCamera(false);setMuted(true);setScreen(false);setHand(false);setModerator(false);setRecordingAllowed(false);clear(localRef.current);clear(remoteRef.current);setParticipants([]);roomRef.current=null});
      await room.connect(data.serverUrl,data.participantToken);
      roomRef.current=room;setSessionId(data.sessionId||"");setModerator(data.moderator===true);setRecordingAllowed(data.recordingAllowed===true);setStatus("CONNECTED");refreshParticipants(room);
-     await room.localParticipant.setMicrophoneEnabled(true);setMuted(false);
+     await room.localParticipant.setMicrophoneEnabled(true,{audioCaptureOptions:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});setMuted(false);
      await room.localParticipant.setCameraEnabled(false);setCamera(false);
      try{const devices=await navigator.mediaDevices?.enumerateDevices?.();setDeviceReady(Boolean(devices?.some(d=>d.kind==="audioinput")||devices?.some(d=>d.kind==="videoinput")))}catch{setDeviceReady(false)}
    }catch(e){console.error("IRPA-DGBS Meeting Room media connection failed",e);setStatus("READY");setError(e?.message||"Unable to connect to the IRPA-DGBS Meeting Room.")}
  }
  async function disconnect(){roomRef.current?.disconnect()}
  async function toggleMic(){if(!roomRef.current)return;const enabled=!roomRef.current.localParticipant.isMicrophoneEnabled;await roomRef.current.localParticipant.setMicrophoneEnabled(enabled);setMuted(!enabled);refreshParticipants(roomRef.current)}
- async function toggleCamera(){if(!roomRef.current)return;const enabled=!roomRef.current.localParticipant.isCameraEnabled;await roomRef.current.localParticipant.setCameraEnabled(enabled);setCamera(enabled);refreshParticipants(roomRef.current)}
+ async function toggleCamera(){if(!roomRef.current)return;const enabled=!roomRef.current.localParticipant.isCameraEnabled;await roomRef.current.localParticipant.setCameraEnabled(enabled,{videoCaptureOptions:{resolution:{width:1280,height:720},frameRate:30}});setCamera(enabled);refreshParticipants(roomRef.current)}
  async function toggleScreen(){if(!roomRef.current)return;try{const enabled=!screen;await roomRef.current.localParticipant.setScreenShareEnabled(enabled);setScreen(enabled)}catch(e){setError(e?.message||"Screen sharing was not enabled by the device or browser.")}}
  async function toggleHand(){if(!roomRef.current)return;const next=!hand;setHand(next);try{await roomRef.current.localParticipant.publishData(encoder.encode(JSON.stringify({type:"hand",raised:next})),{reliable:true});refreshParticipants(roomRef.current)}catch(e){setError(e?.message||"Unable to signal hand raise.")}}
  async function sendChat(e){e?.preventDefault();const text=chat.trim();if(!text||!roomRef.current)return;try{await roomRef.current.localParticipant.publishData(encoder.encode(JSON.stringify({type:"chat",text})),{reliable:true});setMessages(v=>[...v,{from:"You",text}].slice(-30));setChat("")}catch(err){setError(err?.message||"Unable to send meeting message.")}}
