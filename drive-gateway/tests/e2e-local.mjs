@@ -221,6 +221,39 @@ try {
   log("two-signer-final-status", { httpStatus: envelopeStatus.status, response: envelopeStatus.body });
   if (envelopeStatus.status !== 200 || envelopeStatus.body?.status !== "Completed" || envelopeStatus.body?.auditChainValid !== true || envelopeStatus.body?.signers?.every(x => x.status === "Signed") !== true || envelopeStatus.body?.completion?.files?.length !== 5) throw new Error("Final two-signer persistence/archive assertion failed.");
 
+
+  const openEndedSigners = Array.from({ length: 9 }, (_, i) => ({
+    name: `Open Ended Signer ${i + 1}`,
+    email: `open-ended-${i + 1}@example.test`,
+    order: i + 1
+  }));
+  const openEnded = await request("/api/envelopes", {
+    body: {
+      documentId,
+      signers: openEndedSigners,
+      archives: ["legal-contracts", "board-governance"]
+    }
+  });
+  log("open-ended-nine-signer-envelope-created", { httpStatus: openEnded.status, response: openEnded.body });
+  if (openEnded.status !== 201 || openEnded.body?.tokens?.length !== 9 || openEnded.body?.invitations?.length !== 9 || openEnded.body?.invitations?.every(x => x.status === "Sent") !== true) throw new Error("Open-ended signer creation/invitation assertion failed.");
+
+  for (let i = 0; i < openEnded.body.tokens.length; i++) {
+    const signerResult = await request("/api/sign/submit", {
+      body: {
+        token: openEnded.body.tokens[i],
+        consent: true,
+        signature: { type: "typed", value: `Open Ended Signer ${i + 1}` }
+      }
+    });
+    log(`open-ended-signer-${i + 1}-persisted`, { httpStatus: signerResult.status, response: signerResult.body });
+    if (signerResult.status !== 200) throw new Error(`Open-ended signer ${i + 1} failed.`);
+    if (i < openEnded.body.tokens.length - 1 && signerResult.body?.completed !== false) throw new Error(`Open-ended signer ${i + 1} completed prematurely.`);
+  }
+
+  const openEndedStatus = await request("/api/envelopes/" + encodeURIComponent(openEnded.body.envelopeId), { method: "GET" });
+  log("open-ended-nine-signer-final-status", { httpStatus: openEndedStatus.status, response: openEndedStatus.body });
+  if (openEndedStatus.status !== 200 || openEndedStatus.body?.status !== "Completed" || openEndedStatus.body?.signers?.length !== 9 || openEndedStatus.body?.signers?.every(x => x.status === "Signed") !== true || openEndedStatus.body?.completion?.files?.length !== 12) throw new Error("Open-ended signer persistence/completion assertion failed.");
+
   console.log("E2E RESULT: PASS");
 } finally {
   worker.kill("SIGTERM");
