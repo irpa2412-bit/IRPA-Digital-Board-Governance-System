@@ -14,6 +14,7 @@ const RESEARCH_COLLECTIONS={
 };
 
 const clean=v=>String(v??"").trim();
+const cardStyle={padding:18,border:"1px solid rgba(148,163,184,.16)",borderRadius:16,background:"rgba(15,23,42,.35)"};
 const nums=a=>a.map(Number).filter(Number.isFinite);
 function mean(a){const x=nums(a);return x.length?x.reduce((s,v)=>s+v,0)/x.length:null}
 function median(a){const x=nums(a).sort((a,b)=>a-b);if(!x.length)return null;const m=Math.floor(x.length/2);return x.length%2?x[m]:(x[m-1]+x[m])/2}
