@@ -4265,3 +4265,21 @@
   color:var(--text);
   border-bottom-color:var(--border);
 }
+/* RED-LINE READABILITY ENFORCEMENT — Invitation Register.
+   Written records must sit directly on the portal surface; no panel,
+   table, row or cell background may interfere with legibility. */
+.content-area .page .invitation-register-panel,
+.content-area .page .invitation-register-panel .table-wrapper,
+.content-area .page .invitation-register-panel table,
+.content-area .page .invitation-register-panel tbody,
+.content-area .page .invitation-register-panel tbody tr,
+.content-area .page .invitation-register-panel tbody td{
+  background:transparent;
+}
+.content-area .page .invitation-register-panel tbody td{
+  color:var(--text);
+}
+.content-area .page .invitation-register-panel .panel-header h2{
+  color:var(--text);
+  font-weight:850;
+}
