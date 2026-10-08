@@ -26,11 +26,6 @@ jobs:
           node-version: 22
           cache: npm
 
-      # This repository currently has no committed package-lock.json.
-      # Bootstrap the lock in the runner, then use npm ci for the actual clean install.
-      - name: Bootstrap npm lockfile
-        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-
       - name: Clean dependency install
         run: npm ci --ignore-scripts --no-audit --no-fund
 
