@@ -1,4 +1,4 @@
-/* IRPA-DBGS readability migration: no !important declarations remain in this stylesheet.
+/* IRPA-DBGS readability migration: no priority declarations remain in this stylesheet.
    Surface and text precedence is supplied by the final tokens.css layer; source order handles ordinary states.
 */
 /* Remaining opacity declarations are intentional, not readability effects:
