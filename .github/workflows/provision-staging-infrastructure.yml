@@ -1,0 +1,189 @@
+name: Provision Staging Infrastructure Gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      provision_staging:
+        description: "Explicitly authorize creation/reuse of the dedicated staging DRIVE_KV namespace"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  provision-staging-kv:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.provision_staging == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: drive-gateway
+
+    steps:
+      - name: Checkout controlled repository state
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install gateway dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Resolve dedicated staging DRIVE_KV namespace
+        id: kv
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PRODUCTION_KV_ID: ccdbffa662ac48bfbdf7f4b1f62ca941
+          STAGING_KV_TITLE: irpa-google-drive-gateway-staging-DRIVE_KV
+        run: |
+          set -euo pipefail
+          namespaces="$(npx wrangler kv namespace list)"
+          printf '%s\n' "$namespaces" > /tmp/kv-namespaces.json
+
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const rows = JSON.parse(fs.readFileSync("/tmp/kv-namespaces.json", "utf8"));
+          const title = process.env.STAGING_KV_TITLE;
+          const productionId = process.env.PRODUCTION_KV_ID;
+          const matches = Array.isArray(rows) ? rows.filter(row => row?.title === title) : [];
+
+          if (matches.length > 1) {
+            throw new Error(`More than one KV namespace has the dedicated staging title "${title}". Refusing to choose.`);
+          }
+
+          let id;
+          if (matches.length === 1) {
+            id = String(matches[0].id || "");
+            if (!/^[0-9a-f]{32}$/.test(id)) throw new Error("Existing staging KV namespace has an invalid ID.");
+            if (id === productionId) throw new Error("Staging KV namespace resolves to the production KV ID. Refusing to continue.");
+            console.log(`Using existing dedicated staging KV namespace: ${title} (${id})`);
+          } else {
+            console.log(`No dedicated staging KV namespace named ${title}; it will be created by Wrangler.`);
+          }
+
+          fs.writeFileSync("/tmp/staging-kv-existing-id", id || "");
+          NODE
+
+          if [ ! -s /tmp/staging-kv-existing-id ]; then
+            create_output="$(npx wrangler kv namespace create "$STAGING_KV_TITLE")"
+            printf '%s\n' "$create_output"
+            id="$(printf '%s\n' "$create_output" | sed -nE 's/.*id = "([0-9a-f]{32})".*/\1/p' | tail -n1)"
+            if [ -z "$id" ]; then
+              echo "ERROR: Wrangler did not return a namespace ID in the expected form."
+              exit 1
+            fi
+            if [ "$id" = "$PRODUCTION_KV_ID" ]; then
+              echo "ERROR: Newly resolved staging namespace ID equals production ID."
+              exit 1
+            fi
+            printf '%s' "$id" > /tmp/staging-kv-existing-id
+          fi
+
+          id="$(cat /tmp/staging-kv-existing-id)"
+          echo "::add-mask::$id"
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+          echo "Dedicated staging DRIVE_KV namespace resolved."
+
+      - name: Bind the resolved staging namespace in a reviewable branch
+        env:
+          STAGING_KV_ID: ${{ steps.kv.outputs.id }}
+          PRODUCTION_KV_ID: ccdbffa662ac48bfbdf7f4b1f62ca941
+        run: |
+          set -euo pipefail
+          test -n "$STAGING_KV_ID"
+          test "$STAGING_KV_ID" != "$PRODUCTION_KV_ID"
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const path = "wrangler.toml";
+          const id = process.env.STAGING_KV_ID;
+          const productionId = process.env.PRODUCTION_KV_ID;
+          let text = fs.readFileSync(path, "utf8");
+
+          const marker = "[env.staging]";
+          const start = text.indexOf(marker);
+          if (start < 0) throw new Error("Missing [env.staging].");
+          const before = text.slice(0, start);
+          let staging = text.slice(start);
+
+          if (!/\[\[env\.staging\.kv_namespaces\]\]/.test(staging)) {
+            throw new Error("Missing staging DRIVE_KV binding.");
+          }
+
+          const block = /\[\[env\.staging\.kv_namespaces\]\]\nbinding = "DRIVE_KV"(?:\nid = "[^"]*")?/;
+          const match = staging.match(block);
+          if (!match) throw new Error("Unable to locate the staging DRIVE_KV block safely.");
+
+          const existing = match[0];
+          const withoutId = existing.replace(/\n\s*id = "[^"]*"/g, "");
+          const replacement = withoutId + `\nid = "${id}"`;
+          staging = staging.replace(existing, replacement);
+
+          const secretBlock = `[env.staging.secrets]\nrequired = [\n  "GOOGLE_DRIVE_CLIENT_ID",\n  "GOOGLE_DRIVE_CLIENT_SECRET",\n  "GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY",\n  "INVITE_SERVICE_KEY",\n  "SMTP_PASSWORD",\n  "IRPA_CRYPTO_KEY_8864A8364F0D041B6850E60E403B7532",\n]\n\n`;
+          staging = staging.replace(
+            /\[env\.staging\.vars\][\s\S]*?(?=\n\[\[env\.staging\.kv_namespaces\]\])/,
+            match => match + "\n" + secretBlock.trimEnd()
+          );
+
+          if (before.includes(productionId) && !before.includes(`id = "${productionId}"`)) {
+            throw new Error("Unexpected production KV text was altered.");
+          }
+          if (!staging.includes(`binding = "DRIVE_KV"\nid = "${id}"`)) {
+            throw new Error("Resolved staging KV ID was not bound.");
+          }
+          if (staging.includes(`id = "${productionId}"`)) {
+            throw new Error("Production KV ID appears in staging configuration.");
+          }
+
+          fs.writeFileSync(path, before + staging);
+          NODE
+
+          echo "Staging Wrangler configuration now contains the resolved dedicated KV ID and required secret names."
+
+      - name: Verify generated staging configuration without deployment
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const text = fs.readFileSync("wrangler.toml", "utf8");
+          const staging = text.slice(text.indexOf("[env.staging]"));
+          if (!/\[\[env\.staging\.kv_namespaces\]\]\n\s*binding = "DRIVE_KV"\n\s*id = "[0-9a-f]{32}"/.test(staging)) {
+            throw new Error("Staging DRIVE_KV is not bound to a concrete namespace ID.");
+          }
+          if (/\[\[env\.staging\.kv_namespaces\]\][\s\S]*id = "ccdbffa662ac48bfbdf7f4b1f62ca941"/.test(staging)) {
+            throw new Error("Staging DRIVE_KV is using the production namespace ID.");
+          }
+          if (!/\[env\.staging\.secrets\]/.test(staging)) throw new Error("Staging required-secret declaration is missing.");
+          console.log("Static staging infrastructure invariants passed.");
+          NODE
+
+          npx wrangler deploy --env staging --dry-run
+
+      - name: Create reviewable infrastructure PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STAGING_KV_ID: ${{ steps.kv.outputs.id }}
+        run: |
+          set -euo pipefail
+          branch="repair/staging-kv-binding-${GITHUB_RUN_ID}"
+          git config user.name "IRPA Staging Infrastructure Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add wrangler.toml
+          git diff --cached --exit-code && { echo "No infrastructure change was necessary."; exit 0; }
+          git commit -m "chore: bind dedicated staging Drive KV namespace"
+          git push --set-upstream origin "$branch"
+
+          body="Provisioned/resolved the dedicated Cloudflare staging DRIVE_KV namespace and bound its exact namespace ID in wrangler.toml. Production KV ID is explicitly rejected. No Worker deployment is performed by this workflow. Required staging secret names are declared for deploy-time validation.\\n\\nStaging namespace ID: ${STAGING_KV_ID}\\n\\nThe ID is a Cloudflare resource identifier, not a secret value."
+
+          gh pr create \
+            --repo "${GITHUB_REPOSITORY}" \
+            --base fix/separate-staging-deploy-trigger-20261008 \
+            --head "$branch" \
+            --title "chore: bind dedicated staging DRIVE_KV namespace" \
+            --body "$body"
