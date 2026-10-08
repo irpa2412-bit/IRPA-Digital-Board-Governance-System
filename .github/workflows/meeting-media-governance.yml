@@ -1,0 +1,44 @@
+name: Meeting Media Governance Verification
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/components/IRPADGBSMeetingRoomMedia.jsx"
+      - "src/components/MeetingAccessControl.jsx"
+      - "src/pages/MeetingEntryGateway.jsx"
+      - "src/pages/MeetingRoom.jsx"
+      - "src/main.jsx"
+      - "functions/liveMeeting.js"
+      - "functions/meetingGateway.js"
+      - "functions/bootstrap.js"
+      - "package.json"
+      - "package-lock.json"
+      - "scripts/check-meeting-media-governance.mjs"
+      - ".github/workflows/meeting-media-governance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  meeting-media-governance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check:meeting-media
+      - run: npm run build
+      - name: Upload verification report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: meeting-media-governance-verification
+          path: |
+            reports/meeting-media-governance-verification.md
+            reports/meeting-media-governance-verification.json
+          if-no-files-found: ignore
