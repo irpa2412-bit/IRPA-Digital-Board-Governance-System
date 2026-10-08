@@ -4,8 +4,8 @@ import App from"./App";
 import InvitationActivation from"./pages/InvitationActivation";
 import { logout } from "./firebase/auth";
 import "./styles/app.css";
-import "./styles/tokens.css";
 import "./styles/mobile-viewport-containment.css";
+import "./styles/tokens.css";
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
