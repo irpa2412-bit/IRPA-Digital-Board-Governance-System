@@ -80,7 +80,7 @@ export default function ResearchStatisticsKnowledgePortal({profile,employee,onNa
  async function saveOutput(e){e.preventDefault();const id=await createRecord(RESEARCH_COLLECTIONS.outputs,{...outputForm,recordType:"Research Output",recordOrigin:"PRODUCTION"});setMessage("Research output registered: "+id);setOutputForm({title:"",outputType:"Research Report",studyReference:"",status:"Draft",abstract:""});await load()}
 
  const cardStyle={padding:16,border:"1px solid rgba(31,90,65,.15)",borderRadius:12,background:"#fff"};
- return <div className="page">
+ return <div className="page research-portal-page">
   <section className="welcome-panel"><div><span className="eyebrow">RESEARCH • STATISTICS • KNOWLEDGE MANAGEMENT</span><h1>Research, Statistics and Knowledge Portal</h1><p>Institutional research lifecycle, evidence management, datasets, statistical computation, knowledge preservation and research outputs for IRPA.</p></div><button type="button" onClick={load} disabled={busy}>{busy?"Refreshing…":"Refresh Research Workspace"}</button></section>
   {message&&<div className="success-message action-feedback">{message}</div>}{error&&<div className="error-message action-feedback">{error}</div>}
   <PortalDocumentAccessPoint portal="Research, Statistics and Knowledge Portal"/>
