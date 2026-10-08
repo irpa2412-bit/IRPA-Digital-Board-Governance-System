@@ -105,8 +105,56 @@ test("C-G13 staging custody resolves the signer key through the Cloudflare-style
   assert.equal(record.keyId, "IRPA-STAGING-CRYPTO-001");
   assert.equal(record.privateKey.extractable, false);
   assert.deepEqual(record.privateKey.usages, ["sign"]);
-  assert.equal(record.publicKey.extractable, true);
+  assert.equal(record.publicKey.extractable, false);
   assert.deepEqual(record.publicKey.usages, ["verify"]);
+  assert.ok(record.publicKeyJwk);
+  assert.equal(record.publicKeyJwk.kty, "EC");
+  assert.equal(record.publicKeyJwk.crv, "P-256");
+  assert.ok(record.publicKeyJwk.x);
+  assert.ok(record.publicKeyJwk.y);
+});
+
+test("C-G13R non-extractable Cloudflare-style public custody produces independently verifiable persisted evidence", async () => {
+  const f = await fixture();
+  const provider = createCloudflareSignerKeyProvider(f.stagingSecret.env);
+  const record = await provider.getSignerKey(f.envelope.signers[0].uid);
+
+  assert.equal(record.privateKey.extractable, false);
+  assert.equal(record.publicKey.extractable, false);
+  assert.ok(record.publicKeyJwk);
+
+  const result = await finalizeEnvelope({
+    meta: f.meta,
+    storage: f.storage,
+    now: () => new Date("2026-10-07T20:00:00.000Z"),
+    config: { ttlDays: 14 },
+    crypto: { keyProvider: provider },
+  }, f.envelope.id);
+
+  assert.equal(result.completed, true);
+  const state = await f.meta.get("envelopes", f.envelope.id);
+  assert.equal(state.status, "Completed");
+  assert.equal(state.completion.cryptographicEvidenceIds.length, 1);
+
+  const evidence = await f.meta.get(
+    "cryptographicEvidence",
+    state.completion.cryptographicEvidenceIds[0],
+  );
+  assert.ok(evidence);
+  assert.ok(evidence.publicKeyJwk);
+  assert.equal("privateKey" in evidence, false);
+  assert.equal("privateKeyPkcs8" in evidence, false);
+
+  const verificationKey = await importPublicKeyJwk(evidence.publicKeyJwk);
+  assert.equal(verificationKey.extractable, false);
+  assert.equal(await verifyCryptographicEvidence(evidence, {
+    documentHash: state.completion.finalHash,
+    signerUid: f.envelope.signers[0].uid,
+    publicKey: verificationKey,
+  }), true);
+
+  const persistedAgain = await f.meta.get("cryptographicEvidence", evidence.evidenceId);
+  assert.deepEqual(persistedAgain, evidence);
 });
 
 test("C-G14 through C-G20 staging transaction persists and independently verifies cryptographic evidence", async () => {
@@ -171,7 +219,7 @@ test("C-G19 staging transaction rejects tampered persisted cryptographic payload
   const f = await fixture();
   const provider = createCloudflareSignerKeyProvider(f.stagingSecret.env);
 
-  await finalizeEnvelope({
+  const result = await finalizeEnvelope({
     meta: f.meta,
     storage: f.storage,
     now: () => new Date("2026-10-07T20:00:00.000Z"),
@@ -179,8 +227,13 @@ test("C-G19 staging transaction rejects tampered persisted cryptographic payload
     crypto: { keyProvider: provider },
   }, f.envelope.id);
 
+  assert.equal(result.completed, true);
   const state = await f.meta.get("envelopes", f.envelope.id);
+  assert.equal(state.status, "Completed");
+  assert.ok(state.completion);
+  assert.equal(state.completion.cryptographicEvidenceIds.length, 1);
   const evidence = await f.meta.get("cryptographicEvidence", state.completion.cryptographicEvidenceIds[0]);
+  assert.ok(evidence);
   const publicKey = await importPublicKeyJwk(evidence.publicKeyJwk);
   const tampered = { ...evidence, canonicalPayload: evidence.canonicalPayload.replace(f.envelope.signers[0].uid, "uid-tampered") };
 
