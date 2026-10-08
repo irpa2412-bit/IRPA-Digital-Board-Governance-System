@@ -559,7 +559,7 @@ table td{color:var(--text)}
 }
 #root .app-shell .content-area .page :where(input,select,textarea):focus{
   border-color:var(--border-strong);
-  box-shadow:0 0 0 2px color-mix(in srgb,var(--focus) 55%,transparent);
+  outline:2px solid var(--focus);\n  outline-offset:1px;
 }
 @media (max-width:760px){
   #root .app-shell .content-area .page :where(h1){font-size:clamp(22px,6vw,28px);}
