@@ -17,6 +17,12 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - uses: actions/upload-artifact@v4
+        with:
+          name: research-security-generated-lockfile
+          path: package-lock.json
+          if-no-files-found: error
       - run: npm ci
       - run: npx firebase emulators:exec --only firestore --project demo-irpa-research-security "node --test tests/research-portal-security.test.mjs"
       - run: npm run build
