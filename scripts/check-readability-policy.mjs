@@ -14,7 +14,10 @@ const requiredCss=[
   "IRPA-DBGS GLOBAL READABILITY CONTRACT — FINAL CASCADE LAYER",
   "text-rendering:optimizeLegibility;",
   "line-height:1.55;",
-  "color:var(--text-muted);"
+  "color:var(--text-muted);",
+  "IRPA-DBGS CANONICAL UI CONTRACT — MEMBERS & PERSONNEL REFERENCE",
+  "--irpa-canonical-ui-reference:members-personnel;",
+  "--irpa-canonical-ui-contract:2026-10-09;"
 ];
 for(const marker of requiredCss){
   if(!allCss.includes(marker)) throw new Error("Missing app-wide readability guard: "+marker);
@@ -29,5 +32,7 @@ for(const re of [
 ]){
   if(re.test(allCss)) throw new Error("Readability policy violation: transparent text styling found: "+re);
 }
+if(!allCss.includes("background:#ffffff") || !allCss.includes("background:#062b4c")) throw new Error("Canonical UI contract is missing its light content and navy navigation surfaces.");
 console.log("App-wide red-line readability policy check passed.");
+console.log("Canonical UI contract: Members & Personnel visual standard enforced app-wide.");
 console.log("Coverage: authenticated desktop portals + mobile/Capacitor portal views.");
