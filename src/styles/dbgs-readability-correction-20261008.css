@@ -1,0 +1,247 @@
+/*
+ * IRPA-DBGS readability correction pass — 2026-10-08
+ *
+ * Strictly presentation/accessibility only.
+ * Purpose: eliminate fading/low-contrast headings, labels and supporting text
+ * across the entire application, including controls that are not wrapped in
+ * the shared .form-field component.
+ *
+ * No workflow, data, permission, Firebase, transaction or business logic is
+ * changed by this stylesheet.
+ */
+
+.app-shell {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Headings: never allow inherited muted/opacity styles to make page structure fade. */
+.app-shell h1,
+.app-shell h2,
+.app-shell h3,
+.app-shell h4,
+.app-shell h5,
+.app-shell h6 {
+  opacity: 1 !important;
+  filter: none !important;
+  font-weight: 750;
+  color: #f5faf8 !important;
+  text-shadow: none;
+}
+
+.app-shell h1 { line-height: 1.2; }
+.app-shell h2 { line-height: 1.28; }
+.app-shell h3 { line-height: 1.34; }
+.app-shell h4,
+.app-shell h5,
+.app-shell h6 { line-height: 1.4; }
+
+/* The screenshot's problem is a direct <label>, not only .form-field label. */
+.app-shell label,
+.app-shell legend {
+  opacity: 1 !important;
+  filter: none !important;
+  color: #e7f1ed !important;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+/* High-contrast section markers and supporting copy. */
+.app-shell .eyebrow,
+.app-shell .brand-kicker,
+.app-shell .topbar-kicker {
+  opacity: 1 !important;
+  filter: none !important;
+  color: #e3b93e !important;
+  font-weight: 850;
+}
+
+.app-shell .panel-description,
+.app-shell .module-header p,
+.app-shell .page-header p,
+.app-shell .welcome-panel p,
+.app-shell .module-panel > p,
+.app-shell .field-help,
+.app-shell .form-field small,
+.app-shell .form-field .muted {
+  opacity: 1 !important;
+  filter: none !important;
+  color: #b7c9c2 !important;
+}
+
+/* Direct form labels used throughout Research, Finance, HR and other portals. */
+.app-shell form > label,
+.app-shell .form-grid > label,
+.app-shell .record-details label,
+.app-shell .signature-authority-field > label {
+  color: #e7f1ed !important;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+/* Make placeholders readable without competing with actual entered text. */
+.app-shell input::placeholder,
+.app-shell textarea::placeholder {
+  opacity: 1 !important;
+  color: #91aaa0 !important;
+}
+
+/* Inputs/selects/textareas: readable text and clearly visible boundaries. */
+.app-shell input:not([type="checkbox"]):not([type="radio"]),
+.app-shell select,
+.app-shell textarea {
+  color: #edf7f2 !important;
+  opacity: 1 !important;
+  border-color: #466b5b;
+}
+
+.app-shell input:not([type="checkbox"]):not([type="radio"]):focus,
+.app-shell select:focus,
+.app-shell textarea:focus {
+  border-color: #e0b43b;
+}
+
+/* Muted utility text must still be legible. */
+.app-shell .muted,
+.app-shell .table-subtext,
+.app-shell .submit-status,
+.app-shell .loading-sub {
+  opacity: 1 !important;
+  color: #a9bdb5 !important;
+}
+
+/* Tables: headings and primary record text should not fade. */
+.app-shell th {
+  opacity: 1 !important;
+  color: #b9ccc4 !important;
+  font-weight: 800;
+}
+
+.app-shell td {
+  opacity: 1 !important;
+}
+
+.app-shell td strong {
+  color: #f0f7f4 !important;
+  font-weight: 750;
+}
+
+/* Cards and action surfaces. */
+.app-shell .stat-card span {
+  color: #b4c8c0 !important;
+  opacity: 1 !important;
+}
+
+.app-shell .stat-card small {
+  color: #9fb5ac !important;
+  opacity: 1 !important;
+}
+
+/*
+ * Known light presentation surfaces retain dark text. These are explicit
+ * exceptions so the global readability correction never turns a light card
+ * into low-contrast white-on-white text.
+ */
+.app-shell .module-interlink-bar,
+.app-shell .page-back-next-navigation,
+.app-shell .finance-engine-card,
+.app-shell .finance-formula-card,
+.app-shell .finance-technology-operations {
+  color: #173b2d;
+}
+
+.app-shell .module-interlink-bar h1,
+.app-shell .module-interlink-bar h2,
+.app-shell .module-interlink-bar h3,
+.app-shell .page-back-next-navigation h1,
+.app-shell .page-back-next-navigation h2,
+.app-shell .page-back-next-navigation h3,
+.app-shell .finance-engine-card h1,
+.app-shell .finance-engine-card h2,
+.app-shell .finance-engine-card h3,
+.app-shell .finance-formula-card h1,
+.app-shell .finance-formula-card h2,
+.app-shell .finance-formula-card h3,
+.app-shell .finance-technology-operations h1,
+.app-shell .finance-technology-operations h2,
+.app-shell .finance-technology-operations h3 {
+  color: #173b2d !important;
+}
+
+.app-shell .module-interlink-bar label,
+.app-shell .page-back-next-navigation label,
+.app-shell .finance-engine-card label,
+.app-shell .finance-formula-card label,
+.app-shell .finance-technology-operations label {
+  color: #29473c !important;
+}
+
+.app-shell .finance-engine-card input,
+.app-shell .finance-engine-card select,
+.app-shell .finance-formula-card input,
+.app-shell .finance-formula-card select,
+.app-shell .finance-technology-operations input,
+.app-shell .finance-technology-operations select {
+  color: #173b2d !important;
+}
+
+/* Preserve readable dark text for explicitly white inline cards. */
+.app-shell [style*="background:#fff"],
+.app-shell [style*="background: #fff"],
+.app-shell [style*="background:"#fff""] {
+  color: #173b2d;
+}
+
+.app-shell [style*="background:#fff"] h1,
+.app-shell [style*="background:#fff"] h2,
+.app-shell [style*="background:#fff"] h3,
+.app-shell [style*="background: #fff"] h1,
+.app-shell [style*="background: #fff"] h2,
+.app-shell [style*="background: #fff"] h3 {
+  color: #173b2d !important;
+}
+
+.app-shell [style*="background:#fff"] label,
+.app-shell [style*="background: #fff"] label {
+  color: #29473c !important;
+}
+
+/* Disabled text may be subdued, but never invisible. */
+.app-shell button:disabled,
+.app-shell input:disabled,
+.app-shell select:disabled,
+.app-shell textarea:disabled {
+  opacity: .68;
+}
+
+/* Keyboard focus remains conspicuous after the contrast correction. */
+.app-shell a:focus-visible,
+.app-shell button:focus-visible,
+.app-shell input:focus-visible,
+.app-shell select:focus-visible,
+.app-shell textarea:focus-visible {
+  outline: 3px solid #e0b43b !important;
+  outline-offset: 2px;
+}
+
+@media (max-width: 760px) {
+  .app-shell h1 { line-height: 1.18; }
+  .app-shell h2 { line-height: 1.25; }
+  .app-shell h3 { line-height: 1.3; }
+
+  .app-shell form > label,
+  .app-shell .form-grid > label,
+  .app-shell .record-details label {
+    font-size: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell *,
+  .app-shell *::before,
+  .app-shell *::after {
+    transition: none !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
