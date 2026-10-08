@@ -89,8 +89,8 @@ export default function AddAdministratorPortal(){
    <div style={{padding:"12px",border:"1px solid rgba(214,165,44,.35)",borderRadius:10,marginBottom:12}}>
     <strong>{removalTarget.name||"Administrator"}</strong><div className="muted">{removalTarget.email}</div>
    </div>
-   <p className="panel-description">To authorize the final command, type <strong style={{color:"#f0c451"}}>REMOVE</strong> exactly below. Then press the final <strong>Remove Administrator Access</strong> button.</p>
-   <input value={removalConfirm} onChange={e=>setRemovalConfirm(e.target.value)} placeholder="Type REMOVE" autoComplete="off" spellCheck={false} aria-label="Type REMOVE to confirm Administrator removal" style={{width:"100%",padding:"12px",marginTop:8,borderRadius:9,border:"1px solid #6d4038",background:"#120c0a",color:"#fff"}} disabled={!!removeBusy}/>
+   <p className="panel-description">To authorize the final command, type <strong style={{color:"var(--text)"}}>REMOVE</strong> exactly below. Then press the final <strong>Remove Administrator Access</strong> button.</p>
+   <input value={removalConfirm} onChange={e=>setRemovalConfirm(e.target.value)} placeholder="Type REMOVE" autoComplete="off" spellCheck={false} aria-label="Type REMOVE to confirm Administrator removal" style={{width:"100%",padding:"12px",marginTop:8,borderRadius:9,border:"1px solid #6d4038",background:"var(--surface)",color:"var(--text)"}} disabled={!!removeBusy}/>
    <div className="form-actions" style={{marginTop:12}}>
     <button type="button" className="danger-button" onClick={executeRemoval} disabled={!!removeBusy||removalConfirm.trim().toUpperCase()!=="REMOVE"}>{removeBusy?"Removing…":"Remove Administrator Access"}</button>
     <button type="button" className="secondary-button" onClick={cancelRemoval} disabled={!!removeBusy}>Cancel Removal</button>
