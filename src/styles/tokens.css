@@ -424,7 +424,12 @@ table td{color:var(--text)}
 .research-portal-page .form-grid textarea::placeholder{color:var(--placeholder)}
 .finance-engine-tabs{border-color:var(--border);background:var(--surface-raised)}
 .finance-engine-tabs button{background:var(--surface-raised);color:var(--text);border-color:var(--border)}
-.finance-engine-tabs button.active{background:#0b5fa8;color:#fff;border-color:#2f86cf}
+.finance-engine-tabs button.active{
+  --surface:#0b5fa8;--surface-raised:#1672bf;--text:#fff;--text-muted:#e5f1fa;
+  --border:#8fb9d3;--border-strong:#cde5f5;--focus:#fff;--placeholder:#cde5f5;
+  --error:#ffd7d2;--success:#d8f5e5;
+  background:var(--surface);color:var(--text);border-color:var(--border-strong)
+}
 .finance-engine-card,.finance-formula-card{background:var(--surface);color:var(--text);border-color:var(--border)}
 .finance-engine-card>span,.finance-engine-card>small,.finance-engine-card th{color:var(--text-muted)}
 .finance-engine-card>strong,.finance-formula-card h3,.finance-engine-card h3,.finance-engine-card table,.finance-engine-card td{color:var(--text)}
