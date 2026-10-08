@@ -4241,27 +4241,43 @@
 }
 
 
-/* Invitation Register readability correction.
-   Register records are document text, not coloured cards: body rows/cells remain transparent.
-   Status badges retain only their semantic status treatment. */
-.content-area .page .panel-header h2{
+/* ========================================================================
+   🔴 IRPA-DBGS RED-LINE READABILITY POLICY — APP-WIDE
+   Applies to every authenticated portal on desktop and mobile/Capacitor.
+   Written records are content, not coloured cards. Text must never be
+   hidden, obscured, transparent, or placed on a background that hinders
+   legibility. This is a presentation-only guard; workflow/data/auth logic
+   is untouched.
+   ======================================================================== */
+#root .content-area .page :where(
+  h1,h2,h3,h4,h5,h6,p,li,dt,dd,blockquote,figcaption,caption,label,legend
+){
+  background:transparent;
   color:var(--text);
-  font-weight:850;
 }
-.content-area .page .table-wrapper{
+#root .content-area .page .panel-description,
+#root .content-area .page .table-subtext,
+#root .content-area .page .muted{
+  background:transparent;
+  color:var(--text-muted);
+}
+#root .content-area .page .table-wrapper,
+#root .content-area .page table{
   background:transparent;
 }
-.content-area .page table{
+#root .content-area .page table tbody,
+#root .content-area .page table tbody tr,
+#root .content-area .page table tbody tr:nth-child(even),
+#root .content-area .page table tbody tr:hover,
+#root .content-area .page table tbody td{
   background:transparent;
 }
-.content-area .page table tbody,
-.content-area .page table tbody tr,
-.content-area .page table tbody tr:nth-child(even),
-.content-area .page table tbody tr:hover,
-.content-area .page table tbody td{
-  background:transparent;
-}
-.content-area .page table tbody td{
+#root .content-area .page table tbody td{
   color:var(--text);
   border-bottom-color:var(--border);
+}
+#root .content-area .page .panel-header h2,
+#root .content-area .page .welcome-panel h1{
+  color:var(--text);
+  font-weight:850;
 }
