@@ -4239,3 +4239,29 @@
     max-width:100%;overflow-wrap:anywhere;word-break:break-word;
   }
 }
+
+
+/* Invitation Register readability correction.
+   Register records are document text, not coloured cards: body rows/cells remain transparent.
+   Status badges retain only their semantic status treatment. */
+.content-area .page .panel-header h2{
+  color:var(--text);
+  font-weight:850;
+}
+.content-area .page .table-wrapper{
+  background:transparent;
+}
+.content-area .page table{
+  background:transparent;
+}
+.content-area .page table tbody,
+.content-area .page table tbody tr,
+.content-area .page table tbody tr:nth-child(even),
+.content-area .page table tbody tr:hover,
+.content-area .page table tbody td{
+  background:transparent;
+}
+.content-area .page table tbody td{
+  color:var(--text);
+  border-bottom-color:var(--border);
+}
