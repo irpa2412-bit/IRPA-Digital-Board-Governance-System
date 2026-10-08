@@ -198,3 +198,67 @@ table td{color:var(--text)}
   .password-entry-control{gap:7px}
   .password-visibility-toggle{flex-basis:44px;width:44px;min-width:44px}
 }
+
+/* Surface assignments for former readability-patch components. */
+.content-area:not(.dashboard-content-area) .page .stat-card,
+.content-area:not(.dashboard-content-area) .page .workflow-stage,
+.content-area.dashboard-content-area .page .dashboard-gauge,
+.content-area.dashboard-content-area .page .dashboard-function-button,
+.content-area.dashboard-content-area .page .dashboard-feed,
+.content-area .page .unified-control-tabs .unified-control-tab{
+  --surface:#ffffff;
+  --surface-raised:#f4f8f5;
+  --text:#17372b;
+  --text-muted:#526c61;
+  --border:#718a80;
+  --border-strong:#3f6556;
+  --focus:#075f3d;
+  --placeholder:#65776f;
+  --error:#8f2f2a;
+  --success:#0b6b3a;
+}
+.module-interlink-bar .module-interlink-list>button,
+.module-interlink-bar .workflow-portal-parent,
+.module-interlink-bar .workflow-portal-children button{
+  --surface:#0b5fa8;
+  --surface-raised:#1672bf;
+  --text:#ffffff;
+  --text-muted:#e5f1fa;
+  --border:#8fb9d3;
+  --border-strong:#cde5f5;
+  --focus:#ffffff;
+  --placeholder:#cde5f5;
+  --error:#ffd7d2;
+  --success:#d8f5e5;
+}
+.content-area .page .stat-card,
+.content-area .page .workflow-stage,
+.content-area .page .unified-control-tabs .unified-control-tab{
+  color:var(--text);
+}
+.content-area .page .stat-card span,
+.content-area .page .workflow-stage span,
+.content-area .page .stat-card small,
+.content-area .page .workflow-stage small{
+  color:var(--text-muted);
+}
+.content-area .page .stat-card strong,
+.content-area .page .workflow-stage strong{
+  color:var(--text);
+}
+.content-area .page .unified-control-tabs .unified-control-tab,
+.content-area .page .unified-control-tabs .unified-control-tab *{
+  color:var(--text);
+  text-shadow:none;
+  opacity:1;
+}
+.module-interlink-bar .module-interlink-list>button,
+.module-interlink-bar .workflow-portal-parent,
+.module-interlink-bar .workflow-portal-children button{
+  background:var(--surface);
+  color:var(--text);
+  border:1px solid var(--border-strong);
+  font-size:13px;
+  line-height:1.35;
+  font-weight:700;
+}
