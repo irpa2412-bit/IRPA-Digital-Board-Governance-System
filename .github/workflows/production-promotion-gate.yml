@@ -1,0 +1,151 @@
+name: Production Promotion Gate
+
+on:
+  pull_request:
+    branches: ["main"]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  candidate-proof:
+    name: candidate-proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Require an internal repository pull request
+        env:
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$HEAD_REPOSITORY" != "$BASE_REPOSITORY" ]; then
+            echo "PRODUCTION_PROMOTION_BLOCKED: proof-tag creation is only permitted for an internal repository PR."
+            exit 1
+          fi
+          echo "INTERNAL_PR_PROOF_TAG_CREATION_ALLOWED=true"
+
+      - name: Run complete gateway regression suite before proof tagging
+        working-directory: drive-gateway
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm test
+
+      - name: Verify governance application build before proof tagging
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm run build
+
+      - name: Create protected functional proof tag on this exact build
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --force --tags origin
+          TAG_NAME="gate-promotion-proof-$PR_HEAD_SHA"
+
+          if git rev-parse -q --verify "refs/tags/$TAG_NAME^{commit}" >/dev/null; then
+            TAG_COMMIT="$(git rev-list -n 1 "$TAG_NAME^{commit}")"
+            if [ "$TAG_COMMIT" != "$PR_HEAD_SHA" ]; then
+              echo "PRODUCTION_PROMOTION_BLOCKED: existing proof tag resolves to a different commit."
+              echo "TAG=$TAG_NAME"
+              echo "TAG_COMMIT=$TAG_COMMIT"
+              echo "PR_HEAD_SHA=$PR_HEAD_SHA"
+              exit 1
+            fi
+            echo "FUNCTIONAL_GATE_PROOF_TAG_ALREADY_PRESENT=true"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "$TAG_NAME" "$PR_HEAD_SHA" -m "Functional promotion proof for exact PR head $PR_HEAD_SHA"
+            git push origin "refs/tags/$TAG_NAME"
+            echo "FUNCTIONAL_GATE_PROOF_TAG_CREATED=true"
+          fi
+
+          echo "PROOF_TAG=$TAG_NAME"
+          echo "PROOF_TAG_COMMIT=$PR_HEAD_SHA"
+
+  gate-proof:
+    name: gate-proof
+    needs: candidate-proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Require protected functional proof tag on this exact build
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --force --tags origin
+          tags="$(git tag --points-at "$PR_HEAD_SHA" -l 'gate*-proof-*')"
+          if [ -z "$tags" ]; then
+            echo "PRODUCTION_PROMOTION_BLOCKED: PR head has no functional gate proof tag."
+            echo "A build must pass its applicable functional/live gate and receive a protected gate*-proof-* tag before promotion to main."
+            exit 1
+          fi
+          echo "FUNCTIONAL_GATE_PROOF_TAG_PRESENT=true"
+          printf '%s\n' "$tags" | sed 's/^/PROOF_TAG=/'
+
+      - name: Verify proof tag resolves exactly to PR head
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          matches=0
+          while IFS= read -r tag; do
+            [ -n "$tag" ] || continue
+            resolved="$(git rev-list -n 1 "$tag^{commit}")"
+            if [ "$resolved" = "$PR_HEAD_SHA" ]; then
+              matches=$((matches + 1))
+            fi
+          done < <(git tag --points-at "$PR_HEAD_SHA" -l 'gate*-proof-*')
+          if [ "$matches" -lt 1 ]; then
+            echo "PRODUCTION_PROMOTION_BLOCKED: no proof tag resolves exactly to the PR head."
+            exit 1
+          fi
+          echo "EXACT_PR_HEAD_PROOF_TAG_MATCH=true"
+
+      - name: Re-run complete gateway regression suite
+        working-directory: drive-gateway
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm test
+
+      - name: Re-run governance application build
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm run build
+
+      - name: Non-deployment safety assertion
+        run: |
+          set -euo pipefail
+          if grep -RInE 'wrangler[[:space:]]+deploy|firebase[[:space:]]+deploy|npm[[:space:]]+(run[[:space:]]+)?deploy' .github/workflows/production-promotion-gate.yml; then
+            echo "Unexpected deployment command detected in the promotion gate."
+            exit 1
+          fi
+          echo "PRODUCTION_PROMOTION_GATE_IS_NON_DEPLOYING=true"
