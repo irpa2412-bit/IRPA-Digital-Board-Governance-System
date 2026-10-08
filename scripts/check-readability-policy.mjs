@@ -8,7 +8,11 @@ const requiredCss=[
   "#root .content-area .page table tbody tr",
   "#root .content-area .page table tbody td",
   "background:transparent;",
-  "color:var(--text);"
+  "color:var(--text);",
+  "IRPA-DBGS GLOBAL READABILITY CONTRACT — FINAL CASCADE LAYER",
+  "text-rendering:optimizeLegibility;",
+  "line-height:1.55;",
+  "color:var(--text-muted);"
 ];
 for(const marker of requiredCss){
   if(!css.includes(marker)) throw new Error("Missing app-wide readability guard: "+marker);
