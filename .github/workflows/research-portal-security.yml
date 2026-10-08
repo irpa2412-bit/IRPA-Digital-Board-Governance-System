@@ -6,7 +6,7 @@ on:
       - repair/research-portal-access-control-20261008
   pull_request:
     branches:
-      - repair/research-portal-access-control-20261008
+      - feat/signature-trust-platform-20261007
 
 jobs:
   research-security:
