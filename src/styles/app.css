@@ -3927,7 +3927,8 @@
     inset:0!important;
     width:100%!important;
     height:100%!important;
-    opacity:0!important;
+    color:transparent!important;
+    background:transparent!important;
     cursor:pointer!important;
     z-index:2!important;
   }
