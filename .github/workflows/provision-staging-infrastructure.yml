@@ -174,7 +174,7 @@ jobs:
           git config user.name "IRPA Staging Infrastructure Bot"
           git config user.email "actions@users.noreply.github.com"
           git checkout -b "$branch"
-          git add drive-gateway/wrangler.toml
+          git add wrangler.toml
           git diff --cached --exit-code && { echo "No infrastructure change was necessary."; exit 0; }
           git commit -m "chore: bind dedicated staging Drive KV namespace"
           git push --set-upstream origin "$branch"
