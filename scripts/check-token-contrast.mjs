@@ -7,7 +7,7 @@ const textTokens=["--text","--text-muted","--placeholder","--error","--success"]
 const uiTokens=["--border","--border-strong","--focus"];
 
 function blockFor(selector){
-  const re=/([^{}]+)\\{([^{}]*)\\}/g;
+  const re=/([^{}]+)\{([^{}]*)\}/g;
   for(const m of css.matchAll(re)){
     const selectors=m[1].split(",").map(v=>v.trim());
     if(selectors.includes("." + selector)) return m[2];
@@ -16,7 +16,7 @@ function blockFor(selector){
 }
 function vars(block){
   const out={};
-  for(const m of block.matchAll(/(--[a-z-]+)\\s*:\\s*(#[0-9a-fA-F]{3,8})/g)) out[m[1]]=m[2];
+  for(const m of block.matchAll(/(--[a-z-]+)\s*:\s*(#[0-9a-fA-F]{3,8})/g)) out[m[1]]=m[2];
   return out;
 }
 function luminance(hex){
