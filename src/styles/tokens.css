@@ -169,3 +169,32 @@ table td{color:var(--text)}
   .form-grid{grid-template-columns:1fr}
   .form-grid .form-field-wide,.form-grid .full-field{grid-column:1}
 }
+
+.password-entry-control{display:flex;align-items:stretch;gap:8px;min-width:0}
+.password-entry-input{flex:1 1 auto;min-width:0!important}
+.password-visibility-toggle{flex:0 0 44px;width:44px;min-width:44px;min-height:44px;padding:0!important;display:inline-flex;align-items:center;justify-content:center;background:var(--surface-raised);color:var(--text);border:1px solid var(--border);border-radius:8px}
+.password-visibility-toggle:hover{background:var(--surface);color:var(--text)}
+.password-caps-warning{display:block;margin-top:5px;color:var(--error);font-weight:600}
+.login-category-badges{margin-top:4px;color:var(--text)}
+.login-category-heading{display:block;font-size:10px;font-weight:800;letter-spacing:.08em;color:var(--text-muted)}
+.login-category-list{display:flex;flex-wrap:wrap;gap:7px;margin-top:4px;align-items:flex-start}
+.login-category-item{display:inline-flex;flex-direction:column;align-items:flex-start;gap:3px}
+.login-category-pill{display:inline-flex;align-items:center;padding:3px 7px;border-radius:999px;font-size:11px;font-weight:700;border:1px solid currentColor;line-height:1.2;color:var(--text)}
+.login-category-empty{font-size:11px;color:var(--text-muted)}
+.login-category-identifiers{display:flex;flex-wrap:wrap;gap:10px;margin-top:7px;padding-top:6px;border-top:1px solid var(--border)}
+.login-category-identifiers small{display:block;font-size:8px;letter-spacing:.06em;color:var(--text-muted)}
+.login-category-identifiers strong{font-size:10px;color:var(--text)}
+.login-category-note{display:block;font-size:9px;line-height:1.35;color:var(--text-muted);margin-top:6px}
+.authority-capacity-gate{
+  background:rgba(2,10,7,.96);
+  backdrop-filter:none;
+}
+.authority-capacity-gate .authority-capacity-card{
+  background:var(--surface);
+  color:var(--text);
+  border-color:var(--border-strong);
+}
+@media(max-width:767px){
+  .password-entry-control{gap:7px}
+  .password-visibility-toggle{flex-basis:44px;width:44px;min-width:44px}
+}
