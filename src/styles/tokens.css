@@ -1,0 +1,171 @@
+/* IRPA-DBGS authoritative design tokens — surface-aware readability layer.
+   Every text/control color is resolved from the surface on which it renders.
+   Contrast requirements: normal text >= 4.5:1; large text >= 3:1; UI borders/focus >= 3:1.
+*/
+:root,
+.surface-dark{
+  --surface:#07140f;
+  --surface-raised:#0e251b;
+  --text:#f4f8f6;
+  --text-muted:#b9cdc4;
+  --border:#6f8e81;
+  --border-strong:#a5bdb3;
+  --focus:#f3c84b;
+  --placeholder:#829d93;
+  --error:#ffb4ab;
+  --success:#8ad5ae;
+}
+.surface-light,
+.surface-white{
+  --surface:#ffffff;
+  --surface-raised:#f4f8f5;
+  --text:#17372b;
+  --text-muted:#526c61;
+  --border:#718a80;
+  --border-strong:#3f6556;
+  --focus:#075f3d;
+  --placeholder:#65776f;
+  --error:#8f2f2a;
+  --success:#0b6b3a;
+}
+.surface-blue{
+  --surface:#0b5fa8;
+  --surface-raised:#1672bf;
+  --text:#ffffff;
+  --text-muted:#e5f1fa;
+  --border:#8fb9d3;
+  --border-strong:#cde5f5;
+  --focus:#ffffff;
+  --placeholder:#cde5f5;
+  --error:#ffd7d2;
+  --success:#d8f5e5;
+}
+
+/* Existing semantic surfaces inherit the authoritative token set. */
+body,
+.app-shell,
+.auth-screen,
+.loading-screen,
+.sidebar,
+.topbar,
+.auth-card,
+.welcome-panel,
+.module-panel,
+.panel,
+.identity-card,
+.stat-card,
+.detail-grid>div,
+.record-details,
+.mobile-dashboard-search,
+.mobile-dashboard-section,
+.induction-progress-track,
+.authority-card{
+  --surface:#07140f;
+  --surface-raised:#0e251b;
+  --text:#f4f8f6;
+  --text-muted:#b9cdc4;
+  --border:#6f8e81;
+  --border-strong:#a5bdb3;
+  --focus:#f3c84b;
+  --placeholder:#829d93;
+  --error:#ffb4ab;
+  --success:#8ad5ae;
+}
+
+.module-interlink-bar,
+.surface-light-card,
+.dashboard-content-area,
+.dashboard-quote4-main .panel,
+.quote4-activity-table>button{
+  --surface:#ffffff;
+  --surface-raised:#f4f8f5;
+  --text:#17372b;
+  --text-muted:#526c61;
+  --border:#718a80;
+  --border-strong:#3f6556;
+  --focus:#075f3d;
+  --placeholder:#65776f;
+  --error:#8f2f2a;
+  --success:#0b6b3a;
+}
+
+.dashboard-quote4-stats>button,
+.quote4-quick-grid>button,
+.nav-item.active,
+.logout-button,
+.global-home-button,
+.mobile-global-nav button.active{
+  --surface:#0b5fa8;
+  --surface-raised:#1672bf;
+  --text:#ffffff;
+  --text-muted:#e5f1fa;
+  --border:#8fb9d3;
+  --border-strong:#cde5f5;
+  --focus:#ffffff;
+  --placeholder:#cde5f5;
+  --error:#ffd7d2;
+  --success:#d8f5e5;
+}
+
+/* Shared typography/control primitives consume only the active surface tokens. */
+body{background:var(--surface);color:var(--text)}
+.app-shell{color:var(--text)}
+.app-shell h1,.app-shell h2,.app-shell h3,.app-shell h4,.app-shell h5,.app-shell h6,
+.app-shell p,.app-shell span,.app-shell strong,.app-shell small,.app-shell em,
+.app-shell td,.app-shell th,.app-shell legend,.app-shell label{color:var(--text)}
+.app-shell .muted,.app-shell .panel-description,.app-shell .module-panel>p,
+.app-shell .page-header p,.app-shell .module-header p,.app-shell .welcome-panel p{color:var(--text-muted)}
+.app-shell label,.auth-card label,.form-field label,.signature-authority-field>label{
+  color:var(--text);
+  opacity:1;
+  font-size:15px;
+  font-weight:600;
+  line-height:1.45;
+}
+.form-field,
+.form-grid,
+.form-actions{min-width:0}
+.form-grid{grid-template-columns:minmax(0,1fr);gap:0 16px}
+.form-field{gap:7px}
+.form-field input,.form-field select,.form-field textarea,
+.auth-card input,.table-search{
+  width:100%;
+  min-width:0;
+  box-sizing:border-box;
+  color:var(--text);
+  background:var(--surface-raised);
+  border:1px solid var(--border);
+  border-radius:9px;
+  outline:none;
+  font-size:16px;
+}
+.form-field input,.form-field select,.auth-card input,.table-search{min-height:46px;padding:11px 12px}
+.form-field textarea{min-height:120px;padding:11px 12px;resize:vertical}
+.form-field input::placeholder,.form-field textarea::placeholder,.auth-card input::placeholder,.table-search::placeholder{
+  color:var(--placeholder);
+  opacity:1;
+}
+.form-field input:focus,.form-field select:focus,.form-field textarea:focus,
+.auth-card input:focus,.table-search:focus{
+  border-color:var(--border-strong);
+  outline:2px solid var(--focus);
+  outline-offset:2px;
+}
+.form-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:6px}
+.form-actions>*{min-width:0}
+.form-grid .form-field-wide,.form-grid .full-field{grid-column:1}
+.form-field input[type="checkbox"],.form-field input[type="radio"]{width:auto;min-height:0}
+button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+table th{color:var(--text-muted)}
+table td{color:var(--text)}
+.status-badge{color:var(--success)}
+.error-message,.field-help{color:var(--error)}
+.success-message{color:var(--success)}
+@media(min-width:768px){
+  .form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .form-grid .form-field-wide,.form-grid .full-field{grid-column:1/-1}
+}
+@media(max-width:767px){
+  .form-grid{grid-template-columns:1fr}
+  .form-grid .form-field-wide,.form-grid .full-field{grid-column:1}
+}
