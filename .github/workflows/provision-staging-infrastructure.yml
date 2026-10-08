@@ -40,7 +40,7 @@ jobs:
           STAGING_KV_TITLE: irpa-google-drive-gateway-staging-DRIVE_KV
         run: |
           set -euo pipefail
-          namespaces="$(npx wrangler kv namespace list --json)"
+          namespaces="$(npx wrangler kv namespace list)"
           printf '%s\n' "$namespaces" > /tmp/kv-namespaces.json
 
           node --input-type=module <<'NODE'
