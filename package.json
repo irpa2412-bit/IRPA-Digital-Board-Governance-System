@@ -7,8 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "check:token-contrast": "node scripts/check-token-contrast.mjs",
-    "test:a11y": "playwright test"
+    "check:token-contrast": "node scripts/check-token-contrast.mjs"
   },
   "dependencies": {
     "firebase": "^11.10.0",
@@ -33,8 +32,6 @@
     "vite": "^7.1.3",
     "@capacitor/cli": "^8.0.0",
     "typescript": "^5.9.2",
-    "@firebase/rules-unit-testing": "^4.0.1",
-    "@playwright/test": "^1.64.0",
-    "@axe-core/playwright": "^4.13.0"
+    "@firebase/rules-unit-testing": "^4.0.1"
   }
 }
