@@ -183,7 +183,7 @@ jobs:
 
           gh pr create \
             --repo "${GITHUB_REPOSITORY}" \
-            --base fix/separate-staging-deploy-trigger-20261008 \
+            --base repair/staging-infrastructure-provisioning-20261008 \
             --head "$branch" \
             --title "chore: bind dedicated staging DRIVE_KV namespace" \
             --body "$body"
