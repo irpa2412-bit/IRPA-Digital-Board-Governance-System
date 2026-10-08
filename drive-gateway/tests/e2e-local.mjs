@@ -78,7 +78,7 @@ async function request(path, { uid = "authorized-user", email = "authorized@exam
   return { status: response.status, body: parsed };
 }
 
-const workerEnv = `DRIVE_MOCK="true"\nLOCAL_TEST_MODE="true"\nFIREBASE_PROJECT_ID="${PROJECT}"\nFIRESTORE_EMULATOR_HOST="127.0.0.1:8080"\nFIRESTORE_COLLECTION_PREFIX="staging_"\nDRIVE_ROOT_FOLDER_NAME="IRPA Governance System - STAGING"\n`;
+const workerEnv = `DRIVE_MOCK="true"\nLOCAL_TEST_MODE="true"\nFIREBASE_PROJECT_ID="${PROJECT}"\nFIRESTORE_EMULATOR_HOST="127.0.0.1:8080"\nFIRESTORE_COLLECTION_PREFIX="staging_"\nDRIVE_ROOT_FOLDER_NAME="IRPA Governance System - STAGING"\nESIGN_MODULE_ENABLED="true"\nALLOW_RETURN_TOKENS="true"\n`;
 writeFileSync(DEV_VARS, workerEnv);
 
 const worker = spawn("npx", ["wrangler", "dev", "--config", "wrangler.toml", "--env", "staging", "--local", "--test-scheduled", "--port", String(PORT), "--log-level", "error"], {
@@ -178,6 +178,36 @@ try {
   const cleanupState = await request("/__test__/state", { method: "GET" });
   log("cleanup-job-finds-and-removes-pending-record", { httpStatus: cleanup.status, response: cleanupText, stateAfter: cleanupState.body });
   if (!cleanup.ok || (cleanupState.body?.pending || []).length !== 0) throw new Error("Cleanup job did not clear the pending rollback.");
+
+  const envelope = await request("/api/envelopes", { body: { documentId, signers: [ { name: "Staging Signer One", email: "signer1@example.test", order: 1 }, { name: "Staging Signer Two", email: "signer2@example.test", order: 2 } ], archives: ["legal-contracts", "board-governance"] } });
+  log("two-signer-envelope-created", { httpStatus: envelope.status, response: envelope.body });
+  if (envelope.status !== 201 || envelope.body?.tokens?.length !== 2 || envelope.body?.invitations?.every(x => x.status === "Sent") !== true) throw new Error("Two-signer envelope creation/invitation assertion failed.");
+
+  const token1 = envelope.body.tokens[0];
+  const token2 = envelope.body.tokens[1];
+  const opened1 = await request("/api/sign/open", { method: "GET", headers: { "x-signing-token": token1 } });
+  log("signer-one-opened", { httpStatus: opened1.status, response: opened1.body });
+  if (opened1.status !== 200 || opened1.body?.canSign !== true) throw new Error("Signer one could not open/sign.");
+
+  const outOfOrder = await request("/api/sign/submit", { body: { token: token2, consent: true, signature: { type: "typed", value: "Staging Signer Two" } } });
+  log("signer-two-before-order-rejected", { httpStatus: outOfOrder.status, response: outOfOrder.body });
+  if (outOfOrder.status !== 409) throw new Error("Signer order was not enforced.");
+
+  const signed1 = await request("/api/sign/submit", { body: { token: token1, consent: true, signature: { type: "typed", value: "Staging Signer One" } } });
+  log("signer-one-persisted", { httpStatus: signed1.status, response: signed1.body });
+  if (signed1.status !== 200 || signed1.body?.completed !== false) throw new Error("Signer one persistence assertion failed.");
+
+  const signed2 = await request("/api/sign/submit", { body: { token: token2, consent: true, signature: { type: "typed", value: "Staging Signer Two" } } });
+  log("signer-two-completed-envelope", { httpStatus: signed2.status, response: signed2.body });
+  if (signed2.status !== 200 || signed2.body?.completed !== true) throw new Error("Signer two completion assertion failed.");
+
+  const finalOpen = await request("/api/sign/pdf", { method: "GET", headers: { "x-signing-token": token2 } });
+  log("signed-document-retrieval", { httpStatus: finalOpen.status, sha256: finalOpen.body?.sha256 || null });
+  if (finalOpen.status !== 200 || finalOpen.body?.raw === undefined && !finalOpen.body?.base64) throw new Error("Signed document retrieval did not return content.");
+
+  const envelopeStatus = await request("/api/envelopes/" + encodeURIComponent(envelope.body.envelopeId), { method: "GET" });
+  log("two-signer-final-status", { httpStatus: envelopeStatus.status, response: envelopeStatus.body });
+  if (envelopeStatus.status !== 200 || envelopeStatus.body?.status !== "Completed" || envelopeStatus.body?.auditChainValid !== true || envelopeStatus.body?.signers?.every(x => x.status === "Signed") !== true || envelopeStatus.body?.completion?.files?.length !== 5) throw new Error("Final two-signer persistence/archive assertion failed.");
 
   console.log("E2E RESULT: PASS");
 } finally {
