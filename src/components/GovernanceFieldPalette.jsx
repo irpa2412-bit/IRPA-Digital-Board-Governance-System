@@ -39,7 +39,7 @@ export default function GovernanceFieldPalette({onAddField,context="Governance w
       <span className="status-badge">{context}</span>
     </div>
     <div style={{display:"grid",gridTemplateColumns:compact?"repeat(3,minmax(0,1fr))":"repeat(3,minmax(120px,1fr))",gap:8}}>
-      {GOVERNANCE_FIELD_TYPES.map(type=><button key={type} type="button" disabled={disabled} onClick={()=>onAddField?.(type)} title={"Add "+GOVERNANCE_FIELD_LABELS[type]} style={{textAlign:"left",padding:"10px 11px",borderRadius:8,border:"1px solid rgba(109,93,252,.38)",background:"rgba(15,23,42,.72)",color:"#fff",cursor:disabled?"not-allowed":"pointer",opacity:disabled?.55:1}}>
+      {GOVERNANCE_FIELD_TYPES.map(type=><button key={type} type="button" disabled={disabled} onClick={()=>onAddField?.(type)} title={"Add "+GOVERNANCE_FIELD_LABELS[type]} style={{textAlign:"left",padding:"10px 11px",borderRadius:8,border:"1px solid var(--border)",background:"var(--surface)",color:"var(--text)",cursor:disabled?"not-allowed":"pointer",opacity:disabled?.55:1}}>
         <strong style={{display:"block"}}>{GOVERNANCE_FIELD_LABELS[type]}</strong>
         <small style={{display:"block",marginTop:3,opacity:.72}}>{RESPONSIBILITY[type]}</small>
       </button>)}
