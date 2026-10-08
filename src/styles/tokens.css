@@ -169,8 +169,8 @@ table td{color:var(--text)}
 }
 
 .password-entry-control{display:flex;align-items:stretch;gap:8px;min-width:0}
-.password-entry-input{flex:1 1 auto;min-width:0!important}
-.password-visibility-toggle{flex:0 0 44px;width:44px;min-width:44px;min-height:44px;padding:0!important;display:inline-flex;align-items:center;justify-content:center;background:var(--surface-raised);color:var(--text);border:1px solid var(--border);border-radius:8px}
+.password-entry-input{flex:1 1 auto;min-width:0}
+.password-visibility-toggle{flex:0 0 44px;width:44px;min-width:44px;min-height:44px;padding:0;display:inline-flex;align-items:center;justify-content:center;background:var(--surface-raised);color:var(--text);border:1px solid var(--border);border-radius:8px}
 .password-visibility-toggle:hover{background:var(--surface);color:var(--text)}
 .password-caps-warning{display:block;margin-top:5px;color:var(--error);font-weight:600}
 .login-category-badges{margin-top:4px;color:var(--text)}
@@ -185,7 +185,6 @@ table td{color:var(--text)}
 .login-category-note{display:block;font-size:9px;line-height:1.35;color:var(--text-muted);margin-top:6px}
 .authority-capacity-gate{
   background:rgba(2,10,7,.96);
-  backdrop-filter:none;
 }
 .authority-capacity-gate .authority-capacity-card{
   background:var(--surface);
