@@ -68,6 +68,8 @@ jobs:
             fi
             echo "FUNCTIONAL_GATE_PROOF_TAG_ALREADY_PRESENT=true"
           else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git tag -a "$TAG_NAME" "$PR_HEAD_SHA" -m "Functional promotion proof for exact PR head $PR_HEAD_SHA"
             git push origin "refs/tags/$TAG_NAME"
             echo "FUNCTIONAL_GATE_PROOF_TAG_CREATED=true"
