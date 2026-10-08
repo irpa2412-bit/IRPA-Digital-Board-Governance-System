@@ -45,6 +45,7 @@ exports.authorizeMeetingEntry=onCall({region:"us-central1",timeoutSeconds:30},as
  const snap=await db.collection("meetingAccessTokens").where("tokenHash","==",hash(token)).limit(1).get();
  if(snap.empty)throw new HttpsError("permission-denied","This meeting access link is invalid.");
  const doc=snap.docs[0],grant={id:doc.id,...doc.data()};
+ if(suppliedMeetingId&&suppliedMeetingId!==grant.meetingId)throw new HttpsError("permission-denied","The supplied meeting ID does not match this gate pass.");
  if(grant.status!=="Active"||grant.expiresAt?.toDate?.()<new Date())throw new HttpsError("permission-denied","This meeting access link has expired or been revoked.");
  const participantSnap=await db.collection("participants").doc(grant.participantId).get();
  const participant=participantSnap.exists?participantSnap.data():{};
