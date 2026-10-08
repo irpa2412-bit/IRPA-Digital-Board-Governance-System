@@ -684,3 +684,129 @@ test("password-set resumes PROVISIONING_PENDING after a transient institutional-
     assert.equal(memberPatchAttempts,2);
   } finally { global.fetch=originalFetch; }
 });
+
+test("activated canonical Board Member record authorizes portal access when its document ID differs from Firebase UID", async()=>{
+  const originalFetch=global.fetch;
+  const jwk=publicKey.export({format:"jwk"});
+  const idToken=makeFirebaseIdToken("activated-board-uid","invitee@example.org");
+
+  global.fetch=async(url,options={})=>{
+    const target=String(url);
+
+    if(target.includes("securetoken@system.gserviceaccount.com")){
+      return new Response(JSON.stringify({keys:[{...jwk,kid:"invitation-test-key",alg:"RS256",use:"sig"}]}),{status:200});
+    }
+
+    if(
+      target.endsWith("/documents/adminProfiles/activated-board-uid") ||
+      target.endsWith("/documents/members/activated-board-uid") ||
+      target.endsWith("/documents/employees/activated-board-uid")
+    ){
+      return new Response(JSON.stringify({error:{status:"NOT_FOUND"}}),{status:404});
+    }
+
+    if(target.includes("/documents:runQuery")){
+      const query=JSON.parse(options.body||"{}");
+      const collection=query?.structuredQuery?.from?.[0]?.collectionId;
+      if(collection==="members"){
+        return new Response(JSON.stringify([{
+          document:{
+            name:"projects/irpa-digital-board-governance/databases/(default)/documents/members/canonical-board-7",
+            fields:{
+              email:{stringValue:"invitee@example.org"},
+              boardMember:{booleanValue:true},
+              role:{stringValue:"Board Member"},
+              registrationStatus:{stringValue:"Activated"},
+              accountActivated:{booleanValue:true}
+            }
+          }
+        }]),{status:200});
+      }
+      if(collection==="employees") return new Response(JSON.stringify([]),{status:200});
+    }
+
+    throw new Error("Unexpected external request: "+target);
+  };
+
+  try{
+    const response=await handler.fetch(new Request("https://gw.test/api/session/profile",{
+      method:"POST",
+      headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"},
+      body:"{}"
+    }),{
+      FIREBASE_PROJECT_ID:"irpa-digital-board-governance",
+      FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)
+    });
+
+    assert.equal(response.status,200);
+    assert.deepEqual(await response.json(),{
+      ok:true,
+      uid:"activated-board-uid",
+      email:"invitee@example.org",
+      admin:null,
+      member:null,
+      employee:null
+    });
+  } finally {
+    global.fetch=originalFetch;
+  }
+});
+
+test("inactive canonical institutional records remain blocked by portal activation guard", async()=>{
+  const originalFetch=global.fetch;
+  const jwk=publicKey.export({format:"jwk"});
+  const idToken=makeFirebaseIdToken("inactive-board-uid","inactive@example.org");
+
+  global.fetch=async(url,options={})=>{
+    const target=String(url);
+
+    if(target.includes("securetoken@system.gserviceaccount.com")){
+      return new Response(JSON.stringify({keys:[{...jwk,kid:"invitation-test-key",alg:"RS256",use:"sig"}]}),{status:200});
+    }
+
+    if(target.endsWith("/documents/adminProfiles/inactive-board-uid") ||
+       target.endsWith("/documents/members/inactive-board-uid") ||
+       target.endsWith("/documents/employees/inactive-board-uid")){
+      return new Response(JSON.stringify({error:{status:"NOT_FOUND"}}),{status:404});
+    }
+
+    if(target.includes("/documents:runQuery")){
+      const query=JSON.parse(options.body||"{}");
+      const collection=query?.structuredQuery?.from?.[0]?.collectionId;
+      if(collection==="members"){
+        return new Response(JSON.stringify([{
+          document:{
+            name:"projects/irpa-digital-board-governance/databases/(default)/documents/members/canonical-board-inactive",
+            fields:{
+              email:{stringValue:"inactive@example.org"},
+              boardMember:{booleanValue:true},
+              role:{stringValue:"Board Member"},
+              registrationStatus:{stringValue:"Pending"},
+              accountActivated:{booleanValue:false}
+            }
+          }
+        }]),{status:200});
+      }
+      if(collection==="employees") return new Response(JSON.stringify([]),{status:200});
+    }
+
+    throw new Error("Unexpected external request: "+target);
+  };
+
+  try{
+    const response=await handler.fetch(new Request("https://gw.test/api/session/profile",{
+      method:"POST",
+      headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"},
+      body:"{}"
+    }),{
+      FIREBASE_PROJECT_ID:"irpa-digital-board-governance",
+      FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)
+    });
+
+    assert.equal(response.status,403);
+    assert.deepEqual(await response.json(),{ok:false,error:"IRPA_INVITATION_FAILURE:PORTAL_ACTIVATION_REQUIRED"});
+  } finally {
+    global.fetch=originalFetch;
+  }
+});
+
