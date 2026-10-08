@@ -1598,10 +1598,25 @@ async function authenticateFirebaseRequest(request, env, options = {}) {
 async function assertActivatedPortalUser(claims, env) {
   const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
   if (admin?.fields?.active?.booleanValue === true) return;
-  const member = await getFirestoreDocument(env, `members/${claims.user_id}`, claims.token);
-  const employee = await getFirestoreDocument(env, `employees/${claims.user_id}`, claims.token);
-  const memberActivated = member && (member.fields?.registrationStatus?.stringValue === "Activated" || member.fields?.status?.stringValue === "Activated" || member.fields?.accountActivated?.booleanValue === true);
-  const employeeActive = employee && (employee.fields?.registrationStatus?.stringValue === "Activated" || employee.fields?.status?.stringValue === "Active" || employee.fields?.employmentStatus?.stringValue === "Active") && employee.fields?.accountActivated?.booleanValue !== false;
+
+  // Invitation activation preserves the canonical institutional record ID
+  // and attaches the authenticated Firebase UID to that record. Some older
+  // authorization paths incorrectly assumed the institutional document ID
+  // was always identical to the Firebase UID. Resolve the same UID-first,
+  // email-fallback profile used by upload authorization so activated
+  // invitees are not rejected before the storage layer.
+  const { memberRecord, employeeRecord } = await getInstitutionalProfileForUser(env, claims);
+  const memberActivated = memberRecord && (
+    memberRecord.fields?.registrationStatus?.stringValue === "Activated" ||
+    memberRecord.fields?.status?.stringValue === "Activated" ||
+    memberRecord.fields?.accountActivated?.booleanValue === true
+  );
+  const employeeActive = employeeRecord && (
+    employeeRecord.fields?.registrationStatus?.stringValue === "Activated" ||
+    employeeRecord.fields?.status?.stringValue === "Active" ||
+    employeeRecord.fields?.employmentStatus?.stringValue === "Active"
+  ) && employeeRecord.fields?.accountActivated?.booleanValue !== false;
+
   if (!memberActivated && !employeeActive) {
     const error = new Error("IRPA_INVITATION_FAILURE:PORTAL_ACTIVATION_REQUIRED");
     error.status = 403;
