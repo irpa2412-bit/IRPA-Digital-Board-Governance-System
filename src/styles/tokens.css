@@ -258,3 +258,119 @@ table td{color:var(--text)}
   line-height:1.35;
   font-weight:700;
 }
+
+.dashboard-content-area .dashboard-hero,
+.dashboard-content-area .dashboard-gauge,
+.dashboard-content-area .dashboard-function-button,
+.dashboard-content-area .dashboard-feed,
+.members-personnel-page,
+.members-personnel-page .panel,
+.members-personnel-page .registration-feedback,
+.members-personnel-page .detail-grid>div,
+.finance-engine-card,
+.finance-formula-card,
+.finance-technology-operations .finance-engine-tabs button,
+.main-area>.mobile-global-nav,
+.mobile-stat-card,
+.mobile-priority-list>button,
+.mobile-quick-grid>button,
+.mobile-quote1-stats>button,
+.mobile-quote1-grid>button{
+  --surface:#ffffff;
+  --surface-raised:#f4f8f5;
+  --text:#17372b;
+  --text-muted:#526c61;
+  --border:#718a80;
+  --border-strong:#3f6556;
+  --focus:#075f3d;
+  --placeholder:#65776f;
+  --error:#8f2f2a;
+  --success:#0b6b3a;
+}
+.dashboard-quote4-main .panel,
+.quote4-activity-table>button,
+.dashboard-quote4-main,
+.desktop-date-card,
+.desktop-quote4-hero,
+.mobile-quote1-hero,
+.mobile-dashboard-hero{
+  --surface:#07140f;
+  --surface-raised:#0e251b;
+  --text:#f4f8f6;
+  --text-muted:#b9cdc4;
+  --border:#6f8e81;
+  --border-strong:#a5bdb3;
+  --focus:#f3c84b;
+  --placeholder:#829d93;
+  --error:#ffb4ab;
+  --success:#8ad5ae;
+}
+.dashboard-quote4-stats>button,
+.quote4-quick-grid>button,
+.mobile-blue-nav-button,
+.mobile-global-nav button.active{
+  --surface:#0b5fa8;
+  --surface-raised:#1672bf;
+  --text:#ffffff;
+  --text-muted:#e5f1fa;
+  --border:#8fb9d3;
+  --border-strong:#cde5f5;
+  --focus:#ffffff;
+  --placeholder:#cde5f5;
+  --error:#ffd7d2;
+  --success:#d8f5e5;
+}
+.dashboard-content-area .dashboard-hero,
+.dashboard-content-area .dashboard-gauge,
+.dashboard-content-area .dashboard-function-button,
+.dashboard-content-area .dashboard-feed,
+.members-personnel-page,
+.finance-engine-card,
+.finance-formula-card,
+.mobile-stat-card,
+.mobile-priority-list>button,
+.mobile-quick-grid>button,
+.mobile-quote1-stats>button,
+.mobile-quote1-grid>button,
+.main-area>.mobile-global-nav{
+  color:var(--text);
+}
+.dashboard-content-area .dashboard-hero h1,
+.dashboard-content-area .dashboard-hero p,
+.dashboard-content-area .dashboard-gauge,
+.dashboard-content-area .dashboard-function-button,
+.dashboard-content-area .dashboard-feed,
+.members-personnel-page .page-header h1,
+.members-personnel-page .page-header p,
+.finance-engine-card>span,
+.finance-engine-card>strong,
+.finance-engine-card>small,
+.finance-formula-card h3,
+.finance-engine-card h3,
+.finance-formula-card code,
+.finance-formula-card ul,
+.mobile-stat-card *,
+.mobile-priority-list>button *,
+.mobile-quick-grid>button *,
+.mobile-quote1-stats>button *,
+.mobile-quote1-grid>button *{
+  color:var(--text);
+}
+.dashboard-content-area .dashboard-hero p,
+.finance-engine-card>span,
+.finance-engine-card>small,
+.finance-formula-card ul,
+.members-personnel-page .page-header p{
+  color:var(--text-muted);
+}
+.desktop-quote4-hero *,
+.mobile-quote1-hero *,
+.mobile-dashboard-hero *,
+.desktop-date-card *{
+  color:var(--text);
+}
+.desktop-quote4-hero .eyebrow,
+.mobile-quote1-hero .mobile-quote1-user span,
+.desktop-date-card span{
+  color:var(--focus);
+}
