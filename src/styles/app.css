@@ -4286,7 +4286,7 @@
    PRE-READABILITY DASHBOARD VISUAL BASELINE — 2026-10-08
    Restore the established dashboard artwork/cascade without changing
    authentication, routing, data, workflow, Firebase rules or behavior.
-   No !important is used; dashboard selectors are intentionally scoped
+   Strong selector specificity is used; dashboard selectors are intentionally scoped
    more specifically than generic portal/readability selectors.
    ================================================================ */
 
