@@ -1,0 +1,389 @@
+/* IRPA Research Portal readability layer.
+ * Scoped to .research-portal-page so governance, finance, signature and other
+ * portals retain their existing visual system.
+ */
+
+.research-portal-page {
+  --rp-text: #e8f3ee;
+  --rp-muted: #a8bbb4;
+  --rp-soft: #8fa79e;
+  --rp-border: #365b4c;
+  --rp-border-strong: #4a7662;
+  --rp-surface: #0a2118;
+  --rp-surface-2: #0d291f;
+  --rp-input: #071a13;
+  --rp-focus: #d6a52c;
+  color: var(--rp-text);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.research-portal-page *,
+.research-portal-page *::before,
+.research-portal-page *::after {
+  box-sizing: border-box;
+}
+
+.research-portal-page .welcome-panel {
+  min-height: 0;
+  align-items: flex-start;
+  padding: 28px 30px;
+}
+
+.research-portal-page .welcome-panel > div:first-child {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.research-portal-page .welcome-panel h1 {
+  font-size: clamp(24px, 3vw, 34px);
+  line-height: 1.18;
+  letter-spacing: -0.02em;
+  max-width: 980px;
+}
+
+.research-portal-page .welcome-panel p,
+.research-portal-page .panel-description {
+  max-width: 1000px;
+  color: #a9bdb5;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.research-portal-page .eyebrow {
+  color: #d6a52c;
+  font-size: 11px;
+  line-height: 1.35;
+  letter-spacing: .11em;
+}
+
+.research-portal-page .member-actions {
+  align-items: stretch;
+  gap: 8px;
+  padding: 4px;
+  background: rgba(6, 19, 14, .72);
+  border: 1px solid var(--rp-border);
+  border-radius: 12px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.research-portal-page .member-actions button {
+  flex: 0 0 auto;
+  min-height: 42px;
+  padding: 9px 13px;
+  font-size: 12px;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.research-portal-page .panel {
+  padding: 26px;
+}
+
+.research-portal-page .panel-header {
+  align-items: flex-start;
+  margin-bottom: 22px;
+}
+
+.research-portal-page .panel-header > div {
+  min-width: 0;
+}
+
+.research-portal-page .panel-header h2 {
+  font-size: 21px;
+  line-height: 1.3;
+  color: #edf6f2;
+}
+
+.research-portal-page .panel-header h3 {
+  font-size: 17px;
+  line-height: 1.35;
+  color: #edf6f2;
+}
+
+.research-portal-page h2,
+.research-portal-page h3 {
+  overflow-wrap: anywhere;
+}
+
+.research-portal-page .dashboard-grid {
+  gap: 14px;
+}
+
+.research-portal-page .stat-card {
+  min-width: 0;
+  min-height: 116px;
+  padding: 18px 20px;
+}
+
+.research-portal-page .stat-card span {
+  color: #a9bcb4;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.research-portal-page .stat-card strong {
+  line-height: 1.2;
+}
+
+.research-portal-page .stat-card small {
+  color: #91a79f;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.research-portal-page .form-grid {
+  align-items: start;
+  gap: 18px 20px;
+}
+
+.research-portal-page form > label,
+.research-portal-page .form-grid > label,
+.research-portal-page .record-details label {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 7px;
+  min-width: 0;
+  color: #dbe9e3;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.research-portal-page input:not([type="checkbox"]):not([type="radio"]),
+.research-portal-page select,
+.research-portal-page textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  color: #edf7f2;
+  background: var(--rp-input);
+  border: 1px solid #3a5f50;
+  border-radius: 9px;
+  outline: none;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.research-portal-page textarea {
+  min-height: 112px;
+  resize: vertical;
+}
+
+.research-portal-page input::placeholder,
+.research-portal-page textarea::placeholder {
+  color: #78938a;
+  opacity: 1;
+}
+
+.research-portal-page input:not([type="checkbox"]):not([type="radio"]):focus,
+.research-portal-page select:focus,
+.research-portal-page textarea:focus {
+  border-color: var(--rp-focus);
+  box-shadow: 0 0 0 3px rgba(214, 165, 44, .14);
+}
+
+.research-portal-page input[type="checkbox"],
+.research-portal-page input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  accent-color: #d6a52c;
+}
+
+.research-portal-page .dashboard-grid > label.stat-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 76px;
+  padding: 16px 18px;
+  color: #e6f1ec;
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 700;
+}
+
+.research-portal-page .dashboard-grid > label.stat-card input[type="checkbox"] {
+  margin: 0;
+}
+
+.research-portal-page .dashboard-grid > label.stat-card::after {
+  top: 12px;
+  right: 12px;
+}
+
+.research-portal-page .form-actions {
+  align-items: center;
+  gap: 9px;
+  margin-top: 18px;
+}
+
+.research-portal-page .form-actions button,
+.research-portal-page form > button {
+  min-height: 42px;
+}
+
+.research-portal-page .table-wrapper {
+  border: 1px solid #2e5143;
+  background: rgba(5, 18, 13, .45);
+}
+
+.research-portal-page table {
+  min-width: 760px;
+}
+
+.research-portal-page th {
+  padding: 12px 13px;
+  color: #a9c0b7;
+  font-size: 11px;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.research-portal-page td {
+  padding: 14px 13px;
+  color: #d2e0da;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.research-portal-page td strong {
+  color: #edf6f2;
+  font-size: 13px;
+}
+
+.research-portal-page .table-subtext {
+  margin-top: 4px;
+  color: #9eb4ab;
+  font-size: 12px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.research-portal-page .status-badge {
+  font-size: 11px;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.research-portal-page .record-details {
+  color: #d0e0d8;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.research-portal-page .record-details pre {
+  margin: 12px 0 0;
+  padding: 14px;
+  background: #04110c;
+  border: 1px solid #294b3d;
+  border-radius: 9px;
+  color: #d7e8df;
+  font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.research-portal-page button {
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.research-portal-page button.secondary-button {
+  color: #d8e9e1;
+}
+
+.research-portal-page button:focus-visible,
+.research-portal-page select:focus-visible,
+.research-portal-page input:focus-visible,
+.research-portal-page textarea:focus-visible {
+  outline: 2px solid var(--rp-focus);
+  outline-offset: 2px;
+}
+
+.research-portal-page .success-message,
+.research-portal-page .error-message {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.research-portal-page .panel > .panel {
+  background: rgba(6, 19, 14, .72);
+  border-color: #315647;
+}
+
+@media (max-width: 900px) {
+  .research-portal-page .welcome-panel {
+    padding: 22px;
+    flex-direction: column;
+  }
+
+  .research-portal-page .welcome-panel > button {
+    width: 100%;
+  }
+
+  .research-portal-page .panel {
+    padding: 20px;
+  }
+
+  .research-portal-page .dashboard-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .research-portal-page .form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .research-portal-page {
+    font-size: 14px;
+  }
+
+  .research-portal-page .member-actions {
+    margin-left: -4px !important;
+    margin-right: -4px !important;
+  }
+
+  .research-portal-page .member-actions button {
+    min-height: 44px;
+  }
+
+  .research-portal-page .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .research-portal-page .panel {
+    padding: 17px;
+    border-radius: 13px;
+  }
+
+  .research-portal-page .welcome-panel h1 {
+    font-size: 24px;
+  }
+
+  .research-portal-page .panel-header {
+    flex-direction: column;
+  }
+
+  .research-portal-page .panel-header .form-actions {
+    width: 100%;
+  }
+
+  .research-portal-page .panel-header .form-actions button {
+    flex: 1 1 0;
+  }
+
+  .research-portal-page table {
+    min-width: 680px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .research-portal-page * {
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+}
