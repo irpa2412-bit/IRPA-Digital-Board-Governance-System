@@ -72,11 +72,11 @@ export default function IRPADBGSMeetingRoomMedia({meeting,selectedAuthority="",c
      <span className="status-badge">{status}</span>
    </div>
    <div style={{display:"grid",gridTemplateColumns:"minmax(0,2fr) minmax(220px,1fr)",gap:14}}>
-     <div ref={remoteRef} style={{minHeight:260,borderRadius:12,background:"#07111f",padding:8,display:"grid",placeItems:"center",overflow:"hidden"}}>
-       <span style={{color:"#94a3b8"}}>{status==="CONNECTED"?"Waiting for other participants…":"Live meeting media is not connected."}</span>
+     <div ref={remoteRef} style={{minHeight:260,borderRadius:12,background:"var(--surface)",padding:8,display:"grid",placeItems:"center",overflow:"hidden"}}>
+       <span style={{color:"var(--text)"}}>{status==="CONNECTED"?"Waiting for other participants…":"Live meeting media is not connected."}</span>
      </div>
-     <div ref={localRef} style={{minHeight:160,borderRadius:12,background:"#0b1727",padding:8,overflow:"hidden"}}>
-       <span style={{color:"#94a3b8"}}>Your camera preview</span>
+     <div ref={localRef} style={{minHeight:160,borderRadius:12,background:"var(--surface)",padding:8,overflow:"hidden"}}>
+       <span style={{color:"var(--text)"}}>Your camera preview</span>
      </div>
    </div>
    {error&&<div className="error-message action-feedback" style={{marginTop:12}}>{error}</div>}

@@ -1,0 +1,36 @@
+name: Readability CI
+
+on:
+  push:
+    branches:
+      - audit/app-wide-readability-form-layout-20261008
+  pull_request:
+    branches:
+      - main
+      - audit/app-wide-readability-form-layout-20261008
+
+permissions:
+  contents: read
+
+jobs:
+  readability:
+    name: Build and token contrast
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Clean dependency install
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Token contrast gate
+        run: npm run check:token-contrast
+
+      - name: Production build
+        run: npm run build

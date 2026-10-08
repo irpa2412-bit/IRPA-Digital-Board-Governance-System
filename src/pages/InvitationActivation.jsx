@@ -98,15 +98,15 @@ function InvitationShell({children}){
 }
 
 const styles={
-  shell:{minHeight:"100vh",display:"grid",placeItems:"center",padding:24,boxSizing:"border-box",background:"#07140f",color:"#edf5f1",fontFamily:"Inter,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"},
+  shell:{minHeight:"100vh",display:"grid",placeItems:"center",padding:24,boxSizing:"border-box",background:"var(--surface)",color:"var(--text)",fontFamily:"Inter,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"},
   center:{width:"min(620px,100%)",textAlign:"center"},
-  kicker:{fontSize:11,fontWeight:800,letterSpacing:".14em",color:"#d6a52c"},
+  kicker:{fontSize:11,fontWeight:800,letterSpacing:".14em",color:"var(--text)"},
   title:{margin:"12px 0 10px",fontSize:"clamp(26px,4vw,38px)",lineHeight:1.15},
-  text:{margin:"0 0 24px",lineHeight:1.6,color:"#b9cbc4",fontSize:16},
-  label:{display:"grid",gap:7,fontSize:13,fontWeight:800,color:"#dce9e4"},
-  input:{width:"100%",boxSizing:"border-box",border:"1px solid #315a46",borderRadius:10,padding:"13px 14px",background:"#07140f",color:"#edf5f1",fontSize:16,outline:"none"},
-  primary:{border:"1px solid #2f86cf",borderRadius:10,padding:"13px 16px",background:"#0b5fa8",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"},
-  secondary:{border:"1px solid #315a46",borderRadius:10,padding:"12px 16px",background:"transparent",color:"#edf5f1",fontSize:15,fontWeight:700,cursor:"pointer"},
-  error:{padding:12,border:"1px solid #7f3d3d",borderRadius:10,background:"#291313",color:"#ffb7b7",fontSize:14,lineHeight:1.45}
+  text:{margin:"0 0 24px",lineHeight:1.6,color:"var(--text)",fontSize:16},
+  label:{display:"grid",gap:7,fontSize:13,fontWeight:800,color:"var(--text)"},
+  input:{width:"100%",boxSizing:"border-box",border:"1px solid var(--border)",borderRadius:10,padding:"13px 14px",background:"var(--surface)",color:"var(--text)",fontSize:16,outline:"none"},
+  primary:{border:"1px solid var(--border)",borderRadius:10,padding:"13px 16px",background:"var(--surface)",color:"var(--text)",fontSize:15,fontWeight:800,cursor:"pointer"},
+  secondary:{border:"1px solid var(--border)",borderRadius:10,padding:"12px 16px",background:"transparent",color:"var(--text)",fontSize:15,fontWeight:700,cursor:"pointer"},
+  error:{padding:12,border:"1px solid var(--border)",borderRadius:10,background:"var(--surface)",color:"var(--text)",fontSize:14,lineHeight:1.45}
 };
 const css=".irpa-invitation-card{width:min(520px,100%);box-sizing:border-box;padding:30px;border:1px solid #315a46;border-radius:18px;background:#0a1d16;box-shadow:0 20px 60px rgba(0,0,0,.35)}@media(max-width:600px){.irpa-invitation-card{padding:22px;border-radius:14px}}";

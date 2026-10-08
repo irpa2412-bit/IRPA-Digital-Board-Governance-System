@@ -1,0 +1,461 @@
+/* IRPA-DBGS authoritative design tokens — surface-aware readability layer.
+   Every text/control color is resolved from the surface on which it renders.
+   Contrast requirements: normal text >= 4.5:1; large text >= 3:1; UI borders/focus >= 3:1.
+*/
+:root,
+.surface-dark{
+  --surface:#07140f;
+  --surface-raised:#0e251b;
+  --text:#f4f8f6;
+  --text-muted:#b9cdc4;
+  --border:#6f8e81;
+  --border-strong:#a5bdb3;
+  --focus:#f3c84b;
+  --placeholder:#829d93;
+  --error:#ffb4ab;
+  --success:#8ad5ae;
+}
+.surface-light,
+.surface-white{
+  --surface:#ffffff;
+  --surface-raised:#f4f8f5;
+  --text:#17372b;
+  --text-muted:#526c61;
+  --border:#718a80;
+  --border-strong:#3f6556;
+  --focus:#075f3d;
+  --placeholder:#65776f;
+  --error:#8f2f2a;
+  --success:#0b6b3a;
+}
+.surface-blue{
+  --surface:#0b5fa8;
+  --surface-raised:#1672bf;
+  --text:#ffffff;
+  --text-muted:#e5f1fa;
+  --border:#8fb9d3;
+  --border-strong:#cde5f5;
+  --focus:#ffffff;
+  --placeholder:#cde5f5;
+  --error:#ffd7d2;
+  --success:#d8f5e5;
+}
+
+/* Existing semantic surfaces inherit the authoritative token set. */
+body,
+.app-shell,
+.auth-screen,
+.loading-screen,
+.sidebar,
+.topbar,
+.auth-card,
+.welcome-panel,
+.module-panel,
+.panel,
+.identity-card,
+.stat-card,
+.detail-grid>div,
+.record-details,
+.mobile-dashboard-search,
+.mobile-dashboard-section,
+.induction-progress-track,
+.authority-card{
+  --surface:#07140f;
+  --surface-raised:#0e251b;
+  --text:#f4f8f6;
+  --text-muted:#b9cdc4;
+  --border:#6f8e81;
+  --border-strong:#a5bdb3;
+  --focus:#f3c84b;
+  --placeholder:#829d93;
+  --error:#ffb4ab;
+  --success:#8ad5ae;
+}
+
+.module-interlink-bar,
+.surface-light-card,
+.dashboard-content-area,
+.dashboard-quote4-main .panel,
+.quote4-activity-table>button{
+  --surface:#ffffff;
+  --surface-raised:#f4f8f5;
+  --text:#17372b;
+  --text-muted:#526c61;
+  --border:#718a80;
+  --border-strong:#3f6556;
+  --focus:#075f3d;
+  --placeholder:#65776f;
+  --error:#8f2f2a;
+  --success:#0b6b3a;
+}
+
+.dashboard-quote4-stats>button,
+.quote4-quick-grid>button,
+.nav-item.active,
+.logout-button,
+.global-home-button,
+.mobile-global-nav button.active{
+  --surface:#0b5fa8;
+  --surface-raised:#1672bf;
+  --text:#ffffff;
+  --text-muted:#e5f1fa;
+  --border:#8fb9d3;
+  --border-strong:#cde5f5;
+  --focus:#ffffff;
+  --placeholder:#cde5f5;
+  --error:#ffd7d2;
+  --success:#d8f5e5;
+}
+
+/* Shared typography/control primitives consume only the active surface tokens. */
+body{background:var(--surface);color:var(--text)}
+.app-shell{color:var(--text)}
+.app-shell h1,.app-shell h2,.app-shell h3,.app-shell h4,.app-shell h5,.app-shell h6,
+.app-shell p,.app-shell span,.app-shell strong,.app-shell small,.app-shell em,
+.app-shell td,.app-shell th,.app-shell legend,.app-shell label{color:var(--text)}
+.app-shell .muted,.app-shell .panel-description,.app-shell .module-panel>p,
+.app-shell .page-header p,.app-shell .module-header p,.app-shell .welcome-panel p{color:var(--text-muted)}
+.app-shell label,.auth-card label,.form-field label,.signature-authority-field>label{
+  color:var(--text);
+  font-size:15px;
+  font-weight:600;
+  line-height:1.45;
+}
+.form-field,
+.form-grid,
+.form-actions{min-width:0}
+.form-grid{grid-template-columns:minmax(0,1fr);gap:0 16px}
+.form-field{gap:7px}
+.form-field input,.form-field select,.form-field textarea,
+.auth-card input,.table-search{
+  width:100%;
+  min-width:0;
+  box-sizing:border-box;
+  color:var(--text);
+  background:var(--surface-raised);
+  border:1px solid var(--border);
+  border-radius:9px;
+  outline:none;
+  font-size:16px;
+}
+.form-field input,.form-field select,.auth-card input,.table-search{min-height:46px;padding:11px 12px}
+.form-field textarea{min-height:120px;padding:11px 12px;resize:vertical}
+.form-field input::placeholder,.form-field textarea::placeholder,.auth-card input::placeholder,.table-search::placeholder{
+  color:var(--placeholder);
+}
+.form-field input:focus,.form-field select:focus,.form-field textarea:focus,
+.auth-card input:focus,.table-search:focus{
+  border-color:var(--border-strong);
+  outline:2px solid var(--focus);
+  outline-offset:2px;
+}
+.form-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:6px}
+.form-actions>*{min-width:0}
+.form-grid .form-field-wide,.form-grid .full-field{grid-column:1}
+.form-field input[type="checkbox"],.form-field input[type="radio"]{width:auto;min-height:0}
+button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+table th{color:var(--text-muted)}
+table td{color:var(--text)}
+.status-badge{color:var(--success)}
+.error-message,.field-help{color:var(--error)}
+.success-message{color:var(--success)}
+@media(min-width:768px){
+  .form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .form-grid .form-field-wide,.form-grid .full-field{grid-column:1/-1}
+}
+@media(max-width:767px){
+  .form-grid{grid-template-columns:1fr}
+  .form-grid .form-field-wide,.form-grid .full-field{grid-column:1}
+}
+
+.password-entry-control{display:flex;align-items:stretch;gap:8px;min-width:0}
+.password-entry-input{flex:1 1 auto;min-width:0}
+.password-visibility-toggle{flex:0 0 44px;width:44px;min-width:44px;min-height:44px;padding:0;display:inline-flex;align-items:center;justify-content:center;background:var(--surface-raised);color:var(--text);border:1px solid var(--border);border-radius:8px}
+.password-visibility-toggle:hover{background:var(--surface);color:var(--text)}
+.password-caps-warning{display:block;margin-top:5px;color:var(--error);font-weight:600}
+.login-category-badges{margin-top:4px;color:var(--text)}
+.login-category-heading{display:block;font-size:10px;font-weight:800;letter-spacing:.08em;color:var(--text-muted)}
+.login-category-list{display:flex;flex-wrap:wrap;gap:7px;margin-top:4px;align-items:flex-start}
+.login-category-item{display:inline-flex;flex-direction:column;align-items:flex-start;gap:3px}
+.login-category-pill{display:inline-flex;align-items:center;padding:3px 7px;border-radius:999px;font-size:11px;font-weight:700;border:1px solid currentColor;line-height:1.2;color:var(--text)}
+.login-category-empty{font-size:11px;color:var(--text-muted)}
+.login-category-identifiers{display:flex;flex-wrap:wrap;gap:10px;margin-top:7px;padding-top:6px;border-top:1px solid var(--border)}
+.login-category-identifiers small{display:block;font-size:8px;letter-spacing:.06em;color:var(--text-muted)}
+.login-category-identifiers strong{font-size:10px;color:var(--text)}
+.login-category-note{display:block;font-size:9px;line-height:1.35;color:var(--text-muted);margin-top:6px}
+.authority-capacity-gate{
+  background:rgba(2,10,7,.96);
+}
+.authority-capacity-gate .authority-capacity-card{
+  background:var(--surface);
+  color:var(--text);
+  border-color:var(--border-strong);
+}
+@media(max-width:767px){
+  .password-entry-control{gap:7px}
+  .password-visibility-toggle{flex-basis:44px;width:44px;min-width:44px}
+}
+
+/* Surface assignments for former readability-patch components. */
+.content-area:not(.dashboard-content-area) .page .stat-card,
+.content-area:not(.dashboard-content-area) .page .workflow-stage,
+.content-area.dashboard-content-area .page .dashboard-gauge,
+.content-area.dashboard-content-area .page .dashboard-function-button,
+.content-area.dashboard-content-area .page .dashboard-feed,
+.content-area .page .unified-control-tabs .unified-control-tab{
+  --surface:#ffffff;
+  --surface-raised:#f4f8f5;
+  --text:#17372b;
+  --text-muted:#526c61;
+  --border:#718a80;
+  --border-strong:#3f6556;
+  --focus:#075f3d;
+  --placeholder:#65776f;
+  --error:#8f2f2a;
+  --success:#0b6b3a;
+}
+.module-interlink-bar .module-interlink-list>button,
+.module-interlink-bar .workflow-portal-parent,
+.module-interlink-bar .workflow-portal-children button{
+  --surface:#0b5fa8;
+  --surface-raised:#1672bf;
+  --text:#ffffff;
+  --text-muted:#e5f1fa;
+  --border:#8fb9d3;
+  --border-strong:#cde5f5;
+  --focus:#ffffff;
+  --placeholder:#cde5f5;
+  --error:#ffd7d2;
+  --success:#d8f5e5;
+}
+.content-area .page .stat-card,
+.content-area .page .workflow-stage,
+.content-area .page .unified-control-tabs .unified-control-tab{
+  color:var(--text);
+}
+.content-area .page .stat-card span,
+.content-area .page .workflow-stage span,
+.content-area .page .stat-card small,
+.content-area .page .workflow-stage small{
+  color:var(--text-muted);
+}
+.content-area .page .stat-card strong,
+.content-area .page .workflow-stage strong{
+  color:var(--text);
+}
+.content-area .page .unified-control-tabs .unified-control-tab,
+.content-area .page .unified-control-tabs .unified-control-tab *{
+  color:var(--text);
+}
+.module-interlink-bar .module-interlink-list>button,
+.module-interlink-bar .workflow-portal-parent,
+.module-interlink-bar .workflow-portal-children button{
+  background:var(--surface);
+  color:var(--text);
+  border:1px solid var(--border-strong);
+  font-size:13px;
+  line-height:1.35;
+  font-weight:700;
+}
+
+.dashboard-content-area .dashboard-hero,
+.dashboard-content-area .dashboard-gauge,
+.dashboard-content-area .dashboard-function-button,
+.dashboard-content-area .dashboard-feed,
+.members-personnel-page,
+.members-personnel-page .panel,
+.members-personnel-page .registration-feedback,
+.members-personnel-page .detail-grid>div,
+.finance-engine-card,
+.finance-formula-card,
+.finance-technology-operations .finance-engine-tabs button,
+.main-area>.mobile-global-nav,
+.mobile-stat-card,
+.mobile-priority-list>button,
+.mobile-quick-grid>button,
+.mobile-quote1-stats>button,
+.mobile-quote1-grid>button{
+  --surface:#ffffff;
+  --surface-raised:#f4f8f5;
+  --text:#17372b;
+  --text-muted:#526c61;
+  --border:#718a80;
+  --border-strong:#3f6556;
+  --focus:#075f3d;
+  --placeholder:#65776f;
+  --error:#8f2f2a;
+  --success:#0b6b3a;
+}
+.dashboard-quote4-main .panel,
+.quote4-activity-table>button,
+.dashboard-quote4-main,
+.desktop-date-card,
+.desktop-quote4-hero,
+.mobile-quote1-hero,
+.mobile-dashboard-hero{
+  --surface:#07140f;
+  --surface-raised:#0e251b;
+  --text:#f4f8f6;
+  --text-muted:#b9cdc4;
+  --border:#6f8e81;
+  --border-strong:#a5bdb3;
+  --focus:#f3c84b;
+  --placeholder:#829d93;
+  --error:#ffb4ab;
+  --success:#8ad5ae;
+}
+.dashboard-quote4-stats>button,
+.quote4-quick-grid>button,
+.mobile-blue-nav-button,
+.mobile-global-nav button.active{
+  --surface:#0b5fa8;
+  --surface-raised:#1672bf;
+  --text:#ffffff;
+  --text-muted:#e5f1fa;
+  --border:#8fb9d3;
+  --border-strong:#cde5f5;
+  --focus:#ffffff;
+  --placeholder:#cde5f5;
+  --error:#ffd7d2;
+  --success:#d8f5e5;
+}
+.dashboard-content-area .dashboard-hero,
+.dashboard-content-area .dashboard-gauge,
+.dashboard-content-area .dashboard-function-button,
+.dashboard-content-area .dashboard-feed,
+.members-personnel-page,
+.finance-engine-card,
+.finance-formula-card,
+.mobile-stat-card,
+.mobile-priority-list>button,
+.mobile-quick-grid>button,
+.mobile-quote1-stats>button,
+.mobile-quote1-grid>button,
+.main-area>.mobile-global-nav{
+  color:var(--text);
+}
+.dashboard-content-area .dashboard-hero h1,
+.dashboard-content-area .dashboard-hero p,
+.dashboard-content-area .dashboard-gauge,
+.dashboard-content-area .dashboard-function-button,
+.dashboard-content-area .dashboard-feed,
+.members-personnel-page .page-header h1,
+.members-personnel-page .page-header p,
+.finance-engine-card>span,
+.finance-engine-card>strong,
+.finance-engine-card>small,
+.finance-formula-card h3,
+.finance-engine-card h3,
+.finance-formula-card code,
+.finance-formula-card ul,
+.mobile-stat-card *,
+.mobile-priority-list>button *,
+.mobile-quick-grid>button *,
+.mobile-quote1-stats>button *,
+.mobile-quote1-grid>button *{
+  color:var(--text);
+}
+.dashboard-content-area .dashboard-hero p,
+.finance-engine-card>span,
+.finance-engine-card>small,
+.finance-formula-card ul,
+.members-personnel-page .page-header p{
+  color:var(--text-muted);
+}
+.desktop-quote4-hero *,
+.mobile-quote1-hero *,
+.mobile-dashboard-hero *,
+.desktop-date-card *{
+  color:var(--text);
+}
+.desktop-quote4-hero .eyebrow,
+.mobile-quote1-hero .mobile-quote1-user span,
+.desktop-date-card span{
+  color:var(--focus);
+}
+
+/* Authenticated light portal surfaces: Research, Dataset Registry, Finance and Operations. */
+.content-area .page,
+.research-portal-page,
+.finance-portal,
+.finance-accounting-engine,
+.finance-donor-control-cockpit,
+.finance-technology-operations,
+.research-info-card,
+.research-selected-dataset{
+  --surface:#ffffff;
+  --surface-raised:#f4f8f5;
+  --text:#17372b;
+  --text-muted:#526c61;
+  --border:#718a80;
+  --border-strong:#3f6556;
+  --focus:#075f3d;
+  --placeholder:#65776f;
+  --error:#8f2f2a;
+  --success:#0b6b3a;
+}
+.auth-screen,
+.authority-capacity-gate,
+.password-entry-popup{
+  --surface:#07140f;
+  --surface-raised:#0e251b;
+  --text:#f4f8f6;
+  --text-muted:#b9cdc4;
+  --border:#6f8e81;
+  --border-strong:#a5bdb3;
+  --focus:#f3c84b;
+  --placeholder:#829d93;
+  --error:#ffb4ab;
+  --success:#8ad5ae;
+}
+.research-info-card{padding:16px;border:1px solid var(--border);border-radius:12px;background:var(--surface)}
+.research-selected-dataset{margin-top:16px;box-shadow:none}
+.research-portal-page .form-grid>label,
+.research-portal-page .panel>h2,
+.research-portal-page .panel-header h2,
+.research-portal-page .welcome-panel h1{color:var(--text)}
+.research-portal-page .panel-description,
+.research-portal-page .welcome-panel p,
+.research-portal-page .table-subtext{color:var(--text-muted)}
+.research-portal-page .form-grid input,
+.research-portal-page .form-grid select,
+.research-portal-page .form-grid textarea{color:var(--text);background:var(--surface-raised);border-color:var(--border)}
+.research-portal-page .form-grid input::placeholder,
+.research-portal-page .form-grid textarea::placeholder{color:var(--placeholder)}
+.finance-engine-tabs{border-color:var(--border);background:var(--surface-raised)}
+.finance-engine-tabs button{background:var(--surface-raised);color:var(--text);border-color:var(--border)}
+.finance-engine-tabs button.active{
+  --surface:#0b5fa8;--surface-raised:#1672bf;--text:#fff;--text-muted:#e5f1fa;
+  --border:#8fb9d3;--border-strong:#cde5f5;--focus:#fff;--placeholder:#cde5f5;
+  --error:#ffd7d2;--success:#d8f5e5;
+  background:var(--surface);color:var(--text);border-color:var(--border-strong)
+}
+.finance-engine-card,.finance-formula-card{background:var(--surface);color:var(--text);border-color:var(--border)}
+.finance-engine-card>span,.finance-engine-card>small,.finance-engine-card th{color:var(--text-muted)}
+.finance-engine-card>strong,.finance-formula-card h3,.finance-engine-card h3,.finance-engine-card table,.finance-engine-card td{color:var(--text)}
+.finance-formula-card code{background:var(--surface-raised);color:var(--text)}
+.finance-formula-card ul{color:var(--text-muted)}
+.finance-engine-card input,.finance-engine-card select{background:var(--surface);color:var(--text);border-color:var(--border)}
+.finance-engine-card .form-field label{color:var(--text)}
+.finance-engine-card .secondary-button{background:var(--surface-raised);color:var(--text);border-color:var(--border)}
+.finance-technology-operations .finance-engine-tabs button{background:var(--surface);color:var(--text);border-color:var(--border)}
+.finance-operation-result{background:var(--surface-raised);border-color:var(--border);color:var(--text)}
+.authority-capacity-card{background:var(--surface);color:var(--text);border-color:var(--border-strong)}
+.authority-capacity-kicker,.authority-capacity-feedback strong{color:var(--focus)}
+.authority-capacity-card p,.authority-capacity-note,.authority-capacity-option small{color:var(--text-muted)}
+.authority-capacity-status{border-color:var(--border);background:var(--surface-raised)}
+.authority-capacity-status strong{color:var(--text)}
+.authority-capacity-status small{color:var(--text-muted)}
+.authority-capacity-option{border-color:var(--border);background:var(--surface-raised);color:var(--text)}
+.authority-capacity-option:hover:not(:disabled){border-color:var(--border-strong)}
+.authority-capacity-option.selected{border-color:var(--focus);background:var(--surface);box-shadow:0 0 0 2px var(--focus)}
+.authority-capacity-feedback{border-color:var(--focus);background:var(--surface-raised)}
+.authority-capacity-feedback.error{border-color:var(--error);background:var(--surface-raised)}
+.authority-capacity-feedback.error strong{color:var(--error)}
+.authority-capacity-feedback span{color:var(--text)}
+.authority-capacity-signout{background:var(--surface-raised);border-color:var(--border);color:var(--text)}
+.authority-capacity-note{color:var(--text-muted)}
+.password-entry-popup{background:var(--surface);color:var(--text)}
+.auth-security-instructions{border-color:var(--border);background:var(--surface-raised);color:var(--text-muted)}
+.auth-security-instructions strong{color:var(--focus)}
+.auth-message{background:var(--surface-raised);border-color:var(--border);color:var(--text)}

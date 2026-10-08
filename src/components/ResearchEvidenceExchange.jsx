@@ -58,7 +58,7 @@ export default function ResearchEvidenceExchange({active,onNavigate}){
  const institutionalRows=useMemo(()=>INSTITUTIONAL_SOURCES.flatMap(source=>(institutional[source.key]||[]).filter(record=>{if(source.key==="documents"){const classification=clean(record?.classification||"Public").toLowerCase();if(["confidential","restricted"].includes(classification))return false;}return true}).map(record=>({...record,_source:source.label}))).sort((a,b)=>timestamp(b)-timestamp(a)),[institutional]);
 
  const openResearch=()=>{setOpen(true);if(onNavigate&&active!=="Research, Statistics and Knowledge"){}};
- return <section className="panel research-evidence-exchange" style={{margin:"12px 0",boxShadow:"none",border:"1px solid rgba(31,90,65,.18)"}}>
+ return <section className="panel research-evidence-exchange" style={{margin:"12px 0",boxShadow:"none",border:"1px solid var(--border)"}}>
    <div className="panel-header">
      <div><span className="eyebrow">INSTITUTIONAL EVIDENCE EXCHANGE</span><h2>Research &amp; Institutional Information</h2><p className="panel-description">Approved and published research information is consumable from every IRPA portal. The Research, Statistics and Knowledge Portal can also consume relevant information exposed by the other institutional portals through the authenticated data layer.</p></div>
      <div className="form-actions">
