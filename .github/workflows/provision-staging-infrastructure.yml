@@ -181,7 +181,7 @@ jobs:
 
           gh pr create \
             --repo "${GITHUB_REPOSITORY}" \
-            --base main \
+            --base fix/separate-staging-deploy-trigger-20261008 \
             --head "$branch" \
             --title "chore: bind dedicated staging DRIVE_KV namespace" \
             --body "Provisioned/resolved the dedicated Cloudflare staging DRIVE_KV namespace and bound its exact namespace ID in wrangler.toml. Production KV ID is explicitly rejected. No Worker deployment is performed by this workflow. Required staging secret names are declared for deploy-time validation.
