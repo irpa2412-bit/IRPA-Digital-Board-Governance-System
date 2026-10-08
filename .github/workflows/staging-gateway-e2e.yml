@@ -35,7 +35,7 @@ jobs:
       - name: Firestore emulator E2E
         run: |
           set -o pipefail
-          npx firebase emulators:exec --project demo-irpa-staging --only firestore "npm --prefix drive-gateway test" | tee e2e-output.ndjson
+          npx firebase emulators:exec --project demo-irpa-staging --only firestore "npm --prefix drive-gateway test && node drive-gateway/tests/e2e-local.mjs && node drive-gateway/tests/mail-invitation.unit.mjs" | tee e2e-output.ndjson
       - if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -196,4 +196,4 @@ jobs:
           curl --fail --silent --show-error --retry 5 --retry-delay 2 "$url" | tee staging-health.json
           grep -q '"ok":true' staging-health.json
 
-# Controlled staging proof after stale Durable Object migration removal — 2026-10-05
+# Controlled Gate 4 proof boundary: upload -> storage -> retrieval -> hash/integrity -> archive paths -> two-signer envelope -> signer persistence -> forced failure/rollback -> invitation transport -> logs -> legacy upload compatibility
