@@ -5,6 +5,7 @@ import InvitationActivation from"./pages/InvitationActivation";
 import { logout } from "./firebase/auth";
 import "./styles/app.css";
 import "./styles/mobile-viewport-containment.css";
+import "./styles/research-portal-readability.css";
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
