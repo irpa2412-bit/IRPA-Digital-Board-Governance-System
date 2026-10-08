@@ -352,98 +352,64 @@
   background:#f8faf9;
   color:#26352f;
 }
-.content-area:not(.dashboard-content-area) .page{
-  color:#26352f;
+.content-area:not(.dashboard-content-area) .page{ color:var(--text);
 }
 .content-area:not(.dashboard-content-area) .page .welcome-panel,
 .content-area:not(.dashboard-content-area) .page .module-panel,
-.content-area:not(.dashboard-content-area) .page .panel{
-  background:#fff;
-  color:#26352f;
-  border:1px solid #dce5e0;
+.content-area:not(.dashboard-content-area) .page .panel{ background:var(--surface); color:var(--text); border:1px solid var(--border);
   box-shadow:0 6px 20px rgba(24,61,45,.055);
 }
 .content-area:not(.dashboard-content-area) .page .welcome-panel h1,
 .content-area:not(.dashboard-content-area) .page .module-header h1,
 .content-area:not(.dashboard-content-area) .page .page-header h1,
 .content-area:not(.dashboard-content-area) .page .panel h2,
-.content-area:not(.dashboard-content-area) .page .panel-header h2{
-  color:#183b2d;
+.content-area:not(.dashboard-content-area) .page .panel-header h2{ color:var(--text);
 }
 .content-area:not(.dashboard-content-area) .page .welcome-panel p,
 .content-area:not(.dashboard-content-area) .page .module-header p,
 .content-area:not(.dashboard-content-area) .page .page-header p,
 .content-area:not(.dashboard-content-area) .page .panel-description,
-.content-area:not(.dashboard-content-area) .page .module-panel>p{
-  color:#65776f;
+.content-area:not(.dashboard-content-area) .page .module-panel>p{ color:var(--text);
 }
-.content-area:not(.dashboard-content-area) .page .form-field label{
-  color:#385248;
+.content-area:not(.dashboard-content-area) .page .form-field label{ color:var(--text);
 }
 .content-area:not(.dashboard-content-area) .page .form-field input,
 .content-area:not(.dashboard-content-area) .page .form-field select,
 .content-area:not(.dashboard-content-area) .page .form-field textarea,
-.content-area:not(.dashboard-content-area) .page .table-search{
-  color:#243b32;
-  background:#fbfdfc;
-  border:1px solid #cbd9d2;
+.content-area:not(.dashboard-content-area) .page .table-search{ color:var(--text); background:var(--surface); border:1px solid var(--border);
 }
 .content-area:not(.dashboard-content-area) .page .form-field input::placeholder,
 .content-area:not(.dashboard-content-area) .page .form-field textarea::placeholder,
-.content-area:not(.dashboard-content-area) .page .table-search::placeholder{
-  color:#7a8b84;
+.content-area:not(.dashboard-content-area) .page .table-search::placeholder{ color:var(--text);
 }
-.content-area:not(.dashboard-content-area) .page th{
-  color:#496258;
+.content-area:not(.dashboard-content-area) .page th{ color:var(--text);
   border-bottom-color:#d4e0da;
 }
-.content-area:not(.dashboard-content-area) .page td{
-  color:#30473d;
+.content-area:not(.dashboard-content-area) .page td{ color:var(--text);
   border-bottom-color:#dce5e0;
 }
 .content-area:not(.dashboard-content-area) .page .table-wrapper,
-.content-area:not(.dashboard-content-area) .page table{
-  background:#fff;
+.content-area:not(.dashboard-content-area) .page table{ background:var(--surface);
 }
-.content-area:not(.dashboard-content-area) .page .detail-grid>div{
-  background:#f8fbf9;
-  border-color:#d6e2dc;
+.content-area:not(.dashboard-content-area) .page .detail-grid>div{ background:var(--surface); border-color:var(--border);
 }
-.content-area:not(.dashboard-content-area) .page .detail-grid span{
-  color:#647970;
+.content-area:not(.dashboard-content-area) .page .detail-grid span{ color:var(--text);
 }
-.content-area:not(.dashboard-content-area) .page .detail-grid strong{
-  color:#27443a;
+.content-area:not(.dashboard-content-area) .page .detail-grid strong{ color:var(--text);
 }
-.content-area:not(.dashboard-content-area) .page .identity-card{
-  background:#f7fbf9;
-  border-color:#d3e0d9;
+.content-area:not(.dashboard-content-area) .page .identity-card{ background:var(--surface); border-color:var(--border);
 }
-.content-area:not(.dashboard-content-area) .page .identity-card span{
-  color:#687d74;
+.content-area:not(.dashboard-content-area) .page .identity-card span{ color:var(--text);
 }
-.content-area:not(.dashboard-content-area) .page .identity-card strong{
-  color:#234438;
+.content-area:not(.dashboard-content-area) .page .identity-card strong{ color:var(--text);
 }
-.content-area:not(.dashboard-content-area) .page .record-details{
-  background:#f8fbf9;
-  border-color:#d6e2dc;
-  color:#30473d;
+.content-area:not(.dashboard-content-area) .page .record-details{ background:var(--surface); border-color:var(--border); color:var(--text);
 }
-.content-area:not(.dashboard-content-area) .page .module-interlink-bar{
-  background:#fff;
-  border-color:#dce5e0;
-  color:#30473d;
+.content-area:not(.dashboard-content-area) .page .module-interlink-bar{ background:var(--surface); border-color:var(--border); color:var(--text);
 }
-.content-area:not(.dashboard-content-area) .page .module-interlink-list button{
-  background:#f5f9f7;
-  border-color:#d6e2dc;
-  color:#30473d;
+.content-area:not(.dashboard-content-area) .page .module-interlink-list button{ background:var(--surface); border-color:var(--border); color:var(--text);
 }
-.content-area:not(.dashboard-content-area) .page .module-interlink-list button.active{
-  background:#eaf3ee;
-  border-color:#a9c5b7;
-  color:#174d36;
+.content-area:not(.dashboard-content-area) .page .module-interlink-list button.active{ background:var(--surface); border-color:var(--border); color:var(--text);
 }
 /* Keep the approved Governance Command Dashboard panels exactly on their existing light treatment. */
 .dashboard-content-area .dashboard-hero,
@@ -456,48 +422,30 @@
 
 /* Readability-first portal cards — light surfaces outside the approved dashboard */
 .content-area:not(.dashboard-content-area) .page .stat-card,
-.content-area:not(.dashboard-content-area) .page .workflow-stage{
-  background:#fff;
-  color:#243b32;
-  border:1px solid #d7e3dd;
+.content-area:not(.dashboard-content-area) .page .workflow-stage{ background:var(--surface); color:var(--text); border:1px solid var(--border);
   box-shadow:0 5px 18px rgba(24,61,45,.055);
 }
-.content-area:not(.dashboard-content-area) .page .stat-card:after{
-  background:#b88618;
+.content-area:not(.dashboard-content-area) .page .stat-card:after{ background:var(--surface);
 }
-.content-area:not(.dashboard-content-area) .page .stat-card span{
-  color:#3f5a4f;
+.content-area:not(.dashboard-content-area) .page .stat-card span{ color:var(--text);
   font-weight:800;
 }
-.content-area:not(.dashboard-content-area) .page .stat-card strong{
-  color:#18382b;
+.content-area:not(.dashboard-content-area) .page .stat-card strong{ color:var(--text);
   font-weight:850;
 }
-.content-area:not(.dashboard-content-area) .page .stat-card small{
-  color:#667a71;
+.content-area:not(.dashboard-content-area) .page .stat-card small{ color:var(--text);
 }
-.content-area:not(.dashboard-content-area) .page .workflow-stage:hover{
-  border-color:#7da992;
+.content-area:not(.dashboard-content-area) .page .workflow-stage:hover{ border-color:var(--border);
   box-shadow:0 7px 22px rgba(24,61,45,.08);
 }
-.content-area:not(.dashboard-content-area) .page .workflow-stage.active-stage{
-  border-color:#b88618;
+.content-area:not(.dashboard-content-area) .page .workflow-stage.active-stage{ border-color:var(--border);
   box-shadow:0 0 0 2px rgba(184,134,24,.12),0 7px 22px rgba(24,61,45,.08);
 }
-.content-area:not(.dashboard-content-area) .page .success-message{
-  background:#edf8f1;
-  color:#145c38;
-  border-color:#b9dbc6;
+.content-area:not(.dashboard-content-area) .page .success-message{ background:var(--surface); color:var(--text); border-color:var(--border);
 }
-.content-area:not(.dashboard-content-area) .page .error-message{
-  background:#fff3f1;
-  color:#8a2f25;
-  border-color:#e4bbb5;
+.content-area:not(.dashboard-content-area) .page .error-message{ background:var(--surface); color:var(--text); border-color:var(--border);
 }
-.content-area:not(.dashboard-content-area) .page .status-badge{
-  background:#e9f5ee;
-  color:#17613d;
-  border:1px solid #bddbc9;
+.content-area:not(.dashboard-content-area) .page .status-badge{ background:var(--surface); color:var(--text); border:1px solid var(--border);
 }
 
 /* IRPA PORTAL SURFACE STANDARD — NO BLACK/DARK WORKSPACE PANELS.
@@ -599,8 +547,7 @@
 .content-area .page,
 .content-area:not(.dashboard-content-area) .page,
 .dashboard-content-area .page{
-  background:transparent!important;
-  color:#20382e!important;
+  background:transparent!important; color:var(--text);
 }
 .content-area .page .welcome-panel,
 .content-area .page .module-panel,
@@ -856,51 +803,36 @@
    across workflow/archive/stat cards. Saturated green is reserved for semantic success,
    not used as a decorative fill for every card. */
 .content-area:not(.dashboard-content-area) .page .stat-card,
-.content-area:not(.dashboard-content-area) .page .workflow-stage{
-  background:#f3f6f4!important;
-  color:#24362f!important;
-  border:1px solid #d7e1dc!important;
+.content-area:not(.dashboard-content-area) .page .workflow-stage{ background:var(--surface); color:var(--text); border:1px solid var(--border);
   box-shadow:0 5px 16px rgba(24,61,45,.05)!important;
 }
 .content-area:not(.dashboard-content-area) .page .stat-card span,
-.content-area:not(.dashboard-content-area) .page .workflow-stage span{
-  color:#355247!important;
+.content-area:not(.dashboard-content-area) .page .workflow-stage span{ color:var(--text);
   font-weight:800!important;
 }
 .content-area:not(.dashboard-content-area) .page .stat-card strong,
-.content-area:not(.dashboard-content-area) .page .workflow-stage strong{
-  color:#173a2b!important;
+.content-area:not(.dashboard-content-area) .page .workflow-stage strong{ color:var(--text);
   font-weight:900!important;
 }
 .content-area:not(.dashboard-content-area) .page .stat-card small,
-.content-area:not(.dashboard-content-area) .page .workflow-stage small{
-  color:#64776e!important;
+.content-area:not(.dashboard-content-area) .page .workflow-stage small{ color:var(--text);
 }
 .content-area:not(.dashboard-content-area) .page .stat-card:hover,
-.content-area:not(.dashboard-content-area) .page .workflow-stage:hover{
-  background:#eaf2ed!important;
-  border-color:#b9d1c2!important;
+.content-area:not(.dashboard-content-area) .page .workflow-stage:hover{ background:var(--surface); border-color:var(--border);
 }
 .content-area:not(.dashboard-content-area) .page .workflow-stage.active-stage,
-.content-area:not(.dashboard-content-area) .page .stat-card.active-stage{
-  background:#e5f0ea!important;
-  border-color:#6d9d81!important;
+.content-area:not(.dashboard-content-area) .page .stat-card.active-stage{ background:var(--surface); border-color:var(--border);
   box-shadow:0 0 0 2px rgba(61,119,83,.09),0 6px 18px rgba(24,61,45,.07)!important;
 }
 .content-area:not(.dashboard-content-area) .page .workflow-stage.active-stage span,
-.content-area:not(.dashboard-content-area) .page .stat-card.active-stage span{
-  color:#214f38!important;
+.content-area:not(.dashboard-content-area) .page .stat-card.active-stage span{ color:var(--text);
 }
 .content-area:not(.dashboard-content-area) .page .workflow-stage.active-stage strong,
-.content-area:not(.dashboard-content-area) .page .stat-card.active-stage strong{
-  color:#123b28!important;
+.content-area:not(.dashboard-content-area) .page .stat-card.active-stage strong{ color:var(--text);
 }
 /* Archive/category cards follow the same light surface rule. */
 .content-area:not(.dashboard-content-area) .page .document-category-card,
-.content-area:not(.dashboard-content-area) .page .archive-card{
-  background:#f3f6f4!important;
-  color:#24362f!important;
-  border-color:#d7e1dc!important;
+.content-area:not(.dashboard-content-area) .page .archive-card{ background:var(--surface); color:var(--text); border-color:var(--border);
 }
 
 /* FINAL PORTAL CARD SIZE STANDARD — compact workflow/archive boxes.
