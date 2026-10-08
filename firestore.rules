@@ -1,17 +1,23 @@
 // ============================================================================
-// 🔴 RED-LINE IRPA READABILITY POLICY — NON-NEGOTIABLE
-// Every written word rendered by the IRPA-DBGS web application shall remain
-// visible and readable. No text may be hidden, obscured, made transparent,
-// or placed on a background treatment that hinders legibility or contrast.
-// This policy applies across every portal, register, form, table, panel,
-// dialog, card, status area and responsive layout. Semantic status colours
-// are permitted only where they do not reduce the readability of the text.
+// 🔴🔴🔴 RED-LINE POLICY — NON-NEGOTIABLE 🔴🔴🔴
 //
-// IMPORTANT: Firestore Security Rules enforce DATA ACCESS and DATA VALIDATION;
-// they cannot directly enforce CSS or UI presentation. This red-line policy
-// is therefore a binding repository/UI requirement and must be enforced in
-// the application's CSS/markup and CI checks, while this marker preserves
-// the requirement alongside the Firebase security rules.
+// EVERY WRITTEN WORD IN THE ENTIRE IRPA-DBGS WEB APP MUST REMAIN
+// VISIBLE, CLEAR AND READABLE.
+//
+// NO TEXT MAY BE:
+//   1. HIDDEN, OBSCURED OR MADE TRANSPARENT;
+//   2. PLACED ON A BACKGROUND THAT HINDERS ITS READABILITY;
+//   3. STYLED SO THAT RECORDS, LABELS, HEADINGS OR VALUES CANNOT
+//      BE READ CLEARLY.
+//
+// SCOPE: EVERY PORTAL, REGISTER, FORM, TABLE, PANEL, CARD, DIALOG,
+// STATUS AREA AND RESPONSIVE VIEW.
+//
+// 🔴 THIS IS A BINDING APPLICATION/UI REQUIREMENT. 🔴
+//
+// Firestore Rules control data access/validation and cannot directly
+// style CSS. Enforcement of this rule must therefore also exist in
+// application markup/CSS and CI checks.
 // ============================================================================
 
 rules_version = '2';
