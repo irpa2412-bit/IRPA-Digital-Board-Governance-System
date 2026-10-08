@@ -19,6 +19,16 @@ const checks=[
  ["Hand raise signalling",fs.readFileSync("src/components/IRPADGBSMeetingRoomMedia.jsx","utf8").includes('type:"hand"')],
  ["Meeting token route",fs.readFileSync("src/main.jsx","utf8").includes("meetingToken")],
  ["Firestore rules untouched by this feature",fs.existsSync("firestore.rules")]
+ ["Meeting gate issues meeting ID",fs.readFileSync("functions/meetingGateway.js","utf8").includes("meetingId,meetingPassword")],
+ ["Meeting gate issues gate password",fs.readFileSync("functions/meetingGateway.js","utf8").includes("meetingPassword=gatePassword")],
+ ["Meeting gate stores password hash only",fs.readFileSync("functions/meetingGateway.js","utf8").includes("passwordHash")],
+ ["Meeting gate has 30-day expiry",fs.readFileSync("functions/meetingGateway.js","utf8").includes("1000*60*60*24*30")],
+ ["Meeting gate is reusable",fs.readFileSync("functions/meetingGateway.js","utf8").includes("reusable:true")],
+ ["Meeting entry validates ID and password",fs.readFileSync("functions/meetingGateway.js","utf8").includes("suppliedMeetingId")&&fs.readFileSync("functions/meetingGateway.js","utf8").includes("suppliedPassword")],
+ ["Meeting facilities panel exists",fs.readFileSync("src/pages/MeetingRoom.jsx","utf8").includes("MEETING FACILITIES & SERVICES")],
+ ["Meeting category controls facilities",fs.readFileSync("src/pages/MeetingRoom.jsx","utf8").includes("meetingCategory")],
+ ["Board Meetings expose Governance Documents",fs.readFileSync("src/pages/MeetingRoom.jsx","utf8").includes("Governance Documents")],
+ ["Meeting auto registration exists",fs.readFileSync("src/pages/MeetingRoom.jsx","utf8").includes("registerSelf")],
 ];
 const failed=checks.filter(([,ok])=>!ok);
 const report={
