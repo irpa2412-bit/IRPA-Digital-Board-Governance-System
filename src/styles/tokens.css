@@ -373,3 +373,84 @@ table td{color:var(--text)}
 .desktop-date-card span{
   color:var(--focus);
 }
+
+/* Authenticated light portal surfaces: Research, Dataset Registry, Finance and Operations. */
+.content-area .page,
+.research-portal-page,
+.finance-portal,
+.finance-accounting-engine,
+.finance-donor-control-cockpit,
+.finance-technology-operations,
+.research-info-card,
+.research-selected-dataset{
+  --surface:#ffffff;
+  --surface-raised:#f4f8f5;
+  --text:#17372b;
+  --text-muted:#526c61;
+  --border:#718a80;
+  --border-strong:#3f6556;
+  --focus:#075f3d;
+  --placeholder:#65776f;
+  --error:#8f2f2a;
+  --success:#0b6b3a;
+}
+.auth-screen,
+.authority-capacity-gate,
+.password-entry-popup{
+  --surface:#07140f;
+  --surface-raised:#0e251b;
+  --text:#f4f8f6;
+  --text-muted:#b9cdc4;
+  --border:#6f8e81;
+  --border-strong:#a5bdb3;
+  --focus:#f3c84b;
+  --placeholder:#829d93;
+  --error:#ffb4ab;
+  --success:#8ad5ae;
+}
+.research-info-card{padding:16px;border:1px solid var(--border);border-radius:12px;background:var(--surface)}
+.research-selected-dataset{margin-top:16px;box-shadow:none}
+.research-portal-page .form-grid>label,
+.research-portal-page .panel>h2,
+.research-portal-page .panel-header h2,
+.research-portal-page .welcome-panel h1{color:var(--text)}
+.research-portal-page .panel-description,
+.research-portal-page .welcome-panel p,
+.research-portal-page .table-subtext{color:var(--text-muted)}
+.research-portal-page .form-grid input,
+.research-portal-page .form-grid select,
+.research-portal-page .form-grid textarea{color:var(--text);background:var(--surface-raised);border-color:var(--border)}
+.research-portal-page .form-grid input::placeholder,
+.research-portal-page .form-grid textarea::placeholder{color:var(--placeholder)}
+.finance-engine-tabs{border-color:var(--border);background:var(--surface-raised)}
+.finance-engine-tabs button{background:var(--surface-raised);color:var(--text);border-color:var(--border)}
+.finance-engine-tabs button.active{background:#0b5fa8;color:#fff;border-color:#2f86cf}
+.finance-engine-card,.finance-formula-card{background:var(--surface);color:var(--text);border-color:var(--border)}
+.finance-engine-card>span,.finance-engine-card>small,.finance-engine-card th{color:var(--text-muted)}
+.finance-engine-card>strong,.finance-formula-card h3,.finance-engine-card h3,.finance-engine-card table,.finance-engine-card td{color:var(--text)}
+.finance-formula-card code{background:var(--surface-raised);color:var(--text)}
+.finance-formula-card ul{color:var(--text-muted)}
+.finance-engine-card input,.finance-engine-card select{background:var(--surface);color:var(--text);border-color:var(--border)}
+.finance-engine-card .form-field label{color:var(--text)}
+.finance-engine-card .secondary-button{background:var(--surface-raised);color:var(--text);border-color:var(--border)}
+.finance-technology-operations .finance-engine-tabs button{background:var(--surface);color:var(--text);border-color:var(--border)}
+.finance-operation-result{background:var(--surface-raised);border-color:var(--border);color:var(--text)}
+.authority-capacity-card{background:var(--surface);color:var(--text);border-color:var(--border-strong)}
+.authority-capacity-kicker,.authority-capacity-feedback strong{color:var(--focus)}
+.authority-capacity-card p,.authority-capacity-note,.authority-capacity-option small{color:var(--text-muted)}
+.authority-capacity-status{border-color:var(--border);background:var(--surface-raised)}
+.authority-capacity-status strong{color:var(--text)}
+.authority-capacity-status small{color:var(--text-muted)}
+.authority-capacity-option{border-color:var(--border);background:var(--surface-raised);color:var(--text)}
+.authority-capacity-option:hover:not(:disabled){border-color:var(--border-strong)}
+.authority-capacity-option.selected{border-color:var(--focus);background:var(--surface);box-shadow:0 0 0 2px var(--focus)}
+.authority-capacity-feedback{border-color:var(--focus);background:var(--surface-raised)}
+.authority-capacity-feedback.error{border-color:var(--error);background:var(--surface-raised)}
+.authority-capacity-feedback.error strong{color:var(--error)}
+.authority-capacity-feedback span{color:var(--text)}
+.authority-capacity-signout{background:var(--surface-raised);border-color:var(--border);color:var(--text)}
+.authority-capacity-note{color:var(--text-muted)}
+.password-entry-popup{background:var(--surface);color:var(--text)}
+.auth-security-instructions{border-color:var(--border);background:var(--surface-raised);color:var(--text-muted)}
+.auth-security-instructions strong{color:var(--focus)}
+.auth-message{background:var(--surface-raised);border-color:var(--border);color:var(--text)}
