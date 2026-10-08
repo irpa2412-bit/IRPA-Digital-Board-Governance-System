@@ -1,6 +1,8 @@
 import fs from "node:fs";
 
 const css=fs.readFileSync(new URL("../src/styles/app.css",import.meta.url),"utf8");
+const tokens=fs.readFileSync(new URL("../src/styles/tokens.css",import.meta.url),"utf8");
+const allCss=css+"\n"+tokens;
 const rules=fs.readFileSync(new URL("../firestore.rules",import.meta.url),"utf8");
 
 const requiredCss=[
@@ -8,10 +10,14 @@ const requiredCss=[
   "#root .content-area .page table tbody tr",
   "#root .content-area .page table tbody td",
   "background:transparent;",
-  "color:var(--text);"
+  "color:var(--text);",
+  "IRPA-DBGS GLOBAL READABILITY CONTRACT — FINAL CASCADE LAYER",
+  "text-rendering:optimizeLegibility;",
+  "line-height:1.55;",
+  "color:var(--text-muted);"
 ];
 for(const marker of requiredCss){
-  if(!css.includes(marker)) throw new Error("Missing app-wide readability guard: "+marker);
+  if(!allCss.includes(marker)) throw new Error("Missing app-wide readability guard: "+marker);
 }
 if(!rules.includes("RED-LINE POLICY — NON-NEGOTIABLE")){
   throw new Error("firestore.rules is missing the red-line readability policy marker.");
@@ -21,7 +27,7 @@ for(const re of [
   /color\s*:\s*transparent\s*;/i,
   /-webkit-text-fill-color\s*:\s*transparent\s*;/i
 ]){
-  if(re.test(css)) throw new Error("Readability policy violation: transparent text styling found: "+re);
+  if(re.test(allCss)) throw new Error("Readability policy violation: transparent text styling found: "+re);
 }
 console.log("App-wide red-line readability policy check passed.");
 console.log("Coverage: authenticated desktop portals + mobile/Capacitor portal views.");
