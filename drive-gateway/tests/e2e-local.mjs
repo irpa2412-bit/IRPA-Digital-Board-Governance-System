@@ -179,6 +179,18 @@ try {
   log("cleanup-job-finds-and-removes-pending-record", { httpStatus: cleanup.status, response: cleanupText, stateAfter: cleanupState.body });
   if (!cleanup.ok || (cleanupState.body?.pending || []).length !== 0) throw new Error("Cleanup job did not clear the pending rollback.");
 
+  const legacyForm = new FormData();
+  legacyForm.set("file", new Blob([pdf], { type: "application/pdf" }), "legacy-gate4.pdf");
+  legacyForm.set("documentId", "GATE4-LEGACY-001");
+  legacyForm.set("title", "Gate 4 Legacy Upload");
+  legacyForm.set("classification", "Restricted");
+  legacyForm.set("archives", JSON.stringify(["administrative-documents", "board-governance"]));
+  const legacyUpload = await fetch(`${WORKER}/api/documents`, { method: "POST", headers: { Authorization: "Bearer test:authorized-user:authorized@example.test" }, body: legacyForm });
+  const legacyText = await legacyUpload.text();
+  let legacyBody = {}; try { legacyBody = legacyText ? JSON.parse(legacyText) : {}; } catch { legacyBody = { raw: legacyText }; }
+  log("legacy-upload-compatible", { httpStatus: legacyUpload.status, response: legacyBody });
+  if (legacyUpload.status !== 201 || legacyBody?.archives?.length !== 2 || legacyBody.archives.some(x => !String(x.path || "").startsWith("IRPA Governance System/Document Archives/"))) throw new Error("Legacy upload/archive-path assertion failed.");
+
   const envelope = await request("/api/envelopes", { body: { documentId, signers: [ { name: "Staging Signer One", email: "signer1@example.test", order: 1 }, { name: "Staging Signer Two", email: "signer2@example.test", order: 2 } ], archives: ["legal-contracts", "board-governance"] } });
   log("two-signer-envelope-created", { httpStatus: envelope.status, response: envelope.body });
   if (envelope.status !== 201 || envelope.body?.tokens?.length !== 2 || envelope.body?.invitations?.every(x => x.status === "Sent") !== true) throw new Error("Two-signer envelope creation/invitation assertion failed.");
