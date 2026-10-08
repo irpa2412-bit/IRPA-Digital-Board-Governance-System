@@ -2,7 +2,7 @@
 
 Branch: `audit/app-wide-readability-form-layout-20261008`
 
-This is a source audit of literal text/background/border colour declarations still present after the current migration. Shadows are excluded unless they are part of a background declaration. The grouping is selector-based; a selector may serve more than one route.
+Literal text/background/border colours still present after the current migration. `box-shadow` colours are excluded. Grouping is selector-based and therefore not a route map.
 
 ## Authentication / invitation / password (21 rules)
 
@@ -13,18 +13,18 @@ This is a source audit of literal text/background/border colour declarations sti
 - `.authority-card span` → color:#d6a52c
 - `.authority-card strong` → color:#e3eee9
 - `.authority-card small` → color:#779188
-- `.topbar-access-category [aria-label="Login category"]>span` → color:#e7f4ee!important
+- `.topbar-access-category [aria-label="Login category"]>span` → color:#e7f4ee
 - `.topbar-access-category [aria-label="Login category"] span` → color:#f7cf61
 - `.topbar-access-category [aria-label="Login category"] small,.topbar-access-category [aria-label="Login category"] strong` → color:#e7f4ee
 - `.auth-logo-wrap` → background:#fff
 - `/* IRPA portal-wide light workspace — applies to authenticated portals, never to the approved dashboard */ .content-area:not(.dashboard-content-area)` → background:#f8faf9; color:#26352f
 - `/* IRPA PORTAL SURFACE STANDARD — NO BLACK/DARK WORKSPACE PANELS.    Authenticated portal content must use the approved pale-white presentation.    Sidebar, topbar and authentication shell remain architectural chrome. */ .content-area` → background:#f8faf9; color:#26352f
-- `/* FINAL IRPA PORTAL COLOUR STANDARD — UNIFORM LIGHT GREEN THROUGHOUT ALL PORTALS.    Authentication, fixed sidebar and topbar remain separate architectural chrome.    Every authenticated portal workspace uses the same light-green surface family. */ .content-area, .content-area:not(.dashboard-content-area), .dashboard-content-area` → background:#edf7f1!important; color:#20382e!important
-- `/* CONTROLLED DOCUMENT UPLOAD — never use the dark application surface here.    This is a light operational form within the authenticated portal. */ .content-area:not(.dashboard-content-area) .controlled-document-upload-panel` → background:#ffffff!important; color:#26352f!important; border:1px solid #d7e1dc!important
-- `.invitation-edit-notice` → color:#174f34!important; background:#e8f6ee!important
-- `.authority-card` → background:rgba(255,255,255,.075)!important; border:1px solid rgba(255,255,255,.14)!important
-- `.authority-card span` → color:#f7cf61!important
-- `.authority-card strong,.authority-card small` → color:#e7f4ee!important
+- `/* FINAL IRPA PORTAL COLOUR STANDARD — UNIFORM LIGHT GREEN THROUGHOUT ALL PORTALS.    Authentication, fixed sidebar and topbar remain separate architectural chrome.    Every authenticated portal workspace uses the same light-green surface family. */ .content-area, .content-area:not(.dashboard-content-area), .dashboard-content-area` → background:#edf7f1; color:#20382e
+- `/* CONTROLLED DOCUMENT UPLOAD — never use the dark application surface here.    This is a light operational form within the authenticated portal. */ .content-area:not(.dashboard-content-area) .controlled-document-upload-panel` → background:#ffffff; color:#26352f; border:1px solid #d7e1dc
+- `.invitation-edit-notice` → color:#174f34; background:#e8f6ee
+- `.authority-card` → background:rgba(255,255,255,.075); border:1px solid rgba(255,255,255,.14)
+- `.authority-card span` → color:#f7cf61
+- `.authority-card strong,.authority-card small` → color:#e7f4ee
 - `/* WEB APP NAVIGATION ROLLER — 2026-09-25    Desktop-only navigation control. It exposes the authenticated user's    available web-app modules, while the in-portal roller remains mobile-only. */ .desktop-webapp-navigation-roller` → border:1px solid #2f86cf; background:#062b4c; color:#fff
 - `/* PAGE BACK/NEXT NAVIGATION — 2026-09-26    Shared navigation surface for every authenticated live portal page.    Routing remains controlled by the existing Shell/data-gate handlers. */ .page-back-next-navigation` → border:1px solid #c9d8e5; background:#f7fafc
 
@@ -34,42 +34,42 @@ _None._
 
 ## Finance / procurement (6 rules)
 
-- `/* QUICK ACCESS CATEGORY COLOUR SYSTEM — muted fills, white/dark readable text.    Purple = people; teal = process/operations; amber = risk/compliance;    blue = information/reporting; coral = finance/procurement. */ .content-area .page .dashboard-function-button.function-category-people` → background:#eee9f7!important; color:#3f3157!important
-- `.content-area .page .dashboard-function-button.function-category-finance` → background:#f8e8e3!important; color:#673b31!important
-- `.content-area .page .dashboard-function-button.function-category-finance small` → color:#7d554a!important
-- `.content-area .page .dashboard-function-button.function-category-finance .dashboard-function-icon` → color:#b05b46!important; background:#efd2c8!important
-- `.content-area .page .dashboard-function-button.function-category-finance:hover` → background:#f3ddd6!important
-- `.dashboard-content-area .dashboard-function-button.function-category-finance .dashboard-function-icon` → color:#9d5656!important
+- `/* QUICK ACCESS CATEGORY COLOUR SYSTEM — muted fills, white/dark readable text.    Purple = people; teal = process/operations; amber = risk/compliance;    blue = information/reporting; coral = finance/procurement. */ .content-area .page .dashboard-function-button.function-category-people` → background:#eee9f7; color:#3f3157
+- `.content-area .page .dashboard-function-button.function-category-finance` → background:#f8e8e3; color:#673b31
+- `.content-area .page .dashboard-function-button.function-category-finance small` → color:#7d554a
+- `.content-area .page .dashboard-function-button.function-category-finance .dashboard-function-icon` → color:#b05b46; background:#efd2c8
+- `.content-area .page .dashboard-function-button.function-category-finance:hover` → background:#f3ddd6
+- `.dashboard-content-area .dashboard-function-button.function-category-finance .dashboard-function-icon` → color:#9d5656
 
 ## Signature / document / PDF (27 rules)
 
-- `/* Controlled Document primary action — light IRPA green and slightly enlarged. */ .controlled-document-open-button` → background:#dcefe4!important; border:1px solid #9fc9b0!important; color:#17613d!important
-- `.controlled-document-open-button:hover` → background:#cce7d7!important; color:#124f32!important
-- `/* Signature specimen controls — maintain readable contrast on the light portal surface. */ .specimen-clear-button` → background:#eef2f0!important; border:1px solid #aebdb5!important; color:#24362f!important
-- `/* Document archive routing information — neutral light surface.    This is instructional content, not a success/status message. */ .archive-routing-panel` → background:#f8faf9!important; color:#24362f!important; border:1px solid #d7e1dc!important
-- `.content-area:not(.dashboard-content-area) .controlled-document-upload-panel h2` → color:#183b2d!important
-- `.content-area:not(.dashboard-content-area) .controlled-document-upload-panel .panel-description` → color:#65776f!important
-- `.content-area:not(.dashboard-content-area) .controlled-document-upload-panel .form-field label` → color:#385248!important
-- `.content-area:not(.dashboard-content-area) .controlled-document-upload-panel .form-field input, .content-area:not(.dashboard-content-area) .controlled-document-upload-panel .form-field select, .content-area:not(.dashboard-content-area) .controlled-document-upload-panel .form-field textarea` → background:#fbfdfc!important; color:#243b32!important; border:1px solid #cbd9d2!important
-- `.content-area:not(.dashboard-content-area) .controlled-document-upload-panel .muted` → color:#65776f!important
+- `/* Controlled Document primary action — light IRPA green and slightly enlarged. */ .controlled-document-open-button` → background:#dcefe4; border:1px solid #9fc9b0; color:#17613d
+- `.controlled-document-open-button:hover` → background:#cce7d7; color:#124f32
+- `/* Signature specimen controls — maintain readable contrast on the light portal surface. */ .specimen-clear-button` → background:#eef2f0; border:1px solid #aebdb5; color:#24362f
+- `/* Document archive routing information — neutral light surface.    This is instructional content, not a success/status message. */ .archive-routing-panel` → background:#f8faf9; color:#24362f; border:1px solid #d7e1dc
+- `.content-area:not(.dashboard-content-area) .controlled-document-upload-panel h2` → color:#183b2d
+- `.content-area:not(.dashboard-content-area) .controlled-document-upload-panel .panel-description` → color:#65776f
+- `.content-area:not(.dashboard-content-area) .controlled-document-upload-panel .form-field label` → color:#385248
+- `.content-area:not(.dashboard-content-area) .controlled-document-upload-panel .form-field input, .content-area:not(.dashboard-content-area) .controlled-document-upload-panel .form-field select, .content-area:not(.dashboard-content-area) .controlled-document-upload-panel .form-field textarea` → background:#fbfdfc; color:#243b32; border:1px solid #cbd9d2
+- `.content-area:not(.dashboard-content-area) .controlled-document-upload-panel .muted` → color:#65776f
 - `.signature-portal-nav .signature-nav-button` → border:1px solid #456d5b; background:#10291f; color:#d9ebe3
 - `.signature-portal-nav .signature-nav-button:hover` → background:#17442f; color:#fff
 - `.signature-portal-nav .signature-nav-button.active` → background:#d6a52c; color:#07140f
-- `.signature-profile-primary-button` → background:#187343!important; border:1px solid #4b9a70!important; color:#fff!important
-- `.signature-profile-primary-button:hover` → background:#208b52!important
-- `.signature-profile-secondary-button` → background:#102f25!important; border:1px solid #5a806d!important; color:#dff1e8!important
-- `.signature-profile-secondary-button:hover` → background:#17442f!important; color:#fff!important
-- `.signature-portal-nav .signature-nav-button` → border:1px solid #a9c9b8!important; background:#e8f4ed!important; color:#174d36!important
-- `.signature-portal-nav .signature-nav-button:hover, .signature-portal-nav .signature-nav-button:focus-visible, .signature-portal-nav .signature-nav-button.active` → background:#dceee4!important; color:#123f2d!important
-- `/* PORTAL TAB BLUE STATE — only the portal currently in use becomes blue.    Ordinary dashboard/action buttons retain their component-specific original colours. */ .content-area .page .unified-control-tab.active, .content-area .page .unified-control-tab[aria-selected="true"], .content-area .page .signature-portal-nav .signature-nav-button.active, .content-area .page .signature-portal-nav .signature-nav-button[aria-selected="true"]` → background:#0b5fa8!important; color:#fff!important
-- `.content-area .page .unified-control-tab.active *, .content-area .page .unified-control-tab[aria-selected="true"] *, .content-area .page .signature-portal-nav .signature-nav-button.active *, .content-area .page .signature-portal-nav .signature-nav-button[aria-selected="true"] *` → color:#fff!important
-- `/* FINAL CROSS-APP CONTROL SURFACE OVERRIDE — consistent black inactive / IRPA-green active language    for navigation/action button families while preserving each component's functional dimensions. */ .content-area .page .module-interlink-list button, .content-area .page .workflow-portal-parent, .content-area .page .workflow-portal-children button, .content-area .page .dashboard-function-button, .content-area .page .signature-profile-primary-button, .content-area .page .signature-profile-secondary-button` → background:#0b5fa8!important; color:#ffffff!important
-- `.content-area .page .module-interlink-list button:hover, .content-area .page .workflow-portal-parent:hover, .content-area .page .workflow-portal-children button:hover, .content-area .page .dashboard-function-button:hover, .content-area .page .signature-profile-primary-button:hover, .content-area .page .signature-profile-secondary-button:hover` → background:#1672bf!important; color:#ffffff!important
-- `.content-area .page .signature-profile-primary-button` → background:#0b5fa8!important; color:#ffffff!important
-- `.content-area .page .signature-profile-secondary-button` → background:#0b5fa8!important; color:#ffffff!important
-- `/* Preserve original button artwork; labels/text remain white as requested. */ .content-area .page .unified-control-tab, .content-area .page .signature-portal-nav .signature-nav-button, .content-area .page .dashboard-function-button, .content-area .page .signature-profile-primary-button, .content-area .page .signature-profile-secondary-button, .content-area .page .form-actions button:not(.danger-button):not(.delete-button), .content-area .page button[type="submit"]:not(.danger-button):not(.delete-button)` → color:#fff!important
-- `.dashboard-desktop-view .unified-control-tab.active,   .dashboard-desktop-view .unified-control-tab[aria-selected="true"],   .dashboard-desktop-view .signature-portal-nav .signature-nav-button.active,   .dashboard-desktop-view .signature-portal-nav .signature-nav-button[aria-selected="true"]` → background:#0b5fa8!important; background-color:#0b5fa8!important; color:#fff!important
-- `.dashboard-desktop-view .unified-control-tab.active *,   .dashboard-desktop-view .unified-control-tab[aria-selected="true"] *,   .dashboard-desktop-view .signature-portal-nav .signature-nav-button.active *,   .dashboard-desktop-view .signature-portal-nav .signature-nav-button[aria-selected="true"] *` → color:#fff!important
+- `.signature-profile-primary-button` → background:#187343; border:1px solid #4b9a70; color:#fff
+- `.signature-profile-primary-button:hover` → background:#208b52
+- `.signature-profile-secondary-button` → background:#102f25; border:1px solid #5a806d; color:#dff1e8
+- `.signature-profile-secondary-button:hover` → background:#17442f; color:#fff
+- `.signature-portal-nav .signature-nav-button` → border:1px solid #a9c9b8; background:#e8f4ed; color:#174d36
+- `.signature-portal-nav .signature-nav-button:hover, .signature-portal-nav .signature-nav-button:focus-visible, .signature-portal-nav .signature-nav-button.active` → background:#dceee4; color:#123f2d
+- `/* PORTAL TAB BLUE STATE — only the portal currently in use becomes blue.    Ordinary dashboard/action buttons retain their component-specific original colours. */ .content-area .page .unified-control-tab.active, .content-area .page .unified-control-tab[aria-selected="true"], .content-area .page .signature-portal-nav .signature-nav-button.active, .content-area .page .signature-portal-nav .signature-nav-button[aria-selected="true"]` → background:#0b5fa8; color:#fff
+- `.content-area .page .unified-control-tab.active *, .content-area .page .unified-control-tab[aria-selected="true"] *, .content-area .page .signature-portal-nav .signature-nav-button.active *, .content-area .page .signature-portal-nav .signature-nav-button[aria-selected="true"] *` → color:#fff
+- `/* FINAL CROSS-APP CONTROL SURFACE OVERRIDE — consistent black inactive / IRPA-green active language    for navigation/action button families while preserving each component's functional dimensions. */ .content-area .page .module-interlink-list button, .content-area .page .workflow-portal-parent, .content-area .page .workflow-portal-children button, .content-area .page .dashboard-function-button, .content-area .page .signature-profile-primary-button, .content-area .page .signature-profile-secondary-button` → background:#0b5fa8; color:#ffffff
+- `.content-area .page .module-interlink-list button:hover, .content-area .page .workflow-portal-parent:hover, .content-area .page .workflow-portal-children button:hover, .content-area .page .dashboard-function-button:hover, .content-area .page .signature-profile-primary-button:hover, .content-area .page .signature-profile-secondary-button:hover` → background:#1672bf; color:#ffffff
+- `.content-area .page .signature-profile-primary-button` → background:#0b5fa8; color:#ffffff
+- `.content-area .page .signature-profile-secondary-button` → background:#0b5fa8; color:#ffffff
+- `/* Preserve original button artwork; labels/text remain white as requested. */ .content-area .page .unified-control-tab, .content-area .page .signature-portal-nav .signature-nav-button, .content-area .page .dashboard-function-button, .content-area .page .signature-profile-primary-button, .content-area .page .signature-profile-secondary-button, .content-area .page .form-actions button:not(.danger-button):not(.delete-button), .content-area .page button[type="submit"]:not(.danger-button):not(.delete-button)` → color:#fff
+- `.dashboard-desktop-view .unified-control-tab.active,   .dashboard-desktop-view .unified-control-tab[aria-selected="true"],   .dashboard-desktop-view .signature-portal-nav .signature-nav-button.active,   .dashboard-desktop-view .signature-portal-nav .signature-nav-button[aria-selected="true"]` → background:#0b5fa8; background-color:#0b5fa8; color:#fff
+- `.dashboard-desktop-view .unified-control-tab.active *,   .dashboard-desktop-view .unified-control-tab[aria-selected="true"] *,   .dashboard-desktop-view .signature-portal-nav .signature-nav-button.active *,   .dashboard-desktop-view .signature-portal-nav .signature-nav-button[aria-selected="true"] *` → color:#fff
 
 ## Authority / governance (339 rules)
 
@@ -164,95 +164,95 @@ _None._
 - `.content-area .page .dashboard-gauge>span:not(.dashboard-gauge-icon), .content-area .page .dashboard-function-button>span, .content-area .page .mobile-stat-card span` → color:#30473d
 - `.content-area .page .dashboard-gauge>strong, .content-area .page .dashboard-function-button>b, .content-area .page .mobile-stat-card strong` → color:#18382b
 - `.content-area .page .mobile-dashboard-search input` → background:#fff; color:#243b32
-- `.content-area .page .welcome-panel, .content-area .page .module-panel, .content-area .page .panel, .content-area .page .stat-card, .content-area .page .workflow-stage, .content-area .page .dashboard-hero, .content-area .page .dashboard-gauge, .content-area .page .dashboard-function-button, .content-area .page .dashboard-feed, .content-area .page .detail-grid>div, .content-area .page .identity-card, .content-area .page .record-details, .content-area .page .table-wrapper, .content-area .page table, .content-area .page .module-interlink-bar` → background:#e5f3eb!important; color:#20382e!important
-- `.content-area .page .dashboard-gauge-icon` → background:#d4eadc!important; color:#17613d!important
-- `.content-area .page h1, .content-area .page h2, .content-area .page h3, .content-area .page .panel-header h2, .content-area .page .dashboard-section-heading, .content-area .page .dashboard-feed-title, .content-area .page .dashboard-gauge>strong, .content-area .page .dashboard-function-button>span, .content-area .page .stat-card strong` → color:#173b2a!important
-- `.content-area .page p, .content-area .page small, .content-area .page .panel-description, .content-area .page .dashboard-hero p, .content-area .page .dashboard-gauge>small, .content-area .page .dashboard-function-button>small, .content-area .page .dashboard-empty, .content-area .page .stat-card small` → color:#4f695d!important
-- `/* FINAL CARD/TAB STANDARD — light IRPA green surfaces with pale-white wording.    Applies to dashboard cards, quick-access tiles, stat cards and equivalent portal tabs. */ .content-area .page .stat-card, .content-area .page .workflow-stage, .content-area .page .dashboard-gauge, .content-area .page .dashboard-function-button, .content-area .page .dashboard-feed` → background:#347d55!important; color:#f7fff9!important; border:1px solid #5fa77b!important
-- `.content-area .page .stat-card span, .content-area .page .dashboard-gauge>span:not(.dashboard-gauge-icon), .content-area .page .dashboard-function-button>span, .content-area .page .dashboard-feed-title` → color:#f7fff9!important
-- `.content-area .page .stat-card strong, .content-area .page .dashboard-gauge>strong` → color:#ffffff!important
-- `.content-area .page .stat-card small, .content-area .page .dashboard-gauge>small, .content-area .page .dashboard-function-button>small, .content-area .page .dashboard-empty` → color:#e8f5ed!important
-- `.content-area .page .dashboard-function-button>b` → color:#ffffff!important
-- `.content-area .page .dashboard-gauge>b` → color:#f7fff9!important
-- `.content-area .page .dashboard-gauge-icon, .content-area .page .dashboard-function-icon` → color:#ffffff!important; background:rgba(255,255,255,.16)!important
-- `.content-area .page .stat-card:hover, .content-area .page .workflow-stage:hover, .content-area .page .dashboard-gauge:hover, .content-area .page .dashboard-function-button:hover` → background:#3b895f!important
-- `.content-area .page .workflow-stage.active-stage, .content-area .page .dashboard-gauge.active, .content-area .page .dashboard-function-button.active` → background:#2d704c!important
-- `/* IRPA TAB/CARD STATUS PALETTE — adopt the approved deep-navy + neutral hierarchy.    Positive/active/value-bearing cards use #0C447C; zero-value/inactive cards use a light neutral.    Status colours remain reserved for their semantic meaning (success, warning, destructive). */ .content-area .page .stat-card.value-card, .content-area .page .dashboard-gauge.value-card, .content-area .page .dashboard-function-button.value-card` → background:#0C447C!important; color:#fff!important
-- `.content-area .page .stat-card.value-card span, .content-area .page .stat-card.value-card strong, .content-area .page .stat-card.value-card small, .content-area .page .dashboard-gauge.value-card *, .content-area .page .dashboard-function-button.value-card *` → color:#fff!important
-- `.content-area .page .stat-card.zero-value-card, .content-area .page .dashboard-gauge.zero-value-card, .content-area .page .dashboard-function-button.zero-value-card` → background:#f2f4f3!important; color:#34463e!important
-- `.content-area .page .stat-card.zero-value-card span, .content-area .page .stat-card.zero-value-card strong, .content-area .page .stat-card.zero-value-card small, .content-area .page .dashboard-gauge.zero-value-card *, .content-area .page .dashboard-function-button.zero-value-card *` → color:#34463e!important
-- `.content-area .page .stat-card.zero-value-card strong, .content-area .page .dashboard-gauge.zero-value-card strong` → color:#24362f!important
-- `/* Functional access tabs use the same deep-navy #0C447C treatment; zero-value metric cards remain neutral. */ .content-area .page .dashboard-function-button` → background:#0C447C!important; color:#fff!important
-- `.content-area .page .dashboard-function-button span, .content-area .page .dashboard-function-button small, .content-area .page .dashboard-function-button b` → color:#fff!important
-- `.content-area .page .dashboard-function-button:hover` → background:#0b3d70!important
-- `.content-area .page .dashboard-function-button.function-category-process` → background:#e3f2f0!important; color:#234e4a!important
-- `.content-area .page .dashboard-function-button.function-category-risk` → background:#f7efdc!important; color:#654d20!important
-- `.content-area .page .dashboard-function-button.function-category-information` → background:#e6eff8!important; color:#274a68!important
-- `.content-area .page .dashboard-function-button.function-category-people small` → color:#675878!important
-- `.content-area .page .dashboard-function-button.function-category-process small` → color:#4c6f6b!important
-- `.content-area .page .dashboard-function-button.function-category-risk small` → color:#7b663e!important
-- `.content-area .page .dashboard-function-button.function-category-information small` → color:#58738d!important
-- `.content-area .page .dashboard-function-button.function-category-people .dashboard-function-icon` → color:#6f4aa1!important; background:#e2d8f0!important
-- `.content-area .page .dashboard-function-button.function-category-process .dashboard-function-icon` → color:#287d75!important; background:#d2e9e5!important
-- `.content-area .page .dashboard-function-button.function-category-risk .dashboard-function-icon` → color:#a06b12!important; background:#f0dfb8!important
-- `.content-area .page .dashboard-function-button.function-category-information .dashboard-function-icon` → color:#3974a7!important; background:#d4e4f2!important
-- `.content-area .page .dashboard-function-button.function-category-people:hover` → background:#e7def2!important
-- `.content-area .page .dashboard-function-button.function-category-process:hover` → background:#d9ece9!important
-- `.content-area .page .dashboard-function-button.function-category-risk:hover` → background:#f3e6c7!important
-- `.content-area .page .dashboard-function-button.function-category-information:hover` → background:#dce9f5!important
-- `/* GOVERNANCE DASHBOARD READABILITY STANDARD — all functional tabs/cards use    light surfaces with dark readable wording. Category colour is carried by    the icon/accent rather than a saturated full-card background. */ .dashboard-content-area .dashboard-function-button` → background:#ffffff!important; color:#24362f!important; border:1px solid #d7e1dc!important
-- `.dashboard-content-area .dashboard-function-button>span` → color:#203a30!important
-- `.dashboard-content-area .dashboard-function-button>small` → color:#52675e!important
-- `.dashboard-content-area .dashboard-function-button>b` → color:#587269!important
-- `.dashboard-content-area .dashboard-function-button:hover` → background:#f4f8f6!important
-- `.dashboard-content-area .dashboard-function-button.function-category-people .dashboard-function-icon` → color:#6b5599!important
-- `.dashboard-content-area .dashboard-function-button.function-category-process .dashboard-function-icon` → color:#247765!important
-- `.dashboard-content-area .dashboard-function-button.function-category-risk .dashboard-function-icon` → color:#a96f2d!important
-- `.dashboard-content-area .dashboard-function-button.function-category-information .dashboard-function-icon` → color:#326d9f!important
-- `/* Dashboard lower information panels are informational, not success states. */ .dashboard-content-area .dashboard-feed` → background:#ffffff!important; color:#263a32!important; border:1px solid #d7e1dc!important
-- `.dashboard-content-area .dashboard-feed-title` → color:#203a30!important
-- `.dashboard-content-area .dashboard-feed-title button` → color:#326d9f!important
-- `.dashboard-content-area .dashboard-empty` → color:#596d64!important
-- `/* DASHBOARD READABILITY CORRECTION — final specificity override.    Dashboard cards use light surfaces; all primary labels and descriptions must remain dark/readable. */ .content-area.dashboard-content-area .page .dashboard-gauge, .content-area.dashboard-content-area .page .dashboard-function-button, .content-area.dashboard-content-area .page .dashboard-feed` → background:#ffffff!important; color:#24362f!important
-- `.content-area.dashboard-content-area .page .dashboard-gauge>span:not(.dashboard-gauge-icon), .content-area.dashboard-content-area .page .dashboard-function-button>span, .content-area.dashboard-content-area .page .dashboard-feed-title` → color:#203a30!important
-- `.content-area.dashboard-content-area .page .dashboard-gauge>strong, .content-area.dashboard-content-area .page .dashboard-function-button>b` → color:#24362f!important
-- `.content-area.dashboard-content-area .page .dashboard-gauge>small, .content-area.dashboard-content-area .page .dashboard-function-button>small, .content-area.dashboard-content-area .page .dashboard-empty` → color:#52675e!important
-- `.content-area.dashboard-content-area .page .dashboard-function-button .dashboard-function-icon, .content-area.dashboard-content-area .page .dashboard-gauge .dashboard-gauge-icon` → color:#326d9f!important; background:#eef4f1!important
-- `.content-area.dashboard-content-area .page .dashboard-feed-title button` → color:#326d9f!important
-- `/* FINAL DASHBOARD TEXT CONTRAST — force readable wording on every dashboard tile/feed.    Decorative category accents remain; typography is never pale on pale surfaces. */ .dashboard-content-area .dashboard-gauge, .dashboard-content-area .dashboard-function-button` → background:#ffffff!important; color:#182a22!important
-- `.dashboard-content-area .dashboard-gauge>span:not(.dashboard-gauge-icon), .dashboard-content-area .dashboard-function-button>span` → color:#182a22!important
-- `.dashboard-content-area .dashboard-gauge>strong, .dashboard-content-area .dashboard-function-button>b` → color:#14231d!important
-- `.dashboard-content-area .dashboard-gauge>small, .dashboard-content-area .dashboard-function-button>small` → color:#3f5149!important
-- `.dashboard-content-area .dashboard-gauge .dashboard-gauge-icon, .dashboard-content-area .dashboard-function-button .dashboard-function-icon` → background:#edf3f0!important; color:#245f48!important
-- `.dashboard-content-area .dashboard-feed` → background:#ffffff!important; color:#182a22!important; border:1px solid #d7e1dc!important
-- `.dashboard-content-area .dashboard-feed .dashboard-feed-title, .dashboard-content-area .dashboard-feed .dashboard-feed-title span` → color:#182a22!important
-- `.dashboard-content-area .dashboard-feed .dashboard-feed-title button` → color:#245f48!important
-- `.dashboard-content-area .dashboard-feed .dashboard-empty` → color:#3f5149!important
-- `.content-area .page .module-interlink-list button.active, .content-area .page .workflow-portal-parent.active, .content-area .page .workflow-portal-children button.active, .content-area .page .dashboard-function-button.active` → background:#0b5fa8!important; color:#ffffff!important
-- `.content-area .page .dashboard-function-button` → color:#ffffff!important
-- `.content-area .page .dashboard-function-button>span, .content-area .page .dashboard-function-button>small, .content-area .page .dashboard-function-button>b` → color:#ffffff!important
-- `/* Prevent special dashboard tiles from reverting to unrelated button palettes. */ .content-area .page .dashboard-function-button` → background:#0b5fa8!important; border:1px solid #2f86cf!important; color:#ffffff!important
-- `.content-area .page .dashboard-function-button:hover` → background:#1672bf!important; color:#ffffff!important
-- `.content-area .page .dashboard-function-button.active` → background:#0b5fa8!important; color:#ffffff!important
-- `.dashboard-content-area` → background:linear-gradient(180deg,#eef6f1 0%,#f7faf8 46%,#edf5f1 100%)!important
-- `.dashboard-content-area .dashboard-hero` → border:1px solid #c8ddd1!important; background:linear-gradient(135deg,#073c2a 0%,#0d5b40 58%,#154f3c 100%)!important; color:#fff!important
+- `.content-area .page .welcome-panel, .content-area .page .module-panel, .content-area .page .panel, .content-area .page .stat-card, .content-area .page .workflow-stage, .content-area .page .dashboard-hero, .content-area .page .dashboard-gauge, .content-area .page .dashboard-function-button, .content-area .page .dashboard-feed, .content-area .page .detail-grid>div, .content-area .page .identity-card, .content-area .page .record-details, .content-area .page .table-wrapper, .content-area .page table, .content-area .page .module-interlink-bar` → background:#e5f3eb; color:#20382e
+- `.content-area .page .dashboard-gauge-icon` → background:#d4eadc; color:#17613d
+- `.content-area .page h1, .content-area .page h2, .content-area .page h3, .content-area .page .panel-header h2, .content-area .page .dashboard-section-heading, .content-area .page .dashboard-feed-title, .content-area .page .dashboard-gauge>strong, .content-area .page .dashboard-function-button>span, .content-area .page .stat-card strong` → color:#173b2a
+- `.content-area .page p, .content-area .page small, .content-area .page .panel-description, .content-area .page .dashboard-hero p, .content-area .page .dashboard-gauge>small, .content-area .page .dashboard-function-button>small, .content-area .page .dashboard-empty, .content-area .page .stat-card small` → color:#4f695d
+- `/* FINAL CARD/TAB STANDARD — light IRPA green surfaces with pale-white wording.    Applies to dashboard cards, quick-access tiles, stat cards and equivalent portal tabs. */ .content-area .page .stat-card, .content-area .page .workflow-stage, .content-area .page .dashboard-gauge, .content-area .page .dashboard-function-button, .content-area .page .dashboard-feed` → background:#347d55; color:#f7fff9; border:1px solid #5fa77b
+- `.content-area .page .stat-card span, .content-area .page .dashboard-gauge>span:not(.dashboard-gauge-icon), .content-area .page .dashboard-function-button>span, .content-area .page .dashboard-feed-title` → color:#f7fff9
+- `.content-area .page .stat-card strong, .content-area .page .dashboard-gauge>strong` → color:#ffffff
+- `.content-area .page .stat-card small, .content-area .page .dashboard-gauge>small, .content-area .page .dashboard-function-button>small, .content-area .page .dashboard-empty` → color:#e8f5ed
+- `.content-area .page .dashboard-function-button>b` → color:#ffffff
+- `.content-area .page .dashboard-gauge>b` → color:#f7fff9
+- `.content-area .page .dashboard-gauge-icon, .content-area .page .dashboard-function-icon` → color:#ffffff; background:rgba(255,255,255,.16)
+- `.content-area .page .stat-card:hover, .content-area .page .workflow-stage:hover, .content-area .page .dashboard-gauge:hover, .content-area .page .dashboard-function-button:hover` → background:#3b895f
+- `.content-area .page .workflow-stage.active-stage, .content-area .page .dashboard-gauge.active, .content-area .page .dashboard-function-button.active` → background:#2d704c
+- `/* IRPA TAB/CARD STATUS PALETTE — adopt the approved deep-navy + neutral hierarchy.    Positive/active/value-bearing cards use #0C447C; zero-value/inactive cards use a light neutral.    Status colours remain reserved for their semantic meaning (success, warning, destructive). */ .content-area .page .stat-card.value-card, .content-area .page .dashboard-gauge.value-card, .content-area .page .dashboard-function-button.value-card` → background:#0C447C; color:#fff
+- `.content-area .page .stat-card.value-card span, .content-area .page .stat-card.value-card strong, .content-area .page .stat-card.value-card small, .content-area .page .dashboard-gauge.value-card *, .content-area .page .dashboard-function-button.value-card *` → color:#fff
+- `.content-area .page .stat-card.zero-value-card, .content-area .page .dashboard-gauge.zero-value-card, .content-area .page .dashboard-function-button.zero-value-card` → background:#f2f4f3; color:#34463e
+- `.content-area .page .stat-card.zero-value-card span, .content-area .page .stat-card.zero-value-card strong, .content-area .page .stat-card.zero-value-card small, .content-area .page .dashboard-gauge.zero-value-card *, .content-area .page .dashboard-function-button.zero-value-card *` → color:#34463e
+- `.content-area .page .stat-card.zero-value-card strong, .content-area .page .dashboard-gauge.zero-value-card strong` → color:#24362f
+- `/* Functional access tabs use the same deep-navy #0C447C treatment; zero-value metric cards remain neutral. */ .content-area .page .dashboard-function-button` → background:#0C447C; color:#fff
+- `.content-area .page .dashboard-function-button span, .content-area .page .dashboard-function-button small, .content-area .page .dashboard-function-button b` → color:#fff
+- `.content-area .page .dashboard-function-button:hover` → background:#0b3d70
+- `.content-area .page .dashboard-function-button.function-category-process` → background:#e3f2f0; color:#234e4a
+- `.content-area .page .dashboard-function-button.function-category-risk` → background:#f7efdc; color:#654d20
+- `.content-area .page .dashboard-function-button.function-category-information` → background:#e6eff8; color:#274a68
+- `.content-area .page .dashboard-function-button.function-category-people small` → color:#675878
+- `.content-area .page .dashboard-function-button.function-category-process small` → color:#4c6f6b
+- `.content-area .page .dashboard-function-button.function-category-risk small` → color:#7b663e
+- `.content-area .page .dashboard-function-button.function-category-information small` → color:#58738d
+- `.content-area .page .dashboard-function-button.function-category-people .dashboard-function-icon` → color:#6f4aa1; background:#e2d8f0
+- `.content-area .page .dashboard-function-button.function-category-process .dashboard-function-icon` → color:#287d75; background:#d2e9e5
+- `.content-area .page .dashboard-function-button.function-category-risk .dashboard-function-icon` → color:#a06b12; background:#f0dfb8
+- `.content-area .page .dashboard-function-button.function-category-information .dashboard-function-icon` → color:#3974a7; background:#d4e4f2
+- `.content-area .page .dashboard-function-button.function-category-people:hover` → background:#e7def2
+- `.content-area .page .dashboard-function-button.function-category-process:hover` → background:#d9ece9
+- `.content-area .page .dashboard-function-button.function-category-risk:hover` → background:#f3e6c7
+- `.content-area .page .dashboard-function-button.function-category-information:hover` → background:#dce9f5
+- `/* GOVERNANCE DASHBOARD READABILITY STANDARD — all functional tabs/cards use    light surfaces with dark readable wording. Category colour is carried by    the icon/accent rather than a saturated full-card background. */ .dashboard-content-area .dashboard-function-button` → background:#ffffff; color:#24362f; border:1px solid #d7e1dc
+- `.dashboard-content-area .dashboard-function-button>span` → color:#203a30
+- `.dashboard-content-area .dashboard-function-button>small` → color:#52675e
+- `.dashboard-content-area .dashboard-function-button>b` → color:#587269
+- `.dashboard-content-area .dashboard-function-button:hover` → background:#f4f8f6
+- `.dashboard-content-area .dashboard-function-button.function-category-people .dashboard-function-icon` → color:#6b5599
+- `.dashboard-content-area .dashboard-function-button.function-category-process .dashboard-function-icon` → color:#247765
+- `.dashboard-content-area .dashboard-function-button.function-category-risk .dashboard-function-icon` → color:#a96f2d
+- `.dashboard-content-area .dashboard-function-button.function-category-information .dashboard-function-icon` → color:#326d9f
+- `/* Dashboard lower information panels are informational, not success states. */ .dashboard-content-area .dashboard-feed` → background:#ffffff; color:#263a32; border:1px solid #d7e1dc
+- `.dashboard-content-area .dashboard-feed-title` → color:#203a30
+- `.dashboard-content-area .dashboard-feed-title button` → color:#326d9f
+- `.dashboard-content-area .dashboard-empty` → color:#596d64
+- `/* DASHBOARD READABILITY CORRECTION — final specificity override.    Dashboard cards use light surfaces; all primary labels and descriptions must remain dark/readable. */ .content-area.dashboard-content-area .page .dashboard-gauge, .content-area.dashboard-content-area .page .dashboard-function-button, .content-area.dashboard-content-area .page .dashboard-feed` → background:#ffffff; color:#24362f
+- `.content-area.dashboard-content-area .page .dashboard-gauge>span:not(.dashboard-gauge-icon), .content-area.dashboard-content-area .page .dashboard-function-button>span, .content-area.dashboard-content-area .page .dashboard-feed-title` → color:#203a30
+- `.content-area.dashboard-content-area .page .dashboard-gauge>strong, .content-area.dashboard-content-area .page .dashboard-function-button>b` → color:#24362f
+- `.content-area.dashboard-content-area .page .dashboard-gauge>small, .content-area.dashboard-content-area .page .dashboard-function-button>small, .content-area.dashboard-content-area .page .dashboard-empty` → color:#52675e
+- `.content-area.dashboard-content-area .page .dashboard-function-button .dashboard-function-icon, .content-area.dashboard-content-area .page .dashboard-gauge .dashboard-gauge-icon` → color:#326d9f; background:#eef4f1
+- `.content-area.dashboard-content-area .page .dashboard-feed-title button` → color:#326d9f
+- `/* FINAL DASHBOARD TEXT CONTRAST — force readable wording on every dashboard tile/feed.    Decorative category accents remain; typography is never pale on pale surfaces. */ .dashboard-content-area .dashboard-gauge, .dashboard-content-area .dashboard-function-button` → background:#ffffff; color:#182a22
+- `.dashboard-content-area .dashboard-gauge>span:not(.dashboard-gauge-icon), .dashboard-content-area .dashboard-function-button>span` → color:#182a22
+- `.dashboard-content-area .dashboard-gauge>strong, .dashboard-content-area .dashboard-function-button>b` → color:#14231d
+- `.dashboard-content-area .dashboard-gauge>small, .dashboard-content-area .dashboard-function-button>small` → color:#3f5149
+- `.dashboard-content-area .dashboard-gauge .dashboard-gauge-icon, .dashboard-content-area .dashboard-function-button .dashboard-function-icon` → background:#edf3f0; color:#245f48
+- `.dashboard-content-area .dashboard-feed` → background:#ffffff; color:#182a22; border:1px solid #d7e1dc
+- `.dashboard-content-area .dashboard-feed .dashboard-feed-title, .dashboard-content-area .dashboard-feed .dashboard-feed-title span` → color:#182a22
+- `.dashboard-content-area .dashboard-feed .dashboard-feed-title button` → color:#245f48
+- `.dashboard-content-area .dashboard-feed .dashboard-empty` → color:#3f5149
+- `.content-area .page .module-interlink-list button.active, .content-area .page .workflow-portal-parent.active, .content-area .page .workflow-portal-children button.active, .content-area .page .dashboard-function-button.active` → background:#0b5fa8; color:#ffffff
+- `.content-area .page .dashboard-function-button` → color:#ffffff
+- `.content-area .page .dashboard-function-button>span, .content-area .page .dashboard-function-button>small, .content-area .page .dashboard-function-button>b` → color:#ffffff
+- `/* Prevent special dashboard tiles from reverting to unrelated button palettes. */ .content-area .page .dashboard-function-button` → background:#0b5fa8; border:1px solid #2f86cf; color:#ffffff
+- `.content-area .page .dashboard-function-button:hover` → background:#1672bf; color:#ffffff
+- `.content-area .page .dashboard-function-button.active` → background:#0b5fa8; color:#ffffff
+- `.dashboard-content-area` → background:linear-gradient(180deg,#eef6f1 0%,#f7faf8 46%,#edf5f1 100%)
+- `.dashboard-content-area .dashboard-hero` → border:1px solid #c8ddd1; background:linear-gradient(135deg,#073c2a 0%,#0d5b40 58%,#154f3c 100%); color:#fff
 - `.dashboard-content-area .dashboard-hero:after` → border:1px solid rgba(214,165,44,.35)
-- `.dashboard-content-area .dashboard-hero h1` → color:#fff!important
-- `.dashboard-content-area .dashboard-hero p` → color:#dcece5!important
-- `.dashboard-content-area .dashboard-hero .eyebrow` → color:#d6a52c!important
-- `.dashboard-content-area .dashboard-gauge` → background:#fff!important; color:#183129!important; border:1px solid #d2e1d9!important
-- `.dashboard-content-area .dashboard-gauge:hover` → background:#f7fbf9!important
-- `.dashboard-content-area .dashboard-gauge .dashboard-gauge-icon` → background:#e9f4ee!important; color:#176b46!important
-- `.dashboard-content-area .dashboard-gauge>span:not(.dashboard-gauge-icon)` → color:#29453a!important
-- `.dashboard-content-area .dashboard-gauge>strong` → color:#0d5036!important
-- `.dashboard-content-area .dashboard-gauge>small` → color:#62736c!important
-- `.dashboard-content-area .dashboard-gauge>b` → color:#176b46!important
-- `.dashboard-content-area .dashboard-function-button` → background:#fff!important; color:#183129!important; border:1px solid #d2e1d9!important
-- `.dashboard-content-area .dashboard-function-button:hover` → background:#f4faf7!important
-- `.dashboard-content-area .dashboard-function-button>span,   .dashboard-content-area .dashboard-function-button>small,   .dashboard-content-area .dashboard-function-button>b` → color:#183129!important
-- `.dashboard-content-area .dashboard-function-button .dashboard-function-icon` → background:#eaf4ef!important; color:#176b46!important
-- `.dashboard-content-area .dashboard-feed` → border:1px solid #d2e1d9!important
-- `.dashboard-content-area` → background:#f2f7f4!important
+- `.dashboard-content-area .dashboard-hero h1` → color:#fff
+- `.dashboard-content-area .dashboard-hero p` → color:#dcece5
+- `.dashboard-content-area .dashboard-hero .eyebrow` → color:#d6a52c
+- `.dashboard-content-area .dashboard-gauge` → background:#fff; color:#183129; border:1px solid #d2e1d9
+- `.dashboard-content-area .dashboard-gauge:hover` → background:#f7fbf9
+- `.dashboard-content-area .dashboard-gauge .dashboard-gauge-icon` → background:#e9f4ee; color:#176b46
+- `.dashboard-content-area .dashboard-gauge>span:not(.dashboard-gauge-icon)` → color:#29453a
+- `.dashboard-content-area .dashboard-gauge>strong` → color:#0d5036
+- `.dashboard-content-area .dashboard-gauge>small` → color:#62736c
+- `.dashboard-content-area .dashboard-gauge>b` → color:#176b46
+- `.dashboard-content-area .dashboard-function-button` → background:#fff; color:#183129; border:1px solid #d2e1d9
+- `.dashboard-content-area .dashboard-function-button:hover` → background:#f4faf7
+- `.dashboard-content-area .dashboard-function-button>span,   .dashboard-content-area .dashboard-function-button>small,   .dashboard-content-area .dashboard-function-button>b` → color:#183129
+- `.dashboard-content-area .dashboard-function-button .dashboard-function-icon` → background:#eaf4ef; color:#176b46
+- `.dashboard-content-area .dashboard-feed` → border:1px solid #d2e1d9
+- `.dashboard-content-area` → background:#f2f7f4
 - `.dashboard-mobile-view` → color:#19372b
 - `.mobile-dashboard-hero` → background:linear-gradient(145deg,#052e22 0%,#0a4633 57%,#0d5a40 100%); color:#fff
 - `.mobile-dashboard-greeting>span,.mobile-section-kicker` → color:#5f8d78
@@ -264,44 +264,44 @@ _None._
 - `.mobile-dashboard-status .mobile-section-kicker` → color:#36735a
 - `.mobile-dashboard-status strong` → color:#184535
 - `.mobile-dashboard-status small` → color:#60776d
-- `.content-area.dashboard-content-area .page .dashboard-desktop-view .dashboard-gauge,   .content-area.dashboard-content-area .page .dashboard-desktop-view .dashboard-function-button` → background:#fff!important; color:#183129!important
-- `.content-area.dashboard-content-area .page .dashboard-desktop-view .dashboard-gauge:hover,   .content-area.dashboard-content-area .page .dashboard-desktop-view .dashboard-function-button:hover` → background:#f5faf7!important
-- `.content-area.dashboard-content-area .page .dashboard-desktop-view .dashboard-gauge>span:not(.dashboard-gauge-icon),   .content-area.dashboard-content-area .page .dashboard-desktop-view .dashboard-gauge>strong,   .content-area.dashboard-content-area .page .dashboard-desktop-view .dashboard-gauge>small,   .content-area.dashboard-content-area .page .dashboard-desktop-view .dashboard-gauge>b,   .content-area.dashboard-content-area .page .dashboard-desktop-view .dashboard-function-button>span,   .content-area.dashboard-content-area .page .dashboard-desktop-view .dashboard-function-button>small,   .content-area.dashboard-content-area .page .dashboard-desktop-view .dashboard-function-button>b` → color:#183129!important
-- `.content-area.dashboard-content-area .page .dashboard-mobile-view button.mobile-profile-chip,   .content-area.dashboard-content-area .page .dashboard-mobile-view button.mobile-stat-card,   .content-area.dashboard-content-area .page .dashboard-mobile-view .mobile-section-heading>button,   .content-area.dashboard-content-area .page .dashboard-mobile-view .mobile-priority-list>button,   .content-area.dashboard-content-area .page .dashboard-mobile-view .mobile-quick-grid>button` → background:#fff!important; color:#18382c!important
-- `.content-area.dashboard-content-area .page .dashboard-mobile-view button.mobile-profile-chip` → background:rgba(255,255,255,.085)!important; color:#fff!important
-- `.content-area.dashboard-content-area .page .dashboard-mobile-view .mobile-section-heading>button` → color:#176344!important
-- `.content-area.dashboard-content-area .page .dashboard-mobile-view button.mobile-stat-card:hover,   .content-area.dashboard-content-area .page .dashboard-mobile-view .mobile-priority-list>button:hover,   .content-area.dashboard-content-area .page .dashboard-mobile-view .mobile-quick-grid>button:hover` → background:#f9fcfa!important; color:#18382c!important
-- `.dashboard-content-area` → background:#f7faf8!important; color:#17372b!important
-- `.dashboard-content-area .dashboard-command` → background:#f7faf8!important
-- `.dashboard-content-area .dashboard-mobile-view` → color:#17372b!important
-- `/* Strongly legible hero: no translucent text over the page. */   .dashboard-content-area .mobile-dashboard-hero` → background:linear-gradient(145deg,#063a29 0%,#087047 68%,#0b8050 100%)!important; color:#fff!important
-- `.dashboard-content-area .mobile-dashboard-greeting h1` → color:#fff!important
-- `.dashboard-content-area .mobile-dashboard-greeting p` → color:#e7f5ee!important
-- `.dashboard-content-area .mobile-dashboard-greeting>span` → color:#ffe39a!important
-- `.dashboard-content-area .mobile-brand-kicker` → color:#ffe39a!important
-- `.dashboard-content-area .mobile-brand-mark` → background:#ffd45a!important; color:#073323!important
-- `/* Cards: white surfaces + deep text. Never pale text on pale surfaces. */   .dashboard-content-area .mobile-stat-card,   .dashboard-content-area .mobile-priority-list>button,   .dashboard-content-area .mobile-quick-grid>button` → background:#ffffff!important; color:#17372b!important; border:1px solid #cbded4!important
-- `.dashboard-content-area .mobile-stat-card:hover,   .dashboard-content-area .mobile-priority-list>button:hover,   .dashboard-content-area .mobile-quick-grid>button:hover` → background:#f5fbf8!important
-- `.dashboard-content-area .mobile-stat-icon,   .dashboard-content-area .mobile-priority-icon,   .dashboard-content-area .mobile-quick-icon` → background:#e4f3eb!important; color:#075f3d!important
-- `.dashboard-content-area .mobile-stat-card strong,   .dashboard-content-area .mobile-stat-card>b,   .dashboard-content-area .mobile-priority-list strong,   .dashboard-content-area .mobile-priority-list em,   .dashboard-content-area .mobile-quick-grid strong` → color:#084f36!important
-- `.dashboard-content-area .mobile-stat-card small,   .dashboard-content-area .mobile-priority-list small,   .dashboard-content-area .mobile-quick-grid small` → color:#526c61!important
-- `.dashboard-content-area .mobile-stat-card>i,   .dashboard-content-area .mobile-priority-list>b,   .dashboard-content-area .mobile-quick-grid b` → color:#168153!important
-- `/* Clear section hierarchy. */   .dashboard-content-area .mobile-section-kicker` → color:#28765a!important
-- `.dashboard-content-area .mobile-dashboard-attention h2,   .dashboard-content-area .mobile-section-heading h2` → color:#153d2f!important
-- `.dashboard-content-area .mobile-live-dot` → background:#fff!important; color:#315d4c!important
-- `.dashboard-content-area .mobile-live-dot i` → background:#15925c!important
-- `/* Compact profile control remains intentionally dark-green, but readable. */   .dashboard-content-area .mobile-profile-chip` → background:rgba(0,31,21,.24)!important; color:#fff!important
-- `.dashboard-content-area .mobile-profile-chip strong` → color:#fff!important
-- `.dashboard-content-area .mobile-profile-chip small` → color:#d9eee5!important
-- `.dashboard-content-area .mobile-profile-chip>b` → color:#ffe08a!important
-- `/* View-all is a compact outlined control, not a black generic button. */   .dashboard-content-area .mobile-section-heading>button` → background:#ffffff!important; color:#075f3d!important; border:1px solid #a9cbbb!important
-- `.dashboard-content-area .mobile-dashboard-status` → background:#e5f4ec!important
-- `.dashboard-content-area .mobile-dashboard-status strong` → color:#0d5037!important
-- `.dashboard-content-area .mobile-dashboard-status small` → color:#4c6b5d!important
-- `.dashboard-content-area + .mobile-global-nav,   .main-area>.mobile-global-nav` → background:#ffffff!important
-- `.dashboard-content-area` → background:#f4f7f4!important
-- `.dashboard-quote4-stats>button` → background:#0b5fa8!important; color:#fff!important; border:1px solid rgba(255,255,255,.42)!important
-- `.dashboard-quote4-stats>button:hover` → background:#1672bf!important; color:#fff!important
+- `.content-area.dashboard-content-area .page .dashboard-desktop-view .dashboard-gauge,   .content-area.dashboard-content-area .page .dashboard-desktop-view .dashboard-function-button` → background:#fff; color:#183129
+- `.content-area.dashboard-content-area .page .dashboard-desktop-view .dashboard-gauge:hover,   .content-area.dashboard-content-area .page .dashboard-desktop-view .dashboard-function-button:hover` → background:#f5faf7
+- `.content-area.dashboard-content-area .page .dashboard-desktop-view .dashboard-gauge>span:not(.dashboard-gauge-icon),   .content-area.dashboard-content-area .page .dashboard-desktop-view .dashboard-gauge>strong,   .content-area.dashboard-content-area .page .dashboard-desktop-view .dashboard-gauge>small,   .content-area.dashboard-content-area .page .dashboard-desktop-view .dashboard-gauge>b,   .content-area.dashboard-content-area .page .dashboard-desktop-view .dashboard-function-button>span,   .content-area.dashboard-content-area .page .dashboard-desktop-view .dashboard-function-button>small,   .content-area.dashboard-content-area .page .dashboard-desktop-view .dashboard-function-button>b` → color:#183129
+- `.content-area.dashboard-content-area .page .dashboard-mobile-view button.mobile-profile-chip,   .content-area.dashboard-content-area .page .dashboard-mobile-view button.mobile-stat-card,   .content-area.dashboard-content-area .page .dashboard-mobile-view .mobile-section-heading>button,   .content-area.dashboard-content-area .page .dashboard-mobile-view .mobile-priority-list>button,   .content-area.dashboard-content-area .page .dashboard-mobile-view .mobile-quick-grid>button` → background:#fff; color:#18382c
+- `.content-area.dashboard-content-area .page .dashboard-mobile-view button.mobile-profile-chip` → background:rgba(255,255,255,.085); color:#fff
+- `.content-area.dashboard-content-area .page .dashboard-mobile-view .mobile-section-heading>button` → color:#176344
+- `.content-area.dashboard-content-area .page .dashboard-mobile-view button.mobile-stat-card:hover,   .content-area.dashboard-content-area .page .dashboard-mobile-view .mobile-priority-list>button:hover,   .content-area.dashboard-content-area .page .dashboard-mobile-view .mobile-quick-grid>button:hover` → background:#f9fcfa; color:#18382c
+- `.dashboard-content-area` → background:#f7faf8; color:#17372b
+- `.dashboard-content-area .dashboard-command` → background:#f7faf8
+- `.dashboard-content-area .dashboard-mobile-view` → color:#17372b
+- `/* Strongly legible hero: no translucent text over the page. */   .dashboard-content-area .mobile-dashboard-hero` → background:linear-gradient(145deg,#063a29 0%,#087047 68%,#0b8050 100%); color:#fff
+- `.dashboard-content-area .mobile-dashboard-greeting h1` → color:#fff
+- `.dashboard-content-area .mobile-dashboard-greeting p` → color:#e7f5ee
+- `.dashboard-content-area .mobile-dashboard-greeting>span` → color:#ffe39a
+- `.dashboard-content-area .mobile-brand-kicker` → color:#ffe39a
+- `.dashboard-content-area .mobile-brand-mark` → background:#ffd45a; color:#073323
+- `/* Cards: white surfaces + deep text. Never pale text on pale surfaces. */   .dashboard-content-area .mobile-stat-card,   .dashboard-content-area .mobile-priority-list>button,   .dashboard-content-area .mobile-quick-grid>button` → background:#ffffff; color:#17372b; border:1px solid #cbded4
+- `.dashboard-content-area .mobile-stat-card:hover,   .dashboard-content-area .mobile-priority-list>button:hover,   .dashboard-content-area .mobile-quick-grid>button:hover` → background:#f5fbf8
+- `.dashboard-content-area .mobile-stat-icon,   .dashboard-content-area .mobile-priority-icon,   .dashboard-content-area .mobile-quick-icon` → background:#e4f3eb; color:#075f3d
+- `.dashboard-content-area .mobile-stat-card strong,   .dashboard-content-area .mobile-stat-card>b,   .dashboard-content-area .mobile-priority-list strong,   .dashboard-content-area .mobile-priority-list em,   .dashboard-content-area .mobile-quick-grid strong` → color:#084f36
+- `.dashboard-content-area .mobile-stat-card small,   .dashboard-content-area .mobile-priority-list small,   .dashboard-content-area .mobile-quick-grid small` → color:#526c61
+- `.dashboard-content-area .mobile-stat-card>i,   .dashboard-content-area .mobile-priority-list>b,   .dashboard-content-area .mobile-quick-grid b` → color:#168153
+- `/* Clear section hierarchy. */   .dashboard-content-area .mobile-section-kicker` → color:#28765a
+- `.dashboard-content-area .mobile-dashboard-attention h2,   .dashboard-content-area .mobile-section-heading h2` → color:#153d2f
+- `.dashboard-content-area .mobile-live-dot` → background:#fff; color:#315d4c
+- `.dashboard-content-area .mobile-live-dot i` → background:#15925c
+- `/* Compact profile control remains intentionally dark-green, but readable. */   .dashboard-content-area .mobile-profile-chip` → background:rgba(0,31,21,.24); color:#fff
+- `.dashboard-content-area .mobile-profile-chip strong` → color:#fff
+- `.dashboard-content-area .mobile-profile-chip small` → color:#d9eee5
+- `.dashboard-content-area .mobile-profile-chip>b` → color:#ffe08a
+- `/* View-all is a compact outlined control, not a black generic button. */   .dashboard-content-area .mobile-section-heading>button` → background:#ffffff; color:#075f3d; border:1px solid #a9cbbb
+- `.dashboard-content-area .mobile-dashboard-status` → background:#e5f4ec
+- `.dashboard-content-area .mobile-dashboard-status strong` → color:#0d5037
+- `.dashboard-content-area .mobile-dashboard-status small` → color:#4c6b5d
+- `.dashboard-content-area + .mobile-global-nav,   .main-area>.mobile-global-nav` → background:#ffffff
+- `.dashboard-content-area` → background:#f4f7f4
+- `.dashboard-quote4-stats>button` → background:#0b5fa8; color:#fff; border:1px solid rgba(255,255,255,.42)
+- `.dashboard-quote4-stats>button:hover` → background:#1672bf; color:#fff
 - `.dashboard-quote4-stats>button:nth-child(2) .quote4-stat-icon` → background:#e7f1fb; color:#2573ae
 - `.dashboard-quote4-stats>button:nth-child(3) .quote4-stat-icon` → background:#fff2dc; color:#b86f1d
 - `.dashboard-quote4-stats>button:nth-child(4) .quote4-stat-icon` → background:#efe8fa; color:#704ca9
@@ -309,109 +309,109 @@ _None._
 - `.dashboard-quote4-stats b` → color:#fff
 - `.dashboard-quote4-stats small` → color:#e5f1fa
 - `.dashboard-quote4-stats i` → color:#fff
-- `.dashboard-quote4-main .panel` → background:#fff!important; border:1px solid #d9e5df!important
-- `.dashboard-content-area` → background:#f4f8f5!important
-- `.dashboard-content-area` → background:#f5faf7!important
-- `.dashboard-command,.dashboard-command.page` → background:#f6faf8!important; color:#132f24!important
-- `.dashboard-command,.dashboard-command.page` → background:#f4f8f6!important
-- `.dashboard-quote4-stats>button` → background:#fff!important; color:#173c2d!important; border:1px solid #dce8e2!important
-- `.dashboard-quote4-stats strong` → color:#11764c!important
-- `.dashboard-quote4-stats b` → color:#25473b!important
-- `.dashboard-quote4-stats small` → color:#667d73!important
-- `.dashboard-quote4-main .panel` → background:#fff!important; border:1px solid #dce8e2!important
-- `.content-area.dashboard-content-area` → background:#f5faf7!important; color:#18382c!important
-- `.content-area.dashboard-content-area .mobile-quote1-hero` → background:#075f43!important
-- `.content-area.dashboard-content-area .mobile-quote1-shade` → background:linear-gradient(180deg,rgba(3,42,31,.42) 0%,rgba(3,66,45,.34) 48%,rgba(4,91,59,.86) 100%)!important
-- `.content-area.dashboard-content-area .mobile-quote1-top strong` → color:#fff!important
-- `.content-area.dashboard-content-area .mobile-quote1-top small` → color:#f6d76a!important
-- `.content-area.dashboard-content-area .mobile-quote1-top .mobile-quote1-notification` → background:#fff!important; color:#4e6870!important
-- `.content-area.dashboard-content-area .mobile-quote1-notification i` → background:#e31d2b!important; color:#fff!important; border:2px solid #fff!important
-- `.content-area.dashboard-content-area .mobile-quote1-photo` → border:3px solid #fff!important; background:#eef5f1!important; color:#17764e!important
-- `.content-area.dashboard-content-area .mobile-quote1-user span` → color:#f5d76a!important
-- `.content-area.dashboard-content-area .mobile-quote1-user h1` → color:#fff!important
-- `.content-area.dashboard-content-area .mobile-quote1-user p` → color:#eef8f3!important
-- `.content-area.dashboard-content-area .mobile-quote1-user em` → background:#f5cf52!important; color:#173f2d!important
-- `.content-area.dashboard-content-area .mobile-quote1-stats>button` → background:#fff!important; color:#173b2d!important; border:1px solid #dbe8e2!important
-- `.content-area.dashboard-content-area .mobile-quote1-stats>button:hover,   .content-area.dashboard-content-area .mobile-quote1-stats>button:focus` → background:#fff!important; color:#173b2d!important
-- `.content-area.dashboard-content-area .mobile-quote1-stats>button>span` → background:#0d9b5c!important; color:#fff!important
-- `.content-area.dashboard-content-area .mobile-quote1-stats>button:nth-child(2)>span` → background:#197fe1!important
-- `.content-area.dashboard-content-area .mobile-quote1-stats>button:nth-child(3)>span` → background:#f4ad20!important
-- `.content-area.dashboard-content-area .mobile-quote1-stats>button:nth-child(4)>span` → background:#18a05e!important
-- `.content-area.dashboard-content-area .mobile-quote1-stats>button>strong` → color:#149257!important
-- `.content-area.dashboard-content-area .mobile-quote1-stats>button>b` → color:#1d4033!important
-- `.content-area.dashboard-content-area .mobile-quote1-stats>button>small` → color:#71827b!important
-- `.content-area.dashboard-content-area .mobile-quote1-heading h2` → color:#173b2d!important
-- `.content-area.dashboard-content-area .mobile-quote1-heading button` → color:#147dcc!important
-- `.content-area.dashboard-content-area .mobile-quote1-grid>button` → background:#fff!important; color:#183a2e!important; border:1px solid #dfeae5!important
-- `.content-area.dashboard-content-area .mobile-quote1-grid>button:hover,   .content-area.dashboard-content-area .mobile-quote1-grid>button:focus` → background:#fff!important; color:#183a2e!important
-- `.content-area.dashboard-content-area .mobile-quote1-grid>button:nth-child(1)>span` → color:#0879ca!important
-- `.content-area.dashboard-content-area .mobile-quote1-grid>button:nth-child(2)>span` → color:#e52e3b!important
-- `.content-area.dashboard-content-area .mobile-quote1-grid>button:nth-child(3)>span` → color:#dc9008!important
-- `.content-area.dashboard-content-area .mobile-quote1-grid>button:nth-child(4)>span` → color:#087b58!important
-- `.content-area.dashboard-content-area .mobile-quote1-grid>button:nth-child(5)>span` → color:#e4a400!important
-- `.content-area.dashboard-content-area .mobile-quote1-grid>button:nth-child(6)>span` → color:#0879ca!important
-- `.content-area.dashboard-content-area .mobile-quote1-grid>button>strong` → color:#17382d!important
-- `.content-area .dashboard-command` → background:#f7faf8!important; color:#111827!important
-- `/* HERO: fixed 280px, no external hero image dependency */   .content-area .dashboard-command .mobile-quote1-hero` → background:linear-gradient(180deg,#0F2A1D 0%,#1B4332 100%)!important
-- `.content-area .dashboard-command .mobile-quote1-image` → background:linear-gradient(180deg,#0F2A1D 0%,#1B4332 100%)!important
-- `.content-area .dashboard-command .mobile-quote1-shade` → background:linear-gradient(180deg,rgba(15,42,29,.08),rgba(15,42,29,.18) 54%,rgba(15,42,29,.05))!important
-- `.content-area .dashboard-command .mobile-quote1-top strong` → color:#fff!important
-- `.content-area .dashboard-command .mobile-quote1-top small` → color:#fff!important
-- `.content-area .dashboard-command .mobile-quote1-notification` → background:#fff!important; color:#314d45!important
-- `.content-area .dashboard-command .mobile-quote1-notification .svg-inline--fa,   .content-area .dashboard-command .mobile-quote1-notification>i` → color:#314d45!important
-- `.content-area .dashboard-command .mobile-quote1-notification b` → background:#ef233c!important; color:#fff!important; border:2px solid #fff!important
-- `.content-area .dashboard-command .mobile-quote1-photo` → border:3px solid #fff!important; background:#2E8B57!important; color:#fff!important
-- `.content-area .dashboard-command .mobile-quote1-photo span` → color:#fff!important
-- `.content-area .dashboard-command .mobile-quote1-user>div:last-child>span` → color:#fff!important
-- `.content-area .dashboard-command .mobile-quote1-user h1` → color:#fff!important
-- `.content-area .dashboard-command .mobile-quote1-user p` → color:#e6f1eb!important
-- `.content-area .dashboard-command .mobile-quote1-user em` → background:#F5A623!important; color:#172b20!important
-- `.content-area .dashboard-command .mobile-quote1-stats>button` → background:#0b5fa8!important; color:#fff!important; border:1px solid rgba(255,255,255,.45)!important
-- `.content-area .dashboard-command .mobile-quote1-stats>button:hover,   .content-area .dashboard-command .mobile-quote1-stats>button:focus` → background:#1672bf!important; color:#fff!important
-- `.content-area .dashboard-command .mobile-quote1-stats>button>span` → color:#fff!important
-- `.content-area .dashboard-command .mobile-quote1-stats>button:nth-child(1)>span` → background:#2E8B57!important
-- `.content-area .dashboard-command .mobile-quote1-stats>button:nth-child(2)>span` → background:#2D8CDB!important
-- `.content-area .dashboard-command .mobile-quote1-stats>button:nth-child(3)>span` → background:#F5A623!important
-- `.content-area .dashboard-command .mobile-quote1-stats>button:nth-child(4)>span` → background:#2E8B57!important
-- `.content-area .dashboard-command .mobile-quote1-stats>button>strong` → color:#111827!important
-- `.content-area .dashboard-command .mobile-quote1-stats>button>b` → color:#6B7280!important
-- `.content-area .dashboard-command .mobile-quote1-stats>button>small` → color:#6B7280!important
-- `.content-area .dashboard-command .mobile-quote1-heading h2` → color:#17382b!important
-- `.content-area .dashboard-command .mobile-quote1-heading button` → background:#0b5fa8!important; border:1px solid rgba(255,255,255,.45)!important; color:#fff!important
-- `.content-area .dashboard-command .mobile-quote1-grid>button` → background:#0b5fa8!important; color:#fff!important; border:1px solid #eef0f2!important
-- `.content-area .dashboard-command .mobile-quote1-grid>button:hover,   .content-area .dashboard-command .mobile-quote1-grid>button:focus` → background:#1672bf!important; color:#fff!important
-- `.content-area .dashboard-command .mobile-quote1-grid>button>span` → background:#eef7f1!important; color:#2E8B57!important
-- `.content-area .dashboard-command .mobile-quote1-grid>button:nth-child(2)>span` → background:#fff1f0!important; color:#d83a4d!important
-- `.content-area .dashboard-command .mobile-quote1-grid>button:nth-child(3)>span` → background:#fff5df!important; color:#d99113!important
-- `.content-area .dashboard-command .mobile-quote1-grid>button:nth-child(4)>span` → background:#eef7f1!important; color:#2E8B57!important
-- `.content-area .dashboard-command .mobile-quote1-grid>button:nth-child(5)>span` → background:#fff5df!important; color:#d99113!important
-- `.content-area .dashboard-command .mobile-quote1-grid>button:nth-child(6)>span` → background:#eef5fb!important; color:#2D8CDB!important
-- `.content-area .dashboard-command .mobile-quote1-grid>button>strong` → color:#111827!important
-- `.dashboard-content-area` → background:linear-gradient(180deg,#0b5fa8 0%,#0a4f8d 55%,#083f73 100%)!important; color:#fff!important
-- `.dashboard-content-area .dashboard-command` → color:#fff!important
-- `.dashboard-content-area .mobile-quote1-stats>button,   .dashboard-content-area .mobile-quote1-grid>button,   .dashboard-content-area .mobile-quote1-heading>button` → background:#0b5fa8!important; color:#fff!important; border:1px solid rgba(255,255,255,.42)!important
-- `.dashboard-content-area .mobile-quote1-stats>button:hover,   .dashboard-content-area .mobile-quote1-stats>button:focus-visible,   .dashboard-content-area .mobile-quote1-grid>button:hover,   .dashboard-content-area .mobile-quote1-grid>button:focus-visible,   .dashboard-content-area .mobile-quote1-heading>button:hover,   .dashboard-content-area .mobile-quote1-heading>button:focus-visible` → background:#1672bf!important; color:#fff!important
-- `.dashboard-content-area .mobile-quote1-stats>button strong,   .dashboard-content-area .mobile-quote1-stats>button b,   .dashboard-content-area .mobile-quote1-stats>button small,   .dashboard-content-area .mobile-quote1-stats>button i,   .dashboard-content-area .mobile-quote1-grid>button strong,   .dashboard-content-area .mobile-quote1-grid>button b,   .dashboard-content-area .mobile-quote1-heading>button` → color:#fff!important
-- `.dashboard-content-area .mobile-quote1-grid>button>span` → color:#fff!important
-- `.dashboard-content-area section.mobile-quote1-quick .mobile-quote1-grid button.mobile-blue-nav-button,   .dashboard-content-area section.mobile-quote1-stats button.mobile-blue-nav-button,   .dashboard-content-area section.mobile-quote1-quick .mobile-quote1-heading button.mobile-blue-nav-button` → background-color:#0b5fa8!important; color:#ffffff!important
-- `.dashboard-content-area section.mobile-quote1-quick .mobile-quote1-grid button.mobile-blue-nav-button strong,   .dashboard-content-area section.mobile-quote1-stats button.mobile-blue-nav-button strong,   .dashboard-content-area section.mobile-quote1-stats button.mobile-blue-nav-button b,   .dashboard-content-area section.mobile-quote1-stats button.mobile-blue-nav-button small,   .dashboard-content-area section.mobile-quote1-stats button.mobile-blue-nav-button i,   .dashboard-content-area section.mobile-quote1-quick .mobile-quote1-heading button.mobile-blue-nav-button` → color:#ffffff!important
-- `.dashboard-content-area .mobile-quote1-stats button.mobile-blue-nav-button,   .dashboard-content-area .mobile-quote1-quick .mobile-quote1-heading button.mobile-blue-nav-button,   .dashboard-content-area .mobile-quote1-grid button.mobile-blue-nav-button` → background:#0b5fa8!important; background-color:#0b5fa8!important; color:#fff!important
-- `.dashboard-content-area .mobile-quote1-stats button.mobile-blue-nav-button:hover,   .dashboard-content-area .mobile-quote1-stats button.mobile-blue-nav-button:focus,   .dashboard-content-area .mobile-quote1-stats button.mobile-blue-nav-button:active,   .dashboard-content-area .mobile-quote1-quick .mobile-quote1-heading button.mobile-blue-nav-button:hover,   .dashboard-content-area .mobile-quote1-quick .mobile-quote1-heading button.mobile-blue-nav-button:focus,   .dashboard-content-area .mobile-quote1-quick .mobile-quote1-heading button.mobile-blue-nav-button:active,   .dashboard-content-area .mobile-quote1-grid button.mobile-blue-nav-button:hover,   .dashboard-content-area .mobile-quote1-grid button.mobile-blue-nav-button:focus,   .dashboard-content-area .mobile-quote1-grid button.mobile-blue-nav-button:active` → background:#1672bf!important; background-color:#1672bf!important; color:#fff!important
-- `.dashboard-content-area .mobile-quote1-stats button.mobile-blue-nav-button strong,   .dashboard-content-area .mobile-quote1-stats button.mobile-blue-nav-button b,   .dashboard-content-area .mobile-quote1-stats button.mobile-blue-nav-button small,   .dashboard-content-area .mobile-quote1-stats button.mobile-blue-nav-button i,   .dashboard-content-area .mobile-quote1-grid button.mobile-blue-nav-button strong,   .dashboard-content-area .mobile-quote1-quick .mobile-quote1-heading button.mobile-blue-nav-button` → color:#fff!important
-- `/* Front-dashboard navigation/stat cards */   .dashboard-quote4-stats>button,   .quote4-quick-grid>button` → background:#0b5fa8!important; background-color:#0b5fa8!important; color:#fff!important; border:1px solid rgba(255,255,255,.45)!important
-- `.dashboard-quote4-stats>button:hover,   .dashboard-quote4-stats>button:focus-visible,   .quote4-quick-grid>button:hover,   .quote4-quick-grid>button:focus-visible` → background:#1672bf!important; background-color:#1672bf!important; color:#fff!important
-- `.dashboard-quote4-stats>button strong,   .dashboard-quote4-stats>button b,   .dashboard-quote4-stats>button small,   .dashboard-quote4-stats>button i,   .quote4-quick-grid>button strong,   .quote4-quick-grid>button small,   .quote4-quick-grid>button b,   .quote4-quick-grid>button span` → color:#fff!important
-- `.dashboard-desktop-view .desktop-blue-nav-button,   .dashboard-desktop-view .quote4-quick-grid .desktop-blue-nav-button,   .dashboard-desktop-view .dashboard-quote4-stats .desktop-blue-nav-button,   .dashboard-desktop-view .quote4-heading>button` → background:#0b5fa8!important; background-color:#0b5fa8!important; color:#fff!important; border:1px solid rgba(255,255,255,.55)!important
-- `.dashboard-desktop-view .desktop-blue-nav-button:hover,   .dashboard-desktop-view .desktop-blue-nav-button:focus-visible,   .dashboard-desktop-view .quote4-heading>button:hover,   .dashboard-desktop-view .quote4-heading>button:focus-visible` → background:#1672bf!important; background-color:#1672bf!important; color:#fff!important
-- `.dashboard-desktop-view .desktop-blue-nav-button strong,   .dashboard-desktop-view .desktop-blue-nav-button b,   .dashboard-desktop-view .desktop-blue-nav-button small,   .dashboard-desktop-view .desktop-blue-nav-button i,   .dashboard-desktop-view .desktop-blue-nav-button span,   .dashboard-desktop-view .quote4-heading>button` → color:#fff!important
-- `/* The overhead Administrator wording remains white. */   .dashboard-desktop-view .desktop-quote4-hero h1,   .dashboard-desktop-view .desktop-quote4-hero em,   .dashboard-desktop-view .desktop-quote4-hero p` → color:#fff!important
-- `.main-area>.dashboard-topbar .topbar-access-category` → border:1px solid rgba(255,255,255,.25)!important; background:#062b4c!important; color:#fff!important
-- `.main-area>.dashboard-topbar .topbar-access-category>span` → color:#fff!important
-- `.main-area>.dashboard-topbar .mobile-access-live-date` → color:#fff!important
-- `.main-area>.dashboard-topbar .mobile-access-live-date strong` → color:#d7ecff!important
-- `.main-area>.dashboard-topbar .mobile-access-live-date span` → color:#fff!important
-- `.main-area>.dashboard-topbar .mobile-access-live-date b` → color:#f6d76a!important
-- `.main-area>.dashboard-topbar .mobile-access-live-date button` → border:1px solid rgba(255,255,255,.45)!important; background:#0b5fa8!important; color:#fff!important
+- `.dashboard-quote4-main .panel` → background:#fff; border:1px solid #d9e5df
+- `.dashboard-content-area` → background:#f4f8f5
+- `.dashboard-content-area` → background:#f5faf7
+- `.dashboard-command,.dashboard-command.page` → background:#f6faf8; color:#132f24
+- `.dashboard-command,.dashboard-command.page` → background:#f4f8f6
+- `.dashboard-quote4-stats>button` → background:#fff; color:#173c2d; border:1px solid #dce8e2
+- `.dashboard-quote4-stats strong` → color:#11764c
+- `.dashboard-quote4-stats b` → color:#25473b
+- `.dashboard-quote4-stats small` → color:#667d73
+- `.dashboard-quote4-main .panel` → background:#fff; border:1px solid #dce8e2
+- `.content-area.dashboard-content-area` → background:#f5faf7; color:#18382c
+- `.content-area.dashboard-content-area .mobile-quote1-hero` → background:#075f43
+- `.content-area.dashboard-content-area .mobile-quote1-shade` → background:linear-gradient(180deg,rgba(3,42,31,.42) 0%,rgba(3,66,45,.34) 48%,rgba(4,91,59,.86) 100%)
+- `.content-area.dashboard-content-area .mobile-quote1-top strong` → color:#fff
+- `.content-area.dashboard-content-area .mobile-quote1-top small` → color:#f6d76a
+- `.content-area.dashboard-content-area .mobile-quote1-top .mobile-quote1-notification` → background:#fff; color:#4e6870
+- `.content-area.dashboard-content-area .mobile-quote1-notification i` → background:#e31d2b; color:#fff; border:2px solid #fff
+- `.content-area.dashboard-content-area .mobile-quote1-photo` → border:3px solid #fff; background:#eef5f1; color:#17764e
+- `.content-area.dashboard-content-area .mobile-quote1-user span` → color:#f5d76a
+- `.content-area.dashboard-content-area .mobile-quote1-user h1` → color:#fff
+- `.content-area.dashboard-content-area .mobile-quote1-user p` → color:#eef8f3
+- `.content-area.dashboard-content-area .mobile-quote1-user em` → background:#f5cf52; color:#173f2d
+- `.content-area.dashboard-content-area .mobile-quote1-stats>button` → background:#fff; color:#173b2d; border:1px solid #dbe8e2
+- `.content-area.dashboard-content-area .mobile-quote1-stats>button:hover,   .content-area.dashboard-content-area .mobile-quote1-stats>button:focus` → background:#fff; color:#173b2d
+- `.content-area.dashboard-content-area .mobile-quote1-stats>button>span` → background:#0d9b5c; color:#fff
+- `.content-area.dashboard-content-area .mobile-quote1-stats>button:nth-child(2)>span` → background:#197fe1
+- `.content-area.dashboard-content-area .mobile-quote1-stats>button:nth-child(3)>span` → background:#f4ad20
+- `.content-area.dashboard-content-area .mobile-quote1-stats>button:nth-child(4)>span` → background:#18a05e
+- `.content-area.dashboard-content-area .mobile-quote1-stats>button>strong` → color:#149257
+- `.content-area.dashboard-content-area .mobile-quote1-stats>button>b` → color:#1d4033
+- `.content-area.dashboard-content-area .mobile-quote1-stats>button>small` → color:#71827b
+- `.content-area.dashboard-content-area .mobile-quote1-heading h2` → color:#173b2d
+- `.content-area.dashboard-content-area .mobile-quote1-heading button` → color:#147dcc
+- `.content-area.dashboard-content-area .mobile-quote1-grid>button` → background:#fff; color:#183a2e; border:1px solid #dfeae5
+- `.content-area.dashboard-content-area .mobile-quote1-grid>button:hover,   .content-area.dashboard-content-area .mobile-quote1-grid>button:focus` → background:#fff; color:#183a2e
+- `.content-area.dashboard-content-area .mobile-quote1-grid>button:nth-child(1)>span` → color:#0879ca
+- `.content-area.dashboard-content-area .mobile-quote1-grid>button:nth-child(2)>span` → color:#e52e3b
+- `.content-area.dashboard-content-area .mobile-quote1-grid>button:nth-child(3)>span` → color:#dc9008
+- `.content-area.dashboard-content-area .mobile-quote1-grid>button:nth-child(4)>span` → color:#087b58
+- `.content-area.dashboard-content-area .mobile-quote1-grid>button:nth-child(5)>span` → color:#e4a400
+- `.content-area.dashboard-content-area .mobile-quote1-grid>button:nth-child(6)>span` → color:#0879ca
+- `.content-area.dashboard-content-area .mobile-quote1-grid>button>strong` → color:#17382d
+- `.content-area .dashboard-command` → background:#f7faf8; color:#111827
+- `/* HERO: fixed 280px, no external hero image dependency */   .content-area .dashboard-command .mobile-quote1-hero` → background:linear-gradient(180deg,#0F2A1D 0%,#1B4332 100%)
+- `.content-area .dashboard-command .mobile-quote1-image` → background:linear-gradient(180deg,#0F2A1D 0%,#1B4332 100%)
+- `.content-area .dashboard-command .mobile-quote1-shade` → background:linear-gradient(180deg,rgba(15,42,29,.08),rgba(15,42,29,.18) 54%,rgba(15,42,29,.05))
+- `.content-area .dashboard-command .mobile-quote1-top strong` → color:#fff
+- `.content-area .dashboard-command .mobile-quote1-top small` → color:#fff
+- `.content-area .dashboard-command .mobile-quote1-notification` → background:#fff; color:#314d45
+- `.content-area .dashboard-command .mobile-quote1-notification .svg-inline--fa,   .content-area .dashboard-command .mobile-quote1-notification>i` → color:#314d45
+- `.content-area .dashboard-command .mobile-quote1-notification b` → background:#ef233c; color:#fff; border:2px solid #fff
+- `.content-area .dashboard-command .mobile-quote1-photo` → border:3px solid #fff; background:#2E8B57; color:#fff
+- `.content-area .dashboard-command .mobile-quote1-photo span` → color:#fff
+- `.content-area .dashboard-command .mobile-quote1-user>div:last-child>span` → color:#fff
+- `.content-area .dashboard-command .mobile-quote1-user h1` → color:#fff
+- `.content-area .dashboard-command .mobile-quote1-user p` → color:#e6f1eb
+- `.content-area .dashboard-command .mobile-quote1-user em` → background:#F5A623; color:#172b20
+- `.content-area .dashboard-command .mobile-quote1-stats>button` → background:#0b5fa8; color:#fff; border:1px solid rgba(255,255,255,.45)
+- `.content-area .dashboard-command .mobile-quote1-stats>button:hover,   .content-area .dashboard-command .mobile-quote1-stats>button:focus` → background:#1672bf; color:#fff
+- `.content-area .dashboard-command .mobile-quote1-stats>button>span` → color:#fff
+- `.content-area .dashboard-command .mobile-quote1-stats>button:nth-child(1)>span` → background:#2E8B57
+- `.content-area .dashboard-command .mobile-quote1-stats>button:nth-child(2)>span` → background:#2D8CDB
+- `.content-area .dashboard-command .mobile-quote1-stats>button:nth-child(3)>span` → background:#F5A623
+- `.content-area .dashboard-command .mobile-quote1-stats>button:nth-child(4)>span` → background:#2E8B57
+- `.content-area .dashboard-command .mobile-quote1-stats>button>strong` → color:#111827
+- `.content-area .dashboard-command .mobile-quote1-stats>button>b` → color:#6B7280
+- `.content-area .dashboard-command .mobile-quote1-stats>button>small` → color:#6B7280
+- `.content-area .dashboard-command .mobile-quote1-heading h2` → color:#17382b
+- `.content-area .dashboard-command .mobile-quote1-heading button` → background:#0b5fa8; border:1px solid rgba(255,255,255,.45); color:#fff
+- `.content-area .dashboard-command .mobile-quote1-grid>button` → background:#0b5fa8; color:#fff; border:1px solid #eef0f2
+- `.content-area .dashboard-command .mobile-quote1-grid>button:hover,   .content-area .dashboard-command .mobile-quote1-grid>button:focus` → background:#1672bf; color:#fff
+- `.content-area .dashboard-command .mobile-quote1-grid>button>span` → background:#eef7f1; color:#2E8B57
+- `.content-area .dashboard-command .mobile-quote1-grid>button:nth-child(2)>span` → background:#fff1f0; color:#d83a4d
+- `.content-area .dashboard-command .mobile-quote1-grid>button:nth-child(3)>span` → background:#fff5df; color:#d99113
+- `.content-area .dashboard-command .mobile-quote1-grid>button:nth-child(4)>span` → background:#eef7f1; color:#2E8B57
+- `.content-area .dashboard-command .mobile-quote1-grid>button:nth-child(5)>span` → background:#fff5df; color:#d99113
+- `.content-area .dashboard-command .mobile-quote1-grid>button:nth-child(6)>span` → background:#eef5fb; color:#2D8CDB
+- `.content-area .dashboard-command .mobile-quote1-grid>button>strong` → color:#111827
+- `.dashboard-content-area` → background:linear-gradient(180deg,#0b5fa8 0%,#0a4f8d 55%,#083f73 100%); color:#fff
+- `.dashboard-content-area .dashboard-command` → color:#fff
+- `.dashboard-content-area .mobile-quote1-stats>button,   .dashboard-content-area .mobile-quote1-grid>button,   .dashboard-content-area .mobile-quote1-heading>button` → background:#0b5fa8; color:#fff; border:1px solid rgba(255,255,255,.42)
+- `.dashboard-content-area .mobile-quote1-stats>button:hover,   .dashboard-content-area .mobile-quote1-stats>button:focus-visible,   .dashboard-content-area .mobile-quote1-grid>button:hover,   .dashboard-content-area .mobile-quote1-grid>button:focus-visible,   .dashboard-content-area .mobile-quote1-heading>button:hover,   .dashboard-content-area .mobile-quote1-heading>button:focus-visible` → background:#1672bf; color:#fff
+- `.dashboard-content-area .mobile-quote1-stats>button strong,   .dashboard-content-area .mobile-quote1-stats>button b,   .dashboard-content-area .mobile-quote1-stats>button small,   .dashboard-content-area .mobile-quote1-stats>button i,   .dashboard-content-area .mobile-quote1-grid>button strong,   .dashboard-content-area .mobile-quote1-grid>button b,   .dashboard-content-area .mobile-quote1-heading>button` → color:#fff
+- `.dashboard-content-area .mobile-quote1-grid>button>span` → color:#fff
+- `.dashboard-content-area section.mobile-quote1-quick .mobile-quote1-grid button.mobile-blue-nav-button,   .dashboard-content-area section.mobile-quote1-stats button.mobile-blue-nav-button,   .dashboard-content-area section.mobile-quote1-quick .mobile-quote1-heading button.mobile-blue-nav-button` → background-color:#0b5fa8; color:#ffffff
+- `.dashboard-content-area section.mobile-quote1-quick .mobile-quote1-grid button.mobile-blue-nav-button strong,   .dashboard-content-area section.mobile-quote1-stats button.mobile-blue-nav-button strong,   .dashboard-content-area section.mobile-quote1-stats button.mobile-blue-nav-button b,   .dashboard-content-area section.mobile-quote1-stats button.mobile-blue-nav-button small,   .dashboard-content-area section.mobile-quote1-stats button.mobile-blue-nav-button i,   .dashboard-content-area section.mobile-quote1-quick .mobile-quote1-heading button.mobile-blue-nav-button` → color:#ffffff
+- `.dashboard-content-area .mobile-quote1-stats button.mobile-blue-nav-button,   .dashboard-content-area .mobile-quote1-quick .mobile-quote1-heading button.mobile-blue-nav-button,   .dashboard-content-area .mobile-quote1-grid button.mobile-blue-nav-button` → background:#0b5fa8; background-color:#0b5fa8; color:#fff
+- `.dashboard-content-area .mobile-quote1-stats button.mobile-blue-nav-button:hover,   .dashboard-content-area .mobile-quote1-stats button.mobile-blue-nav-button:focus,   .dashboard-content-area .mobile-quote1-stats button.mobile-blue-nav-button:active,   .dashboard-content-area .mobile-quote1-quick .mobile-quote1-heading button.mobile-blue-nav-button:hover,   .dashboard-content-area .mobile-quote1-quick .mobile-quote1-heading button.mobile-blue-nav-button:focus,   .dashboard-content-area .mobile-quote1-quick .mobile-quote1-heading button.mobile-blue-nav-button:active,   .dashboard-content-area .mobile-quote1-grid button.mobile-blue-nav-button:hover,   .dashboard-content-area .mobile-quote1-grid button.mobile-blue-nav-button:focus,   .dashboard-content-area .mobile-quote1-grid button.mobile-blue-nav-button:active` → background:#1672bf; background-color:#1672bf; color:#fff
+- `.dashboard-content-area .mobile-quote1-stats button.mobile-blue-nav-button strong,   .dashboard-content-area .mobile-quote1-stats button.mobile-blue-nav-button b,   .dashboard-content-area .mobile-quote1-stats button.mobile-blue-nav-button small,   .dashboard-content-area .mobile-quote1-stats button.mobile-blue-nav-button i,   .dashboard-content-area .mobile-quote1-grid button.mobile-blue-nav-button strong,   .dashboard-content-area .mobile-quote1-quick .mobile-quote1-heading button.mobile-blue-nav-button` → color:#fff
+- `/* Front-dashboard navigation/stat cards */   .dashboard-quote4-stats>button,   .quote4-quick-grid>button` → background:#0b5fa8; background-color:#0b5fa8; color:#fff; border:1px solid rgba(255,255,255,.45)
+- `.dashboard-quote4-stats>button:hover,   .dashboard-quote4-stats>button:focus-visible,   .quote4-quick-grid>button:hover,   .quote4-quick-grid>button:focus-visible` → background:#1672bf; background-color:#1672bf; color:#fff
+- `.dashboard-quote4-stats>button strong,   .dashboard-quote4-stats>button b,   .dashboard-quote4-stats>button small,   .dashboard-quote4-stats>button i,   .quote4-quick-grid>button strong,   .quote4-quick-grid>button small,   .quote4-quick-grid>button b,   .quote4-quick-grid>button span` → color:#fff
+- `.dashboard-desktop-view .desktop-blue-nav-button,   .dashboard-desktop-view .quote4-quick-grid .desktop-blue-nav-button,   .dashboard-desktop-view .dashboard-quote4-stats .desktop-blue-nav-button,   .dashboard-desktop-view .quote4-heading>button` → background:#0b5fa8; background-color:#0b5fa8; color:#fff; border:1px solid rgba(255,255,255,.55)
+- `.dashboard-desktop-view .desktop-blue-nav-button:hover,   .dashboard-desktop-view .desktop-blue-nav-button:focus-visible,   .dashboard-desktop-view .quote4-heading>button:hover,   .dashboard-desktop-view .quote4-heading>button:focus-visible` → background:#1672bf; background-color:#1672bf; color:#fff
+- `.dashboard-desktop-view .desktop-blue-nav-button strong,   .dashboard-desktop-view .desktop-blue-nav-button b,   .dashboard-desktop-view .desktop-blue-nav-button small,   .dashboard-desktop-view .desktop-blue-nav-button i,   .dashboard-desktop-view .desktop-blue-nav-button span,   .dashboard-desktop-view .quote4-heading>button` → color:#fff
+- `/* The overhead Administrator wording remains white. */   .dashboard-desktop-view .desktop-quote4-hero h1,   .dashboard-desktop-view .desktop-quote4-hero em,   .dashboard-desktop-view .desktop-quote4-hero p` → color:#fff
+- `.main-area>.dashboard-topbar .topbar-access-category` → border:1px solid rgba(255,255,255,.25); background:#062b4c; color:#fff
+- `.main-area>.dashboard-topbar .topbar-access-category>span` → color:#fff
+- `.main-area>.dashboard-topbar .mobile-access-live-date` → color:#fff
+- `.main-area>.dashboard-topbar .mobile-access-live-date strong` → color:#d7ecff
+- `.main-area>.dashboard-topbar .mobile-access-live-date span` → color:#fff
+- `.main-area>.dashboard-topbar .mobile-access-live-date b` → color:#f6d76a
+- `.main-area>.dashboard-topbar .mobile-access-live-date button` → border:1px solid rgba(255,255,255,.45); background:#0b5fa8; color:#fff
 
 ## Dashboard / navigation (233 rules)
 
@@ -449,41 +449,41 @@ _None._
 - `.nav-item.active .nav-item-icon` → color:#fff
 - `.nav-item-icon` → background:rgba(214,165,44,.12); color:#d6a52c
 - `.nav-item.active .nav-item-icon` → background:rgba(214,165,44,.2); color:#d6a52c
-- `/* Final sidebar taskbar icon treatment */ .nav-item-content .nav-item-icon` → color:#f2f5f3!important
-- `.nav-item.active .nav-item-icon` → color:#fff!important
-- `/* ================================================================    IRPA WEB-WIDE BUTTON STANDARD    One visual language across all application pages.    Exceptions are limited to destructive/safety actions, icon-only    controls and mobile/system navigation where their special geometry    is functional rather than a button-style variation.    ================================================================ */ .content-area .page button:not(.danger-button):not(.delete-button):not(.icon-button):not(.close-button):not(.mobile-nav-button):not(.mobile-bottom-nav-button), .content-area .page a.button:not(.danger-button):not(.delete-button), .content-area .page a.secondary-button, .content-area .page a.primary-button` → border:1px solid #2f86cf!important; background:#0b5fa8!important; color:#ffffff!important
-- `.content-area .page button:not(.danger-button):not(.delete-button):not(.icon-button):not(.close-button):not(.mobile-nav-button):not(.mobile-bottom-nav-button):hover, .content-area .page a.button:not(.danger-button):not(.delete-button):hover, .content-area .page a.secondary-button:hover, .content-area .page a.primary-button:hover` → background:#1672bf!important; color:#ffffff!important
-- `.main-area>.mobile-global-nav button` → background:#ffffff!important; color:#557168!important
-- `.main-area>.mobile-global-nav button.active` → background:#e7f4ed!important; color:#075f3d!important
-- `.sidebar` → background:linear-gradient(180deg,#063524 0%,#075032 58%,#043121 100%)!important
+- `/* Final sidebar taskbar icon treatment */ .nav-item-content .nav-item-icon` → color:#f2f5f3
+- `.nav-item.active .nav-item-icon` → color:#fff
+- `/* ================================================================    IRPA WEB-WIDE BUTTON STANDARD    One visual language across all application pages.    Exceptions are limited to destructive/safety actions, icon-only    controls and mobile/system navigation where their special geometry    is functional rather than a button-style variation.    ================================================================ */ .content-area .page button:not(.danger-button):not(.delete-button):not(.icon-button):not(.close-button):not(.mobile-nav-button):not(.mobile-bottom-nav-button), .content-area .page a.button:not(.danger-button):not(.delete-button), .content-area .page a.secondary-button, .content-area .page a.primary-button` → border:1px solid #2f86cf; background:#0b5fa8; color:#ffffff
+- `.content-area .page button:not(.danger-button):not(.delete-button):not(.icon-button):not(.close-button):not(.mobile-nav-button):not(.mobile-bottom-nav-button):hover, .content-area .page a.button:not(.danger-button):not(.delete-button):hover, .content-area .page a.secondary-button:hover, .content-area .page a.primary-button:hover` → background:#1672bf; color:#ffffff
+- `.main-area>.mobile-global-nav button` → background:#ffffff; color:#557168
+- `.main-area>.mobile-global-nav button.active` → background:#e7f4ed; color:#075f3d
+- `.sidebar` → background:linear-gradient(180deg,#063524 0%,#075032 58%,#043121 100%)
 - `.quote4-sidebar-logo` → background:#fff
-- `.sidebar-brand-copy strong` → color:#f7cf61!important
-- `.sidebar-brand-copy span` → color:#fff!important
-- `.sidebar-brand-copy small` → color:#a9c9bb!important
-- `.nav-group-title` → color:#7ea998!important
-- `.nav-item` → color:#bdd5ca!important
-- `.nav-item:hover` → background:rgba(255,255,255,.08)!important; color:#fff!important
-- `.nav-item.active` → background:#0b5fa8!important; color:#fff!important
-- `.nav-item.active .nav-item-icon` → color:#fff!important
-- `.sidebar .logout-button` → background:#0b5fa8!important; color:#fff!important; border:1px solid #2f86cf!important
-- `.topbar` → background:linear-gradient(135deg,#063524 0%,#075032 58%,#043121 100%)!important
-- `.topbar-kicker` → color:#f7cf61!important
-- `.topbar h2` → color:#fff!important
-- `.topbar p` → color:#e7f4ee!important
-- `.topbar .logout-button` → background:#0b5fa8!important; color:#fff!important; border:1px solid #2f86cf!important
-- `.desktop-quote4-hero` → background:#075333!important
+- `.sidebar-brand-copy strong` → color:#f7cf61
+- `.sidebar-brand-copy span` → color:#fff
+- `.sidebar-brand-copy small` → color:#a9c9bb
+- `.nav-group-title` → color:#7ea998
+- `.nav-item` → color:#bdd5ca
+- `.nav-item:hover` → background:rgba(255,255,255,.08); color:#fff
+- `.nav-item.active` → background:#0b5fa8; color:#fff
+- `.nav-item.active .nav-item-icon` → color:#fff
+- `.sidebar .logout-button` → background:#0b5fa8; color:#fff; border:1px solid #2f86cf
+- `.topbar` → background:linear-gradient(135deg,#063524 0%,#075032 58%,#043121 100%)
+- `.topbar-kicker` → color:#f7cf61
+- `.topbar h2` → color:#fff
+- `.topbar p` → color:#e7f4ee
+- `.topbar .logout-button` → background:#0b5fa8; color:#fff; border:1px solid #2f86cf
+- `.desktop-quote4-hero` → background:#075333
 - `.desktop-quote4-hero-overlay` → background:linear-gradient(90deg,rgba(4,45,31,.94) 0%,rgba(5,64,40,.76) 43%,rgba(5,64,40,.18) 100%)
 - `.desktop-quote4-hero-content` → color:#fff
-- `.desktop-quote4-hero .eyebrow` → color:#f3cf65!important
-- `.desktop-quote4-hero h1` → color:#fff!important
-- `.desktop-quote4-hero em` → color:#fff!important
+- `.desktop-quote4-hero .eyebrow` → color:#f3cf65
+- `.desktop-quote4-hero h1` → color:#fff
+- `.desktop-quote4-hero em` → color:#fff
 - `.quote4-stat-icon` → background:#e5f3eb; color:#176943
-- `.quote4-heading h2` → color:#173f2f!important
-- `.quote4-heading .eyebrow` → color:#5f8373!important
-- `.quote4-heading>button` → color:#16764c!important
+- `.quote4-heading h2` → color:#173f2f
+- `.quote4-heading .eyebrow` → color:#5f8373
+- `.quote4-heading>button` → color:#16764c
 - `.quote4-activity-header` → color:#71857c
-- `.quote4-activity-table>button` → background:#fff!important; color:#27473a!important
-- `.quote4-activity-table>button:hover` → background:#f3faf6!important
+- `.quote4-activity-table>button` → background:#fff; color:#27473a
+- `.quote4-activity-table>button:hover` → background:#f3faf6
 - `.quote4-activity-table span,.quote4-activity-table small` → color:#71857c
 - `.quote4-activity-table strong` → color:#214538
 - `.quote4-activity-table em` → background:#edf7f1; color:#187045
@@ -493,161 +493,161 @@ _None._
 - `.quote4-activity-table em.is-neutral` → background:#eef2f0; color:#60756c
 - `.quote4-activity-table b` → color:#1c7850
 - `.quote4-empty` → color:#71857c
-- `.quote4-quick-grid>button` → background:#0b5fa8!important; color:#fff!important; border:1px solid rgba(255,255,255,.42)!important
-- `.quote4-quick-grid>button:hover` → background:#1672bf!important
-- `.quote4-quick-grid>button>span` → color:#fff!important
-- `.quote4-quick-grid>button>strong` → color:#fff!important
-- `.quote4-quick-grid>button>small` → color:#e5f1fa!important
-- `.quote4-quick-grid>button>b` → color:#fff!important
+- `.quote4-quick-grid>button` → background:#0b5fa8; color:#fff; border:1px solid rgba(255,255,255,.42)
+- `.quote4-quick-grid>button:hover` → background:#1672bf
+- `.quote4-quick-grid>button>span` → color:#fff
+- `.quote4-quick-grid>button>strong` → color:#fff
+- `.quote4-quick-grid>button>small` → color:#e5f1fa
+- `.quote4-quick-grid>button>b` → color:#fff
 - `.mobile-quote1-hero` → background:#06452f; color:#fff
 - `.mobile-quote1-shade` → background:linear-gradient(180deg,rgba(2,39,27,.58),rgba(4,72,48,.88))
 - `.mobile-quote1-top img` → background:#fff
 - `.mobile-quote1-top strong` → color:#fff
 - `.mobile-quote1-top small` → color:#f5d36a
-- `.mobile-quote1-top>button` → background:#fff!important; color:#e34b3d!important
+- `.mobile-quote1-top>button` → background:#fff; color:#e34b3d
 - `.mobile-quote1-photo` → background:#e9f4ee; color:#17613d; border:3px solid #fff
 - `.mobile-quote1-user span` → color:#f4d878
-- `.mobile-quote1-user h1` → color:#fff!important
-- `.mobile-quote1-user p` → color:#e1f0e9!important
+- `.mobile-quote1-user h1` → color:#fff
+- `.mobile-quote1-user p` → color:#e1f0e9
 - `.mobile-quote1-user em` → background:#f4cf58; color:#153f2e
-- `.mobile-quote1-stats>button` → background:#fff!important; color:#183e2f!important; border:1px solid #d5e4dc!important
-- `.mobile-quote1-stats>button:hover` → background:#fbfefd!important
+- `.mobile-quote1-stats>button` → background:#fff; color:#183e2f; border:1px solid #d5e4dc
+- `.mobile-quote1-stats>button:hover` → background:#fbfefd
 - `.mobile-quote1-stats>button>span` → background:#e3f2ea; color:#137048
-- `.mobile-quote1-stats>button>strong` → color:#0e613f!important
-- `.mobile-quote1-stats>button>b` → color:#315448!important
-- `.mobile-quote1-stats>button>small` → color:#72867e!important
+- `.mobile-quote1-stats>button>strong` → color:#0e613f
+- `.mobile-quote1-stats>button>b` → color:#315448
+- `.mobile-quote1-stats>button>small` → color:#72867e
 - `.mobile-quote1-stats>button>i` → color:#19794f
-- `.mobile-quote1-heading h2` → color:#173f2f!important
-- `.mobile-quote1-heading button` → color:#16774d!important
-- `.mobile-quote1-grid>button` → background:#fff!important; color:#193e30!important; border:1px solid #d5e4dc!important
-- `.mobile-quote1-grid>button:hover` → background:#f1faf5!important
+- `.mobile-quote1-heading h2` → color:#173f2f
+- `.mobile-quote1-heading button` → color:#16774d
+- `.mobile-quote1-grid>button` → background:#fff; color:#193e30; border:1px solid #d5e4dc
+- `.mobile-quote1-grid>button:hover` → background:#f1faf5
 - `.mobile-quote1-grid>button>span` → background:#edf6f1; color:#17724a
 - `.mobile-quote1-grid>button:nth-child(3n+2)>span` → background:#fff1dc; color:#b56c1b
 - `.mobile-quote1-grid>button:nth-child(3n)>span` → background:#e8effb; color:#2873ae
-- `.mobile-quote1-grid>button>strong` → color:#24483a!important
+- `.mobile-quote1-grid>button>strong` → color:#24483a
 - `.mobile-quote1-motto` → background:#e4f2ea; border:1px solid #c2dccd
 - `.mobile-quote1-motto span` → background:#0c6b45; color:#f4d56d
 - `.mobile-quote1-motto strong` → color:#285544
-- `.main-area>.mobile-global-nav` → background:#fff!important
-- `.main-area>.mobile-global-nav button` → background:#fff!important; color:#637a70!important
-- `.main-area>.mobile-global-nav button.active` → background:#e7f4ed!important; color:#087047!important
-- `.mobile-quote1-hero` → background:#0b6847!important
-- `.mobile-quote1-shade` → background:linear-gradient(180deg,rgba(5,48,34,.40) 0%,rgba(5,75,49,.46) 47%,rgba(4,86,55,.90) 100%)!important
-- `.mobile-quote1-top img` → background:#fff!important
-- `.mobile-quote1-top small` → color:#f6d86b!important
-- `.mobile-quote1-top>button` → background:#fff!important; color:#d63f36!important
-- `.mobile-quote1-photo` → border:3px solid #fff!important
-- `.mobile-quote1-user h1` → color:#fff!important
-- `.mobile-quote1-user p` → color:#edf7f2!important
-- `.mobile-quote1-user em` → background:#f4cf52!important; color:#173e2d!important
-- `.mobile-quote1-stats>button` → background:#fff!important; color:#193f30!important; border:1px solid #d9e7df!important
-- `.content-area .page .mobile-quote1-stats>button,   .content-area .page .mobile-quote1-stats>button:hover,   .content-area .page .mobile-quote1-stats>button:focus` → background:#fff!important; color:#193f30!important
-- `.mobile-quote1-stats>button>span` → background:#e6f4ed!important; color:#17784e!important
-- `.mobile-quote1-stats>button:nth-child(2)>span` → background:#e7f0fb!important; color:#2875b1!important
-- `.mobile-quote1-stats>button:nth-child(3)>span` → background:#fff0d7!important; color:#c17a25!important
-- `.mobile-quote1-stats>button:nth-child(4)>span` → background:#eee8fa!important; color:#704ba7!important
-- `.mobile-quote1-stats>button>strong` → color:#15764d!important
-- `.mobile-quote1-stats>button>b` → color:#274b3d!important
-- `.mobile-quote1-stats>button>small` → color:#72867d!important
-- `.mobile-quote1-stats>button>i` → color:#168052!important
-- `.mobile-quote1-heading h2` → color:#173f2f!important
-- `.content-area .page .mobile-quote1-heading button` → color:#17784e!important
-- `.content-area .page .mobile-quote1-heading button:hover,   .content-area .page .mobile-quote1-heading button:focus` → color:#0e603f!important
-- `.mobile-quote1-grid>button,   .content-area .page .mobile-quote1-grid>button` → background:#fff!important; color:#254a3c!important; border:1px solid #d9e7df!important
-- `.mobile-quote1-grid>button:hover,   .mobile-quote1-grid>button:focus` → background:#fff!important; color:#254a3c!important
-- `.mobile-quote1-grid>button>span` → background:#e7f4ed!important; color:#14774d!important
-- `.mobile-quote1-grid>button:nth-child(3n+2)>span` → background:#fff0d8!important; color:#bd7723!important
-- `.mobile-quote1-grid>button:nth-child(3n)>span` → background:#e8f0fb!important; color:#2a73ad!important
-- `.mobile-quote1-grid>button>strong` → color:#254a3c!important
-- `.mobile-quote1-motto` → background:#e7f4ed!important; border:1px solid #c7ded2!important
-- `/* Selected Quote 1 has a white bottom navigation with green active Home. */   .main-area>.mobile-global-nav` → background:#fff!important
-- `.main-area>.mobile-global-nav button` → background:#fff!important; color:#667b72!important
-- `.main-area>.mobile-global-nav button.active` → background:#e6f4ed!important; color:#08734a!important
-- `.mobile-quote1-hero` → background:#0b6044!important
-- `.mobile-quote1-shade` → background:linear-gradient(180deg,rgba(3,39,30,.35),rgba(3,57,39,.30) 44%,rgba(3,91,59,.76))!important
-- `.mobile-quote1-top img` → background:#fff!important
-- `.mobile-quote1-top strong` → color:#fff!important
-- `.mobile-quote1-top small` → color:#f6d96d!important
-- `.mobile-quote1-top>button` → background:#fff!important; color:#cf3d35!important
-- `.mobile-quote1-photo` → border:3px solid #fff!important; background:#eef5f1!important; color:#16744c!important
-- `.mobile-quote1-user span` → color:#f4d76c!important
-- `color:#fff!important;font-size:18px!important;.mobile-quote1-user p` → color:#f0f7f3!important
-- `.mobile-quote1-user em` → background:#f4ce52!important; color:#163e2d!important
-- `.mobile-quote1-stats>button,.content-area .page .mobile-quote1-stats>button` → background:#fff!important; color:#173b2d!important; border:1px solid #dce9e3!important
-- `.mobile-quote1-stats>button>span` → background:#0f9b5d!important; color:#fff!important
-- `.mobile-quote1-stats>button:nth-child(2)>span` → background:#1688df!important
-- `.mobile-quote1-stats>button:nth-child(3)>span` → background:#f4ad21!important
-- `.mobile-quote1-stats>button:nth-child(4)>span` → background:#16a15d!important
-- `.mobile-quote1-stats>button>strong` → color:#149458!important
-- `.mobile-quote1-stats>button>b` → color:#1c4032!important
-- `.mobile-quote1-stats>button>small` → color:#6c8178!important
-- `.mobile-quote1-stats>button>i` → color:#15955c!important
-- `.mobile-quote1-heading h2` → color:#142f25!important
-- `.mobile-quote1-heading button` → color:#147cc0!important
-- `.mobile-quote1-grid>button,.content-area .page .mobile-quote1-grid>button` → background:#fff!important; color:#172f27!important; border:1px solid #dfeae5!important
-- `.mobile-quote1-grid>button:nth-child(1)>span` → color:#0879ca!important
-- `.mobile-quote1-grid>button:nth-child(2)>span` → color:#e22d3b!important
-- `.mobile-quote1-grid>button:nth-child(3)>span` → color:#d98b09!important
-- `.mobile-quote1-grid>button:nth-child(4)>span` → color:#087b58!important
-- `.mobile-quote1-grid>button:nth-child(5)>span` → color:#e5a600!important
-- `.mobile-quote1-grid>button:nth-child(6)>span` → color:#0879ca!important
-- `.mobile-quote1-grid>button>strong` → color:#17352b!important
-- `.main-area>.mobile-global-nav` → background:#fff!important
-- `.main-area>.mobile-global-nav button` → background:#fff!important; color:#687d75!important
-- `.main-area>.mobile-global-nav button.active` → background:#0b5fa8!important; color:#fff!important
-- `.sidebar` → background:#063d2a!important
-- `.sidebar-brand` → background:#063d2a!important
-- `.quote4-sidebar-logo` → background:#fff!important
-- `.sidebar-brand-copy strong` → color:#f6cf58!important
-- `.sidebar-brand-copy span,.sidebar-brand-copy small` → color:#d9ebe3!important
-- `.topbar` → background:linear-gradient(180deg,#063524 0%,#075032 58%,#043121 100%)!important
-- `.desktop-quote4-hero` → background:#075b42!important
-- `.desktop-quote4-hero-overlay` → background:linear-gradient(90deg,rgba(2,52,37,.76),rgba(4,75,51,.30) 62%,rgba(4,61,43,.14))!important
-- `.quote4-heading h2` → color:#173c2d!important
-- `.quote4-activity-table>button` → background:#fff!important
-- `.quote4-activity-table>button:hover` → background:#f7fbf9!important
-- `.quote4-quick-grid>button` → background:#fff!important; color:#173c2d!important; border:1px solid #dce8e2!important
-- `.quote4-quick-grid>button>span` → color:#128053!important
-- `.quote4-quick-grid>button>strong` → color:#21473a!important
-- `.quote4-quick-grid>button>small` → color:#667d73!important
-- `.main-area>.mobile-global-nav` → background:#fff!important
-- `.main-area>.mobile-global-nav button` → background:#fff!important; color:#72847d!important
-- `.main-area>.mobile-global-nav button.active` → background:#f0f8f4!important; color:#079154!important
-- `.mobile-nav-bell i` → background:#e31d2b!important; color:#fff!important; border:2px solid #fff!important
-- `/* BOTTOM TAB BAR */   .main-area>.mobile-global-nav` → background:#FFFFFF!important
-- `.main-area>.mobile-global-nav button` → background:#FFFFFF!important; color:#6B7280!important
-- `.main-area>.mobile-global-nav button.active` → background:#FFFFFF!important; color:#2E8B57!important
-- `.main-area>.mobile-global-nav button:not(.active) .mobile-nav-icon .svg-inline--fa,   .main-area>.mobile-global-nav button:not(.active) .mobile-nav-icon>i` → color:#6B7280!important
-- `.main-area>.mobile-global-nav button.active .mobile-nav-icon .svg-inline--fa,   .main-area>.mobile-global-nav button.active .mobile-nav-icon>i` → color:#fff!important
-- `.main-area>.mobile-global-nav .mobile-nav-bell b` → background:#ef233c!important; color:#fff!important; border:2px solid #fff!important
-- `.mobile-quote1-stats>button` → background:#082f55!important; color:#fff!important; border:1px solid rgba(255,255,255,.22)!important
-- `.mobile-quote1-stats>button:hover,.mobile-quote1-stats>button:focus-visible` → background:#0b3e6d!important
-- `.mobile-quote1-stats>button>strong,.mobile-quote1-stats>button>b,.mobile-quote1-stats>button>small` → color:#fff!important
-- `.mobile-quote1-stats>button>i` → color:#fff!important
-- `.mobile-quote1-quick` → color:#fff!important
-- `.mobile-quote1-heading h2` → color:#fff!important
-- `.mobile-quote1-heading>button` → background:#082f55!important; color:#fff!important; border:1px solid rgba(255,255,255,.3)!important
-- `.mobile-quote1-grid>button` → background:#082f55!important; color:#fff!important; border:1px solid rgba(255,255,255,.22)!important
-- `.mobile-quote1-grid>button:hover,.mobile-quote1-grid>button:focus-visible` → background:#0b3e6d!important
-- `color:#fff!important;   .mobile-global-nav` → background:#062b4c!important; border-bottom-color:rgba(255,255,255,.22)!important
-- `.mobile-global-nav button,.mobile-global-nav button b` → color:#fff!important
-- `.mobile-global-nav button.active` → color:#fff!important; background:#0b5fa8!important
-- `.mobile-nav-sheet` → background:#062b4c!important
-- `.mobile-nav-sheet-header` → color:#fff!important; border-bottom-color:rgba(255,255,255,.2)!important
-- `.mobile-nav-sheet-header button,.mobile-nav-sheet-list button` → color:#fff!important; background:#0b3e6d!important
-- `.mobile-nav-sheet-list button b` → color:#fff!important
-- `.mobile-blue-nav-button` → background:#0b5fa8!important; color:#fff!important; border:1px solid rgba(255,255,255,.45)!important
-- `.mobile-blue-nav-button:hover,.mobile-blue-nav-button:focus-visible,.mobile-blue-nav-button:active` → background:#1672bf!important; color:#fff!important
-- `.mobile-blue-nav-button strong,.mobile-blue-nav-button b,.mobile-blue-nav-button small,.mobile-blue-nav-button i` → color:#fff!important
-- `.main-area>.mobile-global-nav button.active,   .mobile-global-nav button.active` → background:#0b5fa8!important; background-color:#0b5fa8!important; color:#fff!important
-- `.main-area>.mobile-global-nav button.active .mobile-nav-icon .svg-inline--fa,   .main-area>.mobile-global-nav button.active .mobile-nav-icon>i,   .mobile-global-nav button.active .mobile-nav-icon .svg-inline--fa,   .mobile-global-nav button.active .mobile-nav-icon>i` → color:#fff!important
-- `.desktop-quote4-hero p` → color:#fff!important
-- `/* IRPA READABILITY FIX — UNIFIED CONTROL NAVIGATION — 2026-09-25 */ .module-interlink-bar .module-interlink-list > button, .module-interlink-bar .workflow-portal-parent, .module-interlink-bar .workflow-portal-children button` → background:#0b5fa8!important; background-color:#0b5fa8!important; color:#ffffff!important; border:1px solid #2f86cf!important
+- `.main-area>.mobile-global-nav` → background:#fff
+- `.main-area>.mobile-global-nav button` → background:#fff; color:#637a70
+- `.main-area>.mobile-global-nav button.active` → background:#e7f4ed; color:#087047
+- `.mobile-quote1-hero` → background:#0b6847
+- `.mobile-quote1-shade` → background:linear-gradient(180deg,rgba(5,48,34,.40) 0%,rgba(5,75,49,.46) 47%,rgba(4,86,55,.90) 100%)
+- `.mobile-quote1-top img` → background:#fff
+- `.mobile-quote1-top small` → color:#f6d86b
+- `.mobile-quote1-top>button` → background:#fff; color:#d63f36
+- `.mobile-quote1-photo` → border:3px solid #fff
+- `.mobile-quote1-user h1` → color:#fff
+- `.mobile-quote1-user p` → color:#edf7f2
+- `.mobile-quote1-user em` → background:#f4cf52; color:#173e2d
+- `.mobile-quote1-stats>button` → background:#fff; color:#193f30; border:1px solid #d9e7df
+- `.content-area .page .mobile-quote1-stats>button,   .content-area .page .mobile-quote1-stats>button:hover,   .content-area .page .mobile-quote1-stats>button:focus` → background:#fff; color:#193f30
+- `.mobile-quote1-stats>button>span` → background:#e6f4ed; color:#17784e
+- `.mobile-quote1-stats>button:nth-child(2)>span` → background:#e7f0fb; color:#2875b1
+- `.mobile-quote1-stats>button:nth-child(3)>span` → background:#fff0d7; color:#c17a25
+- `.mobile-quote1-stats>button:nth-child(4)>span` → background:#eee8fa; color:#704ba7
+- `.mobile-quote1-stats>button>strong` → color:#15764d
+- `.mobile-quote1-stats>button>b` → color:#274b3d
+- `.mobile-quote1-stats>button>small` → color:#72867d
+- `.mobile-quote1-stats>button>i` → color:#168052
+- `.mobile-quote1-heading h2` → color:#173f2f
+- `.content-area .page .mobile-quote1-heading button` → color:#17784e
+- `.content-area .page .mobile-quote1-heading button:hover,   .content-area .page .mobile-quote1-heading button:focus` → color:#0e603f
+- `.mobile-quote1-grid>button,   .content-area .page .mobile-quote1-grid>button` → background:#fff; color:#254a3c; border:1px solid #d9e7df
+- `.mobile-quote1-grid>button:hover,   .mobile-quote1-grid>button:focus` → background:#fff; color:#254a3c
+- `.mobile-quote1-grid>button>span` → background:#e7f4ed; color:#14774d
+- `.mobile-quote1-grid>button:nth-child(3n+2)>span` → background:#fff0d8; color:#bd7723
+- `.mobile-quote1-grid>button:nth-child(3n)>span` → background:#e8f0fb; color:#2a73ad
+- `.mobile-quote1-grid>button>strong` → color:#254a3c
+- `.mobile-quote1-motto` → background:#e7f4ed; border:1px solid #c7ded2
+- `/* Selected Quote 1 has a white bottom navigation with green active Home. */   .main-area>.mobile-global-nav` → background:#fff
+- `.main-area>.mobile-global-nav button` → background:#fff; color:#667b72
+- `.main-area>.mobile-global-nav button.active` → background:#e6f4ed; color:#08734a
+- `.mobile-quote1-hero` → background:#0b6044
+- `.mobile-quote1-shade` → background:linear-gradient(180deg,rgba(3,39,30,.35),rgba(3,57,39,.30) 44%,rgba(3,91,59,.76))
+- `.mobile-quote1-top img` → background:#fff
+- `.mobile-quote1-top strong` → color:#fff
+- `.mobile-quote1-top small` → color:#f6d96d
+- `.mobile-quote1-top>button` → background:#fff; color:#cf3d35
+- `.mobile-quote1-photo` → border:3px solid #fff; background:#eef5f1; color:#16744c
+- `.mobile-quote1-user span` → color:#f4d76c
+- `color:#fff;font-size:18px;.mobile-quote1-user p` → color:#f0f7f3
+- `.mobile-quote1-user em` → background:#f4ce52; color:#163e2d
+- `.mobile-quote1-stats>button,.content-area .page .mobile-quote1-stats>button` → background:#fff; color:#173b2d; border:1px solid #dce9e3
+- `.mobile-quote1-stats>button>span` → background:#0f9b5d; color:#fff
+- `.mobile-quote1-stats>button:nth-child(2)>span` → background:#1688df
+- `.mobile-quote1-stats>button:nth-child(3)>span` → background:#f4ad21
+- `.mobile-quote1-stats>button:nth-child(4)>span` → background:#16a15d
+- `.mobile-quote1-stats>button>strong` → color:#149458
+- `.mobile-quote1-stats>button>b` → color:#1c4032
+- `.mobile-quote1-stats>button>small` → color:#6c8178
+- `.mobile-quote1-stats>button>i` → color:#15955c
+- `.mobile-quote1-heading h2` → color:#142f25
+- `.mobile-quote1-heading button` → color:#147cc0
+- `.mobile-quote1-grid>button,.content-area .page .mobile-quote1-grid>button` → background:#fff; color:#172f27; border:1px solid #dfeae5
+- `.mobile-quote1-grid>button:nth-child(1)>span` → color:#0879ca
+- `.mobile-quote1-grid>button:nth-child(2)>span` → color:#e22d3b
+- `.mobile-quote1-grid>button:nth-child(3)>span` → color:#d98b09
+- `.mobile-quote1-grid>button:nth-child(4)>span` → color:#087b58
+- `.mobile-quote1-grid>button:nth-child(5)>span` → color:#e5a600
+- `.mobile-quote1-grid>button:nth-child(6)>span` → color:#0879ca
+- `.mobile-quote1-grid>button>strong` → color:#17352b
+- `.main-area>.mobile-global-nav` → background:#fff
+- `.main-area>.mobile-global-nav button` → background:#fff; color:#687d75
+- `.main-area>.mobile-global-nav button.active` → background:#0b5fa8; color:#fff
+- `.sidebar` → background:#063d2a
+- `.sidebar-brand` → background:#063d2a
+- `.quote4-sidebar-logo` → background:#fff
+- `.sidebar-brand-copy strong` → color:#f6cf58
+- `.sidebar-brand-copy span,.sidebar-brand-copy small` → color:#d9ebe3
+- `.topbar` → background:linear-gradient(180deg,#063524 0%,#075032 58%,#043121 100%)
+- `.desktop-quote4-hero` → background:#075b42
+- `.desktop-quote4-hero-overlay` → background:linear-gradient(90deg,rgba(2,52,37,.76),rgba(4,75,51,.30) 62%,rgba(4,61,43,.14))
+- `.quote4-heading h2` → color:#173c2d
+- `.quote4-activity-table>button` → background:#fff
+- `.quote4-activity-table>button:hover` → background:#f7fbf9
+- `.quote4-quick-grid>button` → background:#fff; color:#173c2d; border:1px solid #dce8e2
+- `.quote4-quick-grid>button>span` → color:#128053
+- `.quote4-quick-grid>button>strong` → color:#21473a
+- `.quote4-quick-grid>button>small` → color:#667d73
+- `.main-area>.mobile-global-nav` → background:#fff
+- `.main-area>.mobile-global-nav button` → background:#fff; color:#72847d
+- `.main-area>.mobile-global-nav button.active` → background:#f0f8f4; color:#079154
+- `.mobile-nav-bell i` → background:#e31d2b; color:#fff; border:2px solid #fff
+- `/* BOTTOM TAB BAR */   .main-area>.mobile-global-nav` → background:#FFFFFF
+- `.main-area>.mobile-global-nav button` → background:#FFFFFF; color:#6B7280
+- `.main-area>.mobile-global-nav button.active` → background:#FFFFFF; color:#2E8B57
+- `.main-area>.mobile-global-nav button:not(.active) .mobile-nav-icon .svg-inline--fa,   .main-area>.mobile-global-nav button:not(.active) .mobile-nav-icon>i` → color:#6B7280
+- `.main-area>.mobile-global-nav button.active .mobile-nav-icon .svg-inline--fa,   .main-area>.mobile-global-nav button.active .mobile-nav-icon>i` → color:#fff
+- `.main-area>.mobile-global-nav .mobile-nav-bell b` → background:#ef233c; color:#fff; border:2px solid #fff
+- `.mobile-quote1-stats>button` → background:#082f55; color:#fff; border:1px solid rgba(255,255,255,.22)
+- `.mobile-quote1-stats>button:hover,.mobile-quote1-stats>button:focus-visible` → background:#0b3e6d
+- `.mobile-quote1-stats>button>strong,.mobile-quote1-stats>button>b,.mobile-quote1-stats>button>small` → color:#fff
+- `.mobile-quote1-stats>button>i` → color:#fff
+- `.mobile-quote1-quick` → color:#fff
+- `.mobile-quote1-heading h2` → color:#fff
+- `.mobile-quote1-heading>button` → background:#082f55; color:#fff; border:1px solid rgba(255,255,255,.3)
+- `.mobile-quote1-grid>button` → background:#082f55; color:#fff; border:1px solid rgba(255,255,255,.22)
+- `.mobile-quote1-grid>button:hover,.mobile-quote1-grid>button:focus-visible` → background:#0b3e6d
+- `color:#fff;   .mobile-global-nav` → background:#062b4c; border-bottom-color:rgba(255,255,255,.22)
+- `.mobile-global-nav button,.mobile-global-nav button b` → color:#fff
+- `.mobile-global-nav button.active` → color:#fff; background:#0b5fa8
+- `.mobile-nav-sheet` → background:#062b4c
+- `.mobile-nav-sheet-header` → color:#fff; border-bottom-color:rgba(255,255,255,.2)
+- `.mobile-nav-sheet-header button,.mobile-nav-sheet-list button` → color:#fff; background:#0b3e6d
+- `.mobile-nav-sheet-list button b` → color:#fff
+- `.mobile-blue-nav-button` → background:#0b5fa8; color:#fff; border:1px solid rgba(255,255,255,.45)
+- `.mobile-blue-nav-button:hover,.mobile-blue-nav-button:focus-visible,.mobile-blue-nav-button:active` → background:#1672bf; color:#fff
+- `.mobile-blue-nav-button strong,.mobile-blue-nav-button b,.mobile-blue-nav-button small,.mobile-blue-nav-button i` → color:#fff
+- `.main-area>.mobile-global-nav button.active,   .mobile-global-nav button.active` → background:#0b5fa8; background-color:#0b5fa8; color:#fff
+- `.main-area>.mobile-global-nav button.active .mobile-nav-icon .svg-inline--fa,   .main-area>.mobile-global-nav button.active .mobile-nav-icon>i,   .mobile-global-nav button.active .mobile-nav-icon .svg-inline--fa,   .mobile-global-nav button.active .mobile-nav-icon>i` → color:#fff
+- `.desktop-quote4-hero p` → color:#fff
+- `/* IRPA READABILITY FIX — UNIFIED CONTROL NAVIGATION — 2026-09-25 */ .module-interlink-bar .module-interlink-list > button, .module-interlink-bar .workflow-portal-parent, .module-interlink-bar .workflow-portal-children button` → background:#0b5fa8; background-color:#0b5fa8; color:#ffffff; border:1px solid #2f86cf
 - `.desktop-webapp-navigation-roller .webapp-navigation-roller-kicker` → color:#9fd2ff
 - `.desktop-webapp-navigation-roller strong` → color:#fff
 - `.desktop-webapp-navigation-roller select` → border:1px solid rgba(255,255,255,.35); background:#0b5fa8; color:#fff
 - `.desktop-webapp-navigation-roller .webapp-navigation-roller-chevron` → border:1px solid rgba(255,255,255,.42); background:#0b5fa8; color:#fff
-- `/* Mobile in-portal navigation roller: remain frozen while page content scrolls. */   .mobile-portal-content-roller` → border:1px solid #2f86cf!important; background:#062b4c!important; color:#fff!important
+- `/* Mobile in-portal navigation roller: remain frozen while page content scrolls. */   .mobile-portal-content-roller` → border:1px solid #2f86cf; background:#062b4c; color:#fff
 
 ## Shared portal / forms / tables (29 rules)
 
@@ -661,25 +661,25 @@ _None._
 - `.content-area .page th` → color:#315746
 - `.content-area .page td` → color:#30473d
 - `.content-area .page .module-interlink-bar, .content-area .page .workflow-linked-records` → background:#fff; color:#30473d
-- `.content-area .page .form-field input, .content-area .page .form-field select, .content-area .page .form-field textarea, .content-area .page .table-search` → background:#f7fcf9!important; color:#20382e!important
-- `.content-area .page th` → background:#dcefe4!important; color:#28513d!important; border-bottom-color:#b9d8c5!important
-- `.content-area .page td` → color:#294638!important; border-bottom-color:#c9dfd2!important
-- `.content-area .page tbody tr:nth-child(even)` → background:#eaf6ef!important
-- `.content-area .page .success-message` → background:#dcefe4!important; color:#145c38!important
-- `.content-area .page .error-message` → background:#fff0ed!important; color:#8a2f25!important
-- `.content-area .page .status-badge` → background:#d5ecdf!important; color:#17613d!important
-- `.content-area .page .stat-card:after` → background:#ffffff!important
-- `/* Destructive actions — every Delete control is consistently red. */ .content-area .page button.danger-button, .content-area .page button.delete-button` → background:#b42318!important; color:#fff!important; border:1px solid #8f1d15!important
-- `.content-area .page button.danger-button:hover, .content-area .page button.delete-button:hover` → background:#991b1b!important; color:#fff!important
-- `.archive-routing-panel strong` → color:#214f38!important
-- `.archive-routing-panel li, .archive-routing-panel div` → color:#40564d!important
-- `/* Trial reset controls: selected reset must provide unmistakable touch/click feedback. */ .content-area .page button[aria-pressed="true"]` → background:#8f1d15!important; color:#fff!important
-- `.content-area .page button.active:not(.danger-button):not(.delete-button), .content-area .page button[aria-selected="true"]:not(.danger-button):not(.delete-button), .content-area .page button[aria-pressed="true"]:not(.danger-button):not(.delete-button), .content-area .page a.active:not(.danger-button):not(.delete-button)` → background:#0b5fa8!important; color:#ffffff!important
-- `/* Submit/primary actions use the same geometry and the institutional green surface. */ .content-area .page button[type="submit"]:not(.danger-button):not(.delete-button)` → background:#0b5fa8!important; color:#ffffff!important
-- `/* Text controls are still compact controls, but retain the same family. */ .content-area .page .text-button` → border:1px solid #2f86cf!important; background:#0b5fa8!important; color:#ffffff!important
-- `.content-area .page .text-button:hover` → background:#1672bf!important; color:#ffffff!important
-- `.module-interlink-bar .module-interlink-list > button:hover, .module-interlink-bar .module-interlink-list > button.active, .module-interlink-bar .workflow-portal-parent:hover, .module-interlink-bar .workflow-portal-parent.active, .module-interlink-bar .workflow-portal-children button:hover, .module-interlink-bar .workflow-portal-children button.active` → background:#0b5fa8!important; background-color:#0b5fa8!important; color:#ffffff!important
-- `.module-interlink-bar .workflow-portal-group` → background:#e5f3eb!important
+- `.content-area .page .form-field input, .content-area .page .form-field select, .content-area .page .form-field textarea, .content-area .page .table-search` → background:#f7fcf9; color:#20382e
+- `.content-area .page th` → background:#dcefe4; color:#28513d; border-bottom-color:#b9d8c5
+- `.content-area .page td` → color:#294638; border-bottom-color:#c9dfd2
+- `.content-area .page tbody tr:nth-child(even)` → background:#eaf6ef
+- `.content-area .page .success-message` → background:#dcefe4; color:#145c38
+- `.content-area .page .error-message` → background:#fff0ed; color:#8a2f25
+- `.content-area .page .status-badge` → background:#d5ecdf; color:#17613d
+- `.content-area .page .stat-card:after` → background:#ffffff
+- `/* Destructive actions — every Delete control is consistently red. */ .content-area .page button.danger-button, .content-area .page button.delete-button` → background:#b42318; color:#fff; border:1px solid #8f1d15
+- `.content-area .page button.danger-button:hover, .content-area .page button.delete-button:hover` → background:#991b1b; color:#fff
+- `.archive-routing-panel strong` → color:#214f38
+- `.archive-routing-panel li, .archive-routing-panel div` → color:#40564d
+- `/* Trial reset controls: selected reset must provide unmistakable touch/click feedback. */ .content-area .page button[aria-pressed="true"]` → background:#8f1d15; color:#fff
+- `.content-area .page button.active:not(.danger-button):not(.delete-button), .content-area .page button[aria-selected="true"]:not(.danger-button):not(.delete-button), .content-area .page button[aria-pressed="true"]:not(.danger-button):not(.delete-button), .content-area .page a.active:not(.danger-button):not(.delete-button)` → background:#0b5fa8; color:#ffffff
+- `/* Submit/primary actions use the same geometry and the institutional green surface. */ .content-area .page button[type="submit"]:not(.danger-button):not(.delete-button)` → background:#0b5fa8; color:#ffffff
+- `/* Text controls are still compact controls, but retain the same family. */ .content-area .page .text-button` → border:1px solid #2f86cf; background:#0b5fa8; color:#ffffff
+- `.content-area .page .text-button:hover` → background:#1672bf; color:#ffffff
+- `.module-interlink-bar .module-interlink-list > button:hover, .module-interlink-bar .module-interlink-list > button.active, .module-interlink-bar .workflow-portal-parent:hover, .module-interlink-bar .workflow-portal-parent.active, .module-interlink-bar .workflow-portal-children button:hover, .module-interlink-bar .workflow-portal-children button.active` → background:#0b5fa8; background-color:#0b5fa8; color:#ffffff
+- `.module-interlink-bar .workflow-portal-group` → background:#e5f3eb
 
 ## Other / uncategorized (124 rules)
 
@@ -708,7 +708,7 @@ _None._
 - `.stat-card small` → color:#5f7b71
 - `th` → color:#78938a
 - `td` → color:#c7d8d1
-- `.danger-button` → background:#5b2926!important; border:1px solid #87423b!important; color:#ffd1ca!important
+- `.danger-button` → background:#5b2926; border:1px solid #87423b; color:#ffd1ca
 - `.detail-grid>div` → background:#081a14; border:1px solid #234538
 - `.detail-grid span` → color:#718c82
 - `.detail-grid strong` → color:#d9e9e2
@@ -740,67 +740,67 @@ _None._
 - `.mobile-portal-card b,.mobile-attention-list b,.mobile-portal-directory b` → color:#d6a52c
 - `.mobile-attention-list button` → background:#10251d; border:1px solid #294c3d; color:#c9d9d2
 - `.mobile-portal-directory button` → color:#c9d9d2
-- `.mobile-portal-directory button` → background:#081a14!important; border:1px solid #294c3d!important
+- `.mobile-portal-directory button` → background:#081a14; border:1px solid #294c3d
 - `.global-home-button` → border:1px solid #315444; background:#0c2119; color:#d6a52c
 - `.global-home-button:hover:not(:disabled)` → background:#123326
-- `.specimen-clear-button:hover` → background:#e2e9e5!important; color:#173a2b!important
-- `.unified-control-tab` → border:1px solid #a9c9b8!important; background:#e8f4ed!important; color:#174d36!important
-- `.unified-control-tab:hover, .unified-control-tab:focus-visible` → background:#dceee4!important; color:#123f2d!important
-- `html,body,#root` → background:#f2f7f4!important
+- `.specimen-clear-button:hover` → background:#e2e9e5; color:#173a2b
+- `.unified-control-tab` → border:1px solid #a9c9b8; background:#e8f4ed; color:#174d36
+- `.unified-control-tab:hover, .unified-control-tab:focus-visible` → background:#dceee4; color:#123f2d
+- `html,body,#root` → background:#f2f7f4
 - `.mobile-brand-mark` → background:#d6a52c; color:#082017
 - `.mobile-brand-kicker` → color:#d6a52c
-- `.mobile-profile-chip` → border:1px solid rgba(214,165,44,.32)!important; background:rgba(255,255,255,.085)!important; color:#fff!important
-- `.mobile-profile-chip:hover` → background:rgba(255,255,255,.13)!important
+- `.mobile-profile-chip` → border:1px solid rgba(214,165,44,.32); background:rgba(255,255,255,.085); color:#fff
+- `.mobile-profile-chip:hover` → background:rgba(255,255,255,.13)
 - `.mobile-profile-avatar` → background:#e9f4ef; color:#126340
 - `.mobile-profile-chip strong` → color:#fff
 - `.mobile-profile-chip small` → color:#b9d5c8
 - `.mobile-profile-chip>b` → color:#d6a52c
 - `.mobile-live-dot` → border:1px solid #c9ddd3; background:#fff; color:#527266
 - `.mobile-live-dot i` → background:#1c9b62
-- `.mobile-stat-card` → border:1px solid #d5e3dc!important; background:#fff!important; color:#18382c!important
+- `.mobile-stat-card` → border:1px solid #d5e3dc; background:#fff; color:#18382c
 - `.mobile-stat-card:before` → background:#edf6f1
-- `.mobile-stat-card:hover` → background:#fff!important
+- `.mobile-stat-card:hover` → background:#fff
 - `.mobile-stat-icon` → background:#edf5f1; color:#1c6b4a
 - `.mobile-stat-card strong` → color:#0b5b3d
 - `.mobile-stat-card>b` → color:#23483a
 - `.mobile-stat-card small` → color:#71837c
 - `.mobile-stat-card>i` → color:#1a7650
-- `.mobile-section-heading>button` → border:1px solid #bdd5c9!important; background:#fff!important; color:#176344!important
-- `.mobile-priority-list>button` → border:1px solid #d5e3dc!important; background:#fff!important; color:#18382c!important
-- `.mobile-priority-list>button:hover` → background:#f9fcfa!important
+- `.mobile-section-heading>button` → border:1px solid #bdd5c9; background:#fff; color:#176344
+- `.mobile-priority-list>button` → border:1px solid #d5e3dc; background:#fff; color:#18382c
+- `.mobile-priority-list>button:hover` → background:#f9fcfa
 - `.mobile-priority-icon` → background:#edf5f1; color:#1a6d4b
 - `.mobile-priority-list strong` → color:#214638
 - `.mobile-priority-list small` → color:#778982
 - `.mobile-priority-list em` → color:#0d5c3e
 - `.mobile-priority-list>b` → color:#8aa79b
-- `.mobile-quick-grid>button` → border:1px solid #d5e3dc!important; background:#fff!important; color:#18382c!important
-- `.mobile-quick-grid>button:hover` → background:#f9fcfa!important
+- `.mobile-quick-grid>button` → border:1px solid #d5e3dc; background:#fff; color:#18382c
+- `.mobile-quick-grid>button:hover` → background:#f9fcfa
 - `.mobile-quick-icon` → background:#f0f6f3; color:#1a6d4b
 - `.mobile-quick-grid strong` → color:#214638
 - `.mobile-quick-grid small` → color:#778982
 - `.mobile-quick-grid b` → color:#1a7650
-- `body` → background:#f4f7f4!important; color:#263a31
-- `.app-shell` → background:#f4f7f4!important
-- `.main-area` → background:#f4f7f4!important
-- `.secure-label` → color:#91b5a6!important
-- `.global-home-button` → background:#0b5fa8!important; color:#fff!important; border:1px solid #2f86cf!important
-- `.user-info` → color:#fff!important
-- `.user-info strong` → color:#fff!important
-- `.user-info span` → color:#f7cf61!important
-- `.user-avatar` → border:2px solid rgba(255,255,255,.45)!important; background:#e6f3ec!important; color:#11613e!important
+- `body` → background:#f4f7f4; color:#263a31
+- `.app-shell` → background:#f4f7f4
+- `.main-area` → background:#f4f7f4
+- `.secure-label` → color:#91b5a6
+- `.global-home-button` → background:#0b5fa8; color:#fff; border:1px solid #2f86cf
+- `.user-info` → color:#fff
+- `.user-info strong` → color:#fff
+- `.user-info span` → color:#f7cf61
+- `.user-avatar` → border:2px solid rgba(255,255,255,.45); background:#e6f3ec; color:#11613e
 - `.desktop-profile-photo` → background:#eaf5ef; color:#12613e; border:4px solid rgba(255,255,255,.78)
-- `margin:0!important;color:#fff!important;font-size:13px!important;font-weight:700!important;   .desktop-motto` → color:#f7d979!important
+- `margin:0;color:#fff;font-size:13px;font-weight:700;   .desktop-motto` → color:#f7d979
 - `.desktop-date-card` → background:#063524; border:1px solid rgba(255,255,255,.2); color:#fff
 - `.desktop-date-card span` → color:#f4d474
 - `.desktop-date-card small` → color:#c7ddd3
-- `.main-area` → background:#f4f8f6!important
-- `top:10px!important;right:12px!important;min-width:250px!important;padding:16px 18px!important;background:rgba(4,66,45,.92)!important;border:1px solid rgba(255,255,255,.34)!important;box-shadow:0 8px 22px rgba(0,0,0,.24)!important;color:#fff!important;.desktop-date-card strong` → color:#fff!important
-- `.desktop-date-card span` → color:#ffe08a!important
-- `.desktop-date-card small` → color:#e4f1eb!important
-- `html,body,#root` → background:#f5faf7!important
-- `.mobile-portal-content-roller-label span` → color:#9fd2ff!important
-- `.mobile-portal-content-roller-label strong` → color:#fff!important
-- `.mobile-portal-content-roller-chevron` → border:1px solid rgba(255,255,255,.42)!important; background:#0b5fa8!important; color:#fff!important
+- `.main-area` → background:#f4f8f6
+- `top:10px;right:12px;min-width:250px;padding:16px 18px;background:rgba(4,66,45,.92);border:1px solid rgba(255,255,255,.34);box-shadow:0 8px 22px rgba(0,0,0,.24);color:#fff;.desktop-date-card strong` → color:#fff
+- `.desktop-date-card span` → color:#ffe08a
+- `.desktop-date-card small` → color:#e4f1eb
+- `html,body,#root` → background:#f5faf7
+- `.mobile-portal-content-roller-label span` → color:#9fd2ff
+- `.mobile-portal-content-roller-label strong` → color:#fff
+- `.mobile-portal-content-roller-chevron` → border:1px solid rgba(255,255,255,.42); background:#0b5fa8; color:#fff
 - `.page-back-next-button` → border:1px solid #2f86cf; background:#0b5fa8; color:#fff
 - `.page-back-next-button:disabled` → background:#71808c
 - `.page-back-next-status span` → color:#557084
