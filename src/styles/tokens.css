@@ -493,3 +493,83 @@ table td{color:var(--text)}
   color:var(--text);
   font-weight:800;
 }
+
+/* ========================================================================
+   IRPA-DBGS GLOBAL READABILITY CONTRACT — FINAL CASCADE LAYER
+   2026-10-08
+   Presentation-only. This layer is loaded last by src/main.jsx and is
+   deliberately stronger than portal-specific readability overrides.
+   It does not alter display, grid, positioning, routing, data or workflow.
+   ======================================================================== */
+#root .app-shell .content-area .page :where(
+  h1,h2,h3,h4,h5,h6,p,li,dt,dd,blockquote,figcaption,caption,label,legend
+){
+  color:var(--text);
+  font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+  text-rendering:optimizeLegibility;
+}
+#root .app-shell .content-area .page :where(p,li,dt,dd,blockquote,figcaption){
+  line-height:1.55;
+}
+#root .app-shell .content-area .page :where(h1,h2,h3,h4,h5,h6){
+  line-height:1.2;
+}
+#root .app-shell .content-area .page :where(button,input,select,textarea){
+  font-family:inherit;
+}
+#root .app-shell .content-area .page :where(input,select,textarea){
+  color:var(--text);
+  background:var(--surface-raised);
+  border-color:var(--border);
+  font-size:16px;
+  line-height:1.5;
+}
+#root .app-shell .content-area .page :where(input,textarea)::placeholder{
+  color:var(--placeholder);
+  opacity:1;
+}
+#root .app-shell .content-area .page :where(button){
+  color:var(--text);
+}
+#root .app-shell .content-area .page :where(button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible){
+  outline:2px solid var(--focus);
+  outline-offset:2px;
+}
+#root .app-shell .content-area .page :where(table){
+  color:var(--text);
+}
+#root .app-shell .content-area .page :where(th){
+  color:var(--text-muted);
+  font-weight:800;
+}
+#root .app-shell .content-area .page :where(td){
+  color:var(--text);
+}
+#root .app-shell .content-area .page :where(.muted,.panel-description,.table-subtext){
+  color:var(--text-muted);
+}
+#root .app-shell .content-area .page :where(a){
+  color:var(--focus);
+}
+#root .app-shell .content-area .page :where(.error-message,.field-help){
+  color:var(--error);
+}
+#root .app-shell .content-area .page :where(.success-message){
+  color:var(--success);
+}
+#root .app-shell .content-area .page :where(input,select,textarea):focus{
+  border-color:var(--border-strong);
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--focus) 55%,transparent);
+}
+@media (max-width:760px){
+  #root .app-shell .content-area .page :where(h1){font-size:clamp(22px,6vw,28px);}
+  #root .app-shell .content-area .page :where(h2){font-size:clamp(18px,5vw,23px);}
+  #root .app-shell .content-area .page :where(h3){font-size:clamp(16px,4.5vw,20px);}
+  #root .app-shell .content-area .page :where(button,input,select,textarea){min-height:44px;}
+  #root .app-shell .content-area .page :where(input,select,textarea){font-size:16px;}
+}
+@media (min-width:761px){
+  #root .app-shell .content-area .page :where(h1){font-size:clamp(24px,2vw,32px);}
+  #root .app-shell .content-area .page :where(h2){font-size:clamp(19px,1.5vw,24px);}
+  #root .app-shell .content-area .page :where(h3){font-size:clamp(16px,1.2vw,20px);}
+}
