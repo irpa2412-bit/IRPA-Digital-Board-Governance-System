@@ -67,6 +67,17 @@ function liveKitConfigured() {
   return Boolean(text(process.env.LIVEKIT_URL) && text(process.env.LIVEKIT_API_KEY) && text(process.env.LIVEKIT_API_SECRET));
 }
 
+function moderatorForMeeting(meeting = {}, uid, email, selectedAuthority) {
+  const actorEmail = text(email).toLowerCase();
+  const authority = text(selectedAuthority).toLowerCase();
+  if (meeting.chairpersonUid && text(meeting.chairpersonUid) === uid) return true;
+  if (meeting.secretaryUid && text(meeting.secretaryUid) === uid) return true;
+  if (text(meeting.chairpersonEmail).toLowerCase() === actorEmail && actorEmail) return true;
+  if (text(meeting.secretaryEmail).toLowerCase() === actorEmail && actorEmail) return true;
+  return ["board chairperson","board secretary","chairperson","meeting chair","meeting secretary","secretary"]
+    .includes(authority);
+}
+
 /**
  * Server-side meeting media authorization boundary.
  *
@@ -138,10 +149,12 @@ exports.issueLiveMeetingToken = onCall({
     room: roomName,
     canPublish: true,
     canSubscribe: true,
-    canPublishData: true
+    canPublishData: true,
+    roomAdmin: moderator
   });
 
   const participantLabel = selectedAuthority || "Meeting Participant";
+  const moderator = isAdmin || moderatorForMeeting(meeting, uid, email, selectedAuthority);
   await sessionRef.set({
     meetingId,
     meetingReference: text(meeting.reference || meeting.title) || null,
@@ -149,6 +162,8 @@ exports.issueLiveMeetingToken = onCall({
     participantUid: uid,
     participantIdentity,
     participantAuthority: participantLabel,
+    moderator,
+    recordingPolicy: meeting.recordingAllowed === true ? "Allowed by meeting record" : "Not enabled",
     createdByUid: uid,
     createdAt: FieldValue.serverTimestamp(),
     status: "Token Issued",
@@ -167,6 +182,8 @@ exports.issueLiveMeetingToken = onCall({
       roomName,
       participantUid: uid,
       participantAuthority: participantLabel,
+      moderator,
+      recordingPolicy: meeting.recordingAllowed === true ? "Allowed by meeting record" : "Not enabled",
       tokenTtl: "10m",
       mediaEngine: "LiveKit"
     },
@@ -180,6 +197,8 @@ exports.issueLiveMeetingToken = onCall({
     sessionId: sessionRef.id,
     serverUrl: text(process.env.LIVEKIT_URL),
     participantToken: await token.toJwt(),
+    moderator,
+    recordingAllowed: meeting.recordingAllowed === true,
     expiresInSeconds: 600
   };
 });
