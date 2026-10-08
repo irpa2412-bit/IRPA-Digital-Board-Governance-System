@@ -12,7 +12,7 @@ function safeJson(value){
 
 export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",controller=false}){
  const roomRef=useRef(null),remoteRef=useRef(null),localRef=useRef(null);
- const[status,setStatus]=useState("READY"),[error,setError]=useState(""),[muted,setMuted]=useState(true),[camera,setCamera]=useState(false),[screen,setScreen]=useState(false),[hand,setHand]=useState(false);
+ const[status,setStatus]=useState("READY"),[error,setError]=useState(""),[muted,setMuted]=useState(true),[camera,setCamera]=useState(false),[screen,setScreen]=useState(false),[hand,setHand]=useState(false),[moderator,setModerator]=useState(false),[recordingAllowed,setRecordingAllowed]=useState(false);
  const[participants,setParticipants]=useState([]),[messages,setMessages]=useState([]),[chat,setChat]=useState(""),[deviceReady,setDeviceReady]=useState(false),[sessionId,setSessionId]=useState("");
 
  const clear=node=>{if(node)while(node.firstChild)node.removeChild(node.firstChild)};
@@ -58,9 +58,9 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
      room.on(RoomEvent.ParticipantConnected,()=>{refreshParticipants(room);setStatus("CONNECTED")});
      room.on(RoomEvent.ParticipantDisconnected,()=>refreshParticipants(room));
      room.on(RoomEvent.DataReceived,(payload,participant)=>{const msg=safeJson(payload);if(msg?.type==="chat")setMessages(v=>[...v,{from:participant?.name||participant?.identity||"Participant",text:String(msg.text||"")}].slice(-30));if(msg?.type==="hand")refreshParticipants(room)});
-     room.on(RoomEvent.Disconnected,()=>{setStatus("DISCONNECTED");setCamera(false);setMuted(true);setScreen(false);setHand(false);clear(localRef.current);clear(remoteRef.current);setParticipants([]);roomRef.current=null});
+     room.on(RoomEvent.Disconnected,()=>{setStatus("DISCONNECTED");setCamera(false);setMuted(true);setScreen(false);setHand(false);setModerator(false);setRecordingAllowed(false);clear(localRef.current);clear(remoteRef.current);setParticipants([]);roomRef.current=null});
      await room.connect(data.serverUrl,data.participantToken);
-     roomRef.current=room;setSessionId(data.sessionId||"");setStatus("CONNECTED");refreshParticipants(room);
+     roomRef.current=room;setSessionId(data.sessionId||"");setModerator(data.moderator===true);setRecordingAllowed(data.recordingAllowed===true);setStatus("CONNECTED");refreshParticipants(room);
      await room.localParticipant.setMicrophoneEnabled(true);setMuted(false);
      await room.localParticipant.setCameraEnabled(false);setCamera(false);
      try{const devices=await navigator.mediaDevices?.enumerateDevices?.();setDeviceReady(Boolean(devices?.some(d=>d.kind==="audioinput")||devices?.some(d=>d.kind==="videoinput")))}catch{setDeviceReady(false)}
@@ -85,7 +85,7 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
    <div className="stat-card"><span>Session</span><strong>{status==="CONNECTED"?"LIVE":"READY"}</strong><small>{sessionId||"Not connected"}</small></div>
    <div className="stat-card"><span>Participants</span><strong>{participantCount}</strong><small>Authenticated room members</small></div>
    <div className="stat-card"><span>Device</span><strong>{readiness}</strong><small>Microphone / camera readiness</small></div>
-   <div className="stat-card"><span>Authority</span><strong style={{fontSize:14}}>{selectedAuthority||"IRPA meeting authority"}</strong><small>Server-authorised session</small></div>
+   <div className="stat-card"><span>Authority</span><strong style={{fontSize:14}}>{moderator?"Meeting Moderator":selectedAuthority||"IRPA meeting authority"}</strong><small>{recordingAllowed?"Recording permitted by meeting policy":"Recording not enabled"}</small></div>
   </div>
   <div style={{display:"grid",gridTemplateColumns:"minmax(0,2fr) minmax(220px,1fr)",gap:14}}>
    <div ref={remoteRef} style={{minHeight:300,border:"1px solid var(--border)",borderRadius:12,padding:8,display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:8,overflow:"auto"}}>
