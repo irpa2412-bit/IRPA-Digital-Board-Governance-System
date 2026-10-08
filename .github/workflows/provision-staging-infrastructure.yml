@@ -179,14 +179,7 @@ jobs:
           git commit -m "chore: bind dedicated staging Drive KV namespace"
           git push --set-upstream origin "$branch"
 
-          body=$(cat <<EOF
-Provisioned/resolved the dedicated Cloudflare staging DRIVE_KV namespace and bound its exact namespace ID in wrangler.toml. Production KV ID is explicitly rejected. No Worker deployment is performed by this workflow. Required staging secret names are declared for deploy-time validation.
-
-Staging namespace ID: ${STAGING_KV_ID}
-
-The ID is a Cloudflare resource identifier, not a secret value.
-EOF
-          )
+          body="Provisioned/resolved the dedicated Cloudflare staging DRIVE_KV namespace and bound its exact namespace ID in wrangler.toml. Production KV ID is explicitly rejected. No Worker deployment is performed by this workflow. Required staging secret names are declared for deploy-time validation.\\n\\nStaging namespace ID: ${STAGING_KV_ID}\\n\\nThe ID is a Cloudflare resource identifier, not a secret value."
 
           gh pr create \
             --repo "${GITHUB_REPOSITORY}" \
