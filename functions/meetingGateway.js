@@ -24,16 +24,16 @@ exports.createMeetingAccessInvitation=onCall({region:"us-central1",timeoutSecond
  const raw=crypto.randomBytes(32).toString("base64url");
  const tokenHash=hash(raw);
  const ref=db.collection("meetingAccessTokens").doc();
- const expiresAt=new Date(Date.now()+1000*60*60*24*7);
+ const reusableUntilMeetingClosure=true;
  await ref.set({
   meetingId,meetingReference:text(meeting.reference||meeting.title),participantId,
   participantEmail:text(participant.participantEmail||participant.email).toLowerCase()||null,
   participantUid:text(participant.participantUid)||null,
-  tokenHash,tokenVersion:"1",status:"Active",
-  expiresAt,createdByUid:uid,createdAt:FieldValue.serverTimestamp(),
+  tokenHash,tokenVersion:"1",status:"Active",reusable:true,reusableUntilMeetingClosure,
+  createdByUid:uid,createdAt:FieldValue.serverTimestamp(),
   gateway:"IRPA Meeting Entry Gateway",singlePurpose:"Live meeting entry"
  });
- return {ok:true,accessToken:raw,expiresAt:expiresAt.toISOString(),meetingId,participantId,meetingReference:text(meeting.reference||meeting.title)};
+ return {ok:true,accessToken:raw,reusable:true,reusePolicy:"Reusable until revoked or the meeting is closed.",meetingId,participantId,meetingReference:text(meeting.reference||meeting.title)};
 });
 
 exports.authorizeMeetingEntry=onCall({region:"us-central1",timeoutSeconds:30},async request=>{
@@ -44,7 +44,7 @@ exports.authorizeMeetingEntry=onCall({region:"us-central1",timeoutSeconds:30},as
  const snap=await db.collection("meetingAccessTokens").where("tokenHash","==",hash(token)).limit(1).get();
  if(snap.empty)throw new HttpsError("permission-denied","This meeting access link is invalid.");
  const doc=snap.docs[0],grant={id:doc.id,...doc.data()};
- if(grant.status!=="Active"||grant.expiresAt?.toDate?.()<new Date())throw new HttpsError("permission-denied","This meeting access link has expired or been revoked.");
+ if(grant.status!=="Active")throw new HttpsError("permission-denied","This meeting access link has been revoked.");
  const participantSnap=await db.collection("participants").doc(grant.participantId).get();
  const participant=participantSnap.exists?participantSnap.data():{};
  const boundEmail=text(grant.participantEmail).toLowerCase();
