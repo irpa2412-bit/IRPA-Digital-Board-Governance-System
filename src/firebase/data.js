@@ -367,7 +367,8 @@ export async function getResearchPortalAlerts(portal){
   const cleanPortal=String(portal||"").trim();
   if(!cleanPortal) return [];
   const snap=await getDocs(query(collection(db,COLLECTIONS.researchPortalAlerts),where("targetPortal","==",cleanPortal),where("status","in",["Submitted","Under Review","Clarification Required"])));
-  return snap.docs.map(x=>({id:x.id,...x.data()}));
+  const alerts=snap.docs.map(x=>({id:x.id,...x.data()}));
+  return Promise.all(alerts.map(async alert=>{const requestId=String(alert.requestId||"").trim();const request=requestId?await getRecord(COLLECTIONS.researchInformationRequests,requestId).catch(()=>null):null;return request?{...request,alertId:alert.id,alertStatus:alert.status}:{...alert};}));
 }
 export async function getResearchUpdates(){
   if(!auth.currentUser?.uid)throw new Error("Authentication is required.");
