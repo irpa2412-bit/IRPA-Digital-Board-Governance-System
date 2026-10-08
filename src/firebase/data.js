@@ -375,7 +375,7 @@ export async function getResearchUpdates(){
   const snap=await getDocs(query(collection(db,COLLECTIONS.researchUpdates),where("status","==","Published")));
   return snap.docs.map(x=>({id:x.id,...x.data()})).sort((a,b)=>String(b.publishedAt||b.createdAt||"").localeCompare(String(a.publishedAt||a.createdAt||"")));
 }
-export async function getResearchToolPermissions(){
+export async function grantResearchToolPermission(data){if(!auth.currentUser?.uid)throw new Error("Authentication is required.");const key=String(data.userUid||"").trim()+"_"+String(data.tool||"").trim()+"_"+String(data.studyId||"").trim();if(!key||key.startsWith("_"))throw new Error("A valid user, tool and study are required.");await setDoc(doc(db,COLLECTIONS.researchToolPermissions,key),{...data,permissionKey:key,updatedAt:serverTimestamp(),createdAt:serverTimestamp()},{merge:true});await writeAudit("GRANT_RESEARCH_TOOL_PERMISSION",COLLECTIONS.researchToolPermissions,key,data);return key;}\nexport async function getResearchToolPermissions(){
   const uid=auth.currentUser?.uid;
   if(!uid)throw new Error("Authentication is required.");
   const snap=await getDocs(query(collection(db,COLLECTIONS.researchToolPermissions),where("userUid","==",uid),where("status","==","Active")));
