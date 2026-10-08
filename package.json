@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "check:token-contrast": "node scripts/check-token-contrast.mjs",
-    "check:readability-policy": "node scripts/check-readability-policy.mjs"
+    "check:readability-policy": "node scripts/check-readability-policy.mjs",
+    "check:meeting-media": "node scripts/check-meeting-media-governance.mjs"
   },
   "dependencies": {
     "firebase": "^11.10.0",
