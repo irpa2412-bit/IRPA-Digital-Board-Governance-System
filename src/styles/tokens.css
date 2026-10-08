@@ -573,3 +573,230 @@ table td{color:var(--text)}
   #root .app-shell .content-area .page :where(h2){font-size:clamp(19px,1.5vw,24px);}
   #root .app-shell .content-area .page :where(h3){font-size:clamp(16px,1.2vw,20px);}
 }
+
+
+/* =========================================================================
+   IRPA-DBGS CANONICAL UI CONTRACT — MEMBERS & PERSONNEL REFERENCE
+   2026-10-09
+   Presentation-only harmonisation. The Members & Personnel portal shown in
+   the approved reference is the visual baseline for every authenticated
+   desktop and mobile portal page.
+   No routing, Firebase authorization, roles, permissions, data structures,
+   gates, workflows or portal-specific meanings are changed by this layer.
+   ========================================================================= */
+
+#root .app-shell{
+  background:#ffffff;
+}
+#root .app-shell .main-area{
+  background:#ffffff;
+}
+#root .app-shell .topbar{
+  background:#10233f;
+  border-bottom-color:#294566;
+  box-shadow:0 5px 20px rgba(16,35,63,.16);
+}
+#root .app-shell .topbar h2{
+  color:#ffffff;
+}
+#root .app-shell .topbar p{
+  color:#d5dfeb;
+}
+#root .app-shell .topbar-kicker{
+  color:#9fc5e8;
+}
+
+#root .app-shell .content-area{
+  background:#ffffff;
+  color:#18364f;
+}
+#root .app-shell .content-area .page{
+  color:#18364f;
+}
+#root .app-shell .content-area .page .welcome-panel,
+#root .app-shell .content-area .page .module-panel,
+#root .app-shell .content-area .page .panel{
+  background:#ffffff;
+  color:#18364f;
+  border-color:#d3dce6;
+  box-shadow:0 5px 18px rgba(22,52,79,.07);
+}
+#root .app-shell .content-area .page .page-header h1,
+#root .app-shell .content-area .page .welcome-panel h1,
+#root .app-shell .content-area .page .module-header h1,
+#root .app-shell .content-area .page .panel-header h2,
+#root .app-shell .content-area .page .panel h2,
+#root .app-shell .content-area .page .module-panel h2{
+  color:#17344d;
+}
+#root .app-shell .content-area .page .page-header p,
+#root .app-shell .content-area .page .welcome-panel p,
+#root .app-shell .content-area .page .panel-description,
+#root .app-shell .content-area .page .panel-header span,
+#root .app-shell .content-area .page .module-panel>p{
+  color:#5b6f80;
+}
+
+#root .app-shell .content-area .page .form-field label,
+#root .app-shell .content-area .page .signature-authority-field label,
+#root .app-shell .content-area .page label,
+#root .app-shell .content-area .page legend{
+  color:#1b3a53;
+  font-weight:750;
+}
+#root .app-shell .content-area .page .form-field input,
+#root .app-shell .content-area .page .form-field select,
+#root .app-shell .content-area .page .form-field textarea,
+#root .app-shell .content-area .page input,
+#root .app-shell .content-area .page select,
+#root .app-shell .content-area .page textarea{
+  color:#18364f;
+  background:#ffffff;
+  border-color:#aebdca;
+  border-radius:10px;
+}
+#root .app-shell .content-area .page input::placeholder,
+#root .app-shell .content-area .page textarea::placeholder{
+  color:#687b8b;
+}
+#root .app-shell .content-area .page input:focus,
+#root .app-shell .content-area .page select:focus,
+#root .app-shell .content-area .page textarea:focus{
+  border-color:#2f86cf;
+  box-shadow:0 0 0 2px rgba(47,134,207,.18);
+}
+#root .app-shell .content-area .page .form-actions button,
+#root .app-shell .content-area .page .page-header button,
+#root .app-shell .content-area .page button:not(.secondary-button):not(.danger-button):not(.text-button){
+  background:#0b5fa8;
+  border-color:#2f86cf;
+  color:#ffffff;
+}
+#root .app-shell .content-area .page .secondary-button{
+  background:#f2f6f9;
+  border-color:#aebdca;
+  color:#24435c;
+}
+#root .app-shell .content-area .page .danger-button{
+  background:#a33b34;
+  border-color:#c45a50;
+  color:#ffffff;
+}
+
+#root .app-shell .content-area .page .table-wrapper{
+  border:1px solid #d5dfe7;
+  background:#ffffff;
+}
+#root .app-shell .content-area .page table{
+  color:#18364f;
+  background:#ffffff;
+}
+#root .app-shell .content-area .page th{
+  color:#50677a;
+  background:#f4f7fa;
+  border-bottom-color:#cbd6df;
+}
+#root .app-shell .content-area .page td{
+  color:#29455b;
+  border-bottom-color:#dce4ea;
+}
+#root .app-shell .content-area .page .table-search{
+  color:#18364f;
+  background:#ffffff;
+  border-color:#aebdca;
+}
+#root .app-shell .content-area .page .status-badge{
+  background:#e8f1f8;
+  color:#15527f;
+  border:1px solid #a8c5dc;
+}
+#root .app-shell .content-area .page .detail-grid>div{
+  background:#f7f9fb;
+  border-color:#d2dce5;
+}
+#root .app-shell .content-area .page .detail-grid span{
+  color:#607487;
+}
+#root .app-shell .content-area .page .detail-grid strong{
+  color:#203e55;
+}
+#root .app-shell .content-area .page .record-details{
+  background:#f5f8fa;
+  border-color:#d2dce5;
+  color:#29465c;
+}
+#root .app-shell .content-area .page .success-message{
+  background:#edf8f2;
+  border-color:#9acdb2;
+  color:#17613d;
+}
+#root .app-shell .content-area .page .error-message{
+  background:#fff1f0;
+  border-color:#e0aaa5;
+  color:#8b2d28;
+}
+#root .app-shell .content-area .page .field-help{
+  color:#7b4a45;
+}
+
+#root .app-shell .content-area .page .identity-card,
+#root .app-shell .content-area .page .stat-card{
+  background:#f4f7fa;
+  border-color:#d1dce5;
+  color:#18364f;
+}
+#root .app-shell .content-area .page .identity-card span,
+#root .app-shell .content-area .page .stat-card span,
+#root .app-shell .content-area .page .stat-card small{
+  color:#607487;
+}
+#root .app-shell .content-area .page .identity-card strong,
+#root .app-shell .content-area .page .stat-card strong{
+  color:#18364f;
+}
+#root .app-shell .content-area .page .stat-card:after{
+  background:#d6a52c;
+}
+
+/* Preserve the established dark-blue navigation surface used by the reference. */
+#root .app-shell .content-area .desktop-webapp-navigation-roller{
+  background:#062b4c;
+  border-color:#2f86cf;
+  color:#ffffff;
+}
+#root .app-shell .content-area .mobile-portal-content-roller{
+  background:#062b4c;
+  border-color:#2f86cf;
+  color:#ffffff;
+}
+#root .app-shell .content-area .page-back-next-navigation{
+  background:#f7fafc;
+  border-color:#c9d8e5;
+}
+#root .app-shell .content-area .page-back-next-status strong,
+#root .app-shell .content-area .page-back-next-status small{
+  color:#18364f;
+}
+
+/* Mobile keeps the same canonical visual language while preserving the
+   existing responsive geometry and fixed navigation mechanics. */
+@media (max-width:760px){
+  #root .app-shell .content-area{
+    background:#ffffff;
+  }
+  #root .app-shell .content-area .page .panel,
+  #root .app-shell .content-area .page .module-panel,
+  #root .app-shell .content-area .page .welcome-panel{
+    border-radius:13px;
+    box-shadow:0 4px 14px rgba(22,52,79,.06);
+  }
+  #root .app-shell .content-area .page .form-actions{
+    background:#ffffff;
+  }
+}
+
+/* Canonical UI contract marker for automated policy checks. */
+:root{
+  --irpa-canonical-ui-reference:members-personnel;
+  --irpa-canonical-ui-contract:2026-10-09;
+}
