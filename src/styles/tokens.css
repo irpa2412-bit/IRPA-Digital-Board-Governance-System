@@ -117,7 +117,6 @@ body{background:var(--surface);color:var(--text)}
 .app-shell .page-header p,.app-shell .module-header p,.app-shell .welcome-panel p{color:var(--text-muted)}
 .app-shell label,.auth-card label,.form-field label,.signature-authority-field>label{
   color:var(--text);
-  opacity:1;
   font-size:15px;
   font-weight:600;
   line-height:1.45;
@@ -143,7 +142,6 @@ body{background:var(--surface);color:var(--text)}
 .form-field textarea{min-height:120px;padding:11px 12px;resize:vertical}
 .form-field input::placeholder,.form-field textarea::placeholder,.auth-card input::placeholder,.table-search::placeholder{
   color:var(--placeholder);
-  opacity:1;
 }
 .form-field input:focus,.form-field select:focus,.form-field textarea:focus,
 .auth-card input:focus,.table-search:focus{
@@ -249,8 +247,6 @@ table td{color:var(--text)}
 .content-area .page .unified-control-tabs .unified-control-tab,
 .content-area .page .unified-control-tabs .unified-control-tab *{
   color:var(--text);
-  text-shadow:none;
-  opacity:1;
 }
 .module-interlink-bar .module-interlink-list>button,
 .module-interlink-bar .workflow-portal-parent,
