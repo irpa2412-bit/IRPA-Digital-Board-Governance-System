@@ -387,3 +387,61 @@
     transition: none !important;
   }
 }
+
+
+/*
+ * Readability correction: research forms must never lose their labels.
+ * The Research Portal uses light form surfaces in the deployed presentation.
+ * Keep the semantic labels visible, bold and dark against those surfaces.
+ */
+.research-portal-page form > label,
+.research-portal-page .form-grid > label,
+.research-portal-page .record-details label,
+.research-portal-page .signature-authority-field > label {
+  color: #173b2d !important;
+  opacity: 1 !important;
+  font-weight: 800 !important;
+  font-size: 14px !important;
+  line-height: 1.45 !important;
+  text-shadow: none !important;
+}
+
+.research-portal-page .panel-header h1,
+.research-portal-page .panel-header h2,
+.research-portal-page .panel-header h3,
+.research-portal-page .welcome-panel h1,
+.research-portal-page > .panel > h2,
+.research-portal-page > .panel > h3 {
+  color: #173b2d !important;
+  opacity: 1 !important;
+  font-weight: 850 !important;
+}
+
+.research-portal-page .eyebrow {
+  color: #315746 !important;
+  opacity: 1 !important;
+  font-weight: 900 !important;
+}
+
+.research-portal-page input:not([type="checkbox"]):not([type="radio"]),
+.research-portal-page select,
+.research-portal-page textarea {
+  color: #173b2d !important;
+  background: #ffffff !important;
+  border-color: #9fb5aa !important;
+  opacity: 1 !important;
+  font-weight: 550;
+}
+
+.research-portal-page input::placeholder,
+.research-portal-page textarea::placeholder {
+  color: #60766c !important;
+  opacity: 1 !important;
+}
+
+.research-portal-page .panel-description,
+.research-portal-page form > label small,
+.research-portal-page .form-grid > label small {
+  color: #52675f !important;
+  opacity: 1 !important;
+}
