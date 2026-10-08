@@ -7,10 +7,12 @@ const textTokens=["--text","--text-muted","--placeholder","--error","--success"]
 const uiTokens=["--border","--border-strong","--focus"];
 
 function blockFor(selector){
-  const re=new RegExp(`\\.${selector}\\s*\\{([^}]*)\\}`,"s");
-  const m=css.match(re);
-  if(!m) throw new Error(`Missing token surface .${selector}`);
-  return m[1];
+  const re=/([^{}]+)\\{([^{}]*)\\}/g;
+  for(const m of css.matchAll(re)){
+    const selectors=m[1].split(",").map(v=>v.trim());
+    if(selectors.includes("." + selector)) return m[2];
+  }
+  throw new Error("Missing token surface ." + selector);
 }
 function vars(block){
   const out={};
