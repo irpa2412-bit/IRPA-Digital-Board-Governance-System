@@ -112,7 +112,7 @@ jobs:
             throw new Error("Missing staging DRIVE_KV binding.");
           }
 
-          const block = /\[\[env\.staging\.kv_namespaces\]\]\n(?:[^\n]*\n)*?binding = "DRIVE_KV"(?:\n[^\n]*)*/;
+          const block = /\[\[env\.staging\.kv_namespaces\]\]\nbinding = "DRIVE_KV"(?:\nid = "[^"]*")?/;
           const match = staging.match(block);
           if (!match) throw new Error("Unable to locate the staging DRIVE_KV block safely.");
 
