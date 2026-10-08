@@ -1,5 +1,10 @@
 import fs from "node:fs";
 import process from "node:process";
+
+const media=fs.readFileSync("src/components/IRPADGBSMeetingRoomMedia.jsx","utf8");
+const gateway=fs.readFileSync("functions/meetingGateway.js","utf8");
+const room=fs.readFileSync("src/pages/MeetingRoom.jsx","utf8");
+const policy=fs.readFileSync("src/firebase/meetingPolicy.js","utf8");
 const checks=[
  ["Meeting media client exists",fs.existsSync("src/components/IRPADGBSMeetingRoomMedia.jsx")],
  ["Meeting entry gateway exists",fs.existsSync("src/pages/MeetingEntryGateway.jsx")],
@@ -8,46 +13,64 @@ const checks=[
  ["Meeting access gateway exists",fs.existsSync("functions/meetingGateway.js")],
  ["Meeting gateway registered",fs.readFileSync("functions/bootstrap.js","utf8").includes('require("./meetingGateway")')],
  ["LiveKit client dependency",fs.readFileSync("package.json","utf8").includes('"livekit-client"')],
- ["Authenticated entry callable",fs.readFileSync("functions/meetingGateway.js","utf8").includes("exports.authorizeMeetingEntry")],
- ["Participant-specific token issuance",fs.readFileSync("functions/meetingGateway.js","utf8").includes("createMeetingAccessInvitation")],
+ ["Authenticated entry callable",gateway.includes("exports.authorizeMeetingEntry")],
+ ["Participant-specific token issuance",gateway.includes("createMeetingAccessInvitation")],
  ["LiveKit server token issuance",fs.readFileSync("functions/liveMeeting.js","utf8").includes("exports.issueLiveMeetingToken")],
- ["Long-session reconnection handling",fs.readFileSync("src/components/IRPADGBSMeetingRoomMedia.jsx","utf8").includes("RoomEvent.Reconnecting")&&fs.readFileSync("src/components/IRPADGBSMeetingRoomMedia.jsx","utf8").includes("RoomEvent.Reconnected")],
- ["Audio quality capture controls",fs.readFileSync("src/components/IRPADGBSMeetingRoomMedia.jsx","utf8").includes("echoCancellation:true")&&fs.readFileSync("src/components/IRPADGBSMeetingRoomMedia.jsx","utf8").includes("noiseSuppression:true")],
- ["HD video capture target",fs.readFileSync("src/components/IRPADGBSMeetingRoomMedia.jsx","utf8").includes("1280,height:720")],
- ["Screen sharing",fs.readFileSync("src/components/IRPADGBSMeetingRoomMedia.jsx","utf8").includes("setScreenShareEnabled")],
- ["Governance chat signalling",fs.readFileSync("src/components/IRPADGBSMeetingRoomMedia.jsx","utf8").includes('type:"chat"')],
- ["Hand raise signalling",fs.readFileSync("src/components/IRPADGBSMeetingRoomMedia.jsx","utf8").includes('type:"hand"')],
+ ["Long-session reconnection handling",media.includes("RoomEvent.Reconnecting")&&media.includes("RoomEvent.Reconnected")],
+ ["Audio quality capture controls",media.includes("echoCancellation:true")&&media.includes("noiseSuppression:true")&&media.includes("autoGainControl:true")],
+ ["HD video capture target",media.includes("1280,height:720")],
+ ["Screen sharing",media.includes("setScreenShareEnabled")],
+ ["Governance chat signalling",media.includes('type:"chat"')],
+ ["Hand raise signalling",media.includes('type:"hand"')],
  ["Meeting token route",fs.readFileSync("src/main.jsx","utf8").includes("meetingToken")],
- ["Firestore rules untouched by this feature",fs.existsSync("firestore.rules")]
- ["Meeting gate issues meeting ID",fs.readFileSync("functions/meetingGateway.js","utf8").includes("meetingId,meetingPassword")],
- ["Meeting gate issues gate password",fs.readFileSync("functions/meetingGateway.js","utf8").includes("meetingPassword=gatePassword")],
- ["Meeting gate stores password hash only",fs.readFileSync("functions/meetingGateway.js","utf8").includes("passwordHash")],
- ["Meeting gate has 30-day expiry",fs.readFileSync("functions/meetingGateway.js","utf8").includes("1000*60*60*24*30")],
- ["Meeting gate is reusable",fs.readFileSync("functions/meetingGateway.js","utf8").includes("reusable:true")],
- ["Meeting entry validates ID and password",fs.readFileSync("functions/meetingGateway.js","utf8").includes("suppliedMeetingId")&&fs.readFileSync("functions/meetingGateway.js","utf8").includes("suppliedPassword")],
- ["Meeting facilities panel exists",fs.readFileSync("src/pages/MeetingRoom.jsx","utf8").includes("MEETING FACILITIES & SERVICES")],
- ["Meeting category controls facilities",fs.readFileSync("src/pages/MeetingRoom.jsx","utf8").includes("meetingCategory")],
- ["Board Meetings expose Governance Documents",fs.readFileSync("src/pages/MeetingRoom.jsx","utf8").includes("Governance Documents")],
- ["Meeting auto registration exists",fs.readFileSync("src/pages/MeetingRoom.jsx","utf8").includes("registerSelf")],
+ ["Firestore rules present and not part of this feature contract",fs.existsSync("firestore.rules")],
+ ["Meeting gate issues meeting ID",gateway.includes("meetingId,meetingPassword")],
+ ["Meeting gate issues gate password",gateway.includes("meetingPassword=gatePassword")],
+ ["Meeting gate stores password hash",gateway.includes("passwordHash")],
+ ["Meeting gate has 30-day expiry",gateway.includes("1000*60*60*24*30")],
+ ["Meeting gate is reusable",gateway.includes("reusable:true")],
+ ["Meeting entry validates ID and password",gateway.includes("suppliedMeetingId")&&gateway.includes("suppliedPassword")],
+ ["Five meeting categories are defined",["GOVERNANCE","ADMINISTRATIVE","STAFF","GENERAL","OTHER"].every(x=>policy.includes(x))],
+ ["Five category labels are selectable",["Governance Meetings","Administrative Meetings","Staff Meetings","General Meetings","Other Meetings"].every(x=>policy.includes(x))],
+ ["Category options are exported",policy.includes("MEETING_CATEGORY_OPTIONS")],
+ ["Meeting category selector exists",fs.readFileSync("src/pages/Meetings.jsx","utf8").includes('name="meetingCategory"')],
+ ["Category controls Meeting Room facilities",room.includes("meetingCapabilities")&&room.includes("capabilities.facilities")],
+ ["Governance exposes Governance Documents",policy.includes('documentsLabel:"Governance Documents"')&&room.includes("policy.documentsLabel")],
+ ["Governance enables quorum and voting",policy.includes('GOVERNANCE:{')&&policy.includes("quorumAccess:true")&&policy.includes("votingEnabled:true")],
+ ["Administrative restricts quorum and voting",policy.includes('ADMINISTRATIVE:{')&&policy.includes("quorumAccess:false")&&policy.includes("votingEnabled:false")],
+ ["Staff restricts signature and authorization",policy.includes('STAFF:{')&&policy.includes("signatureAccess:false")&&policy.includes("authorizationAccess:false")],
+ ["General restricts signature and authorization",policy.includes('GENERAL:{')&&policy.includes("signatureAccess:false")&&policy.includes("authorizationAccess:false")],
+ ["Other is restricted to operational facilities",policy.includes('OTHER:{')&&policy.includes("signatureAccess:false")&&policy.includes("authorizationAccess:false")],
+ ["Meeting auto registration exists",room.includes("registerSelf")],
 ];
 const failed=checks.filter(([,ok])=>!ok);
 const report={
- reportType:"IRPA-DGBS Meeting Media Governance Software Verification",
+ reportType:"IRPA-DGBS Meeting Media and Category Governance Software Verification",
  generatedAt:new Date().toISOString(),
  checks:checks.map(([name,ok])=>({name,status:ok?"PASS":"FAIL"})),
  summary:{total:checks.length,passed:checks.length-failed.length,failed:failed.length},
- limitation:"This is an automated repository/software contract report. Actual audio/video quality, latency, packet loss, device compatibility and long-session endurance require a deployed staging LiveKit endpoint and browser/device E2E run; this script does not falsely mark those as passed."
+ categoryAccessMatrix:{
+  "Governance Meetings":"Auto registration, quorum registration/assessment, attendance, live media, Governance Documents, Authorization & Approvals, Signature Portal, Resolutions & Voting, Decisions & Actions, transcript/proceedings.",
+  "Administrative Meetings":"Auto registration, attendance, live media, Administrative Documents, Authorization & Approvals, Signature Portal, Decisions & Actions and transcript/proceedings; no quorum or formal resolutions/voting by default.",
+  "Staff Meetings":"Auto registration, attendance, live media, Staff Meeting Documents, Decisions & Actions and transcript/proceedings; no quorum, voting, resolutions, authorization or signature by default.",
+  "General Meetings":"Auto registration, attendance, live media, General Meeting Documents, Decisions & Actions and transcript/proceedings; no quorum, voting, resolutions, authorization or signature by default.",
+  "Other Meetings":"Auto registration, attendance, live media, Other Meeting Documents, Decisions & Actions and transcript/proceedings; no quorum, voting, resolutions, authorization or signature by default."
+ },
+ limitation:"This is an automated repository/software contract report. Actual audio/video quality, latency, packet loss, device compatibility and long-session endurance require a deployed staging LiveKit endpoint and browser/device E2E run; this script does not falsely mark those as passed. Category gating here defines the Meeting Room workflow surface; downstream portal authorization remains governed by the existing Firebase authorization model and no Firebase rules are changed by this feature."
 };
 fs.mkdirSync("reports",{recursive:true});
 fs.writeFileSync("reports/meeting-media-governance-verification.json",JSON.stringify(report,null,2)+"\n");
 const md=[
-"# IRPA-DGBS Meeting Media Governance Verification",
+"# IRPA-DGBS Meeting Media and Category Governance Verification",
 "",
 `Generated: ${report.generatedAt}`,
 "",
 `Result: ${report.summary.passed}/${report.summary.total} software checks passed; ${report.summary.failed} failed.`,
 "",
 ...report.checks.map(x=>`- [${x.status==="PASS"?"x":" "}] ${x.name}`),
+"",
+"## Category access matrix",
+...Object.entries(report.categoryAccessMatrix).map(([k,v])=>`- **${k}:** ${v}`),
 "",
 "## Test boundary",
 report.limitation
