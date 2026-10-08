@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - audit/app-wide-readability-form-layout-20261008
+      - fix/app-wide-red-line-readability-20261008
   pull_request:
     branches:
       - main
@@ -31,6 +32,9 @@ jobs:
 
       - name: Token contrast gate
         run: npm run check:token-contrast
+
+      - name: App-wide red-line readability policy gate
+        run: npm run check:readability-policy
 
       - name: Production build
         run: npm run build
