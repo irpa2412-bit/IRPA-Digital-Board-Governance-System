@@ -245,3 +245,307 @@
     animation-iteration-count: 1 !important;
   }
 }
+
+
+/*
+ * APP-WIDE READABILITY PASS — 2026-10-08
+ *
+ * Mission: improve readability across the entire IRPA-DBGS web application.
+ * The Research Portal is evidence/reference for the problem, not the scope
+ * of the solution. Headings and labels are preserved and strengthened across
+ * all authenticated portals, dashboards, forms, registers and light surfaces.
+ *
+ * Presentation/accessibility only. No content, routing, workflow, data,
+ * authorization, Firebase, signature, voting, transaction or business logic
+ * is changed.
+ */
+
+/* 1. Global heading hierarchy: headings remain visible and structurally strong. */
+.app-shell h1,
+.app-shell h2,
+.app-shell h3,
+.app-shell h4,
+.app-shell h5,
+.app-shell h6 {
+  opacity: 1 !important;
+  visibility: visible !important;
+  filter: none !important;
+  font-weight: 800 !important;
+  text-shadow: none !important;
+}
+
+.app-shell h1 { line-height: 1.2 !important; }
+.app-shell h2 { line-height: 1.28 !important; }
+.app-shell h3 { line-height: 1.34 !important; }
+.app-shell h4,
+.app-shell h5,
+.app-shell h6 { line-height: 1.4 !important; }
+
+/* 2. Global form labels: never fade, disappear or become indistinguishable. */
+.app-shell label,
+.app-shell legend {
+  opacity: 1 !important;
+  visibility: visible !important;
+  filter: none !important;
+  font-weight: 750 !important;
+  line-height: 1.45 !important;
+  text-shadow: none !important;
+}
+
+.app-shell form > label,
+.app-shell .form-grid > label,
+.app-shell .form-field > label,
+.app-shell .record-details label,
+.app-shell .signature-authority-field > label,
+.app-shell .auth-card label {
+  opacity: 1 !important;
+  visibility: visible !important;
+  font-weight: 750 !important;
+}
+
+/* 3. Known light workspaces: invert only their text hierarchy, not controls. */
+.app-shell .dashboard-content-area,
+.app-shell .dashboard-content-area .dashboard-hero,
+.app-shell .dashboard-content-area .dashboard-gauge,
+.app-shell .dashboard-content-area .dashboard-function-button,
+.app-shell .dashboard-content-area .dashboard-feed,
+.app-shell .content-area .page .stat-card,
+.app-shell .content-area .page .workflow-stage,
+.app-shell .module-interlink-bar,
+.app-shell .page-back-next-navigation,
+.app-shell .finance-engine-card,
+.app-shell .finance-formula-card,
+.app-shell .finance-technology-operations,
+.app-shell .finance-accounting-engine,
+.app-shell .unified-control-tabs .unified-control-tab {
+  color: #173b2d;
+}
+
+/* Light dashboard headings and descriptive copy. */
+.app-shell .dashboard-content-area h1,
+.app-shell .dashboard-content-area h2,
+.app-shell .dashboard-content-area h3,
+.app-shell .dashboard-content-area h4,
+.app-shell .dashboard-content-area h5,
+.app-shell .dashboard-content-area h6,
+.app-shell .dashboard-content-area label,
+.app-shell .dashboard-content-area .dashboard-section-heading,
+.app-shell .dashboard-content-area .dashboard-feed-title {
+  color: #173b2d !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  font-weight: 800 !important;
+}
+
+.app-shell .dashboard-content-area p,
+.app-shell .dashboard-content-area small {
+  color: #52675f !important;
+  opacity: 1 !important;
+}
+
+/* Light dashboard metrics/function cards. */
+.app-shell .dashboard-content-area .dashboard-gauge > span:not(.dashboard-gauge-icon),
+.app-shell .dashboard-content-area .dashboard-gauge > strong,
+.app-shell .dashboard-content-area .dashboard-gauge > small,
+.app-shell .dashboard-content-area .dashboard-gauge > b,
+.app-shell .dashboard-content-area .dashboard-function-button > span,
+.app-shell .dashboard-content-area .dashboard-function-button > small,
+.app-shell .dashboard-content-area .dashboard-function-button > b,
+.app-shell .dashboard-content-area .dashboard-empty {
+  color: #355247 !important;
+  opacity: 1 !important;
+}
+
+/* Light stat/workflow cards used across multiple portals. */
+.app-shell .content-area .page .stat-card h1,
+.app-shell .content-area .page .stat-card h2,
+.app-shell .content-area .page .stat-card h3,
+.app-shell .content-area .page .stat-card h4,
+.app-shell .content-area .page .stat-card h5,
+.app-shell .content-area .page .stat-card h6,
+.app-shell .content-area .page .workflow-stage h1,
+.app-shell .content-area .page .workflow-stage h2,
+.app-shell .content-area .page .workflow-stage h3,
+.app-shell .content-area .page .workflow-stage h4,
+.app-shell .content-area .page .workflow-stage h5,
+.app-shell .content-area .page .workflow-stage h6,
+.app-shell .content-area .page .stat-card label,
+.app-shell .content-area .page .workflow-stage label {
+  color: #173b2d !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  font-weight: 800 !important;
+}
+
+.app-shell .content-area .page .stat-card span,
+.app-shell .content-area .page .stat-card strong,
+.app-shell .content-area .page .stat-card small,
+.app-shell .content-area .page .workflow-stage span,
+.app-shell .content-area .page .workflow-stage strong,
+.app-shell .content-area .page .workflow-stage small {
+  color: #355247 !important;
+  opacity: 1 !important;
+}
+
+/* White/light inter-module and Back/Next surfaces. */
+.app-shell .module-interlink-bar h1,
+.app-shell .module-interlink-bar h2,
+.app-shell .module-interlink-bar h3,
+.app-shell .module-interlink-bar h4,
+.app-shell .module-interlink-bar label,
+.app-shell .module-interlink-heading,
+.app-shell .module-interlink-heading span,
+.app-shell .module-interlink-heading small,
+.app-shell .page-back-next-navigation h1,
+.app-shell .page-back-next-navigation h2,
+.app-shell .page-back-next-navigation h3,
+.app-shell .page-back-next-navigation label,
+.app-shell .page-back-next-status span,
+.app-shell .page-back-next-status strong,
+.app-shell .page-back-next-status small {
+  color: #173b2d !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Finance's intentionally light cards remain dark-text surfaces. */
+.app-shell .finance-engine-card h1,
+.app-shell .finance-engine-card h2,
+.app-shell .finance-engine-card h3,
+.app-shell .finance-engine-card h4,
+.app-shell .finance-formula-card h1,
+.app-shell .finance-formula-card h2,
+.app-shell .finance-formula-card h3,
+.app-shell .finance-formula-card h4,
+.app-shell .finance-technology-operations h1,
+.app-shell .finance-technology-operations h2,
+.app-shell .finance-technology-operations h3,
+.app-shell .finance-technology-operations h4,
+.app-shell .finance-engine-card label,
+.app-shell .finance-formula-card label,
+.app-shell .finance-technology-operations label {
+  color: #173b2d !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  font-weight: 800 !important;
+}
+
+.app-shell .finance-engine-card p,
+.app-shell .finance-engine-card small,
+.app-shell .finance-formula-card p,
+.app-shell .finance-formula-card small,
+.app-shell .finance-formula-card li,
+.app-shell .finance-technology-operations p,
+.app-shell .finance-technology-operations small {
+  color: #52675f !important;
+  opacity: 1 !important;
+}
+
+/* Finance control tabs: active state remains white; inactive labels are dark. */
+.app-shell .unified-control-tabs .unified-control-tab:not(.active):not([aria-selected="true"]) {
+  color: #173b2d !important;
+  font-weight: 800 !important;
+  opacity: 1 !important;
+}
+.app-shell .unified-control-tabs .unified-control-tab.active,
+.app-shell .unified-control-tabs .unified-control-tab[aria-selected="true"] {
+  color: #fff !important;
+}
+
+/* Inline white/light cards: strengthen headings, labels and supporting text. */
+.app-shell .content-area [style*="background:#fff"] h1,
+.app-shell .content-area [style*="background:#fff"] h2,
+.app-shell .content-area [style*="background:#fff"] h3,
+.app-shell .content-area [style*="background:#fff"] h4,
+.app-shell .content-area [style*="background:#fff"] label,
+.app-shell .content-area [style*="background:#fff"] p,
+.app-shell .content-area [style*="background:#fff"] small,
+.app-shell .content-area [style*="background:#fff"] strong,
+.app-shell .content-area [style*="background: #fff"] h1,
+.app-shell .content-area [style*="background: #fff"] h2,
+.app-shell .content-area [style*="background: #fff"] h3,
+.app-shell .content-area [style*="background: #fff"] h4,
+.app-shell .content-area [style*="background: #fff"] label,
+.app-shell .content-area [style*="background: #fff"] p,
+.app-shell .content-area [style*="background: #fff"] small,
+.app-shell .content-area [style*="background: #fff"] strong,
+.app-shell .content-area [style*="background:white"] h1,
+.app-shell .content-area [style*="background:white"] h2,
+.app-shell .content-area [style*="background:white"] h3,
+.app-shell .content-area [style*="background:white"] h4,
+.app-shell .content-area [style*="background:white"] label,
+.app-shell .content-area [style*="background:white"] p,
+.app-shell .content-area [style*="background:white"] small,
+.app-shell .content-area [style*="background:white"] strong {
+  color: #173b2d !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.app-shell .content-area [style*="background:#fff"] h1,
+.app-shell .content-area [style*="background:#fff"] h2,
+.app-shell .content-area [style*="background:#fff"] h3,
+.app-shell .content-area [style*="background: #fff"] h1,
+.app-shell .content-area [style*="background: #fff"] h2,
+.app-shell .content-area [style*="background: #fff"] h3,
+.app-shell .content-area [style*="background:white"] h1,
+.app-shell .content-area [style*="background:white"] h2,
+.app-shell .content-area [style*="background:white"] h3 {
+  font-weight: 800 !important;
+}
+
+/* Light mobile dashboard cards: preserve their existing artwork and make labels clear. */
+.app-shell .mobile-quote1-stats > button > b,
+.app-shell .mobile-quote1-stats > button > small,
+.app-shell .mobile-quote1-grid > button > strong,
+.app-shell .mobile-quote1-grid > button > small,
+.app-shell .dashboard-quote4-stats > button > b,
+.app-shell .dashboard-quote4-stats > button > small,
+.app-shell .quote4-quick-grid > button > strong,
+.app-shell .quote4-quick-grid > button > small {
+  opacity: 1 !important;
+  font-weight: 750 !important;
+}
+
+/* 4. Visibility contract: readability work must never use hiding as a fix. */
+.app-shell h1,
+.app-shell h2,
+.app-shell h3,
+.app-shell h4,
+.app-shell h5,
+.app-shell h6,
+.app-shell label,
+.app-shell legend {
+  visibility: visible !important;
+}
+
+/* 5. Text and control boundaries: keep readable without changing geometry. */
+.app-shell .panel-description,
+.app-shell .field-help,
+.app-shell .form-field small,
+.app-shell .record-details,
+.app-shell .table-subtext,
+.app-shell .muted {
+  opacity: 1 !important;
+  line-height: 1.5 !important;
+}
+
+@media (max-width: 760px) {
+  .app-shell h1,
+  .app-shell h2,
+  .app-shell h3,
+  .app-shell h4,
+  .app-shell h5,
+  .app-shell h6 {
+    font-weight: 800 !important;
+  }
+
+  .app-shell label,
+  .app-shell legend,
+  .app-shell form > label,
+  .app-shell .form-grid > label,
+  .app-shell .form-field > label {
+    font-size: 14px !important;
+    font-weight: 750 !important;
+  }
+}
