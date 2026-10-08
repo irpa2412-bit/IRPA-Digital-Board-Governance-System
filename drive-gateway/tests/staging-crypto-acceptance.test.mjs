@@ -9,7 +9,7 @@ import {
   importPublicKeyJwk,
   verifyCryptographicEvidence,
 } from "../src/cryptographicGate.mjs";
-import { finalizeEnvelope, verifyChain } from "../src/signing.mjs";
+import { chainEvents, finalizeEnvelope, verifyChain } from "../src/signing.mjs";
 import { sha256Hex } from "../src/util.mjs";
 
 async function makeStagingSecret(signerUid) {
@@ -84,12 +84,10 @@ async function fixture() {
       signatureValue: "Staging Acceptance Signature",
     }],
     archiveTargets: ["legal-contracts"],
-    events: [{
+    events: await chainEvents([], {
       type: "envelope.created",
       at: "2026-10-07T19:00:00.000Z",
-      prevHash: "GENESIS",
-      hash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    }],
+    }),
     completion: null,
   };
   await meta.create("envelopes", envelope.id, envelope);
