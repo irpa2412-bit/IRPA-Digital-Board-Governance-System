@@ -788,7 +788,7 @@
   background:#e6eff8;border-color:#c5d9ec;color:#274a68;
 }
 .content-area .page .dashboard-function-button.function-category-finance{
-  background:#f8e8e3;border-color:#e8c8bd;color:#673b31;
+  background:var(--surface-raised);border-color:var(--text);color:var(--text);
 }
 .content-area .page .dashboard-function-button.function-category-people span,
 .content-area .page .dashboard-function-button.function-category-process span,
@@ -801,17 +801,17 @@
 .content-area .page .dashboard-function-button.function-category-process small{color:#4c6f6b}
 .content-area .page .dashboard-function-button.function-category-risk small{color:#7b663e}
 .content-area .page .dashboard-function-button.function-category-information small{color:#58738d}
-.content-area .page .dashboard-function-button.function-category-finance small{color:#7d554a}
+.content-area .page .dashboard-function-button.function-category-finance small{color:var(--text)}
 .content-area .page .dashboard-function-button.function-category-people .dashboard-function-icon{color:#6f4aa1;background:#e2d8f0}
 .content-area .page .dashboard-function-button.function-category-process .dashboard-function-icon{color:#287d75;background:#d2e9e5}
 .content-area .page .dashboard-function-button.function-category-risk .dashboard-function-icon{color:#a06b12;background:#f0dfb8}
 .content-area .page .dashboard-function-button.function-category-information .dashboard-function-icon{color:#3974a7;background:#d4e4f2}
-.content-area .page .dashboard-function-button.function-category-finance .dashboard-function-icon{color:#b05b46;background:#efd2c8}
+.content-area .page .dashboard-function-button.function-category-finance .dashboard-function-icon{color:var(--text);background:var(--surface-raised)}
 .content-area .page .dashboard-function-button.function-category-people:hover{background:#e7def2;border-color:#c5b3dd}
 .content-area .page .dashboard-function-button.function-category-process:hover{background:#d9ece9;border-color:#acd0c9}
 .content-area .page .dashboard-function-button.function-category-risk:hover{background:#f3e6c7;border-color:#d9c18c}
 .content-area .page .dashboard-function-button.function-category-information:hover{background:#dce9f5;border-color:#adc9e1}
-.content-area .page .dashboard-function-button.function-category-finance:hover{background:#f3ddd6;border-color:#d9b3a5}
+.content-area .page .dashboard-function-button.function-category-finance:hover{background:var(--surface-raised);border-color:var(--text)}
 
 /* FINAL PORTAL CARD PRINCIPLE — apply the approved muted-light surface hierarchy
    across workflow/archive/stat cards. Saturated green is reserved for semantic success,
@@ -1047,7 +1047,7 @@
 .dashboard-content-area .dashboard-function-button.function-category-process .dashboard-function-icon{color:#247765}
 .dashboard-content-area .dashboard-function-button.function-category-risk .dashboard-function-icon{color:#a96f2d}
 .dashboard-content-area .dashboard-function-button.function-category-information .dashboard-function-icon{color:#326d9f}
-.dashboard-content-area .dashboard-function-button.function-category-finance .dashboard-function-icon{color:#9d5656}
+.dashboard-content-area .dashboard-function-button.function-category-finance .dashboard-function-icon{color:var(--text)}
 
 /* Dashboard lower information panels are informational, not success states. */
 .dashboard-content-area .dashboard-feed{
