@@ -2533,6 +2533,7 @@
     box-shadow:inset 0 3px #d4a82f;
   }
 }
+}
 /* FINAL SELECTED ARTWORK FIDELITY — MOBILE QUOTE 1 / DESKTOP QUOTE 4 */
 @media(max-width:760px){
 .dashboard-command,.dashboard-command.page{background:#f6faf8;color:#132f24}
