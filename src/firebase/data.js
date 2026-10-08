@@ -5,7 +5,7 @@ import { getFunctions, httpsCallable } from "firebase/functions";
 
 const uniqueInductionValues=(values)=>[...new Set(values.flatMap(v=>Array.isArray(v)?v:String(v||"").split(",")).map(v=>String(v||"").trim()).filter(Boolean))];
 
-export const COLLECTIONS={members:"members",employees:"employees",employeeCounters:"employeeCounters",memberCounters:"memberCounters",participants:"participants",meetings:"meetings",meetingSubscriptions:"meetingSubscriptions",meetingRoomEvents:"meetingRoomEvents",transcriptions:"transcriptions",resolutions:"resolutions",votes:"votes",voteLocks:"voteLocks",voteCorrections:"voteCorrections",votingIssues:"votingIssues",actions:"actions",documents:"documents",signatures:"signatures",decisions:"decisions",risks:"risks",audit:"audit",reports:"reports",authorizationRequests:"authorizationRequests",workflowActions:"workflowActions",staffPaymentRequests:"staffPaymentRequests",financeBudgets:"financeBudgets",financeTransactions:"financeTransactions",financeFunding:"financeFunding",financeApprovals:"financeApprovals",financeCommitments:"financeCommitments",financeGrants:"financeGrants",financeBankAccounts:"financeBankAccounts",financeReconciliations:"financeReconciliations",financeAssets:"financeAssets",financeRisks:"financeRisks",financeReports:"financeReports",financeChartOfAccounts:"financeChartOfAccounts",financeJournalBatches:"financeJournalBatches",financePeriods:"financePeriods",financeLedgerJournals:"financeLedgerJournals",financeLedgerEntries:"financeLedgerEntries",financePaymentMatches:"financePaymentMatches",financePaymentTrace:"financePaymentTrace",financeReferenceRegistry:"financeReferenceRegistry",procurementVendors:"procurementVendors",procurementRequests:"procurementRequests",procurementVendorScores:"procurementVendorScores",procurementVendorBlacklist:"procurementVendorBlacklist",procurementVendorProbation:"procurementVendorProbation",invitations:"invitations",registrationRequests:"registrationRequests",inductionRecords:"inductionRecords",adminProfiles:"adminProfiles",auditorProfiles:"auditorProfiles",systemSettings:"systemSettings",mail:"mail",donorFunders:"donorFunders",grantReportingObligations:"grantReportingObligations",researchStudies:"researchStudies",researchDatasets:"researchDatasets",researchObservations:"researchObservations",researchAnalyses:"researchAnalyses",researchKnowledge:"researchKnowledge",researchOutputs:"researchOutputs",researchInstruments:"researchInstruments",researchSubmissions:"researchSubmissions"};
+export const COLLECTIONS={members:"members",employees:"employees",employeeCounters:"employeeCounters",memberCounters:"memberCounters",participants:"participants",meetings:"meetings",meetingSubscriptions:"meetingSubscriptions",meetingRoomEvents:"meetingRoomEvents",transcriptions:"transcriptions",resolutions:"resolutions",votes:"votes",voteLocks:"voteLocks",voteCorrections:"voteCorrections",votingIssues:"votingIssues",actions:"actions",documents:"documents",signatures:"signatures",decisions:"decisions",risks:"risks",audit:"audit",reports:"reports",authorizationRequests:"authorizationRequests",workflowActions:"workflowActions",staffPaymentRequests:"staffPaymentRequests",financeBudgets:"financeBudgets",financeTransactions:"financeTransactions",financeFunding:"financeFunding",financeApprovals:"financeApprovals",financeCommitments:"financeCommitments",financeGrants:"financeGrants",financeBankAccounts:"financeBankAccounts",financeReconciliations:"financeReconciliations",financeAssets:"financeAssets",financeRisks:"financeRisks",financeReports:"financeReports",financeChartOfAccounts:"financeChartOfAccounts",financeJournalBatches:"financeJournalBatches",financePeriods:"financePeriods",financeLedgerJournals:"financeLedgerJournals",financeLedgerEntries:"financeLedgerEntries",financePaymentMatches:"financePaymentMatches",financePaymentTrace:"financePaymentTrace",financeReferenceRegistry:"financeReferenceRegistry",procurementVendors:"procurementVendors",procurementRequests:"procurementRequests",procurementVendorScores:"procurementVendorScores",procurementVendorBlacklist:"procurementVendorBlacklist",procurementVendorProbation:"procurementVendorProbation",invitations:"invitations",registrationRequests:"registrationRequests",inductionRecords:"inductionRecords",adminProfiles:"adminProfiles",auditorProfiles:"auditorProfiles",systemSettings:"systemSettings",mail:"mail",donorFunders:"donorFunders",grantReportingObligations:"grantReportingObligations",researchStudies:"researchStudies",researchDatasets:"researchDatasets",researchObservations:"researchObservations",researchAnalyses:"researchAnalyses",researchKnowledge:"researchKnowledge",researchOutputs:"researchOutputs",researchInstruments:"researchInstruments",researchSubmissions:"researchSubmissions",researchInformationRequests:"researchInformationRequests",researchInformationGrants:"researchInformationGrants",researchSharedInformation:"researchSharedInformation",researchUpdates:"researchUpdates",researchToolPermissions:"researchToolPermissions",researchPortalAlerts:"researchPortalAlerts"};
 function currentActor(){return{uid:auth.currentUser?.uid||null,email:auth.currentUser?.email||null};}
 async function writeAudit(action,collectionName,recordId,details={}){const a=currentActor();const anonymous=action.startsWith("ANONYMOUS_VOTE_");await addDoc(collection(db,COLLECTIONS.audit),{action,collection:collectionName,recordId,details,actorUid:anonymous?null:a.uid,actorEmail:anonymous?null:a.email,createdAt:serverTimestamp()});}
 function auditData(action,collectionName,recordId,details={}){const a=currentActor();const anonymous=action.startsWith("ANONYMOUS_VOTE_");return{action,collection:collectionName,recordId,details,actorUid:anonymous?null:a.uid,actorEmail:anonymous?null:a.email,createdAt:serverTimestamp()};}
@@ -354,3 +354,29 @@ export async function synchronizeRegisteredIdentityUids(){
 }
 
 export async function callFinanceAccounting(functionName,data={}){const fn=getFunctions();const callable=httpsCallable(fn,functionName);const result=await callable(data);return result.data;}
+
+
+export async function getResearchInformationRequests(){
+  const uid=auth.currentUser?.uid;
+  if(!uid)throw new Error("Authentication is required.");
+  const snap=await getDocs(query(collection(db,COLLECTIONS.researchInformationRequests),where("requestedByUid","==",uid)));
+  return snap.docs.map(x=>({id:x.id,...x.data()})).sort((a,b)=>String(b.createdAtClient||b.createdAt||"").localeCompare(String(a.createdAtClient||a.createdAt||"")));
+}
+export async function getResearchPortalAlerts(portal){
+  if(!auth.currentUser?.uid)throw new Error("Authentication is required.");
+  const cleanPortal=String(portal||"").trim();
+  if(!cleanPortal) return [];
+  const snap=await getDocs(query(collection(db,COLLECTIONS.researchInformationRequests),where("targetPortal","==",cleanPortal),where("status","in",["Submitted","Under Review","Clarification Required"])));
+  return snap.docs.map(x=>({id:x.id,...x.data()}));
+}
+export async function getResearchUpdates(){
+  if(!auth.currentUser?.uid)throw new Error("Authentication is required.");
+  const snap=await getDocs(query(collection(db,COLLECTIONS.researchUpdates),where("status","==","Published")));
+  return snap.docs.map(x=>({id:x.id,...x.data()})).sort((a,b)=>String(b.publishedAt||b.createdAt||"").localeCompare(String(a.publishedAt||a.createdAt||"")));
+}
+export async function getResearchToolPermissions(){
+  const uid=auth.currentUser?.uid;
+  if(!uid)throw new Error("Authentication is required.");
+  const snap=await getDocs(query(collection(db,COLLECTIONS.researchToolPermissions),where("userUid","==",uid),where("status","==","Active")));
+  return snap.docs.map(x=>({id:x.id,...x.data()}));
+}
