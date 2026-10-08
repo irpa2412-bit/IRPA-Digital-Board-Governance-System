@@ -17,7 +17,14 @@ const requiredCss=[
   "color:var(--text-muted);",
   "IRPA-DBGS CANONICAL UI CONTRACT — MEMBERS & PERSONNEL REFERENCE",
   "--irpa-canonical-ui-reference:members-personnel;",
-  "--irpa-canonical-ui-contract:2026-10-09;"
+  "--irpa-canonical-ui-contract:2026-10-09;",
+  "IRPA-DBGS UNIFORM BLUE NAVIGATION / TAB FIT CONTRACT",
+  ".module-interlink-list>button",
+  ".finance-engine-tabs>button",
+  ".unified-control-tabs>.unified-control-tab",
+  "background:#eaf4fc",
+  "background:#0b5fa8",
+  "white-space:nowrap"
 ];
 for(const marker of requiredCss){
   if(!allCss.includes(marker)) throw new Error("Missing app-wide readability guard: "+marker);
