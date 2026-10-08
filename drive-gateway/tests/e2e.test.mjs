@@ -31,3 +31,26 @@ test("19 forced completion failure is contained and retryable",async()=>{const s
  test("20 Gate 4 archive paths and signer persistence",async()=>{const s=setup(),id=await env(s);const stored=[...s.storage.objs.values()];assert.equal(stored.length,2);for(const o of stored)assert.equal(o.path,archivePath({archiveKey:o.metadata.archive,classification:"Restricted",documentId:"DOC-001",fileName:"doc.pdf"}));const e0=await s.meta.get("envelopes",id);assert.deepEqual(e0.signers.map(x=>x.invitation),["Sent","Sent"]);assert.equal((await route(sig(s.tokenFor("a@example.org")),s.ctx)).status,200);const mid=await s.meta.get("envelopes",id);assert.deepEqual(mid.signers.map(x=>x.status),["Signed","Pending"]);const second=await route(post("/api/sign/submit",{token:s.tokenFor("j@example.org"),consent:true,signature:{type:"typed",value:"Juma K"}},s.ctx),s.ctx);assert.equal(second.status,200);const done=await s.meta.get("envelopes",id);assert.equal(done.status,"Completed");assert.ok(done.signers.every(x=>x.status==="Signed"&&x.signedAt));assert.equal(done.completion.files.length,5);assert.ok(done.completion.files.some(x=>x.kind==="signer-copy"&&x.path===signerCopyPath({ownerKey:""+id+"-S1",fileName:done.completion.fileName})));assert.equal(done.completion.finalHash.length,64)});
 test("21 Gate 4 rollback failure is logged and cleanup is recoverable",async()=>{const s=setup(),logs=[];s.ctx.logger={error:(...a)=>logs.push(a),log(){}};s.storage.failPutWhen=n=>n===2;s.storage.failDelete=true;const r=await route(uploadReq(await pdf(),{documentId:"DOC-ROLLBACK-LOG"}),s.ctx);assert.equal(r.status,502);assert.equal((await s.meta.list("documents")).length,0);assert.equal((await s.meta.list("pendingCleanup")).length,1);assert.ok(logs.some(a=>a[0]==="ROLLBACK_DELETE_FAILED"));s.storage.failDelete=false;assert.deepEqual(await runCleanup(s.ctx),{removed:1});assert.equal((await s.meta.list("pendingCleanup")).length,0)});
 test("22 Gate 4 legacy upload remains compatible with e-sign retrieval",async()=>{const s=setup(),x=await up(s,"DOC-LEGACY-001",{archives:["administrative-documents","board-governance"]});const r=await route(get("/api/documents/DOC-LEGACY-001/pdf",{user:"u1"}),s.ctx);assert.equal(r.status,200);assert.equal(r.headers.get("x-document-sha256"),x.h);assert.equal(await sha256Hex(new Uint8Array(await r.arrayBuffer())),x.h);assert.equal((await s.meta.get("documents","DOC-LEGACY-001")).status,"Stored")});
+
+test("23 Gate 4 supports open-ended additional signers beyond the legacy eight-signer ceiling",async()=>{
+  const s=setup(),signers=Array.from({length:9},(_,i)=>({name:`Signer ${i+1}`,email:`signer${i+1}@example.org`,order:i+1}));
+  const id=await env(s,signers);
+  const e0=await s.meta.get("envelopes",id);
+  assert.equal(e0.signers.length,9);
+  assert.deepEqual(e0.signers.map(x=>x.invitation),Array(9).fill("Sent"));
+  const tokens=signers.map(x=>s.tokenFor(x.email));
+  for(let i=0;i<tokens.length;i++){
+    const out=await route(sig(tokens[i],`Signer ${i+1}`),s.ctx);
+    assert.equal(out.status,200);
+    const state=await s.meta.get("envelopes",id);
+    assert.equal(state.signers[i].status,"Signed");
+    if(i<tokens.length-1) assert.equal(state.signers[i+1].status,"Pending");
+  }
+  const done=await s.meta.get("envelopes",id);
+  assert.equal(done.status,"Completed");
+  assert.ok(done.signers.every(x=>x.status==="Signed"&&x.signedAt));
+  assert.equal(done.completion.files.length,12);
+  const signedPdf=await s.storage.get(done.completion.primaryStorageId);
+  const parsed=await PDFDocument.load(signedPdf);
+  assert.ok(parsed.getPageCount()>=2);
+});
