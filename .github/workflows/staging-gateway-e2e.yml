@@ -196,4 +196,4 @@ jobs:
           curl --fail --silent --show-error --retry 5 --retry-delay 2 "$url" | tee staging-health.json
           grep -q '"ok":true' staging-health.json
 
-# Controlled Gate 4 proof boundary: upload -> storage -> retrieval -> hash/integrity -> archive paths -> two-signer envelope -> signer persistence -> forced failure/rollback -> invitation transport -> logs -> legacy upload compatibility
+# Controlled Gate 4 proof boundary: upload -> storage -> retrieval -> hash/integrity -> archive paths -> ordered signer envelope (two-signer and open-ended additional signers) -> signer persistence -> forced failure/rollback -> invitation transport -> logs -> legacy upload compatibility
