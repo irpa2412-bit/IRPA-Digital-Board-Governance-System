@@ -180,3 +180,39 @@ test("explicitly listed external participant can read only the meeting they are 
   await assertSucceeds(externalDb.doc("meetings/invited-record").get());
   await assertFails(externalDb.doc("meetings/uninvited-record").get());
 });
+
+
+test("meeting invitee can read only the invited meeting and its participant register", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {const db=context.firestore();
+    await db.doc("meetings/invited-meeting").set(meeting({meetingCategory:"GOVERNANCE",meetingPolicyId:"GOVERNANCE",meetingType:"Board Meeting",registerStatus:"Registered",invitedEmails:["invitee@example.test"],participantEmails:["invitee@example.test"]}));
+    await db.doc("meetings/other-meeting").set(meeting({meetingCategory:"GOVERNANCE",meetingPolicyId:"GOVERNANCE",meetingType:"Board Meeting",registerStatus:"Registered",invitedEmails:["someone-else@example.test"]}));
+    await db.doc("participants/invitee-record").set({meetingId:"invited-meeting",participantEmail:"invitee@example.test",participantName:"Invitee",attendanceStatus:"Invited"});
+    await db.doc("participants/other-record").set({meetingId:"other-meeting",participantEmail:"someone-else@example.test",participantName:"Other",attendanceStatus:"Invited"});
+  });
+  const db=testEnv.authenticatedContext("invitee-user",{email:"invitee@example.test"}).firestore();
+  await assertSucceeds(db.doc("meetings/invited-meeting").get()); await assertFails(db.doc("meetings/other-meeting").get());
+  await assertSucceeds(db.doc("participants/invitee-record").get()); await assertSucceeds(db.collection("participants").where("meetingId","==","invited-meeting").get()); await assertFails(db.doc("participants/other-record").get());
+});
+
+test("invitee can check in only their own participant record", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {const db=context.firestore();
+    await db.doc("meetings/invited-meeting").set(meeting({invitedEmails:["invitee@example.test"]}));
+    await db.doc("meetings/closed-meeting").set(meeting({status:"Completed",invitedEmails:["invitee@example.test"]}));
+    await db.doc("participants/invitee-record").set({meetingId:"invited-meeting",participantUid:"invitee-user",participantEmail:"invitee@example.test",attendanceStatus:"Invited"});
+    await db.doc("participants/other-record").set({meetingId:"invited-meeting",participantUid:"other-user",participantEmail:"other@example.test",attendanceStatus:"Invited"});
+    await db.doc("participants/closed-record").set({meetingId:"closed-meeting",participantUid:"invitee-user",participantEmail:"invitee@example.test",attendanceStatus:"Invited"});
+  });
+  const db=testEnv.authenticatedContext("invitee-user",{email:"invitee@example.test"}).firestore();
+  await assertSucceeds(db.doc("participants/invitee-record").update({attendanceStatus:"Present",attendanceRecordedAt:"2026-10-09T18:00:00.000Z",attendanceRecordedByUid:"invitee-user"}));
+  await assertFails(db.doc("participants/other-record").update({attendanceStatus:"Present",attendanceRecordedAt:"2026-10-09T18:00:00.000Z",attendanceRecordedByUid:"invitee-user"}));
+  await assertFails(db.doc("participants/closed-record").update({attendanceStatus:"Present",attendanceRecordedAt:"2026-10-09T18:00:00.000Z",attendanceRecordedByUid:"invitee-user"}));
+  await assertFails(db.doc("participants/invitee-record").update({participantRole:"Board Member"}));
+});
+
+
+test("meeting initiator can register an invitee and create the linked invitation", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {const db=context.firestore();await db.doc("meetings/organizer-meeting").set(meeting({initiatorUid:"departmental-director",initiatorEmail:"director@example.test",registerStatus:"Registered"}));});
+  const db=testEnv.authenticatedContext("departmental-director",{email:"director@example.test"}).firestore();
+  await assertSucceeds(db.doc("participants/new-invitee").set({meetingId:"organizer-meeting",participantEmail:"guest@example.test",participantName:"Guest",participantRole:"Invited Guest",attendanceStatus:"Invited"}));
+  await assertSucceeds(db.doc("invitations/guest-invitation").set({meetingId:"organizer-meeting",participantId:"new-invitee",email:"guest@example.test",name:"Guest",status:"Pending"}));
+});

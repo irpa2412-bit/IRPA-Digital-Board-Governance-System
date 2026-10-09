@@ -1,4 +1,4 @@
-import React,{Component}from"react";
+import React,{Component,useState}from"react";
 import ReactDOM from"react-dom/client";
 import App from"./App";
 import InvitationActivation from"./pages/InvitationActivation";import MeetingEntryGateway from"./pages/MeetingEntryGateway";
@@ -51,13 +51,14 @@ class AppBootBoundary extends Component{
 
 const invitationRoute = new URL(window.location.href).searchParams.has("invitationToken");
 const meetingRoute = new URL(window.location.href).searchParams.has("meetingToken");
+function MeetingEntrySession(){const[entered,setEntered]=useState(false);if(entered)return <App/>;return <MeetingEntryGateway onEnter={meetingId=>{try{sessionStorage.setItem("irpaMeetingGatewayTarget",meetingId||"")}catch{}setEntered(true)}}/>}
 
 ReactDOM.createRoot(document.getElementById("root"),{
   onUncaughtError:(error)=>console.error("IRPA application startup error",error)
 }).render(
   <React.StrictMode>
     <AppBootBoundary>
-      {invitationRoute ? <InvitationActivation /> : meetingRoute ? <MeetingEntryGateway onEnter={(meetingId)=>{try{sessionStorage.setItem("irpaMeetingGatewayTarget",meetingId||"")}catch{} window.history.replaceState({},document.title,window.location.pathname);window.dispatchEvent(new CustomEvent("irpa:navigate",{detail:{module:"Meeting Room"}}));}}/> : <App />}
+      {invitationRoute ? <InvitationActivation /> : meetingRoute ? <MeetingEntrySession/> : <App />}
     </AppBootBoundary>
   </React.StrictMode>
 );
