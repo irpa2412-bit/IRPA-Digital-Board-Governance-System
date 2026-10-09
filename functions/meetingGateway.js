@@ -35,7 +35,29 @@ exports.createMeetingAccessInvitation=onCall({region:"us-central1",timeoutSecond
   createdByUid:uid,createdAt:FieldValue.serverTimestamp(),
   gateway:"IRPA Meeting Entry Gateway",singlePurpose:"Live meeting entry"
  });
- return {ok:true,accessToken:raw,meetingId,meetingPassword,participantId,participantName:text(participant.participantName||participant.name)||text(participant.email),meetingReference:text(meeting.reference||meeting.title),meetingCategory:text(meeting.meetingCategory||meeting.category||meeting.meetingType||"General Meeting"),reusable:true,reusePolicy:"Reusable for 30 days, or until revoked or the meeting is closed.",expiresAt:expiresAt.toISOString()};
+ return {ok:true,accessId:ref.id,accessToken:raw,meetingId,meetingPassword,participantId,participantName:text(participant.participantName||participant.name)||text(participant.email),meetingReference:text(meeting.reference||meeting.title),meetingCategory:text(meeting.meetingCategory||meeting.category||meeting.meetingType||"General Meeting"),reusable:true,reusePolicy:"Reusable for 30 days, or until revoked or the meeting is closed.",expiresAt:expiresAt.toISOString()};
+});
+
+exports.revokeMeetingAccessInvitation=onCall({region:"us-central1",timeoutSeconds:30},async request=>{
+ const uid=request.auth?.uid;
+ if(!uid)throw new HttpsError("unauthenticated","Authentication is required.");
+ const accessId=text(request.data?.accessId);
+ if(!accessId)throw new HttpsError("invalid-argument","Meeting access ID is required.");
+ const ref=db.collection("meetingAccessTokens").doc(accessId);
+ const snap=await ref.get();
+ if(!snap.exists)throw new HttpsError("not-found","Meeting access pass was not found.");
+ const grant=snap.data()||{};
+ const meetingSnap=await db.collection("meetings").doc(text(grant.meetingId)).get();
+ const meeting=meetingSnap.exists?meetingSnap.data()||{}:{};
+ const email=text(request.auth?.token?.email).toLowerCase();
+ const chair=text(meeting.chairpersonEmail).toLowerCase()===email;
+ const secretary=text(meeting.secretaryEmail).toLowerCase()===email;
+ if(!admin(request)&&grant.createdByUid!==uid&&!chair&&!secretary)throw new HttpsError("permission-denied","Only the issuer or an authorised meeting administrator may revoke this pass.");
+ if(grant.status!=="Revoked"){
+  await ref.update({status:"Revoked",revokedByUid:uid,revokedAt:FieldValue.serverTimestamp()});
+  await db.collection("audit").add({action:"MEETING_ACCESS_INVITATION_REVOKED",collection:"meetingAccessTokens",recordId:accessId,details:{meetingId:grant.meetingId,participantId:grant.participantId},actorUid:uid,actorEmail:email||null,createdAt:FieldValue.serverTimestamp()});
+ }
+ return {ok:true,accessId,status:"Revoked"};
 });
 
 exports.authorizeMeetingEntry=onCall({region:"us-central1",timeoutSeconds:30},async request=>{
