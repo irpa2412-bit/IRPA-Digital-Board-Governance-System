@@ -1,0 +1,91 @@
+name: Deploy IRPA LiveKit Staging Function
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: irpa-livekit-staging-function-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy-staging-function:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Firebase CLI
+        run: npm install --global firebase-tools
+
+      - name: Authenticate to the explicitly configured staging project
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.LIVEKIT_STAGING_FIREBASE_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Validate staging-only configuration
+        env:
+          PROJECT_ID: ${{ secrets.LIVEKIT_STAGING_FIREBASE_PROJECT_ID }}
+          LIVEKIT_URL: ${{ secrets.LIVEKIT_STAGING_URL }}
+          LIVEKIT_API_KEY: ${{ secrets.LIVEKIT_STAGING_API_KEY }}
+          LIVEKIT_API_SECRET: ${{ secrets.LIVEKIT_STAGING_API_SECRET }}
+        run: |
+          set -euo pipefail
+          for name in PROJECT_ID LIVEKIT_URL LIVEKIT_API_KEY LIVEKIT_API_SECRET; do
+            if [ -z "${!name:-}" ]; then echo "::error::Missing required secret for ${name}"; exit 1; fi
+          done
+          if [ "$PROJECT_ID" = "irpa-digital-board-governance" ]; then
+            echo "::error::Refusing to deploy this staging workflow to the production Firebase project."
+            exit 1
+          fi
+          case "$LIVEKIT_URL" in wss://*) ;; *) echo "::error::LIVEKIT_STAGING_URL must use wss://"; exit 1;; esac
+          if [ "$LIVEKIT_API_KEY" = "devkey" ] || [ "$LIVEKIT_API_SECRET" = "secret" ] || [ "${#LIVEKIT_API_SECRET}" -lt 32 ]; then
+            echo "::error::Refusing development or weak LiveKit credentials."
+            exit 1
+          fi
+
+      - name: Store LiveKit credentials in staging Secret Manager
+        env:
+          PROJECT_ID: ${{ secrets.LIVEKIT_STAGING_FIREBASE_PROJECT_ID }}
+          LIVEKIT_URL: ${{ secrets.LIVEKIT_STAGING_URL }}
+          LIVEKIT_API_KEY: ${{ secrets.LIVEKIT_STAGING_API_KEY }}
+          LIVEKIT_API_SECRET: ${{ secrets.LIVEKIT_STAGING_API_SECRET }}
+        run: |
+          set -euo pipefail
+          gcloud config set project "$PROJECT_ID"
+          gcloud services enable secretmanager.googleapis.com cloudfunctions.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com run.googleapis.com eventarc.googleapis.com pubsub.googleapis.com --project "$PROJECT_ID"
+          put_secret() {
+            name="$1"
+            value="$2"
+            if ! gcloud secrets describe "$name" --project "$PROJECT_ID" >/dev/null 2>&1; then
+              gcloud secrets create "$name" --replication-policy=automatic --project "$PROJECT_ID"
+            fi
+            printf '%s' "$value" | gcloud secrets versions add "$name" --data-file=- --project "$PROJECT_ID" >/dev/null
+          }
+          put_secret LIVEKIT_URL "$LIVEKIT_URL"
+          put_secret LIVEKIT_API_KEY "$LIVEKIT_API_KEY"
+          put_secret LIVEKIT_API_SECRET "$LIVEKIT_API_SECRET"
+
+      - name: Deploy only the meeting token callable to staging
+        env:
+          PROJECT_ID: ${{ secrets.LIVEKIT_STAGING_FIREBASE_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          firebase deploy --only functions:issueLiveMeetingToken --project "$PROJECT_ID" --non-interactive
+
+      - name: Report deployment boundary
+        run: |
+          echo "Staging callable deployment completed if all prior steps passed."
+          echo "This workflow does not deploy Hosting, change Firestore rules, or deploy to production."
