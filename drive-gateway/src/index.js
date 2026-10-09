@@ -1325,7 +1325,6 @@ async function withInvitationRetry(operation, stage) {
 async function sendMemberInvitation(request, env) {
   const claims = await authenticateFirebaseRequest(request, env);
   const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
-  if (!admin?.fields?.active?.booleanValue) return json({ok:false,error:"Administrator authorization is required to send member invitations."},403,corsHeaders(request));
   await enforceMailRateLimit(env, claims.user_id);
   const data = await request.json();
   const invitationId = cleanId(data.invitationId || "");
@@ -1337,6 +1336,9 @@ async function sendMemberInvitation(request, env) {
   if(!email) return json({ok:false,error:"Invalid recipient"},400,corsHeaders(request));
   const name=String(fields.name?.stringValue||"").trim();
   const role=String(fields.role?.stringValue||"IRPA Member").trim();
+  let meetingOrganizer=false;
+  if(data.meetingAccess){const meetingId=cleanId(data.meetingAccess.meetingId||"");if(meetingId){const meetingDoc=await getFirestoreDocument(env,`meetings/${meetingId}`,claims.token);const mf=meetingDoc?.fields||{};const actorEmail=String(claims.email||"").trim().toLowerCase();meetingOrganizer=String(mf.initiatorUid?.stringValue||"")===claims.user_id||String(mf.chairpersonUid?.stringValue||"")===claims.user_id||String(mf.secretaryUid?.stringValue||"")===claims.user_id||Boolean(actorEmail&&[mf.initiatorEmail?.stringValue,mf.chairpersonEmail?.stringValue,mf.secretaryEmail?.stringValue].some(v=>String(v||"").trim().toLowerCase()===actorEmail));}}
+  if(!admin?.fields?.active?.booleanValue&&!meetingOrganizer)return json({ok:false,error:"Administrator or authorised meeting organiser access is required to send this invitation."},403,corsHeaders(request));
   const appUrl=String(env.IRPA_APP_URL||"https://irpa-digital-board-governance.web.app").replace(/\/$/,"");
   const invitationSecret=randomBase64Url(32);
   const invitationTokenHash=await sha256Hex(invitationSecret);
