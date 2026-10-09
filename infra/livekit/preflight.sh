@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 fail=0
-check(){ if "$@"; then printf 'PASS '; else printf 'FAIL '; fail=1; fi; printf '%s\n' "$*"; }
-for cmd in docker docker-compose certbot getent; do
+for cmd in docker getent curl envsubst; do
   if command -v "$cmd" >/dev/null 2>&1; then printf 'PASS command available: %s\n' "$cmd"; else printf 'FAIL command missing: %s\n' "$cmd"; fail=1; fi
 done
 if [[ -z "${LIVEKIT_DOMAIN:-}" || -z "${LIVEKIT_TURN_DOMAIN:-}" ]]; then
@@ -16,4 +15,4 @@ for domain in "$LIVEKIT_DOMAIN" "$LIVEKIT_TURN_DOMAIN"; do
   fi
 done
 if [[ "$fail" -ne 0 ]]; then exit 1; fi
-echo "PASS basic host and DNS preflight. This does not test firewall reachability, TLS, API credentials, or WebRTC media."
+echo "PASS basic host and DNS preflight. This does not test firewall reachability, TLS issuance, API credentials, or WebRTC media."
