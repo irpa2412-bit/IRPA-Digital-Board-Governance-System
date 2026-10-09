@@ -159,9 +159,9 @@ service cloud.firestore {
       (d.get("archiveCategory","")=="Administrator Documents"&&admin());
   }
   function documentLifecycleClassificationAllowed(d){return d.get("classification","") in ["Public","Internal","Confidential"]||(d.get("classification","")=="Restricted"&&(admin()||anyInstitutionalRole(["RESTRICTED_DOCUMENT_UPLOAD"])));}
-  function documentLifecycleCreateAllowed(){
+  function documentLifecycleCreateAllowed(documentId){
     let d=request.resource.data;
-    return documentLifecycleIdentity()&&
+    return documentLifecycleIdentity()&&d.get("documentId","")==documentId&&
       d.get("ownerUid","")==request.auth.uid&&d.get("uploadedByUid","")==request.auth.uid&&
       d.get("ownerType","") in ["ADMINISTRATOR","EMPLOYEE","MEMBER"]&&
       d.get("status","")=="WORKING"&&d.get("authorizationStatus","")=="AUTHORIZED"&&
@@ -209,7 +209,7 @@ service cloud.firestore {
           documentLifecycleValidTransition(id))
       );
   }
-  match /documents/{id}{allow read:if admin()||controlledDocumentReadAllowed();allow create:if admin()||controlledDocumentCreateAllowed()||documentLifecycleCreateAllowed();allow delete:if admin();allow update:if admin()||signatureDocumentWorkflowUpdate()||documentLifecycleUpdateAllowed();}
+  match /documents/{id}{allow read:if admin()||controlledDocumentReadAllowed();allow create:if admin()||controlledDocumentCreateAllowed()||documentLifecycleCreateAllowed(id);allow delete:if admin();allow update:if admin()||signatureDocumentWorkflowUpdate()||documentLifecycleUpdateAllowed();}
   match /researchInstruments/{id}{allow read:if admin()||researchToolAllowed("Research Data Collection",resource.data.get("studyId",""),request.auth.uid);allow create:if researchToolAllowed("Research Data Collection",request.resource.data.get("studyId",""),request.auth.uid)&&request.resource.data.recordType=="Research Data Collection Instrument"&&request.resource.data.recordOrigin=="PRODUCTION";allow update:if admin()||researchToolAllowed("Survey Instrument",resource.data.get("studyId",""),request.auth.uid);allow delete:if admin();}
   match /researchSubmissions/{id}{allow read:if admin()||researchToolAllowed("Research Submission",resource.data.get("studyId",""),request.auth.uid);allow create:if researchToolAllowed("Research Submission",request.resource.data.get("studyId",""),request.auth.uid)&&request.resource.data.recordType=="Research Data Collection Submission"&&request.resource.data.recordOrigin=="PRODUCTION";allow update:if admin()||researchToolAllowed("Research Submission",resource.data.get("studyId",""),request.auth.uid);allow delete:if admin();}
   match /researchStudies/{id}{allow read,create,update:if researchUser();allow delete:if admin();}
