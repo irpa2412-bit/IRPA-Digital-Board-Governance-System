@@ -277,3 +277,14 @@ test("ordinary governance members cannot write donor registry or reporting oblig
     recordType: "GRANT_REPORTING_OBLIGATION"
   }));
 });
+
+test("document lifecycle records cannot be deleted by an ordinary owner", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("documents/LIFE-test-1").set(lifecycleDocument());
+  });
+  const db = testEnv.authenticatedContext("member-user", {
+    email: "member@example.test"
+  }).firestore();
+  await assertFails(db.doc("documents/LIFE-test-1").delete());
+});
+
