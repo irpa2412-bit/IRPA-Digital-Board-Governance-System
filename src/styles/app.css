@@ -4517,3 +4517,79 @@
     white-space: normal;
   }
 }
+
+
+/* ==========================================================================
+   IRPA-DBGS SYSTEM-WIDE OPAQUE TEXT / READABILITY REPAIR — 2026-10-09
+   Presentation-only final cascade. Preserve every existing word and control.
+   Never use transparency to render text; keep the existing semantic colour
+   of buttons, badges, links and status indicators while restoring opacity.
+   Applies across authenticated portals, dialogs, forms, tables and mobile UI.
+   ========================================================================== */
+
+#root .app-shell .content-area .page,
+#root .app-shell .content-area .page :where(p,span,strong,b,em,i,small,label,legend,
+  dt,dd,li,th,td,caption,h1,h2,h3,h4,h5,h6,summary,output,figcaption),
+#root .app-shell .content-area :where(button,a,input,select,textarea,option),
+#root .app-shell :where(.topbar,.sidebar,.mobile-global-nav,.mobile-nav-sheet)
+  :where(p,span,strong,b,em,i,small,label,button,a){
+  -webkit-text-fill-color: currentColor;
+}
+
+#root .app-shell .content-area .page :where(p,span,strong,b,em,i,small,label,legend,
+  dt,dd,li,th,td,caption,h1,h2,h3,h4,h5,h6,summary,output,figcaption),
+#root .app-shell .content-area :where(button,a,input,select,textarea,option),
+#root .app-shell :where(.topbar,.sidebar,.mobile-global-nav,.mobile-nav-sheet)
+  :where(p,span,strong,b,em,i,small,label,button,a){
+  opacity: 1;
+}
+
+#root .app-shell .content-area .page :where(input,select,textarea),
+#root .app-shell .content-area .page select option,
+#root .app-shell .content-area .page input::file-selector-button{
+  background-color: #ffffff;
+  color: #18364f;
+  -webkit-text-fill-color: #18364f;
+}
+
+#root .app-shell .content-area .page :where(input,select,textarea){
+  border-color: #7b91a5;
+}
+
+#root .app-shell .content-area .page :where(input,select,textarea)::placeholder{
+  color: #526579;
+  -webkit-text-fill-color: #526579;
+  opacity: 1;
+}
+
+#root .app-shell .content-area .page :where(input,select,textarea):focus-visible,
+#root .app-shell .content-area .page :where(button,a):focus-visible{
+  outline: 3px solid #1769aa;
+  outline-offset: 2px;
+}
+
+#root .app-shell .content-area .page :where(button:disabled,input:disabled,
+  select:disabled,textarea:disabled){
+  color: #334155;
+  -webkit-text-fill-color: #334155;
+  background-color: #e8edf2;
+  border-color: #8a9aab;
+  opacity: 1;
+}
+
+#root .app-shell .content-area .page :where(.panel,.module-panel,.welcome-panel,
+  .table-wrapper,dialog,[role="dialog"],[role="listbox"],[role="menu"]){
+  color: #18364f;
+}
+
+#root .app-shell .content-area .page :where([role="listbox"],[role="menu"]) :where(option,[role="option"],button,a){
+  color: #18364f;
+  -webkit-text-fill-color: #18364f;
+}
+
+@media (max-width: 760px){
+  #root .app-shell .content-area .page :where(p,span,strong,b,small,label,th,td,
+    input,select,textarea,button,a){
+    text-rendering: optimizeLegibility;
+  }
+}
