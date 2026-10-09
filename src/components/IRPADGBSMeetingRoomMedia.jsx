@@ -12,7 +12,7 @@ function safeJson(value){
 
 export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",controller=false,authorizedToJoin=false}){
  const roomRef=useRef(null),remoteRef=useRef(null),localRef=useRef(null);
- const[status,setStatus]=useState("READY"),[error,setError]=useState(""),[muted,setMuted]=useState(true),[camera,setCamera]=useState(false),[screen,setScreen]=useState(false),[hand,setHand]=useState(false),[moderator,setModerator]=useState(false),[recordingAllowed,setRecordingAllowed]=useState(false);
+ const[status,setStatus]=useState("READY"),[error,setError]=useState(""),[muted,setMuted]=useState(true),[camera,setCamera]=useState(false),[qualityMode,setQualityMode]=useState("HD"),[screen,setScreen]=useState(false),[hand,setHand]=useState(false),[moderator,setModerator]=useState(false),[recordingAllowed,setRecordingAllowed]=useState(false);
  const[participants,setParticipants]=useState([]),[messages,setMessages]=useState([]),[chat,setChat]=useState(""),[deviceReady,setDeviceReady]=useState(false),[deviceCheck,setDeviceCheck]=useState("NOT CHECKED"),[sessionId,setSessionId]=useState("");
 
  const clear=node=>{if(node)while(node.firstChild)node.removeChild(node.firstChild)};
@@ -95,7 +95,8 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
  }
  async function disconnect(){roomRef.current?.disconnect()}
  async function toggleMic(){if(!roomRef.current)return;const enabled=!roomRef.current.localParticipant.isMicrophoneEnabled;await roomRef.current.localParticipant.setMicrophoneEnabled(enabled);setMuted(!enabled);refreshParticipants(roomRef.current)}
- async function toggleCamera(){if(!roomRef.current)return;const enabled=!roomRef.current.localParticipant.isCameraEnabled;await roomRef.current.localParticipant.setCameraEnabled(enabled,{videoCaptureOptions:{resolution:{width:1280,height:720},frameRate:30}});setCamera(enabled);refreshParticipants(roomRef.current)}
+ async function toggleCamera(){if(!roomRef.current)return;const enabled=!roomRef.current.localParticipant.isCameraEnabled;const resolution=qualityMode==="FULL_HD"?{width:1920,height:1080}:{width:1280,height:720};try{await roomRef.current.localParticipant.setCameraEnabled(enabled,{videoCaptureOptions:{resolution,frameRate:30}});setCamera(enabled);refreshParticipants(roomRef.current)}catch(e){setError(e?.message||"The selected video mode is not supported by this device or browser.")}}
+ function toggleQualityMode(){if(camera)return;setQualityMode(v=>v==="HD"?"FULL_HD":"HD");}
  async function toggleScreen(){if(!roomRef.current)return;try{const enabled=!screen;await roomRef.current.localParticipant.setScreenShareEnabled(enabled);setScreen(enabled)}catch(e){setError(e?.message||"Screen sharing was not enabled by the device or browser.")}}
  async function toggleHand(){if(!roomRef.current)return;const next=!hand;setHand(next);try{await roomRef.current.localParticipant.publishData(encoder.encode(JSON.stringify({type:"hand",raised:next})),{reliable:true});refreshParticipants(roomRef.current)}catch(e){setError(e?.message||"Unable to signal hand raise.")}}
  async function sendChat(e){e?.preventDefault();const text=chat.trim();if(!text||!roomRef.current)return;try{await roomRef.current.localParticipant.publishData(encoder.encode(JSON.stringify({type:"chat",text})),{reliable:true});setMessages(v=>[...v,{from:"You",text}].slice(-30));setChat("")}catch(err){setError(err?.message||"Unable to send meeting message.")}}
@@ -131,7 +132,7 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
    {status!=="CONNECTED"&&<button onClick={connect} disabled={(!controller&&!authorizedToJoin)||status==="AUTHORIZING"}>{status==="AUTHORIZING"?"Authorizing…":"Join IRPA-DGBS Meeting Room"}</button>}
    {status==="CONNECTED"&&<>
     <button className="secondary-button" onClick={toggleMic}>{muted?"Unmute microphone":"Mute microphone"}</button>
-    <button className="secondary-button" onClick={toggleCamera}>{camera?"Stop camera":"Start camera"}</button>
+    <button className="secondary-button" onClick={toggleCamera}>{camera?"Stop camera":"Start camera"}</button>\n    <button className="secondary-button" onClick={toggleQualityMode} disabled={camera} title="Select the capture target before starting the camera">{qualityMode==="HD"?"Video target: HD 720p":"Video target: Full HD 1080p"}</button>
     <button className="secondary-button" onClick={toggleScreen}>{screen?"Stop screen share":"Share screen"}</button>
     <button className={hand?"":"secondary-button"} onClick={toggleHand}>{hand?"Lower hand":"Raise hand"}</button>
     <button className="danger-button" onClick={disconnect}>Leave Meeting Room</button>
@@ -142,6 +143,6 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
    <div className="form-actions"><button type="submit">Send Message</button></div>
   </form>}
   {messages.length>0&&<div className="panel" style={{marginTop:12,padding:12}}><strong>Session Messages</strong><div style={{maxHeight:160,overflow:"auto",marginTop:8}}>{messages.map((m,i)=><div key={i} className="table-subtext"><strong>{m.from}:</strong> {m.text}</div>)}</div></div>}
-  <small style={{display:"block",marginTop:10}}>Meeting: {meeting?.reference||meeting?.title||"—"} · Server-authorized token · 10-minute token lifetime · Camera target: 1280×720 at 30 fps (network/browser may adapt) · Session ID: {sessionId||"pending"}</small>
+  <small style={{display:"block",marginTop:10}}>Meeting: {meeting?.reference||meeting?.title||"—"} · Server-authorized token · 10-minute token lifetime · Video capture target: {qualityMode==="FULL_HD"?"1920×1080 Full HD":"1280×720 HD"} at 30 fps (actual negotiated quality depends on device, browser, network and server) · Session ID: {sessionId||"pending"}</small>
  </section>;
 }
