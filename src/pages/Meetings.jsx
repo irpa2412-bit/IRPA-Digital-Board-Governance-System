@@ -111,7 +111,7 @@ export default function Meetings({onNavigate,admin=false}){
   if(!selected){setError("Open a registered meeting before compiling its report.");return}
   setBusy(true);setError("");setMessage("");
   try{
-    const result=await compileAndEmailMeetingReport({meetingId:selected.id,minutesText:String(assistantMinutes||selected.minutes||"").trim()});
+    const suppliedMinutes=String(assistantMinutes||selected.minutes||"").trim();const transcriptSource=String(assistantTranscript||selected.transcript||"").trim();const compiledMinutes=suppliedMinutes||(transcriptSource?generateDraft(transcriptSource,selected).minutes:"");const result=await compileAndEmailMeetingReport({meetingId:selected.id,minutesText:compiledMinutes});
     if(result.failedCount>0){
       setMessage("Meeting report compiled and archived. Email delivery: "+result.sentCount+" sent, "+result.failedCount+" failed out of "+result.recipientCount+". Review the dispatch status and retry failed recipients.");
     }else if(result.alreadySent){
