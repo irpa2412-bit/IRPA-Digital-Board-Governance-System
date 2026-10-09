@@ -32,17 +32,12 @@ services:
       - "5349:5349/tcp"
       - "50000-60000:50000-60000/udp"
     networks: [meeting-private]
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:7880/ || exit 1"]
-      interval: 20s
-      timeout: 5s
-      retries: 6
-      start_period: 30s
 
   caddy:
     image: caddy:2
     restart: unless-stopped
-    depends_on: [livekit]
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL in the staging .env file}
     ports:
       - "80:80/tcp"
       - "443:443/tcp"
