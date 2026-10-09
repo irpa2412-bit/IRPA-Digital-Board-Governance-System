@@ -314,6 +314,8 @@ exports.openGovernanceVotingIssue=onCall({region:"us-central1",timeoutSeconds:60
   let resolution=null;
   if(resolutionId){const snap=await db.collection("resolutions").doc(resolutionId).get();if(!snap.exists)throw new HttpsError("not-found","The linked resolution was not found.");resolution={id:snap.id,...snap.data()};if(resolution.meetingId!==meetingId)throw new HttpsError("failed-precondition","A resolution may only be voted on within its originating meeting.");}
   const policy=governancePolicySnapshot(meeting);
+  if(meeting.votingRequired!==true)throw new HttpsError("failed-precondition","Mark voting as required in the meeting register before opening a governance vote.");
+  if(!policy.policyReference)throw new HttpsError("failed-precondition","Record the governing constitution, approved policy or terms of reference before opening a vote.");
   const issueId=crypto.createHash("sha256").update(`${meetingId}|${resolutionId||""}|${origin.toLowerCase()}`).digest("hex");
   const ref=db.collection("votingIssues").doc(issueId);
   let response;
