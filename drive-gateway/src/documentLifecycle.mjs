@@ -191,7 +191,7 @@ if(!policy.allowed)return deps.json({ok:false,error:policy.reason},403,deps.cors
       let uploaded=null;
       try {
         uploaded=await uploadToDrive(deps,env,accessToken,{folderId:archive.folderId,fileName,contentType,bytes,description:{irpaGovernance:true,irpaDocumentLifecycle:true,documentId,reference,stage:"WORKING",ownerUid:claims.user_id,classification,archiveCategory:category,sha256:hash}});
-        const record=buildDocumentRecord(identity,{...data,reference,classification,archiveCategory},{documentId,fileId:uploaded.id,fileName,fileSize:bytes.length,sha256:hash,archivePath:archive.archivePath});
+        const record=buildDocumentRecord(identity,{...data,reference,classification,archiveCategory:category},{documentId,fileId:uploaded.id,fileName,fileSize:bytes.length,sha256:hash,archivePath:archive.archivePath});
         record.archiveFolderId=archive.folderId;record.archiveUidLink="https://drive.google.com/drive/folders/"+encodeURIComponent(archive.folderId);record.archiveFileWebViewLink=uploaded.webViewLink||null;record.webViewLink=uploaded.webViewLink||null;record.fileUrl=uploaded.id?"drive://"+uploaded.id:null;record.recordOrigin=String(data.recordOrigin||"PRODUCTION").toUpperCase()==="TRIAL"?"TRIAL":"PRODUCTION";
         await commitDocumentAndAudit(deps,env,claims,documentId,record,"UPLOADED",{reference,classification,archiveCategory:category,sha256:hash},{createOnly:true});
       } catch(error) {
