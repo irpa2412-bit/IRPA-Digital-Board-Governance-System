@@ -1,7 +1,12 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { AccessToken } = require("livekit-server-sdk");
+const { defineSecret, defineString } = require("firebase-functions/params");
 const crypto = require("crypto");
+
+const LIVEKIT_API_KEY = defineSecret("LIVEKIT_API_KEY");
+const LIVEKIT_API_SECRET = defineSecret("LIVEKIT_API_SECRET");
+const LIVEKIT_URL = defineString("LIVEKIT_URL");
 
 const db = getFirestore();
 
@@ -63,8 +68,12 @@ function opaqueRoomName(meetingId, sessionId) {
   return `irpa-meeting-${digest}`;
 }
 
-function liveKitConfigured() {
-  return Boolean(text(process.env.LIVEKIT_URL) && text(process.env.LIVEKIT_API_KEY) && text(process.env.LIVEKIT_API_SECRET));
+function liveKitSettings() {
+  return {
+    url: text(process.env.LIVEKIT_URL || LIVEKIT_URL.value()),
+    apiKey: text(LIVEKIT_API_KEY.value()),
+    apiSecret: text(LIVEKIT_API_SECRET.value())
+  };
 }
 
 function moderatorForMeeting(meeting = {}, uid, email, selectedAuthority) {
@@ -92,7 +101,8 @@ function moderatorForMeeting(meeting = {}, uid, email, selectedAuthority) {
 exports.issueLiveMeetingToken = onCall({
   region: "us-central1",
   timeoutSeconds: 30,
-  enforceAppCheck: false
+  enforceAppCheck: false,
+  secrets: [LIVEKIT_API_KEY, LIVEKIT_API_SECRET]
 }, async request => {
   const uid = request.auth?.uid;
   const email = text(request.auth?.token?.email).toLowerCase();
@@ -101,7 +111,8 @@ exports.issueLiveMeetingToken = onCall({
   const meetingId = text(request.data?.meetingId);
   const selectedAuthority = text(request.data?.selectedAuthority);
   if (!meetingId) throw new HttpsError("invalid-argument", "Meeting ID is required.");
-  if (!liveKitConfigured()) {
+  const liveKit = liveKitSettings();
+  if (!liveKit.url || !liveKit.apiKey || !liveKit.apiSecret) {
     throw new HttpsError("failed-precondition", "Live meeting infrastructure is not configured on the server.");
   }
 
@@ -171,10 +182,12 @@ exports.issueLiveMeetingToken = onCall({
   }
 
   const sessionRef = db.collection("liveMeetingSessions").doc();
-  const roomName = opaqueRoomName(meetingId, sessionRef.id);
+  // Every authorized participant in the same meeting must receive a token for
+  // the same room. Session IDs are per-participant audit records, not room IDs.
+  const roomName = opaqueRoomName(meetingId, "shared-live-room");
   const participantIdentity = `uid-${uid}`;
   const moderator = isAdmin || moderatorForMeeting(meeting, uid, email, selectedAuthority);
-  const token = new AccessToken(process.env.LIVEKIT_API_KEY, process.env.LIVEKIT_API_SECRET, {
+  const token = new AccessToken(liveKit.apiKey, liveKit.apiSecret, {
     identity: participantIdentity,
     name: text(meeting.displayName || meeting.title || "IRPA participant"),
     ttl: "10m"
@@ -204,7 +217,7 @@ exports.issueLiveMeetingToken = onCall({
     status: "Token Issued",
     tokenTtl: "10m",
     mediaEngine: "LiveKit",
-    mediaEndpoint: text(process.env.LIVEKIT_URL),
+    mediaEndpoint: liveKit.url,
     governanceAuthorityRemainsIRPA: true
   });
 
@@ -230,7 +243,7 @@ exports.issueLiveMeetingToken = onCall({
   return {
     ok: true,
     sessionId: sessionRef.id,
-    serverUrl: text(process.env.LIVEKIT_URL),
+    serverUrl: liveKit.url,
     participantToken: await token.toJwt(),
     moderator,
     recordingAllowed: meeting.recordingAllowed === true,
