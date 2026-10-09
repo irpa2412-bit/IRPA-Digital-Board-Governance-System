@@ -178,7 +178,10 @@ exports.issueLiveMeetingToken = onCall({
   }
 
   const sessionRef = db.collection("liveMeetingSessions").doc();
-  const roomName = opaqueRoomName(meetingId, sessionRef.id);
+  // The room identity is meeting-scoped, not session-scoped: every authorized
+  // participant in this meeting must join the same SFU room. Session IDs remain
+  // unique audit records and must not partition host and invitee into separate rooms.
+  const roomName = opaqueRoomName(meetingId, "shared-live-room");
   const participantIdentity = `uid-${uid}`;
   const moderator = isAdmin || moderatorForMeeting(meeting, uid, email, selectedAuthority);
   const token = new AccessToken(LIVEKIT_API_KEY.value(), LIVEKIT_API_SECRET.value(), {
