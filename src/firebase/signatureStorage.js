@@ -223,7 +223,7 @@ if (typeof window !== "undefined" && !window.__irpaDriveFetchPatched) {
 }
 
 const MEETING_ARCHIVE_CATEGORIES = Object.freeze({
-  GOVERNANCE: { label: "Governance Meetings", archiveCategory: "Governance Meeting Archive", classification: "Board Restricted" },
+  GOVERNANCE: { label: "Governance Meetings", archiveCategory: "Governance Meeting Archive", classification: "Restricted" },
   ADMINISTRATIVE: { label: "Administrative Meetings", archiveCategory: "Administrative Meeting Archive", classification: "Restricted" },
   STAFF: { label: "Staff Meetings", archiveCategory: "Staff Meeting Archive", classification: "Internal" },
   GENERAL: { label: "General Meetings", archiveCategory: "General Meeting Archive", classification: "Internal" },
