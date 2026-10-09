@@ -16,7 +16,7 @@ turn:
   key_file: /etc/letsencrypt/live/irpa-livekit/privkey.pem
 
 keys:
-  "${LIVEKIT_API_KEY}": "${LIVEKIT_API_SECRET}"
+  __LIVEKIT_API_KEY_YAML__: __LIVEKIT_API_SECRET_YAML__
 
 # Single-node staging only. Do not point this configuration at production
 # governance storage. LiveKit's room/media state is separate from Firestore.
