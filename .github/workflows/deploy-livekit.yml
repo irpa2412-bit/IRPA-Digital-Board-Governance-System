@@ -1,0 +1,98 @@
+name: Deploy IRPA LiveKit Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_deployment:
+        description: "Type DEPLOY-LIVEKIT to authorize deployment to the configured VM"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: irpa-livekit-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy-livekit:
+    if: ${{ inputs.confirm_deployment == 'DEPLOY-LIVEKIT' }}
+    runs-on: ubuntu-latest
+    environment: livekit-production
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate deployment configuration
+        env:
+          LIVEKIT_SSH_HOST: ${{ secrets.LIVEKIT_SSH_HOST }}
+          LIVEKIT_SSH_USER: ${{ secrets.LIVEKIT_SSH_USER }}
+          LIVEKIT_SSH_PRIVATE_KEY: ${{ secrets.LIVEKIT_SSH_PRIVATE_KEY }}
+          LIVEKIT_SSH_KNOWN_HOSTS: ${{ secrets.LIVEKIT_SSH_KNOWN_HOSTS }}
+          LIVEKIT_DOMAIN: ${{ secrets.LIVEKIT_DOMAIN }}
+          LIVEKIT_TURN_DOMAIN: ${{ secrets.LIVEKIT_TURN_DOMAIN }}
+          LIVEKIT_ACME_EMAIL: ${{ secrets.LIVEKIT_ACME_EMAIL }}
+          LIVEKIT_API_KEY: ${{ secrets.LIVEKIT_API_KEY }}
+          LIVEKIT_API_SECRET: ${{ secrets.LIVEKIT_API_SECRET }}
+        run: |
+          set -euo pipefail
+          for name in LIVEKIT_SSH_HOST LIVEKIT_SSH_USER LIVEKIT_SSH_PRIVATE_KEY LIVEKIT_SSH_KNOWN_HOSTS LIVEKIT_DOMAIN LIVEKIT_TURN_DOMAIN LIVEKIT_ACME_EMAIL LIVEKIT_API_KEY LIVEKIT_API_SECRET; do
+            if [[ -z "${!name:-}" ]]; then echo "Missing required secret: $name" >&2; exit 1; fi
+          done
+          [[ "$LIVEKIT_DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]]
+          [[ "$LIVEKIT_TURN_DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]]
+          [[ "$LIVEKIT_API_KEY" =~ ^[A-Za-z0-9_-]+$ ]]
+          [[ "$LIVEKIT_API_SECRET" =~ ^[A-Za-z0-9_-]+$ ]]
+
+      - name: Install pinned SSH host identity
+        env:
+          LIVEKIT_SSH_PRIVATE_KEY: ${{ secrets.LIVEKIT_SSH_PRIVATE_KEY }}
+          LIVEKIT_SSH_KNOWN_HOSTS: ${{ secrets.LIVEKIT_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$LIVEKIT_SSH_PRIVATE_KEY" > ~/.ssh/irpa-livekit
+          chmod 600 ~/.ssh/irpa-livekit
+          printf '%s\n' "$LIVEKIT_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Package and upload infrastructure configuration
+        env:
+          LIVEKIT_SSH_HOST: ${{ secrets.LIVEKIT_SSH_HOST }}
+          LIVEKIT_SSH_USER: ${{ secrets.LIVEKIT_SSH_USER }}
+          LIVEKIT_DOMAIN: ${{ secrets.LIVEKIT_DOMAIN }}
+          LIVEKIT_TURN_DOMAIN: ${{ secrets.LIVEKIT_TURN_DOMAIN }}
+          LIVEKIT_ACME_EMAIL: ${{ secrets.LIVEKIT_ACME_EMAIL }}
+          LIVEKIT_API_KEY: ${{ secrets.LIVEKIT_API_KEY }}
+          LIVEKIT_API_SECRET: ${{ secrets.LIVEKIT_API_SECRET }}
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"; rm -f ~/.ssh/irpa-livekit' EXIT
+          cp infra/livekit/{bootstrap.sh,docker-compose.yml,Caddyfile,livekit.yaml.template} "$tmp/"
+          chmod 700 "$tmp/bootstrap.sh"
+          umask 077
+          printf 'LIVEKIT_DOMAIN=%s\nLIVEKIT_TURN_DOMAIN=%s\nLIVEKIT_ACME_EMAIL=%s\nLIVEKIT_API_KEY=%s\nLIVEKIT_API_SECRET=%s\n' \
+            "$LIVEKIT_DOMAIN" "$LIVEKIT_TURN_DOMAIN" "$LIVEKIT_ACME_EMAIL" "$LIVEKIT_API_KEY" "$LIVEKIT_API_SECRET" > "$tmp/.env"
+          chmod 600 "$tmp/.env"
+          ssh -i ~/.ssh/irpa-livekit -o BatchMode=yes "$LIVEKIT_SSH_USER@$LIVEKIT_SSH_HOST" 'mkdir -p /tmp/irpa-livekit-deploy'
+          scp -i ~/.ssh/irpa-livekit -o BatchMode=yes "$tmp/"{bootstrap.sh,docker-compose.yml,Caddyfile,livekit.yaml.template,.env} "$LIVEKIT_SSH_USER@$LIVEKIT_SSH_HOST:/tmp/irpa-livekit-deploy/"
+          ssh -i ~/.ssh/irpa-livekit -o BatchMode=yes "$LIVEKIT_SSH_USER@$LIVEKIT_SSH_HOST" \
+            'sudo bash /tmp/irpa-livekit-deploy/bootstrap.sh /tmp/irpa-livekit-deploy/.env; sudo rm -rf /tmp/irpa-livekit-deploy'
+
+      - name: Verify public TLS endpoint
+        env:
+          LIVEKIT_DOMAIN: ${{ secrets.LIVEKIT_DOMAIN }}
+        run: |
+          set -euo pipefail
+          curl --silent --show-error --fail --max-time 15 "https://${LIVEKIT_DOMAIN}/" -o /dev/null || {
+            echo "TLS endpoint did not return a successful HTTP response. Inspect VM service logs and firewall/DNS." >&2
+            exit 1
+          }
+          echo "HTTPS endpoint returned a successful response. This is not yet proof of a WebRTC media session."
+
+      - name: Report deployment boundary
+        run: |
+          echo "LiveKit infrastructure deployment workflow completed."
+          echo "A two-browser WebRTC test is still required before meeting readiness can be declared."
