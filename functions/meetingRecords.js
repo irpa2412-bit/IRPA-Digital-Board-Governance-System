@@ -1,6 +1,9 @@
 const {onCall,HttpsError}=require("firebase-functions/v2/https");
 const {getFirestore,FieldValue}=require("firebase-admin/firestore");
 const crypto=require("crypto");
+const {defineSecret}=require("firebase-functions/params");
+const {queueInductionEmail}=require("./queueInductionEmail");
+const INVITE_SERVICE_KEY=defineSecret("INVITE_SERVICE_KEY");
 const db=getFirestore();
 const text=v=>String(v??"").trim();
 const hash=v=>crypto.createHash("sha256").update(String(v),"utf8").digest("hex");
@@ -151,4 +154,145 @@ exports.disposeMeetingRecord=onCall({region:"us-central1",timeoutSeconds:30},asy
   return {ok:true,deletionStatus:"PURGED",auditId:auditRef.id};
  }
  throw new HttpsError("invalid-argument","Unsupported disposition operation.");
+});
+
+
+function escapeReportHtml(value){
+ return String(value??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;").replace(/\n/g,"<br>");
+}
+function reportLines(rows,fields){
+ return rows.length?rows.map((row,index)=>(index+1)+". "+(fields.map(field=>text(row[field])).filter(Boolean).join(" — ")||text(row.title||row.name||row.description)||"Recorded item")).join("\n"):"No entries recorded in the register at compilation time.";
+}
+exports.compileAndEmailMeetingReport=onCall({
+ region:"us-central1",timeoutSeconds:120,secrets:[INVITE_SERVICE_KEY]
+},async request=>{
+ const uid=request.auth?.uid,email=text(request.auth?.token?.email).toLowerCase();
+ if(!uid)throw new HttpsError("unauthenticated","Sign in to compile and distribute a meeting report.");
+ const meetingId=text(request.data?.meetingId),minutesText=text(request.data?.minutesText);
+ if(!meetingId)throw new HttpsError("invalid-argument","Meeting ID is required.");
+ if(minutesText.length>150000)throw new HttpsError("invalid-argument","Compiled minutes exceed the 150,000 character limit.");
+ const meetingSnap=await db.collection("meetings").doc(meetingId).get();
+ if(!meetingSnap.exists)throw new HttpsError("not-found","The registered meeting could not be found.");
+ const meeting={id:meetingSnap.id,...meetingSnap.data()};
+ const isAdmin=admin(request);
+ const isInitiator=text(meeting.initiatorUid)===uid;
+ const isChair=text(meeting.chairpersonUid)===uid||text(meeting.chairpersonEmail).toLowerCase()===email;
+ const isSecretary=text(meeting.secretaryUid)===uid||text(meeting.secretaryEmail).toLowerCase()===email;
+ let activeAdmin=isAdmin;
+ if(!activeAdmin){const adminSnap=await db.collection("adminProfiles").doc(uid).get();activeAdmin=adminSnap.exists&&adminSnap.data()?.active===true;}
+ if(!activeAdmin&&!isInitiator&&!isChair&&!isSecretary)throw new HttpsError("permission-denied","Only the authorised meeting initiator, chairperson, secretary or administrator may compile and distribute the meeting report.");
+ if(!text(meeting.registerStatus))throw new HttpsError("failed-precondition","The meeting is not registered and cannot be reported.");
+ const [resolutionSnap,decisionSnap,voteSnap,subscriptionSnap,participantSnap,recordSnap]=await Promise.all([
+  db.collection("resolutions").where("meetingId","==",meetingId).get().catch(()=>({docs:[]})),
+  db.collection("decisions").where("meetingId","==",meetingId).get().catch(()=>({docs:[]})),
+  db.collection("votes").where("meetingId","==",meetingId).get().catch(()=>({docs:[]})),
+  db.collection("meetingSubscriptions").where("meetingId","==",meetingId).get().catch(()=>({docs:[]})),
+  db.collection("participants").where("meetingId","==",meetingId).get().catch(()=>({docs:[]})),
+  db.collection("meetingRecords").where("meetingId","==",meetingId).get().catch(()=>({docs:[]}))
+ ]);
+ const resolutions=resolutionSnap.docs.map(d=>({id:d.id,...d.data()}));
+ const decisions=decisionSnap.docs.map(d=>({id:d.id,...d.data()}));
+ const votes=voteSnap.docs.map(d=>d.data()||{});
+ const attendanceRecord=recordSnap.docs.map(d=>({id:d.id,...d.data()})).find(r=>String(r.recordType||"").toUpperCase()==="ATTENDANCE_REGISTER"&&r.status==="Active");
+ const participantEmails=new Map();
+ const addRecipient=(raw,statusOrName="")=>{const address=text(raw).toLowerCase();if(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)&&!["cancelled","canceled","revoked","removed","inactive","closed"].includes(text(statusOrName).toLowerCase()))participantEmails.set(address,participantEmails.get(address)||text(statusOrName)||address);};
+ participantSnap.docs.forEach(d=>{const p=d.data()||{};addRecipient(p.participantEmail||p.email||p.invitedEmail,p.status);});
+ subscriptionSnap.docs.forEach(d=>{const p=d.data()||{};addRecipient(p.email||p.subscriberEmail||p.participantEmail,p.status);});
+ for(const key of ["invitedEmails","participantEmails","attendeeEmails","subscriberEmails"])if(Array.isArray(meeting[key]))meeting[key].forEach(address=>addRecipient(address));
+ for(const key of ["participants","attendees"])if(Array.isArray(meeting[key]))meeting[key].forEach(p=>{if(p&&typeof p==="object")addRecipient(p.email||p.participantEmail||p.subscriberEmail,p.status);});
+ const recipients=[...participantEmails.entries()].map(([recipientEmail,recipientName])=>({recipientEmail,recipientName}));
+ if(!recipients.length)throw new HttpsError("failed-precondition","No valid participant email addresses were found in the meeting invitation portal records. No email was sent.");
+ const countOutcome=outcome=>votes.filter(v=>text(v.outcome||v.vote||v.choice).toLowerCase()===outcome.toLowerCase()).length;
+ const voteCounts={For:countOutcome("For"),Against:countOutcome("Against"),Abstain:countOutcome("Abstain")};
+ const tallyTotal=voteCounts.For+voteCounts.Against+voteCounts.Abstain;
+ const meetingReference=text(meeting.meetingReference||meeting.reference||meeting.meetingIdentity||meetingId);
+ const reportStatus=["Final","Approved","Reviewed"].includes(text(meeting.proceedingsStatus))||text(meeting.reportStatus).toLowerCase()==="approved"?"Compiled report — approval status recorded":"Compiled report — draft / approval status not verified";
+ const decisionsText=reportLines(decisions,["reference","title","decision","description","status","responsiblePerson","deadline"]);
+ const resolutionsText=reportLines(resolutions,["reference","title","resolution","description","status"]);
+ const actionText=text(meeting.actionItems)||reportLines(decisions.filter(d=>d.action||d.actionItems||d.responsiblePerson),["action","actionItems","responsiblePerson","deadline","status"]);
+ const attendanceText=attendanceRecord?attendanceRecord.content:text(meeting.attendanceSummary||meeting.attendanceRegisterSummary)||"Attendance register not found in the linked meeting records.";
+ const quorumText=meeting.quorumVerified===true?"Verified":meeting.quorumVerified===false?"Not verified / not met":text(meeting.quorumStatus||meeting.quorumResult)||"Not recorded";
+ const report=[
+  "IMPROVEMENT OF RANGELAND IN PASTORAL AREAS (IRPA)",
+  "STANDARD MEETING REPORT",
+  "============================================================",
+  "Report status: "+reportStatus,
+  "Meeting title: "+(text(meeting.title)||"Not recorded"),
+  "Meeting reference: "+meetingReference,
+  "Meeting category: "+categoryOf(meeting),
+  "Meeting type: "+(text(meeting.meetingType)||"Not recorded"),
+  "Date: "+(text(meeting.date)||"Not recorded"),
+  "Time: "+(text(meeting.startTime)||"Not recorded")+(text(meeting.endTime)?" – "+text(meeting.endTime):""),
+  "Venue / platform: "+(text(meeting.venue||meeting.meetingPlatform)||"Not recorded"),
+  "Chairperson: "+(text(meeting.chairperson)||"Not recorded"),
+  "",
+  "1. PURPOSE AND AGENDA",
+  text(meeting.agenda)||"No agenda recorded.",
+  "",
+  "2. MEETING STATUS, ATTENDANCE AND QUORUM",
+  "Meeting status: "+(text(meeting.status)||"Not recorded"),
+  "Quorum verification: "+quorumText,
+  attendanceText,
+  "",
+  "3. SUMMARY / COMPILED MINUTES",
+  minutesText||text(meeting.minutes)||text(meeting.summary)||"No minutes or summary were supplied at compilation.",
+  "",
+  "4. DECISIONS REGISTER",
+  decisionsText,
+  "",
+  "5. RESOLUTIONS REGISTER",
+  resolutionsText,
+  "",
+  "6. VOTING STATISTICS (AGGREGATED; NO INDIVIDUAL VOTES DISCLOSED)",
+  "Votes for: "+voteCounts.For,
+  "Votes against: "+voteCounts.Against,
+  "Abstentions: "+voteCounts.Abstain,
+  "Recorded votes counted: "+tallyTotal,
+  "Voting status: "+(text(meeting.votingStatus)||"Not recorded"),
+  "Voting result: "+(text(meeting.votingResult)||"Not recorded"),
+  "",
+  "7. ACTION ITEMS AND FOLLOW-UP",
+  actionText,
+  "",
+  "8. RECORD STATUS AND CONTROL",
+  "This report was compiled from the registered meeting record and linked IRPA governance registers at the time of generation. Missing source information is identified as not recorded; no absent attendance, quorum, decision or voting data has been inferred.",
+  "Compiled by authorised account: "+(email||uid),
+  "Report generated (UTC): "+new Date().toISOString(),
+  "IRPA Digital Board Governance System"
+ ].join("\n");
+ const reportHash=hash(report.replace(/Report generated \(UTC\): .+\n/,""));
+ const dispatchId=hash(meetingId+":"+reportHash).slice(0,40);
+ const dispatchRef=db.collection("meetingReportDispatches").doc(dispatchId);
+ const prior=await dispatchRef.get();
+ if(prior.exists&&prior.data()?.status==="Sent")return{ok:true,alreadySent:true,reportHash,recipientCount:Number(prior.data()?.recipientCount||0),sentCount:Number(prior.data()?.sentCount||0),failedCount:0,dispatchId};
+ if(prior.exists&&prior.data()?.status==="In Progress")throw new HttpsError("aborted","This report is already being distributed. Check the report dispatch register before retrying.");
+ const priorStatuses=prior.exists&&Array.isArray(prior.data()?.recipients)?prior.data().recipients:[];
+ const statusByEmail=new Map(priorStatuses.map(r=>[text(r.email).toLowerCase(),r]));
+ await dispatchRef.set({meetingId,meetingReference,reportHash,reportContent:report,reportStatus,recipientCount:recipients.length,status:"In Progress",initiatedByUid:uid,initiatedByEmail:email||null,updatedAt:FieldValue.serverTimestamp(),createdAt:prior.exists?(prior.data()?.createdAt||FieldValue.serverTimestamp()):FieldValue.serverTimestamp()},{merge:true});
+ const secret=String(INVITE_SERVICE_KEY.value()||"");
+ const gateway=String(process.env.GATEWAY_URL||process.env.INVITATION_GATEWAY_URL||"").replace(/\/$/,"");
+ if(!secret||!gateway)throw new HttpsError("failed-precondition","The invitation email gateway is not fully configured on the server. The report was compiled but email delivery could not start.");
+ const subject="IRPA Meeting Report | "+meetingReference+" | "+(text(meeting.title)||"Meeting");
+ const html='<div style="font-family:Arial,sans-serif;max-width:800px;margin:auto;color:#202124"><div style="border-bottom:3px solid #426b45;padding:16px 0"><h2 style="margin:0">Improvement of Rangeland in Pastoral Areas (IRPA)</h2><h3 style="margin:8px 0 0">Standard Meeting Report</h3></div><p><strong>'+escapeReportHtml(reportStatus)+'</strong></p><div style="white-space:normal;line-height:1.55">'+escapeReportHtml(report)+'</div><hr><p style="font-size:12px;color:#555">Automatically distributed through the IRPA-DBGS meeting invitation email service. Aggregated voting statistics only; individual votes are not disclosed.</p></div>';
+ const results=[];
+ for(const recipient of recipients){
+  const old=statusByEmail.get(recipient.recipientEmail);
+  if(old?.status==="Sent"){results.push(old);continue;}
+  try{
+   const delivery=await queueInductionEmail({recipientEmail:recipient.recipientEmail,recipientName:recipient.recipientName,subject,text:report,html,invitedByUid:uid},{db,env:{...process.env,GATEWAY_URL:gateway,INVITE_SERVICE_KEY:secret}});
+   const row={email:recipient.recipientEmail,name:recipient.recipientName,status:delivery.status||"Failed",messageId:delivery.messageId||null,error:delivery.error||null};
+   results.push(row);
+   await dispatchRef.set({recipients:results,updatedAt:FieldValue.serverTimestamp()},{merge:true});
+  }catch(error){
+   const row={email:recipient.recipientEmail,name:recipient.recipientName,status:"Failed",error:String(error?.message||error).slice(0,240)};
+   results.push(row);
+   await dispatchRef.set({recipients:results,updatedAt:FieldValue.serverTimestamp()},{merge:true});
+  }
+ }
+ const sentCount=results.filter(r=>r.status==="Sent").length,failedCount=results.filter(r=>r.status!=="Sent").length;
+ await dispatchRef.set({status:failedCount?"Partially Failed":"Sent",sentCount,failedCount,recipientCount:recipients.length,recipients:results,completedAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()},{merge:true});
+ const recordRef=db.collection("meetingRecords").doc();
+ await recordRef.set({meetingId,meetingReference,meetingTitle:text(meeting.title),meetingCategory:categoryOf(meeting),meetingPolicyId:categoryOf(meeting),recordType:"MEETING_REPORT",recordLabel:"Compiled Meeting Report",title:"Standard Meeting Report — "+(text(meeting.title)||meetingReference),content:report,contentHash:hash(report),integrityAlgorithm:"SHA-256",integrityStatus:"VERIFIED_AT_CAPTURE",version:1,status:"Active",confidentialityClass:text(meeting.confidentialityClass)||(categoryOf(meeting)==="GOVERNANCE"?"BOARD_RESTRICTED":"INTERNAL"),storageDestination:"FIRESTORE_MEETING_RECORDS",approvalStatus:reportStatus,draftOnly:!reportStatus.startsWith("Compiled report — approval status recorded"),requiresHumanReview:true,retentionYears:RETENTION_YEARS[categoryOf(meeting)]||3,retainUntil:addYears(new Date(),RETENTION_YEARS[categoryOf(meeting)]||3),retentionPolicyVersion:"IRPA-MEETING-RETENTION-1.0",capturedByUid:uid,capturedByEmail:email||null,capturedAt:FieldValue.serverTimestamp(),createdAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp(),deletedAt:null,deletionStatus:"NOT_ELIGIBLE"});
+ await audit("MEETING_REPORT_COMPILED_AND_DISTRIBUTED",{uid,email,meeting,category:categoryOf(meeting),confidentiality:text(meeting.confidentialityClass)||"INTERNAL"},recordRef.id,{reportHash,dispatchId,recipientCount:recipients.length,sentCount,failedCount,aggregatedVoteCounts:voteCounts});
+ return{ok:failedCount===0,reportRecordId:recordRef.id,dispatchId,reportHash,recipientCount:recipients.length,sentCount,failedCount,status:failedCount?"Partially Failed":"Sent"};
 });
