@@ -1,81 +1,69 @@
-# IRPA self-hosted LiveKit staging
+# IRPA self-hosted LiveKit — isolated staging
 
-This is the deployment package for IRPA's self-hosted LiveKit OSS media plane. It is separate from Firebase governance data and must first be deployed to a dedicated staging VM.
+This package deploys the LiveKit OSS media plane on a dedicated VM, isolated from production governance data. It does not deploy the web app, alter Firebase authorization rules, or use production Firestore data.
 
-## Prerequisites that must exist outside GitHub
+## Deployment topology
 
-- A dedicated Ubuntu 22.04/24.04 VM with a public IPv4 address, sufficient CPU/network bandwidth, and SSH access.
-- Two DNS names pointing to that VM: one for the WebSocket/API endpoint and one for TURN/TLS.
-- The cloud firewall/security group and host firewall must allow inbound TCP 80, 443, 7881, 5349; UDP 3478 and 50000–60000. Verify these against the selected provider and current LiveKit documentation.
-- Unique LiveKit API key and secret. Never use LiveKit development credentials.
-- A valid contact email for Let's Encrypt.
-- A deployment identity with root/sudo access to the dedicated VM.
+- `meet.irpa.or.tz`: HTTPS/WSS signalling endpoint.
+- `turn.irpa.or.tz`: TURN/TLS endpoint.
+- LiveKit Server `v1.13.7`, Redis 7.4, and the official `livekit/caddyl4:v2.11.4` image.
+- Caddy's Layer 4 SNI routing multiplexes meeting WSS and TURN/TLS over TCP/443; LiveKit's embedded TURN/UDP remains on UDP/3478.
+- WebRTC media uses UDP/50000–60000 with TCP/7881 fallback.
+- Caddy obtains and renews certificates for both names automatically.
 
-LiveKit's official VM guidance requires a domain and DNS control, and uses Docker Compose/Caddy for TLS. Its recommended WebRTC connectivity includes TCP 7881, UDP media ports 50000–60000, TURN/UDP 3478, and HTTPS/TURN TLS. See [LiveKit VM deployment](https://docs.livekit.io/transport/self-hosting/vm/) and [ports/firewall](https://docs.livekit.io/transport/self-hosting/ports-firewall/).
+This follows the official [LiveKit VM deployment guide](https://docs.livekit.io/transport/self-hosting/vm/) and its [Caddy L4 configuration generator](https://github.com/livekit/deploy/tree/main/generate).
 
-## Deployment
+## Required before deployment
 
-The script `deploy-staging.sh` installs Docker if needed, configures Caddy for the secure WebSocket endpoint, obtains the TURN host certificate with Certbot, and starts LiveKit with server-side credentials. Run it only on the dedicated staging VM with the required environment variables. Review the generated host firewall rules with the cloud provider before opening the service publicly.
+1. A dedicated Ubuntu 22.04/24.04 VM with a public IPv4 address and SSH access.
+2. DNS A records for `meet.irpa.or.tz` and `turn.irpa.or.tz`, both pointing to the VM. The installer refuses to run if either record does not resolve to the target VM.
+3. Provider and host firewall rules: TCP 22 (restricted to trusted admin IPs), 80, 443, 7881; UDP 3478 and 50000–60000. TCP/5349 is an internal LiveKit TURN listener behind Caddy and should not be exposed publicly. Check the current provider firewall before opening ports.
+4. Unique, high-entropy LiveKit API credentials. Never use `devkey/secret`.
+5. A valid ACME contact email and a deployment SSH identity whose host key has been independently verified.
+6. A separate Firebase staging project, with test-only meeting/participant data, authenticated test identities, and staging mail configuration. Do not point the test callable at `irpa-digital-board-governance`.
 
-Required environment variables:
+## VM deployment workflow
 
-- `LIVEKIT_DOMAIN` — e.g. the IRPA-owned meeting subdomain chosen by the organization.
-- `LIVEKIT_TURN_DOMAIN` — a separate DNS name on the same VM.
-- `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET` — unique credentials.
-- `ACME_EMAIL` — certificate expiry contact.
+The manual GitHub Actions workflow is `Deploy IRPA Self-Hosted LiveKit Staging`. It requires the explicit input `DEPLOY-LIVEKIT-STAGING` and the protected `livekit-staging` GitHub Environment.
 
-Example invocation on the target VM (do not paste real secrets into tickets or chat):
+Configure these environment/repository secrets through the approved secret-management UI (never in chat or source files):
 
-```bash
-sudo env LIVEKIT_DOMAIN='live.example.org' \
-  LIVEKIT_TURN_DOMAIN='turn.example.org' \
-  LIVEKIT_API_KEY='replace-with-unique-key' \
-  LIVEKIT_API_SECRET='replace-with-unique-secret-of-32-plus-characters' \
-  ACME_EMAIL='operations@example.org' \
-  bash ./deploy-staging.sh
-```
-
-The example domains and credentials are placeholders, not IRPA's configured values.
-
-## Firebase Functions secret binding
-
-The `issueLiveMeetingToken` callable reads `LIVEKIT_URL`, `LIVEKIT_API_KEY`, and `LIVEKIT_API_SECRET` from Firebase Secret Manager using function-bound secret parameters. For the **staging Firebase project only**, create/set those three secrets and deploy the callable. Do not point the test deployment at the production Firebase project until separately approved.
-
-## Verification gates
-
-1. DNS for both names resolves to the VM public IP; the primary endpoint has valid trusted TLS.
-2. `LIVEKIT_URL=wss://<primary-domain>` with the API key/secret passes `node functions/scripts/verify-livekit-control-plane.js`. This proves authenticated control-plane reachability, not media.
-3. An authenticated IRPA host issues an invitation; the intended test participant receives it and signs in using their own account.
-4. Both browsers open the invitation gate, authorize the same meeting, obtain distinct short-lived tokens, and join the same room.
-5. Both browsers publish microphone and camera tracks; each sees/hears the other. Confirm the selected video resolution and actual connection stats rather than assuming HD from the requested capture constraints.
-6. Repeat with Android/mobile, UDP blocked/TCP fallback, and TURN/TLS path; inspect browser WebRTC stats and LiveKit logs.
-7. Verify unauthorized/revoked invitees cannot obtain tokens, then retain the test results.
-
-## Important limitations
-
-The deployment script creates a **single-node staging pilot**, not a high-availability production cluster. It does not create a VM, reserve a public IP, control DNS, modify cloud security groups, or create Firebase/GitHub secrets. Those require authorized infrastructure account access. A running container or successful API health check is not proof of a successful end-to-end WebRTC call. TURN/TLS on TCP 5349 must be tested from actual client networks; if the chosen network requires TURN/TLS on 443, use the official LiveKit VM generator/load-balancer topology rather than treating 5349 as sufficient.
-
-
-## GitHub Actions setup for staged deployment
-
-Configure these **repository Actions secrets** in GitHub before running the manual workflows:
-
-**Media VM + staging callable deployment** (`Deploy IRPA Self-Hosted LiveKit Staging`):
 - `LIVEKIT_STAGING_SSH_HOST`
 - `LIVEKIT_STAGING_SSH_USER`
 - `LIVEKIT_STAGING_SSH_PRIVATE_KEY`
-- `LIVEKIT_STAGING_SSH_KNOWN_HOSTS` — pre-verified host key; do not disable host-key checking.
-- `LIVEKIT_STAGING_DOMAIN`
-- `LIVEKIT_STAGING_TURN_DOMAIN`
+- `LIVEKIT_STAGING_SSH_KNOWN_HOSTS` — pre-verified host key; do not substitute `ssh-keyscan`
+- `LIVEKIT_STAGING_DOMAIN` — `meet.irpa.or.tz`
+- `LIVEKIT_STAGING_TURN_DOMAIN` — `turn.irpa.or.tz`
 - `LIVEKIT_STAGING_API_KEY`
 - `LIVEKIT_STAGING_API_SECRET`
 - `LIVEKIT_STAGING_ACME_EMAIL`
-- `LIVEKIT_STAGING_FIREBASE_PROJECT_ID` — a dedicated non-production Firebase project; production project ID is explicitly rejected.
-- `LIVEKIT_STAGING_FIREBASE_SERVICE_ACCOUNT` — JSON service account with permission to manage Secret Manager versions and deploy Cloud Functions in that staging project.
+- `LIVEKIT_STAGING_FIREBASE_PROJECT_ID` — must be a dedicated non-production project
+- `LIVEKIT_STAGING_FIREBASE_SERVICE_ACCOUNT` — staging-only service account with minimum deployment permissions
 
-**Control-plane verification** (`Verify IRPA LiveKit Staging Control Plane`):
-- `LIVEKIT_STAGING_URL`
-- `LIVEKIT_STAGING_API_KEY`
-- `LIVEKIT_STAGING_API_SECRET`
+The workflow refuses the known production Firebase project. It deploys the media host and only the `issueLiveMeetingToken` callable to the isolated staging Firebase project. It does not deploy Firebase Hosting or change Firestore/Storage rules.
 
-Run in this order: manually dispatch `Deploy IRPA Self-Hosted LiveKit Staging` with confirmation value `DEPLOY-LIVEKIT-STAGING`; verify TLS/network; the workflow deploys the callable only to the configured staging Firebase project; run `Verify IRPA LiveKit Staging Control Plane`; then complete the real two-browser WebRTC acceptance test. These workflows are manual and are not triggered by merging this PR. A GitHub workflow cannot proceed successfully until all secrets and the dedicated host/project exist.
+## Firebase secret binding
+
+The callable binds `LIVEKIT_URL`, `LIVEKIT_API_KEY`, and `LIVEKIT_API_SECRET` through Firebase Functions Secret Manager. The staging workflow sets them in the staging project and deploys only `issueLiveMeetingToken`. API secrets remain server-side and are never sent to the browser.
+
+## Acceptance gates
+
+1. Verify both DNS records point to the VM and Caddy obtains trusted certificates.
+2. Verify `https://meet.irpa.or.tz/` is reachable and `wss://meet.irpa.or.tz` passes an authenticated LiveKit RoomService API probe.
+3. Confirm the deployed staging callable issues separate short-lived participant tokens that reference the same deterministic room for one meeting.
+4. Send a real invitation through the Invitation Portal's authenticated mail gateway; confirm the invited participant receives the link and separate gate password.
+5. Use two separate authenticated browser sessions (host and invitee). Join the same meeting and confirm each browser publishes microphone and camera tracks and receives the other participant's audio/video.
+6. Inspect browser WebRTC stats for actual negotiated resolution, frame rate, packet loss and selected candidate pair. A 720p/1080p capture request is not proof of actual HD quality.
+7. Repeat on Android/mobile and with UDP blocked to verify TCP fallback and TURN/TLS connectivity; inspect LiveKit logs.
+8. Confirm revoked/wrong-meeting invitations cannot obtain a media token. Keep the invitation portal workflow unchanged.
+9. Verify no production governance records were read or written and preserve test evidence.
+
+A healthy HTTPS endpoint or authenticated control-plane API does not prove browser-to-browser media. Do not declare staging acceptance until the real two-browser test passes.
+
+## Cost and provisioning boundary
+
+This is a single-node staging pilot, not a high-availability production cluster. VM compute, backups, bandwidth, tax and any add-ons incur provider costs. The deployment workflow does not provision a VM, edit DNS, or change provider firewalls; those are separate controlled steps requiring account access and explicit spending approval.
+
+## Rollback
+
+Use the protected staging deployment environment to stop/disable the media stack and remove the staging-only callable/secret versions if necessary. Keep production governance data, production Firebase rules and the Invitation Portal untouched. Do not delete the VM until logs and acceptance evidence have been retained.
