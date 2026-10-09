@@ -58,7 +58,9 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
      room.on(RoomEvent.ParticipantConnected,()=>{refreshParticipants(room);setStatus("CONNECTED")});
      room.on(RoomEvent.ParticipantDisconnected,()=>refreshParticipants(room));
      room.on(RoomEvent.DataReceived,(payload,participant)=>{const msg=safeJson(payload);if(msg?.type==="chat")setMessages(v=>[...v,{from:participant?.name||participant?.identity||"Participant",text:String(msg.text||"")}].slice(-30));if(msg?.type==="hand")refreshParticipants(room)});
-     room.on(RoomEvent.Reconnecting,()=>setStatus("RECONNECTING"));\n     room.on(RoomEvent.Reconnected,()=>{setStatus("CONNECTED");refreshParticipants(room)});\n     room.on(RoomEvent.Disconnected,()=>{setStatus("DISCONNECTED");setCamera(false);setMuted(true);setScreen(false);setHand(false);setModerator(false);setRecordingAllowed(false);clear(localRef.current);clear(remoteRef.current);setParticipants([]);roomRef.current=null});
+     room.on(RoomEvent.Reconnecting,()=>setStatus("RECONNECTING"));
+     room.on(RoomEvent.Reconnected,()=>{setStatus("CONNECTED");refreshParticipants(room)});
+     room.on(RoomEvent.Disconnected,()=>{setStatus("DISCONNECTED");setCamera(false);setMuted(true);setScreen(false);setHand(false);setModerator(false);setRecordingAllowed(false);clear(localRef.current);clear(remoteRef.current);setParticipants([]);roomRef.current=null});
      await room.connect(data.serverUrl,data.participantToken);
      roomRef.current=room;setSessionId(data.sessionId||"");setModerator(data.moderator===true);setRecordingAllowed(data.recordingAllowed===true);setStatus("CONNECTED");refreshParticipants(room);
      await room.localParticipant.setMicrophoneEnabled(true,{audioCaptureOptions:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});setMuted(false);
