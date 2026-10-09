@@ -1,4 +1,4 @@
-name: Deploy IRPA Governance to Cloudflare Pages
+name: Deploy IRPA Governance Frontend to Cloudflare Workers
 on:
   push:
     branches: [main]
@@ -66,7 +66,10 @@ jobs:
           url="https://irpa-digital-board-governance-frontend.irpa-governance.workers.dev"
           curl --fail --silent --show-error --retry 8 --retry-delay 3 --max-time 30 "$url/" -o "$RUNNER_TEMP/cloudflare-live.html"
           grep -qi '<html' "$RUNNER_TEMP/cloudflare-live.html"
-          echo "Cloudflare Workers static-asset endpoint serves HTML successfully."
+          health="$(curl --fail --silent --show-error --retry 5 --retry-delay 2 --max-time 20 "$url/__irpa_health")"
+          echo "$health"
+          echo "$health" | grep -q '"ok":true'
+          echo "Cloudflare Workers static-asset endpoint and health gate passed."
       - name: Publish migration boundary
         run: |
           echo "Cloudflare Pages hosts the frontend. Firebase Authentication and Firestore remain the authoritative identity/data services during this safe migration."
