@@ -8,9 +8,19 @@ const policy=fs.readFileSync("src/firebase/meetingPolicy.js","utf8");
 const records=fs.readFileSync("functions/meetingRecords.js","utf8");
 const liveMeeting=fs.readFileSync("functions/liveMeeting.js","utf8");
 const styles=fs.readFileSync("src/styles/tokens.css","utf8");
+const participantPage=fs.readFileSync("src/pages/OperationalGatewaysParticipants.jsx","utf8");
+const entryGateway=fs.readFileSync("src/pages/MeetingEntryGateway.jsx","utf8");
+const invitationEmail=fs.readFileSync("drive-gateway/src/invitationEmail.mjs","utf8");
+const invitationWorker=fs.readFileSync("drive-gateway/src/index.js","utf8");
 const roomSource=fs.readFileSync("src/pages/MeetingRoom.jsx","utf8");
 const checks=[
  ["Meeting media client exists",fs.existsSync("src/components/IRPADGBSMeetingRoomMedia.jsx")],
+ ["Participant invitation creates a meeting access pass",participantPage.includes("createMeetingAccessInvitation")&&participantPage.includes("meetingAccess")],
+ ["Meeting access pass is sent through the authenticated IRPA mail gateway",participantPage.includes("sendMemberInvitationEmail(payload.participantEmail,invitationId,payload.participantRole,payload.memberType,meetingAccess)")],
+ ["Undelivered meeting access pass is revoked",participantPage.includes("revokeMeetingAccessInvitation")&&gateway.includes("exports.revokeMeetingAccessInvitation")],
+ ["Mail gateway verifies meeting and participant link before dispatch",invitationWorker.includes("fields.participantId?.stringValue")&&invitationWorker.includes("linkedMeeting!==meetingId||participantEmail!==email")],
+ ["Meeting email template includes gate link and password only when supplied",invitationEmail.includes("meetingAccess")&&invitationEmail.includes("Meeting gate password")],
+ ["Meeting entry asks for gate password separately from URL",entryGateway.includes('state==="password"')&&entryGateway.includes('type="password"')&&entryGateway.includes("Verify Password & Continue")],
  ["Meeting Room selects the meeting from the invitation gate context",room.includes("entryContext?.meetingId")&&room.includes("setSelectedId(invitedMeeting.id)")],
  ["Verified invitee context enables the media join control",room.includes("entryContext?.participantId")&&room.includes("entryContext?.meetingId===selected?.id")],
  ["Moderator authority is initialized before LiveKit grant",liveMeeting.indexOf("const moderator = isAdmin || moderatorForMeeting")>=0&&liveMeeting.indexOf("const moderator = isAdmin || moderatorForMeeting")<liveMeeting.indexOf("roomAdmin: moderator")],
