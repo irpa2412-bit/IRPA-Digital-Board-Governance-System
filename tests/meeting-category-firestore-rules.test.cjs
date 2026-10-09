@@ -205,3 +205,11 @@ test("invitee can check in only their own participant record", async () => {
   await assertFails(db.doc("participants/other-record").update({attendanceStatus:"Present",attendanceRecordedAt:"2026-10-09T18:00:00.000Z",attendanceRecordedByUid:"invitee-user"}));
   await assertFails(db.doc("participants/invitee-record").update({participantRole:"Board Member"}));
 });
+
+
+test("meeting initiator can register an invitee and create the linked invitation", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {const db=context.firestore();await db.doc("meetings/organizer-meeting").set(meeting({initiatorUid:"departmental-director",initiatorEmail:"director@example.test",registerStatus:"Registered"}));});
+  const db=testEnv.authenticatedContext("departmental-director",{email:"director@example.test"}).firestore();
+  await assertSucceeds(db.doc("participants/new-invitee").set({meetingId:"organizer-meeting",participantEmail:"guest@example.test",participantName:"Guest",participantRole:"Invited Guest",attendanceStatus:"Invited"}));
+  await assertSucceeds(db.doc("invitations/guest-invitation").set({meetingId:"organizer-meeting",participantId:"new-invitee",email:"guest@example.test",name:"Guest",status:"Pending"}));
+});
