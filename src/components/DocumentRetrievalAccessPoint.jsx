@@ -62,7 +62,7 @@ export default function DocumentRetrievalAccessPoint(){
       const url=URL.createObjectURL(blob);
       const link=window.document.createElement("a");
       link.href=url;
-      link.download=result.fileName||document.fileName||document.title||"IRPA-archived-document";
+      link.download=result.fileName||record.fileName||record.title||"IRPA-archived-document";
       link.style.display="none";
       window.document.body.appendChild(link);
       link.click();
