@@ -31,6 +31,7 @@ const checks=[
  ["Verified invitee can pass media identity gate without duplicate member record",liveMeeting.includes("Boolean(invitedParticipant)")&&liveMeeting.includes("verified meeting invitee identity")],
  ["Responsive media columns stack on mobile",media.includes('className="irpa-live-media-columns"')&&styles.includes("@media (max-width:760px)")&&styles.includes("grid-template-columns:minmax(0,1fr)")],
  ["Camera and microphone preflight checks real capture permission",media.includes("async function checkDevices()")&&media.includes("getUserMedia")&&media.includes("width:{ideal:1280}")],
+ ["Selectable HD and Full HD capture targets",media.includes('qualityMode==="FULL_HD"?{width:1920,height:1080}:{width:1280,height:720}')&&media.includes("Video target: Full HD 1080p")],
  ["Meeting entry gateway exists",fs.existsSync("src/pages/MeetingEntryGateway.jsx")],
  ["Meeting access control exists",fs.existsSync("src/components/MeetingAccessControl.jsx")],
  ["Live meeting token gateway exists",fs.existsSync("functions/liveMeeting.js")],
