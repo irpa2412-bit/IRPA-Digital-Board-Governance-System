@@ -304,23 +304,31 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
         setMessage("Signer Identity trust record is not currently available. Your existing Signature Profile remains available and has not been changed.");
       }
 
-      // Load only registered, active signer candidates from the existing
-      // institutional registers. Some accounts are enrolled as employees rather
-      // than board members, so the selector must consider both registers.
-      // Preserve the current access model: a failed/protected query is not
-      // treated as evidence that no officers exist.
+      // Load both institutional registers. Board-member registrations commonly
+      // use registrationStatus="Registered" rather than status="Active", so
+      // accept registered members only when linked to an Auth UID and not
+      // explicitly inactive. Never substitute a Firestore record ID for an Auth UID.
       const [memberRows,employeeRows]=await Promise.all([
         getRecords("members").catch(error=>{console.warn("Signature member register unavailable:",error);return null}),
         getRecords("employees").catch(error=>{console.warn("Signature employee register unavailable:",error);return null})
       ]);
-      const candidates=[...(Array.isArray(memberRows)?memberRows:[]),...(Array.isArray(employeeRows)?employeeRows:[])];
+      const candidates=[
+        ...(Array.isArray(memberRows)?memberRows.map(x=>({...x,registerType:"Board Member Register"})):[]),
+        ...(Array.isArray(employeeRows)?employeeRows.map(x=>({...x,registerType:"Employee Register"})):[]
+      ];
       const activeCandidates=candidates.filter(x=>{
-        const status=String(x.status||x.employmentStatus||x.registrationStatus||"").trim().toLowerCase();
-        const active=["active","activated","current"].includes(status)||x.active===true||x.accountActivated===true;
-        const inactive=["inactive","suspended","revoked","terminated","disabled"].includes(status)||x.active===false;
-        return active&&!inactive&&Boolean(x.uid||x.id)&&Boolean(x.email);
+        const status=String(x.status||x.employmentStatus||x.accountStatus||x.memberStatus||"").trim().toLowerCase();
+        const registration=String(x.registrationStatus||"").trim().toLowerCase();
+        const uid=String(x.uid||x.firebaseAuthUid||x.authUid||"").trim();
+        const inactive=["inactive","suspended","revoked","terminated","disabled","rejected","cancelled"].includes(status)||["inactive","suspended","revoked","terminated","disabled","account pending","registered — account pending","registered - account pending"].includes(registration)||x.active===false||x.accountActivated===false;
+        const active=["active","activated","current"].includes(status)||x.active===true||x.accountActivated===true||
+          (x.registerType==="Board Member Register"&&["registered","active","activated","current"].includes(registration));
+        return Boolean(uid&&x.email&&active&&!inactive);
       });
-      const uniqueCandidates=[...new Map(activeCandidates.map(x=>[String(x.uid||x.id),{...x,uid:String(x.uid||x.id),name:x.name||x.fullName||x.displayName||x.email}])).values()];
+      const uniqueCandidates=[...new Map(activeCandidates.map(x=>{
+        const uid=String(x.uid||x.firebaseAuthUid||x.authUid).trim();
+        return [uid,{...x,uid,name:x.name||x.fullName||x.displayName||x.email,registerType:x.registerType||"Institutional Register"}];
+      })).values()];
       setMembers(uniqueCandidates);
     }catch(x){
       setMessage(x.message||"Unable to load Signature Portal.")
