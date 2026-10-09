@@ -37,6 +37,7 @@ const documentLifecycleRouter = createDocumentLifecycleRouter({
   updateFirestoreDocument,
   firestoreDocumentToPlain,
   commitDocumentAndAudit: commitFirestoreDocumentAndAudit,
+  recordLifecycleFailure: recordDocumentLifecycleFailure,
   json,
   corsHeaders
 });
@@ -1858,6 +1859,28 @@ async function commitFirestoreDocumentAndAudit(env, documentId, _firebaseToken, 
   });
   if(!response.ok)throw new Error(`Unable to atomically commit the document and its audit event (HTTP ${response.status}).`);
   return response.json();
+}
+
+async function recordDocumentLifecycleFailure(env, claims, documentId, action, details = {}) {
+  const firebaseToken = await getFirestoreAdminAccessToken(env);
+  const base = `projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents`;
+  const auditId = `lifecycle-failure-${Date.now()}-${crypto.randomUUID().slice(0, 12)}`;
+  const auditFields = {
+    action: {stringValue: `DOCUMENT_LIFECYCLE_${action}_FAILED`},
+    collection: {stringValue: "documents"},
+    recordId: {stringValue: String(documentId || "")},
+    actorUid: {stringValue: String(claims?.user_id || "")},
+    actorEmail: claims?.email ? {stringValue: String(claims.email)} : {nullValue: null},
+    details: {mapValue: {fields: Object.fromEntries(Object.entries(details).map(([key, value]) => [key, value == null ? {nullValue: null} : {stringValue: String(value).slice(0, 1000)}]))}},
+    createdAt: {timestampValue: new Date().toISOString()}
+  };
+  const response = await fetch(`https://firestore.googleapis.com/v1/${base}/audit?documentId=${encodeURIComponent(auditId)}`, {
+    method: "POST",
+    headers: {"Authorization": `Bearer ${firebaseToken}`, "Content-Type": "application/json"},
+    body: JSON.stringify({fields: auditFields})
+  });
+  if (!response.ok) throw new Error(`Unable to persist the document lifecycle failure audit event (HTTP ${response.status}).`);
+  return {auditId};
 }
 
 async function updateFirestoreDocument(env, path, firebaseToken, fields, updateMask) {
