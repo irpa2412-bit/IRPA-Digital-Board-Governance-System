@@ -320,3 +320,12 @@ export async function uploadMeetingProductToDrive({
     archivedAt: new Date().toISOString()
   };
 }
+
+export async function provisionAllMeetingCategoryArchives() {
+  const categories = Object.keys(MEETING_ARCHIVE_CATEGORIES);
+  const results = [];
+  for (const meetingCategory of categories) {
+    results.push(await provisionMeetingCategoryArchive({ meetingCategory }));
+  }
+  return results;
+}
