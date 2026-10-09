@@ -8,6 +8,7 @@ function hash(v){return crypto.createHash("sha256").update(String(v)).digest("he
 function gatePassword(){return crypto.randomBytes(9).toString("base64url").replace(/[-_]/g,"").slice(0,12).toUpperCase();}
 function active(status){return !["cancelled","canceled","completed","archived","closed"].includes(text(status||"Scheduled").toLowerCase());}
 function admin(request){return request.auth?.token?.admin===true||text(request.auth?.token?.email).toLowerCase()==="irpa@gmail.com"||text(request.auth?.token?.email).toLowerCase()==="irpa2412@gmail.com";}
+async function activeAdmin(request){if(admin(request))return true;const uid=request.auth?.uid;if(!uid)return false;const snap=await db.collection("adminProfiles").doc(uid).get();return snap.exists&&snap.data()?.active===true;}
 
 exports.createMeetingAccessInvitation=onCall({region:"us-central1",timeoutSeconds:30},async request=>{
  const uid=request.auth?.uid;
@@ -21,7 +22,7 @@ exports.createMeetingAccessInvitation=onCall({region:"us-central1",timeoutSecond
  if(participant.meetingId!==meetingId)throw new HttpsError("failed-precondition","Participant is not linked to the selected meeting.");
  const chair=String(meeting.chairpersonEmail||"").toLowerCase()===String(request.auth.token.email||"").toLowerCase();
  const secretary=String(meeting.secretaryEmail||"").toLowerCase()===String(request.auth.token.email||"").toLowerCase();
- if(!admin(request)&&!chair&&!secretary)throw new HttpsError("permission-denied","Only an authorised meeting administrator, chairperson or secretary may issue meeting access.");
+ const isAdmin=await activeAdmin(request);\n if(!isAdmin&&!chair&&!secretary)throw new HttpsError("permission-denied","Only an authorised meeting administrator, chairperson or secretary may issue meeting access.");
  const raw=crypto.randomBytes(32).toString("base64url");
  const meetingPassword=gatePassword();
  const tokenHash=hash(raw),passwordHash=hash(meetingPassword);
@@ -52,7 +53,7 @@ exports.revokeMeetingAccessInvitation=onCall({region:"us-central1",timeoutSecond
  const email=text(request.auth?.token?.email).toLowerCase();
  const chair=text(meeting.chairpersonEmail).toLowerCase()===email;
  const secretary=text(meeting.secretaryEmail).toLowerCase()===email;
- if(!admin(request)&&grant.createdByUid!==uid&&!chair&&!secretary)throw new HttpsError("permission-denied","Only the issuer or an authorised meeting administrator may revoke this pass.");
+ const isAdmin=await activeAdmin(request);\n if(!isAdmin&&grant.createdByUid!==uid&&!chair&&!secretary)throw new HttpsError("permission-denied","Only the issuer or an authorised meeting administrator may revoke this pass.");
  if(grant.status!=="Revoked"){
   await ref.update({status:"Revoked",revokedByUid:uid,revokedAt:FieldValue.serverTimestamp()});
   await db.collection("audit").add({action:"MEETING_ACCESS_INVITATION_REVOKED",collection:"meetingAccessTokens",recordId:accessId,details:{meetingId:grant.meetingId,participantId:grant.participantId},actorUid:uid,actorEmail:email||null,createdAt:FieldValue.serverTimestamp()});
