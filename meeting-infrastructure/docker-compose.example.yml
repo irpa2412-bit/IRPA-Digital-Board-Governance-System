@@ -1,3 +1,7 @@
+# LEGACY EXAMPLE ONLY — NOT FOR DEPLOYMENT.
+# This minimal sample uses a moving image tag and omits the TLS/ACME startup
+# sequence and staging acceptance gates. Use docker-compose.staging.yml and
+# STAGING_ACCEPTANCE.md for the isolated staging preparation path.
 # IRPA-DGBS Live Meeting Infrastructure
 services:
   livekit:
