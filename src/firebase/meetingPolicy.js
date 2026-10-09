@@ -30,7 +30,7 @@ export function canRegisterMeeting(identity={}){
 }
 export function canAccessMeetingCategory(meeting={},identity={},options={}){
   if(identity.isAdmin===true||identity.admin===true)return true;
-  if(options.isInvited===true||options.isRegisteredParticipant===true)return true;
+  if(options.isInvited===true||options.isRegisteredParticipant===true||options.isInitiator===true)return true;
   if(identity.active!==true)return false;
   const policy=resolveCategory(meeting.meetingCategory||meeting.meetingPolicyId||meeting.category||meeting.meetingType);
   if(policy.id==="GENERAL"&&(identity.activeMember===true||identity.activeEmployee===true))return true;
