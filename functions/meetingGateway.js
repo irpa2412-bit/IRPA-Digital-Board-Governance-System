@@ -23,7 +23,11 @@ exports.createMeetingAccessInvitation=onCall({region:"us-central1",timeoutSecond
  const chair=String(meeting.chairpersonEmail||"").toLowerCase()===String(request.auth.token.email||"").toLowerCase();
  const secretary=String(meeting.secretaryEmail||"").toLowerCase()===String(request.auth.token.email||"").toLowerCase();
  const isAdmin=await activeAdmin(request);
- if(!isAdmin&&!chair&&!secretary)throw new HttpsError("permission-denied","Only an authorised meeting administrator, chairperson or secretary may issue meeting access.");
+ // A meeting initiator is already recorded on the authoritative meeting register only after
+ // the meeting-registration rules accept the authorised registrar. Allow that same initiator
+ // to dispatch invitations for their own meeting; do not force all dispatch work through admin.
+ const initiator=text(meeting.initiatorUid)===uid;
+ if(!isAdmin&&!chair&&!secretary&&!initiator)throw new HttpsError("permission-denied","Only the authorised meeting initiator, administrator, chairperson or secretary may issue meeting access.");
  const raw=crypto.randomBytes(32).toString("base64url");
  const meetingPassword=gatePassword();
  const tokenHash=hash(raw),passwordHash=hash(meetingPassword);
