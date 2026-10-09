@@ -34,7 +34,7 @@ export default function ITOperationsPortal({user,profile,employee,selectedAuthor
         <div>
           <span className="eyebrow">INSTITUTIONAL IDENTITY</span>
           <h2>Current IT Assignment</h2>
-          <p className="muted">This workspace is opened only after the authenticated user explicitly declares an IT capacity. It does not convert Administrator privileges into IT privileges.</p>
+          <p className="muted">This workspace is opened for an explicitly selected IT capacity or an authenticated Administrator session already authorised by the server-side access boundary.</p>
         </div>
       </div>
       <div className="detail-grid" style={{marginTop:16}}>
