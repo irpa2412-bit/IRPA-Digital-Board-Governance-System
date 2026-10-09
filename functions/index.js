@@ -332,6 +332,46 @@ exports.openGovernanceVotingIssue=onCall({region:"us-central1",timeoutSeconds:60
   });
   return response;
 });
+exports.castGovernanceAnonymousVote=onCall({region:"us-central1",timeoutSeconds:60},async request=>{
+  const uid=request.auth?.uid,email=String(request.auth?.token?.email||"").trim().toLowerCase();
+  const issueId=String(request.data?.votingIssueId||"").trim(),outcome=String(request.data?.outcome||"").trim(),votingMethod=String(request.data?.votingMethod||"Meeting Vote").trim();
+  if(!uid)throw new HttpsError("unauthenticated","Sign in before voting.");
+  if(!issueId||!["For","Against","Abstain"].includes(outcome))throw new HttpsError("invalid-argument","A valid voting issue and ballot choice are required.");
+  const issueRef=db.collection("votingIssues").doc(issueId),participationRef=issueRef.collection("participants").doc(uid),voteRef=db.collection("votes").doc();
+  await db.runTransaction(async tx=>{
+    const issueSnap=await tx.get(issueRef);
+    if(!issueSnap.exists)throw new HttpsError("not-found","This voting issue does not exist.");
+    const issue=issueSnap.data();
+    if(issue.status!=="Open")throw new HttpsError("failed-precondition","Voting is closed for this issue.");
+    const [memberSnap,participationSnap,meetingSnap]=await Promise.all([
+      tx.get(db.collection("members").doc(uid)),
+      tx.get(participationRef),
+      tx.get(db.collection("meetings").doc(String(issue.meetingId||"")))
+    ]);
+    if(!memberSnap.exists||!eligibleBoardVoter(memberSnap.data()))throw new HttpsError("permission-denied","Only an eligible Board member may cast this governance vote.");
+    const memberStatus=String(memberSnap.data()?.status||memberSnap.data()?.registrationStatus||"").trim().toLowerCase();
+    if(memberStatus&&!["active","activated"].includes(memberStatus))throw new HttpsError("permission-denied","Your Board membership is not active.");
+    if(!meetingSnap.exists)throw new HttpsError("failed-precondition","The originating meeting is missing.");
+    if(participationSnap.exists())throw new HttpsError("already-exists","You have already voted on this issue. Duplicate voting is not permitted.");
+    const meeting=meetingSnap.data(),references=[...new Set([meeting.meetingReference,meeting.reference,meeting.title].map(v=>String(v||"").trim()).filter(Boolean))];
+    const reads=[tx.get(db.collection("participants").where("meetingId","==",String(issue.meetingId))) ,...references.map(ref=>tx.get(db.collection("participants").where("meetingReference","==",ref)))];
+    const participantSnaps=await Promise.all(reads),participants=new Map();
+    for(const snap of participantSnaps)for(const doc of snap.docs)participants.set(doc.id,doc);
+    const matching=[...participants.values()].filter(doc=>{
+      const p=doc.data();
+      const ids=[p.uid,p.userId,p.memberUid,p.participantUid,p.participantId].map(v=>String(v||""));
+      const emails=[p.email,p.participantEmail,p.subscriberEmail].map(v=>String(v||"").trim().toLowerCase());
+      return ids.includes(uid)||(email&&emails.includes(email));
+    });
+    const presentParticipant=matching.find(doc=>eligibleBoardVoter(doc.data())&&String(doc.data().attendanceStatus||doc.data().status||"").trim().toLowerCase()==="present");
+    const policy=issue.policySnapshot||{};
+    if(policy.requireAttendanceToVote!==false&&!presentParticipant)throw new HttpsError("failed-precondition","Voting requires a matching eligible participant record marked Present in the meeting attendance register.");
+    tx.set(participationRef,{uid,issueId,createdAt:FieldValue.serverTimestamp()});
+    tx.set(voteRef,{voteReference:`IRPA-VOTE-${voteRef.id}`,votingIssueId:issueId,meetingId:issue.meetingId,meetingReference:issue.meetingReference||issue.meetingId,resolutionId:issue.resolutionId||null,resolutionReference:issue.resolutionReference||null,agendaItem:issue.agendaItem||null,votingReference:issue.votingReference,outcome,result:"Pending",status:"Locked",votingMethod,anonymous:true,votedAt:FieldValue.serverTimestamp(),createdAt:FieldValue.serverTimestamp()});
+    tx.set(db.collection("audit").doc(),{action:"ANONYMOUS_VOTE_CAST",collection:"votes",recordId:voteRef.id,details:{votingIssueId:issueId,outcome,votingMethod,anonymous:true},actorUid:null,actorEmail:null,createdAt:FieldValue.serverTimestamp()});
+  });
+  return {ok:true,voteId:voteRef.id,anonymous:true,locked:true};
+});
 exports.closeGovernanceVotingIssue=onCall({region:"us-central1",timeoutSeconds:60},async request=>{
   const issueId=String(request.data?.votingIssueId||"").trim();
   if(!issueId)throw new HttpsError("invalid-argument","A voting issue is required.");
