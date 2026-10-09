@@ -8,6 +8,7 @@
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
+    "run_worker_first": ["/__irpa_health"],
     "not_found_handling": "single-page-application"
   }
 }
