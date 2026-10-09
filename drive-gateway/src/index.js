@@ -354,6 +354,10 @@ async function upload(request, env) {
     if (!requestedFolderId) {
       return json({ ok: false, error: "A member signature folder is required." }, 400, corsHeaders(request));
     }
+  } else if (purpose === "Meeting Products") {
+    if (!requestedFolderId || !data.meetingId || !data.meetingCategory) return json({ok:false,error:"Meeting ID, category and authorised archive folder are required."},400,corsHeaders(request));
+    try { await authorizeMeetingArchiveUser(env, claims, String(data.meetingId), String(data.meetingCategory).toUpperCase()); }
+    catch (error) { return json({ok:false,error:error.message||"Meeting archive access denied."},403,corsHeaders(request)); }
   } else if (purpose === "Signed Documents Archive" || purpose === "Documents Portal" || purpose === "Controlled Documents") {
     if (!requestedFolderId) return json({ ok:false, error:"A controlled document archive folder is required." },400,corsHeaders(request));
   } else if (requestedFolderId || data.ownerUid) {
@@ -375,7 +379,7 @@ async function upload(request, env) {
   const accessToken = await getDriveAccessToken(env);
   const rootId = await findOrCreateFolder(env, accessToken, "IRPA Governance System");
   let purposeId;
-  if (purpose === "Signature Profile" || purpose === "Signed Documents Archive" || purpose === "Documents Portal" || purpose === "Controlled Documents") {
+  if (purpose === "Signature Profile" || purpose === "Signed Documents Archive" || purpose === "Documents Portal" || purpose === "Controlled Documents" || purpose === "Meeting Products") {
     const folderMeta = await driveFetch(env, accessToken, `/drive/v3/files/${encodeURIComponent(requestedFolderId)}?fields=id,name,mimeType,description,trashed`);
     const folderDescription = parseDescription(folderMeta.description);
     if (folderMeta.mimeType !== "application/vnd.google-apps.folder" || folderMeta.trashed) {
@@ -390,6 +394,9 @@ async function upload(request, env) {
     }
     if ((purpose === "Signed Documents Archive" || purpose === "Documents Portal" || purpose === "Controlled Documents") && folderDescription.irpaGovernanceArchive !== true) {
       return json({ ok: false, error: "The requested folder is not an IRPA controlled-document archive folder." }, 403, corsHeaders(request));
+    }
+    if (purpose === "Meeting Products" && (folderDescription.irpaGovernanceArchive !== true || folderDescription.purpose !== "IRPA Meeting Category Archive" || String(folderDescription.meetingCategory || "").toUpperCase() !== String(data.meetingCategory || "").toUpperCase())) {
+      return json({ok:false,error:"The requested folder is not the authorised archive for this meeting category."},403,corsHeaders(request));
     }
     purposeId = requestedFolderId;
   } else {
