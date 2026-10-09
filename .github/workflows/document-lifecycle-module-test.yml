@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - integration/collective-portals-20261009
+      - main
     paths:
       - "src/pages/DocumentLifecycleModule.jsx"
       - "src/firebase/documentLifecycle.js"
