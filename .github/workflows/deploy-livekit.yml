@@ -79,7 +79,7 @@ jobs:
           ssh -i ~/.ssh/irpa-livekit -o BatchMode=yes "$LIVEKIT_SSH_USER@$LIVEKIT_SSH_HOST" 'mkdir -p /tmp/irpa-livekit-deploy'
           scp -i ~/.ssh/irpa-livekit -o BatchMode=yes "$tmp/"{bootstrap.sh,docker-compose.yml,Caddyfile,livekit.yaml.template,.env} "$LIVEKIT_SSH_USER@$LIVEKIT_SSH_HOST:/tmp/irpa-livekit-deploy/"
           ssh -i ~/.ssh/irpa-livekit -o BatchMode=yes "$LIVEKIT_SSH_USER@$LIVEKIT_SSH_HOST" \
-            'sudo bash /tmp/irpa-livekit-deploy/bootstrap.sh /tmp/irpa-livekit-deploy/.env; sudo rm -rf /tmp/irpa-livekit-deploy'
+            'set -Eeuo pipefail; trap "sudo rm -rf /tmp/irpa-livekit-deploy" EXIT; sudo bash /tmp/irpa-livekit-deploy/bootstrap.sh /tmp/irpa-livekit-deploy/.env'
 
       - name: Verify public TLS endpoint
         env:
@@ -129,8 +129,8 @@ jobs:
           printf '%s' "$LIVEKIT_API_KEY" > "$tmp/livekit-api-key"
           printf '%s' "$LIVEKIT_API_SECRET" > "$tmp/livekit-api-secret"
           npm install --global firebase-tools
-          firebase functions:secrets:set LIVEKIT_API_KEY --data-file "$tmp/livekit-api-key" --project irpa-digital-board-governance
-          firebase functions:secrets:set LIVEKIT_API_SECRET --data-file "$tmp/livekit-api-secret" --project irpa-digital-board-governance
+          firebase functions:secrets:set LIVEKIT_API_KEY --data-file "$tmp/livekit-api-key" --project irpa-digital-board-governance --force
+          firebase functions:secrets:set LIVEKIT_API_SECRET --data-file "$tmp/livekit-api-secret" --project irpa-digital-board-governance --force
           printf 'LIVEKIT_URL=wss://%s\n' "$LIVEKIT_DOMAIN" > functions/.env.irpa-digital-board-governance
           chmod 600 functions/.env.irpa-digital-board-governance
           npm ci --prefix functions
