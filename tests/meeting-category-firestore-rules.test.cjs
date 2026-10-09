@@ -150,6 +150,24 @@ test("category-constrained meeting queries are allowed only for the matching cat
   await assertSucceeds(boardDb.collection("meetings").where("meetingCategory", "==", "GOVERNANCE").get());
 });
 
+test("explicit category metadata overrides a conflicting legacy meeting type", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("meetings/category-mismatch").set(meeting({
+      meetingCategory: "STAFF",
+      meetingPolicyId: "STAFF",
+      meetingType: "Board Meeting"
+    }));
+  });
+  const boardDb = testEnv.authenticatedContext("board-member", {
+    email: "board@example.test"
+  }).firestore();
+  const staffDb = testEnv.authenticatedContext("staff-user", {
+    email: "staff@example.test"
+  }).firestore();
+  await assertFails(boardDb.doc("meetings/category-mismatch").get());
+  await assertSucceeds(staffDb.doc("meetings/category-mismatch").get());
+});
+
 test("explicitly listed external participant can read only the meeting they are listed on", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     const db = context.firestore();
