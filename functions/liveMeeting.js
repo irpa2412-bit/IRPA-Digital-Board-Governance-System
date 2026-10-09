@@ -1,7 +1,11 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { AccessToken } = require("livekit-server-sdk");
-const crypto = require("crypto");
+const { defineSecret } = require("firebase-functions/params");
+const { opaqueRoomName } = require("./liveMeetingPolicy");
+
+const LIVEKIT_API_KEY = defineSecret("LIVEKIT_API_KEY");
+const LIVEKIT_API_SECRET = defineSecret("LIVEKIT_API_SECRET");
 
 const db = getFirestore();
 
@@ -58,13 +62,8 @@ function meetingOpenForMedia(meeting = {}) {
   return !["closed", "completed", "cancelled", "canceled", "archived"].includes(status);
 }
 
-function opaqueRoomName(meetingId, sessionId) {
-  const digest = crypto.createHash("sha256").update(`${meetingId}:${sessionId}`).digest("hex").slice(0, 32);
-  return `irpa-meeting-${digest}`;
-}
-
 function liveKitConfigured() {
-  return Boolean(text(process.env.LIVEKIT_URL) && text(process.env.LIVEKIT_API_KEY) && text(process.env.LIVEKIT_API_SECRET));
+  return Boolean(text(process.env.LIVEKIT_URL) && text(LIVEKIT_API_KEY.value()) && text(LIVEKIT_API_SECRET.value()));
 }
 
 /**
@@ -81,6 +80,7 @@ function liveKitConfigured() {
 exports.issueLiveMeetingToken = onCall({
   region: "us-central1",
   timeoutSeconds: 30,
+  secrets: [LIVEKIT_API_KEY, LIVEKIT_API_SECRET],
   enforceAppCheck: false
 }, async request => {
   const uid = request.auth?.uid;
@@ -124,10 +124,10 @@ exports.issueLiveMeetingToken = onCall({
   }
 
   const sessionRef = db.collection("liveMeetingSessions").doc();
-  const roomName = opaqueRoomName(meetingId, sessionRef.id);
+  const roomName = opaqueRoomName(meetingId);
   const participantIdentity = `uid-${uid}`;
 
-  const token = new AccessToken(process.env.LIVEKIT_API_KEY, process.env.LIVEKIT_API_SECRET, {
+  const token = new AccessToken(LIVEKIT_API_KEY.value(), LIVEKIT_API_SECRET.value(), {
     identity: participantIdentity,
     name: text(meeting.displayName || meeting.title || "IRPA participant"),
     ttl: "10m"
