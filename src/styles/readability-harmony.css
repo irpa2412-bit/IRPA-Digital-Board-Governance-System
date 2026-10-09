@@ -2606,3 +2606,61 @@ textarea:focus-visible{
     height:1em!important;
   }
 }
+
+
+/* DASHBOARD INTERACTION POLISH — 2026-10-09
+   Give dashboard navigation a consistent, perceptible hover/pressed/focus
+   response on desktop and mobile without changing routes, labels, dimensions,
+   data, or authorization. Respect the site's existing blue button language. */
+.dashboard-desktop-view .desktop-blue-nav-button,
+.dashboard-desktop-view .quote4-quick-grid>button,
+.content-area .dashboard-command .mobile-quote1-grid>button,
+.content-area .dashboard-command .mobile-quote1-stats>button,
+.content-area .page .dashboard-function-button,
+.main-area>.mobile-global-nav button{
+  -webkit-tap-highlight-color:transparent;
+  transition:background-color .16s ease,border-color .16s ease,box-shadow .16s ease,filter .16s ease;
+}
+@media (hover:hover) and (pointer:fine){
+  .dashboard-desktop-view .desktop-blue-nav-button:hover,
+  .dashboard-desktop-view .quote4-quick-grid>button:hover{
+    background-color:#1674c4!important;
+    border-color:#8bc7f0!important;
+    color:#fff!important;
+    box-shadow:0 5px 14px rgba(11,95,168,.18)!important;
+  }
+  .dashboard-desktop-view .desktop-blue-nav-button:hover *,
+  .dashboard-desktop-view .quote4-quick-grid>button:hover strong,
+  .dashboard-desktop-view .quote4-quick-grid>button:hover small,
+  .dashboard-desktop-view .quote4-quick-grid>button:hover b{
+    color:#fff!important;
+  }
+}
+.dashboard-desktop-view .desktop-blue-nav-button:active,
+.dashboard-desktop-view .quote4-quick-grid>button:active,
+.content-area .dashboard-command .mobile-quote1-grid>button:active,
+.content-area .dashboard-command .mobile-quote1-stats>button:active,
+.content-area .page .dashboard-function-button:active,
+.main-area>.mobile-global-nav button:active{
+  filter:brightness(.92);
+}
+.dashboard-desktop-view .desktop-blue-nav-button:focus-visible,
+.dashboard-desktop-view .quote4-quick-grid>button:focus-visible,
+.content-area .dashboard-command .mobile-quote1-grid>button:focus-visible,
+.content-area .dashboard-command .mobile-quote1-stats>button:focus-visible,
+.content-area .page .dashboard-function-button:focus-visible,
+.main-area>.mobile-global-nav button:focus-visible{
+  outline:3px solid #f4c84a!important;
+  outline-offset:3px!important;
+  box-shadow:0 0 0 2px rgba(11,95,168,.16)!important;
+}
+@media(prefers-reduced-motion:reduce){
+  .dashboard-desktop-view .desktop-blue-nav-button,
+  .dashboard-desktop-view .quote4-quick-grid>button,
+  .content-area .dashboard-command .mobile-quote1-grid>button,
+  .content-area .dashboard-command .mobile-quote1-stats>button,
+  .content-area .page .dashboard-function-button,
+  .main-area>.mobile-global-nav button{
+    transition:none!important;
+  }
+}
