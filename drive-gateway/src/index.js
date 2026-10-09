@@ -832,6 +832,51 @@ async function meetingArchiveContext(request, env) {
   return {claims,data,category,policy,accessToken,rootId,archiveRootId};
 }
 
+
+function firestoreFieldValue(field) {
+  if (!field) return null;
+  if (field.stringValue !== undefined) return field.stringValue;
+  if (field.booleanValue !== undefined) return field.booleanValue;
+  if (field.integerValue !== undefined) return Number(field.integerValue);
+  if (field.doubleValue !== undefined) return Number(field.doubleValue);
+  if (field.arrayValue?.values) return field.arrayValue.values.map(firestoreFieldValue);
+  if (field.mapValue?.fields) return Object.fromEntries(Object.entries(field.mapValue.fields).map(([k,v])=>[k,firestoreFieldValue(v)]));
+  return null;
+}
+async function queryMeetingArchiveRecords(env, collectionName, meetingId, token) {
+  const response=await fetch("https://firestore.googleapis.com/v1/projects/"+FIREBASE_PROJECT_ID+"/databases/(default)/documents:runQuery",{
+    method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
+    body:JSON.stringify({structuredQuery:{from:[{collectionId:collectionName}],where:{fieldFilter:{field:{fieldPath:"meetingId"},op:"EQUAL",value:{stringValue:meetingId}}},limit:200}})
+  });
+  if(!response.ok)throw new Error("Unable to verify meeting archive access.");
+  const rows=await response.json();
+  return rows.filter(row=>row.document).map(row=>({id:row.document.name.split("/").pop(),...(Object.fromEntries(Object.entries(row.document.fields||{}).map(([k,v])=>[k,firestoreFieldValue(v)])))}));
+}
+async function authorizeMeetingArchiveUser(env, claims, meetingId, meetingCategory) {
+  if(!meetingId)throw new Error("Meeting ID is required to access a category archive.");
+  const privilegedToken=await getFirestoreAdminAccessToken(env);
+  const doc=await getFirestoreDocument(env,"meetings/"+meetingId,privilegedToken);
+  if(!doc)throw new Error("The authoritative meeting record was not found.");
+  const meeting=Object.fromEntries(Object.entries(doc.fields||{}).map(([k,v])=>[k,firestoreFieldValue(v)]));
+  const category=String(meeting.meetingCategory||meeting.meetingPolicyId||meeting.category||"OTHER").trim().toUpperCase();
+  if(category!==meetingCategory)throw new Error("Meeting category does not match the requested Google Drive archive.");
+  const uid=String(claims.user_id||"");
+  const email=String(claims.email||"").trim().toLowerCase();
+  const adminEmail=String(env.AUTHORIZED_DRIVE_EMAIL||"").trim().toLowerCase();
+  if(claims.admin===true||(adminEmail&&email===adminEmail))return {meeting,category,uid,email,privilegedToken};
+  const directKeys=["initiatorUid","createdByUid","chairpersonUid","secretaryUid"];
+  if(directKeys.some(key=>String(meeting[key]||"")===uid))return {meeting,category,uid,email,privilegedToken};
+  const listedKeys=["participantUids","attendeeUids","memberUids","invitedUids","subscriberUids"];
+  if(listedKeys.some(key=>Array.isArray(meeting[key])&&meeting[key].map(String).includes(uid)))return {meeting,category,uid,email,privilegedToken};
+  const people=[...(Array.isArray(meeting.participants)?meeting.participants:[]),...(Array.isArray(meeting.attendees)?meeting.attendees:[])];
+  if(people.some(p=>String(p?.uid||p?.userId||p?.memberUid||"")===uid||(email&&String(p?.email||p?.participantEmail||"").trim().toLowerCase()===email)))return {meeting,category,uid,email,privilegedToken};
+  const subscriptions=await queryMeetingArchiveRecords(env,"meetingSubscriptions",meetingId,privilegedToken);
+  if(subscriptions.some(row=>[row.uid,row.subscriberUid,row.userId,row.memberUid,row.participantUid].map(v=>String(v||"")).includes(uid)||(email&&[row.email,row.subscriberEmail,row.participantEmail].some(v=>String(v||"").trim().toLowerCase()===email))&&!["revoked","cancelled","canceled","inactive","removed"].includes(String(row.status||"").toLowerCase())))return {meeting,category,uid,email,privilegedToken};
+  const participants=await queryMeetingArchiveRecords(env,"participants",meetingId,privilegedToken);
+  if(participants.some(row=>(String(row.participantUid||row.uid||row.userId||"")===uid||(email&&String(row.participantEmail||row.email||"").trim().toLowerCase()===email))&&!["revoked","cancelled","canceled","inactive","removed"].includes(String(row.status||"").toLowerCase())))return {meeting,category,uid,email,privilegedToken};
+  throw new Error("This account is not a registered participant or subscriber for the selected meeting.");
+}
+
 async function provisionMeetingCategoryArchive(request, env) {
   const ctx = await meetingArchiveContext(request, env);
   if (ctx.response) return ctx.response;
@@ -858,7 +903,8 @@ async function provisionMeetingCategoryArchive(request, env) {
 async function getMeetingCategoryArchive(request, env) {
   const ctx = await meetingArchiveContext(request, env);
   if (ctx.response) return ctx.response;
-  const {category,policy,accessToken,archiveRootId}=ctx;
+  const {claims,data,category,policy,accessToken,archiveRootId}=ctx;
+  try{await authorizeMeetingArchiveUser(env,claims,String(data.meetingId||""),category)}catch(error){return json({ok:false,error:error.message||"Meeting archive access denied."},403,corsHeaders(request))}
   const folderName="IRPA "+policy.label+" Archive";
   const query=["name='"+folderName.replace(/'/g,"\\'")+"'","mimeType='application/vnd.google-apps.folder'","trashed=false","'"+archiveRootId+"' in parents"].join(" and ");
   const listed=await driveFetch(env,accessToken,"/drive/v3/files?q="+encodeURIComponent(query)+"&spaces=drive&pageSize=10&fields=files(id,name,description,parents)");
