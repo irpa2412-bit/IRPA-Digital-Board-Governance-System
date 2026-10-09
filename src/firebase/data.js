@@ -2,6 +2,7 @@ import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, orderBy, query, ru
 import { auth, db, applicantAuth, applicantDb, applicantApp } from "./config";
 import { sendEmployeeRegistrationEmail } from "./auth";
 import { getFunctions, httpsCallable } from "firebase/functions";
+import { canAccessMeetingCategory, MEETING_CATEGORIES } from "./meetingPolicy.js";
 
 const uniqueInductionValues=(values)=>[...new Set(values.flatMap(v=>Array.isArray(v)?v:String(v||"").split(",")).map(v=>String(v||"").trim()).filter(Boolean))];
 
@@ -37,6 +38,55 @@ export async function createEmployeeProfile(data){const uid=data.uid||auth.curre
 export async function provisionCurrentMemberFromInvitation(invitationId){const uid=auth.currentUser?.uid;const email=auth.currentUser?.email?.trim().toLowerCase();if(!uid||!email||!invitationId)return null;const invitation=await getRecord(COLLECTIONS.invitations,invitationId);if(!invitation)throw new Error("The member invitation could not be found.");if(invitation.email?.trim().toLowerCase()!==email)throw new Error("This invitation is not assigned to the authenticated email address.");if(invitation.status==="Cancelled")throw new Error("This member invitation has been cancelled.");const role=invitation.role||"Board Member";const memberType=invitation.memberType||"Governance Member";const member=await createMemberProfile(uid,{invitationId,email,name:invitation.name||"",role,memberType,status:"Active"});const employeeRoles=["Executive Director","Director Human Resources","HR Manager","Director Finance & Administration","Finance Personnel","Finance Manager","Accountant","Finance Officer","Director Internal Oversight","Internal Oversight Officer","Secretariat","Procurement Officer","Programme/Technical Officer","Management","Operations Manager","Rangeland Officer","Livestock Officer","Outreach Officer","Community Development Officer","Environment Officer","HR Officer","IT Specialist","Information Technology Officer","Employee"];if(employeeRoles.includes(role))await createEmployeeProfile({uid,email,name:invitation.name||"",role,department:invitation.department||"",employmentType:invitation.employmentType||"Employee",status:"Active",invitationId});return member;}
 export async function getRecord(collectionName,id){const s=await getDoc(doc(db,collectionName,id));return s.exists()?{id:s.id,...s.data()}:null;}
 export async function getRecords(collectionName){const s=await getDocs(query(collection(db,collectionName),orderBy("createdAt","desc")));return s.docs.map(x=>({id:x.id,...x.data()}));}
+export async function getAccessibleMeetingRecords(){
+  const user=auth.currentUser;
+  if(!user?.uid)throw new Error("Sign in to view the meeting register.");
+  const email=String(user.email||"").trim().toLowerCase();
+  const [member,employee,token,adminProfile]=await Promise.all([
+    getCurrentMemberProfile().catch(()=>null),
+    getCurrentEmployeeProfile().catch(()=>null),
+    user.getIdTokenResult().catch(()=>null),
+    getRecord(COLLECTIONS.adminProfiles,user.uid).catch(()=>null)
+  ]);
+  const activeStatus=record=>["active","activated"].includes(String(record?.status||record?.employmentStatus||record?.registrationStatus||"").trim().toLowerCase());
+  const activeMember=!!member&&activeStatus(member);
+  const activeEmployee=!!employee&&activeStatus(employee);
+  const isAdmin=email==="irpa2412@gmail.com"||token?.claims?.admin===true||adminProfile?.active===true;
+  const profiles=[member||{},employee||{}];
+  const roles=[...new Set(profiles.flatMap(p=>[
+    p.role,p.title,p.position,p.departmentalRole,p.boardPosition,
+    ...(Array.isArray(p.roles)?p.roles:[]),
+    ...(Array.isArray(p.assignedRoles)?p.assignedRoles:[]),
+    ...(Array.isArray(p.selectedRoles)?p.selectedRoles:[]),
+    ...(Array.isArray(p.roleAssignments)?p.roleAssignments:[]),
+    ...(Array.isArray(token?.claims?.irpaRoles)?token.claims.irpaRoles:[])
+  ]).map(v=>String(v||"").trim()).filter(Boolean))];
+  const identity={uid:user.uid,email,active:activeMember||activeEmployee,isAdmin,activeMember,activeEmployee,roles,...(member||employee||{})};
+  const ref=collection(db,COLLECTIONS.meetings);
+  const jobs=[];
+  if(isAdmin){
+    const all=await getDocs(ref);
+    return all.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>meetingCreatedAt(b)-meetingCreatedAt(a));
+  }
+  for(const policy of Object.values(MEETING_CATEGORIES)){
+    if(!canAccessMeetingCategory({meetingCategory:policy.id,meetingPolicyId:policy.id},identity))continue;
+    jobs.push(query(ref,where("meetingCategory","==",policy.id)));
+    jobs.push(query(ref,where("meetingPolicyId","==",policy.id)));
+    for(const type of policy.meetingTypes)jobs.push(query(ref,where("meetingType","==",type)));
+  }
+  const uid=user.uid;
+  for(const field of ["participantUids","attendeeUids","memberUids","invitedUids","subscriberUids"])jobs.push(query(ref,where(field,"array-contains",uid)));
+  if(email)for(const field of ["participantEmails","attendeeEmails","invitedEmails","subscriberEmails"])jobs.push(query(ref,where(field,"array-contains",email)));
+  const results=await Promise.all(jobs.map(q=>getDocs(q).catch(()=>null)));
+  const records=new Map();
+  results.forEach(s=>s?.docs?.forEach(d=>records.set(d.id,{id:d.id,...d.data()})));
+  return [...records.values()].filter(m=>canAccessMeetingCategory(m,identity,{
+    isInvited:["participantUids","attendeeUids","memberUids","invitedUids","subscriberUids"].some(k=>Array.isArray(m[k])&&m[k].includes(uid))||
+      (email&&["participantEmails","attendeeEmails","invitedEmails","subscriberEmails"].some(k=>Array.isArray(m[k])&&m[k].map(v=>String(v||"").toLowerCase()).includes(email))),
+    isRegisteredParticipant:["participantUids","attendeeUids","memberUids","subscriberUids"].some(k=>Array.isArray(m[k])&&m[k].includes(uid))
+  })).sort((a,b)=>meetingCreatedAt(b)-meetingCreatedAt(a));
+}
+function meetingCreatedAt(record={}){const value=record.createdAt;return typeof value?.toMillis==="function"?value.toMillis():typeof value==="number"?value:Date.parse(value||"")||0;}
 
 // Signing uses a dedicated document read path rather than the generic ordered
 // query. This keeps the Signature Portal resilient to legacy document records
