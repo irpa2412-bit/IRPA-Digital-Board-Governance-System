@@ -32,7 +32,7 @@ export function canAccessMeetingCategory(meeting={},identity={},options={}){
   if(identity.isAdmin===true||identity.admin===true)return true;
   if(options.isInvited===true||options.isRegisteredParticipant===true)return true;
   if(identity.active!==true)return false;
-  const policy=MEETING_CATEGORIES[meeting.meetingPolicyId]||resolveCategory(meeting.meetingCategory||meeting.category||meeting.meetingType);
+  const policy=resolveCategory(meeting.meetingCategory||meeting.meetingPolicyId||meeting.category||meeting.meetingType);
   if(policy.id==="GENERAL"&&(identity.activeMember===true||identity.activeEmployee===true))return true;
   const roles=identityRoles(identity);
   return policy.accessRoles.some(role=>roles.has(NORMALIZE_ROLE(role)));
@@ -43,12 +43,12 @@ export function canEditMeeting(meeting={},identity={}){
   if(released)return false;
   if(identity.active!==true)return false;
   const roles=identityRoles(identity);
-  const policy=MEETING_CATEGORIES[meeting.meetingPolicyId]||resolveCategory(meeting.meetingCategory||meeting.category||meeting.meetingType);
+  const policy=resolveCategory(meeting.meetingCategory||meeting.meetingPolicyId||meeting.category||meeting.meetingType);
   return policy.registrationRoles.some(role=>roles.has(NORMALIZE_ROLE(role)))&&
     String(meeting.initiatorUid||"")===String(identity.uid||"");
 }
 export function canVoteInMeeting(meeting={},identity={}){
-  const policy=MEETING_CATEGORIES[meeting.meetingPolicyId]||resolveCategory(meeting.meetingCategory||meeting.category||meeting.meetingType);
+  const policy=resolveCategory(meeting.meetingCategory||meeting.meetingPolicyId||meeting.category||meeting.meetingType);
   if(!policy.votingEnabled||identity.active!==true)return false;
   const roles=identityRoles(identity);
   return policy.votingRoles.some(role=>roles.has(NORMALIZE_ROLE(role)))&&identity.isBoardMember===true;
@@ -83,7 +83,7 @@ export function normalizeMeetingForV3(meeting={}){
 }
 
 export function meetingCapabilities(meeting={}){
-  const policy=MEETING_CATEGORIES[meeting.meetingPolicyId]||resolveCategory(meeting.meetingCategory||meeting.category||meeting.meetingType);
+  const policy=resolveCategory(meeting.meetingCategory||meeting.meetingPolicyId||meeting.category||meeting.meetingType);
   return {
     policy,
     quorum:policy.quorumRequired,
