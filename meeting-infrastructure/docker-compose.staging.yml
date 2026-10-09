@@ -1,0 +1,75 @@
+# Isolated single-node staging only. Do not use for production without review.
+# Create livekit.yaml from livekit.yaml.example and issue the TURN certificate first.
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    networks: [meeting-private]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  livekit:
+    image: ${LIVEKIT_IMAGE:?Set LIVEKIT_IMAGE to a reviewed LiveKit version or immutable digest}
+    restart: unless-stopped
+    command: ["--config", "/etc/livekit.yaml"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+      - letsencrypt:/etc/letsencrypt:ro
+    expose:
+      - "7880"
+    ports:
+      - "7881:7881/tcp"
+      - "3478:3478/udp"
+      - "5349:5349/tcp"
+      - "50000-60000:50000-60000/udp"
+    networks: [meeting-private]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:7880/ || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [livekit]
+    ports:
+      - "80:80/tcp"
+      - "443:443/tcp"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - acme-webroot:/var/www/certbot
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [meeting-private]
+
+  certbot:
+    image: certbot/certbot
+    profiles: ["tools"]
+    volumes:
+      - acme-webroot:/var/www/certbot
+      - letsencrypt:/etc/letsencrypt
+    entrypoint: ["certbot"]
+    command: ["--help"]
+
+networks:
+  meeting-private:
+    driver: bridge
+
+volumes:
+  redis-data:
+  caddy-data:
+  caddy-config:
+  acme-webroot:
+  letsencrypt:
