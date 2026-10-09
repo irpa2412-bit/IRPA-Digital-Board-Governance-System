@@ -5,6 +5,8 @@ const media=fs.readFileSync("src/components/IRPADGBSMeetingRoomMedia.jsx","utf8"
 const gateway=fs.readFileSync("functions/meetingGateway.js","utf8");
 const room=fs.readFileSync("src/pages/MeetingRoom.jsx","utf8");
 const policy=fs.readFileSync("src/firebase/meetingPolicy.js","utf8");
+const records=fs.readFileSync("functions/meetingRecords.js","utf8");
+const roomSource=fs.readFileSync("src/pages/MeetingRoom.jsx","utf8");
 const checks=[
  ["Meeting media client exists",fs.existsSync("src/components/IRPADGBSMeetingRoomMedia.jsx")],
  ["Meeting entry gateway exists",fs.existsSync("src/pages/MeetingEntryGateway.jsx")],
@@ -41,6 +43,20 @@ const checks=[
  ["Staff restricts signature and authorization",policy.includes('STAFF:{')&&policy.includes("signatureAccess:false")&&policy.includes("authorizationAccess:false")],
  ["General restricts signature and authorization",policy.includes('GENERAL:{')&&policy.includes("signatureAccess:false")&&policy.includes("authorizationAccess:false")],
  ["Other is restricted to operational facilities",policy.includes('OTHER:{')&&policy.includes("signatureAccess:false")&&policy.includes("authorizationAccess:false")],
+ ["Meeting record lifecycle callable registered",fs.readFileSync("functions/bootstrap.js","utf8").includes('require("./meetingRecords")')],
+ ["Record capture is server-authorized",records.includes("exports.captureMeetingRecord")&&records.includes("ctx.canManage")],
+ ["Record storage uses dedicated meetingRecords collection",records.includes('db.collection("meetingRecords")')],
+ ["Record integrity hash stored and checked",records.includes('integrityAlgorithm:"SHA-256"')&&records.includes('actual!==record.contentHash')],
+ ["Retrieval is audited",records.includes('MEETING_RECORD_RETRIEVED')],
+ ["Integrity failure blocks retrieval and audits",records.includes('MEETING_RECORD_INTEGRITY_FAILURE')&&records.includes('data-loss')],
+ ["Retention periods are category-defined",records.includes("GOVERNANCE:7")&&records.includes("ADMINISTRATIVE:5")&&records.includes("STAFF:3")&&records.includes("GENERAL:3")&&records.includes("OTHER:3")],
+ ["Legal hold prevents purge",records.includes('if(record.legalHold===true)throw new HttpsError("failed-precondition","A legal hold prevents deletion.")')],
+ ["Purge requires retention expiry and reviewed request",records.includes('record.deletionStatus!=="PENDING_REVIEW"')&&records.includes("retainUntil>new Date()")],
+ ["Purge restricted to primary administrator",records.includes('if(!admin(req))throw new HttpsError("permission-denied","Only the primary administrator may execute a final purge.")')],
+ ["Deletion writes audit before record purge",records.includes('MEETING_RECORD_PURGED')&&records.includes("tx.set(auditRef")&&records.includes("tx.delete(ref)")],
+ ["Meeting Room can capture transcript and draft minutes",roomSource.includes('captureCurrentRecord("TRANSCRIPT"')&&roomSource.includes('captureCurrentRecord("MINUTES_DRAFT"')],
+ ["Meeting Room provides retrieve and verify UI",roomSource.includes("retrieveRecord(r.id)")&&roomSource.includes("Retrieve & Verify")],
+ ["Binary media is not falsely represented as recorded",records.includes("documentPortalRequiredForBinary:true")],
  ["Meeting auto registration exists",room.includes("registerSelf")],
 ];
 const failed=checks.filter(([,ok])=>!ok);
