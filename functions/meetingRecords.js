@@ -67,8 +67,8 @@ exports.saveMeetingAssistantDraft=onCall({region:"us-central1",timeoutSeconds:30
   recordType:type,recordLabel:recordLabel(type),title:title||recordLabel(type),content,contentHash:digest,
   sourceTranscriptHash:text(req.data?.sourceTranscriptHash)||null,
   integrityAlgorithm:"SHA-256",integrityStatus:"VERIFIED_AT_CAPTURE",version:1,status:"Active",
-  confidentialityClass:ctx.confidentiality,storageDestination:"FIRESTORE_MEETING_RECORDS",
-  storagePath:null,documentPortalRequiredForBinary:true,draftOnly:true,approved:false,
+  confidentialityClass:ctx.confidentiality,storageDestination:req.data?.driveArchive?.provider==="Google Drive"?"GOOGLE_DRIVE_AND_FIRESTORE_METADATA":"FIRESTORE_MEETING_RECORDS",
+  storagePath:text(req.data?.driveArchive?.storagePath)||null,driveArchive:req.data?.driveArchive&&typeof req.data.driveArchive==="object"?{provider:"Google Drive",meetingCategory:ctx.category,folderId:text(req.data.driveArchive.folderId),folderUrl:text(req.data.driveArchive.folderUrl),fileId:text(req.data.driveArchive.fileId),webViewLink:text(req.data.driveArchive.webViewLink),fileName:text(req.data.driveArchive.fileName),storagePath:text(req.data.driveArchive.storagePath),contentType:text(req.data.driveArchive.contentType),fileSize:Number(req.data.driveArchive.fileSize||0)}:null,documentPortalRequiredForBinary:true,draftOnly:true,approved:false,
   approvalStatus:"NOT_SUBMITTED",requiresHumanReview:true,
   createdFrom:"IRPA_AI_MEETING_ASSISTANT",legalHold:false,retentionYears,retainUntil,
   retentionPolicyVersion:"IRPA-MEETING-RETENTION-1.0",capturedByUid:ctx.uid,capturedByEmail:ctx.email||null,
@@ -77,7 +77,7 @@ exports.saveMeetingAssistantDraft=onCall({region:"us-central1",timeoutSeconds:30
  };
  await ref.set(data);
  await audit("MEETING_ASSISTANT_DRAFT_SAVED",ctx,ref.id,{recordType:type,contentHash:digest,sourceTranscriptHash:data.sourceTranscriptHash,requiresHumanReview:true});
- return {ok:true,recordId:ref.id,recordType:type,contentHash:digest,integrityStatus:data.integrityStatus,draftOnly:true,approvalStatus:data.approvalStatus,requiresHumanReview:true};
+ return {ok:true,recordId:ref.id,recordType:type,contentHash:digest,integrityStatus:data.integrityStatus,draftOnly:true,approvalStatus:data.approvalStatus,requiresHumanReview:true,driveArchive:data.driveArchive};
 });
 exports.listMeetingRecords=onCall({region:"us-central1",timeoutSeconds:30},async req=>{
  const meetingId=text(req.data?.meetingId),ctx=await context(req,meetingId);
