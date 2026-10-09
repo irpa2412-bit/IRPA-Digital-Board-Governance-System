@@ -14,8 +14,8 @@ fi
 if [[ "$LIVEKIT_DOMAIN" == "$LIVEKIT_TURN_DOMAIN" ]]; then
   echo "Use separate DNS names for the WebSocket endpoint and TURN/TLS." >&2; exit 2
 fi
-if [[ "$LIVEKIT_API_KEY" == "devkey" || "$LIVEKIT_API_SECRET" == "secret" || ${#LIVEKIT_API_SECRET} -lt 32 ]]; then
-  echo "Refusing default/weak LiveKit credentials; use a unique key and at least 32-character secret." >&2; exit 2
+if [[ ! "$LIVEKIT_API_KEY" =~ ^[A-Za-z0-9_-]{8,64}$ || ! "$LIVEKIT_API_SECRET" =~ ^[A-Za-z0-9_-]{32,128}$ || "$LIVEKIT_API_KEY" == "devkey" || "$LIVEKIT_API_SECRET" == "secret" ]]; then
+  echo "Refusing default, weak, or unsupported LiveKit credentials; use a unique key and 32-128 character base64url-style secret." >&2; exit 2
 fi
 if [[ $EUID -ne 0 ]]; then echo "Run this script as root (sudo)." >&2; exit 2; fi
 if ! command -v docker >/dev/null 2>&1; then
