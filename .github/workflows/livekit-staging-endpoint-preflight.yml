@@ -1,0 +1,23 @@
+name: LiveKit Staging Endpoint Preflight
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  endpoint-preflight:
+    runs-on: ubuntu-latest
+    environment: livekit-staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify protected staging endpoint and credentials
+        env:
+          LIVEKIT_STAGING_URL: ${{ vars.LIVEKIT_STAGING_URL }}
+          LIVEKIT_STAGING_API_KEY: ${{ secrets.LIVEKIT_STAGING_API_KEY }}
+          LIVEKIT_STAGING_API_SECRET: ${{ secrets.LIVEKIT_STAGING_API_SECRET }}
+        run: node scripts/check-livekit-staging-endpoint.mjs
