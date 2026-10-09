@@ -17,6 +17,7 @@ const checks=[
  ["Meeting media client exists",fs.existsSync("src/components/IRPADGBSMeetingRoomMedia.jsx")],
  ["LiveKit API key is bound through Firebase Secret Manager",liveMeeting.includes('defineSecret("LIVEKIT_API_KEY")')&&liveMeeting.includes('defineSecret("LIVEKIT_API_SECRET")')&&liveMeeting.includes("secrets: [LIVEKIT_API_KEY, LIVEKIT_API_SECRET]")],
  ["LiveKit tokens use bound secret values rather than unbound process environment",liveMeeting.includes("new AccessToken(liveKitApiKey, liveKitApiSecret")&&!liveMeeting.includes("new AccessToken(process.env.LIVEKIT_API_KEY")],
+ ["LiveKit connectivity preflight is wired into the Functions package",fs.existsSync("functions/scripts/check-livekit-connectivity.cjs")&&fs.readFileSync("functions/package.json","utf8").includes("check:livekit-connectivity")],
  ["Participant invitation creates a meeting access pass",participantPage.includes("createMeetingAccessInvitation")&&participantPage.includes("meetingAccess")],
  ["Meeting access pass is sent through the authenticated IRPA mail gateway",participantPage.includes("sendMemberInvitationEmail(payload.participantEmail,invitationId,payload.participantRole,payload.memberType,meetingAccess)")],
  ["Undelivered meeting access pass is revoked",participantPage.includes("revokeMeetingAccessInvitation")&&gateway.includes("exports.revokeMeetingAccessInvitation")],
