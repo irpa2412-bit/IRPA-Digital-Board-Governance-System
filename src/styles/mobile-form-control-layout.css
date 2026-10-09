@@ -1,0 +1,64 @@
+/* IRPA DBGS MOBILE FORM CONTROL LAYOUT — 2026-10-09
+   Presentation-only correction: viewport containment previously assigned
+   width:100% and large minimum heights to every input, including checkboxes
+   and radio controls. Restore compact native choice controls on phones.
+   No workflows, data, routing, permissions, or Firebase rules are changed. */
+
+@media screen and (max-width:760px){
+  .content-area .page input[type="checkbox"],
+  .content-area .page input[type="radio"],
+  .content-area .panel input[type="checkbox"],
+  .content-area .panel input[type="radio"],
+  .content-area .module-panel input[type="checkbox"],
+  .content-area .module-panel input[type="radio"]{
+    display:inline-block!important;
+    width:22px!important;
+    min-width:22px!important;
+    max-width:22px!important;
+    height:22px!important;
+    min-height:22px!important;
+    max-height:22px!important;
+    margin:0!important;
+    padding:0!important;
+    flex:0 0 22px!important;
+    vertical-align:middle!important;
+    accent-color:#0b5fa8!important;
+    box-sizing:border-box!important;
+  }
+
+  .content-area .page input[type="checkbox"] + label,
+  .content-area .page input[type="radio"] + label,
+  .content-area .panel input[type="checkbox"] + label,
+  .content-area .panel input[type="radio"] + label{
+    min-width:0!important;
+    width:auto!important;
+    max-width:100%!important;
+    overflow-wrap:break-word!important;
+    word-break:normal!important;
+    line-height:1.45!important;
+  }
+
+  .content-area .page label:has(> input[type="checkbox"]),
+  .content-area .page label:has(> input[type="radio"]),
+  .content-area .panel label:has(> input[type="checkbox"]),
+  .content-area .panel label:has(> input[type="radio"]){
+    display:flex!important;
+    align-items:center!important;
+    justify-content:flex-start!important;
+    gap:10px!important;
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+    white-space:normal!important;
+    overflow-wrap:break-word!important;
+    box-sizing:border-box!important;
+  }
+
+  .content-area .page input:not([type="checkbox"]):not([type="radio"]),
+  .content-area .panel input:not([type="checkbox"]):not([type="radio"]),
+  .content-area .module-panel input:not([type="checkbox"]):not([type="radio"]){
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+  }
+}
