@@ -10,6 +10,8 @@ on:
       - "src/pages/MeetingRoom.jsx"
       - "src/main.jsx"
       - "functions/liveMeeting.js"
+      - "infrastructure/livekit-staging/**"
+      - "scripts/check-livekit-endpoint.sh"
       - "functions/meetingGateway.js"
       - "functions/meetingRecords.js"
       - "src/firebase/meetingRecords.js"
@@ -36,6 +38,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check:meeting-media
+      - name: Check LiveKit endpoint preflight script syntax
+        run: bash -n scripts/check-livekit-endpoint.sh
       - run: npm run build
       - name: Upload verification report
         if: always()
