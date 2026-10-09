@@ -77,8 +77,12 @@ jobs:
           LIVEKIT_DOMAIN: ${{ secrets.LIVEKIT_STAGING_DOMAIN }}
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --max-time 15 "https://$LIVEKIT_DOMAIN/" -o /dev/null || {
-            echo "::error::The HTTPS endpoint did not return a successful HTTP response. Inspect Caddy TLS and DNS before proceeding."
+          status="$(curl --silent --show-error --max-time 15 -o /dev/null -w '%{http_code}' "https://$LIVEKIT_DOMAIN/")" || {
+            echo "::error::TLS or network connection to the LiveKit endpoint failed."
             exit 1
           }
+          case "$status" in
+            2*|3*|404) echo "TLS endpoint reachable (HTTP $status)." ;;
+            *) echo "::error::Unexpected endpoint response HTTP $status."; exit 1 ;;
+          esac
           echo "TLS/HTTPS endpoint responded. This does not yet prove LiveKit API authentication or WebRTC media."
