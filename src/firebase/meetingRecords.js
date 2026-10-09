@@ -11,3 +11,5 @@ export async function stopMeetingRecording(payload){const r=await call("stopMeet
 export async function getMeetingRecordingStatus(meetingId){const r=await call("getMeetingRecordingStatus")({meetingId});return r.data;}
 
 export async function compileAndEmailMeetingReport(payload){const r=await call("compileAndEmailMeetingReport")(payload);return r.data;}
+
+export async function saveLiveMeetingProceedings(payload){const r=await call("saveLiveMeetingProceedings")(payload);return r.data;}
