@@ -1,0 +1,84 @@
+name: Deploy IRPA Self-Hosted LiveKit Staging
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: irpa-livekit-staging-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy-media-server:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate deployment configuration
+        env:
+          SSH_HOST: ${{ secrets.LIVEKIT_STAGING_SSH_HOST }}
+          SSH_USER: ${{ secrets.LIVEKIT_STAGING_SSH_USER }}
+          SSH_PRIVATE_KEY: ${{ secrets.LIVEKIT_STAGING_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.LIVEKIT_STAGING_SSH_KNOWN_HOSTS }}
+          LIVEKIT_DOMAIN: ${{ secrets.LIVEKIT_STAGING_DOMAIN }}
+          LIVEKIT_TURN_DOMAIN: ${{ secrets.LIVEKIT_STAGING_TURN_DOMAIN }}
+          LIVEKIT_API_KEY: ${{ secrets.LIVEKIT_STAGING_API_KEY }}
+          LIVEKIT_API_SECRET: ${{ secrets.LIVEKIT_STAGING_API_SECRET }}
+          ACME_EMAIL: ${{ secrets.LIVEKIT_STAGING_ACME_EMAIL }}
+        run: |
+          set -euo pipefail
+          for name in SSH_HOST SSH_USER SSH_PRIVATE_KEY SSH_KNOWN_HOSTS LIVEKIT_DOMAIN LIVEKIT_TURN_DOMAIN LIVEKIT_API_KEY LIVEKIT_API_SECRET ACME_EMAIL; do
+            if [ -z "${!name:-}" ]; then echo "::error::Missing GitHub Actions secret required for ${name}"; exit 1; fi
+          done
+          if [ "$LIVEKIT_DOMAIN" = "$LIVEKIT_TURN_DOMAIN" ]; then echo "::error::Use separate LiveKit and TURN DNS names"; exit 1; fi
+          if [ "$LIVEKIT_API_KEY" = "devkey" ] || [ "$LIVEKIT_API_SECRET" = "secret" ] || [ "${#LIVEKIT_API_SECRET}" -lt 32 ]; then echo "::error::Refusing default or weak LiveKit credentials"; exit 1; fi
+
+      - name: Prepare pinned SSH connection
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.LIVEKIT_STAGING_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.LIVEKIT_STAGING_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -d -m 0700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 0600 ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 0600 ~/.ssh/known_hosts
+
+      - name: Transfer installer and protected deployment configuration
+        env:
+          SSH_HOST: ${{ secrets.LIVEKIT_STAGING_SSH_HOST }}
+          SSH_USER: ${{ secrets.LIVEKIT_STAGING_SSH_USER }}
+          LIVEKIT_DOMAIN: ${{ secrets.LIVEKIT_STAGING_DOMAIN }}
+          LIVEKIT_TURN_DOMAIN: ${{ secrets.LIVEKIT_STAGING_TURN_DOMAIN }}
+          LIVEKIT_API_KEY: ${{ secrets.LIVEKIT_STAGING_API_KEY }}
+          LIVEKIT_API_SECRET: ${{ secrets.LIVEKIT_STAGING_API_SECRET }}
+          ACME_EMAIL: ${{ secrets.LIVEKIT_STAGING_ACME_EMAIL }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os
+          keys = ["LIVEKIT_DOMAIN","LIVEKIT_TURN_DOMAIN","LIVEKIT_API_KEY","LIVEKIT_API_SECRET","ACME_EMAIL"]
+          with open("/tmp/irpa-livekit-staging-env.json","w",encoding="utf-8") as f:
+              json.dump({k:os.environ[k] for k in keys},f)
+          os.chmod("/tmp/irpa-livekit-staging-env.json",0o600)
+          PY
+          scp -i ~/.ssh/id_ed25519 infra/livekit/deploy-staging.sh infra/livekit/run-deploy-with-env.py "$SSH_USER@$SSH_HOST:/tmp/"
+          scp -i ~/.ssh/id_ed25519 /tmp/irpa-livekit-staging-env.json "$SSH_USER@$SSH_HOST:/tmp/irpa-livekit-staging-env.json"
+          rm -f /tmp/irpa-livekit-staging-env.json
+          ssh -i ~/.ssh/id_ed25519 "$SSH_USER@$SSH_HOST" 'chmod 600 /tmp/irpa-livekit-staging-env.json && sudo python3 /tmp/run-deploy-with-env.py /tmp/irpa-livekit-staging-env.json /tmp/deploy-staging.sh; result=$?; sudo rm -f /tmp/run-deploy-with-env.py /tmp/deploy-staging.sh; exit $result'
+
+      - name: Verify TLS endpoint is reachable
+        env:
+          LIVEKIT_DOMAIN: ${{ secrets.LIVEKIT_STAGING_DOMAIN }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --max-time 15 "https://$LIVEKIT_DOMAIN/" -o /dev/null || {
+            echo "::error::The HTTPS endpoint did not return a successful HTTP response. Inspect Caddy TLS and DNS before proceeding."
+            exit 1
+          }
+          echo "TLS/HTTPS endpoint responded. This does not yet prove LiveKit API authentication or WebRTC media."
