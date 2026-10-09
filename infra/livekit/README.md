@@ -54,3 +54,32 @@ The `issueLiveMeetingToken` callable reads `LIVEKIT_URL`, `LIVEKIT_API_KEY`, and
 ## Important limitations
 
 The deployment script creates a **single-node staging pilot**, not a high-availability production cluster. It does not create a VM, reserve a public IP, control DNS, modify cloud security groups, or create Firebase/GitHub secrets. Those require authorized infrastructure account access. A running container or successful API health check is not proof of a successful end-to-end WebRTC call. TURN/TLS on TCP 5349 must be tested from actual client networks; if the chosen network requires TURN/TLS on 443, use the official LiveKit VM generator/load-balancer topology rather than treating 5349 as sufficient.
+
+
+## GitHub Actions setup for staged deployment
+
+Configure these **repository Actions secrets** in GitHub before running the manual workflows:
+
+**Media VM deployment** (`Deploy IRPA Self-Hosted LiveKit Staging`):
+- `LIVEKIT_STAGING_SSH_HOST`
+- `LIVEKIT_STAGING_SSH_USER`
+- `LIVEKIT_STAGING_SSH_PRIVATE_KEY`
+- `LIVEKIT_STAGING_SSH_KNOWN_HOSTS` — pre-verified host key; do not disable host-key checking.
+- `LIVEKIT_STAGING_DOMAIN`
+- `LIVEKIT_STAGING_TURN_DOMAIN`
+- `LIVEKIT_STAGING_API_KEY`
+- `LIVEKIT_STAGING_API_SECRET`
+- `LIVEKIT_STAGING_ACME_EMAIL`
+
+**Firebase callable deployment** (`Deploy IRPA LiveKit Staging Function`):
+- `LIVEKIT_STAGING_FIREBASE_PROJECT_ID` — a dedicated non-production Firebase project.
+- `LIVEKIT_STAGING_FIREBASE_SERVICE_ACCOUNT` — JSON service account with permission to enable required APIs, manage Secret Manager versions, and deploy Cloud Functions in that staging project.
+- `LIVEKIT_STAGING_URL` — the deployed endpoint in `wss://` form. It should match the VM deployment's primary domain.
+- The same `LIVEKIT_STAGING_API_KEY` and `LIVEKIT_STAGING_API_SECRET` as the VM deployment.
+
+**Verification** (`Verify IRPA LiveKit Staging Control Plane`):
+- `LIVEKIT_STAGING_URL`
+- `LIVEKIT_STAGING_API_KEY`
+- `LIVEKIT_STAGING_API_SECRET`
+
+Run in this order: deploy media VM; verify TLS/network; deploy the callable to the staging Firebase project; run control-plane verification; then complete the real two-browser WebRTC acceptance test. These workflows are manual and are not triggered by merging this PR. A GitHub workflow cannot proceed successfully until all secrets and the dedicated host/project exist.
