@@ -41,7 +41,7 @@ Install the Functions dependencies, then run the authenticated LiveKit API conne
 
 ```sh
 cd functions
-npm ci
+npm install
 LIVEKIT_URL='wss://meet.<your-controlled-domain>' npm run check:livekit-connectivity
 ```
 
