@@ -2,6 +2,7 @@ import React,{useEffect,useMemo,useRef,useState}from"react";
 import{getCurrentEmployeeProfile,getCurrentMemberProfile,getCurrentSigningAuthorityRegisterEntries,getControlledDocumentsForSigning,getRecords}from"../firebase/data";
 import{downloadDriveBytes}from"../firebase/signatureStorage";
 import{auth}from"../firebase/config";
+import{getFunctions,httpsCallable}from"firebase/functions";
 import{getMySignerIdentity}from"../firebase/signerIdentity";
 import{createCompletionCertificate,createSignatureEnvelope,getMySignatureProfile,getSignatureEnvelope,getSignatureEnvelopes,getMySignedDocuments,saveMySignatureProfile,signEnvelope,saveSignatureWorkflowDraft,finalizeSignatureWorkflowDraft,startSignatureWorkflow,verifyManualSigningAuthority,revokeSignatureApplication,migrateExistingSignatureProfile}from"../firebase/signaturePlatform";
 import{updateMySignerAuthority}from"../firebase/signerIdentity";
@@ -309,11 +310,13 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
       // than board members, so the selector must consider both registers.
       // Preserve the current access model: a failed/protected query is not
       // treated as evidence that no officers exist.
-      const [memberRows,employeeRows]=await Promise.all([
-        getRecords("members").catch(error=>{console.warn("Signature member register unavailable:",error);return null}),
+      const [boardDirectory,employeeRows]=await Promise.all([
+        httpsCallable(getFunctions(undefined,"us-central1"),"getSignatureBoardMemberDirectory")({})
+          .then(result=>Array.isArray(result.data?.members)?result.data.members:[])
+          .catch(error=>{console.error("Signature Board Members register directory unavailable:",error);setMessage("The Board Members' Register could not be loaded for signature assignment. Please check your registered access and retry.");return []}),
         getRecords("employees").catch(error=>{console.warn("Signature employee register unavailable:",error);return null})
       ]);
-      const candidates=[...(Array.isArray(memberRows)?memberRows:[]),...(Array.isArray(employeeRows)?employeeRows:[])];
+      const candidates=[...(Array.isArray(boardDirectory)?boardDirectory:[]),...(Array.isArray(employeeRows)?employeeRows:[])];
       const activeCandidates=candidates.filter(x=>{
         const status=String(x.status||x.employmentStatus||x.registrationStatus||"").trim().toLowerCase();
         const active=["active","activated","current"].includes(status)||x.active===true||x.accountActivated===true;
