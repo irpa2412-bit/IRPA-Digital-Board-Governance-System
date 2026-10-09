@@ -13,6 +13,10 @@ const entryGateway=fs.readFileSync("src/pages/MeetingEntryGateway.jsx","utf8");
 const invitationEmail=fs.readFileSync("drive-gateway/src/invitationEmail.mjs","utf8");
 const invitationWorker=fs.readFileSync("drive-gateway/src/index.js","utf8");
 const roomSource=fs.readFileSync("src/pages/MeetingRoom.jsx","utf8");
+const livekitCompose=fs.readFileSync("infra/livekit/docker-compose.yml","utf8");
+const livekitConfig=fs.readFileSync("infra/livekit/livekit.yaml.template","utf8");
+const livekitCaddy=fs.readFileSync("infra/livekit/caddy.yaml.template","utf8");
+const livekitDeploy=fs.readFileSync("infra/livekit/deploy-staging.sh","utf8");
 const checks=[
  ["Meeting media client exists",fs.existsSync("src/components/IRPADGBSMeetingRoomMedia.jsx")],
  ["Participant invitation creates a meeting access pass",participantPage.includes("createMeetingAccessInvitation")&&participantPage.includes("meetingAccess")],
@@ -39,6 +43,11 @@ const checks=[
  ["Authenticated entry callable",gateway.includes("exports.authorizeMeetingEntry")],
  ["Participant-specific token issuance",gateway.includes("createMeetingAccessInvitation")],
  ["LiveKit server token issuance",fs.readFileSync("functions/liveMeeting.js","utf8").includes("exports.issueLiveMeetingToken")],
+ ["Staging uses the official LiveKit Caddy L4 image",livekitCompose.includes("livekit/caddyl4:v2.11.4")&&livekitCompose.includes("livekit/livekit-server:v1.13.7")],
+ ["Caddy SNI routes the TURN and meeting hosts on TLS 443",livekitCaddy.includes("${LIVEKIT_TURN_DOMAIN}")&&livekitCaddy.includes("${LIVEKIT_DOMAIN}")&&livekitCaddy.includes('listen: [":443"]')&&livekitCaddy.includes("127.0.0.1:5349")&&livekitCaddy.includes("127.0.0.1:7880")],
+ ["TURN TLS is externally terminated by the Caddy L4 router",livekitConfig.includes("external_tls: true")&&livekitConfig.includes("tls_port: 5349")],
+ ["Staging installer validates DNS before starting services",livekitDeploy.includes("getent ahostsv4")&&livekitDeploy.includes("does not include this VM")],
+ ["Staging installer does not use a conflicting standalone certbot listener",!livekitDeploy.includes("certbot certonly")&&!livekitDeploy.includes("apt-get install -y certbot")],
  ["Long-session reconnection handling",media.includes("RoomEvent.Reconnecting")&&media.includes("RoomEvent.Reconnected")],
  ["Audio quality capture controls",media.includes("echoCancellation:true")&&media.includes("noiseSuppression:true")&&media.includes("autoGainControl:true")],
  ["HD video capture target",media.includes("1280,height:720")],
