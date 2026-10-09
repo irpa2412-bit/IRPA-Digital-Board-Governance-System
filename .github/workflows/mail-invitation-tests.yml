@@ -21,6 +21,9 @@ jobs:
       - name: Install gateway dependencies
         working-directory: drive-gateway
         run: npm ci
+      - name: Validate Cloudflare gateway syntax
+        working-directory: drive-gateway
+        run: node --check src/index.js
       - name: Run mocked SMTP invitation tests
         working-directory: drive-gateway
         run: node tests/mail-invitation.unit.mjs
