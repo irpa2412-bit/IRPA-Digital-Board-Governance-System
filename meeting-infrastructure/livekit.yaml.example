@@ -10,9 +10,9 @@ turn:
   enabled: true
   udp_port: 3478
   tls_port: 5349
-  domain: turn.meet.irpa.or.tz
-  cert_file: /etc/letsencrypt/live/turn.meet.irpa.or.tz/fullchain.pem
-  key_file: /etc/letsencrypt/live/turn.meet.irpa.or.tz/privkey.pem
+  domain: turn.irpa.or.tz
+  cert_file: /etc/letsencrypt/live/turn.irpa.or.tz/fullchain.pem
+  key_file: /etc/letsencrypt/live/turn.irpa.or.tz/privkey.pem
 
 redis:
   address: redis:6379
