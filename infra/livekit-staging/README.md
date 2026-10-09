@@ -52,8 +52,8 @@ Before issuing a certificate:
 3. Render the server configuration: `./render-config.sh`.
 4. Review `runtime/livekit.yaml` locally, then start: `docker compose up -d`.
 5. Inspect logs and host listeners. Confirm LiveKit is healthy and TURN is bound on the expected ports.
-6. Configure the staging Firebase Functions environment with `LIVEKIT_URL=wss://meet.irpa.or.tz`, `LIVEKIT_API_KEY`, and `LIVEKIT_API_SECRET` using the approved secret-management process. Never place the secret in Vite/client environment variables.
-7. Deploy only the staging Functions project and staging app. Do not use the production Firebase project or production Firestore.
+6. Check signaling locally with `curl -i http://127.0.0.1:7880/` and inspect LiveKit logs; do not rely on a container health label as the acceptance signal.\n7. Configure the staging Firebase Functions environment with `LIVEKIT_URL=wss://meet.irpa.or.tz`, `LIVEKIT_API_KEY`, and `LIVEKIT_API_SECRET` using the approved secret-management process. Never place the secret in Vite/client environment variables.
+8. Deploy only the staging Functions project and staging app. Do not use the production Firebase project or production Firestore.
 
 ## Acceptance gates — all must pass
 
