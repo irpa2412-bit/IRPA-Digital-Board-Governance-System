@@ -19,11 +19,27 @@ import { sendInvitationEmail, buildInvitationMessage, validateRecipient } from "
 import { route as esignRoute } from "./router.mjs";
 import { buildEsignContext, EsignRecordDurableObject } from "./esignContext.mjs";
 import { runCleanup } from "./upload.mjs";
+import { createDocumentLifecycleRouter } from "./documentLifecycle.mjs";
 import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPasswordSetup, getInvitationSessionState } from "./invitationRedemption.mjs";
 import { buildGoogleDriveAuthorizationParams } from "./googleDriveOAuth.mjs";
 
 let jwksCache = null;
 let jwksFetchedAt = 0;
+
+const documentLifecycleRouter = createDocumentLifecycleRouter({
+  FIREBASE_PROJECT_ID,
+  allowedContentTypes: ALLOWED_CONTENT_TYPES,
+  authenticateFirebaseRequest,
+  getFirestoreDocument,
+  getDriveAccessToken,
+  driveFetch,
+  findOrCreateFolder,
+  updateFirestoreDocument,
+  firestoreDocumentToPlain,
+  commitDocumentAndAudit: commitFirestoreDocumentAndAudit,
+  json,
+  corsHeaders
+});
 
 export default {
   async fetch(request, env) {
@@ -59,6 +75,11 @@ export default {
 
       // Normalize trailing slashes so portal upload/archive actions cannot be blocked by URL formatting.
       const pathname = url.pathname.replace(/\/+$/, "") || "/";
+
+      if (pathname.startsWith("/api/document-lifecycle/")) {
+        const lifecycleResponse = await documentLifecycleRouter(request, env);
+        if (lifecycleResponse) return lifecycleResponse;
+      }
 
       if (pathname === "/api/upload" && request.method === "POST") {
         return await upload(request, env);
@@ -1733,6 +1754,27 @@ async function getInstitutionalProfileForUser(env, claims) {
     memberRecord: memberMatches[0] || null,
     employeeRecord: employeeMatches[0] || null
   };
+}
+
+async function commitFirestoreDocumentAndAudit(env, documentId, firebaseToken, documentFields, documentMask, auditFields, {createOnly=false}={}) {
+  const base=`projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents`;
+  const auditId=`${documentId}-${Date.now()}-${crypto.randomUUID().slice(0,8)}`;
+  const documentWrite={
+    update:{name:`${base}/documents/${documentId}`,fields:documentFields},
+    updateMask:{fieldPaths:documentMask}
+  };
+  if(createOnly)documentWrite.currentDocument={exists:false};
+  const writes=[
+    documentWrite,
+    {update:{name:`${base}/audit/${auditId}`,fields:auditFields},currentDocument:{exists:false}}
+  ];
+  const response=await fetch(`https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:commit`,{
+    method:"POST",
+    headers:{"Authorization":`Bearer ${firebaseToken}`,"Content-Type":"application/json"},
+    body:JSON.stringify({writes})
+  });
+  if(!response.ok)throw new Error(`Unable to atomically commit the document and its audit event (HTTP ${response.status}).`);
+  return response.json();
 }
 
 async function updateFirestoreDocument(env, path, firebaseToken, fields, updateMask) {
