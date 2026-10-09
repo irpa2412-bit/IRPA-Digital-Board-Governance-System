@@ -272,7 +272,7 @@ export async function getMeetingCategoryArchive({ meetingCategory, meetingId } =
 
 export async function uploadMeetingProductToDrive({
   meetingCategory, meetingId, meetingReference = "", recordId = "", recordType = "OTHER",
-  title = "", fileName = "", content, contentType = "text/plain; charset=utf-8", ownerUid = null
+  title = "", fileName = "", content, contentType = "text/plain", ownerUid = null
 } = {}) {
   if (!meetingId) throw new Error("A meeting ID is required to archive a meeting product.");
   if (content == null) throw new Error("Meeting product content is required.");
@@ -283,6 +283,8 @@ export async function uploadMeetingProductToDrive({
       ? new Uint8Array(await content.arrayBuffer())
       : new TextEncoder().encode(String(content));
   if (!bytes.length) throw new Error("The meeting product is empty.");
+  if (bytes.length > 60 * 1024 * 1024) throw new Error("Meeting products must not exceed 60 MB per file in this upload workflow.");
+  const resolvedContentType = String(contentType || "application/octet-stream").split(";")[0].trim().toLowerCase();
   let binary = "";
   const chunkSize = 0x8000;
   for (let i = 0; i < bytes.length; i += chunkSize) {
@@ -298,7 +300,7 @@ export async function uploadMeetingProductToDrive({
   const uploaded = await gatewayPost("/api/upload", {
     path,
     fileName: finalName,
-    contentType,
+    contentType: resolvedContentType,
     fileSize: bytes.length,
     base64: btoa(binary),
     purpose: "Meeting Products",
@@ -327,7 +329,7 @@ export async function uploadMeetingProductToDrive({
     folderUrl: archive.folderUrl,
     archivePath: archive.archivePath,
     storagePath: path,
-    contentType,
+    contentType: resolvedContentType,
     fileSize: bytes.length,
     archivedAt: new Date().toISOString()
   };
