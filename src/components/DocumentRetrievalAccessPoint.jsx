@@ -52,19 +52,19 @@ export default function DocumentRetrievalAccessPoint(){
     await refresh();
   }
 
-  async function retrieve(document){
+  async function retrieve(record){
     setBusy(true);setError("");setMessage("");
     try{
-      if(!document?.documentId||!document?.fileId)throw new Error("The archive record is missing its registered document or file identifier.");
-      const result=await downloadLifecycleDocument(document.documentId,document.fileId);
+      if(!record?.documentId||!record?.fileId)throw new Error("The archive record is missing its registered document or file identifier.");
+      const result=await downloadLifecycleDocument(record.documentId,record.fileId);
       if(!result?.bytes?.length)throw new Error("The authorized archive returned no document content.");
       const blob=new Blob([result.bytes],{type:result.contentType||"application/octet-stream"});
       const url=URL.createObjectURL(blob);
-      const link=document.createElement("a");
+      const link=window.document.createElement("a");
       link.href=url;
       link.download=result.fileName||document.fileName||document.title||"IRPA-archived-document";
       link.style.display="none";
-      document.body.appendChild(link);
+      window.document.body.appendChild(link);
       link.click();
       link.remove();
       window.setTimeout(()=>URL.revokeObjectURL(url),1500);
@@ -107,7 +107,7 @@ export default function DocumentRetrievalAccessPoint(){
         </div>
         {confirmActual&&<div style={{marginTop:12}}>
           <label style={{display:"flex",alignItems:"flex-start",gap:9,lineHeight:1.5}}>
-            <input type="checkbox" checked={false} onChange={()=>selectEnvironment("ACTUAL")} disabled={busy}/>
+            <input type="checkbox" checked={confirmActual} onChange={e=>setConfirmActual(e.target.checked)} disabled={busy}/>
             <span>I understand that this retrieves actual IRPA institutional records, subject to my registered access authority.</span>
           </label>
           <button type="button" onClick={()=>selectEnvironment("ACTUAL")} disabled={busy} style={{marginTop:10}}>Confirm Actual Records</button>
