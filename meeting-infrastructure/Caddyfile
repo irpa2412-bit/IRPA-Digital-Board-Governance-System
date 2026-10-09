@@ -1,0 +1,23 @@
+{
+  email {$ACME_EMAIL}
+}
+
+meet.irpa.or.tz {
+  handle /.well-known/acme-challenge/* {
+    root * /var/www/certbot
+    file_server
+  }
+  handle {
+    reverse_proxy livekit:7880
+  }
+}
+
+turn.irpa.or.tz {
+  handle /.well-known/acme-challenge/* {
+    root * /var/www/certbot
+    file_server
+  }
+  handle {
+    respond "IRPA TURN/TLS service. WebSocket/API traffic belongs on meet.irpa.or.tz." 404
+  }
+}
