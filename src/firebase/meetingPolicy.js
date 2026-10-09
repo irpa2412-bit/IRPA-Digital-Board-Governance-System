@@ -7,7 +7,7 @@ export const MEETING_CATEGORIES={
 };
 
 
-const NORMALIZE_ROLE=value=>String(value||"").trim().toLowerCase().replace(/[._-]+/g," ").replace(/\\s+/g," ");
+const NORMALIZE_ROLE=value=>String(value||"").trim().toLowerCase().replace(/[._-]+/g," ").replace(/\s+/g," ");
 export const MEETING_REGISTRATION_ROLES=[
   "Executive Director","Director Internal Oversight","Director Finance & Administration",
   "Director Human Resources","HR Director","Operations Manager","Departmental Director",
