@@ -162,7 +162,6 @@ service cloud.firestore {
   function documentLifecycleCreateAllowed(){
     let d=request.resource.data;
     return documentLifecycleIdentity()&&
-      d.get("documentId","")==id&&
       d.get("ownerUid","")==request.auth.uid&&d.get("uploadedByUid","")==request.auth.uid&&
       d.get("ownerType","") in ["ADMINISTRATOR","EMPLOYEE","MEMBER"]&&
       d.get("status","")=="WORKING"&&d.get("authorizationStatus","")=="AUTHORIZED"&&
@@ -184,9 +183,9 @@ service cloud.firestore {
       (d.get("archiveCategory","")=="Governance Documents"&&anyInstitutionalRole(["Executive Director","Board Secretary","Board Chairperson","Board Vice Chairperson","Director Internal Oversight","Internal Oversight Director"]))||
       (d.get("archiveCategory","")=="Administrator Documents"&&admin());
   }
-  function documentLifecycleValidTransition(){
+  function documentLifecycleValidTransition(documentId){
     return (resource.data.get("status","")=="WORKING"&&request.resource.data.get("status","")=="PENDING_SIGNATURE")||
-      (resource.data.get("status","")=="PENDING_SIGNATURE"&&request.resource.data.get("status","")=="SIGNED"&&request.resource.data.get("signatureEnvelopeId","") is string&&exists(/databases/$(database)/documents/signatureEnvelopes/$(request.resource.data.get("signatureEnvelopeId","")))&&get(/databases/$(database)/documents/signatureEnvelopes/$(request.resource.data.get("signatureEnvelopeId",""))).data.get("status","")=="Completed"&&get(/databases/$(database)/documents/signatureEnvelopes/$(request.resource.data.get("signatureEnvelopeId",""))).data.get("documentId","")==id&&request.resource.data.get("signatureStatus","")=="COMPLETED")||
+      (resource.data.get("status","")=="PENDING_SIGNATURE"&&request.resource.data.get("status","")=="SIGNED"&&request.resource.data.get("signatureEnvelopeId","") is string&&exists(/databases/$(database)/documents/signatureEnvelopes/$(request.resource.data.get("signatureEnvelopeId","")))&&get(/databases/$(database)/documents/signatureEnvelopes/$(request.resource.data.get("signatureEnvelopeId",""))).data.get("status","")=="Completed"&&get(/databases/$(database)/documents/signatureEnvelopes/$(request.resource.data.get("signatureEnvelopeId",""))).data.get("documentId","")==documentId&&request.resource.data.get("signatureStatus","")=="COMPLETED")||
       (resource.data.get("status","")=="SIGNED"&&request.resource.data.get("status","")=="POST_SIGNATURE")||
       (resource.data.get("status","")=="POST_SIGNATURE"&&request.resource.data.get("status","")=="FINAL_ARCHIVE");
   }
@@ -207,7 +206,7 @@ service cloud.firestore {
           request.resource.data.get("authorizedUids",[]).hasAll([resource.data.get("ownerUid","")]))||
         (documentLifecycleWorkflowAuthority(resource.data)&&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","updatedAt","signatureStatus","signatureRequestedAt","signatureRequestedByUid","signedAt","signedByUid","signatureEnvelopeId","signedDocumentUrl","signedSourceFileId","postSignatureStatus","postSignatureStartedAt","postSignatureStartedByUid","finalArchiveStatus","finalArchivedAt","finalArchivedByUid","channelStatus","channelledAt","channelledByUid","channelDestination","archiveFolderId","archiveUidLink","archiveFileWebViewLink","webViewLink","fileUrl","archivePath","signedArchiveFileId","finalArchiveFileId"])&&
-          documentLifecycleValidTransition())
+          documentLifecycleValidTransition(id))
       );
   }
   match /documents/{id}{allow read:if admin()||controlledDocumentReadAllowed();allow create:if admin()||controlledDocumentCreateAllowed()||documentLifecycleCreateAllowed();allow delete:if admin();allow update:if admin()||signatureDocumentWorkflowUpdate()||documentLifecycleUpdateAllowed();}
