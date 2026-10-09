@@ -21,11 +21,12 @@ if [[ "${#LIVEKIT_API_SECRET}" -lt 32 ]]; then
 fi
 mkdir -p runtime
 python3 - <<'PY'
+import json
 import os
 from pathlib import Path
 template = Path("livekit.yaml.tmpl").read_text()
-for key in ("LIVEKIT_API_KEY", "LIVEKIT_API_SECRET"):
-    template = template.replace("${" + key + "}", os.environ[key])
+template = template.replace("__LIVEKIT_API_KEY_YAML__", json.dumps(os.environ["LIVEKIT_API_KEY"]))
+template = template.replace("__LIVEKIT_API_SECRET_YAML__", json.dumps(os.environ["LIVEKIT_API_SECRET"]))
 Path("runtime/livekit.yaml").write_text(template)
 Path("runtime/livekit.yaml").chmod(0o600)
 PY
