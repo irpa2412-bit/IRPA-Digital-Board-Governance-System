@@ -18,7 +18,7 @@ jobs:
           cache: npm
           cache-dependency-path: functions/package-lock.json
       - name: Install server SDK
-        run: npm --prefix functions ci --omit=dev
+        run: npm --prefix functions install --omit=dev
       - name: Verify secure endpoint and API credentials
         env:
           LIVEKIT_URL: ${{ secrets.LIVEKIT_STAGING_URL }}
