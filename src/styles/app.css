@@ -4469,3 +4469,51 @@
     line-height:1.2;
   }
 }
+
+
+/* PORTAL DOCUMENT UPLOAD TRIGGER — keep the entry action visibly interactive. */
+.portal-document-access-point {
+  position: relative;
+  pointer-events: auto;
+  scroll-margin-top: 220px;
+}
+.portal-document-access-point-header {
+  position: relative;
+  pointer-events: auto;
+}
+.portal-document-access-point-trigger {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  padding: 10px 16px;
+  border: 1px solid #2f86cf;
+  border-radius: 9px;
+  background: #0b5fa8;
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+  pointer-events: auto !important;
+  touch-action: manipulation;
+}
+.portal-document-access-point-trigger:hover:not(:disabled) {
+  background: #0d6fbd;
+}
+.portal-document-access-point-trigger:focus-visible {
+  outline: 3px solid rgba(47, 134, 207, .4);
+  outline-offset: 3px;
+}
+.portal-document-access-point-form {
+  position: relative;
+  pointer-events: auto;
+  scroll-margin-top: 220px;
+}
+@media (max-width: 760px) {
+  .portal-document-access-point-trigger {
+    width: 100%;
+    min-height: 48px;
+    white-space: normal;
+  }
+}
