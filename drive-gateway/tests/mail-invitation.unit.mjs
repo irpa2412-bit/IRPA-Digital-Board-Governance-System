@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { handleSendInvitationEmail } from "../src/invitationEmail.mjs";
+import { handleSendInvitationEmail, buildInvitationMessage } from "../src/invitationEmail.mjs";
 import { queueInductionEmail } from "../../functions/queueInductionEmail.mjs";
 
 const quiet = { error() {}, log() {} };
@@ -24,6 +24,26 @@ function req(body, key = "test-key") {
   });
 }
 const good = { to:"a@example.org", name:"Amina", link:"https://app.example.test/?invite=abc" };
+
+test("meeting-linked invitation includes the access link and gate password without affecting normal invitations", () => {
+  const message=buildInvitationMessage({
+    name:"Amina",
+    link:"https://app.example.test/?invitationToken=invite-secret",
+    meetingAccess:{
+      link:"https://app.example.test/?meetingToken=opaque-token&meetingId=MEET-1",
+      meetingReference:"IRPA Board Meeting",
+      password:"AB12CD34EF56",
+      expiresAt:"2026-10-30T10:00:00.000Z"
+    }
+  });
+  assert.match(message.subject,/meeting access/i);
+  assert.match(message.text,/meetingToken=opaque-token/);
+  assert.match(message.text,/AB12CD34EF56/);
+  assert.match(message.html,/Open IRPA Meeting/);
+  assert.match(message.html,/AB12CD34EF56/);
+  const ordinary=buildInvitationMessage({name:"Amina",link:"https://app.example.test/?invitationToken=invite-secret"});
+  assert.doesNotMatch(ordinary.text,/Meeting gate password/);
+});
 
 test("rejects missing or wrong service key", async () => {
   const smtpSend=async()=>({});

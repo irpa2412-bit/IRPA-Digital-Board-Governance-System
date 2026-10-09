@@ -1,0 +1,51 @@
+name: Meeting Media Governance Verification
+
+on:
+  pull_request:
+    branches: [main, integration/collective-portals-20261009]
+    paths:
+      - "src/components/IRPADGBSMeetingRoomMedia.jsx"
+      - "src/components/MeetingAccessControl.jsx"
+      - "src/pages/MeetingEntryGateway.jsx"
+      - "src/pages/MeetingRoom.jsx"
+      - "src/main.jsx"
+      - "functions/liveMeeting.js"
+      - "functions/meetingGateway.js"
+      - "functions/meetingRecords.js"
+      - "src/firebase/meetingRecords.js"
+      - "src/firebase/meetingPolicy.js"
+      - "src/pages/Meetings.jsx"
+      - "functions/bootstrap.js"
+      - "package.json"
+      - "package-lock.json"
+      - "scripts/check-meeting-media-governance.mjs"
+      - "infra/livekit/**"
+      - ".github/workflows/meeting-media-governance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  meeting-media-governance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check:meeting-media
+      - name: Validate LiveKit staging installer syntax
+        run: bash -n infra/livekit/deploy-staging.sh infra/livekit/preflight.sh
+      - run: npm run build
+      - name: Upload verification report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: meeting-media-governance-verification
+          path: |
+            reports/meeting-media-governance-verification.md
+            reports/meeting-media-governance-verification.json
+          if-no-files-found: ignore

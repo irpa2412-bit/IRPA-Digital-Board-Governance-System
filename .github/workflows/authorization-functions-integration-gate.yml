@@ -5,7 +5,7 @@ on:
   push:
     branches: [feature/authorization-functions-integration-gate]
   pull_request:
-    branches: [main]
+    branches: [main, integration/collective-portals-20261009]
 
 jobs:
   integration-gate:
@@ -25,6 +25,8 @@ jobs:
           node --check functions/authorizationPolicy.js
           node --check functions/authorizationService.js
           node --check functions/authorizationFunctions.js
+          node --check functions/meetingGateway.js
+          node --check functions/liveMeeting.js
       - name: Verify Authorization exports through package entrypoint
         working-directory: functions
         run: |

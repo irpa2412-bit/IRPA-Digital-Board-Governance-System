@@ -1,9 +1,15 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { AccessToken } = require("livekit-server-sdk");
+const { defineSecret } = require("firebase-functions/params");
 const crypto = require("crypto");
 
 const db = getFirestore();
+
+// Keep media credentials in Google Secret Manager; never bake them into source or browser bundles.
+const LIVEKIT_URL = defineSecret("LIVEKIT_URL");
+const LIVEKIT_API_KEY = defineSecret("LIVEKIT_API_KEY");
+const LIVEKIT_API_SECRET = defineSecret("LIVEKIT_API_SECRET");
 
 function text(value) {
   return String(value ?? "").trim();
@@ -64,7 +70,18 @@ function opaqueRoomName(meetingId, sessionId) {
 }
 
 function liveKitConfigured() {
-  return Boolean(text(process.env.LIVEKIT_URL) && text(process.env.LIVEKIT_API_KEY) && text(process.env.LIVEKIT_API_SECRET));
+  return Boolean(text(LIVEKIT_URL.value()) && text(LIVEKIT_API_KEY.value()) && text(LIVEKIT_API_SECRET.value()));
+}
+
+function moderatorForMeeting(meeting = {}, uid, email, selectedAuthority) {
+  const actorEmail = text(email).toLowerCase();
+  const authority = text(selectedAuthority).toLowerCase();
+  if (meeting.chairpersonUid && text(meeting.chairpersonUid) === uid) return true;
+  if (meeting.secretaryUid && text(meeting.secretaryUid) === uid) return true;
+  if (text(meeting.chairpersonEmail).toLowerCase() === actorEmail && actorEmail) return true;
+  if (text(meeting.secretaryEmail).toLowerCase() === actorEmail && actorEmail) return true;
+  return ["board chairperson","board secretary","chairperson","meeting chair","meeting secretary","secretary"]
+    .includes(authority);
 }
 
 /**
@@ -81,7 +98,8 @@ function liveKitConfigured() {
 exports.issueLiveMeetingToken = onCall({
   region: "us-central1",
   timeoutSeconds: 30,
-  enforceAppCheck: false
+  enforceAppCheck: false,
+  secrets: [LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET]
 }, async request => {
   const uid = request.auth?.uid;
   const email = text(request.auth?.token?.email).toLowerCase();
@@ -110,24 +128,63 @@ exports.issueLiveMeetingToken = onCall({
   if (memberSnap.exists) records.push(memberSnap.data() || {});
   if (employeeSnap.exists) records.push(employeeSnap.data() || {});
 
-  const isAdmin = request.auth?.token?.admin === true || email === "irpa2412@gmail.com";
-  const activeIdentity = isAdmin || records.some(activeRecord);
-  if (!activeIdentity) throw new HttpsError("permission-denied", "An active IRPA member or employee identity is required.");
+  // When a participant arrives through the Invitation Portal gate, validate
+  // the server-side participant record again before issuing a media token.
+  // The browser-provided ID is only a lookup key; meeting and identity binding
+  // are re-verified here and never trusted from client state alone.
+  const participantId = text(request.data?.participantId);
+  let invitedParticipant = null;
+  if (participantId) {
+    const participantSnap = await db.collection("participants").doc(participantId).get();
+    if (!participantSnap.exists) {
+      throw new HttpsError("permission-denied", "The invitation participant record could not be verified.");
+    }
+    const candidate = { id: participantSnap.id, ...participantSnap.data() };
+    if (text(candidate.meetingId) !== meetingId) {
+      throw new HttpsError("permission-denied", "The invited participant is not linked to this meeting.");
+    }
+    const boundUid = text(candidate.participantUid || candidate.uid || candidate.userId);
+    const boundEmail = text(candidate.participantEmail || candidate.email).toLowerCase();
+    if ((boundUid && boundUid !== uid) || (boundEmail && boundEmail !== email) || (!boundUid && !boundEmail)) {
+      throw new HttpsError("permission-denied", "The invitation participant identity does not match the signed-in account.");
+    }
+    const participantStatus = text(candidate.status).toLowerCase();
+    if (["cancelled", "canceled", "revoked", "removed", "inactive", "closed"].includes(participantStatus)) {
+      throw new HttpsError("permission-denied", "This meeting participant invitation is no longer active.");
+    }
+    invitedParticipant = candidate;
+  }
 
-  const listed = participantListed(meeting, uid);
+  const isAdmin = request.auth?.token?.admin === true || email === "irpa2412@gmail.com";
+  const activeIdentity = isAdmin || records.some(activeRecord) || Boolean(invitedParticipant);
+  if (!activeIdentity) throw new HttpsError("permission-denied", "An active IRPA member, employee, or verified meeting invitee identity is required.");
+
+  const listed = Boolean(invitedParticipant) || participantListed(meeting, uid);
   if (!isAdmin && !listed) {
     throw new HttpsError("permission-denied", "This account is not registered as a participant in the selected meeting.");
   }
 
-  if (!isAdmin && selectedAuthority && !records.some(record => selectedAuthorityMatches(record, selectedAuthority))) {
+  const invitedRoles = invitedParticipant
+    ? [
+        invitedParticipant.role,
+        invitedParticipant.participantRole,
+        invitedParticipant.authority,
+        ...(Array.isArray(invitedParticipant.roles) ? invitedParticipant.roles : [])
+      ].map(value => text(value)).filter(Boolean)
+    : [];
+  const authorityMatches = records.some(record => selectedAuthorityMatches(record, selectedAuthority)) || invitedRoles.includes(selectedAuthority);
+  if (!isAdmin && selectedAuthority && !authorityMatches) {
     throw new HttpsError("permission-denied", "The selected access authority is not registered to this account.");
   }
 
   const sessionRef = db.collection("liveMeetingSessions").doc();
-  const roomName = opaqueRoomName(meetingId, sessionRef.id);
+  // The room identity is meeting-scoped, not session-scoped: every authorized
+  // participant in this meeting must join the same SFU room. Session IDs remain
+  // unique audit records and must not partition host and invitee into separate rooms.
+  const roomName = opaqueRoomName(meetingId, "shared-live-room");
   const participantIdentity = `uid-${uid}`;
-
-  const token = new AccessToken(process.env.LIVEKIT_API_KEY, process.env.LIVEKIT_API_SECRET, {
+  const moderator = isAdmin || moderatorForMeeting(meeting, uid, email, selectedAuthority);
+  const token = new AccessToken(LIVEKIT_API_KEY.value(), LIVEKIT_API_SECRET.value(), {
     identity: participantIdentity,
     name: text(meeting.displayName || meeting.title || "IRPA participant"),
     ttl: "10m"
@@ -138,7 +195,8 @@ exports.issueLiveMeetingToken = onCall({
     room: roomName,
     canPublish: true,
     canSubscribe: true,
-    canPublishData: true
+    canPublishData: true,
+    roomAdmin: moderator
   });
 
   const participantLabel = selectedAuthority || "Meeting Participant";
@@ -149,12 +207,14 @@ exports.issueLiveMeetingToken = onCall({
     participantUid: uid,
     participantIdentity,
     participantAuthority: participantLabel,
+    moderator,
+    recordingPolicy: meeting.recordingAllowed === true ? "Allowed by meeting record" : "Not enabled",
     createdByUid: uid,
     createdAt: FieldValue.serverTimestamp(),
     status: "Token Issued",
     tokenTtl: "10m",
     mediaEngine: "LiveKit",
-    mediaEndpoint: text(process.env.LIVEKIT_URL),
+    mediaEndpoint: text(LIVEKIT_URL.value()),
     governanceAuthorityRemainsIRPA: true
   });
 
@@ -167,6 +227,8 @@ exports.issueLiveMeetingToken = onCall({
       roomName,
       participantUid: uid,
       participantAuthority: participantLabel,
+      moderator,
+      recordingPolicy: meeting.recordingAllowed === true ? "Allowed by meeting record" : "Not enabled",
       tokenTtl: "10m",
       mediaEngine: "LiveKit"
     },
@@ -178,8 +240,10 @@ exports.issueLiveMeetingToken = onCall({
   return {
     ok: true,
     sessionId: sessionRef.id,
-    serverUrl: text(process.env.LIVEKIT_URL),
+    serverUrl: text(LIVEKIT_URL.value()),
     participantToken: await token.toJwt(),
+    moderator,
+    recordingAllowed: meeting.recordingAllowed === true,
     expiresInSeconds: 600
   };
 });

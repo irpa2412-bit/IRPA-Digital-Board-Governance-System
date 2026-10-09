@@ -2,6 +2,7 @@
 import React,{useEffect,useMemo,useState}from"react";
 import{createRecord,getRecords,updateRecord,deleteRecord,COLLECTIONS}from"../firebase/data";
 import{sendMemberInvitationEmail}from"../firebase/auth";
+import{getFunctions,httpsCallable}from"firebase/functions";
 const MANUAL_INVITEE_ROLES=["Technical Expert","Government Representative","Partner / Donor","Invited Guest","External Participant — Non-Voting","Consultant"];
 const AUTHORITATIVE_ROLES=["Board Member","Board Committee Member","Board Chairperson","Board Secretary","Board Treasurer","Board Vice Chairperson"];
 const empty={participantName:"",participantUid:"",participantEmail:"",participantRole:"Invited Guest",participantType:"External Invitee",sourceType:"Manual Invitee",sourceRecordId:"",employeeId:"",boardMemberId:"",memberType:"Technical Advisor",meetingId:"",meetingReference:"",attendanceStatus:"Invited",notes:""};
@@ -24,7 +25,7 @@ export default function OperationalGatewaysParticipants(){
  function invitationPayload(participant,meeting){
   const existing=invitations.find(i=>String(i.email||"").toLowerCase()===String(participant.participantEmail||"").toLowerCase()&&i.meetingId===participant.meetingId&&i.status!=="Cancelled");
   if(existing)return existing;
-  return {email:participant.participantEmail.trim().toLowerCase(),name:participant.participantName.trim(),role:participant.participantRole||"Invited Guest",memberType:participant.memberType||"Technical Advisor",roles:[participant.participantRole||"Invited Guest"],status:"Pending",deliveryStatus:"Preparing",employeeId:participant.employeeId||null,boardMemberId:participant.boardMemberId||null,institutionalRecordId:participant.sourceRecordId||null,institutionalRecordType:participant.sourceType==="Employee Register"?"Employee":participant.sourceType==="Board Member Register"?"Board Member":null,source:participant.sourceType==="Manual Invitee"?"Meeting Participant — Manual Invitee":"Institutional Register",meetingId:participant.meetingId,meetingReference:meeting?.title||participant.meetingReference||"",deliveryProvider:"IRPA Mail Server",inductionOrientationProtocol:"Complete the Induction & Orientation pathway or use normal sign-in; the Administrator finalises registration by linking submitted information to the system record."};
+  return {participantId:participant.id||null,email:participant.participantEmail.trim().toLowerCase(),name:participant.participantName.trim(),role:participant.participantRole||"Invited Guest",memberType:participant.memberType||"Technical Advisor",roles:[participant.participantRole||"Invited Guest"],status:"Pending",deliveryStatus:"Preparing",employeeId:participant.employeeId||null,boardMemberId:participant.boardMemberId||null,institutionalRecordId:participant.sourceRecordId||null,institutionalRecordType:participant.sourceType==="Employee Register"?"Employee":participant.sourceType==="Board Member Register"?"Board Member":null,source:participant.sourceType==="Manual Invitee"?"Meeting Participant — Manual Invitee":"Institutional Register",meetingId:participant.meetingId,meetingReference:meeting?.title||participant.meetingReference||"",deliveryProvider:"IRPA Mail Server",inductionOrientationProtocol:"Complete the Induction & Orientation pathway or use normal sign-in; the Administrator finalises registration by linking submitted information to the system record."};
  }
  function startEdit(r){setEdit(r);setSelected(null);setSourceMode(r.sourceType==="Manual Invitee"?"manual":"system");setForm({...empty,...r});window.scrollTo({top:0,behavior:"smooth"})}
  async function save(e){e.preventDefault();setBusy(true);setErr("");setMsg("");try{
@@ -40,15 +41,23 @@ export default function OperationalGatewaysParticipants(){
     invitationId=await createRecord(COLLECTIONS.invitations,invite);
     await updateRecord(COLLECTIONS.invitations,invitationId,{subscriptionLink:window.location.origin+"/?induction=1&applicant=1&route=subscription&memberInvite="+encodeURIComponent(invitationId),loginAssistanceLink:window.location.origin+"/?induction=1&applicant=1&route=assistance&memberInvite="+encodeURIComponent(invitationId)});
    }
+   await updateRecord(COLLECTIONS.invitations,invitationId,{participantId,meetingId:payload.meetingId,meetingReference:m.title});
+   let issuedAccess=null;
    try{
-    const result=await sendMemberInvitationEmail(payload.participantEmail,invitationId,payload.participantRole,payload.memberType);
-    await updateRecord(COLLECTIONS.invitations,invitationId,{status:"Invitation Requested",deliveryStatus:result.deliveryStatus||"Accepted by Firebase Authentication; SMTP delivery not yet confirmed",sentAt:new Date().toISOString(),deliveryError:""});
-    await updateRecord(COLLECTIONS.participants,participantId,{invitationId,invitationStatus:"Invitation Requested",invitationRole:payload.participantRole});
-    setMsg("Participant registered and invitation request accepted by the existing IRPA invitation protocol. SMTP mailbox delivery is not yet confirmed.");
+    const issueAccess=httpsCallable(getFunctions(undefined,"us-central1"),"createMeetingAccessInvitation");
+    const issued=(await issueAccess({meetingId:payload.meetingId,participantId})).data||{};
+    issuedAccess=issued;
+    if(!issued.accessToken||!issued.meetingPassword||!issued.accessId)throw new Error("The meeting gateway did not return a complete access pass.");
+    const meetingAccess={accessId:issued.accessId,accessToken:issued.accessToken,meetingId:issued.meetingId,participantId:issued.participantId,meetingReference:issued.meetingReference,password:issued.meetingPassword,expiresAt:issued.expiresAt};
+    const result=await sendMemberInvitationEmail(payload.participantEmail,invitationId,payload.participantRole,payload.memberType,meetingAccess);
+    await updateRecord(COLLECTIONS.invitations,invitationId,{status:result.deliveryStatus==="Sent"?"Sent":"Invitation Requested",deliveryStatus:result.deliveryStatus||"Accepted by IRPA Mail Server; SMTP delivery status returned by gateway",sentAt:new Date().toISOString(),deliveryError:"",meetingAccessDispatched:result.meetingAccessSent===true});
+    await updateRecord(COLLECTIONS.participants,participantId,{invitationId,invitationStatus:"Invitation Requested",invitationRole:payload.participantRole,meetingAccessDispatched:result.meetingAccessSent===true});
+    setMsg("Participant registered. The invitation email includes the account activation link and the meeting-specific access link and gate password. Check the returned delivery status before relying on mailbox delivery.");
    }catch(x){
-    await updateRecord(COLLECTIONS.invitations,invitationId,{deliveryStatus:"Failed",deliveryError:x.message||"Invitation request failed."});
-    await updateRecord(COLLECTIONS.participants,participantId,{invitationId,invitationStatus:"Failed"});
-    throw new Error("Participant was registered, but the invitation request failed: "+(x.message||"Unknown invitation error"));
+    if(issuedAccess?.accessId){try{await httpsCallable(getFunctions(undefined,"us-central1"),"revokeMeetingAccessInvitation")({accessId:issuedAccess.accessId})}catch(revokeError){console.error("Unable to revoke undelivered meeting access pass",revokeError?.code||"")}}
+    await updateRecord(COLLECTIONS.invitations,invitationId,{deliveryStatus:"Failed",deliveryError:x.message||"Invitation request failed.",meetingAccessDispatched:false});
+    await updateRecord(COLLECTIONS.participants,participantId,{invitationId,invitationStatus:"Failed",meetingAccessDispatched:false});
+    throw new Error("Participant was registered, but meeting invitation dispatch failed: "+(x.message||"Unknown invitation error"));
    }
   }
   reset();await load()

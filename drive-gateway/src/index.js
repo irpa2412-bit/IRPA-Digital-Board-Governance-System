@@ -19,11 +19,28 @@ import { sendInvitationEmail, buildInvitationMessage, validateRecipient } from "
 import { route as esignRoute } from "./router.mjs";
 import { buildEsignContext, EsignRecordDurableObject } from "./esignContext.mjs";
 import { runCleanup } from "./upload.mjs";
+import { createDocumentLifecycleRouter } from "./documentLifecycle.mjs";
 import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPasswordSetup, getInvitationSessionState } from "./invitationRedemption.mjs";
 import { buildGoogleDriveAuthorizationParams } from "./googleDriveOAuth.mjs";
 
 let jwksCache = null;
 let jwksFetchedAt = 0;
+
+const documentLifecycleRouter = createDocumentLifecycleRouter({
+  FIREBASE_PROJECT_ID,
+  allowedContentTypes: ALLOWED_CONTENT_TYPES,
+  authenticateFirebaseRequest,
+  getFirestoreDocument,
+  getDriveAccessToken,
+  driveFetch,
+  findOrCreateFolder,
+  updateFirestoreDocument,
+  firestoreDocumentToPlain,
+  commitDocumentAndAudit: commitFirestoreDocumentAndAudit,
+  recordLifecycleFailure: recordDocumentLifecycleFailure,
+  json,
+  corsHeaders
+});
 
 export default {
   async fetch(request, env) {
@@ -59,6 +76,11 @@ export default {
 
       // Normalize trailing slashes so portal upload/archive actions cannot be blocked by URL formatting.
       const pathname = url.pathname.replace(/\/+$/, "") || "/";
+
+      if (pathname.startsWith("/api/document-lifecycle/")) {
+        const lifecycleResponse = await documentLifecycleRouter(request, env);
+        if (lifecycleResponse) return lifecycleResponse;
+      }
 
       if (pathname === "/api/upload" && request.method === "POST") {
         return await upload(request, env);
@@ -1192,17 +1214,53 @@ async function sendMemberInvitation(request, env) {
   const invitationTokenHash=await sha256Hex(invitationSecret);
   const invitationExpiresAt=new Date(Date.now()+72*60*60*1000).toISOString();
   const link=`${appUrl}/?invitationToken=${encodeURIComponent(invitationId+"."+invitationSecret)}`;
+  let meetingAccess=null;
+  if(data.meetingAccess){
+    const supplied=data.meetingAccess||{};
+    const meetingId=cleanId(supplied.meetingId||"");
+    const participantId=cleanId(supplied.participantId||"");
+    const accessToken=String(supplied.accessToken||"").trim();
+    const password=String(supplied.password||"").trim();
+    if(!meetingId||!participantId||! /^[A-Za-z0-9_-]{32,128}$/.test(accessToken)||! /^[A-Z0-9]{8,20}$/.test(password)){
+      return json({ok:false,error:"Invalid meeting access payload."},400,corsHeaders(request));
+    }
+    if(String(fields.meetingId?.stringValue||"")!==meetingId||String(fields.participantId?.stringValue||"")!==participantId){
+      return json({ok:false,error:"The meeting access pass does not match the selected invitation record."},409,corsHeaders(request));
+    }
+    const [meetingDoc,participantDoc]=await Promise.all([
+      getFirestoreDocument(env,`meetings/${meetingId}`,claims.token),
+      getFirestoreDocument(env,`participants/${participantId}`,claims.token)
+    ]);
+    if(!meetingDoc||!participantDoc)return json({ok:false,error:"The meeting or participant record could not be verified."},404,corsHeaders(request));
+    const meetingFields=meetingDoc.fields||{},participantFields=participantDoc.fields||{};
+    const linkedMeeting=String(participantFields.meetingId?.stringValue||"");
+    const participantEmail=String(participantFields.participantEmail?.stringValue||participantFields.email?.stringValue||"").trim().toLowerCase();
+    if(linkedMeeting!==meetingId||participantEmail!==email){
+      return json({ok:false,error:"The participant email and meeting relationship do not match this invitation."},403,corsHeaders(request));
+    }
+    const meetingStatus=String(meetingFields.status?.stringValue||"Scheduled").trim().toLowerCase();
+    if(["closed","completed","cancelled","canceled","archived"].includes(meetingStatus)){
+      return json({ok:false,error:"This meeting is closed and cannot issue a new access invitation."},409,corsHeaders(request));
+    }
+    const meetingReference=String(meetingFields.reference?.stringValue||meetingFields.title?.stringValue||"IRPA Meeting").trim();
+    meetingAccess={
+      link:`${appUrl}/?meetingToken=${encodeURIComponent(accessToken)}&meetingId=${encodeURIComponent(meetingId)}`,
+      meetingReference,
+      password,
+      expiresAt:String(supplied.expiresAt||"")
+    };
+  }
   await updateFirestoreDocument(env,`invitations/${invitationId}`,claims.token,{
     invitationTokenHash:{stringValue:invitationTokenHash},invitationTokenVersion:{stringValue:"2"},invitationExpiresAt:{timestampValue:invitationExpiresAt},invitationRedeemedAt:{nullValue:null},invitationRedeemedUid:{nullValue:null},
     deliveryStatus:{stringValue:"Queued"},deliveryQueuedAt:{timestampValue:new Date().toISOString()},deliveryError:{stringValue:""},deliveryProvider:{stringValue:"IRPA Mail Server via Cloudflare Worker"}
   },["invitationTokenHash","invitationTokenVersion","invitationExpiresAt","invitationRedeemedAt","invitationRedeemedUid","deliveryStatus","deliveryQueuedAt","deliveryError","deliveryProvider"]);
-  const message=buildInvitationMessage({name:name||"Member",link});
+  const message=buildInvitationMessage({name:name||"Member",link,meetingAccess});
   try{
-    const result=await sendInvitationEmail({email,name:name||"Member",link,smtpSend:async ({to,subject,text,html})=>smtpSend(env,{to,subject,text,html}),logger:{error:(label,meta)=>console.error(label,{recipientDomain:recipientDomain(email),attempt:meta?.attempt})}});
+    const result=await sendInvitationEmail({email,name:name||"Member",link,meetingAccess,smtpSend:async ({to,subject,text,html})=>smtpSend(env,{to,subject,text,html}),logger:{error:(label,meta)=>console.error(label,{recipientDomain:recipientDomain(email),attempt:meta?.attempt})}});
     const sentAt=new Date().toISOString();
     const messageId=result?.messageId||result;
     await updateFirestoreDocument(env,`invitations/${invitationId}`,claims.token,{status:{stringValue:"Sent"},deliveryStatus:{stringValue:"Sent"},deliverySentAt:{timestampValue:sentAt},deliveryError:{stringValue:""},deliveryMessageId:{stringValue:String(messageId||"")} },["status","deliveryStatus","deliverySentAt","deliveryError","deliveryMessageId"]);
-    return json({ok:true,email,deliveryStatus:"Sent",sentAt,messageId,message},200,corsHeaders(request));
+    return json({ok:true,email,deliveryStatus:"Sent",sentAt,messageId,message:meetingAccess?{subject:message.subject,text:"Meeting access details were included in the invitation email."}:message,meetingAccessSent:Boolean(meetingAccess)},200,corsHeaders(request));
   }catch(error){
     const failedAt=new Date().toISOString(), safeError=safeMailError(error);
     await updateFirestoreDocument(env,`invitations/${invitationId}`,claims.token,{status:{stringValue:"Failed"},deliveryStatus:{stringValue:"Failed"},deliveryFailedAt:{timestampValue:failedAt},deliveryError:{stringValue:safeError}},["status","deliveryStatus","deliveryFailedAt","deliveryError"]);
@@ -1733,6 +1791,132 @@ async function getInstitutionalProfileForUser(env, claims) {
     memberRecord: memberMatches[0] || null,
     employeeRecord: employeeMatches[0] || null
   };
+}
+
+function base64UrlEncodeBytes(bytes) {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/=/g, "").replace(/\\+/g, "-").replace(/\\//g, "_");
+}
+
+function base64UrlEncodeText(value) {
+  return base64UrlEncodeBytes(new TextEncoder().encode(value));
+}
+
+function pemPrivateKeyBytes(pem) {
+  const body = String(pem || "").replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\\s/g, "");
+  if (!body) throw new Error("Privileged Firestore identity is not configured.");
+  const binary = atob(body);
+  return Uint8Array.from(binary, char => char.charCodeAt(0));
+}
+
+let firestoreAdminTokenCache = { token: "", expiresAt: 0 };
+
+async function getFirestoreAdminAccessToken(env) {
+  const now = Math.floor(Date.now() / 1000);
+  if (firestoreAdminTokenCache.token && firestoreAdminTokenCache.expiresAt > now + 60) {
+    return firestoreAdminTokenCache.token;
+  }
+  let serviceAccount;
+  try {
+    serviceAccount = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON || "");
+  } catch {
+    throw new Error("Privileged Firestore identity is not configured correctly.");
+  }
+  if (
+    serviceAccount.project_id !== FIREBASE_PROJECT_ID ||
+    typeof serviceAccount.client_email !== "string" ||
+    !serviceAccount.client_email.endsWith(".iam.gserviceaccount.com") ||
+    typeof serviceAccount.private_key !== "string"
+  ) {
+    throw new Error("Privileged Firestore identity is invalid for this Firebase project.");
+  }
+
+  const issuedAt = now;
+  const claims = {
+    iss: serviceAccount.client_email,
+    scope: "https://www.googleapis.com/auth/datastore",
+    aud: "https://oauth2.googleapis.com/token",
+    iat: issuedAt,
+    exp: issuedAt + 3600
+  };
+  const unsigned = base64UrlEncodeText(JSON.stringify({ alg: "RS256", typ: "JWT" })) + "." +
+    base64UrlEncodeText(JSON.stringify(claims));
+  const key = await crypto.subtle.importKey(
+    "pkcs8",
+    pemPrivateKeyBytes(serviceAccount.private_key),
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign(
+    "RSASSA-PKCS1-v1_5",
+    key,
+    new TextEncoder().encode(unsigned)
+  );
+  const assertion = unsigned + "." + base64UrlEncodeBytes(new Uint8Array(signature));
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion
+    })
+  });
+  const result = await response.json();
+  if (!response.ok || typeof result.access_token !== "string") {
+    firestoreAdminTokenCache = { token: "", expiresAt: 0 };
+    throw new Error("Privileged Firestore identity could not obtain an access token.");
+  }
+  firestoreAdminTokenCache = {
+    token: result.access_token,
+    expiresAt: now + Math.min(Number(result.expires_in) || 3600, 3600)
+  };
+  return firestoreAdminTokenCache.token;
+}
+
+async function commitFirestoreDocumentAndAudit(env, documentId, _firebaseToken, documentFields, documentMask, auditFields, {createOnly=false}={}) {
+  const firebaseToken = await getFirestoreAdminAccessToken(env);
+  const base=`projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents`;
+  const auditId=`${documentId}-${Date.now()}-${crypto.randomUUID().slice(0,8)}`;
+  const documentWrite={
+    update:{name:`${base}/documents/${documentId}`,fields:documentFields},
+    updateMask:{fieldPaths:documentMask}
+  };
+  if(createOnly)documentWrite.currentDocument={exists:false};
+  const writes=[
+    documentWrite,
+    {update:{name:`${base}/audit/${auditId}`,fields:auditFields},currentDocument:{exists:false}}
+  ];
+  const response=await fetch(`https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:commit`,{
+    method:"POST",
+    headers:{"Authorization":`Bearer ${firebaseToken}`,"Content-Type":"application/json"},
+    body:JSON.stringify({writes})
+  });
+  if(!response.ok)throw new Error(`Unable to atomically commit the document and its audit event (HTTP ${response.status}).`);
+  return response.json();
+}
+
+async function recordDocumentLifecycleFailure(env, claims, documentId, action, details = {}) {
+  const firebaseToken = await getFirestoreAdminAccessToken(env);
+  const base = `projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents`;
+  const auditId = `lifecycle-failure-${Date.now()}-${crypto.randomUUID().slice(0, 12)}`;
+  const auditFields = {
+    action: {stringValue: `DOCUMENT_LIFECYCLE_${action}_FAILED`},
+    collection: {stringValue: "documents"},
+    recordId: {stringValue: String(documentId || "")},
+    actorUid: {stringValue: String(claims?.user_id || "")},
+    actorEmail: claims?.email ? {stringValue: String(claims.email)} : {nullValue: null},
+    details: {mapValue: {fields: Object.fromEntries(Object.entries(details).map(([key, value]) => [key, value == null ? {nullValue: null} : {stringValue: String(value).slice(0, 1000)}]))}},
+    createdAt: {timestampValue: new Date().toISOString()}
+  };
+  const response = await fetch(`https://firestore.googleapis.com/v1/${base}/audit?documentId=${encodeURIComponent(auditId)}`, {
+    method: "POST",
+    headers: {"Authorization": `Bearer ${firebaseToken}`, "Content-Type": "application/json"},
+    body: JSON.stringify({fields: auditFields})
+  });
+  if (!response.ok) throw new Error(`Unable to persist the document lifecycle failure audit event (HTTP ${response.status}).`);
+  return {auditId};
 }
 
 async function updateFirestoreDocument(env, path, firebaseToken, fields, updateMask) {

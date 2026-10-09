@@ -1,32 +1,7 @@
-# IRPA-DGBS Live Meeting Infrastructure
+# Legacy LiveKit notes — not a deployment configuration
 
-This directory is the infrastructure boundary for the IRPA-owned live meeting media service.
+The former examples in this directory have been retired to prevent conflicting LiveKit configurations.
 
-## Design
-- Self-hosted LiveKit OSS for WebRTC media.
-- IRPA-DGBS remains the governance authority.
-- Firebase/Firestore remains the governance data layer.
-- Browser receives short-lived participant credentials only.
-- API secrets remain on the meeting-control server.
-- Recording is optional and policy-controlled.
-- Firebase production does not need to be disabled to deploy this layer.
+**Canonical staging implementation:** [infra/livekit/README.md](../infra/livekit/README.md)
 
-## Current status
-Architecture prepared; production installation is pending infrastructure credentials and host provisioning.
-
-No production meeting server, DNS record, API secret or Firebase administrator setting is changed by these repository files.
-
-## Deployment prerequisites
-- Dedicated public VM or equivalent.
-- DNS for meet.irpa.or.tz and turn.meet.irpa.or.tz.
-- TLS.
-- Firewall access for configured WebRTC/TURN ports.
-- Server-side LiveKit credentials.
-- Meeting-control gateway credentials.
-- Monitored storage for authorized recordings.
-
-## Safety rule
-Do not put production secrets in this repository. Use the deployment host secret store/environment.
-
-## Rollback
-Stop the media service and remove only the meeting-media integration route. Do not modify Firebase Auth, Firestore governance records, existing administrator claims, or meeting records during rollback.
+Do not deploy from this directory. It intentionally contains no Compose file, LiveKit server config, or deployment workflow. The canonical deployment is staging-only, requires the protected `livekit-staging` environment, and must not be used until the DigitalOcean account, billing, SSH, DNS, firewall and staging Firebase prerequisites are verified. Production DNS, production Firebase, and production governance data must remain untouched.
