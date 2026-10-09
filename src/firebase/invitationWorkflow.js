@@ -110,6 +110,16 @@ export async function provisionCurrentMemberFromInvitationV2(invitationId) {
       status:"Activated",acceptedUid:uid,acceptedAt:new Date().toISOString(),accountActivated:true,activationCompleted:true
     }, {touchUpdatedAt:false, audit:false});
     return { employee: boardMember, invitationId: invitation.id, uid };
+  } else if (invitation.institutionalRecordType === "Member" || invitation.memberId) {
+    const memberId = invitation.memberId || invitation.institutionalRecordId;
+    const member = memberId ? await getRecord(COLLECTIONS.members, memberId) : null;
+    if (!member) throw new Error("The Member institutional record for this invitation could not be resolved. Ask an administrator to relink the invitation to the Members Register.");
+    if (String(member.email || "").trim().toLowerCase() !== email) throw new Error("The invitation email does not match the Member institutional record.");
+    await updateRecord(COLLECTIONS.members, member.id, {uid, invitationId, accountActivated:true, registrationStatus:"Activated", activatedAt:new Date().toISOString()}, {touchUpdatedAt:false, audit:false});
+    // If this member also holds an employee role, preserve one authenticated identity across both registers.
+    const employeeSnap = await getDocs(query(collection(db, COLLECTIONS.employees), where("email", "==", email)));
+    for (const d of employeeSnap.docs) await updateRecord(COLLECTIONS.employees, d.id, {uid, invitationId, accountActivated:true, registrationStatus:"Activated", registrationEmailStatus:"Completed", activatedAt:new Date().toISOString()}, {touchUpdatedAt:false, audit:false});
+    employee = member;
   } else if (invitation.employeeId || invitation.institutionalRecordType === "Employee" || EMPLOYEE_ROLES.includes(role)) {
     // Employees follow the same controlled activation pattern as Board Members:
     // resolve the authoritative employee record by its invitation link or official
