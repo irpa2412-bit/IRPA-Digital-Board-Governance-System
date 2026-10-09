@@ -38,7 +38,7 @@ exports.captureMeetingRecord=onCall({region:"us-central1",timeoutSeconds:30},asy
  if(!["TRANSCRIPT","MINUTES_DRAFT","MINUTES_FINAL","DECISION_REGISTER","ATTENDANCE_REGISTER","OTHER"].includes(type))throw new HttpsError("invalid-argument","Unsupported meeting record type.");
  if(!content)throw new HttpsError("invalid-argument","Record content is empty.");
  if(content.length>900000)throw new HttpsError("invalid-argument","Text record exceeds the 900,000 character limit. Store large files through the controlled Documents Portal.");
- if(type==="MINUTES_FINAL"&&!req.data?.approvalReference)throw new HttpsError("failed-precondition","Final minutes require an approval reference. Capture them as a draft until approved.");
+ if(type==="MINUTES_FINAL"){const approvalId=text(req.data?.approvalReference);if(!approvalId)throw new HttpsError("failed-precondition","Final minutes require an approved authorization record ID. Capture them as a draft until approved.");const approvalSnap=await db.collection("authorizationRequests").doc(approvalId).get();if(!approvalSnap.exists)throw new HttpsError("failed-precondition","The referenced authorization record was not found.");const approval=approvalSnap.data()||{};if(!["approved","authorized","completed"].includes(text(approval.status).toLowerCase())||approval.meetingId!==meetingId)throw new HttpsError("failed-precondition","The authorization record must be approved and linked to this meeting before final minutes can be captured.");}
  const now=new Date(),retentionYears=RETENTION_YEARS[ctx.category]||3,retainUntil=addYears(now,retentionYears);
  const ref=db.collection("meetingRecords").doc();
  const digest=hash(content);
