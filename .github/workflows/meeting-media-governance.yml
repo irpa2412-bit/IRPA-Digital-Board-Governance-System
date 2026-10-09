@@ -2,7 +2,7 @@ name: Meeting Media Governance Verification
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, integration/collective-portals-20261009]
     paths:
       - "src/components/IRPADGBSMeetingRoomMedia.jsx"
       - "src/components/MeetingAccessControl.jsx"
