@@ -27,6 +27,8 @@ jobs:
           node --check functions/authorizationFunctions.js
           node --check functions/meetingGateway.js
           node --check functions/liveMeeting.js
+      - name: Test governance quorum and decision thresholds
+        run: node --test tests/governance-decision-policy.test.mjs
       - name: Verify Authorization exports through package entrypoint
         working-directory: functions
         run: |
