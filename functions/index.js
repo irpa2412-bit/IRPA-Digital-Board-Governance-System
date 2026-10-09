@@ -274,13 +274,16 @@ function governancePolicySnapshot(meeting={}){
   if(policy.decisionThreshold==="CUSTOM"&&(!Number.isInteger(policy.customThresholdNumerator)||!Number.isInteger(policy.customThresholdDenominator)||policy.customThresholdNumerator<1||policy.customThresholdDenominator<2||policy.customThresholdNumerator>=policy.customThresholdDenominator))throw new HttpsError("invalid-argument","The custom decision threshold must be a valid fraction such as 2/3.");
   return policy;
 }
-async function calculateAuthoritativeQuorum(tx,meetingId,policy){
-  const [memberSnap,participantSnap]=await Promise.all([
-    tx.get(db.collection("members")),
-    tx.get(db.collection("participants").where("meetingId","==",meetingId))
-  ]);
+async function calculateAuthoritativeQuorum(tx,meeting,policy){
+  const meetingId=String(meeting?.id||meeting||"");
+  const meetingReference=String(meeting?.meetingReference||meeting?.reference||meeting?.title||"").trim();
+  const reads=[tx.get(db.collection("members")),tx.get(db.collection("participants").where("meetingId","==",meetingId))];
+  if(meetingReference)reads.push(tx.get(db.collection("participants").where("meetingReference","==",meetingReference)));
+  const snaps=await Promise.all(reads);
+  const memberSnap=snaps[0],participantDocs=new Map();
+  for(const snap of snaps.slice(1))for(const doc of snap.docs)participantDocs.set(doc.id,doc);
   const totalEligibleCount=memberSnap.docs.filter(d=>eligibleBoardVoter(d.data())).length;
-  const eligibleParticipants=participantSnap.docs.filter(d=>eligibleBoardVoter(d.data()));
+  const eligibleParticipants=[...participantDocs.values()].filter(d=>eligibleBoardVoter(d.data()));
   const present=eligibleParticipants.filter(d=>String(d.data().attendanceStatus||d.data().status||"").trim().toLowerCase()==="present");
   const eligiblePresentCount=present.length;
   const requiredCount=policy.quorumBasis==="PERCENT_ELIGIBLE"?Math.ceil(totalEligibleCount*policy.quorumValue/100):Math.ceil(policy.quorumValue);
@@ -318,7 +321,7 @@ exports.openGovernanceVotingIssue=onCall({region:"us-central1",timeoutSeconds:60
   await db.runTransaction(async tx=>{
     const existing=await tx.get(ref);
     if(existing.exists&&String(existing.data().status||"Open")!=="Cancelled"){response={...existing.data(),id:existing.id,alreadyOpen:true};return;}
-    const quorum=await calculateAuthoritativeQuorum(tx,meetingId,policy);
+    const quorum=await calculateAuthoritativeQuorum(tx,meeting,policy);
     if(policy.requireQuorumAtVoteOpen&&!quorum.quorumMet)throw new HttpsError("failed-precondition",`Voting is blocked: quorum is not met (${quorum.eligiblePresentCount}/${quorum.requiredCount} eligible members present).`);
     const data={meetingId,meetingReference:String(meeting.meetingReference||meeting.reference||meeting.title||meetingId),meetingCategory:"GOVERNANCE",resolutionId,resolutionReference:resolution?.resolutionReference||String(request.data?.resolutionReference||""),agendaItem,policySnapshot:policy,quorumSnapshot:quorum,status:"Open",result:"Pending",anonymous:true,openedAt:FieldValue.serverTimestamp(),openedByUid:actor.uid,openedByProcess:true,createdAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()};
     tx.set(ref,data);
@@ -346,7 +349,7 @@ exports.closeGovernanceVotingIssue=onCall({region:"us-central1",timeoutSeconds:6
     const policy=issue.policySnapshot||governancePolicySnapshot(meeting);
     const [voteSnap,quorum]=await Promise.all([
       tx.get(db.collection("votes").where("votingIssueId","==",issueId)),
-      calculateAuthoritativeQuorum(tx,meeting.id,policy)
+      calculateAuthoritativeQuorum(tx,meeting,policy)
     ]);
     let resolutionSnap=null;
     if(issue.resolutionId)resolutionSnap=await tx.get(db.collection("resolutions").doc(String(issue.resolutionId)));
