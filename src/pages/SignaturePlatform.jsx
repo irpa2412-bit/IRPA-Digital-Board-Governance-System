@@ -304,16 +304,24 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
         setMessage("Signer Identity trust record is not currently available. Your existing Signature Profile remains available and has not been changed.");
       }
 
-      // The member collection is intentionally not list-readable to ordinary
-      // users. Do not let that protected directory query block the Signature
-      // Portal or overwrite a useful document-access message.
-      try{
-        const m=await getRecords("members");
-        setMembers(m.filter(x=>x.status==="Active"));
-      }catch(memberError){
-        console.warn("Signature signer directory is protected from collection listing:",memberError);
-        setMembers([]);
-      }
+      // Load only registered, active signer candidates from the existing
+      // institutional registers. Some accounts are enrolled as employees rather
+      // than board members, so the selector must consider both registers.
+      // Preserve the current access model: a failed/protected query is not
+      // treated as evidence that no officers exist.
+      const [memberRows,employeeRows]=await Promise.all([
+        getRecords("members").catch(error=>{console.warn("Signature member register unavailable:",error);return null}),
+        getRecords("employees").catch(error=>{console.warn("Signature employee register unavailable:",error);return null})
+      ]);
+      const candidates=[...(Array.isArray(memberRows)?memberRows:[]),...(Array.isArray(employeeRows)?employeeRows:[])];
+      const activeCandidates=candidates.filter(x=>{
+        const status=String(x.status||x.employmentStatus||x.registrationStatus||"").trim().toLowerCase();
+        const active=["active","activated","current"].includes(status)||x.active===true||x.accountActivated===true;
+        const inactive=["inactive","suspended","revoked","terminated","disabled"].includes(status)||x.active===false;
+        return active&&!inactive&&Boolean(x.uid||x.id)&&Boolean(x.email);
+      });
+      const uniqueCandidates=[...new Map(activeCandidates.map(x=>[String(x.uid||x.id),{...x,uid:String(x.uid||x.id),name:x.name||x.fullName||x.displayName||x.email}])).values()];
+      setMembers(uniqueCandidates);
     }catch(x){
       setMessage(x.message||"Unable to load Signature Portal.")
     }
