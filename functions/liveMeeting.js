@@ -1,6 +1,6 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
-const { AccessToken } = require("livekit-server-sdk");
+const { AccessToken, EgressClient, EncodedFileOutput, EncodedFileType } = require("livekit-server-sdk");
 const { defineSecret } = require("firebase-functions/params");
 const crypto = require("crypto");
 
@@ -245,5 +245,197 @@ exports.issueLiveMeetingToken = onCall({
     moderator,
     recordingAllowed: meeting.recordingAllowed === true,
     expiresInSeconds: 600
+  };
+});
+
+
+function egressClient() {
+  if (!liveKitConfigured()) throw new HttpsError("failed-precondition", "Live meeting infrastructure is not configured on the server.");
+  const host = text(LIVEKIT_URL.value()).replace(/^wss:/i, "https:").replace(/^ws:/i, "http:");
+  return new EgressClient(host, LIVEKIT_API_KEY.value(), LIVEKIT_API_SECRET.value());
+}
+async function resolveRecordingControl(request, meetingId) {
+  const uid = request.auth?.uid;
+  const email = text(request.auth?.token?.email).toLowerCase();
+  if (!uid) throw new HttpsError("unauthenticated", "IRPA authentication is required.");
+  if (!meetingId) throw new HttpsError("invalid-argument", "Meeting ID is required.");
+  const snap = await db.collection("meetings").doc(meetingId).get();
+  if (!snap.exists) throw new HttpsError("not-found", "The requested meeting was not found.");
+  const meeting = { id: snap.id, ...snap.data() };
+  const isAdmin = request.auth?.token?.admin === true || email === "irpa2412@gmail.com";
+  if (!meetingOpenForMedia(meeting)) throw new HttpsError("failed-precondition", "This meeting is closed and recording cannot be controlled.");
+  if (meeting.recordingAllowed !== true) throw new HttpsError("permission-denied", "Recording is not enabled in the authoritative meeting record.");
+  const results = await Promise.all([
+    db.collection("members").doc(uid).get(),
+    db.collection("employees").doc(uid).get()
+  ]);
+  const profiles = results.filter(s => s.exists).map(s => s.data() || {});
+  const activeIdentity = profiles.some(activeRecord);
+  const participantId = text(request.data?.participantId);
+  let invitedParticipant = null;
+  if (participantId) {
+    const participantSnap = await db.collection("participants").doc(participantId).get();
+    if (!participantSnap.exists) throw new HttpsError("permission-denied", "The meeting participant record could not be verified.");
+    const candidate = { id: participantSnap.id, ...participantSnap.data() };
+    if (text(candidate.meetingId) !== meetingId) throw new HttpsError("permission-denied", "The participant record is not linked to this meeting.");
+    const boundUid = text(candidate.participantUid || candidate.uid || candidate.userId);
+    const boundEmail = text(candidate.participantEmail || candidate.email).toLowerCase();
+    if ((boundUid && boundUid !== uid) || (boundEmail && boundEmail !== email) || (!boundUid && !boundEmail)) {
+      throw new HttpsError("permission-denied", "Participant identity does not match this account.");
+    }
+    if (["cancelled", "canceled", "revoked", "removed", "inactive", "closed"].includes(text(candidate.status).toLowerCase())) {
+      throw new HttpsError("permission-denied", "This meeting invitation is no longer active.");
+    }
+    invitedParticipant = candidate;
+  }
+  const subQueries = await Promise.all([
+    db.collection("meetingSubscriptions").where("meetingId", "==", meetingId).where("uid", "==", uid).limit(1).get().catch(() => ({ empty: true })),
+    db.collection("meetingSubscriptions").where("meetingId", "==", meetingId).where("subscriberUid", "==", uid).limit(1).get().catch(() => ({ empty: true }))
+  ]);
+  const invited = Boolean(invitedParticipant) || participantListed(meeting, uid) || subQueries.some(s => !s.empty);
+  if (!isAdmin && (!activeIdentity && !invited)) throw new HttpsError("permission-denied", "An active IRPA identity or verified invitee is required.");
+  if (!isAdmin && !invited) throw new HttpsError("permission-denied", "This account is not registered or subscribed to the selected meeting.");
+  const authority = text(request.data?.selectedAuthority);
+  const profileRoles = profiles.flatMap(registeredRoles);
+  const invitedRoles = invitedParticipant ? [
+    invitedParticipant.role, invitedParticipant.participantRole, invitedParticipant.authority,
+    ...(Array.isArray(invitedParticipant.roles) ? invitedParticipant.roles : [])
+  ].map(text).filter(Boolean) : [];
+  const authorityMatches = !authority || profileRoles.includes(authority) || invitedRoles.includes(authority);
+  if (!authorityMatches) throw new HttpsError("permission-denied", "The selected access authority is not registered to this account.");
+  const trustedModeratorRole = profileRoles.concat(invitedRoles).find(role =>
+    ["board chairperson", "board secretary", "chairperson", "meeting chair", "meeting secretary", "secretary"].includes(text(role).toLowerCase())
+  ) || "";
+  const controller = isAdmin ||
+    (meeting.chairpersonUid && text(meeting.chairpersonUid) === uid) ||
+    (meeting.secretaryUid && text(meeting.secretaryUid) === uid) ||
+    (text(meeting.chairpersonEmail).toLowerCase() === email && Boolean(email)) ||
+    (text(meeting.secretaryEmail).toLowerCase() === email && Boolean(email)) ||
+    text(meeting.createdByUid) === uid ||
+    text(meeting.initiatorUid) === uid ||
+    moderatorForMeeting(meeting, uid, email, trustedModeratorRole);
+  return { uid, email, meeting, isAdmin, invited, controller };
+}
+function recordingRoomName(meetingId) {
+  return opaqueRoomName(meetingId, "shared-live-room");
+}
+function safeRecordingId(value) {
+  return String(value || "").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 120);
+}
+exports.startMeetingRecording = onCall({
+  region: "us-central1", timeoutSeconds: 60,
+  secrets: [LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET]
+}, async request => {
+  const ctx = await resolveRecordingControl(request, text(request.data?.meetingId));
+  if (!ctx.controller) throw new HttpsError("permission-denied", "Only the meeting administrator, initiator, chairperson or secretary may start recording.");
+  const roomName = recordingRoomName(ctx.meeting.id);
+  const activeRecordings = await db.collection("meetingMediaRecordings").where("meetingId", "==", ctx.meeting.id).get();
+  if (activeRecordings.docs.some(doc => ["STARTING", "RECORDING", "STOPPING"].includes(text(doc.data()?.recordingStatus)))) {
+    throw new HttpsError("already-exists", "A recording is already active or stopping for this meeting.");
+  }
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const filepath = "irpa-governance-recordings/" + safeRecordingId(ctx.meeting.id) + "/" + stamp + ".mp4";
+  let egress;
+  try {
+    egress = await egressClient().startRoomCompositeEgress(
+      roomName,
+      { file: new EncodedFileOutput({ filepath, fileType: EncodedFileType.MP4 }) },
+      { layout: "grid", audioOnly: false }
+    );
+  } catch (error) {
+    await db.collection("audit").add({
+      action: "LIVE_MEETING_RECORDING_START_FAILED", collection: "meetingMediaRecordings", recordId: null,
+      details: { meetingId: ctx.meeting.id, reason: text(error?.message).slice(0, 500), storageDestination: "LIVEKIT_EGRESS_CONFIGURED_STORAGE" },
+      actorUid: ctx.uid, actorEmail: ctx.email || null, createdAt: FieldValue.serverTimestamp()
+    });
+    throw new HttpsError("failed-precondition", "Recording could not start. Verify that LiveKit Egress is running and its recording storage is configured; no recording has been confirmed.");
+  }
+  const egressId = text(egress.egressId);
+  if (!egressId) throw new HttpsError("internal", "LiveKit did not return a recording identifier.");
+  const row = {
+    meetingId: ctx.meeting.id,
+    meetingReference: text(ctx.meeting.meetingReference || ctx.meeting.reference || ctx.meeting.title),
+    meetingTitle: text(ctx.meeting.title), meetingCategory: categoryOf(ctx.meeting), roomName,
+    egressId, outputPath: filepath, recordingStatus: "RECORDING",
+    egressStatus: String(egress.status ?? "UNKNOWN"),
+    recordingProvider: "LIVEKIT_EGRESS", storageDestination: "LIVEKIT_EGRESS_CONFIGURED_STORAGE",
+    startedByUid: ctx.uid, startedByEmail: ctx.email || null,
+    startedAt: FieldValue.serverTimestamp(), createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp()
+  };
+  await db.collection("meetingMediaRecordings").doc(egressId).set(row);
+  await db.collection("meetings").doc(ctx.meeting.id).update({
+    recordingStatus: "RECORDING", recordingEgressId: egressId,
+    recordingStartedAt: FieldValue.serverTimestamp(), recordingStartedByUid: ctx.uid,
+    recordingStorage: row.storageDestination
+  });
+  await db.collection("audit").add({
+    action: "LIVE_MEETING_RECORDING_STARTED", collection: "meetingMediaRecordings", recordId: egressId,
+    details: { meetingId: ctx.meeting.id, meetingCategory: row.meetingCategory, egressId, outputPath: filepath, storageDestination: row.storageDestination },
+    actorUid: ctx.uid, actorEmail: ctx.email || null, createdAt: FieldValue.serverTimestamp()
+  });
+  return { ok: true, recordingId: egressId, egressId, recordingStatus: "RECORDING", outputPath: filepath, storageDestination: row.storageDestination };
+});
+exports.stopMeetingRecording = onCall({
+  region: "us-central1", timeoutSeconds: 60,
+  secrets: [LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET]
+}, async request => {
+  const meetingId = text(request.data?.meetingId);
+  const recordingId = text(request.data?.recordingId || request.data?.egressId);
+  if (!recordingId) throw new HttpsError("invalid-argument", "Recording ID is required.");
+  const ctx = await resolveRecordingControl(request, meetingId);
+  if (!ctx.controller) throw new HttpsError("permission-denied", "Only the meeting administrator, initiator, chairperson or secretary may stop recording.");
+  const ref = db.collection("meetingMediaRecordings").doc(recordingId);
+  const snap = await ref.get();
+  if (!snap.exists || text(snap.data()?.meetingId) !== meetingId) throw new HttpsError("not-found", "Recording does not belong to this meeting.");
+  if (!["RECORDING", "STARTING", "STOPPING"].includes(text(snap.data()?.recordingStatus))) {
+    throw new HttpsError("failed-precondition", "This recording is not active.");
+  }
+  let result;
+  try {
+    result = await egressClient().stopEgress(recordingId);
+  } catch (error) {
+    throw new HttpsError("failed-precondition", "LiveKit did not confirm that recording stopped. Check the recording service before retrying.");
+  }
+  const files = Array.isArray(result.fileResults) ? result.fileResults.map(file => ({
+    filename: text(file.filename), location: text(file.location), size: Number(file.size || 0)
+  })) : [];
+  await ref.update({
+    recordingStatus: "STOPPING", egressStatus: String(result.status ?? "UNKNOWN"),
+    fileResults: files, stoppedByUid: ctx.uid, stoppedByEmail: ctx.email || null,
+    stopRequestedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp()
+  });
+  await db.collection("meetings").doc(meetingId).update({
+    recordingStatus: "STOPPING", recordingStoppedAt: FieldValue.serverTimestamp(),
+    recordingStoppedByUid: ctx.uid
+  });
+  await db.collection("audit").add({
+    action: "LIVE_MEETING_RECORDING_STOP_REQUESTED", collection: "meetingMediaRecordings", recordId: recordingId,
+    details: { meetingId, egressStatus: String(result.status ?? "UNKNOWN"), fileCount: files.length },
+    actorUid: ctx.uid, actorEmail: ctx.email || null, createdAt: FieldValue.serverTimestamp()
+  });
+  return { ok: true, recordingId, recordingStatus: "STOPPING", egressStatus: String(result.status ?? "UNKNOWN"), files };
+});
+exports.getMeetingRecordingStatus = onCall({
+  region: "us-central1", timeoutSeconds: 30,
+  secrets: [LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET]
+}, async request => {
+  const ctx = await resolveRecordingControl(request, text(request.data?.meetingId));
+  if (!ctx.invited && !ctx.isAdmin) throw new HttpsError("permission-denied", "An authorised meeting participant is required to view recording status.");
+  const snap = await db.collection("meetingMediaRecordings").where("meetingId", "==", ctx.meeting.id).get();
+  const rows = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) =>
+    (b.startedAt?.toMillis?.() || 0) - (a.startedAt?.toMillis?.() || 0)
+  );
+  const row = rows[0];
+  if (!row) return { ok: true, recordingAllowed: ctx.meeting.recordingAllowed === true, recordingStatus: "NOT_STARTED", recording: null };
+  return {
+    ok: true, recordingAllowed: ctx.meeting.recordingAllowed === true,
+    recordingStatus: row.recordingStatus || "UNKNOWN",
+    recording: {
+      id: row.id, egressId: row.egressId, outputPath: row.outputPath || null,
+      status: row.recordingStatus || "UNKNOWN", egressStatus: row.egressStatus || null,
+      startedAt: row.startedAt?.toDate?.().toISOString?.() || null,
+      stoppedAt: row.stopRequestedAt?.toDate?.().toISOString?.() || null,
+      files: Array.isArray(row.fileResults) ? row.fileResults.map(file => ({ filename: file.filename || "", location: file.location || "", size: file.size || 0 })) : []
+    }
   };
 });
