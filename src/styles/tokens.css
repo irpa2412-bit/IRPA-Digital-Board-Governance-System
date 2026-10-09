@@ -1033,3 +1033,84 @@ table td{color:var(--text)}
     font-size:max(16px,1em);
   }
 }
+
+
+/* ==========================================================================
+   IRPA-DBGS FORM READABILITY HOTFIX — 2026-10-09
+   The app stylesheet is imported before this token stylesheet. Keep this
+   final-cascade form repair here so portal-specific styles cannot wash out
+   field labels, entered values, placeholders, or helper text.
+   Presentation only: preserve every word, field, option, workflow and role.
+   ========================================================================== */
+#root .app-shell .content-area .page .form-field > label,
+#root .app-shell .content-area .page .form-field > .field-label,
+#root .app-shell .content-area .page .signature-authority-field > label,
+#root .app-shell .content-area .page label:has(+ input),
+#root .app-shell .content-area .page label:has(+ select),
+#root .app-shell .content-area .page label:has(+ textarea) {
+  color: #18364f;
+  -webkit-text-fill-color: #18364f;
+  opacity: 1;
+  font-weight: 700;
+}
+
+#root .app-shell .content-area .page .form-field input,
+#root .app-shell .content-area .page .form-field select,
+#root .app-shell .content-area .page .form-field textarea,
+#root .app-shell .content-area .page .form-field input[type="file"],
+#root .app-shell .content-area .page .signature-authority-field input,
+#root .app-shell .content-area .page .signature-authority-field select,
+#root .app-shell .content-area .page .signature-authority-field textarea {
+  color: #18364f;
+  -webkit-text-fill-color: #18364f;
+  background-color: #ffffff;
+  border-color: #7b91a5;
+  opacity: 1;
+  font-weight: 600;
+}
+
+#root .app-shell .content-area .page .form-field input::placeholder,
+#root .app-shell .content-area .page .form-field textarea::placeholder,
+#root .app-shell .content-area .page .signature-authority-field input::placeholder,
+#root .app-shell .content-area .page .signature-authority-field textarea::placeholder {
+  color: #526579;
+  -webkit-text-fill-color: #526579;
+  opacity: 1;
+  font-weight: 500;
+}
+
+#root .app-shell .content-area .page .form-field select option,
+#root .app-shell .content-area .page .signature-authority-field select option {
+  color: #18364f;
+  background-color: #ffffff;
+  -webkit-text-fill-color: #18364f;
+  opacity: 1;
+}
+
+#root .app-shell .content-area .page .form-field :where(.field-help,.muted,.hint,.help-text),
+#root .app-shell .content-area .page .signature-authority-field :where(.field-help,.muted,.hint,.help-text) {
+  color: #40566b;
+  -webkit-text-fill-color: #40566b;
+  opacity: 1;
+}
+
+#root .app-shell .content-area .page .form-field :where(input,select,textarea):focus-visible,
+#root .app-shell .content-area .page .signature-authority-field :where(input,select,textarea):focus-visible {
+  outline: 3px solid #1769aa;
+  outline-offset: 2px;
+  border-color: #1769aa;
+}
+
+@media (max-width: 760px) {
+  #root .app-shell .content-area .page .form-field > label,
+  #root .app-shell .content-area .page .signature-authority-field > label {
+    font-size: 16px;
+    line-height: 1.45;
+  }
+  #root .app-shell .content-area .page .form-field input,
+  #root .app-shell .content-area .page .form-field select,
+  #root .app-shell .content-area .page .form-field textarea {
+    min-height: 48px;
+    font-size: 16px;
+  }
+}
