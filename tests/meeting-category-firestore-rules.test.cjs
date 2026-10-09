@@ -28,6 +28,12 @@ beforeEach(async () => {
       status: "Active",
       role: "Board Member"
     });
+    await db.doc("employees/staff-user").set({
+      uid: "staff-user",
+      email: "staff@example.test",
+      status: "Active",
+      role: "Staff"
+    });
     await db.doc("adminProfiles/admin-user").set({ active: true, email: "admin@example.test" });
   });
 });
@@ -98,4 +104,61 @@ test("meeting creation rejects missing or invalid category metadata", async () =
     meetingCategory: "SECRET",
     meetingPolicyId: "SECRET"
   })));
+});
+
+
+test("direct meeting reads enforce category roles server-side", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    const db = context.firestore();
+    await db.doc("meetings/governance-record").set(meeting({
+      meetingCategory: "GOVERNANCE",
+      meetingPolicyId: "GOVERNANCE",
+      meetingType: "Board Meeting"
+    }));
+    await db.doc("meetings/staff-record").set(meeting({
+      meetingCategory: "STAFF",
+      meetingPolicyId: "STAFF",
+      meetingType: "Staff Meeting"
+    }));
+  });
+  const staffDb = testEnv.authenticatedContext("staff-user", {
+    email: "staff@example.test"
+  }).firestore();
+  const boardDb = testEnv.authenticatedContext("board-member", {
+    email: "board@example.test"
+  }).firestore();
+  await assertFails(staffDb.doc("meetings/governance-record").get());
+  await assertSucceeds(boardDb.doc("meetings/governance-record").get());
+  await assertSucceeds(staffDb.doc("meetings/staff-record").get());
+});
+
+test("category-constrained meeting queries are allowed only for the matching category role", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("meetings/governance-record").set(meeting({
+      meetingCategory: "GOVERNANCE",
+      meetingPolicyId: "GOVERNANCE",
+      meetingType: "Board Meeting"
+    }));
+  });
+  const staffDb = testEnv.authenticatedContext("staff-user", {
+    email: "staff@example.test"
+  }).firestore();
+  const boardDb = testEnv.authenticatedContext("board-member", {
+    email: "board@example.test"
+  }).firestore();
+  await assertFails(staffDb.collection("meetings").where("meetingCategory", "==", "GOVERNANCE").get());
+  await assertSucceeds(boardDb.collection("meetings").where("meetingCategory", "==", "GOVERNANCE").get());
+});
+
+test("explicitly listed external participant can read only the meeting they are listed on", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    const db = context.firestore();
+    await db.doc("meetings/invited-record").set(meeting({ participantUids: ["external-user"] }));
+    await db.doc("meetings/uninvited-record").set(meeting({ title: "Not invited" }));
+  });
+  const externalDb = testEnv.authenticatedContext("external-user", {
+    email: "external@example.test"
+  }).firestore();
+  await assertSucceeds(externalDb.doc("meetings/invited-record").get());
+  await assertFails(externalDb.doc("meetings/uninvited-record").get());
 });
