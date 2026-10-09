@@ -284,7 +284,7 @@ async function calculateAuthoritativeQuorum(tx,meetingId,policy){
   const present=eligibleParticipants.filter(d=>String(d.data().attendanceStatus||d.data().status||"").trim().toLowerCase()==="present");
   const eligiblePresentCount=present.length;
   const requiredCount=policy.quorumBasis==="PERCENT_ELIGIBLE"?Math.ceil(totalEligibleCount*policy.quorumValue/100):Math.ceil(policy.quorumValue);
-  return {totalEligibleCount,eligibleCount:eligibleParticipants.length,eligiblePresentCount,presentCount:present.length,requiredCount,quorumMet:totalEligibleCount>0&&eligiblePresentCount>=requiredCount,policyVersion:policy.policyVersion,calculatedAt:FieldValue.serverTimestamp()};
+  return {totalEligibleCount,eligibleCount:eligibleParticipants.length,eligiblePresentCount,presentCount:present.length,requiredCount,quorumMet:totalEligibleCount>0&&eligiblePresentCount>=requiredCount,policyVersion:policy.policyVersion,calculatedAt:new Date().toISOString()};
 }
 function decideGovernanceVote(policy,quorum,tally){
   const ballotsCast=tally.forVotes+tally.againstVotes+(policy.abstentionsIncludedInBallotsCast?tally.abstainVotes:0);
@@ -323,7 +323,7 @@ exports.openGovernanceVotingIssue=onCall({region:"us-central1",timeoutSeconds:60
     const data={meetingId,meetingReference:String(meeting.meetingReference||meeting.reference||meeting.title||meetingId),meetingCategory:"GOVERNANCE",resolutionId,resolutionReference:resolution?.resolutionReference||String(request.data?.resolutionReference||""),votingReference:origin,policySnapshot:policy,quorumSnapshot:quorum,status:"Open",result:"Pending",anonymous:true,openedAt:FieldValue.serverTimestamp(),openedByUid:actor.uid,openedByProcess:true,createdAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()};
     tx.set(ref,data);
     tx.set(db.collection("audit").doc(),{action:"GOVERNANCE_VOTING_OPENED",collection:"votingIssues",recordId:issueId,details:{meetingId,resolutionId,votingReference:origin,policyVersion:policy.policyVersion,quorumSnapshot:quorum},actorUid:actor.uid,actorEmail:actor.email||null,createdAt:FieldValue.serverTimestamp()});
-    response={...data,id:issueId,alreadyOpen:false};
+    response={id:issueId,alreadyOpen:false,meetingId,meetingReference:data.meetingReference,meetingCategory:"GOVERNANCE",resolutionId,resolutionReference:data.resolutionReference,votingReference:origin,policySnapshot:policy,quorumSnapshot:quorum,status:"Open",result:"Pending",anonymous:true};
   });
   return response;
 });
