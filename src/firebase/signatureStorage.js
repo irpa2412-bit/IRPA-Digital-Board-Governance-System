@@ -221,3 +221,102 @@ if (typeof window !== "undefined" && !window.__irpaDriveFetchPatched) {
   };
   window.__irpaDriveFetchPatched = true;
 }
+
+const MEETING_ARCHIVE_CATEGORIES = Object.freeze({
+  GOVERNANCE: { label: "Governance Meetings", archiveCategory: "Governance Meeting Archive", classification: "Board Restricted" },
+  ADMINISTRATIVE: { label: "Administrative Meetings", archiveCategory: "Administrative Meeting Archive", classification: "Restricted" },
+  STAFF: { label: "Staff Meetings", archiveCategory: "Staff Meeting Archive", classification: "Internal" },
+  GENERAL: { label: "General Meetings", archiveCategory: "General Meeting Archive", classification: "Internal" },
+  OTHER: { label: "Other Meetings", archiveCategory: "Other Meeting Archive", classification: "Restricted" }
+});
+
+export async function provisionMeetingCategoryArchive({ meetingCategory, meetingId = null } = {}) {
+  const category = String(meetingCategory || "OTHER").trim().toUpperCase();
+  const policy = MEETING_ARCHIVE_CATEGORIES[category];
+  if (!policy) throw new Error("Choose a valid meeting category before creating its Google Drive archive.");
+  const result = await gatewayPost("/api/document-archive/provision", {
+    documentId: "IRPA-MEETING-ARCHIVE-" + category,
+    title: "IRPA " + policy.label + " Archive",
+    reference: "IRPA-MEETING-ARCHIVE-" + category,
+    archiveCategory: policy.archiveCategory,
+    classification: policy.classification,
+    meetingCategory: category,
+    meetingId: meetingId || null,
+    archivePurpose: "Authoritative meeting products for the " + policy.label + " category"
+  });
+  if (!result.folderId || !result.archiveUidLink) {
+    throw new Error("Google Drive did not confirm creation of the " + policy.label + " archive.");
+  }
+  return {
+    provider: "Google Drive",
+    meetingCategory: category,
+    archiveName: "IRPA " + policy.label + " Archive",
+    folderId: result.folderId,
+    folderUrl: result.archiveUidLink,
+    archivePath: result.archivePath || policy.archiveCategory,
+    classification: policy.classification
+  };
+}
+
+export async function uploadMeetingProductToDrive({
+  meetingCategory, meetingId, meetingReference = "", recordId = "", recordType = "OTHER",
+  title = "", fileName = "", content, contentType = "text/plain; charset=utf-8", ownerUid = null
+} = {}) {
+  if (!meetingId) throw new Error("A meeting ID is required to archive a meeting product.");
+  if (content == null) throw new Error("Meeting product content is required.");
+  const archive = await provisionMeetingCategoryArchive({ meetingCategory, meetingId });
+  const bytes = content instanceof Uint8Array
+    ? content
+    : content instanceof Blob
+      ? new Uint8Array(await content.arrayBuffer())
+      : new TextEncoder().encode(String(content));
+  if (!bytes.length) throw new Error("The meeting product is empty.");
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + chunkSize, bytes.length)));
+  }
+  const safe = value => String(value || "record").replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 100) || "record";
+  const extension = String(fileName).includes(".") ? String(fileName).split(".").pop() : "txt";
+  const finalName = safe(fileName || (safe(recordType) + "-" + safe(recordId || title) + "." + extension));
+  const path = [
+    "meeting-archives", archive.meetingCategory, safe(meetingId),
+    safe(recordType), safe(finalName)
+  ].join("/");
+  const uploaded = await gatewayPost("/api/upload", {
+    path,
+    fileName: finalName,
+    contentType,
+    fileSize: bytes.length,
+    base64: btoa(binary),
+    purpose: "IRPA Meeting Product · " + archive.meetingCategory,
+    folderId: archive.folderId,
+    ownerUid: ownerUid || auth.currentUser?.uid || null,
+    documentId: recordId || null,
+    meetingId,
+    meetingReference,
+    meetingCategory: archive.meetingCategory,
+    recordType,
+    title: title || finalName
+  });
+  if (!uploaded.fileId) throw new Error("Google Drive did not return a file ID for the meeting product.");
+  return {
+    provider: "Google Drive",
+    meetingCategory: archive.meetingCategory,
+    meetingId,
+    meetingReference,
+    recordId: recordId || null,
+    recordType,
+    title: title || finalName,
+    fileName: finalName,
+    fileId: uploaded.fileId,
+    webViewLink: uploaded.webViewLink || "",
+    folderId: archive.folderId,
+    folderUrl: archive.folderUrl,
+    archivePath: archive.archivePath,
+    storagePath: path,
+    contentType,
+    fileSize: bytes.length,
+    archivedAt: new Date().toISOString()
+  };
+}
