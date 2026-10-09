@@ -86,13 +86,58 @@ jobs:
           LIVEKIT_DOMAIN: ${{ secrets.LIVEKIT_DOMAIN }}
         run: |
           set -euo pipefail
-          curl --silent --show-error --fail --max-time 15 "https://${LIVEKIT_DOMAIN}/" -o /dev/null || {
-            echo "TLS endpoint did not return a successful HTTP response. Inspect VM service logs and firewall/DNS." >&2
+          code="$(curl --silent --show-error --max-time 15 --output /dev/null --write-out '%{http_code}' "https://${LIVEKIT_DOMAIN}/" || true)"
+          if [[ ! "${code}" =~ ^[234][0-9][0-9]$ ]]; then
+            echo "TLS endpoint failed its HTTPS handshake or returned a server error (HTTP ${code:-none}). Inspect VM service logs and firewall/DNS." >&2
             exit 1
-          }
-          echo "HTTPS endpoint returned a successful response. This is not yet proof of a WebRTC media session."
+          fi
+          echo "HTTPS/TLS endpoint responded with HTTP ${code}. This is not yet proof of a WebRTC media session."
+
+  deploy-firebase-token-function:
+    needs: deploy-livekit
+    runs-on: ubuntu-latest
+    environment: livekit-production
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Authenticate to the existing IRPA Firebase project
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - name: Configure LiveKit secret bindings and deploy only the token callable
+        env:
+          LIVEKIT_DOMAIN: ${{ secrets.LIVEKIT_DOMAIN }}
+          LIVEKIT_API_KEY: ${{ secrets.LIVEKIT_API_KEY }}
+          LIVEKIT_API_SECRET: ${{ secrets.LIVEKIT_API_SECRET }}
+        run: |
+          set -euo pipefail
+          test -n "${LIVEKIT_DOMAIN}"
+          test -n "${LIVEKIT_API_KEY}"
+          test -n "${LIVEKIT_API_SECRET}"
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"; rm -f functions/.env.irpa-digital-board-governance' EXIT
+          umask 077
+          printf '%s' "$LIVEKIT_API_KEY" > "$tmp/livekit-api-key"
+          printf '%s' "$LIVEKIT_API_SECRET" > "$tmp/livekit-api-secret"
+          npm install --global firebase-tools
+          firebase functions:secrets:set LIVEKIT_API_KEY --data-file "$tmp/livekit-api-key" --project irpa-digital-board-governance
+          firebase functions:secrets:set LIVEKIT_API_SECRET --data-file "$tmp/livekit-api-secret" --project irpa-digital-board-governance
+          printf 'LIVEKIT_URL=wss://%s\n' "$LIVEKIT_DOMAIN" > functions/.env.irpa-digital-board-governance
+          chmod 600 functions/.env.irpa-digital-board-governance
+          npm ci --prefix functions
+          firebase deploy --only functions:issueLiveMeetingToken --project irpa-digital-board-governance
 
       - name: Report deployment boundary
+        if: always()
         run: |
-          echo "LiveKit infrastructure deployment workflow completed."
+          echo "This workflow does not deploy the web application or alter Firebase authorization rules."
           echo "A two-browser WebRTC test is still required before meeting readiness can be declared."
