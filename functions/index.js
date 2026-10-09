@@ -231,7 +231,7 @@ async function requireActiveAdministratorCallable(request){
 
 function governanceRoleValues(record={}){
   return [record.role,record.title,record.position,record.boardPosition,record.participantRole,record.departmentalRole,
-    ...(Array.isArray(record.roles)?record.roles:[]),...(Array.isArray(record.assignedRoles)?record.assignedRoles:[])]
+    ...(Array.isArray(record.roles)?record.roles:[]),...(Array.isArray(record.assignedRoles)?record.assignedRoles:[]),...(Array.isArray(record.selectedRoles)?record.selectedRoles:[])]
     .map(v=>String(v||"").trim().toLowerCase().replace(/[._-]+/g," ").replace(/\s+/g," "));
 }
 function eligibleBoardVoter(record={}){
