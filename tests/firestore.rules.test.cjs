@@ -306,3 +306,14 @@ test("working-to-signature transition cannot write later-stage archive fields", 
   }));
 });
 
+
+test("non-administrator cannot create a TRIAL lifecycle record in production Firestore", async () => {
+  const db = testEnv.authenticatedContext("member-user", {
+    email: "member@example.test"
+  }).firestore();
+  await assertFails(db.doc("documents/LIFE-trial-denied").set(lifecycleDocument({
+    documentId: "LIFE-trial-denied",
+    recordOrigin: "TRIAL"
+  })));
+});
+
