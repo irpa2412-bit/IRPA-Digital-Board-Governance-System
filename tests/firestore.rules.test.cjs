@@ -288,3 +288,21 @@ test("document lifecycle records cannot be deleted by an ordinary owner", async 
   await assertFails(db.doc("documents/LIFE-test-1").delete());
 });
 
+
+test("working-to-signature transition cannot write later-stage archive fields", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("documents/LIFE-test-1").set(lifecycleDocument());
+  });
+  const db = testEnv.authenticatedContext("member-user", {
+    email: "member@example.test"
+  }).firestore();
+  await assertFails(db.doc("documents/LIFE-test-1").update({
+    status: "PENDING_SIGNATURE",
+    signatureStatus: "PENDING",
+    signatureRequestedAt: "2026-10-09T08:10:00.000Z",
+    signatureRequestedByUid: "member-user",
+    signedArchiveFileId: "forged-later-stage-file",
+    updatedAt: "2026-10-09T08:10:00.000Z"
+  }));
+});
+
