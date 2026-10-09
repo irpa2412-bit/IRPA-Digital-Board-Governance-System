@@ -24,7 +24,7 @@ This follows the official [LiveKit VM deployment guide](https://docs.livekit.io/
 
 ## VM deployment workflow
 
-The manual GitHub Actions workflow is `Deploy IRPA Self-Hosted LiveKit Staging`. It requires the explicit input `DEPLOY-LIVEKIT-STAGING` and the protected `livekit-staging` GitHub Environment.
+The GitHub Actions workflow is `Deploy IRPA Self-Hosted LiveKit Staging`. It requires the protected `livekit-staging` GitHub Environment. On this feature branch, ordinary pushes skip deployment; only a commit whose message begins `DEPLOY-LIVEKIT-STAGING:` can start the staging deployment, and the protected environment must approve it. The manual `DEPLOY-LIVEKIT-STAGING` input is available when workflow dispatch is enabled from the default branch. Do not use the marker until the account limit, spending, VM, DNS, firewall and staging secrets are all approved and ready.
 
 Configure these environment/repository secrets through the approved secret-management UI (never in chat or source files):
 
