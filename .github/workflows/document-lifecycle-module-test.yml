@@ -66,7 +66,8 @@ jobs:
         run: npm run build
       - name: Assert verification workflow is non-deploying
         run: |
-          if grep -nE 'wrangler deploy|firebase deploy|npm run deploy|cloudflare/wrangler-action' .github/workflows/document-lifecycle-module-test.yml; then
-            echo "Deployment command detected in verification workflow."
+          workflow_body="$(sed '/^      - name: Assert verification workflow is non-deploying/,$d' .github/workflows/document-lifecycle-module-test.yml)"
+          if printf '%s\\n' "$workflow_body" | grep -nE 'wrangler deploy|firebase deploy|npm run deploy|cloudflare/wrangler-action'; then
+            echo "Deployment command detected before the non-deployment assertion step."
             exit 1
           fi
