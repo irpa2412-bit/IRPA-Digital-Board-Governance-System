@@ -340,7 +340,7 @@ export async function inviteRegisteredPerson({record,recordType,role,memberType}
   }
 }
 
-export async function sendMemberInvitationEmail(_email, invitationId, _role, _memberType) {
+export async function sendMemberInvitationEmail(_email, invitationId, _role, _memberType, meetingAccess = null) {
   const cleanId = String(invitationId || "").trim();
   if (!cleanId) throw new Error("The invitation ID is required.");
   if (!auth.currentUser) throw new Error("Administrator authentication is required.");
@@ -350,7 +350,7 @@ export async function sendMemberInvitationEmail(_email, invitationId, _role, _me
     const response = await fetch(`${gateway}/api/invitations/send`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ invitationId: cleanId })
+      body: JSON.stringify({ invitationId: cleanId, ...(meetingAccess ? { meetingAccess } : {}) })
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || data.ok === false) throw new Error(data.error || "The IRPA mail server could not send the invitation.");
