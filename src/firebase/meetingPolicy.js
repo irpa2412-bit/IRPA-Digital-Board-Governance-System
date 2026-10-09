@@ -8,7 +8,8 @@ export const MEETING_CATEGORIES={
 
 export const MEETING_CATEGORY_OPTIONS=Object.values(MEETING_CATEGORIES).map(p=>({value:p.id,label:p.label}));
 
-export const MEETING_TYPE_OPTIONS=Object.values(MEETING_CATEGORIES).flatMap(p=>p.meetingTypes);\nexport const MEETING_POLICIES=MEETING_CATEGORIES;
+export const MEETING_TYPE_OPTIONS=Object.values(MEETING_CATEGORIES).flatMap(p=>p.meetingTypes);
+export const MEETING_POLICIES=MEETING_CATEGORIES;
 
 function resolveCategory(value){
   const v=String(value||"").trim().toLowerCase();
