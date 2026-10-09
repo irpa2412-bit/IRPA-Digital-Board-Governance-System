@@ -1,0 +1,16 @@
+{
+  admin off
+  auto_https off
+}
+
+http://meet.irpa.or.tz, http://turn.irpa.or.tz {
+  redir https://{host}{uri} permanent
+}
+
+https://meet.irpa.or.tz {
+  tls /etc/letsencrypt/live/irpa-livekit/fullchain.pem /etc/letsencrypt/live/irpa-livekit/privkey.pem
+  reverse_proxy 127.0.0.1:7880
+}
+
+# TURN/TLS is terminated by LiveKit itself on 5349; Caddy does not proxy
+# TURN packets. The turn hostname must resolve to this host's public IP.
