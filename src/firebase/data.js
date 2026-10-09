@@ -61,7 +61,7 @@ export async function getAccessibleMeetingRecords(){
     ...(Array.isArray(p.roleAssignments)?p.roleAssignments:[]),
     ...(Array.isArray(token?.claims?.irpaRoles)?token.claims.irpaRoles:[])
   ]).map(v=>String(v||"").trim()).filter(Boolean))];
-  const identity={uid:user.uid,email,active:activeMember||activeEmployee,isAdmin,activeMember,activeEmployee,roles,...(member||employee||{})};
+  const identity={...(member||employee||{}),uid:user.uid,email,active:activeMember||activeEmployee,isAdmin,activeMember,activeEmployee,roles};
   const ref=collection(db,COLLECTIONS.meetings);
   const jobs=[];
   if(isAdmin){
