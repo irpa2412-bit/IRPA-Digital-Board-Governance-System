@@ -322,6 +322,20 @@ function recordingRoomName(meetingId) {
 function safeRecordingId(value) {
   return String(value || "").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 120);
 }
+function egressState(info) {
+  const value = info?.status;
+  const numeric = Number(value);
+  const names = { 0: "EGRESS_STARTING", 1: "EGRESS_ACTIVE", 2: "EGRESS_ENDING", 3: "EGRESS_COMPLETE", 4: "EGRESS_FAILED", 5: "EGRESS_ABORTED", 6: "EGRESS_LIMIT_REACHED" };
+  return names[numeric] || text(value) || "UNKNOWN";
+}
+function recordingStateForEgress(info) {
+  const state = egressState(info);
+  if (state === "EGRESS_COMPLETE") return "COMPLETED";
+  if (["EGRESS_FAILED", "EGRESS_ABORTED", "EGRESS_LIMIT_REACHED"].includes(state)) return "FAILED";
+  if (state === "EGRESS_ENDING") return "STOPPING";
+  if (state === "EGRESS_ACTIVE") return "RECORDING";
+  return "STARTING";
+}
 exports.startMeetingRecording = onCall({
   region: "us-central1", timeoutSeconds: 60,
   secrets: [LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET]
@@ -357,7 +371,7 @@ exports.startMeetingRecording = onCall({
     meetingReference: text(ctx.meeting.meetingReference || ctx.meeting.reference || ctx.meeting.title),
     meetingTitle: text(ctx.meeting.title), meetingCategory: categoryOf(ctx.meeting), roomName,
     egressId, outputPath: filepath, recordingStatus: "RECORDING",
-    egressStatus: String(egress.status ?? "UNKNOWN"),
+    egressStatus: egressState(egress),
     recordingProvider: "LIVEKIT_EGRESS", storageDestination: "LIVEKIT_EGRESS_CONFIGURED_STORAGE",
     startedByUid: ctx.uid, startedByEmail: ctx.email || null,
     startedAt: FieldValue.serverTimestamp(), createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp()
@@ -396,9 +410,8 @@ exports.stopMeetingRecording = onCall({
   } catch (error) {
     throw new HttpsError("failed-precondition", "LiveKit did not confirm that recording stopped. Check the recording service before retrying.");
   }
-  const egressStatus = String(result.status ?? "UNKNOWN");
-  const numericStatus = Number(result.status);
-  const recordingStatus = numericStatus === 3 ? "COMPLETED" : [4, 5, 6].includes(numericStatus) ? "FAILED" : "STOPPING";
+  const egressStatus = egressState(result);
+  const recordingStatus = recordingStateForEgress(result);
   const files = Array.isArray(result.fileResults) ? result.fileResults.map(file => ({
     filename: text(file.filename), location: text(file.location), size: Number(file.size || 0)
   })) : [];
@@ -428,8 +441,24 @@ exports.getMeetingRecordingStatus = onCall({
   const rows = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) =>
     (b.startedAt?.toMillis?.() || 0) - (a.startedAt?.toMillis?.() || 0)
   );
-  const row = rows[0];
+  let row = rows[0];
   if (!row) return { ok: true, recordingAllowed: ctx.meeting.recordingAllowed === true, recordingStatus: "NOT_STARTED", recording: null };
+  if (row.egressId && ["RECORDING", "STOPPING", "STARTING"].includes(text(row.recordingStatus))) {
+    try {
+      const latest = (await egressClient().listEgress({ egressId: row.egressId })).find(item => text(item.egressId) === text(row.egressId));
+      if (latest) {
+        const nextStatus = recordingStateForEgress(latest);
+        const files = Array.isArray(latest.fileResults) ? latest.fileResults.map(file => ({ filename: text(file.filename), location: text(file.location), size: Number(file.size || 0) })) : [];
+        const patch = { recordingStatus: nextStatus, egressStatus: egressState(latest), fileResults: files, updatedAt: FieldValue.serverTimestamp() };
+        if (nextStatus === "COMPLETED") patch.completedAt = FieldValue.serverTimestamp();
+        await db.collection("meetingMediaRecordings").doc(row.id).update(patch);
+        await db.collection("meetings").doc(ctx.meeting.id).update({ recordingStatus: nextStatus, ...(nextStatus === "COMPLETED" ? { recordingCompletedAt: FieldValue.serverTimestamp() } : {}) });
+        row = { ...row, ...patch, fileResults: files, recordingStatus: nextStatus, egressStatus: egressState(latest) };
+      }
+    } catch (error) {
+      // Return the last persisted state if the Egress control plane is temporarily unavailable.
+    }
+  }
   return {
     ok: true, recordingAllowed: ctx.meeting.recordingAllowed === true,
     recordingStatus: row.recordingStatus || "UNKNOWN",
