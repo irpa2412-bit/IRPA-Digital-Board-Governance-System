@@ -234,15 +234,9 @@ export async function provisionMeetingCategoryArchive({ meetingCategory, meeting
   const category = String(meetingCategory || "OTHER").trim().toUpperCase();
   const policy = MEETING_ARCHIVE_CATEGORIES[category];
   if (!policy) throw new Error("Choose a valid meeting category before creating its Google Drive archive.");
-  const result = await gatewayPost("/api/document-archive/provision", {
-    documentId: "IRPA-MEETING-ARCHIVE-" + category,
-    title: "IRPA " + policy.label + " Archive",
-    reference: "IRPA-MEETING-ARCHIVE-" + category,
-    archiveCategory: policy.archiveCategory,
-    classification: policy.classification,
+  const result = await gatewayPost("/api/meeting-archive/provision", {
     meetingCategory: category,
-    meetingId: meetingId || null,
-    archivePurpose: "Authoritative meeting products for the " + policy.label + " category"
+    meetingId: meetingId || null
   });
   if (!result.folderId || !result.archiveUidLink) {
     throw new Error("Google Drive did not confirm creation of the " + policy.label + " archive.");
@@ -250,14 +244,13 @@ export async function provisionMeetingCategoryArchive({ meetingCategory, meeting
   return {
     provider: "Google Drive",
     meetingCategory: category,
-    archiveName: "IRPA " + policy.label + " Archive",
+    archiveName: result.archiveName || ("IRPA " + policy.label + " Archive"),
     folderId: result.folderId,
     folderUrl: result.archiveUidLink,
-    archivePath: result.archivePath || policy.archiveCategory,
-    classification: policy.classification
+    archivePath: result.archivePath || ("Meeting Archives/" + policy.label),
+    classification: result.classification || policy.classification
   };
 }
-
 
 export async function getMeetingCategoryArchive({ meetingCategory, meetingId } = {}) {
   const category = String(meetingCategory || "OTHER").trim().toUpperCase();
