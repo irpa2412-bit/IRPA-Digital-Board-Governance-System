@@ -258,6 +258,7 @@ async function requireMeetingController(request,meeting){
 function governancePolicySnapshot(meeting={}){
   const policy={
     policyReference:String(meeting.policyReference||"").trim(),
+    policyEffectiveDate:String(meeting.policyEffectiveDate||"").trim(),
     policyVersion:String(meeting.policyVersion||"1").trim()||"1",
     quorumBasis:["FIXED_COUNT","PERCENT_ELIGIBLE"].includes(meeting.quorumBasis)?meeting.quorumBasis:"FIXED_COUNT",
     quorumValue:Number(meeting.quorumValue??meeting.quorumRequired??1),
