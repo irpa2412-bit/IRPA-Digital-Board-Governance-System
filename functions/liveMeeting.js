@@ -1,10 +1,11 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { AccessToken } = require("livekit-server-sdk");
-const { defineSecret } = require("firebase-functions/params");
+const { defineSecret, defineString } = require("firebase-functions/params");
 
 const LIVEKIT_API_KEY = defineSecret("LIVEKIT_API_KEY");
 const LIVEKIT_API_SECRET = defineSecret("LIVEKIT_API_SECRET");
+const LIVEKIT_URL = defineString("LIVEKIT_URL");
 const crypto = require("crypto");
 
 const db = getFirestore();
@@ -108,7 +109,7 @@ exports.issueLiveMeetingToken = onCall({
   if (!meetingId) throw new HttpsError("invalid-argument", "Meeting ID is required.");
   // Firebase Secret Manager values are available only when explicitly bound to
   // this callable. Never rely on a secret merely existing in the project.
-  const liveKitUrl = text(process.env.LIVEKIT_URL);
+  const liveKitUrl = text(LIVEKIT_URL.value());
   const liveKitApiKey = text(LIVEKIT_API_KEY.value());
   const liveKitApiSecret = text(LIVEKIT_API_SECRET.value());
   if (!liveKitConfigured(liveKitUrl, liveKitApiKey, liveKitApiSecret)) {
