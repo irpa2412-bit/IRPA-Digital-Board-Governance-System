@@ -9,6 +9,7 @@ const records=fs.readFileSync("functions/meetingRecords.js","utf8");
 const liveMeeting=fs.readFileSync("functions/liveMeeting.js","utf8");
 const styles=fs.readFileSync("src/styles/tokens.css","utf8");
 const participantPage=fs.readFileSync("src/pages/OperationalGatewaysParticipants.jsx","utf8");
+const meetingsPage=fs.readFileSync("src/pages/Meetings.jsx","utf8");
 const entryGateway=fs.readFileSync("src/pages/MeetingEntryGateway.jsx","utf8");
 const invitationEmail=fs.readFileSync("drive-gateway/src/invitationEmail.mjs","utf8");
 const invitationWorker=fs.readFileSync("drive-gateway/src/index.js","utf8");
@@ -94,6 +95,7 @@ const checks=[
  ["Meeting Room provides retrieve and verify UI",roomSource.includes("retrieveRecord(r.id)")&&roomSource.includes("Retrieve & Verify")],
  ["Binary media is not falsely represented as recorded",records.includes("documentPortalRequiredForBinary:true")],
  ["Meeting auto registration exists",room.includes("registerSelf")],
+ ["Meeting Registration button routes to the existing Meeting Room and Auto Registration function",meetingsPage.includes('aria-label="Open meeting registration and existing meeting functions" onClick={()=>go("Meeting Room")}>Meeting Registration</button>')&&room.includes("registerSelf")],
 ];
 const failed=checks.filter(([,ok])=>!ok);
 const report={
