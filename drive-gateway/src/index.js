@@ -20,6 +20,7 @@ import { route as esignRoute } from "./router.mjs";
 import { buildEsignContext, EsignRecordDurableObject } from "./esignContext.mjs";
 import { runCleanup } from "./upload.mjs";
 import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPasswordSetup, getInvitationSessionState } from "./invitationRedemption.mjs";
+import { buildGoogleDriveAuthorizationParams } from "./googleDriveOAuth.mjs";
 
 let jwksCache = null;
 let jwksFetchedAt = 0;
@@ -233,14 +234,9 @@ async function startOAuth(request, env) {
   );
 
   const redirectUri = `${new URL(request.url).origin}/oauth/callback`;
-  const params = new URLSearchParams({
-    client_id: env.GOOGLE_DRIVE_CLIENT_ID,
-    redirect_uri: redirectUri,
-    response_type: "code",
-    access_type: "offline",
-    prompt: "consent",
-    include_granted_scopes: "true",
-    login_hint: AUTHORIZED_DRIVE_EMAIL,
+  const params = buildGoogleDriveAuthorizationParams({
+    clientId: env.GOOGLE_DRIVE_CLIENT_ID,
+    redirectUri,
     scope: DRIVE_SCOPE,
     state
   });
