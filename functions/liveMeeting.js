@@ -254,7 +254,7 @@ function egressClient() {
   const host = text(LIVEKIT_URL.value()).replace(/^wss:/i, "https:").replace(/^ws:/i, "http:");
   return new EgressClient(host, LIVEKIT_API_KEY.value(), LIVEKIT_API_SECRET.value());
 }
-async function resolveRecordingControl(request, meetingId) {
+async function resolveRecordingControl(request, meetingId, options = {}) {
   const uid = request.auth?.uid;
   const email = text(request.auth?.token?.email).toLowerCase();
   if (!uid) throw new HttpsError("unauthenticated", "IRPA authentication is required.");
@@ -263,8 +263,8 @@ async function resolveRecordingControl(request, meetingId) {
   if (!snap.exists) throw new HttpsError("not-found", "The requested meeting was not found.");
   const meeting = { id: snap.id, ...snap.data() };
   const isAdmin = request.auth?.token?.admin === true || email === "irpa2412@gmail.com";
-  if (!meetingOpenForMedia(meeting)) throw new HttpsError("failed-precondition", "This meeting is closed and recording cannot be controlled.");
-  if (meeting.recordingAllowed !== true) throw new HttpsError("permission-denied", "Recording is not enabled in the authoritative meeting record.");
+  if (!options.allowClosed && !meetingOpenForMedia(meeting)) throw new HttpsError("failed-precondition", "This meeting is closed and recording cannot be controlled.");
+  if (options.requireRecordingAllowed !== false && meeting.recordingAllowed !== true) throw new HttpsError("permission-denied", "Recording is not enabled in the authoritative meeting record.");
   const results = await Promise.all([
     db.collection("members").doc(uid).get(),
     db.collection("employees").doc(uid).get()
@@ -396,31 +396,34 @@ exports.stopMeetingRecording = onCall({
   } catch (error) {
     throw new HttpsError("failed-precondition", "LiveKit did not confirm that recording stopped. Check the recording service before retrying.");
   }
+  const egressStatus = String(result.status ?? "UNKNOWN");
+  const numericStatus = Number(result.status);
+  const recordingStatus = numericStatus === 3 ? "COMPLETED" : [4, 5, 6].includes(numericStatus) ? "FAILED" : "STOPPING";
   const files = Array.isArray(result.fileResults) ? result.fileResults.map(file => ({
     filename: text(file.filename), location: text(file.location), size: Number(file.size || 0)
   })) : [];
   await ref.update({
-    recordingStatus: "STOPPING", egressStatus: String(result.status ?? "UNKNOWN"),
+    recordingStatus, egressStatus,
     fileResults: files, stoppedByUid: ctx.uid, stoppedByEmail: ctx.email || null,
     stopRequestedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp()
   });
   await db.collection("meetings").doc(meetingId).update({
-    recordingStatus: "STOPPING", recordingStoppedAt: FieldValue.serverTimestamp(),
+    recordingStatus, recordingStoppedAt: FieldValue.serverTimestamp(),
     recordingStoppedByUid: ctx.uid
   });
   await db.collection("audit").add({
     action: "LIVE_MEETING_RECORDING_STOP_REQUESTED", collection: "meetingMediaRecordings", recordId: recordingId,
-    details: { meetingId, egressStatus: String(result.status ?? "UNKNOWN"), fileCount: files.length },
+    details: { meetingId, egressStatus, recordingStatus, fileCount: files.length },
     actorUid: ctx.uid, actorEmail: ctx.email || null, createdAt: FieldValue.serverTimestamp()
   });
-  return { ok: true, recordingId, recordingStatus: "STOPPING", egressStatus: String(result.status ?? "UNKNOWN"), files };
+  return { ok: true, recordingId, recordingStatus, egressStatus, files };
 });
 exports.getMeetingRecordingStatus = onCall({
   region: "us-central1", timeoutSeconds: 30,
   secrets: [LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET]
 }, async request => {
-  const ctx = await resolveRecordingControl(request, text(request.data?.meetingId));
-  if (!ctx.invited && !ctx.isAdmin) throw new HttpsError("permission-denied", "An authorised meeting participant is required to view recording status.");
+  const ctx = await resolveRecordingControl(request, text(request.data?.meetingId), { requireRecordingAllowed: false, allowClosed: true });
+  if (!ctx.invited && !ctx.isAdmin && !ctx.controller) throw new HttpsError("permission-denied", "An authorised meeting participant is required to view recording status.");
   const snap = await db.collection("meetingMediaRecordings").where("meetingId", "==", ctx.meeting.id).get();
   const rows = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) =>
     (b.startedAt?.toMillis?.() || 0) - (a.startedAt?.toMillis?.() || 0)
