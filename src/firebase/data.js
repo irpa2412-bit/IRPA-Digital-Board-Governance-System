@@ -75,12 +75,15 @@ export async function getAccessibleMeetingRecords(){
     for(const type of policy.meetingTypes)jobs.push(query(ref,where("meetingType","==",type)));
   }
   const uid=user.uid;
+  // Always query the authenticated initiator's own meetings, independently of category access roles.
+  jobs.push(query(ref,where("initiatorUid","==",uid)));
   for(const field of ["participantUids","attendeeUids","memberUids","invitedUids","subscriberUids"])jobs.push(query(ref,where(field,"array-contains",uid)));
   if(email)for(const field of ["participantEmails","attendeeEmails","invitedEmails","subscriberEmails"])jobs.push(query(ref,where(field,"array-contains",email)));
   const results=await Promise.all(jobs.map(q=>getDocs(q).catch(()=>null)));
   const records=new Map();
   results.forEach(s=>s?.docs?.forEach(d=>records.set(d.id,{id:d.id,...d.data()})));
   return [...records.values()].filter(m=>canAccessMeetingCategory(m,identity,{
+    isInitiator:String(m.initiatorUid||"")===uid,
     isInvited:["participantUids","attendeeUids","memberUids","invitedUids","subscriberUids"].some(k=>Array.isArray(m[k])&&m[k].includes(uid))||
       (email&&["participantEmails","attendeeEmails","invitedEmails","subscriberEmails"].some(k=>Array.isArray(m[k])&&m[k].map(v=>String(v||"").toLowerCase()).includes(email))),
     isRegisteredParticipant:["participantUids","attendeeUids","memberUids","subscriberUids"].some(k=>Array.isArray(m[k])&&m[k].includes(uid))
