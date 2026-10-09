@@ -1,9 +1,15 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { AccessToken } = require("livekit-server-sdk");
+const { defineSecret } = require("firebase-functions/params");
 const crypto = require("crypto");
 
 const db = getFirestore();
+
+// Keep media credentials in Google Secret Manager; never bake them into source or browser bundles.
+const LIVEKIT_URL = defineSecret("LIVEKIT_URL");
+const LIVEKIT_API_KEY = defineSecret("LIVEKIT_API_KEY");
+const LIVEKIT_API_SECRET = defineSecret("LIVEKIT_API_SECRET");
 
 function text(value) {
   return String(value ?? "").trim();
@@ -64,7 +70,7 @@ function opaqueRoomName(meetingId, sessionId) {
 }
 
 function liveKitConfigured() {
-  return Boolean(text(process.env.LIVEKIT_URL) && text(process.env.LIVEKIT_API_KEY) && text(process.env.LIVEKIT_API_SECRET));
+  return Boolean(text(LIVEKIT_URL.value()) && text(LIVEKIT_API_KEY.value()) && text(LIVEKIT_API_SECRET.value()));
 }
 
 function moderatorForMeeting(meeting = {}, uid, email, selectedAuthority) {
@@ -92,7 +98,8 @@ function moderatorForMeeting(meeting = {}, uid, email, selectedAuthority) {
 exports.issueLiveMeetingToken = onCall({
   region: "us-central1",
   timeoutSeconds: 30,
-  enforceAppCheck: false
+  enforceAppCheck: false,
+  secrets: [LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET]
 }, async request => {
   const uid = request.auth?.uid;
   const email = text(request.auth?.token?.email).toLowerCase();
@@ -174,7 +181,7 @@ exports.issueLiveMeetingToken = onCall({
   const roomName = opaqueRoomName(meetingId, sessionRef.id);
   const participantIdentity = `uid-${uid}`;
   const moderator = isAdmin || moderatorForMeeting(meeting, uid, email, selectedAuthority);
-  const token = new AccessToken(process.env.LIVEKIT_API_KEY, process.env.LIVEKIT_API_SECRET, {
+  const token = new AccessToken(LIVEKIT_API_KEY.value(), LIVEKIT_API_SECRET.value(), {
     identity: participantIdentity,
     name: text(meeting.displayName || meeting.title || "IRPA participant"),
     ttl: "10m"
@@ -204,7 +211,7 @@ exports.issueLiveMeetingToken = onCall({
     status: "Token Issued",
     tokenTtl: "10m",
     mediaEngine: "LiveKit",
-    mediaEndpoint: text(process.env.LIVEKIT_URL),
+    mediaEndpoint: text(LIVEKIT_URL.value()),
     governanceAuthorityRemainsIRPA: true
   });
 
@@ -230,7 +237,7 @@ exports.issueLiveMeetingToken = onCall({
   return {
     ok: true,
     sessionId: sessionRef.id,
-    serverUrl: text(process.env.LIVEKIT_URL),
+    serverUrl: text(LIVEKIT_URL.value()),
     participantToken: await token.toJwt(),
     moderator,
     recordingAllowed: meeting.recordingAllowed === true,
