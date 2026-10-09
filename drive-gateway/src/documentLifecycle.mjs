@@ -195,10 +195,24 @@ if(!policy.allowed)return deps.json({ok:false,error:policy.reason},403,deps.cors
         record.archiveFolderId=archive.folderId;record.archiveUidLink="https://drive.google.com/drive/folders/"+encodeURIComponent(archive.folderId);record.archiveFileWebViewLink=uploaded.webViewLink||null;record.webViewLink=uploaded.webViewLink||null;record.fileUrl=uploaded.id?"drive://"+uploaded.id:null;record.recordOrigin=String(data.recordOrigin||"PRODUCTION").toUpperCase()==="TRIAL"?"TRIAL":"PRODUCTION";
         await commitDocumentAndAudit(deps,env,claims,documentId,record,"UPLOADED",{reference,classification,archiveCategory:category,sha256:hash},{createOnly:true});
       } catch(error) {
+        let rollbackStatus=uploaded?.id?"PENDING":"NOT_REQUIRED";
+        let rollbackError=null;
         if(uploaded?.id) {
-          try { await deleteDriveFile(deps,env,accessToken,uploaded.id); }
-          catch(rollbackError) { throw new Error("Document upload failed and Drive rollback was incomplete: "+(rollbackError?.message||rollbackError)); }
+          try { await deleteDriveFile(deps,env,accessToken,uploaded.id); rollbackStatus="SUCCEEDED"; }
+          catch(caught) { rollbackStatus="FAILED"; rollbackError=caught?.message||String(caught); }
         }
+        let failureAuditStatus="NOT_CONFIGURED";
+        try {
+          if(typeof deps.recordLifecycleFailure==="function") {
+            await deps.recordLifecycleFailure(env,claims,documentId,"UPLOAD",{failureReason:error?.message||String(error),driveFileId:uploaded?.id||"",rollbackStatus,rollbackError});
+            failureAuditStatus="RECORDED";
+          }
+        } catch(auditError) {
+          failureAuditStatus="FAILED";
+          console.error(JSON.stringify({event:"DOCUMENT_LIFECYCLE_FAILURE_AUDIT_FAILED",documentId,action:"UPLOAD",rollbackStatus,error:auditError?.message||String(auditError)}));
+        }
+        if(rollbackStatus==="FAILED") throw new Error("Document upload failed; Drive rollback was incomplete; failure audit "+failureAuditStatus+": "+rollbackError);
+        if(failureAuditStatus==="FAILED") throw new Error("Document upload failed and storage rollback "+rollbackStatus.toLowerCase()+"; failure audit could not be persisted: "+(error?.message||String(error)));
         throw error;
       }
       return deps.json({ok:true,documentId,reference,archivePath:archive.archivePath,fileId:uploaded.id,fileName,sha256:hash,status:"WORKING"},201,deps.corsHeaders(request));
@@ -215,7 +229,7 @@ if(!policy.allowed)return deps.json({ok:false,error:policy.reason},403,deps.cors
       const metadata=await deps.driveFetch(env,accessToken,"/drive/v3/files/"+encodeURIComponent(suppliedFileId)+"?fields=id,name,mimeType,size,description,trashed");
       const description=JSON.parse(metadata.description||"{}");
       if(!description.irpaGovernance||description.documentId!==documentId)return deps.json({ok:false,error:"The requested file is not the registered IRPA lifecycle file."},403,deps.corsHeaders(request));
-      const media=await fetch("https://www.googleapis.com/drive/v3/files/"+encodeURIComponent(suppliedFileId)+"?alt=media",{headers:{Authorization:"Bearer "+accessToken}});
+      const fetchImpl=deps.fetch||fetch;const media=await fetchImpl("https://www.googleapis.com/drive/v3/files/"+encodeURIComponent(suppliedFileId)+"?alt=media",{headers:{Authorization:"Bearer "+accessToken}});
       if(!media.ok)throw new Error("Google Drive download failed.");
       const bytes=new Uint8Array(await media.arrayBuffer());
       const actualHash=await sha256(bytes);
@@ -257,7 +271,19 @@ if(!policy.allowed)return deps.json({ok:false,error:policy.reason},403,deps.cors
           try { await deleteDriveFile(deps,env,accessToken,fileId); }
           catch(rollbackError) { rollbackFailures.push(rollbackError?.message||String(rollbackError)); }
         }
-        if(rollbackFailures.length)throw new Error("Document transition failed and storage rollback was incomplete: "+rollbackFailures.join("; "));
+        const rollbackStatus=rollbackFailures.length?"FAILED":"SUCCEEDED";
+        let failureAuditStatus="NOT_CONFIGURED";
+        try {
+          if(typeof deps.recordLifecycleFailure==="function") {
+            await deps.recordLifecycleFailure(env,claims,documentId,"TRANSITION",{failureReason:error?.message||String(error),targetStage:target,createdStageFiles:createdStageFiles.join(","),rollbackStatus,rollbackError:rollbackFailures.join("; ")});
+            failureAuditStatus="RECORDED";
+          }
+        } catch(auditError) {
+          failureAuditStatus="FAILED";
+          console.error(JSON.stringify({event:"DOCUMENT_LIFECYCLE_FAILURE_AUDIT_FAILED",documentId,action:"TRANSITION",targetStage:target,rollbackStatus,error:auditError?.message||String(auditError)}));
+        }
+        if(rollbackFailures.length)throw new Error("Document transition failed and storage rollback was incomplete; failure audit "+failureAuditStatus+": "+rollbackFailures.join("; "));
+        if(failureAuditStatus==="FAILED")throw new Error("Document transition failed and storage rollback succeeded; failure audit could not be persisted: "+(error?.message||String(error)));
         throw error;
       }
       return deps.json({ok:true,documentId,status:target,archivePath:archive.archivePath,archiveFolderId:archive.folderId,...patch},200,deps.corsHeaders(request));
