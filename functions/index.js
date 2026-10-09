@@ -300,7 +300,7 @@ function decideGovernanceVote(policy,quorum,tally){
 exports.openGovernanceVotingIssue=onCall({region:"us-central1",timeoutSeconds:60},async request=>{
   const uid=request.auth?.uid;
   if(!uid)throw new HttpsError("unauthenticated","Sign in before opening a vote.");
-  const meetingId=String(request.data?.meetingId||"").trim(),origin=String(request.data?.votingReference||"").trim();
+  const meetingId=String(request.data?.meetingId||"").trim(),origin=String(request.data?.votingReference||"").trim(),agendaItem=String(request.data?.agendaItem||"").trim();
   const resolutionId=String(request.data?.resolutionId||"").trim()||null;
   if(!meetingId||!origin)throw new HttpsError("invalid-argument","Meeting and voting issue references are required.");
   const meetingSnap=await db.collection("meetings").doc(meetingId).get();
@@ -320,10 +320,10 @@ exports.openGovernanceVotingIssue=onCall({region:"us-central1",timeoutSeconds:60
     if(existing.exists&&String(existing.data().status||"Open")!=="Cancelled"){response={...existing.data(),id:existing.id,alreadyOpen:true};return;}
     const quorum=await calculateAuthoritativeQuorum(tx,meetingId,policy);
     if(policy.requireQuorumAtVoteOpen&&!quorum.quorumMet)throw new HttpsError("failed-precondition",`Voting is blocked: quorum is not met (${quorum.eligiblePresentCount}/${quorum.requiredCount} eligible members present).`);
-    const data={meetingId,meetingReference:String(meeting.meetingReference||meeting.reference||meeting.title||meetingId),meetingCategory:"GOVERNANCE",resolutionId,resolutionReference:resolution?.resolutionReference||String(request.data?.resolutionReference||""),votingReference:origin,policySnapshot:policy,quorumSnapshot:quorum,status:"Open",result:"Pending",anonymous:true,openedAt:FieldValue.serverTimestamp(),openedByUid:actor.uid,openedByProcess:true,createdAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()};
+    const data={meetingId,meetingReference:String(meeting.meetingReference||meeting.reference||meeting.title||meetingId),meetingCategory:"GOVERNANCE",resolutionId,resolutionReference:resolution?.resolutionReference||String(request.data?.resolutionReference||""),agendaItem,policySnapshot:policy,quorumSnapshot:quorum,status:"Open",result:"Pending",anonymous:true,openedAt:FieldValue.serverTimestamp(),openedByUid:actor.uid,openedByProcess:true,createdAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()};
     tx.set(ref,data);
     tx.set(db.collection("audit").doc(),{action:"GOVERNANCE_VOTING_OPENED",collection:"votingIssues",recordId:issueId,details:{meetingId,resolutionId,votingReference:origin,policyVersion:policy.policyVersion,quorumSnapshot:quorum},actorUid:actor.uid,actorEmail:actor.email||null,createdAt:FieldValue.serverTimestamp()});
-    response={id:issueId,alreadyOpen:false,meetingId,meetingReference:data.meetingReference,meetingCategory:"GOVERNANCE",resolutionId,resolutionReference:data.resolutionReference,votingReference:origin,policySnapshot:policy,quorumSnapshot:quorum,status:"Open",result:"Pending",anonymous:true};
+    response={id:issueId,alreadyOpen:false,meetingId,meetingReference:data.meetingReference,meetingCategory:"GOVERNANCE",resolutionId,resolutionReference:data.resolutionReference,agendaItem, votingReference:origin,policySnapshot:policy,quorumSnapshot:quorum,status:"Open",result:"Pending",anonymous:true};
   });
   return response;
 });
@@ -351,6 +351,7 @@ exports.closeGovernanceVotingIssue=onCall({region:"us-central1",timeoutSeconds:6
     let resolutionSnap=null;
     if(issue.resolutionId)resolutionSnap=await tx.get(db.collection("resolutions").doc(String(issue.resolutionId)));
     if(issue.resolutionId&&!resolutionSnap.exists)throw new HttpsError("failed-precondition","The linked resolution no longer exists.");
+    const decisionsSnap=await tx.get(db.collection("decisions").where("meetingId","==",meeting.id));
     const tally={forVotes:0,againstVotes:0,abstainVotes:0};
     for(const d of voteSnap.docs){const v=d.data();if(v.outcome==="For")tally.forVotes++;else if(v.outcome==="Against")tally.againstVotes++;else if(v.outcome==="Abstain")tally.abstainVotes++;}
     const decision=decideGovernanceVote(policy,quorum,tally);
@@ -358,6 +359,7 @@ exports.closeGovernanceVotingIssue=onCall({region:"us-central1",timeoutSeconds:6
     const now=FieldValue.serverTimestamp();
     tx.update(ref,{status:"Closed",result:decision.result,finalTally:decision,quorumSnapshot:quorum,closedAt:now,closedByUid:actor.uid,updatedAt:now});
     if(resolutionSnap?.exists)tx.update(resolutionSnap.ref,{status:decision.result==="Pending"?"Voting Open":decision.result,votingStatus:decision.result==="Pending"?"Pending":"Completed",votingResult:decision.result,votingIssueId:issueId,finalTally:decision,quorumSnapshot:quorum,updatedAt:now});
+    for(const decisionDoc of decisionsSnap.docs){const row=decisionDoc.data();const linked=String(row.votingIssueId||"")===issueId||(issue.resolutionId&&String(row.resolutionId||"")===String(issue.resolutionId))||(!issue.resolutionId&&issue.agendaItem&&String(row.originatingAgendaItem||row.agendaItem||"")===String(issue.agendaItem));if(linked)tx.update(decisionDoc.ref,{status:decision.result==="Pending"?(row.status||"Draft"):decision.result,votingStatus:decision.result==="Pending"?"Pending":"Completed",votingResult:decision.result,votingIssueId:issueId,finalTally:decision,quorumSnapshot:quorum,updatedAt:now});}
     tx.set(db.collection("audit").doc(),{action:"GOVERNANCE_VOTING_CLOSED",collection:"votingIssues",recordId:issueId,details:{meetingId:meeting.id,resolutionId:issue.resolutionId||null,decision,policyVersion:policy.policyVersion},actorUid:actor.uid,actorEmail:actor.email||null,createdAt:now});
     response={result:decision.result,decision,quorumSnapshot:quorum};
   });
