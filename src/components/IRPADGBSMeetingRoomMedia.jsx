@@ -10,7 +10,7 @@ function safeJson(value){
   try{return JSON.parse(decoder.decode(value))}catch{return null}
 }
 
-export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",controller=false}){
+export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",controller=false,authorizedToJoin=false}){
  const roomRef=useRef(null),remoteRef=useRef(null),localRef=useRef(null);
  const[status,setStatus]=useState("READY"),[error,setError]=useState(""),[muted,setMuted]=useState(true),[camera,setCamera]=useState(false),[screen,setScreen]=useState(false),[hand,setHand]=useState(false),[moderator,setModerator]=useState(false),[recordingAllowed,setRecordingAllowed]=useState(false);
  const[participants,setParticipants]=useState([]),[messages,setMessages]=useState([]),[chat,setChat]=useState(""),[deviceReady,setDeviceReady]=useState(false),[deviceCheck,setDeviceCheck]=useState("NOT CHECKED"),[sessionId,setSessionId]=useState("");
@@ -42,7 +42,7 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
  async function connect(){
    if(!meeting?.id)return setError("Select an IRPA meeting first.");
    if(!auth.currentUser)return setError("Sign in to IRPA before joining the Meeting Room.");
-   if(!controller)return setError("Meeting control authority is required to join the live room.");
+   if(!controller&&!authorizedToJoin)return setError("An authorized meeting invitation or meeting control authority is required to join the live room.");
    if(roomRef.current)return;
    setError("");setStatus("AUTHORIZING");
    try{
@@ -101,7 +101,7 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
  async function sendChat(e){e?.preventDefault();const text=chat.trim();if(!text||!roomRef.current)return;try{await roomRef.current.localParticipant.publishData(encoder.encode(JSON.stringify({type:"chat",text})),{reliable:true});setMessages(v=>[...v,{from:"You",text}].slice(-30));setChat("")}catch(err){setError(err?.message||"Unable to send meeting message.")}}
 
  const participantCount=participants.length;
- const readiness=useMemo(()=>status==="CONNECTED"?(deviceReady?"READY":"CHECK DEVICE"):(controller?"READY TO JOIN":"READ ONLY"),[status,deviceReady,controller]);
+ const readiness=useMemo(()=>status==="CONNECTED"?(deviceReady?"READY":"CHECK DEVICE"):((controller||authorizedToJoin)?"READY TO JOIN":"READ ONLY"),[status,deviceReady,controller,authorizedToJoin]);
 
  return <section className="panel" style={{marginTop:18}}>
   <div className="panel-header">
@@ -128,7 +128,7 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
   </div>
   {error&&<div className="error-message action-feedback" style={{marginTop:12}}>{error}</div>}
   <div className="form-actions" style={{marginTop:14}}>
-   {status!=="CONNECTED"&&<button onClick={connect} disabled={!controller||status==="AUTHORIZING"}>{status==="AUTHORIZING"?"Authorizing…":"Join IRPA-DGBS Meeting Room"}</button>}
+   {status!=="CONNECTED"&&<button onClick={connect} disabled={(!controller&&!authorizedToJoin)||status==="AUTHORIZING"}>{status==="AUTHORIZING"?"Authorizing…":"Join IRPA-DGBS Meeting Room"}</button>}
    {status==="CONNECTED"&&<>
     <button className="secondary-button" onClick={toggleMic}>{muted?"Unmute microphone":"Mute microphone"}</button>
     <button className="secondary-button" onClick={toggleCamera}>{camera?"Stop camera":"Start camera"}</button>
