@@ -121,23 +121,59 @@ exports.issueLiveMeetingToken = onCall({
   if (memberSnap.exists) records.push(memberSnap.data() || {});
   if (employeeSnap.exists) records.push(employeeSnap.data() || {});
 
-  const isAdmin = request.auth?.token?.admin === true || email === "irpa2412@gmail.com";
-  const activeIdentity = isAdmin || records.some(activeRecord);
-  if (!activeIdentity) throw new HttpsError("permission-denied", "An active IRPA member or employee identity is required.");
+  // When a participant arrives through the Invitation Portal gate, validate
+  // the server-side participant record again before issuing a media token.
+  // The browser-provided ID is only a lookup key; meeting and identity binding
+  // are re-verified here and never trusted from client state alone.
+  const participantId = text(request.data?.participantId);
+  let invitedParticipant = null;
+  if (participantId) {
+    const participantSnap = await db.collection("participants").doc(participantId).get();
+    if (!participantSnap.exists) {
+      throw new HttpsError("permission-denied", "The invitation participant record could not be verified.");
+    }
+    const candidate = { id: participantSnap.id, ...participantSnap.data() };
+    if (text(candidate.meetingId) !== meetingId) {
+      throw new HttpsError("permission-denied", "The invited participant is not linked to this meeting.");
+    }
+    const boundUid = text(candidate.participantUid || candidate.uid || candidate.userId);
+    const boundEmail = text(candidate.participantEmail || candidate.email).toLowerCase();
+    if ((boundUid && boundUid !== uid) || (boundEmail && boundEmail !== email) || (!boundUid && !boundEmail)) {
+      throw new HttpsError("permission-denied", "The invitation participant identity does not match the signed-in account.");
+    }
+    const participantStatus = text(candidate.status).toLowerCase();
+    if (["cancelled", "canceled", "revoked", "removed", "inactive", "closed"].includes(participantStatus)) {
+      throw new HttpsError("permission-denied", "This meeting participant invitation is no longer active.");
+    }
+    invitedParticipant = candidate;
+  }
 
-  const listed = participantListed(meeting, uid);
+  const isAdmin = request.auth?.token?.admin === true || email === "irpa2412@gmail.com";
+  const activeIdentity = isAdmin || records.some(activeRecord) || Boolean(invitedParticipant);
+  if (!activeIdentity) throw new HttpsError("permission-denied", "An active IRPA member, employee, or verified meeting invitee identity is required.");
+
+  const listed = Boolean(invitedParticipant) || participantListed(meeting, uid);
   if (!isAdmin && !listed) {
     throw new HttpsError("permission-denied", "This account is not registered as a participant in the selected meeting.");
   }
 
-  if (!isAdmin && selectedAuthority && !records.some(record => selectedAuthorityMatches(record, selectedAuthority))) {
+  const invitedRoles = invitedParticipant
+    ? [
+        invitedParticipant.role,
+        invitedParticipant.participantRole,
+        invitedParticipant.authority,
+        ...(Array.isArray(invitedParticipant.roles) ? invitedParticipant.roles : [])
+      ].map(value => text(value)).filter(Boolean)
+    : [];
+  const authorityMatches = records.some(record => selectedAuthorityMatches(record, selectedAuthority)) || invitedRoles.includes(selectedAuthority);
+  if (!isAdmin && selectedAuthority && !authorityMatches) {
     throw new HttpsError("permission-denied", "The selected access authority is not registered to this account.");
   }
 
   const sessionRef = db.collection("liveMeetingSessions").doc();
   const roomName = opaqueRoomName(meetingId, sessionRef.id);
   const participantIdentity = `uid-${uid}`;
-
+  const moderator = isAdmin || moderatorForMeeting(meeting, uid, email, selectedAuthority);
   const token = new AccessToken(process.env.LIVEKIT_API_KEY, process.env.LIVEKIT_API_SECRET, {
     identity: participantIdentity,
     name: text(meeting.displayName || meeting.title || "IRPA participant"),
@@ -154,7 +190,6 @@ exports.issueLiveMeetingToken = onCall({
   });
 
   const participantLabel = selectedAuthority || "Meeting Participant";
-  const moderator = isAdmin || moderatorForMeeting(meeting, uid, email, selectedAuthority);
   await sessionRef.set({
     meetingId,
     meetingReference: text(meeting.reference || meeting.title) || null,
