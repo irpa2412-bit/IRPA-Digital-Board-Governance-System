@@ -139,9 +139,9 @@ jobs:
           printf '%s' "$LIVEKIT_API_SECRET" > "$tmp/livekit-api-secret"
           npm install --global firebase-tools
           npm ci --prefix functions
-          firebase functions:secrets:set LIVEKIT_URL --data-file "$tmp/livekit-url" --project "$STAGING_FIREBASE_PROJECT_ID" --force
-          firebase functions:secrets:set LIVEKIT_API_KEY --data-file "$tmp/livekit-api-key" --project "$STAGING_FIREBASE_PROJECT_ID" --force
-          firebase functions:secrets:set LIVEKIT_API_SECRET --data-file "$tmp/livekit-api-secret" --project "$STAGING_FIREBASE_PROJECT_ID" --force
+          firebase functions:secrets:set LIVEKIT_URL --data-file "$tmp/livekit-url" --project "$STAGING_FIREBASE_PROJECT_ID"
+          firebase functions:secrets:set LIVEKIT_API_KEY --data-file "$tmp/livekit-api-key" --project "$STAGING_FIREBASE_PROJECT_ID"
+          firebase functions:secrets:set LIVEKIT_API_SECRET --data-file "$tmp/livekit-api-secret" --project "$STAGING_FIREBASE_PROJECT_ID"
           firebase deploy --only functions:issueLiveMeetingToken --project "$STAGING_FIREBASE_PROJECT_ID"
 
       - name: State remaining acceptance gate
