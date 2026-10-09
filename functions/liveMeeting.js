@@ -445,7 +445,7 @@ exports.getMeetingRecordingStatus = onCall({
   if (!row) return { ok: true, recordingAllowed: ctx.meeting.recordingAllowed === true, recordingStatus: "NOT_STARTED", recording: null };
   if (row.egressId && ["RECORDING", "STOPPING", "STARTING"].includes(text(row.recordingStatus))) {
     try {
-      const latest = (await egressClient().listEgress({ egressId: row.egressId })).find(item => text(item.egressId) === text(row.egressId));
+      const latest = (await egressClient().listEgress("", row.egressId)).find(item => text(item.egressId) === text(row.egressId));
       if (latest) {
         const nextStatus = recordingStateForEgress(latest);
         const files = Array.isArray(latest.fileResults) ? latest.fileResults.map(file => ({ filename: text(file.filename), location: text(file.location), size: Number(file.size || 0) })) : [];
