@@ -1,0 +1,5 @@
+{$LIVEKIT_DOMAIN} {
+    tls /etc/letsencrypt/live/irpa-livekit/fullchain.pem /etc/letsencrypt/live/irpa-livekit/privkey.pem
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:7880
+}
