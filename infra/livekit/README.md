@@ -1,3 +1,5 @@
+> **Canonical deployment boundary:** `infra/livekit/` is the only active LiveKit deployment configuration. The older `meeting-infrastructure/` examples and the duplicate functions-only deployment workflow are retired. Use only `.github/workflows/deploy-livekit-staging.yml`; deployment requires the protected `livekit-staging` environment and the explicit marker/confirmation. Do not deploy until provider account, billing, SSH, DNS, firewall and isolated Firebase prerequisites are verified.
+
 # IRPA self-hosted LiveKit — isolated staging
 
 This package deploys the LiveKit OSS media plane on a dedicated VM, isolated from production governance data. It does not deploy the web app, alter Firebase authorization rules, or use production Firestore data.
@@ -24,7 +26,7 @@ This follows the official [LiveKit VM deployment guide](https://docs.livekit.io/
 
 ## VM deployment workflow
 
-The GitHub Actions workflow is `Deploy IRPA Self-Hosted LiveKit Staging`. It requires the protected `livekit-staging` GitHub Environment. On this feature branch, ordinary pushes skip deployment; only a commit whose message begins `DEPLOY-LIVEKIT-STAGING:` can start the staging deployment, and the protected environment must approve it. The manual `DEPLOY-LIVEKIT-STAGING` input is available when workflow dispatch is enabled from the default branch. Do not use the marker until the account limit, spending, VM, DNS, firewall and staging secrets are all approved and ready.
+The GitHub Actions workflow is `Deploy IRPA Self-Hosted LiveKit Staging`. It requires the protected `livekit-staging` GitHub Environment. On the staging feature branch or collective integration branch, ordinary pushes skip deployment; only a commit whose message begins `DEPLOY-LIVEKIT-STAGING:` can start the staging deployment, and the protected environment must approve it. The manual `DEPLOY-LIVEKIT-STAGING` input is available when workflow dispatch is enabled from the default branch. Do not use the marker until the account limit, spending, VM, DNS, firewall and staging secrets are all approved and ready.
 
 Configure these environment/repository secrets through the approved secret-management UI (never in chat or source files):
 

@@ -5,7 +5,7 @@ on:
   # the workflow into main. Ordinary pushes do not deploy; the commit message
   # must carry the explicit marker and the protected environment must approve.
   push:
-    branches: [infra/self-hosted-livekit-staging-20261009]
+    branches: [infra/self-hosted-livekit-staging-20261009, integration/collective-portals-20261009]
   workflow_dispatch:
     inputs:
       confirm_deployment:
@@ -104,7 +104,7 @@ jobs:
 
   deploy-staging-token-function:
     needs: deploy-media-server
-    if: ${{ inputs.confirm_deployment == 'DEPLOY-LIVEKIT-STAGING' }}
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.confirm_deployment == 'DEPLOY-LIVEKIT-STAGING') || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'DEPLOY-LIVEKIT-STAGING:')) }}
     environment: livekit-staging
     runs-on: ubuntu-latest
     timeout-minutes: 25
