@@ -17,6 +17,7 @@ const livekitCompose=fs.readFileSync("infra/livekit/docker-compose.yml","utf8");
 const livekitConfig=fs.readFileSync("infra/livekit/livekit.yaml.template","utf8");
 const livekitCaddy=fs.readFileSync("infra/livekit/caddy.yaml.template","utf8");
 const livekitDeploy=fs.readFileSync("infra/livekit/deploy-staging.sh","utf8");
+const livekitWorkflow=fs.readFileSync(".github/workflows/deploy-livekit-staging.yml","utf8");
 const checks=[
  ["Meeting media client exists",fs.existsSync("src/components/IRPADGBSMeetingRoomMedia.jsx")],
  ["Participant invitation creates a meeting access pass",participantPage.includes("createMeetingAccessInvitation")&&participantPage.includes("meetingAccess")],
@@ -48,6 +49,9 @@ const checks=[
  ["TURN TLS is externally terminated by the Caddy L4 router",livekitConfig.includes("external_tls: true")&&livekitConfig.includes("tls_port: 5349")],
  ["Staging installer validates DNS before starting services",livekitDeploy.includes("getent ahostsv4")&&livekitDeploy.includes("does not include this VM")],
  ["Staging installer does not use a conflicting standalone certbot listener",!livekitDeploy.includes("certbot certonly")&&!livekitDeploy.includes("apt-get install -y certbot")],
+ ["LiveKit URL and credentials are bound as Firebase runtime secrets",liveMeeting.includes('defineSecret("LIVEKIT_URL")')&&liveMeeting.includes('defineSecret("LIVEKIT_API_KEY")')&&liveMeeting.includes('defineSecret("LIVEKIT_API_SECRET")')&&liveMeeting.includes("secrets: [LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET]")],
+ ["Deployment workflow is manually gated and staging-only",livekitWorkflow.includes("DEPLOY-LIVEKIT-STAGING")&&livekitWorkflow.includes("environment: livekit-staging")&&livekitWorkflow.includes('if [ "$STAGING_FIREBASE_PROJECT_ID" = "irpa-digital-board-governance" ]')&&livekitWorkflow.includes("Refusing to deploy the staging callable to the production Firebase project")],
+ ["Staging workflow deploys only the meeting token callable",livekitWorkflow.includes("firebase deploy --only functions:issueLiveMeetingToken")&&!livekitWorkflow.includes("firebase deploy --only hosting")],
  ["Long-session reconnection handling",media.includes("RoomEvent.Reconnecting")&&media.includes("RoomEvent.Reconnected")],
  ["Audio quality capture controls",media.includes("echoCancellation:true")&&media.includes("noiseSuppression:true")&&media.includes("autoGainControl:true")],
  ["HD video capture target",media.includes("1280,height:720")],
