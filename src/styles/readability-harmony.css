@@ -2569,3 +2569,78 @@ textarea:focus-visible{
   color:#17372b;
   background:#ffffff;
 }
+
+/* Signature Portal workflow: explicit dark ink on light cards, no fading. */
+.content-area .page .panel,
+.content-area .page .panel p,
+.content-area .page .panel span,
+.content-area .page .panel small,
+.content-area .page .panel label,
+.content-area .page .panel strong,
+.content-area .page .panel li,
+.content-area .page .panel h1,
+.content-area .page .panel h2,
+.content-area .page .panel h3,
+.content-area .page .panel h4,
+.content-area .page .panel .muted,
+.content-area .page .panel .eyebrow{
+  color:#173b2d!important;
+  opacity:1!important;
+  -webkit-text-fill-color:#173b2d!important;
+  text-shadow:none!important;
+}
+.content-area .page .panel button,
+.content-area .page .panel button span{
+  color:#ffffff!important;
+  opacity:1!important;
+  -webkit-text-fill-color:#ffffff!important;
+  text-shadow:none!important;
+  font-weight:800!important;
+}
+.content-area .page .panel button:disabled{
+  color:#ffffff!important;
+  background:#536b60!important;
+  border-color:#536b60!important;
+  opacity:1!important;
+  cursor:not-allowed;
+}
+.content-area .page .panel input,
+.content-area .page .panel select,
+.content-area .page .panel textarea{
+  color:#173b2d!important;
+  background:#ffffff!important;
+  border:2px solid #6f9282!important;
+  opacity:1!important;
+  -webkit-text-fill-color:#173b2d!important;
+  font-weight:650!important;
+}
+.content-area .page .panel select option{
+  color:#173b2d!important;
+  background:#ffffff!important;
+}
+.content-area .page .panel input::placeholder,
+.content-area .page .panel textarea::placeholder{
+  color:#526b60!important;
+  opacity:1!important;
+  -webkit-text-fill-color:#526b60!important;
+}
+.content-area .page .panel .muted,
+.content-area .page .panel small{
+  color:#526b60!important;
+  opacity:1!important;
+  -webkit-text-fill-color:#526b60!important;
+}
+.content-area .page .panel .eyebrow{
+  color:#245c8a!important;
+  opacity:1!important;
+  -webkit-text-fill-color:#245c8a!important;
+}
+@media(max-width:760px){
+  .content-area .page .panel label,
+  .content-area .page .panel p,
+  .content-area .page .panel small,
+  .content-area .page .panel button{
+    font-size:16px!important;
+    line-height:1.55!important;
+  }
+}
