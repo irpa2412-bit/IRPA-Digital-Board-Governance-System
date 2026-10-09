@@ -9,3 +9,7 @@ export async function disposeMeetingRecord(payload){const r=await call("disposeM
 export async function startMeetingRecording(payload){const r=await call("startMeetingRecording")(payload);return r.data;}
 export async function stopMeetingRecording(payload){const r=await call("stopMeetingRecording")(payload);return r.data;}
 export async function getMeetingRecordingStatus(meetingId){const r=await call("getMeetingRecordingStatus")({meetingId});return r.data;}
+
+export async function compileAndEmailMeetingReport(payload){const r=await call("compileAndEmailMeetingReport")(payload);return r.data;}
+
+export async function saveLiveMeetingProceedings(payload){const r=await call("saveLiveMeetingProceedings")(payload);return r.data;}
