@@ -258,13 +258,32 @@ export async function provisionMeetingCategoryArchive({ meetingCategory, meeting
   };
 }
 
+
+export async function getMeetingCategoryArchive({ meetingCategory, meetingId } = {}) {
+  const category = String(meetingCategory || "OTHER").trim().toUpperCase();
+  const policy = MEETING_ARCHIVE_CATEGORIES[category];
+  if (!policy) throw new Error("Choose a valid meeting category before opening its Google Drive archive.");
+  if (!meetingId) throw new Error("A meeting ID is required to verify access to its category archive.");
+  const result = await gatewayPost("/api/meeting-archive/get", { meetingCategory: category, meetingId });
+  if (!result.folderId || !result.archiveUidLink) throw new Error("Google Drive did not return the authorised meeting category archive.");
+  return {
+    provider: "Google Drive",
+    meetingCategory: category,
+    archiveName: result.archiveName || ("IRPA " + policy.label + " Archive"),
+    folderId: result.folderId,
+    folderUrl: result.archiveUidLink,
+    archivePath: result.archivePath || ("Meeting Archives/" + policy.label),
+    classification: result.classification || policy.classification
+  };
+}
+
 export async function uploadMeetingProductToDrive({
   meetingCategory, meetingId, meetingReference = "", recordId = "", recordType = "OTHER",
   title = "", fileName = "", content, contentType = "text/plain; charset=utf-8", ownerUid = null
 } = {}) {
   if (!meetingId) throw new Error("A meeting ID is required to archive a meeting product.");
   if (content == null) throw new Error("Meeting product content is required.");
-  const archive = await provisionMeetingCategoryArchive({ meetingCategory, meetingId });
+  const archive = await getMeetingCategoryArchive({ meetingCategory, meetingId });
   const bytes = content instanceof Uint8Array
     ? content
     : content instanceof Blob
@@ -289,7 +308,7 @@ export async function uploadMeetingProductToDrive({
     contentType,
     fileSize: bytes.length,
     base64: btoa(binary),
-    purpose: "IRPA Meeting Product · " + archive.meetingCategory,
+    purpose: "Meeting Products",
     folderId: archive.folderId,
     ownerUid: ownerUid || auth.currentUser?.uid || null,
     documentId: recordId || null,
