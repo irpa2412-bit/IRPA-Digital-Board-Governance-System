@@ -276,9 +276,8 @@ function governancePolicySnapshot(meeting={}){
 }
 async function calculateAuthoritativeQuorum(tx,meeting,policy){
   const meetingId=String(meeting?.id||meeting||"");
-  const meetingReference=String(meeting?.meetingReference||meeting?.reference||meeting?.title||"").trim();
-  const reads=[tx.get(db.collection("members")),tx.get(db.collection("participants").where("meetingId","==",meetingId))];
-  if(meetingReference)reads.push(tx.get(db.collection("participants").where("meetingReference","==",meetingReference)));
+  const meetingReferences=[...new Set([meeting?.meetingReference,meeting?.reference,meeting?.title].map(v=>String(v||"").trim()).filter(Boolean))];
+  const reads=[tx.get(db.collection("members")),tx.get(db.collection("participants").where("meetingId","==",meetingId)),...meetingReferences.map(ref=>tx.get(db.collection("participants").where("meetingReference","==",ref)))];
   const snaps=await Promise.all(reads);
   const memberSnap=snaps[0],participantDocs=new Map();
   for(const snap of snaps.slice(1))for(const doc of snap.docs)participantDocs.set(doc.id,doc);
