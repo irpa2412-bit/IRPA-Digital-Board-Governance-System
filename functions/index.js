@@ -314,7 +314,7 @@ exports.openGovernanceVotingIssue=onCall({region:"us-central1",timeoutSeconds:60
   let resolution=null;
   if(resolutionId){const snap=await db.collection("resolutions").doc(resolutionId).get();if(!snap.exists)throw new HttpsError("not-found","The linked resolution was not found.");resolution={id:snap.id,...snap.data()};if(resolution.meetingId!==meetingId)throw new HttpsError("failed-precondition","A resolution may only be voted on within its originating meeting.");}
   const policy=governancePolicySnapshot(meeting);
-  if(meeting.votingRequired!==true)throw new HttpsError("failed-precondition","Mark voting as required in the meeting register before opening a governance vote.");
+  if(meeting.votingRequired!==true&&resolution?.votingRequired!==true)throw new HttpsError("failed-precondition","Mark voting as required in the meeting register or originating resolution before opening a governance vote.");
   if(!policy.policyReference)throw new HttpsError("failed-precondition","Record the governing constitution, approved policy or terms of reference before opening a vote.");
   const issueId=crypto.createHash("sha256").update(`${meetingId}|${resolutionId||""}|${origin.toLowerCase()}`).digest("hex");
   const ref=db.collection("votingIssues").doc(issueId);
@@ -326,6 +326,7 @@ exports.openGovernanceVotingIssue=onCall({region:"us-central1",timeoutSeconds:60
     if(policy.requireQuorumAtVoteOpen&&!quorum.quorumMet)throw new HttpsError("failed-precondition",`Voting is blocked: quorum is not met (${quorum.eligiblePresentCount}/${quorum.requiredCount} eligible members present).`);
     const data={meetingId,meetingReference:String(meeting.meetingReference||meeting.reference||meeting.title||meetingId),meetingCategory:"GOVERNANCE",resolutionId,resolutionReference:resolution?.resolutionReference||String(request.data?.resolutionReference||""),agendaItem,policySnapshot:policy,quorumSnapshot:quorum,status:"Open",result:"Pending",anonymous:true,openedAt:FieldValue.serverTimestamp(),openedByUid:actor.uid,openedByProcess:true,createdAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()};
     tx.set(ref,data);
+    tx.update(db.collection("meetings").doc(meetingId),{votingRequired:true,votingReference:origin,votingIssueId:issueId,votingStatus:"Open",votingResult:"Pending",currentAgendaItem:agendaItem||meeting.currentAgendaItem||null,currentAgendaItemStatus:agendaItem?"Voting":meeting.currentAgendaItemStatus||null,updatedAt:FieldValue.serverTimestamp()});
     tx.set(db.collection("audit").doc(),{action:"GOVERNANCE_VOTING_OPENED",collection:"votingIssues",recordId:issueId,details:{meetingId,resolutionId,votingReference:origin,policyVersion:policy.policyVersion,quorumSnapshot:quorum},actorUid:actor.uid,actorEmail:actor.email||null,createdAt:FieldValue.serverTimestamp()});
     response={id:issueId,alreadyOpen:false,meetingId,meetingReference:data.meetingReference,meetingCategory:"GOVERNANCE",resolutionId,resolutionReference:data.resolutionReference,agendaItem, votingReference:origin,policySnapshot:policy,quorumSnapshot:quorum,status:"Open",result:"Pending",anonymous:true};
   });
