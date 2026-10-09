@@ -2540,3 +2540,32 @@ textarea:focus-visible{
 }
 
 /* Production redeploy marker: system-wide readability audit active on live hosting. 2026-09-26 */
+
+
+/* Signature Portal register selector + high-contrast label repair.
+   Keep all workflow content; remove inherited faded/low-contrast label styling. */
+.signature-authority-field,
+.signature-authority-field label,
+.panel:has(select) label,
+.panel label{
+  color:var(--text, #f4f8f6);
+  opacity:1;
+  -webkit-text-fill-color:currentColor;
+}
+.signature-authority-field label,
+.panel label{
+  font-weight:650;
+  line-height:1.5;
+}
+.panel select,
+.panel input,
+.panel textarea{
+  color:var(--text, #f4f8f6);
+  background:var(--surface-raised, #0e251b);
+  border-color:var(--border-strong, #a5bdb3);
+  opacity:1;
+}
+.panel select option{
+  color:#17372b;
+  background:#ffffff;
+}
