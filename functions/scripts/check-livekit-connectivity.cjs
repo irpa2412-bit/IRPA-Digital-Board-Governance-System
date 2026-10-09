@@ -30,7 +30,8 @@ async function main() {
   }
 
   const client = new RoomServiceClient(httpUrl, apiKey, apiSecret);
-  const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("LiveKit API request timed out after 10 seconds")), 10000));
+  let timeoutId;
+  const timeout = new Promise((_, reject) => { timeoutId = setTimeout(() => reject(new Error("LiveKit API request timed out after 10 seconds")), 10000); });
   try {
     const rooms = await Promise.race([client.listRooms(), timeout]);
     console.log("PASS: LiveKit endpoint is reachable over TLS and accepted the server-side API credentials.");
@@ -39,6 +40,8 @@ async function main() {
   } catch (error) {
     console.error("FAIL: LiveKit endpoint/credentials check failed: " + String(error && error.message || error).slice(0, 500));
     process.exitCode = 1;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
