@@ -1242,10 +1242,23 @@ async function sendMemberInvitation(request, env) {
     if(["closed","completed","cancelled","canceled","archived"].includes(meetingStatus)){
       return json({ok:false,error:"This meeting is closed and cannot issue a new access invitation."},409,corsHeaders(request));
     }
-    const meetingReference=String(meetingFields.reference?.stringValue||meetingFields.title?.stringValue||"IRPA Meeting").trim();
+    const meetingReference=String(meetingFields.meetingReference?.stringValue||meetingFields.reference?.stringValue||meetingFields.title?.stringValue||"IRPA Meeting").trim();
+    // Invitation particulars are sourced from the authoritative meeting document,
+    // not client-supplied display fields, so the invitation cites the saved register.
     meetingAccess={
       link:`${appUrl}/?meetingToken=${encodeURIComponent(accessToken)}&meetingId=${encodeURIComponent(meetingId)}`,
       meetingReference,
+      meetingTitle:String(meetingFields.title?.stringValue||meetingReference).trim(),
+      meetingDate:String(meetingFields.date?.stringValue||""),
+      meetingStartTime:String(meetingFields.startTime?.stringValue||""),
+      meetingEndTime:String(meetingFields.endTime?.stringValue||""),
+      meetingPlatform:String(meetingFields.meetingPlatform?.stringValue||"Platform not recorded"),
+      platformAccessUrl:String(meetingFields.platformAccessUrl?.stringValue||""),
+      platformMeetingId:String(meetingFields.platformMeetingId?.stringValue||""),
+      platformPasscode:String(meetingFields.platformPasscode?.stringValue||""),
+      meetingVenue:String(meetingFields.venue?.stringValue||""),
+      meetingChairperson:String(meetingFields.chairperson?.stringValue||""),
+      meetingAgenda:String(meetingFields.agenda?.stringValue||""),
       password,
       expiresAt:String(supplied.expiresAt||"")
     };
