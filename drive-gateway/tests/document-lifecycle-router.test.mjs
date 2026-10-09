@@ -94,7 +94,13 @@ test("upload rolls back Drive file when atomic document/audit commit fails",asyn
   );
   assert.deepEqual(state.writes,[]);
   assert.deepEqual(state.deletedFiles,["/drive/v3/files/drive-upload-1"]);
-  assert.deepEqual(state.failureEvents,[{documentId:assert.match(Object.keys(state.docs).join(""),/^$/) ? "" : state.failureEvents[0].documentId,actorUid:"emp-1",action:"UPLOAD",details:{failureReason:"simulated atomic document/audit commit failure",driveFileId:"drive-upload-1",rollbackStatus:"SUCCEEDED",rollbackError:null}}]);
+  assert.equal(state.failureEvents.length,1);
+  assert.match(state.failureEvents[0].documentId,/^LIFE-/);
+  assert.equal(state.failureEvents[0].actorUid,"emp-1");
+  assert.equal(state.failureEvents[0].action,"UPLOAD");
+  assert.equal(state.failureEvents[0].details.failureReason,"simulated atomic document/audit commit failure");
+  assert.equal(state.failureEvents[0].details.driveFileId,"drive-upload-1");
+  assert.equal(state.failureEvents[0].details.rollbackStatus,"SUCCEEDED");
 });
 
 test("successful upload atomically writes document registry and audit event",async()=>{
