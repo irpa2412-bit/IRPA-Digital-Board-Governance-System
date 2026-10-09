@@ -55,6 +55,23 @@ exports.captureMeetingRecord=onCall({region:"us-central1",timeoutSeconds:30},asy
  await audit("MEETING_RECORD_CAPTURED",ctx,ref.id,{recordType:type,contentHash:digest,retentionYears,retainUntil:retainUntil.toISOString(),storageDestination:data.storageDestination});
  return {ok:true,recordId:ref.id,recordType:type,contentHash:digest,integrityStatus:data.integrityStatus,retentionYears,retainUntil:retainUntil.toISOString(),storageDestination:data.storageDestination};
 });
+
+exports.saveLiveMeetingProceedings=onCall({region:"us-central1",timeoutSeconds:30},async req=>{
+ const meetingId=text(req.data?.meetingId),content=text(req.data?.content);
+ const ctx=await context(req,meetingId);
+ if(!ctx.canRead)throw new HttpsError("permission-denied","Only an authorised meeting participant or subscriber may save live proceedings.");
+ if(text(ctx.meeting.status).toLowerCase()!=="in progress")throw new HttpsError("failed-precondition","Live proceedings auto-save is only available while the registered meeting status is In Progress.");
+ if(TERMINAL.has(text(ctx.meeting.status).toLowerCase()))throw new HttpsError("failed-precondition","Proceedings cannot be appended to a closed or cancelled meeting.");
+ if(!content)throw new HttpsError("invalid-argument","Live proceedings transcript is empty.");
+ if(content.length>900000)throw new HttpsError("invalid-argument","Transcript exceeds the 900,000 character limit.");
+ const recordId="live-transcript-"+hash(meetingId+":"+ctx.uid).slice(0,32);
+ const ref=db.collection("meetingRecords").doc(recordId),prior=await ref.get(),now=new Date();
+ const retentionYears=RETENTION_YEARS[ctx.category]||3,digest=hash(content);
+ const data={meetingId,meetingReference:text(ctx.meeting.meetingReference||ctx.meeting.reference||ctx.meeting.title),meetingTitle:text(ctx.meeting.title),meetingCategory:ctx.category,meetingPolicyId:ctx.category,recordType:"SUBSCRIBER_TRANSCRIPT_DRAFT",recordLabel:"Live Proceedings Transcript Draft",title:"Live Proceedings — "+text(ctx.meeting.title||"IRPA Meeting"),content,contentHash:digest,integrityAlgorithm:"SHA-256",integrityStatus:"VERIFIED_AT_CAPTURE",version:Number(prior.data()?.version||0)+1,status:"Active",confidentialityClass:ctx.confidentiality,storageDestination:"FIRESTORE_MEETING_RECORDS",draftOnly:true,approved:false,approvalStatus:"NOT_SUBMITTED",requiresHumanReview:true,createdFrom:"IRPA_LIVE_PROCEEDINGS_AUTO_CAPTURE",liveCapture:true,legalHold:false,retentionYears,retainUntil:addYears(now,retentionYears),retentionPolicyVersion:"IRPA-MEETING-RETENTION-1.0",capturedByUid:ctx.uid,capturedByEmail:ctx.email||null,capturedAt:FieldValue.serverTimestamp(),createdAt:prior.exists?(prior.data()?.createdAt||FieldValue.serverTimestamp()):FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp(),deletedAt:null,deletionStatus:"NOT_ELIGIBLE"};
+ await ref.set(data,{merge:true});
+ await audit("LIVE_MEETING_PROCEEDINGS_AUTOSAVED",ctx,recordId,{contentHash:digest,version:data.version,characters:content.length,requiresHumanReview:true});
+ return{ok:true,recordId,contentHash:digest,version:data.version,updated:true,draftOnly:true,requiresHumanReview:true};
+});
 exports.saveMeetingAssistantDraft=onCall({region:"us-central1",timeoutSeconds:30},async req=>{
  const meetingId=text(req.data?.meetingId),type=text(req.data?.recordType).toUpperCase(),content=text(req.data?.content),title=text(req.data?.title);
  const ctx=await context(req,meetingId);
