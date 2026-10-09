@@ -102,6 +102,12 @@ export default {
       if (pathname === "/api/document-archive/provision" && request.method === "POST") {
         return await provisionDocumentArchive(request, env);
       }
+      if (pathname === "/api/meeting-archive/provision" && request.method === "POST") {
+        return await provisionMeetingCategoryArchive(request, env);
+      }
+      if (pathname === "/api/meeting-archive/get" && request.method === "POST") {
+        return await getMeetingCategoryArchive(request, env);
+      }
       if (pathname === "/api/signed-document/archive" && request.method === "POST") {
         return await ensureSignedDocumentArchive(request, env);
       }
@@ -801,6 +807,73 @@ async function ensureSignatureProfileFolder(request, env) {
     folderShared,
     path: `IRPA Governance System/Signature Profiles/${folderName}`
   }, 200, corsHeaders(request));
+}
+
+
+const MEETING_ARCHIVE_POLICIES = Object.freeze({
+  GOVERNANCE: { label: "Governance Meetings", classification: "Restricted" },
+  ADMINISTRATIVE: { label: "Administrative Meetings", classification: "Restricted" },
+  STAFF: { label: "Staff Meetings", classification: "Internal" },
+  GENERAL: { label: "General Meetings", classification: "Internal" },
+  OTHER: { label: "Other Meetings", classification: "Restricted" }
+});
+
+async function meetingArchiveContext(request, env) {
+  const claims = await authenticateFirebaseRequest(request, env);
+  const data = await request.json();
+  const category = String(data.meetingCategory || "").trim().toUpperCase();
+  const policy = MEETING_ARCHIVE_POLICIES[category];
+  if (!policy) return { response: json({ok:false,error:"A valid meeting category is required."},400,corsHeaders(request)) };
+  const accessToken = await getDriveAccessToken(env);
+  const rootId = await findOrCreateFolder(env, accessToken, "IRPA Governance System");
+  const archiveRootId = await findOrCreateFolder(env, accessToken, "Meeting Archives", rootId, {
+    irpaGovernanceArchive:true, purpose:"IRPA Meeting Product Archives"
+  });
+  return {claims,data,category,policy,accessToken,rootId,archiveRootId};
+}
+
+async function provisionMeetingCategoryArchive(request, env) {
+  const ctx = await meetingArchiveContext(request, env);
+  if (ctx.response) return ctx.response;
+  const {claims,category,policy,accessToken,archiveRootId}=ctx;
+  const authorisedEmail=String(env.AUTHORIZED_DRIVE_EMAIL||"").trim().toLowerCase();
+  if (!(claims.admin===true || (authorisedEmail && String(claims.email||"").trim().toLowerCase()===authorisedEmail))) {
+    return json({ok:false,error:"Only the authorised IRPA administrator may provision category archive folders."},403,corsHeaders(request));
+  }
+  const folderName="IRPA "+policy.label+" Archive";
+  const folderId=await findOrCreateFolder(env,accessToken,folderName,archiveRootId,{
+    irpaGovernanceArchive:true, purpose:"IRPA Meeting Category Archive",
+    meetingCategory:category, classification:policy.classification,
+    archiveAccess:"Restricted", createdByUid:claims.user_id
+  });
+  return json({
+    ok:true,provider:"Google Drive",meetingCategory:category,
+    archiveName:folderName,folderId,
+    archivePath:"IRPA Governance System/Meeting Archives/"+folderName,
+    archiveUidLink:"https://drive.google.com/drive/folders/"+encodeURIComponent(folderId),
+    classification:policy.classification,archiveAccess:"Restricted"
+  },200,corsHeaders(request));
+}
+
+async function getMeetingCategoryArchive(request, env) {
+  const ctx = await meetingArchiveContext(request, env);
+  if (ctx.response) return ctx.response;
+  const {category,policy,accessToken,archiveRootId}=ctx;
+  const folderName="IRPA "+policy.label+" Archive";
+  const query=["name='"+folderName.replace(/'/g,"\\'")+"'","mimeType='application/vnd.google-apps.folder'","trashed=false","'"+archiveRootId+"' in parents"].join(" and ");
+  const listed=await driveFetch(env,accessToken,"/drive/v3/files?q="+encodeURIComponent(query)+"&spaces=drive&pageSize=10&fields=files(id,name,description,parents)");
+  const folder=listed.files?.[0];
+  if(!folder?.id)return json({ok:false,error:"The Google Drive archive for "+policy.label+" has not been provisioned. Ask the IRPA administrator to create all five category archives first."},404,corsHeaders(request));
+  let metadata={};
+  try{metadata=JSON.parse(folder.description||"{}")}catch{}
+  if(metadata.irpaGovernanceArchive!==true||metadata.meetingCategory!==category)return json({ok:false,error:"The Google Drive folder does not match the registered meeting archive policy."},403,corsHeaders(request));
+  return json({
+    ok:true,provider:"Google Drive",meetingCategory:category,
+    archiveName:folderName,folderId:folder.id,
+    archivePath:"IRPA Governance System/Meeting Archives/"+folderName,
+    archiveUidLink:"https://drive.google.com/drive/folders/"+encodeURIComponent(folder.id),
+    classification:policy.classification,archiveAccess:"Restricted"
+  },200,corsHeaders(request));
 }
 
 async function ensureDocumentArchiveFolder(request, env) {
