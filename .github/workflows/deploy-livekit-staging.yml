@@ -77,7 +77,7 @@ jobs:
               json.dump({k:os.environ[k] for k in keys},f)
           os.chmod("/tmp/irpa-livekit-staging-env.json",0o600)
           PY
-          scp -i ~/.ssh/id_ed25519 infra/livekit/deploy-staging.sh infra/livekit/run-deploy-with-env.py "$SSH_USER@$SSH_HOST:/tmp/"
+          scp -i ~/.ssh/id_ed25519 infra/livekit/deploy-staging.sh infra/livekit/run-deploy-with-env.py infra/livekit/docker-compose.yml infra/livekit/caddy.yaml.template infra/livekit/livekit.yaml.template "$SSH_USER@$SSH_HOST:/tmp/"
           scp -i ~/.ssh/id_ed25519 /tmp/irpa-livekit-staging-env.json "$SSH_USER@$SSH_HOST:/tmp/irpa-livekit-staging-env.json"
           rm -f /tmp/irpa-livekit-staging-env.json
           ssh -i ~/.ssh/id_ed25519 "$SSH_USER@$SSH_HOST" 'chmod 600 /tmp/irpa-livekit-staging-env.json && sudo python3 /tmp/run-deploy-with-env.py /tmp/irpa-livekit-staging-env.json /tmp/deploy-staging.sh; result=$?; sudo rm -f /tmp/run-deploy-with-env.py /tmp/deploy-staging.sh; exit $result'
