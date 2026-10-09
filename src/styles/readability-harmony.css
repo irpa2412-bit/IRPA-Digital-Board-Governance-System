@@ -2569,3 +2569,40 @@ textarea:focus-visible{
   color:#17372b;
   background:#ffffff;
 }
+
+
+/* IRPA-DBGS DASHBOARD ICON RESTORATION — 2026-10-09
+   The readability cascade made dashboard card text uniformly white, including
+   Font Awesome glyphs inside white icon tiles. Keep the white decorative tile,
+   but explicitly restore a contrasting blue glyph for all dashboard shortcuts. */
+@media screen and (min-width:761px){
+  .app-shell .content-area.dashboard-content-area .page.dashboard-command .dashboard-quote4-stats .quote4-stat-icon i,
+  .app-shell .content-area.dashboard-content-area .page.dashboard-command .dashboard-quote4-stats .quote4-stat-icon svg,
+  .app-shell .content-area.dashboard-content-area .page.dashboard-command .dashboard-quote4-stats .quote4-stat-icon .svg-inline--fa,
+  .app-shell .content-area.dashboard-content-area .page.dashboard-command .dashboard-live-date-slot .quote4-stat-icon i,
+  .app-shell .content-area.dashboard-content-area .page.dashboard-command .dashboard-live-date-slot .quote4-stat-icon svg,
+  .app-shell .content-area.dashboard-content-area .page.dashboard-command .dashboard-live-date-slot .quote4-stat-icon .svg-inline--fa,
+  .app-shell .content-area.dashboard-content-area .page.dashboard-command .quote4-quick-grid>button>span i,
+  .app-shell .content-area.dashboard-content-area .page.dashboard-command .quote4-quick-grid>button>span svg,
+  .app-shell .content-area.dashboard-content-area .page.dashboard-command .quote4-quick-grid>button>span .svg-inline--fa{
+    display:inline-block!important;
+    color:#0b5fa8!important;
+    fill:#0b5fa8!important;
+    opacity:1!important;
+    visibility:visible!important;
+    text-shadow:none!important;
+  }
+  .app-shell .content-area.dashboard-content-area .page.dashboard-command .dashboard-quote4-stats .quote4-stat-icon,
+  .app-shell .content-area.dashboard-content-area .page.dashboard-command .dashboard-live-date-slot .quote4-stat-icon,
+  .app-shell .content-area.dashboard-content-area .page.dashboard-command .quote4-quick-grid>button>span{
+    color:#0b5fa8!important;
+    opacity:1!important;
+    visibility:visible!important;
+  }
+  .app-shell .content-area.dashboard-content-area .page.dashboard-command .dashboard-quote4-stats .quote4-stat-icon svg,
+  .app-shell .content-area.dashboard-content-area .page.dashboard-command .dashboard-live-date-slot .quote4-stat-icon svg,
+  .app-shell .content-area.dashboard-content-area .page.dashboard-command .quote4-quick-grid>button>span svg{
+    width:1em!important;
+    height:1em!important;
+  }
+}
