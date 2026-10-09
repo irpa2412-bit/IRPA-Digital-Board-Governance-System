@@ -21,15 +21,20 @@ async function context(req,meetingId){
  const memberSnap=await db.collection("members").doc(uid).get();
  const employeeSnap=await db.collection("employees").doc(uid).get();
  const identityActive=admin(req)||(memberSnap.exists&&["Active","Activated"].includes(text(memberSnap.data()?.status||memberSnap.data()?.registrationStatus)))||(employeeSnap.exists&&["Active","Activated"].includes(text(employeeSnap.data()?.status||employeeSnap.data()?.employmentStatus||employeeSnap.data()?.registrationStatus)));
- const listed=[...(meeting.participantUids||[]),...(meeting.attendeeUids||[]),...(meeting.memberUids||[]),...(meeting.invitedUids||[])].includes(uid);
- const sub=await db.collection("meetingSubscriptions").where("meetingId","==",meetingId).where("uid","==",uid).limit(1).get().catch(()=>({empty:true}));
- const subscribed=!sub.empty;
+ const listed=[...(meeting.participantUids||[]),...(meeting.attendeeUids||[]),...(meeting.memberUids||[]),...(meeting.invitedUids||[]),...(meeting.subscriberUids||[])].includes(uid);
+ const subResults=await Promise.all([
+  db.collection("meetingSubscriptions").where("meetingId","==",meetingId).where("uid","==",uid).limit(1).get().catch(()=>({empty:true})),
+  db.collection("meetingSubscriptions").where("meetingId","==",meetingId).where("subscriberUid","==",uid).limit(1).get().catch(()=>({empty:true})),
+  db.collection("meetingSubscriptions").where("meetingId","==",meetingId).where("userId","==",uid).limit(1).get().catch(()=>({empty:true})),
+  email?db.collection("meetingSubscriptions").where("meetingId","==",meetingId).where("email","==",email).limit(1).get().catch(()=>({empty:true})):Promise.resolve({empty:true})
+ ]);
+ const subscribed=subResults.some(s=>!s.empty);
  const participant=listed||subscribed;
  if(!identityActive&&!participant)throw new HttpsError("permission-denied","An active IRPA identity or authorised meeting participant is required.");
- const canManage=admin(req)||chair||secretary||text(meeting.createdByUid)===uid;
- return {uid,email,meeting,category:cat,participant,canManage,canRead:canManage||participant,confidentiality:text(meeting.confidentialityClass)||(cat==="GOVERNANCE"?"BOARD_RESTRICTED":"INTERNAL")};
+ const canManage=admin(req)||chair||secretary||text(meeting.chairpersonUid)===uid||text(meeting.secretaryUid)===uid||text(meeting.createdByUid)===uid||text(meeting.initiatorUid)===uid;
+ return {uid,email,meeting,category:cat,participant,subscribed,canManage,canRead:canManage||participant,confidentiality:text(meeting.confidentialityClass)||(cat==="GOVERNANCE"?"BOARD_RESTRICTED":"INTERNAL")};
 }
-function recordLabel(type){return ({TRANSCRIPT:"Meeting Transcript",MINUTES_DRAFT:"Draft Minutes",MINUTES_FINAL:"Approved / Final Minutes",DECISION_REGISTER:"Decision Register",ATTENDANCE_REGISTER:"Attendance Register",OTHER:"Other Meeting Record"})[type]||"Meeting Record";}
+function recordLabel(type){return ({TRANSCRIPT:"Meeting Transcript",MINUTES_DRAFT:"Draft Minutes",MINUTES_FINAL:"Approved / Final Minutes",AI_MINUTES_DRAFT:"AI-Assisted Draft Minutes",AI_SUMMARY_DRAFT:"AI-Assisted Meeting Summary Draft",SUBSCRIBER_TRANSCRIPT_DRAFT:"Subscriber Proceedings Draft",DECISION_REGISTER:"Decision Register",ATTENDANCE_REGISTER:"Attendance Register",OTHER:"Other Meeting Record"})[type]||"Meeting Record";}
 async function audit(action,ctx,recordId,details={}){await db.collection("audit").add({action,collection:"meetingRecords",recordId:recordId||null,details:{meetingId:ctx.meeting.id,meetingCategory:ctx.category,confidentialityClass:ctx.confidentiality,...details},actorUid:ctx.uid,actorEmail:ctx.email||null,createdAt:FieldValue.serverTimestamp()});}
 exports.captureMeetingRecord=onCall({region:"us-central1",timeoutSeconds:30},async req=>{
  const meetingId=text(req.data?.meetingId),type=text(req.data?.recordType).toUpperCase(),content=text(req.data?.content),title=text(req.data?.title);
@@ -46,6 +51,33 @@ exports.captureMeetingRecord=onCall({region:"us-central1",timeoutSeconds:30},asy
  await ref.set(data);
  await audit("MEETING_RECORD_CAPTURED",ctx,ref.id,{recordType:type,contentHash:digest,retentionYears,retainUntil:retainUntil.toISOString(),storageDestination:data.storageDestination});
  return {ok:true,recordId:ref.id,recordType:type,contentHash:digest,integrityStatus:data.integrityStatus,retentionYears,retainUntil:retainUntil.toISOString(),storageDestination:data.storageDestination};
+});
+exports.saveMeetingAssistantDraft=onCall({region:"us-central1",timeoutSeconds:30},async req=>{
+ const meetingId=text(req.data?.meetingId),type=text(req.data?.recordType).toUpperCase(),content=text(req.data?.content),title=text(req.data?.title);
+ const ctx=await context(req,meetingId);
+ if(!ctx.canRead)throw new HttpsError("permission-denied","Only an authorised participant or subscriber may save an AI Meeting Assistant draft.");
+ if(!["AI_MINUTES_DRAFT","AI_SUMMARY_DRAFT","SUBSCRIBER_TRANSCRIPT_DRAFT"].includes(type))throw new HttpsError("invalid-argument","Only assistant drafts and subscriber transcript drafts may be saved through this operation.");
+ if(!content)throw new HttpsError("invalid-argument","Draft content is empty.");
+ if(content.length>900000)throw new HttpsError("invalid-argument","Draft exceeds the 900,000 character limit.");
+ const now=new Date(),retentionYears=RETENTION_YEARS[ctx.category]||3,retainUntil=addYears(now,retentionYears);
+ const ref=db.collection("meetingRecords").doc(),digest=hash(content);
+ const data={
+  meetingId,meetingReference:text(ctx.meeting.meetingReference||ctx.meeting.reference||ctx.meeting.title),
+  meetingTitle:text(ctx.meeting.title),meetingCategory:ctx.category,meetingPolicyId:ctx.category,
+  recordType:type,recordLabel:recordLabel(type),title:title||recordLabel(type),content,contentHash:digest,
+  sourceTranscriptHash:text(req.data?.sourceTranscriptHash)||null,
+  integrityAlgorithm:"SHA-256",integrityStatus:"VERIFIED_AT_CAPTURE",version:1,status:"Active",
+  confidentialityClass:ctx.confidentiality,storageDestination:req.data?.driveArchive?.provider==="Google Drive"?"GOOGLE_DRIVE_AND_FIRESTORE_METADATA":"FIRESTORE_MEETING_RECORDS",
+  storagePath:text(req.data?.driveArchive?.storagePath)||null,driveArchive:req.data?.driveArchive&&typeof req.data.driveArchive==="object"?{provider:"Google Drive",meetingCategory:ctx.category,folderId:text(req.data.driveArchive.folderId),folderUrl:text(req.data.driveArchive.folderUrl),fileId:text(req.data.driveArchive.fileId),webViewLink:text(req.data.driveArchive.webViewLink),fileName:text(req.data.driveArchive.fileName),storagePath:text(req.data.driveArchive.storagePath),contentType:text(req.data.driveArchive.contentType),fileSize:Number(req.data.driveArchive.fileSize||0)}:null,documentPortalRequiredForBinary:true,draftOnly:true,approved:false,
+  approvalStatus:"NOT_SUBMITTED",requiresHumanReview:true,
+  createdFrom:"IRPA_AI_MEETING_ASSISTANT",legalHold:false,retentionYears,retainUntil,
+  retentionPolicyVersion:"IRPA-MEETING-RETENTION-1.0",capturedByUid:ctx.uid,capturedByEmail:ctx.email||null,
+  capturedAt:FieldValue.serverTimestamp(),createdAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp(),
+  deletedAt:null,deletionStatus:"NOT_ELIGIBLE"
+ };
+ await ref.set(data);
+ await audit("MEETING_ASSISTANT_DRAFT_SAVED",ctx,ref.id,{recordType:type,contentHash:digest,sourceTranscriptHash:data.sourceTranscriptHash,requiresHumanReview:true});
+ return {ok:true,recordId:ref.id,recordType:type,contentHash:digest,integrityStatus:data.integrityStatus,draftOnly:true,approvalStatus:data.approvalStatus,requiresHumanReview:true,driveArchive:data.driveArchive};
 });
 exports.listMeetingRecords=onCall({region:"us-central1",timeoutSeconds:30},async req=>{
  const meetingId=text(req.data?.meetingId),ctx=await context(req,meetingId);

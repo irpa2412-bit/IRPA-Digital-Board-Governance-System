@@ -8,7 +8,8 @@ const ALLOWED_CONTENT_TYPES = new Set([
   "application/vnd.ms-powerpoint","application/vnd.openxmlformats-officedocument.presentationml.presentation",
   "application/vnd.oasis.opendocument.text","application/vnd.oasis.opendocument.spreadsheet","application/vnd.oasis.opendocument.presentation",
   "application/rtf","text/plain","text/csv","text/tab-separated-values","text/markdown","text/html","application/xhtml+xml",
-  "application/epub+zip","application/json","application/xml","text/xml","image/png","image/jpeg","image/webp","image/svg+xml"
+  "application/epub+zip","application/json","application/xml","text/xml","image/png","image/jpeg","image/webp","image/svg+xml",
+  "video/mp4","video/webm","audio/mpeg","audio/wav","audio/x-wav","audio/webm","audio/mp4"
 ]);
 const OAUTH_STATE_TTL = 600;
 const SMTP_HOST = "mail.irpa.or.tz";
@@ -101,6 +102,12 @@ export default {
       }
       if (pathname === "/api/document-archive/provision" && request.method === "POST") {
         return await provisionDocumentArchive(request, env);
+      }
+      if (pathname === "/api/meeting-archive/provision" && request.method === "POST") {
+        return await provisionMeetingCategoryArchive(request, env);
+      }
+      if (pathname === "/api/meeting-archive/get" && request.method === "POST") {
+        return await getMeetingCategoryArchive(request, env);
       }
       if (pathname === "/api/signed-document/archive" && request.method === "POST") {
         return await ensureSignedDocumentArchive(request, env);
@@ -348,6 +355,10 @@ async function upload(request, env) {
     if (!requestedFolderId) {
       return json({ ok: false, error: "A member signature folder is required." }, 400, corsHeaders(request));
     }
+  } else if (purpose === "Meeting Products") {
+    if (!requestedFolderId || !data.meetingId || !data.meetingCategory) return json({ok:false,error:"Meeting ID, category and authorised archive folder are required."},400,corsHeaders(request));
+    try { await authorizeMeetingArchiveUser(env, claims, String(data.meetingId), String(data.meetingCategory).toUpperCase()); }
+    catch (error) { return json({ok:false,error:error.message||"Meeting archive access denied."},403,corsHeaders(request)); }
   } else if (purpose === "Signed Documents Archive" || purpose === "Documents Portal" || purpose === "Controlled Documents") {
     if (!requestedFolderId) return json({ ok:false, error:"A controlled document archive folder is required." },400,corsHeaders(request));
   } else if (requestedFolderId || data.ownerUid) {
@@ -357,8 +368,9 @@ async function upload(request, env) {
   if (!ALLOWED_CONTENT_TYPES.has(contentType)) {
     return json({ ok: false, error: "This document format is not supported. Use PDF, Word, Excel, PowerPoint, OpenDocument, text/CSV, or supported image formats." }, 400, corsHeaders(request));
   }
-  if (!Number.isFinite(fileSize) || fileSize <= 0 || fileSize > MAX_BYTES) {
-    return json({ ok: false, error: "Uploaded files must not exceed 10 MB." }, 400, corsHeaders(request));
+  const maxUploadBytes = purpose === "Meeting Products" ? 60 * 1024 * 1024 : MAX_BYTES;
+  if (!Number.isFinite(fileSize) || fileSize <= 0 || fileSize > maxUploadBytes) {
+    return json({ ok: false, error: purpose === "Meeting Products" ? "Meeting products must not exceed 60 MB per file in this upload workflow." : "Uploaded files must not exceed 10 MB." }, 400, corsHeaders(request));
   }
 
   const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
@@ -369,7 +381,7 @@ async function upload(request, env) {
   const accessToken = await getDriveAccessToken(env);
   const rootId = await findOrCreateFolder(env, accessToken, "IRPA Governance System");
   let purposeId;
-  if (purpose === "Signature Profile" || purpose === "Signed Documents Archive" || purpose === "Documents Portal" || purpose === "Controlled Documents") {
+  if (purpose === "Signature Profile" || purpose === "Signed Documents Archive" || purpose === "Documents Portal" || purpose === "Controlled Documents" || purpose === "Meeting Products") {
     const folderMeta = await driveFetch(env, accessToken, `/drive/v3/files/${encodeURIComponent(requestedFolderId)}?fields=id,name,mimeType,description,trashed`);
     const folderDescription = parseDescription(folderMeta.description);
     if (folderMeta.mimeType !== "application/vnd.google-apps.folder" || folderMeta.trashed) {
@@ -384,6 +396,9 @@ async function upload(request, env) {
     }
     if ((purpose === "Signed Documents Archive" || purpose === "Documents Portal" || purpose === "Controlled Documents") && folderDescription.irpaGovernanceArchive !== true) {
       return json({ ok: false, error: "The requested folder is not an IRPA controlled-document archive folder." }, 403, corsHeaders(request));
+    }
+    if (purpose === "Meeting Products" && (folderDescription.irpaGovernanceArchive !== true || folderDescription.purpose !== "IRPA Meeting Category Archive" || String(folderDescription.meetingCategory || "").toUpperCase() !== String(data.meetingCategory || "").toUpperCase())) {
+      return json({ok:false,error:"The requested folder is not the authorised archive for this meeting category."},403,corsHeaders(request));
     }
     purposeId = requestedFolderId;
   } else {
@@ -801,6 +816,119 @@ async function ensureSignatureProfileFolder(request, env) {
     folderShared,
     path: `IRPA Governance System/Signature Profiles/${folderName}`
   }, 200, corsHeaders(request));
+}
+
+
+const MEETING_ARCHIVE_POLICIES = Object.freeze({
+  GOVERNANCE: { label: "Governance Meetings", classification: "Restricted" },
+  ADMINISTRATIVE: { label: "Administrative Meetings", classification: "Restricted" },
+  STAFF: { label: "Staff Meetings", classification: "Internal" },
+  GENERAL: { label: "General Meetings", classification: "Internal" },
+  OTHER: { label: "Other Meetings", classification: "Restricted" }
+});
+
+async function meetingArchiveContext(request, env) {
+  const claims = await authenticateFirebaseRequest(request, env);
+  const data = await request.json();
+  const category = String(data.meetingCategory || "").trim().toUpperCase();
+  const policy = MEETING_ARCHIVE_POLICIES[category];
+  if (!policy) return { response: json({ok:false,error:"A valid meeting category is required."},400,corsHeaders(request)) };
+  const accessToken = await getDriveAccessToken(env);
+  const rootId = await findOrCreateFolder(env, accessToken, "IRPA Governance System");
+  const archiveRootId = await findOrCreateFolder(env, accessToken, "Meeting Archives", rootId, {
+    irpaGovernanceArchive:true, purpose:"IRPA Meeting Product Archives"
+  });
+  return {claims,data,category,policy,accessToken,rootId,archiveRootId};
+}
+
+
+function firestoreFieldValue(field) {
+  if (!field) return null;
+  if (field.stringValue !== undefined) return field.stringValue;
+  if (field.booleanValue !== undefined) return field.booleanValue;
+  if (field.integerValue !== undefined) return Number(field.integerValue);
+  if (field.doubleValue !== undefined) return Number(field.doubleValue);
+  if (field.arrayValue?.values) return field.arrayValue.values.map(firestoreFieldValue);
+  if (field.mapValue?.fields) return Object.fromEntries(Object.entries(field.mapValue.fields).map(([k,v])=>[k,firestoreFieldValue(v)]));
+  return null;
+}
+async function queryMeetingArchiveRecords(env, collectionName, meetingId, token) {
+  const response=await fetch("https://firestore.googleapis.com/v1/projects/"+FIREBASE_PROJECT_ID+"/databases/(default)/documents:runQuery",{
+    method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
+    body:JSON.stringify({structuredQuery:{from:[{collectionId:collectionName}],where:{fieldFilter:{field:{fieldPath:"meetingId"},op:"EQUAL",value:{stringValue:meetingId}}},limit:200}})
+  });
+  if(!response.ok)throw new Error("Unable to verify meeting archive access.");
+  const rows=await response.json();
+  return rows.filter(row=>row.document).map(row=>({id:row.document.name.split("/").pop(),...(Object.fromEntries(Object.entries(row.document.fields||{}).map(([k,v])=>[k,firestoreFieldValue(v)])))}));
+}
+async function authorizeMeetingArchiveUser(env, claims, meetingId, meetingCategory) {
+  if(!meetingId)throw new Error("Meeting ID is required to access a category archive.");
+  const privilegedToken=await getFirestoreAdminAccessToken(env);
+  const doc=await getFirestoreDocument(env,"meetings/"+meetingId,privilegedToken);
+  if(!doc)throw new Error("The authoritative meeting record was not found.");
+  const meeting=Object.fromEntries(Object.entries(doc.fields||{}).map(([k,v])=>[k,firestoreFieldValue(v)]));
+  const category=String(meeting.meetingCategory||meeting.meetingPolicyId||meeting.category||"OTHER").trim().toUpperCase();
+  if(category!==meetingCategory)throw new Error("Meeting category does not match the requested Google Drive archive.");
+  const uid=String(claims.user_id||"");
+  const email=String(claims.email||"").trim().toLowerCase();
+  const adminEmail=String(env.AUTHORIZED_DRIVE_EMAIL||"").trim().toLowerCase();
+  if(claims.admin===true||(adminEmail&&email===adminEmail))return {meeting,category,uid,email,privilegedToken};
+  const directKeys=["initiatorUid","createdByUid","chairpersonUid","secretaryUid"];
+  if(directKeys.some(key=>String(meeting[key]||"")===uid))return {meeting,category,uid,email,privilegedToken};
+  const listedKeys=["participantUids","attendeeUids","memberUids","invitedUids","subscriberUids"];
+  if(listedKeys.some(key=>Array.isArray(meeting[key])&&meeting[key].map(String).includes(uid)))return {meeting,category,uid,email,privilegedToken};
+  const people=[...(Array.isArray(meeting.participants)?meeting.participants:[]),...(Array.isArray(meeting.attendees)?meeting.attendees:[])];
+  if(people.some(p=>String(p?.uid||p?.userId||p?.memberUid||"")===uid||(email&&String(p?.email||p?.participantEmail||"").trim().toLowerCase()===email)))return {meeting,category,uid,email,privilegedToken};
+  const subscriptions=await queryMeetingArchiveRecords(env,"meetingSubscriptions",meetingId,privilegedToken);
+  if(subscriptions.some(row=>([row.uid,row.subscriberUid,row.userId,row.memberUid,row.participantUid].map(v=>String(v||"")).includes(uid)||(email&&[row.email,row.subscriberEmail,row.participantEmail].some(v=>String(v||"").trim().toLowerCase()===email)))&&!["revoked","cancelled","canceled","inactive","removed"].includes(String(row.status||"").toLowerCase())))return {meeting,category,uid,email,privilegedToken};
+  const participants=await queryMeetingArchiveRecords(env,"participants",meetingId,privilegedToken);
+  if(participants.some(row=>(String(row.participantUid||row.uid||row.userId||"")===uid||(email&&String(row.participantEmail||row.email||"").trim().toLowerCase()===email))&&!["revoked","cancelled","canceled","inactive","removed"].includes(String(row.status||"").toLowerCase())))return {meeting,category,uid,email,privilegedToken};
+  throw new Error("This account is not a registered participant or subscriber for the selected meeting.");
+}
+
+async function provisionMeetingCategoryArchive(request, env) {
+  const ctx = await meetingArchiveContext(request, env);
+  if (ctx.response) return ctx.response;
+  const {claims,category,policy,accessToken,archiveRootId}=ctx;
+  const authorisedEmail=String(env.AUTHORIZED_DRIVE_EMAIL||"").trim().toLowerCase();
+  if (!(claims.admin===true || (authorisedEmail && String(claims.email||"").trim().toLowerCase()===authorisedEmail))) {
+    return json({ok:false,error:"Only the authorised IRPA administrator may provision category archive folders."},403,corsHeaders(request));
+  }
+  const folderName="IRPA "+policy.label+" Archive";
+  const folderId=await findOrCreateFolder(env,accessToken,folderName,archiveRootId,{
+    irpaGovernanceArchive:true, purpose:"IRPA Meeting Category Archive",
+    meetingCategory:category, classification:policy.classification,
+    archiveAccess:"Restricted", createdByUid:claims.user_id
+  });
+  return json({
+    ok:true,provider:"Google Drive",meetingCategory:category,
+    archiveName:folderName,folderId,
+    archivePath:"IRPA Governance System/Meeting Archives/"+folderName,
+    archiveUidLink:"https://drive.google.com/drive/folders/"+encodeURIComponent(folderId),
+    classification:policy.classification,archiveAccess:"Restricted"
+  },200,corsHeaders(request));
+}
+
+async function getMeetingCategoryArchive(request, env) {
+  const ctx = await meetingArchiveContext(request, env);
+  if (ctx.response) return ctx.response;
+  const {claims,data,category,policy,accessToken,archiveRootId}=ctx;
+  try{await authorizeMeetingArchiveUser(env,claims,String(data.meetingId||""),category)}catch(error){return json({ok:false,error:error.message||"Meeting archive access denied."},403,corsHeaders(request))}
+  const folderName="IRPA "+policy.label+" Archive";
+  const query=["name='"+folderName.replace(/'/g,"\\'")+"'","mimeType='application/vnd.google-apps.folder'","trashed=false","'"+archiveRootId+"' in parents"].join(" and ");
+  const listed=await driveFetch(env,accessToken,"/drive/v3/files?q="+encodeURIComponent(query)+"&spaces=drive&pageSize=10&fields=files(id,name,description,parents)");
+  const folder=listed.files?.[0];
+  if(!folder?.id)return json({ok:false,error:"The Google Drive archive for "+policy.label+" has not been provisioned. Ask the IRPA administrator to create all five category archives first."},404,corsHeaders(request));
+  let metadata={};
+  try{metadata=JSON.parse(folder.description||"{}")}catch{}
+  if(metadata.irpaGovernanceArchive!==true||metadata.meetingCategory!==category)return json({ok:false,error:"The Google Drive folder does not match the registered meeting archive policy."},403,corsHeaders(request));
+  return json({
+    ok:true,provider:"Google Drive",meetingCategory:category,
+    archiveName:folderName,folderId:folder.id,
+    archivePath:"IRPA Governance System/Meeting Archives/"+folderName,
+    archiveUidLink:"https://drive.google.com/drive/folders/"+encodeURIComponent(folder.id),
+    classification:policy.classification,archiveAccess:"Restricted"
+  },200,corsHeaders(request));
 }
 
 async function ensureDocumentArchiveFolder(request, env) {
