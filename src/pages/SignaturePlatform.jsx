@@ -314,7 +314,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
       ]);
       const candidates=[
         ...(Array.isArray(employeeRows)?employeeRows.map(x=>({...x,registerType:"Employee Register"})):[]),
-        ...(Array.isArray(memberRows)?memberRows.map(x=>({...x,registerType:"Board Member Register"})):[]
+        ...(Array.isArray(memberRows)?memberRows.map(x=>({...x,registerType:"Board Member Register"})):[])
       ];
       const activeCandidates=candidates.filter(x=>{
         const status=String(x.status||x.employmentStatus||x.accountStatus||x.memberStatus||"").trim().toLowerCase();
