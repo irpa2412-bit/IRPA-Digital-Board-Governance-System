@@ -31,8 +31,14 @@ async function context(req,meetingId){
   db.collection("meetingSubscriptions").where("meetingId","==",meetingId).where("userId","==",uid).limit(1).get().catch(()=>({empty:true})),
   email?db.collection("meetingSubscriptions").where("meetingId","==",meetingId).where("email","==",email).limit(1).get().catch(()=>({empty:true})):Promise.resolve({empty:true})
  ]);
+ const [participantSnap]=await Promise.all([db.collection("participants").where("meetingId","==",meetingId).get().catch(()=>({docs:[]}))]);
+ const participantRecord=participantSnap.docs.some(d=>{
+  const p=d.data()||{},status=text(p.status||p.registrationStatus).toLowerCase();
+  if(["cancelled","canceled","revoked","removed","inactive","closed"].includes(status))return false;
+  return [p.uid,p.userId,p.participantUid,p.memberUid,p.invitedUid].map(v=>text(v)).includes(uid)||!!email&&[p.email,p.participantEmail,p.invitedEmail].some(v=>text(v).toLowerCase()===email);
+ });
  const subscribed=subResults.some(s=>!s.empty);
- const participant=listed||subscribed;
+ const participant=listed||subscribed||participantRecord;
  if(!identityActive&&!participant)throw new HttpsError("permission-denied","An active IRPA identity or authorised meeting participant is required.");
  const canManage=admin(req)||chair||secretary||text(meeting.chairpersonUid)===uid||text(meeting.secretaryUid)===uid||text(meeting.createdByUid)===uid||text(meeting.initiatorUid)===uid;
  return {uid,email,meeting,category:cat,participant,subscribed,canManage,canRead:canManage||participant,confidentiality:text(meeting.confidentialityClass)||(cat==="GOVERNANCE"?"BOARD_RESTRICTED":"INTERNAL")};
