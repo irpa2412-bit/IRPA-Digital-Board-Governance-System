@@ -47,6 +47,14 @@ exports.captureMeetingRecord=onCall({region:"us-central1",timeoutSeconds:30},asy
  await audit("MEETING_RECORD_CAPTURED",ctx,ref.id,{recordType:type,contentHash:digest,retentionYears,retainUntil:retainUntil.toISOString(),storageDestination:data.storageDestination});
  return {ok:true,recordId:ref.id,recordType:type,contentHash:digest,integrityStatus:data.integrityStatus,retentionYears,retainUntil:retainUntil.toISOString(),storageDestination:data.storageDestination};
 });
+exports.listMeetingRecords=onCall({region:"us-central1",timeoutSeconds:30},async req=>{
+ const meetingId=text(req.data?.meetingId),ctx=await context(req,meetingId);
+ if(!ctx.canRead)throw new HttpsError("permission-denied","You are not authorised to list records for this meeting.");
+ const snap=await db.collection("meetingRecords").where("meetingId","==",meetingId).get();
+ const records=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.status==="Active").sort((a,b)=>(b.capturedAt?.toMillis?.()||0)-(a.capturedAt?.toMillis?.()||0));
+ await audit("MEETING_RECORD_REGISTER_VIEWED",ctx,null,{recordCount:records.length});
+ return {ok:true,records:records.map(r=>({id:r.id,title:r.title,recordType:r.recordType,recordLabel:r.recordLabel,contentHash:r.contentHash,integrityStatus:r.integrityStatus,confidentialityClass:r.confidentialityClass,version:r.version,capturedAt:r.capturedAt?.toDate?.().toISOString?.()||null,retainUntil:r.retainUntil?.toDate?.().toISOString?.()||null,retentionYears:r.retentionYears,legalHold:r.legalHold===true,deletionStatus:r.deletionStatus||"NOT_ELIGIBLE",storageDestination:r.storageDestination}))};
+});
 exports.retrieveMeetingRecord=onCall({region:"us-central1",timeoutSeconds:30},async req=>{
  const recordId=text(req.data?.recordId);
  if(!recordId)throw new HttpsError("invalid-argument","Meeting record ID is required.");
