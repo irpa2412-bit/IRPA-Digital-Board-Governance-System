@@ -1,6 +1,18 @@
 name: Document Lifecycle Module Verification
 
 on:
+  pull_request:
+    branches:
+      - integration/collective-portals-20261009
+    paths:
+      - "src/pages/DocumentLifecycleModule.jsx"
+      - "src/firebase/documentLifecycle.js"
+      - "drive-gateway/src/documentLifecycle.mjs"
+      - "drive-gateway/src/documentPolicy.mjs"
+      - "drive-gateway/tests/document-*.test.mjs"
+      - "drive-gateway/package*.json"
+      - "package*.json"
+      - ".github/workflows/document-lifecycle-module-test.yml"
   push:
     branches:
       - integration/document-lifecycle-acceptance-20261009
