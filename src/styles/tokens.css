@@ -1033,3 +1033,71 @@ table td{color:var(--text)}
     font-size:max(16px,1em);
   }
 }
+
+/* GLOBAL READABILITY CORRECTION v2
+   Shared content area uses a light surface; define dark text tokens there so
+   secondary descriptions cannot inherit pale text on white/light panels.
+   Explicitly remove opacity/filter effects from content and text across modules. */
+#root .app-shell .content-area{
+  --surface:#ffffff;
+  --surface-raised:#f4f8f5;
+  --text:#17372b;
+  --text-muted:#405b4f;
+  --border:#718a80;
+  --border-strong:#3f6556;
+  --placeholder:#526c61;
+  color:#17372b;
+  opacity:1!important;
+  filter:none!important;
+}
+#root .app-shell .content-area :is(.page,.module-page,.panel,.panel-heading,.panel-heading>div,.card,.identity-card,.form-grid,.form-grid>div,.section-card,.table-wrap,.modal,.dialog,.form-field,.field,.stat-card){
+  opacity:1!important;
+  filter:none!important;
+}
+#root .app-shell .content-area :is(h1,h2,h3,h4,h5,h6,p,span,strong,em,b,label,legend,small,li,dt,dd,th,td,summary,a,output,.muted,.eyebrow,.field-help,.panel-description){
+  opacity:1!important;
+  filter:none!important;
+  text-shadow:none!important;
+  -webkit-text-fill-color:currentColor;
+}
+#root .app-shell .content-area :is(.panel-heading p,.panel-heading .muted,.muted,.panel-description,.field-help,small,.eyebrow){
+  color:#405b4f!important;
+}
+#root .app-shell .content-area :is(.panel, .card, .identity-card, .section-card, .stat-card, .table-wrap, .modal, .dialog){
+  --text:#17372b;
+  --text-muted:#405b4f;
+}
+#root .app-shell .content-area :is(input,select,textarea){
+  color:#17372b!important;
+  background:#ffffff!important;
+  border:1px solid #718a80!important;
+  opacity:1!important;
+  filter:none!important;
+  -webkit-text-fill-color:#17372b!important;
+}
+#root .app-shell .content-area :is(input,select,textarea)::placeholder{
+  color:#526c61!important;
+  opacity:1!important;
+  -webkit-text-fill-color:#526c61!important;
+}
+#root .app-shell .content-area select option{
+  color:#17372b!important;
+  background:#ffffff!important;
+}
+#root .app-shell .content-area button{
+  opacity:1!important;
+  filter:none!important;
+  text-shadow:none!important;
+}
+#root .app-shell .content-area button:disabled{
+  opacity:1!important;
+  color:#ffffff!important;
+  background:#526b60!important;
+  border-color:#526b60!important;
+  -webkit-text-fill-color:#ffffff!important;
+}
+@media(max-width:760px){
+  #root .app-shell .content-area :is(p,li,label,small,.muted,.panel-description){
+    line-height:1.55!important;
+  }
+}
