@@ -2606,3 +2606,101 @@ textarea:focus-visible{
     height:1em!important;
   }
 }
+
+
+/* IRPA-DBGS FUNCTION-BASED DASHBOARD ICON COLOURS — 2026-10-10
+   Shared semantic colour system for desktop, tablet and mobile layouts.
+   Icons are coloured by the function/category class, never by card position.
+   Existing labels, actions, routes, permissions, layout and data remain unchanged. */
+:root{
+  --irpa-icon-governance:#0b5fa8; /* governance, board, members, meetings */
+  --irpa-icon-finance:#8b3e29;   /* finance, budgets, payments */
+  --irpa-icon-risk:#7a4b00;      /* risk, audit, compliance, oversight */
+  --irpa-icon-information:#245c8a; /* reports, documents, records */
+  --irpa-icon-process:#17665e;   /* workflows, approvals, operations */
+  --irpa-icon-community:#176b46; /* outreach, participation, people */
+  --irpa-icon-security:#6741a5;  /* access, security, permissions */
+  --irpa-icon-danger:#b42332;    /* delete, remove, revoke */
+  --irpa-icon-success:#187344;   /* approve, confirm, complete */
+  --irpa-icon-warning:#946200;   /* pending, alerts, attention */
+}
+
+/* Category-specific dashboard shortcut icons — shared across viewport versions. */
+.dashboard-function-button.function-category-finance .dashboard-function-icon,
+.dashboard-command .function-category-finance .dashboard-function-icon,
+.dashboard-command .function-category-finance .quote4-stat-icon,
+.dashboard-command .function-category-finance .quote4-stat-icon i,
+.dashboard-command .function-category-finance .quote4-stat-icon svg{
+  color:var(--irpa-icon-finance)!important;fill:currentColor!important;
+}
+.dashboard-function-button.function-category-risk .dashboard-function-icon,
+.dashboard-command .function-category-risk .dashboard-function-icon,
+.dashboard-command .function-category-risk .quote4-stat-icon,
+.dashboard-command .function-category-risk .quote4-stat-icon i,
+.dashboard-command .function-category-risk .quote4-stat-icon svg{
+  color:var(--irpa-icon-risk)!important;fill:currentColor!important;
+}
+.dashboard-function-button.function-category-information .dashboard-function-icon,
+.dashboard-command .function-category-information .dashboard-function-icon,
+.dashboard-command .function-category-information .quote4-stat-icon,
+.dashboard-command .function-category-information .quote4-stat-icon i,
+.dashboard-command .function-category-information .quote4-stat-icon svg{
+  color:var(--irpa-icon-information)!important;fill:currentColor!important;
+}
+.dashboard-function-button.function-category-process .dashboard-function-icon,
+.dashboard-command .function-category-process .dashboard-function-icon,
+.dashboard-command .function-category-process .quote4-stat-icon,
+.dashboard-command .function-category-process .quote4-stat-icon i,
+.dashboard-command .function-category-process .quote4-stat-icon svg{
+  color:var(--irpa-icon-process)!important;fill:currentColor!important;
+}
+.dashboard-function-button.function-category-community .dashboard-function-icon,
+.dashboard-command .function-category-community .dashboard-function-icon,
+.dashboard-command .function-category-community .quote4-stat-icon,
+.dashboard-command .function-category-community .quote4-stat-icon i,
+.dashboard-command .function-category-community .quote4-stat-icon svg{
+  color:var(--irpa-icon-community)!important;fill:currentColor!important;
+}
+.dashboard-function-button.function-category-security .dashboard-function-icon,
+.dashboard-command .function-category-security .dashboard-function-icon,
+.dashboard-command .function-category-security .quote4-stat-icon,
+.dashboard-command .function-category-security .quote4-stat-icon i,
+.dashboard-command .function-category-security .quote4-stat-icon svg{
+  color:var(--irpa-icon-security)!important;fill:currentColor!important;
+}
+
+/* Explicit action semantics for icons in buttons, including mobile button stacks. */
+.content-area .page button.danger-button i,
+.content-area .page button.danger-button svg,
+.content-area .page button[aria-label*="Delete" i] i,
+.content-area .page button[aria-label*="Delete" i] svg,
+.content-area .page button[aria-label*="Remove" i] i,
+.content-area .page button[aria-label*="Remove" i] svg{
+  color:var(--irpa-icon-danger)!important;fill:currentColor!important;
+}
+.content-area .page button[aria-label*="Approve" i] i,
+.content-area .page button[aria-label*="Approve" i] svg,
+.content-area .page button[aria-label*="Confirm" i] i,
+.content-area .page button[aria-label*="Confirm" i] svg,
+.content-area .page button[aria-label*="Complete" i] i,
+.content-area .page button[aria-label*="Complete" i] svg{
+  color:var(--irpa-icon-success)!important;fill:currentColor!important;
+}
+.content-area .page button[aria-label*="Pending" i] i,
+.content-area .page button[aria-label*="Pending" i] svg,
+.content-area .page button[aria-label*="Alert" i] i,
+.content-area .page button[aria-label*="Alert" i] svg,
+.content-area .page button[aria-label*="Warning" i] i,
+.content-area .page button[aria-label*="Warning" i] svg{
+  color:var(--irpa-icon-warning)!important;fill:currentColor!important;
+}
+
+/* Do not let the desktop-only blue icon repair override semantic colours. */
+@media screen and (min-width:761px){
+  .app-shell .content-area.dashboard-content-area .page.dashboard-command [class*="function-category-"] .quote4-stat-icon,
+  .app-shell .content-area.dashboard-content-area .page.dashboard-command [class*="function-category-"] .quote4-stat-icon i,
+  .app-shell .content-area.dashboard-content-area .page.dashboard-command [class*="function-category-"] .quote4-stat-icon svg{
+    color:inherit!important;
+    fill:currentColor!important;
+  }
+}
