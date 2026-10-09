@@ -197,12 +197,15 @@ test("meeting invitee can read only the invited meeting and its participant regi
 test("invitee can check in only their own participant record", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {const db=context.firestore();
     await db.doc("meetings/invited-meeting").set(meeting({invitedEmails:["invitee@example.test"]}));
+    await db.doc("meetings/closed-meeting").set(meeting({status:"Completed",invitedEmails:["invitee@example.test"]}));
     await db.doc("participants/invitee-record").set({meetingId:"invited-meeting",participantUid:"invitee-user",participantEmail:"invitee@example.test",attendanceStatus:"Invited"});
     await db.doc("participants/other-record").set({meetingId:"invited-meeting",participantUid:"other-user",participantEmail:"other@example.test",attendanceStatus:"Invited"});
+    await db.doc("participants/closed-record").set({meetingId:"closed-meeting",participantUid:"invitee-user",participantEmail:"invitee@example.test",attendanceStatus:"Invited"});
   });
   const db=testEnv.authenticatedContext("invitee-user",{email:"invitee@example.test"}).firestore();
   await assertSucceeds(db.doc("participants/invitee-record").update({attendanceStatus:"Present",attendanceRecordedAt:"2026-10-09T18:00:00.000Z",attendanceRecordedByUid:"invitee-user"}));
   await assertFails(db.doc("participants/other-record").update({attendanceStatus:"Present",attendanceRecordedAt:"2026-10-09T18:00:00.000Z",attendanceRecordedByUid:"invitee-user"}));
+  await assertFails(db.doc("participants/closed-record").update({attendanceStatus:"Present",attendanceRecordedAt:"2026-10-09T18:00:00.000Z",attendanceRecordedByUid:"invitee-user"}));
   await assertFails(db.doc("participants/invitee-record").update({participantRole:"Board Member"}));
 });
 
