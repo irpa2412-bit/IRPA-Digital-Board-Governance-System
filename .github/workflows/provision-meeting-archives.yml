@@ -40,7 +40,7 @@ jobs:
           const categories = ["GOVERNANCE", "ADMINISTRATIVE", "STAFF", "GENERAL", "OTHER"];
           const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || "{}");
           const apiKey = String(process.env.FIREBASE_WEB_API_KEY || "").trim();
-          const gateway = String(process.env.MEETING_ARCHIVE_GATEWAY_URL || "").replace(/\\/$/, "");
+          const gateway = String(process.env.MEETING_ARCHIVE_GATEWAY_URL || "").replace(/\/+$/, "");
           if (!serviceAccount.project_id || !apiKey || !gateway) {
             throw new Error("Required Firebase or meeting-archive gateway configuration is missing.");
           }
