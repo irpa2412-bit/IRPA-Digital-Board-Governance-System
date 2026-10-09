@@ -319,7 +319,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
           <div className="form-field"><label>Document Reference / Identification No.</label><div className="auth-message" role="status" aria-live="polite"><strong>{generatedReference || "Assigned automatically at upload"}</strong><small style={{display:"block",marginTop:6}}>The identifier is generated transactionally by IRPA-DBGS. There is no manual reference-entry field.</small></div></div>
           <div className="form-field">
             <label>Document Type</label>
-            <select value={documentType} onChange={e => { const value=e.target.value; setDocumentType(value); setArchiveCategory(ARCHIVE_CATEGORIES[value] || value); }} aria-label="Document Type" required>
+            <select value={documentType} onChange={e => { const value=e.target.value; setDocumentType(value); setArchiveCategory(ARCHIVE_CATEGORIES[value] || value); }} aria-label="Document Type">
               <option value="">Select document type</option>
               {DOCUMENT_TYPES.map(type => <option key={type} value={type}>{type}{type === "Governance" ? " — Sensitive" : type === "Administrator" ? " — Restricted" : ""}</option>)}
             </select>
