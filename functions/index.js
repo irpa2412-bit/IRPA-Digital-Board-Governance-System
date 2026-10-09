@@ -1707,3 +1707,47 @@ exports.resetTrialData = onCall({region:"us-central1"}, async request => {
     throw new HttpsError("internal","The trial-data reset failed. The audit record has been retained.");
   }
 });
+
+/**
+ * Return a minimal, active Board Members register for signature routing.
+ * Server-side access avoids weakening Firestore list permissions on members.
+ */
+exports.getSignatureBoardMemberDirectory = onCall(async (request) => {
+  if (!request.auth?.uid) throw new HttpsError("unauthenticated", "Sign in to access the registered signing-officer directory.");
+  const uid = request.auth.uid;
+  const [memberSnap, employeeSnap, adminSnap] = await Promise.all([
+    db.collection("members").doc(uid).get(),
+    db.collection("employees").doc(uid).get(),
+    db.collection("adminProfiles").doc(uid).get()
+  ]);
+  const active = (data, type) => {
+    if (!data) return false;
+    const status = String(data.status || data.registrationStatus || data.employmentStatus || "").trim().toLowerCase();
+    if (["inactive","suspended","revoked","terminated","disabled","cancelled"].includes(status)) return false;
+    if (type === "employee") return ["active","activated","current"].includes(status) || data.active === true || data.accountActivated === true;
+    return ["active","activated","current"].includes(status) || data.active === true || data.accountActivated === true;
+  };
+  const authorized = adminSnap.exists && adminSnap.data()?.active === true
+    || memberSnap.exists && active(memberSnap.data(), "member")
+    || employeeSnap.exists && active(employeeSnap.data(), "employee")
+    || request.auth.token.admin === true
+    || request.auth.token.email === "irpa2412@gmail.com";
+  if (!authorized) throw new HttpsError("permission-denied", "An active registered IRPA profile is required.");
+  const snapshot = await db.collection("members").get();
+  const rows = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(row => {
+    const status = String(row.status || row.registrationStatus || "").trim().toLowerCase();
+    const enabled = ["active","activated","current"].includes(status) || row.active === true || row.accountActivated === true;
+    const disabled = ["inactive","suspended","revoked","terminated","disabled","cancelled"].includes(status) || row.active === false;
+    const boardRole = String(row.boardPosition || row.role || row.memberType || "").toLowerCase().includes("board")
+      || Boolean(row.boardPosition);
+    return enabled && !disabled && boardRole && Boolean(row.uid || row.id) && Boolean(row.email);
+  }).map(row => ({
+    id: row.id,
+    uid: String(row.uid || row.id),
+    email: String(row.email || "").trim().toLowerCase(),
+    name: String(row.name || row.fullName || row.displayName || row.email || "").trim(),
+    role: String(row.boardPosition || row.role || "Board Member"),
+    boardPosition: String(row.boardPosition || "")
+  }));
+  return { members: rows };
+});
