@@ -3,6 +3,7 @@ import { auth } from "../firebase/config";
 import { createRecord, getRecord, COLLECTIONS, getCurrentMemberProfile, getCurrentEmployeeProfile, nextDocumentReference } from "../firebase/data";
 import { readWorkflowContext, withWorkflowLinks } from "../firebase/workflowLinks";
 import { uploadControlledDocumentRouted, buildDocumentArchiveDestination } from "../firebase/signatureStorage";
+import { validateControlledDocumentUpload } from "./controlledDocumentUploadValidation.mjs";
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const DOCUMENT_TYPES = ["Governance", "Administrative", "Finance", "Procurement", "Administrator"];
@@ -110,18 +111,28 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
 
   async function submit(e) {
     e.preventDefault();
+    if (busy || pendingDocument) return;
+    setGeneratedReference("");
+    const contentType = file ? resolveContentType(file) : "";
+    const validationError = validateControlledDocumentUpload({
+      authenticated: Boolean(auth.currentUser),
+      file,
+      documentType,
+      allowRestrictedUpload,
+      contentType,
+      maxBytes: MAX_UPLOAD_BYTES
+    });
+    if (validationError) {
+      setError(validationError);
+      setMessage("");
+      return;
+    }
+
     setBusy(true);
     setMessage("Preparing document upload…");
     setError("");
-    setGeneratedReference("");
 
     try {
-      if (!auth.currentUser) throw new Error("You must be signed in.");
-      if (!file) throw new Error("Select a document file to upload.");
-      if (file.size <= 0) throw new Error("The selected document is empty.");
-      if (file.size > MAX_UPLOAD_BYTES) throw new Error("Documents must not exceed 10 MB.");
-      const contentType = resolveContentType(file);
-      if (contentType === "application/octet-stream") throw new Error("The selected file format is not supported. Choose PDF, Word, Excel, PowerPoint, OpenDocument, text/CSV, or an image document.");
 
       const name = (title.trim() || file.name.replace(/\.pdf$/i, "")).slice(0, 160);
       const documentReference = await nextDocumentReference();
@@ -328,7 +339,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
                 setError("");
                 setMessage(selected ? `${selected.name} selected. Click “Upload Document” to continue.` : "No document selected.");
               }}
-              required
+              aria-label="Select document file"
               style={{ display: "none" }}
             />
             <button
@@ -345,9 +356,20 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
           </div>
         </div>
         <div className="form-actions" style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+          {!pendingDocument && !busy && (
+            <small className="muted" role="status" style={{flexBasis:"100%"}}>
+              {!documentType
+                ? "Choose a document type, select a file, then press Upload Document."
+                : documentType === "Administrator" && !allowRestrictedUpload
+                  ? "Administrator documents are restricted. This uploader needs special permission for that document type."
+                  : !file
+                    ? "Select a file to enable the upload transaction."
+                    : "Document type and file are ready. Press Upload Document to continue."}
+            </small>
+          )}
           <button
             type="submit"
-            disabled={busy || !!pendingDocument || !file || !documentType || (documentType === "Administrator" && !allowRestrictedUpload)}
+            disabled={busy || !!pendingDocument}
             aria-busy={busy ? "true" : "false"}
           >
             {busy ? "Uploading…" : submitLabel}
