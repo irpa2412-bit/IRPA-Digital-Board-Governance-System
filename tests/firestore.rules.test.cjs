@@ -392,3 +392,39 @@ test("controlled documents retain uploader and authorization restrictions", asyn
     ...valid, uploadedByUid: "member-user", authorizedUids: []
   }));
 });
+
+test("anonymous ballots and participation locks can only be written by server-side governance functions", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    const db = context.firestore();
+    await db.doc("meetings/meeting-1").set({
+      meetingCategory: "GOVERNANCE",
+      meetingPolicyId: "GOVERNANCE",
+      votingRequired: true,
+      status: "In Progress"
+    });
+    await db.doc("votingIssues/issue-1").set({
+      meetingId: "meeting-1",
+      status: "Open",
+      anonymous: true,
+      votingReference: "Resolution test"
+    });
+  });
+
+  const db = testEnv.authenticatedContext("member-user", {
+    email: "member@example.test"
+  }).firestore();
+
+  await assertFails(db.doc("votes/vote-1").set({
+    meetingId: "meeting-1",
+    votingIssueId: "issue-1",
+    votingReference: "Resolution test",
+    outcome: "For",
+    anonymous: true,
+    status: "Locked"
+  }));
+
+  await assertFails(db.doc("votingIssues/issue-1/participants/member-user").set({
+    uid: "member-user",
+    issueId: "issue-1"
+  }));
+});

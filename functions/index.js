@@ -229,6 +229,189 @@ async function requireActiveAdministratorCallable(request){
   return {uid,email};
 }
 
+function governanceRoleValues(record={}){
+  return [record.role,record.title,record.position,record.boardPosition,record.participantRole,record.departmentalRole,
+    ...(Array.isArray(record.roles)?record.roles:[]),...(Array.isArray(record.assignedRoles)?record.assignedRoles:[]),...(Array.isArray(record.selectedRoles)?record.selectedRoles:[])]
+    .map(v=>String(v||"").trim().toLowerCase().replace(/[._-]+/g," ").replace(/\s+/g," "));
+}
+function eligibleBoardVoter(record={}){
+  const status=String(record.status||record.registrationStatus||"").trim().toLowerCase();
+  if(status&&!["active","activated"].includes(status))return false;
+  const roles=governanceRoleValues(record);
+  return roles.some(role=>["board member","board chairperson","board vice chairperson","board committee member","board treasurer","board secretary"].includes(role))
+    && !roles.some(role=>/non.?voting|observer|guest|external/.test(role));
+}
+async function requireMeetingController(request,meeting){
+  const uid=request.auth?.uid,email=String(request.auth?.token?.email||"").trim().toLowerCase();
+  if(!uid)throw new HttpsError("unauthenticated","Sign in to manage this meeting.");
+  if(email==="irpa2412@gmail.com"||request.auth?.token?.admin===true)return{uid,email};
+  const adminSnap=await db.collection("adminProfiles").doc(uid).get();
+  if(adminSnap.exists&&adminSnap.data()?.active===true)return{uid,email};
+  const memberSnap=await db.collection("members").doc(uid).get();
+  const employeeSnap=await db.collection("employees").doc(uid).get();
+  const active=[memberSnap,employeeSnap].some(s=>s.exists&&["active","activated"].includes(String(s.data()?.status||s.data()?.registrationStatus||s.data()?.employmentStatus||"").toLowerCase()));
+  const uidAllowed=[meeting.initiatorUid,meeting.chairpersonUid,meeting.secretaryUid].map(v=>String(v||"")).includes(uid);
+  const emailAllowed=[meeting.initiatorEmail,meeting.chairpersonEmail,meeting.secretaryEmail].map(v=>String(v||"").trim().toLowerCase()).includes(email);
+  if(!active||(!uidAllowed&&!emailAllowed))throw new HttpsError("permission-denied","Only an active meeting initiator, chairperson, secretary or authorised administrator may manage governance voting.");
+  return{uid,email};
+}
+function governancePolicySnapshot(meeting={}){
+  const policy={
+    policyReference:String(meeting.policyReference||"").trim(),
+    policyEffectiveDate:String(meeting.policyEffectiveDate||"").trim(),
+    policyVersion:String(meeting.policyVersion||"1").trim()||"1",
+    quorumBasis:["FIXED_COUNT","PERCENT_ELIGIBLE"].includes(meeting.quorumBasis)?meeting.quorumBasis:"FIXED_COUNT",
+    quorumValue:Number(meeting.quorumValue??meeting.quorumRequired??1),
+    votingDenominator:["BALLOTS_CAST","ELIGIBLE_PRESENT","TOTAL_ELIGIBLE"].includes(meeting.votingDenominator)?meeting.votingDenominator:"BALLOTS_CAST",
+    decisionThreshold:["SIMPLE_MAJORITY","ONE_THIRD","TWO_THIRDS","CUSTOM"].includes(meeting.decisionThreshold)?meeting.decisionThreshold:"SIMPLE_MAJORITY",
+    customThresholdNumerator:Number(meeting.customThresholdNumerator??2),
+    customThresholdDenominator:Number(meeting.customThresholdDenominator??3),
+    abstentionsIncludedInBallotsCast:meeting.abstentionsIncludedInBallotsCast!==false,
+    requireQuorumAtVoteOpen:meeting.requireQuorumAtVoteOpen!==false,
+    requireQuorumAtVoteClose:meeting.requireQuorumAtVoteClose!==false,
+    requireAttendanceToVote:meeting.requireAttendanceToVote!==false
+  };
+  if(!Number.isFinite(policy.quorumValue)||policy.quorumValue<1||(policy.quorumBasis==="PERCENT_ELIGIBLE"&&policy.quorumValue>100))throw new HttpsError("invalid-argument","The meeting quorum policy is invalid.");
+  if(policy.decisionThreshold==="CUSTOM"&&(!Number.isInteger(policy.customThresholdNumerator)||!Number.isInteger(policy.customThresholdDenominator)||policy.customThresholdNumerator<1||policy.customThresholdDenominator<2||policy.customThresholdNumerator>=policy.customThresholdDenominator))throw new HttpsError("invalid-argument","The custom decision threshold must be a valid fraction such as 2/3.");
+  return policy;
+}
+async function calculateAuthoritativeQuorum(tx,meeting,policy){
+  const meetingId=String(meeting?.id||meeting||"");
+  const meetingReferences=[...new Set([meeting?.meetingReference,meeting?.reference,meeting?.title].map(v=>String(v||"").trim()).filter(Boolean))];
+  const reads=[tx.get(db.collection("members")),tx.get(db.collection("participants").where("meetingId","==",meetingId)),...meetingReferences.map(ref=>tx.get(db.collection("participants").where("meetingReference","==",ref)))];
+  const snaps=await Promise.all(reads);
+  const memberSnap=snaps[0],participantDocs=new Map();
+  for(const snap of snaps.slice(1))for(const doc of snap.docs)participantDocs.set(doc.id,doc);
+  const totalEligibleCount=memberSnap.docs.filter(d=>eligibleBoardVoter(d.data())).length;
+  const eligibleParticipants=[...participantDocs.values()].filter(d=>eligibleBoardVoter(d.data()));
+  const present=eligibleParticipants.filter(d=>String(d.data().attendanceStatus||d.data().status||"").trim().toLowerCase()==="present");
+  const eligiblePresentCount=present.length;
+  const requiredCount=policy.quorumBasis==="PERCENT_ELIGIBLE"?Math.ceil(totalEligibleCount*policy.quorumValue/100):Math.ceil(policy.quorumValue);
+  return {totalEligibleCount,eligibleCount:eligibleParticipants.length,eligiblePresentCount,presentCount:present.length,requiredCount,quorumMet:totalEligibleCount>0&&eligiblePresentCount>=requiredCount,policyVersion:policy.policyVersion,calculatedAt:new Date().toISOString()};
+}
+function decideGovernanceVote(policy,quorum,tally){
+  const ballotsCast=tally.forVotes+tally.againstVotes+(policy.abstentionsIncludedInBallotsCast?tally.abstainVotes:0);
+  const denominator=policy.votingDenominator==="ELIGIBLE_PRESENT"?quorum.eligiblePresentCount:
+    policy.votingDenominator==="TOTAL_ELIGIBLE"?quorum.totalEligibleCount:ballotsCast;
+  const fraction=policy.decisionThreshold==="ONE_THIRD"?[1,3]:policy.decisionThreshold==="TWO_THIRDS"?[2,3]:
+    policy.decisionThreshold==="CUSTOM"?[policy.customThresholdNumerator,policy.customThresholdDenominator]:[1,2];
+  const ratio=fraction[0]/fraction[1];
+  const thresholdMet=policy.decisionThreshold==="SIMPLE_MAJORITY"?denominator>0&&tally.forVotes/denominator>ratio:denominator>0&&tally.forVotes/denominator>=ratio;
+  const result=(policy.requireQuorumAtVoteClose&&!quorum.quorumMet)||denominator===0?"Pending":thresholdMet?"Passed":"Rejected";
+  return {result,forVotes:tally.forVotes,againstVotes:tally.againstVotes,abstainVotes:tally.abstainVotes,ballotsCast,denominator,thresholdNumerator:fraction[0],thresholdDenominator:fraction[1],quorumMet:quorum.quorumMet,policyVersion:policy.policyVersion};
+}
+exports.openGovernanceVotingIssue=onCall({region:"us-central1",timeoutSeconds:60},async request=>{
+  const uid=request.auth?.uid;
+  if(!uid)throw new HttpsError("unauthenticated","Sign in before opening a vote.");
+  const meetingId=String(request.data?.meetingId||"").trim(),origin=String(request.data?.votingReference||"").trim(),agendaItem=String(request.data?.agendaItem||"").trim();
+  const resolutionId=String(request.data?.resolutionId||"").trim()||null;
+  if(!meetingId||!origin)throw new HttpsError("invalid-argument","Meeting and voting issue references are required.");
+  const meetingSnap=await db.collection("meetings").doc(meetingId).get();
+  if(!meetingSnap.exists)throw new HttpsError("not-found","The originating meeting was not found.");
+  const meeting={id:meetingSnap.id,...meetingSnap.data()};
+  const category=String(meeting.meetingCategory||meeting.meetingPolicyId||meeting.category||meeting.meetingType||"").trim().toUpperCase();
+  if(!["GOVERNANCE","BOARD","BOARD MEETING","BOARD COMMITTEE MEETING","ANNUAL GENERAL MEETING","SPECIAL MEETING"].includes(category))throw new HttpsError("failed-precondition","Voting is only available for a governance meeting.");
+  const actor=await requireMeetingController(request,meeting);
+  let resolution=null;
+  if(resolutionId){const snap=await db.collection("resolutions").doc(resolutionId).get();if(!snap.exists)throw new HttpsError("not-found","The linked resolution was not found.");resolution={id:snap.id,...snap.data()};if(resolution.meetingId!==meetingId)throw new HttpsError("failed-precondition","A resolution may only be voted on within its originating meeting.");}
+  const policy=governancePolicySnapshot(meeting);
+  if(meeting.votingRequired!==true&&resolution?.votingRequired!==true)throw new HttpsError("failed-precondition","Mark voting as required in the meeting register or originating resolution before opening a governance vote.");
+  if(!policy.policyReference)throw new HttpsError("failed-precondition","Record the governing constitution, approved policy or terms of reference before opening a vote.");
+  const issueId=crypto.createHash("sha256").update(`${meetingId}|${resolutionId||""}|${origin.toLowerCase()}`).digest("hex");
+  const ref=db.collection("votingIssues").doc(issueId);
+  let response;
+  await db.runTransaction(async tx=>{
+    const existing=await tx.get(ref);
+    if(existing.exists&&String(existing.data().status||"Open")!=="Cancelled"){response={...existing.data(),id:existing.id,alreadyOpen:true};return;}
+    const quorum=await calculateAuthoritativeQuorum(tx,meeting,policy);
+    if(policy.requireQuorumAtVoteOpen&&!quorum.quorumMet)throw new HttpsError("failed-precondition",`Voting is blocked: quorum is not met (${quorum.eligiblePresentCount}/${quorum.requiredCount} eligible members present).`);
+    const data={meetingId,meetingReference:String(meeting.meetingReference||meeting.reference||meeting.title||meetingId),meetingCategory:"GOVERNANCE",resolutionId,resolutionReference:resolution?.resolutionReference||String(request.data?.resolutionReference||""),agendaItem,policySnapshot:policy,quorumSnapshot:quorum,status:"Open",result:"Pending",anonymous:true,openedAt:FieldValue.serverTimestamp(),openedByUid:actor.uid,openedByProcess:true,createdAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()};
+    tx.set(ref,data);
+    tx.update(db.collection("meetings").doc(meetingId),{votingRequired:true,votingReference:origin,votingIssueId:issueId,votingStatus:"Open",votingResult:"Pending",currentAgendaItem:agendaItem||meeting.currentAgendaItem||null,currentAgendaItemStatus:agendaItem?"Voting":meeting.currentAgendaItemStatus||null,updatedAt:FieldValue.serverTimestamp()});
+    tx.set(db.collection("audit").doc(),{action:"GOVERNANCE_VOTING_OPENED",collection:"votingIssues",recordId:issueId,details:{meetingId,resolutionId,votingReference:origin,policyVersion:policy.policyVersion,quorumSnapshot:quorum},actorUid:actor.uid,actorEmail:actor.email||null,createdAt:FieldValue.serverTimestamp()});
+    response={id:issueId,alreadyOpen:false,meetingId,meetingReference:data.meetingReference,meetingCategory:"GOVERNANCE",resolutionId,resolutionReference:data.resolutionReference,agendaItem, votingReference:origin,policySnapshot:policy,quorumSnapshot:quorum,status:"Open",result:"Pending",anonymous:true};
+  });
+  return response;
+});
+exports.castGovernanceAnonymousVote=onCall({region:"us-central1",timeoutSeconds:60},async request=>{
+  const uid=request.auth?.uid,email=String(request.auth?.token?.email||"").trim().toLowerCase();
+  const issueId=String(request.data?.votingIssueId||"").trim(),outcome=String(request.data?.outcome||"").trim(),votingMethod=String(request.data?.votingMethod||"Meeting Vote").trim();
+  if(!uid)throw new HttpsError("unauthenticated","Sign in before voting.");
+  if(!issueId||!["For","Against","Abstain"].includes(outcome))throw new HttpsError("invalid-argument","A valid voting issue and ballot choice are required.");
+  const issueRef=db.collection("votingIssues").doc(issueId),participationRef=issueRef.collection("participants").doc(uid),voteRef=db.collection("votes").doc();
+  await db.runTransaction(async tx=>{
+    const issueSnap=await tx.get(issueRef);
+    if(!issueSnap.exists)throw new HttpsError("not-found","This voting issue does not exist.");
+    const issue=issueSnap.data();
+    if(issue.status!=="Open")throw new HttpsError("failed-precondition","Voting is closed for this issue.");
+    const [memberSnap,participationSnap,meetingSnap]=await Promise.all([
+      tx.get(db.collection("members").doc(uid)),
+      tx.get(participationRef),
+      tx.get(db.collection("meetings").doc(String(issue.meetingId||"")))
+    ]);
+    if(!memberSnap.exists||!eligibleBoardVoter(memberSnap.data()))throw new HttpsError("permission-denied","Only an eligible Board member may cast this governance vote.");
+    const memberStatus=String(memberSnap.data()?.status||memberSnap.data()?.registrationStatus||"").trim().toLowerCase();
+    if(memberStatus&&!["active","activated"].includes(memberStatus))throw new HttpsError("permission-denied","Your Board membership is not active.");
+    if(!meetingSnap.exists)throw new HttpsError("failed-precondition","The originating meeting is missing.");
+    if(participationSnap.exists())throw new HttpsError("already-exists","You have already voted on this issue. Duplicate voting is not permitted.");
+    const meeting=meetingSnap.data(),references=[...new Set([meeting.meetingReference,meeting.reference,meeting.title].map(v=>String(v||"").trim()).filter(Boolean))];
+    const reads=[tx.get(db.collection("participants").where("meetingId","==",String(issue.meetingId))) ,...references.map(ref=>tx.get(db.collection("participants").where("meetingReference","==",ref)))];
+    const participantSnaps=await Promise.all(reads),participants=new Map();
+    for(const snap of participantSnaps)for(const doc of snap.docs)participants.set(doc.id,doc);
+    const matching=[...participants.values()].filter(doc=>{
+      const p=doc.data();
+      const ids=[p.uid,p.userId,p.memberUid,p.participantUid,p.participantId].map(v=>String(v||""));
+      const emails=[p.email,p.participantEmail,p.subscriberEmail].map(v=>String(v||"").trim().toLowerCase());
+      return ids.includes(uid)||(email&&emails.includes(email));
+    });
+    const presentParticipant=matching.find(doc=>eligibleBoardVoter(doc.data())&&String(doc.data().attendanceStatus||doc.data().status||"").trim().toLowerCase()==="present");
+    const policy=issue.policySnapshot||{};
+    if(policy.requireAttendanceToVote!==false&&!presentParticipant)throw new HttpsError("failed-precondition","Voting requires a matching eligible participant record marked Present in the meeting attendance register.");
+    tx.set(participationRef,{uid,issueId,createdAt:FieldValue.serverTimestamp()});
+    tx.set(voteRef,{voteReference:`IRPA-VOTE-${voteRef.id}`,votingIssueId:issueId,meetingId:issue.meetingId,meetingReference:issue.meetingReference||issue.meetingId,resolutionId:issue.resolutionId||null,resolutionReference:issue.resolutionReference||null,agendaItem:issue.agendaItem||null,votingReference:issue.votingReference,outcome,result:"Pending",status:"Locked",votingMethod,anonymous:true,votedAt:FieldValue.serverTimestamp(),createdAt:FieldValue.serverTimestamp()});
+    tx.set(db.collection("audit").doc(),{action:"ANONYMOUS_VOTE_CAST",collection:"votes",recordId:voteRef.id,details:{votingIssueId:issueId,outcome,votingMethod,anonymous:true},actorUid:null,actorEmail:null,createdAt:FieldValue.serverTimestamp()});
+  });
+  return {ok:true,voteId:voteRef.id,anonymous:true,locked:true};
+});
+exports.closeGovernanceVotingIssue=onCall({region:"us-central1",timeoutSeconds:60},async request=>{
+  const issueId=String(request.data?.votingIssueId||"").trim();
+  if(!issueId)throw new HttpsError("invalid-argument","A voting issue is required.");
+  const uid=request.auth?.uid;
+  if(!uid)throw new HttpsError("unauthenticated","Sign in before closing voting.");
+  const ref=db.collection("votingIssues").doc(issueId);
+  let response;
+  await db.runTransaction(async tx=>{
+    const issueSnap=await tx.get(ref);
+    if(!issueSnap.exists)throw new HttpsError("not-found","Voting issue not found.");
+    const issue=issueSnap.data();
+    if(issue.status!=="Open")throw new HttpsError("failed-precondition","This voting issue is already closed.");
+    const meetingSnap=await tx.get(db.collection("meetings").doc(String(issue.meetingId||"")));
+    if(!meetingSnap.exists)throw new HttpsError("failed-precondition","The originating meeting is missing.");
+    const meeting={id:meetingSnap.id,...meetingSnap.data()};
+    const actor=await requireMeetingController(request,meeting);
+    const policy=issue.policySnapshot||governancePolicySnapshot(meeting);
+    const [voteSnap,quorum]=await Promise.all([
+      tx.get(db.collection("votes").where("votingIssueId","==",issueId)),
+      calculateAuthoritativeQuorum(tx,meeting,policy)
+    ]);
+    let resolutionSnap=null;
+    if(issue.resolutionId)resolutionSnap=await tx.get(db.collection("resolutions").doc(String(issue.resolutionId)));
+    if(issue.resolutionId&&!resolutionSnap.exists)throw new HttpsError("failed-precondition","The linked resolution no longer exists.");
+    const decisionsSnap=await tx.get(db.collection("decisions").where("meetingId","==",meeting.id));
+    const tally={forVotes:0,againstVotes:0,abstainVotes:0};
+    for(const d of voteSnap.docs){const v=d.data();if(v.outcome==="For")tally.forVotes++;else if(v.outcome==="Against")tally.againstVotes++;else if(v.outcome==="Abstain")tally.abstainVotes++;}
+    const decision=decideGovernanceVote(policy,quorum,tally);
+    if(policy.requireQuorumAtVoteClose&&!quorum.quorumMet)throw new HttpsError("failed-precondition",`The decision cannot be finalized because quorum is not met (${quorum.eligiblePresentCount}/${quorum.requiredCount}).`);
+    const now=FieldValue.serverTimestamp();
+    tx.update(ref,{status:"Closed",result:decision.result,finalTally:decision,quorumSnapshot:quorum,closedAt:now,closedByUid:actor.uid,updatedAt:now});
+    if(resolutionSnap?.exists)tx.update(resolutionSnap.ref,{status:decision.result==="Pending"?"Voting Open":decision.result,votingStatus:decision.result==="Pending"?"Pending":"Completed",votingResult:decision.result,votingIssueId:issueId,finalTally:decision,quorumSnapshot:quorum,updatedAt:now});
+    for(const decisionDoc of decisionsSnap.docs){const row=decisionDoc.data();const linked=String(row.votingIssueId||"")===issueId||(issue.resolutionId&&String(row.resolutionId||"")===String(issue.resolutionId))||(!issue.resolutionId&&issue.agendaItem&&String(row.originatingAgendaItem||row.agendaItem||"")===String(issue.agendaItem));if(linked)tx.update(decisionDoc.ref,{status:decision.result==="Pending"?(row.status||"Draft"):decision.result,votingStatus:decision.result==="Pending"?"Pending":"Completed",votingResult:decision.result,votingIssueId:issueId,finalTally:decision,quorumSnapshot:quorum,updatedAt:now});}
+    tx.set(db.collection("audit").doc(),{action:"GOVERNANCE_VOTING_CLOSED",collection:"votingIssues",recordId:issueId,details:{meetingId:meeting.id,resolutionId:issue.resolutionId||null,decision,policyVersion:policy.policyVersion},actorUid:actor.uid,actorEmail:actor.email||null,createdAt:now});
+    response={result:decision.result,decision,quorumSnapshot:quorum};
+  });
+  return response;
+});
+
 exports.resolveAuthenticatedLoginContext = onCallV1({region:"us-central1",timeoutSeconds:30}, async request => {
   const uid=String(request.auth?.uid||"").trim();
   const email=String(request.auth?.token?.email||"").trim().toLowerCase();
