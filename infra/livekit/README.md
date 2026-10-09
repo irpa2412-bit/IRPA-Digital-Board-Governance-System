@@ -60,7 +60,7 @@ The deployment script creates a **single-node staging pilot**, not a high-availa
 
 Configure these **repository Actions secrets** in GitHub before running the manual workflows:
 
-**Media VM deployment** (`Deploy IRPA Self-Hosted LiveKit Staging`):
+**Media VM + staging callable deployment** (`Deploy IRPA Self-Hosted LiveKit Staging`):
 - `LIVEKIT_STAGING_SSH_HOST`
 - `LIVEKIT_STAGING_SSH_USER`
 - `LIVEKIT_STAGING_SSH_PRIVATE_KEY`
@@ -70,16 +70,12 @@ Configure these **repository Actions secrets** in GitHub before running the manu
 - `LIVEKIT_STAGING_API_KEY`
 - `LIVEKIT_STAGING_API_SECRET`
 - `LIVEKIT_STAGING_ACME_EMAIL`
+- `LIVEKIT_STAGING_FIREBASE_PROJECT_ID` — a dedicated non-production Firebase project; production project ID is explicitly rejected.
+- `LIVEKIT_STAGING_FIREBASE_SERVICE_ACCOUNT` — JSON service account with permission to manage Secret Manager versions and deploy Cloud Functions in that staging project.
 
-**Firebase callable deployment** (`Deploy IRPA LiveKit Staging Function`):
-- `LIVEKIT_STAGING_FIREBASE_PROJECT_ID` — a dedicated non-production Firebase project.
-- `LIVEKIT_STAGING_FIREBASE_SERVICE_ACCOUNT` — JSON service account with permission to enable required APIs, manage Secret Manager versions, and deploy Cloud Functions in that staging project.
-- `LIVEKIT_STAGING_URL` — the deployed endpoint in `wss://` form. It should match the VM deployment's primary domain.
-- The same `LIVEKIT_STAGING_API_KEY` and `LIVEKIT_STAGING_API_SECRET` as the VM deployment.
-
-**Verification** (`Verify IRPA LiveKit Staging Control Plane`):
+**Control-plane verification** (`Verify IRPA LiveKit Staging Control Plane`):
 - `LIVEKIT_STAGING_URL`
 - `LIVEKIT_STAGING_API_KEY`
 - `LIVEKIT_STAGING_API_SECRET`
 
-Run in this order: deploy media VM; verify TLS/network; deploy the callable to the staging Firebase project; run control-plane verification; then complete the real two-browser WebRTC acceptance test. These workflows are manual and are not triggered by merging this PR. A GitHub workflow cannot proceed successfully until all secrets and the dedicated host/project exist.
+Run in this order: manually dispatch `Deploy IRPA Self-Hosted LiveKit Staging` with confirmation value `DEPLOY-LIVEKIT-STAGING`; verify TLS/network; the workflow deploys the callable only to the configured staging Firebase project; run `Verify IRPA LiveKit Staging Control Plane`; then complete the real two-browser WebRTC acceptance test. These workflows are manual and are not triggered by merging this PR. A GitHub workflow cannot proceed successfully until all secrets and the dedicated host/project exist.
