@@ -50,7 +50,7 @@ export default function OperationalGatewaysParticipants(){
     if(!issued.accessToken||!issued.meetingPassword||!issued.accessId)throw new Error("The meeting gateway did not return a complete access pass.");
     const meetingAccess={accessId:issued.accessId,accessToken:issued.accessToken,meetingId:issued.meetingId,participantId:issued.participantId,meetingReference:issued.meetingReference,password:issued.meetingPassword,expiresAt:issued.expiresAt};
     const result=await sendMemberInvitationEmail(payload.participantEmail,invitationId,payload.participantRole,payload.memberType,meetingAccess);
-    await updateRecord(COLLECTIONS.invitations,invitationId,{status:"Invitation Requested",deliveryStatus:result.deliveryStatus||"Accepted by IRPA Mail Server; SMTP delivery status returned by gateway",sentAt:new Date().toISOString(),deliveryError:"",meetingAccessDispatched:result.meetingAccessSent===true});
+    await updateRecord(COLLECTIONS.invitations,invitationId,{status:result.deliveryStatus==="Sent"?"Sent":"Invitation Requested",deliveryStatus:result.deliveryStatus||"Accepted by IRPA Mail Server; SMTP delivery status returned by gateway",sentAt:new Date().toISOString(),deliveryError:"",meetingAccessDispatched:result.meetingAccessSent===true});
     await updateRecord(COLLECTIONS.participants,participantId,{invitationId,invitationStatus:"Invitation Requested",invitationRole:payload.participantRole,meetingAccessDispatched:result.meetingAccessSent===true});
     setMsg("Participant registered. The invitation email includes the account activation link and the meeting-specific access link and gate password. Check the returned delivery status before relying on mailbox delivery.");
    }catch(x){
