@@ -5,6 +5,7 @@
  */
 export const DEFAULT_GOVERNANCE_POLICY = Object.freeze({
   policyReference: "",
+  policyEffectiveDate: "",
   policyVersion: "1",
   quorumBasis: "FIXED_COUNT",
   quorumValue: 1,
@@ -39,6 +40,7 @@ export function normalizeGovernancePolicy(input = {}) {
     throw new Error("A custom decision threshold requires a valid fraction, such as 2/3.");
   }
   p.policyReference = String(p.policyReference || "").trim();
+  p.policyEffectiveDate = String(p.policyEffectiveDate || "").trim();
   p.policyVersion = String(p.policyVersion || "1").trim() || "1";
   return p;
 }
