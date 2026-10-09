@@ -2,118 +2,103 @@
 set -Eeuo pipefail
 umask 077
 
-: "${LIVEKIT_DOMAIN:?Set LIVEKIT_DOMAIN to the DNS name for the LiveKit WebSocket endpoint}"
-: "${LIVEKIT_TURN_DOMAIN:?Set LIVEKIT_TURN_DOMAIN to the DNS name for TURN/TLS}"
-: "${LIVEKIT_API_KEY:?Set LIVEKIT_API_KEY in the deployment environment}"
-: "${LIVEKIT_API_SECRET:?Set LIVEKIT_API_SECRET in the deployment environment}"
-: "${ACME_EMAIL:?Set ACME_EMAIL for TLS certificate expiry notices}"
+: "${LIVEKIT_DOMAIN:?Set LIVEKIT_DOMAIN to the meeting WebSocket hostname}"
+: "${LIVEKIT_TURN_DOMAIN:?Set LIVEKIT_TURN_DOMAIN to the TURN/TLS hostname}"
+: "${LIVEKIT_API_KEY:?Set LIVEKIT_API_KEY in the protected deployment environment}"
+: "${LIVEKIT_API_SECRET:?Set LIVEKIT_API_SECRET in the protected deployment environment}"
+: "${ACME_EMAIL:?Set ACME_EMAIL for automatic TLS certificate notices}"
 
-if [[ ! "$LIVEKIT_DOMAIN" =~ ^[a-zA-Z0-9.-]+$ || ! "$LIVEKIT_TURN_DOMAIN" =~ ^[a-zA-Z0-9.-]+$ ]]; then
-  echo "Domain names contain unsupported characters." >&2; exit 2
+valid_domain='^[A-Za-z0-9.-]+$'
+if [[ ! "$LIVEKIT_DOMAIN" =~ $valid_domain || ! "$LIVEKIT_TURN_DOMAIN" =~ $valid_domain ]]; then
+  echo "Refusing invalid DNS hostname." >&2; exit 2
 fi
 if [[ "$LIVEKIT_DOMAIN" == "$LIVEKIT_TURN_DOMAIN" ]]; then
-  echo "Use separate DNS names for the WebSocket endpoint and TURN/TLS." >&2; exit 2
+  echo "The meeting and TURN hostnames must be different." >&2; exit 2
 fi
 if [[ ! "$LIVEKIT_API_KEY" =~ ^[A-Za-z0-9_-]{8,64}$ || ! "$LIVEKIT_API_SECRET" =~ ^[A-Za-z0-9_-]{32,128}$ || "$LIVEKIT_API_KEY" == "devkey" || "$LIVEKIT_API_SECRET" == "secret" ]]; then
-  echo "Refusing default, weak, or unsupported LiveKit credentials; use a unique key and 32-128 character base64url-style secret." >&2; exit 2
+  echo "Refusing default, weak, or unsupported LiveKit credentials." >&2; exit 2
 fi
 if [[ $EUID -ne 0 ]]; then echo "Run this script as root (sudo)." >&2; exit 2; fi
-if ! command -v docker >/dev/null 2>&1; then
-  apt-get update
-  DEBIAN_FRONTEND=noninteractive apt-get install -y docker.io docker-compose-v2 certbot
+
+# Fail closed unless both DNS names already point to this VM. Do not create or
+# modify public DNS records automatically.
+for domain in "$LIVEKIT_DOMAIN" "$LIVEKIT_TURN_DOMAIN"; do
+  if ! getent ahostsv4 "$domain" >/dev/null 2>&1; then
+    echo "DNS does not resolve for $domain; configure its A record before deployment." >&2; exit 3
+  fi
+done
+public_ip="$(curl -4fsS --max-time 8 https://api.ipify.org || true)"
+if [[ -z "$public_ip" ]]; then
+  echo "Could not determine this VM's public IPv4 address; refusing certificate/deployment step." >&2; exit 3
 fi
+for domain in "$LIVEKIT_DOMAIN" "$LIVEKIT_TURN_DOMAIN"; do
+  if ! getent ahostsv4 "$domain" | awk '{print $1}' | grep -Fxq "$public_ip"; then
+    echo "DNS for $domain does not include this VM's public IPv4 address." >&2; exit 3
+  fi
+done
+
+export DEBIAN_FRONTEND=noninteractive
+apt-get update
+apt-get install -y docker.io docker-compose-v2 gettext-base curl ca-certificates
 systemctl enable --now docker
-apt-get install -y certbot
-install -d -m 0750 /opt/irpa-livekit /var/www/certbot
+
+install -d -o root -g root -m 0700 /opt/irpa-livekit
 cd /opt/irpa-livekit
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+install -m 0640 "$script_dir/docker-compose.yml" ./docker-compose.yml
+install -m 0640 "$script_dir/caddy.yaml.template" ./caddy.yaml.template
+install -m 0640 "$script_dir/livekit.yaml.template" ./livekit.yaml.template
 
-cat > Caddyfile <<EOF
-{
-  email $ACME_EMAIL
-}
-$LIVEKIT_DOMAIN {
-  reverse_proxy 127.0.0.1:7880
-}
-http://$LIVEKIT_TURN_DOMAIN {
-  handle /.well-known/acme-challenge/* {
-    root * /var/www/certbot
-    file_server
-  }
-  respond "IRPA TURN/TLS certificate endpoint" 404
-}
+# Keep secrets root-only; never echo them or commit generated config.
+cat > .env <<EOF
+LIVEKIT_DOMAIN=$LIVEKIT_DOMAIN
+LIVEKIT_TURN_DOMAIN=$LIVEKIT_TURN_DOMAIN
+LIVEKIT_API_KEY=$LIVEKIT_API_KEY
+LIVEKIT_API_SECRET=$LIVEKIT_API_SECRET
+ACME_EMAIL=$ACME_EMAIL
 EOF
+chmod 0600 .env
+envsubst '${LIVEKIT_DOMAIN} ${LIVEKIT_TURN_DOMAIN}' < caddy.yaml.template > caddy.yaml
+envsubst '${LIVEKIT_API_KEY} ${LIVEKIT_API_SECRET} ${LIVEKIT_TURN_DOMAIN}' < livekit.yaml.template > livekit.yaml
+chmod 0600 caddy.yaml livekit.yaml
 
-cat > compose.yaml <<'EOF'
-services:
-  caddy:
-    image: caddy:2.10.2
-    container_name: irpa-livekit-caddy
-    network_mode: host
-    restart: unless-stopped
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-      - /var/www/certbot:/var/www/certbot:ro
-  livekit:
-    image: livekit/livekit-server:v1.13.7
-    container_name: irpa-livekit-server
-    network_mode: host
-    restart: unless-stopped
-    command: ["--config", "/etc/livekit.yaml"]
-    volumes:
-      - ./livekit.yaml:/etc/livekit.yaml:ro
-      - /etc/letsencrypt:/etc/letsencrypt:ro
-volumes:
-  caddy_data:
-  caddy_config:
-EOF
+docker compose -f docker-compose.yml config -q
+docker compose -f docker-compose.yml pull
+docker compose -f docker-compose.yml up -d
 
-docker compose up -d caddy
-# Caddy serves the HTTP-01 challenge directory for the TURN host; the primary
-# endpoint's certificate is obtained automatically by Caddy.
-certbot certonly --webroot -w /var/www/certbot \
-  --cert-name "$LIVEKIT_TURN_DOMAIN" -d "$LIVEKIT_TURN_DOMAIN" \
-  --email "$ACME_EMAIL" --agree-tos --non-interactive
+cat > /etc/systemd/system/irpa-livekit.service <<'UNIT'
+[Unit]
+Description=IRPA isolated LiveKit staging media stack
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/irpa-livekit
+ExecStart=/usr/bin/docker compose -f /opt/irpa-livekit/docker-compose.yml up -d
+ExecStop=/usr/bin/docker compose -f /opt/irpa-livekit/docker-compose.yml down
+TimeoutStartSec=0
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl daemon-reload
+systemctl enable irpa-livekit.service
 
-cat > livekit.yaml <<EOF
-port: 7880
-log_level: info
-rtc:
-  tcp_port: 7881
-  port_range_start: 50000
-  port_range_end: 60000
-  use_external_ip: true
-keys:
-  "$LIVEKIT_API_KEY": "$LIVEKIT_API_SECRET"
-turn:
-  enabled: true
-  domain: "$LIVEKIT_TURN_DOMAIN"
-  tls_port: 5349
-  udp_port: 3478
-  cert_file: "/etc/letsencrypt/live/$LIVEKIT_TURN_DOMAIN/fullchain.pem"
-  key_file: "/etc/letsencrypt/live/$LIVEKIT_TURN_DOMAIN/privkey.pem"
-EOF
-chmod 0600 livekit.yaml
-chmod 0640 Caddyfile compose.yaml
-docker compose up -d livekit
-# Renew TURN TLS certificates automatically and restart LiveKit after renewal.
-install -d -m 0755 /etc/letsencrypt/renewal-hooks/deploy
-cat > /etc/letsencrypt/renewal-hooks/deploy/irpa-livekit-restart.sh <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-cd /opt/irpa-livekit
-docker compose restart livekit
-EOF
-chmod 0750 /etc/letsencrypt/renewal-hooks/deploy/irpa-livekit-restart.sh
-systemctl enable --now certbot.timer || true
+# Caddy's official LiveKit L4 build multiplexes TLS on TCP/443 by SNI:
+# meeting WSS -> 7880; TURN/TLS -> the internal LiveKit TURN listener 5349.
+# TURN/TLS certificates are automatically issued and renewed by Caddy.
+for attempt in $(seq 1 30); do
+  code="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 "https://$LIVEKIT_DOMAIN/" || true)"
+  if [[ "$code" =~ ^(2[0-9][0-9]|3[0-9][0-9]|404)$ ]]; then
+    echo "Meeting HTTPS/WSS endpoint reachable (HTTP $code)."
+    docker compose -f docker-compose.yml ps
+    echo "Endpoint reachability is not proof of authenticated API access or WebRTC media; run the separate staging acceptance tests."
+    exit 0
+  fi
+  sleep 3
+done
 
-cat > /opt/irpa-livekit/endpoint.txt <<EOF
-wss://$LIVEKIT_DOMAIN
-turns:$LIVEKIT_TURN_DOMAIN:5349?transport=tcp
-EOF
-chmod 0640 /opt/irpa-livekit/endpoint.txt
-
-echo "LiveKit containers are started. This is not yet acceptance proof."
-echo "Verify DNS, TLS, firewall rules, authenticated API calls and a two-browser WebRTC session."
-echo "Endpoint: wss://$LIVEKIT_DOMAIN"
+echo "LiveKit HTTPS endpoint did not become reachable; inspect container logs on the staging VM." >&2
+docker compose -f docker-compose.yml ps >&2 || true
+exit 4
