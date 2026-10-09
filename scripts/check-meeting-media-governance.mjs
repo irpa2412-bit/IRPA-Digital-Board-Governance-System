@@ -24,6 +24,7 @@ const checks=[
  ["Meeting Room selects the meeting from the invitation gate context",room.includes("entryContext?.meetingId")&&room.includes("setSelectedId(invitedMeeting.id)")],
  ["Verified invitee context enables the media join control",room.includes("entryContext?.participantId")&&room.includes("entryContext?.meetingId===selected?.id")],
  ["Moderator authority is initialized before LiveKit grant",liveMeeting.indexOf("const moderator = isAdmin || moderatorForMeeting")>=0&&liveMeeting.indexOf("const moderator = isAdmin || moderatorForMeeting")<liveMeeting.indexOf("roomAdmin: moderator")],
+ ["Every participant for one meeting receives the same deterministic LiveKit room name",liveMeeting.includes('opaqueRoomName(meetingId, "shared-live-room")')&&!liveMeeting.includes("opaqueRoomName(meetingId, sessionRef.id)")],
  ["Invitation gate participant ID is forwarded to media authorization",media.includes("participantId:gateParticipantId")&&media.includes("irpaMeetingEntryContext")],
  ["Live media revalidates invitation participant against meeting and identity",liveMeeting.includes('db.collection("participants").doc(participantId).get()')&&liveMeeting.includes('text(candidate.meetingId) !== meetingId')&&liveMeeting.includes("boundUid !== uid")&&liveMeeting.includes("boundEmail !== email")],
  ["Verified invitee can pass media identity gate without duplicate member record",liveMeeting.includes("Boolean(invitedParticipant)")&&liveMeeting.includes("verified meeting invitee identity")],
