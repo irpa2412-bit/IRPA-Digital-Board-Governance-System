@@ -1243,10 +1243,12 @@ async function sendMemberInvitation(request, env) {
       return json({ok:false,error:"This meeting is closed and cannot issue a new access invitation."},409,corsHeaders(request));
     }
     const meetingReference=String(meetingFields.meetingReference?.stringValue||meetingFields.reference?.stringValue||meetingFields.title?.stringValue||"IRPA Meeting").trim();
+    const meetingIdentity=String(meetingFields.meetingIdentity?.stringValue||`IRPA-MEET-${meetingId.toUpperCase()}`).trim();
     // Invitation particulars are sourced from the authoritative meeting document,
     // not client-supplied display fields, so the invitation cites the saved register.
     meetingAccess={
       link:`${appUrl}/?meetingToken=${encodeURIComponent(accessToken)}&meetingId=${encodeURIComponent(meetingId)}`,
+      meetingIdentity,
       meetingReference,
       meetingTitle:String(meetingFields.title?.stringValue||meetingReference).trim(),
       meetingDate:String(meetingFields.date?.stringValue||""),

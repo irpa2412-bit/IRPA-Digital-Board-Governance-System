@@ -41,11 +41,13 @@ test("meeting-linked invitation includes the access link and gate password witho
   assert.match(message.text,/AB12CD34EF56/);
   assert.match(message.html,/Open IRPA Meeting/);
   assert.match(message.html,/AB12CD34EF56/);
-  const registered=buildInvitationMessage({name:"Amina",link:"https://app.example.test/?invitationToken=invite-secret",meetingAccess:{link:"https://app.example.test/?meetingToken=opaque-token&meetingId=MEET-1",meetingReference:"IRPA-MTG-2026-000123",meetingTitle:"Quarterly Board Meeting",meetingDate:"2026-10-30",meetingStartTime:"10:00",meetingEndTime:"12:00",meetingPlatform:"Microsoft Teams",platformAccessUrl:"https://teams.example.test/meeting",platformMeetingId:"TEAM-123",platformPasscode:"JOIN-456",meetingVenue:"IRPA Board Room",meetingChairperson:"Board Chairperson",meetingAgenda:"Approve minutes and review actions",password:"AB12CD34EF56",expiresAt:"2026-10-30T10:00:00.000Z"}});
+  const registered=buildInvitationMessage({name:"Amina",link:"https://app.example.test/?invitationToken=invite-secret",meetingAccess:{link:"https://app.example.test/?meetingToken=opaque-token&meetingId=MEET-1",meetingIdentity:"IRPA-MEET-MEET-1",meetingReference:"IRPA-MTG-2026-000123",meetingTitle:"Quarterly Board Meeting",meetingDate:"2026-10-30",meetingStartTime:"10:00",meetingEndTime:"12:00",meetingPlatform:"Microsoft Teams",platformAccessUrl:"https://teams.example.test/meeting",platformMeetingId:"TEAM-123",platformPasscode:"JOIN-456",meetingVenue:"IRPA Board Room",meetingChairperson:"Board Chairperson",meetingAgenda:"Approve minutes and review actions",password:"AB12CD34EF56",expiresAt:"2026-10-30T10:00:00.000Z"}});
+  assert.match(registered.text,/IRPA-MEET-MEET-1/);
   assert.match(registered.text,/IRPA-MTG-2026-000123/);
   assert.match(registered.text,/Microsoft Teams/);
   assert.match(registered.text,/https:\/\/teams\.example\.test\/meeting/);
   assert.match(registered.text,/TEAM-123/);
+  assert.match(registered.html,/IRPA-MEET-MEET-1/);
   assert.match(registered.html,/Quarterly Board Meeting/);
   assert.match(registered.html,/Open Microsoft Teams platform/);
   const ordinary=buildInvitationMessage({name:"Amina",link:"https://app.example.test/?invitationToken=invite-secret"});
