@@ -2,6 +2,11 @@ name: Deploy IRPA Self-Hosted LiveKit Staging
 
 on:
   workflow_dispatch:
+    inputs:
+      confirm_deployment:
+        description: "Type DEPLOY-LIVEKIT-STAGING to authorize deployment"
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -12,6 +17,8 @@ concurrency:
 
 jobs:
   deploy-media-server:
+    if: ${{ inputs.confirm_deployment == 'DEPLOY-LIVEKIT-STAGING' }}
+    environment: livekit-staging
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -29,13 +36,16 @@ jobs:
           LIVEKIT_API_KEY: ${{ secrets.LIVEKIT_STAGING_API_KEY }}
           LIVEKIT_API_SECRET: ${{ secrets.LIVEKIT_STAGING_API_SECRET }}
           ACME_EMAIL: ${{ secrets.LIVEKIT_STAGING_ACME_EMAIL }}
+          STAGING_FIREBASE_PROJECT_ID: ${{ secrets.LIVEKIT_STAGING_FIREBASE_PROJECT_ID }}
+          STAGING_FIREBASE_SERVICE_ACCOUNT: ${{ secrets.LIVEKIT_STAGING_FIREBASE_SERVICE_ACCOUNT }}
         run: |
           set -euo pipefail
-          for name in SSH_HOST SSH_USER SSH_PRIVATE_KEY SSH_KNOWN_HOSTS LIVEKIT_DOMAIN LIVEKIT_TURN_DOMAIN LIVEKIT_API_KEY LIVEKIT_API_SECRET ACME_EMAIL; do
+          for name in SSH_HOST SSH_USER SSH_PRIVATE_KEY SSH_KNOWN_HOSTS LIVEKIT_DOMAIN LIVEKIT_TURN_DOMAIN LIVEKIT_API_KEY LIVEKIT_API_SECRET ACME_EMAIL STAGING_FIREBASE_PROJECT_ID STAGING_FIREBASE_SERVICE_ACCOUNT; do
             if [ -z "${!name:-}" ]; then echo "::error::Missing GitHub Actions secret required for ${name}"; exit 1; fi
           done
           if [ "$LIVEKIT_DOMAIN" = "$LIVEKIT_TURN_DOMAIN" ]; then echo "::error::Use separate LiveKit and TURN DNS names"; exit 1; fi
           if [ "$LIVEKIT_API_KEY" = "devkey" ] || [ "$LIVEKIT_API_SECRET" = "secret" ] || [ "${#LIVEKIT_API_SECRET}" -lt 32 ]; then echo "::error::Refusing default or weak LiveKit credentials"; exit 1; fi
+          if [ "$STAGING_FIREBASE_PROJECT_ID" = "irpa-digital-board-governance" ]; then echo "::error::Refusing to deploy the staging callable to the production Firebase project"; exit 1; fi
 
       - name: Prepare pinned SSH connection
         env:
@@ -86,3 +96,56 @@ jobs:
             *) echo "::error::Unexpected endpoint response HTTP $status."; exit 1 ;;
           esac
           echo "TLS/HTTPS endpoint responded. This does not yet prove LiveKit API authentication or WebRTC media."
+
+  deploy-staging-token-function:
+    needs: deploy-media-server
+    if: ${{ inputs.confirm_deployment == 'DEPLOY-LIVEKIT-STAGING' }}
+    environment: livekit-staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+
+      - name: Authenticate to the isolated staging Firebase project
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.LIVEKIT_STAGING_FIREBASE_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - name: Configure Secret Manager and deploy only the LiveKit token callable
+        env:
+          STAGING_FIREBASE_PROJECT_ID: ${{ secrets.LIVEKIT_STAGING_FIREBASE_PROJECT_ID }}
+          LIVEKIT_DOMAIN: ${{ secrets.LIVEKIT_STAGING_DOMAIN }}
+          LIVEKIT_API_KEY: ${{ secrets.LIVEKIT_STAGING_API_KEY }}
+          LIVEKIT_API_SECRET: ${{ secrets.LIVEKIT_STAGING_API_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ "$STAGING_FIREBASE_PROJECT_ID" = "irpa-digital-board-governance" ]; then
+            echo "::error::Production Firebase project is not permitted for this staging workflow."
+            exit 1
+          fi
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          umask 077
+          printf 'wss://%s' "$LIVEKIT_DOMAIN" > "$tmp/livekit-url"
+          printf '%s' "$LIVEKIT_API_KEY" > "$tmp/livekit-api-key"
+          printf '%s' "$LIVEKIT_API_SECRET" > "$tmp/livekit-api-secret"
+          npm install --global firebase-tools
+          npm ci --prefix functions
+          firebase functions:secrets:set LIVEKIT_URL --data-file "$tmp/livekit-url" --project "$STAGING_FIREBASE_PROJECT_ID" --force
+          firebase functions:secrets:set LIVEKIT_API_KEY --data-file "$tmp/livekit-api-key" --project "$STAGING_FIREBASE_PROJECT_ID" --force
+          firebase functions:secrets:set LIVEKIT_API_SECRET --data-file "$tmp/livekit-api-secret" --project "$STAGING_FIREBASE_PROJECT_ID" --force
+          firebase deploy --only functions:issueLiveMeetingToken --project "$STAGING_FIREBASE_PROJECT_ID"
+
+      - name: State remaining acceptance gate
+        if: always()
+        run: |
+          echo "LiveKit host and staging token callable deployment attempted."
+          echo "Authenticated API verification and a real two-browser audio/video test are still required."
