@@ -4593,3 +4593,179 @@
     text-rendering: optimizeLegibility;
   }
 }
+
+
+/* IRPA VOTING PORTAL READABILITY FIX — 2026-10-09 */
+/* The system-wide readability cascade gives generic panels navy text. Voting
+   cards therefore use an opaque light surface with explicit high-contrast
+   text, preserving all voting data and actions. */
+#root .app-shell .content-area .page.voting-page {
+  color: #18364f;
+  gap: 20px;
+}
+#root .app-shell .content-area .page.voting-page .welcome-panel,
+#root .app-shell .content-area .page.voting-page .panel,
+#root .app-shell .content-area .page.voting-page .stat-card {
+  background: #ffffff;
+  color: #18364f;
+  border: 1px solid #9aabba;
+  box-shadow: 0 5px 18px rgba(15, 35, 55, .12);
+}
+#root .app-shell .content-area .page.voting-page .welcome-panel h1,
+#root .app-shell .content-area .page.voting-page .panel h2,
+#root .app-shell .content-area .page.voting-page .panel h3,
+#root .app-shell .content-area .page.voting-page .panel h4,
+#root .app-shell .content-area .page.voting-page .panel p,
+#root .app-shell .content-area .page.voting-page .panel strong,
+#root .app-shell .content-area .page.voting-page .panel span,
+#root .app-shell .content-area .page.voting-page .panel label,
+#root .app-shell .content-area .page.voting-page .welcome-panel p,
+#root .app-shell .content-area .page.voting-page .stat-card span,
+#root .app-shell .content-area .page.voting-page .stat-card strong,
+#root .app-shell .content-area .page.voting-page .stat-card small {
+  color: #18364f;
+  -webkit-text-fill-color: #18364f;
+  opacity: 1;
+}
+#root .app-shell .content-area .page.voting-page .eyebrow {
+  color: #8a5c00;
+  -webkit-text-fill-color: #8a5c00;
+  font-size: 12px;
+  letter-spacing: .1em;
+}
+#root .app-shell .content-area .page.voting-page .welcome-panel h1 {
+  font-size: clamp(26px, 2.3vw, 34px);
+  line-height: 1.25;
+}
+#root .app-shell .content-area .page.voting-page .welcome-panel p,
+#root .app-shell .content-area .page.voting-page .panel-description,
+#root .app-shell .content-area .page.voting-page .panel > p {
+  color: #344b5f;
+  -webkit-text-fill-color: #344b5f;
+  font-size: 16px;
+  line-height: 1.6;
+}
+#root .app-shell .content-area .page.voting-page .voting-issue-card {
+  min-width: 0;
+  padding: clamp(18px, 2vw, 26px);
+  border: 2px solid #8da4b7;
+  border-top: 5px solid #0b5fa8;
+  border-radius: 14px;
+  background: #ffffff;
+}
+#root .app-shell .content-area .page.voting-page .voting-issue-title {
+  margin: 12px 0 16px;
+  color: #102f49;
+  -webkit-text-fill-color: #102f49;
+  font-size: clamp(22px, 2vw, 28px);
+  font-weight: 850;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+#root .app-shell .content-area .page.voting-page .voting-issue-context {
+  margin: 10px 0;
+  color: #18364f;
+  -webkit-text-fill-color: #18364f;
+  font-size: 16px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+#root .app-shell .content-area .page.voting-page .voting-tally {
+  margin: 16px 0;
+  padding: 13px 15px;
+  border: 1px solid #a9bbc9;
+  border-radius: 10px;
+  background: #edf4f8;
+  color: #18364f;
+  -webkit-text-fill-color: #18364f;
+  font-size: 16px;
+  font-weight: 750;
+  line-height: 1.6;
+}
+#root .app-shell .content-area .page.voting-page .voting-choice-group {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 16px 0;
+}
+#root .app-shell .content-area .page.voting-page .voting-choice-button {
+  min-height: 54px;
+  padding: 12px 16px;
+  border: 2px solid #0b5fa8;
+  border-radius: 10px;
+  background: #0b5fa8;
+  color: #ffffff;
+  -webkit-text-fill-color: #ffffff;
+  font-size: 18px;
+  font-weight: 850;
+  line-height: 1.3;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+#root .app-shell .content-area .page.voting-page .voting-choice-button.secondary-button {
+  background: #ffffff;
+  color: #0b4d7e;
+  -webkit-text-fill-color: #0b4d7e;
+}
+#root .app-shell .content-area .page.voting-page .voting-choice-button:disabled {
+  background: #e8edf2;
+  color: #334155;
+  -webkit-text-fill-color: #334155;
+  border-color: #8a9aab;
+}
+#root .app-shell .content-area .page.voting-page .panel th {
+  color: #344b5f;
+  -webkit-text-fill-color: #344b5f;
+  font-size: 12px;
+  font-weight: 850;
+}
+#root .app-shell .content-area .page.voting-page .panel td {
+  color: #18364f;
+  -webkit-text-fill-color: #18364f;
+  font-size: 14px;
+  line-height: 1.5;
+}
+#root .app-shell .content-area .page.voting-page .table-subtext {
+  color: #526579;
+  -webkit-text-fill-color: #526579;
+  font-size: 12px;
+}
+#root .app-shell .content-area .page.voting-page .form-field label {
+  color: #18364f;
+  -webkit-text-fill-color: #18364f;
+  font-size: 16px;
+  font-weight: 750;
+}
+#root .app-shell .content-area .page.voting-page .panel .secondary-button {
+  border: 1px solid #0b5fa8;
+  background: #ffffff;
+  color: #0b4d7e;
+  -webkit-text-fill-color: #0b4d7e;
+  font-size: 15px;
+  min-height: 46px;
+}
+#root .app-shell .content-area .page.voting-page .panel .member-actions button {
+  min-height: 44px;
+  font-size: 14px;
+}
+@media (max-width: 760px) {
+  #root .app-shell .content-area .page.voting-page .dashboard-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  #root .app-shell .content-area .page.voting-page .welcome-panel,
+  #root .app-shell .content-area .page.voting-page .panel {
+    padding: 18px;
+  }
+  #root .app-shell .content-area .page.voting-page .voting-choice-group {
+    grid-template-columns: 1fr;
+  }
+  #root .app-shell .content-area .page.voting-page .voting-choice-button {
+    width: 100%;
+    min-height: 56px;
+    font-size: 18px;
+  }
+  #root .app-shell .content-area .page.voting-page .table-wrapper table {
+    min-width: 700px;
+  }
+}
