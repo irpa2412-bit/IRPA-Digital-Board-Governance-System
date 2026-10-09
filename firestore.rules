@@ -33,6 +33,9 @@ service cloud.firestore {
   function activeEmployee(){return signedIn()&&exists(/databases/$(database)/documents/employees/$(request.auth.uid))&&(get(/databases/$(database)/documents/employees/$(request.auth.uid)).data.get("status","")=="Active"||get(/databases/$(database)/documents/employees/$(request.auth.uid)).data.get("employmentStatus","")=="Active"||get(/databases/$(database)/documents/employees/$(request.auth.uid)).data.get("registrationStatus","")=="Activated");}
   function signatureProfileOwner(){return signedIn()&&self(request.auth.uid)&&request.auth.token.email is string;} function signatureProfileUser(){return signatureProfileOwner();}
   function meetingUser(){return admin()||activeMember()||activeEmployee();}
+  function meetingRegistrar(){return admin()||anyInstitutionalRole(["Executive Director","Director Internal Oversight","Director Finance & Administration","Director Human Resources","HR Director","Operations Manager","Departmental Director","Departmental Manager","Director Outreach","Director Community Development","Director Livestock","Director Environment","Director Field Department","Board Secretary","Secretary to the Board","Meeting Secretary"]);}
+  function validMeetingCategory(data){return data.get("meetingCategory","OTHER") in ["GOVERNANCE","ADMINISTRATIVE","STAFF","GENERAL","OTHER"]&&data.get("meetingPolicyId",data.get("meetingCategory","OTHER")) in ["GOVERNANCE","ADMINISTRATIVE","STAFF","GENERAL","OTHER"];}
+  function completeInitialMeetingRegistration(){return signedIn()&&meetingRegistrar()&&resource.data.get("registerStatus","")!="Registered"&&request.resource.data.get("registerStatus","")=="Registered"&&resource.data.get("initiatorUid","")==request.auth.uid&&request.resource.data.get("initiatorUid","")==request.auth.uid&&validMeetingCategory(request.resource.data);}
   function role(r){return activeMember()&&get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role==r;}
   function anyMemberRole(roles){return signedIn()&&((request.auth.token.irpaRoles is list&&request.auth.token.irpaRoles.hasAny(roles))||(activeMember()&&roles.hasAny([get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role])));}
   function anyInstitutionalRole(roles){return signedIn()&&((activeMember()&&recordHasRole(get(/databases/$(database)/documents/members/$(request.auth.uid)).data,roles))||(activeEmployee()&&recordHasRole(get(/databases/$(database)/documents/employees/$(request.auth.uid)).data,roles))||(request.auth.token.irpaRoles is list&&request.auth.token.irpaRoles.hasAny(roles)));}
@@ -242,7 +245,7 @@ service cloud.firestore {
   match /audit/{id}{allow read:if admin()||auditor();allow create:if signedIn();allow update,delete:if false;}
   match /systemResetPlans/{id}{allow read:if admin();allow create,update,delete:if false;}
   match /participants/{id}{allow read:if governanceUser();allow create,update,delete:if admin();}
-  match /meetings/{id}{allow read:if meetingUser();allow create,update,delete:if admin();}
+  match /meetings/{id}{allow read:if meetingUser();allow create:if meetingRegistrar()&&request.resource.data.get("initiatorUid","")==request.auth.uid&&validMeetingCategory(request.resource.data);allow update:if admin()||completeInitialMeetingRegistration();allow delete:if admin();}
   match /meetingSubscriptions/{id}{allow read:if meetingUser();allow create,update,delete:if admin();}
   match /meetingRoomEvents/{id}{allow read:if meetingUser();allow create,update:if governanceUser();allow delete:if admin();}
   match /transcriptions/{id}{allow read:if meetingUser();allow create,update:if governanceUser();allow delete:if admin();}
