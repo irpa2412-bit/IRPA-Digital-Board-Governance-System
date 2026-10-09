@@ -11,6 +11,8 @@ const styles=fs.readFileSync("src/styles/tokens.css","utf8");
 const roomSource=fs.readFileSync("src/pages/MeetingRoom.jsx","utf8");
 const checks=[
  ["Meeting media client exists",fs.existsSync("src/components/IRPADGBSMeetingRoomMedia.jsx")],
+ ["Meeting Room selects the meeting from the invitation gate context",room.includes("entryContext?.meetingId")&&room.includes("setSelectedId(invitedMeeting.id)")],
+ ["Verified invitee context enables the media join control",room.includes("entryContext?.participantId")&&room.includes("entryContext?.meetingId===selected?.id")],
  ["Moderator authority is initialized before LiveKit grant",liveMeeting.indexOf("const moderator = isAdmin || moderatorForMeeting")>=0&&liveMeeting.indexOf("const moderator = isAdmin || moderatorForMeeting")<liveMeeting.indexOf("roomAdmin: moderator")],
  ["Invitation gate participant ID is forwarded to media authorization",media.includes("participantId:gateParticipantId")&&media.includes("irpaMeetingEntryContext")],
  ["Live media revalidates invitation participant against meeting and identity",liveMeeting.includes('db.collection("participants").doc(participantId).get()')&&liveMeeting.includes('text(candidate.meetingId) !== meetingId')&&liveMeeting.includes("boundUid !== uid")&&liveMeeting.includes("boundEmail !== email")],
