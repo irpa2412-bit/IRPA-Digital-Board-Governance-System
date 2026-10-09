@@ -1,0 +1,129 @@
+name: Provision and Verify IRPA Meeting Category Archives
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/provision-meeting-archives.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  provision-and-verify:
+    name: Provision and verify all five Google Drive meeting archives
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout production revision
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Firebase Admin SDK
+        run: npm --prefix functions install --omit=dev --no-audit --no-fund
+
+      - name: Create and verify all five category archives through the production gateway
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+          FIREBASE_WEB_API_KEY: "AIzaSyC2aMdxHD14nMnGiRyf4mSL1ixXdzBoOtE"
+          MEETING_ARCHIVE_GATEWAY_URL: "https://irpa-google-drive-gateway.irpa-governance.workers.dev"
+        run: |
+          NODE_PATH="$GITHUB_WORKSPACE/functions/node_modules" node <<'NODE'
+          const { initializeApp, cert } = require("firebase-admin/app");
+          const { getAuth } = require("firebase-admin/auth");
+
+          const categories = ["GOVERNANCE", "ADMINISTRATIVE", "STAFF", "GENERAL", "OTHER"];
+          const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || "{}");
+          const apiKey = String(process.env.FIREBASE_WEB_API_KEY || "").trim();
+          const gateway = String(process.env.MEETING_ARCHIVE_GATEWAY_URL || "").replace(/\\/$/, "");
+          if (!serviceAccount.project_id || !apiKey || !gateway) {
+            throw new Error("Required Firebase or meeting-archive gateway configuration is missing.");
+          }
+
+          initializeApp({ credential: cert(serviceAccount), projectId: serviceAccount.project_id });
+
+          async function main() {
+            const auth = getAuth();
+            const admin = await auth.getUserByEmail("irpa2412@gmail.com");
+            if (admin.customClaims?.admin !== true) {
+              throw new Error("The IRPA primary administrator does not have the required Firebase admin claim.");
+            }
+
+            const customToken = await auth.createCustomToken(admin.uid);
+            const signIn = await fetch(
+              "https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=" + encodeURIComponent(apiKey),
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Referer": "https://irpa-digital-board-governance.web.app/"
+                },
+                body: JSON.stringify({ token: customToken, returnSecureToken: true })
+              }
+            );
+            const signInBody = await signIn.json().catch(() => ({}));
+            if (!signIn.ok || !signInBody.idToken) {
+              const reason = signInBody.error?.message || "Firebase administrator sign-in was rejected.";
+              throw new Error("Unable to obtain a short-lived administrator session (" + signIn.status + "): " + reason);
+            }
+            const idToken = signInBody.idToken;
+            const verified = [];
+
+            for (const category of categories) {
+              const provision = async () => {
+                const response = await fetch(gateway + "/api/meeting-archive/provision", {
+                  method: "POST",
+                  headers: {
+                    "Authorization": "Bearer " + idToken,
+                    "Content-Type": "application/json",
+                    "Origin": "https://irpa-digital-board-governance.web.app"
+                  },
+                  body: JSON.stringify({ meetingCategory: category })
+                });
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok || result.ok !== true || !result.folderId || !result.archiveUidLink) {
+                  throw new Error(category + " archive provisioning failed (" + response.status + "): " +
+                    String(result.error || "Google Drive did not return a confirmed folder ID and link."));
+                }
+                if (result.meetingCategory !== category) {
+                  throw new Error(category + " archive response returned a mismatched category.");
+                }
+                return result;
+              };
+
+              const createdOrFound = await provision();
+              const verification = await provision();
+              if (String(createdOrFound.folderId) !== String(verification.folderId)) {
+                throw new Error(category + " archive verification returned a different folder ID on the second lookup.");
+              }
+              verified.push({
+                category,
+                archiveName: verification.archiveName,
+                archivePath: verification.archivePath,
+                folderConfirmed: true,
+                repeatedLookupMatched: true
+              });
+            }
+
+            if (verified.length !== 5 || new Set(verified.map(x => x.category)).size !== 5) {
+              throw new Error("The five-category archive verification was incomplete.");
+            }
+            // The repository is public; do not print folder IDs, folder URLs, Firebase tokens, or Drive credentials.
+            console.log("GOOGLE_DRIVE_MEETING_ARCHIVES_VERIFIED");
+            for (const row of verified) {
+              console.log(row.category + " | " + row.archiveName + " | " + row.archivePath +
+                " | folderConfirmed=true | repeatedLookupMatched=true");
+            }
+            console.log("RESULT=PASS; VERIFIED_CATEGORY_COUNT=" + verified.length);
+          }
+
+          main().catch(error => {
+            console.error(error?.message || "Meeting archive provisioning/verification failed.");
+            process.exit(1);
+          });
+          NODE
