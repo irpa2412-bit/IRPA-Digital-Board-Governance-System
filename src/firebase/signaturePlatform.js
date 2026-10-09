@@ -260,27 +260,20 @@ export async function getSignatureEnvelope(envelopeId){
 export async function getSignatureEnvelopes(){
   const u=user();
   if(!u?.uid)throw new Error("Sign in to retrieve your signature envelopes.");
-  // Include envelopes where the authenticated user is a participant, owner,
-  // or sender. Owner drafts may be saved before recipients are fully assigned.
-  const queries=[
-    query(collection(db,ENVELOPE_COLLECTION),where("participantUids","array-contains",u.uid)),
-    query(collection(db,ENVELOPE_COLLECTION),where("ownerUid","==",u.uid)),
-    query(collection(db,ENVELOPE_COLLECTION),where("senderUid","==",u.uid))
-  ];
-  const snapshots=await Promise.all(queries.map(q=>getDocs(q)));
-  const unique=new Map();
-  for(const snapshot of snapshots){
-    for(const item of snapshot.docs){
-      const data=item.data()||{};
-      if(data.ownerUid!==u.uid&&data.senderUid!==u.uid&&!(Array.isArray(data.participantUids)&&data.participantUids.includes(u.uid)))continue;
-      unique.set(item.id,{id:item.id,...data});
-    }
-  }
-  return [...unique.values()].sort((a,b)=>{
-    const at=a.createdAt?.seconds?Number(a.createdAt.seconds):Date.parse(a.createdAt||a.updatedAt||0)||0;
-    const bt=b.createdAt?.seconds?Number(b.createdAt.seconds):Date.parse(b.createdAt||b.updatedAt||0)||0;
-    return bt-at;
-  });
+  // Keep the query aligned with the existing Firestore read rule, which
+  // authorizes envelope reads through participantUids. The document owner is
+  // included as a participant when a draft is saved, even before signers are
+  // assigned; the Envelopes UI separately includes ownerUid/senderUid records.
+  const q=query(collection(db,ENVELOPE_COLLECTION),where("participantUids","array-contains",u.uid));
+  const snapshot=await getDocs(q);
+  return snapshot.docs
+    .map(item=>({id:item.id,...item.data()}))
+    .filter(envelope=>envelope.ownerUid===u.uid||envelope.senderUid===u.uid||(Array.isArray(envelope.participantUids)&&envelope.participantUids.includes(u.uid)))
+    .sort((a,b)=>{
+      const at=a.createdAt?.seconds?Number(a.createdAt.seconds):Date.parse(a.createdAt||a.updatedAt||0)||0;
+      const bt=b.createdAt?.seconds?Number(b.createdAt.seconds):Date.parse(b.createdAt||b.updatedAt||0)||0;
+      return bt-at;
+    });
 }
 export async function getMySignedDocuments(){const u=user();const q=query(collection(db,"signatures"),where("signerUid","==",u.uid));const s=await getDocs(q);const rows=await Promise.all(s.docs.map(async x=>{const data=x.data();if(data.signerArchiveUrl)return{id:x.id,...data};if(!data.envelopeId)return null;try{const envelopeSnap=await getDoc(doc(db,ENVELOPE_COLLECTION,data.envelopeId));if(!envelopeSnap.exists())return null;const envelope={id:envelopeSnap.id,...envelopeSnap.data()};const delivery=envelope.signerArchiveDeliveries?.[u.uid];if(!delivery?.webViewLink)return null;return{id:x.id,...data,signerArchiveUrl:delivery.webViewLink,signerArchiveFolderId:delivery.folderId||null,signerArchiveFolderLink:delivery.folderLink||null,myDocumentsPortal:delivery.myDocumentsPortal||"My Documents",myDocumentsPortalPath:delivery.myDocumentsPortalPath||null,signerArchiveFinalHash:delivery.finalHash||envelope.signerArchiveFinalHash||null,archivePending:false,archiveProtocol:delivery.archiveProtocol||"IRPA-SIGNER-COPY-V2",archiveState:"Final Completed Document"};}catch(error){console.warn("Unable to resolve completed signer archive delivery:",error);return null;}}));return rows.filter(x=>x&&x.status==="Signed"&&x.signerArchiveUrl).sort((a,b)=>{const at=a.signedAt?.seconds?Number(a.signedAt.seconds):Date.parse(a.signedAt||0);const bt=b.signedAt?.seconds?Number(b.signedAt.seconds):Date.parse(b.signedAt||0);return bt-at;});}
 export async function sendSignatureInvitation(envelope, recipient) {
