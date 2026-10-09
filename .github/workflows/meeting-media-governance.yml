@@ -19,6 +19,7 @@ on:
       - "package.json"
       - "package-lock.json"
       - "scripts/check-meeting-media-governance.mjs"
+      - "infra/livekit/**"
       - ".github/workflows/meeting-media-governance.yml"
   workflow_dispatch:
 
@@ -36,6 +37,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check:meeting-media
+      - name: Validate LiveKit staging installer syntax
+        run: bash -n infra/livekit/deploy-staging.sh infra/livekit/preflight.sh
       - run: npm run build
       - name: Upload verification report
         if: always()
