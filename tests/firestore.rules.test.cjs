@@ -317,3 +317,78 @@ test("non-administrator cannot create a TRIAL lifecycle record in production Fir
   })));
 });
 
+
+
+test("controlled documents accept the supported MIME types", async () => {
+  const db = testEnv.authenticatedContext("member-user", {
+    email: "member@example.test"
+  }).firestore();
+
+  const types = [
+    "application/pdf", "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "application/vnd.oasis.opendocument.text",
+    "application/vnd.oasis.opendocument.spreadsheet",
+    "application/vnd.oasis.opendocument.presentation",
+    "application/rtf", "text/plain", "text/csv",
+    "text/tab-separated-values", "text/markdown", "text/html",
+    "application/xhtml+xml", "application/epub+zip", "application/json",
+    "application/xml", "text/xml", "image/png", "image/jpeg",
+    "image/webp", "image/svg+xml"
+  ];
+
+  for (let i = 0; i < types.length; i++) {
+    await assertSucceeds(db.doc(`documents/mime-allowed-${i}`).set({
+      uploadedByUid: "member-user",
+      status: "Draft",
+      authorizationStatus: "Draft",
+      authorizedUids: ["member-user"],
+      recordOrigin: "PRODUCTION",
+      fileName: `test-file-${i}`,
+      contentType: types[i]
+    }));
+  }
+});
+
+test("controlled documents reject unsupported MIME types", async () => {
+  const db = testEnv.authenticatedContext("member-user", {
+    email: "member@example.test"
+  }).firestore();
+
+  await assertFails(db.doc("documents/mime-rejected").set({
+    uploadedByUid: "member-user",
+    status: "Draft",
+    authorizationStatus: "Draft",
+    authorizedUids: ["member-user"],
+    recordOrigin: "PRODUCTION",
+    fileName: "unsupported.bin",
+    contentType: "application/octet-stream"
+  }));
+});
+
+test("controlled documents retain uploader and authorization restrictions", async () => {
+  const db = testEnv.authenticatedContext("member-user", {
+    email: "member@example.test"
+  }).firestore();
+
+  const valid = {
+    status: "Draft",
+    authorizationStatus: "Draft",
+    authorizedUids: ["member-user"],
+    recordOrigin: "PRODUCTION",
+    fileName: "document.pdf",
+    contentType: "application/pdf"
+  };
+
+  await assertFails(db.doc("documents/wrong-uploader").set({
+    ...valid, uploadedByUid: "another-user"
+  }));
+
+  await assertFails(db.doc("documents/missing-authorization").set({
+    ...valid, uploadedByUid: "member-user", authorizedUids: []
+  }));
+});
