@@ -972,3 +972,64 @@ table td{color:var(--text)}
     grid-template-columns:minmax(0,1fr);
   }
 }
+
+/* IRPA-DBGS SYSTEM-WIDE READABILITY POLICY
+   Applies across every portal, register, modal, card, table, workflow and device.
+   Keep all content and functionality; explicitly prevent faded/transparent text. */
+#root,
+#root .app-shell,
+#root .app-shell .content-area,
+#root .app-shell .content-area .page,
+#root .app-shell .content-area .page *,
+#root .app-shell .main-area,
+#root .app-shell .main-area *{
+  text-shadow:none;
+}
+#root .app-shell .content-area .page :is(h1,h2,h3,h4,h5,h6,p,span,strong,em,b,label,legend,small,li,dt,dd,th,td,summary,a,output,.muted,.eyebrow,.field-help,.panel-description){
+  opacity:1!important;
+  -webkit-text-fill-color:currentColor;
+}
+#root .app-shell .content-area .page :is(h1,h2,h3,h4,h5,h6,p,span,strong,em,b,label,legend,small,li,dt,dd,th,td,summary,a,output,.muted,.eyebrow,.field-help,.panel-description){
+  color:var(--text,#edf5f1);
+}
+#root .app-shell .content-area .page :is(input,select,textarea,option){
+  opacity:1!important;
+  -webkit-text-fill-color:currentColor;
+}
+#root .app-shell .content-area .page :is(input,select,textarea){
+  color:#173b2d!important;
+  background:#fff!important;
+  border:1px solid #6f9282!important;
+}
+#root .app-shell .content-area .page :is(input,select,textarea)::placeholder{
+  color:#526b60!important;
+  opacity:1!important;
+  -webkit-text-fill-color:#526b60!important;
+}
+#root .app-shell .content-area .page select option{
+  color:#173b2d!important;
+  background:#fff!important;
+}
+#root .app-shell .content-area .page button,
+#root .app-shell .content-area .page button :is(span,small,strong){
+  opacity:1!important;
+  -webkit-text-fill-color:currentColor;
+}
+#root .app-shell .content-area .page button:disabled{
+  opacity:1!important;
+  color:#fff!important;
+  background:#526b60!important;
+  border-color:#526b60!important;
+}
+#root .app-shell .content-area .page :is(.panel,.card,.modal,.dialog,.form-field,.field,.section-card,.stat-card,.table-wrap) :is(h1,h2,h3,h4,h5,h6,p,span,strong,em,b,label,legend,small,li,dt,dd,th,td,summary,a,output,.muted,.eyebrow,.field-help,.panel-description){
+  opacity:1!important;
+  text-shadow:none!important;
+}
+@media(max-width:760px){
+  #root .app-shell .content-area .page :is(h1,h2,h3,h4,h5,h6,p,span,strong,label,legend,small,li,th,td,button,input,select,textarea){
+    line-height:1.5;
+  }
+  #root .app-shell .content-area .page :is(input,select,textarea,button){
+    font-size:max(16px,1em);
+  }
+}
