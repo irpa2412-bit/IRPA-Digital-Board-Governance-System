@@ -1,0 +1,75 @@
+name: Document Lifecycle Module Verification
+
+on:
+  pull_request:
+    branches:
+      - integration/collective-portals-20261009
+      - main
+    paths:
+      - "src/pages/DocumentLifecycleModule.jsx"
+      - "src/firebase/documentLifecycle.js"
+      - "drive-gateway/src/documentLifecycle.mjs"
+      - "drive-gateway/src/documentPolicy.mjs"
+      - "drive-gateway/tests/document-*.test.mjs"
+      - "drive-gateway/package*.json"
+      - "package*.json"
+      - ".github/workflows/document-lifecycle-module-test.yml"
+  push:
+    branches:
+      - integration/document-lifecycle-acceptance-20261009
+      - integration/collective-portals-20261009
+    paths:
+      - "src/pages/DocumentLifecycleModule.jsx"
+      - "src/firebase/documentLifecycle.js"
+      - "drive-gateway/src/documentLifecycle.mjs"
+      - "drive-gateway/src/documentPolicy.mjs"
+      - "drive-gateway/tests/document-*.test.mjs"
+      - "drive-gateway/package*.json"
+      - "package*.json"
+      - ".github/workflows/document-lifecycle-module-test.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            drive-gateway/package-lock.json
+      - name: Install application dependencies
+        run: npm install --no-audit --no-fund
+      - name: Install gateway dependencies
+        working-directory: drive-gateway
+        run: npm ci --no-audit --no-fund
+      - name: Syntax gate
+        run: |
+          node --check drive-gateway/src/documentPolicy.mjs
+          node --check drive-gateway/src/documentLifecycle.mjs
+          node --check drive-gateway/tests/document-policy.test.mjs
+          node --check drive-gateway/tests/document-lifecycle-router.test.mjs
+          node --check drive-gateway/tests/document-lifecycle-multipart.test.mjs tests/document-lifecycle-client-policy.test.mjs
+          node --check drive-gateway/tests/document-lifecycle-client-policy.test.mjs
+      - name: Document lifecycle policy and transaction tests
+        working-directory: drive-gateway
+        run: node --test tests/document-policy.test.mjs tests/document-lifecycle-router.test.mjs tests/document-lifecycle-multipart.test.mjs
+      - name: Existing gateway test suite
+        working-directory: drive-gateway
+        run: npm test
+      - name: Application production build
+        run: npm run build
+      - name: Assert verification workflow is non-deploying
+        run: |
+          workflow_body="$(sed '/^      - name: Assert verification workflow is non-deploying/,$d' .github/workflows/document-lifecycle-module-test.yml)"
+          if printf '%s\\n' "$workflow_body" | grep -nE 'wrangler deploy|firebase deploy|npm run deploy|cloudflare/wrangler-action'; then
+            echo "Deployment command detected before the non-deployment assertion step."
+            exit 1
+          fi

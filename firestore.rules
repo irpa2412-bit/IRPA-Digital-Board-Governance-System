@@ -25,7 +25,7 @@ service cloud.firestore {
  match /databases/{database}/documents {
   function signedIn(){return request.auth!=null;}
   function self(uid){return signedIn()&&request.auth.uid==uid;}
-  function primaryAdmin(){return signedIn()&&(request.auth.token.admin==true||request.auth.token.email=="irpa2412@gmail.com");}
+  function primaryAdmin(){return signedIn()&&(request.auth.token.get("admin",false)==true||request.auth.token.get("email","")=="irpa2412@gmail.com");}
   function adminProfileExists(){return signedIn()&&exists(/databases/$(database)/documents/adminProfiles/$(request.auth.uid));}
   function admin(){return primaryAdmin()||(adminProfileExists()&&get(/databases/$(database)/documents/adminProfiles/$(request.auth.uid)).data.active==true);}
   function memberProfileExists(){return signedIn()&&exists(/databases/$(database)/documents/members/$(request.auth.uid));}
@@ -150,7 +150,70 @@ service cloud.firestore {
   match /staffPaymentRequests/{id}{allow read:if admin()||financePersonnel()||management()||hrManagement()||(activeMember()&&(resource.data.employeeUid==request.auth.uid||(resource.data.involvedUids is list&&resource.data.involvedUids.hasAny([request.auth.uid]))));allow create:if activeMember()&&request.resource.data.employeeUid==request.auth.uid&&request.resource.data.status=="Submitted"&&request.resource.data.workflowStage=="HR/Administrative Verification"&&financialReferenceFieldsNotSupplied();allow update:if (admin()&&financialReferenceFieldsImmutable())||(hrManagement()&&resource.data.workflowStage=="HR/Administrative Verification"&&request.resource.data.workflowStage in ["HR/Administrative Verification","Finance Verification"]&&financialReferenceFieldsImmutable())||(financePersonnel()&&resource.data.workflowStage in ["Finance Verification","Payment Processing"]&&request.resource.data.workflowStage in ["Finance Verification","Executive Authorization","Payment Processing","Completed","Returned","Rejected"]&&financialReferenceFieldsImmutable())||(role("Executive Director")&&resource.data.workflowStage=="Executive Authorization"&&request.auth.uid!=resource.data.employeeUid&&request.resource.data.workflowStage in ["Payment Processing","Returned","Rejected"]&&financialReferenceFieldsImmutable())||(activeMember()&&resource.data.employeeUid==request.auth.uid&&resource.data.status in ["Draft","Returned"]&&request.resource.data.status=="Submitted"&&request.resource.data.workflowStage=="HR/Administrative Verification"&&financialReferenceFieldsNotSupplied());allow delete:if admin();}
   function controlledDocumentCreateAllowed(){return signedIn()&&request.resource.data.get("uploadedByUid","")==request.auth.uid&&request.resource.data.get("status","")=="Draft"&&request.resource.data.get("authorizationStatus","")=="Draft"&&request.resource.data.get("authorizedUids",[]) is list&&request.resource.data.get("authorizedUids",[]).hasAll([request.auth.uid])&&request.resource.data.get("recordOrigin","PRODUCTION")=="PRODUCTION"&&request.resource.data.get("fileName","") is string&&request.resource.data.get("fileName","").size()>0&&request.resource.data.get("contentType","application/pdf")=="application/pdf";}
   function controlledDocumentReadAllowed(){return signedIn()&&(authorizationUser()||(resource.data.get("authorizedUids",[]) is list&&resource.data.get("authorizedUids",[]).hasAny([request.auth.uid]))||(resource.data.get("uploadedByUid","")==request.auth.uid));}
-  match /documents/{id}{allow read:if admin()||controlledDocumentReadAllowed();allow create:if admin()||controlledDocumentCreateAllowed();allow delete:if admin();allow update:if admin()||signatureDocumentWorkflowUpdate();}
+  function documentLifecycleIdentity(){return admin()||activeMember()||activeEmployee();}
+  function documentLifecycleCategoryAllowed(d){
+    return (d.get("archiveCategory","")=="Administrative Documents"&&documentLifecycleIdentity())||
+      (d.get("archiveCategory","")=="Finance Documents"&&anyInstitutionalRole(["Executive Director","Director Finance & Administration","Finance Manager","Finance Officer","Accountant","Director Internal Oversight","Internal Oversight Director","Internal Oversight Officer"]))||
+      (d.get("archiveCategory","")=="Procurement Documents"&&anyInstitutionalRole(["Executive Director","Director Finance & Administration","Finance Manager","Procurement Officer","Procurement Manager","Procurement Team Member","Director Internal Oversight","Internal Oversight Director"]))||
+      (d.get("archiveCategory","")=="Governance Documents"&&anyInstitutionalRole(["Executive Director","Board Secretary","Board Chairperson","Board Vice Chairperson","Director Internal Oversight","Internal Oversight Director"]))||
+      (d.get("archiveCategory","")=="Administrator Documents"&&admin());
+  }
+  function documentLifecycleClassificationAllowed(d){return d.get("classification","") in ["Public","Internal","Confidential"]||(d.get("classification","")=="Restricted"&&(admin()||anyInstitutionalRole(["RESTRICTED_DOCUMENT_UPLOAD"])));}
+  function documentLifecycleCreateAllowed(documentId){
+    let d=request.resource.data;
+    return documentLifecycleIdentity()&&d.get("documentId","")==documentId&&
+      d.get("ownerUid","")==request.auth.uid&&d.get("uploadedByUid","")==request.auth.uid&&
+      d.get("ownerType","") in ["ADMINISTRATOR","EMPLOYEE","MEMBER"]&&
+      d.get("status","")=="WORKING"&&d.get("authorizationStatus","")=="AUTHORIZED"&&
+      d.get("signatureStatus","")=="NOT_SENT"&&d.get("postSignatureStatus","")=="NOT_STARTED"&&d.get("finalArchiveStatus","")=="NOT_ARCHIVED"&&
+      d.get("fileId","") is string&&d.get("fileId","").size()>0&&
+      d.get("fileName","") is string&&d.get("fileName","").size()>0&&
+      d.get("sha256","") is string&&d.get("sha256","").matches("^[a-f0-9]{64}$")&&
+      d.get("authorizedUids",[]) is list&&d.get("authorizedUids",[]).hasAll([request.auth.uid])&&
+      d.get("authorizedRoles",[]) is list&&d.get("authorizedDepartments",[]) is list&&
+      d.get("archiveCategory","") in ["Finance Documents","Procurement Documents","Governance Documents","Administrative Documents","Administrator Documents"]&&
+      documentLifecycleCategoryAllowed(d)&&documentLifecycleClassificationAllowed(d)&&
+      d.get("recordOrigin","PRODUCTION") in ["PRODUCTION","TRIAL"]&&
+      (d.get("recordOrigin","PRODUCTION")=="PRODUCTION"||admin());
+  }
+  function documentLifecycleWorkflowAuthority(d){
+    return admin()||d.get("ownerUid","")==request.auth.uid||
+      (d.get("archiveCategory","")=="Finance Documents"&&anyInstitutionalRole(["Executive Director","Director Finance & Administration","Finance Manager","Finance Officer","Accountant","Director Internal Oversight","Internal Oversight Director","Internal Oversight Officer"]))||
+      (d.get("archiveCategory","")=="Procurement Documents"&&anyInstitutionalRole(["Executive Director","Director Finance & Administration","Finance Manager","Procurement Officer","Procurement Manager","Procurement Team Member","Director Internal Oversight","Internal Oversight Director"]))||
+      (d.get("archiveCategory","")=="Governance Documents"&&anyInstitutionalRole(["Executive Director","Board Secretary","Board Chairperson","Board Vice Chairperson","Director Internal Oversight","Internal Oversight Director"]))||
+      (d.get("archiveCategory","")=="Administrator Documents"&&admin());
+  }
+  function documentLifecycleValidTransition(documentId){
+    return (resource.data.get("status","")=="WORKING"&&request.resource.data.get("status","")=="PENDING_SIGNATURE")||
+      (resource.data.get("status","")=="PENDING_SIGNATURE"&&request.resource.data.get("status","")=="SIGNED"&&request.resource.data.get("signatureEnvelopeId","") is string&&exists(/databases/$(database)/documents/signatureEnvelopes/$(request.resource.data.get("signatureEnvelopeId","")))&&get(/databases/$(database)/documents/signatureEnvelopes/$(request.resource.data.get("signatureEnvelopeId",""))).data.get("status","")=="Completed"&&get(/databases/$(database)/documents/signatureEnvelopes/$(request.resource.data.get("signatureEnvelopeId",""))).data.get("documentId","")==documentId&&request.resource.data.get("signatureStatus","")=="COMPLETED")||
+      (resource.data.get("status","")=="SIGNED"&&request.resource.data.get("status","")=="POST_SIGNATURE")||
+      (resource.data.get("status","")=="POST_SIGNATURE"&&request.resource.data.get("status","")=="FINAL_ARCHIVE");
+  }
+  function documentLifecycleTransitionUpdateAllowed(documentId){
+    return (resource.data.get("status","")=="WORKING"&&request.resource.data.get("status","")=="PENDING_SIGNATURE"&&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","updatedAt","signatureStatus","signatureRequestedAt","signatureRequestedByUid","archiveFolderId","archivePath"])&&documentLifecycleValidTransition(documentId))||
+      (resource.data.get("status","")=="PENDING_SIGNATURE"&&request.resource.data.get("status","")=="SIGNED"&&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","updatedAt","signatureStatus","signatureEnvelopeId","signedAt","signedByUid","signedDocumentUrl","signedSourceFileId"])&&documentLifecycleValidTransition(documentId))||
+      (resource.data.get("status","")=="SIGNED"&&request.resource.data.get("status","")=="POST_SIGNATURE"&&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","updatedAt","postSignatureStatus","postSignatureStartedAt","postSignatureStartedByUid","channelStatus","channelledAt","channelledByUid","channelDestination","archiveFolderId","archivePath"])&&documentLifecycleValidTransition(documentId))||
+      (resource.data.get("status","")=="POST_SIGNATURE"&&request.resource.data.get("status","")=="FINAL_ARCHIVE"&&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","updatedAt","finalArchiveStatus","finalArchivedAt","finalArchivedByUid","archiveFolderId","archivePath","finalArchiveFileId"])&&documentLifecycleValidTransition(documentId));
+  }
+  function documentLifecycleUpdateAllowed(){
+    return documentLifecycleIdentity()&&
+      request.resource.data.get("ownerUid","")==resource.data.get("ownerUid","")&&
+      request.resource.data.get("uploadedByUid","")==resource.data.get("uploadedByUid","")&&
+      request.resource.data.get("fileId","")==resource.data.get("fileId","")&&
+      request.resource.data.get("sha256","")==resource.data.get("sha256","")&&
+      request.resource.data.get("reference","")==resource.data.get("reference","")&&
+      request.resource.data.get("documentId","")==resource.data.get("documentId","")&&
+      request.resource.data.get("recordOrigin","PRODUCTION")==resource.data.get("recordOrigin","PRODUCTION")&&
+      (
+        ((admin()||resource.data.get("ownerUid","")==request.auth.uid)&&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(["authorizedUids","updatedAt"])&&
+          request.resource.data.get("authorizedUids",[]) is list&&
+          request.resource.data.get("authorizedUids",[]).hasAll(resource.data.get("authorizedUids",[]))&&
+          request.resource.data.get("authorizedUids",[]).hasAll([resource.data.get("ownerUid","")]))||
+        (documentLifecycleWorkflowAuthority(resource.data)&&documentLifecycleTransitionUpdateAllowed(id))
+      );
+  }
+  match /documents/{id}{allow read:if admin()||controlledDocumentReadAllowed();allow create:if admin()||controlledDocumentCreateAllowed()||documentLifecycleCreateAllowed(id);allow delete:if admin();allow update:if admin()||signatureDocumentWorkflowUpdate()||documentLifecycleUpdateAllowed();}
   match /researchInstruments/{id}{allow read:if admin()||researchToolAllowed("Research Data Collection",resource.data.get("studyId",""),request.auth.uid);allow create:if researchToolAllowed("Research Data Collection",request.resource.data.get("studyId",""),request.auth.uid)&&request.resource.data.recordType=="Research Data Collection Instrument"&&request.resource.data.recordOrigin=="PRODUCTION";allow update:if admin()||researchToolAllowed("Survey Instrument",resource.data.get("studyId",""),request.auth.uid);allow delete:if admin();}
   match /researchSubmissions/{id}{allow read:if admin()||researchToolAllowed("Research Submission",resource.data.get("studyId",""),request.auth.uid);allow create:if researchToolAllowed("Research Submission",request.resource.data.get("studyId",""),request.auth.uid)&&request.resource.data.recordType=="Research Data Collection Submission"&&request.resource.data.recordOrigin=="PRODUCTION";allow update:if admin()||researchToolAllowed("Research Submission",resource.data.get("studyId",""),request.auth.uid);allow delete:if admin();}
   match /researchStudies/{id}{allow read,create,update:if researchUser();allow delete:if admin();}

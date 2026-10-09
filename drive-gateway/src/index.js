@@ -19,11 +19,28 @@ import { sendInvitationEmail, buildInvitationMessage, validateRecipient } from "
 import { route as esignRoute } from "./router.mjs";
 import { buildEsignContext, EsignRecordDurableObject } from "./esignContext.mjs";
 import { runCleanup } from "./upload.mjs";
+import { createDocumentLifecycleRouter } from "./documentLifecycle.mjs";
 import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPasswordSetup, getInvitationSessionState } from "./invitationRedemption.mjs";
 import { buildGoogleDriveAuthorizationParams } from "./googleDriveOAuth.mjs";
 
 let jwksCache = null;
 let jwksFetchedAt = 0;
+
+const documentLifecycleRouter = createDocumentLifecycleRouter({
+  FIREBASE_PROJECT_ID,
+  allowedContentTypes: ALLOWED_CONTENT_TYPES,
+  authenticateFirebaseRequest,
+  getFirestoreDocument,
+  getDriveAccessToken,
+  driveFetch,
+  findOrCreateFolder,
+  updateFirestoreDocument,
+  firestoreDocumentToPlain,
+  commitDocumentAndAudit: commitFirestoreDocumentAndAudit,
+  recordLifecycleFailure: recordDocumentLifecycleFailure,
+  json,
+  corsHeaders
+});
 
 export default {
   async fetch(request, env) {
@@ -59,6 +76,11 @@ export default {
 
       // Normalize trailing slashes so portal upload/archive actions cannot be blocked by URL formatting.
       const pathname = url.pathname.replace(/\/+$/, "") || "/";
+
+      if (pathname.startsWith("/api/document-lifecycle/")) {
+        const lifecycleResponse = await documentLifecycleRouter(request, env);
+        if (lifecycleResponse) return lifecycleResponse;
+      }
 
       if (pathname === "/api/upload" && request.method === "POST") {
         return await upload(request, env);
@@ -1769,6 +1791,132 @@ async function getInstitutionalProfileForUser(env, claims) {
     memberRecord: memberMatches[0] || null,
     employeeRecord: employeeMatches[0] || null
   };
+}
+
+function base64UrlEncodeBytes(bytes) {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/=/g, "").replace(/\\+/g, "-").replace(/\\//g, "_");
+}
+
+function base64UrlEncodeText(value) {
+  return base64UrlEncodeBytes(new TextEncoder().encode(value));
+}
+
+function pemPrivateKeyBytes(pem) {
+  const body = String(pem || "").replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\\s/g, "");
+  if (!body) throw new Error("Privileged Firestore identity is not configured.");
+  const binary = atob(body);
+  return Uint8Array.from(binary, char => char.charCodeAt(0));
+}
+
+let firestoreAdminTokenCache = { token: "", expiresAt: 0 };
+
+async function getFirestoreAdminAccessToken(env) {
+  const now = Math.floor(Date.now() / 1000);
+  if (firestoreAdminTokenCache.token && firestoreAdminTokenCache.expiresAt > now + 60) {
+    return firestoreAdminTokenCache.token;
+  }
+  let serviceAccount;
+  try {
+    serviceAccount = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON || "");
+  } catch {
+    throw new Error("Privileged Firestore identity is not configured correctly.");
+  }
+  if (
+    serviceAccount.project_id !== FIREBASE_PROJECT_ID ||
+    typeof serviceAccount.client_email !== "string" ||
+    !serviceAccount.client_email.endsWith(".iam.gserviceaccount.com") ||
+    typeof serviceAccount.private_key !== "string"
+  ) {
+    throw new Error("Privileged Firestore identity is invalid for this Firebase project.");
+  }
+
+  const issuedAt = now;
+  const claims = {
+    iss: serviceAccount.client_email,
+    scope: "https://www.googleapis.com/auth/datastore",
+    aud: "https://oauth2.googleapis.com/token",
+    iat: issuedAt,
+    exp: issuedAt + 3600
+  };
+  const unsigned = base64UrlEncodeText(JSON.stringify({ alg: "RS256", typ: "JWT" })) + "." +
+    base64UrlEncodeText(JSON.stringify(claims));
+  const key = await crypto.subtle.importKey(
+    "pkcs8",
+    pemPrivateKeyBytes(serviceAccount.private_key),
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign(
+    "RSASSA-PKCS1-v1_5",
+    key,
+    new TextEncoder().encode(unsigned)
+  );
+  const assertion = unsigned + "." + base64UrlEncodeBytes(new Uint8Array(signature));
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion
+    })
+  });
+  const result = await response.json();
+  if (!response.ok || typeof result.access_token !== "string") {
+    firestoreAdminTokenCache = { token: "", expiresAt: 0 };
+    throw new Error("Privileged Firestore identity could not obtain an access token.");
+  }
+  firestoreAdminTokenCache = {
+    token: result.access_token,
+    expiresAt: now + Math.min(Number(result.expires_in) || 3600, 3600)
+  };
+  return firestoreAdminTokenCache.token;
+}
+
+async function commitFirestoreDocumentAndAudit(env, documentId, _firebaseToken, documentFields, documentMask, auditFields, {createOnly=false}={}) {
+  const firebaseToken = await getFirestoreAdminAccessToken(env);
+  const base=`projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents`;
+  const auditId=`${documentId}-${Date.now()}-${crypto.randomUUID().slice(0,8)}`;
+  const documentWrite={
+    update:{name:`${base}/documents/${documentId}`,fields:documentFields},
+    updateMask:{fieldPaths:documentMask}
+  };
+  if(createOnly)documentWrite.currentDocument={exists:false};
+  const writes=[
+    documentWrite,
+    {update:{name:`${base}/audit/${auditId}`,fields:auditFields},currentDocument:{exists:false}}
+  ];
+  const response=await fetch(`https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:commit`,{
+    method:"POST",
+    headers:{"Authorization":`Bearer ${firebaseToken}`,"Content-Type":"application/json"},
+    body:JSON.stringify({writes})
+  });
+  if(!response.ok)throw new Error(`Unable to atomically commit the document and its audit event (HTTP ${response.status}).`);
+  return response.json();
+}
+
+async function recordDocumentLifecycleFailure(env, claims, documentId, action, details = {}) {
+  const firebaseToken = await getFirestoreAdminAccessToken(env);
+  const base = `projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents`;
+  const auditId = `lifecycle-failure-${Date.now()}-${crypto.randomUUID().slice(0, 12)}`;
+  const auditFields = {
+    action: {stringValue: `DOCUMENT_LIFECYCLE_${action}_FAILED`},
+    collection: {stringValue: "documents"},
+    recordId: {stringValue: String(documentId || "")},
+    actorUid: {stringValue: String(claims?.user_id || "")},
+    actorEmail: claims?.email ? {stringValue: String(claims.email)} : {nullValue: null},
+    details: {mapValue: {fields: Object.fromEntries(Object.entries(details).map(([key, value]) => [key, value == null ? {nullValue: null} : {stringValue: String(value).slice(0, 1000)}]))}},
+    createdAt: {timestampValue: new Date().toISOString()}
+  };
+  const response = await fetch(`https://firestore.googleapis.com/v1/${base}/audit?documentId=${encodeURIComponent(auditId)}`, {
+    method: "POST",
+    headers: {"Authorization": `Bearer ${firebaseToken}`, "Content-Type": "application/json"},
+    body: JSON.stringify({fields: auditFields})
+  });
+  if (!response.ok) throw new Error(`Unable to persist the document lifecycle failure audit event (HTTP ${response.status}).`);
+  return {auditId};
 }
 
 async function updateFirestoreDocument(env, path, firebaseToken, fields, updateMask) {
