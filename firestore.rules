@@ -25,7 +25,7 @@ service cloud.firestore {
  match /databases/{database}/documents {
   function signedIn(){return request.auth!=null;}
   function self(uid){return signedIn()&&request.auth.uid==uid;}
-  function primaryAdmin(){return signedIn()&&(request.auth.token.admin==true||request.auth.token.email=="irpa2412@gmail.com");}
+  function primaryAdmin(){return signedIn()&&(request.auth.token.get("admin",false)==true||request.auth.token.get("email","")=="irpa2412@gmail.com");}
   function adminProfileExists(){return signedIn()&&exists(/databases/$(database)/documents/adminProfiles/$(request.auth.uid));}
   function admin(){return primaryAdmin()||(adminProfileExists()&&get(/databases/$(database)/documents/adminProfiles/$(request.auth.uid)).data.active==true);}
   function memberProfileExists(){return signedIn()&&exists(/databases/$(database)/documents/members/$(request.auth.uid));}
