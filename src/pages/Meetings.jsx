@@ -40,9 +40,76 @@ export default function Meetings({onNavigate,admin=false}){
  async function saveProceedings(patch,messageText="Proceedings saved successfully."){if(!selected)return;setBusy(true);setError("");try{const next=normalizeMeetingForV3({...selected,...patch});if(patch.status==="Completed"&&next.votingRequired&&next.votingStatus!=="Completed")throw new Error("This meeting requires a completed vote before the meeting can be closed.");await updateRecord(COLLECTIONS.meetings,selected.id,next);setSelected(next);setForm(next);await load();setMessage(messageText)}catch(x){setError(x.message||"Unable to save proceedings.")}finally{setBusy(false)}}
  async function openMeetingVote(){if(!selected)return;setBusy(true);setError("");try{if(selected.votingStatus==="Completed")throw new Error("Voting for this meeting is already completed.");const votingReference=(selected.votingReference||`IRPA-VOTE-${new Date().getFullYear()}-${String(Date.now()).slice(-8)}`).trim();const issue=await openVotingIssue({meetingId:selected.id,meetingReference:selected.title,resolutionId:null,resolutionReference:"",votingReference});const next={...selected,votingRequired:true,votingReference,votingIssueId:issue.id,votingStatus:"Open",votingResult:"Pending"};await updateRecord(COLLECTIONS.meetings,selected.id,next);setSelected(next);setForm(next);await load();await loadVotes(selected.id);setMessage("Anonymous voting has been opened for this meeting.")}catch(x){setError(x.message||"Unable to open voting.")}finally{setBusy(false)}}
  function startLiveTranscription(){const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SpeechRecognition){setError("Live browser transcription is not supported in this browser. You can paste or type the transcript below.");return}if(listening){recognitionRef.current?.stop();setListening(false);return}const r=new SpeechRecognition();r.continuous=true;r.interimResults=true;r.lang="en-TZ";r.onresult=e=>{let finalText="";for(let i=e.resultIndex;i<e.results.length;i++)if(e.results[i].isFinal)finalText+=`${e.results[i][0].transcript.trim()}\n`;if(finalText)setAssistantTranscript(v=>`${v}${v&&!v.endsWith("\n")?"\n":""}${finalText}`)};r.onerror=e=>{setListening(false);setError(`Live transcription stopped: ${e.error||"browser recognition error"}.`)};r.onend=()=>setListening(false);recognitionRef.current=r;r.start();setListening(true);setError("")}
- function openAssistant(){if(!selected){setError("Open a meeting workspace first.");return}setAssistantTranscript(selected.transcript||"");setAssistantOpen(true)}
- async function generateAI(){if(!selected)return;const transcript=assistantTranscript.trim();if(!transcript){setError("Enter or record a transcript before generating minutes.");return}const draft=generateDraft(transcript,selected);await saveProceedings({...draft,transcript,proceedingsStatus:"Draft Minutes"},"AI Minutes Assistant generated a draft. Review it before approval.");setAssistantOpen(false)}
- async function saveTranscript(){await saveProceedings({transcript:assistantTranscript,proceedingsStatus:assistantTranscript.trim()?"Transcript Saved":"Not Started"},"Transcript saved to the meeting record.")}
+ async function openAssistant(){
+  if(!selected){setError("Open a meeting workspace first.");return}
+  setBusy(true);setError("");setMessage("");
+  try{
+    const records=await listMeetingRecords(selected.id);
+    const drafts=records.filter(r=>["AI_MINUTES_DRAFT","AI_SUMMARY_DRAFT","SUBSCRIBER_TRANSCRIPT_DRAFT"].includes(r.recordType));
+    const latest=type=>drafts.find(r=>r.recordType===type);
+    const [savedTranscript,savedSummary,savedMinutes]=await Promise.all([
+      latest("SUBSCRIBER_TRANSCRIPT_DRAFT")?retrieveMeetingRecord(latest("SUBSCRIBER_TRANSCRIPT_DRAFT").id):Promise.resolve(null),
+      latest("AI_SUMMARY_DRAFT")?retrieveMeetingRecord(latest("AI_SUMMARY_DRAFT").id):Promise.resolve(null),
+      latest("AI_MINUTES_DRAFT")?retrieveMeetingRecord(latest("AI_MINUTES_DRAFT").id):Promise.resolve(null)
+    ]);
+    setAssistantSavedRecords(drafts);
+    setAssistantTranscript(savedTranscript?.content||selected.transcript||"");
+    setAssistantSummary(savedSummary?.content||selected.summary||"");
+    setAssistantMinutes(savedMinutes?.content||selected.minutes||"");
+    setAssistantOpen(true);
+  }catch(e){setError(e?.message||"The AI Meeting Assistant requires an authorised meeting participant or registered subscriber.")}finally{setBusy(false)}
+ }
+ function addSavedAssistantRecord(result,title){
+  setAssistantSavedRecords(rows=>[{id:result.recordId,recordType:result.recordType,title,recordLabel:result.recordType,contentHash:result.contentHash,integrityStatus:result.integrityStatus,requiresHumanReview:true,approvalStatus:"NOT_SUBMITTED"},...rows]);
+ }
+ async function saveTranscript(){
+  if(!selected)return;
+  const transcript=assistantTranscript.trim();
+  if(!transcript){setError("Enter, paste or capture transcript text before saving.");return}
+  setBusy(true);setError("");
+  try{
+    const title="Subscriber Transcript Draft — "+(selected.title||"IRPA Meeting");
+    const saved=await saveMeetingAssistantDraft({meetingId:selected.id,recordType:"SUBSCRIBER_TRANSCRIPT_DRAFT",title,content:transcript});
+    addSavedAssistantRecord(saved,title);
+    if(admin){
+      const next=normalizeMeetingForV3({...selected,transcript,proceedingsStatus:"Transcript Saved"});
+      await updateRecord(COLLECTIONS.meetings,selected.id,next);setSelected(next);setForm(next);await load();
+    }
+    setMessage("Transcript saved as a meeting-linked draft record. It is not an approved or final transcript.");
+  }catch(e){setError(e?.message||"Unable to save the transcript draft.")}finally{setBusy(false)}
+ }
+ async function generateAISummary(){
+  if(!selected)return;
+  const transcript=assistantTranscript.trim();
+  if(!transcript){setError("Enter or record transcript content before generating a summary.");return}
+  setBusy(true);setError("");
+  try{
+    const draft=generateDraft(transcript,selected);
+    const title="AI-Assisted Summary Draft — "+(selected.title||"IRPA Meeting");
+    const saved=await saveMeetingAssistantDraft({meetingId:selected.id,recordType:"AI_SUMMARY_DRAFT",title,content:draft.summary});
+    setAssistantSummary(draft.summary);addSavedAssistantRecord(saved,title);
+    setSelected(current=>current?.id===selected.id?{...current,summary:draft.summary}:current);
+    setMessage("Summary draft saved and linked to this meeting. Human review is required before it is used as an official record.");
+  }catch(e){setError(e?.message||"Unable to save the summary draft.")}finally{setBusy(false)}
+ }
+ async function generateAIMinutes(){
+  if(!selected)return;
+  const transcript=assistantTranscript.trim();
+  if(!transcript){setError("Enter or record transcript content before generating draft minutes.");return}
+  setBusy(true);setError("");
+  try{
+    const draft=generateDraft(transcript,selected);
+    const title="AI-Assisted Draft Minutes — "+(selected.title||"IRPA Meeting");
+    const saved=await saveMeetingAssistantDraft({meetingId:selected.id,recordType:"AI_MINUTES_DRAFT",title,content:draft.minutes});
+    setAssistantSummary(draft.summary);setAssistantMinutes(draft.minutes);addSavedAssistantRecord(saved,title);
+    setSelected(current=>current?.id===selected.id?{...current,...draft,transcript,proceedingsStatus:"Draft Minutes"}:current);
+    if(admin){
+      const next=normalizeMeetingForV3({...selected,...draft,transcript,proceedingsStatus:"Draft Minutes"});
+      await updateRecord(COLLECTIONS.meetings,selected.id,next);setSelected(next);setForm(next);await load();
+    }
+    setMessage("Draft minutes saved to the meeting record lifecycle. They remain unapproved pending review by the authorised secretary.");
+  }catch(e){setError(e?.message||"Unable to save draft minutes.")}finally{setBusy(false)}
+ }
  function go(module){if(onNavigate)onNavigate(module)}
  return <div className="page">
   <section className="welcome-panel"><div><span className="eyebrow">IRPA GOVERNANCE GATEWAY · V3.0</span><h1>Meeting Centre</h1><p>One authoritative meeting engine with category-controlled Governance, Administrative, Staff, General and Other meeting workflows.</p></div><div className="member-actions"><button type="button" className="secondary-button" onClick={showRegister}>View Registered Meetings</button>{(admin||canRegisterMeeting(actorIdentity))&&<button type="button" onClick={startCreate}>+ Register Meeting</button>}</div></section>
