@@ -559,7 +559,8 @@ table td{color:var(--text)}
 }
 #root .app-shell .content-area .page :where(input,select,textarea):focus{
   border-color:var(--border-strong);
-  outline:2px solid var(--focus);\n  outline-offset:1px;
+  outline:2px solid var(--focus);
+  outline-offset:1px;
 }
 @media (max-width:760px){
   #root .app-shell .content-area .page :where(h1){font-size:clamp(22px,6vw,28px);}
@@ -799,4 +800,34 @@ table td{color:var(--text)}
 :root{
   --irpa-canonical-ui-reference:members-personnel;
   --irpa-canonical-ui-contract:2026-10-09;
+
+/* Canonical blue navigation states across desktop and mobile. */
+#root .app-shell .sidebar .nav-item{
+  background:#0b5fa8;
+  border-color:#2f86cf;
+  color:#ffffff;
+}
+#root .app-shell .sidebar .nav-item:hover:not(.active){
+  background:#1476bf;
+  border-color:#70b4ed;
+  color:#ffffff;
+}
+#root .app-shell .sidebar .nav-item.active{
+  background:#0b6fba;
+  border-color:#70baff;
+  color:#ffffff;
+  box-shadow:inset 3px 0 #ffffff;
+}
+#root .app-shell .mobile-global-nav button{
+  background:#0b5fa8;
+  border:1px solid #2f86cf;
+  color:#ffffff;
+}
+#root .app-shell .mobile-global-nav button.active{
+  background:#0b6fba;
+  border-color:#70baff;
+  color:#ffffff;
+  box-shadow:inset 0 2px #ffffff;
+}
+
 }
