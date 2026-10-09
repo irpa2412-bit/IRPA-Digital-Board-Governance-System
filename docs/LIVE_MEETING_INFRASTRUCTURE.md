@@ -60,3 +60,13 @@ Before the current IRPA-DGBS Meeting Room media tranche, IRPA-DGBS contained a s
 
 ## Next deployment gate
 Do not publish a live meeting endpoint until the infrastructure host is provisioned, DNS and TLS are valid, firewall rules are reviewed, LiveKit is deployed, the meeting-control gateway is deployed, short-lived token issuance is tested, mobile/restrictive-network tests pass, and security/rollback tests pass.
+
+## Staging provisioning pack (2026-10-09)
+
+The repository now includes `deploy/livekit-staging/README.md` with the controlled first-deployment procedure, domain/firewall prerequisites, protected staging configuration, and the two-browser acceptance checklist. The official LiveKit VM generator is the deployment source of truth; do not improvise an unverified compose stack or deploy a local development server to the public internet.
+
+A manual GitHub Actions workflow, `LiveKit Staging Endpoint Preflight`, and `scripts/check-livekit-staging-endpoint.mjs` are available to check WSS URL shape, protected staging credential presence, and endpoint TLS reachability. A successful preflight does **not** prove credential validity or real media. Real audio/video remains unaccepted until two authenticated browser sessions exchange remote audio and video and the mobile/restrictive-network checks pass.
+
+## Governance access boundary correction
+
+Invitation entry context is allowed to enable only the live-media join control. It must not set the meeting `controller` flag or unlock chair/secretary governance actions. Server-side `issueLiveMeetingToken` continues to validate the invitation participant, meeting binding and authenticated identity before issuing a short-lived room token.
