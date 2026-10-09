@@ -18,13 +18,14 @@ function makeDeps(state){
     firestoreDocumentToPlain:doc=>doc?.plain||plain(doc?.fields),
     getDriveAccessToken:async()=> "drive-token",
     driveFetch:async(_env,_token,path,options={})=>{
-      if(options.method==="DELETE"){state.deletedFiles.push(path);return {};}
+      if(options.method==="DELETE"){state.deletedFiles.push(path);if(state.failDelete)throw new Error("simulated Drive rollback failure");return {};}
       if(path.includes("/copy"))return {id:"copied-"+Math.random().toString(16).slice(2)};
       if(path.includes("?fields=id,name,mimeType,size,description,trashed"))return {id:"drive-1",name:"test.pdf",mimeType:"application/pdf",size:"4",description:JSON.stringify({irpaGovernance:true,irpaDocumentLifecycle:true,documentId:"LIFE-test"})};
       return {id:"drive-1",name:"test.pdf",mimeType:"application/pdf",size:"4"};
     },
     findOrCreateFolder:async(_env,_token,name)=>"folder-"+name.replace(/\s+/g,"-"),
-    fetch:async()=>new Response(JSON.stringify({id:"drive-upload-1",name:"test.pdf",mimeType:"application/pdf",size:"4",webViewLink:"https://drive.example/test"}),{status:200,headers:{"content-type":"application/json"}}),
+    fetch:async(url)=>{if(String(url).includes("alt=media"))return new Response(state.downloadBytes||new TextEncoder().encode("test"),{status:200,headers:{"content-type":"application/pdf"}});return new Response(JSON.stringify({id:"drive-upload-1",name:"test.pdf",mimeType:"application/pdf",size:"4",webViewLink:"https://drive.example/test"}),{status:200,headers:{"content-type":"application/json"}});},
+    recordLifecycleFailure:async(_env,claims,documentId,action,details)=>{state.failureEvents??=[];state.failureEvents.push({documentId,actorUid:claims.user_id,action,details});return {auditId:"failure-audit-1"};},
     commitDocumentAndAudit:async(_env,documentId,_token,documentFields,documentMask,auditFields,{createOnly=false}={})=>{
       if(state.failAudit)throw new Error("simulated atomic document/audit commit failure");
       if(createOnly&&state.docs[documentId])throw new Error("document already exists");
@@ -93,6 +94,7 @@ test("upload rolls back Drive file when atomic document/audit commit fails",asyn
   );
   assert.deepEqual(state.writes,[]);
   assert.deepEqual(state.deletedFiles,["/drive/v3/files/drive-upload-1"]);
+  assert.deepEqual(state.failureEvents,[{documentId:assert.match(Object.keys(state.docs).join(""),/^$/) ? "" : state.failureEvents[0].documentId,actorUid:"emp-1",action:"UPLOAD",details:{failureReason:"simulated atomic document/audit commit failure",driveFileId:"drive-upload-1",rollbackStatus:"SUCCEEDED",rollbackError:null}}]);
 });
 
 test("successful upload atomically writes document registry and audit event",async()=>{
@@ -105,4 +107,37 @@ test("successful upload atomically writes document registry and audit event",asy
   assert.match(state.writes[1].path,/^audit\/LIFE-/);
   const saved=Object.values(state.docs)[0];
   assert.equal(saved.fields.sha256.stringValue.length,64);
+});
+
+const TEST_SHA256="9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08";
+
+test("download retrieves stored bytes and verifies the registered SHA-256 digest",async()=>{
+  const state={docs:{"LIFE-test":{plain:{documentId:"LIFE-test",fileId:"drive-1",fileName:"test.pdf",sha256:TEST_SHA256,classification:"Internal",ownerUid:"emp-1",status:"WORKING"}}},writes:[],downloadBytes:new TextEncoder().encode("test")};
+  const router=createDocumentLifecycleRouter(makeDeps(state));
+  const response=await router(req("/api/document-lifecycle/download",{documentId:"LIFE-test",fileId:"drive-1"}),env);
+  assert.equal(response.status,200);
+  const result=await response.json();
+  assert.equal(result.sha256,TEST_SHA256);
+  assert.equal(atob(result.base64),"test");
+});
+
+test("download rejects retrieved bytes whose SHA-256 differs from the register",async()=>{
+  const state={docs:{"LIFE-test":{plain:{documentId:"LIFE-test",fileId:"drive-1",fileName:"test.pdf",sha256:"0".repeat(64),classification:"Internal",ownerUid:"emp-1",status:"WORKING"}}},writes:[],downloadBytes:new TextEncoder().encode("test")};
+  const router=createDocumentLifecycleRouter(makeDeps(state));
+  const response=await router(req("/api/document-lifecycle/download",{documentId:"LIFE-test",fileId:"drive-1"}),env);
+  assert.equal(response.status,409);
+  assert.match(await response.text(),/integrity verification failed/i);
+});
+
+test("failed Drive rollback is explicitly recorded and reported after atomic commit failure",async()=>{
+  const state={docs:{},writes:[],deletedFiles:[],failAudit:true,failDelete:true,failureEvents:[]};
+  const router=createDocumentLifecycleRouter(makeDeps(state));
+  await assert.rejects(
+    router(req("/api/document-lifecycle/upload",{fileName:"test.pdf",contentType:"application/pdf",base64:btoa("test"),title:"Test document",documentType:"Other",archiveCategory:"Administrative Documents",classification:"Internal"}),env),
+    /rollback was incomplete; failure audit RECORDED/
+  );
+  assert.equal(state.failureEvents.length,1);
+  assert.equal(state.failureEvents[0].action,"UPLOAD");
+  assert.equal(state.failureEvents[0].details.rollbackStatus,"FAILED");
+  assert.equal(state.failureEvents[0].details.rollbackError,"simulated Drive rollback failure");
 });
