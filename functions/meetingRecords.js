@@ -1,7 +1,7 @@
 const {onCall,HttpsError}=require("firebase-functions/v2/https");
 const {getFirestore,FieldValue}=require("firebase-admin/firestore");
 const crypto=require("crypto");
-const {GoogleAuth}=require("google-auth-library");
+const {getApp}=require("firebase-admin/app");
 const {defineSecret}=require("firebase-functions/params");
 const {queueInductionEmail}=require("./queueInductionEmail");
 const INVITE_SERVICE_KEY=defineSecret("INVITE_SERVICE_KEY");
@@ -72,10 +72,11 @@ exports.translateMeetingTranscript=onCall({region:"us-central1",timeoutSeconds:1
  const allowed=new Set(["sw","en","fr","es","pt","ar","hi","zh","de","it","ja"]);
  if(!allowed.has(targetLanguage))throw new HttpsError("invalid-argument","The requested translation language is not supported.");
  try{
-  const googleAuth=new GoogleAuth({scopes:["https://www.googleapis.com/auth/cloud-platform"]});
-  const client=await googleAuth.getClient();
-  const response=await client.request({url:"https://translation.googleapis.com/language/translate/v2",method:"POST",data:{q:content,target:targetLanguage,format:"text"}});
-  const translatedText=String(response?.data?.data?.translations?.[0]?.translatedText||"");
+  const token=await getApp().options.credential.getAccessToken();
+  const response=await fetch("https://translation.googleapis.com/language/translate/v2",{method:"POST",headers:{"Authorization":"Bearer "+token.access_token,"Content-Type":"application/json"},body:JSON.stringify({q:content,target:targetLanguage,format:"text"})});
+  if(!response.ok)throw new Error("Cloud Translation API returned HTTP "+response.status);
+  const payload=await response.json();
+  const translatedText=String(payload?.data?.translations?.[0]?.translatedText||"");
   if(!translatedText)throw new Error("Google Cloud Translation returned an empty result.");
   await audit("MEETING_TRANSCRIPT_TRANSLATED",ctx,null,{targetLanguage,sourceCharacters:content.length,translatedCharacters:translatedText.length,translationProvider:"Google Cloud Translation",sourceTranscriptStoredSeparately:true});
   return {ok:true,translatedText,targetLanguage,provider:"Google Cloud Translation",requiresHumanReview:true};
