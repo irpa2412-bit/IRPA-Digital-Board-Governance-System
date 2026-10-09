@@ -34,7 +34,7 @@ firebase functions:secrets:set LIVEKIT_API_KEY
 firebase functions:secrets:set LIVEKIT_API_SECRET
 ```
 
-Enter values at the interactive prompts; do not place secrets in command-line arguments. Configure `LIVEKIT_URL` in the staging Functions runtime environment as the WebSocket endpoint, e.g. `wss://meet.<your-controlled-domain>`. Then deploy the Functions to staging through the approved staging workflow. The current repository production deployment workflow targets `main`; merging into the integration branch alone does not deploy Functions.
+Enter values at the interactive prompts; do not place secrets in command-line arguments. Configure the non-secret `LIVEKIT_URL` parameter when the staging Functions deployment prompts for it, using the WebSocket endpoint, e.g. `wss://meet.<your-controlled-domain>`. Keep the endpoint consistent between the Functions parameter and the preflight environment. Then deploy the Functions to staging through the approved staging workflow. The current repository production deployment workflow targets `main`; merging into the integration branch alone does not deploy Functions.
 
 ## Preflight commands
 Install the Functions dependencies, then run the authenticated LiveKit API connectivity check in the same secure environment where the three runtime values are available:
