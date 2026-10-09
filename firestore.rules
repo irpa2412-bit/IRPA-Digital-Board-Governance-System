@@ -189,6 +189,12 @@ service cloud.firestore {
       (resource.data.get("status","")=="SIGNED"&&request.resource.data.get("status","")=="POST_SIGNATURE")||
       (resource.data.get("status","")=="POST_SIGNATURE"&&request.resource.data.get("status","")=="FINAL_ARCHIVE");
   }
+  function documentLifecycleTransitionUpdateAllowed(documentId){
+    return (resource.data.get("status","")=="WORKING"&&request.resource.data.get("status","")=="PENDING_SIGNATURE"&&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","updatedAt","signatureStatus","signatureRequestedAt","signatureRequestedByUid","archiveFolderId","archivePath"])&&documentLifecycleValidTransition(documentId))||
+      (resource.data.get("status","")=="PENDING_SIGNATURE"&&request.resource.data.get("status","")=="SIGNED"&&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","updatedAt","signatureStatus","signatureEnvelopeId","signedAt","signedByUid","signedDocumentUrl","signedSourceFileId"])&&documentLifecycleValidTransition(documentId))||
+      (resource.data.get("status","")=="SIGNED"&&request.resource.data.get("status","")=="POST_SIGNATURE"&&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","updatedAt","postSignatureStatus","postSignatureStartedAt","postSignatureStartedByUid","channelStatus","channelledAt","channelledByUid","channelDestination","archiveFolderId","archivePath"])&&documentLifecycleValidTransition(documentId))||
+      (resource.data.get("status","")=="POST_SIGNATURE"&&request.resource.data.get("status","")=="FINAL_ARCHIVE"&&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","updatedAt","finalArchiveStatus","finalArchivedAt","finalArchivedByUid","archiveFolderId","archivePath","finalArchiveFileId"])&&documentLifecycleValidTransition(documentId));
+  }
   function documentLifecycleUpdateAllowed(){
     return documentLifecycleIdentity()&&
       request.resource.data.get("ownerUid","")==resource.data.get("ownerUid","")&&
@@ -205,8 +211,7 @@ service cloud.firestore {
           request.resource.data.get("authorizedUids",[]).hasAll(resource.data.get("authorizedUids",[]))&&
           request.resource.data.get("authorizedUids",[]).hasAll([resource.data.get("ownerUid","")]))||
         (documentLifecycleWorkflowAuthority(resource.data)&&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","updatedAt","signatureStatus","signatureRequestedAt","signatureRequestedByUid","signedAt","signedByUid","signatureEnvelopeId","signedDocumentUrl","signedSourceFileId","postSignatureStatus","postSignatureStartedAt","postSignatureStartedByUid","finalArchiveStatus","finalArchivedAt","finalArchivedByUid","channelStatus","channelledAt","channelledByUid","channelDestination","archiveFolderId","archiveUidLink","archiveFileWebViewLink","webViewLink","fileUrl","archivePath","signedArchiveFileId","finalArchiveFileId"])&&
-          documentLifecycleValidTransition(id))
+          documentLifecycleTransitionUpdateAllowed(id))
       );
   }
   match /documents/{id}{allow read:if admin()||controlledDocumentReadAllowed();allow create:if admin()||controlledDocumentCreateAllowed()||documentLifecycleCreateAllowed(id);allow delete:if admin();allow update:if admin()||signatureDocumentWorkflowUpdate()||documentLifecycleUpdateAllowed();}
