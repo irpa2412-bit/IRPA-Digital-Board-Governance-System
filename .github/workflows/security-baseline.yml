@@ -28,4 +28,4 @@ jobs:
           distribution: temurin
           java-version: "21"
       - name: Run Firestore security rules regression tests
-        run: npx firebase emulators:exec --only firestore "node tests/firestore.rules.test.cjs"
+        run: npx firebase emulators:exec --only firestore "node tests/firestore.rules.test.cjs && node --test tests/meeting-category-policy.test.mjs tests/meeting-category-firestore-rules.test.cjs"
