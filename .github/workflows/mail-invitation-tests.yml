@@ -3,6 +3,7 @@ on:
   push:
     branches: ["fix/member-signature-invitation-email-20261004"]
   pull_request:
+    branches: ["main", "integration/collective-portals-20261009"]
     paths:
       - "drive-gateway/**"
       - "src/firebase/signaturePlatform.js"
