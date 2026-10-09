@@ -1,6 +1,7 @@
 const {onCall,HttpsError}=require("firebase-functions/v2/https");
 const {getFirestore,FieldValue}=require("firebase-admin/firestore");
 const crypto=require("crypto");
+const {getApp}=require("firebase-admin/app");
 const {defineSecret}=require("firebase-functions/params");
 const {queueInductionEmail}=require("./queueInductionEmail");
 const INVITE_SERVICE_KEY=defineSecret("INVITE_SERVICE_KEY");
@@ -60,6 +61,29 @@ exports.captureMeetingRecord=onCall({region:"us-central1",timeoutSeconds:30},asy
  await ref.set(data);
  await audit("MEETING_RECORD_CAPTURED",ctx,ref.id,{recordType:type,contentHash:digest,retentionYears,retainUntil:retainUntil.toISOString(),storageDestination:data.storageDestination});
  return {ok:true,recordId:ref.id,recordType:type,contentHash:digest,integrityStatus:data.integrityStatus,retentionYears,retainUntil:retainUntil.toISOString(),storageDestination:data.storageDestination};
+});
+
+exports.translateMeetingTranscript=onCall({region:"us-central1",timeoutSeconds:120,memory:"512MiB"},async req=>{
+ const meetingId=text(req.data?.meetingId),content=text(req.data?.content),targetLanguage=text(req.data?.targetLanguage).toLowerCase();
+ const ctx=await context(req,meetingId);
+ if(!ctx.canRead)throw new HttpsError("permission-denied","Only an authorised meeting participant or subscriber may translate these proceedings.");
+ if(!content)throw new HttpsError("invalid-argument","Transcript text is required.");
+ if(content.length>30000)throw new HttpsError("invalid-argument","Translate transcript sections of 30,000 characters or fewer.");
+ const allowed=new Set(["sw","en","fr","es","pt","ar","hi","zh","de","it","ja"]);
+ if(!allowed.has(targetLanguage))throw new HttpsError("invalid-argument","The requested translation language is not supported.");
+ try{
+  const token=await getApp().options.credential.getAccessToken();
+  const response=await fetch("https://translation.googleapis.com/language/translate/v2",{method:"POST",headers:{"Authorization":"Bearer "+token.access_token,"Content-Type":"application/json"},body:JSON.stringify({q:content,target:targetLanguage,format:"text"})});
+  if(!response.ok)throw new Error("Cloud Translation API returned HTTP "+response.status);
+  const payload=await response.json();
+  const translatedText=String(payload?.data?.translations?.[0]?.translatedText||"");
+  if(!translatedText)throw new Error("Google Cloud Translation returned an empty result.");
+  await audit("MEETING_TRANSCRIPT_TRANSLATED",ctx,null,{targetLanguage,sourceCharacters:content.length,translatedCharacters:translatedText.length,translationProvider:"Google Cloud Translation",sourceTranscriptStoredSeparately:true});
+  return {ok:true,translatedText,targetLanguage,provider:"Google Cloud Translation",requiresHumanReview:true};
+ }catch(error){
+  console.error("Meeting transcript translation failed",error?.message||error);
+  throw new HttpsError("failed-precondition","Translation service is not available. Confirm that Cloud Translation API is enabled and billing/permissions are configured for the IRPA Google Cloud project.");
+ }
 });
 
 exports.saveLiveMeetingProceedings=onCall({region:"us-central1",timeoutSeconds:30},async req=>{
