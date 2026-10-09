@@ -52,7 +52,7 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
        if(gateContext?.meetingId===meeting.id)gateParticipantId=String(gateContext?.participantId||"");
      }catch{}
      const call=httpsCallable(getFunctions(undefined,"us-central1"),"issueLiveMeetingToken");
-     const result=await call({meetingId:meeting.id,selectedAuthority:String(selectedAuthority||"").trim(),participantId:gateParticipantId});
+     const result=await call({meetingId:meeting.id,selectedAuthority:gateParticipantId?"":String(selectedAuthority||"").trim(),participantId:gateParticipantId});
      const data=result.data||{};
      if(!data.serverUrl||!data.participantToken)throw new Error("The IRPA live meeting authorization response was incomplete.");
      const room=new Room({adaptiveStream:true,dynacast:true});
