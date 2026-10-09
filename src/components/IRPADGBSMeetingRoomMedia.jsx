@@ -13,7 +13,7 @@ function safeJson(value){
 export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",controller=false}){
  const roomRef=useRef(null),remoteRef=useRef(null),localRef=useRef(null);
  const[status,setStatus]=useState("READY"),[error,setError]=useState(""),[muted,setMuted]=useState(true),[camera,setCamera]=useState(false),[screen,setScreen]=useState(false),[hand,setHand]=useState(false),[moderator,setModerator]=useState(false),[recordingAllowed,setRecordingAllowed]=useState(false);
- const[participants,setParticipants]=useState([]),[messages,setMessages]=useState([]),[chat,setChat]=useState(""),[deviceReady,setDeviceReady]=useState(false),[sessionId,setSessionId]=useState("");
+ const[participants,setParticipants]=useState([]),[messages,setMessages]=useState([]),[chat,setChat]=useState(""),[deviceReady,setDeviceReady]=useState(false),[deviceCheck,setDeviceCheck]=useState("NOT CHECKED"),[sessionId,setSessionId]=useState("");
 
  const clear=node=>{if(node)while(node.firstChild)node.removeChild(node.firstChild)};
  const refreshParticipants=room=>{
@@ -46,8 +46,13 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
    if(roomRef.current)return;
    setError("");setStatus("AUTHORIZING");
    try{
+     let gateParticipantId="";
+     try{
+       const gateContext=JSON.parse(sessionStorage.getItem("irpaMeetingEntryContext")||"null");
+       if(gateContext?.meetingId===meeting.id)gateParticipantId=String(gateContext?.participantId||"");
+     }catch{}
      const call=httpsCallable(getFunctions(undefined,"us-central1"),"issueLiveMeetingToken");
-     const result=await call({meetingId:meeting.id,selectedAuthority:String(selectedAuthority||"").trim()});
+     const result=await call({meetingId:meeting.id,selectedAuthority:gateParticipantId?"":String(selectedAuthority||"").trim(),participantId:gateParticipantId});
      const data=result.data||{};
      if(!data.serverUrl||!data.participantToken)throw new Error("The IRPA live meeting authorization response was incomplete.");
      const room=new Room({adaptiveStream:true,dynacast:true});
@@ -65,8 +70,28 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
      roomRef.current=room;setSessionId(data.sessionId||"");setModerator(data.moderator===true);setRecordingAllowed(data.recordingAllowed===true);setStatus("CONNECTED");refreshParticipants(room);
      await room.localParticipant.setMicrophoneEnabled(true,{audioCaptureOptions:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});setMuted(false);
      await room.localParticipant.setCameraEnabled(false);setCamera(false);
-     try{const devices=await navigator.mediaDevices?.enumerateDevices?.();setDeviceReady(Boolean(devices?.some(d=>d.kind==="audioinput")||devices?.some(d=>d.kind==="videoinput")))}catch{setDeviceReady(false)}
+     try{const devices=await navigator.mediaDevices?.enumerateDevices?.();setDeviceReady(Boolean(devices?.some(d=>d.kind==="audioinput")&&devices?.some(d=>d.kind==="videoinput")))}catch{setDeviceReady(false)}
    }catch(e){console.error("IRPA-DGBS Meeting Room media connection failed",e);setStatus("READY");setError(e?.message||"Unable to connect to the IRPA-DGBS Meeting Room.")}
+ }
+ async function checkDevices(){
+   setError("");setDeviceCheck("CHECKING");
+   if(!navigator.mediaDevices?.getUserMedia){setDeviceReady(false);setDeviceCheck("UNSUPPORTED");setError("This browser does not provide camera/microphone access. Use a current browser with HTTPS enabled.");return}
+   let stream;
+   try{
+     stream=await navigator.mediaDevices.getUserMedia({
+       audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},
+       video:{width:{ideal:1280},height:{ideal:720},frameRate:{ideal:30,max:30}}
+     });
+     const audio=stream.getAudioTracks()[0],video=stream.getVideoTracks()[0];
+     if(!audio||!video)throw new Error("A microphone and camera are both required for the full readiness check.");
+     const settings=video.getSettings?.()||{};
+     const hd=Number(settings.width||0)>=1280&&Number(settings.height||0)>=720;
+     setDeviceReady(true);
+     setDeviceCheck(hd?"READY · 720p CAPABLE":"READY · CAMERA AVAILABLE");
+   }catch(e){
+     setDeviceReady(false);setDeviceCheck("NOT READY");
+     setError(e?.message||"Camera/microphone permission or device check failed.");
+   }finally{stream?.getTracks?.().forEach(track=>track.stop())}
  }
  async function disconnect(){roomRef.current?.disconnect()}
  async function toggleMic(){if(!roomRef.current)return;const enabled=!roomRef.current.localParticipant.isMicrophoneEnabled;await roomRef.current.localParticipant.setMicrophoneEnabled(enabled);setMuted(!enabled);refreshParticipants(roomRef.current)}
@@ -86,10 +111,10 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
   <div className="dashboard-grid" style={{marginBottom:14}}>
    <div className="stat-card"><span>Session</span><strong>{status==="CONNECTED"?"LIVE":"READY"}</strong><small>{sessionId||"Not connected"}</small></div>
    <div className="stat-card"><span>Participants</span><strong>{participantCount}</strong><small>Authenticated room members</small></div>
-   <div className="stat-card"><span>Device</span><strong>{readiness}</strong><small>Microphone / camera readiness</small></div>
+   <div className="stat-card"><span>Device</span><strong>{readiness}</strong><small>{deviceCheck==="NOT CHECKED"?"Run the microphone and camera check":deviceCheck}</small></div>
    <div className="stat-card"><span>Authority</span><strong style={{fontSize:14}}>{moderator?"Meeting Moderator":selectedAuthority||"IRPA meeting authority"}</strong><small>{recordingAllowed?"Recording permitted by meeting policy":"Recording not enabled"}</small></div>
   </div>
-  <div style={{display:"grid",gridTemplateColumns:"minmax(0,2fr) minmax(220px,1fr)",gap:14}}>
+  <div className="irpa-live-media-columns" style={{display:"grid",gap:14}}>
    <div ref={remoteRef} style={{minHeight:300,border:"1px solid var(--border)",borderRadius:12,padding:8,display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:8,overflow:"auto"}}>
     {status!=="CONNECTED"&&<span className="muted">Live meeting media is not connected.</span>}
    </div>
@@ -117,6 +142,6 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
    <div className="form-actions"><button type="submit">Send Message</button></div>
   </form>}
   {messages.length>0&&<div className="panel" style={{marginTop:12,padding:12}}><strong>Session Messages</strong><div style={{maxHeight:160,overflow:"auto",marginTop:8}}>{messages.map((m,i)=><div key={i} className="table-subtext"><strong>{m.from}:</strong> {m.text}</div>)}</div></div>}
-  <small style={{display:"block",marginTop:10}}>Meeting: {meeting?.reference||meeting?.title||"—"} · Server-authorized token · 10-minute token lifetime · Session ID: {sessionId||"pending"}</small>
+  <small style={{display:"block",marginTop:10}}>Meeting: {meeting?.reference||meeting?.title||"—"} · Server-authorized token · 10-minute token lifetime · Camera target: 1280×720 at 30 fps (network/browser may adapt) · Session ID: {sessionId||"pending"}</small>
  </section>;
 }

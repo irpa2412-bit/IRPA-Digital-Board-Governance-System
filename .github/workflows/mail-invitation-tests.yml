@@ -3,6 +3,7 @@ on:
   push:
     branches: ["fix/member-signature-invitation-email-20261004"]
   pull_request:
+    branches: ["main", "integration/collective-portals-20261009"]
     paths:
       - "drive-gateway/**"
       - "src/firebase/signaturePlatform.js"
@@ -20,6 +21,9 @@ jobs:
       - name: Install gateway dependencies
         working-directory: drive-gateway
         run: npm ci
+      - name: Validate Cloudflare gateway syntax
+        working-directory: drive-gateway
+        run: node --check src/index.js
       - name: Run mocked SMTP invitation tests
         working-directory: drive-gateway
         run: node tests/mail-invitation.unit.mjs

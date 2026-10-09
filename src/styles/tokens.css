@@ -959,3 +959,16 @@ table td{color:var(--text)}
     font-size:12px;
   }
 }
+
+
+/* Meeting media layout: preserve a single-column flow on narrow mobile screens. */
+#root .app-shell .content-area .irpa-live-media-columns{
+  grid-template-columns:minmax(0,2fr) minmax(0,1fr);
+  min-width:0;
+}
+#root .app-shell .content-area .irpa-live-media-columns>*{min-width:0;}
+@media (max-width:760px){
+  #root .app-shell .content-area .irpa-live-media-columns{
+    grid-template-columns:minmax(0,1fr);
+  }
+}
