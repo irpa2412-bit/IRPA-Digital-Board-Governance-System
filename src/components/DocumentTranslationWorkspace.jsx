@@ -7,6 +7,7 @@ import{translateDocumentChunk}from"../firebase/documentTranslation";
 import*as pdfjsLib from"pdfjs-dist";
 import mammoth from"mammoth";
 import*as XLSX from"xlsx";
+import JSZip from"jszip";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc=new URL("pdfjs-dist/build/pdf.worker.mjs",import.meta.url).toString();
 const REVIEWER_ROLES=new Set(["Executive Director","Director Outreach","Director Community Development","Director Research","Research Director","Research Officer","Director Human Resources","HR Director"]);
@@ -14,6 +15,29 @@ const roleValues=profile=>[profile?.role,...(Array.isArray(profile?.roles)?profi
 const fmt=v=>{try{const x=v?.toDate?.()||v;return x?new Date(x).toLocaleString():"—"}catch{return"—"}};
 const fileExtension=name=>String(name||"").split(".").pop().toLowerCase();
 function bytesToArrayBuffer(bytes){return bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength)}
+function decodeXml(value){return new DOMParser().parseFromString("<root>"+value+"</root>","application/xml").documentElement.textContent||"";}
+async function extractOfficeZipText(bytes,ext){
+ const zip=await JSZip.loadAsync(bytes);
+ const names=Object.keys(zip.files).filter(name=>!zip.files[name].dir);
+ if(ext==="pptx"){
+  const slides=names.filter(name=>/^ppt\/slides\/slide\d+\.xml$/i.test(name)).sort((a,b)=>Number(a.match(/slide(\d+)/i)?.[1]||0)-Number(b.match(/slide(\d+)/i)?.[1]||0));
+  const parts=[];
+  for(const name of slides){const xml=await zip.file(name).async("string");const text=[...xml.matchAll(/<a:t\b[^>]*>([\s\S]*?)<\/a:t>/g)].map(match=>decodeXml(match[1])).join("");if(text.trim())parts.push(text.trim());}
+  return parts.join("\n\n");
+ }
+ if(ext==="odt"||ext==="odp"){
+  const xmlFile=zip.file("content.xml");if(!xmlFile)throw new Error("The OpenDocument package has no content.xml file.");
+  const xml=await xmlFile.async("string");
+  const parts=[...xml.matchAll(/<text:p\b[^>]*>([\s\S]*?)<\/text:p>/g)].map(match=>decodeXml(match[1].replace(/<[^>]+>/g," "))).filter(Boolean);
+  return parts.join("\n");
+ }
+ if(ext==="epub"){
+  const pages=names.filter(name=>/\.(xhtml|html?)$/i.test(name)).sort();const parts=[];
+  for(const name of pages){const html=await zip.file(name).async("string");const parsed=new DOMParser().parseFromString(html,"text/html");parsed.querySelectorAll("script,style,noscript").forEach(node=>node.remove());const text=parsed.body.textContent||"";if(text.trim())parts.push(text.trim());}
+  return parts.join("\n\n");
+ }
+ return "";
+}
 async function extractDocumentText(bytes,fileName){
  const ext=fileExtension(fileName);
  let text="";
@@ -28,13 +52,15 @@ async function extractDocumentText(bytes,fileName){
  }else if(["xlsx","xls","ods","csv","tsv"].includes(ext)){
   const workbook=XLSX.read(bytes,{type:"array",cellDates:true});
   text=workbook.SheetNames.map(name=>"## "+name+"\n"+XLSX.utils.sheet_to_csv(workbook.Sheets[name])).join("\n\n");
+ }else if(["pptx","odt","odp","epub"].includes(ext)){
+  text=await extractOfficeZipText(bytes,ext);
  }else if(["txt","md","json","xml","xhtml","html","csv","tsv"].includes(ext)){
   text=new TextDecoder("utf-8",{fatal:false}).decode(bytes);
   if(["html","xhtml"].includes(ext))text=new DOMParser().parseFromString(text,"text/html").body.textContent||"";
  }else if(ext==="rtf"){
   text=new TextDecoder("utf-8",{fatal:false}).decode(bytes).replace(/\\'[0-9a-f]{2}/gi," ").replace(/\\[a-z]+-?\d* ?/gi," ").replace(/[{}]/g," ").replace(/\s+/g," ");
  }else{
-  throw new Error("Automatic text extraction currently supports PDF, DOCX, XLSX/XLS/ODS, CSV/TSV, TXT, Markdown, HTML, XML, JSON and RTF. This file format ("+ext.toUpperCase()+") must be converted to a supported text format before translation; the original is unchanged.");
+  throw new Error("Automatic text extraction currently supports PDF, DOCX, PPTX, XLSX/XLS/ODS, ODT/ODP/EPUB, CSV/TSV, TXT, Markdown, HTML, XML, JSON and RTF. This file format ("+ext.toUpperCase()+") must be converted to a supported text format before translation; the original is unchanged.");
  }
  text=String(text||"").replace(/\u0000/g,"").replace(/[ \t]+\n/g,"\n").trim();
  if(!text)throw new Error("No selectable text was extracted. This may be a scanned/image-only PDF or a file without readable text; OCR is not enabled, so no translation was submitted.");
