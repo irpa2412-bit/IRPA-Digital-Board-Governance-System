@@ -100,7 +100,7 @@ export default function DocumentTranslationWorkspace({profile,employee,admin=fal
   if(!fileId)throw new Error("The controlled document's file ID is unavailable. Refresh the Documents Workspace and confirm the document is accessible.");
   setProcessing(true);setError("");setMessage("");setDraft("");
   try{
-   await updateDoc(doc(db,COLLECTIONS.documentTranslationRequests,selected.id),{status:"IN_REVIEW",contentTransferred:true,translationStartedAt:serverTimestamp(),sourceLanguageResolved:sourceLanguage,processingError:deleteField(),updatedAt:serverTimestamp()});
+   await updateDoc(doc(db,COLLECTIONS.documentTranslationRequests,selected.id),{status:"IN_REVIEW",contentTransferAuthorized:true,contentTransferred:false,translationStartedAt:serverTimestamp(),sourceLanguageResolved:sourceLanguage,processingError:deleteField(),updatedAt:serverTimestamp()});
    setProgress("Retrieving the original document from the controlled archive…");
    const downloaded=await downloadLifecycleDocument(selected.documentId,fileId);
    const text=await extractDocumentText(downloaded.bytes,selected.documentFileName||document?.fileName||selected.documentTitle||"document.txt");
@@ -112,6 +112,7 @@ export default function DocumentTranslationWorkspace({profile,employee,admin=fal
     setProgress("Translating section "+(i+1)+" of "+chunks.length+"…");
     const result=await translateDocumentChunk({requestId:selected.id,content:chunks[i],targetLanguage:target,sourceLanguage});
     output+=(output?"\n\n":"")+String(result.translatedText||"");
+    if(i===0)await updateDoc(doc(db,COLLECTIONS.documentTranslationRequests,selected.id),{contentTransferred:true,updatedAt:serverTimestamp()});
     provider=result.provider||provider;matchedTerms+=Number(result.matchedTerms||0);
     if(result.coverage==="partial")coverage="partial";
    }
@@ -128,7 +129,7 @@ export default function DocumentTranslationWorkspace({profile,employee,admin=fal
   }catch(e){
    setError(e.message||"Document extraction or translation failed.");
    setProgress("");
-   try{await updateDoc(doc(db,COLLECTIONS.documentTranslationRequests,selected.id),{status:"IN_REVIEW",contentTransferred:true,processingError:String(e.message||"Translation failed.").slice(0,500),translationFailedAt:serverTimestamp(),updatedAt:serverTimestamp()})}catch{}
+   try{await updateDoc(doc(db,COLLECTIONS.documentTranslationRequests,selected.id),{status:"IN_REVIEW",processingError:String(e.message||"Translation failed.").slice(0,500),translationFailedAt:serverTimestamp(),updatedAt:serverTimestamp()})}catch{}
   }finally{setProcessing(false)}
  }
  async function finalizeTranslation(){
