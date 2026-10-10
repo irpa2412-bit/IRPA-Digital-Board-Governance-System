@@ -30,3 +30,6 @@ export const createMeetingAccessInvitation = payload => callMeetingService("/api
 export const revokeMeetingAccessInvitation = payload => callMeetingService("/api/meeting-access/revoke", payload);
 export const authorizeMeetingEntry = payload => callMeetingService("/api/meeting-access/authorize", payload);
 export const issueLiveMeetingToken = payload => callMeetingService("/api/meeting-media/token", payload);
+
+export const getMeetingRoomActivity = meetingId => callMeetingService("/api/meeting-room/activity", { meetingId });
+export const getMyMeetingSubscriptions = async () => (await callMeetingService("/api/meeting-subscriptions/mine")).subscriptions || [];
