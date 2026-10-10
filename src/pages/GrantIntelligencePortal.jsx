@@ -1,7 +1,6 @@
 import React,{useEffect,useMemo,useState} from "react";
 import {addDoc,collection,onSnapshot,serverTimestamp,updateDoc,doc} from "firebase/firestore";
 import app,{auth,db} from "../firebase/config";
-import {getFunctions,httpsCallable} from "firebase/functions";
 
 const PILLARS=[
  {id:"rangeland",label:"Sustainable Rangeland Management",short:"Rangeland"},
@@ -59,7 +58,6 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
  const [saving,setSaving]=useState(false);
  const [draft,setDraft]=useState({title:"",funder:"",url:"",deadline:"",country:"Tanzania",amount:"",summary:"",status:"Open",pillars:["rangeland"],themes:[]});
  const uid=auth.currentUser?.uid||"";
- const functions=getFunctions(app,"us-central1");
  const roleList=[profile?.role,profile?.roles,employee?.role,employee?.roles].flatMap(v=>Array.isArray(v)?v:String(v||"").split(",")).map(v=>String(v||"").trim().toLowerCase());
  const canManage=isAdmin||roleList.some(r=>["administrator","executive director","director outreach","director finance & administration","director research","research director","research manager","fundraising officer","research officer"].includes(r));
  useEffect(()=>onSnapshot(collection(db,"grantOpportunities"),snap=>{
@@ -77,9 +75,13 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
    if(!isAdmin){setError("Only an administrator can trigger a manual full-source scan.");return;}
    try{
      setCrawlerRunning(true);setError("");setNotice("Manual donor-source scan requested. This can take several minutes.");
-     const run=httpsCallable(functions,"runGrantCrawlerNow",{timeout:540000});
-     const result=await run({});
-     const data=result.data||{};
+     const workerUrl=import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL;
+     if(!workerUrl) throw new Error("Grant crawler Cloudflare Worker URL is not configured.");
+     const idToken=await auth.currentUser?.getIdToken();
+     if(!idToken) throw new Error("Your session has expired. Sign in again.");
+     const response=await fetch(workerUrl.replace(/\\/$/,"")+"/run",{method:"POST",headers:{"Authorization":"Bearer "+idToken,"Content-Type":"application/json"},body:"{}"});
+     const data=await response.json().catch(()=>({}));
+     if(!response.ok) throw new Error(data.error||"Cloudflare grant crawler request failed ("+response.status+").");
      setNotice("Grant crawler scan "+String(data.status||"finished")+". Sources checked: "+String(data.sourceCount||0)+", candidates found: "+String(data.candidatesFound||0)+", new records: "+String(data.created||0)+". Every discovered item remains pending verification.");
    }catch(err){console.error("Manual grant crawler scan failed",err);setError(err?.message||"Manual scan failed. Check Cloud Functions deployment and administrator access.");}
    finally{setCrawlerRunning(false);}
