@@ -41,7 +41,7 @@ Set secrets separately for production and staging; never commit secret values:
 - `LIVEKIT_EGRESS_R2_ACCESS_KEY_ID` and `LIVEKIT_EGRESS_R2_SECRET_ACCESS_KEY` — bucket-scoped Object Read & Write credentials.
 - `LIVEKIT_EGRESS_R2_REGION` — `auto`.
 
-Room-composite recording also requires the pinned self-hosted LiveKit Egress service; the server/Redis/Caddy stack alone is insufficient. The Worker supplies the private R2 S3 output configuration to Egress per recording request. LiveKit API credentials remain on the media host as required by LiveKit, and must match the Worker secrets. R2 credentials remain in Cloudflare Worker secrets and must not be copied to the VM or client.
+Room-composite recording also requires the pinned self-hosted LiveKit Egress service; the server/Redis/Caddy stack alone is insufficient. The Worker supplies the private R2 S3 output configuration to Egress per recording request. LiveKit API credentials remain on the media host as required by LiveKit, and must match the Worker secrets. R2 credentials are persisted as Cloudflare Worker secrets and passed per recording request over HTTPS to LiveKit Egress; they are not written to the VM configuration, source control, logs, or client.
 
 The protected manual workflow `.github/workflows/cloudflare-livekit-secrets.yml` binds production Worker secrets from the GitHub `production` Environment. It requires R2 to be enabled/purchased, the private bucket to exist, and a bucket-scoped R2 token to be configured first. Do not provision or deploy until the previously identified account prerequisites and spending approval are resolved.
 
