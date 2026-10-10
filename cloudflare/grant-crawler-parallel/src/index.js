@@ -396,7 +396,7 @@ async function crawl(env) {
     engines: settled.map(engine => ({ engine: engine.name, ...engine.stats })),
     feedsConfigured: engines[0].configured,
     sourcePagesConfigured: engines[1].configured,
-    webSearchConfigured: engines[2].configured > 0,
+    webSearchConfigured: Number(settled.find(engine => engine.name === "web_search")?.stats.configured || 0) > 0,
     uniqueItemsSeen: items.length,
     itemsSeen: items.length,
     recordsChanged: changed,
