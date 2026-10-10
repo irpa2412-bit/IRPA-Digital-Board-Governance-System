@@ -33,11 +33,17 @@ Meeting-register writes, voting issue open/close, meeting-linked decision creati
 
 Set secrets separately for production and staging; never commit secret values:
 
-- `LIVEKIT_URL` — the configured LiveKit websocket endpoint.
+- `LIVEKIT_URL` — the configured secure LiveKit websocket endpoint.
 - `LIVEKIT_API_KEY`
 - `LIVEKIT_API_SECRET`
+- `LIVEKIT_EGRESS_R2_ENDPOINT` — Cloudflare R2 HTTPS S3 endpoint.
+- `LIVEKIT_EGRESS_R2_BUCKET` — private recording bucket.
+- `LIVEKIT_EGRESS_R2_ACCESS_KEY_ID` and `LIVEKIT_EGRESS_R2_SECRET_ACCESS_KEY` — bucket-scoped Object Read & Write credentials.
+- `LIVEKIT_EGRESS_R2_REGION` — `auto`.
 
-The LiveKit Egress service and its file-output storage must be configured for the existing recording output path. The Worker must fail closed if LiveKit credentials are missing or recording is not enabled on the authoritative meeting record.
+Room-composite recording also requires the pinned self-hosted LiveKit Egress service; the server/Redis/Caddy stack alone is insufficient. The Worker supplies the private R2 S3 output configuration to Egress per recording request. LiveKit API credentials remain on the media host as required by LiveKit, and must match the Worker secrets. R2 credentials remain in Cloudflare Worker secrets and must not be copied to the VM or client.
+
+The protected manual workflow `.github/workflows/cloudflare-livekit-secrets.yml` binds production Worker secrets from the GitHub `production` Environment. It requires R2 to be enabled/purchased, the private bucket to exist, and a bucket-scoped R2 token to be configured first. Do not provision or deploy until the previously identified account prerequisites and spending approval are resolved.
 
 Transcript translation uses Google Cloud Translation through the existing server-side Google access token. Confirm the Translation API is enabled, billing is active if required, and the Worker service identity has the necessary Google Cloud Translation permissions.
 
