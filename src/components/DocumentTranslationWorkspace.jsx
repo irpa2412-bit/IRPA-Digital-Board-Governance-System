@@ -190,9 +190,9 @@ export default function DocumentTranslationWorkspace({profile,employee,admin=fal
     documentType:"Other",archiveCategory:sourceDocument?.archiveCategory||"Administrative Documents",
     classification:selected.documentClassification||sourceDocument?.classification||"Internal",version:"1.0"
    });
-   if(!uploaded?.documentId)throw new Error("The archive service did not return the translated document's registered ID.");
+   if(!uploaded?.documentId||!uploaded?.fileId)throw new Error("The archive service did not return both the translated document registry ID and Drive file ID.");
    await updateDoc(doc(db,COLLECTIONS.documentTranslationRequests,selected.id),{
-    translatedFileId:uploaded.documentId,translationOutputFileName:fileName,updatedAt:serverTimestamp()
+    translatedFileId:uploaded.fileId,translatedDocumentId:uploaded.documentId,translationOutputFileName:fileName,updatedAt:serverTimestamp()
    });
    const archivedReference=String(uploaded.reference||uploaded.documentId);setMessage("Translated text has been uploaded as a separate controlled document ("+archivedReference+"). The original source document was not changed.");
   }catch(e){setError(e.message||"Unable to archive the translated output. You can still download the completed text file.");}
@@ -230,7 +230,7 @@ export default function DocumentTranslationWorkspace({profile,employee,admin=fal
        <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:12}}><button type="button" disabled={processing||!reviewConfirmed||!reviewNotes.trim()||(selected.targetLanguage==="maa"&&(!maaSpeakerName.trim()||!reviewNotes.trim()))} onClick={finalizeTranslation}>{processing?"Saving…":"Approve and Complete Translation"}</button><button type="button" className="secondary-button" disabled={processing||!reviewNotes.trim()} onClick={rejectRequest}>Reject Request</button></div>
       </div>}
      </div>}
-     {selected.status==="COMPLETED"&&<div className="success-message"><p>Completed {fmt(selected.completedAt)}. Reviewer confirmation is recorded{selected.targetLanguage==="maa"?" with the Maa speaker review details.":"."}</p>{selected.translatedFileId&&<p>Archived document ID: <strong>{selected.translatedFileId}</strong></p>}{selected.documentOwnerUid===currentUid&&!selected.translatedFileId&&<button type="button" disabled={archiving} onClick={archiveCompletedTranslation}>{archiving?"Archiving…":"Save Translation to Controlled Documents"}</button>}</div>}
+     {selected.status==="COMPLETED"&&<div className="success-message"><p>Completed {fmt(selected.completedAt)}. Reviewer confirmation is recorded{selected.targetLanguage==="maa"?" with the Maa speaker review details.":"."}</p>{selected.translatedFileId&&<p>Archived document ID: <strong>{selected.translatedDocumentId||selected.translatedFileId}</strong></p>}{selected.documentOwnerUid===currentUid&&!selected.translatedFileId&&<button type="button" disabled={archiving} onClick={archiveCompletedTranslation}>{archiving?"Archiving…":"Save Translation to Controlled Documents"}</button>}</div>}
      {selected.contentTransferred&&<small style={{display:"block",marginTop:10}}>Content transfer recorded for this request. Do not place Confidential/Restricted records into processing without institutional authorization.</small>}
     </div>}
    </div>
