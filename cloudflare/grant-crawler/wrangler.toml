@@ -6,7 +6,7 @@ workers_dev = true
 
 [vars]
 IRPA_ENVIRONMENT = "local"
-GRANT_FEED_URLS = "[]"
+GRANT_FEED_URLS = \"[\\\"https://www.gov.uk/international-development-funding.atom?location%5B%5D=tanzania\\\",\\\"https://www.grants.gov/rss/GG_OppModByCategory.xml\\\"]\"
 
 [[d1_databases]]
 binding = "GRANTS_DB"
