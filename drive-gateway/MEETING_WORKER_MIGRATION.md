@@ -10,6 +10,7 @@ The existing `irpa-google-drive-gateway` Worker is the server-side meeting opera
 - Meeting register: `POST /api/meeting-register/create`, `/api/meeting-register/update`, `/api/meeting-register/delete`
 - Meeting voting control: `POST /api/meeting-voting/open`, `/api/meeting-voting/close`
 - Meeting-linked decisions: `POST /api/meeting-decisions/create`
+- Scoped activity and subscription reads: `POST /api/meeting-room/activity`, `POST /api/meeting-subscriptions/mine`
 - Record lifecycle: `POST /api/meeting-records/capture`, `/draft`, `/list`, `/retrieve`, `/protection`, `/dispose`
 - Live proceedings and translation: `POST /api/meeting-proceedings/save`, `/api/meeting-transcripts/translate`
 - Reports: `POST /api/meeting-reports/compile-email`
@@ -23,8 +24,8 @@ These operations do not inherently depend on callable Cloud Functions and can re
 
 - Meeting/participant realtime listeners and authorized meeting-register reads.
 - Attendance check-in and controller attendance updates, constrained to the allowed attendance fields.
-- Casting an anonymous vote: the client transaction writes the per-issue participant marker and vote together; rules reject a second marker, a closed issue, mismatched meeting/issue references, and voter identity fields in the vote record.
-- Meeting-room event reads/writes and action creation where existing governance-role rules allow them.
+- Casting an anonymous vote: the client transaction writes the per-issue participant marker and vote together; rules reject a second marker, a closed issue, mismatched meeting/issue references, and voter identity fields in the vote record. Vote outcomes are only returned by the Worker after the linked issue is closed.
+- Meeting-room event writes and action creation where existing governance-role rules allow them. Event history, vote tally reads, and the current user’s subscription list use scoped Worker queries to avoid downloading other meetings’ records into the browser.
 
 Meeting-register writes, voting issue open/close, meeting-linked decision creation, record lifecycle, transcript persistence/translation, report dispatch and LiveKit controls are routed through the Worker because the previous direct client or callable path was either restricted by Firestore rules or depended on server-side secrets/privileged execution.
 
