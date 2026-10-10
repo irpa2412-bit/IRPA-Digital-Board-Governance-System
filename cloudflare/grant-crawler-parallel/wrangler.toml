@@ -7,7 +7,7 @@ workers_dev = true
 [vars]
 IRPA_ENVIRONMENT = "local"
 GRANT_FEED_URLS = "[\"https://www.gov.uk/international-development-funding.atom?fund_state=open\",\"https://www.gov.uk/international-development-funding.atom?location%5B%5D=tanzania&fund_state=open\",\"https://www.gov.uk/international-development-funding.atom?eligible_entities=organisations-lmic&fund_state=open\"]"
-GRANT_SOURCE_PAGE_URLS = "[\"https://www.undp.org/tanzania/news\",\"https://www.undp.org/tanzania/press-releases\",\"https://www.thegef.org/what-we-do/topics/gef-small-grants-programme\",\"https://www.fao.org/partnerships/funding-opportunities/en\",\"https://www.eeas.europa.eu/tanzania_en\",\"https://www.mfukowamisitu.go.tz/download-center\"]"
+GRANT_SOURCE_PAGE_URLS = "[\"https://www.undp.org/tanzania/news-centre\",\"https://www.undp.org/tanzania/press-releases\",\"https://www.thegef.org/what-we-do/topics/gef-small-grants-programme\",\"https://www.fao.org/partnerships/funding-opportunities/en\",\"https://www.eeas.europa.eu/eeas/grants_en\",\"https://www.eeas.europa.eu/delegations/tanzania_en\",\"https://www.mfukowamisitu.go.tz/download-center\",\"https://www.mzv.sk/en/web/daressalaam-en/small-grants\",\"https://www.thefoundation.or.tz/what-we-do/grantmaking\",\"https://www.thefoundation.or.tz/our-platforms/smart-grants\"]"
 
 [ai]
 binding = "AI"
@@ -29,7 +29,7 @@ workers_dev = true
 IRPA_ENVIRONMENT = "staging"
 GRANT_CRAWLER_ADMIN_EMAILS = "irpa2412@gmail.com"
 GRANT_FEED_URLS = "[\"https://www.gov.uk/international-development-funding.atom?fund_state=open\",\"https://www.gov.uk/international-development-funding.atom?location%5B%5D=tanzania&fund_state=open\",\"https://www.gov.uk/international-development-funding.atom?eligible_entities=organisations-lmic&fund_state=open\"]"
-GRANT_SOURCE_PAGE_URLS = "[\"https://www.undp.org/tanzania/news\",\"https://www.undp.org/tanzania/press-releases\",\"https://www.thegef.org/what-we-do/topics/gef-small-grants-programme\",\"https://www.fao.org/partnerships/funding-opportunities/en\",\"https://www.eeas.europa.eu/tanzania_en\",\"https://www.mfukowamisitu.go.tz/download-center\"]"
+GRANT_SOURCE_PAGE_URLS = "[\"https://www.undp.org/tanzania/news-centre\",\"https://www.undp.org/tanzania/press-releases\",\"https://www.thegef.org/what-we-do/topics/gef-small-grants-programme\",\"https://www.fao.org/partnerships/funding-opportunities/en\",\"https://www.eeas.europa.eu/eeas/grants_en\",\"https://www.eeas.europa.eu/delegations/tanzania_en\",\"https://www.mfukowamisitu.go.tz/download-center\",\"https://www.mzv.sk/en/web/daressalaam-en/small-grants\",\"https://www.thefoundation.or.tz/what-we-do/grantmaking\",\"https://www.thefoundation.or.tz/our-platforms/smart-grants\"]"
 
 [env.staging.ai]
 binding = "AI"
@@ -51,7 +51,7 @@ workers_dev = true
 IRPA_ENVIRONMENT = "production"
 GRANT_CRAWLER_ADMIN_EMAILS = "irpa2412@gmail.com"
 GRANT_FEED_URLS = "[\"https://www.gov.uk/international-development-funding.atom?fund_state=open\",\"https://www.gov.uk/international-development-funding.atom?location%5B%5D=tanzania&fund_state=open\",\"https://www.gov.uk/international-development-funding.atom?eligible_entities=organisations-lmic&fund_state=open\"]"
-GRANT_SOURCE_PAGE_URLS = "[\"https://www.undp.org/tanzania/news\",\"https://www.undp.org/tanzania/press-releases\",\"https://www.thegef.org/what-we-do/topics/gef-small-grants-programme\",\"https://www.fao.org/partnerships/funding-opportunities/en\",\"https://www.eeas.europa.eu/tanzania_en\",\"https://www.mfukowamisitu.go.tz/download-center\"]"
+GRANT_SOURCE_PAGE_URLS = "[\"https://www.undp.org/tanzania/news-centre\",\"https://www.undp.org/tanzania/press-releases\",\"https://www.thegef.org/what-we-do/topics/gef-small-grants-programme\",\"https://www.fao.org/partnerships/funding-opportunities/en\",\"https://www.eeas.europa.eu/eeas/grants_en\",\"https://www.eeas.europa.eu/delegations/tanzania_en\",\"https://www.mfukowamisitu.go.tz/download-center\",\"https://www.mzv.sk/en/web/daressalaam-en/small-grants\",\"https://www.thefoundation.or.tz/what-we-do/grantmaking\",\"https://www.thefoundation.or.tz/our-platforms/smart-grants\"]"
 
 [env.production.ai]
 binding = "AI"
