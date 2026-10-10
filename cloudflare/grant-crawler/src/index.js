@@ -125,9 +125,11 @@ function assessFit(item) {
     { label: "women/youth inclusion", weight: 8, terms: ["women", "gender", "youth", "young people", "social inclusion"] },
     { label: "water/livelihoods", weight: 8, terms: ["water", "livelihood", "income generation", "economic empowerment", "food security"] },
     { label: "research/innovation", weight: 5, terms: ["research", "innovation", "digital", "knowledge management", "data"] },
+    { label: "digital governance/DBGS investment", weight: 25, terms: ["digital governance", "board management system", "board governance", "governance technology", "digital transformation", "civic technology", "cybersecurity", "cloud infrastructure", "digital public infrastructure", "nonprofit technology", "non-profit technology", "responsible ai", "software development", "digital capacity building"] },
   ];
   const matched = signals.filter(signal => signal.terms.some(term => text.includes(term)));
   const score = Math.min(100, matched.reduce((sum, signal) => sum + signal.weight, 0));
+  const digitalGovernanceMatch = matched.some(signal => signal.label === "digital governance/DBGS investment");
   const fitAssessment = score >= 35 ? "strong_topic_match" : score >= 15 ? "possible_topic_match" : "low_topic_match";
   const sourceIsOpenFeed = /(?:^|[?&])fund_state=open(?:&|$)/i.test(item.sourceUrl || "");
   const callStatus = text.includes("closed")
@@ -160,6 +162,8 @@ function assessFit(item) {
     score,
     fitAssessment,
     reasons: matched.map(signal => signal.label),
+    strategicTrack: digitalGovernanceMatch ? "digital_governance_DBGS_investment" : "rangeland_livestock_market_and_cross_cutting",
+    digitalGovernanceMatch,
     deadlineAt,
     callStatus,
     geographyAssessment,
@@ -209,6 +213,8 @@ async function crawl(env) {
       fitScore: item.fit.score,
       fitAssessment: item.fit.fitAssessment,
       fitReasons: item.fit.reasons,
+      strategicTrack: item.fit.strategicTrack,
+      digitalGovernanceMatch: item.fit.digitalGovernanceMatch,
       deadlineAt: item.fit.deadlineAt,
       callStatus: item.fit.callStatus,
       geographyAssessment: item.fit.geographyAssessment,
