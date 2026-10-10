@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 
 const root = process.cwd();
 const changedOnly = process.argv.includes("--changed-only");
-const extensions = new Set([".css",".scss",".html",".htm",".js",".jsx",".ts",".tsx",".vue",".svelte"]);
+const extensions = new Set([".css",".scss",".html",".htm",".js",".jsx",".ts",".tsx",".vue",".svelte",".mjs"]);
 const ignored = new Set(["node_modules",".git","dist","build","coverage",".next"]);
 const violations = [];
 const notes = [];
@@ -64,7 +64,7 @@ function auditFile(file) {
   }
 }
 const rootHtml=fs.readdirSync(root,{withFileTypes:true}).filter(e=>e.isFile() && extensions.has(path.extname(e.name).toLowerCase())).map(e=>path.join(root,e.name));
-const files=changedOnly?changedFiles():[...walk(path.join(root,"src")),...walk(path.join(root,"public")),...rootHtml].filter(f=>fs.existsSync(f));
+const files=changedOnly?changedFiles():[...walk(path.join(root,"src")),...walk(path.join(root,"public")),...walk(path.join(root,"scripts")),...rootHtml].filter(f=>fs.existsSync(f));
 if(!files.length) notes.push(changedOnly?"No changed UI/source files matched the scoped audit.":"No UI/source files were found to audit.");
 for(const file of [...new Set(files)]) auditFile(file);
 
