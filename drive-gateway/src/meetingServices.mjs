@@ -37,7 +37,6 @@ const isAdmin=claims.admin===true||email==="irpa2412@gmail.com"||adminProfile?.a
 const active=r=>r&&["active","activated"].includes(lower(r.status||r.registrationStatus||r.employmentStatus));
 const roleList=r=>[r?.role,r?.title,r?.position,r?.departmentalRole,r?.department,r?.boardPosition,...(Array.isArray(r?.roles)?r.roles:[]),...(Array.isArray(r?.assignedRoles)?r.assignedRoles:[]),...(Array.isArray(r?.selectedRoles)?r.selectedRoles:[]),...(Array.isArray(r?.roleAssignments)?r.roleAssignments:[])].flatMap(v=>clean(v).split(",")).map(v=>v.trim().toLowerCase()).filter(Boolean);
 const roles=[...roleList(member),...roleList(employee)];
-const registrars=new Set(["executive director","board secretary","board chairperson","board vice chairperson","director internal oversight","director finance & administration","director human resources","hr director","operations manager","departmental director","departmental manager","director outreach","director community development","director livestock","director environment","director field department","meeting secretary","secretary to the board"]);
 if(!isAdmin&&!(active(member)||active(employee)))return fail(ctx,request,"An active institutional identity is required to register a meeting.",403);
 const category=clean(incoming.meetingCategory||incoming.meetingPolicyId||"OTHER").toUpperCase();
 if(!["GOVERNANCE","ADMINISTRATIVE","STAFF","GENERAL","OTHER"].includes(category))return fail(ctx,request,"Choose a valid meeting category.",400);
