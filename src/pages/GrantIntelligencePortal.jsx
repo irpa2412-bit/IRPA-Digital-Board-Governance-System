@@ -96,11 +96,12 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
  },err=>{console.error("Grant opportunity subscription failed",err);setError("Grant records could not be loaded. Check your signed-in profile's Firestore access.");setLoading(false)}),[]);
  useEffect(()=>onSnapshot(doc(db,"grantCrawlerStatus","current"),snap=>setCrawlerStatus(snap.exists()?snap.data():null),err=>console.warn("Grant crawler status unavailable",err)),[]);
  useEffect(()=>onSnapshot(collection(db,"grantCrawlerSources"),snap=>setCrawlerSources(snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||"")))),err=>console.warn("Grant crawler source health unavailable",err)),[]);
- const filtered=useMemo(()=>records.filter(r=>{
+ const combinedRecords=useMemo(()=>{const seen=new Set(records.map(r=>String(r.url||"").trim()).filter(Boolean));return [...records,...crawlerRecords.filter(r=>r.url&&!seen.has(String(r.url).trim()))]},[records,crawlerRecords]);
+ const filtered=useMemo(()=>combinedRecords.filter(r=>{
    const hay=[r.title,r.funder,r.summary,r.country,r.amount].join(" ").toLowerCase();
    return (!queryText||hay.includes(queryText.toLowerCase()))&&(pillar==="all"||cleanArray(r.pillars).includes(pillar))&&(theme==="all"||cleanArray(r.themes).includes(theme))&&(status==="all"||r.status===status);
- }),[records,queryText,pillar,theme,status]);
- const counts=useMemo(()=>({open:records.filter(r=>r.status==="Open").length,review:records.filter(r=>["Under review","Application in progress"].includes(r.status)).length,submitted:records.filter(r=>["Submitted","Awarded"].includes(r.status)).length}),[records]);
+ }),[combinedRecords,queryText,pillar,theme,status]);
+ const counts=useMemo(()=>({open:combinedRecords.filter(r=>r.status==="Open").length,review:combinedRecords.filter(r=>["Under review","Application in progress"].includes(r.status)).length,submitted:combinedRecords.filter(r=>["Submitted","Awarded"].includes(r.status)).length}),[combinedRecords]);
  async function startCrawlerScan(){
    if(!isAdmin){setError("Only an administrator can trigger a manual full-source scan.");return;}
    try{
@@ -145,12 +146,12 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
    </div>
   </section>
   <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12}}>
-   {[["Tracked opportunities",records.length,"All records"],["Open calls",counts.open,"Status: Open"],["In preparation",counts.review,"Review / drafting"],["Submitted or awarded",counts.submitted,"Pipeline progress"]].map(([label,value,sub])=><div key={label} style={styles.card}><div style={styles.muted}>{label}</div><div style={{fontSize:28,fontWeight:800,margin:"7px 0"}}>{value}</div><div style={{fontSize:11,color:"#8ba2b8"}}>{sub}</div></div>)}
+   {[["Tracked opportunities",combinedRecords.length,"Firestore + Cloudflare D1"],["Open calls",counts.open,"Status: Open"],["In preparation",counts.review,"Review / drafting"],["Submitted or awarded",counts.submitted,"Pipeline progress"]].map(([label,value,sub])=><div key={label} style={styles.card}><div style={styles.muted}>{label}</div><div style={{fontSize:28,fontWeight:800,margin:"7px 0"}}>{value}</div><div style={{fontSize:11,color:"#8ba2b8"}}>{sub}</div></div>)}
   </div>
   <section style={{...styles.card,display:"grid",gap:12}} aria-labelledby="crawler-status-heading">
    <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"start",flexWrap:"wrap"}}>
     <div><div style={styles.eyebrow}>AUTOMATED SOURCE MONITOR</div><h2 id="crawler-status-heading" style={{fontSize:18,margin:"5px 0"}}>Multi-donor web crawler</h2><p style={{...styles.muted,margin:0}}>Checks public RSS/Atom feeds, public APIs and selected donor opportunity hubs every six hours. New records are unverified leads, not confirmed eligible grants.</p></div>
-    {isAdmin&&<button type="button" disabled={crawlerRunning} style={{...styles.button,opacity:crawlerRunning?0.6:1}} onClick={startCrawlerScan}>{crawlerRunning?"Scanning sources…":"Run scan now"}</button>}
+    {<div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button type="button" disabled={crawlerResultsBusy} style={{...styles.button,background:"transparent",opacity:crawlerResultsBusy?0.6:1}} onClick={()=>loadCrawlerResults(true)}>{crawlerResultsBusy?"Refreshing results…":"Refresh results"}</button>{isAdmin&&<button type="button" disabled={crawlerRunning} style={{...styles.button,opacity:crawlerRunning?0.6:1}} onClick={startCrawlerScan}>{crawlerRunning?"Scanning sources…":"Run scan now"}</button>}</div>}
    </div>
    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(145px,1fr))",gap:10}}>
     {[[ "Crawler state",crawlerStatus?.status||"Awaiting first scan"],[ "Healthy sources",String(crawlerStatus?.healthySources??0)+" / "+String(crawlerStatus?.configuredSources??11)],[ "New records last run",String(crawlerStatus?.created??0)],[ "Candidates last run",String(crawlerStatus?.candidatesFound??0)]].map(([label,value])=><div key={label} style={{border:"1px solid #344255",borderRadius:10,padding:11}}><div style={styles.muted}>{label}</div><strong style={{display:"block",fontSize:17,marginTop:5}}>{value}</strong></div>)}
@@ -188,9 +189,9 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
   </section>
   <section style={{display:"grid",gap:12}}>
    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}><h2 style={{fontSize:19,margin:0}}>Opportunity register</h2><span style={styles.muted}>{filtered.length} matching records</span></div>
-   {loading?<div style={styles.card} role="status">Loading live opportunity records…</div>:filtered.length===0?<div style={styles.card}><strong>No matching opportunities yet</strong><p style={styles.muted}>The register is empty or no records match the selected filters. Use the official source links below to check current calls, then register relevant announcements through an authorized profile.</p></div>:filtered.map(r=><article key={r.id} style={styles.card}>
+   {loading&&crawlerResultsBusy?<div style={styles.card} role="status">Loading live opportunity records and Cloudflare crawler results…</div>:filtered.length===0?<div style={styles.card}><strong>No matching opportunities yet</strong><p style={styles.muted}>No records currently match these filters. The dashboard checks both manually registered opportunities and Cloudflare crawler results. Refresh results or run a scan if authorized, then verify each call against the donor’s official guidance.</p></div>:filtered.map(r=><article key={r.id} style={styles.card}>
     <div style={{display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
-     <div style={{flex:"1 1 380px"}}><div style={styles.eyebrow}>{r.funder||"Funder not specified"} · {r.verificationStatus||"Verification status unavailable"}</div><h3 style={{fontSize:18,margin:"7px 0"}}>{r.title}</h3><p style={{...styles.muted,margin:"0 0 10px"}}>{r.summary||"No summary provided."}</p></div>
+     <div style={{flex:"1 1 380px"}}><div style={styles.eyebrow}>{r.funder||"Funder not specified"} · {r.verificationStatus||"Verification status unavailable"}{r.fitScore!==undefined?" · IRPA topic fit "+r.fitScore+"/100":""}</div><h3 style={{fontSize:18,margin:"7px 0"}}>{r.title}</h3><p style={{...styles.muted,margin:"0 0 10px"}}>{r.summary||"No summary provided."}</p></div>
      <div style={{minWidth:150}}><div style={{fontSize:12,color:"#9fb0c3"}}>Deadline</div><strong>{dateLabel(r.deadline)}</strong><div style={{fontSize:12,marginTop:8,color:"#9fb0c3"}}>Status</div><strong>{r.status||"Unclassified"}</strong></div>
     </div>
     <div style={{display:"flex",gap:5,flexWrap:"wrap",margin:"8px 0"}}>{cleanArray(r.pillars).map(id=><span key={id} style={styles.tag}>{PILLARS.find(p=>p.id===id)?.label||id}</span>)}{cleanArray(r.themes).map(id=><span key={id} style={{...styles.tag,borderColor:"#6c5b8f"}}>{THEMES.find(t=>t.id===id)?.label||id}</span>)}</div>
