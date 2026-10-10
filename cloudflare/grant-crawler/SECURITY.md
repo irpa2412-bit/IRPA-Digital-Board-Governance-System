@@ -25,7 +25,7 @@ Before enabling Firebase synchronization:
 - Configure only official donor / public-call RSS or Atom feeds that permit automated access. Respect each publisher's terms and robots/access policies.
 
 ## Required GitHub Actions secrets
-- CLOUDFLARE_API_TOKEN: token scoped to Workers Scripts and D1 management/deployment for this account only.
+- CLOUDFLARE_GRANT_CRAWLER_API_TOKEN: a dedicated Cloudflare API token for this crawler staging deployment only. Grant only Workers Scripts write/deploy and D1 edit permissions for the required account; do not reuse the production gateway token. Cloudflare token permissions may be account-scoped, so use a dedicated Cloudflare account for stronger isolation if the account's token model cannot restrict access to the crawler Worker and D1 database.
 - CLOUDFLARE_ACCOUNT_ID: target account ID.
 - GRANT_CRAWLER_CONTROL_TOKEN: random high-entropy token (at least 32 characters).
 - GRANT_CRAWLER_FEED_URLS: JSON array of approved official HTTPS RSS/Atom URLs (optional; defaults to an empty array).
