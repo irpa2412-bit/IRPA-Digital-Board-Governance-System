@@ -185,7 +185,7 @@ jobs:
 
   deploy-production:
     # This workflow may deploy only the isolated production Worker. Allow the same-repository production branch's PR validation to deploy after tests, because GitHub API commits do not reliably emit a push event. Never deploy from arbitrary fork PRs.\n    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: test
+    needs: [test, firebase-rules-test]
     runs-on: ubuntu-latest
     timeout-minutes: 25
     environment: irpa-grant-crawler-production
@@ -304,4 +304,4 @@ jobs:
             -H "Authorization: Bearer $GRANT_CRAWLER_CONTROL_TOKEN" \
             -H "Content-Type: application/json" \
             "$PRODUCTION_WORKER_URL/crawl")"
-          printf '%s' "$result" | node scripts/production-smoke-test.js
+          printf '%s' "$result" | node scripts/staging-smoke-test.js
