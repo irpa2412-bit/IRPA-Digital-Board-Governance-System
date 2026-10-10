@@ -51,6 +51,20 @@ test("authenticated document owner receives dictionary-assisted English-to-Maa o
   assert.equal(result.coverage,"partial");
 });
 
+test("authenticated document owner receives dictionary-assisted Kiswahili-to-Maa output",async()=>{
+  const response=await invoke({
+    requestData:{...requestRecord,sourceLanguage:"sw"},
+    body:{requestId:"request-1",content:"Asante kwa maji mengi sana.",sourceLanguage:"sw-TZ",targetLanguage:"maa"}
+  });
+  assert.equal(response.status,200);
+  const result=await response.json();
+  assert.equal(result.ok,true);
+  assert.equal(result.dictionaryAssisted,true);
+  assert.match(result.translatedText,/ashe/i);
+  assert.match(result.translatedText,/enkare/i);
+  assert.match(result.translatedText,/oleng/i);
+});
+
 test("document translation API rejects requests before explicit content-transfer consent",async()=>{
   const response=await invoke({requestData:{...requestRecord,status:"REQUESTED",contentTransferAuthorized:false}});
   assert.equal(response.status,409);
