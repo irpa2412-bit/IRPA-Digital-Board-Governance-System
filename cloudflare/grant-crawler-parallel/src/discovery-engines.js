@@ -85,7 +85,7 @@ export async function readOfficialPages(env) {
           const parsed = parseOfficialPage(detail.html, detail.finalUrl);
           const title = parsed.title || anchor.label;
           const description = (parsed.description + " " + anchor.context).trim().slice(0, 5000);
-          if (!GRANT_TERMS.test(title + " " + description) && !/climate|pastoral|rangeland|livestock|conservation|community|women|youth|resilience|biodiversity|agriculture/i.test(title + " " + description)) return null;
+          if (!isSpecificOpportunity(title, description)) return null;
           return { ...parsed, title, description, sourceUrl: source.finalUrl, discoveryEngine: "official_pages" };
         } catch (error) {
           errors.push({ sourceUrl: anchor.url, error: String(error.message || error).slice(0, 180) });
