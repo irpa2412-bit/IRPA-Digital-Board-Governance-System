@@ -300,6 +300,7 @@ test("AI grant assistant is authenticated and returns structured eligibility ana
   const mockAnalysis = {
     summary: "Potential fit; verify the official guidelines.",
     eligibility: { status: "possibly_eligible", confidence: "medium", evidence: ["Tanzania is in the stated geography"], unknowns: ["Minimum organizational age"] },
+    strategic_alignment: { relevant_pillars: ["Sustainable Rangeland Management"], relevant_cross_cutting_themes: ["climate change adaptation and resilience"], pillar_theme_alignment: [{ pillar: "Sustainable Rangeland Management", relevant_cross_cutting_themes: ["climate change adaptation and resilience"], rationale: "The call focuses on pastoral resilience." }], digital_governance_relevance: "none", rationale: "Direct thematic fit.", funding_use_fit: ["community-led restoration"] },
     donor_requirements: [{ requirement: "Applicant registered in Tanzania", status: "met", evidence: "Call text states Tanzania", action: "Attach current registration certificate" }],
     concept_note_structure: [{ heading: "Problem statement", purpose: "Describe the challenge", suggested_content: "Pastoral rangeland degradation in Longido", evidence_needed: ["Baseline data"] }],
     application_checklist: ["Confirm deadline"],
@@ -313,6 +314,10 @@ test("AI grant assistant is authenticated and returns structured eligibility ana
       usedModel = model;
       assert.equal(input.messages[0].role, "system");
       assert.ok(input.messages[0].content.includes("Improvement of Rangeland in Pastoral Areas"));
+      assert.ok(input.messages[0].content.includes("pillar_theme_alignment"));
+      assert.ok(input.messages[0].content.includes("Digital Board Governance System"));
+      assert.ok(input.messages[0].content.includes("Market Development"));
+      assert.ok(input.messages[0].content.includes("environmental sustainability"));
       return { response: JSON.stringify(mockAnalysis) };
     } }
   };
