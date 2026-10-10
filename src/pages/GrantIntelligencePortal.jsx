@@ -109,11 +109,12 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
      const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-staging.irpa-governance.workers.dev").replace(/\/+$/, "");
      const idToken=await auth.currentUser?.getIdToken();
      if(!idToken) throw new Error("Your session has expired. Sign in again.");
-     const response=await fetch(workerUrl.replace(/\/+$/, "")+"/run",{method:"POST",headers:{"Authorization":"Bearer "+idToken,"Content-Type":"application/json"},body:"{}"});
+     const response=await fetch(workerUrl+"/run",{method:"POST",headers:{"Authorization":"Bearer "+idToken,"Content-Type":"application/json"},body:"{}",signal:AbortSignal.timeout(90000)});
      const data=await response.json().catch(()=>({}));
      if(!response.ok) throw new Error(data.error||"Cloudflare grant crawler request failed ("+response.status+").");
-     setNotice("Grant crawler scan "+String(data.status||"finished")+". Sources checked: "+String(data.sourceCount||0)+", candidates found: "+String(data.candidatesFound||0)+", new records: "+String(data.created||0)+". Every discovered item remains pending verification.");
-   }catch(err){console.error("Manual grant crawler scan failed",err);setError(err?.message||"Manual scan failed. Check Cloud Functions deployment and administrator access.");}
+     setNotice("Grant crawler scan "+String(data.status||"finished")+". Feeds configured: "+String(data.feedsConfigured||0)+", source entries found: "+String(data.itemsSeen||0)+", records changed: "+String(data.recordsChanged||0)+". Legal eligibility remains unverified.");
+     await loadCrawlerResults(false);
+   }catch(err){console.error("Manual grant crawler scan failed",err);setError(err?.name==="TimeoutError"?"The scan exceeded 90 seconds. Refresh results and inspect crawler health before retrying.":err?.message||"Manual scan failed. Check crawler authorization and Worker health.");}
    finally{setCrawlerRunning(false);}
  }
  async function saveOpportunity(e){
