@@ -196,7 +196,7 @@ const meetingId=clean(data.meetingId),c=await context(ctx,env,token,claims,meeti
 if(!c.canRead)return fail(ctx,request,"You are not authorised to view this meeting's activity.",403);
 const [events,votes]=await Promise.all([listByField(ctx,env,token,"meetingRoomEvents","meetingId",meetingId),listByField(ctx,env,token,"votes","meetingId",meetingId)]);
 const recentEvents=events.sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||""))).slice(0,30);
-const voteClosed=["completed","closed"].includes(lower(c.meeting.votingStatus))||["completed","closed"].includes(lower(c.meeting.status));
+const activeIssue=clean(c.meeting.votingIssueId)?await getDoc(ctx,env,token,"votingIssues",clean(c.meeting.votingIssueId)):null;const voteClosed=["completed","closed"].includes(lower(c.meeting.votingStatus))||["completed","closed"].includes(lower(c.meeting.status))||lower(activeIssue?.status)==="closed";
 const visibleVotes=voteClosed?votes.map(v=>({id:v.id,votingIssueId:v.votingIssueId,meetingId:v.meetingId,meetingReference:v.meetingReference,resolutionId:v.resolutionId||null,resolutionReference:v.resolutionReference||null,votingReference:v.votingReference,outcome:v.outcome,result:v.result,status:v.status,votingMethod:v.votingMethod,anonymous:true,votedAt:iso(v.votedAt)})):[];
 return response(ctx,request,{ok:true,events:recentEvents,votes:visibleVotes,voteTallyAvailable:voteClosed});
 }
