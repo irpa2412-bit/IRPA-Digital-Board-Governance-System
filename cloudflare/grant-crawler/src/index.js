@@ -30,7 +30,7 @@ async function verifyFirebaseIdToken(token, env, requireAdmin = false) {
     });
     if (!response.ok) throw new Error("Identity verification service is temporarily unavailable.");
     const data = await response.json();
-    const maxAge = Number((response.headers.get("cache-control") || "").match(/max-age=(\\d+)/i)?.[1] || 300);
+    const maxAge = Number((response.headers.get("cache-control") || "").match(/max-age=(\d+)/i)?.[1] || 300);
     firebaseJwkCache = { keys: data.keys || [], expiresAt: now + Math.min(Math.max(maxAge, 60), 3600) };
   }
   const jwk = firebaseJwkCache.keys.find(key => key.kid === header.kid && key.kty === "RSA");
