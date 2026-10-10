@@ -88,7 +88,7 @@ async function saveDraft(request, env, uid) {
 }
 export async function handleApplicationPortal(request, env) {
   const url = new URL(request.url);
-  if (request.method === "GET" && (url.pathname === "/application" || url.pathname === "/application/")) {
+  if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/application" || url.pathname === "/application/")) {
     return new Response(APPLICATION_PORTAL_HTML, { headers: {
       "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff", "referrer-policy": "no-referrer",
       "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com; style-src 'self' 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'; object-src 'none';"
