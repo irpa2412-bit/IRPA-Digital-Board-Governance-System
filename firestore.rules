@@ -231,7 +231,19 @@ service cloud.firestore {
       &&request.resource.data.get("contentTransferred",true)==false
       &&request.resource.data.get("documentFileId","") is string&&request.resource.data.get("documentFileId","")!=""&&request.resource.data.get("documentFileName","") is string&&request.resource.data.get("documentContentType","") is string&&request.resource.data.get("documentSha256","") is string&&request.resource.data.keys().hasOnly(["requestType","documentId","documentReference","documentTitle","documentFileId","documentFileName","documentContentType","documentSha256","documentOwnerUid","requestedByUid","sourceLanguage","targetLanguage","targetLanguageLabel","requestNotes","documentClassification","documentStage","status","dictionaryAssistRequested","humanReviewRequired","contentTransferred","requestOrigin","createdAt","updatedAt"]);
     allow read:if admin()||resource.data.get("documentOwnerUid","")==request.auth.uid||translationReviewer();
-    allow update:if translationReviewer()
+    allow update:if (
+      signedIn()
+      &&resource.data.get("documentOwnerUid","")==request.auth.uid
+      &&resource.data.get("requestedByUid","")==request.auth.uid
+      &&resource.data.get("status","") in ["REQUESTED","IN_REVIEW"]
+      &&request.resource.data.get("status","")=="IN_REVIEW"
+      &&request.resource.data.get("contentTransferred",false)==true
+      &&request.resource.data.get("documentOwnerUid","")==resource.data.get("documentOwnerUid","")
+      &&request.resource.data.get("requestedByUid","")==resource.data.get("requestedByUid","")
+      &&request.resource.data.get("documentId","")==resource.data.get("documentId","")
+      &&request.resource.data.get("targetLanguage","")==resource.data.get("targetLanguage","")
+      &&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","contentTransferred","translationStartedAt","sourceLanguageResolved","processingError","translationFailedAt","translationDraftText","translationProvider","sourceTextSha256","extractedCharacterCount","translationChunks","translationCoverage","dictionaryMatchedTerms","updatedAt"])
+    ) || (translationReviewer()
       &&request.resource.data.get("documentOwnerUid","")==resource.data.get("documentOwnerUid","")
       &&request.resource.data.get("documentId","")==resource.data.get("documentId","")
       &&request.resource.data.get("requestedByUid","")==resource.data.get("requestedByUid","")
