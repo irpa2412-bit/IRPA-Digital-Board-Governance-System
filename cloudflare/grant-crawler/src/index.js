@@ -295,7 +295,7 @@ export default {
     }
     if (request.method === "GET" && url.pathname === "/opportunities") {
       try {
-        const token = String(request.headers.get("authorization") || "").replace(/^Bearer\\s+/i, "");
+        const token = String(request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
         await verifyFirebaseIdToken(token, env, false);
         return json(await listOpportunities(env));
       } catch (error) {
@@ -305,7 +305,7 @@ export default {
     if (request.method !== "POST" || !["/crawl", "/run"].includes(url.pathname)) return json({ error: "Not found" }, 404);
     if (url.pathname === "/run") {
       try {
-        const token = String(request.headers.get("authorization") || "").replace(/^Bearer\\s+/i, "");
+        const token = String(request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
         await verifyFirebaseIdToken(token, env, true);
       } catch (error) {
         return json({ error: String(error.message || "Unauthorized").slice(0, 300) }, 401);
