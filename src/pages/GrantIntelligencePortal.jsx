@@ -1,6 +1,7 @@
 import React,{useEffect,useMemo,useState} from "react";
 import {addDoc,collection,onSnapshot,serverTimestamp,updateDoc,doc} from "firebase/firestore";
-import {auth,db} from "../firebase/config";
+import app,{auth,db} from "../firebase/config";
+import {getFunctions,httpsCallable} from "firebase/functions";
 
 const PILLARS=[
  {id:"rangeland",label:"Sustainable Rangeland Management",short:"Rangeland"},
@@ -44,6 +45,9 @@ const text=v=>String(v||"").trim();
 
 export default function GrantIntelligencePortal({profile,employee,isAdmin=false}){
  const [records,setRecords]=useState([]);
+ const [crawlerStatus,setCrawlerStatus]=useState(null);
+ const [crawlerSources,setCrawlerSources]=useState([]);
+ const [crawlerRunning,setCrawlerRunning]=useState(false);
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState("");
  const [notice,setNotice]=useState("");
@@ -55,17 +59,31 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
  const [saving,setSaving]=useState(false);
  const [draft,setDraft]=useState({title:"",funder:"",url:"",deadline:"",country:"Tanzania",amount:"",summary:"",status:"Open",pillars:["rangeland"],themes:[]});
  const uid=auth.currentUser?.uid||"";
+ const functions=getFunctions(app,"us-central1");
  const roleList=[profile?.role,profile?.roles,employee?.role,employee?.roles].flatMap(v=>Array.isArray(v)?v:String(v||"").split(",")).map(v=>String(v||"").trim().toLowerCase());
  const canManage=isAdmin||roleList.some(r=>["administrator","executive director","director outreach","director finance & administration","director research","research director","research manager","fundraising officer","research officer"].includes(r));
  useEffect(()=>onSnapshot(collection(db,"grantOpportunities"),snap=>{
    const next=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>dateMillis(b.createdAt)-dateMillis(a.createdAt));
    setRecords(next);setLoading(false);setError("");
  },err=>{console.error("Grant opportunity subscription failed",err);setError("Grant records could not be loaded. Check your signed-in profile's Firestore access.");setLoading(false)}),[]);
+ useEffect(()=>onSnapshot(doc(db,"grantCrawlerStatus","current"),snap=>setCrawlerStatus(snap.exists()?snap.data():null),err=>console.warn("Grant crawler status unavailable",err)),[]);
+ useEffect(()=>onSnapshot(collection(db,"grantCrawlerSources"),snap=>setCrawlerSources(snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||"")))),err=>console.warn("Grant crawler source health unavailable",err)),[]);
  const filtered=useMemo(()=>records.filter(r=>{
    const hay=[r.title,r.funder,r.summary,r.country,r.amount].join(" ").toLowerCase();
    return (!queryText||hay.includes(queryText.toLowerCase()))&&(pillar==="all"||cleanArray(r.pillars).includes(pillar))&&(theme==="all"||cleanArray(r.themes).includes(theme))&&(status==="all"||r.status===status);
  }),[records,queryText,pillar,theme,status]);
  const counts=useMemo(()=>({open:records.filter(r=>r.status==="Open").length,review:records.filter(r=>["Under review","Application in progress"].includes(r.status)).length,submitted:records.filter(r=>["Submitted","Awarded"].includes(r.status)).length}),[records]);
+ async function startCrawlerScan(){
+   if(!isAdmin){setError("Only an administrator can trigger a manual full-source scan.");return;}
+   try{
+     setCrawlerRunning(true);setError("");setNotice("Manual donor-source scan requested. This can take several minutes.");
+     const run=httpsCallable(functions,"runGrantCrawlerNow",{timeout:540000});
+     const result=await run({});
+     const data=result.data||{};
+     setNotice("Grant crawler scan "+String(data.status||"finished")+". Sources checked: "+String(data.sourceCount||0)+", candidates found: "+String(data.candidatesFound||0)+", new records: "+String(data.created||0)+". Every discovered item remains pending verification.");
+   }catch(err){console.error("Manual grant crawler scan failed",err);setError(err?.message||"Manual scan failed. Check Cloud Functions deployment and administrator access.");}
+   finally{setCrawlerRunning(false);}
+ }
  async function saveOpportunity(e){
    e.preventDefault();if(!canManage){setError("Only designated grant-management and executive roles may publish or update opportunities.");return;}
    if(!text(draft.title)||!text(draft.funder)||!text(draft.url)||!draft.pillars.length){setError("Enter the opportunity title, funder, official source URL and at least one strategic pillar.");return;}
