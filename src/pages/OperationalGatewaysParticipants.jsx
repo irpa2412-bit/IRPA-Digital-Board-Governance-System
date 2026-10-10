@@ -40,7 +40,7 @@ export default function OperationalGatewaysParticipants(){
    let invitationId=invite.id;
    if(!invitationId){
     invitationId=await createRecord(COLLECTIONS.invitations,invite);
-    await updateRecord(COLLECTIONS.invitations,invitationId,{subscriptionLink:window.location.origin+"/?induction=1&applicant=1&route=subscription&memberInvite="+encodeURIComponent(invitationId),loginAssistanceLink:window.location.origin+"/?induction=1&applicant=1&route=assistance&memberInvite="+encodeURIComponent(invitationId)});
+    await updateRecord(COLLECTIONS.invitations,invitationId,{meetingId:payload.meetingId,participantId,subscriptionLink:window.location.origin+"/?induction=1&applicant=1&route=subscription&memberInvite="+encodeURIComponent(invitationId),loginAssistanceLink:window.location.origin+"/?induction=1&applicant=1&route=assistance&memberInvite="+encodeURIComponent(invitationId)});
    }
    await updateRecord(COLLECTIONS.invitations,invitationId,{participantId,meetingId:payload.meetingId,meetingIdentity:payload.meetingIdentity,meetingReference:payload.meetingReference,meetingTitle:m.title});
    let issuedAccess=null;
