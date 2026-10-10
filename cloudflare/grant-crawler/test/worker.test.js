@@ -25,7 +25,8 @@ test("health endpoint reports Firebase disabled and does not expose secrets", as
   });
   const body = await response.json();
   assert.equal(response.status, 200);
-  assert.equal(body.firebase, "disabled-by-design-until-dedicated-rules-and-identity-are-approved");
+  assert.equal(body.identity, "firebase-id-token-verification-only");
+  assert.equal(body.draftStorage, "cloudflare-d1");
   assert.equal(JSON.stringify(body).includes("never-echo-this-token"), false);
 });
 
