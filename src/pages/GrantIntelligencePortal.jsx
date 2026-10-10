@@ -41,14 +41,68 @@ const styles={
 const cleanArray=v=>Array.isArray(v)?v:[];
 const dateLabel=v=>{if(!v)return "Not specified";const d=v?.toDate?v.toDate():new Date(v);return Number.isNaN(d.getTime())?"Not specified":d.toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric",timeZone:"Africa/Dar_es_Salaam"});};
 const text=v=>String(v||"").trim();
+const dateKeyInTanzania=value=>{
+ if(value===undefined||value===null||value==="")return null;
+ if(typeof value==="string"){
+  const dateOnly=value.trim().match(/^(\d{4}-\d{2}-\d{2})$/);
+  if(dateOnly)return dateOnly[1];
+ }
+ const parsed=value?.toDate?value.toDate():new Date(value);
+ if(Number.isNaN(parsed.getTime()))return null;
+ const parts=new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Dar_es_Salaam",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(parsed);
+ const values=Object.fromEntries(parts.filter(part=>part.type!=="literal").map(part=>[part.type,part.value]));
+ return values.year+"-"+values.month+"-"+values.day;
+};
+const getOpportunityCurrentStatusIssue=record=>{
+ const pipelineStatus=text(record?.status).toLowerCase();
+ if(["submitted","awarded"].includes(pipelineStatus))return null;
+ const callStatus=text(record?.callStatus||record?.call_status).toLowerCase();
+ if(["expired","closed","closed_do_not_prioritize"].includes(callStatus)||(!callStatus&&["closed","expired"].includes(pipelineStatus)))return "closed";
+ const deadline=dateKeyInTanzania(record?.deadline??record?.deadline_at??record?.closingDate??record?.closeDate??record?.dueDate);
+ const today=dateKeyInTanzania(new Date());
+ if(deadline&&deadline<today)return "expired";
+ if(deadline)return null;
+ const opportunityText=[record?.title,record?.summary,record?.applicationRequirements,record?.donorRequirements].filter(Boolean).join(" ");
+ const rollingIntake=/\b(?:rolling basis|rolling applications?|year[- ]round|open throughout the year|no fixed deadline|no application deadline)\b/i.test(opportunityText);
+ if(callStatus==="open"||rollingIntake)return null;
+ if(pipelineStatus==="open"&&/\bverified\b|\bconfirmed\b/i.test(text(record?.verificationStatus)))return null;
+ return "unverified";
+};
+const isNotCurrentOpportunity=record=>Boolean(getOpportunityCurrentStatusIssue(record));
+const isCountryRestrictedForIrpa=record=>{
+ const callText=[record?.title,record?.summary,record?.applicationRequirements,record?.eligibleCountries,record?.eligibilityCriteria].flatMap(v=>Array.isArray(v)?v:[v]).filter(Boolean).join(" ").toLowerCase();
+ const geographyText=[callText,record?.country,record?.eligibleGeography].filter(Boolean).join(" ").toLowerCase();
+ const countryOnly=/\b(?:only|exclusively|restricted to|limited to|eligible only in|applicants? (?:must|should) be (?:registered|based|located) in|must be registered in|must be based in)\b[^.!?]{0,90}\b(?:south africa|south african|rsa|zimbabwe|zimbabwean)\b|\b(?:south africa|south african|rsa|zimbabwe|zimbabwean)\b[^.!?]{0,90}\b(?:only|exclusively|restricted to|limited to|based applicants?|registered applicants?|eligible applicants?|organisations? only|organizations? only)\b/i.test(geographyText);
+ if(countryOnly)return true;
+ const mentionsTarget = /\b(?:south africa|south african|rsa|zimbabwe|zimbabwean|kenya|kenyan|uganda|ugandan|rwanda|rwandan|burundi|burundian|zambia|zambian|botswana|namibia|namibian|malawi|malawian|mozambique|mozambican|lesotho|eswatini|swaziland|angola|angolan|ethiopia|ethiopian|somalia|somalian|sudan|south sudan|ghana|nigeria|senegal|cameroon|liberia|sierra leone|gambia|guinea|mali|niger|burkina faso|benin|togo|cote d.?ivoire|ivory coast|egypt|morocco|algeria|tunisia|libya|chad|eritrea|djibouti|madagascar|mauritius|seychelles|democratic republic of the congo|drc|congo|united states of america|united states|american|canada|canadian|united kingdom|british|england|scotland|wales|northern ireland|australia|australian|new zealand|new zealander|germany|german|france|french|italy|italian|spain|spanish|portugal|portuguese|netherlands|dutch|belgium|belgian|sweden|swedish|norway|norwegian|denmark|danish|finland|finnish|switzerland|swiss|austria|austrian|poland|polish|czech republic|czechia|hungary|hungarian|romania|romanian|greece|greek|turkey|turkish|ukraine|ukrainian|russia|russian|china|chinese|india|indian|japan|japanese|south korea|korean|indonesia|indonesian|philippines|filipino|vietnam|vietnamese|thailand|thai|malaysia|malaysian|singapore|singaporean|pakistan|pakistani|bangladesh|bangladeshi|nepal|nepalese|sri lanka|sri lankan|brazil|brazilian|mexico|mexican|argentina|argentinian|chile|chilean|colombia|colombian|peru|peruvian|venezuela|venezuelan|ecuador|ecuadorian|uruguay|uruguayan|paraguay|paraguayan|bolivia|bolivian|costa rica|panama|panamanian|saudi arabia|saudi|united arab emirates|uae|qatar|kuwait|oman|bahrain|israel|israeli|palestine|palestinian|jordan|jordanian|lebanon|lebanese|iraq|iraqi|iran|iranian|afghanistan|afghan|kazakhstan|uzbekistan|kyrgyzstan|tajikistan|turkmenistan|mongolia|mongolian)\b/i.test(geographyText);
+ const titleText=text(record?.title).toLowerCase();
+ const southAfricaZimbabweTitleFocus=/\b(?:south africa|south african|rsa|zimbabwe|zimbabwean)\b/i.test(titleText)&&!/\b(?:africa[- ]wide|pan[- ]african|east africa(?:n)?|sub[- ]saharan africa|global (?:grant|fund|call|programme|program)|worldwide (?:grant|call|eligibility)|open to applicants worldwide)\b/i.test(titleText);
+ const broadScope = /(?:eligible|eligibility|applicants?|organisations?|organizations?|open to|available to|applications? from|funding across|call for|within|across|throughout|for)[^.!?]{0,90}(?:east africa|east african|sub[- ]saharan africa|africa[- ]wide|across africa|pan[- ]african|continental africa|low[- ]and[- ]middle[- ]income countries|\blmics?\b|developing countries|all countries)|(?:east africa|east african|sub[- ]saharan africa|africa[- ]wide|across africa|pan[- ]african|continental africa|low[- ]and[- ]middle[- ]income countries|\blmics?\b|developing countries)[^.!?]{0,90}(?:eligible|eligibility|applicants?|organisations?|organizations?|open to|available to|funding across|call for|applications? from)|\b(?:global|worldwide|international)\s+(?:applicants?|applicant pool|eligibility|eligibility criteria)\b|\b(?:applicants?|organisations?|organizations?|applications?)\b[^.!?]{0,60}\b(?:globally|worldwide|internationally)\b|\bopen to (?:applicants?|organisations?|organizations?|applications?) worldwide\b/i.test(callText);
+ const tanzaniaEligibility=/(?:eligible countries?[^.!?]{0,100}\btanzania\b|\btanzania\b[^.!?]{0,80}(?:is an eligible country|is eligible)|applications? (?:are )?open to (?:applicants?|organisations?|organizations?|ngos?) in tanzania|applications? from tanzania|applicants? from tanzania|tanzania-based (?:ngos?|organisations?|organizations?|civil society)|(?:applicants?|organisations?|organizations?|ngos?|civil society groups?) (?:must|should|may|can) be (?:registered|based|located|operating) in tanzania|(?:applicants?|organisations?|organizations?|ngos?|civil society groups?)[^.!?]{0,80}(?:registered|based|located|operating)[^.!?]{0,50}\btanzania\b)/i.test(callText);
+return countryOnly||(!tanzaniaEligibility&&(southAfricaZimbabweTitleFocus||(mentionsTarget&&!broadScope)));
+};
 
-export default function GrantIntelligencePortal({profile,employee,isAdmin=false}){
+export default function GrantIntelligencePortal({profile,employee,isAdmin=false,onNavigate}){
  const [records,setRecords]=useState([]);
  const [crawlerRecords,setCrawlerRecords]=useState([]);
  const [crawlerResultsBusy,setCrawlerResultsBusy]=useState(false);
  const [crawlerStatus,setCrawlerStatus]=useState(null);
  const [crawlerSources,setCrawlerSources]=useState([]);
  const [crawlerRunning,setCrawlerRunning]=useState(false);
+ const [workspaceOpen,setWorkspaceOpen]=useState(false);
+ const [selectedOpportunity,setSelectedOpportunity]=useState(null);
+ const [opportunityDescription,setOpportunityDescription]=useState("");
+ const [donorRequirements,setDonorRequirements]=useState("");
+ const [analysisBusy,setAnalysisBusy]=useState(false);
+ const [analysisResult,setAnalysisResult]=useState(null);
+ const [conceptDraft,setConceptDraft]=useState("");
+ const [draftId,setDraftId]=useState("");
+ const [savedDrafts,setSavedDrafts]=useState([]);
+ const [draftAuditEvents,setDraftAuditEvents]=useState([]);
+ const [auditBusy,setAuditBusy]=useState(false);
+ const [draftsBusy,setDraftsBusy]=useState(false);
+ const [draftSaving,setDraftSaving]=useState(false);
+ const [workspaceNotice,setWorkspaceNotice]=useState("");
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState("");
  const [notice,setNotice]=useState("");
@@ -81,6 +135,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
        country:item.geography_assessment==="tanzania_mentioned"?"Tanzania":item.geography_assessment==="regional_or_lmic_scope"?"Regional / LMIC":"Not verified",
        amount:"Not stated",summary:item.description||"No description supplied in source feed.",
        status:["closed","expired"].includes(String(item.call_status||"").toLowerCase())?"Closed":item.call_status==="open"?"Open":"Under review",
+       callStatus:item.call_status||"unknown",
        pillars:["livestock/agriculture"].includes(JSON.parse(item.fit_reasons||"[]")[0])?["livestock"]:["rangeland"],
        themes:[],verificationStatus:"Pending official-call verification",sourceType:"Cloudflare crawler",
        fitScore:Number(item.fit_score||0),fitReasons:item.fit_reasons||"[]",
@@ -100,11 +155,15 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
  useEffect(()=>onSnapshot(doc(db,"grantCrawlerStatus","current"),snap=>{if(snap.exists())setCrawlerStatus(snap.data())},err=>console.warn("Legacy Firestore crawler status unavailable",err)),[]);
  useEffect(()=>onSnapshot(collection(db,"grantCrawlerSources"),snap=>setCrawlerSources(snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||"")))),err=>console.warn("Grant crawler source health unavailable",err)),[]);
  const combinedRecords=useMemo(()=>{const seen=new Set(records.map(r=>String(r.url||"").trim()).filter(Boolean));return [...records,...crawlerRecords.filter(r=>r.url&&!seen.has(String(r.url).trim()))]},[records,crawlerRecords]);
- const filtered=useMemo(()=>combinedRecords.filter(r=>{
+ const geographyEligibleRecords=useMemo(()=>combinedRecords.filter(r=>!isCountryRestrictedForIrpa(r)),[combinedRecords]);
+ const geographicExclusionCount=combinedRecords.length-geographyEligibleRecords.length;
+ const currentOpportunityRecords=useMemo(()=>geographyEligibleRecords.filter(r=>!isNotCurrentOpportunity(r)),[geographyEligibleRecords]);
+ const expiredExclusionCount=geographyEligibleRecords.length-currentOpportunityRecords.length;
+ const filtered=useMemo(()=>currentOpportunityRecords.filter(r=>{
    const hay=[r.title,r.funder,r.summary,r.country,r.amount].join(" ").toLowerCase();
    return (!queryText||hay.includes(queryText.toLowerCase()))&&(pillar==="all"||cleanArray(r.pillars).includes(pillar))&&(theme==="all"||cleanArray(r.themes).includes(theme))&&(status==="all"||r.status===status);
- }),[combinedRecords,queryText,pillar,theme,status]);
- const counts=useMemo(()=>({open:combinedRecords.filter(r=>r.status==="Open").length,review:combinedRecords.filter(r=>["Under review","Application in progress"].includes(r.status)).length,submitted:combinedRecords.filter(r=>["Submitted","Awarded"].includes(r.status)).length}),[combinedRecords]);
+ }),[currentOpportunityRecords,queryText,pillar,theme,status]);
+ const counts=useMemo(()=>({open:currentOpportunityRecords.filter(r=>r.status==="Open").length,review:currentOpportunityRecords.filter(r=>["Under review","Application in progress"].includes(r.status)).length,submitted:currentOpportunityRecords.filter(r=>["Submitted","Awarded"].includes(r.status)).length}),[currentOpportunityRecords]);
  async function startCrawlerScan(){
    if(!isAdmin){setError("Only an administrator can trigger a manual full-source scan.");return;}
    try{
@@ -120,6 +179,145 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
    }catch(err){console.error("Manual grant crawler scan failed",err);setError(err?.name==="TimeoutError"?"The scan exceeded 90 seconds. Refresh results and inspect crawler health before retrying.":err?.message||"Manual scan failed. Check crawler authorization and Worker health.");}
    finally{setCrawlerRunning(false);}
  }
+ async function loadSavedDrafts(){
+   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-staging.irpa-governance.workers.dev").replace(/\/+$/,"");
+   const idToken=await auth.currentUser?.getIdToken();
+   if(!idToken)return;
+   setDraftsBusy(true);
+   try{
+     const response=await fetch(workerUrl+"/application/drafts",{headers:{Authorization:"Bearer "+idToken,Accept:"application/json"},signal:AbortSignal.timeout(15000)});
+     const data=await response.json().catch(()=>({}));
+     if(!response.ok)throw new Error(data.error||"Saved concept notes could not be loaded.");
+     setSavedDrafts(Array.isArray(data.drafts)?data.drafts:[]);
+   }catch(err){setError(err?.message||"Saved concept notes could not be loaded.");}
+   finally{setDraftsBusy(false);}
+ }
+ function openConceptWorkspace(record=null){
+   setSelectedOpportunity(record);
+   setOpportunityDescription(text(record?.summary||record?.description||""));
+   setDonorRequirements(text(record?.applicationRequirements||record?.donorRequirements||""));
+   setAnalysisResult(null);
+   setConceptDraft("");
+   setDraftId("");
+   setWorkspaceNotice("");
+   setWorkspaceOpen(true);
+ }
+ async function loadDraftAuditEvents(id){
+   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-staging.irpa-governance.workers.dev").replace(/\/+$/,"");
+   const idToken=await auth.currentUser?.getIdToken();
+   if(!idToken||!id)return;
+   setAuditBusy(true);
+   try{
+     const response=await fetch(workerUrl+"/application/drafts/"+encodeURIComponent(id)+"/events",{headers:{Authorization:"Bearer "+idToken,Accept:"application/json"},signal:AbortSignal.timeout(15000)});
+     const data=await response.json().catch(()=>({}));
+     if(!response.ok)throw new Error(data.error||"Draft audit trail could not be loaded.");
+     setDraftAuditEvents(Array.isArray(data.events)?data.events:[]);
+   }catch(err){setError(err?.message||"Draft audit trail could not be loaded.");}
+   finally{setAuditBusy(false);}
+ }
+ function downloadConceptDraft(){
+   const draft=text(conceptDraft||analysisResult?.concept_note?.draft);
+   if(!draft){setError("Generate or enter a concept note before downloading.");return;}
+   const blob=new Blob([draft],{type:"text/plain;charset=utf-8"});
+   const href=URL.createObjectURL(blob);
+   const link=document.createElement("a");
+   link.href=href;
+   link.download="IRPA-Concept-Note-"+String(selectedOpportunity?.title||"Draft").replace(/[^A-Za-z0-9-]+/g,"-").slice(0,80)+".txt";
+   document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(href);
+   setWorkspaceNotice("Concept-note text downloaded. Upload the reviewed document through the existing DBGS Documents portal when ready.");
+ }
+ function openSavedConceptDraft(draft){
+   setDraftAuditEvents([]);
+   setSelectedOpportunity({
+     id:draft.id,
+     title:draft.opportunity?.title||draft.name||"Saved concept note",
+     url:draft.opportunity?.url||"",
+     summary:draft.opportunity?.description||"",
+     funder:"Saved concept-note draft",
+     applicationRequirements:draft.opportunity?.donorRequirements||"",
+     status:"Under review",
+     deadline:draft.opportunity?.deadline||null,
+     callStatus:draft.opportunity?.callStatus||""
+   });
+   setOpportunityDescription(text(draft.opportunity?.description||""));
+   setDonorRequirements(text(draft.opportunity?.donorRequirements||""));
+   setAnalysisResult(draft.assessment||null);
+   setConceptDraft(text(draft.applicationFields?.conceptNoteDraft||""));
+   setDraftId(draft.id);
+   setWorkspaceNotice("Loaded saved draft. Review eligibility and official call criteria before reuse.");
+   setWorkspaceOpen(true);
+   loadDraftAuditEvents(draft.id);
+ }
+ async function runWorkspaceAnalysis(task="eligibility"){
+   if(!selectedOpportunity?.title){setError("Select a grant opportunity before screening eligibility.");return;}
+   const currentStatusIssue=getOpportunityCurrentStatusIssue({...selectedOpportunity,summary:[selectedOpportunity.summary,opportunityDescription].filter(Boolean).join(" "),applicationRequirements:donorRequirements});
+   if(currentStatusIssue){
+     const stale=currentStatusIssue!=="unverified";
+     setAnalysisResult({geographic_eligibility:{status:"unclear",reason:stale?"The application deadline has passed or the call is explicitly closed/expired.":"The official deadline or current open/rolling status is not established by the supplied opportunity record.",evidence:["Deterministic deadline/status gate applied before AI analysis."]},eligibility:{status:stale?"ineligible":"insufficient_information",confidence:"high",evidence:[stale?"Expired or closed call":"Current deadline/status not verified"],unknowns:[stale?"Select a current call with a future deadline or verify that the donor has formally reopened it.":"Paste the official deadline or verify the donor's current open/rolling-intake status."]}});
+     setConceptDraft("");
+     setError(stale?"This call is expired or closed. AI analysis and concept-note drafting are blocked.":"The call's deadline/current status is unverified. Add the official deadline or confirm rolling/open status before AI analysis.");
+     setWorkspaceNotice("Deadline/current-status gate blocked this call before AI analysis.");
+     return;
+   }
+   if(isCountryRestrictedForIrpa({...selectedOpportunity,summary:[selectedOpportunity.summary,opportunityDescription].filter(Boolean).join(" "),applicationRequirements:donorRequirements})){
+     setAnalysisResult({geographic_eligibility:{status:"ineligible",reason:"This opportunity is country-focused on South Africa, Zimbabwe or another non-Tanzania country, and does not establish Tanzania eligibility. AI screening and concept-note drafting are blocked.",evidence:["Deterministic country-focus exclusion applied before AI analysis."]},eligibility:{status:"ineligible",confidence:"high",evidence:["Country-specific non-Tanzania call"],unknowns:["Find a call explicitly open to Tanzania or an eligible regional/global applicant pool."]}});
+     setConceptDraft("");
+     setError("This country-specific call is excluded for IRPA. Select a Tanzania-eligible or clearly eligible regional/global opportunity.");
+     setWorkspaceNotice("Eligibility gate blocked this call before AI analysis.");
+     return;
+   }
+   if(!text(opportunityDescription)&&!text(donorRequirements)){setError("Provide the opportunity description or paste the official donor eligibility and application criteria.");return;}
+   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-staging.irpa-governance.workers.dev").replace(/\/+$/,"");
+   const idToken=await auth.currentUser?.getIdToken();
+   if(!idToken){setError("Your session has expired. Sign in again.");return;}
+   setAnalysisBusy(true);setError("");setWorkspaceNotice(task==="concept_note"?"Checking eligibility and preparing the concept-note draft…":"Checking geographic, organizational and donor eligibility criteria…");
+   try{
+     const response=await fetch(workerUrl+"/assistant/analyze",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({task,title:selectedOpportunity.title,description:text(opportunityDescription),donorRequirements:text(donorRequirements),url:text(selectedOpportunity.url),deadline:dateKeyInTanzania(selectedOpportunity.deadline||selectedOpportunity.deadline_at)||"",callStatus:text(selectedOpportunity.callStatus||selectedOpportunity.call_status||"")}),signal:AbortSignal.timeout(90000)});
+     const data=await response.json().catch(()=>({}));
+     if(!response.ok){
+       if(data.geographic_eligibility||data.eligibility_gate)setAnalysisResult({geographic_eligibility:data.geographic_eligibility||null,eligibility_gate:data.eligibility_gate||null,eligibility:{status:data.eligibility_gate?.status==="ineligible"||data.geographic_eligibility?.status==="ineligible"?"ineligible":"insufficient_information",confidence:"high",evidence:data.geographic_eligibility?.evidence||[],unknowns:[data.geographic_eligibility?.reason||data.next_step||"Verify official eligibility criteria.",...(data.eligibility_gate?.warnings||[])]}});
+       throw new Error(data.error||"The AI eligibility analysis failed ("+response.status+").");
+     }
+     setAnalysisResult(data.assessment?{...data.assessment,eligibility_gate:data.assessment.known_eligibility_gaps||null}:null);
+     if(task==="concept_note"){
+       const generated=text(data.assessment?.concept_note?.draft);
+       setConceptDraft(generated);
+       setDraftId(id=>id||crypto.randomUUID());
+       setWorkspaceNotice(generated?"Eligibility screening completed and a concept-note draft was generated. Edit it before saving.":"Eligibility screening completed, but the model did not return a concept-note draft. Review the assessment and retry.");
+     }else{
+       setWorkspaceNotice("Eligibility screening completed. Geographic status: "+String(data.assessment?.geographic_eligibility?.status||"unclear")+". Review every requirement before drafting.");
+     }
+   }catch(err){setError(err?.name==="TimeoutError"?"The AI analysis exceeded 90 seconds. Retry after checking the staging Worker.":err?.message||"The AI eligibility analysis failed.");}
+   finally{setAnalysisBusy(false);}
+ }
+ async function saveConceptDraft(){
+   if(!selectedOpportunity?.title||!text(conceptDraft)){setError("Select an opportunity and enter a concept-note draft before saving.");return;}
+   const currentStatusIssue=getOpportunityCurrentStatusIssue({...selectedOpportunity,summary:[selectedOpportunity.summary,opportunityDescription].filter(Boolean).join(" "),applicationRequirements:donorRequirements});
+   if(currentStatusIssue){
+     setError(currentStatusIssue==="unverified"?"The official deadline/current status is unverified. A concept note cannot be saved as an active application until verified.":"This call is expired or closed. A concept note cannot be saved as an active application.");
+     return;
+   }
+   if(isCountryRestrictedForIrpa({...selectedOpportunity,summary:[selectedOpportunity.summary,opportunityDescription].filter(Boolean).join(" "),applicationRequirements:donorRequirements})){
+     setError("This country-specific non-Tanzania opportunity cannot be saved as an IRPA application concept note. Existing saved records are not deleted.");
+     return;
+   }
+   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-staging.irpa-governance.workers.dev").replace(/\/+$/,"");
+   const idToken=await auth.currentUser?.getIdToken();
+   if(!idToken){setError("Your session has expired. Sign in again.");return;}
+   const id=draftId||crypto.randomUUID();
+   setDraftSaving(true);setError("");
+   try{
+     const response=await fetch(workerUrl+"/application/drafts",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({id,name:text(selectedOpportunity.title)+" — IRPA concept note",opportunity:{title:text(selectedOpportunity.title),url:text(selectedOpportunity.url),description:text(opportunityDescription),donorRequirements:text(donorRequirements),deadline:dateKeyInTanzania(selectedOpportunity.deadline||selectedOpportunity.deadline_at)||"",callStatus:text(selectedOpportunity.callStatus||selectedOpportunity.call_status||"")},applicationFields:{conceptNoteDraft:conceptDraft,strategicAlignment:analysisResult?.strategic_alignment||{},geographicEligibility:analysisResult?.geographic_eligibility||null},assessment:analysisResult||null,finalNotes:"Draft saved in the IRPA-DBGS grant concept-note workspace. Official call eligibility and internal approvals remain to be verified."}),signal:AbortSignal.timeout(20000)});
+     const data=await response.json().catch(()=>({}));
+     if(!response.ok)throw new Error(data.error||"Concept-note draft could not be saved.");
+     setDraftId(id);
+     setWorkspaceNotice("Concept-note draft saved to the isolated Cloudflare D1 workspace; an audit event was recorded.");
+     await loadSavedDrafts();
+     await loadDraftAuditEvents(id);
+   }catch(err){setError(err?.message||"Concept-note draft could not be saved.");}
+   finally{setDraftSaving(false);}
+ }
+ useEffect(()=>{if(workspaceOpen)loadSavedDrafts()},[workspaceOpen]);
  async function saveOpportunity(e){
    e.preventDefault();if(!canManage){setError("Only designated grant-management and executive roles may publish or update opportunities.");return;}
    if(!text(draft.title)||!text(draft.funder)||!text(draft.url)||!draft.pillars.length){setError("Enter the opportunity title, funder, official source URL and at least one strategic pillar.");return;}
@@ -146,11 +344,12 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
    </div>
    <div style={{display:"flex",gap:9,flexWrap:"wrap"}}>
     {canManage&&<button style={styles.button} onClick={()=>setShowForm(v=>!v)}>{showForm?"Close form":"+ Add opportunity"}</button>}
+    <button style={styles.button} onClick={()=>openConceptWorkspace(null)}>Concept-note workspace</button>
     <button style={{...styles.button,background:"transparent"}} onClick={()=>{setQueryText("");setPillar("all");setTheme("all");setStatus("all")}}>Reset filters</button>
    </div>
   </section>
   <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12}}>
-   {[["Tracked opportunities",combinedRecords.length,"Firestore + Cloudflare D1"],["Open calls",counts.open,"Status: Open"],["In preparation",counts.review,"Review / drafting"],["Submitted or awarded",counts.submitted,"Pipeline progress"]].map(([label,value,sub])=><div key={label} style={styles.card}><div style={styles.muted}>{label}</div><div style={{fontSize:28,fontWeight:800,margin:"7px 0"}}>{value}</div><div style={{fontSize:11,color:"#8ba2b8"}}>{sub}</div></div>)}
+   {[["Eligible, unexpired opportunities",currentOpportunityRecords.length,"Expired and country-restricted calls suppressed"],["Open calls",counts.open,"Status: Open"],["In preparation",counts.review,"Review / drafting"],["Submitted or awarded",counts.submitted,"Pipeline progress"],["Country-specific calls suppressed",geographicExclusionCount,"South Africa / Zimbabwe and other non-Tanzania restrictions"],["Expired / closed / unverified calls suppressed",expiredExclusionCount,"Past deadlines, explicit closure, or no verified current deadline/status"]].map(([label,value,sub])=><div key={label} style={styles.card}><div style={styles.muted}>{label}</div><div style={{fontSize:28,fontWeight:800,margin:"7px 0"}}>{value}</div><div style={{fontSize:11,color:"#8ba2b8"}}>{sub}</div></div>)}
   </div>
   <section style={{...styles.card,display:"grid",gap:12}} aria-labelledby="crawler-status-heading">
    <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"start",flexWrap:"wrap"}}>
@@ -182,6 +381,83 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
    <fieldset style={{border:"1px solid #425064",borderRadius:10,padding:12}}><legend style={{padding:"0 6px",fontSize:12}}>Cross-cutting themes</legend><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:8}}>{THEMES.map(t=><label key={t.id} style={{display:"flex",gap:8,alignItems:"center",fontSize:12}}><input type="checkbox" checked={draft.themes.includes(t.id)} onChange={()=>toggleDraftArray("themes",t.id)}/>{t.label}</label>)}</div></fieldset>
    <div><button disabled={saving} type="submit" style={{...styles.button,opacity:saving ? 0.6 : 1}}>{saving?"Saving…":"Save opportunity"}</button></div>
   </form>}
+  {workspaceOpen&&<section style={{...styles.card,display:"grid",gap:13,borderColor:"#4e8b91"}} aria-labelledby="concept-workspace-heading">
+   <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"start",flexWrap:"wrap"}}>
+    <div><div style={styles.eyebrow}>IRPA-DBGS · APPLICATION PREPARATION</div><h2 id="concept-workspace-heading" style={{fontSize:21,margin:"5px 0"}}>AI eligibility & concept-note workspace</h2><p style={{...styles.muted,margin:0}}>Screen geography and donor requirements first. Drafting is blocked unless Tanzania or eligible regional/global coverage is established by the supplied call text.</p></div>
+    <button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>setWorkspaceOpen(false)}>Close workspace</button>
+   </div>
+   <label style={{fontSize:12}}>Funding opportunity
+    <select style={{...styles.input,marginTop:5}} value={selectedOpportunity?.id||""} onChange={e=>{const next=combinedRecords.find(r=>r.id===e.target.value);setSelectedOpportunity(next||null);setOpportunityDescription(text(next?.summary||""));setDonorRequirements(text(next?.applicationRequirements||""));setAnalysisResult(null);setConceptDraft("");setDraftId("");setWorkspaceNotice("");}}>
+     <option value="">Select an opportunity from the register…</option>
+     {selectedOpportunity?.id&&!combinedRecords.some(r=>r.id===selectedOpportunity.id)&&<option value={selectedOpportunity.id}>{selectedOpportunity.title} (saved draft)</option>}
+     {currentOpportunityRecords.map(r=><option key={r.id} value={r.id}>{r.title} — {r.country||"Geography unverified"}</option>)}
+    </select>
+   </label>
+   {selectedOpportunity&&<div style={{...styles.card,display:"grid",gap:5}}>
+    <strong>{selectedOpportunity.title}</strong>
+    <div style={styles.muted}>Funder: {selectedOpportunity.funder||"Not verified"} · Geography on record: {selectedOpportunity.country||"Not verified"}</div>
+    {selectedOpportunity.url&&<a href={selectedOpportunity.url} target="_blank" rel="noreferrer" style={{color:"#8ecad1",fontSize:13}}>Open official announcement ↗</a>}
+   </div>}
+   <label style={{fontSize:12}}>Opportunity description / call summary
+    <textarea rows="4" style={{...styles.input,marginTop:5,resize:"vertical"}} value={opportunityDescription} onChange={e=>setOpportunityDescription(e.target.value)} placeholder="Paste the official call summary, geographic scope, purpose, eligible activities and funding conditions."/>
+   </label>
+   <label style={{fontSize:12}}>Official eligibility criteria and application requirements (required for reliable screening)
+    <textarea rows="5" style={{...styles.input,marginTop:5,resize:"vertical"}} value={donorRequirements} onChange={e=>setDonorRequirements(e.target.value)} placeholder="Paste eligible countries, applicant legal status, organization age, track-record, audit/turnover, co-financing, consortium, deadline and eligible-cost rules from the official call."/>
+   </label>
+   <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+    <button type="button" disabled={analysisBusy||!selectedOpportunity} style={{...styles.button,opacity:analysisBusy||!selectedOpportunity?0.6:1}} onClick={()=>runWorkspaceAnalysis("eligibility")}>{analysisBusy?"Analyzing…":"1. Screen eligibility"}</button>
+    <button type="button" disabled={analysisBusy||!selectedOpportunity||analysisResult?.geographic_eligibility?.status!=="eligible"||analysisResult?.eligibility?.status!=="eligible"} style={{...styles.button,background:"#285d45",opacity:analysisBusy||!selectedOpportunity||analysisResult?.geographic_eligibility?.status!=="eligible"||analysisResult?.eligibility?.status!=="eligible"?0.55:1}} onClick={()=>runWorkspaceAnalysis("concept_note")}>2. Generate concept note</button>
+    <button type="button" disabled={draftsBusy} style={{...styles.button,background:"transparent",opacity:draftsBusy?0.6:1}} onClick={loadSavedDrafts}>{draftsBusy?"Loading drafts…":"Refresh saved drafts"}</button>
+   </div>
+   {workspaceNotice&&<div role="status" style={{...styles.card,borderColor:"#32846d",color:"#8de0b7"}}>{workspaceNotice}</div>}
+   {analysisResult&&<section style={{...styles.card,display:"grid",gap:10}}>
+    <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}><h3 style={{fontSize:17,margin:0}}>Eligibility assessment</h3><span style={{...styles.tag,borderColor:analysisResult.geographic_eligibility?.status==="eligible"?"#32846d":analysisResult.geographic_eligibility?.status==="ineligible"?"#b65c5c":"#b78b3d"}}>Geography: {analysisResult.geographic_eligibility?.status||"not assessed"}</span>{analysisResult.eligibility?.status&&<span style={styles.tag}>Overall: {analysisResult.eligibility.status.replaceAll("_"," ")}</span>}</div>
+    {analysisResult.geographic_eligibility?.reason&&<p style={{...styles.muted,margin:0}}>{analysisResult.geographic_eligibility.reason}</p>}
+    {analysisResult.geographic_eligibility?.evidence?.length>0&&<ul style={{...styles.muted,margin:"0 0 0 18px"}}>{analysisResult.geographic_eligibility.evidence.map((item,i)=><li key={i}>{item}</li>)}</ul>}
+    {(analysisResult.eligibility_gate?.blockers?.length>0||analysisResult.eligibility_gate?.warnings?.length>0)&&<div><strong style={{fontSize:13}}>Eligibility blockers and warnings</strong><ul style={{...styles.muted,margin:"5px 0 0 18px"}}>{(analysisResult.eligibility_gate.blockers||[]).map((item,i)=><li key={"b"+i}>BLOCKER: {item}</li>)}{(analysisResult.eligibility_gate.warnings||[]).map((item,i)=><li key={"w"+i}>VERIFY: {item}</li>)}</ul></div>}
+    {analysisResult.eligibility?.evidence?.length>0&&<div><strong style={{fontSize:13}}>Evidence</strong><ul style={{...styles.muted,margin:"5px 0 0 18px"}}>{analysisResult.eligibility.evidence.map((item,i)=><li key={i}>{item}</li>)}</ul></div>}
+    {analysisResult.eligibility?.unknowns?.length>0&&<div><strong style={{fontSize:13}}>Unresolved eligibility questions</strong><ul style={{...styles.muted,margin:"5px 0 0 18px"}}>{analysisResult.eligibility.unknowns.map((item,i)=><li key={i}>{item}</li>)}</ul></div>}
+    {analysisResult.donor_requirements?.length>0&&<div><strong style={{fontSize:13}}>Donor requirement matrix</strong><div style={{display:"grid",gap:7,marginTop:7}}>{analysisResult.donor_requirements.map((item,i)=><div key={i} style={{borderTop:"1px solid #344255",paddingTop:7}}><div style={{display:"flex",gap:8,justifyContent:"space-between",flexWrap:"wrap"}}><strong style={{fontSize:12}}>{item.requirement}</strong><span style={styles.tag}>{String(item.status||"unknown").replaceAll("_"," ")}</span></div><p style={{...styles.muted,margin:"4px 0"}}>{item.evidence||"Evidence not supplied."}</p>{item.action&&<p style={{...styles.muted,margin:0}}>Next action: {item.action}</p>}</div>)}</div></div>}
+    {analysisResult.strategic_alignment&&<div><strong style={{fontSize:13}}>IRPA Strategic Plan alignment</strong><p style={{...styles.muted,margin:"5px 0"}}>{analysisResult.strategic_alignment.rationale}</p><div style={{display:"flex",gap:5,flexWrap:"wrap"}}>{(analysisResult.strategic_alignment.relevant_pillars||[]).map((item,i)=><span key={i} style={styles.tag}>{item}</span>)}{(analysisResult.strategic_alignment.relevant_cross_cutting_themes||[]).map((item,i)=><span key={"t"+i} style={{...styles.tag,borderColor:"#6c5b8f"}}>{item}</span>)}</div></div>}
+    {analysisResult.application_checklist?.length>0&&<div><strong style={{fontSize:13}}>Application checklist</strong><ul style={{...styles.muted,margin:"5px 0 0 18px"}}>{analysisResult.application_checklist.map((item,i)=><li key={i}>{item}</li>)}</ul></div>}
+    {analysisResult.risks_and_gaps?.length>0&&<div><strong style={{fontSize:13}}>Risks and evidence gaps</strong><ul style={{...styles.muted,margin:"5px 0 0 18px"}}>{analysisResult.risks_and_gaps.map((item,i)=><li key={i}>{item}</li>)}</ul></div>}
+   </section>}
+   {(conceptDraft||analysisResult?.concept_note?.draft)&&<section style={{...styles.card,display:"grid",gap:8}}>
+    <h3 style={{fontSize:17,margin:0}}>Editable concept-note draft</h3>
+    <p style={{...styles.muted,margin:0}}>This is a working draft, not an approved IRPA submission. Verify figures, evidence, eligibility, budgets and donor instructions before circulation.</p>
+    <textarea aria-label="Editable concept-note draft" rows="16" style={{...styles.input,resize:"vertical",fontFamily:"inherit",lineHeight:1.6}} value={conceptDraft||analysisResult?.concept_note?.draft||""} onChange={e=>setConceptDraft(e.target.value)}/>
+    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+     <button type="button" disabled={draftSaving||!text(conceptDraft||analysisResult?.concept_note?.draft)} style={{...styles.button,opacity:draftSaving?0.6:1}} onClick={saveConceptDraft}>{draftSaving?"Saving draft…":"Save draft to Cloudflare workspace"}</button>
+     <button type="button" style={{...styles.button,background:"transparent"}} onClick={downloadConceptDraft}>Download .txt for DBGS Documents</button>
+     <button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>{if(!navigator.clipboard?.writeText){setError("Clipboard access is unavailable in this browser.");return;}navigator.clipboard.writeText(conceptDraft||analysisResult?.concept_note?.draft||"").then(()=>setWorkspaceNotice("Concept-note text copied to clipboard.")).catch(()=>setError("Clipboard access was blocked by the browser."));}}>Copy concept-note text</button>
+    </div>
+   </section>}
+   <section style={{display:"grid",gap:8}}>
+    <div style={{display:"flex",justifyContent:"space-between",gap:10,alignItems:"center",flexWrap:"wrap"}}><h3 style={{fontSize:16,margin:0}}>My saved concept-note drafts</h3><span style={styles.muted}>{savedDrafts.length} saved</span></div>
+    {draftsBusy&&<div style={styles.muted}>Loading drafts from the Cloudflare workspace…</div>}
+    {!draftsBusy&&!savedDrafts.length&&<div style={styles.muted}>No saved drafts yet. Screen a grant, generate a concept note and save the draft here.</div>}
+    {savedDrafts.map(draft=><div key={draft.id} style={{border:"1px solid #344255",borderRadius:10,padding:11,display:"flex",justifyContent:"space-between",gap:10,alignItems:"center",flexWrap:"wrap"}}><div><strong style={{fontSize:13}}>{draft.name||draft.opportunity?.title||"Untitled concept note"}</strong><div style={styles.muted}>Status: {draft.status||"draft"} · Updated: {dateLabel(draft.updated_at||draft.updatedAt||draft.created_at)}</div></div><button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>openSavedConceptDraft(draft)}>Open draft</button></div>)}
+   </section>
+   <section style={{...styles.card,display:"grid",gap:9}}>
+    <div><strong style={{fontSize:14}}>Draft audit trail</strong><p style={{...styles.muted,margin:"4px 0"}}>Append-only Cloudflare D1 events record when this draft was created or updated, without copying the full concept-note text into the event log.</p></div>
+    {auditBusy&&<div style={styles.muted}>Loading draft audit events…</div>}
+    {!auditBusy&&draftId&&!draftAuditEvents.length&&<div style={styles.muted}>No audit events loaded yet. Save the draft or reopen it to retrieve the event history.</div>}
+    {!draftId&&<div style={styles.muted}>Save the draft to create its first audit event.</div>}
+    {draftAuditEvents.map((event,i)=><div key={event.createdAt+"-"+i} style={{borderTop:"1px solid #344255",paddingTop:7}}><strong style={{fontSize:12}}>{String(event.eventType||"draft_event").replaceAll("_"," ")}</strong><div style={styles.muted}>{dateLabel(event.createdAt)} · Eligibility: {event.eligibilityStatus||"not assessed"} · Geography: {event.geographicEligibility||"not assessed"}</div></div>)}
+   </section>
+   <section style={{...styles.card,display:"grid",gap:9}}>
+    <strong style={{fontSize:14}}>Related DBGS governance modules</strong>
+    <p style={{...styles.muted,margin:0}}>Use the existing modules to file supporting documents, prepare budget details and route the draft for formal internal review. These navigation links do not automatically submit or approve the concept note.</p>
+    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+     <button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>onNavigate?.("Documents")}>Open Documents</button>
+     <button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>onNavigate?.("Finance Portfolio")}>Open Finance Portfolio</button>
+     <button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>onNavigate?.("Authorization & Approvals")}>Open Authorization & Approvals</button>
+     <button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>onNavigate?.("Meetings")}>Open Meetings</button>
+    </div>
+   </section>
+   <div style={{...styles.muted,borderLeft:"3px solid #b78b3d",padding:"8px 12px"}}><strong>Governance control:</strong> saved drafts remain drafts in the isolated Cloudflare D1 workspace. Saving does not submit an application, approve expenditure, authorize a commitment, or replace IRPA's formal internal review and approval procedures.</div>
+  </section>}
+
   <section style={{...styles.card,display:"grid",gap:12}}>
    <h2 style={{margin:0,fontSize:18}}>Find matching opportunities</h2>
    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:10}}>
@@ -199,7 +475,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
      <div style={{minWidth:150}}><div style={{fontSize:12,color:"#9fb0c3"}}>Deadline</div><strong>{dateLabel(r.deadline)}</strong><div style={{fontSize:12,marginTop:8,color:"#9fb0c3"}}>Status</div><strong>{r.status||"Unclassified"}</strong></div>
     </div>
     <div style={{display:"flex",gap:5,flexWrap:"wrap",margin:"8px 0"}}>{cleanArray(r.pillars).map(id=><span key={id} style={styles.tag}>{PILLARS.find(p=>p.id===id)?.label||id}</span>)}{cleanArray(r.themes).map(id=><span key={id} style={{...styles.tag,borderColor:"#6c5b8f"}}>{THEMES.find(t=>t.id===id)?.label||id}</span>)}</div>
-    <div style={{display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap",alignItems:"center"}}><span style={styles.muted}>Geography: {r.country||"Not specified"} · Funding: {r.amount||"Not specified"} · Updated: {dateLabel(r.updatedAt||r.createdAt)}</span><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><a href={r.url} target="_blank" rel="noreferrer" style={{...styles.button,textDecoration:"none",display:"inline-block"}}>Open official call ↗</a>{canManage&&r.sourceType!=="Cloudflare crawler"&&<select aria-label={"Update status for "+r.title} style={{...styles.input,width:"auto"}} value={r.status||"Open"} onChange={e=>changeStatus(r,e.target.value)}>{statusOptions.map(s=><option key={s}>{s}</option>)}</select>}</div></div>
+    <div style={{display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap",alignItems:"center"}}><span style={styles.muted}>Geography: {r.country||"Not specified"} · Funding: {r.amount||"Not specified"} · Updated: {dateLabel(r.updatedAt||r.createdAt)}</span><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>openConceptWorkspace(r)}>Screen eligibility / draft</button><a href={r.url} target="_blank" rel="noreferrer" style={{...styles.button,textDecoration:"none",display:"inline-block"}}>Open official call ↗</a>{canManage&&r.sourceType!=="Cloudflare crawler"&&<select aria-label={"Update status for "+r.title} style={{...styles.input,width:"auto"}} value={r.status||"Open"} onChange={e=>changeStatus(r,e.target.value)}>{statusOptions.map(s=><option key={s}>{s}</option>)}</select>}</div></div>
    </article>)}
   </section>
   <section style={styles.card}>
