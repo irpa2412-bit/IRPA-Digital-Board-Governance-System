@@ -26,32 +26,33 @@ const IRPA_PROFILE = {
 };
 
 function assessGeographicEligibility(opportunity) {
-  const text = [opportunity.title, opportunity.description, opportunity.donorRequirements, opportunity.url]
+  const opportunityText = [opportunity.title, opportunity.description, opportunity.donorRequirements]
     .filter(Boolean).join(" ").toLowerCase();
-  const broadScope = /\beast africa\b|\beast african\b|sub[- ]saharan africa|africa[- ]wide|across africa|pan[- ]african|continental africa|global|worldwide|international(?:ly)? eligible|low[- ]and[- ]middle[- ]income countries|\blmics?\b|developing countries|eligible in all countries/i.test(text);
-  const explicitTanzaniaEligibility = /(?:eligible|eligibility|applicant|applicants|organisation|organization|ngo|civil society|registered|based|operating|located|country|countries|geography|geographic)[^.!?]{0,100}\btanzania\b|\btanzania\b[^.!?]{0,100}(?:eligible|eligibility|applicant|applicants|organisation|organization|ngo|civil society|registered|based|operating|located|country|countries|geography|geographic)/i.test(text);
-  const hardCountryOnly = /\b(?:only|exclusively|restricted to|limited to|eligible only in|applicants? (?:must|should) be (?:registered|based|located) in|must be registered in|must be based in)\b[^.!?]{0,90}\b(?:south africa|south african|rsa|zimbabwe|zimbabwean)\b|\b(?:south africa|south african|rsa|zimbabwe|zimbabwean)\b[^.!?]{0,90}\b(?:only|exclusively|restricted to|limited to|based applicants?|registered applicants?|eligible applicants?|organisations? only|organizations? only)\b/i.test(text);
-  const countrySpecific = /\b(?:south africa|south african|rsa|zimbabwe|zimbabwean|kenya|kenyan|uganda|ugandan|rwanda|rwandan|burundi|burundian|zambia|zambian|botswana|namibia|namibian|malawi|malawian|mozambique|mozambican|lesotho|eswatini|swaziland|angola|angolan|ethiopia|ethiopian|somalia|somalian|sudan|south sudan|ghana|nigeria|senegal|cameroon|liberia|sierra leone|gambia|guinea|mali|niger|burkina faso|benin|togo|cote d.?ivoire|ivory coast|egypt|morocco|algeria|tunisia|libya|chad|eritrea|djibouti|madagascar|mauritius|seychelles|democratic republic of the congo|drc|congo)\b/i.test(text);
+  const sourceText = [opportunity.url].filter(Boolean).join(" ").toLowerCase();
+  const broadScope = /(?:eligible|eligibility|applicants?|organisations?|organizations?|open to|available to|across|throughout|for|within)[^.!?]{0,90}(?:east africa|east african|sub[- ]saharan africa|africa[- ]wide|across africa|pan[- ]african|continental africa|global|worldwide|international|low[- ]and[- ]middle[- ]income countries|\blmics?\b|developing countries|all countries)|(?:east africa|east african|sub[- ]saharan africa|africa[- ]wide|across africa|pan[- ]african|continental africa|global|worldwide|international|low[- ]and[- ]middle[- ]income countries|\blmics?\b|developing countries)[^.!?]{0,90}(?:eligible|eligibility|applicants?|organisations?|organizations?|open to|available to|funding across|call for|applications? from)/i.test(opportunityText);
+  const explicitTanzaniaEligibility = /(?:eligible countries?[^.!?]{0,100}\btanzania\b|\btanzania\b[^.!?]{0,80}(?:is an eligible country|is eligible)|applications? (?:are )?open to (?:applicants?|organisations?|organizations?|ngos?) in tanzania|applications? from tanzania|tanzania-based (?:ngos?|organisations?|organizations?|civil society)|(?:applicants?|organisations?|organizations?|ngos?|civil society groups?) (?:must|should|may|can) be (?:registered|based|located|operating) in tanzania|(?:registered|based|located) in tanzania[^.!?]{0,80}(?:eligible|applicants?|organisations?|organizations?|ngos?))/i.test(opportunityText);
+  const hardCountryOnly = /\b(?:only|exclusively|restricted to|limited to|eligible only in|applicants? (?:must|should) be (?:registered|based|located) in|must be registered in|must be based in)\b[^.!?]{0,90}\b(?:south africa|south african|rsa|zimbabwe|zimbabwean)\b|\b(?:south africa|south african|rsa|zimbabwe|zimbabwean)\b[^.!?]{0,90}\b(?:only|exclusively|restricted to|limited to|based applicants?|registered applicants?|eligible applicants?|organisations? only|organizations? only)\b/i.test(opportunityText+" "+sourceText);
+  const countrySpecific = /\b(?:south africa|south african|rsa|zimbabwe|zimbabwean|kenya|kenyan|uganda|ugandan|rwanda|rwandan|burundi|burundian|zambia|zambian|botswana|namibia|namibian|malawi|malawian|mozambique|mozambican|lesotho|eswatini|swaziland|angola|angolan|ethiopia|ethiopian|somalia|somalian|sudan|south sudan|ghana|nigeria|senegal|cameroon|liberia|sierra leone|gambia|guinea|mali|niger|burkina faso|benin|togo|cote d.?ivoire|ivory coast|egypt|morocco|algeria|tunisia|libya|chad|eritrea|djibouti|madagascar|mauritius|seychelles|democratic republic of the congo|drc|congo)\b/i.test(opportunityText+" "+sourceText);
   if (hardCountryOnly || (countrySpecific && !broadScope && !explicitTanzaniaEligibility)) {
     return {
       status: "ineligible",
       reason: "The supplied call text appears restricted to a country other than Tanzania; the opportunity is excluded from IRPA's eligible shortlist.",
-      evidence: [hardCountryOnly ? "Explicit country-only restriction detected." : "A country-specific scope was detected without clear Tanzania eligibility or broader regional/global eligibility."],
+      evidence: [hardCountryOnly ? "Explicit country-only restriction detected." : "A country-specific scope was detected without clear Tanzania eligibility or broader regional/global applicant eligibility."],
       holdConceptNote: true
     };
   }
   if (broadScope || explicitTanzaniaEligibility) {
     return {
       status: "eligible",
-      reason: broadScope ? "The supplied text states a regional, Africa-wide, LMIC, or global scope." : "The supplied text explicitly connects Tanzania to applicant or geographic eligibility.",
-      evidence: [broadScope ? "Broad geographic eligibility language detected." : "Tanzania eligibility language detected."],
+      reason: broadScope ? "The supplied call text states an eligible regional, Africa-wide, LMIC, or global applicant pool." : "The supplied text explicitly connects Tanzania to applicant or geographic eligibility.",
+      evidence: [broadScope ? "Explicit broad geographic eligibility language detected." : "Explicit Tanzania applicant-eligibility language detected."],
       holdConceptNote: false
     };
   }
   return {
     status: "unclear",
     reason: "The supplied text does not establish that Tanzania-based IRPA is eligible. Verify the official call's eligible-country list before drafting.",
-    evidence: ["No explicit Tanzania eligibility or sufficiently broad regional/global scope was detected."],
+    evidence: ["No explicit Tanzania eligibility or sufficiently broad regional/global applicant scope was detected."],
     holdConceptNote: true
   };
 }
