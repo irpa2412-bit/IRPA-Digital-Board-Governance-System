@@ -28,6 +28,9 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+
+      - name: Mandatory full-source readability and contrast check
+        run: npm run check:production-readability
       - name: Build production application
         env:
           VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
@@ -35,6 +38,9 @@ jobs:
           VITE_GATEWAY_ORIGIN: ${{ secrets.VITE_GATEWAY_ORIGIN || 'https://irpa-google-drive-gateway.irpa-governance.workers.dev' }}
           VITE_GOOGLE_WEATHER_API_KEY: ${{ secrets.VITE_GOOGLE_WEATHER_API_KEY }}
         run: npm run build
+
+      - name: Independent production readability verification
+        run: npm run verify:production-readability
       - name: Verify build output
         run: |
           set -euo pipefail
