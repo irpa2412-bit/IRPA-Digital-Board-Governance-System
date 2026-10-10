@@ -1,0 +1,56 @@
+name: IRPA-DBGS Readability Release Gate
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: irpa-readability-gate-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  readability-and-contrast:
+    name: Readability Checker and Independent Verifier
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout source and base history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Syntax-check checker and verifier
+        run: node --check scripts/check-production-readability.mjs && node --check scripts/verify-production-readability.mjs
+      - name: Run mandatory full-source readability and contrast audit
+        run: npm run check:production-readability
+      - name: Build production artifact
+        env:
+          VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
+          VITE_GOOGLE_DRIVE_GATEWAY_URL: ${{ secrets.VITE_GOOGLE_DRIVE_GATEWAY_URL }}
+          VITE_GATEWAY_ORIGIN: ${{ secrets.VITE_GATEWAY_ORIGIN || 'https://irpa-google-drive-gateway.irpa-governance.workers.dev' }}
+          VITE_GOOGLE_WEATHER_API_KEY: ${{ secrets.VITE_GOOGLE_WEATHER_API_KEY }}
+        run: npm run build
+      - name: Run independent full-production artifact verifier
+        run: npm run verify:production-readability
+      - name: Upload audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: irpa-dbgs-readability-verification-${{ github.run_id }}
+          path: |
+            artifacts/*.json
+            dist/index.html
+          if-no-files-found: ignore
+          retention-days: 30

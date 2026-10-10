@@ -18,7 +18,13 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm install
+
+      - name: Mandatory full-source readability and contrast check
+        run: npm run check:production-readability
       - name: Production build
         run: npm run build
+
+      - name: Independent production readability verification
+        run: npm run verify:production-readability
       - name: Verify Firebase Hosting output
         run: test -f dist/index.html

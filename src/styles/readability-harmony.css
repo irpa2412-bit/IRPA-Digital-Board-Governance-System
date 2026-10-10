@@ -72,7 +72,7 @@ p,li,td,th,label,small,button,input,select,textarea{
 /* Navigation hierarchy: clearer group titles, labels and active state. */
 .nav-group-title{
   color:#9bb1a9!important;
-  font-size:10px!important;
+  font-size:12px!important;
   line-height:1.35!important;
   letter-spacing:.14em!important;
 }
@@ -385,7 +385,7 @@ textarea:focus-visible{
     line-height:1.45!important;
   }
   .content-area button{font-size:13px!important;line-height:1.4!important;}
-  .content-area table th{font-size:11px!important;}
+  .content-area table th{font-size:12px!important;}
   .content-area table td{font-size:13px!important;}
   .auth-card{padding:24px!important;}
 }
@@ -525,7 +525,7 @@ textarea:focus-visible{
   opacity:1!important;
 }
 .desktop-date-card small{
-  font-size:11px!important;
+  font-size:12px!important;
   line-height:1.4!important;
   color:#e6f0ec!important;
   opacity:1!important;
@@ -536,16 +536,16 @@ textarea:focus-visible{
 }
 [aria-label="Login category"] > span:first-child{
   color:#dce8e3!important;
-  font-size:11px!important;
+  font-size:12px!important;
 }
 [aria-label="Login category"] small{
   color:#b9d9ef!important;
-  font-size:10px!important;
+  font-size:12px!important;
 }
 @media(max-width:760px){
   .desktop-date-card strong{font-size:14px!important;}
   .desktop-date-card span{font-size:12px!important;}
-  .desktop-date-card small{font-size:10px!important;}
+  .desktop-date-card small{font-size:12px!important;}
 }
 
 
@@ -592,7 +592,7 @@ textarea:focus-visible{
 }
 .content-area:not(.dashboard-content-area) .page .stat-card small{
   color:#e8f4ff!important;
-  font-size:11px!important;
+  font-size:12px!important;
   line-height:1.45!important;
   font-weight:650!important;
 }
@@ -635,7 +635,7 @@ textarea:focus-visible{
 }
 .sidebar .nav-group-title{
   color:#b6c9c2!important;
-  font-size:11px!important;
+  font-size:12px!important;
   line-height:1.35!important;
   font-weight:850!important;
   letter-spacing:.13em!important;
@@ -839,7 +839,7 @@ textarea:focus-visible{
   white-space:normal!important;
 }
 .dashboard-live-date-slot .live-date-stat-buttons .desktop-blue-nav-button small{
-  font-size:11px!important;
+  font-size:12px!important;
   line-height:1.25!important;
   margin-top:4px!important;
 }
@@ -883,7 +883,7 @@ textarea:focus-visible{
   white-space:normal!important;
 }
 .dashboard-live-date-slot .live-date-stat-buttons .desktop-blue-nav-button small{
-  font-size:10px!important;
+  font-size:12px!important;
   line-height:1.2!important;
   margin-top:3px!important;
 }
@@ -927,7 +927,7 @@ textarea:focus-visible{
   display:block!important;
   margin-top:6px!important;
   color:#c2d8cf!important;
-  font-size:11px!important;
+  font-size:12px!important;
   line-height:1.25!important;
   font-style:normal!important;
   font-weight:600!important;
@@ -975,7 +975,7 @@ textarea:focus-visible{
 .topbar .open-portal-panel span{
   display:block!important;
   color:#f4d474!important;
-  font-size:10px!important;
+  font-size:12px!important;
   line-height:1.25!important;
   font-weight:850!important;
   letter-spacing:.14em!important;
@@ -1214,7 +1214,7 @@ textarea:focus-visible{
 }
 @media(max-width:760px){
   .sidebar .nav-group-title{
-    font-size:11px!important;
+    font-size:12px!important;
     font-weight:900!important;
   }
   .sidebar .nav-item{
@@ -1582,7 +1582,7 @@ textarea:focus-visible{
   flex:0 0 auto!important;
   margin:0 0 7px!important;
   color:#174ea6!important;
-  font-size:10px!important;
+  font-size:12px!important;
   line-height:1.2!important;
   font-weight:850!important;
   letter-spacing:.14em!important;
@@ -1632,7 +1632,7 @@ textarea:focus-visible{
   display:block!important;
   margin-top:3px!important;
   color:#3c4043!important;
-  font-size:11px!important;
+  font-size:12px!important;
   line-height:1.2!important;
   font-weight:700!important;
   white-space:nowrap!important;
@@ -1643,7 +1643,7 @@ textarea:focus-visible{
   display:block!important;
   margin-top:3px!important;
   color:#5f6368!important;
-  font-size:9px!important;
+  font-size:12px!important;
   line-height:1.2!important;
   white-space:nowrap!important;
 }
@@ -1654,7 +1654,7 @@ textarea:focus-visible{
   gap:5px!important;
   max-width:48%!important;
   color:#3c4043!important;
-  font-size:9px!important;
+  font-size:12px!important;
   line-height:1.2!important;
 }
 .topbar .google-weather-panel .live-weather-metrics span{
@@ -1682,14 +1682,14 @@ textarea:focus-visible{
 .topbar .google-weather-panel .live-weather-day strong{
   display:block!important;
   color:#1a73e8!important;
-  font-size:8px!important;
+  font-size:12px!important;
   line-height:1.1!important;
 }
 .topbar .google-weather-panel .live-weather-day span{
   display:block!important;
   margin-top:3px!important;
   color:#3c4043!important;
-  font-size:8px!important;
+  font-size:12px!important;
   line-height:1.15!important;
   white-space:nowrap!important;
   overflow:hidden!important;
@@ -1699,14 +1699,14 @@ textarea:focus-visible{
   display:block!important;
   margin-top:3px!important;
   color:#202124!important;
-  font-size:9px!important;
+  font-size:12px!important;
   line-height:1.1!important;
 }
 .topbar .google-weather-panel .live-weather-day small{
   display:block!important;
   margin-top:3px!important;
   color:#5f6368!important;
-  font-size:7px!important;
+  font-size:12px!important;
   line-height:1.1!important;
 }
 .topbar .google-weather-panel .live-weather-attribution{
@@ -1715,13 +1715,13 @@ textarea:focus-visible{
   gap:8px!important;
   margin-top:6px!important;
   color:#5f6368!important;
-  font-size:7px!important;
+  font-size:12px!important;
   line-height:1.1!important;
 }
 .topbar .google-weather-panel .live-weather-attribution small{
   margin:0!important;
   color:#5f6368!important;
-  font-size:7px!important;
+  font-size:12px!important;
   line-height:1.1!important;
 }
 @media(min-width:761px) and (max-width:1100px){
@@ -1773,13 +1773,13 @@ textarea:focus-visible{
 }
 .topbar .google-weather-panel .live-weather-current-main small{
   color:#334e68!important;
-  font-size:11px!important;
+  font-size:12px!important;
   line-height:1.25!important;
   font-weight:700!important;
 }
 .topbar .google-weather-panel .live-weather-metrics{
   color:#17324d!important;
-  font-size:11px!important;
+  font-size:12px!important;
   line-height:1.25!important;
   font-weight:750!important;
 }
@@ -1792,19 +1792,19 @@ textarea:focus-visible{
 }
 .topbar .google-weather-panel .live-weather-day strong{
   color:#0b57d0!important;
-  font-size:10px!important;
+  font-size:12px!important;
   line-height:1.2!important;
   font-weight:900!important;
 }
 .topbar .google-weather-panel .live-weather-day span{
   color:#17324d!important;
-  font-size:10px!important;
+  font-size:12px!important;
   line-height:1.25!important;
   font-weight:750!important;
 }
 .topbar .google-weather-panel .live-weather-day b{
   color:#0b1f33!important;
-  font-size:11px!important;
+  font-size:12px!important;
   line-height:1.2!important;
   font-weight:900!important;
 }
@@ -1812,7 +1812,7 @@ textarea:focus-visible{
 .topbar .google-weather-panel .live-weather-attribution,
 .topbar .google-weather-panel .live-weather-attribution small{
   color:#334e68!important;
-  font-size:9px!important;
+  font-size:12px!important;
   line-height:1.2!important;
   font-weight:700!important;
 }
@@ -1885,7 +1885,7 @@ textarea:focus-visible{
   display:block!important;
   margin:3px 0 7px!important;
   color:#5f6368!important;
-  font-size:9px!important;
+  font-size:12px!important;
   line-height:1.25!important;
   font-weight:700!important;
 }
@@ -1907,13 +1907,13 @@ textarea:focus-visible{
 }
 .topbar .google-weather-panel .live-weather-location-popup>button>span{
   color:#17324d!important;
-  font-size:11px!important;
+  font-size:12px!important;
   font-weight:850!important;
 }
 .topbar .google-weather-panel .live-weather-location-popup>button>small{
   margin:0!important;
   color:#5f6368!important;
-  font-size:8px!important;
+  font-size:12px!important;
   font-weight:700!important;
 }
 .topbar .google-weather-panel .live-weather-location-popup>button:hover,
@@ -1930,7 +1930,7 @@ textarea:focus-visible{
   .topbar .google-weather-panel .live-weather-location-trigger{
     min-height:28px!important;
     padding:5px 8px!important;
-    font-size:10px!important;
+    font-size:12px!important;
   }
   .topbar .google-weather-panel .live-weather-location-popup{
     right:auto!important;
@@ -2016,7 +2016,7 @@ textarea:focus-visible{
   color:#202124!important;
   border:1px solid #8ab4f8!important;
   box-shadow:0 7px 18px rgba(60,64,67,.20)!important;
-  font-size:11px!important;
+  font-size:12px!important;
   line-height:1.25!important;
   font-weight:800!important;
   text-align:center!important;
