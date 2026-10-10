@@ -1,5 +1,6 @@
 import { APPLICATION_PORTAL_HTML } from "./application-portal.js";
 
+let firebaseJwkCache = { keys: [], expiresAt: 0 };
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...corsHeaders() } });
 }
@@ -22,18 +23,17 @@ async function verifyFirebaseIdToken(token, env) {
       !claims.iat || claims.iat > now + 60 || !claims.auth_time || claims.auth_time > now + 60) {
     throw new Error("Firebase sign-in token is invalid or expired.");
   }
-  const cache = env.__grantFirebaseJwks;
-  let keys = cache?.expiresAt > now ? cache.keys : null;
+  let keys = firebaseJwkCache.expiresAt > now ? firebaseJwkCache.keys : null;
   if (!keys) {
     const response = await fetch("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com", { headers: { accept: "application/json" }, signal: AbortSignal.timeout(8000) });
     if (!response.ok) throw new Error("Identity verification service is temporarily unavailable.");
     const data = await response.json();
     const maxAge = Number((response.headers.get("cache-control") || "").match(/max-age=(\d+)/i)?.[1] || 300);
     keys = data.keys || [];
-    env.__grantFirebaseJwks = { keys, expiresAt: now + Math.min(Math.max(maxAge, 60), 3600) };
+    firebaseJwkCache = { keys, expiresAt: now + Math.min(Math.max(maxAge, 60), 3600) };
   }
   const jwk = keys.find(key => key.kid === header.kid && key.kty === "RSA");
-  if (!jwk) { if (env.__grantFirebaseJwks) env.__grantFirebaseJwks.expiresAt = 0; throw new Error("Firebase signing key is not recognized; retry the request."); }
+  if (!jwk) { firebaseJwkCache.expiresAt = 0; throw new Error("Firebase signing key is not recognized; retry the request."); }
   const key = await crypto.subtle.importKey("jwk", jwk, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]);
   const signature = Uint8Array.from(atob(parts[2].replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - parts[2].length % 4) % 4)), ch => ch.charCodeAt(0));
   if (!await crypto.subtle.verify("RSASSA-PKCS1-v1_5", key, signature, new TextEncoder().encode(parts[0] + "." + parts[1]))) throw new Error("Firebase signing token signature is invalid.");
