@@ -127,7 +127,7 @@ export default function DocumentTranslationWorkspace({profile,employee,admin=fal
   if(!fileId)throw new Error("The controlled document's file ID is unavailable. Refresh the Documents Workspace and confirm the document is accessible.");
   setProcessing(true);setError("");setMessage("");setDraft("");
   try{
-   await updateDoc(doc(db,COLLECTIONS.documentTranslationRequests,selected.id),{status:"IN_REVIEW",contentTransferAuthorized:true,contentTransferred:false,translationStartedAt:serverTimestamp(),sourceLanguageResolved:sourceLanguage,processingError:deleteField(),updatedAt:serverTimestamp()});
+   await updateDoc(doc(db,COLLECTIONS.documentTranslationRequests,selected.id),{status:"IN_REVIEW",contentTransferAuthorized:true,restrictedTransferAuthorized:sensitiveDocument?restrictedApproval:false,contentTransferred:false,translationStartedAt:serverTimestamp(),sourceLanguageResolved:sourceLanguage,processingError:deleteField(),updatedAt:serverTimestamp()});
    setProgress("Retrieving the original document from the controlled archive…");
    const downloaded=await downloadLifecycleDocument(selected.documentId,fileId);
    const text=await extractDocumentText(downloaded.bytes,selected.documentFileName||document?.fileName||selected.documentTitle||"document.txt");
