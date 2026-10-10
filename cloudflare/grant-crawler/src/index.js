@@ -210,17 +210,18 @@ function assessFit(item) {
       : sourceIsOpenFeed || /fund state:\s*open|open for applications|applications are open|call is open/i.test(text)
         ? "open"
         : "unknown";
-  const geographyText = [item.title, item.description, item.url, item.sourceUrl].filter(Boolean).join(" ").toLowerCase();
-  const explicitTanzaniaEligibility = /(?:eligible|eligibility|applicant|applicants|organisation|organization|ngo|civil society|registered|based|operating|implemented|located|country|countries|geography|geographic)[^.!?]{0,100}\btanzania\b|\btanzania\b[^.!?]{0,100}(?:eligible|eligibility|applicant|applicants|organisation|organization|ngo|civil society|registered|based|operating|located|country|countries|geography|geographic)/i.test(geographyText);
+  const opportunityText = [item.title, item.description].filter(Boolean).join(" ").toLowerCase();
+  const geographyText = [opportunityText, item.url, item.sourceUrl].filter(Boolean).join(" ").toLowerCase();
+  const explicitTanzaniaEligibility = /(?:eligible countries?[^.!?]{0,100}\btanzania\b|\btanzania\b[^.!?]{0,80}(?:is an eligible country|is eligible)|applications? (?:are )?open to (?:applicants?|organisations?|organizations?|ngos?) in tanzania|applications? from tanzania|tanzania-based (?:ngos?|organisations?|organizations?|civil society)|(?:applicants?|organisations?|organizations?|ngos?|civil society groups?) (?:must|should|may|can) be (?:registered|based|located|operating) in tanzania|(?:registered|based|located) in tanzania[^.!?]{0,80}(?:eligible|applicants?|organisations?|organizations?|ngos?))/i.test(opportunityText);
   const hardCountryOnly = /\b(?:only|exclusively|restricted to|limited to|eligible only in|applicants? (?:must|should) be (?:registered|based|located) in|must be registered in|must be based in)\b[^.!?]{0,90}\b(?:south africa|south african|rsa|zimbabwe|zimbabwean)\b|\b(?:south africa|south african|rsa|zimbabwe|zimbabwean)\b[^.!?]{0,90}\b(?:only|exclusively|restricted to|limited to|based applicants?|registered applicants?|eligible applicants?|organisations? only|organizations? only)\b/i.test(geographyText);
-  const tanzaniaMentioned = /\btanzania\b|united republic of tanzania/i.test(geographyText);
-  const regionalScope = /\beast africa\b|\beast african\b|sub[- ]saharan africa|africa[- ]wide|across africa|pan[- ]african|continental africa|global|worldwide|international(?:ly)? eligible|low[- ]and[- ]middle[- ]income countries|\blmics?\b|developing countries|eligible in all countries/i.test(geographyText);
+  const tanzaniaMentioned = /\btanzania\b|united republic of tanzania/i.test(opportunityText);
+  const regionalScope = /(?:eligible|eligibility|applicants?|organisations?|organizations?|open to|available to|across|throughout|for|within)[^.!?]{0,90}(?:east africa|east african|sub[- ]saharan africa|africa[- ]wide|across africa|pan[- ]african|continental africa|global|worldwide|international|low[- ]and[- ]middle[- ]income countries|\blmics?\b|developing countries|all countries)|(?:east africa|east african|sub[- ]saharan africa|africa[- ]wide|across africa|pan[- ]african|continental africa|global|worldwide|international|low[- ]and[- ]middle[- ]income countries|\blmics?\b|developing countries)[^.!?]{0,90}(?:eligible|eligibility|applicants?|organisations?|organizations?|open to|available to|funding across|call for|applications? from)/i.test(opportunityText);
   const countryNames = /\b(?:south africa|south african|rsa|zimbabwe|zimbabwean|kenya|kenyan|uganda|ugandan|rwanda|rwandan|burundi|burundian|zambia|zambian|botswana|namibia|namibian|malawi|malawian|mozambique|mozambican|lesotho|eswatini|swaziland|angola|angolan|ethiopia|ethiopian|somalia|somalian|sudan|south sudan|ghana|nigeria|senegal|cameroon|liberia|sierra leone|gambia|guinea|mali|niger|burkina faso|benin|togo|cote d.?ivoire|ivory coast|egypt|morocco|algeria|tunisia|libya|chad|eritrea|djibouti|madagascar|mauritius|seychelles|democratic republic of the congo|drc|congo)\b/i.test(geographyText);
   const geographyAssessment = hardCountryOnly || (countryNames && !regionalScope && !explicitTanzaniaEligibility)
     ? "other_country_focus"
     : regionalScope
       ? "regional_or_lmic_scope"
-      : explicitTanzaniaEligibility || tanzaniaMentioned
+      : explicitTanzaniaEligibility || (!countryNames && tanzaniaMentioned)
         ? "tanzania_mentioned"
         : "not_stated";
   const triageAssessment = ["closed", "expired"].includes(callStatus)
