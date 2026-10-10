@@ -88,6 +88,13 @@ export async function analyzeGrant(request, env) {
         concept_note: {
           title: "string",
           structure: [{ heading: "string", purpose: "string", suggested_content: "string", evidence_needed: ["string"] }],
+          application_fields: {
+            title: "string", executive_summary: "string", problem_statement: "string", rationale: "string",
+            goal_objectives: "string", target_beneficiaries: "string", activities_methodology: "string",
+            expected_results: "string", monitoring_evaluation: "string", sustainability: "string",
+            implementation_arrangements: "string", risks_mitigation: "string", budget_summary: "string",
+            organizational_capacity: "string", strategic_alignment: "string", other_requirements: "string"
+          },
           draft: "string"
         },
         application_checklist: ["string"],
@@ -115,7 +122,8 @@ export async function analyzeGrant(request, env) {
     "IRPA profile: " + JSON.stringify(IRPA_PROFILE),
     "Compare applicant eligibility against legal entity/country, organization type and age, geographic scope, thematic scope, past-performance requirements, financial/audit requirements, co-funding, consortium rules, and application deadlines where evidence is provided.",
     "An issue is not a confirmed disqualification unless the supplied rules clearly say so. Use insufficient_information when key eligibility rules are absent. Never represent the AI assessment as a legal or donor decision.",
-    "Align any concept note to IRPA's three strategic pillars and cross-cutting themes only where relevant to the donor call. Tailor headings to donor instructions if they are supplied. If donor template instructions are absent, use a conventional concise concept-note structure and flag this limitation.",
+    "Align any concept note to IRPA's three strategic pillars and cross-cutting themes only where relevant to the donor call. Tailor headings, ordering, and wording to donor instructions if supplied, and respect stated word/page limits where the supplied text makes them clear. If donor template instructions are absent, use a conventional concise concept-note structure and flag this limitation.",
+    "Populate each application_fields entry with standalone, editable wording ready to copy into a corresponding donor application form. If a field is unsupported by supplied evidence, clearly label assumptions or evidence needed; never invent exact budgets, baseline figures, partners, track record, audited results, or co-financing. Use an indicative budget narrative only when actual budget figures were not supplied and label it as requiring budget development.",
     "Return valid JSON only, no markdown fences, matching this schema: " + JSON.stringify(schema)
   ].join("\n");
 
