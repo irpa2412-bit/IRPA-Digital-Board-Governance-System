@@ -97,6 +97,8 @@ async function main() {
     sourcePagesConfigured: crawlResult.sourcePagesConfigured,
     webSearchConfigured: crawlResult.webSearchConfigured,
     engines: crawlResult.engines,
+    irpaFitMatches: crawlResult.irpaFitMatches,
+    topMatches: crawlResult.topMatches,
     itemsSeen: crawlResult.itemsSeen,
     recordsChanged: crawlResult.recordsChanged,
     irpaFitMatches: crawlResult.irpaFitMatches,
@@ -123,6 +125,8 @@ main().catch(error => {
       itemsSeen: crawl.itemsSeen ?? null,
       recordsChanged: crawl.recordsChanged ?? null,
       engines: crawl.engines || [],
+      irpaFitMatches: crawl.irpaFitMatches || null,
+      topMatches: crawl.topMatches || [],
       aiEligibilitySmokeTest: "skipped_quota_exhausted",
       aiQuotaMessage: message,
       secretsPrinted: false
