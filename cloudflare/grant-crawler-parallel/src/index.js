@@ -85,7 +85,7 @@ async function listOpportunities(env) {
     ).all();
   } catch {}
   const currentItems = (rows.results || []).filter(item => isCurrentOpportunity(item));
-  return { service: "irpa-grant-crawler", feedsConfigured: JSON.parse(env.GRANT_FEED_URLS_JSON || env.GRANT_FEED_URLS || "[]").length, sourcePagesConfigured: JSON.parse(env.GRANT_SOURCE_PAGE_URLS_JSON || env.GRANT_SOURCE_PAGE_URLS || "[]").length, webSearchConfigured: Boolean(String(env.BRAVE_SEARCH_API_KEY || "").trim()), items: currentItems, count: currentItems.length, suppressedExpiredOrUnverified: (rows.results || []).length - currentItems.length, lastRun: run || null, engineRuns: engineRuns.results || [] };
+  return { service: "irpa-grant-crawler", feedsConfigured: JSON.parse(env.GRANT_FEED_URLS_JSON || env.GRANT_FEED_URLS || "[]").length, sourcePagesConfigured: JSON.parse(env.GRANT_SOURCE_PAGE_URLS_JSON || env.GRANT_SOURCE_PAGE_URLS || "[]").length, webSearchConfigured: true, items: currentItems, count: currentItems.length, suppressedExpiredOrUnverified: (rows.results || []).length - currentItems.length, lastRun: run || null, engineRuns: engineRuns.results || [] };
 }
 
 const MAX_FEED_BYTES = 1_000_000;
