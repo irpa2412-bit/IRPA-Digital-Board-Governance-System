@@ -74,22 +74,51 @@ async function readFeeds(env) {
   return feeds;
 }
 
+function assessFit(item) {
+  const text = `${item.title || ""} ${item.description || ""}`.toLowerCase();
+  const signals = [
+    { label: "pastoralism/rangelands", weight: 35, terms: ["pastoral", "pastoralist", "rangeland", "herder", "grazing", "dryland", "nomadic"] },
+    { label: "restoration/environment", weight: 20, terms: ["restoration", "land degradation", "biodiversity", "ecosystem", "conservation", "desertification", "reforestation", "natural resource"] },
+    { label: "livestock/agriculture", weight: 15, terms: ["livestock", "animal health", "veterinary", "fodder", "agriculture", "food system", "smallholder", "value chain"] },
+    { label: "climate resilience", weight: 15, terms: ["climate adaptation", "climate resilience", "climate change", "drought", "resilience", "early warning"] },
+    { label: "community/NGO delivery", weight: 10, terms: ["civil society", "non-governmental", "ngo", "community-led", "community based", "local communities", "indigenous peoples"] },
+    { label: "women/youth inclusion", weight: 8, terms: ["women", "gender", "youth", "young people", "social inclusion"] },
+    { label: "water/livelihoods", weight: 8, terms: ["water", "livelihood", "income generation", "economic empowerment", "food security"] },
+    { label: "research/innovation", weight: 5, terms: ["research", "innovation", "digital", "knowledge management", "data"] },
+  ];
+  const matched = signals.filter(signal => signal.terms.some(term => text.includes(term)));
+  const score = Math.min(100, matched.reduce((sum, signal) => sum + signal.weight, 0));
+  const fitAssessment = score >= 35 ? "strong_topic_match" : score >= 15 ? "possible_topic_match" : "low_topic_match";
+  return {
+    score,
+    fitAssessment,
+    reasons: matched.map(signal => signal.label),
+    eligibilityStatus: "unverified",
+  };
+}
+
 async function crawl(env) {
   if (!env.GRANTS_DB) throw new Error("The isolated staging D1 database binding is missing.");
   const items = await readFeeds(env);
   let changed = 0;
+  const matchCounts = { strong: 0, possible: 0, low: 0, eligibilityUnverified: 0 };
   for (const item of items) {
+    const fit = assessFit(item);
+    if (fit.fitAssessment === "strong_topic_match") matchCounts.strong++;
+    else if (fit.fitAssessment === "possible_topic_match") matchCounts.possible++;
+    else matchCounts.low++;
+    matchCounts.eligibilityUnverified++;
     const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(item.url));
     const id = [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, "0")).join("");
     const result = await env.GRANTS_DB.prepare(
-      "INSERT INTO grant_opportunities (id, title, description, url, published_at, source_url, first_seen_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT(url) DO UPDATE SET title=excluded.title, description=excluded.description, published_at=excluded.published_at, source_url=excluded.source_url, last_seen_at=CURRENT_TIMESTAMP"
-    ).bind(id, item.title, item.description, item.url, item.publishedAt, item.sourceUrl).run();
+      "INSERT INTO grant_opportunities (id, title, description, url, published_at, source_url, fit_score, fit_assessment, fit_reasons, eligibility_status, first_seen_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT(url) DO UPDATE SET title=excluded.title, description=excluded.description, published_at=excluded.published_at, source_url=excluded.source_url, fit_score=excluded.fit_score, fit_assessment=excluded.fit_assessment, fit_reasons=excluded.fit_reasons, eligibility_status=excluded.eligibility_status, last_seen_at=CURRENT_TIMESTAMP"
+    ).bind(id, item.title, item.description, item.url, item.publishedAt, item.sourceUrl, fit.score, fit.fitAssessment, JSON.stringify(fit.reasons), fit.eligibilityStatus).run();
     if (result.meta?.changes) changed += result.meta.changes;
   }
   await env.GRANTS_DB.prepare(
     "INSERT INTO crawler_runs (status, items_seen, items_changed, finished_at) VALUES ('success', ?, ?, CURRENT_TIMESTAMP)"
   ).bind(items.length, changed).run();
-  return { status: "success", feedsConfigured: JSON.parse(env.GRANT_FEED_URLS_JSON || env.GRANT_FEED_URLS || "[]").length, itemsSeen: items.length, recordsChanged: changed };
+  return { status: "success", feedsConfigured: JSON.parse(env.GRANT_FEED_URLS_JSON || env.GRANT_FEED_URLS || "[]").length, itemsSeen: items.length, recordsChanged: changed, irpaFitMatches: matchCounts };
 }
 
 export default {
@@ -118,4 +147,4 @@ export default {
   },
 };
 
-export { parseFeed, safeUrl };
+export { assessFit, parseFeed, safeUrl };
