@@ -117,6 +117,10 @@ test("AI geographic classifier requires explicit Tanzania or broad eligible geog
     description: "Open to civil society organizations across East Africa."
   }).status, "eligible");
   assert.equal(assessGeographicEligibility({
+    title: "Community resilience grant",
+    description: "Applicants from Tanzania may apply."
+  }).status, "eligible");
+  assert.equal(assessGeographicEligibility({
     title: "Climate resilience grant",
     description: "A global warming awareness campaign."
   }).status, "unclear");
