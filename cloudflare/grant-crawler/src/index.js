@@ -251,7 +251,7 @@ function assessFit(item) {
   const titleText = String(item.title || "").toLowerCase();
   // Do not let a broad phrase elsewhere in a feed description override a country-focused SA/Zimbabwe title.
   const southAfricaZimbabweTitleFocus = /\b(?:south africa|south african|rsa|zimbabwe|zimbabwean)\b/i.test(titleText) &&
-    !/\\b(?:africa[- ]wide|pan[- ]african|east africa(?:n)?|sub[- ]saharan africa|global (?:grant|fund|call|programme|program)|worldwide (?:grant|call|eligibility)|open to applicants worldwide)\\b/i.test(titleText);
+    !/\b(?:africa[- ]wide|pan[- ]african|east africa(?:n)?|sub[- ]saharan africa|global (?:grant|fund|call|programme|program)|worldwide (?:grant|call|eligibility)|open to applicants worldwide)\b/i.test(titleText);
   const geographyAssessment = hardCountryOnly || (southAfricaZimbabweTitleFocus && !explicitTanzaniaEligibility) || (countryNames && !regionalScope && !explicitTanzaniaEligibility)
     ? "other_country_focus"
     : regionalScope
