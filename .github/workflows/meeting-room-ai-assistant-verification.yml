@@ -1,0 +1,36 @@
+name: Meeting Room AI Assistant Verification
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/pages/MeetingRoom.jsx"
+      - "tests/meeting-room-ai-assistant.test.mjs"
+      - ".github/workflows/meeting-room-ai-assistant-verification.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/pages/MeetingRoom.jsx"
+      - "tests/meeting-room-ai-assistant.test.mjs"
+      - ".github/workflows/meeting-room-ai-assistant-verification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-meeting-room-assistant:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify Meeting Room assistant command paths
+        run: node --test tests/meeting-room-ai-assistant.test.mjs
+      - name: Build production application
+        run: npm run build
