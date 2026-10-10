@@ -137,6 +137,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           GRANT_CRAWLER_CONTROL_TOKEN: ${{ secrets.GRANT_CRAWLER_CONTROL_TOKEN }}
           GRANT_CRAWLER_FEED_URLS: ${{ secrets.GRANT_CRAWLER_FEED_URLS }}
+          BRAVE_SEARCH_API_KEY: ${{ secrets.BRAVE_SEARCH_API_KEY }}
         run: |
           set -euo pipefail
           npx wrangler secret put CRAWLER_CONTROL_TOKEN --env staging <<< "$GRANT_CRAWLER_CONTROL_TOKEN"
@@ -150,6 +151,9 @@ jobs:
           }
           NODE
             printf '%s' "$GRANT_CRAWLER_FEED_URLS" | npx wrangler secret put GRANT_FEED_URLS_JSON --env staging
+          fi
+          if [ -n "${BRAVE_SEARCH_API_KEY:-}" ]; then
+            printf '%s' "$BRAVE_SEARCH_API_KEY" | npx wrangler secret put BRAVE_SEARCH_API_KEY --env staging
           fi
           deploy_log="$(npx wrangler deploy --env staging 2>&1)"
           printf '%s\n' "$deploy_log"
