@@ -1,6 +1,6 @@
 # IRPA Grant Crawler
 
-An isolated Cloudflare Worker for collecting public funding call metadata from approved RSS/Atom feeds. Initial staging storage is a dedicated D1 database. Firebase synchronization is intentionally off until collection specific least privilege rules and a dedicated identity are reviewed and tested.
+An isolated Cloudflare Worker for collecting public funding call metadata through parallel RSS/Atom, official donor webpage, and optional Brave Web Search engines. All discovered calls enter one shared D1 opportunity register and the same deterministic IRPA relevance, deadline, geography and eligibility screening pipeline. Initial staging storage is a dedicated D1 database. Firebase synchronization is intentionally off until collection specific least privilege rules and a dedicated identity are reviewed and tested.
 
 ## Local checks
 
@@ -11,6 +11,15 @@ An isolated Cloudflare Worker for collecting public funding call metadata from a
 Configure GitHub Actions secrets CLOUDFLARE_GRANT_CRAWLER_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, and GRANT_CRAWLER_CONTROL_TOKEN (at least 32 characters). Optionally set GRANT_CRAWLER_FEED_URLS to a JSON array of official HTTPS RSS/Atom feed URLs. Use a dedicated CLOUDFLARE_GRANT_CRAWLER_API_TOKEN, not the production gateway token. Grant only the Workers Scripts write/deploy and D1 edit permissions required for this staging deployment. If Cloudflare cannot resource-scope these permissions to the crawler, isolate it in a dedicated Cloudflare account.
 
 Run the IRPA Grant Crawler — Isolated Staging workflow manually after its pull request has been reviewed. It deploys only irpa-grant-crawler-staging; it does not touch irpa-google-drive-gateway or deploy Firebase.
+
+## Parallel discovery engines
+
+- RSS/Atom feeds continue to run as the original connector.
+- Official donor webpage scanning reads configured `GRANT_SOURCE_PAGE_URLS` JSON URLs (maximum 20), follows grant-related links on the same host, and extracts page titles/descriptions without executing page scripts.
+- Brave web search runs four targeted grant queries when the optional `BRAVE_SEARCH_API_KEY` secret is configured. It remains explicitly marked unconfigured otherwise.
+- Every engine feeds the same deduplicated `grant_opportunities` register and the same `assessFit` screening formula. Expired calls, country-only mismatches, and unknown geography are not promoted to eligible opportunities; uncertain cases remain auditable.
+- Engine runs are recorded in `crawler_engine_runs`; the authenticated `/opportunities` response includes recent engine health, source counts and the shared register used by the grant dashboard.
+- Add or change official source-page URLs through `GRANT_SOURCE_PAGE_URLS` (JSON array); add the Brave key only as a Cloudflare secret. Never commit API keys.
 
 ## Endpoints
 - `GET /health`: returns service/environment/storage status, without secrets.
