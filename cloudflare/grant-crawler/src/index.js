@@ -59,17 +59,28 @@ async function readFeeds(env) {
   const feeds = [];
   for (const entry of configured) {
     const url = safeUrl(String(entry));
-    const response = await fetch(url.href, {
-      headers: { "accept": "application/rss+xml, application/atom+xml, application/xml, text/xml", "user-agent": USER_AGENT },
-      redirect: "error",
-      signal: AbortSignal.timeout(12_000),
-    });
-    if (!response.ok) throw new Error("Feed request failed with HTTP " + response.status + ".");
+    let requestUrl = url;
+    let response;
+    for (let redirects = 0; redirects <= 3; redirects++) {
+      response = await fetch(requestUrl.href, {
+        headers: { "accept": "application/rss+xml, application/atom+xml, application/xml, text/xml", "user-agent": USER_AGENT },
+        redirect: "manual",
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (![301, 302, 303, 307, 308].includes(response.status)) break;
+      if (redirects === 3) throw new Error("Feed exceeded the three-redirect limit.");
+      const location = response.headers.get("location");
+      if (!location) throw new Error("Feed redirected without a Location header.");
+      const nextUrl = safeUrl(new URL(location, requestUrl.href).href);
+      if (nextUrl.hostname !== url.hostname) throw new Error("Cross-host feed redirects are not permitted.");
+      requestUrl = nextUrl;
+    }
+    if (!response?.ok) throw new Error("Feed request failed with HTTP " + response?.status + ".");
     const type = response.headers.get("content-type") || "";
     if (!/xml|rss|atom|text\/plain/i.test(type)) throw new Error("Feed did not return an XML-compatible content type.");
     const text = await response.text();
     if (text.length > MAX_FEED_BYTES) throw new Error("Feed exceeds the 1 MB response limit.");
-    feeds.push(...parseFeed(text, url.href));
+    feeds.push(...parseFeed(text, requestUrl.href));
   }
   return feeds;
 }
