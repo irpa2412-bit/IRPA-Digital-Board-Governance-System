@@ -1,5 +1,4 @@
 const assert = require("node:assert/strict");
-const {deleteField} = require("firebase/firestore");
 const { before, after, beforeEach, test } = require("node:test");
 const {
   initializeTestEnvironment,
@@ -471,7 +470,7 @@ test("Maa translation cannot be completed without an identified speaker review",
   });
   const reviewerDb = testEnv.authenticatedContext("reviewer-user", {email:"reviewer@example.test"}).firestore();
   await assertFails(reviewerDb.doc("documentTranslationRequests/translation-test-3").update({
-    status:"COMPLETED",translatedText:"Ashe. Enkare is sidai.",translationDraftText:deleteField(),
+    status:"COMPLETED",translatedText:"Ashe. Enkare is sidai.",translationDraftText:"",
     translationReviewedByUid:"reviewer-user",reviewNotes:"Reviewed",translationReviewedAt:"2026-10-10T06:10:00.000Z",
     completedAt:"2026-10-10T06:10:00.000Z",updatedAt:"2026-10-10T06:10:00.000Z"
   }));
