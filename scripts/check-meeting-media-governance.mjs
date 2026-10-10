@@ -19,6 +19,9 @@ const livekitCaddy=fs.readFileSync("infra/livekit/caddy.yaml.template","utf8");
 const livekitDeploy=fs.readFileSync("infra/livekit/deploy-staging.sh","utf8");
 const livekitWorkflow=fs.readFileSync(".github/workflows/deploy-livekit-staging.yml","utf8");
 const checks=[
+ ["Registration buttons use the authoritative active-role policy",room.includes("canRegisterMeeting({...actorIdentity,isAdmin:admin})")],
+ ["Released meeting edits remain administrator-only",room.includes("if(editing&&!canEditMeeting(editing,{...actorIdentity,isAdmin:admin}))")],
+ ["Firestore create retains registrar, initiator and meeting-category validation",fs.readFileSync("firestore.rules","utf8").includes('allow create:if meetingRegistrar()&&request.resource.data.get("initiatorUid","")==request.auth.uid&&validMeetingCategory(request.resource.data)')],
  ["Meeting media client exists",fs.existsSync("src/components/IRPADGBSMeetingRoomMedia.jsx")],
  ["Participant invitation creates a meeting access pass",participantPage.includes("createMeetingAccessInvitation")&&participantPage.includes("meetingAccess")],
  ["Meeting access pass is sent through the authenticated IRPA mail gateway",participantPage.includes("sendMemberInvitationEmail(payload.participantEmail,invitationId,payload.participantRole,payload.memberType,meetingAccess)")],
