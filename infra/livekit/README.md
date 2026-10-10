@@ -8,7 +8,7 @@ This package deploys the LiveKit OSS media plane on a dedicated VM, isolated fro
 
 - `meet.irpa.or.tz`: HTTPS/WSS signalling endpoint.
 - `turn.irpa.or.tz`: TURN/TLS endpoint.
-- LiveKit Server `v1.13.7`, Redis 7.4, and the official `livekit/caddyl4:v2.11.4` image.
+- LiveKit Server `v1.13.7`, LiveKit Egress `v1.13.0`, Redis 7.4, and the official `livekit/caddyl4:v2.11.4` image. Egress is required for room-composite recordings; the server alone cannot process these recording requests.
 - Caddy's Layer 4 SNI routing multiplexes meeting WSS and TURN/TLS over TCP/443; LiveKit's embedded TURN/UDP remains on UDP/3478.
 - WebRTC media uses UDP/50000–60000 with TCP/7881 fallback.
 - Caddy obtains and renews certificates for both names automatically.
@@ -43,6 +43,28 @@ Configure these environment/repository secrets through the approved secret-manag
 - `LIVEKIT_STAGING_FIREBASE_SERVICE_ACCOUNT` — staging-only service account with minimum deployment permissions
 
 The workflow refuses the known production Firebase project. It deploys the media host and only the `issueLiveMeetingToken` callable to the isolated staging Firebase project. It does not deploy Firebase Hosting or change Firestore/Storage rules.
+
+## Cloudflare Worker secrets and private R2 recording storage
+
+The meeting Worker is the privileged control plane. Its LiveKit API credentials are stored as Cloudflare Worker secrets, not in browser code, `wrangler.toml`, Git, or logs. The self-hosted LiveKit server and Egress service must also retain the same LiveKit API key/secret in their root-only host configuration because they validate and process media/control requests. Do not remove the VM-side copies or rotate only one side; a coordinated rotation is required.
+
+Meeting recordings are stored in a **private Cloudflare R2 bucket** using LiveKit Egress's S3-compatible output. The Egress process writes directly to R2; the Worker does not proxy the video bytes and no public bucket access is required. R2 access credentials are held only as Cloudflare Worker secrets and are sent in the authenticated Egress start request over HTTPS. They are not copied to the VM's `.env` file.
+
+Recommended bucket name: `irpa-dbgs-meeting-recordings`. The object-key prefix is `irpa-governance-recordings/<meeting-id>/<timestamp>.mp4`. Configure a bucket-scoped R2 API token with **Object Read & Write** limited to this bucket, not an account-wide administrative token. R2's S3 endpoint format is `https://<ACCOUNT_ID>.r2.cloudflarestorage.com`, and the region must be `auto`. Set `force_path_style=true`. Keep the bucket private and use an authorized download flow; do not publish recordings through a public R2 URL.
+
+The production GitHub Environment named `production` must have these secrets before the manual `Bind LiveKit and R2 Secrets to Cloudflare Worker` workflow can run:
+
+- `LIVEKIT_URL` — secure LiveKit endpoint, normally `wss://meet.irpa.or.tz`.
+- `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET` — the same credentials configured on the self-hosted LiveKit server.
+- `LIVEKIT_EGRESS_R2_ENDPOINT` — HTTPS R2 S3 endpoint for the IRPA account.
+- `LIVEKIT_EGRESS_R2_BUCKET` — the private recording bucket name.
+- `LIVEKIT_EGRESS_R2_ACCESS_KEY_ID` and `LIVEKIT_EGRESS_R2_SECRET_ACCESS_KEY` — bucket-scoped R2 credentials.
+- `LIVEKIT_EGRESS_R2_REGION` — exactly `auto`.
+- Existing `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets for the Worker account.
+
+The workflow validates these values without printing them, then binds them as Cloudflare Worker secrets using Wrangler. Do not send any of these values through chat or commit them to source control.
+
+**Provisioning boundary:** R2 must be enabled/purchased in the account and the bucket/token created before this workflow can succeed. This repository change does not create the bucket, purchase R2, change DNS, provision a VM, or deploy the stack. Those steps remain blocked until the account prerequisites and spending approval are resolved.
 
 ## Firebase secret binding
 
