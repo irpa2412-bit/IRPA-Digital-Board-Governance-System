@@ -137,7 +137,8 @@ export default {
         await authorizeMeeting(meetingId,user,idToken);
       }
       if(source==="maa"||targetCode==="maa"){
-        if(source==="maa"&&!["en","sw"].includes(targetCode))throw Object.assign(new Error("Maa dictionary-assisted output currently supports English or Kiswahili targets only."),{status:400});
+        if(targetCode==="maa"&&!["en","sw"].includes(source))throw Object.assign(new Error("Maa dictionary-assisted output requires English or Kiswahili source text."),{status:400});
+        if(source==="maa"&& !["en","sw"].includes(targetCode))throw Object.assign(new Error("Maa source text currently supports English or Kiswahili targets only."),{status:400});
         const result=dictionaryTranslate(content,source,targetCode);
         return json({ok:true,translatedText:result.translatedText,targetLanguage:targetCode,sourceLanguage:source,provider:"IRPA Maa Dictionary · provisional glossary",dictionaryAssisted:true,matchedTerms:result.matchedTerms,coverage:result.coverage,requiresHumanReview:true,requestId:isDocumentRequest?requestId:undefined,notice:"This starter glossary does not translate Maa grammar or unknown words. Validate with a Kisonko Maa speaker before official use."},200,origin);
       }
