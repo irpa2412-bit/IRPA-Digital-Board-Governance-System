@@ -164,7 +164,7 @@ test("translated derivative inherits the source classification and all access gr
   const response=await router(req("/api/document-lifecycle/upload",{
     fileName:"translated-minute.txt",contentType:"text/plain",base64:btoa("Confidential translated content"),
     title:"Translated confidential board minute",documentType:"Other",
-    archiveCategory:"Administrative Documents",classification:"Internal",parentDocumentId:"LIFE-source-confidential"
+    archiveCategory:"Governance Documents",classification:"Confidential",parentDocumentId:"LIFE-source-confidential"
   }),env);
   assert.equal(response.status,201);
   const saved=Object.values(state.docs).find(row=>row.plain?.translationDerivative)?.plain;
