@@ -404,6 +404,46 @@ service cloud.firestore {
     allow update,delete:if admin();
   }
   match /inductionRecords/{uid}{allow read:if self(uid)||admin();allow create,update:if self(uid)&&request.resource.data.uid==request.auth.uid&&(activeMember()||request.auth.token.firebase.sign_in_provider=="anonymous");allow delete:if admin();}
+
+  // Public dashboard exposes only deliberately published, sanitized projections.
+  // Never relax access to the private members, reports, meetings or governance collections.
+  function publicInformationPublisher(){return admin()||anyInstitutionalRole(["Executive Director","Director Outreach","Director Internal Oversight","Director Finance & Administration"]);}
+  match /publicStats/{id}{
+    allow get: if id=="memberCounters";
+    allow list: if false;
+    allow create,update: if admin()&&id=="memberCounters"
+      &&request.resource.data.keys().hasOnly(["activeMembers","boardMembers","updatedAt"])
+      &&request.resource.data.keys().hasAll(["activeMembers","updatedAt"])
+      &&request.resource.data.activeMembers is int&&request.resource.data.activeMembers>=0
+      &&(!("boardMembers" in request.resource.data.keys())||(request.resource.data.boardMembers is int&&request.resource.data.boardMembers>=0))
+      &&request.resource.data.updatedAt is timestamp;
+    allow delete: if admin()&&id=="memberCounters";
+  }
+  match /publicReports/{id}{
+    allow read: if resource.data.get("published",false)==true&&resource.data.get("visibility","")=="PUBLIC";
+    allow create,update: if publicInformationPublisher()
+      &&request.resource.data.keys().hasOnly(["title","summary","category","reportDate","publicUrl","documentUrl","url","published","visibility","publishedAt","updatedAt","publishedByUid"])
+      &&request.resource.data.keys().hasAll(["title","published","visibility","publishedAt"])
+      &&request.resource.data.title is string&&request.resource.data.title.size()>0&&request.resource.data.title.size()<=240
+      &&request.resource.data.get("summary","") is string&&request.resource.data.get("summary","").size()<=2000
+      &&request.resource.data.published is bool&&request.resource.data.visibility=="PUBLIC"
+      &&request.resource.data.publishedAt is timestamp
+      &&request.resource.data.get("publicUrl","") is string&&request.resource.data.get("documentUrl","") is string&&request.resource.data.get("url","") is string;
+    allow delete: if admin();
+  }
+  match /publicMeetings/{id}{
+    allow read: if resource.data.get("published",false)==true&&resource.data.get("visibility","")=="PUBLIC";
+    allow create,update: if publicInformationPublisher()
+      &&request.resource.data.keys().hasOnly(["title","description","date","startTime","endTime","venue","publicUrl","published","visibility","publishedAt","updatedAt","publishedByUid"])
+      &&request.resource.data.keys().hasAll(["title","published","visibility","publishedAt"])
+      &&request.resource.data.title is string&&request.resource.data.title.size()>0&&request.resource.data.title.size()<=240
+      &&request.resource.data.get("description","") is string&&request.resource.data.get("description","").size()<=2000
+      &&request.resource.data.published is bool&&request.resource.data.visibility=="PUBLIC"
+      &&request.resource.data.publishedAt is timestamp
+      &&request.resource.data.get("date","") is string&&request.resource.data.get("startTime","") is string&&request.resource.data.get("endTime","") is string&&request.resource.data.get("venue","") is string&&request.resource.data.get("publicUrl","") is string;
+    allow delete: if admin();
+  }
+
   match /{document=**}{allow read,write:if false;}
  }
 }
