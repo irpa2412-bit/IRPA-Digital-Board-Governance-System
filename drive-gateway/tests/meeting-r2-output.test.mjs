@@ -42,4 +42,8 @@ test("recording output rejects non-Cloudflare endpoints and unsafe object paths"
     () => createR2RecordingOutput(env, "meetings/../private/test.mp4"),
     error => error.status === 400
   );
+  assert.throws(
+    () => createR2RecordingOutput({ ...env, LIVEKIT_EGRESS_R2_REGION: "us-east-1" }, "meetings/123/test.mp4"),
+    error => error.status === 503
+  );
 });
