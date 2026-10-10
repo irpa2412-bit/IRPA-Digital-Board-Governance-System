@@ -166,13 +166,16 @@ jobs:
           GRANT_CRAWLER_CONTROL_TOKEN: ${{ secrets.GRANT_CRAWLER_CONTROL_TOKEN }}
         run: |
           set -euo pipefail
-          result="$(curl --fail --silent --show-error --max-time 90 -X POST \
+          result="$(curl --silent --show-error --max-time 90 -X POST \
             -H "Authorization: Bearer $GRANT_CRAWLER_CONTROL_TOKEN" \
             -H "Content-Type: application/json" \
             "https://irpa-grant-crawler-staging.irpa-governance.workers.dev/crawl")"
           node - "$result" <<'NODE'
           const result = JSON.parse(process.argv[2]);
-          if (result.status !== 'success') throw new Error('Live crawler did not return success.');
+          if (result.status !== 'success') {
+            console.error(JSON.stringify({ status: result.status || 'error', error: result.error || 'Unknown crawler error' }, null, 2));
+            process.exit(1);
+          }
           if (result.feedsConfigured < 1) throw new Error('No official feeds are configured.');
           console.log(JSON.stringify({
             status: result.status,
