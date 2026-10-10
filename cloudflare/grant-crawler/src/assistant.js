@@ -246,13 +246,16 @@ export async function analyzeGrant(request, env) {
 
   const opportunity = { title, description, url: url || null, donorRequirements };
   const geographicEligibility = assessGeographicEligibility(opportunity);
-  if (task === "concept_note" && geographicEligibility.status !== "eligible") {
+  const knownGaps = detectKnownEligibilityGaps(opportunity);
+  if (task === "concept_note" && (geographicEligibility.status !== "eligible" || knownGaps.blockers.length || knownGaps.warnings.length)) {
+    const gateStatus = geographicEligibility.status === "ineligible" || knownGaps.blockers.length ? "ineligible" : "insufficient_information";
     return json({
-      error: geographicEligibility.status === "ineligible"
-        ? "Concept-note drafting blocked: the opportunity is country-restricted and does not establish eligibility for Tanzania-based IRPA."
-        : "Concept-note drafting blocked until the official call confirms Tanzania or eligible regional/global coverage.",
+      error: gateStatus === "ineligible"
+        ? "Concept-note drafting blocked: one or more explicit eligibility criteria do not fit IRPA's known profile."
+        : "Concept-note drafting blocked until the official eligibility criteria and IRPA evidence gaps are resolved.",
       geographic_eligibility: geographicEligibility,
-      next_step: "Provide the official eligible-country and applicant-type criteria, then rerun eligibility screening."
+      eligibility_gate: { status: gateStatus, blockers: knownGaps.blockers, warnings: knownGaps.warnings },
+      next_step: "Paste the official eligible-country, applicant-type, organizational-age, track-record, audit and co-financing requirements; resolve every blocker before drafting."
     }, 422);
   }
 
@@ -280,15 +283,23 @@ export async function analyzeGrant(request, env) {
     const allowed = new Set(["eligible", "possibly_eligible", "ineligible", "insufficient_information"]);
     if (!allowed.has(analysis.eligibility.status)) analysis.eligibility.status = "insufficient_information";
     analysis.geographic_eligibility = geographicEligibility;
-    if (geographicEligibility.status === "ineligible") {
-      analysis.eligibility.status = "ineligible";
-      analysis.eligibility.confidence = "high";
-      analysis.eligibility.evidence = [...(Array.isArray(analysis.eligibility.evidence) ? analysis.eligibility.evidence : []), geographicEligibility.reason];
-      analysis.eligibility.unknowns = [...(Array.isArray(analysis.eligibility.unknowns) ? analysis.eligibility.unknowns : []), "Official geographic eligibility should still be retained with the application record as supporting evidence."];
-    } else if (geographicEligibility.status === "unclear" && analysis.eligibility.status !== "ineligible") {
-      analysis.eligibility.status = "insufficient_information";
-      analysis.eligibility.confidence = "low";
-      analysis.eligibility.unknowns = [...(Array.isArray(analysis.eligibility.unknowns) ? analysis.eligibility.unknowns : []), "Eligible-country criteria were not established from the supplied call text; confirm that Tanzania-based applicants may apply."];
+    applyKnownEligibilityGaps(analysis, opportunity, geographicEligibility);
+    if (task === "concept_note") {
+      const requirements = Array.isArray(analysis.donor_requirements) ? analysis.donor_requirements : [];
+      const unresolved = analysis.eligibility.status !== "eligible" ||
+        (Array.isArray(analysis.eligibility.unknowns) && analysis.eligibility.unknowns.length > 0) ||
+        requirements.some(row => row.status !== "met");
+      if (unresolved) {
+        delete analysis.concept_note;
+        delete analysis.concept_note_structure;
+        return json({
+          error: "Concept-note drafting blocked because eligibility is not confirmed and every mandatory requirement has not been evidenced as met.",
+          geographic_eligibility: geographicEligibility,
+          eligibility_gate: analysis.known_eligibility_gaps,
+          assessment: analysis,
+          next_step: "Resolve the listed eligibility gaps and rerun screening before drafting."
+        }, 422);
+      }
     }
     return json({
       service: "irpa-grant-application-assistant",
