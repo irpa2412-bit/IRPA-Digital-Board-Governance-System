@@ -52,7 +52,7 @@ const isCountryRestrictedForIrpa=record=>{
  return mentionsTarget&&!broadScope&&!tanzaniaEligibility;
 };
 
-export default function GrantIntelligencePortal({profile,employee,isAdmin=false}){
+export default function GrantIntelligencePortal({profile,employee,isAdmin=false,onNavigate}){
  const [records,setRecords]=useState([]);
  const [crawlerRecords,setCrawlerRecords]=useState([]);
  const [crawlerResultsBusy,setCrawlerResultsBusy]=useState(false);
@@ -68,6 +68,8 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
  const [conceptDraft,setConceptDraft]=useState("");
  const [draftId,setDraftId]=useState("");
  const [savedDrafts,setSavedDrafts]=useState([]);
+ const [draftAuditEvents,setDraftAuditEvents]=useState([]);
+ const [auditBusy,setAuditBusy]=useState(false);
  const [draftsBusy,setDraftsBusy]=useState(false);
  const [draftSaving,setDraftSaving]=useState(false);
  const [workspaceNotice,setWorkspaceNotice]=useState("");
@@ -167,7 +169,32 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
    setWorkspaceNotice("");
    setWorkspaceOpen(true);
  }
+ async function loadDraftAuditEvents(id){
+   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-staging.irpa-governance.workers.dev").replace(/\/+$/,"");
+   const idToken=await auth.currentUser?.getIdToken();
+   if(!idToken||!id)return;
+   setAuditBusy(true);
+   try{
+     const response=await fetch(workerUrl+"/application/drafts/"+encodeURIComponent(id)+"/events",{headers:{Authorization:"Bearer "+idToken,Accept:"application/json"},signal:AbortSignal.timeout(15000)});
+     const data=await response.json().catch(()=>({}));
+     if(!response.ok)throw new Error(data.error||"Draft audit trail could not be loaded.");
+     setDraftAuditEvents(Array.isArray(data.events)?data.events:[]);
+   }catch(err){setError(err?.message||"Draft audit trail could not be loaded.");}
+   finally{setAuditBusy(false);}
+ }
+ function downloadConceptDraft(){
+   const draft=text(conceptDraft||analysisResult?.concept_note?.draft);
+   if(!draft){setError("Generate or enter a concept note before downloading.");return;}
+   const blob=new Blob([draft],{type:"text/plain;charset=utf-8"});
+   const href=URL.createObjectURL(blob);
+   const link=document.createElement("a");
+   link.href=href;
+   link.download="IRPA-Concept-Note-"+String(selectedOpportunity?.title||"Draft").replace(/[^A-Za-z0-9-]+/g,"-").slice(0,80)+".txt";
+   document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(href);
+   setWorkspaceNotice("Concept-note text downloaded. Upload the reviewed document through the existing DBGS Documents portal when ready.");
+ }
  function openSavedConceptDraft(draft){
+   setDraftAuditEvents([]);
    setSelectedOpportunity({
      id:draft.id,
      title:draft.opportunity?.title||draft.name||"Saved concept note",
@@ -184,6 +211,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
    setDraftId(draft.id);
    setWorkspaceNotice("Loaded saved draft. Review eligibility and official call criteria before reuse.");
    setWorkspaceOpen(true);
+   loadDraftAuditEvents(draft.id);
  }
  async function runWorkspaceAnalysis(task="eligibility"){
    if(!selectedOpportunity?.title){setError("Select a grant opportunity before screening eligibility.");return;}
@@ -223,8 +251,9 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
      const data=await response.json().catch(()=>({}));
      if(!response.ok)throw new Error(data.error||"Concept-note draft could not be saved.");
      setDraftId(id);
-     setWorkspaceNotice("Concept-note draft saved to the isolated Cloudflare D1 workspace.");
+     setWorkspaceNotice("Concept-note draft saved to the isolated Cloudflare D1 workspace; an audit event was recorded.");
      await loadSavedDrafts();
+     await loadDraftAuditEvents(id);
    }catch(err){setError(err?.message||"Concept-note draft could not be saved.");}
    finally{setDraftSaving(false);}
  }
@@ -338,6 +367,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
     <textarea aria-label="Editable concept-note draft" rows="16" style={{...styles.input,resize:"vertical",fontFamily:"inherit",lineHeight:1.6}} value={conceptDraft||analysisResult?.concept_note?.draft||""} onChange={e=>setConceptDraft(e.target.value)}/>
     <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
      <button type="button" disabled={draftSaving||!text(conceptDraft||analysisResult?.concept_note?.draft)} style={{...styles.button,opacity:draftSaving?0.6:1}} onClick={saveConceptDraft}>{draftSaving?"Saving draft…":"Save draft to Cloudflare workspace"}</button>
+     <button type="button" style={{...styles.button,background:"transparent"}} onClick={downloadConceptDraft}>Download .txt for DBGS Documents</button>
      <button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>{if(!navigator.clipboard?.writeText){setError("Clipboard access is unavailable in this browser.");return;}navigator.clipboard.writeText(conceptDraft||analysisResult?.concept_note?.draft||"").then(()=>setWorkspaceNotice("Concept-note text copied to clipboard.")).catch(()=>setError("Clipboard access was blocked by the browser."));}}>Copy concept-note text</button>
     </div>
    </section>}
@@ -346,6 +376,23 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
     {draftsBusy&&<div style={styles.muted}>Loading drafts from the Cloudflare workspace…</div>}
     {!draftsBusy&&!savedDrafts.length&&<div style={styles.muted}>No saved drafts yet. Screen a grant, generate a concept note and save the draft here.</div>}
     {savedDrafts.map(draft=><div key={draft.id} style={{border:"1px solid #344255",borderRadius:10,padding:11,display:"flex",justifyContent:"space-between",gap:10,alignItems:"center",flexWrap:"wrap"}}><div><strong style={{fontSize:13}}>{draft.name||draft.opportunity?.title||"Untitled concept note"}</strong><div style={styles.muted}>Status: {draft.status||"draft"} · Updated: {dateLabel(draft.updated_at||draft.updatedAt||draft.created_at)}</div></div><button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>openSavedConceptDraft(draft)}>Open draft</button></div>)}
+   </section>
+   <section style={{...styles.card,display:"grid",gap:9}}>
+    <div><strong style={{fontSize:14}}>Draft audit trail</strong><p style={{...styles.muted,margin:"4px 0"}}>Append-only Cloudflare D1 events record when this draft was created or updated, without copying the full concept-note text into the event log.</p></div>
+    {auditBusy&&<div style={styles.muted}>Loading draft audit events…</div>}
+    {!auditBusy&&draftId&&!draftAuditEvents.length&&<div style={styles.muted}>No audit events loaded yet. Save the draft or reopen it to retrieve the event history.</div>}
+    {!draftId&&<div style={styles.muted}>Save the draft to create its first audit event.</div>}
+    {draftAuditEvents.map((event,i)=><div key={event.createdAt+"-"+i} style={{borderTop:"1px solid #344255",paddingTop:7}}><strong style={{fontSize:12}}>{String(event.eventType||"draft_event").replaceAll("_"," ")}</strong><div style={styles.muted}>{dateLabel(event.createdAt)} · Eligibility: {event.eligibilityStatus||"not assessed"} · Geography: {event.geographicEligibility||"not assessed"}</div></div>)}
+   </section>
+   <section style={{...styles.card,display:"grid",gap:9}}>
+    <strong style={{fontSize:14}}>Related DBGS governance modules</strong>
+    <p style={{...styles.muted,margin:0}}>Use the existing modules to file supporting documents, prepare budget details and route the draft for formal internal review. These navigation links do not automatically submit or approve the concept note.</p>
+    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+     <button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>onNavigate?.("Documents")}>Open Documents</button>
+     <button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>onNavigate?.("Finance Portfolio")}>Open Finance Portfolio</button>
+     <button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>onNavigate?.("Authorization & Approvals")}>Open Authorization & Approvals</button>
+     <button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>onNavigate?.("Meetings")}>Open Meetings</button>
+    </div>
    </section>
    <div style={{...styles.muted,borderLeft:"3px solid #b78b3d",padding:"8px 12px"}}><strong>Governance control:</strong> saved drafts remain drafts in the isolated Cloudflare D1 workspace. Saving does not submit an application, approve expenditure, authorize a commitment, or replace IRPA's formal internal review and approval procedures.</div>
   </section>}
