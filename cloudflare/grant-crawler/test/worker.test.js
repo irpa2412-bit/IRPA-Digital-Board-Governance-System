@@ -356,7 +356,7 @@ test("AI grant assistant is authenticated and returns structured eligibility ana
   assert.equal(body.service, "irpa-grant-application-assistant");
   assert.equal(body.assessment.eligibility.status, "possibly_eligible");
   assert.equal(body.assessment.donor_requirements.length, 1);
-  assert.equal(usedModel, "@cf/meta/llama-3.1-8b-instruct");
+  assert.equal(usedModel, "@cf/meta/llama-3.3-70b-instruct-fp8-fast");
 });
 
 test("AI grant assistant validates required input and URL", async () => {
