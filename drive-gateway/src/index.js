@@ -1,5 +1,3 @@
-const FIREBASE_PROJECT_ID = "irpa-digital-board-governance";
-const AUTHORIZED_DRIVE_EMAIL = "irpa2412@gmail.com";
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const MAX_BYTES = 10 * 1024 * 1024;
 const ALLOWED_CONTENT_TYPES = new Set([
@@ -24,11 +22,23 @@ import { createDocumentLifecycleRouter } from "./documentLifecycle.mjs";
 import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPasswordSetup, getInvitationSessionState } from "./invitationRedemption.mjs";
 import { buildGoogleDriveAuthorizationParams } from "./googleDriveOAuth.mjs";
 
+function getFirebaseProjectId(env) {
+  const projectId = String(env?.FIREBASE_PROJECT_ID || "").trim();
+  if (!projectId) throw new Error("FIREBASE_PROJECT_ID must be configured for this environment.");
+  return projectId;
+}
+
+function getAuthorizedDriveEmail(env) {
+  const email = String(env?.AUTHORIZED_DRIVE_EMAIL || "").trim().toLowerCase();
+  if (!email) throw new Error("AUTHORIZED_DRIVE_EMAIL must be configured for this environment.");
+  return email;
+}
+
 let jwksCache = null;
 let jwksFetchedAt = 0;
 
 const documentLifecycleRouter = createDocumentLifecycleRouter({
-  FIREBASE_PROJECT_ID,
+  getFirebaseProjectId: env => getFirebaseProjectId(env),
   allowedContentTypes: ALLOWED_CONTENT_TYPES,
   authenticateFirebaseRequest,
   getFirestoreDocument,
@@ -312,8 +322,8 @@ async function oauthCallback(request, env) {
 
   const about = await driveFetch(env, tokens.access_token, "/drive/v3/about?fields=user(emailAddress,displayName)");
   const email = String(about?.user?.emailAddress || "").toLowerCase();
-  if (email !== AUTHORIZED_DRIVE_EMAIL.toLowerCase()) {
-    return html(`Authorization rejected. The Google account must be ${AUTHORIZED_DRIVE_EMAIL}.`);
+  if (email !== getAuthorizedDriveEmail(env).toLowerCase()) {
+    return html(`Authorization rejected. The Google account must be ${getAuthorizedDriveEmail(env)}.`);
   }
   if (!tokens.refresh_token) {
     return html("Google did not return a refresh token. Start authorization again with consent.");
@@ -322,7 +332,7 @@ async function oauthCallback(request, env) {
   const encrypted = await encryptText(tokens.refresh_token, env.GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY);
   await env.DRIVE_KV.put("google-drive-refresh-token", JSON.stringify({
     version: 1,
-    authorizedEmail: AUTHORIZED_DRIVE_EMAIL,
+    authorizedEmail: getAuthorizedDriveEmail(env),
     encrypted,
     authorizedByUid: stateRecord.uid,
     authorizedByEmail: stateRecord.email || null,
@@ -853,7 +863,7 @@ function firestoreFieldValue(field) {
   return null;
 }
 async function queryMeetingArchiveRecords(env, collectionName, meetingId, token) {
-  const response=await fetch("https://firestore.googleapis.com/v1/projects/"+FIREBASE_PROJECT_ID+"/databases/(default)/documents:runQuery",{
+  const response=await fetch("https://firestore.googleapis.com/v1/projects/"+getFirebaseProjectId(env)+"/databases/(default)/documents:runQuery",{
     method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
     body:JSON.stringify({structuredQuery:{from:[{collectionId:collectionName}],where:{fieldFilter:{field:{fieldPath:"meetingId"},op:"EQUAL",value:{stringValue:meetingId}}},limit:200}})
   });
@@ -1297,7 +1307,7 @@ async function notifyInvitationAdministrator(request, env, reason) {
     const token = String(body?.token||"").trim();
     const invitationId = token.split(".")[0] || "unknown";
     await smtpSend(env,{
-      to: AUTHORIZED_DRIVE_EMAIL,
+      to: getAuthorizedDriveEmail(env),
       subject: "IRPA invitation requires a new link",
       text: `Invitation ${invitationId} could not be completed: ${String(reason||"expired or cancelled")}. The invitee has been instructed to request a new link.`,
       html: `<p>Invitation <strong>${invitationId}</strong> could not be completed: ${String(reason||"expired or cancelled")}. The invitee has been instructed to request a new link.</p>`
@@ -1766,8 +1776,8 @@ async function authenticateFirebaseRequest(request, env, options = {}) {
   const headerPart = JSON.parse(base64UrlDecode(parts[0]));
   const payload = JSON.parse(base64UrlDecode(parts[1]));
   const now = Math.floor(Date.now() / 1000);
-  if (payload.iss !== `https://securetoken.google.com/${FIREBASE_PROJECT_ID}`) throw new Error("Invalid Firebase token issuer.");
-  if (payload.aud !== FIREBASE_PROJECT_ID) throw new Error("Invalid Firebase token audience.");
+  if (payload.iss !== `https://securetoken.google.com/${getFirebaseProjectId(env)}`) throw new Error("Invalid Firebase token issuer.");
+  if (payload.aud !== getFirebaseProjectId(env)) throw new Error("Invalid Firebase token audience.");
   if (!payload.sub || Number(payload.exp || 0) <= now) throw new Error("Firebase token is expired.");
 
   const jwks = await getFirebaseJwks();
@@ -1855,7 +1865,7 @@ async function getFirebaseJwks() {
 async function queryFirestoreByEmail(env, collectionName, fieldName, email, firebaseToken) {
   const value = String(email || "").trim().toLowerCase();
   if (!value) return [];
-  const response = await fetch(`https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:runQuery`, {
+  const response = await fetch(`https://firestore.googleapis.com/v1/projects/${getFirebaseProjectId(env)}/databases/(default)/documents:runQuery`, {
     method:"POST",
     headers:{"Authorization":`Bearer ${firebaseToken}`,"Content-Type":"application/json"},
     body:JSON.stringify({
@@ -1895,7 +1905,7 @@ async function getFirestoreDocumentsByEmail(env, collectionName, email, firebase
   const normalizedEmail = String(email || "").trim().toLowerCase();
   if (!normalizedEmail) return [];
   const response = await fetch(
-    `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:runQuery`,
+    `https://firestore.googleapis.com/v1/projects/${getFirebaseProjectId(env)}/databases/(default)/documents:runQuery`,
     {
       method: "POST",
       headers: {
@@ -1969,7 +1979,7 @@ async function getFirestoreAdminAccessToken(env) {
     throw new Error("Privileged Firestore identity is not configured correctly.");
   }
   if (
-    serviceAccount.project_id !== FIREBASE_PROJECT_ID ||
+    serviceAccount.project_id !== getFirebaseProjectId(env) ||
     typeof serviceAccount.client_email !== "string" ||
     !serviceAccount.client_email.endsWith(".iam.gserviceaccount.com") ||
     typeof serviceAccount.private_key !== "string"
@@ -2022,7 +2032,7 @@ async function getFirestoreAdminAccessToken(env) {
 
 async function commitFirestoreDocumentAndAudit(env, documentId, _firebaseToken, documentFields, documentMask, auditFields, {createOnly=false}={}) {
   const firebaseToken = await getFirestoreAdminAccessToken(env);
-  const base=`projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents`;
+  const base=`projects/${getFirebaseProjectId(env)}/databases/(default)/documents`;
   const auditId=`${documentId}-${Date.now()}-${crypto.randomUUID().slice(0,8)}`;
   const documentWrite={
     update:{name:`${base}/documents/${documentId}`,fields:documentFields},
@@ -2033,7 +2043,7 @@ async function commitFirestoreDocumentAndAudit(env, documentId, _firebaseToken, 
     documentWrite,
     {update:{name:`${base}/audit/${auditId}`,fields:auditFields},currentDocument:{exists:false}}
   ];
-  const response=await fetch(`https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:commit`,{
+  const response=await fetch(`https://firestore.googleapis.com/v1/projects/${getFirebaseProjectId(env)}/databases/(default)/documents:commit`,{
     method:"POST",
     headers:{"Authorization":`Bearer ${firebaseToken}`,"Content-Type":"application/json"},
     body:JSON.stringify({writes})
@@ -2044,7 +2054,7 @@ async function commitFirestoreDocumentAndAudit(env, documentId, _firebaseToken, 
 
 async function recordDocumentLifecycleFailure(env, claims, documentId, action, details = {}) {
   const firebaseToken = await getFirestoreAdminAccessToken(env);
-  const base = `projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents`;
+  const base = `projects/${getFirebaseProjectId(env)}/databases/(default)/documents`;
   const auditId = `lifecycle-failure-${Date.now()}-${crypto.randomUUID().slice(0, 12)}`;
   const auditFields = {
     action: {stringValue: `DOCUMENT_LIFECYCLE_${action}_FAILED`},
@@ -2065,7 +2075,7 @@ async function recordDocumentLifecycleFailure(env, claims, documentId, action, d
 }
 
 async function updateFirestoreDocument(env, path, firebaseToken, fields, updateMask) {
-  const url = new URL(`https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/${path}`);
+  const url = new URL(`https://firestore.googleapis.com/v1/projects/${getFirebaseProjectId(env)}/databases/(default)/documents/${path}`);
   for (const fieldPath of updateMask || Object.keys(fields)) url.searchParams.append("updateMask.fieldPaths", fieldPath);
   const response = await fetch(url.toString(), {
     method:"PATCH",
@@ -2077,7 +2087,7 @@ async function updateFirestoreDocument(env, path, firebaseToken, fields, updateM
 }
 
 async function getFirestoreDocument(env, path, firebaseToken) {
-  const response = await fetch(`https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/${path}`, {
+  const response = await fetch(`https://firestore.googleapis.com/v1/projects/${getFirebaseProjectId(env)}/databases/(default)/documents/${path}`, {
     headers: { Authorization: `Bearer ${firebaseToken}` }
   });
   if (response.status === 404) return null;
