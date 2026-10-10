@@ -16,10 +16,10 @@ Run the IRPA Grant Crawler — Isolated Staging workflow manually after its pull
 
 - RSS/Atom feeds continue to run as the original connector.
 - Official donor webpage scanning reads configured `GRANT_SOURCE_PAGE_URLS` JSON URLs (maximum 20), follows grant-related links on the same host, and extracts page titles/descriptions without executing page scripts.
-- Brave web search runs four targeted grant queries when the optional `BRAVE_SEARCH_API_KEY` secret is configured. It remains explicitly marked unconfigured otherwise.
+- Web-search discovery runs four targeted Google News RSS queries by default, with the optional `BRAVE_SEARCH_API_KEY` enabling Brave Search API results instead.
 - Every engine feeds the same deduplicated `grant_opportunities` register and the same `assessFit` screening formula. Expired calls, country-only mismatches, and unknown geography are not promoted to eligible opportunities; uncertain cases remain auditable.
 - Engine runs are recorded in `crawler_engine_runs`; the authenticated `/opportunities` response includes recent engine health, source counts and the shared register used by the grant dashboard.
-- Add or change official source-page URLs through `GRANT_SOURCE_PAGE_URLS` (JSON array); add the Brave key only as a Cloudflare secret. Never commit API keys.
+- Configured official source pages include UNDP Tanzania news and press releases, GEF Small Grants Programme, FAO funding opportunities, the EU Delegation to Tanzania, and the Tanzania Forest Fund download center. Add or change official source-page URLs through `GRANT_SOURCE_PAGE_URLS` (JSON array); add the Brave key only as a Cloudflare secret. Never commit API keys.
 
 ## Endpoints
 - `GET /health`: returns service/environment/storage status, without secrets.
