@@ -227,7 +227,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
        if(data.geographic_eligibility||data.eligibility_gate)setAnalysisResult({geographic_eligibility:data.geographic_eligibility||null,eligibility_gate:data.eligibility_gate||null,eligibility:{status:data.eligibility_gate?.status==="ineligible"||data.geographic_eligibility?.status==="ineligible"?"ineligible":"insufficient_information",confidence:"high",evidence:data.geographic_eligibility?.evidence||[],unknowns:[data.geographic_eligibility?.reason||data.next_step||"Verify official eligibility criteria.",...(data.eligibility_gate?.warnings||[])]}});
        throw new Error(data.error||"The AI eligibility analysis failed ("+response.status+").");
      }
-     setAnalysisResult(data.assessment||null);
+     setAnalysisResult(data.assessment?{...data.assessment,eligibility_gate:data.assessment.known_eligibility_gaps||null}:null);
      if(task==="concept_note"){
        const generated=text(data.assessment?.concept_note?.draft);
        setConceptDraft(generated);
