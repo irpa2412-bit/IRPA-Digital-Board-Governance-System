@@ -1,3 +1,81 @@
+
+const FIREBASE_PROJECT_ID = "irpa-digital-board-governance";
+let firebaseJwkCache = { keys: [], expiresAt: 0 };
+
+function decodeBase64Url(value) {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const binary = atob(normalized + "=".repeat((4 - normalized.length % 4) % 4));
+  return Uint8Array.from(binary, ch => ch.charCodeAt(0));
+}
+
+async function verifyFirebaseIdToken(token, env, requireAdmin = false) {
+  const parts = String(token || "").split(".");
+  if (parts.length !== 3) throw new Error("A valid Firebase sign-in token is required.");
+  let header, claims;
+  try {
+    header = JSON.parse(new TextDecoder().decode(decodeBase64Url(parts[0])));
+    claims = JSON.parse(new TextDecoder().decode(decodeBase64Url(parts[1])));
+  } catch { throw new Error("Firebase sign-in token is malformed."); }
+  const now = Math.floor(Date.now() / 1000);
+  if (header.alg !== "RS256" || !header.kid || claims.aud !== FIREBASE_PROJECT_ID ||
+      claims.iss !== "https://securetoken.google.com/" + FIREBASE_PROJECT_ID ||
+      !claims.sub || claims.sub.length > 128 || !claims.exp || claims.exp <= now ||
+      !claims.iat || claims.iat > now + 60 || !claims.auth_time || claims.auth_time > now + 60) {
+    throw new Error("Firebase sign-in token is invalid or expired.");
+  }
+  if (now - claims.auth_time > 60 * 60 * 24 * 7) throw new Error("Sign in again before using grant scanning.");
+  if (!firebaseJwkCache.keys.length || firebaseJwkCache.expiresAt < now) {
+    const response = await fetch("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com", {
+      headers: { accept: "application/json" }, signal: AbortSignal.timeout(8000)
+    });
+    if (!response.ok) throw new Error("Identity verification service is temporarily unavailable.");
+    const data = await response.json();
+    const maxAge = Number((response.headers.get("cache-control") || "").match(/max-age=(\\d+)/i)?.[1] || 300);
+    firebaseJwkCache = { keys: data.keys || [], expiresAt: now + Math.min(Math.max(maxAge, 60), 3600) };
+  }
+  const jwk = firebaseJwkCache.keys.find(key => key.kid === header.kid && key.kty === "RSA");
+  if (!jwk) { firebaseJwkCache.expiresAt = 0; throw new Error("Firebase signing key is not recognized; retry the request."); }
+  const key = await crypto.subtle.importKey("jwk", jwk, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]);
+  const signature = decodeBase64Url(parts[2]);
+  const signed = new TextEncoder().encode(parts[0] + "." + parts[1]);
+  if (!await crypto.subtle.verify("RSASSA-PKCS1-v1_5", key, signature, signed)) throw new Error("Firebase sign-in token signature is invalid.");
+  if (requireAdmin) {
+    const allowed = String(env.GRANT_CRAWLER_ADMIN_EMAILS || "").split(",").map(v => v.trim().toLowerCase()).filter(Boolean);
+    const email = String(claims.email || "").trim().toLowerCase();
+    if (!claims.email_verified || !email || !allowed.includes(email)) {
+      throw new Error("This signed-in account is not authorized to start a donor-source scan.");
+    }
+  }
+  return claims;
+}
+
+function corsHeaders() {
+  return {
+    "access-control-allow-origin": "*",
+    "access-control-allow-methods": "GET, POST, OPTIONS",
+    "access-control-allow-headers": "Authorization, Content-Type",
+    "access-control-max-age": "600",
+  };
+}
+
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...corsHeaders() },
+  });
+}
+
+async function listOpportunities(env) {
+  if (!env.GRANTS_DB) throw new Error("The isolated staging D1 database binding is missing.");
+  const rows = await env.GRANTS_DB.prepare(
+    "SELECT id, title, description, url, published_at, source_url, fit_score, fit_assessment, fit_reasons, eligibility_status, call_status, geography_assessment, triage_assessment, deadline_at, first_seen_at, last_seen_at FROM grant_opportunities ORDER BY CASE WHEN triage_assessment = 'priority_for_eligibility_review' THEN 0 WHEN triage_assessment = 'manual_eligibility_review' THEN 1 ELSE 2 END, COALESCE(deadline_at, '9999-12-31'), fit_score DESC, title COLLATE NOCASE LIMIT 250"
+  ).all();
+  const run = await env.GRANTS_DB.prepare(
+    "SELECT status, items_seen, items_changed, error_message, finished_at FROM crawler_runs ORDER BY id DESC LIMIT 1"
+  ).first();
+  return { service: "irpa-grant-crawler", items: rows.results || [], count: (rows.results || []).length, lastRun: run || null };
+}
+
 const MAX_FEED_BYTES = 1_000_000;
 const MAX_FEEDS = 30;
 const MAX_ITEMS_PER_FEED = 100;
@@ -219,12 +297,31 @@ async function crawl(env) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders() });
     if (request.method === "GET" && url.pathname === "/health") {
       return json({ service: "irpa-grant-crawler", environment: env.IRPA_ENVIRONMENT || "local", storage: env.GRANTS_DB ? "configured" : "missing", firebase: "disabled-by-design-until-dedicated-rules-and-identity-are-approved" });
     }
-    if (request.method !== "POST" || url.pathname !== "/crawl") return json({ error: "Not found" }, 404);
-    const expected = String(env.CRAWLER_CONTROL_TOKEN || "");
-    if (expected.length < 32 || request.headers.get("authorization") !== "Bearer " + expected) return json({ error: "Unauthorized" }, 401);
+    if (request.method === "GET" && url.pathname === "/opportunities") {
+      try {
+        const token = String(request.headers.get("authorization") || "").replace(/^Bearer\\s+/i, "");
+        await verifyFirebaseIdToken(token, env, false);
+        return json(await listOpportunities(env));
+      } catch (error) {
+        return json({ error: String(error.message || "Unable to retrieve grant results").slice(0, 300) }, 401);
+      }
+    }
+    if (request.method !== "POST" || !["/crawl", "/run"].includes(url.pathname)) return json({ error: "Not found" }, 404);
+    if (url.pathname === "/run") {
+      try {
+        const token = String(request.headers.get("authorization") || "").replace(/^Bearer\\s+/i, "");
+        await verifyFirebaseIdToken(token, env, true);
+      } catch (error) {
+        return json({ error: String(error.message || "Unauthorized").slice(0, 300) }, 401);
+      }
+    } else {
+      const expected = String(env.CRAWLER_CONTROL_TOKEN || "");
+      if (expected.length < 32 || request.headers.get("authorization") !== "Bearer " + expected) return json({ error: "Unauthorized" }, 401);
+    }
     try { return json(await crawl(env)); }
     catch (error) {
       if (env.GRANTS_DB) {
