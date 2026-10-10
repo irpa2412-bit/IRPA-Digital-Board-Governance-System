@@ -157,3 +157,15 @@ test("AI grant assistant fails closed when Cloudflare AI binding is absent", asy
   }), { CRAWLER_CONTROL_TOKEN: token });
   assert.equal(response.status, 503);
 });
+
+
+test("digital governance and DBGS investment opportunities are retained as a distinct strategic track", () => {
+  const fit = assessFit({
+    title: "Digital governance and board management system investment fund",
+    description: "Support for nonprofit board governance technology, cybersecurity and cloud infrastructure for civil society organizations."
+  });
+  assert.equal(fit.digitalGovernanceMatch, true);
+  assert.equal(fit.strategicTrack, "digital_governance_DBGS_investment");
+  assert.ok(fit.reasons.includes("digital governance/DBGS investment"));
+  assert.equal(fit.eligibilityStatus, "unverified");
+});
