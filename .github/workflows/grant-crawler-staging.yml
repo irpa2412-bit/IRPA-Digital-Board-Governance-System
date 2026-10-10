@@ -182,6 +182,7 @@ jobs:
             feedsConfigured: result.feedsConfigured,
             itemsSeen: result.itemsSeen,
             recordsChanged: result.recordsChanged,
-            irpaFitMatches: result.irpaFitMatches
+            irpaFitMatches: result.irpaFitMatches,
+            topMatches: result.topMatches
           }, null, 2));
           NODE
