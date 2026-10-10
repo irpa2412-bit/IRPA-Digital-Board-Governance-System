@@ -219,3 +219,5 @@ export async function analyzeGrant(request, env) {
     return json({ error: String(error?.message || "AI analysis failed").slice(0, 300) }, 502);
   }
 }
+
+export { assessGeographicEligibility };
