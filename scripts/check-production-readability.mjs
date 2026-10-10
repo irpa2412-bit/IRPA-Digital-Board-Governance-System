@@ -80,6 +80,15 @@ for(const script of ["check-readability-policy.mjs","check-token-contrast.mjs"])
 console.log(`IRPA-DBGS Readability & Contrast Checker — mode: ${changedOnly?"changed-files":"full-production"}`);
 console.log(`Files audited: ${new Set(files).size}`);
 for(const note of notes) console.log("INFO: "+note);
+fs.mkdirSync("artifacts",{recursive:true});
+fs.writeFileSync("artifacts/readability-check-report.json",JSON.stringify({
+  generatedAt:new Date().toISOString(),
+  mode:changedOnly?"changed-files":"full-production",
+  filesAudited:new Set(files).size,
+  notes,
+  violationCount:violations.length,
+  violations
+},null,2)+"\n");
 if(violations.length) {
   console.error(`FAIL: ${violations.length} readability/contrast violation(s) detected:`);
   for(const v of violations.slice(0,250)) console.error(`- ${v.file}:${v.line}: ${v.message}`);
