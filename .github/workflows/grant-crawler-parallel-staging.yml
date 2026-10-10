@@ -4,11 +4,11 @@ on:
     branches:
       - feature/parallel-grant-crawler-live
     paths:
-      - "cloudflare/grant-crawler-parallel-parallel/**"
+      - "cloudflare/grant-crawler-parallel/**"
       - ".github/workflows/grant-crawler-staging.yml"
   pull_request:
     paths:
-      - "cloudflare/grant-crawler-parallel-parallel/**"
+      - "cloudflare/grant-crawler-parallel/**"
       - ".github/workflows/grant-crawler-staging.yml"
   workflow_dispatch:
 permissions:
