@@ -6,9 +6,9 @@ async function main() {
   const raw = readFileSync(0, "utf8");
   const crawlResult = JSON.parse(raw);
   lastCrawlResult = crawlResult;
-  const workerUrl = String(process.env.STAGING_WORKER_URL || "").replace(/\/+$/, "");
+  const workerUrl = String(process.env.PRODUCTION_WORKER_URL || process.env.STAGING_WORKER_URL || "").replace(/\/+$/, "");
   const token = String(process.env.GRANT_CRAWLER_CONTROL_TOKEN || "");
-  if (!/^https:\/\//i.test(workerUrl)) throw new Error("STAGING_WORKER_URL must be HTTPS.");
+  if (!/^https:\/\//i.test(workerUrl)) throw new Error("Crawler worker URL must be HTTPS.");
   if (token.length < 32) throw new Error("Crawler control token is missing or too short.");
   if (crawlResult.status !== "success") throw new Error("Crawler failed: " + String(crawlResult.error || crawlResult.status || "unknown error"));
   if (!Number(crawlResult.feedsConfigured)) throw new Error("No official feeds are configured.");
