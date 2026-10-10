@@ -100,10 +100,37 @@ function assessFit(item) {
   const matched = signals.filter(signal => signal.terms.some(term => text.includes(term)));
   const score = Math.min(100, matched.reduce((sum, signal) => sum + signal.weight, 0));
   const fitAssessment = score >= 35 ? "strong_topic_match" : score >= 15 ? "possible_topic_match" : "low_topic_match";
+  const callStatus = /\\bclosed\\b/i.test(text)
+    ? "closed"
+    : /fund state:\\s*open|open for applications|applications are open|call is open/i.test(text)
+      ? "open"
+      : "unknown";
+  const tanzaniaMentioned = /\\btanzania\\b|united republic of tanzania/i.test(text);
+  const otherCountryFocus = /\\b(kenya|uganda|south africa|west africa|sudan|albania|rwanda|bangladesh|morocco|nepal)\\b/i.test(text);
+  const regionalScope = /east africa|sub-saharan africa|africa-wide|across africa|global|worldwide|low[- ]and[- ]middle[- ]income|\\blmic\\b|developing countries/i.test(text);
+  const geographyAssessment = tanzaniaMentioned
+    ? "tanzania_mentioned"
+    : otherCountryFocus && !regionalScope
+      ? "other_country_focus"
+      : regionalScope
+        ? "regional_or_lmic_scope"
+        : "not_stated";
+  const triageAssessment = callStatus === "closed"
+    ? "closed_do_not_prioritize"
+    : geographyAssessment === "other_country_focus"
+      ? "geographic_mismatch_review"
+      : score >= 15 && ["tanzania_mentioned", "regional_or_lmic_scope"].includes(geographyAssessment)
+        ? "priority_for_eligibility_review"
+        : score >= 15
+          ? "manual_eligibility_review"
+          : "low_priority";
   return {
     score,
     fitAssessment,
     reasons: matched.map(signal => signal.label),
+    callStatus,
+    geographyAssessment,
+    triageAssessment,
     eligibilityStatus: "unverified",
   };
 }
@@ -113,26 +140,32 @@ async function crawl(env) {
   const items = await readFeeds(env);
   const assessedItems = items.map(item => ({ ...item, fit: assessFit(item) }));
   let changed = 0;
-  const matchCounts = { strong: 0, possible: 0, low: 0, eligibilityUnverified: 0 };
+  const matchCounts = { strong: 0, possible: 0, low: 0, priorityForReview: 0, closed: 0, geographicMismatch: 0, eligibilityUnverified: 0 };
   for (const item of assessedItems) {
     const fit = item.fit;
     if (fit.fitAssessment === "strong_topic_match") matchCounts.strong++;
     else if (fit.fitAssessment === "possible_topic_match") matchCounts.possible++;
     else matchCounts.low++;
+    if (fit.triageAssessment === "priority_for_eligibility_review") matchCounts.priorityForReview++;
+    if (fit.callStatus === "closed") matchCounts.closed++;
+    if (fit.geographyAssessment === "other_country_focus") matchCounts.geographicMismatch++;
     matchCounts.eligibilityUnverified++;
     const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(item.url));
     const id = [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, "0")).join("");
     const result = await env.GRANTS_DB.prepare(
-      "INSERT INTO grant_opportunities (id, title, description, url, published_at, source_url, fit_score, fit_assessment, fit_reasons, eligibility_status, first_seen_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT(url) DO UPDATE SET title=excluded.title, description=excluded.description, published_at=excluded.published_at, source_url=excluded.source_url, fit_score=excluded.fit_score, fit_assessment=excluded.fit_assessment, fit_reasons=excluded.fit_reasons, eligibility_status=excluded.eligibility_status, last_seen_at=CURRENT_TIMESTAMP"
-    ).bind(id, item.title, item.description, item.url, item.publishedAt, item.sourceUrl, fit.score, fit.fitAssessment, JSON.stringify(fit.reasons), fit.eligibilityStatus).run();
+      "INSERT INTO grant_opportunities (id, title, description, url, published_at, source_url, fit_score, fit_assessment, fit_reasons, eligibility_status, call_status, geography_assessment, triage_assessment, first_seen_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT(url) DO UPDATE SET title=excluded.title, description=excluded.description, published_at=excluded.published_at, source_url=excluded.source_url, fit_score=excluded.fit_score, fit_assessment=excluded.fit_assessment, fit_reasons=excluded.fit_reasons, eligibility_status=excluded.eligibility_status, call_status=excluded.call_status, geography_assessment=excluded.geography_assessment, triage_assessment=excluded.triage_assessment, last_seen_at=CURRENT_TIMESTAMP"
+    ).bind(id, item.title, item.description, item.url, item.publishedAt, item.sourceUrl, fit.score, fit.fitAssessment, JSON.stringify(fit.reasons), fit.eligibilityStatus, fit.callStatus, fit.geographyAssessment, fit.triageAssessment).run();
     if (result.meta?.changes) changed += result.meta.changes;
   }
   await env.GRANTS_DB.prepare(
     "INSERT INTO crawler_runs (status, items_seen, items_changed, finished_at) VALUES ('success', ?, ?, CURRENT_TIMESTAMP)"
   ).bind(items.length, changed).run();
   const topMatches = assessedItems
-    .filter(item => item.fit.score > 0)
-    .sort((a, b) => b.fit.score - a.fit.score || a.title.localeCompare(b.title))
+    .filter(item => item.fit.score > 0 && !["closed_do_not_prioritize", "geographic_mismatch_review", "low_priority"].includes(item.fit.triageAssessment))
+    .sort((a, b) => {
+      const priority = item => item.fit.triageAssessment === "priority_for_eligibility_review" ? 0 : 1;
+      return priority(a) - priority(b) || b.fit.score - a.fit.score || a.title.localeCompare(b.title);
+    })
     .slice(0, 12)
     .map(item => ({
       title: item.title,
@@ -140,6 +173,9 @@ async function crawl(env) {
       fitScore: item.fit.score,
       fitAssessment: item.fit.fitAssessment,
       fitReasons: item.fit.reasons,
+      callStatus: item.fit.callStatus,
+      geographyAssessment: item.fit.geographyAssessment,
+      triageAssessment: item.fit.triageAssessment,
       eligibilityStatus: item.fit.eligibilityStatus,
     }));
   return { status: "success", feedsConfigured: JSON.parse(env.GRANT_FEED_URLS_JSON || env.GRANT_FEED_URLS || "[]").length, itemsSeen: items.length, recordsChanged: changed, irpaFitMatches: matchCounts, topMatches };
