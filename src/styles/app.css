@@ -4777,7 +4777,7 @@
 .irpa-public-entry>.public-information-panel{width:min(1180px,100%);margin:0 auto}
 .public-information-panel{padding:clamp(18px,3vw,30px);border:1px solid #2b5945;border-radius:20px;background:linear-gradient(145deg,#0c241a 0%,#0a1b15 72%);color:#edf5f1;box-shadow:0 18px 48px rgba(0,0,0,.22)}
 .public-info-topline{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;color:#d6a52c;font-size:12px;font-weight:850;letter-spacing:.12em}
-.public-info-readonly{display:inline-flex;align-items:center;gap:7px;padding:6px 10px;border:1px solid #315b47;border-radius:999px;color:#c4d8cd;font-size:11px;letter-spacing:.02em;font-weight:700}
+.public-info-readonly{display:inline-flex;align-items:center;gap:7px;padding:6px 10px;border:1px solid #315b47;border-radius:999px;color:#c4d8cd;font-size:12px;letter-spacing:.02em;font-weight:700}
 .public-info-intro{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:18px 0 22px}
 .public-info-intro h2{margin:0 0 8px;font-size:clamp(25px,3vw,34px);line-height:1.15;color:#f4f8f6}
 .public-info-intro p{max-width:720px;margin:0;color:#bfd0c7;font-size:15px;line-height:1.65}
@@ -4801,7 +4801,7 @@
 .public-info-item-copy small{color:#9db6a9;font-size:12px;line-height:1.45}
 .public-info-open{display:inline-flex;align-items:center;gap:5px;flex:0 0 auto;align-self:center;padding:8px 10px;border:1px solid #3d7957;border-radius:9px;color:#e7f3eb;background:#143a28;font-size:12px;font-weight:800;text-decoration:none;white-space:nowrap}
 .public-info-open:hover{background:#1b4b34;color:#fff}
-.public-info-unavailable{align-self:center;color:#9db6a9;font-size:11px;text-align:right}
+.public-info-unavailable{align-self:center;color:#9db6a9;font-size:12px;text-align:right}
 .public-info-empty{padding:18px 12px;border:1px dashed #355744;border-radius:11px;color:#bfd0c7;font-size:13px;line-height:1.6;text-align:center}
 .public-info-notice{margin:0 0 18px;padding:12px 14px;border:1px solid #725e2c;border-radius:10px;background:#332a12;color:#f4e4b4;font-size:13px;line-height:1.5}
 .public-info-footer{display:flex;align-items:flex-start;gap:9px;margin:18px 0 0;padding-top:15px;border-top:1px solid #294838;color:#a9c1b4;font-size:12px;line-height:1.6}
