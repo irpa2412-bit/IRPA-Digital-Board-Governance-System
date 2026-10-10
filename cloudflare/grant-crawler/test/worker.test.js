@@ -122,6 +122,23 @@ test("AI geographic classifier requires explicit Tanzania or broad eligible geog
   }).status, "unclear");
 });
 
+test("digital governance and DBGS calls are scored as a distinct strategic investment track", () => {
+  const fit = assessFit({
+    title: "Digital governance and board management system investment fund",
+    description: "Eligible applicants must be registered in Tanzania as NGOs. Support for nonprofit board governance technology, cybersecurity and cloud infrastructure for civil society organizations."
+  });
+  assert.equal(fit.digitalGovernanceMatch, true);
+  assert.equal(fit.strategicTrack, "digital_governance_DBGS_investment");
+  assert.ok(fit.reasons.includes("digital governance/DBGS investment"));
+  assert.equal(fit.geographyAssessment, "tanzania_mentioned");
+
+  const market = assessFit({
+    title: "Pastoral livestock market access and value addition grant",
+    description: "Eligible applicants must be registered in Tanzania. Support livestock market linkages, leather processing and market information."
+  });
+  assert.ok(market.reasons.includes("market development/value addition"));
+});
+
 test("strict geographic filter excludes South Africa-only and Zimbabwe-only announcements", () => {
   const southAfrica = assessFit({
     title: "Community grants for South African registered NGOs",
