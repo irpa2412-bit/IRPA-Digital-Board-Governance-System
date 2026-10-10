@@ -489,7 +489,7 @@ test("Maa translation cannot be completed without an identified speaker review",
     completedAt:"2026-10-10T06:10:00.000Z",updatedAt:"2026-10-10T06:10:00.000Z"
   }));
   await assertSucceeds(reviewerDb.doc("documentTranslationRequests/translation-test-3").update({
-    status:"COMPLETED",translatedText:"Ashe. Enkare is sidai.",translationDraftText:deleteField(),
+    status:"COMPLETED",translatedText:"Ashe. Enkare is sidai.",translationDraftText:"",
     translationReviewedByUid:"reviewer-user",reviewNotes:"Reviewed with local speaker; corrected spelling and usage.",
     maaSpeakerReview:{speakerName:"Test Maa Speaker",dialect:"Kisonko / Ilkisonko",reviewNotes:"Checked spelling and usage.",verifiedByUid:"reviewer-user",verifiedAt:"2026-10-10T06:10:00.000Z"},
     translationReviewedAt:"2026-10-10T06:10:00.000Z",
@@ -500,4 +500,51 @@ test("Maa translation cannot be completed without an identified speaker review",
   });
   const ownerDb=testEnv.authenticatedContext("member-user",{email:"member@example.test"}).firestore();
   await assertSucceeds(ownerDb.doc("documentTranslationRequests/translation-test-3").update({translatedFileId:"drive-translation-file",translatedDocumentId:"LIFE-translation-output",translationOutputFileName:"IRPA-Translation-TEST-MAA.txt",updatedAt:"2026-10-10T06:11:00.000Z"}));
+});
+
+
+test("translation derivative can be created by source owner with exactly inherited access controls", async () => {
+  const source=lifecycleDocument({
+    classification:"Confidential",accessPolicy:"CONTROLLED",archiveCategory:"Governance Documents",
+    documentType:"Governance",authorizedUids:["member-user","board-member-2"],
+    authorizedRoles:["Board Member","Executive Director"],authorizedDepartments:["Governance","Board Secretariat"]
+  });
+  await testEnv.withSecurityRulesDisabled(async context=>{
+    await context.firestore().doc("documents/LIFE-source-governance").set({...source,documentId:"LIFE-source-governance",ownerUid:"member-user",uploadedByUid:"member-user"});
+  });
+  const ownerDb=testEnv.authenticatedContext("member-user",{email:"member@example.test"}).firestore();
+  const derivative=lifecycleDocument({
+    documentId:"LIFE-translated-governance",reference:"IRPA-DOC-2026-TRANSLATED01",
+    title:"Translated governance document",fileName:"translated.txt",fileId:"drive-translated-file",
+    ownerUid:"member-user",uploadedByUid:"member-user",ownerType:"MEMBER",
+    classification:"Confidential",accessPolicy:"CONTROLLED",archiveCategory:"Governance Documents",
+    documentType:"Governance",authorizedUids:["member-user","board-member-2"],
+    authorizedRoles:["Board Member","Executive Director"],authorizedDepartments:["Governance","Board Secretariat"],
+    parentDocumentId:"LIFE-source-governance",translationDerivative:true,
+    inheritedAccessFromDocumentId:"LIFE-source-governance"
+  });
+  await assertSucceeds(ownerDb.doc("documents/LIFE-translated-governance").set(derivative));
+});
+
+test("translation derivative creation is denied if access is broader than the source", async () => {
+  const source=lifecycleDocument({
+    classification:"Confidential",accessPolicy:"CONTROLLED",archiveCategory:"Governance Documents",
+    documentType:"Governance",authorizedUids:["member-user"],
+    authorizedRoles:["Board Secretary"],authorizedDepartments:["Governance"]
+  });
+  await testEnv.withSecurityRulesDisabled(async context=>{
+    await context.firestore().doc("documents/LIFE-source-restricted").set({...source,documentId:"LIFE-source-restricted",ownerUid:"member-user",uploadedByUid:"member-user"});
+  });
+  const ownerDb=testEnv.authenticatedContext("member-user",{email:"member@example.test"}).firestore();
+  const derivative=lifecycleDocument({
+    documentId:"LIFE-translated-broader",reference:"IRPA-DOC-2026-TRANSLATED02",
+    title:"Translated governance document",fileName:"translated.txt",fileId:"drive-translated-file-2",
+    ownerUid:"member-user",uploadedByUid:"member-user",ownerType:"MEMBER",
+    classification:"Internal",accessPolicy:"IRPA_INTERNAL",archiveCategory:"Administrative Documents",
+    documentType:"Other",authorizedUids:["member-user","finance-user"],
+    authorizedRoles:["Board Secretary","Finance Manager"],authorizedDepartments:["Governance","Finance"],
+    parentDocumentId:"LIFE-source-restricted",translationDerivative:true,
+    inheritedAccessFromDocumentId:"LIFE-source-restricted"
+  });
+  await assertFails(ownerDb.doc("documents/LIFE-translated-broader").set(derivative));
 });
