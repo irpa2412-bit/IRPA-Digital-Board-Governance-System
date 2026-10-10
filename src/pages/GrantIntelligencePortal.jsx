@@ -47,9 +47,11 @@ const isCountryRestrictedForIrpa=record=>{
  const countryOnly=/\b(?:only|exclusively|restricted to|limited to|eligible only in|applicants? (?:must|should) be (?:registered|based|located) in|must be registered in|must be based in)\b[^.!?]{0,90}\b(?:south africa|south african|rsa|zimbabwe|zimbabwean)\b|\b(?:south africa|south african|rsa|zimbabwe|zimbabwean)\b[^.!?]{0,90}\b(?:only|exclusively|restricted to|limited to|based applicants?|registered applicants?|eligible applicants?|organisations? only|organizations? only)\b/i.test(geographyText);
  if(countryOnly)return true;
  const mentionsTarget = /\b(?:south africa|south african|rsa|zimbabwe|zimbabwean|kenya|kenyan|uganda|ugandan|rwanda|rwandan|burundi|burundian|zambia|zambian|botswana|namibia|namibian|malawi|malawian|mozambique|mozambican|lesotho|eswatini|swaziland|angola|angolan|ethiopia|ethiopian|somalia|somalian|sudan|south sudan|ghana|nigeria|senegal|cameroon|liberia|sierra leone|gambia|guinea|mali|niger|burkina faso|benin|togo|cote d.?ivoire|ivory coast|egypt|morocco|algeria|tunisia|libya|chad|eritrea|djibouti|madagascar|mauritius|seychelles|democratic republic of the congo|drc|congo|united states of america|united states|american|canada|canadian|united kingdom|british|england|scotland|wales|northern ireland|australia|australian|new zealand|new zealander|germany|german|france|french|italy|italian|spain|spanish|portugal|portuguese|netherlands|dutch|belgium|belgian|sweden|swedish|norway|norwegian|denmark|danish|finland|finnish|switzerland|swiss|austria|austrian|poland|polish|czech republic|czechia|hungary|hungarian|romania|romanian|greece|greek|turkey|turkish|ukraine|ukrainian|russia|russian|china|chinese|india|indian|japan|japanese|south korea|korean|indonesia|indonesian|philippines|filipino|vietnam|vietnamese|thailand|thai|malaysia|malaysian|singapore|singaporean|pakistan|pakistani|bangladesh|bangladeshi|nepal|nepalese|sri lanka|sri lankan|brazil|brazilian|mexico|mexican|argentina|argentinian|chile|chilean|colombia|colombian|peru|peruvian|venezuela|venezuelan|ecuador|ecuadorian|uruguay|uruguayan|paraguay|paraguayan|bolivia|bolivian|costa rica|panama|panamanian|saudi arabia|saudi|united arab emirates|uae|qatar|kuwait|oman|bahrain|israel|israeli|palestine|palestinian|jordan|jordanian|lebanon|lebanese|iraq|iraqi|iran|iranian|afghanistan|afghan|kazakhstan|uzbekistan|kyrgyzstan|tajikistan|turkmenistan|mongolia|mongolian)\b/i.test(geographyText);
+ const titleText=text(record?.title).toLowerCase();
+ const southAfricaZimbabweTitleFocus=/\\b(?:south africa|south african|rsa|zimbabwe|zimbabwean)\\b/i.test(titleText)&&!/\\b(?:africa[- ]wide|pan[- ]african|east africa(?:n)?|sub[- ]saharan africa|global (?:grant|fund|call|programme|program)|worldwide (?:grant|call|eligibility)|open to applicants worldwide)\\b/i.test(titleText);
  const broadScope = /(?:eligible|eligibility|applicants?|organisations?|organizations?|open to|available to|applications? from|funding across|call for|within|across|throughout|for)[^.!?]{0,90}(?:east africa|east african|sub[- ]saharan africa|africa[- ]wide|across africa|pan[- ]african|continental africa|low[- ]and[- ]middle[- ]income countries|\blmics?\b|developing countries|all countries)|(?:east africa|east african|sub[- ]saharan africa|africa[- ]wide|across africa|pan[- ]african|continental africa|low[- ]and[- ]middle[- ]income countries|\blmics?\b|developing countries)[^.!?]{0,90}(?:eligible|eligibility|applicants?|organisations?|organizations?|open to|available to|funding across|call for|applications? from)|\b(?:global|worldwide|international)\s+(?:applicants?|applicant pool|eligibility|eligibility criteria)\b|\b(?:applicants?|organisations?|organizations?|applications?)\b[^.!?]{0,60}\b(?:globally|worldwide|internationally)\b|\bopen to (?:applicants?|organisations?|organizations?|applications?) worldwide\b/i.test(callText);
  const tanzaniaEligibility=/(?:eligible countries?[^.!?]{0,100}\btanzania\b|\btanzania\b[^.!?]{0,80}(?:is an eligible country|is eligible)|applications? (?:are )?open to (?:applicants?|organisations?|organizations?|ngos?) in tanzania|applications? from tanzania|applicants? from tanzania|tanzania-based (?:ngos?|organisations?|organizations?|civil society)|(?:applicants?|organisations?|organizations?|ngos?|civil society groups?) (?:must|should|may|can) be (?:registered|based|located|operating) in tanzania|(?:applicants?|organisations?|organizations?|ngos?|civil society groups?)[^.!?]{0,80}(?:registered|based|located|operating)[^.!?]{0,50}\btanzania\b)/i.test(callText);
- return mentionsTarget&&!broadScope&&!tanzaniaEligibility;
+return countryOnly||(!tanzaniaEligibility&&(southAfricaZimbabweTitleFocus||(mentionsTarget&&!broadScope)));
 };
 
 export default function GrantIntelligencePortal({profile,employee,isAdmin=false,onNavigate}){
@@ -215,6 +217,13 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  }
  async function runWorkspaceAnalysis(task="eligibility"){
    if(!selectedOpportunity?.title){setError("Select a grant opportunity before screening eligibility.");return;}
+   if(isCountryRestrictedForIrpa({...selectedOpportunity,summary:[selectedOpportunity.summary,opportunityDescription].filter(Boolean).join(" "),applicationRequirements:donorRequirements})){
+     setAnalysisResult({geographic_eligibility:{status:"ineligible",reason:"This opportunity is country-focused on South Africa, Zimbabwe or another non-Tanzania country, and does not establish Tanzania eligibility. AI screening and concept-note drafting are blocked.",evidence:["Deterministic country-focus exclusion applied before AI analysis."]},eligibility:{status:"ineligible",confidence:"high",evidence:["Country-specific non-Tanzania call"],unknowns:["Find a call explicitly open to Tanzania or an eligible regional/global applicant pool."]}});
+     setConceptDraft("");
+     setError("This country-specific call is excluded for IRPA. Select a Tanzania-eligible or clearly eligible regional/global opportunity.");
+     setWorkspaceNotice("Eligibility gate blocked this call before AI analysis.");
+     return;
+   }
    if(!text(opportunityDescription)&&!text(donorRequirements)){setError("Provide the opportunity description or paste the official donor eligibility and application criteria.");return;}
    const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-staging.irpa-governance.workers.dev").replace(/\/+$/,"");
    const idToken=await auth.currentUser?.getIdToken();
@@ -241,6 +250,10 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  }
  async function saveConceptDraft(){
    if(!selectedOpportunity?.title||!text(conceptDraft)){setError("Select an opportunity and enter a concept-note draft before saving.");return;}
+   if(isCountryRestrictedForIrpa({...selectedOpportunity,summary:[selectedOpportunity.summary,opportunityDescription].filter(Boolean).join(" "),applicationRequirements:donorRequirements})){
+     setError("This country-specific non-Tanzania opportunity cannot be saved as an IRPA application concept note. Existing saved records are not deleted.");
+     return;
+   }
    const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-staging.irpa-governance.workers.dev").replace(/\/+$/,"");
    const idToken=await auth.currentUser?.getIdToken();
    if(!idToken){setError("Your session has expired. Sign in again.");return;}
@@ -330,7 +343,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
     <select style={{...styles.input,marginTop:5}} value={selectedOpportunity?.id||""} onChange={e=>{const next=combinedRecords.find(r=>r.id===e.target.value);setSelectedOpportunity(next||null);setOpportunityDescription(text(next?.summary||""));setDonorRequirements(text(next?.applicationRequirements||""));setAnalysisResult(null);setConceptDraft("");setDraftId("");setWorkspaceNotice("");}}>
      <option value="">Select an opportunity from the register…</option>
      {selectedOpportunity?.id&&!combinedRecords.some(r=>r.id===selectedOpportunity.id)&&<option value={selectedOpportunity.id}>{selectedOpportunity.title} (saved draft)</option>}
-     {combinedRecords.map(r=><option key={r.id} value={r.id}>{r.title} — {r.country||"Geography unverified"}</option>)}
+     {geographyEligibleRecords.map(r=><option key={r.id} value={r.id}>{r.title} — {r.country||"Geography unverified"}</option>)}
     </select>
    </label>
    {selectedOpportunity&&<div style={{...styles.card,display:"grid",gap:5}}>
