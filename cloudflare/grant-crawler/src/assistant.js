@@ -57,6 +57,87 @@ function assessGeographicEligibility(opportunity) {
   };
 }
 
+function detectKnownEligibilityGaps(opportunity) {
+  const text = [opportunity.title, opportunity.description, opportunity.donorRequirements]
+    .filter(Boolean).join(" ").toLowerCase();
+  const blockers = [];
+  const warnings = [];
+  const addUnique = (list, message) => { if (!list.includes(message)) list.push(message); };
+
+  if (/(?:only|exclusively)\s*(?:government agencies|public authorities|universities|academic institutions|for[- ]profit companies|private companies)\s*(?:may apply|are eligible|can apply)|\bngos?\s+(?:are not eligible|may not apply|cannot apply)|\bnonprofits?\s+(?:are not eligible|may not apply|cannot apply)/i.test(text)) {
+    addUnique(blockers, "The call appears to exclude registered NGOs/non-profits or restrict applicants to another entity type.");
+  }
+
+  const requiresOrganizationalTrackRecord =
+    /(?:applicant|organization|organisation|ngo|civil society organization|civil society organisation|lead applicant)[^.!?]{0,100}(?:must|shall|required to|at least|minimum)[^.!?]{0,100}(?:completed projects|previously implemented|previous grants|past projects|proven track record|demonstrated track record)/i.test(text) ||
+    /(?:must|shall|required to)[^.!?]{0,100}(?:previously implemented|completed at least \d+ projects|have a proven track record|demonstrate a track record of completed projects)/i.test(text);
+  if (requiresOrganizationalTrackRecord) {
+    addUnique(blockers, "The call requires organizational project-delivery or grant track record, but IRPA has reported no completed projects.");
+  }
+
+  if (/(?:cash co[- ]?financing|cash match|matching funds|counterpart cash contribution|cash contribution of \d+\s*%|co[- ]?financing of \d+\s*%|co[- ]?funding of \d+\s*%)/i.test(text)) {
+    addUnique(blockers, "The call appears to require cash matching/co-financing, while IRPA has reported no secured project funds.");
+  } else if (/(?:co[- ]?financing|matching contribution|counterpart funding|cost share)/i.test(text)) {
+    addUnique(warnings, "The call mentions co-financing or cost share; IRPA has no secured project funds reported, so confirm whether in-kind contributions or third-party match are allowed.");
+  }
+
+  const yearsMatch = text.match(/(?:registered|incorporated|established|operating|in existence)[^.!?]{0,80}(?:at least|minimum(?: of)?|for|over|more than)\s*(\d{1,2})\s*years?/i) ||
+    text.match(/(?:at least|minimum(?: of)?|over|more than)\s*(\d{1,2})\s*years?[^.!?]{0,80}(?:registered|incorporated|established|operating|in existence)/i);
+  if (yearsMatch) {
+    const requiredYears = Number(yearsMatch[1] || yearsMatch[2]);
+    const registrationDate = Date.parse("2023-12-11T00:00:00Z");
+    const ageYears = Math.max(0, (Date.now() - registrationDate) / (365.2425 * 24 * 60 * 60 * 1000));
+    if (requiredYears > ageYears) {
+      addUnique(warnings, "The call appears to require at least " + requiredYears + " years of organizational existence; IRPA was registered on 11 December 2023 and has not yet reached that age as of this screening. Confirm the donor's eligibility measurement date before proceeding.");
+    }
+  }
+
+  if (/audited (?:financial statements|accounts|financial reports)[^.!?]{0,100}(?:last|past|previous|for)\s*\d+\s*years?/i.test(text)) {
+    addUnique(warnings, "The call requests multi-year audited financial records; IRPA's available audit history has not been established in the supplied profile. Confirm the required periods and acceptable evidence.");
+  }
+
+  const criteriaEvidence = /eligible countries|eligible applicants|applicants? must|organizations? may apply|organisations? may apply|registered in|years of operation|audited|co[- ]?financ|previously implemented|completed projects|application deadline|deadline for applications/i.test(text);
+  if (!criteriaEvidence) {
+    addUnique(warnings, "The supplied text does not include enough explicit applicant eligibility criteria to confirm IRPA's eligibility. Paste the official eligibility and application requirements.");
+  }
+  return { blockers, warnings };
+}
+
+function applyKnownEligibilityGaps(analysis, opportunity, geographicEligibility) {
+  const gaps = detectKnownEligibilityGaps(opportunity);
+  analysis.known_eligibility_gaps = gaps;
+  if (!Array.isArray(analysis.donor_requirements)) analysis.donor_requirements = [];
+  for (const blocker of gaps.blockers) {
+    if (!analysis.donor_requirements.some(row => String(row.requirement || "").toLowerCase() === blocker.toLowerCase())) {
+      analysis.donor_requirements.push({ requirement: blocker, status: "not_met", evidence: blocker, action: "Do not prioritize or draft until the donor confirms a valid exception or eligibility route." });
+    }
+  }
+  for (const warning of gaps.warnings) {
+    if (!analysis.donor_requirements.some(row => String(row.requirement || "").toLowerCase() === warning.toLowerCase())) {
+      analysis.donor_requirements.push({ requirement: warning, status: "unknown", evidence: warning, action: "Verify this criterion in the official call and record supporting evidence before marking the opportunity eligible." });
+    }
+  }
+  if (gaps.blockers.length || geographicEligibility.status === "ineligible") {
+    analysis.eligibility.status = "ineligible";
+    analysis.eligibility.confidence = "high";
+    analysis.eligibility.evidence = [...(Array.isArray(analysis.eligibility.evidence) ? analysis.eligibility.evidence : []), ...gaps.blockers];
+  } else if (gaps.warnings.length || geographicEligibility.status === "unclear") {
+    analysis.eligibility.status = "insufficient_information";
+    analysis.eligibility.confidence = "low";
+    analysis.eligibility.unknowns = [...(Array.isArray(analysis.eligibility.unknowns) ? analysis.eligibility.unknowns : []), ...gaps.warnings];
+  } else if (analysis.eligibility.status === "eligible") {
+    const rows = analysis.donor_requirements;
+    const allRequirementsMet = rows.length > 0 && rows.every(row => row.status === "met");
+    const unknowns = Array.isArray(analysis.eligibility.unknowns) ? analysis.eligibility.unknowns : [];
+    if (!allRequirementsMet || unknowns.length) {
+      analysis.eligibility.status = "insufficient_information";
+      analysis.eligibility.confidence = "low";
+      analysis.eligibility.unknowns = [...unknowns, "An eligible verdict requires every mandatory donor criterion to have explicit evidence and no unresolved eligibility questions."];
+    }
+  }
+  return gaps;
+}
+
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
