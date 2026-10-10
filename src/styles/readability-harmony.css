@@ -3091,3 +3091,53 @@ textarea:focus-visible{
 .dashboard-command .mobile-quote1-stats>button.mobile-blue-nav-button>span svg.dashboard-semantic-icon *{
   fill:none!important;stroke:#fff!important;opacity:1!important;visibility:visible!important;
 }
+
+
+/* Desktop quick-access icon correction: prevent global button/span styles from
+   turning SVG icon wrappers into blank circles. Use consistent visible SVGs
+   on desktop and tablet as well as mobile, without changing button behavior. */
+@media screen and (min-width:761px){
+  .dashboard-command .dashboard-desktop-view .mobile-quote1-quick .mobile-quote1-grid>button>span,
+  .dashboard-command .dashboard-desktop-view .mobile-quote1-grid>button>span,
+  .dashboard-command .dashboard-desktop-view .mobile-quote1-stats>button>span{
+    display:inline-flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    flex:0 0 36px!important;
+    width:36px!important;height:36px!important;
+    min-width:36px!important;min-height:36px!important;
+    padding:0!important;
+    margin:0 auto 8px!important;
+    background:transparent!important;
+    border:0!important;border-radius:0!important;
+    box-shadow:none!important;
+    color:#fff!important;
+    opacity:1!important;visibility:visible!important;
+  }
+  .dashboard-command .dashboard-desktop-view .mobile-quote1-quick .mobile-quote1-grid>button>span svg.dashboard-semantic-icon,
+  .dashboard-command .dashboard-desktop-view .mobile-quote1-grid>button>span svg.dashboard-semantic-icon,
+  .dashboard-command .dashboard-desktop-view .mobile-quote1-stats>button>span svg.dashboard-semantic-icon{
+    display:block!important;
+    flex:none!important;
+    width:30px!important;height:30px!important;
+    min-width:30px!important;min-height:30px!important;
+    max-width:30px!important;max-height:30px!important;
+    padding:0!important;
+    background:transparent!important;
+    border:0!important;border-radius:0!important;
+    box-shadow:none!important;
+    fill:none!important;
+    stroke:#fff!important;
+    stroke-width:1.9!important;
+    color:#fff!important;
+    opacity:1!important;visibility:visible!important;
+    overflow:visible!important;
+  }
+  .dashboard-command .dashboard-desktop-view .mobile-quote1-quick .mobile-quote1-grid>button>span svg.dashboard-semantic-icon *,
+  .dashboard-command .dashboard-desktop-view .mobile-quote1-grid>button>span svg.dashboard-semantic-icon *,
+  .dashboard-command .dashboard-desktop-view .mobile-quote1-stats>button>span svg.dashboard-semantic-icon *{
+    fill:none!important;
+    stroke:#fff!important;
+    opacity:1!important;visibility:visible!important;
+  }
+}
