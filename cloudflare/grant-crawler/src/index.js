@@ -111,10 +111,11 @@ function assessFit(item) {
 async function crawl(env) {
   if (!env.GRANTS_DB) throw new Error("The isolated staging D1 database binding is missing.");
   const items = await readFeeds(env);
+  const assessedItems = items.map(item => ({ ...item, fit: assessFit(item) }));
   let changed = 0;
   const matchCounts = { strong: 0, possible: 0, low: 0, eligibilityUnverified: 0 };
-  for (const item of items) {
-    const fit = assessFit(item);
+  for (const item of assessedItems) {
+    const fit = item.fit;
     if (fit.fitAssessment === "strong_topic_match") matchCounts.strong++;
     else if (fit.fitAssessment === "possible_topic_match") matchCounts.possible++;
     else matchCounts.low++;
@@ -129,7 +130,19 @@ async function crawl(env) {
   await env.GRANTS_DB.prepare(
     "INSERT INTO crawler_runs (status, items_seen, items_changed, finished_at) VALUES ('success', ?, ?, CURRENT_TIMESTAMP)"
   ).bind(items.length, changed).run();
-  return { status: "success", feedsConfigured: JSON.parse(env.GRANT_FEED_URLS_JSON || env.GRANT_FEED_URLS || "[]").length, itemsSeen: items.length, recordsChanged: changed, irpaFitMatches: matchCounts };
+  const topMatches = assessedItems
+    .filter(item => item.fit.score > 0)
+    .sort((a, b) => b.fit.score - a.fit.score || a.title.localeCompare(b.title))
+    .slice(0, 12)
+    .map(item => ({
+      title: item.title,
+      url: item.url,
+      fitScore: item.fit.score,
+      fitAssessment: item.fit.fitAssessment,
+      fitReasons: item.fit.reasons,
+      eligibilityStatus: item.fit.eligibilityStatus,
+    }));
+  return { status: "success", feedsConfigured: JSON.parse(env.GRANT_FEED_URLS_JSON || env.GRANT_FEED_URLS || "[]").length, itemsSeen: items.length, recordsChanged: changed, irpaFitMatches: matchCounts, topMatches };
 }
 
 export default {
