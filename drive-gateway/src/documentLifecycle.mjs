@@ -55,7 +55,7 @@ async function getIdentity(deps, env, claims) {
 }
 
 async function listVisibleDocuments(deps, env, claims, identity) {
-  const response = await fetch("https://firestore.googleapis.com/v1/projects/"+deps.FIREBASE_PROJECT_ID+"/databases/(default)/documents:runQuery",{
+  const response = await fetch("https://firestore.googleapis.com/v1/projects/"+deps.getFirebaseProjectId(env)+"/databases/(default)/documents:runQuery",{
     method:"POST",
     headers:{Authorization:"Bearer "+claims.token,"Content-Type":"application/json"},
     body:JSON.stringify({structuredQuery:{from:[{collectionId:"documents"}],limit:100}})
