@@ -13,9 +13,20 @@ Configure GitHub Actions secrets CLOUDFLARE_GRANT_CRAWLER_API_TOKEN, CLOUDFLARE_
 Run the IRPA Grant Crawler — Isolated Staging workflow manually after its pull request has been reviewed. It deploys only irpa-grant-crawler-staging; it does not touch irpa-google-drive-gateway or deploy Firebase.
 
 ## Endpoints
-- GET /health: returns service/environment/storage status, without secrets.
-- POST /crawl: requires Authorization: Bearer <CRAWLER_CONTROL_TOKEN>.
+- `GET /health`: returns service/environment/storage status, without secrets.
+- `GET /application`: serves the authenticated grant application workspace.
+- `GET /application/drafts`: lists the signed-in user's saved drafts.
+- `GET /application/drafts/:id`: retrieves a draft owned by the signed-in user.
+- `POST /application/drafts`: saves/synchronizes a draft to the isolated D1 database; each draft is scoped to the Firebase user UID.
+- `POST /assistant/analyze`: analyzes a donor call and generates a donor-tailored concept note. Browser requests use a verified Firebase ID token; service-to-service calls may use the crawler control token.
+- `POST /crawl`: requires `Authorization: Bearer <CRAWLER_CONTROL_TOKEN>`.
 - Scheduled scan: every six hours in the staging environment; with no feed URLs configured, it safely scans zero feeds.
+
+## Grant application workspace
+
+Open `/application` on the deployed crawler Worker. Sign in with an existing IRPA Firebase email/password account. Enter the opportunity details and paste the donor's official requirements. The AI can assess eligibility and generate editable fields for the title, executive summary, problem statement, objectives, beneficiaries, activities, results, monitoring and evaluation, sustainability, implementation arrangements, risks, budget narrative, organizational capacity and strategic alignment. Use **Copy wording** beside any field, **Copy all application wording** for a combined copy, or download a `.txt` draft. Save/synchronize to persist a private draft in D1; users can list and reopen only their own drafts. Drafts remain unsubmitted until a human transfers them to the donor portal and completes IRPA's internal review.
+
+The workspace does not submit donor applications. Generated claims, deadlines, budgets and eligibility must be checked against official donor guidance and confirmed IRPA records. Missing evidence must be completed by staff; the AI must not invent organizational track record, audits, partners, co-financing or exact financial figures.
 
 See SECURITY.md for the Firebase least-privilege gate and security boundaries.
 
