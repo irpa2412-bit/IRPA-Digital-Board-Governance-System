@@ -78,8 +78,14 @@ async function listOpportunities(env) {
   const run = await env.GRANTS_DB.prepare(
     "SELECT status, items_seen, items_changed, error_message, finished_at FROM crawler_runs ORDER BY id DESC LIMIT 1"
   ).first();
+  let engineRuns = { results: [] };
+  try {
+    engineRuns = await env.GRANTS_DB.prepare(
+      "SELECT engine, status, configured, items_seen, error_message, finished_at FROM crawler_engine_runs ORDER BY id DESC LIMIT 3"
+    ).all();
+  } catch {}
   const currentItems = (rows.results || []).filter(item => isCurrentOpportunity(item));
-  return { service: "irpa-grant-crawler", feedsConfigured: JSON.parse(env.GRANT_FEED_URLS_JSON || env.GRANT_FEED_URLS || "[]").length, items: currentItems, count: currentItems.length, suppressedExpiredOrUnverified: (rows.results || []).length - currentItems.length, lastRun: run || null };
+  return { service: "irpa-grant-crawler", feedsConfigured: JSON.parse(env.GRANT_FEED_URLS_JSON || env.GRANT_FEED_URLS || "[]").length, sourcePagesConfigured: JSON.parse(env.GRANT_SOURCE_PAGE_URLS_JSON || env.GRANT_SOURCE_PAGE_URLS || "[]").length, webSearchConfigured: Boolean(String(env.BRAVE_SEARCH_API_KEY || "").trim()), items: currentItems, count: currentItems.length, suppressedExpiredOrUnverified: (rows.results || []).length - currentItems.length, lastRun: run || null, engineRuns: engineRuns.results || [] };
 }
 
 const MAX_FEED_BYTES = 1_000_000;
@@ -305,13 +311,16 @@ async function crawl(env) {
   if (!env.GRANTS_DB) throw new Error("The isolated staging D1 database binding is missing.");
   const engines = [
     { name: "rss_atom", run: () => readFeeds(env), configured: (() => { try { return JSON.parse(env.GRANT_FEED_URLS_JSON || env.GRANT_FEED_URLS || "[]").length; } catch { return 0; } })() },
-    { name: "official_pages", run: async () => (await readOfficialPages(env)).items, configured: (() => { try { return JSON.parse(env.GRANT_SOURCE_PAGE_URLS_JSON || env.GRANT_SOURCE_PAGE_URLS || "[]").length; } catch { return 0; } })() },
-    { name: "web_search", run: async () => (await readWebSearch(env)).items, configured: String(env.BRAVE_SEARCH_API_KEY || "").trim() ? 1 : 0 },
+    { name: "official_pages", run: () => readOfficialPages(env), configured: (() => { try { return JSON.parse(env.GRANT_SOURCE_PAGE_URLS_JSON || env.GRANT_SOURCE_PAGE_URLS || "[]").length; } catch { return 0; } })() },
+    { name: "web_search", run: () => readWebSearch(env), configured: String(env.BRAVE_SEARCH_API_KEY || "").trim() ? 1 : 0 },
   ];
   const settled = await Promise.all(engines.map(async engine => {
     try {
-      const items = await engine.run();
-      return { name: engine.name, items, stats: { status: "success", configured: engine.configured, found: items.length, error: null } };
+      const result = await engine.run();
+      const items = Array.isArray(result) ? result : (result.items || []);
+      const detailed = Array.isArray(result) ? null : result.stats;
+      const errors = detailed?.errors || [];
+      return { name: engine.name, items, stats: { status: "success", configured: detailed?.configured ?? engine.configured, found: items.length, error: errors.length ? errors.length + " source/search errors" : (detailed?.message || null) } };
     } catch (error) {
       return { name: engine.name, items: [], stats: { status: "failed", configured: engine.configured, found: 0, error: String(error.message || error).slice(0, 300) } };
     }
