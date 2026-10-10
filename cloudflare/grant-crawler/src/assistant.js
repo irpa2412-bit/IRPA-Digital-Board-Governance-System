@@ -25,6 +25,37 @@ const IRPA_PROFILE = {
   strategic_plan: "IRPA Strategic Plan 2025–2029"
 };
 
+function assessGeographicEligibility(opportunity) {
+  const text = [opportunity.title, opportunity.description, opportunity.donorRequirements, opportunity.url]
+    .filter(Boolean).join(" ").toLowerCase();
+  const broadScope = /\beast africa\b|\beast african\b|sub[- ]saharan africa|africa[- ]wide|across africa|pan[- ]african|continental africa|global|worldwide|international(?:ly)? eligible|low[- ]and[- ]middle[- ]income countries|\blmics?\b|developing countries|eligible in all countries/i.test(text);
+  const explicitTanzaniaEligibility = /(?:eligible|eligibility|applicant|applicants|organisation|organization|ngo|civil society|registered|based|operating|located|country|countries|geography|geographic)[^.!?]{0,100}\btanzania\b|\btanzania\b[^.!?]{0,100}(?:eligible|eligibility|applicant|applicants|organisation|organization|ngo|civil society|registered|based|operating|located|country|countries|geography|geographic)/i.test(text);
+  const hardCountryOnly = /\b(?:only|exclusively|restricted to|limited to|eligible only in|applicants? (?:must|should) be (?:registered|based|located) in|must be registered in|must be based in)\b[^.!?]{0,90}\b(?:south africa|south african|rsa|zimbabwe|zimbabwean)\b|\b(?:south africa|south african|rsa|zimbabwe|zimbabwean)\b[^.!?]{0,90}\b(?:only|exclusively|restricted to|limited to|based applicants?|registered applicants?|eligible applicants?|organisations? only|organizations? only)\b/i.test(text);
+  const countrySpecific = /\b(?:south africa|south african|rsa|zimbabwe|zimbabwean|kenya|kenyan|uganda|ugandan|rwanda|rwandan|burundi|burundian|zambia|zambian|botswana|namibia|namibian|malawi|malawian|mozambique|mozambican|lesotho|eswatini|swaziland|angola|angolan|ethiopia|ethiopian|somalia|somalian|sudan|south sudan|ghana|nigeria|senegal|cameroon|liberia|sierra leone|gambia|guinea|mali|niger|burkina faso|benin|togo|cote d.?ivoire|ivory coast|egypt|morocco|algeria|tunisia|libya|chad|eritrea|djibouti|madagascar|mauritius|seychelles|democratic republic of the congo|drc|congo)\b/i.test(text);
+  if (hardCountryOnly || (countrySpecific && !broadScope && !explicitTanzaniaEligibility)) {
+    return {
+      status: "ineligible",
+      reason: "The supplied call text appears restricted to a country other than Tanzania; the opportunity is excluded from IRPA's eligible shortlist.",
+      evidence: [hardCountryOnly ? "Explicit country-only restriction detected." : "A country-specific scope was detected without clear Tanzania eligibility or broader regional/global eligibility."],
+      holdConceptNote: true
+    };
+  }
+  if (broadScope || explicitTanzaniaEligibility) {
+    return {
+      status: "eligible",
+      reason: broadScope ? "The supplied text states a regional, Africa-wide, LMIC, or global scope." : "The supplied text explicitly connects Tanzania to applicant or geographic eligibility.",
+      evidence: [broadScope ? "Broad geographic eligibility language detected." : "Tanzania eligibility language detected."],
+      holdConceptNote: false
+    };
+  }
+  return {
+    status: "unclear",
+    reason: "The supplied text does not establish that Tanzania-based IRPA is eligible. Verify the official call's eligible-country list before drafting.",
+    evidence: ["No explicit Tanzania eligibility or sufficiently broad regional/global scope was detected."],
+    holdConceptNote: true
+  };
+}
+
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -83,6 +114,7 @@ export async function analyzeGrant(request, env) {
   const schema = task === "concept_note"
     ? {
         summary: "string",
+        geographic_eligibility: { status: "eligible|ineligible|unclear", reason: "string", evidence: ["string"], holdConceptNote: "boolean" },
         eligibility: { status: "eligible|possibly_eligible|ineligible|insufficient_information", confidence: "low|medium|high", evidence: ["string"], unknowns: ["string"] },
         donor_requirements: [{ requirement: "string", status: "met|partially_met|not_met|unknown", evidence: "string", action: "string" }],
         concept_note: {
@@ -104,6 +136,7 @@ export async function analyzeGrant(request, env) {
       }
     : {
         summary: "string",
+        geographic_eligibility: { status: "eligible|ineligible|unclear", reason: "string", evidence: ["string"], holdConceptNote: "boolean" },
         eligibility: { status: "eligible|possibly_eligible|ineligible|insufficient_information", confidence: "low|medium|high", evidence: ["string"], unknowns: ["string"] },
         donor_requirements: [{ requirement: "string", status: "met|partially_met|not_met|unknown", evidence: "string", action: "string" }],
         concept_note_structure: [{ heading: "string", purpose: "string", suggested_content: "string", evidence_needed: ["string"] }],
@@ -120,16 +153,30 @@ export async function analyzeGrant(request, env) {
     "Do not invent eligibility rules, deadlines, donor requirements, budgets, partners, registrations, audits, references, co-financing, or implementation results.",
     "Distinguish explicit evidence from assumptions. Mark missing, ambiguous, or unverified requirements as unknown and list what must be checked in the official call guidelines.",
     "IRPA profile: " + JSON.stringify(IRPA_PROFILE),
-    "Compare applicant eligibility against legal entity/country, organization type and age, geographic scope, thematic scope, past-performance requirements, financial/audit requirements, co-funding, consortium rules, and application deadlines where evidence is provided.",
+    "Apply a strict eligibility gate before thematic fit. IRPA is a Tanzania-registered NGO. Check eligible countries, applicant registration country, entity type, minimum/maximum organizational age, required track record, audited accounts/turnover, co-financing, consortium restrictions, deadline and permitted costs. Do not equate a thematic match with eligibility.",
+    "Hard geographic exclusion: calls explicitly restricted to South Africa, Zimbabwe, or another non-Tanzania country must be marked ineligible for IRPA unless the supplied call text also clearly permits Tanzania or an Africa-wide/East Africa/Sub-Saharan Africa/LMIC/global applicant pool. If geography is unstated or ambiguous, mark geographic eligibility unclear and overall eligibility insufficient_information; do not promote the call as eligible. Never treat a mention of a country in background text as proof that applicants from Tanzania are allowed.",
+    "A concept note must not be generated when geographic eligibility is ineligible or unclear. Return the geographic evidence and tell the user to verify the official eligible-country list first.",
     "An issue is not a confirmed disqualification unless the supplied rules clearly say so. Use insufficient_information when key eligibility rules are absent. Never represent the AI assessment as a legal or donor decision.",
     "Align any concept note to IRPA's three strategic pillars and cross-cutting themes only where relevant to the donor call. Tailor headings, ordering, and wording to donor instructions if supplied, and respect stated word/page limits where the supplied text makes them clear. If donor template instructions are absent, use a conventional concise concept-note structure and flag this limitation.",
     "Populate each application_fields entry with standalone, editable wording ready to copy into a corresponding donor application form. If a field is unsupported by supplied evidence, clearly label assumptions or evidence needed; never invent exact budgets, baseline figures, partners, track record, audited results, or co-financing. Use an indicative budget narrative only when actual budget figures were not supplied and label it as requiring budget development.",
     "Return valid JSON only, no markdown fences, matching this schema: " + JSON.stringify(schema)
   ].join("\n");
 
+  const opportunity = { title, description, url: url || null, donorRequirements };
+  const geographicEligibility = assessGeographicEligibility(opportunity);
+  if (task === "concept_note" && geographicEligibility.status !== "eligible") {
+    return json({
+      error: geographicEligibility.status === "ineligible"
+        ? "Concept-note drafting blocked: the opportunity is country-restricted and does not establish eligibility for Tanzania-based IRPA."
+        : "Concept-note drafting blocked until the official call confirms Tanzania or eligible regional/global coverage.",
+      geographic_eligibility: geographicEligibility,
+      next_step: "Provide the official eligible-country and applicant-type criteria, then rerun eligibility screening."
+    }, 422);
+  }
+
   const userData = {
     task,
-    opportunity: { title, description, url: url || null, donorRequirements },
+    opportunity,
     requested_outputs: task === "concept_note"
       ? ["evidence-based eligibility screening", "requirement-by-requirement compliance matrix", "donor-tailored concept-note structure and editable first draft", "missing evidence checklist", "next steps"]
       : ["evidence-based eligibility screening", "requirement-by-requirement compliance matrix", "recommended concept-note structure", "missing evidence checklist", "next steps"]
@@ -150,6 +197,16 @@ export async function analyzeGrant(request, env) {
     }
     const allowed = new Set(["eligible", "possibly_eligible", "ineligible", "insufficient_information"]);
     if (!allowed.has(analysis.eligibility.status)) analysis.eligibility.status = "insufficient_information";
+    analysis.geographic_eligibility = geographicEligibility;
+    if (geographicEligibility.status === "ineligible") {
+      analysis.eligibility.status = "ineligible";
+      analysis.eligibility.confidence = "high";
+      analysis.eligibility.evidence = [...(Array.isArray(analysis.eligibility.evidence) ? analysis.eligibility.evidence : []), geographicEligibility.reason];
+      analysis.eligibility.unknowns = [...(Array.isArray(analysis.eligibility.unknowns) ? analysis.eligibility.unknowns : []), "Official geographic eligibility should still be retained with the application record as supporting evidence."];
+    } else if (geographicEligibility.status === "unclear" && analysis.eligibility.status === "eligible") {
+      analysis.eligibility.status = "insufficient_information";
+      analysis.eligibility.confidence = "low";
+    }
     return json({
       service: "irpa-grant-application-assistant",
       model: MODEL,
