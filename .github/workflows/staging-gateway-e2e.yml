@@ -196,6 +196,10 @@ jobs:
           printf '%s' "$GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY" | npx wrangler secret put GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY --config wrangler.staging.generated.json
           printf '%s' "$SMTP_PASSWORD" | npx wrangler secret put SMTP_PASSWORD --config wrangler.staging.generated.json
 
+      - name: Install gateway dependencies for bundling
+        working-directory: drive-gateway
+        run: npm ci --no-audit --no-fund
+
       - name: Deploy staging Worker only
         uses: cloudflare/wrangler-action@v3
         with:
