@@ -23,7 +23,6 @@ async function verifyFirebaseIdToken(token, env, requireAdmin = false) {
       !claims.iat || claims.iat > now + 60 || !claims.auth_time || claims.auth_time > now + 60) {
     throw new Error("Firebase sign-in token is invalid or expired.");
   }
-  if (now - claims.auth_time > 60 * 60 * 24 * 7) throw new Error("Sign in again before using grant scanning.");
   if (!firebaseJwkCache.keys.length || firebaseJwkCache.expiresAt < now) {
     const response = await fetch("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com", {
       headers: { accept: "application/json" }, signal: AbortSignal.timeout(8000)
