@@ -20,7 +20,7 @@ function walk(dir, out=[]) {
 }
 function changedFiles() {
   const base = process.env.GITHUB_BASE_REF ? `origin/${process.env.GITHUB_BASE_REF}` : "origin/main";
-  const r = spawnSync("git",["diff","--name-only",`${base}...HEAD"],{encoding:"utf8"});
+  const r = spawnSync("git",["diff","--name-only",`${base}...HEAD`],{encoding:"utf8"});
   if (r.status !== 0) throw new Error("Cannot determine changed files for scoped audit: "+(r.stderr||"git diff failed"));
   return r.stdout.split(/\r?\n/).filter(Boolean).filter(f=>extensions.has(path.extname(f).toLowerCase()) && fs.existsSync(f));
 }
