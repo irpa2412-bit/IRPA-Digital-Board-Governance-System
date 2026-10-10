@@ -51,6 +51,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
  const [crawlerRunning,setCrawlerRunning]=useState(false);
  const [workspaceOpen,setWorkspaceOpen]=useState(false);
  const [selectedOpportunity,setSelectedOpportunity]=useState(null);
+ const [opportunityDescription,setOpportunityDescription]=useState("");
  const [donorRequirements,setDonorRequirements]=useState("");
  const [analysisBusy,setAnalysisBusy]=useState(false);
  const [analysisResult,setAnalysisResult]=useState(null);
@@ -146,6 +147,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
  }
  function openConceptWorkspace(record=null){
    setSelectedOpportunity(record);
+   setOpportunityDescription(text(record?.summary||record?.description||""));
    setDonorRequirements(text(record?.applicationRequirements||record?.donorRequirements||""));
    setAnalysisResult(null);
    setConceptDraft("");
@@ -163,6 +165,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
      applicationRequirements:draft.opportunity?.donorRequirements||"",
      status:"Under review"
    });
+   setOpportunityDescription(text(draft.opportunity?.description||""));
    setDonorRequirements(text(draft.opportunity?.donorRequirements||""));
    setAnalysisResult(draft.assessment||null);
    setConceptDraft(text(draft.applicationFields?.conceptNoteDraft||""));
@@ -172,13 +175,13 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
  }
  async function runWorkspaceAnalysis(task="eligibility"){
    if(!selectedOpportunity?.title){setError("Select a grant opportunity before screening eligibility.");return;}
-   if(!text(selectedOpportunity.summary)&&!text(donorRequirements)){setError("Provide the opportunity description or paste the official donor eligibility and application criteria.");return;}
+   if(!text(opportunityDescription)&&!text(donorRequirements)){setError("Provide the opportunity description or paste the official donor eligibility and application criteria.");return;}
    const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-staging.irpa-governance.workers.dev").replace(/\/+$/,"");
    const idToken=await auth.currentUser?.getIdToken();
    if(!idToken){setError("Your session has expired. Sign in again.");return;}
    setAnalysisBusy(true);setError("");setWorkspaceNotice(task==="concept_note"?"Checking eligibility and preparing the concept-note draft…":"Checking geographic, organizational and donor eligibility criteria…");
    try{
-     const response=await fetch(workerUrl+"/assistant/analyze",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({task,title:selectedOpportunity.title,description:text(selectedOpportunity.summary),donorRequirements:text(donorRequirements),url:text(selectedOpportunity.url)}),signal:AbortSignal.timeout(90000)});
+     const response=await fetch(workerUrl+"/assistant/analyze",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({task,title:selectedOpportunity.title,description:text(opportunityDescription),donorRequirements:text(donorRequirements),url:text(selectedOpportunity.url)}),signal:AbortSignal.timeout(90000)});
      const data=await response.json().catch(()=>({}));
      if(!response.ok){
        if(data.geographic_eligibility)setAnalysisResult({geographic_eligibility:data.geographic_eligibility,eligibility:{status:data.geographic_eligibility.status==="ineligible"?"ineligible":"insufficient_information",confidence:"high",evidence:data.geographic_eligibility.evidence||[],unknowns:[data.geographic_eligibility.reason||data.next_step||"Verify official geography eligibility."]}});
@@ -204,7 +207,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
    const id=draftId||crypto.randomUUID();
    setDraftSaving(true);setError("");
    try{
-     const response=await fetch(workerUrl+"/application/drafts",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({id,name:text(selectedOpportunity.title)+" — IRPA concept note",opportunity:{title:text(selectedOpportunity.title),url:text(selectedOpportunity.url),description:text(selectedOpportunity.summary),donorRequirements:text(donorRequirements)},applicationFields:{conceptNoteDraft:conceptDraft,strategicAlignment:analysisResult?.strategic_alignment||{},geographicEligibility:analysisResult?.geographic_eligibility||null},assessment:analysisResult||null,finalNotes:"Draft saved in the IRPA-DBGS grant concept-note workspace. Official call eligibility and internal approvals remain to be verified."}),signal:AbortSignal.timeout(20000)});
+     const response=await fetch(workerUrl+"/application/drafts",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({id,name:text(selectedOpportunity.title)+" — IRPA concept note",opportunity:{title:text(selectedOpportunity.title),url:text(selectedOpportunity.url),description:text(opportunityDescription),donorRequirements:text(donorRequirements)},applicationFields:{conceptNoteDraft:conceptDraft,strategicAlignment:analysisResult?.strategic_alignment||{},geographicEligibility:analysisResult?.geographic_eligibility||null},assessment:analysisResult||null,finalNotes:"Draft saved in the IRPA-DBGS grant concept-note workspace. Official call eligibility and internal approvals remain to be verified."}),signal:AbortSignal.timeout(20000)});
      const data=await response.json().catch(()=>({}));
      if(!response.ok)throw new Error(data.error||"Concept-note draft could not be saved.");
      setDraftId(id);
