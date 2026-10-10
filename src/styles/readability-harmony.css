@@ -3065,12 +3065,12 @@ textarea:focus-visible{
 }
 .dashboard-command .mobile-quote1-stats>button>span,
 .dashboard-command .mobile-quote1-grid>button>span{
-  background:#d6a52c!important;color:#fff!important;
-  border:1px solid #f3d36a!important;box-shadow:0 2px 7px rgba(0,0,0,.18)!important;
+  background:#082d4b!important;color:#d6a52c!important;
+  border:1px solid #d6a52c!important;box-shadow:0 2px 7px rgba(0,0,0,.18)!important;
 }
 .dashboard-command .mobile-quote1-stats>button>span svg.dashboard-semantic-icon,
 .dashboard-command .mobile-quote1-grid>button>span svg.dashboard-semantic-icon{
-  stroke:#fff!important;color:#fff!important;
+  stroke:#d6a52c!important;color:#d6a52c!important;
 }
 
 /* Restore original IRPA dashboard icon colour treatment (green, blue, amber and gold).
