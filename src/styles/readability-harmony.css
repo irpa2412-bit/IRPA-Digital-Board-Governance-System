@@ -3155,3 +3155,49 @@ textarea:focus-visible{
 .dashboard-command svg.dashboard-semantic-icon *{
   stroke:#d6a52c!important;color:#d6a52c!important;
 }
+
+
+/* Mobile correction: keep the access-category panel independent from the portal navigator. */
+@media screen and (max-width:760px){
+  .topbar,
+  .topbar-heading-row,
+  .topbar-access-category{
+    display:block!important;visibility:visible!important;opacity:1!important;
+    position:relative!important;inset:auto!important;transform:none!important;
+    width:100%!important;max-width:100%!important;height:auto!important;
+    max-height:none!important;overflow:visible!important;box-sizing:border-box!important;
+  }
+  .topbar-heading-row{display:flex!important;flex-direction:column!important;gap:12px!important;}
+  .topbar-access-category{
+    order:2!important;padding:14px!important;margin:0 0 12px!important;
+    background:#082d4b!important;color:#edf5f1!important;
+    border:1px solid #d6a52c!important;border-radius:12px!important;
+  }
+  .topbar-access-category>span,
+  .topbar-access-category .login-category-heading,
+  .topbar-access-category .login-category-note{
+    display:block!important;visibility:visible!important;opacity:1!important;
+    color:#edf5f1!important;white-space:normal!important;
+  }
+  .topbar-access-category .login-category-list,
+  .topbar-access-category .login-category-item{
+    display:flex!important;visibility:visible!important;opacity:1!important;
+    flex-wrap:wrap!important;gap:8px!important;
+  }
+  .topbar-access-category .login-category-pill{
+    color:#f3d36a!important;border:1px solid #d6a52c!important;background:transparent!important;
+  }
+  .mobile-access-live-date{display:flex!important;visibility:visible!important;opacity:1!important;flex-wrap:wrap!important;gap:6px 10px!important;margin-top:12px!important;}
+  .mobile-portal-content-roller{
+    display:flex!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;
+    position:relative!important;inset:auto!important;width:100%!important;box-sizing:border-box!important;
+    margin:12px 0 18px!important;padding:10px!important;background:#f1f6f3!important;
+    border:1px solid #547568!important;border-radius:12px!important;z-index:3!important;
+  }
+  .mobile-portal-content-roller select{
+    display:block!important;width:100%!important;min-height:48px!important;
+    color:#173b2d!important;background:#fff!important;opacity:1!important;
+    font-size:16px!important;font-weight:600!important;border:1px solid #547568!important;
+  }
+  .desktop-webapp-navigation-roller{display:none!important;}
+}
