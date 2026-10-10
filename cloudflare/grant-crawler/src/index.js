@@ -128,7 +128,7 @@ function assessFit(item) {
   const score = Math.min(100, matched.reduce((sum, signal) => sum + signal.weight, 0));
   const fitAssessment = score >= 35 ? "strong_topic_match" : score >= 15 ? "possible_topic_match" : "low_topic_match";
   const sourceIsOpenFeed = /(?:^|[?&])fund_state=open(?:&|$)/i.test(item.sourceUrl || "");
-  const callStatus = /\bclosed\b/i.test(text)
+  const callStatus = text.includes("closed")
     ? "closed"
     : isExpired
       ? "expired"
