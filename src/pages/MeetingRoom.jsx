@@ -35,7 +35,7 @@ function lines(v){return String(v||"").split(/\n+/).map(x=>x.trim()).filter(Bool
 function votingRole(p){const role=String(p.participantRole||p.role||p.boardPosition||"").trim().toLowerCase();return ["board member","board chairperson","board committee member","board vice chairperson","board treasurer","board secretary"].includes(role)&&!/non.?voting|guest|observer|external/i.test(`${role} ${p.participantType||""}`)}
 function roleControl(member,meeting){const uid=String(auth.currentUser?.uid||"");const email=String(auth.currentUser?.email||"").trim().toLowerCase();return !!meeting&&Boolean((uid&&[meeting.initiatorUid,meeting.chairpersonUid,meeting.secretaryUid].map(String).includes(uid))||(email&&[meeting.initiatorEmail,meeting.chairpersonEmail,meeting.secretaryEmail].some(v=>String(v||"").trim().toLowerCase()===email)))}
 export default function MeetingRoom({onNavigate}){
- const[meetings,setMeetings]=useState([]),[meetingRecords,setMeetingRecords]=useState([]),[retrievedRecord,setRetrievedRecord]=useState(null),[participants,setParticipants]=useState([]),[selfRegistered,setSelfRegistered]=useState(false),[member,setMember]=useState(null),[admin,setAdmin]=useState(null),[selectedId,setSelectedId]=useState(""),[busy,setBusy]=useState(false),[message,setMessage]=useState(""),[error,setError]=useState(""),[transcript,setTranscript]=useState(""),[listening,setListening]=useState(false),[recognitionLanguage,setRecognitionLanguage]=useState("en-TZ"),[translationLanguage,setTranslationLanguage]=useState("sw"),[maaSearch,setMaaSearch]=useState(""),[translatedTranscript,setTranslatedTranscript]=useState(""),[translating,setTranslating]=useState(false),[liveInterpreterEnabled,setLiveInterpreterEnabled]=useState(false),[liveInterpretation,setLiveInterpretation]=useState(""),[interpreterBusy,setInterpreterBusy]=useState(false),[currentIndex,setCurrentIndex]=useState(-1),[itemStatus,setItemStatus]=useState("Pending"),[motion,setMotion]=useState(emptyMotion),[decision,setDecision]=useState(""),[action,setAction]=useState(emptyAction),[quorumOverride,setQuorumOverride]=useState(""),[events,setEvents]=useState([]),[meetingVotes,setMeetingVotes]=useState([]),[meetingFields,setMeetingFields]=useState([]);[assistantOpen,setAssistantOpen]=useState(false),[assistantCommand,setAssistantCommand]=useState(""),[assistantResponse,setAssistantResponse]=useState("Choose a quick command or type what you want the Meeting Room assistant to do.");
+ const[meetings,setMeetings]=useState([]),[meetingRecords,setMeetingRecords]=useState([]),[retrievedRecord,setRetrievedRecord]=useState(null),[participants,setParticipants]=useState([]),[selfRegistered,setSelfRegistered]=useState(false),[member,setMember]=useState(null),[admin,setAdmin]=useState(null),[selectedId,setSelectedId]=useState(""),[busy,setBusy]=useState(false),[message,setMessage]=useState(""),[error,setError]=useState(""),[transcript,setTranscript]=useState(""),[listening,setListening]=useState(false),[recognitionLanguage,setRecognitionLanguage]=useState("en-TZ"),[translationLanguage,setTranslationLanguage]=useState("sw"),[maaSearch,setMaaSearch]=useState(""),[translatedTranscript,setTranslatedTranscript]=useState(""),[translating,setTranslating]=useState(false),[liveInterpreterEnabled,setLiveInterpreterEnabled]=useState(false),[liveInterpretation,setLiveInterpretation]=useState(""),[interpreterBusy,setInterpreterBusy]=useState(false),[currentIndex,setCurrentIndex]=useState(-1),[itemStatus,setItemStatus]=useState("Pending"),[motion,setMotion]=useState(emptyMotion),[decision,setDecision]=useState(""),[action,setAction]=useState(emptyAction),[quorumOverride,setQuorumOverride]=useState(""),[events,setEvents]=useState([]),[meetingVotes,setMeetingVotes]=useState([]),[meetingFields,setMeetingFields]=useState([]),[assistantOpen,setAssistantOpen]=useState(false),[assistantCommand,setAssistantCommand]=useState(""),[assistantResponse,setAssistantResponse]=useState("Choose a quick command or type what you want the Meeting Room assistant to do.");
  const entryContext=useMemo(()=>{try{return JSON.parse(window.sessionStorage.getItem("irpaMeetingEntryContext")||"null")}catch{return null}},[]);
  const recognition=useRef(null),autoCaptureEnabled=useRef(false),captureStartedAt=useRef(0),transcriptRef=useRef(""),lastSavedTranscript=useRef(""),saveInFlight=useRef(false),selectedRef=useRef(null),liveInterpreterRef=useRef(false),translationLanguageRef=useRef("sw"),recognitionLanguageRef=useRef("en-TZ"),interpreterQueue=useRef(Promise.resolve()),selected=useMemo(()=>meetings.find(m=>m.id===selectedId)||null,[meetings,selectedId]);
  const attending=useMemo(()=>participants.filter(p=>p.meetingId===selected?.id||p.meetingReference===selected?.title),[participants,selected]),agenda=useMemo(()=>lines(selected?.agenda),[selected]);
@@ -123,43 +123,43 @@ export default function MeetingRoom({onNavigate}){
  async function runAssistantCommand(rawCommand){
   const raw=String(rawCommand||"").trim();
   if(!raw){setAssistantResponse("Type a command, or choose one of the quick actions.");return;}
-  const cmd=raw.toLowerCase().replace(/[’']/g,"").replace(/[^\\p{L}\\p{N}\\s-]/gu," ").replace(/\\s+/g," ").trim();
+  const cmd=raw.toLowerCase().replace(/[’']/g,"").replace(/[^\p{L}\p{N}\s-]/gu," ").replace(/\s+/g," ").trim();
   setAssistantCommand(raw);
   if(/^(help|commands|what can you do|show help)$/.test(cmd)){
    setAssistantResponse("I can open quorum, attendance, agenda, the live proceedings assistant, the Maa dictionary, and meeting records; start/pause transcription; save or translate the transcript; toggle live interpretation; and open Documents or Signature Platform. Governance actions such as voting, approving, signing, recording decisions or closing a meeting still require you to use their controlled workflow.");
    return;
   }
-  if(/\\b(quorum|quorum status|quorum assessment)\\b/.test(cmd)){scrollToMeetingSection("irpa-meeting-quorum","quorum assessment");return;}
-  if(/\\b(attendance|attendees|participants|participant register)\\b/.test(cmd)){scrollToMeetingSection("irpa-meeting-attendance","attendance register");return;}
-  if(/\\b(agenda|current agenda|motion)\\b/.test(cmd)){scrollToMeetingSection("irpa-meeting-agenda","agenda and motion controls");return;}
-  if(/\\b(dictionary|maa|maasai language|language dictionary)\\b/.test(cmd)){scrollToMeetingSection("irpa-maa-dictionary","Maa dictionary");return;}
-  if(/\\b(meeting records|records lifecycle|archive records|record archive)\\b/.test(cmd)){scrollToMeetingSection("irpa-meeting-records","meeting records lifecycle");return;}
-  if(/\\b(documents|meeting documents|document portal)\\b/.test(cmd)){setAssistantOpen(false);nav("Documents");setAssistantResponse("Opened the Documents Portal.");return;}
-  if(/\\b(signature|sign document|signature portal)\\b/.test(cmd)){setAssistantOpen(false);nav("Signature Platform");setAssistantResponse("Opened the Signature Platform. Signing still follows the controlled authorization workflow.");return;}
-  if(/\\b(translate|translation)\\b/.test(cmd)&&/\\b(transcript|proceedings|minutes)\\b/.test(cmd)){
+  if(/\b(quorum|quorum status|quorum assessment)\b/.test(cmd)){scrollToMeetingSection("irpa-meeting-quorum","quorum assessment");return;}
+  if(/\b(attendance|attendees|participants|participant register)\b/.test(cmd)){scrollToMeetingSection("irpa-meeting-attendance","attendance register");return;}
+  if(/\b(agenda|current agenda|motion)\b/.test(cmd)){scrollToMeetingSection("irpa-meeting-agenda","agenda and motion controls");return;}
+  if(/\b(dictionary|maa|maasai language|language dictionary)\b/.test(cmd)){scrollToMeetingSection("irpa-maa-dictionary","Maa dictionary");return;}
+  if(/\b(meeting records|records lifecycle|archive records|record archive)\b/.test(cmd)){scrollToMeetingSection("irpa-meeting-records","meeting records lifecycle");return;}
+  if(/\b(documents|meeting documents|document portal)\b/.test(cmd)){setAssistantOpen(false);nav("Documents");setAssistantResponse("Opened the Documents Portal.");return;}
+  if(/\b(signature|sign document|signature portal)\b/.test(cmd)){setAssistantOpen(false);nav("Signature Platform");setAssistantResponse("Opened the Signature Platform. Signing still follows the controlled authorization workflow.");return;}
+  if(/\b(translate|translation)\b/.test(cmd)&&/\b(transcript|proceedings|minutes)\b/.test(cmd)){
    if(!transcript.trim()){setAssistantResponse("There is no transcript to translate yet. Start or enter proceedings first.");return;}
    setAssistantOpen(false);await translateTranscript();setAssistantResponse("Transcript translation was requested. Check the translated draft and any error message; review it before official use.");return;
   }
-  if(/\\b(save|store)\\b/.test(cmd)&&/\\b(transcript|proceedings)\\b/.test(cmd)){
+  if(/\b(save|store)\b/.test(cmd)&&/\b(transcript|proceedings)\b/.test(cmd)){
    if(!controller){setAssistantResponse("Your current access is read-only; you cannot save the meeting transcript.");return;}
    if(!transcript.trim()){setAssistantResponse("There is no transcript to save yet.");return;}
    try{await saveTranscript();setAssistantResponse("Transcript save completed. The meeting record remains the source of truth.");}catch(e){setAssistantResponse("Transcript save failed: "+(e?.message||"check the error message above."));}
    return;
   }
-  if(/\\b(start|resume|pause|stop|toggle)\\b/.test(cmd)&&/\\b(transcription|transcribe|microphone|capture|speech recognition)\\b/.test(cmd)){
+  if(/\b(start|resume|pause|stop|toggle)\b/.test(cmd)&&/\b(transcription|transcribe|microphone|capture|speech recognition)\b/.test(cmd)){
    if(!controller){setAssistantResponse("Your current access is read-only; only an authorised meeting controller can start or pause capture.");return;}
    if(selected?.status!=="In Progress"){setAssistantResponse("Proceedings capture is available only while the meeting status is In Progress.");return;}
    startTranscript(false);
    setAssistantResponse(listening?"Capture pause was requested.":"Capture start/resume was requested. Check microphone permission and the capture status above.");
    setAssistantOpen(false);return;
   }
-  if(/\\b(live interpreter|interpret live|spoken translation|speech translation)\\b/.test(cmd)){
+  if(/\b(live interpreter|interpret live|spoken translation|speech translation)\b/.test(cmd)){
    if(!controller){setAssistantResponse("Your current access is read-only; only an authorised meeting controller can operate live interpretation.");return;}
    if(selected?.status!=="In Progress"){setAssistantResponse("Live interpretation is available while the meeting is In Progress.");return;}
    toggleLiveInterpreter();setAssistantResponse(liveInterpreterEnabled?"Live interpretation pause was requested.":"Live interpretation was enabled/ requested.");setAssistantOpen(false);return;
   }
-  if(/\\b(assistant|live proceedings|transcription panel)\\b/.test(cmd)){scrollToMeetingSection("irpa-meeting-ai-assistant","AI proceedings assistant");return;}
-  if(/\\b(vote|voting|approve|approval|sign|close meeting|record decision|record action)\\b/.test(cmd)){
+  if(/\b(assistant|live proceedings|transcription panel)\b/.test(cmd)){scrollToMeetingSection("irpa-meeting-ai-assistant","AI proceedings assistant");return;}
+  if(/\b(vote|voting|approve|approval|sign|close meeting|record decision|record action)\b/.test(cmd)){
    setAssistantResponse("For governance integrity, I will not execute a vote, approval, signature, decision, action or meeting closure from free-text commands. Open the relevant controlled panel and confirm the action there.");
    return;
   }
