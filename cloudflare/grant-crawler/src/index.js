@@ -193,6 +193,9 @@ function assessFit(item) {
     { label: "pastoralism/rangelands", weight: 35, terms: ["pastoral", "pastoralist", "rangeland", "herder", "grazing", "dryland", "nomadic"] },
     { label: "restoration/environment", weight: 20, terms: ["restoration", "land degradation", "biodiversity", "ecosystem", "conservation", "desertification", "reforestation", "natural resource"] },
     { label: "livestock/agriculture", weight: 15, terms: ["livestock", "animal health", "veterinary", "fodder", "agriculture", "food system", "smallholder", "value chain"] },
+    { label: "market development/value addition", weight: 10, terms: ["market access", "market linkage", "market development", "value addition", "value-added", "livestock market", "leather processing", "meat processing", "market systems"] },
+    { label: "governance/institutional capacity", weight: 10, terms: ["institutional strengthening", "institutional capacity", "organizational development", "organisational development", "governance", "accountability", "transparency", "board management", "nonprofit management", "non-profit management"] },
+    { label: "digital governance/DBGS investment", weight: 25, terms: ["digital governance", "board management system", "board governance", "governance technology", "digital transformation", "civic technology", "cybersecurity", "cloud infrastructure", "digital public infrastructure", "nonprofit technology", "non-profit technology", "responsible ai", "software development", "digital capacity building"] },
     { label: "climate resilience", weight: 15, terms: ["climate adaptation", "climate resilience", "climate change", "drought", "resilience", "early warning"] },
     { label: "community/NGO delivery", weight: 10, terms: ["civil society", "non-governmental", "ngo", "community-led", "community based", "local communities", "indigenous peoples"] },
     { label: "women/youth inclusion", weight: 8, terms: ["women", "gender", "youth", "young people", "social inclusion"] },
@@ -201,6 +204,8 @@ function assessFit(item) {
   ];
   const matched = signals.filter(signal => signal.terms.some(term => text.includes(term)));
   const score = Math.min(100, matched.reduce((sum, signal) => sum + signal.weight, 0));
+  const digitalGovernanceMatch = matched.some(signal => signal.label === "digital governance/DBGS investment");
+  const strategicTrack = digitalGovernanceMatch ? "digital_governance_DBGS_investment" : "rangeland_livestock_market_and_cross_cutting";
   const fitAssessment = score >= 35 ? "strong_topic_match" : score >= 15 ? "possible_topic_match" : "low_topic_match";
   const sourceIsOpenFeed = /(?:^|[?&])fund_state=open(?:&|$)/i.test(item.sourceUrl || "");
   const callStatus = text.includes("closed")
@@ -236,6 +241,8 @@ function assessFit(item) {
     score,
     fitAssessment,
     reasons: matched.map(signal => signal.label),
+    strategicTrack,
+    digitalGovernanceMatch,
     deadlineAt,
     callStatus,
     geographyAssessment,
@@ -286,6 +293,8 @@ async function crawl(env) {
       fitScore: item.fit.score,
       fitAssessment: item.fit.fitAssessment,
       fitReasons: item.fit.reasons,
+      strategicTrack: item.fit.strategicTrack,
+      digitalGovernanceMatch: item.fit.digitalGovernanceMatch,
       deadlineAt: item.fit.deadlineAt,
       callStatus: item.fit.callStatus,
       geographyAssessment: item.fit.geographyAssessment,
