@@ -43,6 +43,11 @@ jobs:
           cache: npm
       - name: Install repository test dependencies
         run: npm ci
+      - name: Set up Java 21 for the Firestore emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
       - name: Verify isolated Firebase rules in the emulator
         run: npx firebase emulators:exec --config cloudflare/grant-crawler/firebase-staging/firebase.json --only firestore --project demo-irpa-grant-crawler-staging-test "node --test cloudflare/grant-crawler/firebase-staging/firestore.rules.test.js"
 
