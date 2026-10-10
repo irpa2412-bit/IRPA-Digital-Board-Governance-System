@@ -54,6 +54,17 @@ async function getDraft(env, uid, id) {
   const row = await env.GRANTS_DB.prepare("SELECT id, name, status, content_json, created_at, updated_at FROM grant_application_drafts WHERE owner_uid = ? AND id = ? LIMIT 1").bind(uid, id).first();
   return row ? parseRow(row) : null;
 }
+async function listDraftEvents(env, uid, id) {
+  if (!env.GRANTS_DB) throw new Error("Grant application draft storage is not configured.");
+  const owner = await env.GRANTS_DB.prepare("SELECT id FROM grant_application_drafts WHERE owner_uid = ? AND id = ? LIMIT 1").bind(uid, id).first();
+  if (!owner) return null;
+  const result = await env.GRANTS_DB.prepare("SELECT event_type, event_json, created_at FROM grant_application_draft_events WHERE owner_uid = ? AND draft_id = ? ORDER BY created_at DESC LIMIT 50").bind(uid, id).all();
+  return (result.results || []).map(row => {
+    let details = {};
+    try { details = JSON.parse(row.event_json || "{}"); } catch {}
+    return { eventType: row.event_type, createdAt: row.created_at, ...details };
+  });
+}
 async function saveDraft(request, env, uid) {
   if (!env.GRANTS_DB) return json({ error: "Grant application draft storage is not configured." }, 503);
   let body;
@@ -81,7 +92,20 @@ async function saveDraft(request, env, uid) {
   };
   const contentJson = JSON.stringify(content);
   if (contentJson.length > 100_000) return json({ error: "Saved application content exceeds the 100 KB limit." }, 413);
-  await env.GRANTS_DB.prepare("INSERT INTO grant_application_drafts (id, owner_uid, name, opportunity_title, opportunity_url, status, content_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'draft', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET name=excluded.name, opportunity_title=excluded.opportunity_title, opportunity_url=excluded.opportunity_url, status='draft', content_json=excluded.content_json, updated_at=CURRENT_TIMESTAMP WHERE grant_application_drafts.owner_uid=excluded.owner_uid").bind(id, uid, content.name, title, url, contentJson).run();
+  const existing = await env.GRANTS_DB.prepare("SELECT owner_uid FROM grant_application_drafts WHERE id = ? LIMIT 1").bind(id).first();
+  if (existing && existing.owner_uid !== uid) return json({ error: "Draft not found or you do not own this draft." }, 403);
+  const eventType = existing ? "draft_updated" : "draft_created";
+  const eventDetails = JSON.stringify({
+    name: content.name,
+    opportunityTitle: title,
+    geographicEligibility: content.assessment?.geographic_eligibility?.status || content.applicationFields?.geographicEligibility?.status || "not_assessed",
+    eligibilityStatus: content.assessment?.eligibility?.status || "not_assessed",
+    savedCharacters: contentJson.length
+  });
+  await env.GRANTS_DB.batch([
+    env.GRANTS_DB.prepare("INSERT INTO grant_application_drafts (id, owner_uid, name, opportunity_title, opportunity_url, status, content_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'draft', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET name=excluded.name, opportunity_title=excluded.opportunity_title, opportunity_url=excluded.opportunity_url, status='draft', content_json=excluded.content_json, updated_at=CURRENT_TIMESTAMP WHERE grant_application_drafts.owner_uid=excluded.owner_uid").bind(id, uid, content.name, title, url, contentJson),
+    env.GRANTS_DB.prepare("INSERT INTO grant_application_draft_events (id, draft_id, owner_uid, event_type, event_json, created_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)").bind(crypto.randomUUID(), id, uid, eventType, eventDetails)
+  ]);
   const saved = await getDraft(env, uid, id);
   if (!saved) return json({ error: "Draft not found or you do not own this draft." }, 403);
   return json({ draft: saved });
@@ -106,6 +130,13 @@ export async function handleApplicationPortal(request, env) {
   if (request.method === "POST" && url.pathname === "/application/drafts") {
     try { return await saveDraft(request, env, claims.sub); }
     catch (error) { return json({ error: String(error.message || "Unable to save draft").slice(0, 300) }, 503); }
+  }
+  const auditMatch = url.pathname.match(/^\/application\/drafts\/([A-Za-z0-9_-]{8,100})\/events$/);
+  if (request.method === "GET" && auditMatch) {
+    try {
+      const events = await listDraftEvents(env, claims.sub, auditMatch[1]);
+      return events ? json({ events }) : json({ error: "Draft not found." }, 404);
+    } catch (error) { return json({ error: String(error.message || "Unable to load draft audit trail").slice(0, 300) }, 503); }
   }
   const match = url.pathname.match(/^\/application\/drafts\/([A-Za-z0-9_-]{8,100})$/);
   if (request.method === "GET" && match) {
