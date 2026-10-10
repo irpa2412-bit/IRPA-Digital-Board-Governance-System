@@ -482,6 +482,9 @@ test("Maa translation cannot be completed without an identified speaker review",
     translationReviewedAt:"2026-10-10T06:10:00.000Z",
     completedAt:"2026-10-10T06:10:00.000Z",updatedAt:"2026-10-10T06:10:00.000Z"
   }));
+  await testEnv.withSecurityRulesDisabled(async context=>{
+    await context.firestore().doc("documents/LIFE-translation-output").set(lifecycleDocument({documentId:"LIFE-translation-output",reference:"IRPA-DOC-2026-TRANSLATED",fileName:"IRPA-Translation-TEST-MAA.txt",fileId:"drive-translation-file",ownerUid:"member-user",uploadedByUid:"member-user",authorizedUids:["member-user"]}));
+  });
   const ownerDb=testEnv.authenticatedContext("member-user",{email:"member@example.test"}).firestore();
   await assertSucceeds(ownerDb.doc("documentTranslationRequests/translation-test-3").update({translatedFileId:"drive-translation-file",translatedDocumentId:"LIFE-translation-output",translationOutputFileName:"IRPA-Translation-TEST-MAA.txt",updatedAt:"2026-10-10T06:11:00.000Z"}));
 });
