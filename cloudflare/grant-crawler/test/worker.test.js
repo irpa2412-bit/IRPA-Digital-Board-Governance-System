@@ -18,7 +18,7 @@ test("parses RSS entries and escapes without executing markup", () => {
   assert.equal(items[0].url, "https://donor.example/call/1");
 });
 
-test("health endpoint reports Firebase disabled and does not expose secrets", async () => {
+test("health endpoint reports identity and Cloudflare storage boundaries without exposing secrets", async () => {
   const response = await worker.fetch(new Request("https://crawler.example/health"), {
     IRPA_ENVIRONMENT: "staging",
     CRAWLER_CONTROL_TOKEN: "never-echo-this-token",
@@ -179,9 +179,7 @@ test("grant application draft records require an authenticated Firebase identity
 
 test("application draft routes are available without exposing crawler control token", async () => {
   const token = "private-control-token-that-must-not-be-rendered";
-  const response = await worker.fetch(new Request("https://crawler.example/application"), {
-    headers: { authorization: "Bearer " + token }
-  }, { CRAWLER_CONTROL_TOKEN: token });
+  const response = await worker.fetch(new Request("https://crawler.example/application"), { CRAWLER_CONTROL_TOKEN: token });
   const html = await response.text();
   assert.equal(response.status, 200);
   assert.equal(html.includes(token), false);
