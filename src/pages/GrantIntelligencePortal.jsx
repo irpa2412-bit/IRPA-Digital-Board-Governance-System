@@ -75,8 +75,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
    if(!isAdmin){setError("Only an administrator can trigger a manual full-source scan.");return;}
    try{
      setCrawlerRunning(true);setError("");setNotice("Manual donor-source scan requested. This can take several minutes.");
-     const workerUrl=import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL;
-     if(!workerUrl) throw new Error("Grant crawler Cloudflare Worker URL is not configured.");
+     const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-staging.irpa-governance.workers.dev").replace(/\/+$/, "");
      const idToken=await auth.currentUser?.getIdToken();
      if(!idToken) throw new Error("Your session has expired. Sign in again.");
      const response=await fetch(workerUrl.replace(/\/+$/, "")+"/run",{method:"POST",headers:{"Authorization":"Bearer "+idToken,"Content-Type":"application/json"},body:"{}"});
