@@ -3049,95 +3049,61 @@ textarea:focus-visible{
 }
 
 
-/* Mobile quick-access icon correction: render actual SVG line icons rather
-   than the oversized white circular placeholders visible on handset screens.
-   Keep icons independent of inherited button/span background and fill rules. */
-.dashboard-command .mobile-quote1-grid>button.mobile-blue-nav-button>span,
-.dashboard-command .mobile-quote1-stats>button.mobile-blue-nav-button>span,
-.dashboard-command .mobile-quote1-quick .mobile-quote1-grid>button>span{
+/* Restore original IRPA dashboard icon colour treatment (green, blue, amber and gold).
+   Keep the actual SVG artwork visible while preserving the original coloured icon badges. */
+.dashboard-command .mobile-quote1-stats>button>span,
+.dashboard-command .mobile-quote1-grid>button>span{
   display:inline-flex!important;
   align-items:center!important;
   justify-content:center!important;
-  flex:0 0 32px!important;
-  width:32px!important;height:32px!important;
-  min-width:32px!important;min-height:32px!important;
-  padding:0!important;margin:0 auto 8px!important;
-  background:transparent!important;
-  border:0!important;border-radius:0!important;
-  box-shadow:none!important;
+  flex:0 0 42px!important;
+  width:42px!important;height:42px!important;
+  min-width:42px!important;min-height:42px!important;
+  margin:0 auto 8px!important;
+  border:1px solid rgba(255,255,255,.22)!important;
+  border-radius:12px!important;
+  background:#197343!important;
+  box-shadow:0 2px 7px rgba(0,0,0,.18)!important;
   color:#fff!important;
-  opacity:1!important;visibility:visible!important;
 }
-.dashboard-command .mobile-quote1-grid>button.mobile-blue-nav-button>span svg.dashboard-semantic-icon,
-.dashboard-command .mobile-quote1-stats>button.mobile-blue-nav-button>span svg.dashboard-semantic-icon,
-.dashboard-command .mobile-quote1-quick .mobile-quote1-grid>button>span svg.dashboard-semantic-icon{
+.dashboard-command .mobile-quote1-stats>button:nth-child(4n+2)>span,
+.dashboard-command .mobile-quote1-grid>button:nth-child(3n+2)>span{
+  background:#0b5fa8!important;
+}
+.dashboard-command .mobile-quote1-stats>button:nth-child(4n+3)>span,
+.dashboard-command .mobile-quote1-grid>button:nth-child(3n)>span{
+  background:#b98113!important;
+  border-color:rgba(255,224,145,.7)!important;
+}
+.dashboard-command .mobile-quote1-stats>button:nth-child(4n)>span{
+  background:#a97808!important;
+  border-color:rgba(255,224,145,.7)!important;
+}
+.dashboard-command svg.dashboard-semantic-icon{
   display:block!important;
-  flex:none!important;
-  width:28px!important;height:28px!important;
-  min-width:28px!important;min-height:28px!important;
-  max-width:28px!important;max-height:28px!important;
+  width:26px!important;height:26px!important;
+  min-width:26px!important;min-height:26px!important;
+  max-width:26px!important;max-height:26px!important;
   padding:0!important;
   background:transparent!important;
-  border:0!important;border-radius:0!important;
-  box-shadow:none!important;
+  border:0!important;border-radius:0!important;box-shadow:none!important;
   fill:none!important;
-  stroke:#fff!important;
-  stroke-width:1.9!important;
+  stroke:currentColor!important;
   color:#fff!important;
-  opacity:1!important;visibility:visible!important;
-  overflow:visible!important;
+  stroke-width:1.9!important;
+  opacity:1!important;visibility:visible!important;overflow:visible!important;
 }
-.dashboard-command .mobile-quote1-grid>button.mobile-blue-nav-button>span svg.dashboard-semantic-icon *,
-.dashboard-command .mobile-quote1-stats>button.mobile-blue-nav-button>span svg.dashboard-semantic-icon *{
-  fill:none!important;stroke:#fff!important;opacity:1!important;visibility:visible!important;
+.dashboard-command svg.dashboard-semantic-icon *{
+  fill:none!important;stroke:currentColor!important;opacity:1!important;visibility:visible!important;
 }
-
-
-/* Desktop quick-access icon correction: prevent global button/span styles from
-   turning SVG icon wrappers into blank circles. Use consistent visible SVGs
-   on desktop and tablet as well as mobile, without changing button behavior. */
 @media screen and (min-width:761px){
-  .dashboard-command .dashboard-desktop-view .mobile-quote1-quick .mobile-quote1-grid>button>span,
-  .dashboard-command .dashboard-desktop-view .mobile-quote1-grid>button>span,
-  .dashboard-command .dashboard-desktop-view .mobile-quote1-stats>button>span{
-    display:inline-flex!important;
-    align-items:center!important;
-    justify-content:center!important;
-    flex:0 0 36px!important;
-    width:36px!important;height:36px!important;
-    min-width:36px!important;min-height:36px!important;
-    padding:0!important;
-    margin:0 auto 8px!important;
-    background:transparent!important;
-    border:0!important;border-radius:0!important;
-    box-shadow:none!important;
-    color:#fff!important;
-    opacity:1!important;visibility:visible!important;
+  .dashboard-command .dashboard-desktop-view .mobile-quote1-stats>button>span,
+  .dashboard-command .dashboard-desktop-view .mobile-quote1-grid>button>span{
+    width:46px!important;height:46px!important;min-width:46px!important;min-height:46px!important;
+    flex-basis:46px!important;border-radius:12px!important;
   }
-  .dashboard-command .dashboard-desktop-view .mobile-quote1-quick .mobile-quote1-grid>button>span svg.dashboard-semantic-icon,
-  .dashboard-command .dashboard-desktop-view .mobile-quote1-grid>button>span svg.dashboard-semantic-icon,
-  .dashboard-command .dashboard-desktop-view .mobile-quote1-stats>button>span svg.dashboard-semantic-icon{
-    display:block!important;
-    flex:none!important;
-    width:30px!important;height:30px!important;
-    min-width:30px!important;min-height:30px!important;
-    max-width:30px!important;max-height:30px!important;
-    padding:0!important;
-    background:transparent!important;
-    border:0!important;border-radius:0!important;
-    box-shadow:none!important;
-    fill:none!important;
-    stroke:#fff!important;
-    stroke-width:1.9!important;
-    color:#fff!important;
-    opacity:1!important;visibility:visible!important;
-    overflow:visible!important;
-  }
-  .dashboard-command .dashboard-desktop-view .mobile-quote1-quick .mobile-quote1-grid>button>span svg.dashboard-semantic-icon *,
-  .dashboard-command .dashboard-desktop-view .mobile-quote1-grid>button>span svg.dashboard-semantic-icon *,
-  .dashboard-command .dashboard-desktop-view .mobile-quote1-stats>button>span svg.dashboard-semantic-icon *{
-    fill:none!important;
-    stroke:#fff!important;
-    opacity:1!important;visibility:visible!important;
+  .dashboard-command .dashboard-desktop-view svg.dashboard-semantic-icon{
+    width:29px!important;height:29px!important;min-width:29px!important;min-height:29px!important;
+    max-width:29px!important;max-height:29px!important;
   }
 }
