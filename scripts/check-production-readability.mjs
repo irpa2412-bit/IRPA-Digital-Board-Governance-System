@@ -63,7 +63,8 @@ function auditFile(file) {
     }
   }
 }
-const files=changedOnly?changedFiles():[...walk(path.join(root,"src")),...walk(path.join(root,"public"))].filter(f=>fs.existsSync(f));
+const rootHtml=fs.readdirSync(root,{withFileTypes:true}).filter(e=>e.isFile() && extensions.has(path.extname(e.name).toLowerCase())).map(e=>path.join(root,e.name));
+const files=changedOnly?changedFiles():[...walk(path.join(root,"src")),...walk(path.join(root,"public")),...rootHtml].filter(f=>fs.existsSync(f));
 if(!files.length) notes.push(changedOnly?"No changed UI/source files matched the scoped audit.":"No UI/source files were found to audit.");
 for(const file of [...new Set(files)]) auditFile(file);
 
