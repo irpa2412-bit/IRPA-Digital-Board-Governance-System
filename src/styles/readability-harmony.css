@@ -3013,39 +3013,66 @@ textarea:focus-visible{
 }
 
 
-/* Restore the original four-item mobile navigation and normal access-category panel flow. */
+/* Corrective layout: keep the four-action bar at the top of the app viewport,
+   restore the visible access-category block below it, and use one consistent gold
+   treatment for dashboard action icon badges. */
 @media screen and (max-width:760px){
   .mobile-global-nav{
-    left:0!important;right:0!important;bottom:0!important;top:auto!important;
-    width:100%!important;height:76px!important;
+    position:fixed!important;
+    top:0!important;bottom:auto!important;left:0!important;right:0!important;
+    width:100%!important;height:76px!important;min-height:76px!important;
     display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;
-    border:1px solid #2f86cf!important;border-radius:0!important;
-    overflow:hidden!important;box-shadow:0 -4px 18px rgba(0,0,0,.22)!important;
-    z-index:1200!important;
+    border:1px solid #d6a52c!important;border-radius:0!important;
+    overflow:visible!important;box-shadow:0 3px 14px rgba(0,0,0,.28)!important;
+    z-index:1500!important;
   }
-  .mobile-global-nav>button{
+  .mobile-global-nav>button,
+  .mobile-global-nav>button:last-child{
     display:flex!important;min-width:0!important;height:76px!important;
     flex-direction:column!important;align-items:center!important;justify-content:center!important;
-    gap:5px!important;border-radius:0!important;border-right:1px solid rgba(255,255,255,.18)!important;
+    gap:5px!important;border-radius:0!important;
+    border-right:1px solid rgba(255,255,255,.22)!important;
     background:#0b5fa8!important;color:#fff!important;
   }
-  .mobile-global-nav>button:last-child{display:flex!important;}
-  .mobile-nav-sheet{bottom:84px!important;}
-  .desktop-webapp-navigation-roller,
-  .mobile-portal-content-roller{display:none!important;visibility:hidden!important;pointer-events:none!important;}
+  .mobile-global-nav>button.active{background:#0b5fa8!important;box-shadow:inset 0 -4px #d6a52c!important;}
+  .mobile-nav-sheet{top:84px!important;bottom:auto!important;z-index:1501!important;}
+  .main-area{padding-top:76px!important;}
   .main-area .content-area{padding-top:14px!important;padding-bottom:92px!important;}
+  .topbar{height:auto!important;min-height:0!important;overflow:visible!important;}
+  .topbar-heading-row{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:12px!important;overflow:visible!important;}
+  .topbar-title-block{width:100%!important;min-width:0!important;}
   .topbar-access-category{
-    position:relative!important;inset:auto!important;transform:none!important;
-    width:100%!important;max-width:100%!important;max-height:none!important;
-    overflow:visible!important;z-index:1!important;
+    display:block!important;position:relative!important;inset:auto!important;transform:none!important;
+    order:2!important;grid-column:auto!important;grid-row:auto!important;
+    width:100%!important;min-width:0!important;max-width:100%!important;
+    height:auto!important;max-height:none!important;overflow:visible!important;
+    padding:14px!important;margin:0!important;box-sizing:border-box!important;
+    background:#082d4b!important;border:1px solid rgba(214,165,44,.75)!important;
+    border-radius:12px!important;color:#fff!important;z-index:2!important;
   }
+  .topbar-access-category>span,
+  .topbar-access-category .login-category-heading,
+  .topbar-access-category .login-category-note{display:block!important;visibility:visible!important;opacity:1!important;color:#edf5f1!important;white-space:normal!important;}
+  .topbar-access-category .login-category-list,
+  .topbar-access-category .login-category-item{display:flex!important;visibility:visible!important;opacity:1!important;flex-wrap:wrap!important;gap:8px!important;}
+  .topbar-access-category .login-category-pill{color:#f3d36a!important;border-color:#d6a52c!important;background:transparent!important;}
   .topbar-access-category select,
   .topbar-access-category .authority-select,
-  .topbar-access-category .access-category-select{
-    color:#173b2d!important;background:#fff!important;opacity:1!important;
-  }
+  .topbar-access-category .access-category-select{color:#173b2d!important;background:#fff!important;opacity:1!important;}
+  .mobile-access-live-date{position:relative!important;display:flex!important;flex-wrap:wrap!important;gap:5px 10px!important;inset:auto!important;margin-top:12px!important;}
+  .desktop-webapp-navigation-roller,
+  .mobile-portal-content-roller{display:none!important;visibility:hidden!important;pointer-events:none!important;}
 }
- 
+.dashboard-command .mobile-quote1-stats>button>span,
+.dashboard-command .mobile-quote1-grid>button>span{
+  background:#d6a52c!important;color:#fff!important;
+  border:1px solid #f3d36a!important;box-shadow:0 2px 7px rgba(0,0,0,.18)!important;
+}
+.dashboard-command .mobile-quote1-stats>button>span svg.dashboard-semantic-icon,
+.dashboard-command .mobile-quote1-grid>button>span svg.dashboard-semantic-icon{
+  stroke:#fff!important;color:#fff!important;
+}
+
 /* Restore original IRPA dashboard icon colour treatment (green, blue, amber and gold).
    Keep the actual SVG artwork visible while preserving the original coloured icon badges. */
 .dashboard-command .mobile-quote1-stats>button>span,
