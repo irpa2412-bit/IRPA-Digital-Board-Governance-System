@@ -504,6 +504,16 @@ test("AI grant assistant fails closed when Cloudflare AI binding is absent", asy
 });
 
 
+test("grant application portal exposes a live open-calls dashboard and read-only access boundary", async () => {
+  const response = await worker.fetch(new Request("https://crawler.example/application"), {});
+  const html = await response.text();
+  assert.equal(response.status, 200);
+  assert.match(html, /Live eligible open calls/);
+  assert.match(html, /refreshOpportunities/);
+  assert.match(html, /setInterval\(\(\)=>\{if\(currentUser\)loadOpportunities\(\)\},60000\)/);
+  assert.match(html, /saved application drafts remain editable only by their responsible owner/i);
+});
+
 test("grant application portal serves the authenticated copy-ready workspace", async () => {
   const response = await worker.fetch(new Request("https://crawler.example/application"), {});
   const html = await response.text();
