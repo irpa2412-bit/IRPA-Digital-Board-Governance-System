@@ -21,9 +21,9 @@ export function normalizeOpportunityUrl(value) {
 function isSpecificOpportunity(title = "", description = "") {
   const titleText = String(title);
   const bodyText = String(description);
-  const explicitCallTitle = /\\b(call for proposals|call for applications|grant call|open grant|grant opportunity|funding opportunity|grant fund|small grants? (?:programme|program|fund)|open call|request for proposals|expression of interest|funding call|applications open|apply now|submit proposals|challenge fund|grant competition|award competition)\\b/i.test(titleText);
-  const deadlineEvidence = /\\b(deadline|due date|closing date|apply by|submit (?:by|before)|applications? close|applications? due|application window|closes on|closing on|submission deadline)\\b/i.test(bodyText);
-  const grantSignal = /\\b(grant|funding|fund|proposal|application|award)\\b/i.test(titleText + " " + bodyText);
+  const explicitCallTitle = /\b(call for proposals|call for applications|grant call|open grant|grant opportunity|funding opportunity|grant fund|small grants? (?:programme|program|fund)|open call|request for proposals|expression of interest|funding call|applications open|apply now|submit proposals|challenge fund|grant competition|award competition)\b/i.test(titleText);
+  const deadlineEvidence = /\b(deadline|due date|closing date|apply by|submit (?:by|before)|applications? close|applications? due|application window|closes on|closing on|submission deadline)\b/i.test(bodyText);
+  const grantSignal = /\b(grant|funding|fund|proposal|application|award)\b/i.test(titleText + " " + bodyText);
   return explicitCallTitle || (grantSignal && deadlineEvidence);
 }
 
