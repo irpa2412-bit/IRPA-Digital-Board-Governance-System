@@ -51,6 +51,7 @@ const meetingServicesRouter = createMeetingServicesRouter({
   authenticateFirebaseRequest,
   getFirebaseProjectId,
   getFirestoreAdminAccessToken,
+  sendEmail: (env, message) => smtpSend(env, message),
   json,
   corsHeaders
 });
