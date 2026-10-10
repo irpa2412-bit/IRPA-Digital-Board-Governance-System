@@ -243,6 +243,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
    </div>
    <div style={{display:"flex",gap:9,flexWrap:"wrap"}}>
     {canManage&&<button style={styles.button} onClick={()=>setShowForm(v=>!v)}>{showForm?"Close form":"+ Add opportunity"}</button>}
+    <button style={styles.button} onClick={()=>openConceptWorkspace(null)}>Concept-note workspace</button>
     <button style={{...styles.button,background:"transparent"}} onClick={()=>{setQueryText("");setPillar("all");setTheme("all");setStatus("all")}}>Reset filters</button>
    </div>
   </section>
@@ -279,6 +280,64 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
    <fieldset style={{border:"1px solid #425064",borderRadius:10,padding:12}}><legend style={{padding:"0 6px",fontSize:12}}>Cross-cutting themes</legend><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:8}}>{THEMES.map(t=><label key={t.id} style={{display:"flex",gap:8,alignItems:"center",fontSize:12}}><input type="checkbox" checked={draft.themes.includes(t.id)} onChange={()=>toggleDraftArray("themes",t.id)}/>{t.label}</label>)}</div></fieldset>
    <div><button disabled={saving} type="submit" style={{...styles.button,opacity:saving ? 0.6 : 1}}>{saving?"Saving…":"Save opportunity"}</button></div>
   </form>}
+  {workspaceOpen&&<section style={{...styles.card,display:"grid",gap:13,borderColor:"#4e8b91"}} aria-labelledby="concept-workspace-heading">
+   <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"start",flexWrap:"wrap"}}>
+    <div><div style={styles.eyebrow}>IRPA-DBGS · APPLICATION PREPARATION</div><h2 id="concept-workspace-heading" style={{fontSize:21,margin:"5px 0"}}>AI eligibility & concept-note workspace</h2><p style={{...styles.muted,margin:0}}>Screen geography and donor requirements first. Drafting is blocked unless Tanzania or eligible regional/global coverage is established by the supplied call text.</p></div>
+    <button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>setWorkspaceOpen(false)}>Close workspace</button>
+   </div>
+   <label style={{fontSize:12}}>Funding opportunity
+    <select style={{...styles.input,marginTop:5}} value={selectedOpportunity?.id||""} onChange={e=>{const next=combinedRecords.find(r=>r.id===e.target.value);setSelectedOpportunity(next||null);setOpportunityDescription(text(next?.summary||""));setDonorRequirements(text(next?.applicationRequirements||""));setAnalysisResult(null);setConceptDraft("");setDraftId("");setWorkspaceNotice("");}}>
+     <option value="">Select an opportunity from the register…</option>
+     {selectedOpportunity?.id&&!combinedRecords.some(r=>r.id===selectedOpportunity.id)&&<option value={selectedOpportunity.id}>{selectedOpportunity.title} (saved draft)</option>}
+     {combinedRecords.map(r=><option key={r.id} value={r.id}>{r.title} — {r.country||"Geography unverified"}</option>)}
+    </select>
+   </label>
+   {selectedOpportunity&&<div style={{...styles.card,display:"grid",gap:5}}>
+    <strong>{selectedOpportunity.title}</strong>
+    <div style={styles.muted}>Funder: {selectedOpportunity.funder||"Not verified"} · Geography on record: {selectedOpportunity.country||"Not verified"}</div>
+    {selectedOpportunity.url&&<a href={selectedOpportunity.url} target="_blank" rel="noreferrer" style={{color:"#8ecad1",fontSize:13}}>Open official announcement ↗</a>}
+   </div>}
+   <label style={{fontSize:12}}>Opportunity description / call summary
+    <textarea rows="4" style={{...styles.input,marginTop:5,resize:"vertical"}} value={opportunityDescription} onChange={e=>setOpportunityDescription(e.target.value)} placeholder="Paste the official call summary, geographic scope, purpose, eligible activities and funding conditions."/>
+   </label>
+   <label style={{fontSize:12}}>Official eligibility criteria and application requirements (required for reliable screening)
+    <textarea rows="5" style={{...styles.input,marginTop:5,resize:"vertical"}} value={donorRequirements} onChange={e=>setDonorRequirements(e.target.value)} placeholder="Paste eligible countries, applicant legal status, organization age, track-record, audit/turnover, co-financing, consortium, deadline and eligible-cost rules from the official call."/>
+   </label>
+   <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+    <button type="button" disabled={analysisBusy||!selectedOpportunity} style={{...styles.button,opacity:analysisBusy||!selectedOpportunity?0.6:1}} onClick={()=>runWorkspaceAnalysis("eligibility")}>{analysisBusy?"Analyzing…":"1. Screen eligibility"}</button>
+    <button type="button" disabled={analysisBusy||!selectedOpportunity||analysisResult?.geographic_eligibility?.status!=="eligible"||analysisResult?.eligibility?.status==="ineligible"} style={{...styles.button,background:"#285d45",opacity:analysisBusy||!selectedOpportunity||analysisResult?.geographic_eligibility?.status!=="eligible"||analysisResult?.eligibility?.status==="ineligible"?0.55:1}} onClick={()=>runWorkspaceAnalysis("concept_note")}>2. Generate concept note</button>
+    <button type="button" disabled={draftsBusy} style={{...styles.button,background:"transparent",opacity:draftsBusy?0.6:1}} onClick={loadSavedDrafts}>{draftsBusy?"Loading drafts…":"Refresh saved drafts"}</button>
+   </div>
+   {workspaceNotice&&<div role="status" style={{...styles.card,borderColor:"#32846d",color:"#8de0b7"}}>{workspaceNotice}</div>}
+   {analysisResult&&<section style={{...styles.card,display:"grid",gap:10}}>
+    <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}><h3 style={{fontSize:17,margin:0}}>Eligibility assessment</h3><span style={{...styles.tag,borderColor:analysisResult.geographic_eligibility?.status==="eligible"?"#32846d":analysisResult.geographic_eligibility?.status==="ineligible"?"#b65c5c":"#b78b3d"}}>Geography: {analysisResult.geographic_eligibility?.status||"not assessed"}</span>{analysisResult.eligibility?.status&&<span style={styles.tag}>Overall: {analysisResult.eligibility.status.replaceAll("_"," ")}</span>}</div>
+    {analysisResult.geographic_eligibility?.reason&&<p style={{...styles.muted,margin:0}}>{analysisResult.geographic_eligibility.reason}</p>}
+    {analysisResult.geographic_eligibility?.evidence?.length>0&&<ul style={{...styles.muted,margin:"0 0 0 18px"}}>{analysisResult.geographic_eligibility.evidence.map((item,i)=><li key={i}>{item}</li>)}</ul>}
+    {analysisResult.eligibility?.evidence?.length>0&&<div><strong style={{fontSize:13}}>Evidence</strong><ul style={{...styles.muted,margin:"5px 0 0 18px"}}>{analysisResult.eligibility.evidence.map((item,i)=><li key={i}>{item}</li>)}</ul></div>}
+    {analysisResult.eligibility?.unknowns?.length>0&&<div><strong style={{fontSize:13}}>Unresolved eligibility questions</strong><ul style={{...styles.muted,margin:"5px 0 0 18px"}}>{analysisResult.eligibility.unknowns.map((item,i)=><li key={i}>{item}</li>)}</ul></div>}
+    {analysisResult.donor_requirements?.length>0&&<div><strong style={{fontSize:13}}>Donor requirement matrix</strong><div style={{display:"grid",gap:7,marginTop:7}}>{analysisResult.donor_requirements.map((item,i)=><div key={i} style={{borderTop:"1px solid #344255",paddingTop:7}}><div style={{display:"flex",gap:8,justifyContent:"space-between",flexWrap:"wrap"}}><strong style={{fontSize:12}}>{item.requirement}</strong><span style={styles.tag}>{String(item.status||"unknown").replaceAll("_"," ")}</span></div><p style={{...styles.muted,margin:"4px 0"}}>{item.evidence||"Evidence not supplied."}</p>{item.action&&<p style={{...styles.muted,margin:0}}>Next action: {item.action}</p>}</div>)}</div></div>}
+    {analysisResult.strategic_alignment&&<div><strong style={{fontSize:13}}>IRPA Strategic Plan alignment</strong><p style={{...styles.muted,margin:"5px 0"}}>{analysisResult.strategic_alignment.rationale}</p><div style={{display:"flex",gap:5,flexWrap:"wrap"}}>{(analysisResult.strategic_alignment.relevant_pillars||[]).map((item,i)=><span key={i} style={styles.tag}>{item}</span>)}{(analysisResult.strategic_alignment.relevant_cross_cutting_themes||[]).map((item,i)=><span key={"t"+i} style={{...styles.tag,borderColor:"#6c5b8f"}}>{item}</span>)}</div></div>}
+    {analysisResult.application_checklist?.length>0&&<div><strong style={{fontSize:13}}>Application checklist</strong><ul style={{...styles.muted,margin:"5px 0 0 18px"}}>{analysisResult.application_checklist.map((item,i)=><li key={i}>{item}</li>)}</ul></div>}
+    {analysisResult.risks_and_gaps?.length>0&&<div><strong style={{fontSize:13}}>Risks and evidence gaps</strong><ul style={{...styles.muted,margin:"5px 0 0 18px"}}>{analysisResult.risks_and_gaps.map((item,i)=><li key={i}>{item}</li>)}</ul></div>}
+   </section>}
+   {(conceptDraft||analysisResult?.concept_note?.draft)&&<section style={{...styles.card,display:"grid",gap:8}}>
+    <h3 style={{fontSize:17,margin:0}}>Editable concept-note draft</h3>
+    <p style={{...styles.muted,margin:0}}>This is a working draft, not an approved IRPA submission. Verify figures, evidence, eligibility, budgets and donor instructions before circulation.</p>
+    <textarea aria-label="Editable concept-note draft" rows="16" style={{...styles.input,resize:"vertical",fontFamily:"inherit",lineHeight:1.6}} value={conceptDraft||analysisResult?.concept_note?.draft||""} onChange={e=>setConceptDraft(e.target.value)}/>
+    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+     <button type="button" disabled={draftSaving||!text(conceptDraft||analysisResult?.concept_note?.draft)} style={{...styles.button,opacity:draftSaving?0.6:1}} onClick={saveConceptDraft}>{draftSaving?"Saving draft…":"Save draft to Cloudflare workspace"}</button>
+     <button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>GenUI.copy(conceptDraft||analysisResult?.concept_note?.draft||"")}>Copy concept-note text</button>
+    </div>
+   </section>}
+   <section style={{display:"grid",gap:8}}>
+    <div style={{display:"flex",justifyContent:"space-between",gap:10,alignItems:"center",flexWrap:"wrap"}}><h3 style={{fontSize:16,margin:0}}>My saved concept-note drafts</h3><span style={styles.muted}>{savedDrafts.length} saved</span></div>
+    {draftsBusy&&<div style={styles.muted}>Loading drafts from the Cloudflare workspace…</div>}
+    {!draftsBusy&&!savedDrafts.length&&<div style={styles.muted}>No saved drafts yet. Screen a grant, generate a concept note and save the draft here.</div>}
+    {savedDrafts.map(draft=><div key={draft.id} style={{border:"1px solid #344255",borderRadius:10,padding:11,display:"flex",justifyContent:"space-between",gap:10,alignItems:"center",flexWrap:"wrap"}}><div><strong style={{fontSize:13}}>{draft.name||draft.opportunity?.title||"Untitled concept note"}</strong><div style={styles.muted}>Status: {draft.status||"draft"} · Updated: {dateLabel(draft.updated_at||draft.updatedAt||draft.created_at)}</div></div><button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>openSavedConceptDraft(draft)}>Open draft</button></div>)}
+   </section>
+   <div style={{...styles.muted,borderLeft:"3px solid #b78b3d",padding:"8px 12px"}}><strong>Governance control:</strong> saved drafts remain drafts in the isolated Cloudflare D1 workspace. Saving does not submit an application, approve expenditure, authorize a commitment, or replace IRPA's formal internal review and approval procedures.</div>
+  </section>}
+
   <section style={{...styles.card,display:"grid",gap:12}}>
    <h2 style={{margin:0,fontSize:18}}>Find matching opportunities</h2>
    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:10}}>
@@ -296,7 +355,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
      <div style={{minWidth:150}}><div style={{fontSize:12,color:"#9fb0c3"}}>Deadline</div><strong>{dateLabel(r.deadline)}</strong><div style={{fontSize:12,marginTop:8,color:"#9fb0c3"}}>Status</div><strong>{r.status||"Unclassified"}</strong></div>
     </div>
     <div style={{display:"flex",gap:5,flexWrap:"wrap",margin:"8px 0"}}>{cleanArray(r.pillars).map(id=><span key={id} style={styles.tag}>{PILLARS.find(p=>p.id===id)?.label||id}</span>)}{cleanArray(r.themes).map(id=><span key={id} style={{...styles.tag,borderColor:"#6c5b8f"}}>{THEMES.find(t=>t.id===id)?.label||id}</span>)}</div>
-    <div style={{display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap",alignItems:"center"}}><span style={styles.muted}>Geography: {r.country||"Not specified"} · Funding: {r.amount||"Not specified"} · Updated: {dateLabel(r.updatedAt||r.createdAt)}</span><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><a href={r.url} target="_blank" rel="noreferrer" style={{...styles.button,textDecoration:"none",display:"inline-block"}}>Open official call ↗</a>{canManage&&r.sourceType!=="Cloudflare crawler"&&<select aria-label={"Update status for "+r.title} style={{...styles.input,width:"auto"}} value={r.status||"Open"} onChange={e=>changeStatus(r,e.target.value)}>{statusOptions.map(s=><option key={s}>{s}</option>)}</select>}</div></div>
+    <div style={{display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap",alignItems:"center"}}><span style={styles.muted}>Geography: {r.country||"Not specified"} · Funding: {r.amount||"Not specified"} · Updated: {dateLabel(r.updatedAt||r.createdAt)}</span><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>openConceptWorkspace(r)}>Screen eligibility / draft</button><a href={r.url} target="_blank" rel="noreferrer" style={{...styles.button,textDecoration:"none",display:"inline-block"}}>Open official call ↗</a>{canManage&&r.sourceType!=="Cloudflare crawler"&&<select aria-label={"Update status for "+r.title} style={{...styles.input,width:"auto"}} value={r.status||"Open"} onChange={e=>changeStatus(r,e.target.value)}>{statusOptions.map(s=><option key={s}>{s}</option>)}</select>}</div></div>
    </article>)}
   </section>
   <section style={styles.card}>
