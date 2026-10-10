@@ -22,7 +22,6 @@ import { createDocumentLifecycleRouter } from "./documentLifecycle.mjs";
 import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPasswordSetup, getInvitationSessionState } from "./invitationRedemption.mjs";
 import { buildGoogleDriveAuthorizationParams } from "./googleDriveOAuth.mjs";
 import { createMeetingPortalRouter } from "./meetingPortal.mjs";
-import { createMeetingOperationsRouter } from "./meetingOperations.mjs";
 import { createMeetingServicesRouter } from "./meetingServices.mjs";
 
 function getFirebaseProjectId(env) {
@@ -48,14 +47,7 @@ const meetingPortalRouter = createMeetingPortalRouter({
   corsHeaders
 });
 
-const meetingOperationsRouter = createMeetingOperationsRouter({
-  authenticateFirebaseRequest,
-  getFirebaseProjectId,
-  getFirestoreAdminAccessToken,
-  sendMail: (env, message) => smtpSend(env, message),
-  json,
-  corsHeaders
-});
+
 
 const meetingServicesRouter = createMeetingServicesRouter({
   authenticateFirebaseRequest,
@@ -116,9 +108,6 @@ export default {
 
       // Normalize trailing slashes so portal upload/archive actions cannot be blocked by URL formatting.
       const pathname = url.pathname.replace(/\/+$/, "") || "/";
-
-      const meetingOperationsResponse = await meetingOperationsRouter(request, env, pathname);
-      if (meetingOperationsResponse) return meetingOperationsResponse;
 
       const meetingPortalResponse = await meetingPortalRouter(request, env, pathname);
       if (meetingPortalResponse) return meetingPortalResponse;
