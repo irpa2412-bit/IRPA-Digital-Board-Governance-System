@@ -381,7 +381,17 @@ service cloud.firestore {
   match /financeReports/{id}{allow read:if financePortfolioViewer();allow create:if financePersonnel()&&financialReferenceFieldsNotSupplied();allow update:if financePersonnel()&&(request.resource.data.status==resource.data.status||financeApprovalOfficer())&&financialReferenceFieldsImmutable();allow delete:if financePersonnel();}
   match /authorizationRequests/{id}{allow read:if admin()||authorizationParticipant(resource);allow create:if admin()||authorizationUser();allow update:if admin()||authorizationParticipant(resource)||authorizationParticipant(request.resource);allow delete:if admin();}
   match /workflowActions/{id}{allow read:if admin()||(resource.data.workflowType=="Authorization"&&authorizationParticipant(resource))||workflowParticipant(resource);allow create:if admin()||validAuthorizationCreate();allow update:if admin()||((resource.data.workflowType=="Authorization"&&authorizationParticipant(resource))||workflowParticipant(resource))&&validWorkflowRecord(request.resource)&&!workflowTerminal()&&(request.resource.data.workflowType!="Authorization"||authorizationTransitionAllowed());allow delete:if admin();}
-  // Grant Intelligence: every authenticated IRPA profile may discover opportunities; publication and pipeline updates are restricted to authorized management roles.\n  match /grantOpportunities/{id}{allow read:if signedIn();allow create,update:if admin()||anyInstitutionalRole(["Executive Director","Director Outreach","Director Finance & Administration","Director Research","Research Director","Research Manager","Research Officer","Fundraising Officer"]);allow delete:if admin();}\n  match /systemSettings/{id}{allow read,create,update,delete:if admin();}
+  // Grant Intelligence: authenticated profiles may read opportunities; designated management roles publish and update them.
+  match /grantOpportunities/{id}{
+    allow read: if signedIn();
+    allow create, update: if admin() || anyInstitutionalRole(["Executive Director","Director Outreach","Director Finance & Administration","Director Research","Research Director","Research Manager","Research Officer","Fundraising Officer"]);
+    allow delete: if admin();
+  }
+  // Grant crawler telemetry is visible to authenticated IRPA profiles; only trusted server functions write crawler status.
+  match /grantCrawlerStatus/{id}{allow read:if signedIn();allow write:if false;}
+  match /grantCrawlerSources/{id}{allow read:if signedIn();allow write:if false;}
+  match /grantCrawlerRuns/{id}{allow read:if signedIn()&&(admin()||anyInstitutionalRole(["Executive Director","Director Outreach","Director Finance & Administration","Director Research","Research Director","Research Manager","Research Officer","Fundraising Officer"]));allow write:if false;}
+  match /systemSettings/{id}{allow read,create,update,delete:if admin();}
   match /systemSettings/documentCounters{
     allow get:if signedIn();
     allow create:if signedIn()&&request.resource.data.documentReference==1&&request.resource.data.keys().hasOnly(["documentReference","updatedAt"]);
