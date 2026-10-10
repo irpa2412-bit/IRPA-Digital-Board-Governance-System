@@ -13,8 +13,13 @@ Configure GitHub Actions secrets CLOUDFLARE_GRANT_CRAWLER_API_TOKEN, CLOUDFLARE_
 Run the IRPA Grant Crawler — Isolated Staging workflow manually after its pull request has been reviewed. It deploys only irpa-grant-crawler-staging; it does not touch irpa-google-drive-gateway or deploy Firebase.
 
 ## Endpoints
-- GET /health: returns service/environment/storage status, without secrets.
+- GET /health: returns service/environment/storage/AI-binding status, without secrets.
 - POST /crawl: requires Authorization: Bearer <CRAWLER_CONTROL_TOKEN>.
+- POST /assistant/analyze: authenticated Cloudflare Workers AI screening of eligibility, donor requirements, concept-note structure, evidence gaps and next steps. Set `task: "concept_note"` to request an editable first-draft concept note as well.
 - Scheduled scan: every six hours in the staging environment; with no feed URLs configured, it safely scans zero feeds.
 
 See SECURITY.md for the Firebase least-privilege gate and security boundaries.
+
+## AI grant application assistant
+
+The assistant uses the Cloudflare Workers AI binding (model `@cf/meta/llama-3.1-8b-instruct`); no external AI API key or Google/Firebase route is used. Requests are limited to 20 KB and require the crawler control token. It compares supplied call text against IRPA's known organizational profile, returns a structured requirement matrix and marks missing information as unknown. It must not be treated as a donor eligibility decision; official call guidelines remain authoritative. Send `task: "concept_note"` to generate a tailored structure and draft.
