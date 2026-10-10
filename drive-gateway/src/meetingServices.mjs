@@ -53,6 +53,7 @@ const c=await context(ctx,env,token,claims,meetingId);
 const current=c.meeting;
 const changed={};
 for(const [key,value] of Object.entries(incoming)){if(["id","updateTime","createdAt"].includes(key)||(!c.isAdmin&&key==="registeredAt"))continue;
+if(JSON.stringify(value)!==JSON.stringify(current[key]))changed[key]=value;}
 if(!Object.keys(changed).length)return response(ctx,request,{ok:true,meetingId,changedFields:[]});
 const controller=c.isAdmin||clean(current.initiatorUid)===c.uid||clean(current.chairpersonUid)===c.uid||clean(current.secretaryUid)===c.uid||lower(current.initiatorEmail)===c.email||lower(current.chairpersonEmail)===c.email||lower(current.secretaryEmail)===c.email;
 if(!controller)return fail(ctx,request,"Only the authorised meeting administrator, initiator, chairperson or secretary may update this meeting.",403);
