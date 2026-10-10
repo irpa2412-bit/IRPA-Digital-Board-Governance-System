@@ -8,12 +8,48 @@ const IRPA_PROFILE = {
   operational_area: "Longido District, Arusha Region, Tanzania; initial focus includes Longido, Engikaret and Kimokouwa wards and pilot villages across Longido, Engarenaibor and Kitumbeine divisions.",
   maturity: "Newly registered organization. No completed projects and no secured project funding have been reported. Do not imply a proven delivery track record, audited project history, or co-financing that has not been supplied.",
   pillars: [
-    "Sustainable Rangeland Management: sustainable use, restoration and control of invasive plant species",
-    "Livestock Development: improved breeding and access to veterinary services",
-    "Market Development: livestock market linkages and value addition to livestock products"
+    {
+      name: "Sustainable Rangeland Management",
+      objectives: ["promote proper use of rangelands", "promote rangeland restoration", "control invasive plant species"],
+      cross_cutting_themes: [
+        "climate change adaptation and resilience: drought preparedness, ecosystem resilience and climate-informed restoration",
+        "gender equality and social inclusion: equitable access to rangelands, restoration benefits and decision-making",
+        "youth empowerment: youth participation in restoration, monitoring and green livelihoods",
+        "community participation: community-led grazing plans, restoration and invasive-species management",
+        "research, innovation and knowledge management: rangeland condition evidence, GIS/NDVI and community knowledge",
+        "governance and institutional capacity strengthening: local resource governance, accountability and management capacity",
+        "environmental sustainability: biodiversity, soil and vegetation recovery, and sustainable land use"
+      ]
+    },
+    {
+      name: "Livestock Development",
+      objectives: ["promote breeding of improved hybrid animals", "facilitate veterinary services"],
+      cross_cutting_themes: [
+        "climate change adaptation and resilience: climate-resilient livestock systems and drought preparedness",
+        "gender equality and social inclusion: inclusive access to animal health, breeding and livestock services",
+        "youth empowerment: youth participation in livestock enterprises and service delivery",
+        "community participation: pastoralist-led livestock priorities and community animal-health approaches",
+        "research, innovation and knowledge management: animal-health evidence, appropriate innovation and knowledge exchange",
+        "governance and institutional capacity strengthening: stronger livestock institutions, service coordination and accountability",
+        "environmental sustainability: sustainable grazing pressure, animal welfare and responsible natural-resource use"
+      ]
+    },
+    {
+      name: "Market Development",
+      objectives: ["facilitate linkages between pastoralists and livestock markets", "promote value addition to livestock products"],
+      cross_cutting_themes: [
+        "climate change adaptation and resilience: resilient market access and diversified pastoral incomes",
+        "gender equality and social inclusion: fair participation and benefit-sharing for women and marginalized groups",
+        "youth empowerment: youth-led market services, enterprises and value addition",
+        "community participation: pastoralist participation in market design, priorities and producer linkages",
+        "research, innovation and knowledge management: market information, digital innovation and evidence-based decisions",
+        "governance and institutional capacity strengthening: transparent market systems, producer organization and accountable value chains",
+        "environmental sustainability: resource-efficient processing, waste management and sustainable value chains"
+      ]
+    }
   ],
   cross_cutting: [
-    "climate adaptation and resilience",
+    "climate change adaptation and resilience",
     "gender equality and social inclusion",
     "youth empowerment",
     "community participation",
@@ -22,7 +58,8 @@ const IRPA_PROFILE = {
     "environmental sustainability"
   ],
   community_readiness: "IRPA has mobilized 10 women and youth groups interested in launching economic activities. This is a readiness signal, not evidence that activities have been funded or implemented.",
-  strategic_plan: "IRPA Strategic Plan 2025–2029"
+  strategic_plan: "IRPA Strategic Plan 2025–2029",
+  digital_governance: "IRPA has an existing Digital Board Governance System (DBGS) that requires significant investment for completion, security, integration, hosting, reliability, accessibility, maintenance and adoption. Treat digital governance, nonprofit governance technology, board-management systems, digital public infrastructure, civic technology and responsible AI as a distinct strategic investment track. Assess donor restrictions on software, existing-platform support, cybersecurity, cloud costs, equipment, technical assistance, maintenance, training and institutional capacity. Do not claim the DBGS is completed, deployed or has proven impact unless supplied evidence establishes it."
 };
 
 function assessGeographicEligibility(opportunity) {
@@ -198,6 +235,7 @@ export async function analyzeGrant(request, env) {
         summary: "string",
         geographic_eligibility: { status: "eligible|ineligible|unclear", reason: "string", evidence: ["string"], holdConceptNote: "boolean" },
         eligibility: { status: "eligible|possibly_eligible|ineligible|insufficient_information", confidence: "low|medium|high", evidence: ["string"], unknowns: ["string"] },
+        strategic_alignment: { relevant_pillars: ["string"], relevant_cross_cutting_themes: ["string"], pillar_theme_alignment: [{ pillar: "string", relevant_cross_cutting_themes: ["string"], rationale: "string" }], digital_governance_relevance: "high|medium|low|none", rationale: "string", funding_use_fit: ["string"] },
         donor_requirements: [{ requirement: "string", status: "met|partially_met|not_met|unknown", evidence: "string", action: "string" }],
         concept_note: {
           title: "string",
@@ -220,6 +258,7 @@ export async function analyzeGrant(request, env) {
         summary: "string",
         geographic_eligibility: { status: "eligible|ineligible|unclear", reason: "string", evidence: ["string"], holdConceptNote: "boolean" },
         eligibility: { status: "eligible|possibly_eligible|ineligible|insufficient_information", confidence: "low|medium|high", evidence: ["string"], unknowns: ["string"] },
+        strategic_alignment: { relevant_pillars: ["string"], relevant_cross_cutting_themes: ["string"], pillar_theme_alignment: [{ pillar: "string", relevant_cross_cutting_themes: ["string"], rationale: "string" }], digital_governance_relevance: "high|medium|low|none", rationale: "string", funding_use_fit: ["string"] },
         donor_requirements: [{ requirement: "string", status: "met|partially_met|not_met|unknown", evidence: "string", action: "string" }],
         concept_note_structure: [{ heading: "string", purpose: "string", suggested_content: "string", evidence_needed: ["string"] }],
         application_checklist: ["string"],
@@ -235,9 +274,11 @@ export async function analyzeGrant(request, env) {
     "Do not invent eligibility rules, deadlines, donor requirements, budgets, partners, registrations, audits, references, co-financing, or implementation results.",
     "Distinguish explicit evidence from assumptions. Mark missing, ambiguous, or unverified requirements as unknown and list what must be checked in the official call guidelines.",
     "IRPA profile: " + JSON.stringify(IRPA_PROFILE),
+    "Apply the IRPA Strategic Plan 2025–2029 as a strategic-fit filter across all three pillars. Each pillar in the profile has all seven cross-cutting themes embedded within it, with pillar-specific examples. Assess pillar fit and theme fit together; return strategic_alignment.relevant_pillars, strategic_alignment.relevant_cross_cutting_themes, and strategic_alignment.pillar_theme_alignment with one evidence-based entry per relevant pillar. Never force an unrelated call into a pillar.",
+    "Digital governance funding is explicitly in scope as a separate investment track. IRPA's existing Digital Board Governance System (DBGS) requires significant investment. Retain relevant calls for digital governance, board-management technology, nonprofit governance systems, civic technology, cybersecurity, cloud infrastructure, responsible AI and institutional digital capacity. Evaluate donor restrictions on software, hosting/cloud costs, security, maintenance, training, equipment and institutional strengthening. Do not claim the DBGS is completed, deployed or has proven impact unless supplied evidence establishes it.",
     "Apply a strict eligibility gate before thematic fit. IRPA is a Tanzania-registered NGO. Check eligible countries, applicant registration country, entity type, minimum/maximum organizational age, required track record, audited accounts/turnover, co-financing, consortium restrictions, deadline and permitted costs. Do not equate a thematic match with eligibility.",
     "Hard geographic exclusion: calls explicitly restricted to South Africa, Zimbabwe, or another non-Tanzania country must be marked ineligible for IRPA unless the supplied call text also clearly permits Tanzania or an Africa-wide/East Africa/Sub-Saharan Africa/LMIC/global applicant pool. If geography is unstated or ambiguous, mark geographic eligibility unclear and overall eligibility insufficient_information; do not promote the call as eligible. Never treat a mention of a country in background text as proof that applicants from Tanzania are allowed.",
-    "A concept note must not be generated when geographic eligibility is ineligible or unclear. Return the geographic evidence and tell the user to verify the official eligible-country list first.",
+    "A concept note must not be generated when geographic eligibility is ineligible or unclear, when a known mandatory criterion is not met, or while required eligibility evidence remains unresolved. Return the geographic evidence and list every blocker/warning first.",
     "An issue is not a confirmed disqualification unless the supplied rules clearly say so. Use insufficient_information when key eligibility rules are absent. Never represent the AI assessment as a legal or donor decision.",
     "Align any concept note to IRPA's three strategic pillars and cross-cutting themes only where relevant to the donor call. Tailor headings, ordering, and wording to donor instructions if supplied, and respect stated word/page limits where the supplied text makes them clear. If donor template instructions are absent, use a conventional concise concept-note structure and flag this limitation.",
     "Populate each application_fields entry with standalone, editable wording ready to copy into a corresponding donor application form. If a field is unsupported by supplied evidence, clearly label assumptions or evidence needed; never invent exact budgets, baseline figures, partners, track record, audited results, or co-financing. Use an indicative budget narrative only when actual budget figures were not supplied and label it as requiring budget development.",
