@@ -462,6 +462,18 @@ test("document owner can explicitly transfer content and save a translation draf
   }));
 });
 
+test("Confidential document owner cannot transfer content directly without reviewer authority", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("documents/LIFE-test-1").set(lifecycleDocument({classification:"Confidential",accessPolicy:"CONTROLLED"}));
+    await context.firestore().doc("documentTranslationRequests/translation-sensitive").set(translationRequest({documentClassification:"Confidential"}));
+  });
+  const ownerDb=testEnv.authenticatedContext("member-user",{email:"member@example.test"}).firestore();
+  await assertFails(ownerDb.doc("documentTranslationRequests/translation-sensitive").update({
+    status:"IN_REVIEW",contentTransferAuthorized:true,contentTransferred:false,
+    translationStartedAt:"2026-10-10T06:08:00.000Z",updatedAt:"2026-10-10T06:08:00.000Z"
+  }));
+});
+
 test("Maa translation cannot be completed without an identified speaker review", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     await context.firestore().doc("documents/LIFE-test-1").set(lifecycleDocument());
