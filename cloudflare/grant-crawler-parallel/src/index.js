@@ -320,7 +320,8 @@ async function crawl(env) {
       const items = Array.isArray(result) ? result : (result.items || []);
       const detailed = Array.isArray(result) ? null : result.stats;
       const errors = detailed?.errors || [];
-      return { name: engine.name, items, stats: { status: "success", configured: detailed?.configured ?? engine.configured, found: items.length, error: errors.length ? errors.length + " source/search errors" : (detailed?.message || null) } };
+      const engineStatus = detailed?.configured === false || (errors.length > 0 && items.length === 0) ? "failed" : "success";
+      return { name: engine.name, items, stats: { status: engineStatus, configured: detailed?.configured ?? engine.configured, found: items.length, error: errors.length ? errors.length + " source/search errors" : (detailed?.message || null) } };
     } catch (error) {
       return { name: engine.name, items: [], stats: { status: "failed", configured: engine.configured, found: 0, error: String(error.message || error).slice(0, 300) } };
     }
