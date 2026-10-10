@@ -2750,3 +2750,161 @@ textarea:focus-visible{
 .dashboard-live-date-slot .live-date-stat-buttons .desktop-blue-nav-button .quote4-stat-icon i.dashboard-semantic-icon--signature,
 .dashboard-command .mobile-quote1-stats>button>span i.dashboard-semantic-icon--signature,
 .dashboard-command .mobile-quote1-grid>button>span i.dashboard-semantic-icon--signature{color:#6842a6!important}
+
+
+/* Dashboard action-card readability and responsive icon repair.
+   Presentation-only: does not alter routes, data access, or authorization. */
+.dashboard-content-area .stat-card,
+.dashboard-content-area button.stat-card,
+.dashboard-content-area .dashboard-command,
+.dashboard-content-area .quick-access button,
+.dashboard-content-area [class*="quick-access"] button,
+.dashboard-content-area [class*="dashboard-card"],
+.dashboard-content-area [class*="dashboard-tile"] {
+  box-sizing: border-box;
+  min-width: 0;
+  color: #fff !important;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.dashboard-content-area .stat-card,
+.dashboard-content-area button.stat-card,
+.dashboard-content-area .dashboard-command,
+.dashboard-content-area .quick-access button,
+.dashboard-content-area [class*="quick-access"] button,
+.dashboard-content-area [class*="dashboard-card"],
+.dashboard-content-area [class*="dashboard-tile"] {
+  background: linear-gradient(135deg, #0b5fa8 0%, #07508f 100%) !important;
+  border: 1px solid #4b9bd5 !important;
+  border-radius: 14px !important;
+}
+.dashboard-content-area .stat-card *,
+.dashboard-content-area button.stat-card *,
+.dashboard-content-area .dashboard-command *,
+.dashboard-content-area .quick-access button *,
+.dashboard-content-area [class*="quick-access"] button *,
+.dashboard-content-area [class*="dashboard-card"] *,
+.dashboard-content-area [class*="dashboard-tile"] * {
+  opacity: 1 !important;
+  text-shadow: none !important;
+}
+.dashboard-content-area .stat-card strong,
+.dashboard-content-area button.stat-card strong,
+.dashboard-content-area .dashboard-command strong,
+.dashboard-content-area .quick-access button strong,
+.dashboard-content-area [class*="quick-access"] button strong,
+.dashboard-content-area [class*="dashboard-card"] strong,
+.dashboard-content-area [class*="dashboard-tile"] strong {
+  display: block;
+  color: #fff !important;
+  font-weight: 800 !important;
+  line-height: 1.3 !important;
+  overflow-wrap: anywhere;
+}
+.dashboard-content-area .stat-card small,
+.dashboard-content-area button.stat-card small,
+.dashboard-content-area .dashboard-command small,
+.dashboard-content-area .quick-access button small,
+.dashboard-content-area [class*="quick-access"] button small,
+.dashboard-content-area [class*="dashboard-card"] small,
+.dashboard-content-area [class*="dashboard-tile"] small,
+.dashboard-content-area [class*="dashboard-card"] p,
+.dashboard-content-area [class*="dashboard-tile"] p {
+  display: block;
+  color: #e8f4ff !important;
+  font-size: 13px !important;
+  line-height: 1.45 !important;
+  font-weight: 600 !important;
+  overflow-wrap: anywhere;
+}
+.dashboard-content-area .stat-card svg,
+.dashboard-content-area button.stat-card svg,
+.dashboard-content-area .dashboard-command svg,
+.dashboard-content-area .quick-access button svg,
+.dashboard-content-area [class*="quick-access"] button svg,
+.dashboard-content-area [class*="dashboard-card"] svg,
+.dashboard-content-area [class*="dashboard-tile"] svg {
+  display: block !important;
+  flex: 0 0 auto !important;
+  width: 25px !important;
+  height: 25px !important;
+  min-width: 25px !important;
+  min-height: 25px !important;
+  color: #fff !important;
+  fill: none !important;
+  stroke: currentColor !important;
+  stroke-width: 2 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+.dashboard-content-area .stat-card > span:first-child,
+.dashboard-content-area button.stat-card > span:first-child,
+.dashboard-content-area [class*="dashboard-card"] > span:first-child,
+.dashboard-content-area [class*="dashboard-tile"] > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  min-height: 48px;
+  border-radius: 12px;
+  background: rgba(255,255,255,.14);
+  color: #fff !important;
+}
+.dashboard-content-area button:focus-visible,
+.dashboard-content-area a:focus-visible {
+  outline: 3px solid #ffd75e !important;
+  outline-offset: 3px !important;
+}
+.dashboard-content-area .stat-card:hover,
+.dashboard-content-area button.stat-card:hover,
+.dashboard-content-area .dashboard-command:hover,
+.dashboard-content-area .quick-access button:hover,
+.dashboard-content-area [class*="quick-access"] button:hover,
+.dashboard-content-area [class*="dashboard-card"]:hover,
+.dashboard-content-area [class*="dashboard-tile"]:hover {
+  border-color: #ffd75e !important;
+  filter: brightness(1.06);
+}
+@media (min-width: 761px) {
+  .dashboard-content-area .stat-card,
+  .dashboard-content-area button.stat-card,
+  .dashboard-content-area .dashboard-command,
+  .dashboard-content-area .quick-access button,
+  .dashboard-content-area [class*="quick-access"] button,
+  .dashboard-content-area [class*="dashboard-card"],
+  .dashboard-content-area [class*="dashboard-tile"] {
+    min-height: 104px;
+    padding: 18px !important;
+    gap: 14px;
+  }
+}
+@media (max-width: 760px) {
+  .dashboard-content-area .stat-card,
+  .dashboard-content-area button.stat-card,
+  .dashboard-content-area .dashboard-command,
+  .dashboard-content-area .quick-access button,
+  .dashboard-content-area [class*="quick-access"] button,
+  .dashboard-content-area [class*="dashboard-card"],
+  .dashboard-content-area [class*="dashboard-tile"] {
+    min-height: 88px;
+    padding: 14px !important;
+    gap: 10px;
+    white-space: normal !important;
+    font-size: 14px !important;
+  }
+  .dashboard-content-area .stat-card svg,
+  .dashboard-content-area button.stat-card svg,
+  .dashboard-content-area .dashboard-command svg,
+  .dashboard-content-area .quick-access button svg,
+  .dashboard-content-area [class*="quick-access"] button svg,
+  .dashboard-content-area [class*="dashboard-card"] svg,
+  .dashboard-content-area [class*="dashboard-tile"] svg {
+    width: 22px !important;
+    height: 22px !important;
+    min-width: 22px !important;
+    min-height: 22px !important;
+  }
+}
