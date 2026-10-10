@@ -160,35 +160,62 @@ async function readFeeds(env) {
   return feeds;
 }
 
+function todayInTanzania() {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Africa/Dar_es_Salaam", year: "numeric", month: "2-digit", day: "2-digit"
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.filter(part => part.type !== "literal").map(part => [part.type, part.value]));
+  return values.year + "-" + values.month + "-" + values.day;
+}
+
 function extractDeadline(item) {
-  const text = String(item.title || "") + " " + String(item.description || "");
+  const structured = [item.deadline_at, item.deadline, item.closingDate, item.closeDate, item.dueDate]
+    .find(value => value !== undefined && value !== null && String(value).trim() !== "");
+  if (structured) {
+    const candidate = String(structured).trim();
+    const isoDate = candidate.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (isoDate && !Number.isNaN(Date.parse(isoDate[1] + "T00:00:00Z"))) return isoDate[1];
+    const parsed = new Date(candidate);
+    if (!Number.isNaN(parsed.getTime())) {
+      const parts = new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Africa/Dar_es_Salaam", year: "numeric", month: "2-digit", day: "2-digit"
+      }).formatToParts(parsed);
+      const values = Object.fromEntries(parts.filter(part => part.type !== "literal").map(part => [part.type, part.value]));
+      return values.year + "-" + values.month + "-" + values.day;
+    }
+  }
+  const sourceText = String(item.title || "") + " " + String(item.description || "");
   const monthNames = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
   const patterns = [
-    /\b(?:by|deadline(?: date)?|submission deadline|closing date|due date|submit(?:ted)? by)\D{0,40}?(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)(?:\s+(\d{4}))?/i,
-    /\b(?:by|deadline(?: date)?|submission deadline|closing date|due date|submit(?:ted)? by)\D{0,40}?(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2})(?:,?\s+(\d{4}))?/i,
+    /\b(?:deadline(?: date)?|submission deadline|closing date|closing on|applications? close(?:s)?|call closes|apply before|apply by|submit(?:ted)? by|due date|no later than|by)\D{0,40}?(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)(?:\s+(\d{4}))?/i,
+    /\b(?:deadline(?: date)?|submission deadline|closing date|closing on|applications? close(?:s)?|call closes|apply before|apply by|submit(?:ted)? by|due date|no later than|by)\D{0,40}?(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2})(?:,?\s+(\d{4}))?/i,
+    /\b(?:deadline(?: date)?|submission deadline|closing date|closing on|applications? close(?:s)?|call closes|apply before|apply by|submit(?:ted)? by|due date|no later than|by)\D{0,40}?(\d{4})-(\d{2})-(\d{2})\b/i
   ];
   for (const pattern of patterns) {
-    const match = text.match(pattern);
+    const match = sourceText.match(pattern);
     if (!match) continue;
+    if (/^\d{4}$/.test(match[1])) {
+      const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+      if (date.getUTCFullYear() === Number(match[1]) && date.getUTCMonth() === Number(match[2]) - 1 && date.getUTCDate() === Number(match[3])) return date.toISOString().slice(0, 10);
+      continue;
+    }
     const dayFirst = /^\d+$/.test(match[1]);
     const monthToken = dayFirst ? match[2] : match[1];
     const day = Number(dayFirst ? match[1] : match[2]);
     const yearText = match[3];
-    const year = yearText ? Number(yearText) : new Date().getUTCFullYear();
+    const year = yearText ? Number(yearText) : Number(todayInTanzania().slice(0, 4));
     const month = monthNames.indexOf(monthToken.toLowerCase());
     if (month < 0 || day < 1 || day > 31) continue;
     const date = new Date(Date.UTC(year, month, day));
     if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month || date.getUTCDate() !== day) continue;
     return date.toISOString().slice(0, 10);
   }
-  const iso = text.match(/\b(?:deadline|due|submit by|closing date)\D{0,30}?(\d{4})-(\d{2})-(\d{2})/i);
-  if (iso) return iso[1] + "-" + iso[2] + "-" + iso[3];
   return null;
 }
 function assessFit(item) {
   const text = `${item.title || ""} ${item.description || ""}`.toLowerCase();
   const deadlineAt = extractDeadline(item);
-  const isExpired = Boolean(deadlineAt && deadlineAt < new Date().toISOString().slice(0, 10));
+  const isExpired = Boolean(deadlineAt && deadlineAt < todayInTanzania());
   const signals = [
     { label: "pastoralism/rangelands", weight: 35, terms: ["pastoral", "pastoralist", "rangeland", "herder", "grazing", "dryland", "nomadic"] },
     { label: "restoration/environment", weight: 20, terms: ["restoration", "land degradation", "biodiversity", "ecosystem", "conservation", "desertification", "reforestation", "natural resource"] },
