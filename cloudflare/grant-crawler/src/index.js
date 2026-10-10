@@ -81,7 +81,7 @@ async function listOpportunities(env) {
   let engineRuns = { results: [] };
   try {
     engineRuns = await env.GRANTS_DB.prepare(
-      "SELECT engine, status, configured, items_seen, error_message, finished_at FROM crawler_engine_runs ORDER BY id DESC LIMIT 3"
+      "SELECT e.engine, e.status, e.configured, e.items_seen, e.error_message, e.finished_at FROM crawler_engine_runs e WHERE e.id = (SELECT MAX(latest.id) FROM crawler_engine_runs latest WHERE latest.engine = e.engine) ORDER BY e.engine"
     ).all();
   } catch {}
   const currentItems = (rows.results || []).filter(item => isCurrentOpportunity(item));
