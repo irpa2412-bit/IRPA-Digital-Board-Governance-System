@@ -45,6 +45,8 @@ Room-composite recording also requires the pinned self-hosted LiveKit Egress ser
 
 The protected manual workflow `.github/workflows/cloudflare-livekit-secrets.yml` binds production Worker secrets from the GitHub `production` Environment. It requires R2 to be enabled/purchased, the private bucket to exist, and a bucket-scoped R2 token to be configured first. Do not provision or deploy until the previously identified account prerequisites and spending approval are resolved.
 
+The existing Firebase callable definitions are retained temporarily for rollback, but the migrated frontend uses the Worker routes. Do not remove the legacy callable functions or revoke their Firebase secret versions until the Cloudflare Worker and private R2 recording upload have passed isolated end-to-end acceptance. This migration configures new recordings for R2; it does not copy, delete, or change access to any existing recording objects.
+
 Transcript translation uses Google Cloud Translation through the existing server-side Google access token. Confirm the Translation API is enabled, billing is active if required, and the Worker service identity has the necessary Google Cloud Translation permissions.
 
 Keep the existing mail route unchanged: Worker → `mail.irpa.or.tz:465`, sender `info@irpa.or.tz`. Report email delivery must be verified with a controlled recipient before any live success claim.
