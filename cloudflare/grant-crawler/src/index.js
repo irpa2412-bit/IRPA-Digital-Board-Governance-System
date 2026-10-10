@@ -1,3 +1,5 @@
+import { analyzeGrant } from "./assistant.js";
+
 const MAX_FEED_BYTES = 1_000_000;
 const MAX_FEEDS = 30;
 const MAX_ITEMS_PER_FEED = 100;
@@ -222,9 +224,10 @@ export default {
     if (request.method === "GET" && url.pathname === "/health") {
       return json({ service: "irpa-grant-crawler", environment: env.IRPA_ENVIRONMENT || "local", storage: env.GRANTS_DB ? "configured" : "missing", firebase: "disabled-by-design-until-dedicated-rules-and-identity-are-approved" });
     }
-    if (request.method !== "POST" || url.pathname !== "/crawl") return json({ error: "Not found" }, 404);
+    if (request.method !== "POST" || !["/crawl", "/assistant/analyze"].includes(url.pathname)) return json({ error: "Not found" }, 404);
     const expected = String(env.CRAWLER_CONTROL_TOKEN || "");
     if (expected.length < 32 || request.headers.get("authorization") !== "Bearer " + expected) return json({ error: "Unauthorized" }, 401);
+    if (url.pathname === "/assistant/analyze") return analyzeGrant(request, env);
     try { return json(await crawl(env)); }
     catch (error) {
       if (env.GRANTS_DB) {
