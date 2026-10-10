@@ -259,6 +259,9 @@ service cloud.firestore {
       &&request.resource.data.get("translatedFileId","")!=""
       &&request.resource.data.get("translatedDocumentId","") is string
       &&request.resource.data.get("translatedDocumentId","")!=""
+      &&exists(/databases/$(database)/documents/documents/$(request.resource.data.translatedDocumentId))
+      &&get(/databases/$(database)/documents/documents/$(request.resource.data.translatedDocumentId)).data.get("ownerUid","")==request.auth.uid
+      &&get(/databases/$(database)/documents/documents/$(request.resource.data.translatedDocumentId)).data.get("fileId","")==request.resource.data.get("translatedFileId","")
       &&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["translatedFileId","translatedDocumentId","translationOutputFileName","updatedAt"])
     ) || (translationReviewer()
       &&request.resource.data.get("documentOwnerUid","")==resource.data.get("documentOwnerUid","")
