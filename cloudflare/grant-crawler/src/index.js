@@ -81,13 +81,6 @@ const MAX_FEEDS = 30;
 const MAX_ITEMS_PER_FEED = 100;
 const USER_AGENT = "IRPA-GrantCrawler/1.0 (+https://www.irpa.or.tz)";
 
-function json(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
-  });
-}
-
 function safeUrl(value) {
   const url = new URL(value);
   if (url.protocol !== "https:" || url.username || url.password) throw new Error("Only credential-free HTTPS feed URLs are permitted.");
