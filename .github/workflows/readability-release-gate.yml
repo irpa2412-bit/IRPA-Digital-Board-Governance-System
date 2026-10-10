@@ -31,6 +31,8 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Syntax-check checker and verifier
+        run: node --check scripts/check-production-readability.mjs && node --check scripts/verify-production-readability.mjs
       - name: Run dedicated checker
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
