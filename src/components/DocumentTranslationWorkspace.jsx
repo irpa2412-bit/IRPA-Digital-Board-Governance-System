@@ -66,6 +66,8 @@ export default function DocumentTranslationWorkspace({profile,employee,admin=fal
  const roles=[...roleValues(profile),...roleValues(employee)];
  const isReviewer=Boolean(admin||profile?.active===true&&profile?.isAdmin===true||roles.some(r=>REVIEWER_ROLES.has(r)));
  const selected=useMemo(()=>requests.find(r=>r.id===selectedId)||null,[requests,selectedId]);
+ const isOwner=Boolean(selected&&selected.documentOwnerUid===currentUid);
+ const canProcess=Boolean(isReviewer||isOwner);
  const visibleRequests=useMemo(()=>requests.filter(r=>isReviewer||r.documentOwnerUid===currentUid),[requests,isReviewer,currentUid]);
  useEffect(()=>{
   if(!currentUid){setRequests([]);return}
@@ -86,7 +88,7 @@ export default function DocumentTranslationWorkspace({profile,employee,admin=fal
   setReviewConfirmed(false);setReviewNotes("");setMaaSpeakerName("");setMaaDialect("Kisonko / Ilkisonko (confirm with speaker)");setConsent(false);setRestrictedApproval(false);setError("");setMessage("");setProgress("");
  },[selectedId]);
  async function processRequest(){
-  if(!selected||!isReviewer)throw new Error("An authorised translation reviewer is required to process requests.");
+  if(!selected||!canProcess)throw new Error("The document owner or an authorised translation reviewer is required to process this request.");
   if(!consent)throw new Error("Confirm that extracted document content may be sent to the IRPA translation service before processing.");
   if(["Confidential","Restricted"].includes(String(selected.documentClassification||""))&&!restrictedApproval)throw new Error("This document is Confidential or Restricted. Confirm separate institutional authorization before transferring its content.");
   if(!["REQUESTED","IN_REVIEW"].includes(String(selected.status||"")))throw new Error("Only open translation requests can be processed.");
@@ -134,6 +136,7 @@ export default function DocumentTranslationWorkspace({profile,employee,admin=fal
   const text=String(draft||selected.translationDraftText||"");
   if(!text.trim())throw new Error("Generate a translation draft before final review.");
   if(!reviewConfirmed)throw new Error("Confirm that the translated output has been reviewed.");
+  if(!reviewNotes.trim())throw new Error("Enter review notes or confirm any corrections before completing the translation.");
   if(selected.targetLanguage==="maa"&&(!maaSpeakerName.trim()||!reviewNotes.trim()))throw new Error("Maa output cannot be finalised without the local Maa speaker's name and documented review notes/corrections.");
   setProcessing(true);setError("");setMessage("");
   try{
@@ -160,9 +163,9 @@ export default function DocumentTranslationWorkspace({profile,employee,admin=fal
     {!selected?<div className="auth-message">Select a translation request to review its details.</div>:<div className="auth-message">
      <h4 style={{marginTop:0}}>{selected.documentTitle||selected.documentId}</h4>
      <dl style={{display:"grid",gridTemplateColumns:"max-content 1fr",gap:"5px 10px"}}><dt>Status</dt><dd>{requestStatusLabel(selected.status)}</dd><dt>Requested target</dt><dd>{selected.targetLanguageLabel||selected.targetLanguage}</dd><dt>Source</dt><dd>{selected.sourceLanguage||"Detect / not specified"}</dd><dt>Classification</dt><dd>{selected.documentClassification||"Internal"}</dd><dt>Owner UID</dt><dd style={{wordBreak:"break-all"}}>{selected.documentOwnerUid}</dd><dt>Requested</dt><dd>{fmt(selected.createdAt)}</dd><dt>Instructions</dt><dd>{selected.requestNotes||"—"}</dd></dl>
-     {isReviewer&&["REQUESTED","IN_REVIEW"].includes(String(selected.status||""))&&<div style={{borderTop:"1px solid var(--border)",paddingTop:12,marginTop:12}}>
+     {canProcess&&["REQUESTED","IN_REVIEW"].includes(String(selected.status||""))&&<div style={{borderTop:"1px solid var(--border)",paddingTop:12,marginTop:12}}>
       <div className="form-field"><label>Source language used for extraction</label><select value={sourceLanguage} onChange={e=>setSourceLanguage(e.target.value)}><option value="en-TZ">English</option><option value="sw-TZ">Kiswahili</option><option value="maa">Maa (Maasai)</option><option value="fr-FR">French</option><option value="es-ES">Spanish</option><option value="pt-PT">Portuguese</option><option value="ar-SA">Arabic</option></select></div>
-      <div style={{marginTop:10}}><label style={{display:"flex",gap:8,alignItems:"flex-start"}}><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)}/> <span>I confirm that this owner-requested document may be extracted and its text sent to the IRPA translation service for processing. This action transfers content; submitting the request alone does not.</span></label></div>
+      <div style={{marginTop:10}}><label style={{display:"flex",gap:8,alignItems:"flex-start"}}><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)}/> <span>I confirm that this owner-requested document may be extracted and its text sent to the IRPA translation service for processing. This action transfers content; submitting the request alone does not. The owner can generate a draft, but only an authorised reviewer can approve it as complete.</span></label></div>
       {["Confidential","Restricted"].includes(String(selected.documentClassification||""))&&<div style={{marginTop:10}}><label style={{display:"flex",gap:8,alignItems:"flex-start"}}><input type="checkbox" checked={restrictedApproval} onChange={e=>setRestrictedApproval(e.target.checked)}/> <span>I have verified the separate institutional authorization required to transfer Confidential/Restricted document content.</span></label></div>}
       <button type="button" disabled={processing||!consent} onClick={processRequest} style={{marginTop:12}}>{processing?"Processing…":"Extract and Translate Document"}</button>
       {progress&&<p role="status" aria-live="polite">{progress}</p>}
@@ -175,7 +178,7 @@ export default function DocumentTranslationWorkspace({profile,employee,admin=fal
        <div className="form-field"><label>Reviewer notes and corrections</label><textarea rows={3} value={reviewNotes} onChange={e=>setReviewNotes(e.target.value)} placeholder={selected.targetLanguage==="maa"?"Record corrections and the local speaker's review observations.":"Record material corrections or review notes."}/></div>
        {selected.targetLanguage==="maa"&&<><div className="form-field" style={{marginTop:8}}><label>Local Maa speaker who verified the draft</label><input value={maaSpeakerName} onChange={e=>setMaaSpeakerName(e.target.value)} placeholder="Enter actual reviewer name"/></div><div className="form-field" style={{marginTop:8}}><label>Dialect / variety</label><input value={maaDialect} onChange={e=>setMaaDialect(e.target.value)}/></div></>}
        <label style={{display:"flex",gap:8,alignItems:"flex-start",marginTop:10}}><input type="checkbox" checked={reviewConfirmed} onChange={e=>setReviewConfirmed(e.target.checked)}/> <span>I have reviewed the translation and its terminology; any required specialist review is complete.</span></label>
-       <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:12}}><button type="button" disabled={processing||!reviewConfirmed||(selected.targetLanguage==="maa"&&(!maaSpeakerName.trim()||!reviewNotes.trim()))} onClick={finalizeTranslation}>{processing?"Saving…":"Approve and Complete Translation"}</button><button type="button" className="secondary-button" disabled={processing||!reviewNotes.trim()} onClick={rejectRequest}>Reject Request</button></div>
+       <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:12}}><button type="button" disabled={processing||!reviewConfirmed||!reviewNotes.trim()||(selected.targetLanguage==="maa"&&(!maaSpeakerName.trim()||!reviewNotes.trim()))} onClick={finalizeTranslation}>{processing?"Saving…":"Approve and Complete Translation"}</button><button type="button" className="secondary-button" disabled={processing||!reviewNotes.trim()} onClick={rejectRequest}>Reject Request</button></div>
       </div>}
      </div>}
      {selected.status==="COMPLETED"&&<p className="success-message">Completed {fmt(selected.completedAt)}. Reviewer confirmation is recorded{selected.targetLanguage==="maa"?" with the Maa speaker review details.":"."}</p>}
