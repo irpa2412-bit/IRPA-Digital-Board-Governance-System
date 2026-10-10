@@ -98,8 +98,10 @@ function xmlField(block, name) {
   const match = block.match(new RegExp("<" + name + "\\b[^>]*>([\\s\\S]*?)<\\/" + name + "\\s*>", "i"));
   return match ? decodeHtml(match[1]) : "";
 }
-export function parseSearchRss(xml, query) {
-  const sourceUrl = "https://news.google.com/rss/search?q=" + encodeURIComponent(query) + "&hl=en-TZ&gl=TZ&ceid=TZ:en";
+export function parseSearchRss(xml, query, provider = "Google News RSS") {
+  const sourceUrl = provider === "Bing RSS"
+    ? "https://www.bing.com/search?format=rss&q=" + encodeURIComponent(query)
+    : "https://news.google.com/rss/search?q=" + encodeURIComponent(query) + "&hl=en-TZ&gl=TZ&ceid=TZ:en";
   return [...String(xml).matchAll(/<item\b[^>]*>([\s\S]*?)<\/item\s*>/gi)].slice(0, 20).map(match => {
     const block = match[1], title = xmlField(block, "title").slice(0, 500);
     let url = ""; try { url = normalizeOpportunityUrl(xmlField(block, "link")); } catch {}
@@ -126,9 +128,30 @@ async function readGoogleNewsSearch() {
   const items = results.flatMap(result => result.items), errors = results.filter(result => result.error).map(result => result.error);
   return { items, stats: { configured: true, provider: "Google News RSS", queries: SEARCH_QUERIES.length, found: items.length, errors } };
 }
+async function readBingSearch() {
+  const results = await Promise.all(SEARCH_QUERIES.map(async query => {
+    try {
+      const url = new URL("https://www.bing.com/search");
+      url.searchParams.set("format", "rss"); url.searchParams.set("q", query);
+      const response = await fetch(url.href, { headers: { accept: "application/rss+xml, application/xml, text/xml", "user-agent": USER_AGENT }, signal: AbortSignal.timeout(12_000) });
+      if (!response.ok) throw new Error("Bing RSS search HTTP " + response.status);
+      const xml = await response.text();
+      if (xml.length > MAX_PAGE_BYTES) throw new Error("Search response exceeds the 1 MB limit.");
+      return { items: parseSearchRss(xml, query, "Bing RSS"), error: null };
+    } catch (error) { return { items: [], error: { query, error: String(error.message || error).slice(0, 180) } }; }
+  }));
+  const items = results.flatMap(result => result.items), errors = results.filter(result => result.error).map(result => result.error);
+  return { items, stats: { configured: true, provider: "Bing RSS", queries: SEARCH_QUERIES.length, found: items.length, errors } };
+}
 export async function readWebSearch(env) {
   const apiKey = String(env.BRAVE_SEARCH_API_KEY || "").trim();
-  if (!apiKey) return readGoogleNewsSearch();
+  if (!apiKey) {
+    const google = await readGoogleNewsSearch();
+    if (google.items.length || google.stats.errors.length === 0) return google;
+    const bing = await readBingSearch();
+    if (bing.items.length || bing.stats.errors.length === 0) return bing;
+    return { items: [], stats: { configured: true, provider: "Google News RSS / Bing RSS", queries: SEARCH_QUERIES.length, found: 0, errors: [...google.stats.errors, ...bing.stats.errors] } };
+  }
   const results = await Promise.all(SEARCH_QUERIES.map(async query => {
     const items = [];
     try {
