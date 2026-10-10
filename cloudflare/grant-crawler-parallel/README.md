@@ -19,7 +19,7 @@ Run the IRPA Grant Crawler — Isolated Staging workflow manually after its pull
 - Web-search discovery runs four targeted Google News RSS queries, falls back to Bing RSS if Google News is unavailable, and uses Brave Search API when the optional `BRAVE_SEARCH_API_KEY` secret is configured.
 - Every engine feeds the same deduplicated `grant_opportunities` register and the same `assessFit` screening formula. Expired calls, country-only mismatches, and unknown geography are not promoted to eligible opportunities; uncertain cases remain auditable.
 - Engine runs are recorded in `crawler_engine_runs`; the authenticated `/opportunities` response includes recent engine health, source counts and the shared register used by the grant dashboard.
-- Configured official source pages include UNDP Tanzania news and press releases, GEF Small Grants Programme, FAO funding opportunities, the EU Delegation to Tanzania, and the Tanzania Forest Fund download center. Add or change official source-page URLs through `GRANT_SOURCE_PAGE_URLS` (JSON array); add the Brave key only as a Cloudflare secret. Never commit API keys.
+- Configured official source pages include UNDP Tanzania news and press releases, GEF Small Grants Programme, FAO funding opportunities, EU grants and the EU Delegation to Tanzania, the Slovak Embassy small-grants page, the Tanzania Forest Fund download center, and Foundation for Civil Society grantmaking and Smart Grants. Add or change official source-page URLs through `GRANT_SOURCE_PAGE_URLS` (JSON array); add the Brave key only as a Cloudflare secret. Never commit API keys.
 
 ## Endpoints
 - `GET /health`: returns service/environment/storage status, without secrets.
