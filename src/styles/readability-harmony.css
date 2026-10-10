@@ -3013,42 +3013,39 @@ textarea:focus-visible{
 }
 
 
-/* Screenshot-driven correction: the fixed Home/Portals/Alerts/Menu strip
-   still obscures the first dashboard panel. Keep only the Menu control as
-   the entry point to the existing navigation sheet; remove the three
-   redundant overhead shortcuts and keep the white in-portal selector hidden. */
+/* Restore the original four-item mobile navigation and normal access-category panel flow. */
 @media screen and (max-width:760px){
   .mobile-global-nav{
-    left:auto!important;
-    right:12px!important;
-    bottom:12px!important;
-    width:76px!important;
-    height:58px!important;
-    display:grid!important;
-    grid-template-columns:minmax(0,1fr)!important;
-    border:1px solid #2f86cf!important;
-    border-radius:12px!important;
-    overflow:hidden!important;
-    box-shadow:0 8px 24px rgba(0,0,0,.3)!important;
+    left:0!important;right:0!important;bottom:0!important;top:auto!important;
+    width:100%!important;height:76px!important;
+    display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;
+    border:1px solid #2f86cf!important;border-radius:0!important;
+    overflow:hidden!important;box-shadow:0 -4px 18px rgba(0,0,0,.22)!important;
+    z-index:1200!important;
   }
-  .mobile-global-nav>button:not(:last-child){display:none!important;}
-  .mobile-global-nav>button:last-child{
-    display:flex!important;
-    height:58px!important;
-    flex-direction:column!important;
-    align-items:center!important;
-    justify-content:center!important;
-    gap:2px!important;
-    background:#0b5fa8!important;
-    color:#fff!important;
+  .mobile-global-nav>button{
+    display:flex!important;min-width:0!important;height:76px!important;
+    flex-direction:column!important;align-items:center!important;justify-content:center!important;
+    gap:5px!important;border-radius:0!important;border-right:1px solid rgba(255,255,255,.18)!important;
+    background:#0b5fa8!important;color:#fff!important;
   }
-  .mobile-nav-sheet{bottom:82px!important;}
+  .mobile-global-nav>button:last-child{display:flex!important;}
+  .mobile-nav-sheet{bottom:84px!important;}
   .desktop-webapp-navigation-roller,
   .mobile-portal-content-roller{display:none!important;visibility:hidden!important;pointer-events:none!important;}
-  .main-area .content-area{padding-top:14px!important;}
+  .main-area .content-area{padding-top:14px!important;padding-bottom:92px!important;}
+  .topbar-access-category{
+    position:relative!important;inset:auto!important;transform:none!important;
+    width:100%!important;max-width:100%!important;max-height:none!important;
+    overflow:visible!important;z-index:1!important;
+  }
+  .topbar-access-category select,
+  .topbar-access-category .authority-select,
+  .topbar-access-category .access-category-select{
+    color:#173b2d!important;background:#fff!important;opacity:1!important;
+  }
 }
-
-
+ 
 /* Restore original IRPA dashboard icon colour treatment (green, blue, amber and gold).
    Keep the actual SVG artwork visible while preserving the original coloured icon badges. */
 .dashboard-command .mobile-quote1-stats>button>span,
