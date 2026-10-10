@@ -257,7 +257,8 @@ test("strict geographic filter retains explicit Tanzania and broad eligible regi
 
   const regional = assessFit({
     title: "East Africa community resilience funding",
-    description: "Open to civil society organizations across East Africa."
+    description: "Open to civil society organizations across East Africa.",
+    sourceUrl: "https://donor.example/calls?fund_state=open"
   });
   assert.equal(regional.geographyAssessment, "regional_or_lmic_scope");
   assert.equal(regional.triageAssessment, "priority_for_eligibility_review");
