@@ -293,7 +293,7 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders() });
-    if (url.pathname === "/application" || url.pathname === "/application/" || url.pathname === "/application/drafts" || url.pathname.startsWith("/application/drafts/")) return handleApplicationPortal(request, env);
+    if (url.pathname === "/" || url.pathname === "/application" || url.pathname === "/application/" || url.pathname === "/application/drafts" || url.pathname.startsWith("/application/drafts/")) return handleApplicationPortal(request, env);
     if (request.method === "GET" && url.pathname === "/health") {
       return json({ service: "irpa-grant-crawler", environment: env.IRPA_ENVIRONMENT || "local", storage: env.GRANTS_DB ? "configured" : "missing", ai: env.AI ? "configured" : "missing", identity: "firebase-id-token-verification-only", draftStorage: "cloudflare-d1" });
     }
