@@ -161,3 +161,24 @@ jobs:
           if (!String(body.firebase).startsWith('disabled-by-design')) throw new Error('Firebase sync must remain disabled.');
           console.log('Staging health verification passed; Firebase remains disabled.');
           NODE
+      - name: Run live feed discovery and IRPA topic-fit assessment
+        env:
+          GRANT_CRAWLER_CONTROL_TOKEN: ${{ secrets.GRANT_CRAWLER_CONTROL_TOKEN }}
+        run: |
+          set -euo pipefail
+          result="$(curl --fail --silent --show-error --max-time 90 -X POST \
+            -H "Authorization: Bearer $GRANT_CRAWLER_CONTROL_TOKEN" \
+            -H "Content-Type: application/json" \
+            "https://irpa-grant-crawler-staging.irpa-governance.workers.dev/crawl")"
+          node - "$result" <<'NODE'
+          const result = JSON.parse(process.argv[2]);
+          if (result.status !== 'success') throw new Error('Live crawler did not return success.');
+          if (result.feedsConfigured < 1) throw new Error('No official feeds are configured.');
+          console.log(JSON.stringify({
+            status: result.status,
+            feedsConfigured: result.feedsConfigured,
+            itemsSeen: result.itemsSeen,
+            recordsChanged: result.recordsChanged,
+            irpaFitMatches: result.irpaFitMatches
+          }, null, 2));
+          NODE
