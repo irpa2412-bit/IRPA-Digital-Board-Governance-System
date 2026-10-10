@@ -16,10 +16,14 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm install
+      - name: Mandatory full-source readability and contrast check
+        run: npm run check:production-readability
       - name: Build web application
         env:
           VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
         run: npm run build
+      - name: Independent production readability verification
+        run: npm run verify:production-readability
       - name: Deploy Hosting and Firestore
         uses: w9jds/firebase-action@v14.17.0
         with:
