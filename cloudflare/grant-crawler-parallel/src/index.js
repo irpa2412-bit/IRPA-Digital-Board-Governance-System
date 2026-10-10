@@ -321,7 +321,7 @@ async function crawl(env) {
       const detailed = Array.isArray(result) ? null : result.stats;
       const errors = detailed?.errors || [];
       const engineStatus = detailed?.configured === false || (errors.length > 0 && items.length === 0) ? "failed" : "success";
-      return { name: engine.name, items, stats: { status: engineStatus, configured: detailed?.configured ?? engine.configured, found: items.length, error: errors.length ? errors.length + " source/search errors" : (detailed?.message || null) } };
+      return { name: engine.name, items, stats: { status: engineStatus, configured: detailed?.configured ?? engine.configured, found: items.length, error: errors.length ? errors.length + " source/search errors: " + String(errors[0].error || errors[0]).slice(0, 180) : (detailed?.message || null) } };
     } catch (error) {
       return { name: engine.name, items: [], stats: { status: "failed", configured: engine.configured, found: 0, error: String(error.message || error).slice(0, 300) } };
     }
