@@ -3161,3 +3161,39 @@ textarea:focus-visible{
 
 /* Remove the redundant portal content navigator; keep the access-category panel. */
 .mobile-portal-content-roller{display:none!important;visibility:hidden!important;pointer-events:none!important;}
+
+/* FINAL ENFORCEMENT: all dashboard action icons use identical gold artwork
+   on a dark-navy badge with a thin gold outline. This intentionally overrides
+   legacy per-category green/blue/amber/purple icon colour rules above. */
+.dashboard-content-area .dashboard-command .quote4-stat-icon,
+.dashboard-content-area .dashboard-command .dashboard-function-icon,
+.dashboard-content-area .dashboard-command .mobile-quote1-stats>button>span,
+.dashboard-content-area .dashboard-command .mobile-quote1-grid>button>span,
+.dashboard-content-area .dashboard-command .dashboard-desktop-view .quote4-quick-grid>button>span,
+.dashboard-content-area .dashboard-command .dashboard-desktop-view .dashboard-quote4-stats .quote4-stat-icon,
+.dashboard-content-area .dashboard-command .quick-access button .dashboard-function-icon,
+.dashboard-content-area .dashboard-command .quick-access button>span:first-child,
+.dashboard-content-area .dashboard-command [class*="quick-access"] button>span:first-child{
+  background:#082d4b!important;
+  border:1px solid #d6a52c!important;
+  color:#d6a52c!important;
+  box-shadow:0 2px 7px rgba(0,0,0,.18)!important;
+}
+.dashboard-content-area .dashboard-command svg.dashboard-semantic-icon,
+.dashboard-content-area .dashboard-command i.dashboard-semantic-icon,
+.dashboard-content-area .dashboard-command svg.dashboard-semantic-icon *,
+.dashboard-content-area .dashboard-command i.dashboard-semantic-icon *,
+.dashboard-content-area .dashboard-command .quote4-stat-icon svg,
+.dashboard-content-area .dashboard-command .quote4-stat-icon i,
+.dashboard-content-area .dashboard-command .dashboard-function-icon svg,
+.dashboard-content-area .dashboard-command .dashboard-function-icon i,
+.dashboard-content-area .dashboard-command .quick-access button svg,
+.dashboard-content-area .dashboard-command [class*="quick-access"] button svg{
+  color:#d6a52c!important;
+  stroke:#d6a52c!important;
+  fill:none!important;
+}
+.dashboard-content-area .dashboard-command svg.dashboard-semantic-icon [fill]:not([fill="none"]),
+.dashboard-content-area .dashboard-command svg.dashboard-semantic-icon *[fill]:not([fill="none"]){
+  fill:#d6a52c!important;
+}
