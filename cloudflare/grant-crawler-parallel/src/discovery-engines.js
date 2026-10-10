@@ -1,7 +1,7 @@
 const MAX_SOURCE_PAGES = 20;
 const MAX_PAGE_BYTES = 1_000_000;
 const MAX_PAGE_LINKS = 8;
-const MAX_TOTAL_DETAIL_PAGES = 12;
+const MAX_TOTAL_DETAIL_PAGES = 6;
 const USER_AGENT = "IRPA-GrantDiscovery/1.0 (+https://www.irpa.or.tz)";
 const GRANT_TERMS = /grant|funding|fund|call for proposals|call for applications|expression of interest|small grant|challenge fund|fellowship|award|open call|apply now|application window|tender opportunity/i;
 const HTML_ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
@@ -119,7 +119,7 @@ export async function readOfficialPages(env) {
   return { items, stats: { configured: urls.length, scanned: urls.length, detailPagesScanned: selected.length, found: items.length, errors: errors.slice(0, 20) } };
 }
 
-const SEARCH_QUERIES = ['"grant call" Tanzania NGO climate pastoral livestock rangeland','"call for proposals" Africa NGO environment biodiversity restoration','foundation grants Tanzania civil society women youth livelihoods','embassy small grants Tanzania NGO community development'];
+const SEARCH_QUERIES = ['"grant call" Tanzania NGO climate pastoral livestock rangeland','"call for proposals" Africa NGO environment biodiversity restoration','embassy small grants Tanzania NGO community development'];
 function xmlField(block, name) {
   const pattern = "<" + name + "\\b[^>]*>([\\s\\S]*?)<\\/" + name + "\\s*>";
   const match = block.match(new RegExp(pattern, "i"));
