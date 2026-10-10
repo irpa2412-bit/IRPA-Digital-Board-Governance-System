@@ -1,6 +1,7 @@
 const MAX_SOURCE_PAGES = 20;
 const MAX_PAGE_BYTES = 1_000_000;
 const MAX_PAGE_LINKS = 8;
+const MAX_TOTAL_DETAIL_PAGES = 12;
 const USER_AGENT = "IRPA-GrantDiscovery/1.0 (+https://www.irpa.or.tz)";
 const GRANT_TERMS = /grant|funding|fund|call for proposals|call for applications|expression of interest|small grant|challenge fund|fellowship|award|open call|apply now|application window|tender opportunity/i;
 const HTML_ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
@@ -74,32 +75,48 @@ export function parseOfficialPage(html, pageUrl) {
 export async function readOfficialPages(env) {
   const urls = configuredUrls(env.GRANT_SOURCE_PAGE_URLS_JSON || env.GRANT_SOURCE_PAGE_URLS, "GRANT_SOURCE_PAGE_URLS", MAX_SOURCE_PAGES);
   const errors = [];
-  const sourceResults = await Promise.all(urls.map(async sourceUrl => {
+  const sources = await Promise.all(urls.map(async sourceUrl => {
     try {
       const source = await fetchHtml(sourceUrl);
       const sourceHost = new URL(source.finalUrl).hostname;
-      const anchors = getAnchors(source.html, source.finalUrl).filter(anchor => new URL(anchor.url).hostname === sourceHost).slice(0, MAX_PAGE_LINKS);
-      const results = await Promise.all(anchors.map(async anchor => {
-        try {
-          const detail = await fetchHtml(anchor.url);
-          const parsed = parseOfficialPage(detail.html, detail.finalUrl);
-          const title = parsed.title || anchor.label;
-          const description = (parsed.description + " " + anchor.context).trim().slice(0, 5000);
-          if (!isSpecificOpportunity(title, description)) return null;
-          return { ...parsed, title, description, sourceUrl: source.finalUrl, discoveryEngine: "official_pages" };
-        } catch (error) {
-          errors.push({ sourceUrl: anchor.url, error: String(error.message || error).slice(0, 180) });
-          return null;
-        }
-      }));
-      return results.filter(Boolean);
+      const anchors = getAnchors(source.html, source.finalUrl)
+        .filter(anchor => new URL(anchor.url).hostname === sourceHost)
+        .slice(0, MAX_PAGE_LINKS);
+      return { sourceUrl: source.finalUrl, anchors };
     } catch (error) {
       errors.push({ sourceUrl, error: String(error.message || error).slice(0, 180) });
-      return [];
+      return { sourceUrl, anchors: [] };
     }
   }));
-  const items = sourceResults.flat();
-  return { items, stats: { configured: urls.length, scanned: urls.length, found: items.length, errors: errors.slice(0, 20) } };
+  // Round-robin across configured donor pages and cap detail requests. This keeps
+  // the combined feed + page + search scan below Cloudflare's subrequest ceiling.
+  const selected = [];
+  for (let index = 0; selected.length < MAX_TOTAL_DETAIL_PAGES; index++) {
+    let added = false;
+    for (const source of sources) {
+      if (source.anchors[index]) {
+        selected.push({ sourceUrl: source.sourceUrl, anchor: source.anchors[index] });
+        added = true;
+        if (selected.length >= MAX_TOTAL_DETAIL_PAGES) break;
+      }
+    }
+    if (!added) break;
+  }
+  const results = await Promise.all(selected.map(async ({ sourceUrl, anchor }) => {
+    try {
+      const detail = await fetchHtml(anchor.url);
+      const parsed = parseOfficialPage(detail.html, detail.finalUrl);
+      const title = parsed.title || anchor.label;
+      const description = (parsed.description + " " + anchor.context).trim().slice(0, 5000);
+      if (!isSpecificOpportunity(title, description)) return null;
+      return { ...parsed, title, description, sourceUrl, discoveryEngine: "official_pages" };
+    } catch (error) {
+      errors.push({ sourceUrl: anchor.url, error: String(error.message || error).slice(0, 180) });
+      return null;
+    }
+  }));
+  const items = results.filter(Boolean);
+  return { items, stats: { configured: urls.length, scanned: urls.length, detailPagesScanned: selected.length, found: items.length, errors: errors.slice(0, 20) } };
 }
 
 const SEARCH_QUERIES = ['"grant call" Tanzania NGO climate pastoral livestock rangeland','"call for proposals" Africa NGO environment biodiversity restoration','foundation grants Tanzania civil society women youth livelihoods','embassy small grants Tanzania NGO community development'];
