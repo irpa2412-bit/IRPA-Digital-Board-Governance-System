@@ -91,6 +91,31 @@ test("past advertised deadlines are marked expired even when an open-feed source
   assert.equal(fit.triageAssessment, "closed_do_not_prioritize");
 });
 
+test("deadline parser detects closing dates, ISO dates and structured deadline fields", () => {
+  const textualClose = assessFit({
+    title: "Open climate resilience grant",
+    description: "Applications close on 1 January 2020. Fund state: Open."
+  });
+  assert.equal(textualClose.deadlineAt, "2020-01-01");
+  assert.equal(textualClose.callStatus, "expired");
+  assert.equal(textualClose.triageAssessment, "closed_do_not_prioritize");
+
+  const isoClose = assessFit({
+    title: "Open rangeland restoration grant",
+    description: "Closing date: 2020-01-01. Fund state: Open."
+  });
+  assert.equal(isoClose.deadlineAt, "2020-01-01");
+  assert.equal(isoClose.callStatus, "expired");
+
+  const structuredDeadline = assessFit({
+    title: "Open livestock market grant",
+    description: "Support for livestock value chains.",
+    deadline_at: "2020-01-01"
+  });
+  assert.equal(structuredDeadline.deadlineAt, "2020-01-01");
+  assert.equal(structuredDeadline.callStatus, "expired");
+});
+
 test("future deadlines can remain open for eligibility review", () => {
   const fit = assessFit({
     title: "Open community rangeland restoration grant",
