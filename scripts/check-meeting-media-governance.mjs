@@ -19,8 +19,8 @@ const livekitCaddy=fs.readFileSync("infra/livekit/caddy.yaml.template","utf8");
 const livekitDeploy=fs.readFileSync("infra/livekit/deploy-staging.sh","utf8");
 const livekitWorkflow=fs.readFileSync(".github/workflows/deploy-livekit-staging.yml","utf8");
 const checks=[
- ["Registration buttons use the authoritative active-role policy",room.includes("canRegisterMeeting(actorIdentity)")&&room.includes("canRegisterMeeting({...actorIdentity,isAdmin:admin})")],
- ["Released meeting edits remain administrator-only",room.includes("if(editing&&!canEditMeeting(editing,{...actorIdentity,isAdmin:admin}))")&&room.includes("released. Only an authorised administrator may edit it.")],
+ ["Registration buttons use the authoritative active-role policy",room.includes('{canRegisterMeeting({...actorIdentity,isAdmin:admin})&&<button type="button" onClick={startCreate}>+ Register Meeting</button>}')&&room.includes('{canRegisterMeeting({...actorIdentity,isAdmin:admin})&&<button className="secondary-button" onClick={startCreate}>+ New Meeting</button>}')],
+ ["Released meeting edits remain administrator-only",room.includes("if(editing&&!canEditMeeting(editing,{...actorIdentity,isAdmin:admin}))")&&room.includes("function edit(m){if(!canEditMeeting(m,{...actorIdentity,isAdmin:admin}))")&&room.includes("released. Only an authorised administrator may edit it.")],
  ["Firestore create retains registrar, initiator and meeting-category validation",fs.readFileSync("firestore.rules","utf8").includes('allow create:if meetingRegistrar()&&request.resource.data.get("initiatorUid","")==request.auth.uid&&validMeetingCategory(request.resource.data)')],
  ["Meeting media client exists",fs.existsSync("src/components/IRPADGBSMeetingRoomMedia.jsx")],
  ["Participant invitation creates a meeting access pass",participantPage.includes("createMeetingAccessInvitation")&&participantPage.includes("meetingAccess")],
