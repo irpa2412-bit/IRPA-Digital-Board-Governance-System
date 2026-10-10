@@ -1,4 +1,5 @@
 import { analyzeGrant } from "./assistant.js";
+import { handleApplicationPortal } from "./application-portal-handler.js";
 
 
 const FIREBASE_PROJECT_ID = "irpa-digital-board-governance";
@@ -292,8 +293,9 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders() });
+    if (url.pathname === "/" || url.pathname === "/application" || url.pathname === "/application/" || url.pathname === "/application/drafts" || url.pathname.startsWith("/application/drafts/")) return handleApplicationPortal(request, env);
     if (request.method === "GET" && url.pathname === "/health") {
-      return json({ service: "irpa-grant-crawler", environment: env.IRPA_ENVIRONMENT || "local", storage: env.GRANTS_DB ? "configured" : "missing", ai: env.AI ? "configured" : "missing", firebase: "disabled-by-design-until-dedicated-rules-and-identity-are-approved" });
+      return json({ service: "irpa-grant-crawler", environment: env.IRPA_ENVIRONMENT || "local", storage: env.GRANTS_DB ? "configured" : "missing", ai: env.AI ? "configured" : "missing", identity: "firebase-id-token-verification-only", draftStorage: "cloudflare-d1" });
     }
     if (request.method === "GET" && url.pathname === "/opportunities") {
       try {
@@ -312,10 +314,16 @@ export default {
       } catch (error) {
         return json({ error: String(error.message || "Unauthorized").slice(0, 300) }, 401);
       }
+    } else if (url.pathname === "/assistant/analyze") {
+      const token = String(request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+      const expected = String(env.CRAWLER_CONTROL_TOKEN || "");
+      if (expected.length >= 32 && token === expected) return analyzeGrant(request, env);
+      try { await verifyFirebaseIdToken(token, env, false); }
+      catch (error) { return json({ error: String(error.message || "A valid sign-in is required.").slice(0, 300) }, 401); }
+      return analyzeGrant(request, env);
     } else {
       const expected = String(env.CRAWLER_CONTROL_TOKEN || "");
       if (expected.length < 32 || request.headers.get("authorization") !== "Bearer " + expected) return json({ error: "Unauthorized" }, 401);
-      if (url.pathname === "/assistant/analyze") return analyzeGrant(request, env);
     }
     try { return json(await crawl(env)); }
     catch (error) {

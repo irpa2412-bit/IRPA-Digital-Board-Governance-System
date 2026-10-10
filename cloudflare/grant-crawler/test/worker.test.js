@@ -18,14 +18,15 @@ test("parses RSS entries and escapes without executing markup", () => {
   assert.equal(items[0].url, "https://donor.example/call/1");
 });
 
-test("health endpoint reports Firebase disabled and does not expose secrets", async () => {
+test("health endpoint reports identity and Cloudflare storage boundaries without exposing secrets", async () => {
   const response = await worker.fetch(new Request("https://crawler.example/health"), {
     IRPA_ENVIRONMENT: "staging",
     CRAWLER_CONTROL_TOKEN: "never-echo-this-token",
   });
   const body = await response.json();
   assert.equal(response.status, 200);
-  assert.equal(body.firebase, "disabled-by-design-until-dedicated-rules-and-identity-are-approved");
+  assert.equal(body.identity, "firebase-id-token-verification-only");
+  assert.equal(body.draftStorage, "cloudflare-d1");
   assert.equal(JSON.stringify(body).includes("never-echo-this-token"), false);
 });
 
@@ -156,4 +157,30 @@ test("AI grant assistant fails closed when Cloudflare AI binding is absent", asy
     body: JSON.stringify({ title: "Grant", description: "Details" })
   }), { CRAWLER_CONTROL_TOKEN: token });
   assert.equal(response.status, 503);
+});
+
+
+test("grant application portal serves the authenticated copy-ready workspace", async () => {
+  const response = await worker.fetch(new Request("https://crawler.example/application"), {});
+  const html = await response.text();
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type"), /text\/html/);
+  assert.match(html, /Copy all application wording/);
+  assert.match(html, /Save \/ synchronize draft/);
+  assert.match(html, /existing IRPA Digital Board Governance System account/);
+});
+
+test("grant application draft records require an authenticated Firebase identity", async () => {
+  const response = await worker.fetch(new Request("https://crawler.example/application/drafts", {
+    method: "GET"
+  }), {});
+  assert.equal(response.status, 401);
+});
+
+test("application draft routes are available without exposing crawler control token", async () => {
+  const token = "private-control-token-that-must-not-be-rendered";
+  const response = await worker.fetch(new Request("https://crawler.example/application"), { CRAWLER_CONTROL_TOKEN: token });
+  const html = await response.text();
+  assert.equal(response.status, 200);
+  assert.equal(html.includes(token), false);
 });
