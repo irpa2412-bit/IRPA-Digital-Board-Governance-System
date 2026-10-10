@@ -190,6 +190,23 @@ test("AI geographic gate blocks concept-note drafting when geography is ineligib
   assert.equal(modelCalls, 0);
 });
 
+test("AI cannot mark a call eligible when geographic eligibility is unstated", async () => {
+  const token = "test-token-with-at-least-32-characters-long";
+  const env = { CRAWLER_CONTROL_TOKEN: token, AI: { run: async () => ({ response: JSON.stringify({
+    eligibility: { status: "eligible", confidence: "high", evidence: ["Model guess"], unknowns: [] },
+    donor_requirements: []
+  }) }) } };
+  const response = await worker.fetch(new Request("https://crawler.example/assistant/analyze", {
+    method: "POST",
+    headers: { authorization: "Bearer " + token, "content-type": "application/json" },
+    body: JSON.stringify({ title: "Global warming awareness grant", description: "Supports community education." })
+  }), env);
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.assessment.geographic_eligibility.status, "unclear");
+  assert.equal(body.assessment.eligibility.status, "insufficient_information");
+});
+
 test("AI eligibility analysis deterministically overrides model claims for country-restricted calls", async () => {
   const token = "test-token-with-at-least-32-characters-long";
   const env = { CRAWLER_CONTROL_TOKEN: token, AI: { run: async () => ({ response: JSON.stringify({
