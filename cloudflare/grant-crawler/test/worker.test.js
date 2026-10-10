@@ -157,3 +157,31 @@ test("AI grant assistant fails closed when Cloudflare AI binding is absent", asy
   }), { CRAWLER_CONTROL_TOKEN: token });
   assert.equal(response.status, 503);
 });
+
+
+test("grant application portal serves the authenticated copy-ready workspace", async () => {
+  const response = await worker.fetch(new Request("https://crawler.example/application"), {});
+  const html = await response.text();
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type"), /text\/html/);
+  assert.match(html, /Copy all application wording/);
+  assert.match(html, /Save \/ synchronize draft/);
+  assert.match(html, /Firebase/);
+});
+
+test("grant application draft records require an authenticated Firebase identity", async () => {
+  const response = await worker.fetch(new Request("https://crawler.example/application/drafts", {
+    method: "GET"
+  }), {});
+  assert.equal(response.status, 401);
+});
+
+test("application draft routes are available without exposing crawler control token", async () => {
+  const token = "private-control-token-that-must-not-be-rendered";
+  const response = await worker.fetch(new Request("https://crawler.example/application"), {
+    headers: { authorization: "Bearer " + token }
+  }, { CRAWLER_CONTROL_TOKEN: token });
+  const html = await response.text();
+  assert.equal(response.status, 200);
+  assert.equal(html.includes(token), false);
+});
