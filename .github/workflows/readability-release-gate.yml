@@ -57,6 +57,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: irpa-dbgs-readability-verification-${{ github.run_id }}
-          path: dist/index.html
+          path: |
+            artifacts/*.json
+            dist/index.html
           if-no-files-found: ignore
           retention-days: 30
