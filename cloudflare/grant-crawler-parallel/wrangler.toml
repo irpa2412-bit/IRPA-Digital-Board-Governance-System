@@ -1,0 +1,44 @@
+# Isolated grant-discovery Worker. Never reuse drive-gateway/wrangler.toml.
+name = "irpa-grant-crawler"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+[vars]
+IRPA_ENVIRONMENT = "local"
+GRANT_FEED_URLS = "[\"https://www.gov.uk/international-development-funding.atom?fund_state=open\",\"https://www.gov.uk/international-development-funding.atom?location%5B%5D=tanzania&fund_state=open\",\"https://www.gov.uk/international-development-funding.atom?eligible_entities=organisations-lmic&fund_state=open\"]"
+GRANT_SOURCE_PAGE_URLS = "[\"https://www.undp.org/tanzania/news\",\"https://www.undp.org/tanzania/press-releases\",\"https://www.thegef.org/what-we-do/topics/gef-small-grants-program\",\"https://www.fao.org/small-grants-program/\"]"
+
+[ai]
+binding = "AI"
+
+[[d1_databases]]
+binding = "GRANTS_DB"
+database_name = "irpa-grant-crawler-staging"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+[triggers]
+crons = []
+
+[env.staging]
+name = "irpa-grant-crawler-staging"
+workers_dev = true
+
+[env.staging.vars]
+IRPA_ENVIRONMENT = "staging"
+GRANT_CRAWLER_ADMIN_EMAILS = "irpa2412@gmail.com"
+GRANT_FEED_URLS = "[\"https://www.gov.uk/international-development-funding.atom?fund_state=open\",\"https://www.gov.uk/international-development-funding.atom?location%5B%5D=tanzania&fund_state=open\",\"https://www.gov.uk/international-development-funding.atom?eligible_entities=organisations-lmic&fund_state=open\"]"
+GRANT_SOURCE_PAGE_URLS = "[\"https://www.undp.org/tanzania/news\",\"https://www.undp.org/tanzania/press-releases\",\"https://www.thegef.org/what-we-do/topics/gef-small-grants-program\",\"https://www.fao.org/small-grants-program/\"]"
+
+[env.staging.ai]
+binding = "AI"
+
+[[env.staging.d1_databases]]
+binding = "GRANTS_DB"
+database_name = "irpa-grant-crawler-staging"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+[env.staging.triggers]
+crons = ["0 */6 * * *"]
