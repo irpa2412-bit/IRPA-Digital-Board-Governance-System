@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import worker, { assessFit, isCurrentOpportunity, parseFeed, safeUrl } from "../src/index.js";
 import { assessGeographicEligibility } from "../src/assistant.js";
-import { decodeHtml, normalizeOpportunityUrl, parseOfficialPage, readOfficialPages, readWebSearch } from "../src/discovery-engines.js";
+import { decodeHtml, normalizeOpportunityUrl, parseOfficialPage, parseSearchRss, readOfficialPages, readWebSearch } from "../src/discovery-engines.js";
 
 test("accepts only credential-free HTTPS feed URLs", () => {
   assert.equal(safeUrl("https://example.org/feed.xml").hostname, "example.org");
@@ -615,11 +615,27 @@ test("official webpage parser extracts safe title and description text", () => {
   assert.equal(decodeHtml("Women &amp; youth"), "Women & youth");
 });
 
-test("parallel webpage scanner and web search connector fail closed when unconfigured", async () => {
+test("web search RSS parser extracts grant announcements and rejects unsafe links", () => {
+  const xml = '<rss><channel><item><title>Open grant for pastoral restoration</title><link>https://donor.example/call?utm_source=news</link><description>Funding for rangeland restoration in Tanzania</description><pubDate>Sat, 10 Oct 2026 10:00:00 GMT</pubDate></item></channel></rss>';
+  const items = parseSearchRss(xml, "grant Tanzania");
+  assert.equal(items.length, 1);
+  assert.equal(items[0].title, "Open grant for pastoral restoration");
+  assert.equal(items[0].url, "https://donor.example/call");
+  assert.equal(items[0].discoveryEngine, "web_search");
+});
+
+test("parallel webpage scanner and no-key web search use the configured public search fallback", async () => {
   const pages = await readOfficialPages({});
-  const search = await readWebSearch({});
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response('<rss><channel><item><title>Open grant for pastoral restoration</title><link>https://donor.example/call</link><description>Funding for rangeland restoration in Tanzania</description></item></channel></rss>', { status: 200, headers: { "content-type": "application/rss+xml" } });
+  try {
+    const search = await readWebSearch({});
+    assert.equal(search.items.length, 4);
+    assert.equal(search.stats.configured, true);
+    assert.equal(search.stats.provider, "Google News RSS");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
   assert.equal(pages.items.length, 0);
   assert.equal(pages.stats.configured, 0);
-  assert.equal(search.items.length, 0);
-  assert.equal(search.stats.configured, false);
 });
