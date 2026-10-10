@@ -284,7 +284,7 @@ export default function DocumentTranslationWorkspace({profile,employee,admin=fal
     translatedFileId:uploaded.fileId,translatedDocumentId:uploaded.documentId,translationOutputFileName:fileName,updatedAt:serverTimestamp()
    });
    const archivedReference=String(uploaded.reference||uploaded.documentId);setMessage("Translated text has been uploaded as a separate controlled document with the source document’s classification and access grants inherited ("+archivedReference+"). The original source document was not changed.");
-  }catch(e){setError(e.message||"Unable to archive the translated output. You can still download the completed text file.");}
+  }catch(e){setError(e.message||"Unable to archive the translated PDF. You can still download the completed PDF directly.");}
   finally{setArchiving(false)}
  }
  async function rejectRequest(){
