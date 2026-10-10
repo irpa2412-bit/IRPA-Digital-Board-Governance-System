@@ -2,7 +2,7 @@ name: Staging Gateway E2E and Deploy
 
 on:
   push:
-    branches: [fix/member-signature-invitation-email-20261004]
+    branches: [main, fix/member-signature-invitation-email-20261004]
     paths:
       - "drive-gateway/**"
       - "firebase.json"
@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   local-e2e:
-    if: github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -154,6 +154,7 @@ jobs:
             compatibility_date:"2026-09-29",workers_dev:true,
             vars:{
               FIREBASE_PROJECT_ID:process.env.PROJECT,
+              AUTHORIZED_DRIVE_EMAIL:"irpa2412@gmail.com",
               AUTHORIZED_DRIVE_EMAIL:"irpa2412@gmail.com",
               IRPA_APP_URL:process.env.APP_URL,
               SMTP_HOST:"mail.irpa.or.tz",SMTP_PORT:"465",SMTP_FROM:"info@irpa.or.tz",
