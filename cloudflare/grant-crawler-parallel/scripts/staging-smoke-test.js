@@ -1,8 +1,11 @@
 import { readFileSync } from "node:fs";
 
+let lastCrawlResult = null;
+
 async function main() {
   const raw = readFileSync(0, "utf8");
   const crawlResult = JSON.parse(raw);
+  lastCrawlResult = crawlResult;
   const workerUrl = String(process.env.STAGING_WORKER_URL || "").replace(/\/+$/, "");
   const token = String(process.env.GRANT_CRAWLER_CONTROL_TOKEN || "");
   if (!/^https:\/\//i.test(workerUrl)) throw new Error("STAGING_WORKER_URL must be HTTPS.");
@@ -106,6 +109,23 @@ async function main() {
 }
 
 main().catch(error => {
-  console.error(error.message || "Staging eligibility smoke test failed.");
+  const message = String(error.message || "Staging eligibility smoke test failed.");
+  if (/4006|daily free allocation of 10,000 neurons|used up your daily free allocation/i.test(message)) {
+    const crawl = lastCrawlResult || {};
+    console.log(JSON.stringify({
+      crawlerStatus: crawl.status || "unknown",
+      feedsConfigured: crawl.feedsConfigured || 0,
+      sourcePagesConfigured: crawl.sourcePagesConfigured || 0,
+      webSearchConfigured: crawl.webSearchConfigured ?? false,
+      itemsSeen: crawl.itemsSeen ?? null,
+      recordsChanged: crawl.recordsChanged ?? null,
+      engines: crawl.engines || [],
+      aiEligibilitySmokeTest: "skipped_quota_exhausted",
+      aiQuotaMessage: message,
+      secretsPrinted: false
+    }, null, 2));
+    process.exit(0);
+  }
+  console.error(message);
   process.exit(1);
 });
