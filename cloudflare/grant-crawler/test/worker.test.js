@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import worker, { parseFeed, safeUrl } from "../src/index.js";
+import worker, { assessFit, parseFeed, safeUrl } from "../src/index.js";
 
 test("accepts only credential-free HTTPS feed URLs", () => {
   assert.equal(safeUrl("https://example.org/feed.xml").hostname, "example.org");
@@ -32,4 +32,22 @@ test("health endpoint reports Firebase disabled and does not expose secrets", as
 test("crawl endpoint rejects unauthenticated requests", async () => {
   const response = await worker.fetch(new Request("https://crawler.example/crawl", { method: "POST" }), {});
   assert.equal(response.status, 401);
+});
+
+
+test("IRPA fit matcher prioritizes pastoral and rangeland calls without claiming legal eligibility", () => {
+  const fit = assessFit({
+    title: "Community-led rangeland restoration and drought resilience",
+    description: "Supporting pastoralist livelihoods, women and youth groups in Tanzania.",
+  });
+  assert.equal(fit.fitAssessment, "strong_topic_match");
+  assert.ok(fit.score >= 35);
+  assert.ok(fit.reasons.includes("pastoralism/rangelands"));
+  assert.equal(fit.eligibilityStatus, "unverified");
+});
+
+test("generic unrelated call is low topic match and eligibility remains unverified", () => {
+  const fit = assessFit({ title: "University arts fellowship", description: "Performing arts scholarship." });
+  assert.equal(fit.fitAssessment, "low_topic_match");
+  assert.equal(fit.eligibilityStatus, "unverified");
 });
