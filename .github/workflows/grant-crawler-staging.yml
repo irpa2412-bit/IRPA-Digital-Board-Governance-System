@@ -63,6 +63,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/feature/isolated-grant-crawler-staging')
     needs: test
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     environment: irpa-grant-crawler-staging
     defaults:
       run:
