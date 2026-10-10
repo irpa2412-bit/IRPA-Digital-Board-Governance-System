@@ -4,7 +4,7 @@ An isolated Cloudflare Worker for collecting public funding call metadata throug
 
 ## Local checks
 
-    cd cloudflare/grant crawler
+    cd cloudflare/grant-crawler-parallel
     npm run check
 
 ## Staging prerequisites
