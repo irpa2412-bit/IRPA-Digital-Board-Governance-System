@@ -51,7 +51,7 @@ test("IRPA fit matcher prioritizes pastoral and rangeland calls without claiming
 test("generic unrelated call is low topic match and eligibility remains unverified", () => {
   const fit = assessFit({ title: "University arts fellowship", description: "Performing arts scholarship." });
   assert.equal(fit.fitAssessment, "low_topic_match");
-  assert.equal(fit.eligibilityStatus, "unverified");
+  assert.equal(fit.eligibilityStatus, "geography_unverified");
 });
 
 
