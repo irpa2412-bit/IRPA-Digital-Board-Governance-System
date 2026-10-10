@@ -274,7 +274,7 @@ test("known IRPA eligibility gaps block concept-note drafting", async () => {
     }), env);
     const body = await response.json();
     assert.equal(response.status, 422);
-    assert.equal(body.eligibility_gate.status, item.expected);
+    assert.equal(body.eligibility_gate.status, item.expected, item.title);
     const combined = [...(body.eligibility_gate.blockers||[]), ...(body.eligibility_gate.warnings||[])].join(" ").toLowerCase();
     assert.ok(combined.includes(item.expectedTerm.toLowerCase()), "Expected eligibility evidence for: " + item.expectedTerm);
   }
