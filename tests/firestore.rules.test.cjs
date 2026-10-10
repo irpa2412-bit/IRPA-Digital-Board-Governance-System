@@ -421,6 +421,7 @@ function translationRequest(overrides = {}) {
     status: "REQUESTED",
     dictionaryAssistRequested: true,
     humanReviewRequired: true,
+    contentTransferAuthorized: false,
     contentTransferred: false,
     requestOrigin: "Documents Portal",
     createdAt: "2026-10-10T06:00:00.000Z",
@@ -448,7 +449,7 @@ test("document owner can explicitly transfer content and save a translation draf
   });
   const ownerDb = testEnv.authenticatedContext("member-user", {email:"member@example.test"}).firestore();
   await assertSucceeds(ownerDb.doc("documentTranslationRequests/translation-test-2").update({
-    status:"IN_REVIEW",contentTransferred:true,translationStartedAt:"2026-10-10T06:05:00.000Z",
+    status:"IN_REVIEW",contentTransferAuthorized:true,contentTransferred:true,translationStartedAt:"2026-10-10T06:05:00.000Z",
     sourceLanguageResolved:"en-TZ",translationDraftText:"Ashe. Enkare is sidai.",
     translationProvider:"IRPA Maa Dictionary · provisional glossary",sourceTextSha256:"b".repeat(64),
     extractedCharacterCount:35,translationChunks:1,translationCoverage:"partial",dictionaryMatchedTerms:3,
