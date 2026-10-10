@@ -54,7 +54,7 @@ jobs:
         run: |
           npx --yes wrangler deploy
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" | npx --yes wrangler secret put FIREBASE_SERVICE_ACCOUNT_JSON
-          curl --fail --silent --show-error --retry 5 --retry-delay 3 --max-time 20 "$CRAWLER_URL/health"
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 --max-time 20 "${CRAWLER_URL%/}/health"
       - name: Configure Firebase CLI authentication
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
