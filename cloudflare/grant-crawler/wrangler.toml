@@ -7,6 +7,7 @@ workers_dev = true
 [vars]
 IRPA_ENVIRONMENT = "local"
 GRANT_FEED_URLS = "[\"https://www.gov.uk/international-development-funding.atom?fund_state=open\",\"https://www.gov.uk/international-development-funding.atom?location%5B%5D=tanzania&fund_state=open\",\"https://www.gov.uk/international-development-funding.atom?eligible_entities=organisations-lmic&fund_state=open\"]"
+GRANT_SOURCE_PAGE_URLS = "[\\\"https://www.undp.org/tanzania/news\\\",\\\"https://www.undp.org/tanzania/press-releases\\\",\\\"https://www.thegef.org/what-we-do/topics/gef-small-grants-program\\\",\\\"https://www.fao.org/small-grants-program/\\\"]"
 
 [ai]
 binding = "AI"
@@ -28,6 +29,7 @@ workers_dev = true
 IRPA_ENVIRONMENT = "staging"
 GRANT_CRAWLER_ADMIN_EMAILS = "irpa2412@gmail.com"
 GRANT_FEED_URLS = "[\"https://www.gov.uk/international-development-funding.atom?fund_state=open\",\"https://www.gov.uk/international-development-funding.atom?location%5B%5D=tanzania&fund_state=open\",\"https://www.gov.uk/international-development-funding.atom?eligible_entities=organisations-lmic&fund_state=open\"]"
+GRANT_SOURCE_PAGE_URLS = "[\\\"https://www.undp.org/tanzania/news\\\",\\\"https://www.undp.org/tanzania/press-releases\\\",\\\"https://www.thegef.org/what-we-do/topics/gef-small-grants-program\\\",\\\"https://www.fao.org/small-grants-program/\\\"]"
 
 [env.staging.ai]
 binding = "AI"
