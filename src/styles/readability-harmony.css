@@ -3197,3 +3197,122 @@ textarea:focus-visible{
 .dashboard-content-area .dashboard-command svg.dashboard-semantic-icon *[fill]:not([fill="none"]){
   fill:#d6a52c!important;
 }
+
+/* MOBILE ACCESS-CATEGORY PANEL — hard layout correction.
+   Keep the access panel in normal document flow directly below the fixed
+   four-button navigation. Prevent dashboard content from covering it. */
+@media screen and (max-width:760px){
+  .app-shell .main-area{
+    padding-top:76px!important;
+    min-height:100vh!important;
+  }
+  .app-shell .main-area>.topbar{
+    display:block!important;
+    position:relative!important;
+    inset:auto!important;
+    width:100%!important;
+    height:auto!important;
+    min-height:0!important;
+    max-height:none!important;
+    overflow:visible!important;
+    padding:14px 14px 12px!important;
+    margin:0!important;
+    box-sizing:border-box!important;
+    background:#07140f!important;
+    z-index:1!important;
+  }
+  .app-shell .main-area>.topbar .topbar-heading-row{
+    display:flex!important;
+    position:relative!important;
+    flex-direction:column!important;
+    align-items:stretch!important;
+    gap:12px!important;
+    width:100%!important;
+    height:auto!important;
+    min-height:0!important;
+    max-height:none!important;
+    overflow:visible!important;
+    transform:none!important;
+  }
+  .app-shell .main-area>.topbar .topbar-title-block{
+    display:block!important;
+    position:relative!important;
+    width:100%!important;
+    height:auto!important;
+    min-height:0!important;
+    overflow:visible!important;
+    order:0!important;
+  }
+  .app-shell .main-area>.topbar .topbar-access-category{
+    display:block!important;
+    position:relative!important;
+    inset:auto!important;
+    float:none!important;
+    transform:none!important;
+    order:1!important;
+    flex:0 0 auto!important;
+    width:100%!important;
+    min-width:0!important;
+    max-width:none!important;
+    height:auto!important;
+    min-height:120px!important;
+    max-height:none!important;
+    overflow:visible!important;
+    visibility:visible!important;
+    opacity:1!important;
+    margin:0!important;
+    padding:14px!important;
+    box-sizing:border-box!important;
+    background:#082d4b!important;
+    border:2px solid #d6a52c!important;
+    border-radius:12px!important;
+    color:#edf5f1!important;
+    z-index:3!important;
+  }
+  .app-shell .main-area>.topbar .topbar-access-category *{
+    visibility:visible!important;
+    opacity:1!important;
+  }
+  .app-shell .main-area>.topbar .topbar-access-category>span,
+  .app-shell .main-area>.topbar .topbar-access-category .login-category-heading,
+  .app-shell .main-area>.topbar .topbar-access-category .login-category-note{
+    display:block!important;
+    color:#edf5f1!important;
+    white-space:normal!important;
+  }
+  .app-shell .main-area>.topbar .topbar-access-category .login-category-list{
+    display:flex!important;
+    flex-wrap:wrap!important;
+    gap:8px!important;
+    margin-top:8px!important;
+  }
+  .app-shell .main-area>.topbar .topbar-access-category .login-category-pill{
+    display:inline-flex!important;
+    color:#f3d36a!important;
+    background:#082d4b!important;
+    border:1px solid #d6a52c!important;
+  }
+  .app-shell .main-area>.topbar .mobile-access-live-date{
+    display:flex!important;
+    position:relative!important;
+    flex-wrap:wrap!important;
+    gap:5px 10px!important;
+    margin-top:12px!important;
+    color:#fff!important;
+  }
+  .app-shell .main-area>.topbar .mobile-access-live-date *{
+    color:#fff!important;
+  }
+  .app-shell .main-area>.topbar .mobile-access-live-date button{
+    background:#0b5fa8!important;
+    border:1px solid #d6a52c!important;
+    color:#fff!important;
+  }
+  .app-shell .main-area>.topbar .open-portal-panel,
+  .app-shell .main-area>.topbar .user-info{
+    display:none!important;
+  }
+  .app-shell .main-area>.topbar+.content-area{
+    padding-top:14px!important;
+  }
+}
