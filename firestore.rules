@@ -405,7 +405,7 @@ service cloud.firestore {
     allow create:if (procurementRequester()||admin())&&initialCounterIsValid();
     allow update:if (procurementRequester()||admin())&&request.resource.data.updatedAt==request.time&&(counterIncrementIsValid("vendorRegistrationNumber")||counterIncrementIsValid("requestNumber")||counterIncrementIsValid("documentReference")||counterIncrementIsValid("prNumber")||counterIncrementIsValid("poNumber"));
     allow delete:if admin();
-  }}
+  }
   match /systemSettings/documentCounters{
     allow get:if signedIn();
     allow create:if signedIn()&&request.resource.data.documentReference==1&&request.resource.data.keys().hasOnly(["documentReference","updatedAt"]);
