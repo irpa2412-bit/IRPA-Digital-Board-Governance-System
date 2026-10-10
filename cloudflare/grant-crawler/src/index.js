@@ -266,7 +266,7 @@ function assessFit(item) {
   // A country-focused title is a hard geographic signal: generic regional wording elsewhere
   // in the description cannot make a country-specific call eligible for Tanzania.
   const countryFocusedTitle = countryNamePattern.test(titleText) &&
-    !/\\b(?:africa[- ]wide|pan[- ]african|east africa(?:n)?|sub[- ]saharan africa|global (?:grant|fund|call|programme|program)|worldwide (?:grant|call|eligibility)|open to applicants worldwide|regional (?:grant|fund|call|programme|program))\\b/i.test(titleText);
+    !/\b(?:africa[- ]wide|pan[- ]african|east africa(?:n)?|sub[- ]saharan africa|global (?:grant|fund|call|programme|program)|worldwide (?:grant|call|eligibility)|open to applicants worldwide|regional (?:grant|fund|call|programme|program))\b/i.test(titleText);
   const geographyAssessment = hardCountryOnly || (countryFocusedTitle && !explicitTanzaniaEligibility) || (countryNames && !regionalScope && !explicitTanzaniaEligibility)
     ? "other_country_focus"
     : regionalScope
