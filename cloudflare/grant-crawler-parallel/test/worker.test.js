@@ -604,6 +604,7 @@ test("parallel discovery URL normalization strips tracking parameters and reject
   assert.equal(normalizeOpportunityUrl("https://donor.example/call?id=3&utm_source=newsletter#apply"), "https://donor.example/call?id=3");
   assert.throws(() => normalizeOpportunityUrl("http://donor.example/call"));
   assert.throws(() => normalizeOpportunityUrl("https://user:secret@donor.example/call"));
+  assert.throws(() => normalizeOpportunityUrl("https://127.0.0.1/private"));
 });
 
 test("official webpage parser extracts safe title and description text", () => {
