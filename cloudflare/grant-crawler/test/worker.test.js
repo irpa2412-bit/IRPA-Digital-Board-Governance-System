@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import worker, { assessFit, parseFeed, safeUrl } from "../src/index.js";
+import worker, { assessFit, isCurrentOpportunity, parseFeed, safeUrl } from "../src/index.js";
 import { assessGeographicEligibility } from "../src/assistant.js";
 
 test("accepts only credential-free HTTPS feed URLs", () => {
@@ -129,6 +129,17 @@ test("deadline parser detects closing dates, ISO dates and structured deadline f
   });
   assert.equal(structuredDeadline.deadlineAt, "2020-01-01");
   assert.equal(structuredDeadline.callStatus, "expired");
+});
+
+test("expired and unverified calls are suppressed from the live opportunity list", () => {
+  const today = "2026-10-10";
+  assert.equal(isCurrentOpportunity({ title: "Old climate grant", description: "Apply by 1 January 2020.", call_status: "open" }, today), false);
+  assert.equal(isCurrentOpportunity({ title: "Stale metadata", description: "Climate resilience", call_status: "expired", deadline_at: "2099-12-31" }, today), false);
+  assert.equal(isCurrentOpportunity({ title: "Closed announcement", description: "Applications are closed.", call_status: "open", deadline_at: "2099-12-31" }, today), false);
+  assert.equal(isCurrentOpportunity({ title: "Unverified call", description: "Community climate support", call_status: "unknown" }, today), false);
+  assert.equal(isCurrentOpportunity({ title: "Current call", description: "Deadline for applications is 31 December 2099.", call_status: "unknown", deadline_at: "2099-12-31" }, today), true);
+  assert.equal(isCurrentOpportunity({ title: "Rolling call", description: "Applications accepted on a rolling basis.", call_status: "unknown" }, today), true);
+  assert.equal(isCurrentOpportunity({ title: "Deadline today", description: "Climate grant", call_status: "unknown", deadline_at: today }, today), true);
 });
 
 test("future deadlines can remain open for eligibility review", () => {
