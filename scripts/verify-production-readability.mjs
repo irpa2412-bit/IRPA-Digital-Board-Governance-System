@@ -24,7 +24,7 @@ else {
   if(!assets.some(p=>p.endsWith(".js")&&fs.existsSync(p))) failures.push("Built JavaScript asset");
   for(const asset of assets.filter(p=>fs.existsSync(p)&&p.endsWith(".css"))) {
     const css=fs.readFileSync(asset,"utf8");
-    if(/(?:color|-webkit-text-fill-color)\s*:\s*transparent\b/i.test(css)) failures.push("Built CSS contains transparent text: "+path.relative(dist,asset));
+    if(/(?:^|[;{\s])(?:color|-webkit-text-fill-color)\s*:\s*transparent\b/i.test(css)) failures.push("Built CSS contains transparent text: "+path.relative(dist,asset));
     if(!changedOnly && /font-size\s*:\s*[0-9]+(?:\.\d+)?(?:px|pt)\b/i.test(css)) {
       const small=[...css.matchAll(/font-size\s*:\s*([0-9]+(?:\.\d+)?)(px|pt)\b/ig)].filter(m=>Number(m[1])*(m[2].toLowerCase()==="pt"?4/3:1)<12);
       if(small.length) failures.push(`Built CSS contains ${small.length} font-size declaration(s) below 12px in ${path.relative(dist,asset)}`);
