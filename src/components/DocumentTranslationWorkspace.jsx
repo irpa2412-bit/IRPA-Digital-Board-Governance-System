@@ -167,7 +167,7 @@ export default function DocumentTranslationWorkspace({profile,employee,admin=fal
    await updateDoc(doc(db,COLLECTIONS.documentTranslationRequests,selected.id),{
     translatedFileId:uploaded.documentId,translationOutputFileName:fileName,updatedAt:serverTimestamp()
    });
-   setMessage("Translated text has been uploaded as a separate controlled document ("+uploaded.reference||uploaded.documentId+"). The original source document was not changed.");
+   const archivedReference=String(uploaded.reference||uploaded.documentId);setMessage("Translated text has been uploaded as a separate controlled document ("+archivedReference+"). The original source document was not changed.");
   }catch(e){setError(e.message||"Unable to archive the translated output. You can still download the completed text file.");}
   finally{setArchiving(false)}
  }
