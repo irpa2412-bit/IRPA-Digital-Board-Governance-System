@@ -191,7 +191,7 @@ function detectKnownEligibilityGaps(opportunity) {
 
   const hasDeadline = Boolean(getOpportunityDeadline(opportunity));
   const explicitOpenStatus = String(opportunity.callStatus || "").toLowerCase() === "open" ||
-    /\\b(?:open to (?:eligible )?(?:applicants?|(?:civil society )?organizations?|(?:civil society )?organisations?|ngos?|nonprofits?)|open for applications|applications? (?:are )?open|call is open|rolling basis|rolling applications?|year[- ]round|open throughout the year)\\b/i.test(text);
+    /\b(?:open to (?:eligible )?(?:applicants?|(?:civil society )?organizations?|(?:civil society )?organisations?|ngos?|nonprofits?)|open for applications|applications? (?:are )?open|call is open|rolling basis|rolling applications?|year[- ]round|open throughout the year)\b/i.test(text);
   if (!hasDeadline && !explicitOpenStatus) {
     addUnique(warnings, "The official deadline or current open/rolling status is not established by the supplied text. Verify the donor's official call page before treating this as a current opportunity or drafting.");
   }
