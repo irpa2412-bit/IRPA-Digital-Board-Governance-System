@@ -44,6 +44,8 @@ const text=v=>String(v||"").trim();
 
 export default function GrantIntelligencePortal({profile,employee,isAdmin=false}){
  const [records,setRecords]=useState([]);
+ const [crawlerRecords,setCrawlerRecords]=useState([]);
+ const [crawlerResultsBusy,setCrawlerResultsBusy]=useState(false);
  const [crawlerStatus,setCrawlerStatus]=useState(null);
  const [crawlerSources,setCrawlerSources]=useState([]);
  const [crawlerRunning,setCrawlerRunning]=useState(false);
@@ -60,6 +62,34 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
  const uid=auth.currentUser?.uid||"";
  const roleList=[profile?.role,profile?.roles,employee?.role,employee?.roles].flatMap(v=>Array.isArray(v)?v:String(v||"").split(",")).map(v=>String(v||"").trim().toLowerCase());
  const canManage=isAdmin||roleList.some(r=>["administrator","executive director","director outreach","director finance & administration","director research","research director","research manager","fundraising officer","research officer"].includes(r));
+ async function loadCrawlerResults(showNotice=false){
+   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-staging.irpa-governance.workers.dev").replace(/\/+$/,"");
+   const token=await auth.currentUser?.getIdToken();
+   if(!token){if(showNotice)setError("Your session has expired. Sign in again to load crawler results.");return;}
+   setCrawlerResultsBusy(true);
+   try{
+     const response=await fetch(workerUrl+"/opportunities",{headers:{Authorization:"Bearer "+token,Accept:"application/json"},signal:AbortSignal.timeout(15000)});
+     const data=await response.json().catch(()=>({}));
+     if(!response.ok)throw new Error(data.error||"Crawler results request failed ("+response.status+").");
+     setCrawlerRecords((Array.isArray(data.items)?data.items:[]).map(item=>({
+       id:"crawler-"+item.id,title:item.title||"Untitled opportunity",
+       funder:(()=>{try{return new URL(item.source_url||item.url).hostname.replace(/^www\./,"")}catch{return "Official source"}})(),
+       url:item.url||"",deadline:item.deadline_at||null,
+       country:item.geography_assessment==="tanzania_mentioned"?"Tanzania":item.geography_assessment==="regional_or_lmic_scope"?"Regional / LMIC":"Not verified",
+       amount:"Not stated",summary:item.description||"No description supplied in source feed.",
+       status:["closed","expired"].includes(String(item.call_status||"").toLowerCase())?"Closed":item.call_status==="open"?"Open":"Under review",
+       pillars:["livestock/agriculture"].includes(JSON.parse(item.fit_reasons||"[]")[0])?["livestock"]:["rangeland"],
+       themes:[],verificationStatus:"Pending official-call verification",sourceType:"Cloudflare crawler",
+       fitScore:Number(item.fit_score||0),fitReasons:item.fit_reasons||"[]",
+       eligibilityStatus:item.eligibility_status||"unverified",triageAssessment:item.triage_assessment||"manual_eligibility_review",
+       createdAt:item.first_seen_at||null
+     })));
+     if(data.lastRun)setCrawlerStatus({status:data.lastRun.status,created:data.lastRun.items_changed,candidatesFound:data.lastRun.items_seen,lastCompletedAt:data.lastRun.finished_at,lastStartedAt:data.lastRun.finished_at});
+     if(showNotice)setNotice("Refreshed "+String(data.count||0)+" grant records from the Cloudflare crawler. Eligibility remains unverified.");
+   }catch(err){console.error("Crawler result retrieval failed",err);if(showNotice)setError(err?.message||"Unable to load crawler results.");}
+   finally{setCrawlerResultsBusy(false);}
+ }
+ useEffect(()=>{loadCrawlerResults(false)},[]);
  useEffect(()=>onSnapshot(collection(db,"grantOpportunities"),snap=>{
    const next=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>dateMillis(b.createdAt)-dateMillis(a.createdAt));
    setRecords(next);setLoading(false);setError("");
