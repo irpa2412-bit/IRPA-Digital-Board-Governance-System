@@ -259,7 +259,7 @@ function assessFit(item) {
       : explicitTanzaniaEligibility
         ? "tanzania_mentioned"
         : "not_stated";
-  const rollingIntake = /\\b(?:rolling basis|rolling applications?|year[- ]round|open throughout the year|no fixed deadline|no application deadline)\\b/i.test(text);
+  const rollingIntake = /\b(?:rolling basis|rolling applications?|year[- ]round|open throughout the year|no fixed deadline|no application deadline)\b/i.test(text);
   const triageAssessment = ["closed", "expired"].includes(callStatus)
     ? "closed_do_not_prioritize"
     : geographyAssessment === "other_country_focus"
