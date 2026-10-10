@@ -20,7 +20,7 @@ const LANGUAGES = {
 };
 const SOURCE_LANGUAGES = {
   "en":"en","en-TZ":"en","en-US":"en","en-GB":"en","sw":"sw","sw-TZ":"sw","fr":"fr","fr-FR":"fr",
-  "es-ES":"es","pt-PT":"pt","ar-SA":"ar","hi-IN":"hi","zh-CN":"zh","maa":"maa"
+  "es":"es","es-ES":"es","pt":"pt","pt-PT":"pt","ar":"ar","ar-SA":"ar","hi":"hi","hi-IN":"hi","zh":"zh","zh-CN":"zh","de":"de","de-DE":"de","it":"it","it-IT":"it","ja":"ja","ja-JP":"ja","maa":"maa"
 };
 function json(data,status=200,origin="") {
   const headers={"content-type":"application/json; charset=utf-8","cache-control":"no-store","vary":"Origin"};
