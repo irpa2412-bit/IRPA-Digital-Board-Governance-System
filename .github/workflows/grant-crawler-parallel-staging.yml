@@ -15,7 +15,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: irpa-grant-crawler-staging
+  group: irpa-grant-crawler-staging-${{ github.event_name }}
   cancel-in-progress: true
 jobs:
   test:
