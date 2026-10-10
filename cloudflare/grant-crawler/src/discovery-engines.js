@@ -63,33 +63,43 @@ export function parseOfficialPage(html, pageUrl) {
 }
 export async function readOfficialPages(env) {
   const urls = configuredUrls(env.GRANT_SOURCE_PAGE_URLS_JSON || env.GRANT_SOURCE_PAGE_URLS, "GRANT_SOURCE_PAGE_URLS", MAX_SOURCE_PAGES);
-  const items = [], errors = [];
-  for (const sourceUrl of urls) {
+  const errors = [];
+  const sourceResults = await Promise.all(urls.map(async sourceUrl => {
     try {
-      const source = await fetchHtml(sourceUrl), anchors = getAnchors(source.html, source.finalUrl), seen = new Set();
-      for (const anchor of anchors) {
-        if (items.length >= MAX_SOURCE_PAGES * MAX_PAGE_LINKS || seen.has(anchor.url)) continue;
-        seen.add(anchor.url);
+      const source = await fetchHtml(sourceUrl);
+      const anchors = getAnchors(source.html, source.finalUrl).slice(0, MAX_PAGE_LINKS);
+      const results = await Promise.all(anchors.map(async anchor => {
         try {
-          const detail = await fetchHtml(anchor.url), parsed = parseOfficialPage(detail.html, detail.finalUrl);
-          const title = parsed.title || anchor.label, description = (parsed.description + " " + anchor.context).trim().slice(0, 5000);
-          if (!GRANT_TERMS.test(title + " " + description) && !/climate|pastoral|rangeland|livestock|conservation|community|women|youth|resilience|biodiversity|agriculture/i.test(title + " " + description)) continue;
-          items.push({ ...parsed, title, description, sourceUrl: source.finalUrl, discoveryEngine: "official_pages" });
-          if (seen.size >= MAX_PAGE_LINKS) break;
-        } catch (error) { errors.push({ sourceUrl: anchor.url, error: String(error.message || error).slice(0, 180) }); }
-      }
-    } catch (error) { errors.push({ sourceUrl, error: String(error.message || error).slice(0, 180) }); }
-  }
+          const detail = await fetchHtml(anchor.url);
+          const parsed = parseOfficialPage(detail.html, detail.finalUrl);
+          const title = parsed.title || anchor.label;
+          const description = (parsed.description + " " + anchor.context).trim().slice(0, 5000);
+          if (!GRANT_TERMS.test(title + " " + description) && !/climate|pastoral|rangeland|livestock|conservation|community|women|youth|resilience|biodiversity|agriculture/i.test(title + " " + description)) return null;
+          return { ...parsed, title, description, sourceUrl: source.finalUrl, discoveryEngine: "official_pages" };
+        } catch (error) {
+          errors.push({ sourceUrl: anchor.url, error: String(error.message || error).slice(0, 180) });
+          return null;
+        }
+      }));
+      return results.filter(Boolean);
+    } catch (error) {
+      errors.push({ sourceUrl, error: String(error.message || error).slice(0, 180) });
+      return [];
+    }
+  }));
+  const items = sourceResults.flat();
   return { items, stats: { configured: urls.length, scanned: urls.length, found: items.length, errors: errors.slice(0, 20) } };
 }
+
 const SEARCH_QUERIES = ['"grant call" Tanzania NGO climate pastoral livestock rangeland','"call for proposals" Africa NGO environment biodiversity restoration','foundation grants Tanzania civil society women youth livelihoods','embassy small grants Tanzania NGO community development'];
 export async function readWebSearch(env) {
   const apiKey = String(env.BRAVE_SEARCH_API_KEY || "").trim();
   if (!apiKey) return { items: [], stats: { configured: false, queries: 0, found: 0, errors: [], message: "BRAVE_SEARCH_API_KEY is not configured." } };
-  const items = [], errors = [];
-  for (const query of SEARCH_QUERIES) {
+  const results = await Promise.all(SEARCH_QUERIES.map(async query => {
+    const items = [];
     try {
-      const url = new URL("https://api.search.brave.com/res/v1/web/search"); url.searchParams.set("q", query); url.searchParams.set("count", "10"); url.searchParams.set("country", "ALL"); url.searchParams.set("search_lang", "en");
+      const url = new URL("https://api.search.brave.com/res/v1/web/search");
+      url.searchParams.set("q", query); url.searchParams.set("count", "10"); url.searchParams.set("country", "ALL"); url.searchParams.set("search_lang", "en");
       const response = await fetch(url.href, { headers: { "X-Subscription-Token": apiKey, accept: "application/json" }, signal: AbortSignal.timeout(12_000) });
       if (!response.ok) throw new Error("Search API HTTP " + response.status);
       const body = await response.json();
@@ -99,7 +109,12 @@ export async function readWebSearch(env) {
         if (!title || (!GRANT_TERMS.test(title + " " + description) && !/climate|pastoral|rangeland|livestock|conservation|community|women|youth|resilience|biodiversity|agriculture/i.test(title + " " + description))) continue;
         items.push({ title, description, url: resultUrl, publishedAt: result.page_age || null, sourceUrl: "https://search.brave.com/search?q=" + encodeURIComponent(query), discoveryEngine: "web_search" });
       }
-    } catch (error) { errors.push({ query, error: String(error.message || error).slice(0, 180) }); }
-  }
+      return { items, error: null };
+    } catch (error) {
+      return { items, error: { query, error: String(error.message || error).slice(0, 180) } };
+    }
+  }));
+  const errors = results.filter(result => result.error).map(result => result.error);
+  const items = results.flatMap(result => result.items);
   return { items, stats: { configured: true, queries: SEARCH_QUERIES.length, found: items.length, errors } };
 }
