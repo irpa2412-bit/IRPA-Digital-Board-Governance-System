@@ -62,6 +62,6 @@ test("document translation API rejects a user who is neither owner nor authorise
 });
 
 test("Maa output rejects unsupported source languages",async()=>{
-  const response=await invoke({body:{requestId:"request-1",content:"Merci beaucoup",sourceLanguage:"fr-FR",targetLanguage:"maa"}});
+  const response=await invoke({requestData:{...requestRecord,sourceLanguage:"AUTO"},body:{requestId:"request-1",content:"Merci beaucoup",sourceLanguage:"fr-FR",targetLanguage:"maa"}});
   assert.equal(response.status,400);
 });
