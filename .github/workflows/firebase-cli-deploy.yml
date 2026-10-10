@@ -27,10 +27,34 @@ jobs:
           VITE_GOOGLE_DRIVE_GATEWAY_URL: ${{ secrets.VITE_GOOGLE_DRIVE_GATEWAY_URL }}
           VITE_GATEWAY_ORIGIN: ${{ secrets.VITE_GATEWAY_ORIGIN || 'https://irpa-google-drive-gateway.irpa-governance.workers.dev' }}
           VITE_GOOGLE_WEATHER_API_KEY: ${{ secrets.VITE_GOOGLE_WEATHER_API_KEY }}
+          VITE_GRANT_CRAWLER_WORKER_URL: ${{ secrets.VITE_GRANT_CRAWLER_WORKER_URL }}
         run: npm run build
 
       - name: Independent production readability verification
         run: npm run verify:production-readability
+      - name: Require Cloudflare migration secrets before production cutover
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_FIRESTORE_SA: ${{ secrets.CLOUDFLARE_FIREBASE_SERVICE_ACCOUNT_JSON }}
+          CRAWLER_URL: ${{ secrets.VITE_GRANT_CRAWLER_WORKER_URL }}
+        run: |
+          test -n "$CF_TOKEN" || { echo "::error::CLOUDFLARE_API_TOKEN is required before production cutover."; exit 1; }
+          test -n "$CF_ACCOUNT" || { echo "::error::CLOUDFLARE_ACCOUNT_ID is required before production cutover."; exit 1; }
+          test -n "$CF_FIRESTORE_SA" || { echo "::error::CLOUDFLARE_FIREBASE_SERVICE_ACCOUNT_JSON is required before production cutover."; exit 1; }
+          test -n "$CRAWLER_URL" || { echo "::error::VITE_GRANT_CRAWLER_WORKER_URL is required before production cutover."; exit 1; }
+          node -e 'const s=JSON.parse(process.env.CF_FIRESTORE_SA); if(!s.client_email||!s.private_key||!s.project_id)process.exit(1); if(s.project_id!=="irpa-digital-board-governance")process.exit(2);'
+      - name: Deploy grant crawler to Cloudflare Workers
+        working-directory: cloudflare/grant-crawler
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.CLOUDFLARE_FIREBASE_SERVICE_ACCOUNT_JSON }}
+          CRAWLER_URL: ${{ secrets.VITE_GRANT_CRAWLER_WORKER_URL }}
+        run: |
+          npx --yes wrangler deploy
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" | npx --yes wrangler secret put FIREBASE_SERVICE_ACCOUNT_JSON
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 --max-time 20 "${CRAWLER_URL%/}/health"
       - name: Configure Firebase CLI authentication
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
@@ -41,10 +65,6 @@ jobs:
           echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-service-account.json" >> "$GITHUB_ENV"
       - name: Deploy Hosting and Firestore using Firebase CLI (no Docker action)
         run: npx --yes firebase-tools deploy --project irpa-digital-board-governance --only hosting,firestore --non-interactive
-      - name: Install Cloud Functions dependencies
-        run: npm --prefix functions install --omit=dev
-      - name: Deploy scheduled multi-donor grant crawler and manual scan callable
-        run: npx --yes firebase-tools deploy --project irpa-digital-board-governance --only functions:runGrantCrawlerScheduled,functions:runGrantCrawlerNow --non-interactive
       - name: Deploy multilingual transcript translation callable
         id: translation
         continue-on-error: true
