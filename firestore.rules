@@ -265,7 +265,7 @@ service cloud.firestore {
       &&get(/databases/$(database)/documents/documents/$(request.resource.data.documentId)).data.get("fileId","")==request.resource.data.get("documentFileId","")
       &&get(/databases/$(database)/documents/documents/$(request.resource.data.documentId)).data.get("classification","Internal")==request.resource.data.get("documentClassification","Internal")
       &&get(/databases/$(database)/documents/documents/$(request.resource.data.documentId)).data.get("sha256","")==request.resource.data.get("documentSha256","")
-      &&request.resource.data.get("targetLanguage","") in ["sw","en","maa","fr","es","pt","ar"]
+      &&request.resource.data.get("targetLanguage","") in ["sw","en","maa","fr","es","pt","ar","hi","zh","de","it","ja"]
       &&request.resource.data.get("status","")=="REQUESTED"
       &&request.resource.data.get("humanReviewRequired",false)==true
       &&request.resource.data.get("contentTransferAuthorized",true)==false
