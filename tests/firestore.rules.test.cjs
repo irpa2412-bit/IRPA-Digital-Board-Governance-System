@@ -466,7 +466,7 @@ test("Maa translation cannot be completed without an identified speaker review",
   await testEnv.withSecurityRulesDisabled(async context => {
     await context.firestore().doc("documents/LIFE-test-1").set(lifecycleDocument());
     await context.firestore().doc("documentTranslationRequests/translation-test-3").set(translationRequest({
-      status:"IN_REVIEW",contentTransferred:true,translationDraftText:"Ashe. Enkare is sidai."
+      status:"IN_REVIEW",contentTransferAuthorized:true,contentTransferred:true,translationDraftText:"Ashe. Enkare is sidai."
     }));
   });
   const reviewerDb = testEnv.authenticatedContext("reviewer-user", {email:"reviewer@example.test"}).firestore();
