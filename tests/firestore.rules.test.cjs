@@ -31,6 +31,12 @@ beforeEach(async () => {
       status: "Active",
       role: "Board Member"
     });
+    await db.doc("members/reviewer-user").set({
+      uid: "reviewer-user",
+      email: "reviewer@example.test",
+      status: "Active",
+      role: "Director Outreach"
+    });
     await db.doc("members/finance-user").set({
       uid: "finance-user",
       email: "finance@example.test",
@@ -391,4 +397,167 @@ test("controlled documents retain uploader and authorization restrictions", asyn
   await assertFails(db.doc("documents/missing-authorization").set({
     ...valid, uploadedByUid: "member-user", authorizedUids: []
   }));
+});
+
+
+function translationRequest(overrides = {}) {
+  return {
+    requestType: "DOCUMENT_TRANSLATION",
+    documentId: "LIFE-test-1",
+    documentReference: "IRPA-DOC-2026-TEST0001",
+    documentTitle: "Controlled test document",
+    documentFileId: "drive-file-1",
+    documentFileName: "test.txt",
+    documentContentType: "text/plain",
+    documentSha256: "a".repeat(64),
+    documentOwnerUid: "member-user",
+    requestedByUid: "member-user",
+    sourceLanguage: "en",
+    targetLanguage: "maa",
+    targetLanguageLabel: "Maa (dictionary-assisted; human review)",
+    requestNotes: "Non-confidential translation smoke test",
+    documentClassification: "Internal",
+    documentStage: "WORKING",
+    status: "REQUESTED",
+    dictionaryAssistRequested: true,
+    humanReviewRequired: true,
+    contentTransferAuthorized: false,
+    restrictedTransferAuthorized: false,
+    contentTransferred: false,
+    requestOrigin: "Documents Portal",
+    createdAt: "2026-10-10T06:00:00.000Z",
+    updatedAt: "2026-10-10T06:00:00.000Z",
+    ...overrides
+  };
+}
+
+test("document owner can submit and retrieve their own translation request status", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("documents/LIFE-test-1").set(lifecycleDocument());
+  });
+  const ownerDb = testEnv.authenticatedContext("member-user", {email:"member@example.test"}).firestore();
+  await assertSucceeds(ownerDb.doc("documentTranslationRequests/translation-test-1").set(translationRequest()));
+  const snapshot = await assertSucceeds(ownerDb.doc("documentTranslationRequests/translation-test-1").get());
+  assert.equal(snapshot.data().status, "REQUESTED");
+  const unrelatedDb = testEnv.authenticatedContext("finance-user", {email:"finance@example.test"}).firestore();
+  await assertFails(unrelatedDb.doc("documentTranslationRequests/translation-test-1").get());
+});
+
+test("document owner can request translation into every supported target language", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("documents/LIFE-test-1").set(lifecycleDocument());
+  });
+  const db=testEnv.authenticatedContext("member-user",{email:"member@example.test"}).firestore();
+  const targets=["en","sw","maa","fr","es","pt","ar","hi","zh","de","it","ja"];
+  for(const targetLanguage of targets){
+    await assertSucceeds(db.doc("documentTranslationRequests/language-"+targetLanguage).set(translationRequest({
+      targetLanguage,targetLanguageLabel:targetLanguage,requestNotes:"Cross-language coverage test"
+    })));
+  }
+});
+
+test("document owner can explicitly transfer content and save a translation draft but cannot approve it", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("documents/LIFE-test-1").set(lifecycleDocument());
+    await context.firestore().doc("documentTranslationRequests/translation-test-2").set(translationRequest());
+  });
+  const ownerDb = testEnv.authenticatedContext("member-user", {email:"member@example.test"}).firestore();
+  await assertSucceeds(ownerDb.doc("documentTranslationRequests/translation-test-2").update({
+    status:"IN_REVIEW",contentTransferAuthorized:true,contentTransferred:true,translationStartedAt:"2026-10-10T06:05:00.000Z",
+    sourceLanguageResolved:"en-TZ",translationDraftText:"Ashe. Enkare is sidai.",
+    translationProvider:"IRPA Maa Dictionary · provisional glossary",sourceTextSha256:"b".repeat(64),
+    extractedCharacterCount:35,translationChunks:1,translationCoverage:"partial",dictionaryMatchedTerms:3,
+    updatedAt:"2026-10-10T06:05:00.000Z"
+  }));
+  await assertFails(ownerDb.doc("documentTranslationRequests/translation-test-2").update({
+    status:"COMPLETED",translatedText:"Ashe. Enkare is sidai.",
+    translationReviewedByUid:"member-user",reviewNotes:"Approved",completedAt:"2026-10-10T06:06:00.000Z",
+    updatedAt:"2026-10-10T06:06:00.000Z"
+  }));
+});
+
+test("Confidential document owner cannot transfer content directly without reviewer authority", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("documents/LIFE-test-1").set(lifecycleDocument({classification:"Confidential",accessPolicy:"CONTROLLED"}));
+    await context.firestore().doc("documentTranslationRequests/translation-sensitive").set(translationRequest({documentClassification:"Confidential"}));
+  });
+  const ownerDb=testEnv.authenticatedContext("member-user",{email:"member@example.test"}).firestore();
+  await assertFails(ownerDb.doc("documentTranslationRequests/translation-sensitive").update({
+    status:"IN_REVIEW",contentTransferAuthorized:true,contentTransferred:false,
+    translationStartedAt:"2026-10-10T06:08:00.000Z",updatedAt:"2026-10-10T06:08:00.000Z"
+  }));
+});
+
+test("Maa translation cannot be completed without an identified speaker review", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("documents/LIFE-test-1").set(lifecycleDocument());
+    await context.firestore().doc("documentTranslationRequests/translation-test-3").set(translationRequest({
+      status:"IN_REVIEW",contentTransferAuthorized:true,contentTransferred:true,translationDraftText:"Ashe. Enkare is sidai."
+    }));
+  });
+  const reviewerDb = testEnv.authenticatedContext("reviewer-user", {email:"reviewer@example.test"}).firestore();
+  await assertFails(reviewerDb.doc("documentTranslationRequests/translation-test-3").update({
+    status:"COMPLETED",translatedText:"Ashe. Enkare is sidai.",translationDraftText:"",
+    translationReviewedByUid:"reviewer-user",reviewNotes:"Reviewed",translationReviewedAt:"2026-10-10T06:10:00.000Z",
+    completedAt:"2026-10-10T06:10:00.000Z",updatedAt:"2026-10-10T06:10:00.000Z"
+  }));
+  await assertSucceeds(reviewerDb.doc("documentTranslationRequests/translation-test-3").update({
+    status:"COMPLETED",translatedText:"Ashe. Enkare is sidai.",translationDraftText:"",
+    translationReviewedByUid:"reviewer-user",reviewNotes:"Reviewed with local speaker; corrected spelling and usage.",
+    maaSpeakerReview:{speakerName:"Test Maa Speaker",dialect:"Kisonko / Ilkisonko",reviewNotes:"Checked spelling and usage.",verifiedByUid:"reviewer-user",verifiedAt:"2026-10-10T06:10:00.000Z"},
+    translationReviewedAt:"2026-10-10T06:10:00.000Z",
+    completedAt:"2026-10-10T06:10:00.000Z",updatedAt:"2026-10-10T06:10:00.000Z"
+  }));
+  await testEnv.withSecurityRulesDisabled(async context=>{
+    await context.firestore().doc("documents/LIFE-translation-output").set(lifecycleDocument({documentId:"LIFE-translation-output",reference:"IRPA-DOC-2026-TRANSLATED",fileName:"IRPA-Translation-TEST-MAA.txt",fileId:"drive-translation-file",ownerUid:"member-user",uploadedByUid:"member-user",authorizedUids:["member-user"]}));
+  });
+  const ownerDb=testEnv.authenticatedContext("member-user",{email:"member@example.test"}).firestore();
+  await assertSucceeds(ownerDb.doc("documentTranslationRequests/translation-test-3").update({translatedFileId:"drive-translation-file",translatedDocumentId:"LIFE-translation-output",translationOutputFileName:"IRPA-Translation-TEST-MAA.txt",updatedAt:"2026-10-10T06:11:00.000Z"}));
+});
+
+
+test("translation derivative can be created by source owner with exactly inherited access controls", async () => {
+  const source=lifecycleDocument({
+    classification:"Confidential",accessPolicy:"CONTROLLED",archiveCategory:"Governance Documents",
+    documentType:"Governance",authorizedUids:["member-user","board-member-2"],
+    authorizedRoles:["Board Member","Executive Director"],authorizedDepartments:["Governance","Board Secretariat"]
+  });
+  await testEnv.withSecurityRulesDisabled(async context=>{
+    await context.firestore().doc("documents/LIFE-source-governance").set({...source,documentId:"LIFE-source-governance",ownerUid:"member-user",uploadedByUid:"member-user"});
+  });
+  const ownerDb=testEnv.authenticatedContext("member-user",{email:"member@example.test"}).firestore();
+  const derivative=lifecycleDocument({
+    documentId:"LIFE-translated-governance",reference:"IRPA-DOC-2026-TRANSLATED01",
+    title:"Translated governance document",fileName:"translated.txt",fileId:"drive-translated-file",
+    ownerUid:"member-user",uploadedByUid:"member-user",ownerType:"MEMBER",
+    classification:"Confidential",accessPolicy:"CONTROLLED",archiveCategory:"Governance Documents",
+    documentType:"Governance",authorizedUids:["member-user","board-member-2"],
+    authorizedRoles:["Board Member","Executive Director"],authorizedDepartments:["Governance","Board Secretariat"],
+    parentDocumentId:"LIFE-source-governance",translationDerivative:true,
+    inheritedAccessFromDocumentId:"LIFE-source-governance"
+  });
+  await assertSucceeds(ownerDb.doc("documents/LIFE-translated-governance").set(derivative));
+});
+
+test("translation derivative creation is denied if access is broader than the source", async () => {
+  const source=lifecycleDocument({
+    classification:"Confidential",accessPolicy:"CONTROLLED",archiveCategory:"Governance Documents",
+    documentType:"Governance",authorizedUids:["member-user"],
+    authorizedRoles:["Board Secretary"],authorizedDepartments:["Governance"]
+  });
+  await testEnv.withSecurityRulesDisabled(async context=>{
+    await context.firestore().doc("documents/LIFE-source-restricted").set({...source,documentId:"LIFE-source-restricted",ownerUid:"member-user",uploadedByUid:"member-user"});
+  });
+  const ownerDb=testEnv.authenticatedContext("member-user",{email:"member@example.test"}).firestore();
+  const derivative=lifecycleDocument({
+    documentId:"LIFE-translated-broader",reference:"IRPA-DOC-2026-TRANSLATED02",
+    title:"Translated governance document",fileName:"translated.txt",fileId:"drive-translated-file-2",
+    ownerUid:"member-user",uploadedByUid:"member-user",ownerType:"MEMBER",
+    classification:"Internal",accessPolicy:"IRPA_INTERNAL",archiveCategory:"Administrative Documents",
+    documentType:"Other",authorizedUids:["member-user","finance-user"],
+    authorizedRoles:["Board Secretary","Finance Manager"],authorizedDepartments:["Governance","Finance"],
+    parentDocumentId:"LIFE-source-restricted",translationDerivative:true,
+    inheritedAccessFromDocumentId:"LIFE-source-restricted"
+  });
+  await assertFails(ownerDb.doc("documents/LIFE-translated-broader").set(derivative));
 });

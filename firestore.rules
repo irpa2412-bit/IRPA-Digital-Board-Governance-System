@@ -164,7 +164,7 @@ service cloud.firestore {
   function documentLifecycleClassificationAllowed(d){return d.get("classification","") in ["Public","Internal","Confidential"]||(d.get("classification","")=="Restricted"&&(admin()||anyInstitutionalRole(["RESTRICTED_DOCUMENT_UPLOAD"])));}
   function documentLifecycleCreateAllowed(documentId){
     let d=request.resource.data;
-    return documentLifecycleIdentity()&&d.get("documentId","")==documentId&&
+    return d.get("translationDerivative",false)!=true&&documentLifecycleIdentity()&&d.get("documentId","")==documentId&&
       d.get("ownerUid","")==request.auth.uid&&d.get("uploadedByUid","")==request.auth.uid&&
       d.get("ownerType","") in ["ADMINISTRATOR","EMPLOYEE","MEMBER"]&&
       d.get("status","")=="WORKING"&&d.get("authorizationStatus","")=="AUTHORIZED"&&
@@ -216,7 +216,42 @@ service cloud.firestore {
         (documentLifecycleWorkflowAuthority(resource.data)&&documentLifecycleTransitionUpdateAllowed(id))
       );
   }
-  match /documents/{id}{allow read:if admin()||controlledDocumentReadAllowed();allow create:if admin()||controlledDocumentCreateAllowed()||documentLifecycleCreateAllowed(id);allow delete:if admin();allow update:if admin()||signatureDocumentWorkflowUpdate()||documentLifecycleUpdateAllowed();}
+  function documentLifecycleDerivativeCreateAllowed(documentId){
+    let d=request.resource.data;
+    let sourceId=d.get("parentDocumentId","");
+    let sourcePath=/databases/$(database)/documents/documents/$(sourceId);
+    let source=get(sourcePath);
+    return documentLifecycleIdentity()&&
+      d.get("translationDerivative",false)==true&&
+      sourceId is string&&sourceId.size()>0&&exists(sourcePath)&&
+      source.data.get("documentId","")==sourceId&&
+      source.data.get("ownerUid","")==request.auth.uid&&
+      d.get("documentId","")==documentId&&
+      d.get("ownerUid","")==request.auth.uid&&
+      d.get("uploadedByUid","")==request.auth.uid&&
+      d.get("ownerType","")==source.data.get("ownerType","")&&
+      d.get("department","")==source.data.get("department","")&&
+      d.get("unit","")==source.data.get("unit","")&&
+      d.get("classification","")==source.data.get("classification","")&&
+      d.get("accessPolicy","")==source.data.get("accessPolicy","")&&
+      d.get("archiveCategory","")==source.data.get("archiveCategory","")&&
+      d.get("documentType","")==source.data.get("documentType","")&&
+      d.get("authorizedUids",[])==source.data.get("authorizedUids",[])&&
+      d.get("authorizedRoles",[])==source.data.get("authorizedRoles",[])&&
+      d.get("authorizedDepartments",[])==source.data.get("authorizedDepartments",[])&&
+      d.get("status","")=="WORKING"&&
+      d.get("authorizationStatus","")=="AUTHORIZED"&&
+      d.get("signatureStatus","")=="NOT_SENT"&&
+      d.get("postSignatureStatus","")=="NOT_STARTED"&&
+      d.get("finalArchiveStatus","")=="NOT_ARCHIVED"&&
+      d.get("fileId","") is string&&d.get("fileId","").size()>0&&
+      d.get("fileName","") is string&&d.get("fileName","").size()>0&&
+      d.get("sha256","") is string&&d.get("sha256","").matches("^[a-f0-9]{64}$")&&
+      d.get("authorizedUids",[]) is list&&d.get("authorizedUids",[]).hasAll([request.auth.uid])&&
+      d.get("recordOrigin","PRODUCTION")==source.data.get("recordOrigin","PRODUCTION")&&
+      d.get("recordOrigin","PRODUCTION") in ["PRODUCTION","TRIAL"];
+  }
+  match /documents/{id}{allow read:if admin()||controlledDocumentReadAllowed();allow create:if admin()||controlledDocumentCreateAllowed()||documentLifecycleCreateAllowed(id)||documentLifecycleDerivativeCreateAllowed(id);allow delete:if admin();allow update:if admin()||signatureDocumentWorkflowUpdate()||documentLifecycleUpdateAllowed();}
   match /documentTranslationRequests/{id}{
     function translationReviewer(){return admin()||anyInstitutionalRole(["Executive Director","Director Outreach","Director Community Development","Director Research","Research Director","Research Officer","Director Human Resources","HR Director"]);}
     allow create:if signedIn()
@@ -225,18 +260,58 @@ service cloud.firestore {
       &&request.resource.data.get("documentOwnerUid","")==request.auth.uid
       &&request.resource.data.get("documentId","") is string
       &&request.resource.data.get("documentId","")!=""
-      &&request.resource.data.get("targetLanguage","") in ["sw","en","maa","fr","es","pt","ar"]
+      &&exists(/databases/$(database)/documents/documents/$(request.resource.data.documentId))
+      &&get(/databases/$(database)/documents/documents/$(request.resource.data.documentId)).data.get("ownerUid","")==request.auth.uid
+      &&get(/databases/$(database)/documents/documents/$(request.resource.data.documentId)).data.get("fileId","")==request.resource.data.get("documentFileId","")
+      &&get(/databases/$(database)/documents/documents/$(request.resource.data.documentId)).data.get("classification","Internal")==request.resource.data.get("documentClassification","Internal")
+      &&get(/databases/$(database)/documents/documents/$(request.resource.data.documentId)).data.get("sha256","")==request.resource.data.get("documentSha256","")
+      &&request.resource.data.get("targetLanguage","") in ["sw","en","maa","fr","es","pt","ar","hi","zh","de","it","ja"]
       &&request.resource.data.get("status","")=="REQUESTED"
       &&request.resource.data.get("humanReviewRequired",false)==true
+      &&request.resource.data.get("contentTransferAuthorized",true)==false
+      &&request.resource.data.get("restrictedTransferAuthorized",true)==false
       &&request.resource.data.get("contentTransferred",true)==false
-      &&request.resource.data.keys().hasOnly(["requestType","documentId","documentReference","documentTitle","documentOwnerUid","requestedByUid","sourceLanguage","targetLanguage","targetLanguageLabel","requestNotes","documentClassification","documentStage","status","dictionaryAssistRequested","humanReviewRequired","contentTransferred","requestOrigin","createdAt","updatedAt"]);
+      &&request.resource.data.get("documentFileId","") is string&&request.resource.data.get("documentFileId","")!=""&&request.resource.data.get("documentFileName","") is string&&request.resource.data.get("documentContentType","") is string&&request.resource.data.get("documentSha256","") is string&&request.resource.data.keys().hasOnly(["requestType","documentId","documentReference","documentTitle","documentFileId","documentFileName","documentContentType","documentSha256","documentOwnerUid","requestedByUid","sourceLanguage","targetLanguage","targetLanguageLabel","requestNotes","documentClassification","documentArchiveCategory","documentStage","status","dictionaryAssistRequested","humanReviewRequired","contentTransferAuthorized","restrictedTransferAuthorized","contentTransferred","requestOrigin","createdAt","updatedAt"]);
     allow read:if admin()||resource.data.get("documentOwnerUid","")==request.auth.uid||translationReviewer();
-    allow update:if translationReviewer()
+    allow update:if (
+      signedIn()
+      &&resource.data.get("documentOwnerUid","")==request.auth.uid
+      &&resource.data.get("requestedByUid","")==request.auth.uid
+      &&resource.data.get("status","") in ["REQUESTED","IN_REVIEW"]
+      &&(resource.data.get("documentClassification","Internal") in ["Public","Internal"]||translationReviewer())
+      &&request.resource.data.get("status","")=="IN_REVIEW"
+      &&request.resource.data.get("contentTransferAuthorized",false)==true
+      &&(resource.data.get("documentClassification","Internal") in ["Public","Internal"]||request.resource.data.get("restrictedTransferAuthorized",false)==true)
+      &&request.resource.data.get("documentOwnerUid","")==resource.data.get("documentOwnerUid","")
+      &&request.resource.data.get("requestedByUid","")==resource.data.get("requestedByUid","")
+      &&request.resource.data.get("documentId","")==resource.data.get("documentId","")
+      &&request.resource.data.get("targetLanguage","")==resource.data.get("targetLanguage","")
+      &&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","contentTransferAuthorized","restrictedTransferAuthorized","contentTransferred","translationStartedAt","sourceLanguageResolved","processingError","translationFailedAt","translationDraftText","translationProvider","sourceTextSha256","extractedCharacterCount","translationChunks","translationCoverage","dictionaryMatchedTerms","updatedAt"])
+      &&(request.resource.data.get("translationDraftText","") is string&&request.resource.data.get("translationDraftText","").size()<=450000||!request.resource.data.keys().hasAny(["translationDraftText"]))
+    ) || (
+      signedIn()
+      &&resource.data.get("documentOwnerUid","")==request.auth.uid
+      &&resource.data.get("status","")=="COMPLETED"
+      &&request.resource.data.get("status","")=="COMPLETED"
+      &&request.resource.data.get("translatedFileId","") is string
+      &&request.resource.data.get("translatedFileId","")!=""
+      &&request.resource.data.get("translatedDocumentId","") is string
+      &&request.resource.data.get("translatedDocumentId","")!=""
+      &&exists(/databases/$(database)/documents/documents/$(request.resource.data.translatedDocumentId))
+      &&get(/databases/$(database)/documents/documents/$(request.resource.data.translatedDocumentId)).data.get("ownerUid","")==request.auth.uid
+      &&get(/databases/$(database)/documents/documents/$(request.resource.data.translatedDocumentId)).data.get("fileId","")==request.resource.data.get("translatedFileId","")
+      &&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["translatedFileId","translatedDocumentId","translationOutputFileName","updatedAt"])
+    ) || (translationReviewer()
       &&request.resource.data.get("documentOwnerUid","")==resource.data.get("documentOwnerUid","")
       &&request.resource.data.get("documentId","")==resource.data.get("documentId","")
       &&request.resource.data.get("requestedByUid","")==resource.data.get("requestedByUid","")
+      &&request.resource.data.get("targetLanguage","")==resource.data.get("targetLanguage","")
+      &&request.resource.data.get("sourceLanguage","")==resource.data.get("sourceLanguage","")
       &&request.resource.data.get("status","") in ["REQUESTED","IN_REVIEW","COMPLETED","REJECTED"]
-      &&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","assignedToUid","reviewNotes","translatedFileId","completedAt","updatedAt"]);
+      &&(request.resource.data.get("status","")!="COMPLETED"||(request.resource.data.get("translationReviewedByUid","")==request.auth.uid&&request.resource.data.get("contentTransferAuthorized",false)==true&&request.resource.data.get("contentTransferred",false)==true&&request.resource.data.get("translatedText","") is string&&request.resource.data.get("translatedText","")!=""&&request.resource.data.get("reviewNotes","") is string&&request.resource.data.get("reviewNotes","")!=""&&(resource.data.get("targetLanguage","")!="maa"||(request.resource.data.get("maaSpeakerReview",{}) is map&&request.resource.data.get("maaSpeakerReview",{}).get("speakerName","") is string&&request.resource.data.get("maaSpeakerReview",{}).get("speakerName","")!=""&&request.resource.data.get("maaSpeakerReview",{}).get("dialect","") is string&&request.resource.data.get("maaSpeakerReview",{}).get("dialect","")!=""))))
+      &&(request.resource.data.get("translationDraftText","") is string&&request.resource.data.get("translationDraftText","").size()<=450000||!request.resource.data.keys().hasAny(["translationDraftText"]))
+      &&(request.resource.data.get("translatedText","") is string&&request.resource.data.get("translatedText","").size()<=450000||!request.resource.data.keys().hasAny(["translatedText"]))
+      &&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","assignedToUid","reviewNotes","translatedFileId","translatedDocumentId","completedAt","updatedAt","contentTransferAuthorized","restrictedTransferAuthorized","contentTransferred","translationStartedAt","translationDraftText","translationProvider","sourceTextSha256","extractedCharacterCount","translationChunks","translationCoverage","dictionaryMatchedTerms","sourceLanguageResolved","processingError","translationFailedAt","translatedText","translationReviewedByUid","translationReviewedAt","maaSpeakerReview","translationOutputFileName"]));
     allow delete:if admin();
   }
   match /researchInstruments/{id}{allow read:if admin()||researchToolAllowed("Research Data Collection",resource.data.get("studyId",""),request.auth.uid);allow create:if researchToolAllowed("Research Data Collection",request.resource.data.get("studyId",""),request.auth.uid)&&request.resource.data.recordType=="Research Data Collection Instrument"&&request.resource.data.recordOrigin=="PRODUCTION";allow update:if admin()||researchToolAllowed("Survey Instrument",resource.data.get("studyId",""),request.auth.uid);allow delete:if admin();}

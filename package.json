@@ -27,7 +27,8 @@
     "pptx-viewer": "^0.2.2",
     "dompurify": "^3.3.0",
     "@turf/turf": "^7.2.0",
-    "jstat": "^1.9.6"
+    "jstat": "^1.9.6",
+    "jszip": "^3.10.2"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^5.0.2",

@@ -179,10 +179,25 @@ export function createDocumentLifecycleRouter(deps) {
       if(!bytes.length)return deps.json({ok:false,error:"Document content is required."},400,deps.corsHeaders(request));
       if(bytes.length>MAX_BYTES)return deps.json({ok:false,error:"Documents must not exceed 10 MB."},400,deps.corsHeaders(request));
       if(!deps.allowedContentTypes.has(contentType))return deps.json({ok:false,error:"The selected file format is not supported."},400,deps.corsHeaders(request));
-      const policy=canUpload(identity,{...data,contentType});
-if(!policy.allowed)return deps.json({ok:false,error:policy.reason},403,deps.corsHeaders(request));
-      const classification=clean(data.classification||"Internal");const category=clean(data.archiveCategory||"Administrative Documents");
+      const parentDocumentId=cleanId(data.parentDocumentId);
+      let parentDocument=null;
+      let policy={allowed:false,reason:"Document upload policy could not be verified."};
+      if(parentDocumentId){
+        parentDocument=await getPlainDocument(deps,env,claims,parentDocumentId);
+        if(!parentDocument)return deps.json({ok:false,error:"The source document for this derivative was not found."},404,deps.corsHeaders(request));
+        if(clean(parentDocument.ownerUid)!==clean(identity.uid))return deps.json({ok:false,error:"Only the original document owner may create a translated derivative through this request."},403,deps.corsHeaders(request));
+        const sourceAccess=canRead(identity,parentDocument);
+        if(!sourceAccess.allowed)return deps.json({ok:false,error:"Access to the source document is required to create a translated derivative."},403,deps.corsHeaders(request));
+        if(!CLASSIFICATIONS.has(clean(parentDocument.classification||"Internal"))||!ARCHIVE_CATEGORIES.has(clean(parentDocument.archiveCategory)))return deps.json({ok:false,error:"The source document has invalid access metadata; correct it before creating a translation."},409,deps.corsHeaders(request));
+        policy={allowed:true};
+      }else{
+        policy=canUpload(identity,{...data,contentType});
+        if(!policy.allowed)return deps.json({ok:false,error:policy.reason},403,deps.corsHeaders(request));
+      }
+      const classification=clean(parentDocument?.classification||data.classification||"Internal");
+      const category=clean(parentDocument?.archiveCategory||data.archiveCategory||"Administrative Documents");
       if(!CLASSIFICATIONS.has(classification)||!ARCHIVE_CATEGORIES.has(category))return deps.json({ok:false,error:"Invalid document archive classification or category."},400,deps.corsHeaders(request));
+      if(parentDocument&&((clean(data.classification)&&clean(data.classification)!==classification)||(clean(data.archiveCategory)&&clean(data.archiveCategory)!==category)))return deps.json({ok:false,error:"A translated derivative must retain the source document's classification and archive category."},403,deps.corsHeaders(request));
       const documentId="LIFE-"+crypto.randomUUID().replace(/-/g,"").slice(0,24);
       const reference="IRPA-DOC-"+new Date().getUTCFullYear()+"-"+documentId.slice(-8).toUpperCase();
       const hash=await sha256(bytes);
@@ -190,9 +205,23 @@ if(!policy.allowed)return deps.json({ok:false,error:policy.reason},403,deps.cors
       const archive=await ensureLifecycleArchive(deps,env,accessToken,{category,classification,stage:"WORKING",documentId,title:clean(data.title||fileName),reference});
       let uploaded=null;
       try {
-        uploaded=await uploadToDrive(deps,env,accessToken,{folderId:archive.folderId,fileName,contentType,bytes,description:{irpaGovernance:true,irpaDocumentLifecycle:true,documentId,reference,stage:"WORKING",ownerUid:claims.user_id,classification,archiveCategory:category,sha256:hash}});
-        const record=buildDocumentRecord(identity,{...data,reference,classification,archiveCategory:category},{documentId,fileId:uploaded.id,fileName,fileSize:bytes.length,sha256:hash,archivePath:archive.archivePath});
-        record.archiveFolderId=archive.folderId;record.archiveUidLink="https://drive.google.com/drive/folders/"+encodeURIComponent(archive.folderId);record.archiveFileWebViewLink=uploaded.webViewLink||null;record.webViewLink=uploaded.webViewLink||null;record.fileUrl=uploaded.id?"drive://"+uploaded.id:null;record.recordOrigin=String(data.recordOrigin||"PRODUCTION").toUpperCase()==="TRIAL"?"TRIAL":"PRODUCTION";
+        uploaded=await uploadToDrive(deps,env,accessToken,{folderId:archive.folderId,fileName,contentType,bytes,description:{irpaGovernance:true,irpaDocumentLifecycle:true,documentId,reference,stage:"WORKING",ownerUid:parentDocument?.ownerUid||claims.user_id,classification,archiveCategory:category,accessPolicy:parentDocument?.accessPolicy||(classification==="Public"?"PUBLIC":classification==="Internal"?"IRPA_INTERNAL":"CONTROLLED"),authorizedUids:parentDocument?.authorizedUids||[claims.user_id],authorizedRoles:parentDocument?.authorizedRoles||[],authorizedDepartments:parentDocument?.authorizedDepartments||[],parentDocumentId:parentDocument?.documentId||null,translationDerivative:Boolean(parentDocument),sha256:hash}});
+        const record=buildDocumentRecord(identity,{...data,reference,classification,archiveCategory:category,documentType:parentDocument?.documentType||data.documentType,authorizedRoles:parentDocument?.authorizedRoles||data.authorizedRoles,authorizedDepartments:parentDocument?.authorizedDepartments||data.authorizedDepartments,parentDocumentId:parentDocument?.documentId||data.parentDocumentId},{documentId,fileId:uploaded.id,fileName,fileSize:bytes.length,sha256:hash,archivePath:archive.archivePath});
+        if(parentDocument){
+          record.ownerUid=parentDocument.ownerUid;
+          record.ownerType=parentDocument.ownerType||record.ownerType;
+          record.department=parentDocument.department||record.department;
+          record.unit=parentDocument.unit||record.unit;
+          record.accessPolicy=parentDocument.accessPolicy||(classification==="Public"?"PUBLIC":classification==="Internal"?"IRPA_INTERNAL":"CONTROLLED");
+          record.authorizedUids=Array.isArray(parentDocument.authorizedUids)?parentDocument.authorizedUids:[parentDocument.ownerUid];
+          record.authorizedRoles=Array.isArray(parentDocument.authorizedRoles)?parentDocument.authorizedRoles:[];
+          record.authorizedDepartments=Array.isArray(parentDocument.authorizedDepartments)?parentDocument.authorizedDepartments:[];
+          record.parentDocumentId=parentDocument.documentId;
+          record.sourceDocumentReference=parentDocument.reference||null;
+          record.translationDerivative=true;
+          record.inheritedAccessFromDocumentId=parentDocument.documentId;
+        }
+        record.archiveFolderId=archive.folderId;record.archiveUidLink="https://drive.google.com/drive/folders/"+encodeURIComponent(archive.folderId);record.archiveFileWebViewLink=uploaded.webViewLink||null;record.webViewLink=uploaded.webViewLink||null;record.fileUrl=uploaded.id?"drive://"+uploaded.id:null;record.recordOrigin=String(parentDocument?.recordOrigin||data.recordOrigin||"PRODUCTION").toUpperCase()==="TRIAL"?"TRIAL":"PRODUCTION";
         await commitDocumentAndAudit(deps,env,claims,documentId,record,"UPLOADED",{reference,classification,archiveCategory:category,sha256:hash},{createOnly:true});
       } catch(error) {
         let rollbackStatus=uploaded?.id?"PENDING":"NOT_REQUIRED";
