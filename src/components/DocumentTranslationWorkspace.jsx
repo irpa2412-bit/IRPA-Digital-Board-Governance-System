@@ -157,7 +157,7 @@ export default function DocumentTranslationWorkspace({profile,employee,admin=fal
    const sourceDocument=documents.find(d=>String(d.documentId)===String(selected.documentId));
    const safeTarget=String(selected.targetLanguage||"translated").toUpperCase();
    const fileName="IRPA-Translation-"+String(selected.documentReference||selected.documentId).replace(/[^A-Za-z0-9_-]/g,"-")+"-"+safeTarget+".txt";
-   const file=new File([selected.translatedText],fileName,{type:"text/plain;charset=utf-8"});
+   const file=new File([selected.translatedText],fileName,{type:"text/plain"});
    const uploaded=await uploadLifecycleDocument({
     file,title:"Translation of "+String(selected.documentTitle||selected.documentId)+" ("+safeTarget+") — request "+selected.id,
     documentType:"Other",archiveCategory:sourceDocument?.archiveCategory||"Administrative Documents",
