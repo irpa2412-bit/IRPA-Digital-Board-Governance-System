@@ -1,7 +1,7 @@
 import React,{useEffect,useMemo,useRef,useState}from"react";
 import{auth,db}from"../firebase/config";
 import{collection,doc,onSnapshot,query,where}from"firebase/firestore";
-import{getFunctions,httpsCallable}from"firebase/functions";
+
 import{translateMeetingPhrase}from"../firebase/liveInterpreter";
 import{MAA_DICTIONARY,MAA_DICTIONARY_SOURCES,searchMaaDictionary}from"../data/maaDictionary";
 import{COLLECTIONS,createRecord,getAccessibleMeetingRecords,getAdminProfile,getCurrentMemberProfile,getRecord,getRecords,openVotingIssue,updateRecord}from"../firebase/data";
