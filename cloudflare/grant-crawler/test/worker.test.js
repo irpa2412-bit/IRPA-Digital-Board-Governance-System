@@ -130,6 +130,28 @@ test("AI geographic classifier requires explicit Tanzania or broad eligible geog
   }).status, "ineligible");
 });
 
+test("country-focused South Africa/Zimbabwe titles cannot be rescued by generic Africa-wide wording", () => {
+  const southAfrica = {
+    title: "South Africa climate resilience funding opportunity",
+    description: "This programme supports applications across Africa, but this listing is focused on South Africa."
+  };
+  assert.equal(assessGeographicEligibility(southAfrica).status, "ineligible");
+
+  const zimbabwe = {
+    title: "Zimbabwe community innovation fund",
+    description: "The announcement describes funding across Africa; this specific call is for Zimbabwe-based organizations."
+  };
+  assert.equal(assessGeographicEligibility(zimbabwe).status, "ineligible");
+
+  const fitSA = assessFit(southAfrica);
+  assert.equal(fitSA.geographyAssessment, "other_country_focus");
+  assert.equal(fitSA.triageAssessment, "geographic_mismatch_review");
+
+  const fitZW = assessFit(zimbabwe);
+  assert.equal(fitZW.geographyAssessment, "other_country_focus");
+  assert.equal(fitZW.triageAssessment, "geographic_mismatch_review");
+});
+
 test("digital governance and DBGS calls are scored as a distinct strategic investment track", () => {
   const fit = assessFit({
     title: "Digital governance and board management system investment fund",
