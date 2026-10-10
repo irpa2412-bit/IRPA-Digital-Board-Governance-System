@@ -43,14 +43,16 @@ export default function OperationalGatewaysParticipants(){
     await updateRecord(COLLECTIONS.invitations,invitationId,{subscriptionLink:window.location.origin+"/?induction=1&applicant=1&route=subscription&memberInvite="+encodeURIComponent(invitationId),loginAssistanceLink:window.location.origin+"/?induction=1&applicant=1&route=assistance&memberInvite="+encodeURIComponent(invitationId)});
    }
    await updateRecord(COLLECTIONS.invitations,invitationId,{participantId,meetingId:payload.meetingId,meetingIdentity:payload.meetingIdentity,meetingReference:payload.meetingReference,meetingTitle:m.title});
-   let issuedAccess=null;
+   let issuedAccess=null,dispatchStage="issue-access-pass";
    try{
     const issueAccess=httpsCallable(getFunctions(undefined,"us-central1"),"createMeetingAccessInvitation");
     const issued=(await issueAccess({meetingId:payload.meetingId,participantId})).data||{};
     issuedAccess=issued;
     if(!issued.accessToken||!issued.meetingPassword||!issued.accessId)throw new Error("The meeting gateway did not return a complete access pass.");
     const meetingAccess={accessId:issued.accessId,accessToken:issued.accessToken,meetingId:issued.meetingId,participantId:issued.participantId,meetingIdentity:payload.meetingIdentity,meetingReference:payload.meetingReference,meetingTitle:m.title,meetingDate:m.date||"",meetingStartTime:m.startTime||"",meetingEndTime:m.endTime||"",meetingPlatform:m.meetingPlatform||"Platform not recorded",platformAccessUrl:m.platformAccessUrl||"",platformMeetingId:m.platformMeetingId||"",platformPasscode:m.platformPasscode||"",meetingVenue:m.venue||"",meetingChairperson:m.chairperson||"",meetingAgenda:m.agenda||"",password:issued.meetingPassword,expiresAt:issued.expiresAt};
+    dispatchStage="send-email";
     const result=await sendMemberInvitationEmail(payload.participantEmail,invitationId,payload.participantRole,payload.memberType,meetingAccess);
+    dispatchStage="persist-dispatch-confirmation";
     if(result.meetingAccessSent!==true)throw new Error("The IRPA Mail Server did not confirm dispatch of the meeting access link and gate token. The access pass will be revoked rather than counted as released.");
     const dispatchedAt=new Date().toISOString();
     const deliveryStatus=String(result.deliveryStatus||"Accepted by IRPA Mail Server; SMTP delivery status returned by gateway");
@@ -58,11 +60,13 @@ export default function OperationalGatewaysParticipants(){
     await updateRecord(COLLECTIONS.participants,participantId,{invitationId,invitationStatus:"Invitation Requested",invitationRole:payload.participantRole,meetingAccessDispatched:true,meetingAccessDispatchStatus:"Confirmed",meetingAccessId:issued.accessId,meetingAccessDispatchedAt:dispatchedAt,meetingAccessExpiresAt:issued.expiresAt||null});
     setMsg("Participant registered. The invitation register now records the meeting link and gate-token release reference and updates its dispatch tally. The bearer token itself is sent to the invitee and is not stored in the register. Delivery status: "+deliveryStatus);
    }catch(x){
+    console.error("IRPA meeting invitation dispatch failed",{stage:dispatchStage,errorCode:String(x?.code||""),errorMessage:String(x?.message||x).slice(0,240),meetingId:payload.meetingId,participantId});
     if(issuedAccess?.accessId){try{await httpsCallable(getFunctions(undefined,"us-central1"),"revokeMeetingAccessInvitation")({accessId:issuedAccess.accessId})}catch(revokeError){console.error("Unable to revoke undelivered meeting access pass",revokeError?.code||"")}}
     const failedAt=new Date().toISOString();
-    await updateRecord(COLLECTIONS.invitations,invitationId,{deliveryStatus:"Failed",status:"Invitation Dispatch Failed",deliveryError:x.message||"Invitation request failed.",meetingAccessDispatched:false,meetingAccessDispatchStatus:"Failed",meetingInvitationLinkStatus:"Not released",meetingTokenStatus:issuedAccess?.accessId?"Revoked after dispatch failure":"Not issued",meetingAccessId:issuedAccess?.accessId||null,meetingAccessTokenReference:issuedAccess?.accessId||null,meetingAccessDispatchedAt:null,meetingAccessDispatchFailedAt:failedAt,meetingAccessDispatchError:x.message||"Invitation request failed."});
-    await updateRecord(COLLECTIONS.participants,participantId,{invitationId,invitationStatus:"Failed",meetingAccessDispatched:false,meetingAccessDispatchStatus:"Failed",meetingAccessId:issuedAccess?.accessId||null,meetingAccessDispatchFailedAt:failedAt});
-    throw new Error("Participant was registered, but meeting invitation dispatch failed: "+(x.message||"Unknown invitation error"));
+    await updateRecord(COLLECTIONS.invitations,invitationId,{deliveryStatus:"Failed",status:"Invitation Dispatch Failed",deliveryError:x.message||"Invitation request failed.",meetingAccessDispatched:false,meetingAccessDispatchStatus:"Failed",meetingInvitationLinkStatus:"Not released",meetingTokenStatus:issuedAccess?.accessId?"Revoked after dispatch failure":"Not issued",meetingAccessId:issuedAccess?.accessId||null,meetingAccessTokenReference:issuedAccess?.accessId||null,meetingAccessDispatchedAt:null,meetingAccessDispatchFailedAt:failedAt,meetingAccessDispatchError:x.message||"Invitation request failed.",meetingAccessDispatchStage:dispatchStage});
+    await updateRecord(COLLECTIONS.participants,participantId,{invitationId,invitationStatus:"Failed",meetingAccessDispatched:false,meetingAccessDispatchStatus:"Failed",meetingAccessId:issuedAccess?.accessId||null,meetingAccessDispatchFailedAt:failedAt,meetingAccessDispatchStage:dispatchStage});
+    const failureCode=String(x?.code||"");
+    throw new Error("Participant was registered, but meeting invitation dispatch failed at "+dispatchStage+": "+(x.message||"Unknown invitation error")+(failureCode?" ("+failureCode+")":""));
    }
   }
   reset();await load()
