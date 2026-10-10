@@ -104,14 +104,14 @@ function wrapCanvasText(ctx,text,maxWidth,language){
  if(line)lines.push(line);
  return lines;
 }
-async function createTranslationPdfBlob(text,{title="IRPA translated document",language="en",sourceReference="",requestId="",status="COMPLETED"}={}){
+async function createTranslationPdfBlob(text,{title="IRPA translated document",language="en",sourceReference="",requestId="",status="COMPLETED",classification="Internal",sourceStage="WORKING",archiveCategory=""}={}){
  const content=String(text||"").trim();
  if(!content)throw new Error("There is no translation text to export.");
  if(typeof document==="undefined")throw new Error("PDF export requires a browser canvas.");
  const pdf=await PDFDocument.create();
- pdf.setTitle(title);pdf.setSubject("IRPA document translation; "+status+"; target language "+language);
+ pdf.setTitle(title);pdf.setSubject("IRPA document translation; "+status+"; target language "+language+"; source classification "+classification+"; source workflow stage "+sourceStage);
  pdf.setCreator("IRPA Digital Board Governance System");
- pdf.setKeywords(["IRPA","document translation",language,sourceReference,requestId].filter(Boolean));
+ pdf.setKeywords(["IRPA","document translation",language,sourceReference,requestId,classification,sourceStage,archiveCategory].filter(Boolean));
  const width=1240,height=1600,margin=86,lineHeight=31,bodyTop=255,bodyBottom=height-100,maxTextWidth=width-margin*2;
  const canvas=document.createElement("canvas");canvas.width=width;canvas.height=height;
  const ctx=canvas.getContext("2d");
@@ -136,7 +136,7 @@ async function createTranslationPdfBlob(text,{title="IRPA translated document",l
   titleLines.forEach((line,i)=>ctx.fillText(line,direction==="rtl"?width-margin:margin,margin+38+i*38));
   ctx.font='20px Arial, "Noto Sans", "Noto Naskh Arabic", "Noto Sans CJK SC", sans-serif';
   ctx.fillStyle="#4b5563";
-  const meta=["Translation status: "+status,"Target language: "+language,sourceReference?"Source reference: "+sourceReference:"",requestId?"Translation request: "+requestId:""].filter(Boolean).join("  •  ");
+  const meta=["Translation status: "+status,"Target language: "+language,"Access classification: "+classification,"Source workflow stage: "+sourceStage,archiveCategory?"Archive category: "+archiveCategory:"",sourceReference?"Source reference: "+sourceReference:"",requestId?"Translation request: "+requestId:""].filter(Boolean).join("  •  ");
   ctx.textAlign="left";ctx.direction="ltr";ctx.fillText(meta.slice(0,150),margin,margin+125);
   ctx.strokeStyle="#d1d5db";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(margin,margin+155);ctx.lineTo(width-margin,margin+155);ctx.stroke();
   ctx.fillStyle="#111827";ctx.font='24px Arial, "Noto Sans", "Noto Naskh Arabic", "Noto Sans CJK SC", sans-serif';ctx.textAlign=direction==="rtl"?"right":"left";ctx.direction=direction;
@@ -260,7 +260,7 @@ export default function DocumentTranslationWorkspace({profile,employee,admin=fal
   setPdfGenerating(true);setError("");
   try{
    const isCompleted=selected.status==="COMPLETED";
-   const blob=await createTranslationPdfBlob(text,{title:(selected.documentTitle||selected.documentId)+" — translated document",language:selected.targetLanguage,sourceReference:selected.documentReference||selected.documentId,requestId:selected.id,status:isCompleted?"COMPLETED":"DRAFT — HUMAN REVIEW REQUIRED"});
+   const blob=await createTranslationPdfBlob(text,{title:(selected.documentTitle||selected.documentId)+" — translated document",language:selected.targetLanguage,sourceReference:selected.documentReference||selected.documentId,requestId:selected.id,status:isCompleted?"COMPLETED":"DRAFT — HUMAN REVIEW REQUIRED",classification:selected.documentClassification||"Internal",sourceStage:selected.documentStage||"WORKING",archiveCategory:selected.documentArchiveCategory||""});
    const name="IRPA-Translation-"+String(selected.documentReference||selected.documentId).replace(/[^A-Za-z0-9_-]/g,"-")+"-"+String(selected.targetLanguage||"translated").toUpperCase()+(isCompleted?"":"-DRAFT")+".pdf";
    triggerDownload(blob,name);
   }catch(e){setError(e.message||"Unable to generate the translation PDF.");}
@@ -273,7 +273,7 @@ export default function DocumentTranslationWorkspace({profile,employee,admin=fal
   try{
    const safeTarget=String(selected.targetLanguage||"translated").toUpperCase();
    const fileName="IRPA-Translation-"+String(selected.documentReference||selected.documentId).replace(/[^A-Za-z0-9_-]/g,"-")+"-"+safeTarget+".pdf";
-   const pdfBlob=await createTranslationPdfBlob(selected.translatedText,{title:"Translation of "+String(selected.documentTitle||selected.documentId),language:selected.targetLanguage,sourceReference:selected.documentReference||selected.documentId,requestId:selected.id,status:"COMPLETED"});
+   const pdfBlob=await createTranslationPdfBlob(selected.translatedText,{title:"Translation of "+String(selected.documentTitle||selected.documentId),language:selected.targetLanguage,sourceReference:selected.documentReference||selected.documentId,requestId:selected.id,status:"COMPLETED",classification:selected.documentClassification||"Internal",sourceStage:selected.documentStage||"WORKING",archiveCategory:selected.documentArchiveCategory||""});
    const file=new File([pdfBlob],fileName,{type:"application/pdf"});
    const uploaded=await uploadLifecycleDocument({
     file,title:"Translation of "+String(selected.documentTitle||selected.documentId)+" ("+safeTarget+") — request "+selected.id,
