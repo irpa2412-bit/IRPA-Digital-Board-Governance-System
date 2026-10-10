@@ -69,8 +69,10 @@ function json(data, status = 200) {
 
 async function listOpportunities(env) {
   if (!env.GRANTS_DB) throw new Error("The isolated staging D1 database binding is missing.");
+  // Only show opportunities with affirmative Tanzania or broad regional/global eligibility evidence.
+  // Country-specific and unstated-geography records remain in D1 for review/audit, but are not promoted to the portal.
   const rows = await env.GRANTS_DB.prepare(
-    "SELECT id, title, description, url, published_at, source_url, fit_score, fit_assessment, fit_reasons, eligibility_status, call_status, geography_assessment, triage_assessment, deadline_at, first_seen_at, last_seen_at FROM grant_opportunities ORDER BY CASE WHEN triage_assessment = 'priority_for_eligibility_review' THEN 0 WHEN triage_assessment = 'manual_eligibility_review' THEN 1 ELSE 2 END, COALESCE(deadline_at, '9999-12-31'), fit_score DESC, title COLLATE NOCASE LIMIT 250"
+    "SELECT id, title, description, url, published_at, source_url, fit_score, fit_assessment, fit_reasons, eligibility_status, call_status, geography_assessment, triage_assessment, deadline_at, first_seen_at, last_seen_at FROM grant_opportunities WHERE geography_assessment IN ('tanzania_mentioned', 'regional_or_lmic_scope') AND triage_assessment NOT IN ('closed_do_not_prioritize', 'low_priority', 'geographic_mismatch_review') ORDER BY CASE WHEN triage_assessment = 'priority_for_eligibility_review' THEN 0 ELSE 1 END, COALESCE(deadline_at, '9999-12-31'), fit_score DESC, title COLLATE NOCASE LIMIT 250"
   ).all();
   const run = await env.GRANTS_DB.prepare(
     "SELECT status, items_seen, items_changed, error_message, finished_at FROM crawler_runs ORDER BY id DESC LIMIT 1"
@@ -208,24 +210,27 @@ function assessFit(item) {
       : sourceIsOpenFeed || /fund state:\s*open|open for applications|applications are open|call is open/i.test(text)
         ? "open"
         : "unknown";
-  const tanzaniaMentioned = /\btanzania\b|united republic of tanzania/i.test(text);
-  const otherCountryFocus = /\b(kenya|uganda|south africa|west africa|sudan|albania|rwanda|bangladesh|morocco|nepal)\b/i.test(text);
-  const regionalScope = /east africa|sub-saharan africa|africa-wide|across africa|global|worldwide|low[- ]and[- ]middle[- ]income|\blmic\b|developing countries/i.test(text);
-  const geographyAssessment = tanzaniaMentioned
-    ? "tanzania_mentioned"
-    : otherCountryFocus && !regionalScope
-      ? "other_country_focus"
-      : regionalScope
-        ? "regional_or_lmic_scope"
+  const geographyText = [item.title, item.description, item.url, item.sourceUrl].filter(Boolean).join(" ").toLowerCase();
+  const explicitTanzaniaEligibility = /(?:eligible|eligibility|applicant|applicants|organisation|organization|ngo|civil society|registered|based|operating|implemented|located|country|countries|geography|geographic)[^.!?]{0,100}\btanzania\b|\btanzania\b[^.!?]{0,100}(?:eligible|eligibility|applicant|applicants|organisation|organization|ngo|civil society|registered|based|operating|located|country|countries|geography|geographic)/i.test(geographyText);
+  const hardCountryOnly = /\b(?:only|exclusively|restricted to|limited to|eligible only in|applicants? (?:must|should) be (?:registered|based|located) in|must be registered in|must be based in)\b[^.!?]{0,90}\b(?:south africa|south african|rsa|zimbabwe|zimbabwean)\b|\b(?:south africa|south african|rsa|zimbabwe|zimbabwean)\b[^.!?]{0,90}\b(?:only|exclusively|restricted to|limited to|based applicants?|registered applicants?|eligible applicants?|organisations? only|organizations? only)\b/i.test(geographyText);
+  const tanzaniaMentioned = /\btanzania\b|united republic of tanzania/i.test(geographyText);
+  const regionalScope = /\beast africa\b|\beast african\b|sub[- ]saharan africa|africa[- ]wide|across africa|pan[- ]african|continental africa|global|worldwide|international(?:ly)? eligible|low[- ]and[- ]middle[- ]income countries|\blmics?\b|developing countries|eligible in all countries/i.test(geographyText);
+  const countryNames = /\b(?:south africa|south african|rsa|zimbabwe|zimbabwean|kenya|kenyan|uganda|ugandan|rwanda|rwandan|burundi|burundian|zambia|zambian|botswana|namibia|namibian|malawi|malawian|mozambique|mozambican|lesotho|eswatini|swaziland|angola|angolan|ethiopia|ethiopian|somalia|somalian|sudan|south sudan|ghana|nigeria|senegal|cameroon|liberia|sierra leone|gambia|guinea|mali|niger|burkina faso|benin|togo|cote d.?ivoire|ivory coast|egypt|morocco|algeria|tunisia|libya|chad|eritrea|djibouti|madagascar|mauritius|seychelles|democratic republic of the congo|drc|congo)\b/i.test(geographyText);
+  const geographyAssessment = hardCountryOnly || (countryNames && !regionalScope && !explicitTanzaniaEligibility)
+    ? "other_country_focus"
+    : regionalScope
+      ? "regional_or_lmic_scope"
+      : explicitTanzaniaEligibility || tanzaniaMentioned
+        ? "tanzania_mentioned"
         : "not_stated";
   const triageAssessment = ["closed", "expired"].includes(callStatus)
     ? "closed_do_not_prioritize"
     : geographyAssessment === "other_country_focus"
       ? "geographic_mismatch_review"
-      : score >= 15 && ["tanzania_mentioned", "regional_or_lmic_scope"].includes(geographyAssessment)
-        ? "priority_for_eligibility_review"
+      : geographyAssessment === "not_stated"
+        ? "geography_unverified_suppressed"
         : score >= 15
-          ? "manual_eligibility_review"
+          ? "priority_for_eligibility_review"
           : "low_priority";
   return {
     score,
@@ -235,7 +240,7 @@ function assessFit(item) {
     callStatus,
     geographyAssessment,
     triageAssessment,
-    eligibilityStatus: "unverified",
+    eligibilityStatus: geographyAssessment === "other_country_focus" ? "geographic_ineligible" : geographyAssessment === "not_stated" ? "geography_unverified" : "unverified",
   };
 }
 
@@ -244,7 +249,7 @@ async function crawl(env) {
   const items = await readFeeds(env);
   const assessedItems = items.map(item => ({ ...item, fit: assessFit(item) }));
   let changed = 0;
-  const matchCounts = { strong: 0, possible: 0, low: 0, priorityForReview: 0, open: 0, closed: 0, expired: 0, statusUnknown: 0, geographicMismatch: 0, eligibilityUnverified: 0 };
+  const matchCounts = { strong: 0, possible: 0, low: 0, priorityForReview: 0, open: 0, closed: 0, expired: 0, statusUnknown: 0, geographicMismatch: 0, geographyUnverifiedSuppressed: 0, eligibilityUnverified: 0 };
   for (const item of assessedItems) {
     const fit = item.fit;
     if (fit.fitAssessment === "strong_topic_match") matchCounts.strong++;
@@ -256,7 +261,8 @@ async function crawl(env) {
     if (fit.callStatus === "expired") matchCounts.expired++;
     if (fit.callStatus === "unknown") matchCounts.statusUnknown++;
     if (fit.geographyAssessment === "other_country_focus") matchCounts.geographicMismatch++;
-    matchCounts.eligibilityUnverified++;
+    if (fit.geographyAssessment === "not_stated") matchCounts.geographyUnverifiedSuppressed++;
+    if (fit.eligibilityStatus === "unverified") matchCounts.eligibilityUnverified++;
     const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(item.url));
     const id = [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, "0")).join("");
     const result = await env.GRANTS_DB.prepare(
@@ -268,7 +274,7 @@ async function crawl(env) {
     "INSERT INTO crawler_runs (status, items_seen, items_changed, finished_at) VALUES ('success', ?, ?, CURRENT_TIMESTAMP)"
   ).bind(items.length, changed).run();
   const topMatches = assessedItems
-    .filter(item => item.fit.score > 0 && !["closed_do_not_prioritize", "low_priority"].includes(item.fit.triageAssessment))
+    .filter(item => item.fit.score > 0 && ["tanzania_mentioned", "regional_or_lmic_scope"].includes(item.fit.geographyAssessment) && !["closed_do_not_prioritize", "low_priority"].includes(item.fit.triageAssessment))
     .sort((a, b) => {
       const priority = item => item.fit.triageAssessment === "priority_for_eligibility_review" ? 0 : 1;
       return priority(a) - priority(b) || b.fit.score - a.fit.score || a.title.localeCompare(b.title);
