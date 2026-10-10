@@ -11,7 +11,7 @@ export const MAA_TERMS = [
 
 function replaceTerm(text,term,replacement){
   const pattern=term.replaceAll(" ","\\s+");
-  return text.replace(new RegExp("(^|[^\\\\p{L}])("+pattern+")(?=$|[^\\\\p{L}])","giu"),(match,prefix,word)=>prefix+(word[0]===word[0].toUpperCase()?replacement.charAt(0).toUpperCase()+replacement.slice(1):replacement));
+  return text.replace(new RegExp("(^|[^\\p{L}])("+pattern+")(?=$|[^\\p{L}])","giu"),(match,prefix,word)=>prefix+(word[0]===word[0].toUpperCase()?replacement.charAt(0).toUpperCase()+replacement.slice(1):replacement));
 }
 
 export function dictionaryTranslate(content,source,target){
