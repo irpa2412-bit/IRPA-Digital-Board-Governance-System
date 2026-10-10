@@ -2704,3 +2704,49 @@ textarea:focus-visible{
     fill:currentColor!important;
   }
 }
+
+
+/* Dashboard semantic icon language: icon shape and colour reinforce the
+   action's meaning on desktop and mobile without changing button behaviour. */
+.dashboard-command .dashboard-semantic-icon--governance{color:#0b5fa8!important}
+.dashboard-command .dashboard-semantic-icon--information{color:#245c8a!important}
+.dashboard-command .dashboard-semantic-icon--finance{color:#8b3e29!important}
+.dashboard-command .dashboard-semantic-icon--approval{color:#176b46!important}
+.dashboard-command .dashboard-semantic-icon--pending{color:#8a5700!important}
+.dashboard-command .dashboard-semantic-icon--workflow{color:#17665e!important}
+.dashboard-command .dashboard-semantic-icon--signature{color:#6842a6!important}
+.dashboard-command .dashboard-semantic-icon--reports{color:#194c80!important}
+.dashboard-command .dashboard-semantic-icon--community{color:#176b46!important}
+.dashboard-command .dashboard-semantic-icon--risk{color:#8a5700!important}
+.dashboard-command .dashboard-semantic-icon--settings{color:#526b60!important}
+.dashboard-command .dashboard-semantic-icon--general{color:#0b5fa8!important}
+
+.dashboard-desktop-view .quote4-quick-grid>button>span i.dashboard-semantic-icon,
+.dashboard-desktop-view .dashboard-quote4-stats .quote4-stat-icon i.dashboard-semantic-icon,
+.dashboard-live-date-slot .live-date-stat-buttons .desktop-blue-nav-button .quote4-stat-icon i.dashboard-semantic-icon,
+.dashboard-command .mobile-quote1-stats>button>span i.dashboard-semantic-icon,
+.dashboard-command .mobile-quote1-grid>button>span i.dashboard-semantic-icon{
+  display:inline-block!important;
+  opacity:1!important;
+  text-shadow:none!important;
+}
+.dashboard-desktop-view .quote4-quick-grid>button>span i.dashboard-semantic-icon--finance,
+.dashboard-desktop-view .dashboard-quote4-stats .quote4-stat-icon i.dashboard-semantic-icon--finance,
+.dashboard-live-date-slot .live-date-stat-buttons .desktop-blue-nav-button .quote4-stat-icon i.dashboard-semantic-icon--finance,
+.dashboard-command .mobile-quote1-stats>button>span i.dashboard-semantic-icon--finance,
+.dashboard-command .mobile-quote1-grid>button>span i.dashboard-semantic-icon--finance{color:#8b3e29!important}
+.dashboard-desktop-view .quote4-quick-grid>button>span i.dashboard-semantic-icon--approval,
+.dashboard-desktop-view .dashboard-quote4-stats .quote4-stat-icon i.dashboard-semantic-icon--approval,
+.dashboard-live-date-slot .live-date-stat-buttons .desktop-blue-nav-button .quote4-stat-icon i.dashboard-semantic-icon--approval,
+.dashboard-command .mobile-quote1-stats>button>span i.dashboard-semantic-icon--approval,
+.dashboard-command .mobile-quote1-grid>button>span i.dashboard-semantic-icon--approval{color:#176b46!important}
+.dashboard-desktop-view .quote4-quick-grid>button>span i.dashboard-semantic-icon--pending,
+.dashboard-desktop-view .dashboard-quote4-stats .quote4-stat-icon i.dashboard-semantic-icon--pending,
+.dashboard-live-date-slot .live-date-stat-buttons .desktop-blue-nav-button .quote4-stat-icon i.dashboard-semantic-icon--pending,
+.dashboard-command .mobile-quote1-stats>button>span i.dashboard-semantic-icon--pending,
+.dashboard-command .mobile-quote1-grid>button>span i.dashboard-semantic-icon--pending{color:#8a5700!important}
+.dashboard-desktop-view .quote4-quick-grid>button>span i.dashboard-semantic-icon--signature,
+.dashboard-desktop-view .dashboard-quote4-stats .quote4-stat-icon i.dashboard-semantic-icon--signature,
+.dashboard-live-date-slot .live-date-stat-buttons .desktop-blue-nav-button .quote4-stat-icon i.dashboard-semantic-icon--signature,
+.dashboard-command .mobile-quote1-stats>button>span i.dashboard-semantic-icon--signature,
+.dashboard-command .mobile-quote1-grid>button>span i.dashboard-semantic-icon--signature{color:#6842a6!important}
