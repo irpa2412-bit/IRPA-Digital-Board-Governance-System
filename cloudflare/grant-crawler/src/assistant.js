@@ -8,12 +8,48 @@ const IRPA_PROFILE = {
   operational_area: "Longido District, Arusha Region, Tanzania; initial focus includes Longido, Engikaret and Kimokouwa wards and pilot villages across Longido, Engarenaibor and Kitumbeine divisions.",
   maturity: "Newly registered organization. No completed projects and no secured project funding have been reported. Do not imply a proven delivery track record, audited project history, or co-financing that has not been supplied.",
   pillars: [
-    "Sustainable Rangeland Management: sustainable use, restoration and control of invasive plant species",
-    "Livestock Development: improved breeding and access to veterinary services",
-    "Market Development: livestock market linkages and value addition to livestock products"
+    {
+      name: "Sustainable Rangeland Management",
+      objectives: ["promote proper use of rangelands", "promote rangeland restoration", "control invasive plant species"],
+      cross_cutting_themes: [
+        "climate change adaptation and resilience: drought preparedness, ecosystem resilience and climate-informed restoration",
+        "gender equality and social inclusion: equitable access to rangelands, restoration benefits and decision-making",
+        "youth empowerment: youth participation in restoration, monitoring and green livelihoods",
+        "community participation: community-led grazing plans, restoration and invasive-species management",
+        "research, innovation and knowledge management: rangeland condition evidence, GIS/NDVI and community knowledge",
+        "governance and institutional capacity strengthening: local resource governance, accountability and management capacity",
+        "environmental sustainability: biodiversity, soil and vegetation recovery, and sustainable land use"
+      ]
+    },
+    {
+      name: "Livestock Development",
+      objectives: ["promote breeding of improved hybrid animals", "facilitate veterinary services"],
+      cross_cutting_themes: [
+        "climate change adaptation and resilience: climate-resilient livestock systems and drought preparedness",
+        "gender equality and social inclusion: inclusive access to animal health, breeding and livestock services",
+        "youth empowerment: youth participation in livestock enterprises and service delivery",
+        "community participation: pastoralist-led livestock priorities and community animal-health approaches",
+        "research, innovation and knowledge management: animal-health evidence, appropriate innovation and knowledge exchange",
+        "governance and institutional capacity strengthening: stronger livestock institutions, service coordination and accountability",
+        "environmental sustainability: sustainable grazing pressure, animal welfare and responsible natural-resource use"
+      ]
+    },
+    {
+      name: "Market Development",
+      objectives: ["facilitate linkages between pastoralists and livestock markets", "promote value addition to livestock products"],
+      cross_cutting_themes: [
+        "climate change adaptation and resilience: resilient market access and diversified pastoral incomes",
+        "gender equality and social inclusion: fair participation and benefit-sharing for women and marginalized groups",
+        "youth empowerment: youth-led market services, enterprises and value addition",
+        "community participation: pastoralist participation in market design, priorities and producer linkages",
+        "research, innovation and knowledge management: market information, digital innovation and evidence-based decisions",
+        "governance and institutional capacity strengthening: transparent market systems, producer organization and accountable value chains",
+        "environmental sustainability: resource-efficient processing, waste management and sustainable value chains"
+      ]
+    }
   ],
   cross_cutting: [
-    "climate adaptation and resilience",
+    "climate change adaptation and resilience",
     "gender equality and social inclusion",
     "youth empowerment",
     "community participation",
@@ -22,8 +58,122 @@ const IRPA_PROFILE = {
     "environmental sustainability"
   ],
   community_readiness: "IRPA has mobilized 10 women and youth groups interested in launching economic activities. This is a readiness signal, not evidence that activities have been funded or implemented.",
-  strategic_plan: "IRPA Strategic Plan 2025–2029"
+  strategic_plan: "IRPA Strategic Plan 2025–2029",
+  digital_governance: "IRPA has an existing Digital Board Governance System (DBGS) that requires significant investment for completion, security, integration, hosting, reliability, accessibility, maintenance and adoption. Treat digital governance, nonprofit governance technology, board-management systems, digital public infrastructure, civic technology and responsible AI as a distinct strategic investment track. Assess donor restrictions on software, existing-platform support, cybersecurity, cloud costs, equipment, technical assistance, maintenance, training and institutional capacity. Do not claim the DBGS is completed, deployed or has proven impact unless supplied evidence establishes it."
 };
+
+function assessGeographicEligibility(opportunity) {
+  const opportunityText = [opportunity.title, opportunity.description, opportunity.donorRequirements]
+    .filter(Boolean).join(" ").toLowerCase();
+  const sourceText = [opportunity.url].filter(Boolean).join(" ").toLowerCase();
+ const broadScope = /(?:eligible|eligibility|applicants?|organisations?|organizations?|open to|available to|applications? from|funding across|call for|within|across|throughout|for)[^.!?]{0,90}(?:east africa|east african|sub[- ]saharan africa|africa[- ]wide|across africa|pan[- ]african|continental africa|low[- ]and[- ]middle[- ]income countries|\blmics?\b|developing countries|all countries)|(?:east africa|east african|sub[- ]saharan africa|africa[- ]wide|across africa|pan[- ]african|continental africa|low[- ]and[- ]middle[- ]income countries|\blmics?\b|developing countries)[^.!?]{0,90}(?:eligible|eligibility|applicants?|organisations?|organizations?|open to|available to|funding across|call for|applications? from)|\b(?:global|worldwide|international)\s+(?:applicants?|applicant pool|eligibility|eligibility criteria)\b|\b(?:applicants?|organisations?|organizations?|applications?)\b[^.!?]{0,60}\b(?:globally|worldwide|internationally)\b|\bopen to (?:applicants?|organisations?|organizations?|applications?) worldwide\b/i.test(opportunityText);
+  const explicitTanzaniaEligibility = /(?:eligible countries?[^.!?]{0,100}\btanzania\b|\btanzania\b[^.!?]{0,80}(?:is an eligible country|is eligible)|applications? (?:are )?open to (?:applicants?|organisations?|organizations?|ngos?) in tanzania|applications? from tanzania|applicants? from tanzania|tanzania-based (?:ngos?|organisations?|organizations?|civil society)|(?:applicants?|organisations?|organizations?|ngos?|civil society groups?) (?:must|should|may|can) be (?:registered|based|located|operating) in tanzania|(?:registered|based|located) in tanzania[^.!?]{0,80}(?:eligible|applicants?|organisations?|organizations?|ngos?)|(?:applicants?|organisations?|organizations?|ngos?|civil society groups?)[^.!?]{0,80}(?:registered|based|located|operating)[^.!?]{0,50}\btanzania\b)/i.test(opportunityText);
+  const hardCountryOnly = /\b(?:only|exclusively|restricted to|limited to|eligible only in|applicants? (?:must|should) be (?:registered|based|located) in|must be registered in|must be based in)\b[^.!?]{0,90}\b(?:south africa|south african|rsa|zimbabwe|zimbabwean)\b|\b(?:south africa|south african|rsa|zimbabwe|zimbabwean)\b[^.!?]{0,90}\b(?:only|exclusively|restricted to|limited to|based applicants?|registered applicants?|eligible applicants?|organisations? only|organizations? only)\b/i.test(opportunityText+" "+sourceText);
+  const countrySpecific = /\b(?:south africa|south african|rsa|zimbabwe|zimbabwean|kenya|kenyan|uganda|ugandan|rwanda|rwandan|burundi|burundian|zambia|zambian|botswana|namibia|namibian|malawi|malawian|mozambique|mozambican|lesotho|eswatini|swaziland|angola|angolan|ethiopia|ethiopian|somalia|somalian|sudan|south sudan|ghana|nigeria|senegal|cameroon|liberia|sierra leone|gambia|guinea|mali|niger|burkina faso|benin|togo|cote d.?ivoire|ivory coast|egypt|morocco|algeria|tunisia|libya|chad|eritrea|djibouti|madagascar|mauritius|seychelles|democratic republic of the congo|drc|congo|united states of america|united states|american|canada|canadian|united kingdom|british|england|scotland|wales|northern ireland|australia|australian|new zealand|new zealander|germany|german|france|french|italy|italian|spain|spanish|portugal|portuguese|netherlands|dutch|belgium|belgian|sweden|swedish|norway|norwegian|denmark|danish|finland|finnish|switzerland|swiss|austria|austrian|poland|polish|czech republic|czechia|hungary|hungarian|romania|romanian|greece|greek|turkey|turkish|ukraine|ukrainian|russia|russian|china|chinese|india|indian|japan|japanese|south korea|korean|indonesia|indonesian|philippines|filipino|vietnam|vietnamese|thailand|thai|malaysia|malaysian|singapore|singaporean|pakistan|pakistani|bangladesh|bangladeshi|nepal|nepalese|sri lanka|sri lankan|brazil|brazilian|mexico|mexican|argentina|argentinian|chile|chilean|colombia|colombian|peru|peruvian|venezuela|venezuelan|ecuador|ecuadorian|uruguay|uruguayan|paraguay|paraguayan|bolivia|bolivian|costa rica|panama|panamanian|saudi arabia|saudi|united arab emirates|uae|qatar|kuwait|oman|bahrain|israel|israeli|palestine|palestinian|jordan|jordanian|lebanon|lebanese|iraq|iraqi|iran|iranian|afghanistan|afghan|kazakhstan|uzbekistan|kyrgyzstan|tajikistan|turkmenistan|mongolia|mongolian)\b/i.test(opportunityText+" "+sourceText);
+  if (hardCountryOnly || (countrySpecific && !broadScope && !explicitTanzaniaEligibility)) {
+    return {
+      status: "ineligible",
+      reason: "The supplied call text appears restricted to a country other than Tanzania; the opportunity is excluded from IRPA's eligible shortlist.",
+      evidence: [hardCountryOnly ? "Explicit country-only restriction detected." : "A country-specific scope was detected without clear Tanzania eligibility or broader regional/global applicant eligibility."],
+      holdConceptNote: true
+    };
+  }
+  if (broadScope || explicitTanzaniaEligibility) {
+    return {
+      status: "eligible",
+      reason: broadScope ? "The supplied call text states an eligible regional, Africa-wide, LMIC, or global applicant pool." : "The supplied text explicitly connects Tanzania to applicant or geographic eligibility.",
+      evidence: [broadScope ? "Explicit broad geographic eligibility language detected." : "Explicit Tanzania applicant-eligibility language detected."],
+      holdConceptNote: false
+    };
+  }
+  return {
+    status: "unclear",
+    reason: "The supplied text does not establish that Tanzania-based IRPA is eligible. Verify the official call's eligible-country list before drafting.",
+    evidence: ["No explicit Tanzania eligibility or sufficiently broad regional/global applicant scope was detected."],
+    holdConceptNote: true
+  };
+}
+
+function detectKnownEligibilityGaps(opportunity) {
+  const text = [opportunity.title, opportunity.description, opportunity.donorRequirements]
+    .filter(Boolean).join(" ").toLowerCase();
+  const blockers = [];
+  const warnings = [];
+  const addUnique = (list, message) => { if (!list.includes(message)) list.push(message); };
+
+  if (/(?:only|exclusively)\s*(?:government agencies|public authorities|universities|academic institutions|for[- ]profit companies|private companies)\s*(?:may apply|are eligible|can apply)|\bngos?\s+(?:are not eligible|may not apply|cannot apply)|\bnonprofits?\s+(?:are not eligible|may not apply|cannot apply)/i.test(text)) {
+    addUnique(blockers, "The call appears to exclude registered NGOs/non-profits or restrict applicants to another entity type.");
+  }
+
+  const requiresOrganizationalTrackRecord =
+    /(?:applicant|organization|organisation|ngo|civil society organization|civil society organisation|lead applicant)[^.!?]{0,100}(?:must|shall|required to|at least|minimum)[^.!?]{0,100}(?:completed[^.!?]{0,30}projects|previously implemented|previous grants|past projects|proven track record|demonstrated track record)/i.test(text) ||
+    /(?:must|shall|required to)[^.!?]{0,100}(?:previously implemented|completed at least \d+ projects|have a proven track record|demonstrate a track record of completed projects)/i.test(text);
+  if (requiresOrganizationalTrackRecord) {
+    addUnique(blockers, "The call requires organizational project-delivery or grant track record, but IRPA has reported no completed projects.");
+  }
+
+  if (/(?:cash co[- ]?financing|cash match|matching funds|counterpart cash contribution|cash contribution of \d+\s*%|co[- ]?financing of \d+\s*%|co[- ]?funding of \d+\s*%)/i.test(text)) {
+    addUnique(blockers, "The call appears to require cash matching/co-financing, while IRPA has reported no secured project funds.");
+  } else if (/(?:co[- ]?financing|matching contribution|counterpart funding|cost share)/i.test(text)) {
+    addUnique(warnings, "The call mentions co-financing or cost share; IRPA has no secured project funds reported, so confirm whether in-kind contributions or third-party match are allowed.");
+  }
+
+  const yearsMatch = text.match(/(?:registered|incorporated|established|operating|in existence)[^.!?]{0,80}(?:at least|minimum(?: of)?|for|over|more than)\s*(\d{1,2})\s*years?/i) ||
+    text.match(/(?:at least|minimum(?: of)?|over|more than)\s*(\d{1,2})\s*years?[^.!?]{0,80}(?:registered|incorporated|established|operating|in existence)/i);
+  if (yearsMatch) {
+    const requiredYears = Number(yearsMatch[1] || yearsMatch[2]);
+    const registrationDate = Date.parse("2023-12-11T00:00:00Z");
+    const ageYears = Math.max(0, (Date.now() - registrationDate) / (365.2425 * 24 * 60 * 60 * 1000));
+    if (requiredYears > ageYears) {
+      addUnique(warnings, "The call appears to require at least " + requiredYears + " years of organizational existence; IRPA was registered on 11 December 2023 and has not yet reached that age as of this screening. Confirm the donor's eligibility measurement date before proceeding.");
+    }
+  }
+
+  if (/audited (?:financial statements|accounts|financial reports)[^.!?]{0,100}(?:last|past|previous|for)\s*\d+\s*years?/i.test(text)) {
+    addUnique(warnings, "The call requests multi-year audited financial records; IRPA's available audit history has not been established in the supplied profile. Confirm the required periods and acceptable evidence.");
+  }
+
+  const criteriaEvidence = /eligible countries|eligible applicants|applicants? must|organizations? may apply|organisations? may apply|registered in|years of operation|audited|co[- ]?financ|previously implemented|completed projects|application deadline|deadline for applications/i.test(text);
+  if (!criteriaEvidence) {
+    addUnique(warnings, "The supplied text does not include enough explicit applicant eligibility criteria to confirm IRPA's eligibility. Paste the official eligibility and application requirements.");
+  }
+  return { blockers, warnings };
+}
+
+function applyKnownEligibilityGaps(analysis, opportunity, geographicEligibility) {
+  const gaps = detectKnownEligibilityGaps(opportunity);
+  analysis.known_eligibility_gaps = gaps;
+  if (!Array.isArray(analysis.donor_requirements)) analysis.donor_requirements = [];
+  for (const blocker of gaps.blockers) {
+    if (!analysis.donor_requirements.some(row => String(row.requirement || "").toLowerCase() === blocker.toLowerCase())) {
+      analysis.donor_requirements.push({ requirement: blocker, status: "not_met", evidence: blocker, action: "Do not prioritize or draft until the donor confirms a valid exception or eligibility route." });
+    }
+  }
+  for (const warning of gaps.warnings) {
+    if (!analysis.donor_requirements.some(row => String(row.requirement || "").toLowerCase() === warning.toLowerCase())) {
+      analysis.donor_requirements.push({ requirement: warning, status: "unknown", evidence: warning, action: "Verify this criterion in the official call and record supporting evidence before marking the opportunity eligible." });
+    }
+  }
+  if (gaps.blockers.length || geographicEligibility.status === "ineligible") {
+    analysis.eligibility.status = "ineligible";
+    analysis.eligibility.confidence = "high";
+    analysis.eligibility.evidence = [...(Array.isArray(analysis.eligibility.evidence) ? analysis.eligibility.evidence : []), ...gaps.blockers];
+  } else if (gaps.warnings.length || geographicEligibility.status === "unclear") {
+    analysis.eligibility.status = "insufficient_information";
+    analysis.eligibility.confidence = "low";
+    analysis.eligibility.unknowns = [...(Array.isArray(analysis.eligibility.unknowns) ? analysis.eligibility.unknowns : []), ...gaps.warnings];
+  } else if (analysis.eligibility.status === "eligible") {
+    const rows = analysis.donor_requirements;
+    const allRequirementsMet = rows.length > 0 && rows.every(row => row.status === "met");
+    const unknowns = Array.isArray(analysis.eligibility.unknowns) ? analysis.eligibility.unknowns : [];
+    if (!allRequirementsMet || unknowns.length) {
+      analysis.eligibility.status = "insufficient_information";
+      analysis.eligibility.confidence = "low";
+      analysis.eligibility.unknowns = [...unknowns, "An eligible verdict requires every mandatory donor criterion to have explicit evidence and no unresolved eligibility questions."];
+    }
+  }
+  return gaps;
+}
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -83,7 +233,9 @@ export async function analyzeGrant(request, env) {
   const schema = task === "concept_note"
     ? {
         summary: "string",
+        geographic_eligibility: { status: "eligible|ineligible|unclear", reason: "string", evidence: ["string"], holdConceptNote: "boolean" },
         eligibility: { status: "eligible|possibly_eligible|ineligible|insufficient_information", confidence: "low|medium|high", evidence: ["string"], unknowns: ["string"] },
+        strategic_alignment: { relevant_pillars: ["string"], relevant_cross_cutting_themes: ["string"], pillar_theme_alignment: [{ pillar: "string", relevant_cross_cutting_themes: ["string"], rationale: "string" }], digital_governance_relevance: "high|medium|low|none", rationale: "string", funding_use_fit: ["string"] },
         donor_requirements: [{ requirement: "string", status: "met|partially_met|not_met|unknown", evidence: "string", action: "string" }],
         concept_note: {
           title: "string",
@@ -104,7 +256,9 @@ export async function analyzeGrant(request, env) {
       }
     : {
         summary: "string",
+        geographic_eligibility: { status: "eligible|ineligible|unclear", reason: "string", evidence: ["string"], holdConceptNote: "boolean" },
         eligibility: { status: "eligible|possibly_eligible|ineligible|insufficient_information", confidence: "low|medium|high", evidence: ["string"], unknowns: ["string"] },
+        strategic_alignment: { relevant_pillars: ["string"], relevant_cross_cutting_themes: ["string"], pillar_theme_alignment: [{ pillar: "string", relevant_cross_cutting_themes: ["string"], rationale: "string" }], digital_governance_relevance: "high|medium|low|none", rationale: "string", funding_use_fit: ["string"] },
         donor_requirements: [{ requirement: "string", status: "met|partially_met|not_met|unknown", evidence: "string", action: "string" }],
         concept_note_structure: [{ heading: "string", purpose: "string", suggested_content: "string", evidence_needed: ["string"] }],
         application_checklist: ["string"],
@@ -120,16 +274,35 @@ export async function analyzeGrant(request, env) {
     "Do not invent eligibility rules, deadlines, donor requirements, budgets, partners, registrations, audits, references, co-financing, or implementation results.",
     "Distinguish explicit evidence from assumptions. Mark missing, ambiguous, or unverified requirements as unknown and list what must be checked in the official call guidelines.",
     "IRPA profile: " + JSON.stringify(IRPA_PROFILE),
-    "Compare applicant eligibility against legal entity/country, organization type and age, geographic scope, thematic scope, past-performance requirements, financial/audit requirements, co-funding, consortium rules, and application deadlines where evidence is provided.",
+    "Apply the IRPA Strategic Plan 2025–2029 as a strategic-fit filter across all three pillars. Each pillar in the profile has all seven cross-cutting themes embedded within it, with pillar-specific examples. Assess pillar fit and theme fit together; return strategic_alignment.relevant_pillars, strategic_alignment.relevant_cross_cutting_themes, and strategic_alignment.pillar_theme_alignment with one evidence-based entry per relevant pillar. Never force an unrelated call into a pillar.",
+    "Digital governance funding is explicitly in scope as a separate investment track. IRPA's existing Digital Board Governance System (DBGS) requires significant investment. Retain relevant calls for digital governance, board-management technology, nonprofit governance systems, civic technology, cybersecurity, cloud infrastructure, responsible AI and institutional digital capacity. Evaluate donor restrictions on software, hosting/cloud costs, security, maintenance, training, equipment and institutional strengthening. Do not claim the DBGS is completed, deployed or has proven impact unless supplied evidence establishes it.",
+    "Apply a strict eligibility gate before thematic fit. IRPA is a Tanzania-registered NGO. Check eligible countries, applicant registration country, entity type, minimum/maximum organizational age, required track record, audited accounts/turnover, co-financing, consortium restrictions, deadline and permitted costs. Do not equate a thematic match with eligibility.",
+    "Hard geographic exclusion: calls explicitly restricted to South Africa, Zimbabwe, or another non-Tanzania country must be marked ineligible for IRPA unless the supplied call text also clearly permits Tanzania or an Africa-wide/East Africa/Sub-Saharan Africa/LMIC/global applicant pool. If geography is unstated or ambiguous, mark geographic eligibility unclear and overall eligibility insufficient_information; do not promote the call as eligible. Never treat a mention of a country in background text as proof that applicants from Tanzania are allowed.",
+    "A concept note must not be generated when geographic eligibility is ineligible or unclear, when a known mandatory criterion is not met, or while required eligibility evidence remains unresolved. Return the geographic evidence and list every blocker/warning first.",
     "An issue is not a confirmed disqualification unless the supplied rules clearly say so. Use insufficient_information when key eligibility rules are absent. Never represent the AI assessment as a legal or donor decision.",
     "Align any concept note to IRPA's three strategic pillars and cross-cutting themes only where relevant to the donor call. Tailor headings, ordering, and wording to donor instructions if supplied, and respect stated word/page limits where the supplied text makes them clear. If donor template instructions are absent, use a conventional concise concept-note structure and flag this limitation.",
     "Populate each application_fields entry with standalone, editable wording ready to copy into a corresponding donor application form. If a field is unsupported by supplied evidence, clearly label assumptions or evidence needed; never invent exact budgets, baseline figures, partners, track record, audited results, or co-financing. Use an indicative budget narrative only when actual budget figures were not supplied and label it as requiring budget development.",
     "Return valid JSON only, no markdown fences, matching this schema: " + JSON.stringify(schema)
   ].join("\n");
 
+  const opportunity = { title, description, url: url || null, donorRequirements };
+  const geographicEligibility = assessGeographicEligibility(opportunity);
+  const knownGaps = detectKnownEligibilityGaps(opportunity);
+  if (task === "concept_note" && (geographicEligibility.status !== "eligible" || knownGaps.blockers.length || knownGaps.warnings.length)) {
+    const gateStatus = geographicEligibility.status === "ineligible" || knownGaps.blockers.length ? "ineligible" : "insufficient_information";
+    return json({
+      error: gateStatus === "ineligible"
+        ? "Concept-note drafting blocked: one or more explicit eligibility criteria do not fit IRPA's known profile."
+        : "Concept-note drafting blocked until the official eligibility criteria and IRPA evidence gaps are resolved.",
+      geographic_eligibility: geographicEligibility,
+      eligibility_gate: { status: gateStatus, blockers: knownGaps.blockers, warnings: knownGaps.warnings },
+      next_step: "Paste the official eligible-country, applicant-type, organizational-age, track-record, audit and co-financing requirements; resolve every blocker before drafting."
+    }, 422);
+  }
+
   const userData = {
     task,
-    opportunity: { title, description, url: url || null, donorRequirements },
+    opportunity,
     requested_outputs: task === "concept_note"
       ? ["evidence-based eligibility screening", "requirement-by-requirement compliance matrix", "donor-tailored concept-note structure and editable first draft", "missing evidence checklist", "next steps"]
       : ["evidence-based eligibility screening", "requirement-by-requirement compliance matrix", "recommended concept-note structure", "missing evidence checklist", "next steps"]
@@ -150,6 +323,25 @@ export async function analyzeGrant(request, env) {
     }
     const allowed = new Set(["eligible", "possibly_eligible", "ineligible", "insufficient_information"]);
     if (!allowed.has(analysis.eligibility.status)) analysis.eligibility.status = "insufficient_information";
+    analysis.geographic_eligibility = geographicEligibility;
+    applyKnownEligibilityGaps(analysis, opportunity, geographicEligibility);
+    if (task === "concept_note") {
+      const requirements = Array.isArray(analysis.donor_requirements) ? analysis.donor_requirements : [];
+      const unresolved = analysis.eligibility.status !== "eligible" ||
+        (Array.isArray(analysis.eligibility.unknowns) && analysis.eligibility.unknowns.length > 0) ||
+        requirements.some(row => row.status !== "met");
+      if (unresolved) {
+        delete analysis.concept_note;
+        delete analysis.concept_note_structure;
+        return json({
+          error: "Concept-note drafting blocked because eligibility is not confirmed and every mandatory requirement has not been evidenced as met.",
+          geographic_eligibility: geographicEligibility,
+          eligibility_gate: analysis.known_eligibility_gaps,
+          assessment: analysis,
+          next_step: "Resolve the listed eligibility gaps and rerun screening before drafting."
+        }, 422);
+      }
+    }
     return json({
       service: "irpa-grant-application-assistant",
       model: MODEL,
@@ -162,3 +354,5 @@ export async function analyzeGrant(request, env) {
     return json({ error: String(error?.message || "AI analysis failed").slice(0, 300) }, 502);
   }
 }
+
+export { assessGeographicEligibility };
