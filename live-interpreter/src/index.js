@@ -88,7 +88,7 @@ async function authorizeDocumentTranslation(requestId,user,idToken){
   if(!/^[A-Za-z0-9_-]{1,160}$/.test(requestId))throw Object.assign(new Error("A valid document translation request ID is required."),{status:400});
   const request=await firestoreGet("documentTranslationRequests/"+requestId,idToken);
   if(!request)throw Object.assign(new Error("Document translation request not found or access denied."),{status:404});
-  if(!["REQUESTED","IN_REVIEW"].includes(String(request.status||"")))throw Object.assign(new Error("This translation request is not open for processing."),{status:409});
+  if(String(request.status||"")!=="IN_REVIEW"||request.contentTransferAuthorized!==true)throw Object.assign(new Error("The request must be placed in review and content-transfer consent recorded before translation."),{status:409});
   const owner=String(request.documentOwnerUid||"")===user.uid&&String(request.requestedByUid||"")===user.uid;
   const [admin,member,employee]=await Promise.all([
     firestoreGet("adminProfiles/"+user.uid,idToken).catch(()=>null),
