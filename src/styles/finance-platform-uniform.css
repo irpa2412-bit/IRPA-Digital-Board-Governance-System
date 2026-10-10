@@ -204,7 +204,7 @@
 }
 .finance-portal .eyebrow{
   color:#315f4e!important;
-  font-size:11px!important;
+  font-size:12px!important;
   line-height:1.3!important;
   font-weight:900!important;
   letter-spacing:.08em!important;
@@ -387,7 +387,7 @@
     line-height:1.3!important;
   }
   .finance-portal .eyebrow{
-    font-size:10px!important;
+    font-size:12px!important;
     line-height:1.35!important;
   }
   .finance-portal .form-field{
@@ -530,7 +530,7 @@
 .finance-field-roller-kicker{
   display:block;
   color:#9fd2ff;
-  font-size:9px;
+  font-size:12px;
   line-height:1.1;
   font-weight:900;
   letter-spacing:.12em;
@@ -546,7 +546,7 @@
   display:block;
   margin-top:3px;
   color:#d7eaff!important;
-  font-size:11px;
+  font-size:12px;
   line-height:1.35;
 }
 .finance-field-roller-control{
@@ -587,7 +587,7 @@
     padding:10px;
   }
   .finance-field-roller strong{font-size:13px}
-  .finance-field-roller small{font-size:10px}
+  .finance-field-roller small{font-size:12px}
   .finance-field-roller-control select{min-height:46px;font-size:16px}
   .finance-portal #finance-entry .finance-field-label{
     font-size:14px!important;
