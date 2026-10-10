@@ -262,7 +262,7 @@ async function runGrantCrawler(trigger = "scheduled") {
   await runRef.set(summary, { merge: true });
   await statusRef.set({ active: true, status: finalStatus, currentRunId: runId, lastStartedAt: Timestamp.fromDate(startedAt), lastCompletedAt: FieldValue.serverTimestamp(), configuredSources: SOURCES.length, healthySources: summary.healthySources, failedSources: errors, candidatesFound, created, updated, schedule: "Every 6 hours", nextScheduledWindow: "Within 6 hours of the previous scheduled invocation", updatedAt: FieldValue.serverTimestamp() }, { merge: true });
   console.log("IRPA grant crawler run complete", JSON.stringify({ runId, trigger, status: finalStatus, candidatesFound, created, updated, errors }));
-  return summary;
+  return { runId, trigger, status: finalStatus, sourceCount: SOURCES.length, healthySources: summary.healthySources, failedSources: errors, candidatesFound, created, updated };
 }
 
 exports.runGrantCrawlerScheduled = onSchedule({ schedule: "every 6 hours", timeZone: "Africa/Dar_es_Salaam", region: REGION, timeoutSeconds: 540, memory: "512MiB", maxInstances: 1 }, async () => runGrantCrawler("scheduled"));
