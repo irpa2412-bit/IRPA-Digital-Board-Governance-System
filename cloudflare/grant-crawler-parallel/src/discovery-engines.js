@@ -13,6 +13,7 @@ export function decodeHtml(value = "") {
 export function normalizeOpportunityUrl(value) {
   const url = new URL(value);
   if (url.protocol !== "https:" || url.username || url.password || (url.port && url.port !== "443")) throw new Error("Only credential-free HTTPS opportunity URLs are permitted.");
+  if (url.hostname === "localhost" || url.hostname.endsWith(".localhost") || url.hostname.endsWith(".local") || url.hostname.endsWith(".internal") || /^\d{1,3}(?:\.\d{1,3}){3}$/.test(url.hostname) || url.hostname.startsWith("[")) throw new Error("Local and IP-literal URLs are not permitted.");
   url.hash = "";
   for (const key of [...url.searchParams.keys()]) if (/^(utm_.+|fbclid|gclid|mc_cid|mc_eid)$/i.test(key)) url.searchParams.delete(key);
   return url.href;
@@ -67,7 +68,8 @@ export async function readOfficialPages(env) {
   const sourceResults = await Promise.all(urls.map(async sourceUrl => {
     try {
       const source = await fetchHtml(sourceUrl);
-      const anchors = getAnchors(source.html, source.finalUrl).slice(0, MAX_PAGE_LINKS);
+      const sourceHost = new URL(source.finalUrl).hostname;
+      const anchors = getAnchors(source.html, source.finalUrl).filter(anchor => new URL(anchor.url).hostname === sourceHost).slice(0, MAX_PAGE_LINKS);
       const results = await Promise.all(anchors.map(async anchor => {
         try {
           const detail = await fetchHtml(anchor.url);
