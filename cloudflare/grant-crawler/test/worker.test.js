@@ -535,3 +535,35 @@ test("application draft routes are available without exposing crawler control to
   assert.equal(response.status, 200);
   assert.equal(html.includes(token), false);
 });
+
+test("country-focused calls are suppressed even when descriptions contain generic regional wording", () => {
+  const kenya = assessFit({
+    title: "Kenya climate resilience grant",
+    description: "Funding is available across Africa, but this specific call is for Kenya-based organizations."
+  });
+  assert.equal(kenya.geographyAssessment, "other_country_focus");
+  assert.equal(kenya.eligibilityStatus, "geographic_ineligible");
+  assert.equal(kenya.triageAssessment, "geographic_mismatch_review");
+
+  const tanzaniaEligible = assessFit({
+    title: "Kenya and Tanzania community resilience programme",
+    description: "This call explicitly accepts applications from Tanzania-based NGOs; funding is available across East Africa."
+  });
+  assert.notEqual(tanzaniaEligible.geographyAssessment, "other_country_focus");
+});
+
+test("open-feed metadata cannot bypass expiry filtering", () => {
+  assert.equal(isCurrentOpportunity({
+    title: "Past-deadline rangeland grant",
+    description: "Fund state: Open. Deadline for applications is 1 January 2000.",
+    call_status: "open",
+    deadline_at: "2000-01-01"
+  }), false);
+
+  assert.equal(isCurrentOpportunity({
+    title: "Future rangeland grant",
+    description: "Fund state: Open. Deadline for applications is 31 December 2099.",
+    call_status: "open",
+    deadline_at: "2099-12-31"
+  }), true);
+});
