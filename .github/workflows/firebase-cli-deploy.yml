@@ -43,6 +43,8 @@ jobs:
         run: npx --yes firebase-tools deploy --project irpa-digital-board-governance --only hosting,firestore --non-interactive
       - name: Install Cloud Functions dependencies
         run: npm --prefix functions install --omit=dev
+      - name: Deploy scheduled multi-donor grant crawler and manual scan callable
+        run: npx --yes firebase-tools deploy --project irpa-digital-board-governance --only functions:runGrantCrawlerScheduled,functions:runGrantCrawlerNow --non-interactive
       - name: Deploy multilingual transcript translation callable
         id: translation
         continue-on-error: true
