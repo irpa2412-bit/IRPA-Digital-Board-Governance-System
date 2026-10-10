@@ -1,0 +1,10 @@
+name = "irpa-dbgs-grant-crawler"
+main = "src/index.js"
+compatibility_date = "2026-10-10"
+workers_dev = true
+
+[triggers]
+crons = ["0 */6 * * *"]
+
+[vars]
+FIREBASE_PROJECT_ID = "irpa-digital-board-governance"
