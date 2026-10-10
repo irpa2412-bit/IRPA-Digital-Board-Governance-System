@@ -6,7 +6,7 @@ workers_dev = true
 
 [vars]
 IRPA_ENVIRONMENT = "local"
-GRANT_FEED_URLS = "[\"https://www.gov.uk/international-development-funding.atom?location%5B%5D=tanzania\",\"https://www.gov.uk/international-development-funding.atom?eligible_entities=organisations-lmic\",\"https://www.gov.uk/international-development-funding.atom?fund_state=open\"]"
+GRANT_FEED_URLS = "[\"https://www.gov.uk/international-development-funding.atom?fund_state=open\",\"https://www.gov.uk/international-development-funding.atom?location%5B%5D=tanzania&fund_state=open\",\"https://www.gov.uk/international-development-funding.atom?eligible_entities=organisations-lmic&fund_state=open\"]"
 
 [[d1_databases]]
 binding = "GRANTS_DB"
@@ -23,7 +23,7 @@ workers_dev = true
 
 [env.staging.vars]
 IRPA_ENVIRONMENT = "staging"
-GRANT_FEED_URLS = "[\"https://www.gov.uk/international-development-funding.atom?location%5B%5D=tanzania\",\"https://www.gov.uk/international-development-funding.atom?eligible_entities=organisations-lmic\",\"https://www.gov.uk/international-development-funding.atom?fund_state=open\"]"
+GRANT_FEED_URLS = "[\"https://www.gov.uk/international-development-funding.atom?fund_state=open\",\"https://www.gov.uk/international-development-funding.atom?location%5B%5D=tanzania&fund_state=open\",\"https://www.gov.uk/international-development-funding.atom?eligible_entities=organisations-lmic&fund_state=open\"]"
 
 [[env.staging.d1_databases]]
 binding = "GRANTS_DB"
