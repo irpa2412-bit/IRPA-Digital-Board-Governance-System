@@ -72,12 +72,13 @@ async function listOpportunities(env) {
   // Only show opportunities with affirmative Tanzania or broad regional/global eligibility evidence.
   // Country-specific and unstated-geography records remain in D1 for review/audit, but are not promoted to the portal.
   const rows = await env.GRANTS_DB.prepare(
-    "SELECT id, title, description, url, published_at, source_url, fit_score, fit_assessment, fit_reasons, eligibility_status, call_status, geography_assessment, triage_assessment, deadline_at, first_seen_at, last_seen_at FROM grant_opportunities WHERE geography_assessment IN ('tanzania_mentioned', 'regional_or_lmic_scope') AND triage_assessment NOT IN ('closed_do_not_prioritize', 'low_priority', 'geographic_mismatch_review', 'deadline_unverified_suppressed') ORDER BY CASE WHEN triage_assessment = 'priority_for_eligibility_review' THEN 0 ELSE 1 END, COALESCE(deadline_at, '9999-12-31'), fit_score DESC, title COLLATE NOCASE LIMIT 250"
+    "SELECT id, title, description, url, published_at, source_url, fit_score, fit_assessment, fit_reasons, eligibility_status, call_status, geography_assessment, triage_assessment, deadline_at, first_seen_at, last_seen_at FROM grant_opportunities WHERE geography_assessment IN ('tanzania_mentioned', 'regional_or_lmic_scope') AND triage_assessment NOT IN ('closed_do_not_prioritize', 'low_priority', 'geographic_mismatch_review', 'deadline_unverified_suppressed') AND LOWER(COALESCE(call_status, 'unknown')) NOT IN ('closed', 'expired') AND (deadline_at IS NULL OR date(deadline_at) >= date('now', '+3 hours')) ORDER BY CASE WHEN triage_assessment = 'priority_for_eligibility_review' THEN 0 ELSE 1 END, COALESCE(deadline_at, '9999-12-31'), fit_score DESC, title COLLATE NOCASE LIMIT 250"
   ).all();
   const run = await env.GRANTS_DB.prepare(
     "SELECT status, items_seen, items_changed, error_message, finished_at FROM crawler_runs ORDER BY id DESC LIMIT 1"
   ).first();
-  return { service: "irpa-grant-crawler", feedsConfigured: JSON.parse(env.GRANT_FEED_URLS_JSON || env.GRANT_FEED_URLS || "[]").length, items: rows.results || [], count: (rows.results || []).length, lastRun: run || null };
+  const currentItems = (rows.results || []).filter(item => isCurrentOpportunity(item));
+  return { service: "irpa-grant-crawler", feedsConfigured: JSON.parse(env.GRANT_FEED_URLS_JSON || env.GRANT_FEED_URLS || "[]").length, items: currentItems, count: currentItems.length, suppressedExpiredOrUnverified: (rows.results || []).length - currentItems.length, lastRun: run || null };
 }
 
 const MAX_FEED_BYTES = 1_000_000;
@@ -212,6 +213,17 @@ function extractDeadline(item) {
   }
   return null;
 }
+function isCurrentOpportunity(item, today = todayInTanzania()) {
+  const status = String(item.call_status || item.callStatus || "").trim().toLowerCase();
+  if (["closed", "expired", "closed_do_not_prioritize"].includes(status)) return false;
+  const deadline = extractDeadline(item);
+  if (deadline && deadline < today) return false;
+  if (deadline) return true; // Deadline is today or in the future (Tanzania local date).
+  const text = [item.title, item.description].filter(Boolean).join(" ").toLowerCase();
+  const rolling = /\\b(?:rolling basis|rolling applications?|year[- ]round|open throughout the year|no fixed deadline|no application deadline)\\b/i.test(text);
+  return status === "open" || rolling;
+}
+
 function assessFit(item) {
   const text = `${item.title || ""} ${item.description || ""}`.toLowerCase();
   const deadlineAt = extractDeadline(item);
@@ -393,4 +405,4 @@ export default {
   },
 };
 
-export { assessFit, parseFeed, safeUrl };
+export { assessFit, isCurrentOpportunity, parseFeed, safeUrl };
