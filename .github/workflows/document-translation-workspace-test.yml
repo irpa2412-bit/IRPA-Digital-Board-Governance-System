@@ -42,6 +42,6 @@ jobs:
           node --check live-interpreter/src/maaDictionary.js
           node --check src/firebase/documentTranslation.js
       - name: Test provisional Maa dictionary behavior
-        run: node --test live-interpreter/tests/maaDictionary.test.mjs
+        run: node --test live-interpreter/tests/*.test.mjs
       - name: Build production frontend
         run: npm run build
