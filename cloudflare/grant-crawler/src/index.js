@@ -289,7 +289,9 @@ async function crawl(env) {
     .slice(0, 12)
     .map(item => ({
       title: item.title,
+      description: item.description,
       url: item.url,
+      sourceUrl: item.sourceUrl,
       fitScore: item.fit.score,
       fitAssessment: item.fit.fitAssessment,
       fitReasons: item.fit.reasons,
