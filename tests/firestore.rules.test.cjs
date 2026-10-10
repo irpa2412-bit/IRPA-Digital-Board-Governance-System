@@ -1,4 +1,5 @@
 const assert = require("node:assert/strict");
+const {deleteField} = require("firebase/firestore");
 const { before, after, beforeEach, test } = require("node:test");
 const {
   initializeTestEnvironment,
@@ -30,6 +31,12 @@ beforeEach(async () => {
       email: "member@example.test",
       status: "Active",
       role: "Board Member"
+    });
+    await db.doc("members/reviewer-user").set({
+      uid: "reviewer-user",
+      email: "reviewer@example.test",
+      status: "Active",
+      role: "Director Outreach"
     });
     await db.doc("members/finance-user").set({
       uid: "finance-user",
@@ -390,5 +397,89 @@ test("controlled documents retain uploader and authorization restrictions", asyn
 
   await assertFails(db.doc("documents/missing-authorization").set({
     ...valid, uploadedByUid: "member-user", authorizedUids: []
+  }));
+});
+
+
+function translationRequest(overrides = {}) {
+  return {
+    requestType: "DOCUMENT_TRANSLATION",
+    documentId: "LIFE-test-1",
+    documentReference: "IRPA-DOC-2026-TEST0001",
+    documentTitle: "Controlled test document",
+    documentFileId: "drive-file-1",
+    documentFileName: "test.txt",
+    documentContentType: "text/plain",
+    documentSha256: "a".repeat(64),
+    documentOwnerUid: "member-user",
+    requestedByUid: "member-user",
+    sourceLanguage: "en",
+    targetLanguage: "maa",
+    targetLanguageLabel: "Maa (dictionary-assisted; human review)",
+    requestNotes: "Non-confidential translation smoke test",
+    documentClassification: "Internal",
+    documentStage: "WORKING",
+    status: "REQUESTED",
+    dictionaryAssistRequested: true,
+    humanReviewRequired: true,
+    contentTransferred: false,
+    requestOrigin: "Documents Portal",
+    createdAt: "2026-10-10T06:00:00.000Z",
+    updatedAt: "2026-10-10T06:00:00.000Z",
+    ...overrides
+  };
+}
+
+test("document owner can submit and retrieve their own translation request status", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("documents/LIFE-test-1").set(lifecycleDocument());
+  });
+  const ownerDb = testEnv.authenticatedContext("member-user", {email:"member@example.test"}).firestore();
+  await assertSucceeds(ownerDb.doc("documentTranslationRequests/translation-test-1").set(translationRequest()));
+  const snapshot = await assertSucceeds(ownerDb.doc("documentTranslationRequests/translation-test-1").get());
+  assert.equal(snapshot.data().status, "REQUESTED");
+  const unrelatedDb = testEnv.authenticatedContext("finance-user", {email:"finance@example.test"}).firestore();
+  await assertFails(unrelatedDb.doc("documentTranslationRequests/translation-test-1").get());
+});
+
+test("document owner can explicitly transfer content and save a translation draft but cannot approve it", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("documents/LIFE-test-1").set(lifecycleDocument());
+    await context.firestore().doc("documentTranslationRequests/translation-test-2").set(translationRequest());
+  });
+  const ownerDb = testEnv.authenticatedContext("member-user", {email:"member@example.test"}).firestore();
+  await assertSucceeds(ownerDb.doc("documentTranslationRequests/translation-test-2").update({
+    status:"IN_REVIEW",contentTransferred:true,translationStartedAt:"2026-10-10T06:05:00.000Z",
+    sourceLanguageResolved:"en-TZ",translationDraftText:"Ashe. Enkare is sidai.",
+    translationProvider:"IRPA Maa Dictionary · provisional glossary",sourceTextSha256:"b".repeat(64),
+    extractedCharacterCount:35,translationChunks:1,translationCoverage:"partial",dictionaryMatchedTerms:3,
+    updatedAt:"2026-10-10T06:05:00.000Z"
+  }));
+  await assertFails(ownerDb.doc("documentTranslationRequests/translation-test-2").update({
+    status:"COMPLETED",translatedText:"Ashe. Enkare is sidai.",
+    translationReviewedByUid:"member-user",reviewNotes:"Approved",completedAt:"2026-10-10T06:06:00.000Z",
+    updatedAt:"2026-10-10T06:06:00.000Z"
+  }));
+});
+
+test("Maa translation cannot be completed without an identified speaker review", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("documents/LIFE-test-1").set(lifecycleDocument());
+    await context.firestore().doc("documentTranslationRequests/translation-test-3").set(translationRequest({
+      status:"IN_REVIEW",contentTransferred:true,translationDraftText:"Ashe. Enkare is sidai."
+    }));
+  });
+  const reviewerDb = testEnv.authenticatedContext("reviewer-user", {email:"reviewer@example.test"}).firestore();
+  await assertFails(reviewerDb.doc("documentTranslationRequests/translation-test-3").update({
+    status:"COMPLETED",translatedText:"Ashe. Enkare is sidai.",translationDraftText:deleteField(),
+    translationReviewedByUid:"reviewer-user",reviewNotes:"Reviewed",translationReviewedAt:"2026-10-10T06:10:00.000Z",
+    completedAt:"2026-10-10T06:10:00.000Z",updatedAt:"2026-10-10T06:10:00.000Z"
+  }));
+  await assertSucceeds(reviewerDb.doc("documentTranslationRequests/translation-test-3").update({
+    status:"COMPLETED",translatedText:"Ashe. Enkare is sidai.",translationDraftText:deleteField(),
+    translationReviewedByUid:"reviewer-user",reviewNotes:"Reviewed with local speaker; corrected spelling and usage.",
+    maaSpeakerReview:{speakerName:"Test Maa Speaker",dialect:"Kisonko / Ilkisonko",reviewNotes:"Checked spelling and usage.",verifiedByUid:"reviewer-user",verifiedAt:"2026-10-10T06:10:00.000Z"},
+    translationReviewedAt:"2026-10-10T06:10:00.000Z",
+    completedAt:"2026-10-10T06:10:00.000Z",updatedAt:"2026-10-10T06:10:00.000Z"
   }));
 });
