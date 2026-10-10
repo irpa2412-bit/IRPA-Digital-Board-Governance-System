@@ -1,5 +1,5 @@
 import React,{useEffect,useState}from"react";
-import{httpsCallable,getFunctions}from"firebase/functions";
+import{authorizeMeetingEntry}from"../firebase/meetingGatewayApi";
 import{auth}from"../firebase/config";
 import{onAuthStateChanged}from"firebase/auth";
 
@@ -14,8 +14,7 @@ export default function MeetingEntryGateway({onEnter}){
   if(!token){setState("error");setMessage("This meeting gate pass is incomplete.");return}
   if(!meetingPassword){setState("password");setMessage("Enter the meeting gate password from the invitation email.");return}
   try{
-   const call=httpsCallable(getFunctions(undefined,"us-central1"),"authorizeMeetingEntry");
-   const result=await call({accessToken:token,meetingId,meetingPassword});const data=result.data||{};
+   const data=await authorizeMeetingEntry({accessToken:token,meetingId,meetingPassword});
    setMeeting(data);sessionStorage.setItem("irpaMeetingEntryContext",JSON.stringify(data));setState("authorized");
   }catch(e){setState("error");setMessage(e?.message||"Meeting entry authorization failed.")}
  });return()=>unsub()},[token,meetingId,meetingPassword]);

@@ -1,5 +1,5 @@
 import React,{useEffect,useRef,useState}from"react";
-import{httpsCallable,getFunctions}from"firebase/functions";
+import{issueLiveMeetingToken}from"../firebase/meetingGatewayApi";
 import{auth}from"../firebase/config";
 import{Room,RoomEvent,Track}from"livekit-client";
 
@@ -23,9 +23,9 @@ export default function IRPADBGSMeetingRoomMedia({meeting,selectedAuthority="",c
    if(roomRef.current)return;
    setError("");setStatus("AUTHORIZING");
    try{
-     const call=httpsCallable(getFunctions(undefined,"us-central1"),"issueLiveMeetingToken");
-     const result=await call({meetingId:meeting.id,selectedAuthority:String(selectedAuthority||"").trim()});
-     const data=result.data||{};
+     
+     const data=await issueLiveMeetingToken({meetingId:meeting.id,selectedAuthority:String(selectedAuthority||"").trim()});
+     
      if(!data.serverUrl||!data.participantToken)throw new Error("The IRPA live meeting authorization response was incomplete.");
      const room=new Room({adaptiveStream:true,dynacast:true});
      room.on(RoomEvent.TrackSubscribed,(track)=>attach(track,remoteRef.current));

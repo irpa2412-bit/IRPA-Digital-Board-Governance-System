@@ -2,14 +2,14 @@
 import React,{useEffect,useMemo,useState}from"react";
 import{createRecord,getRecords,updateRecord,deleteRecord,COLLECTIONS}from"../firebase/data";
 import{sendMemberInvitationEmail}from"../firebase/auth";
-import{getFunctions,httpsCallable}from"firebase/functions";
+import{createMeetingAccessInvitation,revokeMeetingAccessInvitation}from"../firebase/meetingGatewayApi";
 const MANUAL_INVITEE_ROLES=["Technical Expert","Government Representative","Partner / Donor","Invited Guest","External Participant — Non-Voting","Consultant"];
 const AUTHORITATIVE_ROLES=["Board Member","Board Committee Member","Board Chairperson","Board Secretary","Board Treasurer","Board Vice Chairperson"];
 const empty={participantName:"",participantUid:"",participantEmail:"",participantRole:"Invited Guest",participantType:"External Invitee",sourceType:"Manual Invitee",sourceRecordId:"",employeeId:"",boardMemberId:"",memberType:"Technical Advisor",meetingId:"",meetingReference:"",attendanceStatus:"Invited",notes:""};
 const SYSTEM_ROLES=["Board Member","Board Chairperson","Board Secretary","Board Treasurer","Board Vice Chairperson","Executive Director","Director Human Resources","Director Livestock","Director Environment","Director Outreach","Director Community Development","Director Field Operations","HR Manager","Director Finance & Administration","Finance Personnel","Finance Manager","Accountant","Finance Officer","Director Internal Oversight","Internal Oversight Officer","Secretariat","Procurement Officer","Programme/Technical Officer","Management","Operations Manager","IT Specialist","Information Technology Officer","Driver","Field Assistant","Administrative Assistant","Communications Officer","Monitoring & Evaluation Officer","Project Officer","Rangeland Officer","Livestock Officer","Outreach Officer","Community Development Officer","Environment Officer","HR Officer","Employee"];
 export default function OperationalGatewaysParticipants(){
  const[rows,setRows]=useState([]),[meetings,setMeetings]=useState([]),[employees,setEmployees]=useState([]),[boardMembers,setBoardMembers]=useState([]),[members,setMembers]=useState([]),[invitations,setInvitations]=useState([]),[form,setForm]=useState(empty),[edit,setEdit]=useState(null),[selected,setSelected]=useState(null),[filter,setFilter]=useState("All"),[search,setSearch]=useState(""),[busy,setBusy]=useState(false),[msg,setMsg]=useState(""),[err,setErr]=useState(""),[sourceMode,setSourceMode]=useState("system");
- async function load(){try{const[r,m,e,b,i]=await Promise.all([getRecords(COLLECTIONS.participants),getRecords(COLLECTIONS.meetings),getRecords(COLLECTIONS.employees),getRecords(COLLECTIONS.members),getRecords(COLLECTIONS.invitations)]);setRows(r);setMeetings(m);setEmployees(e);setBoardMembers(b.filter(x=>x.boardMember===true||x.boardPosition||x.department==="Board of Directors"));setMembers(b.filter(x=>!x.boardMember&&!x.boardPosition&&x.role!=="Board Member"));setInvitations(i)}catch(e){setErr(e.message||"Unable to load participants.")}}
+ async function load(){try{const[r,m,e,b,i]=await Promise.all([getRecords(COLLECTIONS.participants),getRecords(COLLECTIONS.meetings),getRecords(COLLECTIONS.employees),getRecords(COLLECTIONS.members),getRecords(COLLECTIONS.invitations)]);setRows(r.filter(item=>!["removed","cancelled","canceled","revoked","inactive","closed"].includes(String(item.status||item.registrationStatus||"").trim().toLowerCase())));setMeetings(m);setEmployees(e);setBoardMembers(b.filter(x=>x.boardMember===true||x.boardPosition||x.department==="Board of Directors"));setMembers(b.filter(x=>!x.boardMember&&!x.boardPosition&&x.role!=="Board Member"));setInvitations(i)}catch(e){setErr(e.message||"Unable to load participants.")}}
  useEffect(()=>{load()},[]);
  function change(e){setForm({...form,[e.target.name]:e.target.value})}
  function reset(){setForm(empty);setEdit(null);setSourceMode("system")}
@@ -40,13 +40,12 @@ export default function OperationalGatewaysParticipants(){
    let invitationId=invite.id;
    if(!invitationId){
     invitationId=await createRecord(COLLECTIONS.invitations,invite);
-    await updateRecord(COLLECTIONS.invitations,invitationId,{subscriptionLink:window.location.origin+"/?induction=1&applicant=1&route=subscription&memberInvite="+encodeURIComponent(invitationId),loginAssistanceLink:window.location.origin+"/?induction=1&applicant=1&route=assistance&memberInvite="+encodeURIComponent(invitationId)});
+    await updateRecord(COLLECTIONS.invitations,invitationId,{meetingId:payload.meetingId,participantId,subscriptionLink:window.location.origin+"/?induction=1&applicant=1&route=subscription&memberInvite="+encodeURIComponent(invitationId),loginAssistanceLink:window.location.origin+"/?induction=1&applicant=1&route=assistance&memberInvite="+encodeURIComponent(invitationId)});
    }
    await updateRecord(COLLECTIONS.invitations,invitationId,{participantId,meetingId:payload.meetingId,meetingIdentity:payload.meetingIdentity,meetingReference:payload.meetingReference,meetingTitle:m.title});
    let issuedAccess=null;
    try{
-    const issueAccess=httpsCallable(getFunctions(undefined,"us-central1"),"createMeetingAccessInvitation");
-    const issued=(await issueAccess({meetingId:payload.meetingId,participantId})).data||{};
+    const issued=await createMeetingAccessInvitation({meetingId:payload.meetingId,participantId});
     issuedAccess=issued;
     if(!issued.accessToken||!issued.meetingPassword||!issued.accessId)throw new Error("The meeting gateway did not return a complete access pass.");
     const meetingAccess={accessId:issued.accessId,accessToken:issued.accessToken,meetingId:issued.meetingId,participantId:issued.participantId,meetingIdentity:payload.meetingIdentity,meetingReference:payload.meetingReference,meetingTitle:m.title,meetingDate:m.date||"",meetingStartTime:m.startTime||"",meetingEndTime:m.endTime||"",meetingPlatform:m.meetingPlatform||"Platform not recorded",platformAccessUrl:m.platformAccessUrl||"",platformMeetingId:m.platformMeetingId||"",platformPasscode:m.platformPasscode||"",meetingVenue:m.venue||"",meetingChairperson:m.chairperson||"",meetingAgenda:m.agenda||"",password:issued.meetingPassword,expiresAt:issued.expiresAt};
@@ -58,7 +57,7 @@ export default function OperationalGatewaysParticipants(){
     await updateRecord(COLLECTIONS.participants,participantId,{invitationId,invitationStatus:"Invitation Requested",invitationRole:payload.participantRole,meetingAccessDispatched:true,meetingAccessDispatchStatus:"Confirmed",meetingAccessId:issued.accessId,meetingAccessDispatchedAt:dispatchedAt,meetingAccessExpiresAt:issued.expiresAt||null});
     setMsg("Participant registered. The invitation register now records the meeting link and gate-token release reference and updates its dispatch tally. The bearer token itself is sent to the invitee and is not stored in the register. Delivery status: "+deliveryStatus);
    }catch(x){
-    if(issuedAccess?.accessId){try{await httpsCallable(getFunctions(undefined,"us-central1"),"revokeMeetingAccessInvitation")({accessId:issuedAccess.accessId})}catch(revokeError){console.error("Unable to revoke undelivered meeting access pass",revokeError?.code||"")}}
+    if(issuedAccess?.accessId){try{await revokeMeetingAccessInvitation({accessId:issuedAccess.accessId})}catch(revokeError){console.error("Unable to revoke undelivered meeting access pass",revokeError?.code||"")}}
     const failedAt=new Date().toISOString();
     await updateRecord(COLLECTIONS.invitations,invitationId,{deliveryStatus:"Failed",status:"Invitation Dispatch Failed",deliveryError:x.message||"Invitation request failed.",meetingAccessDispatched:false,meetingAccessDispatchStatus:"Failed",meetingInvitationLinkStatus:"Not released",meetingTokenStatus:issuedAccess?.accessId?"Revoked after dispatch failure":"Not issued",meetingAccessId:issuedAccess?.accessId||null,meetingAccessTokenReference:issuedAccess?.accessId||null,meetingAccessDispatchedAt:null,meetingAccessDispatchFailedAt:failedAt,meetingAccessDispatchError:x.message||"Invitation request failed."});
     await updateRecord(COLLECTIONS.participants,participantId,{invitationId,invitationStatus:"Failed",meetingAccessDispatched:false,meetingAccessDispatchStatus:"Failed",meetingAccessId:issuedAccess?.accessId||null,meetingAccessDispatchFailedAt:failedAt});

@@ -1,5 +1,5 @@
 import React,{useEffect,useMemo,useRef,useState}from"react";
-import{httpsCallable,getFunctions}from"firebase/functions";
+import{issueLiveMeetingToken}from"../firebase/meetingGatewayApi";
 import{auth}from"../firebase/config";
 import{getMeetingRecordingStatus,startMeetingRecording,stopMeetingRecording}from"../firebase/meetingRecords";
 import{uploadMeetingProductToDrive}from"../firebase/signatureStorage";
@@ -53,9 +53,7 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
        const gateContext=JSON.parse(sessionStorage.getItem("irpaMeetingEntryContext")||"null");
        if(gateContext?.meetingId===meeting.id)gateParticipantId=String(gateContext?.participantId||"");
      }catch{}
-     const call=httpsCallable(getFunctions(undefined,"us-central1"),"issueLiveMeetingToken");
-     const result=await call({meetingId:meeting.id,selectedAuthority:gateParticipantId?"":String(selectedAuthority||"").trim(),participantId:gateParticipantId});
-     const data=result.data||{};
+     const data=await issueLiveMeetingToken({meetingId:meeting.id,selectedAuthority:gateParticipantId?"":String(selectedAuthority||"").trim(),participantId:gateParticipantId});
      if(!data.serverUrl||!data.participantToken)throw new Error("The IRPA live meeting authorization response was incomplete.");
      const room=new Room({adaptiveStream:true,dynacast:true});
      room.on(RoomEvent.TrackSubscribed,(track)=>attach(track,remoteRef.current));
