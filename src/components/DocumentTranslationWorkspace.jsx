@@ -93,7 +93,8 @@ export default function DocumentTranslationWorkspace({profile,employee,admin=fal
  const isReviewer=Boolean(admin||profile?.active===true&&profile?.isAdmin===true||roles.some(r=>REVIEWER_ROLES.has(r)));
  const selected=useMemo(()=>requests.find(r=>r.id===selectedId)||null,[requests,selectedId]);
  const isOwner=Boolean(selected&&selected.documentOwnerUid===currentUid);
- const canProcess=Boolean(isReviewer||isOwner);
+ const sensitiveDocument=["Confidential","Restricted"].includes(String(selected?.documentClassification||""));
+ const canProcess=Boolean(isReviewer||(isOwner&&!sensitiveDocument));
  const visibleRequests=useMemo(()=>requests.filter(r=>isReviewer||r.documentOwnerUid===currentUid),[requests,isReviewer,currentUid]);
  useEffect(()=>{
   if(!currentUid){setRequests([]);return}
@@ -213,7 +214,7 @@ export default function DocumentTranslationWorkspace({profile,employee,admin=fal
     {!selected?<div className="auth-message">Select a translation request to review its details.</div>:<div className="auth-message">
      <h4 style={{marginTop:0}}>{selected.documentTitle||selected.documentId}</h4>
      <dl style={{display:"grid",gridTemplateColumns:"max-content 1fr",gap:"5px 10px"}}><dt>Status</dt><dd>{requestStatusLabel(selected.status)}</dd><dt>Requested target</dt><dd>{selected.targetLanguageLabel||selected.targetLanguage}</dd><dt>Source</dt><dd>{selected.sourceLanguage||"Detect / not specified"}</dd><dt>Classification</dt><dd>{selected.documentClassification||"Internal"}</dd><dt>Owner UID</dt><dd style={{wordBreak:"break-all"}}>{selected.documentOwnerUid}</dd><dt>Requested</dt><dd>{fmt(selected.createdAt)}</dd><dt>Instructions</dt><dd>{selected.requestNotes||"—"}</dd></dl>
-     {canProcess&&["REQUESTED","IN_REVIEW"].includes(String(selected.status||""))&&<div style={{borderTop:"1px solid var(--border)",paddingTop:12,marginTop:12}}>
+     {sensitiveDocument&&!isReviewer&&<p className="muted">Confidential/Restricted document content may only be transferred by an authorised reviewer or administrator. The owner can submit and track the request but cannot run the translation directly.</p>}{canProcess&&["REQUESTED","IN_REVIEW"].includes(String(selected.status||""))&&<div style={{borderTop:"1px solid var(--border)",paddingTop:12,marginTop:12}}>
       <div className="form-field"><label>Source language used for extraction</label><select value={sourceLanguage} onChange={e=>setSourceLanguage(e.target.value)}><option value="en-TZ">English</option><option value="sw-TZ">Kiswahili</option><option value="maa">Maa (Maasai)</option><option value="fr-FR">French</option><option value="es-ES">Spanish</option><option value="pt-PT">Portuguese</option><option value="ar-SA">Arabic</option></select></div>
       <div style={{marginTop:10}}><label style={{display:"flex",gap:8,alignItems:"flex-start"}}><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)}/> <span>I confirm that this owner-requested document may be extracted and its text sent to the IRPA translation service for processing. This action transfers content; submitting the request alone does not. The owner can generate a draft, but only an authorised reviewer can approve it as complete.</span></label></div>
       {["Confidential","Restricted"].includes(String(selected.documentClassification||""))&&<div style={{marginTop:10}}><label style={{display:"flex",gap:8,alignItems:"flex-start"}}><input type="checkbox" checked={restrictedApproval} onChange={e=>setRestrictedApproval(e.target.checked)}/> <span>I have verified the separate institutional authorization required to transfer Confidential/Restricted document content.</span></label></div>}
