@@ -17,7 +17,7 @@ This follows the official [LiveKit VM deployment guide](https://docs.livekit.io/
 
 ## Required before deployment
 
-1. A dedicated Ubuntu 22.04/24.04 VM with a public IPv4 address and SSH access.
+1. A dedicated Ubuntu 22.04/24.04 VM with a public IPv4 address and SSH access. LiveKit room-composite Egress is resource-intensive; LiveKit recommends at least 4 CPUs and 4 GB RAM for each Egress instance. Verify the existing host meets this before enabling recordings; do not provision or resize a VM without the previously required explicit spending approval.
 2. DNS A records for `meet.irpa.or.tz` and `turn.irpa.or.tz`, both pointing to the VM. The installer refuses to run if either record does not resolve to the target VM.
 3. Provider and host firewall rules: TCP 22 (restricted to trusted admin IPs), 80, 443, 7881; UDP 3478 and 50000–60000. TCP/5349 is an internal LiveKit TURN listener behind Caddy and should not be exposed publicly. Check the current provider firewall before opening ports.
 4. Unique, high-entropy LiveKit API credentials. Never use `devkey/secret`.
