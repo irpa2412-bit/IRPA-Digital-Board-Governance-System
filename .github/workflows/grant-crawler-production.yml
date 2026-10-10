@@ -1,0 +1,159 @@
+name: IRPA Grant Crawler — Production Release
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "cloudflare/grant-crawler-parallel/**"
+      - ".github/workflows/grant-crawler-production.yml"
+permissions:
+  contents: read
+concurrency:
+  group: irpa-grant-crawler-production
+  cancel-in-progress: false
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloudflare/grant-crawler-parallel
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run parser, authentication and isolation tests
+        run: npm run check
+      - name: Validate production Worker bundle
+        run: npx --yes wrangler@4 deploy --config wrangler.toml --dry-run --env production
+      - name: Verify production isolation
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const config = fs.readFileSync('wrangler.toml', 'utf8');
+          if (config.includes('irpa-google-drive-gateway')) throw new Error('Crawler config references production gateway.');
+          if (!config.includes('name = "irpa-grant-crawler-production"')) throw new Error('Production Worker name missing.');
+          if (!config.includes('IRPA_ENVIRONMENT = "production"')) throw new Error('Production environment marker missing.');
+          if (!config.includes('database_name = "irpa-grant-crawler-production"')) throw new Error('Production D1 database missing.');
+          NODE
+  deploy-production:
+    # This workflow may deploy only the isolated production Worker. Allow the same-repository production branch's PR validation to deploy after tests, because GitHub API commits do not reliably emit a push event. Never deploy from arbitrary fork PRs.\n    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: irpa-grant-crawler-production
+    defaults:
+      run:
+        working-directory: cloudflare/grant-crawler-parallel
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Wrangler
+        run: npm install --global wrangler@4
+      - name: Validate scoped deployment credentials
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_GRANT_CRAWLER_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          GRANT_CRAWLER_CONTROL_TOKEN: ${{ secrets.GRANT_CRAWLER_CONTROL_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test "${#GRANT_CRAWLER_CONTROL_TOKEN}" -ge 32
+          echo "Required secret presence validated; values are not printed."
+      - name: Create or locate isolated production D1 database
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_GRANT_CRAWLER_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          response="$(curl --fail --silent --show-error \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/d1/database")"
+          database_id="$(node - "$response" <<'NODE'
+          const a = JSON.parse(process.argv[2]);
+          if (!a.success) throw new Error('Cloudflare D1 listing failed.');
+          const d = (a.result || []).find(x => x.name === 'irpa-grant-crawler-production');
+          if (d?.uuid) process.stdout.write(d.uuid);
+          NODE
+          )"
+          if [ -z "$database_id" ]; then
+            created="$(curl --fail --silent --show-error -X POST \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              --data '{"name":"irpa-grant-crawler-production"}' \
+              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/d1/database")"
+            database_id="$(node - "$created" <<'NODE'
+          const a = JSON.parse(process.argv[2]);
+          if (!a.success || !a.result?.uuid) throw new Error('Could not create isolated production D1 database.');
+          process.stdout.write(a.result.uuid);
+          NODE
+            )"
+          fi
+          node - "$database_id" <<'NODE'
+          const fs = require('fs');
+          const id = process.argv[2];
+          if (!/^[0-9a-f-]{36}$/i.test(id)) throw new Error('Invalid production D1 identifier.');
+          let config = fs.readFileSync('wrangler.toml', 'utf8');
+          config = config.replaceAll('00000000-0000-0000-0000-000000000000', id);
+          fs.writeFileSync('wrangler.toml', config);
+          NODE
+          echo "Isolated production database configured; ID is not printed."
+      - name: Apply production D1 migrations
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_GRANT_CRAWLER_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler d1 migrations apply irpa-grant-crawler-production --config wrangler.toml --env production --remote
+      - name: Deploy only the isolated production Worker
+        id: deploy_production
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_GRANT_CRAWLER_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          GRANT_CRAWLER_CONTROL_TOKEN: ${{ secrets.GRANT_CRAWLER_CONTROL_TOKEN }}
+          GRANT_CRAWLER_FEED_URLS: ${{ secrets.GRANT_CRAWLER_FEED_URLS }}
+          BRAVE_SEARCH_API_KEY: ${{ secrets.BRAVE_SEARCH_API_KEY }}
+        run: |
+          set -euo pipefail
+          npx wrangler secret put CRAWLER_CONTROL_TOKEN --config wrangler.toml --env production <<< "$GRANT_CRAWLER_CONTROL_TOKEN"
+          if [ -n "${GRANT_CRAWLER_FEED_URLS:-}" ]; then
+            node - "$GRANT_CRAWLER_FEED_URLS" <<'NODE'
+          const feeds = JSON.parse(process.argv[2]);
+          if (!Array.isArray(feeds) || feeds.length > 30) throw new Error('Feed secret must be a JSON array with at most 30 URLs.');
+          for (const value of feeds) {
+            const url = new URL(value);
+            if (url.protocol !== 'https:' || url.username || url.password || (url.port && url.port !== '443')) throw new Error('Every feed must use credential-free HTTPS on port 443.');
+          }
+          NODE
+            printf '%s' "$GRANT_CRAWLER_FEED_URLS" | npx wrangler secret put GRANT_FEED_URLS_JSON --config wrangler.toml --env production
+          fi
+          if [ -n "${BRAVE_SEARCH_API_KEY:-}" ]; then
+            printf '%s' "$BRAVE_SEARCH_API_KEY" | npx wrangler secret put BRAVE_SEARCH_API_KEY --config wrangler.toml --env production
+          fi
+          deploy_log="$(npx wrangler deploy --config wrangler.toml --env production 2>&1)"
+          printf '%s\n' "$deploy_log"
+          worker_url="$(printf '%s\n' "$deploy_log" | grep -Eo 'https://irpa-grant-crawler-production\.[a-zA-Z0-9.-]+\.workers\.dev' | head -n 1 || true)"
+          if [ -z "$worker_url" ]; then
+            echo "Could not safely resolve the deployed production URL from Wrangler output." >&2
+            exit 1
+          fi
+          health="$(curl --fail --silent --show-error --max-time 15 "$worker_url/health")"
+          node - "$health" <<'NODE'
+          const body = JSON.parse(process.argv[2]);
+          if (body.service !== 'irpa-grant-crawler' || body.environment !== 'production' || body.storage !== 'configured' || body.ai !== 'configured') throw new Error('Production health response failed, including Workers AI binding.');
+          if (body.identity !== 'firebase-id-token-verification-only' || body.draftStorage !== 'cloudflare-d1') throw new Error('Identity and Cloudflare D1 storage health markers are missing.');
+          console.log('Production health verification passed; draft storage is Cloudflare D1 and Firebase is used only for identity verification.');
+          NODE
+          echo "worker_url=$worker_url" >> "$GITHUB_OUTPUT"
+      - name: Run live feed discovery and test AI eligibility on a public opportunity
+        env:
+          GRANT_CRAWLER_CONTROL_TOKEN: ${{ secrets.GRANT_CRAWLER_CONTROL_TOKEN }}
+          PRODUCTION_WORKER_URL: ${{ steps.deploy_production.outputs.worker_url }}
+        run: |
+          set -euo pipefail
+          result="$(curl --silent --show-error --max-time 90 -X POST \
+            -H "Authorization: Bearer $GRANT_CRAWLER_CONTROL_TOKEN" \
+            -H "Content-Type: application/json" \
+            "$PRODUCTION_WORKER_URL/crawl")"
+          printf '%s' "$result" | node scripts/staging-smoke-test.js
