@@ -32,6 +32,14 @@ else {
   }
   console.log("[VERIFIER] Production HTML and emitted JS/CSS assets: "+(failures.length?"CHECK REQUIRED":"PASS"));
 }
+fs.mkdirSync("artifacts",{recursive:true});
+fs.writeFileSync("artifacts/readability-verification-report.json",JSON.stringify({
+  generatedAt:new Date().toISOString(),
+  mode:changedOnly?"changed-files":"full-production",
+  passed:failures.length===0,
+  failures:[...new Set(failures)],
+  productionHtmlPresent:fs.existsSync(html)&&fs.statSync(html).size>0
+},null,2)+"\n");
 if(failures.length) {
   console.error("\nPRODUCTION READABILITY VERIFICATION FAILED — RELEASE MUST NOT PROCEED.");
   for(const f of [...new Set(failures)]) console.error("- "+f);
