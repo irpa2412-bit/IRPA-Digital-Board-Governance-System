@@ -340,6 +340,7 @@ test("AI grant assistant is authenticated and returns structured eligibility ana
       assert.ok(input.messages[0].content.includes("Digital Board Governance System"));
       assert.ok(input.messages[0].content.includes("Market Development"));
       assert.ok(input.messages[0].content.includes("environmental sustainability"));
+      assert.deepEqual(input.response_format, { type: "json_object" });
       return { response: JSON.stringify(mockAnalysis) };
     } }
   };
@@ -357,6 +358,30 @@ test("AI grant assistant is authenticated and returns structured eligibility ana
   assert.equal(body.assessment.eligibility.status, "possibly_eligible");
   assert.equal(body.assessment.donor_requirements.length, 1);
   assert.equal(usedModel, "@cf/meta/llama-3.3-70b-instruct-fp8-fast");
+});
+
+test("AI grant assistant accepts object-shaped JSON-mode responses", async () => {
+  const token = "test-token-with-at-least-32-characters-long";
+  const response = await worker.fetch(new Request("https://crawler.example/assistant/analyze", {
+    method: "POST",
+    headers: { authorization: "Bearer " + token, "content-type": "application/json" },
+    body: JSON.stringify({
+      title: "Tanzania rangeland grant",
+      description: "Eligible applicants must be registered in Tanzania as NGOs.",
+      donorRequirements: "Eligible applicants must be registered in Tanzania as NGOs."
+    })
+  }), {
+    CRAWLER_CONTROL_TOKEN: token,
+    AI: { run: async () => ({ response: {
+      eligibility: { status: "possibly_eligible", confidence: "medium", evidence: [], unknowns: ["Confirm minimum organization age"] },
+      donor_requirements: [{ requirement: "Tanzania registration", status: "met", evidence: "Call text requires Tanzania registration", action: "Attach registration certificate" }],
+      strategic_alignment: { relevant_pillars: ["Sustainable Rangeland Management"], relevant_cross_cutting_themes: ["community participation"], pillar_theme_alignment: [], digital_governance_relevance: "none", rationale: "Direct fit", funding_use_fit: [] }
+    } }) }
+  });
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.assessment.eligibility.status, "possibly_eligible");
+  assert.equal(body.assessment.geographic_eligibility.status, "eligible");
 });
 
 test("AI grant assistant validates required input and URL", async () => {
