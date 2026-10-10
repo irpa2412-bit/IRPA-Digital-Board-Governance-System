@@ -14,11 +14,16 @@ exports.createMeetingAccessInvitation=onCall({region:"us-central1",timeoutSecond
  const uid=request.auth?.uid;
  if(!uid)throw new HttpsError("unauthenticated","Authentication is required.");
  const meetingId=text(request.data?.meetingId),participantId=text(request.data?.participantId);
+ let stage="VALIDATE_INPUT";
+ const logStage=(status,extra={})=>console.info("MEETING_ACCESS_INVITATION_STAGE",{stage,status,meetingId:meetingId||null,participantId:participantId||null,actorUid:uid,...extra});
+ logStage("START");
  if(!meetingId||!participantId)throw new HttpsError("invalid-argument","Meeting and participant are required.");
+ stage="LOAD_MEETING_AND_PARTICIPANT";
  const meetingSnap=await db.collection("meetings").doc(meetingId).get();
  const participantSnap=await db.collection("participants").doc(participantId).get();
  if(!meetingSnap.exists||!participantSnap.exists)throw new HttpsError("not-found","Meeting or participant was not found.");
  const meeting={id:meetingSnap.id,...meetingSnap.data()},participant={id:participantSnap.id,...participantSnap.data()};
+ logStage("RECORDS_LOADED",{meetingFound:true,participantFound:true,participantMeetingMatches:participant.meetingId===meetingId});
  if(participant.meetingId!==meetingId)throw new HttpsError("failed-precondition","Participant is not linked to the selected meeting.");
  const chair=String(meeting.chairpersonEmail||"").toLowerCase()===String(request.auth.token.email||"").toLowerCase();
  const secretary=String(meeting.secretaryEmail||"").toLowerCase()===String(request.auth.token.email||"").toLowerCase();
@@ -27,10 +32,13 @@ exports.createMeetingAccessInvitation=onCall({region:"us-central1",timeoutSecond
  // the meeting-registration rules accept the authorised registrar. Allow that same initiator
  // to dispatch invitations for their own meeting; do not force all dispatch work through admin.
  const initiator=text(meeting.initiatorUid)===uid;
+ stage="AUTHORIZE_ISSUER";
+ logStage("AUTHORIZATION_EVALUATED",{isAdmin,chair,secretary,initiator});
  if(!isAdmin&&!chair&&!secretary&&!initiator)throw new HttpsError("permission-denied","Only the authorised meeting initiator, administrator, chairperson or secretary may issue meeting access.");
  const raw=crypto.randomBytes(32).toString("base64url");
  const meetingPassword=gatePassword();
  const tokenHash=hash(raw),passwordHash=hash(meetingPassword);
+ stage="CREATE_ACCESS_PASS";
  const ref=db.collection("meetingAccessTokens").doc();
  const expiresAt=new Date(Date.now()+1000*60*60*24*30);
  await ref.set({
@@ -41,7 +49,10 @@ exports.createMeetingAccessInvitation=onCall({region:"us-central1",timeoutSecond
   createdByUid:uid,createdAt:FieldValue.serverTimestamp(),
   gateway:"IRPA Meeting Entry Gateway",singlePurpose:"Live meeting entry"
  });
- await db.runTransaction(async tx=>{const latest=await tx.get(meetingSnap.ref);if(!latest.exists)throw new HttpsError("not-found","The meeting record no longer exists.");const current=latest.data()||{};const ids=Array.isArray(current.invitedParticipantIds)?current.invitedParticipantIds.map(String):[];const nextIds=[...new Set([...ids,participantId])];const invitedEmails=new Set(Array.isArray(current.invitedEmails)?current.invitedEmails.map(v=>text(v).toLowerCase()).filter(Boolean):[]);const participantEmails=new Set(Array.isArray(current.participantEmails)?current.participantEmails.map(v=>text(v).toLowerCase()).filter(Boolean):[]);const participantEmail=text(participant.participantEmail||participant.email).toLowerCase();if(participantEmail){invitedEmails.add(participantEmail);participantEmails.add(participantEmail);}const patch={invitedParticipantIds:nextIds,invitedParticipantCount:nextIds.length,invitedEmails:[...invitedEmails],participantEmails:[...participantEmails],updatedAt:FieldValue.serverTimestamp()};const participantUid=text(participant.participantUid||participant.uid||participant.userId);if(participantUid){patch.invitedUids=FieldValue.arrayUnion(participantUid);patch.participantUids=FieldValue.arrayUnion(participantUid);}tx.set(meetingSnap.ref,patch,{merge:true});});
+ logStage("ACCESS_PASS_CREATED",{accessId:ref.id});
+ stage="UPDATE_MEETING_INVITEE_TALLY";
+ try { await db.runTransaction(async tx=>{const latest=await tx.get(meetingSnap.ref);if(!latest.exists)throw new HttpsError("not-found","The meeting record no longer exists.");const current=latest.data()||{};const ids=Array.isArray(current.invitedParticipantIds)?current.invitedParticipantIds.map(String):[];const nextIds=[...new Set([...ids,participantId])];const invitedEmails=new Set(Array.isArray(current.invitedEmails)?current.invitedEmails.map(v=>text(v).toLowerCase()).filter(Boolean):[]);const participantEmails=new Set(Array.isArray(current.participantEmails)?current.participantEmails.map(v=>text(v).toLowerCase()).filter(Boolean):[]);const participantEmail=text(participant.participantEmail||participant.email).toLowerCase();if(participantEmail){invitedEmails.add(participantEmail);participantEmails.add(participantEmail);}const patch={invitedParticipantIds:nextIds,invitedParticipantCount:nextIds.length,invitedEmails:[...invitedEmails],participantEmails:[...participantEmails],updatedAt:FieldValue.serverTimestamp()};const participantUid=text(participant.participantUid||participant.uid||participant.userId);if(participantUid){patch.invitedUids=FieldValue.arrayUnion(participantUid);patch.participantUids=FieldValue.arrayUnion(participantUid);}tx.set(meetingSnap.ref,patch,{merge:true});}); } catch(error) { console.error("MEETING_ACCESS_INVITATION_TALLY_FAILED",{stage,meetingId,participantId,accessId:ref.id,code:error?.code||null,message:String(error?.message||error).slice(0,240)}); try { await ref.update({status:"Revoked",revokedAt:FieldValue.serverTimestamp(),revocationReason:"INVITEE_TALLY_UPDATE_FAILED"}); } catch(revokeError) { console.error("MEETING_ACCESS_INVITATION_ORPHAN_PASS_REVOCATION_FAILED",{meetingId,participantId,accessId:ref.id,code:revokeError?.code||null,message:String(revokeError?.message||revokeError).slice(0,200)}); } throw new HttpsError("internal","Meeting invitation could not update the meeting invitee register. Retry after checking the meeting register permissions."); }
+ logStage("SUCCESS",{accessId:ref.id});
  return {ok:true,accessId:ref.id,accessToken:raw,meetingId,meetingPassword,participantId,participantName:text(participant.participantName||participant.name)||text(participant.email),meetingReference:text(meeting.reference||meeting.title),meetingCategory:text(meeting.meetingCategory||meeting.category||meeting.meetingType||"General Meeting"),reusable:true,reusePolicy:"Reusable for 30 days, or until revoked or the meeting is closed.",expiresAt:expiresAt.toISOString()};
 });
 
