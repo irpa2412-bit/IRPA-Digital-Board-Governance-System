@@ -108,7 +108,7 @@ function detectKnownEligibilityGaps(opportunity) {
   const requiresOrganizationalTrackRecord =
     /(?:applicant|organization|organisation|ngo|civil society organization|civil society organisation|lead applicant)[^.!?]{0,100}(?:must|shall|required to|at least|minimum)[^.!?]{0,100}(?:completed[^.!?]{0,30}projects|previously implemented|previous grants|past projects|proven track record|demonstrated track record)/i.test(text) ||
     /(?:must|shall|required to)[^.!?]{0,100}(?:previously implemented|completed at least \d+ projects|have a proven track record|demonstrate a track record of completed projects)/i.test(text) ||
-    /\b(?:csos?|ngos?|civil society organizations?|civil society organisations?|applicant organizations?|applicant organisations?)\b[^.!?]{0,80}\b(?:over|more than|at least|minimum of)\s*\d+\s*years?[^.!?]{0,80}\b(?:experience|proven evidence|working|track record|implementation)\b/i.test(text);
+    /\b(?:csos?|ngos?|civil society organizations?|civil society organisations?|applicant organizations?|applicant organisations?)\b[^.!?]{0,80}\b(?:over|more than|at least|minimum of)\s*(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*years?[^.!?]{0,80}\b(?:experience|proven evidence|working|track record|implementation)\b/i.test(text);
   if (requiresOrganizationalTrackRecord) {
     addUnique(blockers, "The call requires organizational project-delivery or grant track record, but IRPA has reported no completed projects.");
   }
@@ -119,10 +119,12 @@ function detectKnownEligibilityGaps(opportunity) {
     addUnique(warnings, "The call mentions co-financing or cost share; IRPA has no secured project funds reported, so confirm whether in-kind contributions or third-party match are allowed.");
   }
 
-  const yearsMatch = text.match(/(?:registered|incorporated|established|operating|in existence)[^.!?]{0,80}(?:at least|minimum(?: of)?|for|over|more than)\s*(\d{1,2})\s*years?/i) ||
-    text.match(/(?:at least|minimum(?: of)?|over|more than)\s*(\d{1,2})\s*years?[^.!?]{0,80}(?:registered|incorporated|established|operating|in existence)/i);
+  const yearsMatch = text.match(/(?:registered|incorporated|established|operating|in existence)[^.!?]{0,80}(?:at least|minimum(?: of)?|for|over|more than)\s*(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s*years?/i) ||
+    text.match(/(?:at least|minimum(?: of)?|over|more than)\s*(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s*years?[^.!?]{0,80}(?:registered|incorporated|established|operating|in existence)/i);
   if (yearsMatch) {
-    const requiredYears = Number(yearsMatch[1] || yearsMatch[2]);
+    const yearsToken = String(yearsMatch[1] || yearsMatch[2]).toLowerCase();
+    const wordNumbers = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+    const requiredYears = Number.isFinite(Number(yearsToken)) ? Number(yearsToken) : (wordNumbers[yearsToken] || 0);
     const registrationDate = Date.parse("2023-12-11T00:00:00Z");
     const ageYears = Math.max(0, (Date.now() - registrationDate) / (365.2425 * 24 * 60 * 60 * 1000));
     if (requiredYears > ageYears) {
