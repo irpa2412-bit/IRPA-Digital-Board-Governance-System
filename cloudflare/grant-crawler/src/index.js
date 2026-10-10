@@ -85,8 +85,35 @@ async function readFeeds(env) {
   return feeds;
 }
 
+function extractDeadline(item) {
+  const text = `${item.title || ""} ${item.description || ""}`;
+  const monthNames = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+  const months = monthNames.join("|");
+  const patterns = [
+    new RegExp("(?:by|deadline(?: date)?|submission deadline|closing date|due date|submit(?:ted)? by)[^\\\\n]{0,40}?(\\\\d{1,2})\\\\s+(" + months + ")(?:\\\\s+(\\\\d{4}))?", "i"),
+    new RegExp("(?:by|deadline(?: date)?|submission deadline|closing date|due date|submit(?:ted)? by)[^\\\\n]{0,40}?(" + months + ")\\\\s+(\\\\d{1,2})(?:,?\\\\s+(\\\\d{4}))?", "i"),
+  ];
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (!match) continue;
+    const month = monthNames.indexOf((match[2] || match[1]).toLowerCase());
+    const day = Number(match[1] && /^\\\\d+$/.test(match[1]) ? match[1] : match[2]);
+    const yearText = match[3] || match[4];
+    const year = yearText ? Number(yearText) : new Date().getUTCFullYear();
+    if (month < 0 || day < 1 || day > 31) continue;
+    const date = new Date(Date.UTC(year, month, day));
+    if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month || date.getUTCDate() !== day) continue;
+    return date.toISOString().slice(0, 10);
+  }
+  const iso = text.match(/(?:deadline|due|submit by|closing date)[^\\\\n]{0,30}?(\\\\d{4})-(\\\\d{2})-(\\\\d{2})/i);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  return null;
+}
+
 function assessFit(item) {
   const text = `${item.title || ""} ${item.description || ""}`.toLowerCase();
+  const deadlineAt = extractDeadline(item);
+  const isExpired = Boolean(deadlineAt && deadlineAt < new Date().toISOString().slice(0, 10));
   const signals = [
     { label: "pastoralism/rangelands", weight: 35, terms: ["pastoral", "pastoralist", "rangeland", "herder", "grazing", "dryland", "nomadic"] },
     { label: "restoration/environment", weight: 20, terms: ["restoration", "land degradation", "biodiversity", "ecosystem", "conservation", "desertification", "reforestation", "natural resource"] },
@@ -116,7 +143,7 @@ function assessFit(item) {
       : regionalScope
         ? "regional_or_lmic_scope"
         : "not_stated";
-  const triageAssessment = callStatus === "closed"
+  const triageAssessment = ["closed", "expired"].includes(callStatus)
     ? "closed_do_not_prioritize"
     : geographyAssessment === "other_country_focus"
       ? "geographic_mismatch_review"
@@ -129,6 +156,7 @@ function assessFit(item) {
     score,
     fitAssessment,
     reasons: matched.map(signal => signal.label),
+    deadlineAt,
     callStatus,
     geographyAssessment,
     triageAssessment,
@@ -141,7 +169,7 @@ async function crawl(env) {
   const items = await readFeeds(env);
   const assessedItems = items.map(item => ({ ...item, fit: assessFit(item) }));
   let changed = 0;
-  const matchCounts = { strong: 0, possible: 0, low: 0, priorityForReview: 0, open: 0, closed: 0, statusUnknown: 0, geographicMismatch: 0, eligibilityUnverified: 0 };
+  const matchCounts = { strong: 0, possible: 0, low: 0, priorityForReview: 0, open: 0, closed: 0, expired: 0, statusUnknown: 0, geographicMismatch: 0, eligibilityUnverified: 0 };
   for (const item of assessedItems) {
     const fit = item.fit;
     if (fit.fitAssessment === "strong_topic_match") matchCounts.strong++;
@@ -150,14 +178,15 @@ async function crawl(env) {
     if (fit.triageAssessment === "priority_for_eligibility_review") matchCounts.priorityForReview++;
     if (fit.callStatus === "open") matchCounts.open++;
     if (fit.callStatus === "closed") matchCounts.closed++;
+    if (fit.callStatus === "expired") matchCounts.expired++;
     if (fit.callStatus === "unknown") matchCounts.statusUnknown++;
     if (fit.geographyAssessment === "other_country_focus") matchCounts.geographicMismatch++;
     matchCounts.eligibilityUnverified++;
     const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(item.url));
     const id = [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, "0")).join("");
     const result = await env.GRANTS_DB.prepare(
-      "INSERT INTO grant_opportunities (id, title, description, url, published_at, source_url, fit_score, fit_assessment, fit_reasons, eligibility_status, call_status, geography_assessment, triage_assessment, first_seen_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT(url) DO UPDATE SET title=excluded.title, description=excluded.description, published_at=excluded.published_at, source_url=excluded.source_url, fit_score=excluded.fit_score, fit_assessment=excluded.fit_assessment, fit_reasons=excluded.fit_reasons, eligibility_status=excluded.eligibility_status, call_status=excluded.call_status, geography_assessment=excluded.geography_assessment, triage_assessment=excluded.triage_assessment, last_seen_at=CURRENT_TIMESTAMP"
-    ).bind(id, item.title, item.description, item.url, item.publishedAt, item.sourceUrl, fit.score, fit.fitAssessment, JSON.stringify(fit.reasons), fit.eligibilityStatus, fit.callStatus, fit.geographyAssessment, fit.triageAssessment).run();
+      "INSERT INTO grant_opportunities (id, title, description, url, published_at, source_url, fit_score, fit_assessment, fit_reasons, eligibility_status, call_status, geography_assessment, triage_assessment, deadline_at, first_seen_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT(url) DO UPDATE SET title=excluded.title, description=excluded.description, published_at=excluded.published_at, source_url=excluded.source_url, fit_score=excluded.fit_score, fit_assessment=excluded.fit_assessment, fit_reasons=excluded.fit_reasons, eligibility_status=excluded.eligibility_status, call_status=excluded.call_status, geography_assessment=excluded.geography_assessment, triage_assessment=excluded.triage_assessment, deadline_at=excluded.deadline_at, last_seen_at=CURRENT_TIMESTAMP"
+    ).bind(id, item.title, item.description, item.url, item.publishedAt, item.sourceUrl, fit.score, fit.fitAssessment, JSON.stringify(fit.reasons), fit.eligibilityStatus, fit.callStatus, fit.geographyAssessment, fit.triageAssessment, fit.deadlineAt).run();
     if (result.meta?.changes) changed += result.meta.changes;
   }
   await env.GRANTS_DB.prepare(
@@ -176,6 +205,7 @@ async function crawl(env) {
       fitScore: item.fit.score,
       fitAssessment: item.fit.fitAssessment,
       fitReasons: item.fit.reasons,
+      deadlineAt: item.fit.deadlineAt,
       callStatus: item.fit.callStatus,
       geographyAssessment: item.fit.geographyAssessment,
       triageAssessment: item.fit.triageAssessment,
