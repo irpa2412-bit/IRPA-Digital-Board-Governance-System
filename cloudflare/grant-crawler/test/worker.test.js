@@ -567,3 +567,23 @@ test("open-feed metadata cannot bypass expiry filtering", () => {
     deadline_at: "2099-12-31"
   }), true);
 });
+
+test("AI concept-note gate rejects a country-focused call despite generic regional wording", async () => {
+  const token = "test-token-with-at-least-32-characters-long";
+  let modelCalls = 0;
+  const response = await worker.fetch(new Request("https://crawler.example/assistant/analyze", {
+    method: "POST",
+    headers: { authorization: "Bearer " + token, "content-type": "application/json" },
+    body: JSON.stringify({
+      task: "concept_note",
+      title: "Kenya climate resilience grant",
+      description: "Funding is available across Africa, but this specific call is for Kenya-based organizations."
+    })
+  }), {
+    CRAWLER_CONTROL_TOKEN: token,
+    AI: { run: async () => { modelCalls++; return { response: "{}" }; } }
+  });
+  assert.equal(response.status, 422);
+  assert.equal((await response.json()).geographic_eligibility.status, "ineligible");
+  assert.equal(modelCalls, 0);
+});
