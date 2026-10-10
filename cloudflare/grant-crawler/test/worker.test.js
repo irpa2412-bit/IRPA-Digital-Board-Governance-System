@@ -40,7 +40,7 @@ test("crawl endpoint rejects unauthenticated requests", async () => {
 test("IRPA fit matcher prioritizes pastoral and rangeland calls without claiming legal eligibility", () => {
   const fit = assessFit({
     title: "Community-led rangeland restoration and drought resilience",
-    description: "Supporting pastoralist livelihoods, women and youth groups in Tanzania.",
+    description: "Eligible applicants must be registered NGOs in Tanzania. Supporting pastoralist livelihoods, women and youth groups.",
   });
   assert.equal(fit.fitAssessment, "strong_topic_match");
   assert.ok(fit.score >= 35);
@@ -236,7 +236,7 @@ test("AI grant assistant is authenticated and returns structured eligibility ana
   const response = await worker.fetch(new Request("https://crawler.example/assistant/analyze", {
     method: "POST",
     headers: { authorization: "Bearer " + token, "content-type": "application/json" },
-    body: JSON.stringify({ title: "Rangeland grant", description: "Tanzania pastoral resilience", donorRequirements: "Applicants must be registered NGOs", url: "https://donor.example/call" })
+    body: JSON.stringify({ title: "Rangeland grant", description: "Pastoral resilience", donorRequirements: "Applicants must be registered in Tanzania as NGOs", url: "https://donor.example/call" })
   }), env);
   const body = await response.json();
   assert.equal(response.status, 200);
