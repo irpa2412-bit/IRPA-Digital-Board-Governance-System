@@ -41,7 +41,7 @@ jobs:
       - name: Verify live interpreter health endpoint
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --retry 8 --retry-delay 3 --max-time 30 https://irpa-live-interpreter.irpa-governance.workers.dev/health > "$RUNNER_TEMP/interpreter-health.json"
+          curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 3 --max-time 30 https://irpa-live-interpreter.irpa-governance.workers.dev/health > "$RUNNER_TEMP/interpreter-health.json"
           cat "$RUNNER_TEMP/interpreter-health.json"
           grep -q '"ok":true' "$RUNNER_TEMP/interpreter-health.json"
           grep -q '"provider":"Cloudflare Workers AI"' "$RUNNER_TEMP/interpreter-health.json"
