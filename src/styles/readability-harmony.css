@@ -2995,3 +2995,19 @@ textarea:focus-visible{
     stroke:#fff!important;
   }
 }
+
+
+/* Corrective follow-up: remove both fixed overhead navigation rollers on
+   mobile. The existing MobileGlobalNavigation menu remains available. The
+   in-portal roller was fixed at 150px and could overlay page-panel text. */
+@media screen and (max-width:760px){
+  .desktop-webapp-navigation-roller,
+  .mobile-portal-content-roller{
+    display:none!important;
+    visibility:hidden!important;
+    pointer-events:none!important;
+  }
+  .main-area .content-area{
+    padding-top:14px!important;
+  }
+}
