@@ -157,7 +157,7 @@ export async function readWebSearch(env) {
   const apiKey = String(env.BRAVE_SEARCH_API_KEY || "").trim();
   if (!apiKey) {
     const google = await readGoogleNewsSearch();
-    if (google.items.length || google.stats.errors.length === 0) return google;
+    if (google.items.length > 0 || google.stats.errors.length === 0 && google.stats.found > 0) return google;
     const bing = await readBingSearch();
     if (bing.items.length || bing.stats.errors.length === 0) return bing;
     return { items: [], stats: { configured: true, provider: "Google News RSS / Bing RSS", queries: SEARCH_QUERIES.length, found: 0, errors: [...google.stats.errors, ...bing.stats.errors] } };
