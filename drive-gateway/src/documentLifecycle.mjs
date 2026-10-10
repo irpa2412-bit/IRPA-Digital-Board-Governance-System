@@ -221,7 +221,7 @@ export function createDocumentLifecycleRouter(deps) {
           record.translationDerivative=true;
           record.inheritedAccessFromDocumentId=parentDocument.documentId;
         }
-        record.archiveFolderId=archive.folderId;record.archiveUidLink="https://drive.google.com/drive/folders/"+encodeURIComponent(archive.folderId);record.archiveFileWebViewLink=uploaded.webViewLink||null;record.webViewLink=uploaded.webViewLink||null;record.fileUrl=uploaded.id?"drive://"+uploaded.id:null;record.recordOrigin=String(data.recordOrigin||"PRODUCTION").toUpperCase()==="TRIAL"?"TRIAL":"PRODUCTION";
+        record.archiveFolderId=archive.folderId;record.archiveUidLink="https://drive.google.com/drive/folders/"+encodeURIComponent(archive.folderId);record.archiveFileWebViewLink=uploaded.webViewLink||null;record.webViewLink=uploaded.webViewLink||null;record.fileUrl=uploaded.id?"drive://"+uploaded.id:null;record.recordOrigin=String(parentDocument?.recordOrigin||data.recordOrigin||"PRODUCTION").toUpperCase()==="TRIAL"?"TRIAL":"PRODUCTION";
         await commitDocumentAndAudit(deps,env,claims,documentId,record,"UPLOADED",{reference,classification,archiveCategory:category,sha256:hash},{createOnly:true});
       } catch(error) {
         let rollbackStatus=uploaded?.id?"PENDING":"NOT_REQUIRED";
