@@ -37,7 +37,7 @@ jobs:
           if (!config.includes('database_name = "irpa-grant-crawler-production"')) throw new Error('Production D1 database missing.');
           NODE
   deploy-production:
-    # This workflow may deploy only the isolated production Worker. Allow the same-repository production branch's PR validation to deploy after tests, because GitHub API commits do not reliably emit a push event. Never deploy from arbitrary fork PRs.\n    needs: test
+    # Main-branch release workflow deploys only the isolated crawler and never targets the Drive Gateway.
     runs-on: ubuntu-latest
     timeout-minutes: 25
     environment: irpa-grant-crawler-production
