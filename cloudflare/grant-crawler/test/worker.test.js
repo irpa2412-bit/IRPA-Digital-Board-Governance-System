@@ -328,6 +328,30 @@ test("known IRPA eligibility gaps block concept-note drafting", async () => {
   assert.equal(modelCalls, 0, "AI generation must not run when deterministic eligibility gates block drafting.");
 });
 
+test("AI eligibility and concept-note endpoint block expired and explicitly closed calls before model invocation", async () => {
+  const token = "test-token-with-at-least-32-characters-long";
+  let modelCalls = 0;
+  const env = { CRAWLER_CONTROL_TOKEN: token, AI: { run: async () => {
+    modelCalls++;
+    return { response: JSON.stringify({ eligibility: { status: "eligible", confidence: "high", evidence: [], unknowns: [] }, donor_requirements: [] }) };
+  } } };
+  const headers = { authorization: "Bearer " + token, "content-type": "application/json" };
+  for (const body of [
+    { task: "concept_note", title: "East Africa climate grant", description: "Open to civil society applicants across East Africa.", deadline: "2020-01-01", callStatus: "open" },
+    { task: "eligibility", title: "East Africa livestock grant", description: "Open to applicants across East Africa.", callStatus: "closed" },
+    { task: "concept_note", title: "Climate resilience grant", description: "Applications close on 1 January 2020. Open to applicants across East Africa." }
+  ]) {
+    const response = await worker.fetch(new Request("https://crawler.example/assistant/analyze", {
+      method: "POST", headers, body: JSON.stringify(body)
+    }), env);
+    const result = await response.json();
+    assert.equal(response.status, 422);
+    assert.equal(result.call_status, "expired");
+    assert.ok(result.expiry_assessment?.reason);
+  }
+  assert.equal(modelCalls, 0, "AI generation must not run for closed or expired calls.");
+});
+
 test("AI cannot mark a call eligible when geographic eligibility is unstated", async () => {
   const token = "test-token-with-at-least-32-characters-long";
   const env = { CRAWLER_CONTROL_TOKEN: token, AI: { run: async () => ({ response: JSON.stringify({
