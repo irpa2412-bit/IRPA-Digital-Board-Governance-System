@@ -213,7 +213,7 @@ export function createDocumentLifecycleRouter(deps) {
           record.department=parentDocument.department||record.department;
           record.unit=parentDocument.unit||record.unit;
           record.accessPolicy=parentDocument.accessPolicy||(classification==="Public"?"PUBLIC":classification==="Internal"?"IRPA_INTERNAL":"CONTROLLED");
-          record.authorizedUids=[...new Set([parentDocument.ownerUid,...(Array.isArray(parentDocument.authorizedUids)?parentDocument.authorizedUids:[])].map(value=>String(value||"").trim()).filter(Boolean))];
+          record.authorizedUids=Array.isArray(parentDocument.authorizedUids)?parentDocument.authorizedUids:[parentDocument.ownerUid];
           record.authorizedRoles=Array.isArray(parentDocument.authorizedRoles)?parentDocument.authorizedRoles:[];
           record.authorizedDepartments=Array.isArray(parentDocument.authorizedDepartments)?parentDocument.authorizedDepartments:[];
           record.parentDocumentId=parentDocument.documentId;
