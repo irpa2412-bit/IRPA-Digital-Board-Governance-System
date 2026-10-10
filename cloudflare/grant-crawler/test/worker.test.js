@@ -103,6 +103,25 @@ test("future deadlines can remain open for eligibility review", () => {
 
 
 
+test("AI geographic classifier requires explicit Tanzania or broad eligible geography", () => {
+  assert.equal(assessGeographicEligibility({
+    title: "South African NGO grant",
+    description: "Only organizations registered in South Africa may apply."
+  }).status, "ineligible");
+  assert.equal(assessGeographicEligibility({
+    title: "Zimbabwe community fund",
+    description: "Applications are open only to Zimbabwean registered organizations."
+  }).status, "ineligible");
+  assert.equal(assessGeographicEligibility({
+    title: "East Africa resilience grant",
+    description: "Open to civil society organizations across East Africa."
+  }).status, "eligible");
+  assert.equal(assessGeographicEligibility({
+    title: "Climate resilience grant",
+    description: "A global warming awareness campaign."
+  }).status, "unclear");
+});
+
 test("strict geographic filter excludes South Africa-only and Zimbabwe-only announcements", () => {
   const southAfrica = assessFit({
     title: "Community grants for South African registered NGOs",
