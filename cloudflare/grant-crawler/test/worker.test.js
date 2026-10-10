@@ -258,6 +258,13 @@ test("known IRPA eligibility gaps block concept-note drafting", async () => {
       donorRequirements: "Only government agencies may apply.",
       expected: "ineligible",
       expectedTerm: "exclude registered NGOs"
+    },
+    {
+      title: "East Africa ICCA conservation grant",
+      description: "Open to eligible applicants across East Africa.",
+      donorRequirements: "Applicants must be registered in Tanzania as NGOs. CSOs with over three years of proven evidence of working in or near an ICCA are eligible.",
+      expected: "ineligible",
+      expectedTerm: "no completed projects"
     }
   ];
   for (const item of cases) {
