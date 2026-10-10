@@ -128,6 +128,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx wrangler d1 migrations apply irpa-grant-crawler-staging --env staging --remote
       - name: Deploy only the isolated staging Worker
+        id: deploy_staging
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_GRANT_CRAWLER_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -161,10 +162,11 @@ jobs:
           if (body.identity !== 'firebase-id-token-verification-only' || body.draftStorage !== 'cloudflare-d1') throw new Error('Identity and Cloudflare D1 storage health markers are missing.');
           console.log('Staging health verification passed; draft storage is Cloudflare D1 and Firebase is used only for identity verification.');
           NODE
+          echo "worker_url=$worker_url" >> "$GITHUB_OUTPUT"
       - name: Run live feed discovery and test AI eligibility on a public opportunity
         env:
           GRANT_CRAWLER_CONTROL_TOKEN: ${{ secrets.GRANT_CRAWLER_CONTROL_TOKEN }}
-          STAGING_WORKER_URL: https://irpa-grant-crawler-staging.irpa-governance.workers.dev
+          STAGING_WORKER_URL: ${{ steps.deploy_staging.outputs.worker_url }}
         run: |
           set -euo pipefail
           result="$(curl --silent --show-error --max-time 90 -X POST \
