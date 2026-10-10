@@ -79,7 +79,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
      if(!workerUrl) throw new Error("Grant crawler Cloudflare Worker URL is not configured.");
      const idToken=await auth.currentUser?.getIdToken();
      if(!idToken) throw new Error("Your session has expired. Sign in again.");
-     const response=await fetch(workerUrl.replace(/\\/$/,"")+"/run",{method:"POST",headers:{"Authorization":"Bearer "+idToken,"Content-Type":"application/json"},body:"{}"});
+     const response=await fetch(workerUrl.replace(/\/+$/, "")+"/run",{method:"POST",headers:{"Authorization":"Bearer "+idToken,"Content-Type":"application/json"},body:"{}"});
      const data=await response.json().catch(()=>({}));
      if(!response.ok) throw new Error(data.error||"Cloudflare grant crawler request failed ("+response.status+").");
      setNotice("Grant crawler scan "+String(data.status||"finished")+". Sources checked: "+String(data.sourceCount||0)+", candidates found: "+String(data.candidatesFound||0)+", new records: "+String(data.created||0)+". Every discovered item remains pending verification.");
