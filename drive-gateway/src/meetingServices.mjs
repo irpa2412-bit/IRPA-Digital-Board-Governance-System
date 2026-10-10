@@ -42,7 +42,7 @@ if(!isAdmin&&(!(active(member)||active(employee))||!roles.some(r=>registrars.has
 const category=clean(incoming.meetingCategory||incoming.meetingPolicyId||"OTHER").toUpperCase();
 if(!["GOVERNANCE","ADMINISTRATIVE","STAFF","GENERAL","OTHER"].includes(category))return fail(ctx,request,"Choose a valid meeting category.",400);
 if(clean(incoming.initiatorUid)!==uid)return fail(ctx,request,"The meeting initiator must match the authenticated account.",403);
-const id=crypto.randomUUID(),now=new Date(),record={...incoming,meetingCategory:category,meetingPolicyId:category,registerStatus:"Registered",createdByUid:uid,createdAt:now,updatedAt:now};
+const id=crypto.randomUUID(),now=new Date(),year=clean(incoming.date).slice(0,4)||String(now.getUTCFullYear()),record={...incoming,meetingCategory:category,meetingPolicyId:category,meetingIdentity:clean(incoming.meetingIdentity)||"IRPA-MEET-"+id.toUpperCase(),meetingReference:clean(incoming.meetingReference)||"IRPA-MTG-"+year+"-"+id.slice(0,8).toUpperCase(),registerStatus:"Registered",registeredAt:now,createdByUid:uid,createdAt:now,updatedAt:now};
 await writeDoc(ctx,env,token,"meetings",id,record,false);
 await audit(ctx,env,token,claims,"MEETING_REGISTER_CREATED",{id,...record},id,{meetingCategory:category});
 return response(ctx,request,{ok:true,id});
@@ -52,7 +52,7 @@ const meetingId=clean(data.meetingId),incoming=data.data&&typeof data.data==="ob
 const c=await context(ctx,env,token,claims,meetingId);
 const current=c.meeting;
 const changed={};
-for(const [key,value] of Object.entries(incoming)){if(["id","updateTime","createdAt"].includes(key))continue;if(JSON.stringify(value)!==JSON.stringify(current[key]))changed[key]=value;}
+for(const [key,value] of Object.entries(incoming)){if(["id","updateTime","createdAt"].includes(key)||(!c.isAdmin&&key==="registeredAt"))continue;
 if(!Object.keys(changed).length)return response(ctx,request,{ok:true,meetingId,changedFields:[]});
 const controller=c.isAdmin||clean(current.initiatorUid)===c.uid||clean(current.chairpersonUid)===c.uid||clean(current.secretaryUid)===c.uid||lower(current.initiatorEmail)===c.email||lower(current.chairpersonEmail)===c.email||lower(current.secretaryEmail)===c.email;
 if(!controller)return fail(ctx,request,"Only the authorised meeting administrator, initiator, chairperson or secretary may update this meeting.",403);
