@@ -18,6 +18,15 @@ export function normalizeOpportunityUrl(value) {
   for (const key of [...url.searchParams.keys()]) if (/^(utm_.+|fbclid|gclid|mc_cid|mc_eid)$/i.test(key)) url.searchParams.delete(key);
   return url.href;
 }
+function isSpecificOpportunity(title = "", description = "") {
+  const titleText = String(title);
+  const bodyText = String(description);
+  const explicitCallTitle = /\\b(call for proposals|call for applications|grant call|open grant|grant opportunity|funding opportunity|grant fund|small grants? (?:programme|program|fund)|open call|request for proposals|expression of interest|funding call|applications open|apply now|submit proposals|challenge fund|grant competition|award competition)\\b/i.test(titleText);
+  const deadlineEvidence = /\\b(deadline|due date|closing date|apply by|submit (?:by|before)|applications? close|applications? due|application window|closes on|closing on|submission deadline)\\b/i.test(bodyText);
+  const grantSignal = /\\b(grant|funding|fund|proposal|application|award)\\b/i.test(titleText + " " + bodyText);
+  return explicitCallTitle || (grantSignal && deadlineEvidence);
+}
+
 function configuredUrls(value, label, max) {
   let urls; try { urls = JSON.parse(value || "[]"); } catch { throw new Error(label + " must be a JSON array."); }
   if (!Array.isArray(urls) || urls.length > max) throw new Error(label + " must be an array with no more than " + max + " URLs.");
@@ -110,7 +119,7 @@ export function parseSearchRss(xml, query, provider = "Google News RSS") {
     const publisher = block.match(/<source\b[^>]*\burl=["']([^"']+)["']/i)?.[1];
     let verifiedSourceUrl = sourceUrl;
     try { if (publisher) verifiedSourceUrl = normalizeOpportunityUrl(publisher); } catch {}
-    if (!title || !url || (!GRANT_TERMS.test(title + " " + description) && !/climate|pastoral|rangeland|livestock|conservation|community|women|youth|resilience|biodiversity|agriculture/i.test(title + " " + description))) return null;
+    if (!title || !url || !isSpecificOpportunity(title, description)) return null;
     return { title, description, url, publishedAt: xmlField(block, "pubDate") || null, sourceUrl: verifiedSourceUrl, discoveryEngine: "web_search" };
   }).filter(Boolean);
 }
@@ -164,7 +173,7 @@ export async function readWebSearch(env) {
       for (const result of body.web?.results || []) {
         let resultUrl; try { resultUrl = normalizeOpportunityUrl(result.url); } catch { continue; }
         const title = decodeHtml(result.title || "").slice(0, 500), description = decodeHtml(result.description || "").slice(0, 5000);
-        if (!title || (!GRANT_TERMS.test(title + " " + description) && !/climate|pastoral|rangeland|livestock|conservation|community|women|youth|resilience|biodiversity|agriculture/i.test(title + " " + description))) continue;
+        if (!title || !isSpecificOpportunity(title, description)) continue;
         items.push({ title, description, url: resultUrl, publishedAt: result.page_age || null, sourceUrl: "https://search.brave.com/search?q=" + encodeURIComponent(query), discoveryEngine: "web_search" });
       }
       return { items, error: null };
