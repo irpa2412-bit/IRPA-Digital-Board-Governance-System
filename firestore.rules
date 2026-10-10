@@ -164,7 +164,7 @@ service cloud.firestore {
   function documentLifecycleClassificationAllowed(d){return d.get("classification","") in ["Public","Internal","Confidential"]||(d.get("classification","")=="Restricted"&&(admin()||anyInstitutionalRole(["RESTRICTED_DOCUMENT_UPLOAD"])));}
   function documentLifecycleCreateAllowed(documentId){
     let d=request.resource.data;
-    return documentLifecycleIdentity()&&d.get("documentId","")==documentId&&
+    return d.get("translationDerivative",false)!=true&&documentLifecycleIdentity()&&d.get("documentId","")==documentId&&
       d.get("ownerUid","")==request.auth.uid&&d.get("uploadedByUid","")==request.auth.uid&&
       d.get("ownerType","") in ["ADMINISTRATOR","EMPLOYEE","MEMBER"]&&
       d.get("status","")=="WORKING"&&d.get("authorizationStatus","")=="AUTHORIZED"&&
@@ -220,24 +220,25 @@ service cloud.firestore {
     let d=request.resource.data;
     let sourceId=d.get("parentDocumentId","");
     let sourcePath=/databases/$(database)/documents/documents/$(sourceId);
+    let source=get(sourcePath);
     return documentLifecycleIdentity()&&
       d.get("translationDerivative",false)==true&&
       sourceId is string&&sourceId.size()>0&&exists(sourcePath)&&
-      get(sourcePath).data.get("documentId","")==sourceId&&
-      get(sourcePath).data.get("ownerUid","")==request.auth.uid&&
+      source.data.get("documentId","")==sourceId&&
+      source.data.get("ownerUid","")==request.auth.uid&&
       d.get("documentId","")==documentId&&
       d.get("ownerUid","")==request.auth.uid&&
       d.get("uploadedByUid","")==request.auth.uid&&
-      d.get("ownerType","")==get(sourcePath).data.get("ownerType","")&&
-      d.get("department","")==get(sourcePath).data.get("department","")&&
-      d.get("unit","")==get(sourcePath).data.get("unit","")&&
-      d.get("classification","")==get(sourcePath).data.get("classification","")&&
-      d.get("accessPolicy","")==get(sourcePath).data.get("accessPolicy","")&&
-      d.get("archiveCategory","")==get(sourcePath).data.get("archiveCategory","")&&
-      d.get("documentType","")==get(sourcePath).data.get("documentType","")&&
-      d.get("authorizedUids",[])==get(sourcePath).data.get("authorizedUids",[])&&
-      d.get("authorizedRoles",[])==get(sourcePath).data.get("authorizedRoles",[])&&
-      d.get("authorizedDepartments",[])==get(sourcePath).data.get("authorizedDepartments",[])&&
+      d.get("ownerType","")==source.data.get("ownerType","")&&
+      d.get("department","")==source.data.get("department","")&&
+      d.get("unit","")==source.data.get("unit","")&&
+      d.get("classification","")==source.data.get("classification","")&&
+      d.get("accessPolicy","")==source.data.get("accessPolicy","")&&
+      d.get("archiveCategory","")==source.data.get("archiveCategory","")&&
+      d.get("documentType","")==source.data.get("documentType","")&&
+      d.get("authorizedUids",[])==source.data.get("authorizedUids",[])&&
+      d.get("authorizedRoles",[])==source.data.get("authorizedRoles",[])&&
+      d.get("authorizedDepartments",[])==source.data.get("authorizedDepartments",[])&&
       d.get("status","")=="WORKING"&&
       d.get("authorizationStatus","")=="AUTHORIZED"&&
       d.get("signatureStatus","")=="NOT_SENT"&&
@@ -247,7 +248,7 @@ service cloud.firestore {
       d.get("fileName","") is string&&d.get("fileName","").size()>0&&
       d.get("sha256","") is string&&d.get("sha256","").matches("^[a-f0-9]{64}$")&&
       d.get("authorizedUids",[]) is list&&d.get("authorizedUids",[]).hasAll([request.auth.uid])&&
-      d.get("recordOrigin","PRODUCTION")==get(sourcePath).data.get("recordOrigin","PRODUCTION")&&
+      d.get("recordOrigin","PRODUCTION")==source.data.get("recordOrigin","PRODUCTION")&&
       d.get("recordOrigin","PRODUCTION") in ["PRODUCTION","TRIAL"];
   }
   match /documents/{id}{allow read:if admin()||controlledDocumentReadAllowed();allow create:if admin()||controlledDocumentCreateAllowed()||documentLifecycleCreateAllowed(id)||documentLifecycleDerivativeCreateAllowed(id);allow delete:if admin();allow update:if admin()||signatureDocumentWorkflowUpdate()||documentLifecycleUpdateAllowed();}
