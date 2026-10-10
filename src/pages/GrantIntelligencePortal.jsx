@@ -44,7 +44,7 @@ const text=v=>String(v||"").trim();
 const dateKeyInTanzania=value=>{
  if(value===undefined||value===null||value==="")return null;
  if(typeof value==="string"){
-  const dateOnly=value.trim().match(/^(\\d{4}-\\d{2}-\\d{2})$/);
+  const dateOnly=value.trim().match(/^(\d{4}-\d{2}-\d{2})$/);
   if(dateOnly)return dateOnly[1];
  }
  const parsed=value?.toDate?value.toDate():new Date(value);
