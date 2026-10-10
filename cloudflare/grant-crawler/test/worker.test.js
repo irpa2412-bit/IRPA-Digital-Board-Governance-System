@@ -51,3 +51,28 @@ test("generic unrelated call is low topic match and eligibility remains unverifi
   assert.equal(fit.fitAssessment, "low_topic_match");
   assert.equal(fit.eligibilityStatus, "unverified");
 });
+
+
+test("closed and country-specific opportunities are not promoted as IRPA priorities", () => {
+  const closed = assessFit({
+    title: "Closed: Climate adaptation grant in Kenya",
+    description: "Fund state: Closed. Supporting climate resilience and livelihoods.",
+  });
+  assert.equal(closed.callStatus, "closed");
+  assert.equal(closed.triageAssessment, "closed_do_not_prioritize");
+
+  const regional = assessFit({
+    title: "Open: Community-led restoration across East Africa",
+    description: "Fund state: Open. Supporting rangelands and pastoralist livelihoods.",
+  });
+  assert.equal(regional.callStatus, "open");
+  assert.equal(regional.geographyAssessment, "regional_or_lmic_scope");
+  assert.equal(regional.triageAssessment, "priority_for_eligibility_review");
+
+  const otherCountry = assessFit({
+    title: "Livelihood resilience programme in Uganda",
+    description: "Supporting community livelihoods and climate adaptation in Uganda only.",
+  });
+  assert.equal(otherCountry.geographyAssessment, "other_country_focus");
+  assert.equal(otherCountry.triageAssessment, "geographic_mismatch_review");
+});
