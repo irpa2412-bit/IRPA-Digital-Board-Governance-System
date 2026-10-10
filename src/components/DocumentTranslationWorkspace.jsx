@@ -8,6 +8,7 @@ import*as pdfjsLib from"pdfjs-dist";
 import mammoth from"mammoth";
 import*as XLSX from"xlsx";
 import JSZip from"jszip";
+import {PDFDocument} from"pdf-lib";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc=new URL("pdfjs-dist/build/pdf.worker.mjs",import.meta.url).toString();
 const REVIEWER_ROLES=new Set(["Executive Director","Director Outreach","Director Community Development","Director Research","Research Director","Research Officer","Director Human Resources","HR Director"]);
@@ -81,6 +82,80 @@ async function sha256(text){
  const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(text));
  return Array.from(new Uint8Array(digest)).map(x=>x.toString(16).padStart(2,"0")).join("");
 }
+
+const RTL_LANGUAGES=new Set(["ar","ar-SA","fa","ur","he"]);
+function wrapCanvasText(ctx,text,maxWidth,language){
+ const words=String(text||"").split(/\s+/).filter(Boolean),lines=[];let line="";
+ const splitLongWord=word=>{
+  if(ctx.measureText(word).width<=maxWidth)return [word];
+  const segments=typeof Intl!=="undefined"&&Intl.Segmenter?[...new Intl.Segmenter(language,{granularity:"grapheme"}).segment(word)].map(x=>x.segment):Array.from(word);
+  const out=[];let part="";
+  for(const char of segments){if(part&&ctx.measureText(part+char).width>maxWidth){out.push(part);part=char}else part+=char}
+  if(part)out.push(part);return out;
+ };
+ for(const word of words){
+  const candidate=line?line+" "+word:word;
+  if(ctx.measureText(candidate).width<=maxWidth){line=candidate;continue}
+  if(line)lines.push(line);
+  const pieces=splitLongWord(word);
+  for(let i=0;i<pieces.length-1;i++)lines.push(pieces[i]);
+  line=pieces[pieces.length-1]||"";
+ }
+ if(line)lines.push(line);
+ return lines;
+}
+async function createTranslationPdfBlob(text,{title="IRPA translated document",language="en",sourceReference="",requestId="",status="COMPLETED"}={}){
+ const content=String(text||"").trim();
+ if(!content)throw new Error("There is no translation text to export.");
+ if(typeof document==="undefined")throw new Error("PDF export requires a browser canvas.");
+ const pdf=await PDFDocument.create();
+ pdf.setTitle(title);pdf.setSubject("IRPA document translation; "+status+"; target language "+language);
+ pdf.setCreator("IRPA Digital Board Governance System");
+ pdf.setKeywords(["IRPA","document translation",language,sourceReference,requestId].filter(Boolean));
+ const width=1240,height=1600,margin=86,lineHeight=31,bodyTop=255,bodyBottom=height-100,maxTextWidth=width-margin*2;
+ const canvas=document.createElement("canvas");canvas.width=width;canvas.height=height;
+ const ctx=canvas.getContext("2d");
+ if(!ctx)throw new Error("Could not create a PDF rendering canvas.");
+ const direction=RTL_LANGUAGES.has(language)?"rtl":"ltr";
+ ctx.direction=direction;
+ const paragraphs=content.replace(/\r\n?/g,"\n").split("\n");
+ const allLines=[];
+ ctx.font='24px Arial, "Noto Sans", "Noto Naskh Arabic", "Noto Sans CJK SC", sans-serif';
+ for(const paragraph of paragraphs){
+  if(!paragraph.trim()){allLines.push("");continue}
+  allLines.push(...wrapCanvasText(ctx,paragraph,maxTextWidth,language));
+ }
+ const linesPerPage=Math.floor((bodyBottom-bodyTop)/lineHeight);
+ const pages=Math.max(1,Math.ceil(allLines.length/linesPerPage));
+ if(pages>160)throw new Error("The PDF would exceed 160 pages. Split the translation into smaller sections before exporting.");
+ for(let pageIndex=0;pageIndex<pages;pageIndex++){
+  ctx.fillStyle="#ffffff";ctx.fillRect(0,0,width,height);
+  ctx.fillStyle="#172033";ctx.textAlign=direction==="rtl"?"right":"left";
+  ctx.font='bold 30px Arial, "Noto Sans", "Noto Naskh Arabic", "Noto Sans CJK SC", sans-serif';
+  const titleLines=wrapCanvasText(ctx,title,maxTextWidth,language).slice(0,2);
+  titleLines.forEach((line,i)=>ctx.fillText(line,direction==="rtl"?width-margin:margin,margin+38+i*38));
+  ctx.font='20px Arial, "Noto Sans", "Noto Naskh Arabic", "Noto Sans CJK SC", sans-serif';
+  ctx.fillStyle="#4b5563";
+  const meta=["Translation status: "+status,"Target language: "+language,sourceReference?"Source reference: "+sourceReference:"",requestId?"Translation request: "+requestId:""].filter(Boolean).join("  •  ");
+  ctx.textAlign="left";ctx.direction="ltr";ctx.fillText(meta.slice(0,150),margin,margin+125);
+  ctx.strokeStyle="#d1d5db";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(margin,margin+155);ctx.lineTo(width-margin,margin+155);ctx.stroke();
+  ctx.fillStyle="#111827";ctx.font='24px Arial, "Noto Sans", "Noto Naskh Arabic", "Noto Sans CJK SC", sans-serif';ctx.textAlign=direction==="rtl"?"right":"left";ctx.direction=direction;
+  const start=pageIndex*linesPerPage,stop=Math.min(allLines.length,start+linesPerPage);
+  for(let i=start;i<stop;i++){const line=allLines[i];if(!line)continue;ctx.fillText(line,direction==="rtl"?width-margin:margin,bodyTop+(i-start)*lineHeight,maxTextWidth);}
+  ctx.strokeStyle="#e5e7eb";ctx.beginPath();ctx.moveTo(margin,height-75);ctx.lineTo(width-margin,height-75);ctx.stroke();
+  ctx.fillStyle="#6b7280";ctx.font="18px Arial, sans-serif";ctx.textAlign="right";ctx.direction="ltr";ctx.fillText("Page "+(pageIndex+1)+" of "+pages,width-margin,height-42);
+  const jpeg=await new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error("Could not render a PDF page.")),"image/jpeg",0.88));
+  const bytes=new Uint8Array(await jpeg.arrayBuffer());const image=await pdf.embedJpg(bytes);
+  const page=pdf.addPage([612,792]);page.drawImage(image,{x:0,y:0,width:612,height:792});
+ }
+ const bytes=await pdf.save({useObjectStreams:true});
+ if(bytes.byteLength>9*1024*1024)throw new Error("The generated PDF exceeds the 9 MB controlled-archive limit. Split the translation into smaller sections and export them separately.");
+ return new Blob([bytes],{type:"application/pdf"});
+}
+function triggerDownload(blob,name){
+ const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=name;a.style.display="none";document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);
+}
+
 function downloadText(text,name){
  const blob=new Blob([String(text||"")],{type:"text/plain;charset=utf-8"});
  const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=name||"IRPA-translated-document.txt";a.click();setTimeout(()=>URL.revokeObjectURL(url),1500);
@@ -174,9 +249,22 @@ export default function DocumentTranslationWorkspace({profile,employee,admin=fal
     completedAt:serverTimestamp(),updatedAt:serverTimestamp(),translationOutputFileName:String(selected.documentFileName||selected.documentTitle||"document").replace(/\.[^.]+$/,"")+"."+selected.targetLanguage+".translated.txt"};
    if(selected.targetLanguage==="maa")patch.maaSpeakerReview={speakerName:maaSpeakerName.trim(),dialect:maaDialect.trim(),reviewNotes:reviewNotes.trim(),verifiedByUid:auth.currentUser?.uid||currentUid,verifiedAt:new Date().toISOString()};
    await updateDoc(doc(db,COLLECTIONS.documentTranslationRequests,selected.id),patch);
-   setMessage("Translation marked complete after reviewer confirmation. Download the translated text and retain it with the controlled source record according to IRPA records policy.");
+   setMessage("Translation marked complete after reviewer confirmation. The owner can download a PDF or save a separate controlled PDF derivative; the source record remains unchanged.");
   }catch(e){setError(e.message||"Unable to finalise the translation.")}
   finally{setProcessing(false)}
+ }
+ async function downloadTranslationPdf(){
+  if(!selected)throw new Error("Select a translation request first.");
+  const text=selected.translatedText||selected.translationDraftText||draft;
+  if(!text)throw new Error("No translated text is available to export.");
+  setPdfGenerating(true);setError("");
+  try{
+   const isCompleted=selected.status==="COMPLETED";
+   const blob=await createTranslationPdfBlob(text,{title:(selected.documentTitle||selected.documentId)+" — translated document",language:selected.targetLanguage,sourceReference:selected.documentReference||selected.documentId,requestId:selected.id,status:isCompleted?"COMPLETED":"DRAFT — HUMAN REVIEW REQUIRED"});
+   const name="IRPA-Translation-"+String(selected.documentReference||selected.documentId).replace(/[^A-Za-z0-9_-]/g,"-")+"-"+String(selected.targetLanguage||"translated").toUpperCase()+(isCompleted?"":"-DRAFT")+".pdf";
+   triggerDownload(blob,name);
+  }catch(e){setError(e.message||"Unable to generate the translation PDF.");}
+  finally{setPdfGenerating(false)}
  }
  async function archiveCompletedTranslation(){
   if(!selected||selected.status!=="COMPLETED"||!selected.translatedText)throw new Error("Only a completed translation can be archived.");
@@ -184,8 +272,9 @@ export default function DocumentTranslationWorkspace({profile,employee,admin=fal
   setArchiving(true);setError("");setMessage("");
   try{
    const safeTarget=String(selected.targetLanguage||"translated").toUpperCase();
-   const fileName="IRPA-Translation-"+String(selected.documentReference||selected.documentId).replace(/[^A-Za-z0-9_-]/g,"-")+"-"+safeTarget+".txt";
-   const file=new File([selected.translatedText],fileName,{type:"text/plain"});
+   const fileName="IRPA-Translation-"+String(selected.documentReference||selected.documentId).replace(/[^A-Za-z0-9_-]/g,"-")+"-"+safeTarget+".pdf";
+   const pdfBlob=await createTranslationPdfBlob(selected.translatedText,{title:"Translation of "+String(selected.documentTitle||selected.documentId),language:selected.targetLanguage,sourceReference:selected.documentReference||selected.documentId,requestId:selected.id,status:"COMPLETED"});
+   const file=new File([pdfBlob],fileName,{type:"application/pdf"});
    const uploaded=await uploadLifecycleDocument({
     file,title:"Translation of "+String(selected.documentTitle||selected.documentId)+" ("+safeTarget+") — request "+selected.id,
     version:"1.0",parentDocumentId:selected.documentId
@@ -220,7 +309,7 @@ export default function DocumentTranslationWorkspace({profile,employee,admin=fal
       {progress&&<p role="status" aria-live="polite">{progress}</p>}
      </div>}
      {(draft||selected.translationDraftText||selected.translatedText)&&<div style={{marginTop:14,borderTop:"1px solid var(--border)",paddingTop:12}}>
-      <div className="panel-header"><div><strong>{selected.status==="COMPLETED"?"Completed Translation":"Translation Draft — Human Review Required"}</strong><small style={{display:"block",marginTop:4}}>{selected.translationProvider||"IRPA translation service"}{selected.targetLanguage==="maa"?" · provisional Maa dictionary assistance":""}</small></div><button type="button" className="secondary-button" onClick={()=>downloadText(selected.translatedText||draft||selected.translationDraftText,selected.translationOutputFileName||"IRPA-translated-document.txt")}>Download TXT</button></div>
+      <div className="panel-header"><div><strong>{selected.status==="COMPLETED"?"Completed Translation":"Translation Draft — Human Review Required"}</strong><small style={{display:"block",marginTop:4}}>{selected.translationProvider||"IRPA translation service"}{selected.targetLanguage==="maa"?" · provisional Maa dictionary assistance":""}</small></div><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button type="button" className="secondary-button" onClick={()=>downloadText(selected.translatedText||draft||selected.translationDraftText,selected.translationOutputFileName||"IRPA-translated-document.txt")}>Download TXT</button><button type="button" className="secondary-button" disabled={pdfGenerating} onClick={downloadTranslationPdf}>{pdfGenerating?"Preparing PDF…":"Download PDF"}</button></div></div>
       {isReviewer&&selected.status!=="COMPLETED"?<textarea aria-label="Editable translation draft" rows={12} value={draft||selected.translationDraftText||""} onChange={e=>setDraft(e.target.value)} style={{width:"100%",boxSizing:"border-box",marginTop:10}}/>:<div style={{maxHeight:360,overflow:"auto",whiteSpace:"pre-wrap",overflowWrap:"anywhere",border:"1px solid var(--border)",borderRadius:8,padding:12,marginTop:10}}>{selected.translatedText||draft||selected.translationDraftText}</div>}
       {selected.targetLanguage==="maa"&&<p className="muted">Maa dictionary output is not grammar-complete. It must not be used in official governance records until a local competent Maa speaker has reviewed and corrected it.</p>}
       {isReviewer&&selected.status!=="COMPLETED"&&<div style={{marginTop:12}}>
