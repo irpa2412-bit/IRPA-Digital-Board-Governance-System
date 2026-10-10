@@ -228,7 +228,9 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
      summary:draft.opportunity?.description||"",
      funder:"Saved concept-note draft",
      applicationRequirements:draft.opportunity?.donorRequirements||"",
-     status:"Under review"
+     status:"Under review",
+     deadline:draft.opportunity?.deadline||null,
+     callStatus:draft.opportunity?.callStatus||""
    });
    setOpportunityDescription(text(draft.opportunity?.description||""));
    setDonorRequirements(text(draft.opportunity?.donorRequirements||""));
@@ -298,7 +300,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    const id=draftId||crypto.randomUUID();
    setDraftSaving(true);setError("");
    try{
-     const response=await fetch(workerUrl+"/application/drafts",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({id,name:text(selectedOpportunity.title)+" — IRPA concept note",opportunity:{title:text(selectedOpportunity.title),url:text(selectedOpportunity.url),description:text(opportunityDescription),donorRequirements:text(donorRequirements)},applicationFields:{conceptNoteDraft:conceptDraft,strategicAlignment:analysisResult?.strategic_alignment||{},geographicEligibility:analysisResult?.geographic_eligibility||null},assessment:analysisResult||null,finalNotes:"Draft saved in the IRPA-DBGS grant concept-note workspace. Official call eligibility and internal approvals remain to be verified."}),signal:AbortSignal.timeout(20000)});
+     const response=await fetch(workerUrl+"/application/drafts",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({id,name:text(selectedOpportunity.title)+" — IRPA concept note",opportunity:{title:text(selectedOpportunity.title),url:text(selectedOpportunity.url),description:text(opportunityDescription),donorRequirements:text(donorRequirements),deadline:dateKeyInTanzania(selectedOpportunity.deadline||selectedOpportunity.deadline_at)||"",callStatus:text(selectedOpportunity.callStatus||selectedOpportunity.call_status||"")},applicationFields:{conceptNoteDraft:conceptDraft,strategicAlignment:analysisResult?.strategic_alignment||{},geographicEligibility:analysisResult?.geographic_eligibility||null},assessment:analysisResult||null,finalNotes:"Draft saved in the IRPA-DBGS grant concept-note workspace. Official call eligibility and internal approvals remain to be verified."}),signal:AbortSignal.timeout(20000)});
      const data=await response.json().catch(()=>({}));
      if(!response.ok)throw new Error(data.error||"Concept-note draft could not be saved.");
      setDraftId(id);
