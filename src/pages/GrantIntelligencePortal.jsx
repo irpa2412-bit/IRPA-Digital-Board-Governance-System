@@ -53,7 +53,11 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
  const [status,setStatus]=useState("all");
  const [showForm,setShowForm]=useState(false);
  const [saving,setSaving]=useState(false);
- const [draft,setDraft]=useState({title:"",funder:"",url:"",deadline:"",country:"Tanzania",amount:"",summary:"",status:"Open",pillars:["rangeland"],themes:[]});
+ const [activeEnquiry,setActiveEnquiry]=useState(null);
+ const [enquirySaving,setEnquirySaving]=useState(false);
+ const [enquiryMessage,setEnquiryMessage]=useState("");
+ const [enquiryDraft,setEnquiryDraft]=useState({contactName:"",contactEmail:"",contactRole:"",questions:"",notes:""});
+ const [draft,setDraft]=useState({title:"",funder:"",url:"",deadline:"",country:"Tanzania",amount:"",summary:"",status:"Open",pillars:["rangeland"],themes:[],eligibleCountries:"Tanzania; East Africa; Global",eligibleApplicantTypes:"NGO; CSO; nonprofit",minimumOperatingYears:"",requiresPriorProjects:false,requiresAuditedAccounts:false,requiresCofunding:false,cofundingDetails:"",requiredDocuments:"Registration certificate; Constitution; Board list; Bank details; Financial statements",applicationRequirements:"",applicationMethod:"Not specified",funderContactEmail:"",eligibilityNotes:""});
  const uid=auth.currentUser?.uid||"";
  const roleList=[profile?.role,profile?.roles,employee?.role,employee?.roles].flatMap(v=>Array.isArray(v)?v:String(v||"").split(",")).map(v=>String(v||"").trim().toLowerCase());
  const canManage=isAdmin||roleList.some(r=>["administrator","executive director","director outreach","director finance & administration","director research","research director","research manager","fundraising officer","research officer"].includes(r));
@@ -71,11 +75,67 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
    if(!text(draft.title)||!text(draft.funder)||!text(draft.url)||!draft.pillars.length){setError("Enter the opportunity title, funder, official source URL and at least one strategic pillar.");return;}
    try{
      setSaving(true);setError("");
-     const payload={...draft,title:text(draft.title),funder:text(draft.funder),url:text(draft.url),summary:text(draft.summary),country:text(draft.country)||"Not specified",amount:text(draft.amount)||"Not specified",deadline:draft.deadline||null,createdAt:serverTimestamp(),updatedAt:serverTimestamp(),createdByUid:uid,createdByEmail:auth.currentUser?.email||"",verificationStatus:"Pending verification",sourceType:"Official source URL",recordOrigin:"PRODUCTION"};
+     const payload={...draft,title:text(draft.title),funder:text(draft.funder),url:text(draft.url),summary:text(draft.summary),country:text(draft.country)||"Not specified",amount:text(draft.amount)||"Not specified",deadline:draft.deadline||null,minimumOperatingYears:draft.minimumOperatingYears===""?null:Number(draft.minimumOperatingYears),eligibleCountries:splitList(draft.eligibleCountries),eligibleApplicantTypes:splitList(draft.eligibleApplicantTypes),requiredDocuments:splitList(draft.requiredDocuments),applicationRequirements:text(draft.applicationRequirements),applicationMethod:text(draft.applicationMethod)||"Not specified",funderContactEmail:text(draft.funderContactEmail),eligibilityNotes:text(draft.eligibilityNotes),createdAt:serverTimestamp(),updatedAt:serverTimestamp(),createdByUid:uid,createdByEmail:auth.currentUser?.email||"",verificationStatus:"Pending verification",sourceType:"Official source URL",recordOrigin:"PRODUCTION"};
      await addDoc(collection(db,"grantOpportunities"),payload);
-     setDraft({title:"",funder:"",url:"",deadline:"",country:"Tanzania",amount:"",summary:"",status:"Open",pillars:["rangeland"],themes:[]});setShowForm(false);setNotice("Opportunity saved. It is marked Pending verification until checked against the donor's official call.");setTimeout(()=>setNotice(""),7000);
+     setDraft({title:"",funder:"",url:"",deadline:"",country:"Tanzania",amount:"",summary:"",status:"Open",pillars:["rangeland"],themes:[],eligibleCountries:"Tanzania; East Africa; Global",eligibleApplicantTypes:"NGO; CSO; nonprofit",minimumOperatingYears:"",requiresPriorProjects:false,requiresAuditedAccounts:false,requiresCofunding:false,cofundingDetails:"",requiredDocuments:"Registration certificate; Constitution; Board list; Bank details; Financial statements",applicationRequirements:"",applicationMethod:"Not specified",funderContactEmail:"",eligibilityNotes:""});setShowForm(false);setNotice("Opportunity saved. It is marked Pending verification until checked against the donor's official call.");setTimeout(()=>setNotice(""),7000);
    }catch(err){console.error(err);setError(err?.message||"Could not save the opportunity. Check the deployed Firestore rules.");}
    finally{setSaving(false);}
+ }
+ function eligibilityFor(record){
+   const checks=[];
+   const applicantTypes=cleanArray(record.eligibleApplicantTypes);
+   const typeText=applicantTypes.join(" ").toLowerCase();
+   if(applicantTypes.length){
+     const acceptsNgo=/ngo|non.?profit|civil society|cs[o]?|charit|not.?for.?profit|community.?based/.test(typeText);
+     checks.push({label:"Applicant legal type",state:acceptsNgo?"pass":"unknown",detail:acceptsNgo?"Call lists applicant types compatible with an NGO; confirm the exact legal definition in the official guidelines.":"The listed applicant types do not clearly confirm that a Tanzanian NGO may apply."});
+   }else checks.push({label:"Applicant legal type",state:"unknown",detail:"The call's eligible applicant types have not been recorded."});
+   const countries=cleanArray(record.eligibleCountries);
+   if(countries.length){
+     const geography=countries.join(" ").toLowerCase();
+     const acceptsTanzania=/tanzania|east africa|africa|global|worldwide|international|all countr/.test(geography);
+     checks.push({label:"Geographic eligibility",state:acceptsTanzania?"pass":"fail",detail:acceptsTanzania?"Recorded eligible geography appears to include Tanzania; verify any district or target-population restrictions.":"Recorded eligible geography does not include Tanzania."});
+   }else checks.push({label:"Geographic eligibility",state:"unknown",detail:"Eligible countries or regions have not been recorded."});
+   if(Number.isFinite(Number(record.minimumOperatingYears))&&record.minimumOperatingYears!==null&&record.minimumOperatingYears!==""){
+     const years=(Date.now()-new Date("2023-12-11T00:00:00Z").getTime())/(365.25*24*60*60*1000);
+     const required=Number(record.minimumOperatingYears);
+     checks.push({label:"Organizational operating history",state:years>=required?"pass":"fail",detail:"IRPA was registered on 11 December 2023 (approximately "+years.toFixed(1)+" years by today's date); the call records a minimum of "+required+" years."});
+   }else checks.push({label:"Organizational operating history",state:"unknown",detail:"No minimum operating-history rule has been recorded."});
+   if(record.requiresPriorProjects===true)checks.push({label:"Previous project implementation",state:"fail",detail:"IRPA has not yet implemented a project; this call is recorded as requiring prior project experience."});
+   else if(record.requiresPriorProjects===false)checks.push({label:"Previous project implementation",state:"pass",detail:"No mandatory prior-project requirement is recorded; verify the full guidelines and scoring criteria."});
+   else checks.push({label:"Previous project implementation",state:"unknown",detail:"Whether prior project implementation is mandatory has not been checked."});
+   if(record.requiresAuditedAccounts===true)checks.push({label:"Audited accounts",state:"unknown",detail:"The call requires audited accounts. IRPA's available financial records must be checked before eligibility can be confirmed."});
+   else if(record.requiresAuditedAccounts===false)checks.push({label:"Audited accounts",state:"pass",detail:"No mandatory audited-account requirement is recorded; verify the call's financial due-diligence rules."});
+   else checks.push({label:"Audited accounts",state:"unknown",detail:"Financial-statement and audit requirements have not been confirmed."});
+   if(record.requiresCofunding===true)checks.push({label:"Co-financing / matching funds",state:"fail",detail:"The call requires co-financing, while IRPA currently has no project funds confirmed. Ask whether in-kind contributions or a consortium route are permitted."});
+   else if(record.requiresCofunding===false)checks.push({label:"Co-financing / matching funds",state:"pass",detail:"No mandatory co-financing requirement is recorded; check the official call."});
+   else checks.push({label:"Co-financing / matching funds",state:"unknown",detail:"Co-financing requirements have not been confirmed."});
+   const fails=checks.filter(c=>c.state==="fail"),unknowns=checks.filter(c=>c.state==="unknown");
+   const verdict=fails.length?"Potentially ineligible":unknowns.length?"Needs verification":"Potentially eligible";
+   return {checks,verdict,summary:fails.length?fails.length+" possible disqualifying condition(s) need review.":unknowns.length?unknowns.length+" eligibility item(s) remain unverified.":"Recorded criteria show a possible fit, subject to checking the official guidelines."};
+ }
+ function beginEnquiry(record){
+   const assessment=eligibilityFor(record);
+   const questions=[
+     "Please confirm whether Improvement of Rangeland in Pastoral Areas (IRPA), a Tanzanian-registered NGO established on 11 December 2023, is eligible to apply under this call.",
+     "Does the call require a minimum number of years of operation or previously completed projects? IRPA is newly established and has not yet implemented a funded project.",
+     "Which financial statements, audits, bank documents and organizational policies are mandatory at application and award stages?",
+     "Is cash co-financing mandatory, and can in-kind contributions or consortium applications satisfy any matching requirement?",
+     "Please confirm the eligible project duration, funding range, eligible costs, geographic scope, required attachments, submission route and exact deadline/time zone."
+   ];
+   if(record.requiresPriorProjects===true)questions.splice(1,1,"The call appears to require previous project experience. Can a newly registered NGO apply as a consortium member or through an eligible lead partner?");
+   if(record.requiresCofunding===true)questions.splice(3,1,"The call appears to require co-financing. Are in-kind contributions, a consortium arrangement or a waiver permitted for a newly established NGO?");
+   setEnquiryDraft({contactName:profile?.name||employee?.name||"",contactEmail:auth.currentUser?.email||"",contactRole:profile?.role||employee?.role||"",questions:questions.join("\n\n"),notes:"Please refer to the official call: "+(record.url||"")});
+   setActiveEnquiry({...record,assessment});setEnquiryMessage("");
+ }
+ async function submitEnquiry(e){
+   e.preventDefault();if(!activeEnquiry||!uid)return;
+   if(!text(enquiryDraft.contactName)||!text(enquiryDraft.contactEmail)||!text(enquiryDraft.questions)){setEnquiryMessage("Please enter your name, email and enquiry questions.");return;}
+   try{
+     setEnquirySaving(true);setEnquiryMessage("");
+     await addDoc(collection(db,"grantEnquiries"),{opportunityId:activeEnquiry.id,opportunityTitle:activeEnquiry.title,funder:activeEnquiry.funder||"",officialCallUrl:activeEnquiry.url||"",eligibilityAssessment:activeEnquiry.assessment,contactName:text(enquiryDraft.contactName),contactEmail:text(enquiryDraft.contactEmail),contactRole:text(enquiryDraft.contactRole),questions:text(enquiryDraft.questions),notes:text(enquiryDraft.notes),createdByUid:uid,createdByEmail:auth.currentUser?.email||"",status:"Draft — not sent to funder",createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
+     setEnquiryMessage("Enquiry saved in IRPA-DBGS. It has not been emailed to the funder; review and send it through the call's official contact channel.");
+   }catch(err){console.error(err);setEnquiryMessage(err?.message||"Could not save enquiry. Check your profile permissions.");}
+   finally{setEnquirySaving(false);}
  }
  async function changeStatus(record,nextStatus){
    if(!canManage)return;
@@ -112,6 +172,20 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
     <label style={{fontSize:12}}>Pipeline status<select style={{...styles.input,marginTop:5}} value={draft.status} onChange={e=>setDraft(d=>({...d,status:e.target.value}))}>{statusOptions.map(s=><option key={s}>{s}</option>)}</select></label>
    </div>
    <label style={{fontSize:12}}>Opportunity summary<textarea rows="3" style={{...styles.input,marginTop:5,resize:"vertical"}} value={draft.summary} onChange={e=>setDraft(d=>({...d,summary:e.target.value}))}/></label>
+   <div style={{border:"1px solid #425064",borderRadius:10,padding:12,display:"grid",gap:10}}><h3 style={{margin:0,fontSize:15}}>Eligibility and application requirements (from official call)</h3><p style={styles.muted}>Enter only conditions confirmed in the donor's guidelines. Leave unknown criteria unconfirmed so the portal flags them for verification.</p>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:10}}>
+     <label style={{fontSize:12}}>Eligible applicant types (separate with semicolons)<textarea rows="2" style={{...styles.input,marginTop:5}} value={draft.eligibleApplicantTypes} onChange={e=>setDraft(d=>({...d,eligibleApplicantTypes:e.target.value}))}/></label>
+     <label style={{fontSize:12}}>Eligible countries / regions (separate with semicolons)<textarea rows="2" style={{...styles.input,marginTop:5}} value={draft.eligibleCountries} onChange={e=>setDraft(d=>({...d,eligibleCountries:e.target.value}))}/></label>
+     <label style={{fontSize:12}}>Minimum operating years (blank if unknown)<input type="number" min="0" step="0.5" style={{...styles.input,marginTop:5}} value={draft.minimumOperatingYears} onChange={e=>setDraft(d=>({...d,minimumOperatingYears:e.target.value}))}/></label>
+     <label style={{fontSize:12}}>Application method<input style={{...styles.input,marginTop:5}} value={draft.applicationMethod} onChange={e=>setDraft(d=>({...d,applicationMethod:e.target.value}))} placeholder="Portal / email / expression of interest"/></label>
+     <label style={{fontSize:12}}>Funder enquiry email (if published)<input type="email" style={{...styles.input,marginTop:5}} value={draft.funderContactEmail} onChange={e=>setDraft(d=>({...d,funderContactEmail:e.target.value}))}/></label>
+     <label style={{fontSize:12}}>Required documents (separate with semicolons)<textarea rows="3" style={{...styles.input,marginTop:5}} value={draft.requiredDocuments} onChange={e=>setDraft(d=>({...d,requiredDocuments:e.target.value}))}/></label>
+    </div>
+    <div style={{display:"grid",gap:8}}>{[["requiresPriorProjects","Previous project implementation is mandatory"],["requiresAuditedAccounts","Audited accounts are mandatory"],["requiresCofunding","Cash co-financing / matching funds are mandatory"]].map(([key,label])=><label key={key} style={{display:"flex",gap:8,alignItems:"center",fontSize:12}}><input type="checkbox" checked={draft[key]} onChange={e=>setDraft(d=>({...d,[key]:e.target.checked}))}/>{label}</label>)}</div>
+    <label style={{fontSize:12}}>Co-financing notes<textarea rows="2" style={{...styles.input,marginTop:5}} value={draft.cofundingDetails} onChange={e=>setDraft(d=>({...d,cofundingDetails:e.target.value}))}/></label>
+    <label style={{fontSize:12}}>Other application requirements<textarea rows="3" style={{...styles.input,marginTop:5}} value={draft.applicationRequirements} onChange={e=>setDraft(d=>({...d,applicationRequirements:e.target.value}))} placeholder="Project duration, page limits, eligible costs, partnership, language, submission deadline/time zone…"/></label>
+    <label style={{fontSize:12}}>Eligibility caveats / source paragraph references<textarea rows="2" style={{...styles.input,marginTop:5}} value={draft.eligibilityNotes} onChange={e=>setDraft(d=>({...d,eligibilityNotes:e.target.value}))}/></label>
+   </div>
    <fieldset style={{border:"1px solid #425064",borderRadius:10,padding:12}}><legend style={{padding:"0 6px",fontSize:12}}>Strategic pillars — select one or more</legend><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:8}}>{PILLARS.map(p=><label key={p.id} style={{display:"flex",gap:8,alignItems:"center",fontSize:12}}><input type="checkbox" checked={draft.pillars.includes(p.id)} onChange={()=>toggleDraftArray("pillars",p.id)}/>{p.label}</label>)}</div></fieldset>
    <fieldset style={{border:"1px solid #425064",borderRadius:10,padding:12}}><legend style={{padding:"0 6px",fontSize:12}}>Cross-cutting themes</legend><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:8}}>{THEMES.map(t=><label key={t.id} style={{display:"flex",gap:8,alignItems:"center",fontSize:12}}><input type="checkbox" checked={draft.themes.includes(t.id)} onChange={()=>toggleDraftArray("themes",t.id)}/>{t.label}</label>)}</div></fieldset>
    <div><button disabled={saving} type="submit" style={{...styles.button,opacity:saving ? 0.6 : 1}}>{saving?"Saving…":"Save opportunity"}</button></div>
@@ -133,9 +207,25 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
      <div style={{minWidth:150}}><div style={{fontSize:12,color:"#9fb0c3"}}>Deadline</div><strong>{dateLabel(r.deadline)}</strong><div style={{fontSize:12,marginTop:8,color:"#9fb0c3"}}>Status</div><strong>{r.status||"Unclassified"}</strong></div>
     </div>
     <div style={{display:"flex",gap:5,flexWrap:"wrap",margin:"8px 0"}}>{cleanArray(r.pillars).map(id=><span key={id} style={styles.tag}>{PILLARS.find(p=>p.id===id)?.label||id}</span>)}{cleanArray(r.themes).map(id=><span key={id} style={{...styles.tag,borderColor:"#6c5b8f"}}>{THEMES.find(t=>t.id===id)?.label||id}</span>)}</div>
-    <div style={{display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap",alignItems:"center"}}><span style={styles.muted}>Geography: {r.country||"Not specified"} · Funding: {r.amount||"Not specified"} · Updated: {dateLabel(r.updatedAt||r.createdAt)}</span><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><a href={r.url} target="_blank" rel="noreferrer" style={{...styles.button,textDecoration:"none",display:"inline-block"}}>Open official call ↗</a>{canManage&&<select aria-label={"Update status for "+r.title} style={{...styles.input,width:"auto"}} value={r.status||"Open"} onChange={e=>changeStatus(r,e.target.value)}>{statusOptions.map(s=><option key={s}>{s}</option>)}</select>}</div></div>
+    {(()=>{const a=eligibilityFor(r);return <div style={{margin:"10px 0",padding:12,border:"1px solid "+(a.verdict==="Potentially ineligible"?"#b65c5c":a.verdict==="Potentially eligible"?"#32846d":"#b78b3d"),borderRadius:10}}><div style={{fontSize:11,fontWeight:800,letterSpacing:.5,textTransform:"uppercase"}}>IRPA eligibility screening · {a.verdict}</div><p style={{...styles.muted,margin:"5px 0"}}>{a.summary} This is a preliminary rule-based screen, not a donor decision.</p><details><summary style={{cursor:"pointer",fontSize:12,fontWeight:700}}>View eligibility checks</summary><ul style={{paddingLeft:20,fontSize:12,lineHeight:1.6}}>{a.checks.map((c,i)=><li key={i}><strong>{c.state==="pass"?"Potential match":c.state==="fail"?"Potential blocker":"Needs checking"} — {c.label}:</strong> {c.detail}</li>)}</ul></details></div>})()}
+    {(cleanArray(r.requiredDocuments).length>0||r.applicationRequirements)&&<details style={{margin:"8px 0"}}><summary style={{cursor:"pointer",fontSize:13,fontWeight:700}}>Application requirements and document checklist</summary><div style={{padding:10,fontSize:12,lineHeight:1.6}}>{r.applicationRequirements&&<p style={{whiteSpace:"pre-wrap"}}>{r.applicationRequirements}</p>}{r.applicationMethod&&<p><strong>Submission method:</strong> {r.applicationMethod}</p>}{r.funderContactEmail&&<p><strong>Funder contact:</strong> {r.funderContactEmail}</p>}{cleanArray(r.requiredDocuments).length>0&&<ul>{r.requiredDocuments.map((d,i)=><li key={i}>{d}</li>)}</ul>}{r.eligibilityNotes&&<p><strong>Eligibility notes:</strong> {r.eligibilityNotes}</p>}</div></details>}
+    <div style={{display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap",alignItems:"center"}}><span style={styles.muted}>Geography: {r.country||"Not specified"} · Funding: {r.amount||"Not specified"} · Updated: {dateLabel(r.updatedAt||r.createdAt)}</span><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><a href={r.url} target="_blank" rel="noreferrer" style={{...styles.button,textDecoration:"none",display:"inline-block"}}>Open official call ↗</a><button type="button" style={{...styles.button,background:"#6a4b20"}} onClick={()=>beginEnquiry(r)}>Eligibility &amp; tailored enquiry</button>{canManage&&<select aria-label={"Update status for "+r.title} style={{...styles.input,width:"auto"}} value={r.status||"Open"} onChange={e=>changeStatus(r,e.target.value)}>{statusOptions.map(s=><option key={s}>{s}</option>)}</select>}</div></div>
    </article>)}
   </section>
+  {activeEnquiry&&<div role="dialog" aria-modal="true" aria-labelledby="grant-enquiry-title" style={{position:"fixed",zIndex:16000,inset:0,overflowY:"auto",background:"#000b",padding:16,display:"grid",placeItems:"center"}}>
+   <form onSubmit={submitEnquiry} style={{...styles.card,width:"min(860px,100%)",maxHeight:"calc(100vh - 32px)",overflowY:"auto",boxSizing:"border-box",display:"grid",gap:13}}>
+    <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"start"}}><div><div style={styles.eyebrow}>IRPA-DBGS · CALL-SPECIFIC WORKSPACE</div><h2 id="grant-enquiry-title" style={{fontSize:21,margin:"6px 0"}}>Eligibility review &amp; tailored funder enquiry</h2><p style={styles.muted}>{activeEnquiry.funder} · {activeEnquiry.title}</p></div><button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>setActiveEnquiry(null)}>Close</button></div>
+    <div style={{...styles.card,display:"grid",gap:8}}><strong>Preliminary eligibility result: {activeEnquiry.assessment.verdict}</strong><p style={{...styles.muted,margin:0}}>{activeEnquiry.assessment.summary} Review every item and the original call before deciding to apply.</p>{activeEnquiry.assessment.checks.map((c,i)=><div key={i} style={{fontSize:12,lineHeight:1.5,borderTop:"1px solid #344255",paddingTop:7}}><strong>{c.state==="pass"?"Potential match":c.state==="fail"?"Potential blocker":"Needs verification"} · {c.label}</strong><div style={styles.muted}>{c.detail}</div></div>)}</div>
+    <div style={{...styles.card,display:"grid",gap:8}}><strong>Application preparation checklist</strong><p style={styles.muted}>Use the official call to verify every item; this list is not a substitute for donor instructions.</p>{(cleanArray(activeEnquiry.requiredDocuments).length?activeEnquiry.requiredDocuments:["Registration certificate","Constitution / governing instrument","Board / governance details","Project concept note and results framework","Activity-based budget and budget narrative","Financial statements and audit information, if required","Safeguarding, procurement, finance and other required policies","Partnership / co-financing evidence, if required"]).map((d,i)=><label key={i} style={{display:"flex",gap:8,alignItems:"start",fontSize:12}}><input type="checkbox"/><span>{d}</span></label>)}</div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:10}}><label style={{fontSize:12}}>Enquirer name<input required style={{...styles.input,marginTop:5}} value={enquiryDraft.contactName} onChange={e=>setEnquiryDraft(d=>({...d,contactName:e.target.value}))}/></label><label style={{fontSize:12}}>Reply email<input required type="email" style={{...styles.input,marginTop:5}} value={enquiryDraft.contactEmail} onChange={e=>setEnquiryDraft(d=>({...d,contactEmail:e.target.value}))}/></label><label style={{fontSize:12}}>Role / department<input style={{...styles.input,marginTop:5}} value={enquiryDraft.contactRole} onChange={e=>setEnquiryDraft(d=>({...d,contactRole:e.target.value}))}/></label></div>
+    <label style={{fontSize:12}}>Customized questions for the funder<textarea required rows="8" style={{...styles.input,marginTop:5,resize:"vertical"}} value={enquiryDraft.questions} onChange={e=>setEnquiryDraft(d=>({...d,questions:e.target.value}))}/></label>
+    <label style={{fontSize:12}}>Additional context / call references<textarea rows="3" style={{...styles.input,marginTop:5,resize:"vertical"}} value={enquiryDraft.notes} onChange={e=>setEnquiryDraft(d=>({...d,notes:e.target.value}))}/></label>
+    {enquiryMessage&&<div role="status" style={{...styles.card,borderColor:enquiryMessage.startsWith("Could not")?"#b65c5c":"#32846d"}}>{enquiryMessage}</div>}
+    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button type="submit" disabled={enquirySaving} style={{...styles.button,opacity:enquirySaving?0.6:1}}>{enquirySaving?"Saving enquiry…":"Save enquiry to IRPA-DBGS"}</button><button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>GenUICopy(enquiryDraft.questions)}>Copy enquiry text</button>{activeEnquiry.funderContactEmail&&<a href={"mailto:"+activeEnquiry.funderContactEmail+"?subject="+encodeURIComponent("Eligibility enquiry: "+activeEnquiry.title)+"&body="+encodeURIComponent(enquiryDraft.questions+"\n\n"+enquiryDraft.notes+"\n\nContact: "+enquiryDraft.contactName+" ("+enquiryDraft.contactEmail+")")} style={{...styles.button,textDecoration:"none"}}>Open email draft ↗</a>}</div>
+    <p style={styles.muted}>Saving records a draft for internal coordination only. It does not submit a grant application or send an email automatically.</p>
+   </form>
+  </div>}
+
   <section style={styles.card}>
    <h2 style={{fontSize:18,marginTop:0}}>Official funding-source directory</h2><p style={styles.muted}>Open the source to verify the current call, eligible applicants, deadlines and original application documents. Source pages are not proof that a call is currently open.</p>
    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:9}}>{SOURCES.map(s=><a key={s.name} href={s.url} target="_blank" rel="noreferrer" style={{border:"1px solid #425064",borderRadius:9,padding:12,color:"var(--text-primary, #e8edf5)",textDecoration:"none",fontSize:13,fontWeight:650}}>{s.name} ↗</a>)}</div>
@@ -143,4 +233,6 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
   <div style={{...styles.muted,borderLeft:"3px solid #b78b3d",padding:"8px 12px"}}><strong>Live-data status:</strong> this portal subscribes to the shared IRPA opportunity register in real time. The source directory supports official verification; automated multi-donor crawling and scheduled ingestion require a separately configured collector and approved source/API access. No sample or unverified record is represented as a confirmed live grant.</div>
  </div>;
 }
+function splitList(value){return String(value||"").split(/[;\\n]/).map(v=>v.trim()).filter(Boolean);}
+function GenUICopy(value){if(typeof navigator!=="undefined"&&navigator.clipboard?.writeText)navigator.clipboard.writeText(String(value||"")).catch(()=>{});}
 function dateMillis(v){if(!v)return 0;const d=v?.toDate?v.toDate():new Date(v);return Number.isNaN(d.getTime())?0:d.getTime();}
