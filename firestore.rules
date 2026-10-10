@@ -216,7 +216,41 @@ service cloud.firestore {
         (documentLifecycleWorkflowAuthority(resource.data)&&documentLifecycleTransitionUpdateAllowed(id))
       );
   }
-  match /documents/{id}{allow read:if admin()||controlledDocumentReadAllowed();allow create:if admin()||controlledDocumentCreateAllowed()||documentLifecycleCreateAllowed(id);allow delete:if admin();allow update:if admin()||signatureDocumentWorkflowUpdate()||documentLifecycleUpdateAllowed();}
+  function documentLifecycleDerivativeCreateAllowed(documentId){
+    let d=request.resource.data;
+    let sourceId=d.get("parentDocumentId","");
+    let sourcePath=/databases/$(database)/documents/documents/$(sourceId);
+    return documentLifecycleIdentity()&&
+      d.get("translationDerivative",false)==true&&
+      sourceId is string&&sourceId.size()>0&&exists(sourcePath)&&
+      get(sourcePath).data.get("documentId","")==sourceId&&
+      get(sourcePath).data.get("ownerUid","")==request.auth.uid&&
+      d.get("documentId","")==documentId&&
+      d.get("ownerUid","")==request.auth.uid&&
+      d.get("uploadedByUid","")==request.auth.uid&&
+      d.get("ownerType","")==get(sourcePath).data.get("ownerType","")&&
+      d.get("department","")==get(sourcePath).data.get("department","")&&
+      d.get("unit","")==get(sourcePath).data.get("unit","")&&
+      d.get("classification","")==get(sourcePath).data.get("classification","")&&
+      d.get("accessPolicy","")==get(sourcePath).data.get("accessPolicy","")&&
+      d.get("archiveCategory","")==get(sourcePath).data.get("archiveCategory","")&&
+      d.get("documentType","")==get(sourcePath).data.get("documentType","")&&
+      d.get("authorizedUids",[])==get(sourcePath).data.get("authorizedUids",[])&&
+      d.get("authorizedRoles",[])==get(sourcePath).data.get("authorizedRoles",[])&&
+      d.get("authorizedDepartments",[])==get(sourcePath).data.get("authorizedDepartments",[])&&
+      d.get("status","")=="WORKING"&&
+      d.get("authorizationStatus","")=="AUTHORIZED"&&
+      d.get("signatureStatus","")=="NOT_SENT"&&
+      d.get("postSignatureStatus","")=="NOT_STARTED"&&
+      d.get("finalArchiveStatus","")=="NOT_ARCHIVED"&&
+      d.get("fileId","") is string&&d.get("fileId","").size()>0&&
+      d.get("fileName","") is string&&d.get("fileName","").size()>0&&
+      d.get("sha256","") is string&&d.get("sha256","").matches("^[a-f0-9]{64}$")&&
+      d.get("authorizedUids",[]) is list&&d.get("authorizedUids",[]).hasAll([request.auth.uid])&&
+      d.get("recordOrigin","PRODUCTION")==get(sourcePath).data.get("recordOrigin","PRODUCTION")&&
+      d.get("recordOrigin","PRODUCTION") in ["PRODUCTION","TRIAL"];
+  }
+  match /documents/{id}{allow read:if admin()||controlledDocumentReadAllowed();allow create:if admin()||controlledDocumentCreateAllowed()||documentLifecycleCreateAllowed(id)||documentLifecycleDerivativeCreateAllowed(id);allow delete:if admin();allow update:if admin()||signatureDocumentWorkflowUpdate()||documentLifecycleUpdateAllowed();}
   match /documentTranslationRequests/{id}{
     function translationReviewer(){return admin()||anyInstitutionalRole(["Executive Director","Director Outreach","Director Community Development","Director Research","Research Director","Research Officer","Director Human Resources","HR Director"]);}
     allow create:if signedIn()
