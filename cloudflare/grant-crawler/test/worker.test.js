@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import worker, { assessFit, parseFeed, safeUrl } from "../src/index.js";
+import { assessGeographicEligibility } from "../src/assistant.js";
 
 test("accepts only credential-free HTTPS feed URLs", () => {
   assert.equal(safeUrl("https://example.org/feed.xml").hostname, "example.org");
@@ -98,6 +99,93 @@ test("future deadlines can remain open for eligibility review", () => {
   });
   assert.equal(fit.deadlineAt, "2099-12-31");
   assert.equal(fit.callStatus, "open");
+});
+
+
+
+test("strict geographic filter excludes South Africa-only and Zimbabwe-only announcements", () => {
+  const southAfrica = assessFit({
+    title: "Community grants for South African registered NGOs",
+    description: "Applicants must be registered and operating in South Africa. Funding for climate resilience and community livelihoods.",
+    sourceUrl: "https://donor.example/calls"
+  });
+  assert.equal(southAfrica.geographyAssessment, "other_country_focus");
+  assert.equal(southAfrica.triageAssessment, "geographic_mismatch_review");
+  assert.equal(southAfrica.eligibilityStatus, "geographic_ineligible");
+
+  const zimbabwe = assessFit({
+    title: "Zimbabwean civil society innovation fund",
+    description: "Only organizations registered in Zimbabwe may apply. Digital transformation and community development.",
+    sourceUrl: "https://donor.example/calls"
+  });
+  assert.equal(zimbabwe.geographyAssessment, "other_country_focus");
+  assert.equal(zimbabwe.triageAssessment, "geographic_mismatch_review");
+  assert.equal(zimbabwe.eligibilityStatus, "geographic_ineligible");
+});
+
+test("strict geographic filter suppresses calls whose eligible geography is unstated", () => {
+  const fit = assessFit({
+    title: "Climate resilience small grants",
+    description: "Support for community-led restoration and youth innovation.",
+    sourceUrl: "https://donor.example/calls"
+  });
+  assert.equal(fit.geographyAssessment, "not_stated");
+  assert.equal(fit.triageAssessment, "geography_unverified_suppressed");
+  assert.equal(fit.eligibilityStatus, "geography_unverified");
+});
+
+test("strict geographic filter retains explicit Tanzania and broad eligible regions", () => {
+  const tanzania = assessFit({
+    title: "Tanzania NGO climate resilience grant",
+    description: "Eligible applicants must be registered in Tanzania and serve local communities."
+  });
+  assert.equal(tanzania.geographyAssessment, "tanzania_mentioned");
+  assert.equal(tanzania.eligibilityStatus, "unverified");
+
+  const regional = assessFit({
+    title: "East Africa community resilience funding",
+    description: "Open to civil society organizations across East Africa."
+  });
+  assert.equal(regional.geographyAssessment, "regional_or_lmic_scope");
+  assert.equal(regional.triageAssessment, "priority_for_eligibility_review");
+});
+
+test("AI geographic gate blocks concept-note drafting when geography is ineligible or unclear", async () => {
+  const token = "test-token-with-at-least-32-characters-long";
+  let modelCalls = 0;
+  const env = { CRAWLER_CONTROL_TOKEN: token, AI: { run: async () => { modelCalls++; return { response: JSON.stringify({ eligibility: { status: "eligible", confidence: "high", evidence: [], unknowns: [] }, donor_requirements: [] }) }; } } };
+  const headers = { authorization: "Bearer " + token, "content-type": "application/json" };
+  const southAfrica = await worker.fetch(new Request("https://crawler.example/assistant/analyze", {
+    method: "POST", headers,
+    body: JSON.stringify({ task: "concept_note", title: "South African NGO grant", description: "Only organizations registered in South Africa may apply." })
+  }), env);
+  assert.equal(southAfrica.status, 422);
+  assert.equal((await southAfrica.json()).geographic_eligibility.status, "ineligible");
+
+  const unknown = await worker.fetch(new Request("https://crawler.example/assistant/analyze", {
+    method: "POST", headers,
+    body: JSON.stringify({ task: "concept_note", title: "Climate grant", description: "Supports community climate adaptation." })
+  }), env);
+  assert.equal(unknown.status, 422);
+  assert.equal((await unknown.json()).geographic_eligibility.status, "unclear");
+  assert.equal(modelCalls, 0);
+});
+
+test("AI eligibility analysis deterministically overrides model claims for country-restricted calls", async () => {
+  const token = "test-token-with-at-least-32-characters-long";
+  const env = { CRAWLER_CONTROL_TOKEN: token, AI: { run: async () => ({ response: JSON.stringify({
+    eligibility: { status: "eligible", confidence: "high", evidence: ["The model guessed eligible"], unknowns: [] },
+    donor_requirements: []
+  }) }) } };
+  const response = await worker.fetch(new Request("https://crawler.example/assistant/analyze", {
+    method: "POST",
+    headers: { authorization: "Bearer " + token, "content-type": "application/json" },
+    body: JSON.stringify({ title: "Zimbabwe grant", description: "Only organizations registered in Zimbabwe may apply." })
+  }), env);
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.assessment.geographic_eligibility.status, "ineligible");
+  assert.equal(body.assessment.eligibility.status, "ineligible");
 });
 
 
