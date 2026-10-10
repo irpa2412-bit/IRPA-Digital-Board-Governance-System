@@ -193,15 +193,31 @@ function extractModelText(result) {
     result?.choices?.[0]?.message?.content,
     result?.result?.choices?.[0]?.message?.content,
     result?.output_text,
-    result?.result?.output_text
+    result?.result?.output_text,
+    result?.generated_text,
+    result?.output,
+    result?.result?.output
   ];
   for (const candidate of candidates) {
     if (typeof candidate === "string") return candidate;
+    if (Array.isArray(candidate) && candidate[0]) {
+      const first = candidate[0];
+      if (typeof first === "string") return first;
+      if (typeof first?.text === "string") return first.text;
+      if (typeof first?.content === "string") return first.content;
+    }
     if (candidate && typeof candidate === "object") {
       if (typeof candidate.choices?.[0]?.message?.content === "string") return candidate.choices[0].message.content;
       if (typeof candidate.response === "string") return candidate.response;
+      if (typeof candidate.output_text === "string") return candidate.output_text;
+      if (typeof candidate.text === "string") return candidate.text;
+      if (typeof candidate.content === "string") return candidate.content;
       if (candidate.eligibility || candidate.donor_requirements || candidate.strategic_alignment) return JSON.stringify(candidate);
     }
+  }
+  if (result?.result && typeof result.result === "object" &&
+      (result.result.eligibility || result.result.donor_requirements || result.result.strategic_alignment)) {
+    return JSON.stringify(result.result);
   }
   if (result && typeof result === "object" && (result.eligibility || result.donor_requirements || result.strategic_alignment)) {
     return JSON.stringify(result);
