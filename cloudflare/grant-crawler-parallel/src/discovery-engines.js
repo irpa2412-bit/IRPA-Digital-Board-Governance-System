@@ -95,7 +95,8 @@ export async function readOfficialPages(env) {
 
 const SEARCH_QUERIES = ['"grant call" Tanzania NGO climate pastoral livestock rangeland','"call for proposals" Africa NGO environment biodiversity restoration','foundation grants Tanzania civil society women youth livelihoods','embassy small grants Tanzania NGO community development'];
 function xmlField(block, name) {
-  const match = block.match(new RegExp("<" + name + "\b[^>]*>([\\s\\S]*?)<\\/" + name + "\\s*>", "i"));
+  const pattern = "<" + name + "\\b[^>]*>([\\s\\S]*?)<\\/" + name + "\\s*>";
+  const match = block.match(new RegExp(pattern, "i"));
   return match ? decodeHtml(match[1]) : "";
 }
 export function parseSearchRss(xml, query, provider = "Google News RSS") {
