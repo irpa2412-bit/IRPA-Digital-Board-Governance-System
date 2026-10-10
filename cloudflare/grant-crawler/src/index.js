@@ -90,13 +90,13 @@ function extractDeadline(item) {
   const monthNames = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
   const monthPattern = "January|February|March|April|May|June|July|August|September|October|November|December";
   const patterns = [
-    new RegExp("(?:by|deadline(?: date)?|submission deadline|closing date|due date|submit(?:ted)? by)\\D{0,40}?(\\d{1,2})\\s+(" + monthPattern + ")(?:\\s+(\\d{4}))?", "i"),
-    new RegExp("(?:by|deadline(?: date)?|submission deadline|closing date|due date|submit(?:ted)? by)\\D{0,40}?(" + monthPattern + ")\\s+(\\d{1,2})(?:,?\\s+(\\d{4}))?", "i"),
+    /\b(?:by|deadline(?: date)?|submission deadline|closing date|due date|submit(?:ted)? by)\D{0,40}?(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)(?:\s+(\d{4}))?/i,
+    /\b(?:by|deadline(?: date)?|submission deadline|closing date|due date|submit(?:ted)? by)\D{0,40}?(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2})(?:,?\s+(\d{4}))?/i,
   ];
   for (const pattern of patterns) {
     const match = text.match(pattern);
     if (!match) continue;
-    const dayFirst = /^\\d+$/.test(match[1]);
+    const dayFirst = /^\d+$/.test(match[1]);
     const monthToken = dayFirst ? match[2] : match[1];
     const day = Number(dayFirst ? match[1] : match[2]);
     const yearText = match[3];
@@ -107,7 +107,7 @@ function extractDeadline(item) {
     if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month || date.getUTCDate() !== day) continue;
     return date.toISOString().slice(0, 10);
   }
-  const iso = text.match(/(?:deadline|due|submit by|closing date)\\D{0,30}?(\\d{4})-(\\d{2})-(\\d{2})/i);
+  const iso = text.match(/\b(?:deadline|due|submit by|closing date)\D{0,30}?(\d{4})-(\d{2})-(\d{2})/i);
   if (iso) return iso[1] + "-" + iso[2] + "-" + iso[3];
   return null;
 }
