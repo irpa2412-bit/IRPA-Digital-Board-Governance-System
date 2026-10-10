@@ -1,0 +1,45 @@
+name: Grant Crawler Cloudflare CI
+on:
+  pull_request:
+    paths:
+      - "cloudflare/grant-crawler/**"
+      - "src/pages/GrantIntelligencePortal.jsx"
+      - ".github/workflows/firebase-cli-deploy.yml"
+      - ".github/workflows/grant-crawler-cloudflare-ci.yml"
+      - "package.json"
+      - "package-lock.json"
+  push:
+    branches: [main]
+    paths:
+      - "cloudflare/grant-crawler/**"
+      - "src/pages/GrantIntelligencePortal.jsx"
+      - ".github/workflows/firebase-cli-deploy.yml"
+      - ".github/workflows/grant-crawler-cloudflare-ci.yml"
+      - "package.json"
+      - "package-lock.json"
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Validate Worker JavaScript syntax
+        run: node --check cloudflare/grant-crawler/src/index.js
+      - name: Test Worker health, authentication guard, routing and CORS
+        working-directory: cloudflare/grant-crawler
+        run: node --test tests/worker.test.js
+      - name: Install application dependencies
+        run: npm ci
+      - name: Full-source readability and contrast check
+        run: npm run check:production-readability
+      - name: Build production web application
+        run: npm run build
+      - name: Independent readability verification
+        run: npm run verify:production-readability
+      - name: Verify built portal
+        run: test -f dist/index.html
