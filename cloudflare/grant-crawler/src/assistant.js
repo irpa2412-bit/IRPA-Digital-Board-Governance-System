@@ -8,9 +8,45 @@ const IRPA_PROFILE = {
   operational_area: "Longido District, Arusha Region, Tanzania; initial focus includes Longido, Engikaret and Kimokouwa wards and pilot villages across Longido, Engarenaibor and Kitumbeine divisions.",
   maturity: "Newly registered organization. No completed projects and no secured project funding have been reported. Do not imply a proven delivery track record, audited project history, or co-financing that has not been supplied.",
   pillars: [
-    "Sustainable Rangeland Management: sustainable use, restoration and control of invasive plant species",
-    "Livestock Development: improved breeding and access to veterinary services",
-    "Market Development: livestock market linkages and value addition to livestock products"
+    {
+      name: "Sustainable Rangeland Management",
+      objectives: ["promote proper use of rangelands", "promote rangeland restoration", "control invasive plant species"],
+      cross_cutting_themes: [
+        "climate change adaptation and resilience: drought preparedness, ecosystem resilience and climate-informed restoration",
+        "gender equality and social inclusion: equitable access to rangelands, restoration benefits and decision-making",
+        "youth empowerment: youth participation in restoration, monitoring and green livelihoods",
+        "community participation: community-led grazing plans, restoration and invasive-species management",
+        "research, innovation and knowledge management: rangeland condition evidence, GIS/NDVI and community knowledge",
+        "governance and institutional capacity strengthening: local resource governance, accountability and management capacity",
+        "environmental sustainability: biodiversity, soil and vegetation recovery, and sustainable land use"
+      ]
+    },
+    {
+      name: "Livestock Development",
+      objectives: ["promote breeding of improved hybrid animals", "facilitate veterinary services"],
+      cross_cutting_themes: [
+        "climate change adaptation and resilience: climate-resilient livestock systems and drought preparedness",
+        "gender equality and social inclusion: inclusive access to animal health, breeding and livestock services",
+        "youth empowerment: youth participation in livestock enterprises and service delivery",
+        "community participation: pastoralist-led livestock priorities and community animal-health approaches",
+        "research, innovation and knowledge management: animal-health evidence, appropriate innovation and knowledge exchange",
+        "governance and institutional capacity strengthening: stronger livestock institutions, service coordination and accountability",
+        "environmental sustainability: sustainable grazing pressure, animal welfare and responsible natural-resource use"
+      ]
+    },
+    {
+      name: "Market Development",
+      objectives: ["facilitate linkages between pastoralists and livestock markets", "promote value addition to livestock products"],
+      cross_cutting_themes: [
+        "climate change adaptation and resilience: resilient market access and diversified pastoral incomes",
+        "gender equality and social inclusion: fair participation and benefit-sharing for women and marginalized groups",
+        "youth empowerment: youth-led market services, enterprises and value addition",
+        "community participation: pastoralist participation in market design, priorities and producer linkages",
+        "research, innovation and knowledge management: market information, digital innovation and evidence-based decisions",
+        "governance and institutional capacity strengthening: transparent market systems, producer organization and accountable value chains",
+        "environmental sustainability: resource-efficient processing, waste management and sustainable value chains"
+      ]
+    }
   ],
   cross_cutting: [
     "climate adaptation and resilience",
@@ -85,7 +121,7 @@ export async function analyzeGrant(request, env) {
     ? {
         summary: "string",
         eligibility: { status: "eligible|possibly_eligible|ineligible|insufficient_information", confidence: "low|medium|high", evidence: ["string"], unknowns: ["string"] },
-        strategic_alignment: { relevant_pillars: ["string"], relevant_cross_cutting_themes: ["string"], digital_governance_relevance: "high|medium|low|none", rationale: "string", funding_use_fit: ["string"] },
+        strategic_alignment: { relevant_pillars: ["string"], relevant_cross_cutting_themes: ["string"], pillar_theme_alignment: [{ pillar: "string", relevant_cross_cutting_themes: ["string"], rationale: "string" }], digital_governance_relevance: "high|medium|low|none", rationale: "string", funding_use_fit: ["string"] },
         donor_requirements: [{ requirement: "string", status: "met|partially_met|not_met|unknown", evidence: "string", action: "string" }],
         concept_note: {
           title: "string",
@@ -100,7 +136,7 @@ export async function analyzeGrant(request, env) {
     : {
         summary: "string",
         eligibility: { status: "eligible|possibly_eligible|ineligible|insufficient_information", confidence: "low|medium|high", evidence: ["string"], unknowns: ["string"] },
-        strategic_alignment: { relevant_pillars: ["string"], relevant_cross_cutting_themes: ["string"], digital_governance_relevance: "high|medium|low|none", rationale: "string", funding_use_fit: ["string"] },
+        strategic_alignment: { relevant_pillars: ["string"], relevant_cross_cutting_themes: ["string"], pillar_theme_alignment: [{ pillar: "string", relevant_cross_cutting_themes: ["string"], rationale: "string" }], digital_governance_relevance: "high|medium|low|none", rationale: "string", funding_use_fit: ["string"] },
         donor_requirements: [{ requirement: "string", status: "met|partially_met|not_met|unknown", evidence: "string", action: "string" }],
         concept_note_structure: [{ heading: "string", purpose: "string", suggested_content: "string", evidence_needed: ["string"] }],
         application_checklist: ["string"],
@@ -118,7 +154,7 @@ export async function analyzeGrant(request, env) {
     "IRPA profile: " + JSON.stringify(IRPA_PROFILE),
     "Compare applicant eligibility against legal entity/country, organization type and age, geographic scope, thematic scope, past-performance requirements, financial/audit requirements, co-funding, consortium rules, and application deadlines where evidence is provided.",
     "An issue is not a confirmed disqualification unless the supplied rules clearly say so. Use insufficient_information when key eligibility rules are absent. Never represent the AI assessment as a legal or donor decision.",
-    "Apply IRPA Strategic Plan 2025–2029 as an explicit strategic-fit filter: Sustainable Rangeland Management; Livestock Development; Market Development; and all seven cross-cutting themes (climate change adaptation and resilience; gender equality and social inclusion; youth empowerment; community participation; research, innovation and knowledge management; governance and institutional capacity strengthening; environmental sustainability). Return strategic_alignment with evidence-based relevant matches, never force an unrelated call into a pillar.",
+    "Apply IRPA Strategic Plan 2025–2029 as an explicit strategic-fit filter. Each of the three pillars in the IRPA profile has all seven cross-cutting themes embedded within it, with pillar-specific examples. Assess both pillar fit and theme fit together; do not treat cross-cutting themes as a detached list or apply them only at organization level. Return strategic_alignment.relevant_pillars, strategic_alignment.relevant_cross_cutting_themes, and strategic_alignment.pillar_theme_alignment (one entry per relevant pillar with matched themes and rationale). Only claim matches supported by the opportunity text; never force an unrelated call into a pillar.",
     "IMPORTANT: digital governance funding is explicitly in scope. IRPA has an existing Digital Board Governance System (DBGS) that needs significant investment. Identify and retain relevant opportunities for digital governance, board-management/governance technology, civic technology, digital transformation, cybersecurity, cloud infrastructure, responsible AI, nonprofit institutional strengthening and digital capacity building. Score this as a separate strategic investment track, not as a substitute for the three strategic pillars. For each such opportunity, assess whether the donor funds software development, existing platforms, cybersecurity, hosting/cloud costs, equipment, technical assistance, maintenance, training, or institutional capacity; flag restrictions and unknowns. Do not claim DBGS is completed, deployed, or has proven impact unless the supplied evidence establishes it.",
     "Align concept notes to the three pillars and cross-cutting themes when relevant, and also allow a standalone digital-governance/DBGS investment concept when the donor call supports it. Tailor headings to donor instructions if supplied. If donor template instructions are absent, use a conventional concise structure and flag the limitation.",
     "Return valid JSON only, no markdown fences, matching this schema: " + JSON.stringify(schema)
