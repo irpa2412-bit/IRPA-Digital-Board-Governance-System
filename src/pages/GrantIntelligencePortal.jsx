@@ -71,7 +71,10 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
      const response=await fetch(workerUrl+"/opportunities",{headers:{Authorization:"Bearer "+token,Accept:"application/json"},signal:AbortSignal.timeout(15000)});
      const data=await response.json().catch(()=>({}));
      if(!response.ok)throw new Error(data.error||"Crawler results request failed ("+response.status+").");
-     setCrawlerRecords((Array.isArray(data.items)?data.items:[]).map(item=>({
+     const items=Array.isArray(data.items)?data.items:[];
+     const uniqueSources=[...new Set(items.map(item=>item.source_url).filter(Boolean))];
+     setCrawlerSources(uniqueSources.map(sourceUrl=>({id:sourceUrl,name:(()=>{try{return new URL(sourceUrl).hostname}catch{return sourceUrl}})(),url:sourceUrl,status:"Fetched",candidateCount:items.filter(item=>item.source_url===sourceUrl).length})));
+     setCrawlerRecords(items.map(item=>({
        id:"crawler-"+item.id,title:item.title||"Untitled opportunity",
        funder:(()=>{try{return new URL(item.source_url||item.url).hostname.replace(/^www\./,"")}catch{return "Official source"}})(),
        url:item.url||"",deadline:item.deadline_at||null,
@@ -84,7 +87,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
        eligibilityStatus:item.eligibility_status||"unverified",triageAssessment:item.triage_assessment||"manual_eligibility_review",
        createdAt:item.first_seen_at||null
      })));
-     if(data.lastRun)setCrawlerStatus({status:data.lastRun.status,created:data.lastRun.items_changed,candidatesFound:data.lastRun.items_seen,lastCompletedAt:data.lastRun.finished_at,lastStartedAt:data.lastRun.finished_at});
+     if(data.lastRun)setCrawlerStatus({status:data.lastRun.status,created:data.lastRun.items_changed,candidatesFound:data.lastRun.items_seen,lastCompletedAt:data.lastRun.finished_at,lastStartedAt:data.lastRun.finished_at,configuredSources:data.feedsConfigured,healthySources:uniqueSources.length});
      if(showNotice)setNotice("Refreshed "+String(data.count||0)+" grant records from the Cloudflare crawler. Eligibility remains unverified.");
    }catch(err){console.error("Crawler result retrieval failed",err);if(showNotice)setError(err?.message||"Unable to load crawler results.");}
    finally{setCrawlerResultsBusy(false);}
@@ -94,7 +97,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
    const next=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>dateMillis(b.createdAt)-dateMillis(a.createdAt));
    setRecords(next);setLoading(false);setError("");
  },err=>{console.error("Grant opportunity subscription failed",err);setError("Grant records could not be loaded. Check your signed-in profile's Firestore access.");setLoading(false)}),[]);
- useEffect(()=>onSnapshot(doc(db,"grantCrawlerStatus","current"),snap=>setCrawlerStatus(snap.exists()?snap.data():null),err=>console.warn("Grant crawler status unavailable",err)),[]);
+ useEffect(()=>onSnapshot(doc(db,"grantCrawlerStatus","current"),snap=>{if(snap.exists())setCrawlerStatus(snap.data())},err=>console.warn("Legacy Firestore crawler status unavailable",err)),[]);
  useEffect(()=>onSnapshot(collection(db,"grantCrawlerSources"),snap=>setCrawlerSources(snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||"")))),err=>console.warn("Grant crawler source health unavailable",err)),[]);
  const combinedRecords=useMemo(()=>{const seen=new Set(records.map(r=>String(r.url||"").trim()).filter(Boolean));return [...records,...crawlerRecords.filter(r=>r.url&&!seen.has(String(r.url).trim()))]},[records,crawlerRecords]);
  const filtered=useMemo(()=>combinedRecords.filter(r=>{
