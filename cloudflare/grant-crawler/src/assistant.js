@@ -108,7 +108,7 @@ function detectKnownEligibilityGaps(opportunity) {
   const requiresOrganizationalTrackRecord =
     /(?:applicant|organization|organisation|ngo|civil society organization|civil society organisation|lead applicant)[^.!?]{0,100}(?:must|shall|required to|at least|minimum)[^.!?]{0,100}(?:completed[^.!?]{0,30}projects|previously implemented|previous grants|past projects|proven track record|demonstrated track record)/i.test(text) ||
     /(?:must|shall|required to)[^.!?]{0,100}(?:previously implemented|completed at least \d+ projects|have a proven track record|demonstrate a track record of completed projects)/i.test(text) ||
-    /\b(?:cso|ngo|civil society organization|civil society organisation|applicant organization|applicant organisation)\b[^.!?]{0,80}\b(?:over|more than|at least|minimum of)\s*\d+\s*years?[^.!?]{0,80}\b(?:experience|proven evidence|working|track record|implementation)\b/i.test(text);
+    /\b(?:csos?|ngos?|civil society organizations?|civil society organisations?|applicant organizations?|applicant organisations?)\b[^.!?]{0,80}\b(?:over|more than|at least|minimum of)\s*\d+\s*years?[^.!?]{0,80}\b(?:experience|proven evidence|working|track record|implementation)\b/i.test(text);
   if (requiresOrganizationalTrackRecord) {
     addUnique(blockers, "The call requires organizational project-delivery or grant track record, but IRPA has reported no completed projects.");
   }
