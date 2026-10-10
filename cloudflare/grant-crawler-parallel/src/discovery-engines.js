@@ -92,9 +92,38 @@ export async function readOfficialPages(env) {
 }
 
 const SEARCH_QUERIES = ['"grant call" Tanzania NGO climate pastoral livestock rangeland','"call for proposals" Africa NGO environment biodiversity restoration','foundation grants Tanzania civil society women youth livelihoods','embassy small grants Tanzania NGO community development'];
+function xmlField(block, name) {
+  const match = block.match(new RegExp("<" + name + "\\b[^>]*>([\\s\\S]*?)<\\/" + name + "\\s*>", "i"));
+  return match ? decodeHtml(match[1]) : "";
+}
+export function parseSearchRss(xml, query) {
+  const sourceUrl = "https://news.google.com/rss/search?q=" + encodeURIComponent(query) + "&hl=en-TZ&gl=TZ&ceid=TZ:en";
+  return [...String(xml).matchAll(/<item\b[^>]*>([\s\S]*?)<\/item\s*>/gi)].slice(0, 20).map(match => {
+    const block = match[1], title = xmlField(block, "title").slice(0, 500);
+    let url = ""; try { url = normalizeOpportunityUrl(xmlField(block, "link")); } catch {}
+    const description = xmlField(block, "description").slice(0, 5000);
+    if (!title || !url || (!GRANT_TERMS.test(title + " " + description) && !/climate|pastoral|rangeland|livestock|conservation|community|women|youth|resilience|biodiversity|agriculture/i.test(title + " " + description))) return null;
+    return { title, description, url, publishedAt: xmlField(block, "pubDate") || null, sourceUrl, discoveryEngine: "web_search" };
+  }).filter(Boolean);
+}
+async function readGoogleNewsSearch() {
+  const results = await Promise.all(SEARCH_QUERIES.map(async query => {
+    try {
+      const url = new URL("https://news.google.com/rss/search");
+      url.searchParams.set("q", query); url.searchParams.set("hl", "en-TZ"); url.searchParams.set("gl", "TZ"); url.searchParams.set("ceid", "TZ:en");
+      const response = await fetch(url.href, { headers: { accept: "application/rss+xml, application/xml, text/xml", "user-agent": USER_AGENT }, signal: AbortSignal.timeout(12_000) });
+      if (!response.ok) throw new Error("Google News search HTTP " + response.status);
+      const xml = await response.text();
+      if (xml.length > MAX_PAGE_BYTES) throw new Error("Search response exceeds the 1 MB limit.");
+      return { items: parseSearchRss(xml, query), error: null };
+    } catch (error) { return { items: [], error: { query, error: String(error.message || error).slice(0, 180) } }; }
+  }));
+  const items = results.flatMap(result => result.items), errors = results.filter(result => result.error).map(result => result.error);
+  return { items, stats: { configured: true, provider: "Google News RSS", queries: SEARCH_QUERIES.length, found: items.length, errors } };
+}
 export async function readWebSearch(env) {
   const apiKey = String(env.BRAVE_SEARCH_API_KEY || "").trim();
-  if (!apiKey) return { items: [], stats: { configured: false, queries: 0, found: 0, errors: [], message: "BRAVE_SEARCH_API_KEY is not configured." } };
+  if (!apiKey) return readGoogleNewsSearch();
   const results = await Promise.all(SEARCH_QUERIES.map(async query => {
     const items = [];
     try {
@@ -110,11 +139,8 @@ export async function readWebSearch(env) {
         items.push({ title, description, url: resultUrl, publishedAt: result.page_age || null, sourceUrl: "https://search.brave.com/search?q=" + encodeURIComponent(query), discoveryEngine: "web_search" });
       }
       return { items, error: null };
-    } catch (error) {
-      return { items, error: { query, error: String(error.message || error).slice(0, 180) } };
-    }
+    } catch (error) { return { items: [], error: { query, error: String(error.message || error).slice(0, 180) } }; }
   }));
-  const errors = results.filter(result => result.error).map(result => result.error);
-  const items = results.flatMap(result => result.items);
-  return { items, stats: { configured: true, queries: SEARCH_QUERIES.length, found: items.length, errors } };
+  const errors = results.filter(result => result.error).map(result => result.error), items = results.flatMap(result => result.items);
+  return { items, stats: { configured: true, provider: "Brave Search API", queries: SEARCH_QUERIES.length, found: items.length, errors } };
 }
