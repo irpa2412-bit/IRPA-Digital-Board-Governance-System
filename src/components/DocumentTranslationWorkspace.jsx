@@ -183,7 +183,6 @@ export default function DocumentTranslationWorkspace({profile,employee,admin=fal
   if(selected.documentOwnerUid!==currentUid)throw new Error("Only the document owner can archive the translated output through their Documents Portal.");
   setArchiving(true);setError("");setMessage("");
   try{
-   const sourceDocument=documents.find(d=>String(d.documentId)===String(selected.documentId));
    const safeTarget=String(selected.targetLanguage||"translated").toUpperCase();
    const fileName="IRPA-Translation-"+String(selected.documentReference||selected.documentId).replace(/[^A-Za-z0-9_-]/g,"-")+"-"+safeTarget+".txt";
    const file=new File([selected.translatedText],fileName,{type:"text/plain"});
