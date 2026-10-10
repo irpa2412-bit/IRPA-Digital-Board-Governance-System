@@ -217,11 +217,11 @@ function isCurrentOpportunity(item, today = todayInTanzania()) {
   const status = String(item.call_status || item.callStatus || "").trim().toLowerCase();
   const text = [item.title, item.description].filter(Boolean).join(" ").toLowerCase();
   if (["closed", "expired", "closed_do_not_prioritize"].includes(status) ||
-      /\\b(?:fund state:\\s*closed|call is closed|call closed|applications? (?:are )?closed|this call has closed|deadline has passed|expired opportunity)\\b/i.test(text)) return false;
+      /\b(?:fund state:\s*closed|call is closed|call closed|applications? (?:are )?closed|this call has closed|deadline has passed|expired opportunity)\b/i.test(text)) return false;
   const deadline = extractDeadline(item);
   if (deadline && deadline < today) return false;
   if (deadline) return true; // Deadline is today or in the future (Tanzania local date).
-  const rolling = /\\b(?:rolling basis|rolling applications?|year[- ]round|open throughout the year|no fixed deadline|no application deadline)\\b/i.test(text);
+  const rolling = /\b(?:rolling basis|rolling applications?|year[- ]round|open throughout the year|no fixed deadline|no application deadline)\b/i.test(text);
   return status === "open" || rolling;
 }
 
