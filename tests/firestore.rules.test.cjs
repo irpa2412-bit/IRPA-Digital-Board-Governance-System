@@ -422,6 +422,7 @@ function translationRequest(overrides = {}) {
     dictionaryAssistRequested: true,
     humanReviewRequired: true,
     contentTransferAuthorized: false,
+    restrictedTransferAuthorized: false,
     contentTransferred: false,
     requestOrigin: "Documents Portal",
     createdAt: "2026-10-10T06:00:00.000Z",
