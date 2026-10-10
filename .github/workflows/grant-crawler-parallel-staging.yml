@@ -15,7 +15,7 @@ permissions:
   contents: read
 concurrency:
   group: irpa-grant-crawler-staging-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   test:
     runs-on: ubuntu-latest
