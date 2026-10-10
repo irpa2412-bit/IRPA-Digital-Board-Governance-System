@@ -88,7 +88,6 @@ async function readFeeds(env) {
 function extractDeadline(item) {
   const text = String(item.title || "") + " " + String(item.description || "");
   const monthNames = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
-  const monthPattern = "January|February|March|April|May|June|July|August|September|October|November|December";
   const patterns = [
     /\b(?:by|deadline(?: date)?|submission deadline|closing date|due date|submit(?:ted)? by)\D{0,40}?(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)(?:\s+(\d{4}))?/i,
     /\b(?:by|deadline(?: date)?|submission deadline|closing date|due date|submit(?:ted)? by)\D{0,40}?(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2})(?:,?\s+(\d{4}))?/i,
@@ -131,9 +130,11 @@ function assessFit(item) {
   const sourceIsOpenFeed = /(?:^|[?&])fund_state=open(?:&|$)/i.test(item.sourceUrl || "");
   const callStatus = /\bclosed\b/i.test(text)
     ? "closed"
-    : sourceIsOpenFeed || /fund state:\s*open|open for applications|applications are open|call is open/i.test(text)
-      ? "open"
-      : "unknown";
+    : isExpired
+      ? "expired"
+      : sourceIsOpenFeed || /fund state:\s*open|open for applications|applications are open|call is open/i.test(text)
+        ? "open"
+        : "unknown";
   const tanzaniaMentioned = /\btanzania\b|united republic of tanzania/i.test(text);
   const otherCountryFocus = /\b(kenya|uganda|south africa|west africa|sudan|albania|rwanda|bangladesh|morocco|nepal)\b/i.test(text);
   const regionalScope = /east africa|sub-saharan africa|africa-wide|across africa|global|worldwide|low[- ]and[- ]middle[- ]income|\blmic\b|developing countries/i.test(text);
