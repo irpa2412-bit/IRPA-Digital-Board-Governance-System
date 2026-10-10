@@ -94,6 +94,9 @@ async function main() {
   console.log(JSON.stringify({
     crawlerStatus: crawlResult.status,
     feedsConfigured: crawlResult.feedsConfigured,
+    sourcePagesConfigured: crawlResult.sourcePagesConfigured,
+    webSearchConfigured: crawlResult.webSearchConfigured,
+    engines: crawlResult.engines,
     itemsSeen: crawlResult.itemsSeen,
     recordsChanged: crawlResult.recordsChanged,
     irpaFitMatches: crawlResult.irpaFitMatches,
