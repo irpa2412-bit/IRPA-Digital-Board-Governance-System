@@ -1,4 +1,5 @@
 const {onCall,HttpsError}=require("firebase-functions/v2/https");
+const logger=require("firebase-functions/logger");
 const {getFirestore,FieldValue}=require("firebase-admin/firestore");
 const crypto=require("crypto");
 const db=getFirestore();
@@ -12,9 +13,11 @@ async function activeAdmin(request){if(admin(request))return true;const uid=requ
 
 exports.createMeetingAccessInvitation=onCall({region:"us-central1",timeoutSeconds:30},async request=>{
  const uid=request.auth?.uid;
- if(!uid)throw new HttpsError("unauthenticated","Authentication is required.");
  const meetingId=text(request.data?.meetingId),participantId=text(request.data?.participantId);
- let stage="VALIDATE_INPUT";
+ let stage="AUTHENTICATE";
+ try{
+ if(!uid)throw new HttpsError("unauthenticated","Authentication is required.");
+ stage="VALIDATE_INPUT";
  const logStage=(status,extra={})=>console.info("MEETING_ACCESS_INVITATION_STAGE",{stage,status,meetingId:meetingId||null,participantId:participantId||null,actorUid:uid,...extra});
  logStage("START");
  if(!meetingId||!participantId)throw new HttpsError("invalid-argument","Meeting and participant are required.");
@@ -54,6 +57,11 @@ exports.createMeetingAccessInvitation=onCall({region:"us-central1",timeoutSecond
  try { await db.runTransaction(async tx=>{const latest=await tx.get(meetingSnap.ref);if(!latest.exists)throw new HttpsError("not-found","The meeting record no longer exists.");const current=latest.data()||{};const ids=Array.isArray(current.invitedParticipantIds)?current.invitedParticipantIds.map(String):[];const nextIds=[...new Set([...ids,participantId])];const invitedEmails=new Set(Array.isArray(current.invitedEmails)?current.invitedEmails.map(v=>text(v).toLowerCase()).filter(Boolean):[]);const participantEmails=new Set(Array.isArray(current.participantEmails)?current.participantEmails.map(v=>text(v).toLowerCase()).filter(Boolean):[]);const participantEmail=text(participant.participantEmail||participant.email).toLowerCase();if(participantEmail){invitedEmails.add(participantEmail);participantEmails.add(participantEmail);}const patch={invitedParticipantIds:nextIds,invitedParticipantCount:nextIds.length,invitedEmails:[...invitedEmails],participantEmails:[...participantEmails],updatedAt:FieldValue.serverTimestamp()};const participantUid=text(participant.participantUid||participant.uid||participant.userId);if(participantUid){patch.invitedUids=FieldValue.arrayUnion(participantUid);patch.participantUids=FieldValue.arrayUnion(participantUid);}tx.set(meetingSnap.ref,patch,{merge:true});}); } catch(error) { console.error("MEETING_ACCESS_INVITATION_TALLY_FAILED",{stage,meetingId,participantId,accessId:ref.id,code:error?.code||null,message:String(error?.message||error).slice(0,240)}); try { await ref.update({status:"Revoked",revokedAt:FieldValue.serverTimestamp(),revocationReason:"INVITEE_TALLY_UPDATE_FAILED"}); } catch(revokeError) { console.error("MEETING_ACCESS_INVITATION_ORPHAN_PASS_REVOCATION_FAILED",{meetingId,participantId,accessId:ref.id,code:revokeError?.code||null,message:String(revokeError?.message||revokeError).slice(0,200)}); } throw new HttpsError("internal","Meeting invitation could not update the meeting invitee register. Retry after checking the meeting register permissions."); }
  logStage("SUCCESS",{accessId:ref.id});
  return {ok:true,accessId:ref.id,accessToken:raw,meetingId,meetingPassword,participantId,participantName:text(participant.participantName||participant.name)||text(participant.email),meetingReference:text(meeting.reference||meeting.title),meetingCategory:text(meeting.meetingCategory||meeting.category||meeting.meetingType||"General Meeting"),reusable:true,reusePolicy:"Reusable for 30 days, or until revoked or the meeting is closed.",expiresAt:expiresAt.toISOString()};
+ }catch(error){
+  logger.error("MEETING_INVITATION_ACCESS_ISSUE_FAILED",{stage,actorUid:uid||null,meetingId:meetingId||null,participantId:participantId||null,errorCode:String(error?.code||"").slice(0,100),errorMessage:String(error?.message||error).slice(0,300),stack:String(error?.stack||"").slice(0,1600)});
+  if(error instanceof HttpsError)throw error;
+  throw new HttpsError("internal","Meeting access could not be issued. The server recorded a diagnostic event; contact IRPA support if the error persists.");
+ }
 });
 
 exports.revokeMeetingAccessInvitation=onCall({region:"us-central1",timeoutSeconds:30},async request=>{
