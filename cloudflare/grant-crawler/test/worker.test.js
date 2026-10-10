@@ -332,7 +332,7 @@ test("known IRPA eligibility gaps block concept-note drafting", async () => {
   for (const item of cases) {
     const response = await worker.fetch(new Request("https://crawler.example/assistant/analyze", {
       method: "POST", headers,
-      body: JSON.stringify({ task: "concept_note", ...item })
+      body: JSON.stringify({ task: "concept_note", callStatus: "open", ...item })
     }), env);
     const body = await response.json();
     assert.equal(response.status, 422);
@@ -436,7 +436,7 @@ test("AI grant assistant is authenticated and returns structured eligibility ana
   const response = await worker.fetch(new Request("https://crawler.example/assistant/analyze", {
     method: "POST",
     headers: { authorization: "Bearer " + token, "content-type": "application/json" },
-    body: JSON.stringify({ title: "Rangeland grant", description: "Pastoral resilience", donorRequirements: "Applicants must be registered in Tanzania as NGOs", url: "https://donor.example/call" })
+    body: JSON.stringify({ title: "Rangeland grant", description: "Pastoral resilience", donorRequirements: "Applicants must be registered in Tanzania as NGOs", url: "https://donor.example/call", callStatus: "open" })
   }), env);
   const body = await response.json();
   assert.equal(response.status, 200);
@@ -454,7 +454,8 @@ test("AI grant assistant accepts object-shaped JSON-mode responses", async () =>
     body: JSON.stringify({
       title: "Tanzania rangeland grant",
       description: "Eligible applicants must be registered in Tanzania as NGOs.",
-      donorRequirements: "Eligible applicants must be registered in Tanzania as NGOs."
+      donorRequirements: "Eligible applicants must be registered in Tanzania as NGOs.",
+      callStatus: "open"
     })
   }), {
     CRAWLER_CONTROL_TOKEN: token,
