@@ -73,7 +73,7 @@ async function listOpportunities(env) {
   const run = await env.GRANTS_DB.prepare(
     "SELECT status, items_seen, items_changed, error_message, finished_at FROM crawler_runs ORDER BY id DESC LIMIT 1"
   ).first();
-  return { service: "irpa-grant-crawler", items: rows.results || [], count: (rows.results || []).length, lastRun: run || null };
+  return { service: "irpa-grant-crawler", feedsConfigured: JSON.parse(env.GRANT_FEED_URLS_JSON || env.GRANT_FEED_URLS || "[]").length, items: rows.results || [], count: (rows.results || []).length, lastRun: run || null };
 }
 
 const MAX_FEED_BYTES = 1_000_000;
