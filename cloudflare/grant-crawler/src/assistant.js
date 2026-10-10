@@ -22,7 +22,8 @@ const IRPA_PROFILE = {
     "environmental sustainability"
   ],
   community_readiness: "IRPA has mobilized 10 women and youth groups interested in launching economic activities. This is a readiness signal, not evidence that activities have been funded or implemented.",
-  strategic_plan: "IRPA Strategic Plan 2025–2029"
+  strategic_plan: "IRPA Strategic Plan 2025–2029",
+  digital_governance: "IRPA has an existing Digital Board Governance System (DBGS) that requires significant investment for completion, security, integration, hosting, reliability, accessibility, maintenance and adoption. Treat digital governance, nonprofit governance technology, board management systems, digital public infrastructure, civic technology and responsible AI opportunities as a distinct eligible funding theme for screening. Do not force these calls into an environmental or livestock pillar; assess strategic institutional fit separately and identify any donor restrictions on technology, software, capital expenditure, operating costs or institutional funding."
 };
 
 function json(data, status = 200) {
@@ -84,6 +85,7 @@ export async function analyzeGrant(request, env) {
     ? {
         summary: "string",
         eligibility: { status: "eligible|possibly_eligible|ineligible|insufficient_information", confidence: "low|medium|high", evidence: ["string"], unknowns: ["string"] },
+        strategic_alignment: { relevant_pillars: ["string"], relevant_cross_cutting_themes: ["string"], digital_governance_relevance: "high|medium|low|none", rationale: "string", funding_use_fit: ["string"] },
         donor_requirements: [{ requirement: "string", status: "met|partially_met|not_met|unknown", evidence: "string", action: "string" }],
         concept_note: {
           title: "string",
@@ -98,6 +100,7 @@ export async function analyzeGrant(request, env) {
     : {
         summary: "string",
         eligibility: { status: "eligible|possibly_eligible|ineligible|insufficient_information", confidence: "low|medium|high", evidence: ["string"], unknowns: ["string"] },
+        strategic_alignment: { relevant_pillars: ["string"], relevant_cross_cutting_themes: ["string"], digital_governance_relevance: "high|medium|low|none", rationale: "string", funding_use_fit: ["string"] },
         donor_requirements: [{ requirement: "string", status: "met|partially_met|not_met|unknown", evidence: "string", action: "string" }],
         concept_note_structure: [{ heading: "string", purpose: "string", suggested_content: "string", evidence_needed: ["string"] }],
         application_checklist: ["string"],
@@ -115,7 +118,9 @@ export async function analyzeGrant(request, env) {
     "IRPA profile: " + JSON.stringify(IRPA_PROFILE),
     "Compare applicant eligibility against legal entity/country, organization type and age, geographic scope, thematic scope, past-performance requirements, financial/audit requirements, co-funding, consortium rules, and application deadlines where evidence is provided.",
     "An issue is not a confirmed disqualification unless the supplied rules clearly say so. Use insufficient_information when key eligibility rules are absent. Never represent the AI assessment as a legal or donor decision.",
-    "Align any concept note to IRPA's three strategic pillars and cross-cutting themes only where relevant to the donor call. Tailor headings to donor instructions if they are supplied. If donor template instructions are absent, use a conventional concise concept-note structure and flag this limitation.",
+    "Apply IRPA Strategic Plan 2025–2029 as an explicit strategic-fit filter: Sustainable Rangeland Management; Livestock Development; Market Development; and all seven cross-cutting themes (climate change adaptation and resilience; gender equality and social inclusion; youth empowerment; community participation; research, innovation and knowledge management; governance and institutional capacity strengthening; environmental sustainability). Return strategic_alignment with evidence-based relevant matches, never force an unrelated call into a pillar.",
+    "IMPORTANT: digital governance funding is explicitly in scope. IRPA has an existing Digital Board Governance System (DBGS) that needs significant investment. Identify and retain relevant opportunities for digital governance, board-management/governance technology, civic technology, digital transformation, cybersecurity, cloud infrastructure, responsible AI, nonprofit institutional strengthening and digital capacity building. Score this as a separate strategic investment track, not as a substitute for the three strategic pillars. For each such opportunity, assess whether the donor funds software development, existing platforms, cybersecurity, hosting/cloud costs, equipment, technical assistance, maintenance, training, or institutional capacity; flag restrictions and unknowns. Do not claim DBGS is completed, deployed, or has proven impact unless the supplied evidence establishes it.",
+    "Align concept notes to the three pillars and cross-cutting themes when relevant, and also allow a standalone digital-governance/DBGS investment concept when the donor call supports it. Tailor headings to donor instructions if supplied. If donor template instructions are absent, use a conventional concise structure and flag the limitation.",
     "Return valid JSON only, no markdown fences, matching this schema: " + JSON.stringify(schema)
   ].join("\n");
 
