@@ -15,11 +15,12 @@ const LANGUAGES = {
   zh: {label:"Chinese (Simplified)", model:"zh"},
   de: {label:"German", model:"de"},
   it: {label:"Italian", model:"it"},
-  ja: {label:"Japanese", model:"ja"}
+  ja: {label:"Japanese", model:"ja"},
+  maa: {label:"Maa (dictionary-assisted)", model:null}
 };
 const SOURCE_LANGUAGES = {
   "en-TZ":"en","en-US":"en","en-GB":"en","sw-TZ":"sw","fr-FR":"fr",
-  "es-ES":"es","pt-PT":"pt","ar-SA":"ar","hi-IN":"hi","zh-CN":"zh"
+  "es-ES":"es","pt-PT":"pt","ar-SA":"ar","hi-IN":"hi","zh-CN":"zh","maa":"maa"
 };
 function json(data,status=200,origin="") {
   const headers={"content-type":"application/json; charset=utf-8","cache-control":"no-store","vary":"Origin"};
@@ -71,6 +72,36 @@ async function authorizeMeeting(meetingId,user,idToken){
   if(!participant)throw Object.assign(new Error("Only authorised participants, subscribers, chairpersons or secretaries may use the live interpreter for this meeting."),{status:403});
   return meeting;
 }
+const MAA_TERMS = [
+  { maa:"ashe", en:["thank you","thanks"], sw:["asante"], enMeaning:"thank you / thanks", swMeaning:"asante" },
+  { maa:"enkare", en:["water"], sw:["maji"], enMeaning:"water", swMeaning:"maji" },
+  { maa:"Enkai", en:["god"], sw:["mungu"], enMeaning:"God / the divine", swMeaning:"Mungu" },
+  { maa:"oleng", en:["very","much"], sw:["sana","mno"], enMeaning:"very / much", swMeaning:"sana / mno" },
+  { maa:"sidai", en:["good","beautiful","well"], sw:["nzuri","vizuri"], enMeaning:"good / beautiful / well", swMeaning:"nzuri / vizuri" },
+  { maa:"supa", en:[], sw:[], enMeaning:"context-specific greeting used for a man", swMeaning:"salamu ya muktadha kwa mwanaume" },
+  { maa:"tash", en:[], sw:[], enMeaning:"context-specific greeting used for a woman", swMeaning:"salamu ya muktadha kwa mwanamke" }
+];
+function replaceTerm(text,term,replacement){
+  const pattern=term.replace(/[.*+?^${}()|[\]\\]/g,"\\export default {
+  async fetch(request,env){");
+  return text.replace(new RegExp("(^|[^\\p{L}])("+pattern+")(?=$|[^\\p{L}])","giu"),(match,prefix,word)=>prefix+(word[0]===word[0].toUpperCase()?replacement.charAt(0).toUpperCase()+replacement.slice(1):replacement));
+}
+function dictionaryTranslate(content,source,target){
+  let output=String(content||""),matched=0;
+  const entries=[...MAA_TERMS].sort((a,b)=>Math.max(...b.en.map(x=>x.length),...b.sw.map(x=>x.length),b.maa.length)-Math.max(...a.en.map(x=>x.length),...a.sw.map(x=>x.length),a.maa.length));
+  if(target==="maa"){
+    for(const entry of entries){
+      const synonyms=[...(source==="sw"?entry.sw:entry.en)];
+      for(const term of synonyms){const before=output;output=replaceTerm(output,term,entry.maa);if(output!==before)matched++;}
+    }
+  }else{
+    for(const entry of entries){
+      const terms=source==="maa"?[entry.maa]:[];
+      for(const term of terms){const before=output;output=replaceTerm(output,term,target==="sw"?entry.swMeaning:entry.enMeaning);if(output!==before)matched++;}
+    }
+  }
+  return {translatedText:output,matchedTerms:matched,coverage:matched?"partial":"none"};
+}
 export default {
   async fetch(request,env){
     const origin=request.headers.get("origin")||"";
@@ -86,13 +117,19 @@ export default {
       const body=await request.json();
       const meetingId=String(body.meetingId||"").trim();
       const content=String(body.content||"").trim();
-      const target=LANGUAGES[String(body.targetLanguage||"").toLowerCase()];
+      const targetCode=String(body.targetLanguage||"").toLowerCase();
+      const target=LANGUAGES[targetCode];
       const source=SOURCE_LANGUAGES[String(body.sourceLanguage||"")]||"en";
       if(!meetingId||!/^[A-Za-z0-9_-]{1,160}$/.test(meetingId))throw Object.assign(new Error("A valid meeting ID is required."),{status:400});
       if(!content||content.length>2500)throw Object.assign(new Error("Interpreter phrases must contain 1–2,500 characters."),{status:400});
       if(!target)throw Object.assign(new Error("The requested target language is not supported."),{status:400});
       const user=await firebaseUser(idToken);
       await authorizeMeeting(meetingId,user,idToken);
+      if(source==="maa"||targetCode==="maa"){
+        if(source==="maa"&&!["en","sw"].includes(targetCode))throw Object.assign(new Error("Maa dictionary-assisted output currently supports English or Kiswahili targets only."),{status:400});
+        const result=dictionaryTranslate(content,source,targetCode);
+        return json({ok:true,translatedText:result.translatedText,targetLanguage:targetCode,sourceLanguage:source,provider:"IRPA Maa Dictionary · provisional glossary",dictionaryAssisted:true,matchedTerms:result.matchedTerms,coverage:result.coverage,requiresHumanReview:true,notice:"This starter glossary does not translate Maa grammar or unknown words. Validate with a Kisonko Maa speaker before official use."},200,origin);
+      }
       if(source===target.model)return json({ok:true,translatedText:content,targetLanguage:body.targetLanguage,provider:"Cloudflare Workers AI",unchanged:true,requiresHumanReview:true},200,origin);
       if(!env.AI||typeof env.AI.run!=="function")throw Object.assign(new Error("Cloudflare Workers AI binding is not configured."),{status:503});
       const result=await env.AI.run("@cf/meta/m2m100-1.2b",{text:content,source_lang:source,target_lang:target.model});
