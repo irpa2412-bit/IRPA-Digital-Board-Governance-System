@@ -22,6 +22,7 @@ import { createDocumentLifecycleRouter } from "./documentLifecycle.mjs";
 import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPasswordSetup, getInvitationSessionState } from "./invitationRedemption.mjs";
 import { buildGoogleDriveAuthorizationParams } from "./googleDriveOAuth.mjs";
 import { createMeetingPortalRouter } from "./meetingPortal.mjs";
+import { createMeetingServicesRouter } from "./meetingServices.mjs";
 
 function getFirebaseProjectId(env) {
   const projectId = String(env?.FIREBASE_PROJECT_ID || "").trim();
@@ -39,6 +40,14 @@ let jwksCache = null;
 let jwksFetchedAt = 0;
 
 const meetingPortalRouter = createMeetingPortalRouter({
+  authenticateFirebaseRequest,
+  getFirebaseProjectId,
+  getFirestoreAdminAccessToken,
+  json,
+  corsHeaders
+});
+
+const meetingServicesRouter = createMeetingServicesRouter({
   authenticateFirebaseRequest,
   getFirebaseProjectId,
   getFirestoreAdminAccessToken,
@@ -99,6 +108,9 @@ export default {
 
       const meetingPortalResponse = await meetingPortalRouter(request, env, pathname);
       if (meetingPortalResponse) return meetingPortalResponse;
+
+      const meetingServicesResponse = await meetingServicesRouter(request, env, pathname);
+      if (meetingServicesResponse) return meetingServicesResponse;
 
       if (pathname.startsWith("/api/document-lifecycle/")) {
         const lifecycleResponse = await documentLifecycleRouter(request, env);
