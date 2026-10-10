@@ -5,9 +5,9 @@ const gateway = () => String(
   "https://irpa-google-drive-gateway.irpa-governance.workers.dev"
 ).replace(/\/$/, "");
 
-async function callMeetingGateway(path, payload = {}) {
+export async function callMeetingService(path, payload = {}) {
   const user = auth.currentUser;
-  if (!user) throw new Error("Sign in before managing meeting access.");
+  if (!user) throw new Error("Sign in before using meeting services.");
   const token = await user.getIdToken();
   let response;
   try {
@@ -26,6 +26,7 @@ async function callMeetingGateway(path, payload = {}) {
   return data;
 }
 
-export const createMeetingAccessInvitation = payload => callMeetingGateway("/api/meeting-access/issue", payload);
-export const revokeMeetingAccessInvitation = payload => callMeetingGateway("/api/meeting-access/revoke", payload);
-export const authorizeMeetingEntry = payload => callMeetingGateway("/api/meeting-access/authorize", payload);
+export const createMeetingAccessInvitation = payload => callMeetingService("/api/meeting-access/issue", payload);
+export const revokeMeetingAccessInvitation = payload => callMeetingService("/api/meeting-access/revoke", payload);
+export const authorizeMeetingEntry = payload => callMeetingService("/api/meeting-access/authorize", payload);
+export const issueLiveMeetingToken = payload => callMeetingService("/api/meeting-media/token", payload);
