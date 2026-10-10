@@ -1,0 +1,47 @@
+name: Document Translation Workspace Verification
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/components/DocumentTranslationWorkspace.jsx"
+      - "src/firebase/documentTranslation.js"
+      - "src/pages/DocumentLifecycleModule.jsx"
+      - "live-interpreter/**"
+      - "firestore.rules"
+      - ".github/workflows/document-translation-workspace-test.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/components/DocumentTranslationWorkspace.jsx"
+      - "src/firebase/documentTranslation.js"
+      - "src/pages/DocumentLifecycleModule.jsx"
+      - "live-interpreter/**"
+      - "firestore.rules"
+      - ".github/workflows/document-translation-workspace-test.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-translation-workspace:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install application dependencies
+        run: npm ci
+      - name: Check interpreter syntax
+        run: |
+          node --check live-interpreter/src/index.js
+          node --check live-interpreter/src/maaDictionary.js
+          node --check src/firebase/documentTranslation.js
+      - name: Test provisional Maa dictionary behavior
+        run: node --test live-interpreter/tests/maaDictionary.test.mjs
+      - name: Build production frontend
+        run: npm run build
