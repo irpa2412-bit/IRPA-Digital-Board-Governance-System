@@ -167,7 +167,7 @@ test("grant application portal serves the authenticated copy-ready workspace", a
   assert.match(response.headers.get("content-type"), /text\/html/);
   assert.match(html, /Copy all application wording/);
   assert.match(html, /Save \/ synchronize draft/);
-  assert.match(html, /Firebase/);
+  assert.match(html, /existing IRPA Digital Board Governance System account/);
 });
 
 test("grant application draft records require an authenticated Firebase identity", async () => {
