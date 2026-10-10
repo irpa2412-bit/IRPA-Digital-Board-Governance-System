@@ -190,6 +190,58 @@ test("AI geographic gate blocks concept-note drafting when geography is ineligib
   assert.equal(modelCalls, 0);
 });
 
+test("known IRPA eligibility gaps block concept-note drafting", async () => {
+  const token = "test-token-with-at-least-32-characters-long";
+  let modelCalls = 0;
+  const env = { CRAWLER_CONTROL_TOKEN: token, AI: { run: async () => {
+    modelCalls++;
+    return { response: JSON.stringify({ eligibility: { status: "eligible", confidence: "high", evidence: [], unknowns: [] }, donor_requirements: [] }) };
+  } } };
+  const headers = { authorization: "Bearer " + token, "content-type": "application/json" };
+  const cases = [
+    {
+      title: "East Africa civil society grant",
+      description: "Open to eligible civil society organizations across East Africa.",
+      donorRequirements: "Applicants must be registered in Tanzania as NGOs and must have completed at least two projects.",
+      expected: "ineligible",
+      expectedTerm: "no completed projects"
+    },
+    {
+      title: "East Africa resilience grant",
+      description: "Open to eligible applicants across East Africa.",
+      donorRequirements: "Applicants must be registered in Tanzania as NGOs and provide 20% cash co-financing.",
+      expected: "ineligible",
+      expectedTerm: "cash matching/co-financing"
+    },
+    {
+      title: "East Africa community grant",
+      description: "Open to eligible applicants across East Africa.",
+      donorRequirements: "Applicants must be registered in Tanzania as NGOs and the organization must have been registered for at least 5 years.",
+      expected: "insufficient_information",
+      expectedTerm: "5 years of organizational existence"
+    },
+    {
+      title: "East Africa public services grant",
+      description: "Open to eligible applicants across East Africa.",
+      donorRequirements: "Only government agencies may apply.",
+      expected: "ineligible",
+      expectedTerm: "exclude registered NGOs"
+    }
+  ];
+  for (const item of cases) {
+    const response = await worker.fetch(new Request("https://crawler.example/assistant/analyze", {
+      method: "POST", headers,
+      body: JSON.stringify({ task: "concept_note", ...item })
+    }), env);
+    const body = await response.json();
+    assert.equal(response.status, 422);
+    assert.equal(body.eligibility_gate.status, item.expected);
+    const combined = [...(body.eligibility_gate.blockers||[]), ...(body.eligibility_gate.warnings||[])].join(" ").toLowerCase();
+    assert.ok(combined.includes(item.expectedTerm.toLowerCase()), "Expected eligibility evidence for: " + item.expectedTerm);
+  }
+  assert.equal(modelCalls, 0, "AI generation must not run when deterministic eligibility gates block drafting.");
+});
+
 test("AI cannot mark a call eligible when geographic eligibility is unstated", async () => {
   const token = "test-token-with-at-least-32-characters-long";
   const env = { CRAWLER_CONTROL_TOKEN: token, AI: { run: async () => ({ response: JSON.stringify({
