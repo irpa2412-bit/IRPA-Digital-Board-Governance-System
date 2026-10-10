@@ -301,6 +301,13 @@ test("grant application draft records require an authenticated Firebase identity
   assert.equal(response.status, 401);
 });
 
+test("concept-note audit trail requires an authenticated draft owner", async () => {
+  const response = await worker.fetch(new Request("https://crawler.example/application/drafts/draft-123456/events", {
+    method: "GET"
+  }), {});
+  assert.equal(response.status, 401);
+});
+
 test("application draft routes are available without exposing crawler control token", async () => {
   const token = "private-control-token-that-must-not-be-rendered";
   const response = await worker.fetch(new Request("https://crawler.example/application"), { CRAWLER_CONTROL_TOKEN: token });
