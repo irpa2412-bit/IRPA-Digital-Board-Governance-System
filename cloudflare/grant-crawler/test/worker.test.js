@@ -98,3 +98,62 @@ test("future deadlines can remain open for eligibility review", () => {
   assert.equal(fit.deadlineAt, "2099-12-31");
   assert.equal(fit.callStatus, "open");
 });
+
+
+test("AI grant assistant is authenticated and returns structured eligibility analysis", async () => {
+  const token = "test-token-with-at-least-32-characters-long";
+  let usedModel = "";
+  const mockAnalysis = {
+    summary: "Potential fit; verify the official guidelines.",
+    eligibility: { status: "possibly_eligible", confidence: "medium", evidence: ["Tanzania is in the stated geography"], unknowns: ["Minimum organizational age"] },
+    donor_requirements: [{ requirement: "Applicant registered in Tanzania", status: "met", evidence: "Call text states Tanzania", action: "Attach current registration certificate" }],
+    concept_note_structure: [{ heading: "Problem statement", purpose: "Describe the challenge", suggested_content: "Pastoral rangeland degradation in Longido", evidence_needed: ["Baseline data"] }],
+    application_checklist: ["Confirm deadline"],
+    risks_and_gaps: ["Past performance requirements not supplied"],
+    next_steps: ["Review official call document"],
+    source_caveat: "Assessment based only on supplied text."
+  };
+  const env = {
+    CRAWLER_CONTROL_TOKEN: token,
+    AI: { run: async (model, input) => {
+      usedModel = model;
+      assert.equal(input.messages[0].role, "system");
+      assert.ok(input.messages[0].content.includes("Improvement of Rangeland in Pastoral Areas"));
+      return { response: JSON.stringify(mockAnalysis) };
+    } }
+  };
+  const denied = await worker.fetch(new Request("https://crawler.example/assistant/analyze", { method: "POST", body: JSON.stringify({ title: "Test grant", description: "Tanzania climate resilience" }) }), env);
+  assert.equal(denied.status, 401);
+
+  const response = await worker.fetch(new Request("https://crawler.example/assistant/analyze", {
+    method: "POST",
+    headers: { authorization: "Bearer " + token, "content-type": "application/json" },
+    body: JSON.stringify({ title: "Rangeland grant", description: "Tanzania pastoral resilience", donorRequirements: "Applicants must be registered NGOs", url: "https://donor.example/call" })
+  }), env);
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.service, "irpa-grant-application-assistant");
+  assert.equal(body.assessment.eligibility.status, "possibly_eligible");
+  assert.equal(body.assessment.donor_requirements.length, 1);
+  assert.equal(usedModel, "@cf/meta/llama-3.1-8b-instruct");
+});
+
+test("AI grant assistant validates required input and URL", async () => {
+  const token = "test-token-with-at-least-32-characters-long";
+  const env = { CRAWLER_CONTROL_TOKEN: token, AI: { run: async () => { throw new Error("must not run"); } } };
+  const headers = { authorization: "Bearer " + token, "content-type": "application/json" };
+  const missing = await worker.fetch(new Request("https://crawler.example/assistant/analyze", { method: "POST", headers, body: JSON.stringify({ title: "Grant" }) }), env);
+  assert.equal(missing.status, 400);
+  const unsafe = await worker.fetch(new Request("https://crawler.example/assistant/analyze", { method: "POST", headers, body: JSON.stringify({ title: "Grant", description: "Details", url: "http://example.org/call" }) }), env);
+  assert.equal(unsafe.status, 400);
+});
+
+test("AI grant assistant fails closed when Cloudflare AI binding is absent", async () => {
+  const token = "test-token-with-at-least-32-characters-long";
+  const response = await worker.fetch(new Request("https://crawler.example/assistant/analyze", {
+    method: "POST",
+    headers: { authorization: "Bearer " + token, "content-type": "application/json" },
+    body: JSON.stringify({ title: "Grant", description: "Details" })
+  }), { CRAWLER_CONTROL_TOKEN: token });
+  assert.equal(response.status, 503);
+});
