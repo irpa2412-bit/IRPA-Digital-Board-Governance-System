@@ -100,14 +100,14 @@ function assessFit(item) {
   const matched = signals.filter(signal => signal.terms.some(term => text.includes(term)));
   const score = Math.min(100, matched.reduce((sum, signal) => sum + signal.weight, 0));
   const fitAssessment = score >= 35 ? "strong_topic_match" : score >= 15 ? "possible_topic_match" : "low_topic_match";
-  const callStatus = /\\bclosed\\b/i.test(text)
+  const callStatus = /\bclosed\b/i.test(text)
     ? "closed"
-    : /fund state:\\s*open|open for applications|applications are open|call is open/i.test(text)
+    : /fund state:\s*open|open for applications|applications are open|call is open/i.test(text)
       ? "open"
       : "unknown";
-  const tanzaniaMentioned = /\\btanzania\\b|united republic of tanzania/i.test(text);
-  const otherCountryFocus = /\\b(kenya|uganda|south africa|west africa|sudan|albania|rwanda|bangladesh|morocco|nepal)\\b/i.test(text);
-  const regionalScope = /east africa|sub-saharan africa|africa-wide|across africa|global|worldwide|low[- ]and[- ]middle[- ]income|\\blmic\\b|developing countries/i.test(text);
+  const tanzaniaMentioned = /\btanzania\b|united republic of tanzania/i.test(text);
+  const otherCountryFocus = /\b(kenya|uganda|south africa|west africa|sudan|albania|rwanda|bangladesh|morocco|nepal)\b/i.test(text);
+  const regionalScope = /east africa|sub-saharan africa|africa-wide|across africa|global|worldwide|low[- ]and[- ]middle[- ]income|\blmic\b|developing countries/i.test(text);
   const geographyAssessment = tanzaniaMentioned
     ? "tanzania_mentioned"
     : otherCountryFocus && !regionalScope
