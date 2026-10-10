@@ -33,13 +33,8 @@ jobs:
         run: npm ci
       - name: Syntax-check checker and verifier
         run: node --check scripts/check-production-readability.mjs && node --check scripts/verify-production-readability.mjs
-      - name: Run dedicated checker
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            npm run check:production-readability -- --changed-only
-          else
-            npm run check:production-readability
-          fi
+      - name: Run mandatory full-source readability and contrast audit
+        run: npm run check:production-readability
       - name: Build production artifact
         env:
           VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
@@ -47,13 +42,8 @@ jobs:
           VITE_GATEWAY_ORIGIN: ${{ secrets.VITE_GATEWAY_ORIGIN || 'https://irpa-google-drive-gateway.irpa-governance.workers.dev' }}
           VITE_GOOGLE_WEATHER_API_KEY: ${{ secrets.VITE_GOOGLE_WEATHER_API_KEY }}
         run: npm run build
-      - name: Run independent release verifier
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            npm run verify:production-readability -- --changed-only
-          else
-            npm run verify:production-readability
-          fi
+      - name: Run independent full-production artifact verifier
+        run: npm run verify:production-readability
       - name: Upload audit evidence
         if: always()
         uses: actions/upload-artifact@v4
