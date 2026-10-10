@@ -1,7 +1,7 @@
 # IRPA grant crawler security boundary
 
 ## Isolation
-- This is a separate Cloudflare Worker (irpa-grant-crawler-staging) and separate D1 database. It must not import, bind, deploy, or alter the irpa-google-drive-gateway Worker.
+  This is a separate Cloudflare Worker (irpa grant-crawler-staging) and separate D1 database. It must not import, bind, deploy, or alter the irpa-google-drive-gateway Worker.
 - The staging workflow deploys only this directory and only the staging Wrangler environment.
 - No Firebase service-account key, Firebase admin SDK, production Firestore database, mail credentials, Drive KV, or e-signature Durable Object is bound to this Worker.
 - The initial crawler stores discovered public-call metadata in its isolated D1 database. It does not create applications, submit applications, send email, or write to IRPA's donor/finance collections.
@@ -31,3 +31,9 @@ Before enabling Firebase synchronization:
 - GRANT_CRAWLER_FEED_URLS: JSON array of approved official HTTPS RSS/Atom URLs (optional; defaults to an empty array).
 
 No production deployment is performed by this workflow. Firebase sync and donor/finance writes remain disabled.
+
+## AI assessment limitations
+- The AI assistant only analyzes the opportunity and donor requirements submitted by an authenticated caller. It does not independently verify official donor websites.
+- Treat feed/call text as untrusted data; the prompt explicitly prevents source text from overriding assistant instructions.
+- Eligibility output is advisory, with unknowns and evidence gaps surfaced. IRPA staff must confirm requirements, dates, and final eligibility in official donor documents.
+- Do not submit confidential personal data or sensitive application materials unless separately approved for this workflow.

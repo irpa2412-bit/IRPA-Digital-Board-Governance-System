@@ -1,10 +1,10 @@
 # IRPA Grant Crawler
 
-An isolated Cloudflare Worker for collecting public funding-call metadata from approved RSS/Atom feeds. Initial staging storage is a dedicated D1 database. Firebase synchronization is intentionally off until collection-specific least-privilege rules and a dedicated identity are reviewed and tested.
+An isolated Cloudflare Worker for collecting public funding call metadata from approved RSS/Atom feeds. Initial staging storage is a dedicated D1 database. Firebase synchronization is intentionally off until collection specific least privilege rules and a dedicated identity are reviewed and tested.
 
 ## Local checks
 
-    cd cloudflare/grant-crawler
+    cd cloudflare/grant crawler
     npm run check
 
 ## Staging prerequisites
@@ -18,3 +18,7 @@ Run the IRPA Grant Crawler — Isolated Staging workflow manually after its pull
 - Scheduled scan: every six hours in the staging environment; with no feed URLs configured, it safely scans zero feeds.
 
 See SECURITY.md for the Firebase least-privilege gate and security boundaries.
+
+## AI grant application assistant
+
+The assistant uses the Cloudflare Workers AI binding (model `@cf/meta/llama-3.1-8b-instruct`); no external AI API key or Google/Firebase route is used. Requests are limited to 20 KB and require the crawler control token. It compares supplied call text against IRPA's known organizational profile, returns a structured requirement matrix and marks missing information as unknown. It must not be treated as a donor eligibility decision; official call guidelines remain authoritative. Send `task: "concept_note"` to generate a tailored structure and draft.

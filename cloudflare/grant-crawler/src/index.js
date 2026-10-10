@@ -1,3 +1,5 @@
+import { analyzeGrant } from "./assistant.js";
+
 
 const FIREBASE_PROJECT_ID = "irpa-digital-board-governance";
 let firebaseJwkCache = { keys: [], expiresAt: 0 };
@@ -291,7 +293,7 @@ export default {
     const url = new URL(request.url);
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders() });
     if (request.method === "GET" && url.pathname === "/health") {
-      return json({ service: "irpa-grant-crawler", environment: env.IRPA_ENVIRONMENT || "local", storage: env.GRANTS_DB ? "configured" : "missing", firebase: "disabled-by-design-until-dedicated-rules-and-identity-are-approved" });
+      return json({ service: "irpa-grant-crawler", environment: env.IRPA_ENVIRONMENT || "local", storage: env.GRANTS_DB ? "configured" : "missing", ai: env.AI ? "configured" : "missing", firebase: "disabled-by-design-until-dedicated-rules-and-identity-are-approved" });
     }
     if (request.method === "GET" && url.pathname === "/opportunities") {
       try {
@@ -302,7 +304,7 @@ export default {
         return json({ error: String(error.message || "Unable to retrieve grant results").slice(0, 300) }, 401);
       }
     }
-    if (request.method !== "POST" || !["/crawl", "/run"].includes(url.pathname)) return json({ error: "Not found" }, 404);
+    if (request.method !== "POST" || !["/crawl", "/run", "/assistant/analyze"].includes(url.pathname)) return json({ error: "Not found" }, 404);
     if (url.pathname === "/run") {
       try {
         const token = String(request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
@@ -313,6 +315,7 @@ export default {
     } else {
       const expected = String(env.CRAWLER_CONTROL_TOKEN || "");
       if (expected.length < 32 || request.headers.get("authorization") !== "Bearer " + expected) return json({ error: "Unauthorized" }, 401);
+      if (url.pathname === "/assistant/analyze") return analyzeGrant(request, env);
     }
     try { return json(await crawl(env)); }
     catch (error) {
