@@ -104,8 +104,11 @@ export function parseSearchRss(xml, query) {
     const block = match[1], title = xmlField(block, "title").slice(0, 500);
     let url = ""; try { url = normalizeOpportunityUrl(xmlField(block, "link")); } catch {}
     const description = xmlField(block, "description").slice(0, 5000);
+    const publisher = block.match(/<source\\b[^>]*\\burl=["']([^"']+)["']/i)?.[1];
+    let verifiedSourceUrl = sourceUrl;
+    try { if (publisher) verifiedSourceUrl = normalizeOpportunityUrl(publisher); } catch {}
     if (!title || !url || (!GRANT_TERMS.test(title + " " + description) && !/climate|pastoral|rangeland|livestock|conservation|community|women|youth|resilience|biodiversity|agriculture/i.test(title + " " + description))) return null;
-    return { title, description, url, publishedAt: xmlField(block, "pubDate") || null, sourceUrl, discoveryEngine: "web_search" };
+    return { title, description, url, publishedAt: xmlField(block, "pubDate") || null, sourceUrl: verifiedSourceUrl, discoveryEngine: "web_search" };
   }).filter(Boolean);
 }
 async function readGoogleNewsSearch() {
