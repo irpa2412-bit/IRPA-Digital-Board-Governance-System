@@ -80,6 +80,21 @@ test("closed and country-specific opportunities are not promoted as IRPA priorit
 });
 
 
+test("announcements with no deadline and no verified current status are suppressed", () => {
+  const unverified = assessFit({
+    title: "Pastoral resilience grant across East Africa",
+    description: "Supports pastoral communities and climate resilience."
+  });
+  assert.equal(unverified.callStatus, "unknown");
+  assert.equal(unverified.triageAssessment, "deadline_unverified_suppressed");
+
+  const rolling = assessFit({
+    title: "Rolling community restoration fund",
+    description: "Open on a rolling basis throughout the year for community-led restoration across East Africa."
+  });
+  assert.equal(rolling.triageAssessment, "priority_for_eligibility_review");
+});
+
 test("past advertised deadlines are marked expired even when an open-feed source is used", () => {
   const fit = assessFit({
     title: "Open call for climate resilience grants",
