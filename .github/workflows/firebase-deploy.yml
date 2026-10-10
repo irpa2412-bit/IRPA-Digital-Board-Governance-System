@@ -34,6 +34,9 @@ jobs:
       - name: Install web and Android packaging dependencies
         run: npm install
 
+      - name: Mandatory full-source readability and contrast check
+        run: npm run check:production-readability
+
       - name: Build web application
         env:
           VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
@@ -41,6 +44,9 @@ jobs:
           VITE_GATEWAY_ORIGIN: ${{ secrets.VITE_GATEWAY_ORIGIN || 'https://irpa-google-drive-gateway.irpa-governance.workers.dev' }}
           VITE_GOOGLE_WEATHER_API_KEY: ${{ secrets.VITE_GOOGLE_WEATHER_API_KEY }}
         run: npm run build
+
+      - name: Independent production readability verification
+        run: npm run verify:production-readability
 
       - name: Bootstrap primary administrator authorization
         env:
