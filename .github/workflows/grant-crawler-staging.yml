@@ -29,6 +29,8 @@ jobs:
           node-version: 22
       - name: Run parser, authentication and isolation tests
         run: npm run check
+      - name: Validate Wrangler TOML and staging Worker bundle before deployment
+        run: npx --yes wrangler@4 deploy --dry-run --env staging
       - name: Verify deployment config cannot target production gateway
         run: |
           node --input-type=module <<'NODE'
