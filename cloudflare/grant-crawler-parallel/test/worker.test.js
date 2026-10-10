@@ -617,12 +617,13 @@ test("official webpage parser extracts safe title and description text", () => {
 });
 
 test("web search RSS parser extracts grant announcements and rejects unsafe links", () => {
-  const xml = '<rss><channel><item><title>Open grant for pastoral restoration</title><link>https://donor.example/call?utm_source=news</link><description>Funding for rangeland restoration in Tanzania</description><pubDate>Sat, 10 Oct 2026 10:00:00 GMT</pubDate></item></channel></rss>';
+  const xml = '<rss><channel><item><title>Open grant for pastoral restoration</title><link>https://donor.example/call?utm_source=news</link><description>Funding for rangeland restoration in Tanzania</description><pubDate>Sat, 10 Oct 2026 10:00:00 GMT</pubDate><source url="https://donor.example">Donor</source></item></channel></rss>';
   const items = parseSearchRss(xml, "grant Tanzania");
   assert.equal(items.length, 1);
   assert.equal(items[0].title, "Open grant for pastoral restoration");
   assert.equal(items[0].url, "https://donor.example/call");
   assert.equal(items[0].discoveryEngine, "web_search");
+  assert.equal(items[0].sourceUrl, "https://donor.example/");
 });
 
 test("parallel webpage scanner and no-key web search use the configured public search fallback", async () => {
