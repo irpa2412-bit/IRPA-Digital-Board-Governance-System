@@ -38,3 +38,19 @@ test("LiveKit token issuance also requires an authenticated identity", async () 
   assert.equal(response.status, 401);
   assert.match((await response.json()).error, /sign-in/i);
 });
+
+test("meeting register, decision, and voting control routes require authenticated identity", async () => {
+  const router = createMeetingServicesRouter(ctx);
+  for (const path of [
+    "/api/meeting-register/create",
+    "/api/meeting-register/update",
+    "/api/meeting-register/delete",
+    "/api/meeting-decisions/create",
+    "/api/meeting-voting/open",
+    "/api/meeting-voting/close"
+  ]) {
+    const response = await post(router, path, { meetingId: "test-meeting" });
+    assert.equal(response.status, 401, path);
+    assert.match((await response.json()).error, /sign-in/i, path);
+  }
+});
