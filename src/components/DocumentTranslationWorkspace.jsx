@@ -162,6 +162,7 @@ export default function DocumentTranslationWorkspace({profile,employee,admin=fal
   if(!selected||!isReviewer)throw new Error("An authorised reviewer is required.");
   const text=String(draft||selected.translationDraftText||"");
   if(!text.trim())throw new Error("Generate a translation draft before final review.");
+  if(text.length>450000)throw new Error("The reviewed translation exceeds the 450,000-character limit. Split the document before completing the request.");
   if(!reviewConfirmed)throw new Error("Confirm that the translated output has been reviewed.");
   if(!reviewNotes.trim())throw new Error("Enter review notes or confirm any corrections before completing the translation.");
   if(selected.targetLanguage==="maa"&&(!maaSpeakerName.trim()||!reviewNotes.trim()))throw new Error("Maa output cannot be finalised without the local Maa speaker's name and documented review notes/corrections.");
