@@ -86,30 +86,31 @@ async function readFeeds(env) {
 }
 
 function extractDeadline(item) {
-  const text = `${item.title || ""} ${item.description || ""}`;
+  const text = String(item.title || "") + " " + String(item.description || "");
   const monthNames = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
-  const months = monthNames.join("|");
+  const monthPattern = "January|February|March|April|May|June|July|August|September|October|November|December";
   const patterns = [
-    new RegExp("(?:by|deadline(?: date)?|submission deadline|closing date|due date|submit(?:ted)? by)[^\\\\n]{0,40}?(\\\\d{1,2})\\\\s+(" + months + ")(?:\\\\s+(\\\\d{4}))?", "i"),
-    new RegExp("(?:by|deadline(?: date)?|submission deadline|closing date|due date|submit(?:ted)? by)[^\\\\n]{0,40}?(" + months + ")\\\\s+(\\\\d{1,2})(?:,?\\\\s+(\\\\d{4}))?", "i"),
+    new RegExp("(?:by|deadline(?: date)?|submission deadline|closing date|due date|submit(?:ted)? by)\\D{0,40}?(\\d{1,2})\\s+(" + monthPattern + ")(?:\\s+(\\d{4}))?", "i"),
+    new RegExp("(?:by|deadline(?: date)?|submission deadline|closing date|due date|submit(?:ted)? by)\\D{0,40}?(" + monthPattern + ")\\s+(\\d{1,2})(?:,?\\s+(\\d{4}))?", "i"),
   ];
   for (const pattern of patterns) {
     const match = text.match(pattern);
     if (!match) continue;
-    const month = monthNames.indexOf((match[2] || match[1]).toLowerCase());
-    const day = Number(match[1] && /^\\\\d+$/.test(match[1]) ? match[1] : match[2]);
-    const yearText = match[3] || match[4];
+    const dayFirst = /^\\d+$/.test(match[1]);
+    const monthToken = dayFirst ? match[2] : match[1];
+    const day = Number(dayFirst ? match[1] : match[2]);
+    const yearText = match[3];
     const year = yearText ? Number(yearText) : new Date().getUTCFullYear();
+    const month = monthNames.indexOf(monthToken.toLowerCase());
     if (month < 0 || day < 1 || day > 31) continue;
     const date = new Date(Date.UTC(year, month, day));
     if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month || date.getUTCDate() !== day) continue;
     return date.toISOString().slice(0, 10);
   }
-  const iso = text.match(/(?:deadline|due|submit by|closing date)[^\\\\n]{0,30}?(\\\\d{4})-(\\\\d{2})-(\\\\d{2})/i);
-  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const iso = text.match(/(?:deadline|due|submit by|closing date)\\D{0,30}?(\\d{4})-(\\d{2})-(\\d{2})/i);
+  if (iso) return iso[1] + "-" + iso[2] + "-" + iso[3];
   return null;
 }
-
 function assessFit(item) {
   const text = `${item.title || ""} ${item.description || ""}`.toLowerCase();
   const deadlineAt = extractDeadline(item);
