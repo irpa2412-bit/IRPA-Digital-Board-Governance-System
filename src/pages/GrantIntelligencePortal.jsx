@@ -23,7 +23,7 @@ const SOURCES=[
  {name:"Green Climate Fund",url:"https://www.greenclimate.fund"},
  {name:"Adaptation Fund",url:"https://www.adaptation-fund.org"},
  {name:"African Development Bank",url:"https://www.afdb.org"},
- {name:"Tanzania Forest Fund",url:"https://www.tfs.go.tz"},
+ {name:"Tanzania Forest Services",url:"https://www.tfs.go.tz"},
  {name:"Grants.gov open opportunities",url:"https://www.grants.gov/search-grants"}
 ];
 const statusOptions=["Open","Upcoming","Closed","Under review","Application in progress","Submitted","Awarded","Not pursuing"];
