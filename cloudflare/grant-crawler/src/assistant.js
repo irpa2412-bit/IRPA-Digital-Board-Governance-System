@@ -1,5 +1,5 @@
 const MAX_REQUEST_BYTES = 20_000;
-const MODEL = "@cf/meta/llama-3.1-8b-instruct";
+const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 
 const IRPA_PROFILE = {
   name: "Improvement of Rangeland in Pastoral Areas (IRPA)",
@@ -318,7 +318,8 @@ export async function analyzeGrant(request, env) {
         { role: "user", content: JSON.stringify(userData) }
       ],
       max_tokens: task === "concept_note" ? 3_500 : 2_200,
-      temperature: 0.1
+      temperature: 0.1,
+      response_format: { type: "json_object" }
     });
     const analysis = parseModelJson(extractModelText(result));
     if (!analysis || typeof analysis !== "object" || !analysis.eligibility || !Array.isArray(analysis.donor_requirements)) {
