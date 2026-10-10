@@ -443,6 +443,19 @@ test("document owner can submit and retrieve their own translation request statu
   await assertFails(unrelatedDb.doc("documentTranslationRequests/translation-test-1").get());
 });
 
+test("document owner can request translation into every supported target language", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("documents/LIFE-test-1").set(lifecycleDocument());
+  });
+  const db=testEnv.authenticatedContext("member-user",{email:"member@example.test"}).firestore();
+  const targets=["en","sw","maa","fr","es","pt","ar","hi","zh","de","it","ja"];
+  for(const targetLanguage of targets){
+    await assertSucceeds(db.doc("documentTranslationRequests/language-"+targetLanguage).set(translationRequest({
+      targetLanguage,targetLanguageLabel:targetLanguage,requestNotes:"Cross-language coverage test"
+    })));
+  }
+});
+
 test("document owner can explicitly transfer content and save a translation draft but cannot approve it", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     await context.firestore().doc("documents/LIFE-test-1").set(lifecycleDocument());
