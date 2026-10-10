@@ -95,7 +95,7 @@ export async function readOfficialPages(env) {
 
 const SEARCH_QUERIES = ['"grant call" Tanzania NGO climate pastoral livestock rangeland','"call for proposals" Africa NGO environment biodiversity restoration','foundation grants Tanzania civil society women youth livelihoods','embassy small grants Tanzania NGO community development'];
 function xmlField(block, name) {
-  const match = block.match(new RegExp("<" + name + "\\b[^>]*>([\\s\\S]*?)<\\/" + name + "\\s*>", "i"));
+  const match = block.match(new RegExp("<" + name + "\b[^>]*>([\\s\\S]*?)<\\/" + name + "\\s*>", "i"));
   return match ? decodeHtml(match[1]) : "";
 }
 export function parseSearchRss(xml, query, provider = "Google News RSS") {
@@ -106,7 +106,7 @@ export function parseSearchRss(xml, query, provider = "Google News RSS") {
     const block = match[1], title = xmlField(block, "title").slice(0, 500);
     let url = ""; try { url = normalizeOpportunityUrl(xmlField(block, "link")); } catch {}
     const description = xmlField(block, "description").slice(0, 5000);
-    const publisher = block.match(/<source\\b[^>]*\\burl=["']([^"']+)["']/i)?.[1];
+    const publisher = block.match(/<source\b[^>]*\burl=["']([^"']+)["']/i)?.[1];
     let verifiedSourceUrl = sourceUrl;
     try { if (publisher) verifiedSourceUrl = normalizeOpportunityUrl(publisher); } catch {}
     if (!title || !url || (!GRANT_TERMS.test(title + " " + description) && !/climate|pastoral|rangeland|livestock|conservation|community|women|youth|resilience|biodiversity|agriculture/i.test(title + " " + description))) return null;
