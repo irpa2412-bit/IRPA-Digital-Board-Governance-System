@@ -141,14 +141,16 @@ async function crawl(env) {
   const items = await readFeeds(env);
   const assessedItems = items.map(item => ({ ...item, fit: assessFit(item) }));
   let changed = 0;
-  const matchCounts = { strong: 0, possible: 0, low: 0, priorityForReview: 0, closed: 0, geographicMismatch: 0, eligibilityUnverified: 0 };
+  const matchCounts = { strong: 0, possible: 0, low: 0, priorityForReview: 0, open: 0, closed: 0, statusUnknown: 0, geographicMismatch: 0, eligibilityUnverified: 0 };
   for (const item of assessedItems) {
     const fit = item.fit;
     if (fit.fitAssessment === "strong_topic_match") matchCounts.strong++;
     else if (fit.fitAssessment === "possible_topic_match") matchCounts.possible++;
     else matchCounts.low++;
     if (fit.triageAssessment === "priority_for_eligibility_review") matchCounts.priorityForReview++;
+    if (fit.callStatus === "open") matchCounts.open++;
     if (fit.callStatus === "closed") matchCounts.closed++;
+    if (fit.callStatus === "unknown") matchCounts.statusUnknown++;
     if (fit.geographyAssessment === "other_country_focus") matchCounts.geographicMismatch++;
     matchCounts.eligibilityUnverified++;
     const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(item.url));
@@ -162,7 +164,7 @@ async function crawl(env) {
     "INSERT INTO crawler_runs (status, items_seen, items_changed, finished_at) VALUES ('success', ?, ?, CURRENT_TIMESTAMP)"
   ).bind(items.length, changed).run();
   const topMatches = assessedItems
-    .filter(item => item.fit.score > 0 && !["closed_do_not_prioritize", "geographic_mismatch_review", "low_priority"].includes(item.fit.triageAssessment))
+    .filter(item => item.fit.score > 0 && !["closed_do_not_prioritize", "low_priority"].includes(item.fit.triageAssessment))
     .sort((a, b) => {
       const priority = item => item.fit.triageAssessment === "priority_for_eligibility_review" ? 0 : 1;
       return priority(a) - priority(b) || b.fit.score - a.fit.score || a.title.localeCompare(b.title);
