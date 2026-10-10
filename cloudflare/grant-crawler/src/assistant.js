@@ -187,9 +187,26 @@ function json(data, status = 200) {
 
 function extractModelText(result) {
   if (typeof result === "string") return result;
-  if (typeof result?.response === "string") return result.response;
-  if (typeof result?.result?.response === "string") return result.result.response;
-  throw new Error("The Cloudflare AI model returned an unsupported response shape.");
+  const candidates = [
+    result?.response,
+    result?.result?.response,
+    result?.choices?.[0]?.message?.content,
+    result?.result?.choices?.[0]?.message?.content,
+    result?.output_text,
+    result?.result?.output_text
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === "string") return candidate;
+    if (candidate && typeof candidate === "object") {
+      if (typeof candidate.choices?.[0]?.message?.content === "string") return candidate.choices[0].message.content;
+      if (typeof candidate.response === "string") return candidate.response;
+      if (candidate.eligibility || candidate.donor_requirements || candidate.strategic_alignment) return JSON.stringify(candidate);
+    }
+  }
+  if (result && typeof result === "object" && (result.eligibility || result.donor_requirements || result.strategic_alignment)) {
+    return JSON.stringify(result);
+  }
+  throw new Error("The Cloudflare AI model returned an unsupported response shape (keys: " + Object.keys(result || {}).join(",").slice(0, 160) + ").");
 }
 
 function parseModelJson(text) {
