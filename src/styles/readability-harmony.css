@@ -3047,3 +3047,47 @@ textarea:focus-visible{
   .mobile-portal-content-roller{display:none!important;visibility:hidden!important;pointer-events:none!important;}
   .main-area .content-area{padding-top:14px!important;}
 }
+
+
+/* Mobile quick-access icon correction: render actual SVG line icons rather
+   than the oversized white circular placeholders visible on handset screens.
+   Keep icons independent of inherited button/span background and fill rules. */
+.dashboard-command .mobile-quote1-grid>button.mobile-blue-nav-button>span,
+.dashboard-command .mobile-quote1-stats>button.mobile-blue-nav-button>span,
+.dashboard-command .mobile-quote1-quick .mobile-quote1-grid>button>span{
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  flex:0 0 32px!important;
+  width:32px!important;height:32px!important;
+  min-width:32px!important;min-height:32px!important;
+  padding:0!important;margin:0 auto 8px!important;
+  background:transparent!important;
+  border:0!important;border-radius:0!important;
+  box-shadow:none!important;
+  color:#fff!important;
+  opacity:1!important;visibility:visible!important;
+}
+.dashboard-command .mobile-quote1-grid>button.mobile-blue-nav-button>span svg.dashboard-semantic-icon,
+.dashboard-command .mobile-quote1-stats>button.mobile-blue-nav-button>span svg.dashboard-semantic-icon,
+.dashboard-command .mobile-quote1-quick .mobile-quote1-grid>button>span svg.dashboard-semantic-icon{
+  display:block!important;
+  flex:none!important;
+  width:28px!important;height:28px!important;
+  min-width:28px!important;min-height:28px!important;
+  max-width:28px!important;max-height:28px!important;
+  padding:0!important;
+  background:transparent!important;
+  border:0!important;border-radius:0!important;
+  box-shadow:none!important;
+  fill:none!important;
+  stroke:#fff!important;
+  stroke-width:1.9!important;
+  color:#fff!important;
+  opacity:1!important;visibility:visible!important;
+  overflow:visible!important;
+}
+.dashboard-command .mobile-quote1-grid>button.mobile-blue-nav-button>span svg.dashboard-semantic-icon *,
+.dashboard-command .mobile-quote1-stats>button.mobile-blue-nav-button>span svg.dashboard-semantic-icon *{
+  fill:none!important;stroke:#fff!important;opacity:1!important;visibility:visible!important;
+}
