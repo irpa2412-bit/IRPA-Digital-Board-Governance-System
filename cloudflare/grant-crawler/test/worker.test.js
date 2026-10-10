@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import worker, { assessFit, isCurrentOpportunity, parseFeed, safeUrl } from "../src/index.js";
 import { assessGeographicEligibility } from "../src/assistant.js";
+import { decodeHtml, normalizeOpportunityUrl, parseOfficialPage, readOfficialPages, readWebSearch } from "../src/discovery-engines.js";
 
 test("accepts only credential-free HTTPS feed URLs", () => {
   assert.equal(safeUrl("https://example.org/feed.xml").hostname, "example.org");
@@ -596,4 +597,29 @@ test("AI concept-note gate rejects a country-focused call despite generic region
   assert.equal(response.status, 422);
   assert.equal((await response.json()).geographic_eligibility.status, "ineligible");
   assert.equal(modelCalls, 0);
+});
+
+
+test("parallel discovery URL normalization strips tracking parameters and rejects unsafe URLs", () => {
+  assert.equal(normalizeOpportunityUrl("https://donor.example/call?id=3&utm_source=newsletter#apply"), "https://donor.example/call?id=3");
+  assert.throws(() => normalizeOpportunityUrl("http://donor.example/call"));
+  assert.throws(() => normalizeOpportunityUrl("https://user:secret@donor.example/call"));
+});
+
+test("official webpage parser extracts safe title and description text", () => {
+  const item = parseOfficialPage('<html><head><title>Grant &amp; Funding Call</title><meta name="description" content="Support pastoral livelihoods"></head><body><script>secret()</script><p>Open grant for restoration</p></body></html>', "https://donor.example/grants?utm_campaign=x");
+  assert.equal(item.title, "Grant & Funding Call");
+  assert.match(item.description, /Support pastoral livelihoods/);
+  assert.doesNotMatch(item.description, /secret\(\)/);
+  assert.equal(item.url, "https://donor.example/grants");
+  assert.equal(decodeHtml("Women &amp; youth"), "Women & youth");
+});
+
+test("parallel webpage scanner and web search connector fail closed when unconfigured", async () => {
+  const pages = await readOfficialPages({});
+  const search = await readWebSearch({});
+  assert.equal(pages.items.length, 0);
+  assert.equal(pages.stats.configured, 0);
+  assert.equal(search.items.length, 0);
+  assert.equal(search.stats.configured, false);
 });
