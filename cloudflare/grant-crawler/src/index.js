@@ -77,7 +77,7 @@ async function readFeeds(env) {
     }
     if (!response?.ok) throw new Error("Feed request failed with HTTP " + response?.status + ".");
     const type = response.headers.get("content-type") || "";
-    if (!/xml|rss|atom|text\/plain/i.test(type)) throw new Error("Feed did not return an XML-compatible content type.");
+    if (!/xml|rss|atom|text\/plain/i.test(type)) throw new Error("Feed from " + requestUrl.hostname + " did not return XML-compatible content (content type: " + (type || "missing") + ").");
     const text = await response.text();
     if (text.length > MAX_FEED_BYTES) throw new Error("Feed exceeds the 1 MB response limit.");
     feeds.push(...parseFeed(text, requestUrl.href));
