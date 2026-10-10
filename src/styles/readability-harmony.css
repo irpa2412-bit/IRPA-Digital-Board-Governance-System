@@ -3011,3 +3011,39 @@ textarea:focus-visible{
     padding-top:14px!important;
   }
 }
+
+
+/* Screenshot-driven correction: the fixed Home/Portals/Alerts/Menu strip
+   still obscures the first dashboard panel. Keep only the Menu control as
+   the entry point to the existing navigation sheet; remove the three
+   redundant overhead shortcuts and keep the white in-portal selector hidden. */
+@media screen and (max-width:760px){
+  .mobile-global-nav{
+    left:auto!important;
+    right:12px!important;
+    bottom:12px!important;
+    width:76px!important;
+    height:58px!important;
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr)!important;
+    border:1px solid #2f86cf!important;
+    border-radius:12px!important;
+    overflow:hidden!important;
+    box-shadow:0 8px 24px rgba(0,0,0,.3)!important;
+  }
+  .mobile-global-nav>button:not(:last-child){display:none!important;}
+  .mobile-global-nav>button:last-child{
+    display:flex!important;
+    height:58px!important;
+    flex-direction:column!important;
+    align-items:center!important;
+    justify-content:center!important;
+    gap:2px!important;
+    background:#0b5fa8!important;
+    color:#fff!important;
+  }
+  .mobile-nav-sheet{bottom:82px!important;}
+  .desktop-webapp-navigation-roller,
+  .mobile-portal-content-roller{display:none!important;visibility:hidden!important;pointer-events:none!important;}
+  .main-area .content-area{padding-top:14px!important;}
+}
