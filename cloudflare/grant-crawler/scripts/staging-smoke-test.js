@@ -23,7 +23,7 @@ async function main() {
     });
     const body = await response.json();
     if (!response.ok || body.service !== "irpa-grant-application-assistant") {
-      throw new Error("AI opportunity analysis failed with HTTP " + response.status + ".");
+      throw new Error("AI opportunity analysis failed with HTTP " + response.status + ": " + String(body.error || "no safe error detail returned").slice(0, 240));
     }
     return body.assessment || {};
   }
