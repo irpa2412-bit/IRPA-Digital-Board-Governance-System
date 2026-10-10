@@ -189,8 +189,8 @@ export default function DocumentTranslationWorkspace({profile,employee,admin=fal
    const file=new File([selected.translatedText],fileName,{type:"text/plain"});
    const uploaded=await uploadLifecycleDocument({
     file,title:"Translation of "+String(selected.documentTitle||selected.documentId)+" ("+safeTarget+") — request "+selected.id,
-    documentType:"Other",archiveCategory:sourceDocument?.archiveCategory||"Administrative Documents",
-    classification:selected.documentClassification||sourceDocument?.classification||"Internal",version:"1.0"
+    documentType:sourceDocument?.documentType||"Other",archiveCategory:sourceDocument?.archiveCategory||"Administrative Documents",
+    classification:sourceDocument?.classification||selected.documentClassification||"Internal",version:"1.0",parentDocumentId:selected.documentId
    });
    if(!uploaded?.documentId||!uploaded?.fileId)throw new Error("The archive service did not return both the translated document registry ID and Drive file ID.");
    await updateDoc(doc(db,COLLECTIONS.documentTranslationRequests,selected.id),{
