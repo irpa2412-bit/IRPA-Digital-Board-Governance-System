@@ -2951,3 +2951,47 @@ textarea:focus-visible{
 @media(min-width:761px) and (max-width:1100px){
   .dashboard-command .quote4-quick-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+
+
+/* IRPA mobile navigation and quick-access icon repair — 2026-10-11
+   Keep the bottom mobile menu panel as the sole global navigation surface.
+   Restore visible, high-contrast SVG icons on blue quick-access cards. */
+@media screen and (max-width:760px){
+  .main-area>.topbar{
+    display:none!important;
+  }
+  .main-area{
+    padding-top:0!important;
+  }
+  .dashboard-command .mobile-quote1-grid>button.mobile-blue-nav-button>span,
+  .dashboard-command .mobile-quote1-stats>button.mobile-blue-nav-button>span,
+  .dashboard-command .mobile-quote1-quick .mobile-quote1-grid>button>span{
+    display:inline-flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    width:2rem!important;
+    height:2rem!important;
+    min-width:2rem!important;
+    min-height:2rem!important;
+    color:#fff!important;
+    opacity:1!important;
+    visibility:visible!important;
+  }
+  .dashboard-command .mobile-quote1-grid .dashboard-semantic-icon,
+  .dashboard-command .mobile-quote1-stats .dashboard-semantic-icon{
+    display:block!important;
+    width:1.5rem!important;
+    height:1.5rem!important;
+    min-width:1.5rem!important;
+    min-height:1.5rem!important;
+    stroke:#fff!important;
+    color:#fff!important;
+    fill:none!important;
+    opacity:1!important;
+    visibility:visible!important;
+  }
+  .dashboard-command .mobile-quote1-grid .dashboard-semantic-icon *,
+  .dashboard-command .mobile-quote1-stats .dashboard-semantic-icon *{
+    stroke:#fff!important;
+  }
+}
