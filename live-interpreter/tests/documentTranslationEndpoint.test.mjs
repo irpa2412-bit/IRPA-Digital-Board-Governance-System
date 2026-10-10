@@ -75,6 +75,11 @@ test("document translation API rejects a user who is neither owner nor authorise
   assert.equal(response.status,403);
 });
 
+test("document owner cannot translate Confidential content without reviewer authority",async()=>{
+  const response=await invoke({requestData:{...requestRecord,documentClassification:"Confidential"}});
+  assert.equal(response.status,403);
+});
+
 test("Maa output rejects unsupported source languages",async()=>{
   const response=await invoke({requestData:{...requestRecord,sourceLanguage:"AUTO"},body:{requestId:"request-1",content:"Merci beaucoup",sourceLanguage:"fr-FR",targetLanguage:"maa"}});
   assert.equal(response.status,400);
