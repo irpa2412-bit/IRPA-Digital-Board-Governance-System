@@ -41,6 +41,16 @@ const styles={
 const cleanArray=v=>Array.isArray(v)?v:[];
 const dateLabel=v=>{if(!v)return "Not specified";const d=v?.toDate?v.toDate():new Date(v);return Number.isNaN(d.getTime())?"Not specified":d.toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric",timeZone:"Africa/Dar_es_Salaam"});};
 const text=v=>String(v||"").trim();
+const isCountryRestrictedForIrpa=record=>{
+ const callText=[record?.title,record?.summary,record?.applicationRequirements,record?.eligibleCountries,record?.eligibilityCriteria].flatMap(v=>Array.isArray(v)?v:[v]).filter(Boolean).join(" ").toLowerCase();
+ const geographyText=[callText,record?.country,record?.eligibleGeography].filter(Boolean).join(" ").toLowerCase();
+ const countryOnly=/\b(?:only|exclusively|restricted to|limited to|eligible only in|applicants? (?:must|should) be (?:registered|based|located) in|must be registered in|must be based in)\b[^.!?]{0,90}\b(?:south africa|south african|rsa|zimbabwe|zimbabwean)\b|\b(?:south africa|south african|rsa|zimbabwe|zimbabwean)\b[^.!?]{0,90}\b(?:only|exclusively|restricted to|limited to|based applicants?|registered applicants?|eligible applicants?|organisations? only|organizations? only)\b/i.test(geographyText);
+ if(countryOnly)return true;
+ const mentionsTarget=/\b(?:south africa|south african|rsa|zimbabwe|zimbabwean)\b/i.test(geographyText);
+ const broadScope=/(?:eligible|eligibility|applicants?|organisations?|organizations?|open to|available to|across|throughout|for|within)[^.!?]{0,90}(?:east africa|east african|sub[- ]saharan africa|africa[- ]wide|across africa|pan[- ]african|continental africa|global|worldwide|international|low[- ]and[- ]middle[- ]income countries|\blmics?\b|developing countries|all countries)|(?:east africa|east african|sub[- ]saharan africa|africa[- ]wide|across africa|pan[- ]african|continental africa|global|worldwide|international|low[- ]and[- ]middle[- ]income countries|\blmics?\b|developing countries)[^.!?]{0,90}(?:eligible|eligibility|applicants?|organisations?|organizations?|open to|available to|funding across|call for|applications? from)/i.test(callText);
+ const tanzaniaEligibility=/(?:eligible countries?[^.!?]{0,100}\btanzania\b|\btanzania\b[^.!?]{0,80}(?:is an eligible country|is eligible)|applications? (?:are )?open to (?:applicants?|organisations?|organizations?|ngos?) in tanzania|applications? from tanzania|tanzania-based (?:ngos?|organisations?|organizations?|civil society)|(?:applicants?|organisations?|organizations?|ngos?|civil society groups?) (?:must|should|may|can) be (?:registered|based|located|operating) in tanzania)/i.test(callText);
+ return mentionsTarget&&!broadScope&&!tanzaniaEligibility;
+};
 
 export default function GrantIntelligencePortal({profile,employee,isAdmin=false}){
  const [records,setRecords]=useState([]);
@@ -112,11 +122,13 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
  useEffect(()=>onSnapshot(doc(db,"grantCrawlerStatus","current"),snap=>{if(snap.exists())setCrawlerStatus(snap.data())},err=>console.warn("Legacy Firestore crawler status unavailable",err)),[]);
  useEffect(()=>onSnapshot(collection(db,"grantCrawlerSources"),snap=>setCrawlerSources(snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||"")))),err=>console.warn("Grant crawler source health unavailable",err)),[]);
  const combinedRecords=useMemo(()=>{const seen=new Set(records.map(r=>String(r.url||"").trim()).filter(Boolean));return [...records,...crawlerRecords.filter(r=>r.url&&!seen.has(String(r.url).trim()))]},[records,crawlerRecords]);
- const filtered=useMemo(()=>combinedRecords.filter(r=>{
+ const geographyEligibleRecords=useMemo(()=>combinedRecords.filter(r=>!isCountryRestrictedForIrpa(r)),[combinedRecords]);
+ const geographicExclusionCount=combinedRecords.length-geographyEligibleRecords.length;
+ const filtered=useMemo(()=>geographyEligibleRecords.filter(r=>{
    const hay=[r.title,r.funder,r.summary,r.country,r.amount].join(" ").toLowerCase();
    return (!queryText||hay.includes(queryText.toLowerCase()))&&(pillar==="all"||cleanArray(r.pillars).includes(pillar))&&(theme==="all"||cleanArray(r.themes).includes(theme))&&(status==="all"||r.status===status);
- }),[combinedRecords,queryText,pillar,theme,status]);
- const counts=useMemo(()=>({open:combinedRecords.filter(r=>r.status==="Open").length,review:combinedRecords.filter(r=>["Under review","Application in progress"].includes(r.status)).length,submitted:combinedRecords.filter(r=>["Submitted","Awarded"].includes(r.status)).length}),[combinedRecords]);
+ }),[geographyEligibleRecords,queryText,pillar,theme,status]);
+ const counts=useMemo(()=>({open:geographyEligibleRecords.filter(r=>r.status==="Open").length,review:geographyEligibleRecords.filter(r=>["Under review","Application in progress"].includes(r.status)).length,submitted:geographyEligibleRecords.filter(r=>["Submitted","Awarded"].includes(r.status)).length}),[geographyEligibleRecords]);
  async function startCrawlerScan(){
    if(!isAdmin){setError("Only an administrator can trigger a manual full-source scan.");return;}
    try{
@@ -248,7 +260,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false}
    </div>
   </section>
   <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12}}>
-   {[["Tracked opportunities",combinedRecords.length,"Firestore + Cloudflare D1"],["Open calls",counts.open,"Status: Open"],["In preparation",counts.review,"Review / drafting"],["Submitted or awarded",counts.submitted,"Pipeline progress"]].map(([label,value,sub])=><div key={label} style={styles.card}><div style={styles.muted}>{label}</div><div style={{fontSize:28,fontWeight:800,margin:"7px 0"}}>{value}</div><div style={{fontSize:11,color:"#8ba2b8"}}>{sub}</div></div>)}
+   {[["Geography-screened opportunities",geographyEligibleRecords.length,"Excludes country-specific non-Tanzania calls"],["Open calls",counts.open,"Status: Open"],["In preparation",counts.review,"Review / drafting"],["Submitted or awarded",counts.submitted,"Pipeline progress"],["Country-specific calls suppressed",geographicExclusionCount,"South Africa / Zimbabwe and other non-Tanzania restrictions"]].map(([label,value,sub])=><div key={label} style={styles.card}><div style={styles.muted}>{label}</div><div style={{fontSize:28,fontWeight:800,margin:"7px 0"}}>{value}</div><div style={{fontSize:11,color:"#8ba2b8"}}>{sub}</div></div>)}
   </div>
   <section style={{...styles.card,display:"grid",gap:12}} aria-labelledby="crawler-status-heading">
    <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"start",flexWrap:"wrap"}}>
