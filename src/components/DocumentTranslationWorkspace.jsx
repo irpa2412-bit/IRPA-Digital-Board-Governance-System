@@ -2,7 +2,7 @@ import React,{useEffect,useMemo,useState}from"react";
 import{collection,deleteField,doc,onSnapshot,query,serverTimestamp,updateDoc,where}from"firebase/firestore";
 import{db,auth}from"../firebase/config";
 import{COLLECTIONS}from"../firebase/data";
-import{downloadLifecycleDocument}from"../firebase/documentLifecycle";
+import{downloadLifecycleDocument,uploadLifecycleDocument}from"../firebase/documentLifecycle";
 import{translateDocumentChunk}from"../firebase/documentTranslation";
 import*as pdfjsLib from"pdfjs-dist";
 import mammoth from"mammoth";
@@ -83,10 +83,10 @@ export default function DocumentTranslationWorkspace({profile,employee,admin=fal
   },e=>setError(e.message||"Unable to retrieve translation requests."));
  },[currentUid,isReviewer]);
  useEffect(()=>{
-  setDraft(selected?.translationDraftText||selected?.translatedText||"");
   setSourceLanguage(selected?.sourceLanguage==="sw"?"sw-TZ":selected?.sourceLanguage==="maa"?"maa":selected?.sourceLanguage==="en"?"en-TZ":"en-TZ");
   setReviewConfirmed(false);setReviewNotes("");setMaaSpeakerName("");setMaaDialect("Kisonko / Ilkisonko (confirm with speaker)");setConsent(false);setRestrictedApproval(false);setError("");setMessage("");setProgress("");
  },[selectedId]);
+ useEffect(()=>{setDraft(selected?.translationDraftText||selected?.translatedText||"")},[selectedId,selected?.translationDraftText,selected?.translatedText]);
  async function processRequest(){
   if(!selected||!canProcess)throw new Error("The document owner or an authorised translation reviewer is required to process this request.");
   if(!consent)throw new Error("Confirm that extracted document content may be sent to the IRPA translation service before processing.");
@@ -149,6 +149,28 @@ export default function DocumentTranslationWorkspace({profile,employee,admin=fal
   }catch(e){setError(e.message||"Unable to finalise the translation.")}
   finally{setProcessing(false)}
  }
+ async function archiveCompletedTranslation(){
+  if(!selected||selected.status!=="COMPLETED"||!selected.translatedText)throw new Error("Only a completed translation can be archived.");
+  if(selected.documentOwnerUid!==currentUid)throw new Error("Only the document owner can archive the translated output through their Documents Portal.");
+  setArchiving(true);setError("");setMessage("");
+  try{
+   const sourceDocument=documents.find(d=>String(d.documentId)===String(selected.documentId));
+   const safeTarget=String(selected.targetLanguage||"translated").toUpperCase();
+   const fileName="IRPA-Translation-"+String(selected.documentReference||selected.documentId).replace(/[^A-Za-z0-9_-]/g,"-")+"-"+safeTarget+".txt";
+   const file=new File([selected.translatedText],fileName,{type:"text/plain;charset=utf-8"});
+   const uploaded=await uploadLifecycleDocument({
+    file,title:"Translation of "+String(selected.documentTitle||selected.documentId)+" ("+safeTarget+") — request "+selected.id,
+    documentType:"Other",archiveCategory:sourceDocument?.archiveCategory||"Administrative Documents",
+    classification:selected.documentClassification||sourceDocument?.classification||"Internal",version:"1.0"
+   });
+   if(!uploaded?.documentId)throw new Error("The archive service did not return the translated document's registered ID.");
+   await updateDoc(doc(db,COLLECTIONS.documentTranslationRequests,selected.id),{
+    translatedFileId:uploaded.documentId,translationOutputFileName:fileName,updatedAt:serverTimestamp()
+   });
+   setMessage("Translated text has been uploaded as a separate controlled document ("+uploaded.reference||uploaded.documentId+"). The original source document was not changed.");
+  }catch(e){setError(e.message||"Unable to archive the translated output. You can still download the completed text file.");}
+  finally{setArchiving(false)}
+ }
  async function rejectRequest(){
   if(!selected||!isReviewer)return;
   const reason=reviewNotes.trim();if(!reason)return setError("Enter the reason for rejecting this translation request.");
@@ -181,7 +203,7 @@ export default function DocumentTranslationWorkspace({profile,employee,admin=fal
        <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:12}}><button type="button" disabled={processing||!reviewConfirmed||!reviewNotes.trim()||(selected.targetLanguage==="maa"&&(!maaSpeakerName.trim()||!reviewNotes.trim()))} onClick={finalizeTranslation}>{processing?"Saving…":"Approve and Complete Translation"}</button><button type="button" className="secondary-button" disabled={processing||!reviewNotes.trim()} onClick={rejectRequest}>Reject Request</button></div>
       </div>}
      </div>}
-     {selected.status==="COMPLETED"&&<p className="success-message">Completed {fmt(selected.completedAt)}. Reviewer confirmation is recorded{selected.targetLanguage==="maa"?" with the Maa speaker review details.":"."}</p>}
+     {selected.status==="COMPLETED"&&<div className="success-message"><p>Completed {fmt(selected.completedAt)}. Reviewer confirmation is recorded{selected.targetLanguage==="maa"?" with the Maa speaker review details.":"."}</p>{selected.translatedFileId&&<p>Archived document ID: <strong>{selected.translatedFileId}</strong></p>}{selected.documentOwnerUid===currentUid&&!selected.translatedFileId&&<button type="button" disabled={archiving} onClick={archiveCompletedTranslation}>{archiving?"Archiving…":"Save Translation to Controlled Documents"}</button>}</div>}
      {selected.contentTransferred&&<small style={{display:"block",marginTop:10}}>Content transfer recorded for this request. Do not place Confidential/Restricted records into processing without institutional authorization.</small>}
     </div>}
    </div>
