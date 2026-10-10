@@ -53,15 +53,22 @@ const dateKeyInTanzania=value=>{
  const values=Object.fromEntries(parts.filter(part=>part.type!=="literal").map(part=>[part.type,part.value]));
  return values.year+"-"+values.month+"-"+values.day;
 };
-const isExpiredOpportunity=record=>{
+const getOpportunityCurrentStatusIssue=record=>{
  const pipelineStatus=text(record?.status).toLowerCase();
- if(["submitted","awarded"].includes(pipelineStatus))return false;
+ if(["submitted","awarded"].includes(pipelineStatus))return null;
  const callStatus=text(record?.callStatus||record?.call_status).toLowerCase();
- if(["expired","closed","closed_do_not_prioritize"].includes(callStatus))return true;
- if(!callStatus&&["closed","expired"].includes(pipelineStatus))return true;
+ if(["expired","closed","closed_do_not_prioritize"].includes(callStatus)||(!callStatus&&["closed","expired"].includes(pipelineStatus)))return "closed";
  const deadline=dateKeyInTanzania(record?.deadline??record?.deadline_at??record?.closingDate??record?.closeDate??record?.dueDate);
- return Boolean(deadline&&deadline<dateKeyInTanzania(new Date()));
+ const today=dateKeyInTanzania(new Date());
+ if(deadline&&deadline<today)return "expired";
+ if(deadline)return null;
+ const opportunityText=[record?.title,record?.summary,record?.applicationRequirements,record?.donorRequirements].filter(Boolean).join(" ");
+ const rollingIntake=/\b(?:rolling basis|rolling applications?|year[- ]round|open throughout the year|no fixed deadline|no application deadline)\b/i.test(opportunityText);
+ if(callStatus==="open"||rollingIntake)return null;
+ if(pipelineStatus==="open"&&/\bverified\b|\bconfirmed\b/i.test(text(record?.verificationStatus)))return null;
+ return "unverified";
 };
+const isNotCurrentOpportunity=record=>Boolean(getOpportunityCurrentStatusIssue(record));
 const isCountryRestrictedForIrpa=record=>{
  const callText=[record?.title,record?.summary,record?.applicationRequirements,record?.eligibleCountries,record?.eligibilityCriteria].flatMap(v=>Array.isArray(v)?v:[v]).filter(Boolean).join(" ").toLowerCase();
  const geographyText=[callText,record?.country,record?.eligibleGeography].filter(Boolean).join(" ").toLowerCase();
@@ -150,7 +157,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  const combinedRecords=useMemo(()=>{const seen=new Set(records.map(r=>String(r.url||"").trim()).filter(Boolean));return [...records,...crawlerRecords.filter(r=>r.url&&!seen.has(String(r.url).trim()))]},[records,crawlerRecords]);
  const geographyEligibleRecords=useMemo(()=>combinedRecords.filter(r=>!isCountryRestrictedForIrpa(r)),[combinedRecords]);
  const geographicExclusionCount=combinedRecords.length-geographyEligibleRecords.length;
- const currentOpportunityRecords=useMemo(()=>geographyEligibleRecords.filter(r=>!isExpiredOpportunity(r)),[geographyEligibleRecords]);
+ const currentOpportunityRecords=useMemo(()=>geographyEligibleRecords.filter(r=>!isNotCurrentOpportunity(r)),[geographyEligibleRecords]);
  const expiredExclusionCount=geographyEligibleRecords.length-currentOpportunityRecords.length;
  const filtered=useMemo(()=>currentOpportunityRecords.filter(r=>{
    const hay=[r.title,r.funder,r.summary,r.country,r.amount].join(" ").toLowerCase();
@@ -243,11 +250,13 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  }
  async function runWorkspaceAnalysis(task="eligibility"){
    if(!selectedOpportunity?.title){setError("Select a grant opportunity before screening eligibility.");return;}
-   if(isExpiredOpportunity({...selectedOpportunity,summary:[selectedOpportunity.summary,opportunityDescription].filter(Boolean).join(" "),applicationRequirements:donorRequirements})){
-     setAnalysisResult({geographic_eligibility:{status:"eligible",reason:"Geographic fit may be possible, but the application deadline has passed or the call is explicitly closed/expired.",evidence:["Deterministic deadline/status exclusion applied before AI analysis."]},eligibility:{status:"ineligible",confidence:"high",evidence:["Expired or closed call"],unknowns:["Select a current call with a future deadline or verify that the donor has officially reopened this call."]}});
+   const currentStatusIssue=getOpportunityCurrentStatusIssue({...selectedOpportunity,summary:[selectedOpportunity.summary,opportunityDescription].filter(Boolean).join(" "),applicationRequirements:donorRequirements});
+   if(currentStatusIssue){
+     const stale=currentStatusIssue!=="unverified";
+     setAnalysisResult({geographic_eligibility:{status:"unclear",reason:stale?"The application deadline has passed or the call is explicitly closed/expired.":"The official deadline or current open/rolling status is not established by the supplied opportunity record.",evidence:["Deterministic deadline/status gate applied before AI analysis."]},eligibility:{status:stale?"ineligible":"insufficient_information",confidence:"high",evidence:[stale?"Expired or closed call":"Current deadline/status not verified"],unknowns:[stale?"Select a current call with a future deadline or verify that the donor has formally reopened it.":"Paste the official deadline or verify the donor's current open/rolling-intake status."]}});
      setConceptDraft("");
-     setError("This call is expired or closed. AI analysis and concept-note drafting are blocked to avoid wasting application effort.");
-     setWorkspaceNotice("Expiry gate blocked this call before AI analysis.");
+     setError(stale?"This call is expired or closed. AI analysis and concept-note drafting are blocked.":"The call's deadline/current status is unverified. Add the official deadline or confirm rolling/open status before AI analysis.");
+     setWorkspaceNotice("Deadline/current-status gate blocked this call before AI analysis.");
      return;
    }
    if(isCountryRestrictedForIrpa({...selectedOpportunity,summary:[selectedOpportunity.summary,opportunityDescription].filter(Boolean).join(" "),applicationRequirements:donorRequirements})){
@@ -283,11 +292,9 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  }
  async function saveConceptDraft(){
    if(!selectedOpportunity?.title||!text(conceptDraft)){setError("Select an opportunity and enter a concept-note draft before saving.");return;}
-   if(isExpiredOpportunity({...selectedOpportunity,summary:[selectedOpportunity.summary,opportunityDescription].filter(Boolean).join(" "),applicationRequirements:donorRequirements})){
-     
-     
-     setError("This call is expired or closed. A concept note cannot be saved as an active application.");
-     
+   const currentStatusIssue=getOpportunityCurrentStatusIssue({...selectedOpportunity,summary:[selectedOpportunity.summary,opportunityDescription].filter(Boolean).join(" "),applicationRequirements:donorRequirements});
+   if(currentStatusIssue){
+     setError(currentStatusIssue==="unverified"?"The official deadline/current status is unverified. A concept note cannot be saved as an active application until verified.":"This call is expired or closed. A concept note cannot be saved as an active application.");
      return;
    }
    if(isCountryRestrictedForIrpa({...selectedOpportunity,summary:[selectedOpportunity.summary,opportunityDescription].filter(Boolean).join(" "),applicationRequirements:donorRequirements})){
@@ -342,7 +349,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    </div>
   </section>
   <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12}}>
-   {[["Eligible, unexpired opportunities",currentOpportunityRecords.length,"Expired and country-restricted calls suppressed"],["Open calls",counts.open,"Status: Open"],["In preparation",counts.review,"Review / drafting"],["Submitted or awarded",counts.submitted,"Pipeline progress"],["Country-specific calls suppressed",geographicExclusionCount,"South Africa / Zimbabwe and other non-Tanzania restrictions"],["Expired / closed calls suppressed",expiredExclusionCount,"Past deadlines or explicit closed/expired status"]].map(([label,value,sub])=><div key={label} style={styles.card}><div style={styles.muted}>{label}</div><div style={{fontSize:28,fontWeight:800,margin:"7px 0"}}>{value}</div><div style={{fontSize:11,color:"#8ba2b8"}}>{sub}</div></div>)}
+   {[["Eligible, unexpired opportunities",currentOpportunityRecords.length,"Expired and country-restricted calls suppressed"],["Open calls",counts.open,"Status: Open"],["In preparation",counts.review,"Review / drafting"],["Submitted or awarded",counts.submitted,"Pipeline progress"],["Country-specific calls suppressed",geographicExclusionCount,"South Africa / Zimbabwe and other non-Tanzania restrictions"],["Expired / closed / unverified calls suppressed",expiredExclusionCount,"Past deadlines, explicit closure, or no verified current deadline/status"]].map(([label,value,sub])=><div key={label} style={styles.card}><div style={styles.muted}>{label}</div><div style={{fontSize:28,fontWeight:800,margin:"7px 0"}}>{value}</div><div style={{fontSize:11,color:"#8ba2b8"}}>{sub}</div></div>)}
   </div>
   <section style={{...styles.card,display:"grid",gap:12}} aria-labelledby="crawler-status-heading">
    <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"start",flexWrap:"wrap"}}>
