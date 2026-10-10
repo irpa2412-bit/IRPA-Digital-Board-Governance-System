@@ -189,6 +189,13 @@ function detectKnownEligibilityGaps(opportunity) {
     addUnique(warnings, "The call requests multi-year audited financial records; IRPA's available audit history has not been established in the supplied profile. Confirm the required periods and acceptable evidence.");
   }
 
+  const hasDeadline = Boolean(getOpportunityDeadline(opportunity));
+  const explicitOpenStatus = String(opportunity.callStatus || "").toLowerCase() === "open" ||
+    /\\b(?:open to (?:eligible )?(?:applicants?|(?:civil society )?organizations?|(?:civil society )?organisations?|ngos?|nonprofits?)|open for applications|applications? (?:are )?open|call is open|rolling basis|rolling applications?|year[- ]round|open throughout the year)\\b/i.test(text);
+  if (!hasDeadline && !explicitOpenStatus) {
+    addUnique(warnings, "The official deadline or current open/rolling status is not established by the supplied text. Verify the donor's official call page before treating this as a current opportunity or drafting.");
+  }
+
   const criteriaEvidence = /eligible countries|eligible applicants|applicants? must|organizations? may apply|organisations? may apply|registered in|years of operation|audited|co[- ]?financ|previously implemented|completed projects|application deadline|deadline for applications/i.test(text);
   if (!criteriaEvidence) {
     addUnique(warnings, "The supplied text does not include enough explicit applicant eligibility criteria to confirm IRPA's eligibility. Paste the official eligibility and application requirements.");
