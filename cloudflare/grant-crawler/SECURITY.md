@@ -5,7 +5,8 @@
 - The staging workflow deploys only this directory and only the staging Wrangler environment.
 - No Firebase service-account key, Firebase admin SDK, production Firestore database, mail credentials, Drive KV, or e-signature Durable Object is bound to this Worker.
 - The initial crawler stores discovered public-call metadata in its isolated D1 database. It does not create applications, submit applications, send email, or write to IRPA's donor/finance collections.
-- The /crawl control endpoint requires CRAWLER_CONTROL_TOKEN (minimum 32 characters); tokens are never returned by /health.
+- The /crawl and /assistant/analyze control endpoints require CRAWLER_CONTROL_TOKEN (minimum 32 characters); tokens are never returned by /health.
+- The AI assistant uses only the native Cloudflare Workers AI binding; it does not call external model APIs or route through Firebase/Google Cloud. Requests are capped at 20 KB, and opportunity URLs must be credential-free HTTPS.
 
 ## Firebase least-privilege release gate
 CLOUDFLARE_FIREBASE_SERVICE_ACCOUNT_JSON is intentionally not consumed by this Worker. A Firebase service-account private key used with the Admin SDK would bypass Firestore Security Rules and would not provide collection-level least privilege. Secret storage alone does not prove the credential is constrained.
@@ -31,3 +32,9 @@ Before enabling Firebase synchronization:
 - GRANT_CRAWLER_FEED_URLS: JSON array of approved official HTTPS RSS/Atom URLs (optional; defaults to an empty array).
 
 No production deployment is performed by this workflow. Firebase sync and donor/finance writes remain disabled.
+
+## AI assessment limitations
+- The AI assistant only analyzes the opportunity and donor requirements submitted by an authenticated caller. It does not independently verify official donor websites.
+- Treat feed/call text as untrusted data; the prompt explicitly prevents source text from overriding assistant instructions.
+- Eligibility output is advisory, with unknowns and evidence gaps surfaced. IRPA staff must confirm requirements, dates, and final eligibility in official donor documents.
+- Do not submit confidential personal data or sensitive application materials unless separately approved for this workflow.
