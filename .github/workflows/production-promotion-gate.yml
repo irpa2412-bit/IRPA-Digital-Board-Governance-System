@@ -141,7 +141,9 @@ jobs:
         run: |
           set -euo pipefail
           npm ci --no-audit --no-fund
+          npm run check:production-readability -- --changed-only
           npm run build
+          npm run verify:production-readability -- --changed-only
 
       - name: Non-deployment safety assertion
         run: |
