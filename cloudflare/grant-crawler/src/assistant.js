@@ -204,9 +204,10 @@ export async function analyzeGrant(request, env) {
       analysis.eligibility.confidence = "high";
       analysis.eligibility.evidence = [...(Array.isArray(analysis.eligibility.evidence) ? analysis.eligibility.evidence : []), geographicEligibility.reason];
       analysis.eligibility.unknowns = [...(Array.isArray(analysis.eligibility.unknowns) ? analysis.eligibility.unknowns : []), "Official geographic eligibility should still be retained with the application record as supporting evidence."];
-    } else if (geographicEligibility.status === "unclear" && analysis.eligibility.status === "eligible") {
+    } else if (geographicEligibility.status === "unclear" && analysis.eligibility.status !== "ineligible") {
       analysis.eligibility.status = "insufficient_information";
       analysis.eligibility.confidence = "low";
+      analysis.eligibility.unknowns = [...(Array.isArray(analysis.eligibility.unknowns) ? analysis.eligibility.unknowns : []), "Eligible-country criteria were not established from the supplied call text; confirm that Tanzania-based applicants may apply."];
     }
     return json({
       service: "irpa-grant-application-assistant",
