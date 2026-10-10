@@ -147,3 +147,50 @@ test("failed Drive rollback is explicitly recorded and reported after atomic com
   assert.equal(state.failureEvents[0].details.rollbackStatus,"FAILED");
   assert.equal(state.failureEvents[0].details.rollbackError,"simulated Drive rollback failure");
 });
+
+
+test("translated derivative inherits the source classification and all access grants server-side",async()=>{
+  const source={
+    documentId:"LIFE-source-confidential",reference:"IRPA-DOC-2026-SOURCE01",title:"Confidential board minute",
+    fileName:"board-minute.pdf",fileId:"drive-source-1",sha256:"a".repeat(64),ownerUid:"emp-1",ownerType:"EMPLOYEE",
+    department:"Governance",unit:"Board Secretariat",documentType:"Governance",archiveCategory:"Governance Documents",
+    classification:"Confidential",accessPolicy:"CONTROLLED",authorizedUids:["emp-1","board-member-2"],
+    authorizedRoles:["Board Member","Executive Director"],authorizedDepartments:["Governance","Board Secretariat"],
+    status:"FINAL_ARCHIVE",authorizationStatus:"AUTHORIZED",signatureStatus:"COMPLETED",
+    postSignatureStatus:"COMPLETED",finalArchiveStatus:"ARCHIVED",version:"2.0"
+  };
+  const state={docs:{"LIFE-source-confidential":{plain:source}},writes:[],deletedFiles:[]};
+  const router=createDocumentLifecycleRouter(makeDeps(state));
+  const response=await router(req("/api/document-lifecycle/upload",{
+    fileName:"translated-minute.txt",contentType:"text/plain",base64:btoa("Confidential translated content"),
+    title:"Translated confidential board minute",documentType:"Other",
+    archiveCategory:"Administrative Documents",classification:"Internal",parentDocumentId:"LIFE-source-confidential"
+  }),env);
+  assert.equal(response.status,201);
+  const saved=Object.values(state.docs).find(row=>row.plain?.translationDerivative)?.plain;
+  assert.ok(saved,"translated derivative registry record should be committed");
+  assert.equal(saved.classification,"Confidential");
+  assert.equal(saved.accessPolicy,"CONTROLLED");
+  assert.equal(saved.archiveCategory,"Governance Documents");
+  assert.equal(saved.documentType,"Governance");
+  assert.equal(saved.ownerUid,"emp-1");
+  assert.deepEqual(saved.authorizedUids,["emp-1","board-member-2"]);
+  assert.deepEqual(saved.authorizedRoles,["Board Member","Executive Director"]);
+  assert.deepEqual(saved.authorizedDepartments,["Governance","Board Secretariat"]);
+  assert.equal(saved.parentDocumentId,"LIFE-source-confidential");
+  assert.equal(saved.inheritedAccessFromDocumentId,"LIFE-source-confidential");
+});
+
+test("translated derivative upload is denied if client attempts to lower source classification",async()=>{
+  const source={documentId:"LIFE-source-confidential",reference:"IRPA-DOC-2026-SOURCE01",title:"Confidential board minute",fileName:"board-minute.pdf",fileId:"drive-source-1",ownerUid:"emp-1",department:"Governance",documentType:"Governance",archiveCategory:"Governance Documents",classification:"Confidential",accessPolicy:"CONTROLLED",authorizedUids:["emp-1"],authorizedRoles:["Board Member"],authorizedDepartments:["Governance"]};
+  const state={docs:{"LIFE-source-confidential":{plain:source}},writes:[],deletedFiles:[]};
+  const router=createDocumentLifecycleRouter(makeDeps(state));
+  const response=await router(req("/api/document-lifecycle/upload",{
+    fileName:"translated-minute.txt",contentType:"text/plain",base64:btoa("Confidential translated content"),
+    title:"Translated confidential board minute",documentType:"Governance",
+    archiveCategory:"Administrative Documents",classification:"Internal",parentDocumentId:"LIFE-source-confidential"
+  }),env);
+  assert.equal(response.status,403);
+  assert.match(await response.text(),/retain the source document's classification and archive category/i);
+  assert.deepEqual(state.writes,[]);
+});
