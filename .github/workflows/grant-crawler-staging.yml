@@ -33,6 +33,19 @@ jobs:
           if (!config.includes('IRPA_ENVIRONMENT = "staging"')) throw new Error('Staging environment marker missing.');
           if (!config.includes('database_name = "irpa-grant-crawler-staging"')) throw new Error('Staging D1 database missing.');
           NODE
+  firebase-rules-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install repository test dependencies
+        run: npm ci
+      - name: Verify isolated Firebase rules in the emulator
+        run: npx firebase emulators:exec --config cloudflare/grant-crawler/firebase-staging/firebase.json --only firestore --project demo-irpa-grant-crawler-staging-test "node --test cloudflare/grant-crawler/firebase-staging/firestore.rules.test.js"
+
   deploy-staging:
     if: github.event_name == 'workflow_dispatch'
     needs: test
