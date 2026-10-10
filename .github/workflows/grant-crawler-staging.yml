@@ -59,7 +59,7 @@ jobs:
         run: npx firebase emulators:exec --config cloudflare/grant-crawler/firebase-staging/firebase.json --only firestore --project demo-irpa-grant-crawler-staging-test "node --test cloudflare/grant-crawler/firebase-staging/firestore.rules.test.js"
 
   deploy-staging:
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref == 'refs/heads/feature/isolated-grant-crawler-staging' || github.ref == 'refs/heads/feature/grant-crawler-ai-assistant'))
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/feature/isolated-grant-crawler-staging')
     needs: test
     runs-on: ubuntu-latest
     environment: irpa-grant-crawler-staging
