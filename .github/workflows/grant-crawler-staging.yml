@@ -60,7 +60,7 @@ jobs:
         run: npx firebase emulators:exec --config cloudflare/grant-crawler/firebase-staging/firebase.json --only firestore --project demo-irpa-grant-crawler-staging-test "node --test cloudflare/grant-crawler/firebase-staging/firestore.rules.test.js"
 
   deploy-staging:
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/feature/isolated-grant-crawler-staging')
+    # This workflow may deploy only the isolated staging Worker. Allow the same-repository staging branch's PR validation to deploy after tests, because GitHub API commits do not reliably emit a push event. Never deploy from arbitrary fork PRs.\n    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/feature/isolated-grant-crawler-staging') || (github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'feature/isolated-grant-crawler-staging' && github.event.pull_request.head.repo.full_name == github.repository)
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 25
