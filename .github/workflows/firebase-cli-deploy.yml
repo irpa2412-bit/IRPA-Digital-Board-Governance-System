@@ -33,6 +33,8 @@ jobs:
       - name: Independent production readability verification
         run: npm run verify:production-readability
       - name: Require Cloudflare migration secrets before production cutover
+        id: cloudflare_gate
+        continue-on-error: true
         env:
           CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -45,6 +47,7 @@ jobs:
           test -n "$CRAWLER_URL" || { echo "::error::VITE_GRANT_CRAWLER_WORKER_URL is required before production cutover."; exit 1; }
           node -e 'const s=JSON.parse(process.env.CF_FIRESTORE_SA); if(!s.client_email||!s.private_key||!s.project_id)process.exit(1); if(s.project_id!=="irpa-digital-board-governance")process.exit(2);'
       - name: Deploy grant crawler to Cloudflare Workers
+        if: steps.cloudflare_gate.outcome == 'success'
         working-directory: cloudflare/grant-crawler
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -64,7 +67,13 @@ jobs:
           chmod 600 "$RUNNER_TEMP/firebase-service-account.json"
           echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-service-account.json" >> "$GITHUB_ENV"
       - name: Deploy Hosting and Firestore using Firebase CLI (no Docker action)
+        if: steps.cloudflare_gate.outcome == 'success'
         run: npx --yes firebase-tools deploy --project irpa-digital-board-governance --only hosting,firestore --non-interactive
+      - name: Deploy Firestore only while crawler cutover is blocked
+        if: steps.cloudflare_gate.outcome != 'success'
+        run: |
+          echo "::warning::Cloudflare grant-crawler cutover is blocked by missing or invalid Cloudflare migration secrets. Firebase Hosting will not be updated with an empty crawler URL; deploying Firestore configuration only."
+          npx --yes firebase-tools deploy --project irpa-digital-board-governance --only firestore --non-interactive
       - name: Deploy multilingual transcript translation callable
         id: translation
         continue-on-error: true
@@ -78,6 +87,19 @@ jobs:
             echo "TRANSLATION_CALLABLE_DEPLOYED=true"
           else
             echo "::warning::Translation callable was not deployed. Hosting deployment can still succeed; check Cloud Functions billing, API enablement and service-account permissions."
+          fi
+      - name: Report Cloudflare crawler cutover status
+        if: always()
+        env:
+          GATE_OUTCOME: ${{ steps.cloudflare_gate.outcome }}
+        run: |
+          if [ "$GATE_OUTCOME" = "success" ]; then
+            echo "### Grant crawler cutover gate: passed" >> "$GITHUB_STEP_SUMMARY"
+            echo "Cloudflare Worker deployment and Firebase Hosting release were permitted by the credential gate." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### Grant crawler cutover gate: blocked" >> "$GITHUB_STEP_SUMMARY"
+            echo "The Cloudflare grant crawler was not deployed, and Firebase Hosting was intentionally left unchanged. Firestore configuration was deployed independently. Configure the required Cloudflare token, account ID, dedicated least-privilege Firestore service-account JSON, and crawler Worker URL before attempting the crawler cutover again." >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning::Grant crawler is not certified live. Manual and scheduled Firestore scan verification remains outstanding."
           fi
       - name: Verify production page responds
         run: |
