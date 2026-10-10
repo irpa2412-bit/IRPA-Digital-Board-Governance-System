@@ -174,9 +174,9 @@ test("translated derivative inherits the source classification and all access gr
   assert.equal(saved.archiveCategory,"Governance Documents");
   assert.equal(saved.documentType,"Governance");
   assert.equal(saved.ownerUid,"emp-1");
-  assert.deepEqual(saved.authorizedUids,["emp-1","board-member-2"]);
-  assert.deepEqual(saved.authorizedRoles,["Board Member","Executive Director"]);
-  assert.deepEqual(saved.authorizedDepartments,["Governance","Board Secretariat"]);
+  assert.deepEqual(saved.authorizedUids.map(value=>value.stringValue),["emp-1","board-member-2"]);
+  assert.deepEqual(saved.authorizedRoles.map(value=>value.stringValue),["Board Member","Executive Director"]);
+  assert.deepEqual(saved.authorizedDepartments.map(value=>value.stringValue),["Governance","Board Secretariat"]);
   assert.equal(saved.parentDocumentId,"LIFE-source-confidential");
   assert.equal(saved.inheritedAccessFromDocumentId,"LIFE-source-confidential");
 });
