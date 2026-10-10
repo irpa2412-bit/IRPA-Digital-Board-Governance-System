@@ -99,6 +99,54 @@ function assessGeographicEligibility(opportunity) {
   };
 }
 
+function todayInTanzania() {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Africa/Dar_es_Salaam", year: "numeric", month: "2-digit", day: "2-digit"
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.filter(part => part.type !== "literal").map(part => [part.type, part.value]));
+  return values.year + "-" + values.month + "-" + values.day;
+}
+
+function getOpportunityDeadline(opportunity) {
+  const structured = String(opportunity.deadline || "").trim();
+  const iso = structured.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (iso && !Number.isNaN(Date.parse(iso[1] + "T00:00:00Z"))) return iso[1];
+  const text = [opportunity.title, opportunity.description, opportunity.donorRequirements].filter(Boolean).join(" ");
+  const monthNames = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+  const patterns = [
+    /\b(?:deadline(?: date)?|submission deadline|closing date|closing on|applications? close(?:s)?|call closes|apply before|apply by|submit(?:ted)? by|due date|no later than|by)\D{0,40}?(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)(?:\s+(\d{4}))?/i,
+    /\b(?:deadline(?: date)?|submission deadline|closing date|closing on|applications? close(?:s)?|call closes|apply before|apply by|submit(?:ted)? by|due date|no later than|by)\D{0,40}?(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2})(?:,?\s+(\d{4}))?/i,
+    /\b(?:deadline(?: date)?|submission deadline|closing date|closing on|applications? close(?:s)?|call closes|apply before|apply by|submit(?:ted)? by|due date|no later than|by)\D{0,40}?(\d{4})-(\d{2})-(\d{2})\b/i
+  ];
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (!match) continue;
+    if (/^\d{4}$/.test(match[1])) {
+      const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+      if (date.getUTCFullYear() === Number(match[1]) && date.getUTCMonth() === Number(match[2]) - 1 && date.getUTCDate() === Number(match[3])) return date.toISOString().slice(0, 10);
+      continue;
+    }
+    const dayFirst = /^\d+$/.test(match[1]);
+    const month = monthNames.indexOf((dayFirst ? match[2] : match[1]).toLowerCase());
+    const day = Number(dayFirst ? match[1] : match[2]);
+    const year = Number(dayFirst ? match[3] : match[3]) || Number(todayInTanzania().slice(0, 4));
+    if (month < 0 || day < 1 || day > 31) continue;
+    const date = new Date(Date.UTC(year, month, day));
+    if (date.getUTCFullYear() === year && date.getUTCMonth() === month && date.getUTCDate() === day) return date.toISOString().slice(0, 10);
+  }
+  return null;
+}
+
+function assessCallExpiry(opportunity) {
+  const status = String(opportunity.callStatus || "").trim().toLowerCase();
+  const text = [opportunity.title, opportunity.description, opportunity.donorRequirements].filter(Boolean).join(" ");
+  const explicitlyClosed = ["closed", "expired", "closed_do_not_prioritize"].includes(status) ||
+    /\b(?:fund state:\s*closed|call is closed|call closed|applications? (?:are )?closed|this call has closed|deadline has passed|expired opportunity)\b/i.test(text);
+  const deadline = getOpportunityDeadline(opportunity);
+  const expiredDeadline = Boolean(deadline && deadline < todayInTanzania());
+  return { expired: explicitlyClosed || expiredDeadline, deadline, reason: explicitlyClosed ? "The supplied call status/text says this call is closed or expired." : expiredDeadline ? "The application deadline has passed in Tanzania time." : null };
+}
+
 function detectKnownEligibilityGaps(opportunity) {
   const text = [opportunity.title, opportunity.description, opportunity.donorRequirements]
     .filter(Boolean).join(" ").toLowerCase();
@@ -258,6 +306,8 @@ export async function analyzeGrant(request, env) {
   const description = typeof body.description === "string" ? body.description.trim().slice(0, 10_000) : "";
   const donorRequirements = typeof body.donorRequirements === "string" ? body.donorRequirements.trim().slice(0, 8_000) : "";
   const url = typeof body.url === "string" ? body.url.trim().slice(0, 1_000) : "";
+  const deadline = typeof body.deadline === "string" ? body.deadline.trim().slice(0, 80) : "";
+  const callStatus = typeof body.callStatus === "string" ? body.callStatus.trim().slice(0, 40) : "";
   const task = body.task === "concept_note" ? "concept_note" : "eligibility";
   if (!title || (!description && !donorRequirements)) {
     return json({ error: "Provide a grant title and at least one of the opportunity description or donor requirements." }, 400);
@@ -326,7 +376,9 @@ export async function analyzeGrant(request, env) {
     "Return valid JSON only, no markdown fences, matching this schema: " + JSON.stringify(schema)
   ].join("\n");
 
-  const opportunity = { title, description, url: url || null, donorRequirements };
+  const opportunity = { title, description, url: url || null, donorRequirements, deadline, callStatus };
+  const expiry = assessCallExpiry(opportunity);
+  if (expiry.expired) return json({ error: "Eligibility analysis blocked: this call is closed or its application deadline has passed.", call_status: "expired", deadline_at: expiry.deadline, expiry_assessment: expiry, next_step: "Do not prepare an application for this call. Verify the official donor page for a formally reopened or extended deadline." }, 422);
   const geographicEligibility = assessGeographicEligibility(opportunity);
   const knownGaps = detectKnownEligibilityGaps(opportunity);
   if (task === "concept_note" && (geographicEligibility.status !== "eligible" || knownGaps.blockers.length || knownGaps.warnings.length)) {
