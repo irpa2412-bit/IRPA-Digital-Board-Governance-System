@@ -76,3 +76,25 @@ test("closed and country-specific opportunities are not promoted as IRPA priorit
   assert.equal(otherCountry.geographyAssessment, "other_country_focus");
   assert.equal(otherCountry.triageAssessment, "geographic_mismatch_review");
 });
+
+
+test("past advertised deadlines are marked expired even when an open-feed source is used", () => {
+  const fit = assessFit({
+    title: "Open call for climate resilience grants",
+    description: "The call invites proposals by 1 January 2020. Fund state: Open.",
+    sourceUrl: "https://www.gov.uk/international-development-funding.atom?fund_state=open",
+  });
+  assert.equal(fit.deadlineAt, "2020-01-01");
+  assert.equal(fit.callStatus, "expired");
+  assert.equal(fit.triageAssessment, "closed_do_not_prioritize");
+});
+
+test("future deadlines can remain open for eligibility review", () => {
+  const fit = assessFit({
+    title: "Open community rangeland restoration grant",
+    description: "Fund state: Open. Deadline for applications is 31 December 2099.",
+    sourceUrl: "https://www.gov.uk/international-development-funding.atom?fund_state=open",
+  });
+  assert.equal(fit.deadlineAt, "2099-12-31");
+  assert.equal(fit.callStatus, "open");
+});
