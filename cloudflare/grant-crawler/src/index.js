@@ -54,7 +54,7 @@ function parseFeed(xml, sourceUrl) {
 
 async function readFeeds(env) {
   let configured;
-  try { configured = JSON.parse(env.GRANT_FEED_URLS || "[]"); } catch { throw new Error("GRANT_FEED_URLS must be a JSON array."); }
+  try { configured = JSON.parse(env.GRANT_FEED_URLS_JSON || env.GRANT_FEED_URLS || "[]"); } catch { throw new Error("GRANT_FEED_URLS must be a JSON array."); }
   if (!Array.isArray(configured) || configured.length > MAX_FEEDS) throw new Error("GRANT_FEED_URLS must be an array of no more than 30 feeds.");
   const feeds = [];
   for (const entry of configured) {
@@ -89,7 +89,7 @@ async function crawl(env) {
   await env.GRANTS_DB.prepare(
     "INSERT INTO crawler_runs (status, items_seen, items_changed, finished_at) VALUES ('success', ?, ?, CURRENT_TIMESTAMP)"
   ).bind(items.length, changed).run();
-  return { status: "success", feedsConfigured: JSON.parse(env.GRANT_FEED_URLS || "[]").length, itemsSeen: items.length, recordsChanged: changed };
+  return { status: "success", feedsConfigured: JSON.parse(env.GRANT_FEED_URLS_JSON || env.GRANT_FEED_URLS || "[]").length, itemsSeen: items.length, recordsChanged: changed };
 }
 
 export default {
