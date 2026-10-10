@@ -1,4 +1,5 @@
 import { analyzeGrant } from "./assistant.js";
+import { readOfficialPages, readWebSearch, normalizeOpportunityUrl } from "./discovery-engines.js";
 import { handleApplicationPortal } from "./application-portal-handler.js";
 
 
@@ -302,7 +303,34 @@ function assessFit(item) {
 
 async function crawl(env) {
   if (!env.GRANTS_DB) throw new Error("The isolated staging D1 database binding is missing.");
-  const items = await readFeeds(env);
+  const engines = [
+    { name: "rss_atom", run: () => readFeeds(env), configured: (() => { try { return JSON.parse(env.GRANT_FEED_URLS_JSON || env.GRANT_FEED_URLS || "[]").length; } catch { return 0; } })() },
+    { name: "official_pages", run: async () => (await readOfficialPages(env)).items, configured: (() => { try { return JSON.parse(env.GRANT_SOURCE_PAGE_URLS_JSON || env.GRANT_SOURCE_PAGE_URLS || "[]").length; } catch { return 0; } })() },
+    { name: "web_search", run: async () => (await readWebSearch(env)).items, configured: String(env.BRAVE_SEARCH_API_KEY || "").trim() ? 1 : 0 },
+  ];
+  const settled = await Promise.all(engines.map(async engine => {
+    try {
+      const items = await engine.run();
+      return { name: engine.name, items, stats: { status: "success", configured: engine.configured, found: items.length, error: null } };
+    } catch (error) {
+      return { name: engine.name, items: [], stats: { status: "failed", configured: engine.configured, found: 0, error: String(error.message || error).slice(0, 300) } };
+    }
+  }));
+  const successful = settled.filter(engine => engine.stats.status === "success");
+  if (!successful.length) throw new Error("All grant discovery engines failed.");
+  const unique = new Map();
+  for (const engine of settled) {
+    for (const raw of engine.items) {
+      let canonical;
+      try { canonical = normalizeOpportunityUrl(raw.url); } catch { continue; }
+      const item = { ...raw, url: canonical, discoveryEngine: raw.discoveryEngine || engine.name };
+      const previous = unique.get(canonical);
+      if (!previous || String(item.description || "").length > String(previous.description || "").length) {
+        unique.set(canonical, { ...previous, ...item, sourceUrl: item.sourceUrl || previous?.sourceUrl });
+      }
+    }
+  }
+  const items = [...unique.values()];
   const assessedItems = items.map(item => ({ ...item, fit: assessFit(item) }));
   let changed = 0;
   const matchCounts = { strong: 0, possible: 0, low: 0, priorityForReview: 0, open: 0, closed: 0, expired: 0, statusUnknown: 0, geographicMismatch: 0, geographyUnverifiedSuppressed: 0, eligibilityUnverified: 0 };
@@ -323,12 +351,22 @@ async function crawl(env) {
     const id = [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, "0")).join("");
     const result = await env.GRANTS_DB.prepare(
       "INSERT INTO grant_opportunities (id, title, description, url, published_at, source_url, fit_score, fit_assessment, fit_reasons, eligibility_status, call_status, geography_assessment, triage_assessment, deadline_at, first_seen_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT(url) DO UPDATE SET title=excluded.title, description=excluded.description, published_at=excluded.published_at, source_url=excluded.source_url, fit_score=excluded.fit_score, fit_assessment=excluded.fit_assessment, fit_reasons=excluded.fit_reasons, eligibility_status=excluded.eligibility_status, call_status=excluded.call_status, geography_assessment=excluded.geography_assessment, triage_assessment=excluded.triage_assessment, deadline_at=excluded.deadline_at, last_seen_at=CURRENT_TIMESTAMP"
-    ).bind(id, item.title, item.description, item.url, item.publishedAt, item.sourceUrl, fit.score, fit.fitAssessment, JSON.stringify(fit.reasons), fit.eligibilityStatus, fit.callStatus, fit.geographyAssessment, fit.triageAssessment, fit.deadlineAt).run();
+    ).bind(id, item.title, item.description, item.url, item.publishedAt || null, item.sourceUrl || item.url, fit.score, fit.fitAssessment, JSON.stringify(fit.reasons), fit.eligibilityStatus, fit.callStatus, fit.geographyAssessment, fit.triageAssessment, fit.deadlineAt).run();
     if (result.meta?.changes) changed += result.meta.changes;
   }
+  const overallStatus = settled.every(engine => engine.stats.status === "failed") ? "failed" : "success";
   await env.GRANTS_DB.prepare(
-    "INSERT INTO crawler_runs (status, items_seen, items_changed, finished_at) VALUES ('success', ?, ?, CURRENT_TIMESTAMP)"
-  ).bind(items.length, changed).run();
+    "INSERT INTO crawler_runs (status, items_seen, items_changed, finished_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)"
+  ).bind(overallStatus, items.length, changed).run();
+  for (const engine of settled) {
+    const engineItems = engine.items.length;
+    const engineError = engine.stats.error || null;
+    try {
+      await env.GRANTS_DB.prepare(
+        "INSERT INTO crawler_engine_runs (engine, status, configured, items_seen, error_message, finished_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)"
+      ).bind(engine.name, engine.stats.status, engine.stats.configured, engineItems, engineError).run();
+    } catch {}
+  }
   const topMatches = assessedItems
     .filter(item => item.fit.score > 0 && ["tanzania_mentioned", "regional_or_lmic_scope"].includes(item.fit.geographyAssessment) && !["closed_do_not_prioritize", "low_priority"].includes(item.fit.triageAssessment))
     .sort((a, b) => {
@@ -337,22 +375,24 @@ async function crawl(env) {
     })
     .slice(0, 12)
     .map(item => ({
-      title: item.title,
-      description: item.description,
-      url: item.url,
-      sourceUrl: item.sourceUrl,
-      fitScore: item.fit.score,
-      fitAssessment: item.fit.fitAssessment,
-      fitReasons: item.fit.reasons,
-      strategicTrack: item.fit.strategicTrack,
-      digitalGovernanceMatch: item.fit.digitalGovernanceMatch,
-      deadlineAt: item.fit.deadlineAt,
-      callStatus: item.fit.callStatus,
-      geographyAssessment: item.fit.geographyAssessment,
-      triageAssessment: item.fit.triageAssessment,
-      eligibilityStatus: item.fit.eligibilityStatus,
+      title: item.title, description: item.description, url: item.url, sourceUrl: item.sourceUrl,
+      discoveryEngine: item.discoveryEngine, fitScore: item.fit.score, fitAssessment: item.fit.fitAssessment,
+      fitReasons: item.fit.reasons, strategicTrack: item.fit.strategicTrack,
+      digitalGovernanceMatch: item.fit.digitalGovernanceMatch, deadlineAt: item.fit.deadlineAt,
+      callStatus: item.fit.callStatus, geographyAssessment: item.fit.geographyAssessment,
+      triageAssessment: item.fit.triageAssessment, eligibilityStatus: item.fit.eligibilityStatus,
     }));
-  return { status: "success", feedsConfigured: JSON.parse(env.GRANT_FEED_URLS_JSON || env.GRANT_FEED_URLS || "[]").length, itemsSeen: items.length, recordsChanged: changed, irpaFitMatches: matchCounts, topMatches };
+  return {
+    status: "success",
+    engines: settled.map(engine => ({ engine: engine.name, ...engine.stats })),
+    feedsConfigured: engines[0].configured,
+    sourcePagesConfigured: engines[1].configured,
+    webSearchConfigured: engines[2].configured > 0,
+    uniqueItemsSeen: items.length,
+    recordsChanged: changed,
+    irpaFitMatches: matchCounts,
+    topMatches,
+  };
 }
 
 export default {
