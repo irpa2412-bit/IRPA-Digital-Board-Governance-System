@@ -120,6 +120,10 @@ test("AI geographic classifier requires explicit Tanzania or broad eligible geog
     title: "Climate resilience grant",
     description: "A global warming awareness campaign."
   }).status, "unclear");
+  assert.equal(assessGeographicEligibility({
+    title: "Global Environment Facility small grants in South Africa",
+    description: "Eligible applicants must be registered in South Africa as NGOs. Climate resilience and community development."
+  }).status, "ineligible");
 });
 
 test("digital governance and DBGS calls are scored as a distinct strategic investment track", () => {
@@ -148,6 +152,13 @@ test("strict geographic filter excludes South Africa-only and Zimbabwe-only anno
   assert.equal(southAfrica.geographyAssessment, "other_country_focus");
   assert.equal(southAfrica.triageAssessment, "geographic_mismatch_review");
   assert.equal(southAfrica.eligibilityStatus, "geographic_ineligible");
+
+  const southAfricaDonorName = assessFit({
+    title: "Global Environment Facility small grants in South Africa",
+    description: "Eligible applicants must be registered in South Africa as NGOs. Climate resilience and community development."
+  });
+  assert.equal(southAfricaDonorName.geographyAssessment, "other_country_focus");
+  assert.equal(southAfricaDonorName.triageAssessment, "geographic_mismatch_review");
 
   const zimbabwe = assessFit({
     title: "Zimbabwean civil society innovation fund",
