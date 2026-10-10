@@ -65,7 +65,7 @@ async function queryDocs(ctx, env, token, collection, field, value, limit = 500)
 async function putDoc(ctx, env, token, collection, id, data, merge = false) {
   const path = `${collection}/${encodeURIComponent(id)}`;
   const mask = Object.keys(data).map(k => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join("&");
-  return firestore(ctx, env, token, merge ? `${path}?${mask}` : `${path}?updateMask.fieldPaths=${Object.keys(data).map(encodeURIComponent).join("&updateMask.fieldPaths=")}`, {
+  return firestore(ctx, env, token, `${path}?${mask}`, {
     method: "PATCH", body: JSON.stringify({ fields: firestoreFields(data) })
   });
 }
@@ -119,12 +119,16 @@ async function meetingContext(ctx, env, token, claims, meetingId) {
     .some(list => Array.isArray(list) && list.map(String).includes(uid)) ||
     [meeting.participantEmails, meeting.attendeeEmails, meeting.invitedEmails, meeting.subscriberEmails]
       .some(list => Array.isArray(list) && list.map(lower).includes(email));
-  const participant = listed || participants.some(p => !["cancelled", "canceled", "revoked", "removed", "inactive", "closed"].includes(lower(p.status || p.registrationStatus)) &&
-      [p.uid, p.userId, p.participantUid, p.memberUid, p.invitedUid].map(String).includes(uid) ||
-      (email && [p.email, p.participantEmail, p.invitedEmail].some(v => lower(v) === email))) ||
-    subscriptions.some(s => !["cancelled", "canceled", "revoked", "removed", "inactive", "closed"].includes(lower(s.status)) &&
-      ([s.uid, s.subscriberUid, s.userId, s.memberUid, s.participantUid].map(String).includes(uid) || (email && [s.email, s.subscriberEmail, s.participantEmail].some(v => lower(v) === email))));
-  const canRead = controller || participant || activeMember || activeEmployee;
+  const participant = listed || participants.some(p => {
+      if (["cancelled", "canceled", "revoked", "removed", "inactive", "closed"].includes(lower(p.status || p.registrationStatus))) return false;
+      return [p.uid, p.userId, p.participantUid, p.memberUid, p.invitedUid].map(String).includes(uid) ||
+        Boolean(email && [p.email, p.participantEmail, p.invitedEmail].some(v => lower(v) === email));
+    }) || subscriptions.some(s => {
+      if (["cancelled", "canceled", "revoked", "removed", "inactive", "closed"].includes(lower(s.status))) return false;
+      return [s.uid, s.subscriberUid, s.userId, s.memberUid, s.participantUid].map(String).includes(uid) ||
+        Boolean(email && [s.email, s.subscriberEmail, s.participantEmail].some(v => lower(v) === email));
+    });
+  const canRead = controller || participant;
   if (!canRead) throw Object.assign(new Error("An active IRPA identity or authorised meeting participant is required."), { status: 403 });
   return { uid, email, meeting, category: categoryOf(meeting), controller, canRead, admin: activeAdmin, confidentiality: clean(meeting.confidentialityClass) || (categoryOf(meeting) === "GOVERNANCE" ? "BOARD_RESTRICTED" : "INTERNAL") };
 }
