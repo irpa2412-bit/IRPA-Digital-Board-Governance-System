@@ -398,6 +398,7 @@ async function crawl(env) {
     sourcePagesConfigured: engines[1].configured,
     webSearchConfigured: engines[2].configured > 0,
     uniqueItemsSeen: items.length,
+    itemsSeen: items.length,
     recordsChanged: changed,
     irpaFitMatches: matchCounts,
     topMatches,
