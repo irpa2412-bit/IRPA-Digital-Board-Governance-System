@@ -10221,3 +10221,16 @@ html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-headin
     overflow-wrap: anywhere;
   }
 }
+
+
+/* 2026-10-11 hard correction: visibly translate the Dashboard weather pad left.
+   Grid margins alone were neutralized by later dashboard sizing rules; transform is
+   a deterministic visual offset while the matching width expansion preserves its right edge. */
+@media (min-width: 1200px) {
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel {
+    transform: translateX(calc(-24px - 1.5cm));
+    width: calc(100% + 24px + 1.5cm);
+    max-width: none;
+    box-sizing: border-box;
+  }
+}
