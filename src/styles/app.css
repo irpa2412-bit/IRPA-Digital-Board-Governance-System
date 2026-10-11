@@ -5997,7 +5997,7 @@
 .main-area>.topbar .google-weather-panel .live-weather-metrics>span{padding:5px 7px;font-size:12px}
 .main-area>.topbar .google-weather-panel .live-weather-days{gap:6px}
 .main-area>.topbar .google-weather-panel .live-weather-day{padding:7px 5px;gap:4px}
-.main-area>.topbar .google-weather-panel .live-weather-attribution{font-size:11px;line-height:1.35;padding-top:6px}
+.main-area>.topbar .google-weather-panel .live-weather-attribution{font-size:12px;line-height:1.35;padding-top:6px}
 .main-area>.topbar .topbar-access-category{height:100%;min-height:100%}
 .main-area>.topbar .topbar-access-category .login-category-identifiers{display:grid;gap:10px}
 .main-area>.topbar .topbar-access-category .login-category-identifiers>div{min-width:0;overflow-wrap:anywhere}
@@ -6188,9 +6188,9 @@
 .main-area .topbar .google-weather-panel .live-weather-metrics>span{padding:4px 6px;font-size:12px;line-height:1.2}
 .main-area .topbar .google-weather-panel .live-weather-days{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
 .main-area .topbar .google-weather-panel .live-weather-day{padding:6px 4px;gap:3px;min-width:0}
-.main-area .topbar .google-weather-panel .live-weather-day *{font-size:11px;line-height:1.2;overflow-wrap:anywhere}
-.main-area .topbar .google-weather-panel .live-weather-attribution{font-size:11px;line-height:1.25;padding-top:4px;margin-top:auto}
-.main-area .topbar .google-weather-panel .live-weather-attribution *{font-size:11px;line-height:1.25}
+.main-area .topbar .google-weather-panel .live-weather-day *{font-size:12px;line-height:1.2;overflow-wrap:anywhere}
+.main-area .topbar .google-weather-panel .live-weather-attribution{font-size:12px;line-height:1.25;padding-top:4px;margin-top:auto}
+.main-area .topbar .google-weather-panel .live-weather-attribution *{font-size:12px;line-height:1.25}
 @media(max-width:1100px){
  .main-area .topbar .topbar-heading-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"title authority" "weather weather"}
  .main-area .topbar .topbar-heading-row .google-weather-panel{width:100%;max-width:620px;height:auto;max-height:none;min-height:0;justify-self:center}
