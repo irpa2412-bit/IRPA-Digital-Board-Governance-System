@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import worker, { assessFit, isCurrentOpportunity, parseFeed, safeUrl } from "../src/index.js";
 import { assessGeographicEligibility } from "../src/assistant.js";
-import { decodeHtml, normalizeOpportunityUrl, parseOfficialPage, parseSearchRss, readOfficialPages, readWebSearch } from "../src/discovery-engines.js";
+import { decodeHtml, normalizeOpportunityUrl, parseOfficialPage, parseSearchRss, readOfficialPages, readWebSearch, readUNAgencyGrants, readEmbassySmallGrants, readClimateFunds, readBiodiversityConservation, readAgricultureLivestock, readWomenYouthEnterprise, readPastoralRangeland, readEastAfricaRegional, readCorporateFoundations, readTanzaniaFunding } from "../src/discovery-engines.js";
 
 test("accepts only credential-free HTTPS feed URLs", () => {
   assert.equal(safeUrl("https://example.org/feed.xml").hostname, "example.org");
@@ -640,4 +640,39 @@ test("parallel webpage scanner and no-key web search use the configured public s
   }
   assert.equal(pages.items.length, 0);
   assert.equal(pages.stats.configured, 0);
+});
+
+
+test("all ten specialized scanners run independently and emit into the shared grant pipeline", async () => {
+  const names = [
+    "un_agency_grants", "embassy_small_grants", "climate_funds",
+    "biodiversity_conservation", "agriculture_livestock", "women_youth_enterprise",
+    "pastoral_rangeland", "east_africa_regional", "corporate_foundations", "tanzania_funding",
+  ];
+  const scanners = [
+    readUNAgencyGrants, readEmbassySmallGrants, readClimateFunds, readBiodiversityConservation,
+    readAgricultureLivestock, readWomenYouthEnterprise, readPastoralRangeland,
+    readEastAfricaRegional, readCorporateFoundations, readTanzaniaFunding,
+  ];
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    return new Response('<rss><channel><item><title>Open grant call for proposals</title><link>https://donor.example/open-call</link><description>Call for proposals. Deadline 31 December 2026. Tanzania and East Africa eligible.</description></item></channel></rss>', {
+      status: 200, headers: { "content-type": "application/rss+xml" },
+    });
+  };
+  try {
+    const results = await Promise.all(scanners.map(scanner => scanner()));
+    assert.equal(calls, 10);
+    assert.equal(results.length, 10);
+    assert.deepEqual(results.map(result => result.items[0]?.discoveryEngine), names);
+    for (const result of results) {
+      assert.equal(result.stats.configured, true);
+      assert.equal(result.items.length, 1);
+      assert.equal(result.items[0].url, "https://donor.example/open-call");
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
