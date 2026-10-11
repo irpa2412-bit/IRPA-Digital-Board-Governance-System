@@ -8476,6 +8476,14 @@ html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-ro
   flex: 1 1 auto;
   box-sizing: border-box;
 }
+ .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-current-main,
+.main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-metrics {
+  width: auto;
+  max-width: none;
+  min-width: 0;
+  flex: 1 1 220px;
+  box-sizing: border-box;
+}
 .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-days {
   display: flex;
   flex-direction: row;
@@ -8495,14 +8503,6 @@ html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-ro
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "title" "weather" "authority";
   }
- .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-current-main,
-.main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-metrics {
-  width: auto;
-  max-width: none;
-  min-width: 0;
-  flex: 1 1 220px;
-  box-sizing: border-box;
-}
  .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-days {
     overflow-x: auto;
   }
