@@ -686,6 +686,27 @@ test("AfricanNGOs and NGO Portal aggregator engines retain original issuer URLs"
   }
 });
 
+test("aggregator without an issuer link records a no-match warning, not a failed engine", async () => {
+  const originalFetch = globalThis.fetch;
+  const root = "https://jobs.ngoportal.africa/grants-funding/";
+  const article = "https://jobs.ngoportal.africa/grants-funding/open-call/";
+  globalThis.fetch = async input => {
+    const url = String(input);
+    if (url === root) return new Response('<html><head><title>Funding Calls</title></head><body><a href="' + article + '">Open Grant Funding Opportunity</a></body></html>', { status: 200, headers: { "content-type": "text/html" } });
+    if (url === article) return new Response('<html><head><title>Open Grant Funding Opportunity</title><meta name="description" content="Call for proposals funding community restoration. Applications close 30 December 2026."></head><body><p>Call for proposals funding community restoration. Applications close 30 December 2026.</p></body></html>', { status: 200, headers: { "content-type": "text/html" } });
+    if (url.startsWith("https://www.bing.com/search?")) return new Response("<rss><channel></channel></rss>", { status: 200, headers: { "content-type": "application/rss+xml" } });
+    throw new Error("Unexpected URL " + url);
+  };
+  try {
+    const result = await readDonorScanner({ name: "ngo_portal_africa", label: "NGO Portal Africa Funding Calls", url: root });
+    assert.equal(result.items.length, 0);
+    assert.equal(result.stats.errors.length, 0);
+    assert.match(result.stats.message, /fallback found no matching call/i);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("web search RSS parser extracts grant announcements and rejects unsafe links", () => {
   const xml = '<rss><channel><item><title>Open grant for pastoral restoration</title><link>https://donor.example/call?utm_source=news</link><description>Funding for rangeland restoration in Tanzania</description><pubDate>Sat, 10 Oct 2026 10:00:00 GMT</pubDate><source url="https://donor.example">Donor</source></item></channel></rss>';
   const items = parseSearchRss(xml, "grant Tanzania");
