@@ -8106,3 +8106,76 @@
     padding: 8px 10px;
   }
 }
+
+
+/* 2026-10-11 correction: the request moved only the portal selector, not the date/time panel.
+   Restore the live clock to the left; keep the selector at the right with readable, wider controls. */
+@media (min-width: 761px) {
+  .main-area > .desktop-webapp-navigation-roller {
+    display: flex;
+    width: 100%;
+    max-width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 10px;
+    padding: 4px 8px;
+  }
+  .main-area > .desktop-webapp-navigation-roller .webapp-navigation-live-clock {
+    order: 0;
+    flex: 0 0 auto;
+    width: max-content;
+    max-width: 260px;
+    margin-right: 8px;
+    font-size: 13px;
+  }
+  .main-area > .desktop-webapp-navigation-roller > strong {
+    order: 1;
+    flex: 0 1 auto;
+    max-width: none;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: nowrap;
+    font-size: 14px;
+    line-height: 1.4;
+  }
+  .main-area > .desktop-webapp-navigation-roller select {
+    order: 2;
+    flex: 0 1 300px;
+    width: min(300px, 32vw);
+    min-width: 230px;
+    margin-left: auto;
+    padding: 9px 12px;
+    font-size: 14px;
+    line-height: 1.4;
+    min-height: 40px;
+  }
+  .main-area > .desktop-webapp-navigation-roller .webapp-navigation-roller-chevron {
+    order: 3;
+    flex: 0 0 auto;
+    margin-left: 0;
+    font-size: 16px;
+  }
+}
+@media (max-width: 760px) {
+  .main-area > .desktop-webapp-navigation-roller {
+    width: 100%;
+    max-width: 100%;
+    margin-left: 0;
+    gap: 8px;
+  }
+  .main-area > .desktop-webapp-navigation-roller > strong {
+    max-width: 100%;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    font-size: 14px;
+    line-height: 1.4;
+  }
+  .main-area > .desktop-webapp-navigation-roller select {
+    font-size: 14px;
+    line-height: 1.4;
+    min-height: 42px;
+  }
+}
