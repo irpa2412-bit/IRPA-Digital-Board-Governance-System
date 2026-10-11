@@ -373,7 +373,7 @@ function LiveWeatherPanel(){
   {name:"Singida",region:"Singida Region",latitude:-4.817,longitude:34.743}
  ];
  const apiKey=String(import.meta.env.VITE_GOOGLE_WEATHER_API_KEY||"").trim();
- const[weatherByPlace,setWeatherByPlace]=useState({});
+ const[weatherByPlace,setWeatherByPlace]=useState({});const[forecastExpanded,setForecastExpanded]=useState(false);
  const[activePlaceIndex,setActivePlaceIndex]=useState(0);
  const[error,setError]=useState("");
  const[loading,setLoading]=useState(true);
@@ -436,17 +436,19 @@ function LiveWeatherPanel(){
  const condition=current?.weatherCondition?.description?.text||"Conditions unavailable";
  const fmt=(value,suffix="")=>Number.isFinite(value)?Math.round(value)+suffix:"—";
  const changePlace=delta=>setActivePlaceIndex(index=>(index+delta+WEATHER_POINTS.length)%WEATHER_POINTS.length);
- return <div className="live-weather-content" aria-live="polite">
+ return <div className={"live-weather-content"+(forecastExpanded?" forecast-expanded":"")} aria-live="polite">
   <div className="live-weather-location-bar">
-   <div className="live-weather-location-name"><strong>{activePlace.name}</strong><span>{activePlace.region}</span><small>PLACE {activePlaceIndex+1} OF {WEATHER_POINTS.length} · ROLLING LIVE FORECAST</small></div>
-   <div className="live-weather-location-controls"><button type="button" onClick={()=>changePlace(-1)} aria-label="Previous weather location" title="Previous location">‹</button><button type="button" onClick={()=>changePlace(1)} aria-label="Next weather location" title="Next location">›</button></div>
+   <div className="live-weather-location-name"><strong>{activePlace.name}</strong><span>{icon(current?.weatherCondition?.type)} {Number.isFinite(temp)?fmt(temp,"°C"):(loading?"Loading…":"—")} · {placeWeather?condition:(error||"Live conditions loading")}</span></div>
+   <div className="live-weather-location-controls"><button type="button" onClick={()=>changePlace(-1)} aria-label="Previous weather location" title="Previous location">‹</button><button type="button" onClick={()=>changePlace(1)} aria-label="Next weather location" title="Next location">›</button><button type="button" className="live-weather-expand" onClick={()=>setForecastExpanded(value=>!value)} aria-expanded={forecastExpanded}>{forecastExpanded?"Less":"Forecast"}</button></div>
   </div>
-  <div className="live-weather-current">
-   <div className="live-weather-current-main"><span className="live-weather-icon" aria-hidden="true">{icon(current?.weatherCondition?.type)}</span><div><strong>{Number.isFinite(temp)?fmt(temp,"°C"):(loading?"Loading…":"—")}</strong><small>{placeWeather?condition:(error||"Connecting to Google Weather…")} · feels like {fmt(feels,"°C")}</small></div></div>
-   <div className="live-weather-metrics"><span>💧 Humidity <b>{fmt(current?.relativeHumidity,"%")}</b></span><span>💨 Wind <b>{fmt(current?.wind?.speed?.value," km/h")}</b></span><span>🌧️ Rain chance <b>{fmt(rain,"%")}</b></span></div>
-  </div>
-  <div className="live-weather-days">{daily.slice(0,3).map((day,index)=>{const forecast=day.daytimeForecast||day.nighttimeForecast||{},high=day.maxTemperature?.degrees,low=day.minTemperature?.degrees,type=forecast.weatherCondition?.type,text=forecast.weatherCondition?.description?.text||"Forecast unavailable",p=forecast.precipitation?.probability?.percent??day.precipitation?.probability?.percent;const date=day.interval?.startTime||day.interval?.startDate;return <div className="live-weather-day" key={date||index}><strong>{index===0?"Today":new Intl.DateTimeFormat("en-GB",{weekday:"short",day:"2-digit",month:"short",timeZone:"Africa/Dar_es_Salaam"}).format(new Date(date||Date.now()))}</strong><span className="live-weather-day-icon" aria-label={text} title={text}>{icon(type)}</span><b>{fmt(high,"°")} / {fmt(low,"°")}</b><small>Rain {fmt(p,"%")}</small></div>})}</div>
-  <div className="live-weather-attribution"><span>TANZANIA WEATHER · LIVE FORECAST</span><small>{lastUpdated?"Updated "+new Intl.DateTimeFormat("en-GB",{dateStyle:"medium",timeStyle:"short",timeZone:"Africa/Dar_es_Salaam"}).format(new Date(lastUpdated))+" · refreshes every 15 minutes · location rolls every 8 seconds":error||"Fetching live Google Weather forecasts for 12 locations…"}</small></div>
+  {forecastExpanded&&<>
+   <div className="live-weather-current">
+    <div className="live-weather-current-main"><span className="live-weather-icon" aria-hidden="true">{icon(current?.weatherCondition?.type)}</span><div><strong>{Number.isFinite(temp)?fmt(temp,"°C"):(loading?"Loading…":"—")}</strong><small>{placeWeather?condition:(error||"Connecting to live weather…")} · feels like {fmt(feels,"°C")}</small></div></div>
+    <div className="live-weather-metrics"><span>💧 Humidity <b>{fmt(current?.relativeHumidity,"%")}</b></span><span>💨 Wind <b>{fmt(current?.wind?.speed?.value," km/h")}</b></span><span>🌧️ Rain chance <b>{fmt(rain,"%")}</b></span></div>
+   </div>
+   <div className="live-weather-days">{daily.slice(0,3).map((day,index)=>{const forecast=day.daytimeForecast||day.nighttimeForecast||{},high=day.maxTemperature?.degrees,low=day.minTemperature?.degrees,type=forecast.weatherCondition?.type,text=forecast.weatherCondition?.description?.text||"Forecast unavailable",p=forecast.precipitation?.probability?.percent??day.precipitation?.probability?.percent;const date=day.interval?.startTime||day.interval?.startDate;return <div className="live-weather-day" key={date||index}><strong>{index===0?"Today":new Intl.DateTimeFormat("en-GB",{weekday:"short",day:"2-digit",month:"short",timeZone:"Africa/Dar_es_Salaam"}).format(new Date(date||Date.now()))}</strong><span className="live-weather-day-icon" aria-label={text} title={text}>{icon(type)}</span><b>{fmt(high,"°")} / {fmt(low,"°")}</b><small>Rain {fmt(p,"%")}</small></div>})}</div>
+   <div className="live-weather-attribution"><span>LIVE FORECAST</span><small>{lastUpdated?"Updated "+new Intl.DateTimeFormat("en-GB",{dateStyle:"medium",timeStyle:"short",timeZone:"Africa/Dar_es_Salaam"}).format(new Date(lastUpdated))+" · refreshes every 15 minutes · location rolls every 8 seconds":error||"Fetching live forecasts for 12 locations…"}</small></div>
+  </>}
  </div>;
 }
 const IRPA_SESSION_RECOVERY_KEY="irpaSessionRecovery";const IRPA_INACTIVITY_LIMIT_MS=5*60*1000;const IRPA_RECOVERY_MAX_AGE_MS=24*60*60*1000;function readIrpaRecovery(){try{const raw=window.localStorage.getItem(IRPA_SESSION_RECOVERY_KEY);if(!raw)return null;const value=JSON.parse(raw);if(!value||Date.now()-Number(value.savedAt||0)>IRPA_RECOVERY_MAX_AGE_MS){window.localStorage.removeItem(IRPA_SESSION_RECOVERY_KEY);return null}return value}catch{return null}}function writeIrpaRecovery(snapshot){try{window.localStorage.setItem(IRPA_SESSION_RECOVERY_KEY,JSON.stringify({...snapshot,savedAt:Date.now()}))}catch{}}
