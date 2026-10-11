@@ -650,6 +650,30 @@ test("web search RSS parser extracts grant announcements and rejects unsafe link
   assert.equal(items[0].sourceUrl, "https://donor.example/");
 });
 
+test("official-page scanner prioritizes current source registry over stale JSON override", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async input => {
+    const url = String(input);
+    calls.push(url);
+    if (url === "https://current.example/grants") {
+      return new Response('<html><head><title>Call for Proposals: Rangeland Restoration Grant</title><meta name="description" content="Funding opportunity for pastoral communities in Tanzania. Applications close 30 December 2026."></head><body>Apply for the grant.</body></html>', { status: 200, headers: { "content-type": "text/html" } });
+    }
+    throw new Error("Unexpected stale source URL " + url);
+  };
+  try {
+    const result = await readOfficialPages({
+      GRANT_SOURCE_PAGE_URLS: '["https://current.example/grants"]',
+      GRANT_SOURCE_PAGE_URLS_JSON: '["https://stale.example/404"]'
+    });
+    assert.deepEqual(calls, ["https://current.example/grants"]);
+    assert.equal(result.stats.status, "success");
+    assert.equal(result.items.length, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("official-page scanner skips stale 404 detail links without marking the engine failed", async () => {
   const originalFetch = globalThis.fetch;
   const calls = [];
