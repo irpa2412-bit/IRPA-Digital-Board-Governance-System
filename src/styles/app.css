@@ -8337,10 +8337,7 @@ html body #root .main-area > .topbar .topbar-heading-row > .topbar-access-catego
   gap: 10px;
   padding: 6px 0 8px;
   box-sizing: border-box;}
-.main-area > header.topbar.dashboard-topbar .google-weather-panel .live-weather-days > * {
-  flex: 0 0 auto;
-  min-width: 92px;
-}
+.main-area > header.topbar.dashboard-topbar .google-weather-panel .live-weather-days > * {}
 .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .topbar-access-category {
   grid-area: authority;
   align-self: stretch;
@@ -8447,14 +8444,10 @@ html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-ro
   scroll-snap-align: start; box-sizing: border-box;}
 html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-day > * { white-space: normal; overflow-wrap: anywhere; }
 html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-day small { display: block; }html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-attribution{margin-top: 0;}
-@media (min-width: 1201px) {html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-days{ overflow-x: visible;}html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-day{}
-}
-@media (max-width: 1200px) and (min-width: 901px) {
-  html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row { grid-template-columns: minmax(200px, .8fr) minmax(360px, 1.5fr) minmax(250px, 1fr); }
-}
+
+
 @media (max-width: 900px) {
   html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row {
-    grid-template-columns: minmax(0, 1fr); grid-template-areas: "title" "weather" "authority";
     gap: 12px; min-height: 0; width: 100%; max-width: 100%;
   }html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel{; min-height: 220px; height: auto; overflow: visible;}html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-days{; overflow-x: auto; overscroll-behavior-x: contain;}html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-day{}
   html, body, #root { max-width: 100%; overflow-x: clip; }
