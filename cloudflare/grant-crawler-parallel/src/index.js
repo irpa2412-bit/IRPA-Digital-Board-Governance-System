@@ -320,7 +320,7 @@ async function crawl(env) {
       const items = Array.isArray(result) ? result : (result.items || []);
       const detailed = Array.isArray(result) ? null : result.stats;
       const errors = detailed?.errors || [];
-      const engineStatus = detailed?.configured === false || (errors.length > 0 && items.length === 0) ? "failed" : errors.length > 0 ? "partial" : "success";
+      const engineStatus = detailed?.status || (detailed?.configured === false || (errors.length > 0 && items.length === 0) ? "failed" : errors.length > 0 ? "partial" : "success");
       return {
         name: engine.name,
         items,
@@ -335,7 +335,7 @@ async function crawl(env) {
           fallbackProvider: detailed?.fallbackProvider ?? null,
           found: items.length,
           errors,
-          error: errors.length ? errors.length + " source/search errors: " + String(errors[0].error || errors[0]).slice(0, 180) : (detailed?.message || null)
+          error: errors.length ? errors.length + " source/search errors: " + String(errors[0].error || errors[0]).slice(0, 180) : (detailed?.warnings?.length ? detailed.warnings.length + " non-404 detail-page warnings: " + String(detailed.warnings[0].error || detailed.warnings[0]).slice(0, 180) : (detailed?.notFoundLinksSkipped ? detailed.notFoundLinksSkipped + " stale 404 detail links skipped" : (detailed?.message || null)))
         }
       };
     } catch (error) {
