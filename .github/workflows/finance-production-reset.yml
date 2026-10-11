@@ -1,0 +1,30 @@
+name: Approved Finance Production Data Reset
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/reset-finance-production.js"
+      - ".github/workflows/finance-production-reset.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reset-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Firebase Admin SDK
+        run: npm --prefix functions install --omit=dev
+      - name: Execute approved reset and verify zero operational entries
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+          NODE_PATH: ${{ github.workspace }}/functions/node_modules
+        run: node scripts/reset-finance-production.js
