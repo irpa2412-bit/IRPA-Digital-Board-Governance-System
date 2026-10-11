@@ -631,6 +631,10 @@ test("donor scanner returns opportunities in the shared candidate shape", async 
   try {
     const result = await readDonorScanner({ name: "test_donor", label: "Test Donor", url: "https://example.org/grants" });
     assert.equal(result.stats.configured, 1);
+    assert.equal(result.stats.pagesScanned, 1);
+    assert.equal(result.stats.httpStatus, 200);
+    assert.equal(result.stats.found, result.items.length);
+    assert.equal(result.stats.errors.length, 0);
     assert.ok(result.items.length >= 1);
     assert.equal(result.items[0].discoveryEngine, "test_donor");
     assert.equal(result.items[0].sourceUrl, "https://example.org/grants");
