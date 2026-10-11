@@ -13,6 +13,8 @@ const DATA_TYPES=[
 ];
 const ENVIRONMENTS=[["TRIAL","Trial data — testing and demonstrations"],["ACTUAL","Actual data — official institutional records"]];
 const ACTUAL_ONLY_TYPES=new Set(["personnel","signatures","system"]);
+const ACTUAL_ONLY_PORTAL_HINT=/member|personnel|employee|signature|signer|auditor|security|system settings|administrator|authorization|approval/i;
+const portalRequiresActual=portal=>ACTUAL_ONLY_PORTAL_HINT.test(String(portal||""));
 const IGNORE_HINT=/search|filter|find|weather|forecast|navigation|time format|quick access|global menu/i;
 const isEntryControl=el=>{
   if(!(el instanceof HTMLElement)||el.closest("[data-irpa-field-gate]"))return false;
@@ -34,7 +36,7 @@ const describeField=el=>{
 };
 const describePortal=()=>{
   const active=document.querySelector(".nav-item.active,[aria-current='page']");
-  return String(active?.innerText||"Current portal").trim().replace(/\\s+/g," ").slice(0,100);
+  return String(active?.innerText||"Current portal").trim().replace(/\s+/g," ").slice(0,100);
 };
 export default function FieldEntryDataGate(){
   const[field,setField]=useState(null);
@@ -53,7 +55,7 @@ export default function FieldEntryDataGate(){
       setEnvironment("");
       setConfirmed(false);
       setStorageError("");
-      setField({element:el,label:describeField(el),portal:describePortal()});
+      setField({element:el,label:describeField(el),portal});
       return true;
     };
     const onPointerDown=e=>{
@@ -82,7 +84,7 @@ export default function FieldEntryDataGate(){
       document.removeEventListener("keydown",onKeyDown,true);
     };
   },[]);
-  const actualOnly=ACTUAL_ONLY_TYPES.has(dataType);
+  const actualOnly=ACTUAL_ONLY_TYPES.has(dataType)||portalRequiresActual(field?.portal);
   const proceed=()=>{
     const el=pending.current;
     if(!el||!dataType||!environment||(environment==="ACTUAL"&&!confirmed))return;
@@ -91,7 +93,7 @@ export default function FieldEntryDataGate(){
     const verifiedAt=new Date().toISOString();
     const record={dataType,environment:selectedEnvironment,portal:field?.portal||"Current portal",field:field?.label||"Data field",verifiedAt};
     try{
-      window.sessionStorage.setItem("irpaFieldEntryVerification",JSON.stringify(record));
+      const existing=JSON.parse(window.sessionStorage.getItem("irpaPortalDataEntryVerifications")||"{}");\n      window.sessionStorage.setItem("irpaPortalDataEntryVerifications",JSON.stringify({...existing,[record.portal]:record}));\n      window.sessionStorage.setItem("irpaFieldEntryVerification",JSON.stringify(record));
       window.sessionStorage.setItem("irpaDataTypeVerified",dataType);
       window.sessionStorage.setItem("irpaDataEnvironment",selectedEnvironment);
       window.sessionStorage.setItem("irpaDataEnvironmentTarget",record.portal);
@@ -111,7 +113,7 @@ export default function FieldEntryDataGate(){
     <section style={{width:"min(100%,680px)",maxHeight:"92vh",overflowY:"auto",background:"var(--surface, #fff)",color:"var(--text, #14231f)",border:"1px solid var(--border, #cbd5d1)",borderRadius:18,padding:24,boxShadow:"0 24px 80px rgba(0,0,0,.35)"}}>
       <div style={{fontSize:12,fontWeight:800,letterSpacing:1.4,textTransform:"uppercase",opacity:.75}}>IRPA · Data Control</div>
       <h2 id="irpa-field-gate-title" style={{margin:"8px 0 6px",fontSize:25}}>Verify before entering data</h2>
-      <p style={{margin:"0 0 16px",lineHeight:1.5}}>Entry is paused at the first attempted edit. Classify the record and verify its environment before the field accepts changes.</p>
+      <p style={{margin:"0 0 16px",lineHeight:1.5}}>Entry is paused only for the first attempted edit in this portal or sub-portal. Once you confirm, the verification authorises data entry throughout this portal for the current session; other portals are verified separately.</p>
       <div style={{padding:12,borderRadius:10,background:"var(--surface-muted, #f1f5f3)",marginBottom:18}}>
         <div><strong>Portal:</strong> {field.portal}</div>
         <div style={{marginTop:4,overflowWrap:"anywhere"}}><strong>Entry field:</strong> {field.label}</div>
@@ -120,7 +122,7 @@ export default function FieldEntryDataGate(){
         <legend style={{fontWeight:750,marginBottom:10}}>1. What type of data are you entering? (Required)</legend>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:8}}>
           {DATA_TYPES.map(([value,label])=><label key={value} style={{display:"flex",alignItems:"flex-start",gap:9,padding:11,border:"1px solid var(--border, #cbd5d1)",borderRadius:9,cursor:"pointer"}}>
-            <input type="radio" name="irpa-data-type" value={value} checked={dataType===value} onChange={()=>{setDataType(value);if(ACTUAL_ONLY_TYPES.has(value)){setEnvironment("ACTUAL");setConfirmed(false)}else if(environment==="ACTUAL"){setConfirmed(false)}}} style={{marginTop:3}}/>
+            <input type="radio" name="irpa-data-type" value={value} checked={dataType===value} onChange={()=>{setDataType(value);if(ACTUAL_ONLY_TYPES.has(value)||portalRequiresActual(field?.portal)){setEnvironment("ACTUAL");setConfirmed(false)}else if(environment==="ACTUAL"){setConfirmed(false)}}} style={{marginTop:3}}/>
             <span>{label}</span>
           </label>)}
         </div>
@@ -132,10 +134,10 @@ export default function FieldEntryDataGate(){
           <span>{label}{actualOnly&&value==="TRIAL"?" — unavailable for protected identity/security records":""}</span>
         </label>)}
       </fieldset>
-      {actualOnly&&<p style={{padding:12,borderRadius:9,background:"var(--surface-muted, #f1f5f3)",lineHeight:1.45}}>Identity, personnel, signer/signature, auditor and system-security records must remain in ACTUAL DATA.</p>}
+      {actualOnly&&<p style={{padding:12,borderRadius:9,background:"var(--surface-muted, #f1f5f3)",lineHeight:1.45}}>This portal contains or is reserved for protected identity, personnel, signer/signature, auditor, authorization or system-security records. It must remain in ACTUAL DATA.</p>}
       {environment==="ACTUAL"&&<label style={{display:"flex",alignItems:"flex-start",gap:10,padding:12,border:"1px solid #b7791f",borderRadius:9,marginBottom:16}}>
         <input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)} style={{marginTop:3}}/>
-        <span>I confirm this is an authorised entry into official IRPA records and understand that it may affect live institutional data.</span>
+        <span>I confirm this portal’s data-entry environment for this session. This selection authorises data entry throughout this portal/sub-portal. If ACTUAL DATA is selected, I understand changes may affect live institutional records.</span>
       </label>}
       {environment==="TRIAL"&&<p style={{padding:12,borderRadius:9,background:"var(--surface-muted, #f1f5f3)",lineHeight:1.45}}>Use test records only. Do not enter confidential live information into trial records. Identity and security configuration remain in ACTUAL DATA.</p>}
       {storageError&&<p role="alert" style={{padding:12,borderRadius:9,background:"#fff1f0",color:"#9b1c1c"}}>{storageError}</p>}
