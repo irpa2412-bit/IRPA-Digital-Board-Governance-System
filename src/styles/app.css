@@ -9368,6 +9368,10 @@ html body #root .main-area > .topbar.dashboard-topbar .topbar-heading-row > .top
   -webkit-text-fill-color: #e7f4ee;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
 }
+html body #root .main-area > .topbar.dashboard-topbar .topbar-heading-row > .topbar-access-category.topbar-access-category.topbar-access-category > span {
+  color: #f7cf61;
+  -webkit-text-fill-color: #f7cf61;
+}
 html body #root .main-area > .topbar.dashboard-topbar .topbar-heading-row > .topbar-access-category.topbar-access-category.topbar-access-category .login-category-heading,
 html body #root .main-area > .topbar.dashboard-topbar .topbar-heading-row > .topbar-access-category.topbar-access-category.topbar-access-category [aria-label="Login category"] > span,
 html body #root .main-area > .topbar.dashboard-topbar .topbar-heading-row > .topbar-access-category.topbar-access-category.topbar-access-category .login-category-identifiers small,
@@ -9386,6 +9390,10 @@ html body #root .main-area > .topbar.dashboard-topbar .topbar-heading-row > .top
   border-color: currentColor;
 }
 html body #root .main-area > .topbar.dashboard-topbar .topbar-heading-row > .topbar-access-category.topbar-access-category.topbar-access-category .login-category-explanation {
+  color: #d8e6f1;
+  -webkit-text-fill-color: #d8e6f1;
+}
+html body #root .main-area > .topbar.dashboard-topbar .topbar-heading-row > .topbar-access-category.topbar-access-category.topbar-access-category .login-category-note {
   color: #d8e6f1;
   -webkit-text-fill-color: #d8e6f1;
 }
