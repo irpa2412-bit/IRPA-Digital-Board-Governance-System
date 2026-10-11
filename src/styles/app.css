@@ -8049,3 +8049,60 @@
     margin-left: 0;
   }
 }
+
+
+/* 2026-10-11 workspace polish: let forecast text breathe, use blue typography,
+   and make Back/Next buttons identical at every breakpoint. */
+@media (min-width: 1101px) {
+  .main-area > .topbar .topbar-heading-row {
+    grid-template-columns: minmax(160px, .58fr) minmax(360px, 1.12fr) minmax(380px, 1.18fr);
+    gap: 10px;
+  }
+  .main-area > .topbar .topbar-heading-row > .google-weather-panel {
+    width: 100%;
+    min-width: 380px;
+    max-width: none;
+    justify-self: stretch;
+  }
+}
+.main-area > .topbar .topbar-heading-row > .google-weather-panel,
+.main-area > .topbar .topbar-heading-row > .google-weather-panel :is(h1,h2,h3,h4,p,span,strong,b,small,label,div,li,dt,dd) {
+  color: #2563eb;
+}
+.main-area > .topbar .topbar-heading-row > .google-weather-panel :is(button, a) {
+  color: #2563eb;
+}
+.main-area > .page-back-next-navigation {
+  grid-template-columns: 112px minmax(100px, 1fr) 112px;
+  align-items: center;
+}
+.main-area > .page-back-next-navigation .page-back-next-button {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 112px;
+  min-width: 112px;
+  max-width: 112px;
+  height: 38px;
+  min-height: 38px;
+  max-height: 38px;
+  padding: 8px 12px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+@media (max-width: 760px) {
+  .main-area > .page-back-next-navigation {
+    grid-template-columns: 112px minmax(0, 1fr) 112px;
+    gap: 6px;
+  }
+  .main-area > .page-back-next-navigation .page-back-next-button {
+    width: 112px;
+    min-width: 112px;
+    max-width: 112px;
+    height: 38px;
+    min-height: 38px;
+    max-height: 38px;
+    padding: 8px 10px;
+  }
+}
