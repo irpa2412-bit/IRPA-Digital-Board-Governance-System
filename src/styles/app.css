@@ -9783,3 +9783,24 @@ html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-headin
     margin-bottom: 0;
   }
 }
+
+/* 2026-10-11 dashboard weather expansion: use the marked gap for the forecast pad.
+   Keep the title and access-authority panels distinct; no weather colour/data changes. */
+@media (min-width: 1200px) {
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row {
+    grid-template-columns: minmax(200px, 260px) minmax(0, 1fr) 6cm;
+    grid-template-areas: "title weather authority";
+    column-gap: 0;
+    row-gap: 0;
+    width: 100%;
+    min-width: 0;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    justify-self: stretch;
+    margin-left: 0;
+    box-sizing: border-box;
+  }
+}
