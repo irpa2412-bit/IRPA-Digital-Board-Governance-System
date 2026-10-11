@@ -9756,3 +9756,18 @@ html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-headin
     min-width: 0;
   }
 }
+
+/* IRPA dashboard: remove excess lower whitespace from the left title panel.
+   Keep the three overhead sections and all portal behavior unchanged. */
+@media (min-width: 1200px) {
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .topbar-title-block {
+    align-self: start;
+    height: fit-content;
+    min-height: 0;
+    padding-bottom: 0;
+    margin-bottom: 0;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .topbar-title-block > p {
+    margin-bottom: 0;
+  }
+}
