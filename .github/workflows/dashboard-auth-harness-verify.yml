@@ -5,6 +5,7 @@ on:
     paths:
       - ".github/scripts/verify-dashboard-auth-harness.cjs"
       - ".github/workflows/dashboard-auth-harness-verify.yml"
+      - "src/styles/app.css"
 permissions:
   contents: read
 jobs:
