@@ -253,10 +253,11 @@ export const SPECIALIZED_ENGINE_LABELS = CHANNEL_LABELS;
 
 
 export async function readWebSearch(env) {
-  const results = await Promise.all([readGoogleNewsSearch(), readBingSearch()]);
-  const items = results.flatMap(result => result.items);
-  const errors = results.flatMap(result => result.stats.errors || []);
-  return { items, stats: { configured: true, provider: "Google News RSS + Bing RSS", queries: results.reduce((sum, result) => sum + Number(result.stats.queries || 0), 0), found: items.length, errors } };
+  const google = await readGoogleNewsSearch();
+  if (google.items.length > 0 || google.stats.errors.length === 0 && google.stats.found > 0) return google;
+  const bing = await readBingSearch();
+  if (bing.items.length || bing.stats.errors.length === 0) return bing;
+  return { items: [], stats: { configured: true, provider: "Google News RSS / Bing RSS", queries: SEARCH_QUERIES.length, found: 0, errors: [...google.stats.errors, ...bing.stats.errors] } };
 }
 
 async function fetchText(url) {
