@@ -1,0 +1,78 @@
+name: Isolated Dashboard Auth-Harness Verification
+on:
+  push:
+    branches: [verify/dashboard-auth-harness-20261011]
+    paths:
+      - ".github/scripts/verify-dashboard-auth-harness.cjs"
+      - ".github/workflows/dashboard-auth-harness-verify.yml"
+permissions:
+  contents: read
+jobs:
+  browser-verification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm install --no-save playwright
+      - run: npx playwright install --with-deps chromium
+      - name: Prepare isolated test-only authenticated render
+        shell: bash
+        run: |
+          mkdir -p hero-layout-evidence
+          cp src/App.jsx /tmp/irpa-App.jsx.original
+          printf '\nexport { Shell as HeroTestShell };\n' >> src/App.jsx
+          cat > hero-test.html <<'HTML'
+          <!doctype html>
+          <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>IRPA Isolated Visual Test</title></head><body><div id="root"></div><script type="module" src="/src/hero-test.jsx"></script></body></html>
+          HTML
+          cat > src/hero-test.jsx <<'JSX'
+          import React from "react";
+          import { createRoot } from "react-dom/client";
+          import { HeroTestShell } from "./App.jsx";
+          import "./styles/readability-harmony.css";
+          import "./styles/finance-readability.css";
+          import "./styles/app.css";
+          import "./styles/mobile-viewport-containment.css";
+          import "./styles/tokens.css";
+          const uid = "irpa-layout-only-test-uid";
+          const user = { uid, email: "irpa.visual.test@example.invalid", displayName: "IRPA Visual Test" };
+          const profile = { uid, email: user.email, name: "IRPA Visual Test", role: "Board Member", roles: ["Board Member"], status: "Active", registrationStatus: "Active", authorizationType: "member", authorities: [{ id: "IRPA-AUTH-BOARD-MEMBER-TEST", authorityId: "IRPA-AUTH-BOARD-MEMBER-TEST", role: "Board Member", active: true, pathway: "Isolated visual test only" }] };
+          try {
+            sessionStorage.setItem("irpaActiveAccessAuthority", "Board Member");
+            localStorage.setItem("irpaSessionRecovery", JSON.stringify({ uid, email: user.email, active: "Dashboard", authority: "Board Member", reason: "isolated visual verification", savedAt: Date.now() }));
+          } catch {}
+          createRoot(document.getElementById("root")).render(React.createElement(HeroTestShell, { user, profile, admin: false, employee: null, inductionComplete: true, onInductionComplete: () => {}, buttonFeedback: "", setButtonFeedback: () => {} }));
+          JSX
+      - name: Start isolated Vite test page
+        shell: bash
+        run: |
+          npm run dev -- --host 127.0.0.1 --port 4173 > /tmp/irpa-hero-vite.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:4173/hero-test.html >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/irpa-hero-vite.log
+          exit 1
+      - name: Run production and isolated dashboard browser verification
+        env:
+          TARGET_URL: https://irpa-digital-board-governance.web.app
+          LOCAL_TEST_URL: http://127.0.0.1:4173/hero-test.html
+        run: node .github/scripts/verify-dashboard-auth-harness.cjs | tee hero-layout-evidence/run.log
+      - name: Restore app source in runner workspace
+        if: always()
+        shell: bash
+        run: |
+          if [ -f /tmp/irpa-App.jsx.original ]; then cp /tmp/irpa-App.jsx.original src/App.jsx; fi
+          rm -f src/hero-test.jsx hero-test.html
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: irpa-dashboard-auth-harness-evidence
+          path: hero-layout-evidence/
+          if-no-files-found: warn
+          retention-days: 7
