@@ -9408,7 +9408,7 @@ html body #root .main-area > .topbar.dashboard-topbar .topbar-heading-row > .top
 @media (min-width: 901px) {
   html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row {
     display: grid;
-    grid-template-columns: minmax(200px, 260px) minmax(0, 1fr) 6cm;
+    grid-template-columns: minmax(200px, 220px) minmax(0, 1fr) 6cm;
     grid-template-areas: "title weather authority";
     grid-template-rows: auto;
     column-gap: 0;
@@ -9855,5 +9855,22 @@ html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-headin
   html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-attribution {
     grid-column: 1 / -1;
     grid-row: 4;
+  }
+}
+
+
+/* 2026-10-11 dashboard weather pad: consume the marked title-to-weather gap. */
+@media (min-width: 1200px) {
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row {
+    column-gap: 0 !important;
+    grid-template-columns: minmax(200px, 220px) minmax(0, 1fr) 6cm !important;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel {
+    margin-left: -24px !important;
+    width: calc(100% + 24px) !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    justify-self: stretch !important;
+    box-sizing: border-box !important;
   }
 }
