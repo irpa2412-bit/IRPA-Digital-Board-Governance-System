@@ -9084,3 +9084,18 @@ html body #root .main-area > header.topbar:has(> .topbar-heading-row > .google-w
     display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px;
   }
 }
+
+/* Dashboard hero grid: widen only the weather track while retaining the
+   existing Access Categories track definition and its card sizing. */
+@media (min-width: 1101px) {
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row {
+    grid-template-columns: minmax(140px, 0.4fr) minmax(0, 3fr) minmax(260px, 0.9fr);
+    grid-template-areas: "title weather authority";
+  }
+}
+@media (min-width: 901px) and (max-width: 1100px) {
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row {
+    grid-template-columns: minmax(120px, 0.4fr) minmax(0, 2.5fr) minmax(260px, 0.9fr);
+    grid-template-areas: "title weather authority";
+  }
+}
