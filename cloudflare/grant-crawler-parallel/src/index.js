@@ -1,5 +1,5 @@
 import { analyzeGrant } from "./assistant.js";
-import { DONOR_SCANNERS, readDonorScanner, readOfficialPages, readWebSearch, normalizeOpportunityUrl } from "./discovery-engines.js";
+import { DONOR_SCANNERS, SEARCH_QUERIES, readDonorScanner, readOfficialPages, readWebSearch, normalizeOpportunityUrl } from "./discovery-engines.js";
 import { handleApplicationPortal } from "./application-portal-handler.js";
 
 
@@ -84,7 +84,25 @@ async function listOpportunities(env) {
     ).all();
   } catch {}
   const currentItems = (rows.results || []).filter(item => isCurrentOpportunity(item));
-  return { service: "irpa-grant-crawler", feedsConfigured: JSON.parse(env.GRANT_FEED_URLS_JSON || env.GRANT_FEED_URLS || "[]").length, sourcePagesConfigured: JSON.parse(env.GRANT_SOURCE_PAGE_URLS_JSON || env.GRANT_SOURCE_PAGE_URLS || "[]").length, webSearchConfigured: true, items: currentItems, count: currentItems.length, suppressedExpiredOrUnverified: (rows.results || []).length - currentItems.length, lastRun: run || null, engineRuns: engineRuns.results || [] };
+  const configuredList = value => { try { const parsed = JSON.parse(value || "[]"); return Array.isArray(parsed) ? [...new Set(parsed.map(String))] : []; } catch { return []; } };
+  const feedUrls = configuredList(env.GRANT_FEED_URLS_JSON || env.GRANT_FEED_URLS);
+  const pageUrls = configuredList(env.GRANT_SOURCE_PAGE_URLS_JSON || env.GRANT_SOURCE_PAGE_URLS);
+  const engineProvision = [
+    { engine: "rss_atom", label: "RSS / Atom Feed Crawler", description: "Fetches public RSS and Atom feeds in parallel, extracts call metadata, then sends candidates through the shared deduplication, IRPA fit, deadline, geography and eligibility pipeline.", sources: feedUrls, configured: feedUrls.length },
+    { engine: "official_pages", label: "Official Funding Page Scanner", description: "Reads configured official donor pages, follows grant-related links on the same host, extracts public call details, and records HTTP failures without bypassing access controls.", sources: pageUrls, configured: pageUrls.length },
+    { engine: "web_search", label: "Web Search Discovery", description: "Runs targeted funding searches in parallel using Google News RSS, falls back to Bing RSS when needed, and can use Brave Search API when its secret is configured. Results retain publisher/source provenance and original opportunity URLs.", sources: ["Google News RSS", "Bing RSS fallback", "Brave Search API (optional)"], queries: SEARCH_QUERIES, configured: 1 },
+    { engine: "ai_eligibility", label: "AI Eligibility & Concept-Note Assistant", description: "Uses Cloudflare Workers AI for donor-requirement extraction, evidence-based eligibility analysis, compliance matrices and concept-note drafting. Deterministic deadline and known-applicant eligibility checks run first; AI output cannot override hard exclusions or invent IRPA track record. Inference availability depends on the Cloudflare AI account quota.", sources: ["POST /assistant/analyze", "Cloudflare Workers AI binding"], configured: 1, provisionStatus: "configured" },
+    ...DONOR_SCANNERS.map(scanner => ({
+      engine: scanner.name,
+      label: scanner.label,
+      description: /fundsforngos|africanngos|ngo_portal_africa/.test(scanner.name)
+        ? "Funding aggregator scanner: searches public listings and article pages, attempts to extract the original issuer/application URL, and does not use an aggregator article as the final apply target when an issuer link is found."
+        : "Dedicated donor scanner: checks the public funding page, extracts relevant calls, and records source HTTP failures. When the source blocks automated access, it tries a public search fallback and preserves the primary failure in telemetry.",
+      sources: [scanner.url],
+      configured: 1
+    }))
+  ];
+  return { service: "irpa-grant-crawler", feedsConfigured: feedUrls.length, sourcePagesConfigured: pageUrls.length, webSearchConfigured: true, items: currentItems, count: currentItems.length, suppressedExpiredOrUnverified: (rows.results || []).length - currentItems.length, lastRun: run || null, engineRuns: engineRuns.results || [], engineProvision };
 }
 
 const MAX_FEED_BYTES = 1_000_000;
