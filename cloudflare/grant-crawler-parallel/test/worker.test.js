@@ -650,6 +650,46 @@ test("web search RSS parser extracts grant announcements and rejects unsafe link
   assert.equal(items[0].sourceUrl, "https://donor.example/");
 });
 
+test("official-page scanner skips stale 404 detail links without marking the engine failed", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async input => {
+    const url = String(input);
+    calls.push(url);
+    if (url === "https://example.org/funding") {
+      return new Response('<html><head><title>Programme Information</title><meta name="description" content="Information about our community work."></head><body><a href="/grant-guidelines">Grant guidelines</a></body></html>', { status: 200, headers: { "content-type": "text/html" } });
+    }
+    if (url === "https://example.org/grant-guidelines") {
+      return new Response("Not found", { status: 404, headers: { "content-type": "text/plain" } });
+    }
+    throw new Error("Unexpected URL " + url);
+  };
+  try {
+    const result = await readOfficialPages({ GRANT_SOURCE_PAGE_URLS: '["https://example.org/funding"]' });
+    assert.equal(result.stats.status, "success");
+    assert.equal(result.stats.pagesFetched, 1);
+    assert.equal(result.stats.notFoundLinksSkipped, 1);
+    assert.equal(result.stats.errors.length, 0);
+    assert.equal(result.items.length, 0);
+    assert.match(result.stats.message, /Scan completed/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("official-page scanner reports failed only when every configured source fails", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response("Not found", { status: 404, headers: { "content-type": "text/plain" } });
+  try {
+    const result = await readOfficialPages({ GRANT_SOURCE_PAGE_URLS: '["https://example.org/missing"]' });
+    assert.equal(result.stats.status, "failed");
+    assert.equal(result.stats.pagesFetched, 0);
+    assert.equal(result.stats.errors.length, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("parallel webpage scanner and no-key web search use the configured public search fallback", async () => {
   const pages = await readOfficialPages({ GRANT_SOURCE_PAGE_URLS: "[]" });
   const originalFetch = globalThis.fetch;
