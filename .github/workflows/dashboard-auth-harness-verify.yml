@@ -63,7 +63,8 @@ jobs:
         env:
           TARGET_URL: https://irpa-digital-board-governance.web.app
           LOCAL_TEST_URL: http://127.0.0.1:4173/hero-test.html
-        run: node .github/scripts/verify-dashboard-auth-harness.cjs | tee hero-layout-evidence/run.log
+        shell: bash
+        run: set -o pipefail; node .github/scripts/verify-dashboard-auth-harness.cjs | tee hero-layout-evidence/run.log
       - name: Restore app source in runner workspace
         if: always()
         shell: bash
