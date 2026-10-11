@@ -6766,7 +6766,7 @@
   border: 1px solid #8fc2fa;
 }
 .main-area>.topbar .google-weather-panel * {
-  background-color: transparent;
+  background: transparent;
   background-image: none;
 }
 .main-area>.topbar .google-weather-panel .live-weather-location-bar,
