@@ -8997,16 +8997,9 @@ html body #root .main-area > .topbar .topbar-heading-row > .topbar-access-catego
     height: auto; min-height: 0; max-height: none; overflow: visible;
     align-items: start;
   }
-  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row {
-    grid-template-columns: minmax(140px, 0.4fr) minmax(0, 3fr) 6cm;
-    grid-template-areas: "title weather authority";
-    grid-template-rows: auto;
-    height: auto; min-height: 0; max-height: none; overflow: visible;
-    align-items: start;
-  }
 }
 @media (min-width: 901px) and (max-width: 1100px) {
-  html body #root .main-area > header.topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row {
+  html body #root .main-area > header.topbar:not(.dashboard-topbar):has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row {
     grid-template-columns: minmax(120px, 0.4fr) minmax(0, 2.5fr) 4cm;
     grid-template-areas: "title weather authority";
     grid-template-rows: auto;
@@ -9060,10 +9053,12 @@ html body #root .main-area > header.topbar:has(> .topbar-heading-row > .google-w
 html body #root .main-area > header.topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-day > * {
   max-width: 100%; white-space: normal; overflow: visible; overflow-wrap: anywhere;
 }
-html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .topbar-access-category {
-  align-self: start;
-  height: 250px; min-height: 250px; max-height: 250px;
-  overflow: auto; box-sizing: border-box;
+@media (min-width: 901px) {
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .topbar-access-category {
+    align-self: start;
+    height: 250px; min-height: 250px; max-height: 250px;
+    overflow: auto; box-sizing: border-box;
+  }
 }
 @media (max-width: 900px) {
   html body #root .main-area > header.topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row {
