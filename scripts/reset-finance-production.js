@@ -1,5 +1,5 @@
-const { initializeApp, cert, getApps } = require("firebase-admin/app");
-const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+import { initializeApp, cert, getApps } from "firebase-admin/app";
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
 
 const EXPECTED_PROJECT_ID = "irpa-digital-board-governance";
 const AUDIT_DOC = "financeProductionReset20261011";
