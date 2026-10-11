@@ -616,9 +616,12 @@ test("official webpage parser extracts safe title and description text", () => {
   assert.equal(decodeHtml("Women &amp; youth"), "Women & youth");
 });
 
-test("registers ten independent donor scanners with official HTTPS sources", () => {
-  assert.equal(DONOR_SCANNERS.length, 10);
-  assert.equal(new Set(DONOR_SCANNERS.map(scanner => scanner.name)).size, 10);
+test("registers fourteen independent donor scanners with official HTTPS sources", () => {
+  assert.equal(DONOR_SCANNERS.length, 14);
+  assert.equal(new Set(DONOR_SCANNERS.map(scanner => scanner.name)).size, 14);
+  for (const name of ["fundsforngos_latest", "fundsforngos_africa", "fundsforngos_donors", "fundsforngos_news"]) {
+    assert.ok(DONOR_SCANNERS.some(scanner => scanner.name === name));
+  }
   for (const scanner of DONOR_SCANNERS) {
     assert.equal(new URL(scanner.url).protocol, "https:");
     assert.ok(scanner.label.length > 3);
