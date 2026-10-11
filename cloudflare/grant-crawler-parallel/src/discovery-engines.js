@@ -120,16 +120,16 @@ export async function readOfficialPages(env) {
 }
 
 export const DONOR_SCANNERS = [
-  { name: "japan_embassy", label: "Japan Embassy Grassroots Grants", url: "https://www.tz.emb-japan.go.jp/itpr_en/kusanone.html" },
+  { name: "japan_embassy", label: "Japan Embassy Grassroots Grants", url: "https://www.tz.emb-japan.go.jp/e_bilateral/kusanone_en.htm" },
   { name: "canada_funding", label: "Canada International Funding Calls", url: "https://www.international.gc.ca/world-monde/funding-financement/open_calls-appels_ouverts.aspx?lang=eng" },
   { name: "usadf_grants", label: "U.S. African Development Foundation", url: "https://www.usadf.gov/apply/" },
   { name: "un_tanzania", label: "United Nations Tanzania Calls", url: "https://tanzania.un.org/en" },
-  { name: "undp_tanzania", label: "UNDP Tanzania Opportunities", url: "https://www.undp.org/tanzania/news" },
+  { name: "undp_tanzania", label: "UNDP Tanzania Opportunities", url: "https://www.undp.org/tanzania/news-centre" },
   { name: "gef_small_grants", label: "GEF Small Grants Programme", url: "https://www.thegef.org/what-we-do/topics/gef-small-grants-programme" },
-  { name: "fao_funding", label: "FAO Funding Opportunities", url: "https://www.fao.org/partnerships/funding-opportunities/en" },
+  { name: "fao_funding", label: "FAO Funding Opportunities", url: "https://fao-grants.smapply.io/" },
   { name: "eu_tanzania", label: "EU Delegation Tanzania", url: "https://www.eeas.europa.eu/tanzania_en" },
   { name: "tanzania_forest_fund", label: "Tanzania Forest Fund", url: "https://www.mfukowamisitu.go.tz/download-center" },
-  { name: "world_bank_funding", label: "World Bank Funding Opportunities", url: "https://www.worldbank.org/en/programs/financing" },
+  { name: "world_bank_funding", label: "World Bank Funding Opportunities", url: "https://projects.worldbank.org/en/projects-operations/opportunities" },
 ];
 
 export async function readDonorScanner(scanner) {
