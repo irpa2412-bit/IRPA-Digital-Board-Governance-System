@@ -27,6 +27,7 @@ export default function FieldEntryDataGate({portal}){
   const actualOnly=ACTUAL_ONLY_TYPES.has(dataType)||portalRequiresActual(currentPortal);
 
   useEffect(()=>{
+    setStorageError("");
     let verified=false;
     try{
       const records=JSON.parse(window.sessionStorage.getItem(verificationMapKey)||"{}");
