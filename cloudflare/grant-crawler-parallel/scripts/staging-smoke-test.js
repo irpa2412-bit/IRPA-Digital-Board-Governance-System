@@ -17,7 +17,10 @@ async function main() {
     "japan_embassy", "canada_funding", "usadf_grants", "un_tanzania",
     "undp_tanzania", "gef_small_grants", "fao_funding", "eu_tanzania",
     "tanzania_forest_fund", "world_bank_funding", "fundsforngos_latest",
-    "fundsforngos_africa", "fundsforngos_tanzania", "fundsforngos_news"
+    "fundsforngos_africa", "fundsforngos_tanzania", "fundsforngos_news",
+    "africanngos_roundups", "ngo_portal_africa", "awdf_grants",
+    "urgent_action_fund_africa", "rufford_grants", "awhf_grants",
+    "gfcf_grants", "mbz_species_grants"
   ];
   const scanners = Array.isArray(crawlResult.additionalScanners) ? crawlResult.additionalScanners : [];
   const scannerReport = {
@@ -45,7 +48,7 @@ async function main() {
   const missing = expectedScanners.filter(name => !observedNames.has(name));
   if (Number(crawlResult.additionalScannersConfigured) !== expectedScanners.length ||
       scanners.length !== expectedScanners.length || missing.length) {
-    throw new Error("Donor scanner acceptance failed: expected all 10 scanner runs; missing: " + (missing.join(", ") || "count mismatch"));
+    throw new Error("Donor scanner acceptance failed: expected all 22 scanner runs; missing: " + (missing.join(", ") || "count mismatch"));
   }
   const failed = scanners.filter(scanner =>
     scanner.configured !== 1 ||
