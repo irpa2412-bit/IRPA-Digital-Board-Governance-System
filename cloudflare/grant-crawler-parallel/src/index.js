@@ -1,5 +1,5 @@
 import { analyzeGrant } from "./assistant.js";
-import { readOfficialPages, readWebSearch, normalizeOpportunityUrl } from "./discovery-engines.js";
+import { DONOR_SCANNERS, readDonorScanner, readOfficialPages, readWebSearch, normalizeOpportunityUrl } from "./discovery-engines.js";
 import { handleApplicationPortal } from "./application-portal-handler.js";
 
 
@@ -312,7 +312,12 @@ async function crawl(env) {
   const engines = [
     { name: "rss_atom", run: () => readFeeds(env), configured: (() => { try { return JSON.parse(env.GRANT_FEED_URLS_JSON || env.GRANT_FEED_URLS || "[]").length; } catch { return 0; } })() },
     { name: "official_pages", run: () => readOfficialPages(env), configured: (() => { try { return JSON.parse(env.GRANT_SOURCE_PAGE_URLS_JSON || env.GRANT_SOURCE_PAGE_URLS || "[]").length; } catch { return 0; } })() },
-    { name: "web_search", run: () => readWebSearch(env), configured: String(env.BRAVE_SEARCH_API_KEY || "").trim() ? 1 : 0 },
+    { name: "web_search", run: () => readWebSearch(env), configured: 1 },
+    ...DONOR_SCANNERS.map(scanner => ({
+      name: scanner.name,
+      run: () => readDonorScanner(scanner),
+      configured: 1,
+    })),
   ];
   const settled = await Promise.all(engines.map(async engine => {
     try {
@@ -398,6 +403,8 @@ async function crawl(env) {
     feedsConfigured: engines[0].configured,
     sourcePagesConfigured: engines[1].configured,
     webSearchConfigured: Number(settled.find(engine => engine.name === "web_search")?.stats.configured || 0) > 0,
+    additionalScannersConfigured: DONOR_SCANNERS.length,
+    additionalScanners: settled.filter(engine => DONOR_SCANNERS.some(scanner => scanner.name === engine.name)).map(engine => ({ engine: engine.name, ...engine.stats })),
     uniqueItemsSeen: items.length,
     itemsSeen: items.length,
     recordsChanged: changed,
