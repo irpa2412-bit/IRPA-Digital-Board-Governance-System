@@ -9550,7 +9550,7 @@ html body #root .main-area > .topbar.dashboard-topbar .topbar-heading-row > .top
     max-width: none;
     height: auto;
     min-height: 0;
-    max-height: 112px;
+    max-height: 86px;
     margin: 0;
     padding: 0;
     overflow-x: auto;
@@ -9569,15 +9569,16 @@ html body #root .main-area > .topbar.dashboard-topbar .topbar-heading-row > .top
     max-width: none;
     height: auto;
     min-height: 0;
-    max-height: 108px;
-    padding: 4px 6px;
+    max-height: 82px;
+    padding: 3px 5px;
     margin: 0;
     overflow-wrap: anywhere;
     box-sizing: border-box;
   }
   html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-day > * {
     max-width: 100%;
-    line-height: 1.15;
+    font-size: 0.65rem;
+    line-height: 1.05;
     overflow-wrap: anywhere;
   }
   html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-attribution {
