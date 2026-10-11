@@ -6,6 +6,7 @@ import { logout } from "./firebase/auth";
 import "./styles/app.css";
 import "./styles/mobile-viewport-containment.css";
 import "./styles/tokens.css";
+import "./styles/portal-typography.css";
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
