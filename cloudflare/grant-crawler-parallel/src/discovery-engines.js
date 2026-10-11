@@ -153,7 +153,7 @@ export async function readDonorScanner(scanner) {
       .slice(0, 20);
     const items = [];
     const self = parseOfficialPage(source.html, source.finalUrl);
-    const isAggregator = /(?:^|\\.)fundsforngos\\.org$/i.test(new URL(source.finalUrl).hostname);
+    const isAggregator = /(?:^|\.)fundsforngos\.org$/i.test(new URL(source.finalUrl).hostname);
     // Aggregator articles are discovery leads, not the opportunity issuance.
     // Resolve the article and extract an external application/call URL; never
     // make a FundsforNGOs listing the primary tap target.
@@ -177,7 +177,7 @@ export async function readDonorScanner(scanner) {
             const host = new URL(candidate.url).hostname;
             return host !== detailHost &&
               /apply|application|submit|official call|grant|funding|proposal|guidelines|opportunity|call for/i.test(candidate.label + " " + candidate.context) &&
-              !/(?:fundsforngos\\.org|facebook\\.com|linkedin\\.com|instagram\\.com|youtube\\.com|twitter\\.com|x\\.com)$/i.test(host);
+              !/(?:fundsforngos\.org|facebook\.com|linkedin\.com|instagram\.com|youtube\.com|twitter\.com|x\.com)$/i.test(host);
           });
           const original = outgoing.find(candidate => /apply|application|submit|official call|application form|apply here/i.test(candidate.label + " " + candidate.context)) || outgoing[0];
           if (!original) {
