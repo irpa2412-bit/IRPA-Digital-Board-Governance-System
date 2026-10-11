@@ -1,7 +1,8 @@
 const MAX_SOURCE_PAGES = 20;
 const MAX_PAGE_BYTES = 1_000_000;
 const MAX_PAGE_LINKS = 8;
-const MAX_TOTAL_DETAIL_PAGES = 6;
+const MAX_TOTAL_DETAIL_PAGES = 3;
+const MAX_SOURCE_PAGES_PER_RUN = 8;
 const USER_AGENT = "IRPA-GrantDiscovery/1.0 (+https://www.irpa.or.tz)";
 const GRANT_TERMS = /grant|funding|fund|call for proposals|call for applications|expression of interest|small grant|challenge fund|fellowship|award|open call|apply now|application window|tender opportunity/i;
 const HTML_ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
@@ -76,8 +77,12 @@ export function parseOfficialPage(html, pageUrl) {
 }
 export async function readOfficialPages(env) {
   const urls = configuredUrls(env.GRANT_SOURCE_PAGE_URLS_JSON || env.GRANT_SOURCE_PAGE_URLS, "GRANT_SOURCE_PAGE_URLS", MAX_SOURCE_PAGES);
+  // Rotate through the full configured source registry across six-hour runs.
+  // This bounds per-invocation subrequests while still checking every configured source over successive runs.
+  const rotation = urls.length ? Math.floor(Date.now() / (6 * 60 * 60 * 1000)) * MAX_SOURCE_PAGES_PER_RUN % urls.length : 0;
+  const selectedUrls = Array.from({ length: Math.min(MAX_SOURCE_PAGES_PER_RUN, urls.length) }, (_, index) => urls[(rotation + index) % urls.length]);
   const errors = [];
-  const sources = await Promise.all(urls.map(async sourceUrl => {
+  const sources = await Promise.all(selectedUrls.map(async sourceUrl => {
     try {
       const source = await fetchHtml(sourceUrl);
       const sourceHost = new URL(source.finalUrl).hostname;
@@ -118,7 +123,7 @@ export async function readOfficialPages(env) {
     }
   }));
   const items = results.filter(Boolean);
-  return { items, stats: { configured: urls.length, scanned: urls.length, detailPagesScanned: selected.length, found: items.length, errors: errors.slice(0, 20) } };
+  return { items, stats: { configured: urls.length, scanned: selectedUrls.length, configuredSources: urls.length, sourcesScanned: selectedUrls, detailPagesScanned: selected.length, found: items.length, errors: errors.slice(0, 20) } };
 }
 
 export const DONOR_SCANNERS = [
@@ -176,7 +181,7 @@ export async function readDonorScanner(scanner) {
       const description = String(anchor.context || "").trim().slice(0, 5000);
       if (!title || !isSpecificOpportunity(title, description)) continue;
       if (isAggregator) {
-        if (detailPagesScanned >= 2) continue;
+        if (detailPagesScanned >= 1) continue;
         try {
           const detail = await fetchHtml(anchor.url);
           detailPagesScanned++;
