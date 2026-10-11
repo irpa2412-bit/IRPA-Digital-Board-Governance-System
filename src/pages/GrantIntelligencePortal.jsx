@@ -279,7 +279,6 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
      return;
    }
    // Geographic eligibility no longer blocks saving a reviewed draft.
-   }
    const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-staging.irpa-governance.workers.dev").replace(/\/+$/,"");
    const idToken=await auth.currentUser?.getIdToken();
    if(!idToken){setError("Your session has expired. Sign in again.");return;}
