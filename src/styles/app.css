@@ -9406,6 +9406,7 @@ html body #root .main-area > .topbar.dashboard-topbar .topbar-heading-row > .top
    Layout-only overrides scoped to the dashboard hero and weather card. */
 @media (min-width: 901px) {
   html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row {
+    display: grid;
     grid-template-columns: minmax(200px, 260px) minmax(0, 1fr) 6cm;
     grid-template-areas: "title weather authority";
     grid-template-rows: auto;
