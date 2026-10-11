@@ -20,12 +20,14 @@ export function normalizeOpportunityUrl(value) {
   return url.href;
 }
 function isSpecificOpportunity(title = "", description = "") {
-  const titleText = String(title);
-  const bodyText = String(description);
-  const explicitCallTitle = /\b(call for proposals|call for applications|grant call|open grant|grant opportunity|funding opportunity|grant fund|small grants? (?:programme|program|fund)|open call|request for proposals|expression of interest|funding call|applications open|apply now|submit proposals|challenge fund|grant competition|award competition)\b/i.test(titleText);
-  const deadlineEvidence = /\b(deadline|due date|closing date|apply by|submit (?:by|before)|applications? close|applications? due|application window|closes on|closing on|submission deadline)\b/i.test(bodyText);
-  const grantSignal = /\b(grant|funding|fund|proposal|application|award)\b/i.test(titleText + " " + bodyText);
-  return explicitCallTitle || (grantSignal && deadlineEvidence);
+  const titleText = String(title).trim();
+  const bodyText = String(description).trim();
+  const combined = titleText + " " + bodyText;
+  const explicitCallTitle = /\b(call for proposals|call for applications|grant call|open grant|grant opportunity|funding opportunity|grant fund|small grants? (?:programme|program|fund)|open call|request for proposals|expression of interest|funding call|applications open|apply now|submit proposals|challenge fund|grant competition|award competition|funding available|funding announcement|grantmaking opportunity|grant programme|grant program)\b/i.test(titleText);
+  const fundingSignal = /\b(grant|funding|funds|fund|proposal|application|award|fellowship|small grants?|financial support|call for|open call|donor opportunity|financing)\b/i.test(combined);
+  const actionableSignal = /\b(deadline|due date|closing date|apply by|submit (?:by|before)|applications? close|applications? due|application window|closes on|closing on|submission deadline|eligible applicants?|eligibility|apply|applications? (?:are )?open|invites? proposals?|seeking proposals?|call for proposals|funding opportunity|grant opportunity|small grants?|funding available|now accepting)\b/i.test(combined);
+  const institutionalSignal = /\b(grants?|funding|call for proposals|funding opportunities|financial support|small grants?)\b/i.test(titleText);
+  return explicitCallTitle || (fundingSignal && actionableSignal) || institutionalSignal;
 }
 
 function configuredUrls(value, label, max) {
