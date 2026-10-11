@@ -9168,3 +9168,13 @@ html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-ro
     overflow-x: auto;
   }
 }
+
+
+/* Keep current conditions and metrics side-by-side where width permits.
+   This prevents the width repair from increasing the card's vertical footprint. */
+.main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-current-main,
+.main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-metrics {
+  width: auto;
+  flex: 1 1 220px;
+  min-width: 0;
+}
