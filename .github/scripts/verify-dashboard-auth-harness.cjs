@@ -79,7 +79,9 @@ const report = { testedAt:new Date().toISOString(), production:{url:prodUrl,cach
    if(Math.abs(a.gapWeatherToAccess)>1)report.isolatedHarness.failures.push(v.viewport.width+"x"+v.viewport.height+": weather/access gap "+a.gapWeatherToAccess+"px");
    if(a.bannerHeight>300)report.isolatedHarness.failures.push(v.viewport.width+"x"+v.viewport.height+": banner height "+a.bannerHeight+"px");
    const tops=a.metrics.map(m=>m.top);if(tops.length>=3&&Math.max(...tops)-Math.min(...tops)>1)report.isolatedHarness.failures.push(v.viewport.width+"x"+v.viewport.height+": humidity/wind/rain top spread "+(Math.max(...tops)-Math.min(...tops))+"px");
-   if(a.accessHeadingColor!=="rgb(231, 244, 238)")report.isolatedHarness.failures.push(v.viewport.width+"x"+v.viewport.height+": access heading colour "+a.accessHeadingColor);\n   if(a.accessPillColor!=="rgb(247, 207, 97)")report.isolatedHarness.failures.push(v.viewport.width+"x"+v.viewport.height+": access category colour "+a.accessPillColor);\n   if(a.cityColor!=="rgb(37, 99, 235)")report.isolatedHarness.failures.push(v.viewport.width+"x"+v.viewport.height+": weather city text color "+a.cityColor);
+   if(a.accessHeadingColor!=="rgb(231, 244, 238)")report.isolatedHarness.failures.push(v.viewport.width+"x"+v.viewport.height+": access heading colour "+a.accessHeadingColor);
+   if(a.accessPillColor!=="rgb(247, 207, 97)")report.isolatedHarness.failures.push(v.viewport.width+"x"+v.viewport.height+": access category colour "+a.accessPillColor);
+   if(a.cityColor!=="rgb(37, 99, 235)")report.isolatedHarness.failures.push(v.viewport.width+"x"+v.viewport.height+": weather city text color "+a.cityColor);
    if(!a.forecast.length)report.isolatedHarness.failures.push(v.viewport.width+"x"+v.viewport.height+": no forecast items rendered");
    if(a.forecast.some(f=>!f.fullyVisible))report.isolatedHarness.failures.push(v.viewport.width+"x"+v.viewport.height+": forecast item(s) clipped: "+a.forecast.filter(f=>!f.fullyVisible).map(f=>f.index).join(","));
   }
