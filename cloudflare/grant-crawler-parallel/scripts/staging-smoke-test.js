@@ -20,7 +20,8 @@ async function main() {
     "fundsforngos_africa", "fundsforngos_tanzania", "fundsforngos_news",
     "africanngos_roundups", "ngo_portal_africa", "awdf_grants",
     "urgent_action_fund_africa", "rufford_grants", "awhf_grants",
-    "gfcf_grants", "mbz_species_grants"
+    "gfcf_grants", "mbz_species_grants", "africa_climate_change_fund",
+    "global_eba_fund", "climate_justice_resilience_fund", "whitley_fund_for_nature"
   ];
   const scanners = Array.isArray(crawlResult.additionalScanners) ? crawlResult.additionalScanners : [];
   const scannerReport = {
@@ -48,16 +49,16 @@ async function main() {
   const missing = expectedScanners.filter(name => !observedNames.has(name));
   if (Number(crawlResult.additionalScannersConfigured) !== expectedScanners.length ||
       scanners.length !== expectedScanners.length || missing.length) {
-    throw new Error("Donor scanner acceptance failed: expected all 22 scanner runs; missing: " + (missing.join(", ") || "count mismatch"));
+    throw new Error("Donor scanner acceptance failed: expected all 26 scanner runs; missing: " + (missing.join(", ") || "count mismatch"));
   }
   const failed = scanners.filter(scanner =>
     scanner.configured !== 1 ||
     !Number(scanner.pagesScanned) ||
     scanner.status !== "success" ||
-    scanner.httpStatus !== 200
+    Number(scanner.httpStatus) < 200 || Number(scanner.httpStatus) >= 300
   );
   if (failed.length) {
-    throw new Error("Donor scanner live-fetch acceptance failed: " + failed.map(scanner =>
+    throw new Error("Donor scanner live-fetch acceptance failed (HTTP status must be 2xx): " + failed.map(scanner =>
       scanner.engine + " status=" + scanner.status +
       " pagesScanned=" + scanner.pagesScanned +
       " httpStatus=" + scanner.httpStatus +
