@@ -155,20 +155,50 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  const counts=useMemo(()=>({open:currentOpportunityRecords.filter(r=>r.status==="Open").length,review:currentOpportunityRecords.filter(r=>["Under review","Application in progress"].includes(r.status)).length,submitted:currentOpportunityRecords.filter(r=>["Submitted","Awarded"].includes(r.status)).length}),[currentOpportunityRecords]);
  const smartKeywordSuggestions=["rangeland restoration","pastoral livelihoods","livestock health","climate resilience","women and youth","digital governance","market access","biodiversity conservation","water security","community grants"];
  const smartAssistantResults=useMemo(()=>{
-   const terms=smartKeywords.toLowerCase().split(/[^a-z0-9]+/).filter(term=>term.length>1);
+   // Comma/semicolon/newline separates keyword phrases; a space-only query is treated as individual keywords.
+   const raw=smartKeywords.toLowerCase().split(/[,;\\n]+/).map(term=>term.trim()).filter(Boolean);
+   const terms=(raw.length?raw:smartKeywords.toLowerCase().split(/\\s+/)).filter(term=>term.length>1).slice(0,20);
    if(!terms.length)return [];
-   return currentOpportunityRecords.filter(r=>String(r.callStatus||r.call_status||"").toLowerCase()==="open"||String(r.status||"").toLowerCase()==="open")
-     .map(r=>{
+   const aliases={
+     pastoralism:["pastoralist","pastoral","rangeland","nomadic"],
+     pastoral:["pastoralism","pastoralist","rangeland"],
+     livestock:["animal health","veterinary","herd","cattle","goat","sheep"],
+     climate:["drought","adaptation","resilience","climate change"],
+     women:["gender","female","women-led","girls"],
+     youth:["young people","youth-led","young entrepreneurs"],
+     digital:["technology","software","cybersecurity","cloud","AI","artificial intelligence"],
+     governance:["board management","institutional capacity","nonprofit governance"],
+     restoration:["rehabilitation","land recovery","ecosystem recovery","reforestation"],
+     biodiversity:["conservation","ecosystem","wildlife","habitat"],
+     water:["borehole","water access","water security","irrigation"],
+     market:["value chain","market access","value addition","trade"],
+     grants:["funding","grant","call for proposals","open call"]
+   };
+   const openCalls=currentOpportunityRecords.filter(r=>{
+     const callStatus=text(r.callStatus||r.call_status).toLowerCase();
+     const pipelineStatus=text(r.status).toLowerCase();
+     return callStatus==="open"||pipelineStatus==="open"||/\\b(?:rolling basis|rolling applications?|year[- ]round|no fixed deadline)\\b/i.test([r.title,r.summary,r.description].filter(Boolean).join(" "));
+   });
+   return openCalls.map(r=>{
        const title=text(r.title).toLowerCase();
        const funder=text(r.funder).toLowerCase();
        const summary=text(r.summary||r.description).toLowerCase();
-       const full=[title,funder,summary,text(r.country).toLowerCase(),text(r.amount).toLowerCase(),text(r.url).toLowerCase()].join(" ");
-       const matched=terms.filter(term=>full.includes(term));
-       const score=matched.reduce((total,term)=>total+(title.includes(term)?5:summary.includes(term)?3:funder.includes(term)?2:1),0);
+       const requirements=text(r.donorRequirements||r.applicationRequirements||r.donor_requirements).toLowerCase();
+       const fitReasons=text(r.fitReasons||r.fit_reasons).toLowerCase();
+       const full=[title,funder,summary,requirements,fitReasons,text(r.country).toLowerCase(),text(r.amount).toLowerCase(),text(r.url).toLowerCase()].join(" ");
+       const matched=[];
+       let score=0;
+       for(const term of terms){
+         const candidates=[term,...(aliases[term]||[])];
+         const hit=candidates.some(candidate=>full.includes(candidate));
+         if(!hit)continue;
+         matched.push(term);
+         score+=candidates.some(candidate=>title.includes(candidate))?5:candidates.some(candidate=>summary.includes(candidate)||requirements.includes(candidate))?3:candidates.some(candidate=>funder.includes(candidate))?2:1;
+       }
        return {...r,_smartScore:score,_matchedKeywords:matched};
      })
      .filter(r=>r._smartScore>0)
-     .sort((a,b)=>b._smartScore-a._smartScore||dateMillis(a.deadline)-dateMillis(b.deadline))
+     .sort((a,b)=>b._smartScore-a._smartScore||dateMillis(a.deadline||a.deadline_at)-dateMillis(b.deadline||b.deadline_at))
      .slice(0,8);
  },[currentOpportunityRecords,smartKeywords]);
  async function startCrawlerScan(){
