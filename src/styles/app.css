@@ -9230,7 +9230,7 @@ html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-headin
   font-size: 0.75rem;
   line-height: 1.2;
 }
-html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel.forecast-expanded .live-weather-content {
+html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-content.forecast-expanded {
   grid-template-columns: minmax(130px, 0.85fr) minmax(190px, 1fr) minmax(0, 2fr);
 }
 html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-days {
