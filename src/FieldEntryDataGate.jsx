@@ -93,7 +93,8 @@ export default function FieldEntryDataGate(){
     const verifiedAt=new Date().toISOString();
     const record={dataType,environment:selectedEnvironment,portal:field?.portal||"Current portal",field:field?.label||"Data field",verifiedAt};
     try{
-      const existing=JSON.parse(window.sessionStorage.getItem("irpaPortalDataEntryVerifications")||"{}");\n      window.sessionStorage.setItem("irpaPortalDataEntryVerifications",JSON.stringify({...existing,[record.portal]:record}));
+      const existing=JSON.parse(window.sessionStorage.getItem("irpaPortalDataEntryVerifications")||"{}");
+      window.sessionStorage.setItem("irpaPortalDataEntryVerifications",JSON.stringify({...existing,[record.portal]:record}));
       window.sessionStorage.setItem("irpaFieldEntryVerification",JSON.stringify(record));
       window.sessionStorage.setItem("irpaDataTypeVerified",dataType);
       window.sessionStorage.setItem("irpaDataEnvironment",selectedEnvironment);
