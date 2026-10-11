@@ -6221,3 +6221,32 @@
  .main-area .topbar .topbar-heading-row .google-weather-panel{width:100%;max-width:100%;height:auto;max-height:none}
  .main-area .topbar .google-weather-panel .live-weather-current{grid-template-columns:minmax(0,1fr)}
 }
+
+
+/* Final enforced weather palette: defeat component-level/inline colour declarations. */
+.main-area .topbar .google-weather-panel,
+.main-area .topbar .google-weather-panel *,
+.main-area .topbar .google-weather-panel *::before,
+.main-area .topbar .google-weather-panel *::after{
+ color:#1769c2 !important;
+ -webkit-text-fill-color:#1769c2 !important;
+ text-shadow:none !important;
+}
+.main-area .topbar .google-weather-panel .live-weather-current-main strong,
+.main-area .topbar .google-weather-panel .live-weather-day strong,
+.main-area .topbar .google-weather-panel .live-weather-day b,
+.main-area .topbar .google-weather-panel .live-weather-temperature,
+.main-area .topbar .google-weather-panel .live-weather-condition{
+ color:#1459a6 !important;
+ -webkit-text-fill-color:#1459a6 !important;
+}
+.main-area .topbar .google-weather-panel .live-weather-location-name,
+.main-area .topbar .google-weather-panel .live-weather-location-name *,
+.main-area .topbar .google-weather-panel .live-weather-location-name span,
+.main-area .topbar .google-weather-panel .live-weather-attribution,
+.main-area .topbar .google-weather-panel .live-weather-attribution *,
+.main-area .topbar .google-weather-panel .live-weather-location-bar button{
+ color:#1769c2 !important;
+ -webkit-text-fill-color:#1769c2 !important;
+ opacity:1 !important;
+}
