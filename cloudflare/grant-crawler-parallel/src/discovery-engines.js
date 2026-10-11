@@ -199,3 +199,60 @@ export async function readWebSearch(env) {
   const errors = results.filter(result => result.error).map(result => result.error), items = results.flatMap(result => result.items);
   return { items, stats: { configured: true, provider: "Brave Search API", queries: SEARCH_QUERIES.length, found: items.length, errors } };
 }
+
+
+const SPECIALIZED_CHANNELS = {
+  un_agency_grants: '"UNDP" OR "FAO" OR "UNICEF" "call for proposals" Africa NGO',
+  embassy_small_grants: 'embassy "small grants" Tanzania OR East Africa NGO',
+  climate_funds: '"climate adaptation" "call for proposals" Africa grant NGO',
+  biodiversity_conservation: 'biodiversity conservation restoration "grant call" Africa NGO',
+  agriculture_livestock: 'agriculture livestock pastoral "call for proposals" Africa grant',
+  women_youth_enterprise: 'women youth enterprise "small grants" Africa NGO',
+  pastoral_rangeland: 'pastoral rangeland "call for proposals" grant Africa',
+  east_africa_regional: '"East Africa" "call for proposals" NGO funding grant',
+  corporate_foundations: 'foundation corporate CSR "grant application" Africa NGO',
+  tanzania_funding: 'Tanzania NGO "call for proposals" grant funding open',
+};
+const CHANNEL_LABELS = {
+  un_agency_grants: "UN agency funding search",
+  embassy_small_grants: "Embassy small-grants search",
+  climate_funds: "Climate-fund search",
+  biodiversity_conservation: "Biodiversity and conservation search",
+  agriculture_livestock: "Agriculture and livestock search",
+  women_youth_enterprise: "Women and youth enterprise search",
+  pastoral_rangeland: "Pastoral and rangeland search",
+  east_africa_regional: "East Africa regional funding search",
+  corporate_foundations: "Corporate and foundation search",
+  tanzania_funding: "Tanzania-specific funding search",
+};
+async function readSearchChannel(engine) {
+  const query = SPECIALIZED_CHANNELS[engine];
+  if (!query) throw new Error("Unknown specialized grant search engine.");
+  const endpoints = [
+    { provider: "Google News RSS", url: "https://news.google.com/rss/search?q=" + encodeURIComponent(query) + "&hl=en-TZ&gl=TZ&ceid=TZ:en" },
+    { provider: "Bing RSS", url: "https://www.bing.com/search?format=rss&q=" + encodeURIComponent(query) },
+  ];
+  const errors = [];
+  for (const endpoint of endpoints) {
+    try {
+      const response = await fetch(endpoint.url, { headers: { accept: "application/rss+xml, application/xml, text/xml", "user-agent": USER_AGENT }, signal: AbortSignal.timeout(10_000 } });
+      if (!response.ok) throw new Error(endpoint.provider + " HTTP " + response.status);
+      const xml = await response.text();
+      if (xml.length > MAX_PAGE_BYTES) throw new Error("Search response exceeds the 1 MB limit.");
+      const items = parseSearchRss(xml, query, endpoint.provider).map(item => ({ ...item, discoveryEngine: engine }));
+      return { items, stats: { configured: true, provider: endpoint.provider, label: CHANNEL_LABELS[engine], queries: 1, found: items.length, errors } };
+    } catch (error) { errors.push({ provider: endpoint.provider, error: String(error.message || error).slice(0, 180) }); }
+  }
+  return { items: [], stats: { configured: true, provider: "Google News RSS / Bing RSS", label: CHANNEL_LABELS[engine], queries: 1, found: 0, errors } };
+}
+export const readUNAgencyGrants = () => readSearchChannel("un_agency_grants");
+export const readEmbassySmallGrants = () => readSearchChannel("embassy_small_grants");
+export const readClimateFunds = () => readSearchChannel("climate_funds");
+export const readBiodiversityConservation = () => readSearchChannel("biodiversity_conservation");
+export const readAgricultureLivestock = () => readSearchChannel("agriculture_livestock");
+export const readWomenYouthEnterprise = () => readSearchChannel("women_youth_enterprise");
+export const readPastoralRangeland = () => readSearchChannel("pastoral_rangeland");
+export const readEastAfricaRegional = () => readSearchChannel("east_africa_regional");
+export const readCorporateFoundations = () => readSearchChannel("corporate_foundations");
+export const readTanzaniaFunding = () => readSearchChannel("tanzania_funding");
+export const SPECIALIZED_ENGINE_LABELS = CHANNEL_LABELS;
