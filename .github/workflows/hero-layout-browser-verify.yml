@@ -1,0 +1,37 @@
+name: Safe Hero Layout Browser Verification
+on:
+  push:
+    branches: [verify/hero-auth-safe-20261011]
+    paths:
+      - ".github/scripts/verify-hero-layout.cjs"
+      - ".github/workflows/hero-layout-browser-verify.yml"
+permissions:
+  contents: read
+jobs:
+  browser-verification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm install --no-save playwright
+      - run: npx playwright install --with-deps chromium
+      - name: Run production verification (uses a real test login only when repository secrets are configured)
+        env:
+          TARGET_URL: https://irpa-digital-board-governance.web.app
+          IRPA_E2E_EMAIL: \${{ secrets.IRPA_E2E_EMAIL }}
+          IRPA_E2E_PASSWORD: \${{ secrets.IRPA_E2E_PASSWORD }}
+        run: |
+          mkdir -p hero-layout-evidence
+          node .github/scripts/verify-hero-layout.cjs | tee hero-layout-evidence/run.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: irpa-hero-layout-browser-evidence
+          path: hero-layout-evidence/
+          if-no-files-found: warn
+          retention-days: 7
