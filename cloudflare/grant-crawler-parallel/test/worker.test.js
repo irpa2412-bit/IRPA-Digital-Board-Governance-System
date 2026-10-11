@@ -2,7 +2,17 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import worker, { assessFit, isCurrentOpportunity, parseFeed, safeUrl } from "../src/index.js";
 import { assessGeographicEligibility } from "../src/assistant.js";
-import { DONOR_SCANNERS, decodeHtml, normalizeOpportunityUrl, parseOfficialPage, parseSearchRss, readDonorScanner, readOfficialPages, readWebSearch } from "../src/discovery-engines.js";
+import { DONOR_SCANNERS, SEARCH_QUERIES, decodeHtml, normalizeOpportunityUrl, parseOfficialPage, parseSearchRss, readDonorScanner, readOfficialPages, readWebSearch } from "../src/discovery-engines.js";
+
+test("expanded engine registry includes African NGO aggregators and conservation funders", () => {
+  const names = new Set(DONOR_SCANNERS.map(scanner => scanner.name));
+  for (const name of ["fundsforngos_latest", "fundsforngos_africa", "africanngos_roundups", "ngo_portal_africa", "awdf_grants", "urgent_action_fund_africa", "rufford_grants", "awhf_grants", "gfcf_grants", "mbz_species_grants"]) {
+    assert.ok(names.has(name), "missing configured discovery engine: " + name);
+  }
+  assert.ok(DONOR_SCANNERS.every(scanner => scanner.url.startsWith("https://")));
+  assert.ok(SEARCH_QUERIES.length >= 3);
+  assert.equal(new Set(DONOR_SCANNERS.map(scanner => scanner.name)).size, DONOR_SCANNERS.length);
+});
 
 test("accepts only credential-free HTTPS feed URLs", () => {
   assert.equal(safeUrl("https://example.org/feed.xml").hostname, "example.org");
@@ -582,9 +592,9 @@ test("official webpage parser extracts safe title and description text", () => {
   assert.equal(decodeHtml("Women &amp; youth"), "Women & youth");
 });
 
-test("registers fourteen independent donor scanners with official HTTPS sources", () => {
-  assert.equal(DONOR_SCANNERS.length, 14);
-  assert.equal(new Set(DONOR_SCANNERS.map(scanner => scanner.name)).size, 14);
+test("registers twenty-two independent donor scanners with official HTTPS sources", () => {
+  assert.equal(DONOR_SCANNERS.length, 22);
+  assert.equal(new Set(DONOR_SCANNERS.map(scanner => scanner.name)).size, 22);
   for (const name of ["fundsforngos_latest", "fundsforngos_africa", "fundsforngos_tanzania", "fundsforngos_news"]) {
     assert.ok(DONOR_SCANNERS.some(scanner => scanner.name === name));
   }
@@ -635,6 +645,63 @@ test("FundsforNGOs scanner sends opportunity URL to original issuer, not aggrega
     assert.equal(result.items[0].discoverySourceUrl, "https://www2.fundsforngos.org/");
     assert.notEqual(result.items[0].url, "https://www2.fundsforngos.org/listing/open-grant-call/");
     assert.equal(result.stats.detailPagesScanned, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("AfricanNGOs and NGO Portal aggregator engines retain original issuer URLs", async () => {
+  const originalFetch = globalThis.fetch;
+  const cases = [
+    {
+      scanner: { name: "africanngos_roundups", label: "AfricanNGOs Funding Roundups", url: "https://africanngos.org/" },
+      article: "https://africanngos.org/2026/open-grant-call/",
+      issuer: "https://issuer-africanngos.example/apply"
+    },
+    {
+      scanner: { name: "ngo_portal_africa", label: "NGO Portal Africa Funding Calls", url: "https://jobs.ngoportal.africa/grants-funding/" },
+      article: "https://jobs.ngoportal.africa/grants-funding/open-call/",
+      issuer: "https://issuer-ngoportal.example/apply"
+    }
+  ];
+  try {
+    for (const item of cases) {
+      globalThis.fetch = async input => {
+        const url = String(input);
+        if (url === item.scanner.url) {
+          return new Response('<html><head><title>Funding Opportunities</title></head><body><a href="' + item.article + '">Open Grant Funding Opportunity</a></body></html>', { status: 200, headers: { "content-type": "text/html" } });
+        }
+        if (url === item.article) {
+          return new Response('<html><head><title>Open Grant Funding Opportunity for Tanzania</title><meta name="description" content="Call for proposals funding community rangeland restoration in Tanzania. Applications close 30 December 2026."></head><body><p>Call for proposals funding community rangeland restoration in Tanzania. Applications close 30 December 2026.</p><a href="' + item.issuer + '">Apply now at official donor website</a></body></html>', { status: 200, headers: { "content-type": "text/html" } });
+        }
+        throw new Error("Unexpected URL " + url);
+      };
+      const result = await readDonorScanner(item.scanner);
+      assert.equal(result.items.length, 1, item.scanner.name);
+      assert.equal(result.items[0].url, item.issuer, item.scanner.name);
+      assert.notEqual(result.items[0].url, item.article, item.scanner.name);
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("aggregator without an issuer link records a no-match warning, not a failed engine", async () => {
+  const originalFetch = globalThis.fetch;
+  const root = "https://jobs.ngoportal.africa/grants-funding/";
+  const article = "https://jobs.ngoportal.africa/grants-funding/open-call/";
+  globalThis.fetch = async input => {
+    const url = String(input);
+    if (url === root) return new Response('<html><head><title>Funding Calls</title></head><body><a href="' + article + '">Open Grant Funding Opportunity</a></body></html>', { status: 200, headers: { "content-type": "text/html" } });
+    if (url === article) return new Response('<html><head><title>Open Grant Funding Opportunity</title><meta name="description" content="Call for proposals funding community restoration. Applications close 30 December 2026."></head><body><p>Call for proposals funding community restoration. Applications close 30 December 2026.</p></body></html>', { status: 200, headers: { "content-type": "text/html" } });
+    if (url.startsWith("https://www.bing.com/search?")) return new Response("<rss><channel></channel></rss>", { status: 200, headers: { "content-type": "application/rss+xml" } });
+    throw new Error("Unexpected URL " + url);
+  };
+  try {
+    const result = await readDonorScanner({ name: "ngo_portal_africa", label: "NGO Portal Africa Funding Calls", url: root });
+    assert.equal(result.items.length, 0);
+    assert.equal(result.stats.errors.length, 0);
+    assert.match(result.stats.message, /fallback found no matching call/i);
   } finally {
     globalThis.fetch = originalFetch;
   }

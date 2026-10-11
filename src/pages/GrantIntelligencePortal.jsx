@@ -53,11 +53,7 @@ const SOURCES=[
  {name:"AfricanNGOs October–November 2026 opportunity roundup",category:"Current opportunity roundups",url:"https://africanngos.org/2026/10/06/african-ngo-funding-opportunities-october-november-2026/"},
  {name:"NGO Portal Africa — funding listings",category:"Current opportunity roundups",url:"https://jobs.ngoportal.africa/grants-funding/"}
 ];
-const ENGINE_INFO={
- rss_atom:{title:"RSS / Atom crawler",description:"Reads configured RSS and Atom feeds in parallel, parses funding-call metadata, normalises URLs and sends candidate records into the common deduplication and IRPA screening pipeline.",sources:["UK Government international development funding feeds"],limits:"Feed-only discovery; a funder without a usable feed will not be discovered by this engine."},
- official_pages:{title:"Official donor webpage scanner",description:"Fetches configured public donor and funding pages, follows a bounded number of grant-related links on the same host, extracts call titles and descriptions, and records source failures.",sources:["UNDP Tanzania","GEF Small Grants Programme","FAO funding opportunities","EU Delegation to Tanzania","Tanzania Forest Fund","AfricanNGOs","TrustAfrica","Foundation for Civil Society","AWDF","UN Partner Portal"],limits:"Some sites block automated requests or render content dynamically. HTTP errors are recorded; access controls are not bypassed."},
- web_search:{title:"Parallel web-search discovery",description:"Runs targeted funding searches concurrently through Google News RSS, falls back to Bing RSS when Google News fails, and uses Brave Search API when the optional key is configured.",sources:["Google News RSS","Bing RSS fallback","Brave Search API (optional secret)"],limits:"Search results are leads, not verified open calls. Every result still passes the same IRPA fit, deadline, geography and eligibility checks."}
-};
+
 const statusOptions=["Open","Upcoming","Closed","Under review","Application in progress","Submitted","Awarded","Not pursuing"];
 const styles={
  page:{color:"var(--text-primary, #e8edf5)",display:"grid",gap:18},
@@ -108,6 +104,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  const [crawlerStatus,setCrawlerStatus]=useState(null);
  const [crawlerSources,setCrawlerSources]=useState([]);
  const [crawlerEngines,setCrawlerEngines]=useState([]);
+ const [crawlerProvision,setCrawlerProvision]=useState([]);
  const [crawlerRunning,setCrawlerRunning]=useState(false);
  const [workspaceOpen,setWorkspaceOpen]=useState(false);
  const [selectedOpportunity,setSelectedOpportunity]=useState(null);
@@ -148,6 +145,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
      if(!response.ok)throw new Error(data.error||"Crawler results request failed ("+response.status+").");
      const items=Array.isArray(data.items)?data.items:[];
      setCrawlerEngines(Array.isArray(data.engineRuns)?data.engineRuns:[]);
+     setCrawlerProvision(Array.isArray(data.engineProvision)?data.engineProvision:[]);
      const uniqueSources=[...new Set(items.map(item=>item.source_url).filter(Boolean))];
      setCrawlerSources(uniqueSources.map(sourceUrl=>({id:sourceUrl,name:(()=>{try{return new URL(sourceUrl).hostname}catch{return sourceUrl}})(),url:sourceUrl,status:"Fetched",candidateCount:items.filter(item=>item.source_url===sourceUrl).length})));
      setCrawlerRecords(items.map(item=>({
@@ -427,19 +425,36 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    </div>
    <div style={styles.muted}>Last scan started: {dateLabel(crawlerStatus?.lastStartedAt)} · Last completed: {dateLabel(crawlerStatus?.lastCompletedAt)} · Cadence: every 6 hours (Tanzania time)</div>
    <details><summary style={{cursor:"pointer",fontSize:13,fontWeight:700}}>Source health and crawl results ({crawlerSources.length})</summary><div style={{display:"grid",gap:7,marginTop:10}}>{crawlerSources.map(source=><div key={source.id} style={{borderTop:"1px solid #344255",paddingTop:8,display:"flex",justifyContent:"space-between",gap:10,alignItems:"start"}}><div><strong style={{fontSize:13}}>{source.name||source.id}</strong><div style={styles.muted}>{source.url}</div>{source.error&&<div style={{fontSize:12,color:"#ffb8b8"}}>{source.error}</div>}</div><div style={{textAlign:"right",minWidth:100,fontSize:12}}><strong>{source.status||"Not checked"}</strong><div style={styles.muted}>{source.candidateCount??0} candidates</div></div></div>)}</div></details>
-   <details><summary style={{cursor:"pointer",fontSize:14,fontWeight:800}}>Engine provision and scan status (3 engines · click to open)</summary>
-    <p style={styles.muted}>All engines feed one shared opportunity register. Discovered calls use the same deduplication, deadline checks, geography checks, IRPA strategic-fit scoring and eligibility triage. AI analysis is supplementary and cannot override deterministic exclusions.</p>
-    <div style={{display:"grid",gap:8,marginTop:10}}>{["rss_atom","official_pages","web_search"].map(engineKey=>{const engine=crawlerEngines.find(item=>item.engine===engineKey);const info=ENGINE_INFO[engineKey];const configured=engine?.configured;const found=engine?.items_seen??engine?.found;return <details key={engineKey} style={{border:"1px solid #344255",borderRadius:10,padding:11}}>
-     <summary style={{cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,fontSize:13,fontWeight:750}}><span>{info.title}</span><span style={{fontSize:11,color:!engine?"#aab6c5":engine.status==="success"?"#8de0b7":"#ffb8b8"}}>{!engine?"No run recorded":engine.status==="success"?"Completed":"Failed"} · {configured??"—"} sources</span></summary>
-     <div style={{display:"grid",gap:8,marginTop:10}}>
-      <div style={styles.muted}>{info.description}</div>
-      <div style={{display:"flex",flexWrap:"wrap",gap:7}}><span style={styles.tag}>Configured: {configured??"not reported"}</span><span style={styles.tag}>Found: {found??"not reported"}</span><span style={styles.tag}>Last run: {dateLabel(engine?.finished_at)}</span></div>
-      {engine?.error_message&&<div style={{fontSize:12,color:"#ffcf88"}}>Reported issue: {engine.error_message}</div>}
-      <div><strong style={{fontSize:12}}>Sources / provider</strong><ul style={{margin:"5px 0 0",paddingLeft:20}}>{info.sources.map(source=><li key={source} style={{fontSize:12,marginBottom:3}}>{source}</li>)}</ul></div>
-      <div style={{...styles.muted,borderLeft:"2px solid #50727b",paddingLeft:9}}>{info.limits}</div>
-     </div>
-    </details>})}</div>
+   <details>
+    <summary style={{cursor:"pointer",fontSize:14,fontWeight:800}}>Engine provision panel — source registry ({crawlerProvision.length} engines)</summary>
+    <div style={{...styles.muted,marginTop:8}}>Select an engine to inspect its technical function, configured sources, search queries and latest run result. All engines feed the same deduplicated opportunity register and common IRPA screening formula.</div>
+    <div style={{display:"grid",gap:8,marginTop:10}}>
+     {crawlerProvision.map(provision=>{
+      const run=crawlerEngines.find(item=>item.engine===provision.engine);
+      const status=run?.status||"not_run";
+      const statusLabel=status==="success"?"Completed":status==="partial"?"Partial":status==="failed"?"Failed":provision.provisionStatus==="configured"?"Provisioned":"Not run";
+      const statusColor=status==="success"?"#8de0b7":status==="partial"?"#ffcf88":status==="failed"?"#ffb8b8":provision.provisionStatus==="configured"?"#8bd3e6":"#aab6c5";
+      return <details key={provision.engine} style={{border:"1px solid #344255",borderRadius:10,padding:"9px 11px",background:"rgba(255,255,255,0.015)"}}>
+       <summary style={{cursor:"pointer",display:"flex",justifyContent:"space-between",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+        <strong style={{fontSize:13}}>{provision.label||provision.engine}</strong>
+        <span style={{fontSize:11,color:statusColor,fontWeight:800}}>{statusLabel} · {run?(run.items_seen??run.found??0)+" found":provision.engine==="ai_eligibility"?"AI tool":"Awaiting scan"}</span>
+       </summary>
+       <div style={{display:"grid",gap:8,marginTop:10}}>
+        <div style={styles.muted}>{provision.description||"Parallel funding-opportunity discovery engine."}</div>
+        <div style={{fontSize:12}}>Configured sources: <strong>{provision.configured??(provision.sources||[]).length}</strong>{run?.finished_at&&<> · Last run: <strong>{dateLabel(run.finished_at)}</strong></>}</div>
+        {run?.error_message&&<div style={{fontSize:12,color:"#ffcf88"}}>Source report: {run.error_message}</div>}
+        {!!(provision.sources||[]).length&&<div><strong style={{fontSize:12}}>Source endpoints</strong><div style={{display:"grid",gap:5,marginTop:5}}>{provision.sources.map((source,index)=>{
+          const url=typeof source==="string"?source:source.url;
+          const label=typeof source==="string"?source:(source.label||source.name||source.url);
+          return <div key={url||label||index} style={{fontSize:12,overflowWrap:"anywhere"}}>{url&&/^https:\/\//i.test(url)?<a href={url} target="_blank" rel="noreferrer" style={{color:"#8bd3e6",textDecoration:"underline"}}>{label}</a>:<span>{label}</span>}</div>;
+        })}</div></div>}
+        {!!(provision.queries||[]).length&&<div><strong style={{fontSize:12}}>Parallel search queries</strong><ul style={{margin:"5px 0 0",paddingLeft:20}}>{provision.queries.map(query=><li key={query} style={{fontSize:12,marginBottom:3}}>{query}</li>)}</ul></div>}
+       </div>
+      </details>;
+     })}
+    </div>
    </details>
+   <details><summary style={{cursor:"pointer",fontSize:13,fontWeight:800}}>Parallel scanning engine health ({crawlerEngines.length})</summary><div style={{display:"grid",gap:7,marginTop:10}}>{crawlerEngines.map(engine=><div key={engine.engine} style={{borderTop:"1px solid #344255",paddingTop:8,display:"grid",gridTemplateColumns:"minmax(140px,1fr) auto",gap:10,alignItems:"start"}}><div><strong style={{fontSize:13}}>{(crawlerProvision.find(item=>item.engine===engine.engine)||{}).label||engine.engine}</strong><div style={styles.muted}>Last checked: {dateLabel(engine.finished_at)}</div>{engine.error_message&&<div style={{fontSize:12,color:"#ffcf88"}}>{engine.error_message}</div>}</div><div style={{textAlign:"right",fontSize:12}}><strong style={{color:engine.status==="success"?"#8de0b7":engine.status==="partial"?"#ffcf88":"#ffb8b8"}}>{engine.status==="success"?"Completed":engine.status==="partial"?"Partial":"Failed"}</strong><div style={styles.muted}>{engine.configured} configured · {engine.items_seen} found</div></div></div>)}</div></details>
    <div style={{...styles.muted,borderLeft:"3px solid #b78b3d",padding:"8px 12px"}}><strong>Coverage limitation:</strong> source websites can change, block automated requests or publish calls outside feeds. The crawler records source failures, uses public endpoints only, and does not bypass access controls or submit applications. Official-call verification and IRPA eligibility screening remain necessary.</div>
   </section>
   {notice&&<div role="status" style={{...styles.card,borderColor:"#32846d",color:"#8de0b7"}}>{notice}</div>}
