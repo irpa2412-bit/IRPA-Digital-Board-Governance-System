@@ -146,6 +146,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  const combinedRecords=useMemo(()=>{const seen=new Set(records.map(r=>String(r.url||"").trim()).filter(Boolean));return [...records,...crawlerRecords.filter(r=>r.url&&!seen.has(String(r.url).trim()))]},[records,crawlerRecords]);
  const currentOpportunityRecords=useMemo(()=>combinedRecords.filter(r=>!isNotCurrentOpportunity(r)),[combinedRecords]);
  const expiredExclusionCount=combinedRecords.length-currentOpportunityRecords.length;
+ const crawlerDiscoveryActive=crawlerRecords.length>0;
  const filtered=useMemo(()=>currentOpportunityRecords.filter(r=>{
    const hay=[r.title,r.funder,r.summary,r.country,r.amount].join(" ").toLowerCase();
    return (!queryText||hay.includes(queryText.toLowerCase()))&&(pillar==="all"||cleanArray(r.pillars).includes(pillar))&&(theme==="all"||cleanArray(r.themes).includes(theme))&&(status==="all"||r.status===status);
@@ -317,7 +318,13 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
   <section style={styles.hero}>
    <div style={{maxWidth:760}}>
     <div style={styles.eyebrow}>IRPA-DBGS · FUNDING INTELLIGENCE</div>
-    <h1 style={styles.title}>Live Grants & Calls for Proposals</h1>
+    <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+     <h1 style={{...styles.title,margin:"7px 0"}}>Live Grants & Calls for Proposals</h1>
+     <span role="status" aria-live="polite" title={crawlerDiscoveryActive?"The crawler has returned one or more funding opportunities.":"The crawler has not returned any funding opportunities."} style={{display:"inline-flex",alignItems:"center",gap:7,padding:"6px 10px",borderRadius:999,border:"1px solid "+(crawlerDiscoveryActive?"#32846d":"#b65c5c"),background:crawlerDiscoveryActive?"#123b32":"#3b2228",color:crawlerDiscoveryActive?"#8de0b7":"#ffb8b8",fontSize:12,fontWeight:800,whiteSpace:"nowrap"}}>
+      <span aria-hidden="true" style={{width:7,height:7,borderRadius:"50%",background:crawlerDiscoveryActive?"#54d6a4":"#ff8585",display:"inline-block"}}/>
+      {crawlerDiscoveryActive?"Active":"In Active"}
+     </span>
+    </div>
     <div style={{fontSize:14,lineHeight:1.6,color:"#e1edf2"}}>Discover, classify and manage funding opportunities against IRPA's three strategic pillars and seven cross-cutting themes. All authenticated profiles can access this portal at no additional cost.</div>
    </div>
    <div style={{display:"flex",gap:9,flexWrap:"wrap"}}>
