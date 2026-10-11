@@ -8747,3 +8747,28 @@ html body #root .main-area > .topbar .topbar-heading-row > .topbar-access-catego
     flex-wrap: wrap;
   }
 }
+
+
+/* Restore original Authorized User – Access Category palette only.
+   Keep the Live Weather blue styling and hero layout unchanged. */
+.main-area > .topbar.dashboard-topbar .topbar-heading-row > .topbar-access-category {
+  color: #e7f4ee;
+  -webkit-text-fill-color: #e7f4ee;
+}
+.main-area > .topbar.dashboard-topbar .topbar-heading-row > .topbar-access-category > span {
+  color: #f7cf61;
+  -webkit-text-fill-color: #f7cf61;
+}
+.main-area > .topbar.dashboard-topbar .topbar-heading-row > .topbar-access-category [aria-label="Login category"] > span {
+  color: #e7f4ee;
+  -webkit-text-fill-color: #e7f4ee;
+}
+.main-area > .topbar.dashboard-topbar .topbar-heading-row > .topbar-access-category [aria-label="Login category"] span {
+  color: #f7cf61;
+  -webkit-text-fill-color: #f7cf61;
+}
+.main-area > .topbar.dashboard-topbar .topbar-heading-row > .topbar-access-category [aria-label="Login category"] small,
+.main-area > .topbar.dashboard-topbar .topbar-heading-row > .topbar-access-category [aria-label="Login category"] strong {
+  color: #e7f4ee;
+  -webkit-text-fill-color: #e7f4ee;
+}
