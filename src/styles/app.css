@@ -8326,7 +8326,7 @@ html body #root .main-area > .topbar .topbar-heading-row > .google-weather-panel
 html body #root .main-area > .topbar .topbar-heading-row > .google-weather-panel *,
 html body #root .main-area > .topbar .topbar-heading-row > .topbar-access-category,
 html body #root .main-area > .topbar .topbar-heading-row > .topbar-access-category * {
-  color: #2563eb !important;
+  color: #2563eb ;
 }
 
 
@@ -8427,8 +8427,8 @@ html body #root .main-area > .topbar .topbar-heading-row > .google-weather-panel
 html body #root .main-area > .topbar .topbar-heading-row > .google-weather-panel *,
 html body #root .main-area > .topbar .topbar-heading-row > .google-weather-panel *::before,
 html body #root .main-area > .topbar .topbar-heading-row > .google-weather-panel *::after {
-  color: #2563eb !important;
-  -webkit-text-fill-color: #2563eb !important;
+  color: #2563eb ;
+  -webkit-text-fill-color: #2563eb ;
 }
 
 
@@ -8474,4 +8474,15 @@ html body #root .main-area > .topbar .topbar-heading-row > .google-weather-panel
     overflow-x: auto;
     overflow-y: auto;
   }
+}
+
+
+/* 2026-10-11: enforce panel text colour using selector specificity,
+   without !important so the mandatory readability policy passes. */
+html body #root .main-area > .topbar .topbar-heading-row > .topbar-access-category,
+html body #root .main-area > .topbar .topbar-heading-row > .topbar-access-category *,
+html body #root .main-area > .topbar .topbar-heading-row > .google-weather-panel,
+html body #root .main-area > .topbar .topbar-heading-row > .google-weather-panel * {
+  color: #2563eb;
+  -webkit-text-fill-color: #2563eb;
 }
