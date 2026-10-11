@@ -7,6 +7,11 @@ const PORTAL_GROUPS=[
   {label:"Meeting Portal",target:"Meetings",children:[
     ["Meeting Room Portal","Meeting Room"],["Participants Portal","Participants"],["Resolutions Portal","Resolutions"],
     ["Voting Portal","Voting"],["Decisions Portal","Decisions"]
+  ]},
+  {label:"Documents Portal",target:"Documents",children:[
+    ["My Documents","Documents","MY_WORK"],["Department Documents","Documents","DEPARTMENT"],
+    ["Shared With Me","Documents","SHARED"],["Signing Workspace","Documents","SIGNATURE"],
+    ["Post-Signature Work","Documents","POST"],["Final Archive","Documents","FINAL"],["Upload Document","Documents","UPLOAD"]
   ]}
 ];
 const CORE=[
@@ -32,7 +37,8 @@ export default function ModuleInterlinkBar({active,onNavigate,admin=false,role="
   const[context,setContext]=useState(null),[feedback,setFeedback]=useState("");
   const finance=admin||["Executive Director","Finance Personnel","Finance Manager","Accountant","Finance Officer"].includes(role);
   useEffect(()=>{const sync=()=>setContext(readWorkflowContext());sync();const handler=e=>setContext(e?.detail?.context||readWorkflowContext());window.addEventListener("irpa:navigate",handler);return()=>window.removeEventListener("irpa:navigate",handler)},[active]);
-  const go=target=>{
+  const go=(target,branch=null)=>{
+    if(branch){window.dispatchEvent(new CustomEvent("irpa:portal-branch",{detail:{portal:target,branch}}));if(target!==active&&onNavigate)onNavigate(target);setFeedback(branch==="UPLOAD"?"Opening document upload…":"Opening "+branch.replaceAll("_"," ").toLowerCase()+"…");return}
     if(target===active){setFeedback(target+" is already open.");return}
     setFeedback("Opening "+target+"…");
     const current=readWorkflowContext()||{};
@@ -49,7 +55,7 @@ export default function ModuleInterlinkBar({active,onNavigate,admin=false,role="
       {PORTAL_GROUPS.filter(group=>group.target!=="Finance Portfolio"||finance).map(group=><div key={group.target} className={"workflow-portal-group"+(active===group.target||group.children.some(([,target])=>target===active)?" active-group":"")}>
         <button type="button" className={"workflow-portal-parent"+(active===group.target?" active":"")} onClick={()=>go(group.target)}>{group.label}</button>
         <div className="workflow-portal-children">
-          {group.children.map(([itemLabel,target])=><React.Fragment key={target}>{target==="Actions"&&<span className="workflow-row-break" aria-hidden="true"/>}<button type="button" className={target===active?"active workflow-action-portal":"workflow-action-portal"} onClick={()=>go(target)}>{itemLabel}</button></React.Fragment>)}
+          {group.children.map(([itemLabel,target,branch])=><React.Fragment key={branch||target}>{target==="Actions"&&<span className="workflow-row-break" aria-hidden="true"/>}<button type="button" className={target===active&&(!branch||branch===window.__irpaActivePortalBranch)?"active workflow-action-portal":"workflow-action-portal"} onClick={()=>go(target,branch||null)}>{itemLabel}</button></React.Fragment>)}
         </div>
       </div>)}
       {CORE.map(([itemLabel,target])=><button key={target} type="button" className={target===active?"active":""} onClick={()=>go(target)}>{itemLabel}</button>)}
