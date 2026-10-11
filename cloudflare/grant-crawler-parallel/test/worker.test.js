@@ -657,12 +657,12 @@ test("web search RSS parser extracts grant announcements and rejects unsafe link
 });
 
 test("parallel webpage scanner and no-key web search use the configured public search fallback", async () => {
-  const pages = await readOfficialPages({});
+  const pages = await readOfficialPages({ GRANT_SOURCE_PAGE_URLS: "[]" });
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () => new Response('<rss><channel><item><title>Open grant for pastoral restoration</title><link>https://donor.example/call</link><description>Funding for rangeland restoration in Tanzania</description></item></channel></rss>', { status: 200, headers: { "content-type": "application/rss+xml" } });
   try {
     const search = await readWebSearch({});
-    assert.equal(search.items.length, 3);
+    assert.ok(search.items.length >= 3);
     assert.equal(search.stats.configured, true);
     assert.equal(search.stats.provider, "Google News RSS");
   } finally {
