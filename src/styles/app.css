@@ -8348,3 +8348,25 @@ html body #root .main-area > .topbar .topbar-heading-row > .topbar-access-catego
     box-sizing: border-box;
   }
 }
+
+
+/* 2026-10-11: set Authorized User – Access Category width to 6 cm. */
+@media (min-width: 1101px) {
+  html body #root .main-area > .topbar .topbar-heading-row > .topbar-access-category {
+    width: 6cm;
+    min-width: 6cm;
+    max-width: 6cm;
+    height: 4cm;
+    min-height: 4cm;
+    max-height: 4cm;
+    box-sizing: border-box;
+    overflow-x: auto;
+    overflow-y: auto;
+  }
+  html body #root .main-area > .topbar .topbar-heading-row {
+    grid-template-columns: minmax(140px, 1fr) 6cm 6cm;
+    grid-template-areas: "title authority weather";
+    align-items: start;
+    gap: 10px;
+  }
+}
