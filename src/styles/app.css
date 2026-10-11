@@ -6030,3 +6030,28 @@
  .main-area>.page-back-next-navigation{grid-template-columns:minmax(0,1fr) minmax(80px,auto) minmax(0,1fr)}
  .main-area>.page-back-next-navigation .page-back-next-button{font-size:13px;padding:8px 6px}
 }
+
+
+/* Keep Back/Next docked beneath the In-Portal Navigation roller during page scrolling. */
+.main-area>.desktop-webapp-navigation-roller{
+ position:sticky;
+ top:0;
+ z-index:120;
+}
+.main-area>.page-back-next-navigation{
+ position:sticky;
+ top:68px;
+ z-index:119;
+ margin-bottom:0;
+ box-shadow:0 3px 8px rgba(16,70,130,.12);
+}
+@media(max-width:1100px){
+ .main-area>.page-back-next-navigation{top:100px}
+}
+@media(max-width:760px){
+ .main-area>.desktop-webapp-navigation-roller{top:0}
+ .main-area>.page-back-next-navigation{top:112px}
+}
+@media(max-width:390px){
+ .main-area>.page-back-next-navigation{top:178px}
+}
