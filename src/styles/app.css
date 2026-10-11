@@ -9430,8 +9430,16 @@ html body #root .main-area > .topbar.dashboard-topbar .topbar-heading-row > .top
   html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .topbar-access-category {
     grid-area: authority;
     min-width: 0;
-    align-self: stretch;
+    height: fit-content;
+    min-height: 0;
+    max-height: none;
+    align-self: center;
     justify-self: stretch;
+    overflow: visible;
+    box-sizing: border-box;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .topbar-access-category .login-category-explanation {
+    margin-bottom: 0;
   }
   html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel {
     grid-area: weather;
