@@ -152,25 +152,66 @@ export async function readDonorScanner(scanner) {
       .filter(anchor => new URL(anchor.url).hostname === sourceHost)
       .slice(0, 20);
     const items = [];
-    // Keep this engine to one network request per donor per crawl. Link text and
-    // surrounding source-page text are indexed as leads; do not fan out into
-    // detail-page requests that can exhaust the Cloudflare subrequest budget.
     const self = parseOfficialPage(source.html, source.finalUrl);
-    if (isSpecificOpportunity(self.title, self.description)) {
-      items.push({ ...self, sourceUrl, discoveryEngine: scanner.name });
+    const isAggregator = /(?:^|\\.)fundsforngos\\.org$/i.test(new URL(source.finalUrl).hostname);
+    // Aggregator articles are discovery leads, not the opportunity issuance.
+    // Resolve the article and extract an external application/call URL; never
+    // make a FundsforNGOs listing the primary tap target.
+    if (!isAggregator && isSpecificOpportunity(self.title, self.description)) {
+      items.push({ ...self, sourceUrl, discoveryEngine: scanner.name, originalOpportunityUrl: self.url });
     }
+    let detailPagesScanned = 0;
     for (const anchor of anchors) {
       const title = String(anchor.label || "").trim().slice(0, 500);
       const description = String(anchor.context || "").trim().slice(0, 5000);
       if (!title || !isSpecificOpportunity(title, description)) continue;
+      if (isAggregator) {
+        if (detailPagesScanned >= 2) continue;
+        try {
+          const detail = await fetchHtml(anchor.url);
+          detailPagesScanned++;
+          pagesScanned++;
+          const detailParsed = parseOfficialPage(detail.html, detail.finalUrl);
+          const detailHost = new URL(detail.finalUrl).hostname;
+          const outgoing = getAnchors(detail.html, detail.finalUrl).filter(candidate => {
+            const host = new URL(candidate.url).hostname;
+            return host !== detailHost &&
+              /apply|application|submit|official call|grant|funding|proposal|guidelines|opportunity|call for/i.test(candidate.label + " " + candidate.context) &&
+              !/(?:fundsforngos\\.org|facebook\\.com|linkedin\\.com|instagram\\.com|youtube\\.com|twitter\\.com|x\\.com)$/i.test(host);
+          });
+          const original = outgoing.find(candidate => /apply|application|submit|official call|application form|apply here/i.test(candidate.label + " " + candidate.context)) || outgoing[0];
+          if (!original) {
+            errors.push({ sourceUrl: detail.finalUrl, error: "No external original-issuer/application URL found; aggregator article was not promoted as the opportunity link." });
+            continue;
+          }
+          const opportunityTitle = detailParsed.title || title;
+          const opportunityDescription = (detailParsed.description + " " + description).trim().slice(0, 5000);
+          if (!isSpecificOpportunity(opportunityTitle, opportunityDescription)) continue;
+          items.push({
+            title: opportunityTitle,
+            description: opportunityDescription,
+            url: original.url,
+            originalOpportunityUrl: original.url,
+            publishedAt: detailParsed.publishedAt || null,
+            sourceUrl: detail.finalUrl,
+            discoverySourceUrl: sourceUrl,
+            discoveryEngine: scanner.name,
+            eligibilityEvidence: "Original issuer/application URL extracted from aggregator article; confirm call status and eligibility.",
+          });
+        } catch (error) {
+          errors.push({ sourceUrl: anchor.url, error: String(error.message || error).slice(0, 180) });
+        }
+        continue;
+      }
       items.push({
         title,
         description,
         url: anchor.url,
+        originalOpportunityUrl: anchor.url,
         publishedAt: null,
         sourceUrl,
         discoveryEngine: scanner.name,
-        eligibilityEvidence: "source-page link only; detail page not yet verified",
+        eligibilityEvidence: "Source link extracted; verify it opens the original call or application page.",
       });
     }
     const unique = [...new Map(items.map(item => [item.url, item])).values()];
@@ -181,7 +222,7 @@ export async function readDonorScanner(scanner) {
         scanned: pagesScanned,
         pagesScanned,
         httpStatus,
-        detailPagesScanned: 0,
+        detailPagesScanned,
         found: unique.length,
         errors,
       },
