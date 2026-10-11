@@ -95,6 +95,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  const [error,setError]=useState("");
  const [notice,setNotice]=useState("");
  const [queryText,setQueryText]=useState("");
+ const [smartKeywords,setSmartKeywords]=useState("");
  const [pillar,setPillar]=useState("all");
  const [theme,setTheme]=useState("all");
  const [status,setStatus]=useState("all");
@@ -152,6 +153,24 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    return (!queryText||hay.includes(queryText.toLowerCase()))&&(pillar==="all"||cleanArray(r.pillars).includes(pillar))&&(theme==="all"||cleanArray(r.themes).includes(theme))&&(status==="all"||r.status===status);
  }),[currentOpportunityRecords,queryText,pillar,theme,status]);
  const counts=useMemo(()=>({open:currentOpportunityRecords.filter(r=>r.status==="Open").length,review:currentOpportunityRecords.filter(r=>["Under review","Application in progress"].includes(r.status)).length,submitted:currentOpportunityRecords.filter(r=>["Submitted","Awarded"].includes(r.status)).length}),[currentOpportunityRecords]);
+ const smartKeywordSuggestions=["rangeland restoration","pastoral livelihoods","livestock health","climate resilience","women and youth","digital governance","market access","biodiversity conservation","water security","community grants"];
+ const smartAssistantResults=useMemo(()=>{
+   const terms=smartKeywords.toLowerCase().split(/[^a-z0-9]+/).filter(term=>term.length>1);
+   if(!terms.length)return [];
+   return currentOpportunityRecords.filter(r=>String(r.callStatus||r.call_status||"").toLowerCase()==="open"||String(r.status||"").toLowerCase()==="open")
+     .map(r=>{
+       const title=text(r.title).toLowerCase();
+       const funder=text(r.funder).toLowerCase();
+       const summary=text(r.summary||r.description).toLowerCase();
+       const full=[title,funder,summary,text(r.country).toLowerCase(),text(r.amount).toLowerCase(),text(r.url).toLowerCase()].join(" ");
+       const matched=terms.filter(term=>full.includes(term));
+       const score=matched.reduce((total,term)=>total+(title.includes(term)?5:summary.includes(term)?3:funder.includes(term)?2:1),0);
+       return {...r,_smartScore:score,_matchedKeywords:matched};
+     })
+     .filter(r=>r._smartScore>0)
+     .sort((a,b)=>b._smartScore-a._smartScore||dateMillis(a.deadline)-dateMillis(b.deadline))
+     .slice(0,8);
+ },[currentOpportunityRecords,smartKeywords]);
  async function startCrawlerScan(){
    if(!auth.currentUser){setError("Sign in to IRPA to start a grant scan.");return;}
    try{
@@ -443,6 +462,33 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    <div style={{...styles.muted,borderLeft:"3px solid #b78b3d",padding:"8px 12px"}}><strong>Governance control:</strong> saved drafts remain drafts in the isolated Cloudflare D1 workspace. Saving does not submit an application, approve expenditure, authorize a commitment, or replace IRPA's formal internal review and approval procedures.</div>
   </section>}
 
+  <section style={{...styles.card,display:"grid",gap:12,borderColor:"#4e8b91"}} aria-labelledby="grant-smart-assistant-heading">
+   <div>
+    <div style={styles.eyebrow}>AI SMART ASSISTANT · KEYWORD ROUTING</div>
+    <h2 id="grant-smart-assistant-heading" style={{margin:"5px 0",fontSize:19}}>Find open calls quickly</h2>
+    <p style={{...styles.muted,margin:0}}>Enter keywords or select a topic. Results are ranked against currently listed open calls; use the original official-call link to confirm details. Keyword search works without waiting for generative-AI analysis.</p>
+   </div>
+   <form onSubmit={e=>e.preventDefault()} style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) auto",gap:9}}>
+    <input aria-label="Smart Assistant keywords" style={styles.input} value={smartKeywords} onChange={e=>setSmartKeywords(e.target.value)} placeholder="Keywords: pastoralism, climate, livestock, women, digital governance…"/>
+    <button type="button" style={styles.button} onClick={()=>setSmartKeywords(smartKeywords.trim())}>Find open calls</button>
+   </form>
+   <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>{smartKeywordSuggestions.map(keyword=><button key={keyword} type="button" style={{...styles.button,background:"transparent",fontSize:12,padding:"7px 10px"}} onClick={()=>setSmartKeywords(keyword)}>{keyword}</button>)}</div>
+   {smartKeywords.trim()&&<div aria-live="polite" style={{display:"grid",gap:9}}>
+    <div style={styles.muted}>{smartAssistantResults.length} ranked open call{smartAssistantResults.length===1?"":"s"} match these keywords.</div>
+    {!smartAssistantResults.length&&<div style={{...styles.card,borderStyle:"dashed"}}><strong>No matching open calls found</strong><p style={{...styles.muted,margin:"5px 0 0"}}>Try a broader keyword such as climate, community, livestock, restoration or grants, or refresh crawler results.</p></div>}
+    {smartAssistantResults.map(r=><article key={r.id} style={{...styles.card,display:"grid",gap:7}}>
+     <div style={{display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap",alignItems:"start"}}>
+      <div style={{flex:"1 1 300px"}}><div style={styles.eyebrow}>{r.funder||"Funder not verified"} · Open call</div><strong style={{display:"block",fontSize:15,marginTop:4}}>{r.title}</strong><p style={{...styles.muted,margin:"5px 0"}}>{text(r.summary||r.description).slice(0,320)||"No description supplied."}</p></div>
+      <div style={{fontSize:12,minWidth:105}}><div style={styles.muted}>Deadline</div><strong>{dateLabel(r.deadline||r.deadline_at)}</strong><div style={{...styles.muted,marginTop:5}}>Keyword score: {r._smartScore}</div></div>
+     </div>
+     <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{r._matchedKeywords.map(term=><span key={term} style={styles.tag}>{term}</span>)}</div>
+     <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+      <button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>openConceptWorkspace(r)}>Screen call with AI Assistant</button>
+      {r.url&&<a href={r.url} target="_blank" rel="noreferrer" style={{...styles.button,textDecoration:"none",display:"inline-block"}}>Open original call ↗</a>}
+     </div>
+    </article>)}
+   </div>}
+  </section>
   <section style={{...styles.card,display:"grid",gap:12}}>
    <h2 style={{margin:0,fontSize:18}}>Find matching opportunities</h2>
    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:10}}>
