@@ -7309,9 +7309,9 @@
   flex:0 0 auto;
 }
 .main-area>.desktop-webapp-navigation-roller {
-  position:sticky;
-  top:0;
-  z-index:1300;
+  position:relative;
+  top:auto;
+  z-index:20;
   background:#f4f8fc;
   border-bottom:1px solid #b8cfe5;
 }
@@ -7342,9 +7342,11 @@
     max-width:420px;
   }
   .main-area>.desktop-webapp-navigation-roller {
-    top:0;
+    position:relative;
+    top:auto;
   }
   .main-area>.page-back-next-navigation {
+    position:sticky;
     top:0;
   }
 }
