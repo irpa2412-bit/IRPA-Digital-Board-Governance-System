@@ -8328,3 +8328,23 @@ html body #root .main-area > .topbar .topbar-heading-row > .topbar-access-catego
 html body #root .main-area > .topbar .topbar-heading-row > .topbar-access-category * {
   color: #2563eb !important;
 }
+
+
+/* 2026-10-11: increase Weather Forecast panel height to 10 cm as requested. */
+@media (min-width: 1101px) {
+  html body #root .main-area > .topbar .topbar-heading-row > .google-weather-panel {
+    height: 10cm;
+    min-height: 10cm;
+    max-height: 10cm;
+    overflow-x: auto;
+    overflow-y: auto;
+  }
+  html body #root .main-area > .topbar .topbar-heading-row > .google-weather-panel .live-weather-content {
+    height: 100%;
+    min-height: 0;
+    max-height: 100%;
+    overflow-x: auto;
+    overflow-y: auto;
+    box-sizing: border-box;
+  }
+}
