@@ -7349,3 +7349,97 @@
     flex-basis: 100% !important;
   }
 }
+
+
+/* Final cascade repair: older responsive grid placement was overriding the compact clock. */
+.main-area>.desktop-webapp-navigation-roller .webapp-navigation-live-clock {
+  display: grid !important;
+  grid-template-columns: minmax(0,1fr) auto !important;
+  grid-template-rows: auto auto !important;
+  grid-template-areas: "day date" "time button" !important;
+  grid-auto-flow: row !important;
+  flex: 0 0 190px !important;
+  width: 190px !important;
+  min-width: 190px !important;
+  max-width: 190px !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: hidden !important;
+  align-self: center !important;
+}
+.main-area>.desktop-webapp-navigation-roller .webapp-navigation-live-clock strong {
+  grid-area: day !important;
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  font-size: 11px !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+.main-area>.desktop-webapp-navigation-roller .webapp-navigation-live-clock span {
+  grid-area: date !important;
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  color: #eaf4ff !important;
+  -webkit-text-fill-color: #eaf4ff !important;
+  font-size: 10px !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+  text-align: right !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+.main-area>.desktop-webapp-navigation-roller .webapp-navigation-live-clock b {
+  grid-area: time !important;
+  grid-column: 1 !important;
+  grid-row: 2 !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  color: #ffe28a !important;
+  -webkit-text-fill-color: #ffe28a !important;
+  font-size: 12px !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+}
+.main-area>.desktop-webapp-navigation-roller .webapp-navigation-live-clock button {
+  grid-area: button !important;
+  grid-column: 2 !important;
+  grid-row: 2 !important;
+  display: inline-flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  font-size: 10px !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+}
+@media (max-width:760px) {
+  .main-area>.desktop-webapp-navigation-roller .webapp-navigation-live-clock {
+    flex: 0 0 170px !important;
+    width: 170px !important;
+    min-width: 170px !important;
+    max-width: 170px !important;
+  }
+}
+@media (max-width:390px) {
+  .main-area>.desktop-webapp-navigation-roller .webapp-navigation-live-clock {
+    flex-basis: 100% !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+}
