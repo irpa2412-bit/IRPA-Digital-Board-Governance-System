@@ -15,10 +15,11 @@ Run the IRPA Grant Crawler — Isolated Staging workflow manually after its pull
 ## Parallel discovery engines
 
 - RSS/Atom feeds continue to run as the original connector.
+- Ten additional donor-specific scanners run concurrently: Japan Embassy grassroots grants, Canada international funding calls, U.S. African Development Foundation, UN Tanzania, UNDP Tanzania, GEF Small Grants Programme, FAO funding opportunities, EU Delegation Tanzania, Tanzania Forest Fund, and World Bank funding opportunities.
 - Official donor webpage scanning reads configured `GRANT_SOURCE_PAGE_URLS` JSON URLs (maximum 20), follows grant-related links on the same host, and extracts page titles/descriptions without executing page scripts.
 - Web-search discovery runs four targeted Google News RSS queries, falls back to Bing RSS if Google News is unavailable, and uses Brave Search API when the optional `BRAVE_SEARCH_API_KEY` secret is configured.
 - Every engine feeds the same deduplicated `grant_opportunities` register and the same `assessFit` screening formula. Expired calls, country-only mismatches, and unknown geography are not promoted to eligible opportunities; uncertain cases remain auditable.
-- Engine runs are recorded in `crawler_engine_runs`; the authenticated `/opportunities` response includes recent engine health, source counts and the shared register used by the grant dashboard.
+- All 13 engines (RSS/Atom, general official webpages, web search, and ten donor-specific scanners) run concurrently, deduplicate into the same `grant_opportunities` register, and apply the same deterministic `assessFit` deadline/geography/eligibility criteria. Engine runs are recorded individually in `crawler_engine_runs`; the authenticated `/opportunities` response exposes the latest status, source count, found count and error for each engine to the shared grant dashboard.
 - Configured official source pages include UNDP Tanzania news and press releases, GEF Small Grants Programme, FAO funding opportunities, EU grants and the EU Delegation to Tanzania, the Slovak Embassy small-grants page, the Tanzania Forest Fund download center, and Foundation for Civil Society grantmaking and Smart Grants. Add or change official source-page URLs through `GRANT_SOURCE_PAGE_URLS` (JSON array); add the Brave key only as a Cloudflare secret. Never commit API keys.
 
 ## Endpoints
