@@ -2,13 +2,14 @@ import { getIdToken } from "firebase/auth";
 import { auth } from "./config";
 
 const PRODUCTION_GATEWAY_URL=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").replace(/\/$/,"");
+// The staging Worker has its own name, KV namespace, Firebase project and prefixed Firestore collections.
+// Allow Trial/Test to work in every portal/profile even when the optional build-time override is absent.
+const STAGING_GATEWAY_URL=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_STAGING_URL||"https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev").replace(/\/$/,"");
 function getGatewayUrl(){
  let environment="";
  try{environment=window.sessionStorage.getItem("irpaDataEnvironment")||""}catch{}
  if(environment==="TRIAL"){
-  const staging=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_STAGING_URL||"").replace(/\/$/,"");
-  if(!staging)throw new Error("Trial document operations are disabled until an isolated staging gateway is configured.");
-  return staging;
+  return STAGING_GATEWAY_URL;
  }
  if(environment==="ACTUAL")return PRODUCTION_GATEWAY_URL;
  throw new Error("Choose Trial/Test or Actual Institutional Records in the Data Environment Gate before using Documents.");
