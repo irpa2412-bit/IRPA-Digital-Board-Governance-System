@@ -6254,7 +6254,7 @@
 
 /* Final screenshot correction: explicitly target each weather text component.
    Higher selector specificity avoids inherited gold/white component styling without
-   global !important rules or changes to weather data and navigation. */
+   stronger selector specificity or changes to weather data and navigation. */
 .main-area .topbar .topbar-heading-row .google-weather-panel.google-weather-panel .live-weather-content .live-weather-location-bar .live-weather-location-name,
 .main-area .topbar .topbar-heading-row .google-weather-panel.google-weather-panel .live-weather-content .live-weather-location-bar .live-weather-location-name strong,
 .main-area .topbar .topbar-heading-row .google-weather-panel.google-weather-panel .live-weather-content .live-weather-location-bar .live-weather-location-name span,
@@ -6357,7 +6357,7 @@
 .main-area .topbar .google-weather-panel .live-weather-metrics{gap:4px}
 .main-area .topbar .google-weather-panel .live-weather-metrics>span{
   padding:4px 6px;
-  font-size:11px;
+  font-size:12px;
   line-height:1.25;
   background:#eaf4ff;
   color:#1769c2;
@@ -6372,7 +6372,7 @@
   min-width:0;
   padding:5px 4px;
   gap:3px;
-  font-size:11px;
+  font-size:12px;
   line-height:1.2;
   background:#eaf4ff;
   color:#1769c2;
@@ -6387,7 +6387,7 @@
 .main-area .topbar .google-weather-panel .live-weather-attribution{
   margin-top:0;
   padding-top:4px;
-  font-size:11px;
+  font-size:12px;
   line-height:1.25;
   overflow-wrap:anywhere;
 }
@@ -6511,7 +6511,7 @@
 .main-area>.topbar .google-weather-panel .live-weather-attribution{
   margin-top:0;
   padding-top:3px;
-  font-size:11px;
+  font-size:12px;
   line-height:1.25;
 }
 
