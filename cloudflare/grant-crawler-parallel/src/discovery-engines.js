@@ -235,7 +235,7 @@ async function readSearchChannel(engine) {
   const errors = [];
   for (const endpoint of endpoints) {
     try {
-      const response = await fetch(endpoint.url, { headers: { accept: "application/rss+xml, application/xml, text/xml", "user-agent": USER_AGENT }, signal: AbortSignal.timeout(10_000 } });
+      const response = await fetch(endpoint.url, { headers: { accept: "application/rss+xml, application/xml, text/xml", "user-agent": USER_AGENT }, signal: AbortSignal.timeout(10_000) });
       if (!response.ok) throw new Error(endpoint.provider + " HTTP " + response.status);
       const xml = await response.text();
       if (xml.length > MAX_PAGE_BYTES) throw new Error("Search response exceeds the 1 MB limit.");
