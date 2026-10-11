@@ -76,6 +76,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  const [crawlerStatus,setCrawlerStatus]=useState(null);
  const [crawlerSources,setCrawlerSources]=useState([]);
  const [crawlerEngines,setCrawlerEngines]=useState([]);
+ const [crawlerProvision,setCrawlerProvision]=useState([]);
  const [crawlerRunning,setCrawlerRunning]=useState(false);
  const [workspaceOpen,setWorkspaceOpen]=useState(false);
  const [selectedOpportunity,setSelectedOpportunity]=useState(null);
@@ -115,6 +116,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
      if(!response.ok)throw new Error(data.error||"Crawler results request failed ("+response.status+").");
      const items=Array.isArray(data.items)?data.items:[];
      setCrawlerEngines(Array.isArray(data.engineRuns)?data.engineRuns:[]);
+     setCrawlerProvision(Array.isArray(data.engineProvision)?data.engineProvision:[]);
      const uniqueSources=[...new Set(items.map(item=>item.source_url).filter(Boolean))];
      setCrawlerSources(uniqueSources.map(sourceUrl=>({id:sourceUrl,name:(()=>{try{return new URL(sourceUrl).hostname}catch{return sourceUrl}})(),url:sourceUrl,status:"Fetched",candidateCount:items.filter(item=>item.source_url===sourceUrl).length})));
      setCrawlerRecords(items.map(item=>({
@@ -346,7 +348,36 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    </div>
    <div style={styles.muted}>Last scan started: {dateLabel(crawlerStatus?.lastStartedAt)} · Last completed: {dateLabel(crawlerStatus?.lastCompletedAt)} · Cadence: every 6 hours (Tanzania time)</div>
    <details><summary style={{cursor:"pointer",fontSize:13,fontWeight:700}}>Source health and crawl results ({crawlerSources.length})</summary><div style={{display:"grid",gap:7,marginTop:10}}>{crawlerSources.map(source=><div key={source.id} style={{borderTop:"1px solid #344255",paddingTop:8,display:"flex",justifyContent:"space-between",gap:10,alignItems:"start"}}><div><strong style={{fontSize:13}}>{source.name||source.id}</strong><div style={styles.muted}>{source.url}</div>{source.error&&<div style={{fontSize:12,color:"#ffb8b8"}}>{source.error}</div>}</div><div style={{textAlign:"right",minWidth:100,fontSize:12}}><strong>{source.status||"Not checked"}</strong><div style={styles.muted}>{source.candidateCount??0} candidates</div></div></div>)}</div></details>
-   <details open><summary style={{cursor:"pointer",fontSize:13,fontWeight:800}}>Parallel scanning engines ({crawlerEngines.length})</summary><div style={{display:"grid",gap:7,marginTop:10}}>{crawlerEngines.map(engine=><div key={engine.engine} style={{borderTop:"1px solid #344255",paddingTop:8,display:"grid",gridTemplateColumns:"minmax(140px,1fr) auto",gap:10,alignItems:"start"}}><div><strong style={{fontSize:13}}>{{rss_atom:"RSS / Atom feeds",official_pages:"General official-page scanner",web_search:"Web-search discovery",japan_embassy:"Japan Embassy Grassroots Grants",canada_funding:"Canada International Funding Calls",usadf_grants:"U.S. African Development Foundation",un_tanzania:"United Nations Tanzania Calls",undp_tanzania:"UNDP Tanzania Opportunities",gef_small_grants:"GEF Small Grants Programme",fao_funding:"FAO Funding Opportunities",eu_tanzania:"EU Delegation Tanzania",tanzania_forest_fund:"Tanzania Forest Fund",world_bank_funding:"World Bank Funding Opportunities"}[engine.engine]||engine.engine}</strong><div style={styles.muted}>Last checked: {dateLabel(engine.finished_at)}</div>{engine.error_message&&<div style={{fontSize:12,color:"#ffcf88"}}>{engine.error_message}</div>}</div><div style={{textAlign:"right",fontSize:12}}><strong style={{color:engine.status==="success"?"#8de0b7":"#ffb8b8"}}>{engine.status==="success"?"Completed":"Failed"}</strong><div style={styles.muted}>{engine.configured} configured · {engine.items_seen} found</div></div></div>)}</div></details>
+   <details>
+    <summary style={{cursor:"pointer",fontSize:14,fontWeight:800}}>Engine provision panel — source registry ({crawlerProvision.length} engines)</summary>
+    <div style={{...styles.muted,marginTop:8}}>Select an engine to inspect its technical function, configured sources, search queries and latest run result. All engines feed the same deduplicated opportunity register and common IRPA screening formula.</div>
+    <div style={{display:"grid",gap:8,marginTop:10}}>
+     {crawlerProvision.map(provision=>{
+      const run=crawlerEngines.find(item=>item.engine===provision.engine);
+      const status=run?.status||"not_run";
+      const statusLabel=status==="success"?"Completed":status==="partial"?"Partial":status==="failed"?"Failed":"Not run";
+      const statusColor=status==="success"?"#8de0b7":status==="partial"?"#ffcf88":status==="failed"?"#ffb8b8":"#aab6c5";
+      return <details key={provision.engine} style={{border:"1px solid #344255",borderRadius:10,padding:"9px 11px",background:"rgba(255,255,255,0.015)"}}>
+       <summary style={{cursor:"pointer",display:"flex",justifyContent:"space-between",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+        <strong style={{fontSize:13}}>{provision.label||provision.engine}</strong>
+        <span style={{fontSize:11,color:statusColor,fontWeight:800}}>{statusLabel} · {run?.items_seen??run?.found??0} found</span>
+       </summary>
+       <div style={{display:"grid",gap:8,marginTop:10}}>
+        <div style={styles.muted}>{provision.description||"Parallel funding-opportunity discovery engine."}</div>
+        <div style={{fontSize:12}}>Configured sources: <strong>{provision.configured??(provision.sources||[]).length}</strong>{run?.finished_at&&<> · Last run: <strong>{dateLabel(run.finished_at)}</strong></>}</div>
+        {run?.error_message&&<div style={{fontSize:12,color:"#ffcf88"}}>Source report: {run.error_message}</div>}
+        {!!(provision.sources||[]).length&&<div><strong style={{fontSize:12}}>Source endpoints</strong><div style={{display:"grid",gap:5,marginTop:5}}>{provision.sources.map((source,index)=>{
+          const url=typeof source==="string"?source:source.url;
+          const label=typeof source==="string"?source:(source.label||source.name||source.url);
+          return <div key={url||label||index} style={{fontSize:12,overflowWrap:"anywhere"}}>{url&&/^https:\/\//i.test(url)?<a href={url} target="_blank" rel="noreferrer" style={{color:"#8bd3e6",textDecoration:"underline"}}>{label}</a>:<span>{label}</span>}</div>;
+        })}</div></div>}
+        {!!(provision.queries||[]).length&&<div><strong style={{fontSize:12}}>Parallel search queries</strong><ul style={{margin:"5px 0 0",paddingLeft:20}}>{provision.queries.map(query=><li key={query} style={{fontSize:12,marginBottom:3}}>{query}</li>)}</ul></div>}
+       </div>
+      </details>;
+     })}
+    </div>
+   </details>
+   <details><summary style={{cursor:"pointer",fontSize:13,fontWeight:800}}>Parallel scanning engine health ({crawlerEngines.length})</summary><div style={{display:"grid",gap:7,marginTop:10}}>{crawlerEngines.map(engine=><div key={engine.engine} style={{borderTop:"1px solid #344255",paddingTop:8,display:"grid",gridTemplateColumns:"minmax(140px,1fr) auto",gap:10,alignItems:"start"}}><div><strong style={{fontSize:13}}>{(crawlerProvision.find(item=>item.engine===engine.engine)||{}).label||engine.engine}</strong><div style={styles.muted}>Last checked: {dateLabel(engine.finished_at)}</div>{engine.error_message&&<div style={{fontSize:12,color:"#ffcf88"}}>{engine.error_message}</div>}</div><div style={{textAlign:"right",fontSize:12}}><strong style={{color:engine.status==="success"?"#8de0b7":engine.status==="partial"?"#ffcf88":"#ffb8b8"}}>{engine.status==="success"?"Completed":engine.status==="partial"?"Partial":"Failed"}</strong><div style={styles.muted}>{engine.configured} configured · {engine.items_seen} found</div></div></div>)}</div></details>
    <div style={{...styles.muted,borderLeft:"3px solid #b78b3d",padding:"8px 12px"}}><strong>Coverage limitation:</strong> source websites can change, block automated requests or publish calls outside feeds. The crawler records source failures, uses public endpoints only, and does not bypass access controls or submit applications. Official-call verification and IRPA eligibility screening remain necessary.</div>
   </section>
   {notice&&<div role="status" style={{...styles.card,borderColor:"#32846d",color:"#8de0b7"}}>{notice}</div>}
