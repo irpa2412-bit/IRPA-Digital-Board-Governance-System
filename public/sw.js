@@ -1,4 +1,4 @@
-const CACHE_NAME="irpa-dbgs-app-shell-v30";
+const CACHE_NAME="irpa-dbgs-app-shell-v31";
 const APP_SHELL=["/","/index.html","/manifest.webmanifest"];
 
 self.addEventListener("install",(event)=>{
