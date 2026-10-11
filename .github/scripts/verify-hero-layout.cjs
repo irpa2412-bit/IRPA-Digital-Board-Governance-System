@@ -11,6 +11,12 @@ const report={target,testedAt:new Date().toISOString(),cache:{},viewports:[],int
  const html=await page.content();
  report.htmlScriptAssets=await page.locator("script[src]").evaluateAll(es=>es.map(e=>e.getAttribute("src")));
  report.htmlStylesheetAssets=await page.locator('link[rel="stylesheet"]').evaluateAll(es=>es.map(e=>e.getAttribute("href")));
+ report.cache.builtAssets=[];
+ for(const u of [...report.htmlScriptAssets,...report.htmlStylesheetAssets]){
+  try{const r=await page.request.get(new URL(u,target).toString(),{timeout:20000});const t=await r.text();report.cache.builtAssets.push({url:u,status:r.status(),bytes:t.length,hasWeatherSelector:t.includes("google-weather-panel"),hasHeroGrid:t.includes("minmax(200px,260px)")||t.includes("minmax(200px, 260px)"),hasWeatherBlue:t.includes("#2563eb")||t.includes("37,99,235"),hasLandscapeRules:t.includes("grid-template-areas")&&t.includes("authority")})}
+  catch(e){report.cache.builtAssets.push({url:u,error:String(e)})}
+ }
+
 report.cache.indexVersion=html.match(/\/src\/main\.jsx\?v=([^"'&]+)/)?.[1]||null;
  try{const r=await page.request.get(new URL("/sw.js",target).toString(),{timeout:20000});const t=await r.text();report.cache.swHttpStatus=r.status();report.cache.serviceWorkerVersion=t.match(/CACHE_NAME\s*=\s*["']([^"']+)/)?.[1]||null}catch(e){report.cache.swFetchError=String(e)}
  report.title=await page.title();report.authScreenVisible=await page.locator(".auth-screen").count()>0;
