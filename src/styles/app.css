@@ -9357,3 +9357,38 @@ html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-headin
     white-space: normal;
   }
 }
+
+
+/* Authorized User · Access Categories — restore the exact pre-override palette from bff713e2aa50e5f863879c26a5ca4e8fbde2a7df.
+   Every rule is confined to the Access Categories card; no dimensions or layout declarations. */
+html body #root .main-area > .topbar.dashboard-topbar .topbar-heading-row > .topbar-access-category.topbar-access-category.topbar-access-category {
+  background-color: rgba(17, 26, 32, 0.88);
+  border-color: rgba(235, 193, 75, 0.48);
+  color: #e7f4ee;
+  -webkit-text-fill-color: #e7f4ee;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
+}
+html body #root .main-area > .topbar.dashboard-topbar .topbar-heading-row > .topbar-access-category.topbar-access-category.topbar-access-category .login-category-heading,
+html body #root .main-area > .topbar.dashboard-topbar .topbar-heading-row > .topbar-access-category.topbar-access-category.topbar-access-category [aria-label="Login category"] > span,
+html body #root .main-area > .topbar.dashboard-topbar .topbar-heading-row > .topbar-access-category.topbar-access-category.topbar-access-category .login-category-identifiers small,
+html body #root .main-area > .topbar.dashboard-topbar .topbar-heading-row > .topbar-access-category.topbar-access-category.topbar-access-category .login-category-identifiers strong,
+html body #root .main-area > .topbar.dashboard-topbar .topbar-heading-row > .topbar-access-category.topbar-access-category.topbar-access-category .login-category-empty {
+  color: #e7f4ee;
+  -webkit-text-fill-color: #e7f4ee;
+}
+html body #root .main-area > .topbar.dashboard-topbar .topbar-heading-row > .topbar-access-category.topbar-access-category.topbar-access-category .login-category-pill,
+html body #root .main-area > .topbar.dashboard-topbar .topbar-heading-row > .topbar-access-category.topbar-access-category.topbar-access-category [aria-label="Login category"] span {
+  color: #f7cf61;
+  -webkit-text-fill-color: #f7cf61;
+}
+html body #root .main-area > .topbar.dashboard-topbar .topbar-heading-row > .topbar-access-category.topbar-access-category.topbar-access-category .login-category-pill {
+  background-color: transparent;
+  border-color: currentColor;
+}
+html body #root .main-area > .topbar.dashboard-topbar .topbar-heading-row > .topbar-access-category.topbar-access-category.topbar-access-category .login-category-explanation {
+  color: #d8e6f1;
+  -webkit-text-fill-color: #d8e6f1;
+}
+html body #root .main-area > .topbar.dashboard-topbar .topbar-heading-row > .topbar-access-category.topbar-access-category.topbar-access-category .login-category-identifiers {
+  border-top-color: rgba(235, 193, 75, 0.3);
+}
