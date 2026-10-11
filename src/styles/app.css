@@ -4771,8 +4771,7 @@
 /* 2026-10-11: system-wide access-authority panel visibility and collision fix.
    Keep authority, authorized-user categories, page title and weather in separate layout
    tracks. Never clip the authority/category content or float another panel over it. */
-.topbar{height:auto;min-height:92px;align-items:stretch;overflow:visible}
-.topbar-heading-row{
+.topbar{height:auto;min-height:92px;align-items:stretch;overflow:visible}.topbar:not(.dashboard-topbar) .topbar-heading-row{
   display:grid;
   grid-template-columns:minmax(245px,290px) minmax(180px,1fr) minmax(150px,205px);
   align-items:start;
@@ -4836,8 +4835,7 @@
 }
 .topbar .user-info{z-index:0;pointer-events:none}
 .topbar-access-category{z-index:2}
-@media(max-width:1100px){
-  .topbar-heading-row{
+@media(max-width:1100px){.topbar:not(.dashboard-topbar) .topbar-heading-row{
     grid-template-columns:minmax(0,1fr) minmax(0,1fr);
     align-items:start;
   }
@@ -5102,8 +5100,7 @@
 
 /* 2026-10-11: restore the declared access authority and reduce weather-panel height.
    Desktop weather content is arranged in compact rows; all live values remain visible. */
-@media (min-width:761px) {
-  .topbar-heading-row {
+@media (min-width:761px) {.topbar:not(.dashboard-topbar) .topbar-heading-row{
     grid-template-columns:minmax(245px,290px) minmax(150px,1fr) minmax(290px,340px);
     gap:10px;
   }
@@ -5211,8 +5208,7 @@
     overflow-wrap:anywhere;
   }
 }
-@media (min-width:761px) and (max-width:1100px) {
-  .topbar-heading-row {
+@media (min-width:761px) and (max-width:1100px) {.topbar:not(.dashboard-topbar) .topbar-heading-row{
     grid-template-columns:minmax(0,1fr) minmax(0,1fr);
   }
   .topbar-heading-row>.google-weather-panel .live-weather-content {
@@ -5230,8 +5226,7 @@
   min-height:0;
   max-height:none;
   overflow:visible;
-}
-.topbar-heading-row {
+}.topbar:not(.dashboard-topbar) .topbar-heading-row{
   position:relative;
   display:grid;
   grid-template-columns:minmax(230px,270px) minmax(180px,1fr) minmax(270px,320px);
@@ -5379,14 +5374,12 @@
   clear:both;
   margin-top:10px;
 }
-@media (min-width:1101px) {
-  .topbar-heading-row {
+@media (min-width:1101px) {.topbar:not(.dashboard-topbar) .topbar-heading-row{
     grid-template-columns:minmax(230px,270px) minmax(180px,1fr) minmax(270px,320px);
     grid-template-areas:"title authority weather";
   }
 }
-@media (min-width:761px) and (max-width:1100px) {
-  .topbar-heading-row {
+@media (min-width:761px) and (max-width:1100px) {.topbar:not(.dashboard-topbar) .topbar-heading-row{
     grid-template-columns:minmax(0,1fr) minmax(0,1fr);
     grid-template-areas:"title authority" "weather weather";
   }
@@ -5424,8 +5417,7 @@
 
 
 /* Workspace-first header correction: weather is a compact secondary status, never a feature panel. */
-@media (min-width:761px) {
-  .topbar-heading-row {
+@media (min-width:761px) {.topbar:not(.dashboard-topbar) .topbar-heading-row{
     grid-template-columns:minmax(210px,250px) minmax(190px,1fr) minmax(210px,250px);
     grid-template-areas:"title authority weather";
     gap:10px;
@@ -5498,8 +5490,7 @@
  height:auto;min-height:0;max-height:none;
  overflow:visible;
  padding-bottom:10px;
-}
-.topbar-heading-row{
+}.topbar:not(.dashboard-topbar) .topbar-heading-row{
  display:grid;
  grid-template-columns:minmax(210px,1fr) minmax(230px,1fr) minmax(240px,270px);
  grid-template-areas:"title authority weather";
@@ -5554,8 +5545,7 @@
  display:block;width:100%;min-width:0;
  margin-top:0;padding-top:8px;overflow:visible;
 }
-@media(max-width:1100px){
- .topbar-heading-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"title authority" "weather weather"}
+@media(max-width:1100px){.topbar:not(.dashboard-topbar) .topbar-heading-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"title authority" "weather weather"}
  .desktop-webapp-navigation-roller{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
 }
 @media(max-width:760px){
@@ -5600,8 +5590,7 @@
  display:block;flex:0 0 auto;
  height:auto;min-height:0;max-height:none;
  margin:0 0 10px;padding:12px;overflow:visible;box-sizing:border-box;
-}
-.main-area>.topbar .topbar-heading-row{
+}.main-area>.topbar:not(.dashboard-topbar) .topbar-heading-row{
  display:grid;
  grid-template-columns:minmax(200px,1fr) minmax(230px,1fr) minmax(230px,270px);
  grid-template-areas:"title authority weather";
@@ -5634,8 +5623,7 @@
 .main-area>.topbar .google-weather-panel .live-weather-days{display:grid;gap:4px}
 .main-area>.topbar .user-info{position:relative;inset:auto;display:flex;justify-content:flex-end;width:100%;margin-top:8px}
 .main-area>main.content-area{order:2;position:relative;inset:auto;z-index:0;flex:0 0 auto;width:100%;min-width:0;margin:0;padding-top:8px;overflow:visible}
-@media(max-width:1100px){
- .main-area>.topbar .topbar-heading-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"title authority" "weather weather"}
+@media(max-width:1100px){.main-area>.topbar:not(.dashboard-topbar) .topbar-heading-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"title authority" "weather weather"}
  .main-area>.desktop-webapp-navigation-roller{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
 }
 @media(max-width:760px){
@@ -5819,8 +5807,7 @@
 .main-area>.topbar .google-weather-panel .live-weather-location-bar button{
  color:#1769c2;background:#d9ebff;border:1px solid #8fc2fa;
 }
-@media(max-width:1100px){
- .main-area>.topbar .topbar-heading-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"title authority" "weather weather"}
+@media(max-width:1100px){.main-area>.topbar:not(.dashboard-topbar) .topbar-heading-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"title authority" "weather weather"}
  .main-area>.topbar .google-weather-panel .live-weather-current{grid-template-columns:minmax(0,1fr) minmax(220px,0.9fr)}
 }
 @media(max-width:760px){
@@ -5890,11 +5877,8 @@
  .main-area>.desktop-webapp-navigation-roller .webapp-navigation-roller-kicker,
  .main-area>.desktop-webapp-navigation-roller>strong,
  .main-area>.desktop-webapp-navigation-roller>select{grid-column:1;grid-row:auto}
-}
-
-
-/* Match weather-card height to the complete access-authority card; keep all forecast details visible. */
-.main-area>.topbar .topbar-heading-row{
+}/* Match weather-card height to the complete access-authority card; keep all forecast details visible. */
+.main-area>.topbar:not(.dashboard-topbar) .topbar-heading-row{
  align-items:stretch;
  grid-template-columns:minmax(190px,0.82fr) minmax(300px,1fr) minmax(420px,1.22fr);
 }
@@ -5919,19 +5903,14 @@
 .main-area>.topbar .google-weather-panel .live-weather-current-main strong{color:#1459a6}
 .main-area>.topbar .google-weather-panel .live-weather-location-name span{white-space:normal;overflow-wrap:anywhere}
 .main-area>.topbar .topbar-heading-row>.topbar-access-category .login-category-explanation{margin-bottom:0}
-@media(max-width:1100px){
- .main-area>.topbar .topbar-heading-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"title authority" "weather weather"}
+@media(max-width:1100px){.main-area>.topbar:not(.dashboard-topbar) .topbar-heading-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"title authority" "weather weather"}
  .main-area>.topbar .topbar-heading-row>.google-weather-panel{height:auto;min-height:0}
 }
-@media(max-width:760px){
- .main-area>.topbar .topbar-heading-row{grid-template-columns:minmax(0,1fr);grid-template-areas:"title" "authority" "weather"}
+@media(max-width:760px){.main-area>.topbar:not(.dashboard-topbar) .topbar-heading-row{grid-template-columns:minmax(0,1fr);grid-template-areas:"title" "authority" "weather"}
  .main-area>.topbar .topbar-heading-row>.topbar-access-category,
  .main-area>.topbar .topbar-heading-row>.google-weather-panel{min-height:0;height:auto}
-}
-
-
-/* Final screenshot correction: keep the overhead header compact and controls readable. */
-.main-area>.topbar .topbar-heading-row{
+}/* Final screenshot correction: keep the overhead header compact and controls readable. */
+.main-area>.topbar:not(.dashboard-topbar) .topbar-heading-row{
  grid-template-columns:minmax(180px,0.85fr) minmax(290px,1fr) minmax(360px,1.15fr);
  align-items:stretch;
  gap:12px;
@@ -5974,13 +5953,11 @@
 .main-area>.page-back-next-navigation{min-height:52px}
 .main-area>.page-back-next-navigation .page-back-next-button{min-height:48px;font-size:14px;font-weight:700;line-height:1.3;white-space:normal;overflow-wrap:anywhere}
 .main-area>.page-back-next-navigation .page-back-next-status{font-size:13px;line-height:1.3;overflow-wrap:anywhere}
-@media(max-width:1100px){
- .main-area>.topbar .topbar-heading-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"title authority" "weather weather"}
+@media(max-width:1100px){.main-area>.topbar:not(.dashboard-topbar) .topbar-heading-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"title authority" "weather weather"}
  .main-area>.topbar .topbar-heading-row>.google-weather-panel{height:auto;min-height:0}
  .main-area>.desktop-webapp-navigation-roller{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
 }
-@media(max-width:760px){
- .main-area>.topbar .topbar-heading-row{grid-template-columns:minmax(0,1fr);grid-template-areas:"title" "authority" "weather"}
+@media(max-width:760px){.main-area>.topbar:not(.dashboard-topbar) .topbar-heading-row{grid-template-columns:minmax(0,1fr);grid-template-areas:"title" "authority" "weather"}
  .main-area>.topbar .topbar-heading-row>.topbar-access-category,.main-area>.topbar .topbar-heading-row>.google-weather-panel{height:auto;min-height:0}
  .main-area>.topbar .google-weather-panel .live-weather-current{grid-template-columns:minmax(0,1fr)}
  .main-area>.desktop-webapp-navigation-roller{grid-template-columns:minmax(0,1fr) minmax(0,1fr);min-height:0}
@@ -6012,11 +5989,8 @@
 }
 @media(max-width:390px){
  .main-area>.page-back-next-navigation{top:178px}
-}
-
-
-/* Screenshot-driven correction: give weather content usable width and enforce blue readable text. */
-.main-area .topbar .topbar-heading-row{
+}/* Screenshot-driven correction: give weather content usable width and enforce blue readable text. */
+.main-area .topbar:not(.dashboard-topbar) .topbar-heading-row{
  grid-template-columns:minmax(180px,0.78fr) minmax(280px,0.9fr) minmax(430px,1.32fr);
  align-items:stretch;
 }
@@ -6055,14 +6029,12 @@
  line-height:1.4;
  overflow-wrap:anywhere;
 }
-@media(max-width:1100px){
- .main-area .topbar .topbar-heading-row{
+@media(max-width:1100px){.main-area .topbar:not(.dashboard-topbar) .topbar-heading-row{
   grid-template-columns:minmax(0,1fr) minmax(0,1fr);
   grid-template-areas:"title authority" "weather weather";
  }
 }
-@media(max-width:760px){
- .main-area .topbar .topbar-heading-row{
+@media(max-width:760px){.main-area .topbar:not(.dashboard-topbar) .topbar-heading-row{
   grid-template-columns:minmax(0,1fr);
   grid-template-areas:"title" "authority" "weather";
  }
@@ -6160,13 +6132,11 @@
 .main-area .topbar .google-weather-panel .live-weather-day *{font-size:12px;line-height:1.2;overflow-wrap:anywhere}
 .main-area .topbar .google-weather-panel .live-weather-attribution{font-size:12px;line-height:1.25;padding-top:4px;margin-top:auto}
 .main-area .topbar .google-weather-panel .live-weather-attribution *{font-size:12px;line-height:1.25}
-@media(max-width:1100px){
- .main-area .topbar .topbar-heading-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"title authority" "weather weather"}
+@media(max-width:1100px){.main-area .topbar:not(.dashboard-topbar) .topbar-heading-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"title authority" "weather weather"}
  .main-area .topbar .topbar-heading-row .google-weather-panel{height:auto;max-height:none;min-height:0;justify-self:center}
  .main-area .topbar .google-weather-panel .live-weather-content{height:auto;max-height:none;overflow:visible}
 }
-@media(max-width:760px){
- .main-area .topbar .topbar-heading-row{grid-template-columns:minmax(0,1fr);grid-template-areas:"title" "authority" "weather"}
+@media(max-width:760px){.main-area .topbar:not(.dashboard-topbar) .topbar-heading-row{grid-template-columns:minmax(0,1fr);grid-template-areas:"title" "authority" "weather"}
  .main-area .topbar .topbar-heading-row .google-weather-panel{height:auto;max-height:none}
  .main-area .topbar .google-weather-panel .live-weather-current{grid-template-columns:minmax(0,1fr)}
 }
@@ -6335,8 +6305,7 @@
   line-height:1.25;
   overflow-wrap:anywhere;
 }
-@media(max-width:1100px){
-  .main-area .topbar .topbar-heading-row{
+@media(max-width:1100px){.main-area .topbar:not(.dashboard-topbar) .topbar-heading-row{
     grid-template-columns:minmax(0,1fr) minmax(0,1fr);
     grid-template-areas:"title authority" "weather weather";
   }
@@ -6351,8 +6320,7 @@
     overflow:visible;
   }
 }
-@media(max-width:760px){
-  .main-area .topbar .topbar-heading-row{
+@media(max-width:760px){.main-area .topbar:not(.dashboard-topbar) .topbar-heading-row{
     grid-template-columns:minmax(0,1fr);
     grid-template-areas:"title" "authority" "weather";
   }
@@ -6536,8 +6504,7 @@
   overflow-wrap:anywhere;
   line-height:1.3;
 }
-@media(max-width:1100px){
-  .main-area>.topbar .topbar-heading-row{
+@media(max-width:1100px){.main-area>.topbar:not(.dashboard-topbar) .topbar-heading-row{
     grid-template-columns:minmax(0,1fr) minmax(0,1fr);
     grid-template-areas:"title authority" "weather weather";
   }
@@ -6552,8 +6519,7 @@
   .main-area>.desktop-webapp-navigation-roller>strong,
   .main-area>.desktop-webapp-navigation-roller>select{grid-column:auto;grid-row:auto}
 }
-@media(max-width:760px){
-  .main-area>.topbar .topbar-heading-row{
+@media(max-width:760px){.main-area>.topbar:not(.dashboard-topbar) .topbar-heading-row{
     grid-template-columns:minmax(0,1fr);
     grid-template-areas:"title" "authority" "weather";
     gap:10px;
@@ -6611,8 +6577,7 @@
 .main-area>.page-back-next-navigation .page-back-next-status {
   font-size: 13px;
   line-height: 1.4;
-}
-.main-area>.topbar .topbar-heading-row {
+}.main-area>.topbar:not(.dashboard-topbar) .topbar-heading-row{
   grid-template-columns: minmax(0,1fr) minmax(190px,0.85fr) minmax(220px,280px);
   grid-template-areas: "title authority weather";
   align-items: start;
@@ -6638,8 +6603,7 @@
 .main-area>.topbar .google-weather-panel .live-weather-day {
   padding: 5px 4px;
 }
-@media(max-width:1100px) {
-  .main-area>.topbar .topbar-heading-row {
+@media(max-width:1100px) {.main-area>.topbar:not(.dashboard-topbar) .topbar-heading-row{
     grid-template-columns: minmax(0,1fr) minmax(0,1fr);
     grid-template-areas: "title authority" "weather weather";
   }
@@ -6659,8 +6623,7 @@
   .main-area>.page-back-next-navigation {
     position: relative;
     top: auto;
-  }
-  .main-area>.topbar .topbar-heading-row {
+  }.main-area>.topbar:not(.dashboard-topbar) .topbar-heading-row{
     grid-template-columns: minmax(0,1fr);
     grid-template-areas: "title" "authority" "weather";
   }
@@ -6744,11 +6707,8 @@
   .main-area>.topbar .google-weather-panel {
     height: auto;
   }
-}
-
-
-/* Root layout authority: access card determines header height; weather must fit it. */
-.main-area>.topbar .topbar-heading-row {
+}/* Root layout authority: access card determines header height; weather must fit it. */
+.main-area>.topbar:not(.dashboard-topbar) .topbar-heading-row{
   display:grid;
   grid-template-columns:minmax(0,1fr) minmax(230px,280px) minmax(0,280px);
   grid-template-areas:"title authority weather";
@@ -6831,8 +6791,7 @@
   background:#d8eaff;
   border-color:#8fc2fa;
 }
-@media(max-width:1100px) {
-  .main-area>.topbar .topbar-heading-row {
+@media(max-width:1100px) {.main-area>.topbar:not(.dashboard-topbar) .topbar-heading-row{
     grid-template-columns:minmax(0,1fr) minmax(220px,280px);
     grid-template-areas:"title authority" "weather weather";
     align-items:start;
@@ -6848,8 +6807,7 @@
     overflow:visible;
   }
 }
-@media(max-width:760px) {
-  .main-area>.topbar .topbar-heading-row {
+@media(max-width:760px) {.main-area>.topbar:not(.dashboard-topbar) .topbar-heading-row{
     grid-template-columns:minmax(0,1fr);
     grid-template-areas:"title" "authority" "weather";
   }
@@ -6903,8 +6861,7 @@
 .main-area>.topbar {
   padding: 12px 18px;
   min-height: 0;
-}
-.main-area>.topbar .topbar-heading-row {
+}.main-area>.topbar:not(.dashboard-topbar) .topbar-heading-row{
   display: grid;
   grid-template-columns: minmax(220px,1fr) minmax(220px,300px) minmax(220px,300px);
   grid-template-areas: "title authority weather";
@@ -7125,8 +7082,7 @@
   line-height: 1.25;
   text-align: center;
 }
-@media (max-width:1100px) {
-  .main-area>.topbar .topbar-heading-row {
+@media (max-width:1100px) {.main-area>.topbar:not(.dashboard-topbar) .topbar-heading-row{
     grid-template-columns: minmax(0,1fr) minmax(220px,300px);
     grid-template-areas: "title authority" "weather weather";
   }
@@ -7154,8 +7110,7 @@
     min-height: 38px;
     padding: 7px 5px;
     font-size: 12px;
-  }
-  .main-area>.topbar .topbar-heading-row {
+  }.main-area>.topbar:not(.dashboard-topbar) .topbar-heading-row{
     grid-template-columns: minmax(0,1fr);
     grid-template-areas: "title" "authority" "weather";
   }
@@ -7405,8 +7360,7 @@
 
 /* 2026-10-11 dashboard correction: restore access-category content and keep weather secondary.
    Preserve the existing navigator location and Back/Next behavior; do not relocate navigation. */
-@media (min-width:1101px) {
-  .main-area > .topbar .topbar-heading-row {
+@media (min-width:1101px) {.main-area > .topbar:not(.dashboard-topbar) .topbar-heading-row{
     display: grid ;
     grid-template-columns: minmax(220px, .9fr) minmax(280px, 1.05fr) minmax(200px, 240px) ;
     grid-template-areas: "title authority weather" ;
@@ -7492,8 +7446,7 @@
     padding: 3px 2px ;
   }
 }
-@media (min-width:761px) and (max-width:1100px) {
-  .main-area > .topbar .topbar-heading-row {
+@media (min-width:761px) and (max-width:1100px) {.main-area > .topbar:not(.dashboard-topbar) .topbar-heading-row{
     display: grid ;
     grid-template-columns: minmax(0, 1fr) minmax(230px, 280px) ;
     grid-template-areas: "title authority" "weather weather" ;
@@ -7556,8 +7509,7 @@
 
 /* WORKSPACE-FIRST DASHBOARD: weather is a compact optional preview, not the main workspace.
    Forecast details remain available through the existing Forecast toggle. */
-@media (min-width:1101px) {
-  .main-area > .topbar .topbar-heading-row {
+@media (min-width:1101px) {.main-area > .topbar:not(.dashboard-topbar) .topbar-heading-row{
     grid-template-columns: minmax(220px, .9fr) minmax(300px, 1.2fr) minmax(180px, 210px) ;
     grid-template-areas: "title authority weather" ;
     align-items: start ;
@@ -7778,8 +7730,7 @@
 
 /* 2026-10-11 targeted workspace sizing: wider access/weather panels, compact right-aligned
    in-portal selector, and standard Back/Next button dimensions. */
-@media (min-width: 1101px) {
-  .main-area > .topbar .topbar-heading-row {
+@media (min-width: 1101px) {.main-area > .topbar:not(.dashboard-topbar) .topbar-heading-row{
     grid-template-columns: minmax(180px, .72fr) minmax(360px, 1.28fr) minmax(300px, .95fr);
     grid-template-areas: "title authority weather";
     align-items: stretch;
@@ -7799,8 +7750,7 @@
     box-sizing: border-box;
   }
 }
-@media (min-width: 761px) and (max-width: 1100px) {
-  .main-area > .topbar .topbar-heading-row {
+@media (min-width: 761px) and (max-width: 1100px) {.main-area > .topbar:not(.dashboard-topbar) .topbar-heading-row{
     grid-template-columns: minmax(0, 1fr) minmax(320px, 1.2fr);
     grid-template-areas: "title authority" "weather weather";
     gap: 10px;
@@ -7937,8 +7887,7 @@
 
 /* 2026-10-11 workspace polish: let forecast text breathe, use blue typography,
    and make Back/Next buttons identical at every breakpoint. */
-@media (min-width: 1101px) {
-  .main-area > .topbar .topbar-heading-row {
+@media (min-width: 1101px) {.main-area > .topbar:not(.dashboard-topbar) .topbar-heading-row{
     grid-template-columns: minmax(160px, .58fr) minmax(360px, 1.12fr) minmax(380px, 1.18fr);
     gap: 10px;
   }
@@ -8063,8 +8012,7 @@
 
 
 /* 2026-10-11 weather panel correction: widen forecast for content and make all forecast text blue. */
-@media (min-width: 1101px) {
-  html body #root .main-area > .topbar .topbar-heading-row {
+@media (min-width: 1101px) {html body #root .main-area > .topbar:not(.dashboard-topbar) .topbar-heading-row{
     grid-template-columns: minmax(140px, .5fr) minmax(300px, 1fr) minmax(420px, 1.35fr);
     grid-template-areas: "title authority weather";
     align-items: stretch;
@@ -8090,8 +8038,7 @@ html body #root .main-area > .topbar .topbar-heading-row > .google-weather-panel
 html body #root .main-area > .topbar .topbar-heading-row > .google-weather-panel * {
   color: #2563eb;
 }
-@media (min-width: 761px) and (max-width: 1100px) {
-  html body #root .main-area > .topbar .topbar-heading-row {
+@media (min-width: 761px) and (max-width: 1100px) {html body #root .main-area > .topbar:not(.dashboard-topbar) .topbar-heading-row{
     grid-template-columns: minmax(0, 1fr) minmax(320px, 1.2fr);
     grid-template-areas: "title authority" "weather weather";
     gap: 10px;
@@ -8348,8 +8295,7 @@ html body #root .main-area > .topbar .topbar-heading-row > .google-weather-panel
 /* 2026-10-11: expand the weather panel into the unused central header space.
    Keep the title left and access-category panel right; do not float/reposition
    either panel. Let weather content use the available width and height. */
-@media (min-width: 1101px) {
-  html body #root .main-area > .topbar .topbar-heading-row {
+@media (min-width: 1101px) {html body #root .main-area > .topbar:not(.dashboard-topbar) .topbar-heading-row{
     display: grid;
     grid-template-columns: minmax(220px, 0.9fr) minmax(360px, 1.8fr) minmax(180px, 0.7fr);
     grid-template-areas: "title weather authority";
