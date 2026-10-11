@@ -6123,24 +6123,24 @@
 .main-area .topbar .google-weather-panel *,
 .main-area .topbar .google-weather-panel *::before,
 .main-area .topbar .google-weather-panel *::after{
- color:#1769c2 !important;
+ color:#1769c2;
 }
 .main-area .topbar .google-weather-panel .live-weather-current-main strong,
 .main-area .topbar .google-weather-panel .live-weather-day strong,
 .main-area .topbar .google-weather-panel .live-weather-day b{
- color:#1459a6 !important;
+ color:#1459a6;
 }
 .main-area .topbar .google-weather-panel .live-weather-location-name,
 .main-area .topbar .google-weather-panel .live-weather-location-name *,
 .main-area .topbar .google-weather-panel .live-weather-location-name span{
- color:#1769c2 !important;
- opacity:1 !important;
- text-shadow:none !important;
+ color:#1769c2;
+ opacity:1;
+ text-shadow:none;
 }
 .main-area .topbar .google-weather-panel .live-weather-attribution,
 .main-area .topbar .google-weather-panel .live-weather-attribution *,
 .main-area .topbar .google-weather-panel .live-weather-location-bar button{
- color:#1769c2 !important;
+ color:#1769c2;
 }
 .main-area .topbar .google-weather-panel .live-weather-location-bar,
 .main-area .topbar .google-weather-panel .live-weather-day,
