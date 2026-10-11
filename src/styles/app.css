@@ -8833,7 +8833,7 @@ html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-ro
 html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-current-main small,
 html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-metrics,
 html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-metrics > span {
-  color: #17211d; -webkit-text-fill-color: #17211d; opacity: 1;
+  color: #2563eb; -webkit-text-fill-color: #2563eb; opacity: 1;
 }
 html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-days {
   display: flex; flex-direction: row; flex-wrap: nowrap; align-items: stretch;
@@ -8902,4 +8902,14 @@ html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-ro
     grid-template-columns: minmax(0, 1fr); grid-template-areas: "title" "weather" "authority";
   }
   .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-days { overflow-x: auto; }
+}
+
+
+/* Restore the exact pre-layout blue on Live Weather text and controls only. */
+html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel.google-weather-panel.google-weather-panel,
+html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel.google-weather-panel.google-weather-panel *,
+html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel.google-weather-panel.google-weather-panel *::before,
+html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel.google-weather-panel.google-weather-panel *::after {
+  color: #2563eb;
+  -webkit-text-fill-color: #2563eb;
 }
