@@ -153,6 +153,7 @@ export const DONOR_SCANNERS = [
 
 export async function readDonorScanner(scanner) {
   const errors = [];
+  let warningMessage = null;
   let httpStatus = null;
   let pagesScanned = 0;
   let sourceUrl = scanner.url;
@@ -217,7 +218,7 @@ export async function readDonorScanner(scanner) {
                 fallbackProvider: "Bing RSS",
               }));
               if (fallbackItems.length) items.push(...fallbackItems);
-              else errors.push({ sourceUrl: detail.finalUrl, error: "No original issuer URL was present in the aggregator article; Bing RSS fallback found no matching call." });
+              else warningMessage = "No original issuer URL was present in the aggregator article; Bing RSS fallback found no matching call.";
             } catch (error) {
               errors.push({ sourceUrl: detail.finalUrl, error: String(error.message || error).slice(0, 180) });
             }
@@ -263,6 +264,7 @@ export async function readDonorScanner(scanner) {
         httpStatus,
         detailPagesScanned,
         found: unique.length,
+        message: warningMessage,
         errors,
       },
     };
