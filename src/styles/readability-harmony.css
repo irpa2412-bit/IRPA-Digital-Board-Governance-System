@@ -3367,7 +3367,7 @@ textarea:focus-visible{
       grid-template-areas:"title weather authority"!important; grid-template-rows:auto!important;
       column-gap:0!important; row-gap:0!important; align-items:center!important; max-height:300px!important; overflow:visible!important;
     }
-    html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .topbar-title-block { grid-area:title!important; max-width:260px!important; margin-right:12px!important; align-self:center!important; }
+    html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .topbar-title-block { grid-area:title!important; width:calc(100% - 12px)!important; max-width:260px!important; margin-right:0!important; justify-self:start!important; align-self:center!important; }
     html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .topbar-access-category { grid-area:authority!important; justify-self:stretch!important; align-self:center!important; }
     html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel {
       grid-area:weather!important; display:grid!important; grid-template-columns:minmax(110px,.8fr) repeat(3,minmax(0,1fr))!important;
