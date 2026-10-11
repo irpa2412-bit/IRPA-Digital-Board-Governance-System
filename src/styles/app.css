@@ -8952,3 +8952,26 @@ html body #root .main-area > .topbar .topbar-heading-row > .topbar-access-catego
   color: #d1d5db;
   -webkit-text-fill-color: #d1d5db;
 }
+
+
+/* Weather descendants: remove width constraints only inside the weather card. */
+@media (min-width: 901px) {
+  html body #root .main-area > .topbar:not(.dashboard-topbar) .topbar-heading-row:has(> .google-weather-panel) > .google-weather-panel .live-weather-content,
+  html body #root .main-area > .topbar:not(.dashboard-topbar) .topbar-heading-row:has(> .google-weather-panel) > .google-weather-panel .live-weather-location-bar,
+  html body #root .main-area > .topbar:not(.dashboard-topbar) .topbar-heading-row:has(> .google-weather-panel) > .google-weather-panel .live-weather-current,
+  html body #root .main-area > .topbar:not(.dashboard-topbar) .topbar-heading-row:has(> .google-weather-panel) > .google-weather-panel .live-weather-days,
+  html body #root .main-area > .topbar:not(.dashboard-topbar) .topbar-heading-row:has(> .google-weather-panel) > .google-weather-panel .live-weather-attribution {
+    width: 100%; min-width: 0; max-width: none; flex: 1 1 auto; box-sizing: border-box;
+  }
+  html body #root .main-area > .topbar:not(.dashboard-topbar) .topbar-heading-row:has(> .google-weather-panel) > .google-weather-panel .live-weather-days {
+    display: flex; flex-direction: row; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden;
+  }
+  html body #root .main-area > .topbar:not(.dashboard-topbar) .topbar-heading-row:has(> .google-weather-panel) > .google-weather-panel .live-weather-day {
+    flex: 0 0 110px; min-width: 110px; max-width: none;
+  }
+}
+@media (max-width: 900px) {
+  html body #root .main-area > .topbar:not(.dashboard-topbar) .topbar-heading-row:has(> .google-weather-panel) > .google-weather-panel .live-weather-days {
+    display: flex; flex-direction: row; flex-wrap: nowrap; overflow-x: auto;
+  }
+}
