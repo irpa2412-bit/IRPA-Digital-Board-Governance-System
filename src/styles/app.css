@@ -8415,3 +8415,18 @@ html body #root .main-area > .topbar .topbar-heading-row > .topbar-access-catego
     overflow-y: auto;
   }
 }
+
+
+/* 2026-10-11: force the requested blue text on the exact panel descendants,
+   overriding legacy yellow/green rules and inline declarations where possible. */
+html body #root .main-area > .topbar .topbar-heading-row > .topbar-access-category,
+html body #root .main-area > .topbar .topbar-heading-row > .topbar-access-category *,
+html body #root .main-area > .topbar .topbar-heading-row > .topbar-access-category *::before,
+html body #root .main-area > .topbar .topbar-heading-row > .topbar-access-category *::after,
+html body #root .main-area > .topbar .topbar-heading-row > .google-weather-panel,
+html body #root .main-area > .topbar .topbar-heading-row > .google-weather-panel *,
+html body #root .main-area > .topbar .topbar-heading-row > .google-weather-panel *::before,
+html body #root .main-area > .topbar .topbar-heading-row > .google-weather-panel *::after {
+  color: #2563eb !important;
+  -webkit-text-fill-color: #2563eb !important;
+}
