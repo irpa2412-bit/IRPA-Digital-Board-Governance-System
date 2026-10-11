@@ -7443,3 +7443,31 @@
     max-width: 100% !important;
   }
 }
+
+
+/* User-requested vertical extension of the compact live date/time panel. */
+.main-area>.desktop-webapp-navigation-roller .webapp-navigation-live-clock {
+  min-height: 112px !important;
+  height: 112px !important;
+  align-self: stretch !important;
+  box-sizing: border-box !important;
+  padding: 12px 10px !important;
+  grid-template-rows: minmax(0,1fr) minmax(0,1fr) !important;
+  row-gap: 10px !important;
+}
+.main-area>.desktop-webapp-navigation-roller .webapp-navigation-live-clock strong,
+.main-area>.desktop-webapp-navigation-roller .webapp-navigation-live-clock span {
+  align-self: center !important;
+}
+.main-area>.desktop-webapp-navigation-roller .webapp-navigation-live-clock b,
+.main-area>.desktop-webapp-navigation-roller .webapp-navigation-live-clock button {
+  align-self: center !important;
+}
+@media (max-width:760px) {
+  .main-area>.desktop-webapp-navigation-roller .webapp-navigation-live-clock {
+    min-height: 104px !important;
+    height: 104px !important;
+    padding: 10px 8px !important;
+    row-gap: 8px !important;
+  }
+}
