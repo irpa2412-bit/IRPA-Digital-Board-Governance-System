@@ -75,7 +75,7 @@ export function parseOfficialPage(html, pageUrl) {
   return { title: title.slice(0, 500), description: (description + (description && text ? " " : "") + text).slice(0, 5000), url: normalizeOpportunityUrl(pageUrl), publishedAt: null, sourceUrl: normalizeOpportunityUrl(pageUrl) };
 }
 export async function readOfficialPages(env) {
-  const urls = [...new Set(configuredUrls(env.GRANT_SOURCE_PAGE_URLS_JSON || env.GRANT_SOURCE_PAGE_URLS, "GRANT_SOURCE_PAGE_URLS", MAX_SOURCE_PAGES))];
+  const urls = [...new Set(configuredUrls(env.GRANT_SOURCE_PAGE_URLS || env.GRANT_SOURCE_PAGE_URLS_JSON, "GRANT_SOURCE_PAGE_URLS", MAX_SOURCE_PAGES))];
   const errors = [];
   const warnings = [];
   let pagesFetched = 0;
