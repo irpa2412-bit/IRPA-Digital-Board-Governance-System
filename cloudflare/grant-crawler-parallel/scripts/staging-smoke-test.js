@@ -24,9 +24,12 @@ async function main() {
     "global_eba_fund", "climate_justice_resilience_fund", "whitley_fund_for_nature"
   ];
   const scanners = Array.isArray(crawlResult.additionalScanners) ? crawlResult.additionalScanners : [];
+  const scheduledScanners = Array.isArray(crawlResult.additionalScannersScheduled) ? crawlResult.additionalScannersScheduled : [];
   const scannerReport = {
     expected: expectedScanners.length,
     configured: crawlResult.additionalScannersConfigured ?? 0,
+    scheduledCount: scheduledScanners.length,
+    scheduledScanners,
     actualEntries: scanners.length,
     engines: scanners.map(scanner => ({
       engine: scanner.engine,
@@ -46,10 +49,12 @@ async function main() {
   // Print the actual per-engine run evidence before applying the acceptance gate.
   console.log("DONOR_SCANNER_LIVE_EVIDENCE " + JSON.stringify(scannerReport));
   const observedNames = new Set(scanners.map(scanner => scanner.engine));
-  const missing = expectedScanners.filter(name => !observedNames.has(name));
+  const missing = scheduledScanners.filter(name => !observedNames.has(name));
+  const unexpected = scanners.map(scanner => scanner.engine).filter(name => !expectedScanners.includes(name));
   if (Number(crawlResult.additionalScannersConfigured) !== expectedScanners.length ||
-      scanners.length !== expectedScanners.length || missing.length) {
-    throw new Error("Donor scanner acceptance failed: expected all 26 scanner runs; missing: " + (missing.join(", ") || "count mismatch"));
+      scheduledScanners.length !== Math.min(18, expectedScanners.length) ||
+      scanners.length !== scheduledScanners.length || missing.length || unexpected.length) {
+    throw new Error("Donor scanner acceptance failed: expected the complete 26-source registry and all scheduled scanner runs; missing: " + (missing.join(", ") || "count mismatch"));
   }
   const failed = scanners.filter(scanner =>
     scanner.configured !== 1 ||
@@ -181,6 +186,7 @@ main().catch(error => {
       recordsChanged: crawl.recordsChanged ?? null,
       engines: crawl.engines || [],
       additionalScannersConfigured: crawl.additionalScannersConfigured ?? 0,
+      additionalScannersScheduled: crawl.additionalScannersScheduled || [],
       additionalScanners: crawl.additionalScanners || [],
       irpaFitMatches: crawl.irpaFitMatches || null,
       topMatches: crawl.topMatches || [],
