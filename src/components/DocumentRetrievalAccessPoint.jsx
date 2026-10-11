@@ -19,6 +19,7 @@ function readableDate(value){
 
 export default function DocumentRetrievalAccessPoint(){
   const [open,setOpen]=useState(false);
+  useEffect(()=>{const handlePortalBranch=e=>{if(e?.detail?.portal==="Documents"&&e?.detail?.branch==="RETRIEVAL"){setOpen(true);if(environment)refresh();}};window.addEventListener("irpa:portal-branch",handlePortalBranch);return()=>window.removeEventListener("irpa:portal-branch",handlePortalBranch)},[environment]);
   const [environment,setEnvironment]=useState(()=>{try{return sessionStorage.getItem("irpaDataEnvironment")||""}catch{return ""}});
   const [confirmActual,setConfirmActual]=useState(false);
   const [documents,setDocuments]=useState([]);
