@@ -21,7 +21,7 @@ const report={target,testedAt:new Date().toISOString(),cache:{},authentication:{
  if(!dashboard){
   report.mode="production-css-fixture";
   report.authBlocker="No authorized test credentials supplied or login did not produce dashboard. Production authentication remains enabled; fixture only measures deployed CSS.";
-  const cssHref=report.htmlStylesheetAssets.find(x=>/\.css(?:\?|$)/.test(x));
+  const cssHref=report.htmlStylesheetAssets.find(x=>/\.css(?:\?|$)/.test(x) && new URL(x,target).origin===new URL(target).origin);
   if(!cssHref)throw new Error("No production CSS asset found in live HTML");
   await page.evaluate(async({cssHref})=>{
    document.querySelectorAll("link[rel=stylesheet]").forEach(e=>e.remove());
