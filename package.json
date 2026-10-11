@@ -12,7 +12,9 @@
     "check:meeting-media": "node scripts/check-meeting-media-governance.mjs",
     "test:meeting-category": "node --test tests/meeting-category-policy.test.mjs tests/meeting-category-firestore-rules.test.cjs",
     "check:production-readability": "node scripts/check-production-readability.mjs",
-    "verify:production-readability": "node scripts/verify-production-readability.mjs"
+    "verify:production-readability": "node scripts/verify-production-readability.mjs",
+    "test:finance-policy": "node --test tests/finance-portal-policy.test.cjs",
+    "test:security-rules": "node --test tests/meeting-category-firestore-rules.test.cjs tests/finance-portal-policy.test.cjs"
   },
   "dependencies": {
     "firebase": "^11.10.0",
