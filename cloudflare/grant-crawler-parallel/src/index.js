@@ -331,6 +331,9 @@ async function crawl(env) {
           pagesScanned: detailed?.pagesScanned ?? detailed?.scanned ?? null,
           detailPagesScanned: detailed?.detailPagesScanned ?? null,
           httpStatus: detailed?.httpStatus ?? null,
+          primaryHttpStatus: detailed?.primaryHttpStatus ?? null,
+          primarySourceError: detailed?.primarySourceError ?? null,
+          fallbackProvider: detailed?.fallbackProvider ?? null,
           found: items.length,
           errors,
           error: errors.length ? errors.length + " source/search errors: " + String(errors[0].error || errors[0]).slice(0, 180) : (detailed?.message || null)
