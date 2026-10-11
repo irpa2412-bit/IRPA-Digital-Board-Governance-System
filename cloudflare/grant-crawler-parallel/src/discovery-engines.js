@@ -119,6 +119,61 @@ export async function readOfficialPages(env) {
   return { items, stats: { configured: urls.length, scanned: urls.length, detailPagesScanned: selected.length, found: items.length, errors: errors.slice(0, 20) } };
 }
 
+
+export const DONOR_SCANNERS = [
+  { name: "japan_embassy", label: "Japan Embassy Grassroots Grants", url: "https://www.tz.emb-japan.go.jp/itpr_en/kusanone.html" },
+  { name: "canada_funding", label: "Canada International Funding Calls", url: "https://www.international.gc.ca/world-monde/funding-financement/open_calls-appels_ouverts.aspx?lang=eng" },
+  { name: "usadf_grants", label: "U.S. African Development Foundation", url: "https://www.usadf.gov/apply/" },
+  { name: "un_tanzania", label: "United Nations Tanzania Calls", url: "https://tanzania.un.org/en" },
+  { name: "undp_tanzania", label: "UNDP Tanzania Opportunities", url: "https://www.undp.org/tanzania/news" },
+  { name: "gef_small_grants", label: "GEF Small Grants Programme", url: "https://www.thegef.org/what-we-do/topics/gef-small-grants-programme" },
+  { name: "fao_funding", label: "FAO Funding Opportunities", url: "https://www.fao.org/partnerships/funding-opportunities/en" },
+  { name: "eu_tanzania", label: "EU Delegation Tanzania", url: "https://www.eeas.europa.eu/tanzania_en" },
+  { name: "tanzania_forest_fund", label: "Tanzania Forest Fund", url: "https://www.mfukowamisitu.go.tz/download-center" },
+  { name: "world_bank_funding", label: "World Bank Funding Opportunities", url: "https://www.worldbank.org/en/programs/financing" },
+];
+
+export async function readDonorScanner(scanner) {
+  const errors = [];
+  try {
+    const sourceUrl = normalizeOpportunityUrl(scanner.url);
+    const source = await fetchHtml(sourceUrl);
+    const sourceHost = new URL(source.finalUrl).hostname;
+    const anchors = getAnchors(source.html, source.finalUrl)
+      .filter(anchor => new URL(anchor.url).hostname === sourceHost)
+      .slice(0, 2);
+    const selected = anchors.slice(0, 1);
+    const found = await Promise.all(selected.map(async anchor => {
+      try {
+        const detail = await fetchHtml(anchor.url);
+        const parsed = parseOfficialPage(detail.html, detail.finalUrl);
+        const title = parsed.title || anchor.label;
+        const description = (parsed.description + " " + anchor.context).trim().slice(0, 5000);
+        if (!isSpecificOpportunity(title, description)) return null;
+        return { ...parsed, title, description, sourceUrl, discoveryEngine: scanner.name };
+      } catch (error) {
+        errors.push({ sourceUrl: anchor.url, error: String(error.message || error).slice(0, 180) });
+        return null;
+      }
+    }));
+    // The page itself can be a current grant scheme; retain it for eligibility review.
+    const self = parseOfficialPage(source.html, source.finalUrl);
+    if (isSpecificOpportunity(self.title, self.description)) {
+      found.push({ ...self, sourceUrl, discoveryEngine: scanner.name });
+    }
+    return {
+      items: found.filter(Boolean),
+      stats: {
+        configured: 1, scanned: 1, detailPagesScanned: selected.length,
+        found: found.filter(Boolean).length, errors
+      }
+    };
+  } catch (error) {
+    errors.push({ sourceUrl: scanner.url, error: String(error.message || error).slice(0, 180) });
+    return { items: [], stats: { configured: 1, scanned: 1, detailPagesScanned: 0, found: 0, errors } };
+  }
+}
+
 const SEARCH_QUERIES = ['"grant call" Tanzania NGO climate pastoral livestock rangeland','"call for proposals" Africa NGO environment biodiversity restoration','embassy small grants Tanzania NGO community development'];
 function xmlField(block, name) {
   const pattern = "<" + name + "\\b[^>]*>([\\s\\S]*?)<\\/" + name + "\\s*>";
