@@ -140,10 +140,10 @@ export const DONOR_SCANNERS = [
   { name: "ngo_portal_africa", label: "NGO Portal Africa Funding Calls", url: "https://jobs.ngoportal.africa/grants-funding/" },
   { name: "awdf_grants", label: "African Women’s Development Fund", url: "https://awdf.org/what-we-do/resourcing/" },
   { name: "urgent_action_fund_africa", label: "Urgent Action Fund Africa", url: "https://www.uaf-africa.org/apply-for-a-grant/" },
-  { name: "rufford_grants", label: "Rufford Foundation Conservation Grants", url: "https://www.rufford.org/grants/" },
+  { name: "rufford_grants", label: "Rufford Foundation Conservation Grants", url: "https://www.rufford.org/" },
   { name: "awhf_grants", label: "African World Heritage Fund Grants", url: "https://awhf.net/grants/" },
   { name: "gfcf_grants", label: "Global Fund for Community Foundations", url: "https://globalfundcommunityfoundations.org/what-we-do/grants/" },
-  { name: "mbz_species_grants", label: "Mohamed bin Zayed Species Conservation Fund", url: "https://www.speciesconservation.org/grants/" },
+  { name: "mbz_species_grants", label: "Mohamed bin Zayed Species Conservation Fund", url: "https://www.speciesconservation.org/" },
 ];
 
 export async function readDonorScanner(scanner) {
