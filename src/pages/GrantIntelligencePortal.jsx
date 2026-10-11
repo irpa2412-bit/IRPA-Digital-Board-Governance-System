@@ -360,7 +360,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
       return <details key={provision.engine} style={{border:"1px solid #344255",borderRadius:10,padding:"9px 11px",background:"rgba(255,255,255,0.015)"}}>
        <summary style={{cursor:"pointer",display:"flex",justifyContent:"space-between",gap:10,alignItems:"center",flexWrap:"wrap"}}>
         <strong style={{fontSize:13}}>{provision.label||provision.engine}</strong>
-        <span style={{fontSize:11,color:statusColor,fontWeight:800}}>{statusLabel} · {run?.items_seen??run?.found??0} found</span>
+        <span style={{fontSize:11,color:statusColor,fontWeight:800}}>{statusLabel} · {run?(run.items_seen??run.found??0)+" found":provision.engine==="ai_eligibility"?"AI tool":"Awaiting scan"}</span>
        </summary>
        <div style={{display:"grid",gap:8,marginTop:10}}>
         <div style={styles.muted}>{provision.description||"Parallel funding-opportunity discovery engine."}</div>
