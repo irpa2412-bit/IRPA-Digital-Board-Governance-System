@@ -1,5 +1,5 @@
 import { analyzeGrant } from "./assistant.js";
-import { readOfficialPages, readWebSearch, normalizeOpportunityUrl } from "./discovery-engines.js";
+import { readOfficialPages, readWebSearch, normalizeOpportunityUrl, readUNAgencyGrants, readEmbassySmallGrants, readClimateFunds, readBiodiversityConservation, readAgricultureLivestock, readWomenYouthEnterprise, readPastoralRangeland, readEastAfricaRegional, readCorporateFoundations, readTanzaniaFunding } from "./discovery-engines.js";
 import { handleApplicationPortal } from "./application-portal-handler.js";
 
 
@@ -312,7 +312,17 @@ async function crawl(env) {
   const engines = [
     { name: "rss_atom", run: () => readFeeds(env), configured: (() => { try { return JSON.parse(env.GRANT_FEED_URLS_JSON || env.GRANT_FEED_URLS || "[]").length; } catch { return 0; } })() },
     { name: "official_pages", run: () => readOfficialPages(env), configured: (() => { try { return JSON.parse(env.GRANT_SOURCE_PAGE_URLS_JSON || env.GRANT_SOURCE_PAGE_URLS || "[]").length; } catch { return 0; } })() },
-    { name: "web_search", run: () => readWebSearch(env), configured: String(env.BRAVE_SEARCH_API_KEY || "").trim() ? 1 : 0 },
+    { name: "web_search", run: () => readWebSearch(env), configured: 1 },
+    { name: "un_agency_grants", run: readUNAgencyGrants, configured: 1 },
+    { name: "embassy_small_grants", run: readEmbassySmallGrants, configured: 1 },
+    { name: "climate_funds", run: readClimateFunds, configured: 1 },
+    { name: "biodiversity_conservation", run: readBiodiversityConservation, configured: 1 },
+    { name: "agriculture_livestock", run: readAgricultureLivestock, configured: 1 },
+    { name: "women_youth_enterprise", run: readWomenYouthEnterprise, configured: 1 },
+    { name: "pastoral_rangeland", run: readPastoralRangeland, configured: 1 },
+    { name: "east_africa_regional", run: readEastAfricaRegional, configured: 1 },
+    { name: "corporate_foundations", run: readCorporateFoundations, configured: 1 },
+    { name: "tanzania_funding", run: readTanzaniaFunding, configured: 1 },
   ];
   const settled = await Promise.all(engines.map(async engine => {
     try {
