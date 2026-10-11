@@ -7830,3 +7830,56 @@
     max-width: 260px !important;
   }
 }
+
+
+/* 2026-10-11 corrective fix: prevent the date/time card from stretching to the
+   height of the navigation row. Keep its existing date, clock and 12H/24H control. */
+@media screen and (min-width:761px) {
+  .desktop-webapp-navigation-roller .webapp-navigation-live-clock {
+    display: grid !important;
+    width: 100% !important;
+    height: 76px !important;
+    min-height: 76px !important;
+    max-height: 76px !important;
+    align-self: start !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr) !important;
+    grid-template-areas: "day date" "time button" !important;
+    align-content: center !important;
+    justify-content: stretch !important;
+    gap: 4px 8px !important;
+    padding: 7px 9px !important;
+    overflow: hidden !important;
+  }
+  .desktop-webapp-navigation-roller .webapp-navigation-live-clock strong {
+    grid-area: day !important;
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    align-self: end !important;
+    white-space: nowrap !important;
+    line-height: 1.15 !important;
+  }
+  .desktop-webapp-navigation-roller .webapp-navigation-live-clock span {
+    grid-area: date !important;
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    align-self: end !important;
+    white-space: nowrap !important;
+    line-height: 1.15 !important;
+  }
+  .desktop-webapp-navigation-roller .webapp-navigation-live-clock b {
+    grid-area: time !important;
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+    align-self: start !important;
+    line-height: 1.15 !important;
+  }
+  .desktop-webapp-navigation-roller .webapp-navigation-live-clock button {
+    grid-area: button !important;
+    grid-column: 2 !important;
+    grid-row: 2 !important;
+    align-self: start !important;
+    min-height: 27px !important;
+    line-height: 1 !important;
+  }
+}
