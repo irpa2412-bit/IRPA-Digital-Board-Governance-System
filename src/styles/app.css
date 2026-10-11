@@ -9005,7 +9005,7 @@ html body #root .main-area > .topbar .topbar-heading-row > .topbar-access-catego
       height:auto!important; min-height:0!important; max-height:300px!important; overflow:visible!important;
     }
     html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row {
-      display:grid!important; grid-template-columns:minmax(200px,260px) minmax(0,1fr) 6cm!important;
+      display:grid!important; grid-template-columns:minmax(200px,260px) minmax(0,1fr) 250px!important;
       grid-template-areas:"title weather authority"!important; grid-template-rows:auto!important;
       column-gap:0!important; row-gap:0!important; align-items:center!important; max-height:300px!important; overflow:visible!important;
     }

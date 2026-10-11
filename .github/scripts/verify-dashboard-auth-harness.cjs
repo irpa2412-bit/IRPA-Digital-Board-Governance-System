@@ -33,7 +33,7 @@ const report = { testedAt:new Date().toISOString(), production:{url:prodUrl,cach
   await page.route("**/*",async route=>{
    const req=route.request(),u=new URL(req.url()),method=req.method().toUpperCase();
    const cloudMutationHost=/firestore\.googleapis\.com|identitytoolkit\.googleapis\.com|securetoken\.googleapis\.com|cloudfunctions\.net|firebaseio\.com/.test(u.hostname);
-   const readOnlyRpc=/:(runQuery|batchGet|listCollectionIds)$/.test(u.pathname);
+   const readOnlyRpc=/:(runQuery|batchGet|listCollectionIds)$/.test(u.pathname)||/\/Listen\/channel$/.test(u.pathname);
    const mutation=cloudMutationHost&&["POST","PUT","PATCH","DELETE"].includes(method)&&!readOnlyRpc;
    if(mutation){report.isolatedHarness.blockedMutations.push({method,url:req.url()});await route.abort("blockedbyclient");return}
    await route.continue();
