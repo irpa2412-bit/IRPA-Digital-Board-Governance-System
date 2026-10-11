@@ -8,11 +8,14 @@ const report={target,testedAt:new Date().toISOString(),cache:{},viewports:[],int
  const page=await browser.newPage({viewport:{width:1366,height:768},deviceScaleFactor:1});
  page.on("console",m=>{if(m.type()==="error")report.consoleErrors.push({text:m.text(),location:m.location()})});page.on("pageerror",e=>report.pageErrors.push(String(e)));
  const response=await page.goto(target,{waitUntil:"domcontentloaded",timeout:60000});report.httpStatus=response?.status();await page.waitForTimeout(5000);
- const html=await page.content();report.cache.indexVersion=html.match(/\/src\/main\.jsx\?v=([^"'&]+)/)?.[1]||null;
+ const html=await page.content();
+ report.htmlScriptAssets=await page.locator("script[src]").evaluateAll(es=>es.map(e=>e.getAttribute("src")));
+ report.htmlStylesheetAssets=await page.locator('link[rel="stylesheet"]').evaluateAll(es=>es.map(e=>e.getAttribute("href")));
+report.cache.indexVersion=html.match(/\/src\/main\.jsx\?v=([^"'&]+)/)?.[1]||null;
  try{const r=await page.request.get(new URL("/sw.js",target).toString(),{timeout:20000});const t=await r.text();report.cache.swHttpStatus=r.status();report.cache.serviceWorkerVersion=t.match(/CACHE_NAME\s*=\s*["']([^"']+)/)?.[1]||null}catch(e){report.cache.swFetchError=String(e)}
  report.title=await page.title();report.authScreenVisible=await page.locator(".auth-screen").count()>0;
  report.dashboardAccessible=await page.locator(".google-weather-panel").count()>0&&await page.locator(".topbar-access-category").count()>0&&await page.locator(".topbar-heading-row").count()>0;
- if(!report.dashboardAccessible){await page.screenshot({path:path.join(out,"auth-or-gate-screen.png"),fullPage:true});report.dashboardBlocker=report.authScreenVisible?"Anonymous browser landed on authentication screen; authenticated dashboard session unavailable.":"Dashboard/weather selectors not found on the live page."}
+ if(!report.dashboardAccessible){for(const vp of [{width:1366,height:768},{width:1920,height:1080}]){await page.setViewportSize(vp);await page.waitForTimeout(300);await page.screenshot({path:path.join(out,"auth-screen-"+vp.width+"x"+vp.height+".png"),fullPage:true})}report.dashboardBlocker=report.authScreenVisible?"Anonymous browser landed on authentication screen; authenticated dashboard session unavailable.":"Dashboard/weather selectors not found on the live page.";report.dashboardChecks="SKIPPED — production authentication required; no credentials/session were supplied to this isolated browser."}
  else{
   for(const vp of [{width:1366,height:768},{width:1920,height:1080}]){
    await page.setViewportSize(vp);await page.waitForTimeout(1000);
