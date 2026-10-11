@@ -3047,15 +3047,21 @@ textarea:focus-visible{
     width:100%!important;min-width:0!important;max-width:100%!important;
     height:auto!important;max-height:none!important;overflow:visible!important;
     padding:14px!important;margin:0!important;box-sizing:border-box!important;
-    background:#082d4b!important;border:1px solid rgba(214,165,44,.75)!important;
-    border-radius:12px!important;color:#fff!important;z-index:2!important;
+    background:#111312!important;border:1px solid #343735!important;
+    border-radius:12px!important;color:#f5f5f5!important;-webkit-text-fill-color:#f5f5f5!important;
+    box-shadow:0 8px 22px rgba(0,0,0,.22)!important;z-index:2!important;
   }
   .topbar-access-category>span,
   .topbar-access-category .login-category-heading,
-  .topbar-access-category .login-category-note{display:block!important;visibility:visible!important;opacity:1!important;color:#edf5f1!important;white-space:normal!important;}
+  .topbar-access-category .login-category-note,
+  .topbar-access-category .login-category-explanation,
+  .topbar-access-category .login-category-identifiers strong{display:block!important;visibility:visible!important;opacity:1!important;color:#f5f5f5!important;-webkit-text-fill-color:#f5f5f5!important;white-space:normal!important;}
+  .topbar-access-category .login-category-identifiers{border-top-color:rgba(245,245,245,.18)!important;}
+  .topbar-access-category .login-category-identifiers small,
+  .topbar-access-category .login-category-empty{color:#d1d5db!important;-webkit-text-fill-color:#d1d5db!important;}
   .topbar-access-category .login-category-list,
   .topbar-access-category .login-category-item{display:flex!important;visibility:visible!important;opacity:1!important;flex-wrap:wrap!important;gap:8px!important;}
-  .topbar-access-category .login-category-pill{color:#f3d36a!important;border-color:#d6a52c!important;background:transparent!important;}
+  .topbar-access-category .login-category-pill{color:#f5f5f5!important;-webkit-text-fill-color:#f5f5f5!important;border-color:#e5e7eb!important;background:transparent!important;}
   .topbar-access-category select,
   .topbar-access-category .authority-select,
   .topbar-access-category .access-category-select{color:#173b2d!important;background:#fff!important;opacity:1!important;}
