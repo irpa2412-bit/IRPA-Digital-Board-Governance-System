@@ -592,10 +592,10 @@ test("official webpage parser extracts safe title and description text", () => {
   assert.equal(decodeHtml("Women &amp; youth"), "Women & youth");
 });
 
-test("registers twenty-two independent donor scanners with official HTTPS sources", () => {
-  assert.equal(DONOR_SCANNERS.length, 22);
-  assert.equal(new Set(DONOR_SCANNERS.map(scanner => scanner.name)).size, 22);
-  for (const name of ["fundsforngos_latest", "fundsforngos_africa", "fundsforngos_tanzania", "fundsforngos_news"]) {
+test("registers twenty-six independent donor scanners with official HTTPS sources", () => {
+  assert.equal(DONOR_SCANNERS.length, 26);
+  assert.equal(new Set(DONOR_SCANNERS.map(scanner => scanner.name)).size, 26);
+  for (const name of ["fundsforngos_latest", "fundsforngos_africa", "fundsforngos_tanzania", "fundsforngos_news", "africa_climate_change_fund", "global_eba_fund", "climate_justice_resilience_fund", "whitley_fund_for_nature"]) {
     assert.ok(DONOR_SCANNERS.some(scanner => scanner.name === name));
   }
   for (const scanner of DONOR_SCANNERS) {
