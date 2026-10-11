@@ -2,30 +2,39 @@ import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 
 const EXPECTED_PROJECT_ID = "irpa-digital-board-governance";
-const AUDIT_DOC = "financeProductionReset20261011";
-const PROTECTED_REGISTERS = new Set([
-  "financeChartOfAccounts",
-  "financePeriods",
-  "financeReferenceRegistry"
+const AUDIT_DOC = "wholeWebAppZeroReset20261011";
+// Preserve authentication, authorization, personnel identity, and deployment configuration
+// so the administrator can sign in and continue operational-readiness work after the reset.
+const PROTECTED_TOP_LEVEL = new Set([
+  "adminProfiles",
+  "members",
+  "employees",
+  "systemSettings",
+  "auditorProfiles",
+  "signerIdentities",
+  "signatureProfiles"
 ]);
-const TARGET_COLLECTIONS = [
-  "financeJournalBatches",
-  "financeLedgerJournals",
-  "financeLedgerEntries",
-  "financePaymentMatches",
-  "financeBudgets",
-  "financeTransactions",
-  "financePaymentTrace",
-  "financeFunding",
-  "financeApprovals",
-  "financeCommitments",
-  "financeGrants",
-  "financeBankAccounts",
-  "financeReconciliations",
-  "financeAssets",
-  "financeRisks",
-  "financeReports"
-];
+
+async function deleteCollectionTree(db, collectionRef, report) {
+  const snap = await collectionRef.get();
+  report.before[collectionRef.path] = snap.size;
+  let deleted = 0;
+  for (const doc of snap.docs) {
+    const children = await doc.ref.listCollections();
+    for (const child of children) {
+      deleted += await deleteCollectionTree(db, child, report);
+    }
+    await doc.ref.delete();
+    deleted++;
+  }
+  report.deleted[collectionRef.path] = deleted;
+  const verify = await collectionRef.get();
+  report.after[collectionRef.path] = verify.size;
+  if (!verify.empty) {
+    throw new Error(`Zero-reset verification failed for ${collectionRef.path}: ${verify.size} documents remain.`);
+  }
+  return deleted;
+}
 
 async function main() {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
@@ -39,67 +48,56 @@ async function main() {
   const auditRef = db.collection("systemSettings").doc(AUDIT_DOC);
   const existing = await auditRef.get();
   if (existing.exists && existing.data()?.status === "COMPLETED") {
-    console.log("FINANCE_RESET_ALREADY_COMPLETED: no deletion performed.");
+    console.log("WHOLE_WEB_APP_ZERO_RESET_ALREADY_COMPLETED: no deletion performed.");
     console.log(JSON.stringify(existing.data()));
     return;
   }
 
-  const before = {};
-  const deleted = {};
-  const trialPreserved = {};
-  const after = {};
-  for (const name of TARGET_COLLECTIONS) {
-    const snap = await db.collection(name).get();
-    before[name] = snap.size;
-    const productionDocs = snap.docs.filter(doc => doc.data()?.recordOrigin !== "TRIAL");
-    const trialDocs = snap.docs.filter(doc => doc.data()?.recordOrigin === "TRIAL");
-    trialPreserved[name] = trialDocs.length;
-    const writer = db.bulkWriter();
-    let count = 0;
-    for (const doc of productionDocs) {
-      writer.delete(doc.ref);
-      count++;
+  const report = { before: {}, deleted: {}, after: {}, protected: {}, startedAt: new Date().toISOString() };
+  const collections = await db.listCollections();
+  const targets = collections.filter(c => !PROTECTED_TOP_LEVEL.has(c.id) && c.id !== "systemSettings");
+  const totalBefore = {};
+  for (const collection of collections) {
+    if (PROTECTED_TOP_LEVEL.has(collection.id)) {
+      const snap = await collection.get();
+      report.protected[collection.id] = { documentsPreserved: snap.size };
+      continue;
     }
-    await writer.close();
-    deleted[name] = count;
+    if (collection.id === "systemSettings") continue;
+    totalBefore[collection.id] = (await collection.get()).size;
   }
 
-  for (const name of TARGET_COLLECTIONS) {
-    const snap = await db.collection(name).get();
-    after[name] = snap.size;
-    const remainingProduction = snap.docs.filter(doc => doc.data()?.recordOrigin !== "TRIAL").length;
-    const remainingTrial = snap.docs.filter(doc => doc.data()?.recordOrigin === "TRIAL").length;
-    if (remainingProduction !== 0) {
-      throw new Error(`Verification failed for ${name}: ${remainingProduction} non-TRIAL record(s) remain.`);
-    }
-    if (remainingTrial !== trialPreserved[name]) {
-      throw new Error(`TRIAL preservation check failed for ${name}: expected ${trialPreserved[name]}, found ${remainingTrial}.`);
-    }
+  let deletedDocuments = 0;
+  for (const collection of targets) {
+    deletedDocuments += await deleteCollectionTree(db, collection, report);
   }
 
-  const preservedRegisters = {};
-  for (const name of PROTECTED_REGISTERS) {
-    preservedRegisters[name] = (await db.collection(name).get()).size;
+  const remaining = {};
+  for (const collection of targets) {
+    const snap = await collection.get();
+    remaining[collection.id] = snap.size;
+    if (!snap.empty) throw new Error(`Top-level zero-reset verification failed for ${collection.id}: ${snap.size} documents remain.`);
   }
   const result = {
     status: "COMPLETED",
     projectId: EXPECTED_PROJECT_ID,
     completedAt: FieldValue.serverTimestamp(),
-    scope: "Delete all non-TRIAL documents in operational Finance collections; preserve all TRIAL documents and protected registers.",
-    protectedRegisters: [...PROTECTED_REGISTERS],
-    targetCollections: TARGET_COLLECTIONS,
-    before,
-    deleted,
-    trialPreserved,
-    after,
-    preservedRegisters
+    scope: "Zero-reset all application data collections and their nested subcollections. Preserve only administrator/member/employee identity, auditor and signer identity profiles, and system configuration required for secure access and continued setup.",
+    protectedTopLevelCollections: [...PROTECTED_TOP_LEVEL],
+    totalDeletedDocuments: deletedDocuments,
+    beforeTopLevelCounts: totalBefore,
+    deletedByCollectionPath: report.deleted,
+    beforeByCollectionPath: report.before,
+    afterByCollectionPath: report.after,
+    protected: report.protected,
+    remainingTopLevelCounts: remaining
   };
   await auditRef.set(result);
-  console.log("FINANCE_PRODUCTION_RESET_VERIFIED");
+  console.log("WHOLE_WEB_APP_ZERO_RESET_VERIFIED");
   console.log(JSON.stringify({ ...result, completedAt: "serverTimestamp" }, null, 2));
 }
 
 main().catch(error => {
-  console.error("FINANCE_PRODUCTION_RESET_FAILED", error);
+  console.error("WHOLE_WEB_APP_ZERO_RESET_FAILED", error);
   process.exit(1);
 });
