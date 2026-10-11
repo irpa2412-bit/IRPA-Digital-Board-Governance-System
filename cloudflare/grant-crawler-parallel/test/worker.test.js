@@ -2,7 +2,17 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import worker, { assessFit, isCurrentOpportunity, parseFeed, safeUrl } from "../src/index.js";
 import { assessGeographicEligibility } from "../src/assistant.js";
-import { DONOR_SCANNERS, decodeHtml, normalizeOpportunityUrl, parseOfficialPage, parseSearchRss, readDonorScanner, readOfficialPages, readWebSearch } from "../src/discovery-engines.js";
+import { DONOR_SCANNERS, SEARCH_QUERIES, decodeHtml, normalizeOpportunityUrl, parseOfficialPage, parseSearchRss, readDonorScanner, readOfficialPages, readWebSearch } from "../src/discovery-engines.js";
+
+test("expanded engine registry includes African NGO aggregators and conservation funders", () => {
+  const names = new Set(DONOR_SCANNERS.map(scanner => scanner.name));
+  for (const name of ["fundsforngos_latest", "fundsforngos_africa", "africanngos_roundups", "ngo_portal_africa", "awdf_grants", "urgent_action_fund_africa", "rufford_grants", "awhf_grants", "gfcf_grants", "mbz_species_grants"]) {
+    assert.ok(names.has(name), "missing configured discovery engine: " + name);
+  }
+  assert.ok(DONOR_SCANNERS.every(scanner => scanner.url.startsWith("https://")));
+  assert.ok(SEARCH_QUERIES.length >= 3);
+  assert.equal(new Set(DONOR_SCANNERS.map(scanner => scanner.name)).size, DONOR_SCANNERS.length);
+});
 
 test("accepts only credential-free HTTPS feed URLs", () => {
   assert.equal(safeUrl("https://example.org/feed.xml").hostname, "example.org");
