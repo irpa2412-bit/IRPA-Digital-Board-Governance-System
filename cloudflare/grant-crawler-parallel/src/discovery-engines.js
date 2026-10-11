@@ -136,6 +136,14 @@ export const DONOR_SCANNERS = [
   { name: "fundsforngos_africa", label: "FundsforNGOs Current Funding Listings", url: "https://www2.fundsforngos.org/category/listing/" },
   { name: "fundsforngos_tanzania", label: "FundsforNGOs Tanzania Funding Calls", url: "https://www2.fundsforngos.org/listing/new-grant-funding-opportunities-for-tanzania-in-2026/" },
   { name: "fundsforngos_news", label: "FundsforNGOs Funding News", url: "https://news.fundsforngos.org/" },
+  { name: "africanngos_roundups", label: "AfricanNGOs Funding Roundups", url: "https://africanngos.org/" },
+  { name: "ngo_portal_africa", label: "NGO Portal Africa Funding Calls", url: "https://jobs.ngoportal.africa/grants-funding/" },
+  { name: "awdf_grants", label: "African Women's Development Fund", url: "https://awdf.org/what-we-do/resourcing/" },
+  { name: "urgent_action_fund_africa", label: "Urgent Action Fund Africa", url: "https://www.uaf-africa.org/apply-for-a-grant/" },
+  { name: "rufford_grants", label: "Rufford Foundation Conservation Grants", url: "https://www.rufford.org/" },
+  { name: "awhf_grants", label: "African Wildlife and Habitat Foundation Grants", url: "https://awhf.net/grants/" },
+  { name: "gfcf_grants", label: "Global Fund for Community Foundations", url: "https://globalfundcommunityfoundations.org/what-we-do/grants/" },
+  { name: "mbz_species_grants", label: "Mohamed bin Zayed Species Conservation Fund", url: "https://www.speciesconservation.org/" },
 ];
 
 export async function readDonorScanner(scanner) {
