@@ -9382,7 +9382,7 @@ html body #root .main-area > .topbar.dashboard-topbar .topbar-heading-row > .top
   -webkit-text-fill-color: #f7cf61;
 }
 html body #root .main-area > .topbar.dashboard-topbar .topbar-heading-row > .topbar-access-category.topbar-access-category.topbar-access-category .login-category-pill {
-  background-color: transparent;
+  background-color: rgba(0, 0, 0, 0);
   border-color: currentColor;
 }
 html body #root .main-area > .topbar.dashboard-topbar .topbar-heading-row > .topbar-access-category.topbar-access-category.topbar-access-category .login-category-explanation {
