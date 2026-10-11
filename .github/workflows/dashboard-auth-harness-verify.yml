@@ -6,6 +6,7 @@ on:
       - ".github/scripts/verify-dashboard-auth-harness.cjs"
       - ".github/workflows/dashboard-auth-harness-verify.yml"
       - "src/styles/app.css"
+      - "src/styles/readability-harmony.css"
 permissions:
   contents: read
 jobs:
