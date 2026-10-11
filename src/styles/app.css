@@ -10291,3 +10291,54 @@ html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-headin
   html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-metrics > span { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-width: 0; padding: 10px 8px; font-size: 1rem; text-align: center; white-space: normal; overflow-wrap: anywhere; }
   html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-metrics > span b { font-size: 1.4rem; white-space: normal; overflow-wrap: anywhere; }
 }
+
+
+/* Dashboard overhead alignment and weather readability — scoped, additive correction. */
+@media (min-width: 901px) {
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row {
+    align-items: start;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .topbar-title-block {
+    align-self: start;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .topbar-access-category {
+    align-self: start;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel {
+    width: calc(100% + 1.5cm);
+    position: relative;
+    left: -1.5cm;
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    align-self: start;
+    box-sizing: border-box;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-current-main {
+    color: #24649a;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-current-main strong {
+    font-size: clamp(1.45rem, 1.8vw, 2rem);
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-current-main small {
+    font-size: clamp(.95rem, 1vw, 1.1rem);
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: center;
+    gap: 8px 12px;
+    color: #24649a;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-metrics > span {
+    min-width: 0;
+    font-size: clamp(.9rem, .95vw, 1.05rem);
+    line-height: 1.3;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-metrics > span b {
+    font-size: clamp(1.05rem, 1.2vw, 1.35rem);
+    line-height: 1.2;
+  }
+}
