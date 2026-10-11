@@ -5,6 +5,7 @@ on:
     branches: [main, fix/member-signature-invitation-email-20261004]
     paths:
       - "drive-gateway/**"
+      - "src/firebase/documentLifecycle.js"
       - "firebase.json"
       - ".github/workflows/staging-gateway-e2e.yml"
   workflow_dispatch:
