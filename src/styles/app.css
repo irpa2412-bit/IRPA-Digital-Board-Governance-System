@@ -8776,14 +8776,6 @@ html body #root .main-area > .topbar .topbar-heading-row > .topbar-access-catego
 
 /* Dashboard weather correction only: restore the title block's inherited/original
    appearance by leaving its colours and decoration untouched; expand weather content. */
-.main-area > .topbar.dashboard-topbar .topbar-heading-row > .topbar-title-block {
-  background: initial;
-  background-image: initial;
-  color: inherit;
-  border-color: initial;
-  box-shadow: initial;
-  opacity: 1;
-}
 .main-area > .topbar.dashboard-topbar .topbar-heading-row > .google-weather-panel {
   width: 100%;
   max-width: none;
