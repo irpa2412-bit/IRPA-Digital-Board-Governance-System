@@ -21,6 +21,7 @@ jobs:
       - name: Build web application
         env:
           VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
+          VITE_GOOGLE_WEATHER_API_KEY: ${{ secrets.VITE_GOOGLE_WEATHER_API_KEY }}
         run: npm run build
       - name: Independent production readability verification
         run: npm run verify:production-readability
