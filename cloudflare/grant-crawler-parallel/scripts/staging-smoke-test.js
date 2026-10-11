@@ -95,6 +95,8 @@ async function main() {
     crawlerStatus: crawlResult.status,
     feedsConfigured: crawlResult.feedsConfigured,
     sourcePagesConfigured: crawlResult.sourcePagesConfigured,
+    additionalScannersConfigured: crawlResult.additionalScannersConfigured,
+    additionalScanners: crawlResult.additionalScanners,
     webSearchConfigured: crawlResult.webSearchConfigured,
     engines: crawlResult.engines,
     irpaFitMatches: crawlResult.irpaFitMatches,
