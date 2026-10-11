@@ -11,6 +11,10 @@ test("expanded engine registry includes African NGO aggregators and conservation
   }
   assert.ok(DONOR_SCANNERS.every(scanner => scanner.url.startsWith("https://")));
   assert.ok(SEARCH_QUERIES.length >= 3);
+  const expandedQueries = SEARCH_QUERIES.join(" ").toLowerCase();
+  for (const term of ["youth", "children", "livelihoods", "health", "renewable energy", "solar", "pastoralism", "rangeland", "livestock"]) {
+    assert.ok(expandedQueries.includes(term), "missing expanded search term: " + term);
+  }
   assert.equal(new Set(DONOR_SCANNERS.map(scanner => scanner.name)).size, DONOR_SCANNERS.length);
 });
 
