@@ -14,8 +14,22 @@ const CORE=[
   ["Documents Portal","Documents"],["Signature Portal","Signature Platform"],["Authorization & Approvals Portal","Authorization & Approvals"],
   ["Employee Payments Portal","Employee Payments"],["Reports Portal","Reports"],["Actions Portal","Actions"]
 ];
+/* Explicit cross-portal provisions for interactive sub-portals.
+   These links appear only inside the in-portal workflow bar, never in global Back/Next navigation. */
+const INTERACTIVE_PORTAL_CONNECTIONS={
+  "Meeting Room":["Meetings","Participants","Documents","Actions","Decisions"],
+  "Participants":["Meetings","Meeting Room","Documents","Actions","Decisions"],
+  "Resolutions":["Meetings","Voting","Decisions","Actions","Documents"],
+  "Voting":["Meetings","Resolutions","Decisions"],
+  "Decisions":["Meetings","Resolutions","Actions","Documents","Reports","Authorization & Approvals"],
+  "Actions":["Meetings","Decisions","Documents","Authorization & Approvals","Reports","Procurement"],
+  "Procurement":["Finance Portfolio","Authorization & Approvals","Documents","Reports","Employee Payments"],
+  "Induction Applications":["Induction and Orientation","Members & Personnel","Documents","Authorization & Approvals"]
+};
+const MODULE_LABELS={"Meetings":"Meeting Portal","Meeting Room":"Meeting Room Portal","Participants":"Participants Portal","Resolutions":"Resolutions Portal","Voting":"Voting Portal","Decisions":"Decisions Portal","Actions":"Actions Portal","Finance Portfolio":"Finance Portal","Procurement":"Procurement Portal","Induction and Orientation":"Induction & Orientation Portal","Induction Applications":"Induction Applications Portal","Members & Personnel":"Members & Personnel Portal","Documents":"Documents Portal","Authorization & Approvals":"Authorization & Approvals Portal","Reports":"Reports Portal","Employee Payments":"Employee Payments Portal"};
+
 function contextLabel(c){if(!c)return"";return c.resolutionReference||c.meetingReference||c.documentReference||c.procurementReference||c.authorizationReference||c.employeeNumber||""}
-export default function ModuleInterlinkBar({active,onNavigate,admin=false,role=""}){
+export default function ModuleInterlinkBar({active,onNavigate,admin=false,role="",modules=[]}){
   const[context,setContext]=useState(null),[feedback,setFeedback]=useState("");
   const finance=admin||["Executive Director","Finance Personnel","Finance Manager","Accountant","Finance Officer"].includes(role);
   useEffect(()=>{const sync=()=>setContext(readWorkflowContext());sync();const handler=e=>setContext(e?.detail?.context||readWorkflowContext());window.addEventListener("irpa:navigate",handler);return()=>window.removeEventListener("irpa:navigate",handler)},[active]);
@@ -29,6 +43,7 @@ export default function ModuleInterlinkBar({active,onNavigate,admin=false,role="
   };
   const label=contextLabel(context);
   const linked=workflowLinkEntries(context||{});
+  const connectedPortals=(INTERACTIVE_PORTAL_CONNECTIONS[active]||[]).filter(target=>target!==active&&modules.includes(target)&&((target!=="Finance Portfolio"&&target!=="Procurement")||finance));
   return <><ResearchEvidenceExchange active={active} onNavigate={onNavigate}/><section className="module-interlink-bar" aria-label="Related governance modules">{feedback&&<div className="action-feedback" role="status" aria-live="polite">{feedback}</div>}
     <div className="module-interlink-heading"><span>CONNECTED WORKFLOW</span><small>Move directly between linked institutional records</small>{label&&<strong className="workflow-context-chip">Linked record: {label}</strong>}</div>
     <div className="module-interlink-list">
@@ -40,6 +55,7 @@ export default function ModuleInterlinkBar({active,onNavigate,admin=false,role="
       </div>)}
       {CORE.map(([itemLabel,target])=><button key={target} type="button" className={target===active?"active":""} onClick={()=>go(target)}>{itemLabel}</button>)}
     </div>
-    {linked.length>0&&<div className="workflow-linked-records"><span>ACTIVE LINKS</span>{linked.map(link=><button key={link.module+"-"+(link.id||link.reference)} type="button" className={link.module===active?"linked-active":""} onClick={()=>go(link.module)}>{link.module}: {link.reference}</button>)}</div>}
+    {connectedPortals.length>0&&<div className="workflow-linked-records workflow-connected-portals"><span>CONNECTED PORTALS FOR THIS WORKFLOW</span>{connectedPortals.map(target=><button key={"connected-"+target} type="button" className={target===active?"linked-active":""} onClick={()=>go(target)}>{MODULE_LABELS[target]||target}</button>)}</div>}
+    {linked.length>0&&<div className="workflow-linked-records"><span>ACTIVE RECORD LINKS</span>{linked.map(link=><button key={link.module+"-"+(link.id||link.reference)} type="button" className={link.module===active?"linked-active":""} onClick={()=>go(link.module)}>{link.module}: {link.reference}</button>)}</div>}
   </section></>;
 }
