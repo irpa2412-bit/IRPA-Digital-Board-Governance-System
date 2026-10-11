@@ -2,7 +2,7 @@ name: IRPA Security Baseline Gate
 
 on:
   push:
-    branches: [main]
+    branches: [main, feat/data-gate-field-entry]
   pull_request:
     branches: [main]
 
