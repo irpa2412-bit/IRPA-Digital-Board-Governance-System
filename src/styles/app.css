@@ -9109,29 +9109,29 @@ html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-ro
 /* 2026-10-11 Live Weather width correction.
    Layout-only: preserve all paint, text, data bindings, and existing card height. */
 @media (min-width: 901px) {
-  .main-area > header.topbar.dashboard-topbar > .topbar-heading-row {
+  html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row {
     grid-template-columns: minmax(180px, 0.6fr) minmax(560px, 2.4fr) minmax(260px, 0.9fr);
   }
 }
-.main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel {
+html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel {
   width: 100%;
   max-width: none;
   min-width: 0;
   flex: 1 1 auto;
   box-sizing: border-box;
 }
-.main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-content,
-.main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-location-bar,
-.main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-current,
-.main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-current-main,
-.main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-metrics,
-.main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-attribution {
+html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-content,
+html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-location-bar,
+html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-current,
+html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-current-main,
+html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-metrics,
+html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-attribution {
   width: 100%;
   max-width: none;
   min-width: 0;
   box-sizing: border-box;
 }
-.main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-days {
+html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-days {
   display: flex;
   flex-direction: row;
   flex-wrap: nowrap;
@@ -9143,7 +9143,7 @@ html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-ro
   box-sizing: border-box;
   -webkit-overflow-scrolling: touch;
 }
-.main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-day {
+html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-day {
   flex: 0 0 110px;
   min-width: 110px;
   max-width: none;
@@ -9151,17 +9151,17 @@ html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-ro
   box-sizing: border-box;
 }
 @media (max-width: 900px) {
-  .main-area > header.topbar.dashboard-topbar > .topbar-heading-row {
+  html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "title" "weather" "authority";
   }
-  .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel {
+  html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel {
     width: 100%;
     max-width: none;
     min-width: 0;
     flex: 1 1 auto;
   }
-  .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-days {
+  html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-days {
     width: 100%;
     max-width: none;
     min-width: 0;
@@ -9172,8 +9172,8 @@ html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-ro
 
 /* Keep current conditions and metrics side-by-side where width permits.
    This prevents the width repair from increasing the card's vertical footprint. */
-.main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-current-main,
-.main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-metrics {
+html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-current-main,
+html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-metrics {
   width: auto;
   flex: 1 1 220px;
   min-width: 0;
