@@ -30,6 +30,8 @@ async function main() {
       pagesScanned: scanner.pagesScanned,
       httpStatus: scanner.httpStatus,
       found: scanner.found,
+      candidatesAfterDeduplication: scanner.candidatesAfterDeduplication,
+      sharedRegisterWrites: scanner.sharedRegisterWrites,
       errors: scanner.errors || scanner.error || null
     }))
   };
