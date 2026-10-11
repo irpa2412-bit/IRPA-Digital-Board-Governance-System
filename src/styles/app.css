@@ -5147,7 +5147,7 @@
   }
   .topbar-heading-row>.google-weather-panel .live-weather-location-name>span,
   .topbar-heading-row>.google-weather-panel .live-weather-location-name>small {
-    font-size:11px;
+    font-size:12px;
     line-height:1.2;
   }
   .topbar-heading-row>.google-weather-panel .live-weather-location-controls button {
@@ -5172,7 +5172,7 @@
     line-height:1.05;
   }
   .topbar-heading-row>.google-weather-panel .live-weather-current-main small {
-    font-size:11px;
+    font-size:12px;
     line-height:1.25;
   }
   .topbar-heading-row>.google-weather-panel .live-weather-icon {
@@ -5193,11 +5193,11 @@
   }
   .topbar-heading-row>.google-weather-panel .live-weather-metrics>span {
     padding:4px 6px;
-    font-size:11px;
+    font-size:12px;
     line-height:1.2;
   }
   .topbar-heading-row>.google-weather-panel .live-weather-metrics b {
-    font-size:11px;
+    font-size:12px;
   }
   .topbar-heading-row>.google-weather-panel .live-weather-days {
     grid-template-columns:repeat(3,minmax(0,1fr));
@@ -5211,7 +5211,7 @@
   .topbar-heading-row>.google-weather-panel .live-weather-day strong,
   .topbar-heading-row>.google-weather-panel .live-weather-day b,
   .topbar-heading-row>.google-weather-panel .live-weather-day small {
-    font-size:11px;
+    font-size:12px;
     line-height:1.2;
   }
   .topbar-heading-row>.google-weather-panel .live-weather-day-icon {
@@ -5224,7 +5224,7 @@
   }
   .topbar-heading-row>.google-weather-panel .live-weather-attribution span,
   .topbar-heading-row>.google-weather-panel .live-weather-attribution small {
-    font-size:10px;
+    font-size:12px;
     line-height:1.25;
     overflow-wrap:anywhere;
   }
