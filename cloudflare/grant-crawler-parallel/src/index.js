@@ -70,10 +70,9 @@ function json(data, status = 200) {
 
 async function listOpportunities(env) {
   if (!env.GRANTS_DB) throw new Error("The isolated staging D1 database binding is missing.");
-  // Only show opportunities with affirmative Tanzania or broad regional/global eligibility evidence.
-  // Country-specific and unstated-geography records remain in D1 for review/audit, but are not promoted to the portal.
+  // Show discovered current calls regardless of geography or eligibility confidence; eligibility is advisory, not a discovery gate.
   const rows = await env.GRANTS_DB.prepare(
-    "SELECT id, title, description, url, published_at, source_url, fit_score, fit_assessment, fit_reasons, eligibility_status, call_status, geography_assessment, triage_assessment, deadline_at, first_seen_at, last_seen_at FROM grant_opportunities WHERE geography_assessment IN ('tanzania_mentioned', 'regional_or_lmic_scope') AND triage_assessment NOT IN ('closed_do_not_prioritize', 'low_priority', 'geographic_mismatch_review', 'deadline_unverified_suppressed') AND LOWER(COALESCE(call_status, 'unknown')) NOT IN ('closed', 'expired') AND (deadline_at IS NULL OR date(deadline_at) >= date('now', '+3 hours')) ORDER BY CASE WHEN triage_assessment = 'priority_for_eligibility_review' THEN 0 ELSE 1 END, COALESCE(deadline_at, '9999-12-31'), fit_score DESC, title COLLATE NOCASE LIMIT 250"
+    "SELECT id, title, description, url, published_at, source_url, fit_score, fit_assessment, fit_reasons, eligibility_status, call_status, geography_assessment, triage_assessment, deadline_at, first_seen_at, last_seen_at FROM grant_opportunities WHERE LOWER(COALESCE(call_status, 'unknown')) NOT IN ('closed', 'expired') AND (deadline_at IS NULL OR date(deadline_at) >= date('now', '+3 hours')) ORDER BY CASE WHEN call_status = 'open' THEN 0 ELSE 1 END, COALESCE(deadline_at, '9999-12-31'), fit_score DESC, title COLLATE NOCASE LIMIT 500"
   ).all();
   const run = await env.GRANTS_DB.prepare(
     "SELECT status, items_seen, items_changed, error_message, finished_at FROM crawler_runs ORDER BY id DESC LIMIT 1"
@@ -406,11 +405,8 @@ async function crawl(env) {
     } catch {}
   }
   const topMatches = assessedItems
-    .filter(item => item.fit.score > 0 && ["tanzania_mentioned", "regional_or_lmic_scope"].includes(item.fit.geographyAssessment) && !["closed_do_not_prioritize", "low_priority"].includes(item.fit.triageAssessment))
-    .sort((a, b) => {
-      const priority = item => item.fit.triageAssessment === "priority_for_eligibility_review" ? 0 : 1;
-      return priority(a) - priority(b) || b.fit.score - a.fit.score || a.title.localeCompare(b.title);
-    })
+    .filter(item => item.fit.score > 0 && !["closed", "expired"].includes(item.fit.callStatus))
+    .sort((a, b) => b.fit.score - a.fit.score || a.title.localeCompare(b.title))
     .slice(0, 12)
     .map(item => ({
       title: item.title, description: item.description, url: item.url, sourceUrl: item.sourceUrl,
