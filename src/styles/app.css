@@ -6250,3 +6250,35 @@
  -webkit-text-fill-color:#1769c2;
  opacity:1;
 }
+
+
+/* Final screenshot correction: explicitly target each weather text component.
+   Higher selector specificity avoids inherited gold/white component styling without
+   global !important rules or changes to weather data and navigation. */
+.main-area .topbar .topbar-heading-row .google-weather-panel.google-weather-panel .live-weather-content .live-weather-location-bar .live-weather-location-name,
+.main-area .topbar .topbar-heading-row .google-weather-panel.google-weather-panel .live-weather-content .live-weather-location-bar .live-weather-location-name strong,
+.main-area .topbar .topbar-heading-row .google-weather-panel.google-weather-panel .live-weather-content .live-weather-location-bar .live-weather-location-name span,
+.main-area .topbar .topbar-heading-row .google-weather-panel.google-weather-panel .live-weather-content .live-weather-current .live-weather-current-main strong,
+.main-area .topbar .topbar-heading-row .google-weather-panel.google-weather-panel .live-weather-content .live-weather-current .live-weather-current-main small,
+.main-area .topbar .topbar-heading-row .google-weather-panel.google-weather-panel .live-weather-content .live-weather-metrics,
+.main-area .topbar .topbar-heading-row .google-weather-panel.google-weather-panel .live-weather-content .live-weather-metrics span,
+.main-area .topbar .topbar-heading-row .google-weather-panel.google-weather-panel .live-weather-content .live-weather-metrics b,
+.main-area .topbar .topbar-heading-row .google-weather-panel.google-weather-panel .live-weather-content .live-weather-days .live-weather-day,
+.main-area .topbar .topbar-heading-row .google-weather-panel.google-weather-panel .live-weather-content .live-weather-days .live-weather-day *,
+.main-area .topbar .topbar-heading-row .google-weather-panel.google-weather-panel .live-weather-content .live-weather-attribution,
+.main-area .topbar .topbar-heading-row .google-weather-panel.google-weather-panel .live-weather-content .live-weather-attribution * {
+  color: #1769c2;
+  -webkit-text-fill-color: #1769c2;
+  text-shadow: none;
+}
+.main-area .topbar .topbar-heading-row .google-weather-panel.google-weather-panel .live-weather-content .live-weather-location-name span,
+.main-area .topbar .topbar-heading-row .google-weather-panel.google-weather-panel .live-weather-content .live-weather-attribution span {
+  color: #1769c2;
+  -webkit-text-fill-color: #1769c2;
+}
+.main-area .topbar .topbar-heading-row .google-weather-panel.google-weather-panel .live-weather-content .live-weather-current .live-weather-current-main strong,
+.main-area .topbar .topbar-heading-row .google-weather-panel.google-weather-panel .live-weather-content .live-weather-days .live-weather-day strong,
+.main-area .topbar .topbar-heading-row .google-weather-panel.google-weather-panel .live-weather-content .live-weather-days .live-weather-day b {
+  color: #1459a6;
+  -webkit-text-fill-color: #1459a6;
+}
