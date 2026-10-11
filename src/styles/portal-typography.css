@@ -2,16 +2,13 @@
    Increase portal navigation and working-area text for clear, consistent use.
    Intentionally excludes Access Categories sizing, colors, authorization, and data bindings.
 */
-.desktop-webapp-navigation-roller,
-.mobile-portal-content-roller {
+.desktop-webapp-navigation-roller {
   font-size: 18px;
   line-height: 1.45;
 }
 
 .desktop-webapp-navigation-roller select,
-.desktop-webapp-navigation-roller button,
-.mobile-portal-content-roller select,
-.mobile-portal-content-roller button {
+.desktop-webapp-navigation-roller button {
   min-height: 48px;
   font-size: 18px;
   font-weight: 700;
@@ -47,11 +44,10 @@
 
 @media (max-width: 760px) {
   .desktop-webapp-navigation-roller,
-  .mobile-portal-content-roller,
   .desktop-webapp-navigation-roller select,
   .desktop-webapp-navigation-roller button,
-  .mobile-portal-content-roller select,
-  .mobile-portal-content-roller button {
+  .mobile-global-nav button,
+  .mobile-nav-sheet button {
     font-size: 17px;
   }
 
@@ -63,5 +59,22 @@
 
   .panel-header h2 {
     font-size: 19px;
+  }
+}
+
+
+/* Apply mobile readability to the active global navigation, not the retired
+   in-portal roller, which is intentionally hidden by the existing design. */
+@media (max-width: 760px) {
+  .mobile-global-nav button,
+  .mobile-nav-sheet button {
+    font-size: 15px;
+    line-height: 1.35;
+    font-weight: 750;
+    min-height: 48px;
+  }
+  .mobile-nav-sheet-header strong {
+    font-size: 16px;
+    line-height: 1.4;
   }
 }
