@@ -4,7 +4,7 @@ const MAX_PAGE_LINKS = 8;
 const MAX_TOTAL_DETAIL_PAGES = 1;
 const MAX_SOURCE_PAGES_PER_RUN = 4;
 const USER_AGENT = "IRPA-GrantDiscovery/1.0 (+https://www.irpa.or.tz)";
-const GRANT_TERMS = /grant|funding|fund|call for proposals|call for applications|expression of interest|small grant|challenge fund|fellowship|award|open call|apply now|application window|tender opportunity/i;
+const GRANT_TERMS = /grant|funding|fund|call for proposals|call for applications|expression of interest|small grant|challenge fund|fellowship|award|open call|apply now|application window|tender opportunity|youth|young people|children|child welfare|livelihoods?|public health|healthcare|nutrition|renewable energy|clean energy|solar energy|solar power|energy access|women.s empowerment|gender equality|food security|water access|sanitation|education|vocational training|entrepreneurship|economic empowerment|pastoralism|rangeland|livestock|climate resilience|biodiversity|ecosystem restoration|agroecology|irrigation|digital inclusion|community development/i;
 const HTML_ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
 export function decodeHtml(value = "") {
   return String(value).replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1").replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ").replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ").replace(/<[^>]*>/g, " ").replace(/&(#x[\da-f]+|#\d+|[a-z]+);/gi, (whole, token) => {
@@ -334,7 +334,7 @@ export async function readDonorScanner(scanner) {
   }
 }
 
-export const SEARCH_QUERIES = ['"grant call" Tanzania NGO climate pastoral livestock rangeland','"call for proposals" Africa NGO environment biodiversity restoration','embassy small grants Tanzania NGO community development'];
+export const SEARCH_QUERIES = ['"grant call" OR "call for proposals" Tanzania NGO youth children livelihoods health education nutrition','"call for proposals" Africa NGO renewable energy solar clean energy water sanitation women entrepreneurship climate biodiversity restoration','funding opportunities pastoralism rangeland livestock food security community development Tanzania East Africa renewable energy'];
 function xmlField(block, name) {
   const pattern = "<" + name + "\\b[^>]*>([\\s\\S]*?)<\\/" + name + "\\s*>";
   const match = block.match(new RegExp(pattern, "i"));
