@@ -374,9 +374,8 @@ export async function analyzeGrant(request, env) {
     "IRPA profile: " + JSON.stringify(IRPA_PROFILE),
     "Apply the IRPA Strategic Plan 2025–2029 as a strategic-fit filter across all three pillars. Each pillar in the profile has all seven cross-cutting themes embedded within it, with pillar-specific examples. Assess pillar fit and theme fit together; return strategic_alignment.relevant_pillars, strategic_alignment.relevant_cross_cutting_themes, and strategic_alignment.pillar_theme_alignment with one evidence-based entry per relevant pillar. Never force an unrelated call into a pillar.",
     "Digital governance funding is explicitly in scope as a separate investment track. IRPA's existing Digital Board Governance System (DBGS) requires significant investment. Retain relevant calls for digital governance, board-management technology, nonprofit governance systems, civic technology, cybersecurity, cloud infrastructure, responsible AI and institutional digital capacity. Evaluate donor restrictions on software, hosting/cloud costs, security, maintenance, training, equipment and institutional strengthening. Do not claim the DBGS is completed, deployed or has proven impact unless supplied evidence establishes it.",
-    "Apply a strict eligibility gate before thematic fit. IRPA is a Tanzania-registered NGO. Check eligible countries, applicant registration country, entity type, minimum/maximum organizational age, required track record, audited accounts/turnover, co-financing, consortium restrictions, deadline and permitted costs. Do not equate a thematic match with eligibility.",
-    "Hard geographic exclusion: calls explicitly restricted to South Africa, Zimbabwe, or another non-Tanzania country must be marked ineligible for IRPA unless the supplied call text also clearly permits Tanzania or an Africa-wide/East Africa/Sub-Saharan Africa/LMIC/global applicant pool. If geography is unstated or ambiguous, mark geographic eligibility unclear and overall eligibility insufficient_information; do not promote the call as eligible. Never treat a mention of a country in background text as proof that applicants from Tanzania are allowed.",
-    "A concept note must not be generated when geographic eligibility is ineligible or unclear, when a known mandatory criterion is not met, or while required eligibility evidence remains unresolved. Return the geographic evidence and list every blocker/warning first.",
+    "Do not use applicant eligibility, country, organizational age, track record, audit, co-financing or other eligibility criteria to hide opportunities or block concept-note drafting. Assess and report those criteria as advisory information, identify uncertainties, and let IRPA review the official call before submission. Never represent the AI assessment as a donor decision.",
+    "Include opportunities regardless of whether applicant geography is explicit, unclear, or country-specific. Geographic eligibility is informational only and must not be used to exclude a discovery or block a draft.",
     "An issue is not a confirmed disqualification unless the supplied rules clearly say so. Use insufficient_information when key eligibility rules are absent. Never represent the AI assessment as a legal or donor decision.",
     "Align any concept note to IRPA's three strategic pillars and cross-cutting themes only where relevant to the donor call. Tailor headings, ordering, and wording to donor instructions if supplied, and respect stated word/page limits where the supplied text makes them clear. If donor template instructions are absent, use a conventional concise concept-note structure and flag this limitation.",
     "Populate each application_fields entry with standalone, editable wording ready to copy into a corresponding donor application form. If a field is unsupported by supplied evidence, clearly label assumptions or evidence needed; never invent exact budgets, baseline figures, partners, track record, audited results, or co-financing. Use an indicative budget narrative only when actual budget figures were not supplied and label it as requiring budget development.",
@@ -388,17 +387,7 @@ export async function analyzeGrant(request, env) {
   if (expiry.expired) return json({ error: "Eligibility analysis blocked: this call is closed or its application deadline has passed.", call_status: "expired", deadline_at: expiry.deadline, expiry_assessment: expiry, next_step: "Do not prepare an application for this call. Verify the official donor page for a formally reopened or extended deadline." }, 422);
   const geographicEligibility = assessGeographicEligibility(opportunity);
   const knownGaps = detectKnownEligibilityGaps(opportunity);
-  if (task === "concept_note" && (geographicEligibility.status !== "eligible" || knownGaps.blockers.length || knownGaps.warnings.length)) {
-    const gateStatus = geographicEligibility.status === "ineligible" || knownGaps.blockers.length ? "ineligible" : "insufficient_information";
-    return json({
-      error: gateStatus === "ineligible"
-        ? "Concept-note drafting blocked: one or more explicit eligibility criteria do not fit IRPA's known profile."
-        : "Concept-note drafting blocked until the official eligibility criteria and IRPA evidence gaps are resolved.",
-      geographic_eligibility: geographicEligibility,
-      eligibility_gate: { status: gateStatus, blockers: knownGaps.blockers, warnings: knownGaps.warnings },
-      next_step: "Paste the official eligible-country, applicant-type, organizational-age, track-record, audit and co-financing requirements; resolve every blocker before drafting."
-    }, 422);
-  }
+  // Eligibility is advisory only: it does not suppress opportunities or block drafting.
 
   const userData = {
     task,
@@ -426,23 +415,7 @@ export async function analyzeGrant(request, env) {
     if (!allowed.has(analysis.eligibility.status)) analysis.eligibility.status = "insufficient_information";
     analysis.geographic_eligibility = geographicEligibility;
     applyKnownEligibilityGaps(analysis, opportunity, geographicEligibility);
-    if (task === "concept_note") {
-      const requirements = Array.isArray(analysis.donor_requirements) ? analysis.donor_requirements : [];
-      const unresolved = analysis.eligibility.status !== "eligible" ||
-        (Array.isArray(analysis.eligibility.unknowns) && analysis.eligibility.unknowns.length > 0) ||
-        requirements.some(row => row.status !== "met");
-      if (unresolved) {
-        delete analysis.concept_note;
-        delete analysis.concept_note_structure;
-        return json({
-          error: "Concept-note drafting blocked because eligibility is not confirmed and every mandatory requirement has not been evidenced as met.",
-          geographic_eligibility: geographicEligibility,
-          eligibility_gate: analysis.known_eligibility_gaps,
-          assessment: analysis,
-          next_step: "Resolve the listed eligibility gaps and rerun screening before drafting."
-        }, 422);
-      }
-    }
+    // Keep eligibility findings visible as advisory evidence; never block a draft on them.
     return json({
       service: "irpa-grant-application-assistant",
       model: MODEL,
