@@ -8975,3 +8975,13 @@ html body #root .main-area > .topbar .topbar-heading-row > .topbar-access-catego
     display: flex; flex-direction: row; flex-wrap: nowrap; overflow-x: auto;
   }
 }
+
+/* Explicitly beat the legacy high-specificity direct-heading colour rule. */
+html body #root .main-area > .topbar .topbar-heading-row > .topbar-access-category.topbar-access-category.topbar-access-category .login-category-heading {
+  color: #f5f5f5;
+  -webkit-text-fill-color: #f5f5f5;
+}
+html body #root .main-area > .topbar .topbar-heading-row > .topbar-access-category.topbar-access-category.topbar-access-category .login-category-identifiers small {
+  color: #d1d5db;
+  -webkit-text-fill-color: #d1d5db;
+}
