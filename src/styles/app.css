@@ -5112,3 +5112,128 @@
  .main-area>.dashboard-topbar .google-weather-panel .live-weather-days{grid-template-columns:repeat(3,minmax(0,1fr))}
  .main-area>.dashboard-topbar .google-weather-panel .live-weather-day{padding:6px 2px}
 }
+
+
+/* 2026-10-11: restore the declared access authority and reduce weather-panel height.
+   Desktop weather content is arranged in compact rows; all live values remain visible. */
+@media (min-width:761px) {
+  .topbar-heading-row {
+    grid-template-columns:minmax(245px,290px) minmax(150px,1fr) minmax(290px,340px);
+    gap:10px;
+  }
+  .topbar-heading-row>.google-weather-panel {
+    min-width:0;
+    padding:10px;
+    box-sizing:border-box;
+  }
+  .topbar-heading-row>.google-weather-panel .live-weather-content {
+    display:grid;
+    grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);
+    align-items:start;
+    gap:7px 10px;
+    min-width:0;
+  }
+  .topbar-heading-row>.google-weather-panel .live-weather-location-bar,
+  .topbar-heading-row>.google-weather-panel .live-weather-days,
+  .topbar-heading-row>.google-weather-panel .live-weather-attribution {
+    grid-column:1 / -1;
+  }
+  .topbar-heading-row>.google-weather-panel .live-weather-location-bar {
+    margin:0;
+    padding:6px 8px;
+  }
+  .topbar-heading-row>.google-weather-panel .live-weather-location-name>strong {
+    font-size:13px;
+  }
+  .topbar-heading-row>.google-weather-panel .live-weather-location-name>span,
+  .topbar-heading-row>.google-weather-panel .live-weather-location-name>small {
+    font-size:11px;
+    line-height:1.2;
+  }
+  .topbar-heading-row>.google-weather-panel .live-weather-location-controls button {
+    width:28px;
+    min-width:28px;
+    height:28px;
+    min-height:28px;
+    font-size:20px;
+  }
+  .topbar-heading-row>.google-weather-panel .live-weather-current {
+    display:contents;
+  }
+  .topbar-heading-row>.google-weather-panel .live-weather-current-main {
+    grid-column:1;
+    display:flex;
+    align-items:center;
+    gap:7px;
+    min-width:0;
+  }
+  .topbar-heading-row>.google-weather-panel .live-weather-current-main strong {
+    font-size:22px;
+    line-height:1.05;
+  }
+  .topbar-heading-row>.google-weather-panel .live-weather-current-main small {
+    font-size:11px;
+    line-height:1.25;
+  }
+  .topbar-heading-row>.google-weather-panel .live-weather-icon {
+    width:32px;
+    height:32px;
+    min-width:32px;
+    flex:0 0 32px;
+    font-size:20px;
+  }
+  .topbar-heading-row>.google-weather-panel .live-weather-metrics {
+    grid-column:2;
+    display:flex;
+    flex-direction:column;
+    flex-wrap:nowrap;
+    gap:4px;
+    align-self:center;
+    margin:0;
+  }
+  .topbar-heading-row>.google-weather-panel .live-weather-metrics>span {
+    padding:4px 6px;
+    font-size:11px;
+    line-height:1.2;
+  }
+  .topbar-heading-row>.google-weather-panel .live-weather-metrics b {
+    font-size:11px;
+  }
+  .topbar-heading-row>.google-weather-panel .live-weather-days {
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:5px;
+    margin:0;
+  }
+  .topbar-heading-row>.google-weather-panel .live-weather-day {
+    gap:3px;
+    padding:6px 4px;
+  }
+  .topbar-heading-row>.google-weather-panel .live-weather-day strong,
+  .topbar-heading-row>.google-weather-panel .live-weather-day b,
+  .topbar-heading-row>.google-weather-panel .live-weather-day small {
+    font-size:11px;
+    line-height:1.2;
+  }
+  .topbar-heading-row>.google-weather-panel .live-weather-day-icon {
+    font-size:16px;
+  }
+  .topbar-heading-row>.google-weather-panel .live-weather-attribution {
+    display:flex;
+    gap:3px;
+    margin:0;
+  }
+  .topbar-heading-row>.google-weather-panel .live-weather-attribution span,
+  .topbar-heading-row>.google-weather-panel .live-weather-attribution small {
+    font-size:10px;
+    line-height:1.25;
+    overflow-wrap:anywhere;
+  }
+}
+@media (min-width:761px) and (max-width:1100px) {
+  .topbar-heading-row {
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  }
+  .topbar-heading-row>.google-weather-panel .live-weather-content {
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  }
+}
