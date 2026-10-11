@@ -9804,3 +9804,56 @@ html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-headin
     box-sizing: border-box;
   }
 }
+
+/* 2026-10-11 dashboard live readings: dedicate the lower weather-pad row to metrics.
+   Keep the live condition above; give humidity, wind and rain separate readable columns. */
+@media (min-width: 1200px) {
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-content:not(.forecast-expanded) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto auto auto auto;
+    align-content: stretch;
+    row-gap: 8px;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-current-main {
+    grid-column: 1;
+    grid-row: 2;
+    align-self: center;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-metrics {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: stretch;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+    padding-top: 8px;
+    border-top: 1px solid rgba(40, 91, 133, 0.2);
+    box-sizing: border-box;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-metrics > span {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 4px;
+    min-width: 0;
+    padding: 7px 9px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.42);
+    white-space: normal;
+    overflow-wrap: anywhere;
+    font-size: 0.78rem;
+    line-height: 1.25;
+    box-sizing: border-box;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-metrics > span b {
+    font-size: 1rem;
+    line-height: 1.2;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-attribution {
+    grid-column: 1 / -1;
+    grid-row: 4;
+  }
+}
