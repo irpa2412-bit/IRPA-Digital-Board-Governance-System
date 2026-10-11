@@ -372,62 +372,71 @@ function LiveWeatherPanel(){
   {name:"Tanga",region:"Tanga Region",latitude:-5.067,longitude:39.098},
   {name:"Singida",region:"Singida Region",latitude:-4.817,longitude:34.743}
  ];
+ const apiKey=String(import.meta.env.VITE_GOOGLE_WEATHER_API_KEY||"").trim();
  const[weatherByPlace,setWeatherByPlace]=useState({});
  const[activePlaceIndex,setActivePlaceIndex]=useState(0);
  const[error,setError]=useState("");
  const[loading,setLoading]=useState(true);
  const[lastUpdated,setLastUpdated]=useState("");
- const weatherDescription=code=>{
-  if(code===0)return"Clear sky";if([1,2].includes(code))return"Mostly clear";if(code===3)return"Overcast";
-  if([45,48].includes(code))return"Fog";if([51,53,55,56,57].includes(code))return"Drizzle";
-  if([61,63,65,66,67,80,81,82].includes(code))return"Rain";if([71,73,75,77,85,86].includes(code))return"Snow";
-  if([95,96,99].includes(code))return"Thunderstorm";return"Conditions unavailable";
- };
  useEffect(()=>{
+  if(!apiKey){setError("Google Weather API key is not configured");setLoading(false);return;}
   let disposed=false;
   const loadWeather=async()=>{
    try{
     const results=await Promise.allSettled(WEATHER_POINTS.map(async point=>{
-     const params=new URLSearchParams({latitude:String(point.latitude),longitude:String(point.longitude),current:"temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m",daily:"weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",forecast_days:"4",timezone:"Africa/Dar_es_Salaam"});
-     const response=await fetch("https://api.open-meteo.com/v1/forecast?"+params.toString(),{cache:"no-store"});
-     if(!response.ok)throw new Error("Weather service returned HTTP "+response.status);
-     const data=await response.json();
-     if(!data?.current||!data?.daily?.time?.length)throw new Error("No usable forecast for "+point.name);
-     return {name:point.name,region:point.region,current:data.current,daily:data.daily};
+     const params=new URLSearchParams({key:apiKey,"location.latitude":String(point.latitude),"location.longitude":String(point.longitude),unitsSystem:"METRIC"});
+     const currentUrl="https://weather.googleapis.com/v1/currentConditions:lookup?"+params.toString();
+     const dailyUrl="https://weather.googleapis.com/v1/forecast/days:lookup?"+params.toString()+"&days=4";
+     const [currentResponse,dailyResponse]=await Promise.all([
+      fetch(currentUrl,{cache:"no-store"}),
+      fetch(dailyUrl,{cache:"no-store"})
+     ]);
+     if(!currentResponse.ok||!dailyResponse.ok)throw new Error("Google Weather returned HTTP "+(!currentResponse.ok?currentResponse.status:dailyResponse.status)+" for "+point.name);
+     const [current,dailyPayload]=await Promise.all([currentResponse.json(),dailyResponse.json()]);
+     if(!current?.weatherCondition||!dailyPayload?.forecastDays?.length)throw new Error("Incomplete Google Weather response for "+point.name);
+     return {name:point.name,region:point.region,current,daily:dailyPayload.forecastDays};
     }));
     const next={};
     results.forEach((result,index)=>{if(result.status==="fulfilled")next[WEATHER_POINTS[index].name]=result.value;});
-    if(!Object.keys(next).length)throw new Error("Live weather data is temporarily unavailable for all places");
-    if(!disposed){setWeatherByPlace(previous=>({...previous,...next}));setLastUpdated(new Date().toISOString());setError(results.some(result=>result.status==="rejected")?"Some locations could not refresh; showing their last available observations where available.":"");setLoading(false);}
-   }catch(e){if(!disposed){setError(e?.message||"Live weather is temporarily unavailable");setLoading(false);}}
+    if(!Object.keys(next).length)throw new Error("Google Weather returned no usable forecasts for the configured locations");
+    const updateTimes=Object.values(next).map(row=>row.current?.currentTime).filter(Boolean).sort();
+    if(!disposed){
+     setWeatherByPlace(previous=>({...previous,...next}));
+     setLastUpdated(updateTimes[updateTimes.length-1]||new Date().toISOString());
+     setError(results.some(result=>result.status==="rejected")?"Some locations could not refresh; showing their last available observations where available.":"");
+     setLoading(false);
+    }
+   }catch(e){if(!disposed){setError(e?.message||"Google Weather is temporarily unavailable");setLoading(false);}}
   };
   loadWeather();
   const refreshId=window.setInterval(loadWeather,15*60*1000);
+  return()=>{disposed=true;window.clearInterval(refreshId);};
+ },[apiKey]);
+ useEffect(()=>{
   const rotationId=window.setInterval(()=>setActivePlaceIndex(index=>(index+1)%WEATHER_POINTS.length),8000);
-  return()=>{disposed=true;window.clearInterval(refreshId);window.clearInterval(rotationId);};
+  return()=>window.clearInterval(rotationId);
  },[]);
- const icon=code=>code===0?"☀️":[1,2].includes(code)?"🌤️":code===3?"☁️":[45,48].includes(code)?"🌫️":[51,53,55,56,57].includes(code)?"🌦️":[61,63,65,66,67,80,81,82].includes(code)?"🌧️":[71,73,75,77,85,86].includes(code)?"🌨️":[95,96,99].includes(code)?"⛈️":"🌡️";
+ const icon=type=>({CLEAR:"☀️",MOSTLY_CLEAR:"🌤️",PARTLY_CLOUDY:"⛅",MOSTLY_CLOUDY:"☁️",CLOUDY:"☁️",FOG:"🌫️",LIGHT_RAIN:"🌦️",RAIN:"🌧️",HEAVY_RAIN:"🌧️",SCATTERED_SHOWERS:"🌦️",LIGHT_SNOW:"🌨️",SNOW:"❄️",HEAVY_SNOW:"❄️",THUNDERSTORM:"⛈️",HAIL:"🌨️"}[type]||"🌡️");
  const activePlace=WEATHER_POINTS[activePlaceIndex]||WEATHER_POINTS[0];
  const placeWeather=weatherByPlace[activePlace.name];
- const current=placeWeather?.current,daily=placeWeather?.daily;
- const temp=current?.temperature_2m,feels=current?.apparent_temperature,rain=daily?.precipitation_probability_max?.[0];
+ const current=placeWeather?.current,daily=placeWeather?.daily||[];
+ const temp=current?.temperature?.degrees,feels=current?.feelsLikeTemperature?.degrees;
+ const todayForecast=daily[0]?.daytimeForecast||daily[0]?.nighttimeForecast||{};
+ const rain=todayForecast?.precipitation?.probability?.percent??daily[0]?.precipitation?.probability?.percent;
+ const condition=current?.weatherCondition?.description?.text||"Conditions unavailable";
  const fmt=(value,suffix="")=>Number.isFinite(value)?Math.round(value)+suffix:"—";
- const condition=weatherDescription(current?.weather_code);
  const changePlace=delta=>setActivePlaceIndex(index=>(index+delta+WEATHER_POINTS.length)%WEATHER_POINTS.length);
  return <div className="live-weather-content" aria-live="polite">
   <div className="live-weather-location-bar">
    <div className="live-weather-location-name"><strong>{activePlace.name}</strong><span>{activePlace.region}</span><small>PLACE {activePlaceIndex+1} OF {WEATHER_POINTS.length} · ROLLING LIVE FORECAST</small></div>
-   <div className="live-weather-location-controls">
-    <button type="button" onClick={()=>changePlace(-1)} aria-label="Previous weather location" title="Previous location">‹</button>
-    <button type="button" onClick={()=>changePlace(1)} aria-label="Next weather location" title="Next location">›</button>
-   </div>
+   <div className="live-weather-location-controls"><button type="button" onClick={()=>changePlace(-1)} aria-label="Previous weather location" title="Previous location">‹</button><button type="button" onClick={()=>changePlace(1)} aria-label="Next weather location" title="Next location">›</button></div>
   </div>
   <div className="live-weather-current">
-   <div className="live-weather-current-main"><span className="live-weather-icon" aria-hidden="true">{icon(current?.weather_code)}</span><div><strong>{Number.isFinite(temp)?fmt(temp,"°C"):(loading?"Loading…":"—")}</strong><small>{placeWeather?condition:(error||"Connecting to live weather service…")} · feels like {fmt(feels,"°C")}</small></div></div>
-   <div className="live-weather-metrics"><span>💧 Humidity <b>{fmt(current?.relative_humidity_2m,"%")}</b></span><span>💨 Wind <b>{fmt(current?.wind_speed_10m," km/h")}</b></span><span>🌧️ Rain chance <b>{fmt(rain,"%")}</b></span></div>
+   <div className="live-weather-current-main"><span className="live-weather-icon" aria-hidden="true">{icon(current?.weatherCondition?.type)}</span><div><strong>{Number.isFinite(temp)?fmt(temp,"°C"):(loading?"Loading…":"—")}</strong><small>{placeWeather?condition:(error||"Connecting to Google Weather…")} · feels like {fmt(feels,"°C")}</small></div></div>
+   <div className="live-weather-metrics"><span>💧 Humidity <b>{fmt(current?.relativeHumidity,"%")}</b></span><span>💨 Wind <b>{fmt(current?.wind?.speed?.value," km/h")}</b></span><span>🌧️ Rain chance <b>{fmt(rain,"%")}</b></span></div>
   </div>
-  <div className="live-weather-days">{(daily?.time||[]).slice(0,3).map((date,index)=>{const type=daily.weather_code?.[index],high=daily.temperature_2m_max?.[index],low=daily.temperature_2m_min?.[index],p=daily.precipitation_probability_max?.[index];return <div className="live-weather-day" key={date}><strong>{index===0?"Today":new Intl.DateTimeFormat("en-GB",{weekday:"short",day:"2-digit",month:"short",timeZone:"Africa/Dar_es_Salaam"}).format(new Date(date+"T12:00:00+03:00"))}</strong><span className="live-weather-day-icon" aria-label={weatherDescription(type)}>{icon(type)}</span><b>{fmt(high,"°")} / {fmt(low,"°")}</b><small>Rain {fmt(p,"%")}</small></div>})}</div>
-  <div className="live-weather-attribution"><span>TANZANIA WEATHER · LIVE DATA: OPEN-METEO.COM</span><small>{lastUpdated?"Updated "+new Intl.DateTimeFormat("en-GB",{dateStyle:"medium",timeStyle:"short",timeZone:"Africa/Dar_es_Salaam"}).format(new Date(lastUpdated))+" · refreshes every 15 minutes · location rolls every 8 seconds":error||"Fetching live forecasts for 12 locations…"}</small></div>
+  <div className="live-weather-days">{daily.slice(0,3).map((day,index)=>{const forecast=day.daytimeForecast||day.nighttimeForecast||{},high=day.maxTemperature?.degrees,low=day.minTemperature?.degrees,type=forecast.weatherCondition?.type,text=forecast.weatherCondition?.description?.text||"Forecast unavailable",p=forecast.precipitation?.probability?.percent??day.precipitation?.probability?.percent;const date=day.interval?.startTime||day.interval?.startDate;return <div className="live-weather-day" key={date||index}><strong>{index===0?"Today":new Intl.DateTimeFormat("en-GB",{weekday:"short",day:"2-digit",month:"short",timeZone:"Africa/Dar_es_Salaam"}).format(new Date(date||Date.now()))}</strong><span className="live-weather-day-icon" aria-label={text} title={text}>{icon(type)}</span><b>{fmt(high,"°")} / {fmt(low,"°")}</b><small>Rain {fmt(p,"%")}</small></div>})}</div>
+  <div className="live-weather-attribution"><span>TANZANIA WEATHER · GOOGLE WEATHER</span><small>{lastUpdated?"Updated "+new Intl.DateTimeFormat("en-GB",{dateStyle:"medium",timeStyle:"short",timeZone:"Africa/Dar_es_Salaam"}).format(new Date(lastUpdated))+" · refreshes every 15 minutes · location rolls every 8 seconds":error||"Fetching live Google Weather forecasts for 12 locations…"}</small></div>
  </div>;
 }
 const IRPA_SESSION_RECOVERY_KEY="irpaSessionRecovery";const IRPA_INACTIVITY_LIMIT_MS=5*60*1000;const IRPA_RECOVERY_MAX_AGE_MS=24*60*60*1000;function readIrpaRecovery(){try{const raw=window.localStorage.getItem(IRPA_SESSION_RECOVERY_KEY);if(!raw)return null;const value=JSON.parse(raw);if(!value||Date.now()-Number(value.savedAt||0)>IRPA_RECOVERY_MAX_AGE_MS){window.localStorage.removeItem(IRPA_SESSION_RECOVERY_KEY);return null}return value}catch{return null}}function writeIrpaRecovery(snapshot){try{window.localStorage.setItem(IRPA_SESSION_RECOVERY_KEY,JSON.stringify({...snapshot,savedAt:Date.now()}))}catch{}}
