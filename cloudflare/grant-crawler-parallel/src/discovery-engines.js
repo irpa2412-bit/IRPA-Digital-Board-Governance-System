@@ -1,7 +1,8 @@
 const MAX_SOURCE_PAGES = 20;
 const MAX_PAGE_BYTES = 1_000_000;
 const MAX_PAGE_LINKS = 8;
-const MAX_TOTAL_DETAIL_PAGES = 6;
+const MAX_TOTAL_DETAIL_PAGES = 2;
+const MAX_SOURCE_PAGES_PER_RUN = 6;
 const USER_AGENT = "IRPA-GrantDiscovery/1.0 (+https://www.irpa.or.tz)";
 const GRANT_TERMS = /grant|funding|fund|call for proposals|call for applications|expression of interest|small grant|challenge fund|fellowship|award|open call|apply now|application window|tender opportunity/i;
 const HTML_ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
@@ -76,8 +77,12 @@ export function parseOfficialPage(html, pageUrl) {
 }
 export async function readOfficialPages(env) {
   const urls = configuredUrls(env.GRANT_SOURCE_PAGE_URLS_JSON || env.GRANT_SOURCE_PAGE_URLS, "GRANT_SOURCE_PAGE_URLS", MAX_SOURCE_PAGES);
+  // Rotate through the full configured source registry across six-hour runs.
+  // This bounds per-invocation subrequests while still checking every configured source over successive runs.
+  const rotation = urls.length ? Math.floor(Date.now() / (6 * 60 * 60 * 1000)) * MAX_SOURCE_PAGES_PER_RUN % urls.length : 0;
+  const selectedUrls = Array.from({ length: Math.min(MAX_SOURCE_PAGES_PER_RUN, urls.length) }, (_, index) => urls[(rotation + index) % urls.length]);
   const errors = [];
-  const sources = await Promise.all(urls.map(async sourceUrl => {
+  const sources = await Promise.all(selectedUrls.map(async sourceUrl => {
     try {
       const source = await fetchHtml(sourceUrl);
       const sourceHost = new URL(source.finalUrl).hostname;
@@ -118,7 +123,7 @@ export async function readOfficialPages(env) {
     }
   }));
   const items = results.filter(Boolean);
-  return { items, stats: { configured: urls.length, scanned: urls.length, detailPagesScanned: selected.length, found: items.length, errors: errors.slice(0, 20) } };
+  return { items, stats: { configured: urls.length, scanned: selectedUrls.length, configuredSources: urls.length, sourcesScanned: selectedUrls, detailPagesScanned: selected.length, found: items.length, errors: errors.slice(0, 20) } };
 }
 
 export const DONOR_SCANNERS = [
@@ -136,10 +141,19 @@ export const DONOR_SCANNERS = [
   { name: "fundsforngos_africa", label: "FundsforNGOs Current Funding Listings", url: "https://www2.fundsforngos.org/category/listing/" },
   { name: "fundsforngos_tanzania", label: "FundsforNGOs Tanzania Funding Calls", url: "https://www2.fundsforngos.org/listing/new-grant-funding-opportunities-for-tanzania-in-2026/" },
   { name: "fundsforngos_news", label: "FundsforNGOs Funding News", url: "https://news.fundsforngos.org/" },
+  { name: "africanngos_roundups", label: "AfricanNGOs Funding Roundups", url: "https://africanngos.org/" },
+  { name: "ngo_portal_africa", label: "NGO Portal Africa Funding Calls", url: "https://jobs.ngoportal.africa/grants-funding/" },
+  { name: "awdf_grants", label: "African Women’s Development Fund", url: "https://awdf.org/what-we-do/resourcing/" },
+  { name: "urgent_action_fund_africa", label: "Urgent Action Fund Africa", url: "https://www.uaf-africa.org/apply-for-a-grant/" },
+  { name: "rufford_grants", label: "Rufford Foundation Conservation Grants", url: "https://www.rufford.org/" },
+  { name: "awhf_grants", label: "African World Heritage Fund Grants", url: "https://awhf.net/grants/" },
+  { name: "gfcf_grants", label: "Global Fund for Community Foundations", url: "https://globalfundcommunityfoundations.org/what-we-do/grants/" },
+  { name: "mbz_species_grants", label: "Mohamed bin Zayed Species Conservation Fund", url: "https://www.speciesconservation.org/" },
 ];
 
 export async function readDonorScanner(scanner) {
   const errors = [];
+  let warningMessage = null;
   let httpStatus = null;
   let pagesScanned = 0;
   let sourceUrl = scanner.url;
@@ -155,7 +169,7 @@ export async function readDonorScanner(scanner) {
       .slice(0, 20);
     const items = [];
     const self = parseOfficialPage(source.html, source.finalUrl);
-    const isAggregator = /(?:^|\.)fundsforngos\.org$/i.test(new URL(source.finalUrl).hostname);
+    const isAggregator = /(?:^|\.)(?:fundsforngos\.org|africanngos\.org|ngoportal\.africa)$/i.test(new URL(source.finalUrl).hostname);
     // Aggregator articles are discovery leads, not the opportunity issuance.
     // Resolve the article and extract an external application/call URL; never
     // make a FundsforNGOs listing the primary tap target.
@@ -168,7 +182,7 @@ export async function readDonorScanner(scanner) {
       const description = String(anchor.context || "").trim().slice(0, 5000);
       if (!title || !isSpecificOpportunity(title, description)) continue;
       if (isAggregator) {
-        if (detailPagesScanned >= 2) continue;
+        if (detailPagesScanned >= 1) continue;
         try {
           const detail = await fetchHtml(anchor.url);
           detailPagesScanned++;
@@ -183,7 +197,31 @@ export async function readDonorScanner(scanner) {
           });
           const original = outgoing.find(candidate => /apply|application|submit|official call|application form|apply here/i.test(candidate.label + " " + candidate.context)) || outgoing[0];
           if (!original) {
-            errors.push({ sourceUrl: detail.finalUrl, error: "No external original-issuer/application URL found; aggregator article was not promoted as the opportunity link." });
+            // Never promote a directory/listing page as the apply target. Search
+            // for the original issuer URL when an aggregator article has no outbound call link.
+            const query = scanner.label + " grant funding opportunity Tanzania Africa";
+            try {
+              const searchUrl = new URL("https://www.bing.com/search");
+              searchUrl.searchParams.set("format", "rss");
+              searchUrl.searchParams.set("q", query);
+              const response = await fetch(searchUrl.href, {
+                headers: { accept: "application/rss+xml, application/xml, text/xml", "user-agent": USER_AGENT },
+                signal: AbortSignal.timeout(12_000),
+              });
+              if (!response.ok) throw new Error("Bing RSS fallback HTTP " + response.status);
+              const xml = await response.text();
+              if (xml.length > MAX_PAGE_BYTES) throw new Error("Bing RSS fallback response exceeds the 1 MB limit.");
+              const fallbackItems = parseSearchRss(xml, query, "Bing RSS").map(item => ({
+                ...item,
+                discoveryEngine: scanner.name,
+                primarySourceUrl: scanner.url,
+                fallbackProvider: "Bing RSS",
+              }));
+              if (fallbackItems.length) items.push(...fallbackItems);
+              else warningMessage = "No original issuer URL was present in the aggregator article; Bing RSS fallback found no matching call.";
+            } catch (error) {
+              errors.push({ sourceUrl: detail.finalUrl, error: String(error.message || error).slice(0, 180) });
+            }
             continue;
           }
           const opportunityTitle = detailParsed.title || title;
@@ -226,6 +264,7 @@ export async function readDonorScanner(scanner) {
         httpStatus,
         detailPagesScanned,
         found: unique.length,
+        message: warningMessage,
         errors,
       },
     };
@@ -291,7 +330,7 @@ export async function readDonorScanner(scanner) {
   }
 }
 
-const SEARCH_QUERIES = ['"grant call" Tanzania NGO climate pastoral livestock rangeland','"call for proposals" Africa NGO environment biodiversity restoration','embassy small grants Tanzania NGO community development'];
+export const SEARCH_QUERIES = ['"grant call" Tanzania NGO climate pastoral livestock rangeland','"call for proposals" Africa NGO environment biodiversity restoration','embassy small grants Tanzania NGO community development'];
 function xmlField(block, name) {
   const pattern = "<" + name + "\\b[^>]*>([\\s\\S]*?)<\\/" + name + "\\s*>";
   const match = block.match(new RegExp(pattern, "i"));
