@@ -4893,61 +4893,71 @@
 }
 
 
-/* IRPA compact live-weather panel — 2026-10-11 */
+/* IRPA compact live-weather panel — 2026-10-11: preserve complete readable card */
 @media(max-width:760px){
   .main-area>.dashboard-topbar .google-weather-panel{
     top:calc(70px + env(safe-area-inset-top)) !important;
     left:8px !important;
     right:auto !important;
-    width:112px !important;
-    min-width:112px !important;
-    max-width:112px !important;
-    height:48px !important;
-    min-height:48px !important;
-    max-height:48px !important;
-    padding:5px 6px !important;
-    overflow:hidden !important;
+    box-sizing:border-box !important;
+    width:148px !important;
+    min-width:148px !important;
+    max-width:148px !important;
+    height:auto !important;
+    min-height:58px !important;
+    max-height:none !important;
+    padding:6px 7px !important;
+    overflow:visible !important;
     border-radius:8px !important;
   }
   .main-area>.dashboard-topbar .google-weather-panel>span{
-    margin:0 0 2px !important;
-    font-size:9px !important;
-    line-height:1 !important;
+    display:block !important;
+    margin:0 0 4px !important;
+    font-size:10px !important;
+    line-height:1.2 !important;
     letter-spacing:.04em !important;
+    white-space:normal !important;
   }
-  .main-area>.dashboard-topbar .google-weather-panel .live-weather-location-bar,
-  .main-area>.dashboard-topbar .google-weather-panel .live-weather-current-main small,
-  .main-area>.dashboard-topbar .google-weather-panel .live-weather-metrics,
-  .main-area>.dashboard-topbar .google-weather-panel .live-weather-days,
-  .main-area>.dashboard-topbar .google-weather-panel .live-weather-attribution{
+  .main-area>.dashboard-topbar .google-weather-panel .live-weather-location-bar{
     display:none !important;
   }
   .main-area>.dashboard-topbar .google-weather-panel .live-weather-current{
     display:block !important;
     margin:0 !important;
     padding:0 !important;
+    overflow:visible !important;
   }
   .main-area>.dashboard-topbar .google-weather-panel .live-weather-current-main{
     display:flex !important;
     align-items:center !important;
-    gap:5px !important;
+    gap:6px !important;
     min-width:0 !important;
+    overflow:visible !important;
   }
   .main-area>.dashboard-topbar .google-weather-panel .live-weather-icon{
-    width:22px !important;
-    height:22px !important;
-    min-width:22px !important;
-    flex:0 0 22px !important;
-    font-size:14px !important;
+    width:24px !important;
+    height:24px !important;
+    min-width:24px !important;
+    flex:0 0 24px !important;
+    font-size:15px !important;
     border-radius:6px !important;
   }
   .main-area>.dashboard-topbar .google-weather-panel .live-weather-current-main strong{
-    font-size:13px !important;
-    line-height:1 !important;
+    display:block !important;
+    font-size:14px !important;
+    line-height:1.15 !important;
+    white-space:nowrap !important;
   }
   .main-area>.dashboard-topbar .google-weather-panel .live-weather-current-main span{
+    display:inline !important;
     margin:0 !important;
     font-size:10px !important;
-    line-height:1 !important;
+    line-height:1.2 !important;
+  }
+  .main-area>.dashboard-topbar .google-weather-panel .live-weather-current-main small,
+  .main-area>.dashboard-topbar .google-weather-panel .live-weather-metrics,
+  .main-area>.dashboard-topbar .google-weather-panel .live-weather-days,
+  .main-area>.dashboard-topbar .google-weather-panel .live-weather-attribution{
+    display:none !important;
   }
 }
