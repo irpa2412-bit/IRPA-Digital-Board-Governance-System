@@ -131,8 +131,8 @@ export const DONOR_SCANNERS = [
   { name: "tanzania_forest_fund", label: "Tanzania Forest Fund", url: "https://www.mfukowamisitu.go.tz/download-center" },
   { name: "world_bank_funding", label: "World Bank Funding Opportunities", url: "https://projects.worldbank.org/en/projects-operations/opportunities" },
   { name: "fundsforngos_latest", label: "FundsforNGOs Latest Funding Opportunities", url: "https://www2.fundsforngos.org/" },
-  { name: "fundsforngos_africa", label: "FundsforNGOs Africa Funding Calls", url: "https://www2.fundsforngos.org/listing/explore-60-funding-opportunities-across-africa/" },
-  { name: "fundsforngos_donors", label: "FundsforNGOs Donors and Funders Directory", url: "https://donors.fundsforngos.org/" },
+  { name: "fundsforngos_africa", label: "FundsforNGOs Current Funding Listings", url: "https://www2.fundsforngos.org/category/listing/" },
+  { name: "fundsforngos_tanzania", label: "FundsforNGOs Tanzania Funding Calls", url: "https://www2.fundsforngos.org/listing/new-grant-funding-opportunities-for-tanzania-in-2026/" },
   { name: "fundsforngos_news", label: "FundsforNGOs Funding News", url: "https://news.fundsforngos.org/" },
 ];
 
