@@ -373,7 +373,7 @@ function LiveWeatherPanel(){
   {name:"Singida",region:"Singida Region",latitude:-4.817,longitude:34.743}
  ];
  const apiKey=String(import.meta.env.VITE_GOOGLE_WEATHER_API_KEY||"").trim();
- const[weatherByPlace,setWeatherByPlace]=useState({});const[forecastExpanded,setForecastExpanded]=useState(true);
+ const[weatherByPlace,setWeatherByPlace]=useState({});const[forecastExpanded,setForecastExpanded]=useState(false);
  const[activePlaceIndex,setActivePlaceIndex]=useState(0);
  const[error,setError]=useState("");
  const[loading,setLoading]=useState(true);
