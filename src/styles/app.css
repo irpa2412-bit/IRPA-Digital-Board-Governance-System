@@ -8546,3 +8546,28 @@ html body #root .main-area > .topbar .topbar-heading-row > .google-weather-panel
     overflow: auto;
   }
 }
+
+
+/* 2026-10-11 correction: preserve the Access Category's original text colours.
+   Only the Weather Forecast text is intended to use blue. */
+html body #root .main-area > .topbar .topbar-heading-row > .topbar-access-category.topbar-access-category.topbar-access-category {
+  color: #e7f4ee;
+  -webkit-text-fill-color: #e7f4ee;
+}
+html body #root .main-area > .topbar .topbar-heading-row > .topbar-access-category.topbar-access-category.topbar-access-category > span {
+  color: #f7cf61;
+  -webkit-text-fill-color: #f7cf61;
+}
+html body #root .main-area > .topbar .topbar-heading-row > .topbar-access-category.topbar-access-category.topbar-access-category [aria-label="Login category"] > span {
+  color: #e7f4ee;
+  -webkit-text-fill-color: #e7f4ee;
+}
+html body #root .main-area > .topbar .topbar-heading-row > .topbar-access-category.topbar-access-category.topbar-access-category [aria-label="Login category"] span {
+  color: #f7cf61;
+  -webkit-text-fill-color: #f7cf61;
+}
+html body #root .main-area > .topbar .topbar-heading-row > .topbar-access-category.topbar-access-category.topbar-access-category [aria-label="Login category"] small,
+html body #root .main-area > .topbar .topbar-heading-row > .topbar-access-category.topbar-access-category.topbar-access-category [aria-label="Login category"] strong {
+  color: #e7f4ee;
+  -webkit-text-fill-color: #e7f4ee;
+}
