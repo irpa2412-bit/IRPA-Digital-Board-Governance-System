@@ -156,8 +156,8 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  const smartKeywordSuggestions=["rangeland restoration","pastoral livelihoods","livestock health","climate resilience","women and youth","digital governance","market access","biodiversity conservation","water security","community grants"];
  const smartAssistantResults=useMemo(()=>{
    // Comma/semicolon/newline separates keyword phrases; a space-only query is treated as individual keywords.
-   const raw=smartKeywords.toLowerCase().split(/[,;\\n]+/).map(term=>term.trim()).filter(Boolean);
-   const terms=(raw.length?raw:smartKeywords.toLowerCase().split(/\\s+/)).filter(term=>term.length>1).slice(0,20);
+   const raw=smartKeywords.toLowerCase().split(/[,;\n]+/).map(term=>term.trim()).filter(Boolean);
+   const terms=(raw.length?raw:smartKeywords.toLowerCase().split(/\s+/)).filter(term=>term.length>1).slice(0,20);
    if(!terms.length)return [];
    const aliases={
      pastoralism:["pastoralist","pastoral","rangeland","nomadic"],
@@ -177,7 +177,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    const openCalls=currentOpportunityRecords.filter(r=>{
      const callStatus=text(r.callStatus||r.call_status).toLowerCase();
      const pipelineStatus=text(r.status).toLowerCase();
-     return callStatus==="open"||pipelineStatus==="open"||/\\b(?:rolling basis|rolling applications?|year[- ]round|no fixed deadline)\\b/i.test([r.title,r.summary,r.description].filter(Boolean).join(" "));
+     return callStatus==="open"||pipelineStatus==="open"||/\b(?:rolling basis|rolling applications?|year[- ]round|no fixed deadline)\b/i.test([r.title,r.summary,r.description].filter(Boolean).join(" "));
    });
    return openCalls.map(r=>{
        const title=text(r.title).toLowerCase();
