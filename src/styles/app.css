@@ -4769,3 +4769,125 @@
     min-width: 700px;
   }
 }
+
+
+/* 2026-10-11: system-wide access-authority panel visibility and collision fix.
+   Keep authority, authorized-user categories, page title and weather in separate layout
+   tracks. Never clip the authority/category content or float another panel over it. */
+.topbar{height:auto;min-height:92px;align-items:stretch;overflow:visible}
+.topbar-heading-row{
+  display:grid;
+  grid-template-columns:minmax(245px,290px) minmax(180px,1fr) minmax(150px,205px);
+  align-items:start;
+  justify-content:stretch;
+  gap:12px;
+  min-width:0;
+  overflow:visible;
+}
+.topbar-access-category{
+  order:1;
+  width:auto;
+  min-width:0;
+  max-width:none;
+  min-height:0;
+  max-height:none;
+  height:auto;
+  overflow:visible;
+  align-self:start;
+  white-space:normal;
+}
+.topbar-access-category>span{
+  white-space:normal;
+  line-height:1.35;
+  overflow-wrap:anywhere;
+}
+.topbar-access-category [aria-label="Login category"]{
+  min-width:0;
+  overflow:visible;
+}
+.topbar-access-category .login-category-heading{
+  white-space:normal;
+  line-height:1.35;
+}
+.topbar-access-category .login-category-list{
+  display:flex;
+  flex-wrap:wrap;
+  gap:5px;
+  min-width:0;
+  overflow:visible;
+}
+.topbar-access-category .login-category-item,
+.topbar-access-category .login-category-pill{
+  min-width:0;
+  max-width:100%;
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
+.topbar-title-block{order:2;min-width:0;width:100%;flex:1 1 auto}
+.topbar-title-line h2{white-space:normal;overflow-wrap:anywhere}
+.topbar-heading-row>.google-weather-panel{
+  position:relative;
+  inset:auto;
+  z-index:1;
+  order:3;
+  width:auto;
+  min-width:0;
+  max-width:none;
+  height:auto;
+  min-height:0;
+  max-height:none;
+  margin:0;
+  overflow:visible;
+  align-self:start;
+}
+.topbar .user-info{z-index:0;pointer-events:none}
+.topbar-access-category{z-index:2}
+@media(max-width:1100px){
+  .topbar-heading-row{
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+    align-items:start;
+  }
+  .topbar-access-category{grid-column:1;grid-row:1}
+  .topbar-title-block{grid-column:2;grid-row:1}
+  .topbar-heading-row>.google-weather-panel{grid-column:1/-1;grid-row:2;width:100%;max-width:none}
+}
+@media(max-width:760px){
+  .topbar{min-height:0;overflow:visible}
+  .topbar-heading-row{
+    display:flex;
+    flex-direction:column;
+    align-items:stretch;
+    gap:10px;
+    width:100%;
+    overflow:visible;
+  }
+  .topbar-access-category,
+  .topbar-title-block,
+  .topbar-heading-row>.google-weather-panel{
+    position:relative;
+    inset:auto;
+    order:initial;
+    width:100%;
+    min-width:0;
+    max-width:none;
+    height:auto;
+    min-height:0;
+    max-height:none;
+    overflow:visible;
+  }
+  .topbar-access-category{order:1}
+  .topbar-title-block{order:2}
+  .topbar-heading-row>.google-weather-panel{order:3}
+  .main-area>.dashboard-topbar .google-weather-panel{
+    position:relative;
+    inset:auto;
+    z-index:1;
+    width:100%;
+    max-width:none;
+    height:auto;
+    min-height:0;
+    max-height:none;
+    margin:0;
+    overflow:visible;
+  }
+}
