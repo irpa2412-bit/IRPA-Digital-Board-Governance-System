@@ -379,11 +379,21 @@ function LiveWeatherPanel(){
  const[loading,setLoading]=useState(true);
  const[lastUpdated,setLastUpdated]=useState("");
  useEffect(()=>{
-  if(!apiKey){setError("Google Weather API key is not configured");setLoading(false);return;}
   let disposed=false;
   const loadWeather=async()=>{
    try{
     const results=await Promise.allSettled(WEATHER_POINTS.map(async point=>{
+     if(!apiKey){
+      const params=new URLSearchParams({latitude:String(point.latitude),longitude:String(point.longitude),current:"temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m",daily:"weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",forecast_days:"4",timezone:"Africa/Dar_es_Salaam"});
+      const response=await fetch("https://api.open-meteo.com/v1/forecast?"+params.toString(),{cache:"no-store"});
+      if(!response.ok)throw new Error("Live forecast returned HTTP "+response.status+" for "+point.name);
+      const data=await response.json();
+      if(!data?.current||!data?.daily?.time?.length)throw new Error("No usable live forecast for "+point.name);
+      const types={0:["CLEAR","Clear sky"],1:["MOSTLY_CLEAR","Mainly clear"],2:["PARTLY_CLOUDY","Partly cloudy"],3:["CLOUDY","Overcast"],45:["FOG","Fog"],48:["FOG","Depositing rime fog"],51:["LIGHT_RAIN","Light drizzle"],53:["LIGHT_RAIN","Drizzle"],55:["RAIN","Dense drizzle"],61:["LIGHT_RAIN","Slight rain"],63:["RAIN","Moderate rain"],65:["HEAVY_RAIN","Heavy rain"],80:["SCATTERED_SHOWERS","Rain showers"],81:["RAIN","Rain showers"],82:["HEAVY_RAIN","Violent rain showers"],95:["THUNDERSTORM","Thunderstorm"],96:["THUNDERSTORM","Thunderstorm with hail"],99:["THUNDERSTORM","Thunderstorm with heavy hail"]};
+      const condition=code=>{const item=types[code]||["CLOUDY","Weather conditions"];return {type:item[0],description:{text:item[1]}};};
+      const daily=data.daily.time.map((date,index)=>({interval:{startTime:date+"T00:00:00+03:00"},maxTemperature:{degrees:data.daily.temperature_2m_max?.[index]},minTemperature:{degrees:data.daily.temperature_2m_min?.[index]},daytimeForecast:{weatherCondition:condition(data.daily.weather_code?.[index]),precipitation:{probability:{percent:data.daily.precipitation_probability_max?.[index]}}}}));
+      return {name:point.name,region:point.region,current:{currentTime:new Date().toISOString(),temperature:{degrees:data.current.temperature_2m},feelsLikeTemperature:{degrees:data.current.apparent_temperature},relativeHumidity:data.current.relative_humidity_2m,wind:{speed:{value:data.current.wind_speed_10m}},weatherCondition:condition(data.current.weather_code)},daily};
+     }
      const params=new URLSearchParams({key:apiKey,"location.latitude":String(point.latitude),"location.longitude":String(point.longitude),unitsSystem:"METRIC"});
      const currentUrl="https://weather.googleapis.com/v1/currentConditions:lookup?"+params.toString();
      const dailyUrl="https://weather.googleapis.com/v1/forecast/days:lookup?"+params.toString()+"&days=4";
@@ -403,7 +413,7 @@ function LiveWeatherPanel(){
     if(!disposed){
      setWeatherByPlace(previous=>({...previous,...next}));
      setLastUpdated(updateTimes[updateTimes.length-1]||new Date().toISOString());
-     setError(results.some(result=>result.status==="rejected")?"Some locations could not refresh; showing their last available observations where available.":"");
+     setError(results.some(result=>result.status==="rejected")?"Some locations could not refresh; showing their last available observations where available.":(!apiKey?"Using live public forecast fallback because the Google Weather API key is not configured.":""));
      setLoading(false);
     }
    }catch(e){if(!disposed){setError(e?.message||"Google Weather is temporarily unavailable");setLoading(false);}}
@@ -436,7 +446,7 @@ function LiveWeatherPanel(){
    <div className="live-weather-metrics"><span>💧 Humidity <b>{fmt(current?.relativeHumidity,"%")}</b></span><span>💨 Wind <b>{fmt(current?.wind?.speed?.value," km/h")}</b></span><span>🌧️ Rain chance <b>{fmt(rain,"%")}</b></span></div>
   </div>
   <div className="live-weather-days">{daily.slice(0,3).map((day,index)=>{const forecast=day.daytimeForecast||day.nighttimeForecast||{},high=day.maxTemperature?.degrees,low=day.minTemperature?.degrees,type=forecast.weatherCondition?.type,text=forecast.weatherCondition?.description?.text||"Forecast unavailable",p=forecast.precipitation?.probability?.percent??day.precipitation?.probability?.percent;const date=day.interval?.startTime||day.interval?.startDate;return <div className="live-weather-day" key={date||index}><strong>{index===0?"Today":new Intl.DateTimeFormat("en-GB",{weekday:"short",day:"2-digit",month:"short",timeZone:"Africa/Dar_es_Salaam"}).format(new Date(date||Date.now()))}</strong><span className="live-weather-day-icon" aria-label={text} title={text}>{icon(type)}</span><b>{fmt(high,"°")} / {fmt(low,"°")}</b><small>Rain {fmt(p,"%")}</small></div>})}</div>
-  <div className="live-weather-attribution"><span>TANZANIA WEATHER · GOOGLE WEATHER</span><small>{lastUpdated?"Updated "+new Intl.DateTimeFormat("en-GB",{dateStyle:"medium",timeStyle:"short",timeZone:"Africa/Dar_es_Salaam"}).format(new Date(lastUpdated))+" · refreshes every 15 minutes · location rolls every 8 seconds":error||"Fetching live Google Weather forecasts for 12 locations…"}</small></div>
+  <div className="live-weather-attribution"><span>TANZANIA WEATHER · LIVE FORECAST</span><small>{lastUpdated?"Updated "+new Intl.DateTimeFormat("en-GB",{dateStyle:"medium",timeStyle:"short",timeZone:"Africa/Dar_es_Salaam"}).format(new Date(lastUpdated))+" · refreshes every 15 minutes · location rolls every 8 seconds":error||"Fetching live Google Weather forecasts for 12 locations…"}</small></div>
  </div>;
 }
 const IRPA_SESSION_RECOVERY_KEY="irpaSessionRecovery";const IRPA_INACTIVITY_LIMIT_MS=5*60*1000;const IRPA_RECOVERY_MAX_AGE_MS=24*60*60*1000;function readIrpaRecovery(){try{const raw=window.localStorage.getItem(IRPA_SESSION_RECOVERY_KEY);if(!raw)return null;const value=JSON.parse(raw);if(!value||Date.now()-Number(value.savedAt||0)>IRPA_RECOVERY_MAX_AGE_MS){window.localStorage.removeItem(IRPA_SESSION_RECOVERY_KEY);return null}return value}catch{return null}}function writeIrpaRecovery(snapshot){try{window.localStorage.setItem(IRPA_SESSION_RECOVERY_KEY,JSON.stringify({...snapshot,savedAt:Date.now()}))}catch{}}

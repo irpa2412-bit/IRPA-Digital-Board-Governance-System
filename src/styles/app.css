@@ -5237,3 +5237,215 @@
     grid-template-columns:minmax(0,1fr) minmax(0,1fr);
   }
 }
+
+
+/* 2026-10-11 production correction: access authority and weather must never overlap portal navigation. */
+.topbar.dashboard-topbar,
+.topbar {
+  position:relative;
+  z-index:5;
+  height:auto;
+  min-height:0;
+  max-height:none;
+  overflow:visible;
+}
+.topbar-heading-row {
+  position:relative;
+  display:grid;
+  grid-template-columns:minmax(230px,270px) minmax(180px,1fr) minmax(270px,320px);
+  grid-template-areas:"title authority weather";
+  align-items:start;
+  gap:12px;
+  width:100%;
+  height:auto;
+  min-height:0;
+  max-height:none;
+  overflow:visible;
+  box-sizing:border-box;
+}
+.topbar-heading-row>.topbar-title-block {
+  grid-area:title;
+  position:relative;
+  inset:auto;
+  z-index:1;
+  width:auto;
+  min-width:0;
+  max-width:100%;
+  height:auto;
+  max-height:none;
+  overflow:visible;
+}
+.topbar-heading-row>.topbar-access-category {
+  grid-area:authority;
+  position:relative;
+  inset:auto;
+  z-index:4;
+  order:initial;
+  width:auto;
+  min-width:0;
+  max-width:100%;
+  height:auto;
+  min-height:0;
+  max-height:none;
+  margin:0;
+  padding:10px;
+  align-self:start;
+  overflow:visible;
+  box-sizing:border-box;
+  border:1px solid rgba(125,211,160,.35);
+  border-radius:10px;
+  background:rgba(4,22,16,.9);
+}
+.topbar-heading-row>.topbar-access-category .login-category-badges,
+.topbar-heading-row>.topbar-access-category .login-category-list,
+.topbar-heading-row>.topbar-access-category .login-category-item {
+  width:100%;
+  min-width:0;
+  max-width:100%;
+  height:auto;
+  max-height:none;
+  overflow:visible;
+  box-sizing:border-box;
+}
+.topbar-heading-row>.topbar-access-category .login-category-heading,
+.topbar-heading-row>.topbar-access-category .login-category-pill {
+  white-space:normal;
+  overflow-wrap:anywhere;
+  word-break:normal;
+}
+.topbar-heading-row>.google-weather-panel {
+  grid-area:weather;
+  position:relative;
+  inset:auto;
+  z-index:1;
+  order:initial;
+  width:auto;
+  min-width:0;
+  max-width:100%;
+  height:auto;
+  min-height:0;
+  max-height:none;
+  margin:0;
+  padding:9px;
+  align-self:start;
+  overflow:visible;
+  box-sizing:border-box;
+}
+.topbar-heading-row>.google-weather-panel .live-weather-content {
+  display:flex;
+  flex-direction:column;
+  gap:7px;
+  min-width:0;
+}
+.topbar-heading-row>.google-weather-panel .live-weather-location-bar {
+  margin:0;
+  padding:6px 8px;
+}
+.topbar-heading-row>.google-weather-panel .live-weather-current {
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  min-width:0;
+}
+.topbar-heading-row>.google-weather-panel .live-weather-current-main {
+  min-width:0;
+}
+.topbar-heading-row>.google-weather-panel .live-weather-current-main>div {
+  min-width:0;
+}
+.topbar-heading-row>.google-weather-panel .live-weather-current-main strong {
+  font-size:23px;
+  line-height:1.1;
+}
+.topbar-heading-row>.google-weather-panel .live-weather-metrics {
+  display:flex;
+  flex-wrap:wrap;
+  gap:5px;
+  margin:0;
+}
+.topbar-heading-row>.google-weather-panel .live-weather-metrics>span {
+  padding:4px 6px;
+  font-size:12px;
+  line-height:1.25;
+}
+.topbar-heading-row>.google-weather-panel .live-weather-days {
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:5px;
+  margin:0;
+}
+.topbar-heading-row>.google-weather-panel .live-weather-day {
+  min-width:0;
+  padding:6px 3px;
+  gap:3px;
+}
+.topbar-heading-row>.google-weather-panel .live-weather-day strong,
+.topbar-heading-row>.google-weather-panel .live-weather-day b,
+.topbar-heading-row>.google-weather-panel .live-weather-day small {
+  font-size:12px;
+  line-height:1.2;
+  overflow-wrap:anywhere;
+}
+.topbar-heading-row>.google-weather-panel .live-weather-attribution {
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+  margin:0;
+}
+.topbar-heading-row>.google-weather-panel .live-weather-attribution span,
+.topbar-heading-row>.google-weather-panel .live-weather-attribution small {
+  font-size:12px;
+  line-height:1.25;
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
+.desktop-webapp-navigation-roller {
+  position:relative;
+  z-index:1;
+  clear:both;
+  margin-top:10px;
+}
+@media (min-width:1101px) {
+  .topbar-heading-row {
+    grid-template-columns:minmax(230px,270px) minmax(180px,1fr) minmax(270px,320px);
+    grid-template-areas:"title authority weather";
+  }
+}
+@media (min-width:761px) and (max-width:1100px) {
+  .topbar-heading-row {
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+    grid-template-areas:"title authority" "weather weather";
+  }
+  .topbar-heading-row>.google-weather-panel {
+    width:100%;
+  }
+}
+@media (max-width:760px) {
+  .topbar-heading-row {
+    display:flex;
+    flex-direction:column;
+    align-items:stretch;
+    gap:10px;
+    width:100%;
+    height:auto;
+    min-height:0;
+    overflow:visible;
+  }
+  .topbar-heading-row>.topbar-title-block {
+    order:1;
+    width:100%;
+  }
+  .topbar-heading-row>.topbar-access-category {
+    order:2;
+    width:100%;
+    padding:9px;
+  }
+  .topbar-heading-row>.google-weather-panel {
+    order:3;
+    width:100%;
+    padding:9px;
+  }
+  .desktop-webapp-navigation-roller {
+    margin-top:12px;
+  }
+}
