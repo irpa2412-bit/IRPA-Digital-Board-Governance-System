@@ -1,6 +1,6 @@
 // Extensible portal hierarchy registry: add future sub-portals under their parent here.
 // Every registered child is kept out of the top-level Portals navigator and exposed in the in-portal navigator.
-const PORTAL_ROLLER_GROUPS=[["Meetings",["Meeting Room","Participants","Resolutions","Voting","Actions","Decisions"]],["Documents",["Document Workspace","My Documents","Department Documents","Shared With Me","Signing Workspace","Post-Signature Work","Final Archive","Upload Document","Retrieve Archived Documents"]],["Induction and Orientation",["Induction Applications"]]];
+const PORTAL_ROLLER_GROUPS=[["Meetings",["Meeting Room","Participants","Resolutions","Voting","Actions","Decisions"]],["Documents",["My Documents","Department Documents","Shared With Me","Signing Workspace","Post-Signature Work","Final Archive","Upload Document","Retrieve Archived Documents"]],["Induction and Orientation",["Induction Applications"]]];
 function sortNavigationItems(items){return [...new Set(items)].filter(Boolean).sort((a,b)=>{const labelA=displayModuleName(a)||a;const labelB=displayModuleName(b)||b;return labelA.localeCompare(labelB,"en",{sensitivity:"base",numeric:true})||a.localeCompare(b,"en",{sensitivity:"base"});});}
 function getPortalGroupForModule(module){return PORTAL_ROLLER_GROUPS.find(([parent,children])=>module===parent||children.includes(module))||null;}
 function isRegisteredSubPortal(module){return PORTAL_ROLLER_GROUPS.some(([,children])=>children.includes(module));}
