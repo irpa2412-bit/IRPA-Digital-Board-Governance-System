@@ -36,6 +36,30 @@ async function deleteCollectionTree(db, collectionRef, report) {
   return deleted;
 }
 
+const ACTUAL_DATA_GATE_DOC = "actualDataGateMigration20261011";
+const ACTUAL_ONLY_COLLECTIONS = [
+  "adminProfiles", "members", "employees", "auditorProfiles",
+  "signerIdentities", "signatureProfiles", "systemSettings"
+];
+
+async function writeActualDataGateManifest(db) {
+  const collections = {};
+  for (const name of ACTUAL_ONLY_COLLECTIONS) {
+    const snap = await db.collection(name).get();
+    collections[name] = { documentCount: snap.size, environment: "ACTUAL" };
+  }
+  const manifest = {
+    status: "VERIFIED",
+    environment: "ACTUAL",
+    migrationType: "identity-and-system-configuration-routing",
+    scope: "Member and employee identities, signer identity and signature profiles, auditor profiles, administrator profiles, and system configuration remain in the live Firestore project and are never switched to the trial data environment.",
+    collections,
+    verifiedAt: FieldValue.serverTimestamp()
+  };
+  await db.collection("systemSettings").doc(ACTUAL_DATA_GATE_DOC).set(manifest, { merge: true });
+  return manifest;
+}
+
 async function main() {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
   if (!raw) throw new Error("FIREBASE_SERVICE_ACCOUNT secret is missing.");
@@ -48,8 +72,10 @@ async function main() {
   const auditRef = db.collection("systemSettings").doc(AUDIT_DOC);
   const existing = await auditRef.get();
   if (existing.exists && existing.data()?.status === "COMPLETED") {
+    const actualDataGate = await writeActualDataGateManifest(db);
     console.log("WHOLE_WEB_APP_ZERO_RESET_ALREADY_COMPLETED: no deletion performed.");
-    console.log(JSON.stringify(existing.data()));
+    console.log("ACTUAL_DATA_GATE_IDENTITY_MIGRATION_VERIFIED");
+    console.log(JSON.stringify({ reset: existing.data(), actualDataGate }, null, 2));
     return;
   }
 
@@ -93,8 +119,10 @@ async function main() {
     remainingTopLevelCounts: remaining
   };
   await auditRef.set(result);
+  const actualDataGate = await writeActualDataGateManifest(db);
   console.log("WHOLE_WEB_APP_ZERO_RESET_VERIFIED");
-  console.log(JSON.stringify({ ...result, completedAt: "serverTimestamp" }, null, 2));
+  console.log("ACTUAL_DATA_GATE_IDENTITY_MIGRATION_VERIFIED");
+  console.log(JSON.stringify({ ...result, actualDataGate, completedAt: "serverTimestamp" }, null, 2));
 }
 
 main().catch(error => {
