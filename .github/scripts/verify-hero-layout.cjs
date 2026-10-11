@@ -11,12 +11,18 @@ const report={target,testedAt:new Date().toISOString(),cache:{},authentication:{
  let html=await page.content();report.cache.indexVersion=html.match(/\/src\/main\.jsx\?v=([^"'&]+)/)?.[1]||null;
  report.htmlScriptAssets=await page.locator("script[src]").evaluateAll(es=>es.map(e=>e.getAttribute("src")));
  report.htmlStylesheetAssets=await page.locator('link[rel="stylesheet"]').evaluateAll(es=>es.map(e=>e.getAttribute("href")));
+ report.cache.deployedAssets=[];
+ for(const u of [...report.htmlScriptAssets,...report.htmlStylesheetAssets]){
+  try{const r=await page.request.get(new URL(u,target).href,{timeout:20000});const t=await r.text();report.cache.deployedAssets.push({url:u,status:r.status(),bytes:t.length,containsHeroGrid:t.includes("minmax(200px, 260px)")||t.includes("minmax(200px,260px)"),containsWeatherBlue:t.includes("#2563eb"),containsAccessPalette:t.includes("#f7cf61"),containsHeroBlock:t.includes("DASHBOARD HERO FINAL OVERRIDES")||t.includes("Dashboard hero: title")})}
+  catch(e){report.cache.deployedAssets.push({url:u,error:String(e).slice(0,250)})}
+ }
+
  try{const sw=await page.request.get(new URL("/sw.js",target).href,{timeout:20000});const t=await sw.text();report.cache.swHttpStatus=sw.status();report.cache.serviceWorkerVersion=t.match(/CACHE_NAME\s*=\s*["']([^"']+)/)?.[1]||null;report.cache.swContainsV19=t.includes("irpa-dbgs-app-shell-v19")}catch(e){report.cache.swFetchError=String(e)}
  report.authScreenVisible=await page.locator(".auth-screen").count()>0;
  let dashboard=await page.locator(".google-weather-panel").count()>0&&await page.locator(".topbar-access-category").count()>0;
  if(!dashboard&&process.env.IRPA_E2E_EMAIL&&process.env.IRPA_E2E_PASSWORD){
   report.authentication.attempted=true;
-  try{await page.locator('.auth-screen input[type="email"]').fill(process.env.IRPA_E2E_EMAIL);await page.locator('.auth-screen input[type="password"]').fill(process.env.IRPA_E2E_PASSWORD);await page.getByRole("button",{name:"Sign In Securely"}).click();await page.waitForFunction(()=>!!document.querySelector(".google-weather-panel")&&!!document.querySelector(".topbar-access-category"),null,{timeout:30000});dashboard=true;report.authentication.used=true;}catch(e){report.authentication.error=String(e).slice(0,400)}
+  try{await page.locator('.auth-screen input[type="email"]').fill(process.env.IRPA_E2E_EMAIL);await page.locator('.auth-screen input[type="password"]').fill(process.env.IRPA_E2E_PASSWORD);await page.getByRole("button",{name:"Sign In Securely"}).click();await page.waitForFunction(()=>!!document.querySelector(".google-weather-panel")&&!!document.querySelector(".topbar-access-category"),null,{timeout:12000});dashboard=true;report.authentication.used=true;}catch(e){report.authentication.error=String(e).slice(0,400);report.authentication.screenMessage=(await page.locator(".auth-screen").innerText().catch(()=>"" )).slice(-1000);report.authentication.currentUrl=page.url()}
  }
  if(!dashboard){
   report.mode="production-css-fixture";
