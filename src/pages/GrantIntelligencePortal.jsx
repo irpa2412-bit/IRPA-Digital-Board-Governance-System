@@ -118,7 +118,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  const roleList=[profile?.role,profile?.roles,employee?.role,employee?.roles].flatMap(v=>Array.isArray(v)?v:String(v||"").split(",")).map(v=>String(v||"").trim().toLowerCase());
  const canManage=isAdmin||roleList.some(r=>["administrator","executive director","director outreach","director finance & administration","director research","research director","research manager","fundraising officer","research officer"].includes(r));
  async function loadCrawlerResults(showNotice=false){
-   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-staging.irpa-governance.workers.dev").replace(/\/+$/,"");
+   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-production.irpa-governance.workers.dev").replace(/\/+$/,"");
    const token=await auth.currentUser?.getIdToken();
    if(!token){if(showNotice)setError("Your session has expired. Sign in again to load crawler results.");return;}
    setCrawlerResultsBusy(true);
