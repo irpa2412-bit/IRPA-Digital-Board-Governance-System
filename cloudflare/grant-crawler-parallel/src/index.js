@@ -357,9 +357,13 @@ async function crawl(env) {
   const items = [...unique.values()];
   const assessedItems = items.map(item => ({ ...item, fit: assessFit(item) }));
   let changed = 0;
+  const registerWritesByEngine = new Map(settled.map(engine => [engine.name, 0]));
+  const candidatesByEngine = new Map(settled.map(engine => [engine.name, 0]));
   const matchCounts = { strong: 0, possible: 0, low: 0, priorityForReview: 0, open: 0, closed: 0, expired: 0, statusUnknown: 0, geographicMismatch: 0, geographyUnverifiedSuppressed: 0, eligibilityUnverified: 0 };
   for (const item of assessedItems) {
     const fit = item.fit;
+    const sourceEngine = String(item.discoveryEngine || "unknown");
+    candidatesByEngine.set(sourceEngine, (candidatesByEngine.get(sourceEngine) || 0) + 1);
     if (fit.fitAssessment === "strong_topic_match") matchCounts.strong++;
     else if (fit.fitAssessment === "possible_topic_match") matchCounts.possible++;
     else matchCounts.low++;
@@ -376,7 +380,14 @@ async function crawl(env) {
     const result = await env.GRANTS_DB.prepare(
       "INSERT INTO grant_opportunities (id, title, description, url, published_at, source_url, fit_score, fit_assessment, fit_reasons, eligibility_status, call_status, geography_assessment, triage_assessment, deadline_at, first_seen_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT(url) DO UPDATE SET title=excluded.title, description=excluded.description, published_at=excluded.published_at, source_url=excluded.source_url, fit_score=excluded.fit_score, fit_assessment=excluded.fit_assessment, fit_reasons=excluded.fit_reasons, eligibility_status=excluded.eligibility_status, call_status=excluded.call_status, geography_assessment=excluded.geography_assessment, triage_assessment=excluded.triage_assessment, deadline_at=excluded.deadline_at, last_seen_at=CURRENT_TIMESTAMP"
     ).bind(id, item.title, item.description, item.url, item.publishedAt || null, item.sourceUrl || item.url, fit.score, fit.fitAssessment, JSON.stringify(fit.reasons), fit.eligibilityStatus, fit.callStatus, fit.geographyAssessment, fit.triageAssessment, fit.deadlineAt).run();
-    if (result.meta?.changes) changed += result.meta.changes;
+    if (result.meta?.changes) {
+      changed += result.meta.changes;
+      registerWritesByEngine.set(sourceEngine, (registerWritesByEngine.get(sourceEngine) || 0) + result.meta.changes);
+    }
+  }
+  for (const engine of settled) {
+    engine.stats.candidatesAfterDeduplication = candidatesByEngine.get(engine.name) || 0;
+    engine.stats.sharedRegisterWrites = registerWritesByEngine.get(engine.name) || 0;
   }
   const overallStatus = settled.every(engine => engine.stats.status === "failed") ? "failed" : "success";
   await env.GRANTS_DB.prepare(
