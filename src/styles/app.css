@@ -9962,3 +9962,11 @@ html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-headin
     overflow-wrap: anywhere;
   }
 }
+
+/* 2026-10-11 follow-up: shift the weather pad a further 1.5 cm left. */
+@media (min-width: 1200px) {
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel {
+    margin-left: calc(-24px - 1.5cm);
+    width: calc(100% + 24px + 1.5cm);
+  }
+}
