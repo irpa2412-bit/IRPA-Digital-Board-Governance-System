@@ -157,10 +157,8 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  useEffect(()=>onSnapshot(doc(db,"grantCrawlerStatus","current"),snap=>{if(snap.exists())setCrawlerStatus(snap.data())},err=>console.warn("Legacy Firestore crawler status unavailable",err)),[]);
  useEffect(()=>onSnapshot(collection(db,"grantCrawlerSources"),snap=>setCrawlerSources(snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||"")))),err=>console.warn("Grant crawler source health unavailable",err)),[]);
  const combinedRecords=useMemo(()=>{const seen=new Set(records.map(r=>String(r.url||"").trim()).filter(Boolean));return [...records,...crawlerRecords.filter(r=>r.url&&!seen.has(String(r.url).trim()))]},[records,crawlerRecords]);
- const geographyEligibleRecords=useMemo(()=>combinedRecords.filter(r=>!isCountryRestrictedForIrpa(r)),[combinedRecords]);
- const geographicExclusionCount=combinedRecords.length-geographyEligibleRecords.length;
- const currentOpportunityRecords=useMemo(()=>geographyEligibleRecords.filter(r=>!isNotCurrentOpportunity(r)),[geographyEligibleRecords]);
- const expiredExclusionCount=geographyEligibleRecords.length-currentOpportunityRecords.length;
+ const currentOpportunityRecords=useMemo(()=>combinedRecords.filter(r=>!isNotCurrentOpportunity(r)),[combinedRecords]);
+ const expiredExclusionCount=combinedRecords.length-currentOpportunityRecords.length;
  const filtered=useMemo(()=>currentOpportunityRecords.filter(r=>{
    const hay=[r.title,r.funder,r.summary,r.country,r.amount].join(" ").toLowerCase();
    return (!queryText||hay.includes(queryText.toLowerCase()))&&(pillar==="all"||cleanArray(r.pillars).includes(pillar))&&(theme==="all"||cleanArray(r.themes).includes(theme))&&(status==="all"||r.status===status);
@@ -261,13 +259,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
      setWorkspaceNotice("Deadline/current-status gate blocked this call before AI analysis.");
      return;
    }
-   if(isCountryRestrictedForIrpa({...selectedOpportunity,summary:[selectedOpportunity.summary,opportunityDescription].filter(Boolean).join(" "),applicationRequirements:donorRequirements})){
-     setAnalysisResult({geographic_eligibility:{status:"ineligible",reason:"This opportunity is country-focused on South Africa, Zimbabwe or another non-Tanzania country, and does not establish Tanzania eligibility. AI screening and concept-note drafting are blocked.",evidence:["Deterministic country-focus exclusion applied before AI analysis."]},eligibility:{status:"ineligible",confidence:"high",evidence:["Country-specific non-Tanzania call"],unknowns:["Find a call explicitly open to Tanzania or an eligible regional/global applicant pool."]}});
-     setConceptDraft("");
-     setError("This country-specific call is excluded for IRPA. Select a Tanzania-eligible or clearly eligible regional/global opportunity.");
-     setWorkspaceNotice("Eligibility gate blocked this call before AI analysis.");
-     return;
-   }
+   // Geographic eligibility no longer blocks opportunity analysis; show and assess all calls.
    if(!text(opportunityDescription)&&!text(donorRequirements)){setError("Provide the opportunity description or paste the official donor eligibility and application criteria.");return;}
    const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-staging.irpa-governance.workers.dev").replace(/\/+$/,"");
    const idToken=await auth.currentUser?.getIdToken();
@@ -299,9 +291,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
      setError(currentStatusIssue==="unverified"?"The official deadline/current status is unverified. A concept note cannot be saved as an active application until verified.":"This call is expired or closed. A concept note cannot be saved as an active application.");
      return;
    }
-   if(isCountryRestrictedForIrpa({...selectedOpportunity,summary:[selectedOpportunity.summary,opportunityDescription].filter(Boolean).join(" "),applicationRequirements:donorRequirements})){
-     setError("This country-specific non-Tanzania opportunity cannot be saved as an IRPA application concept note. Existing saved records are not deleted.");
-     return;
+   // Geographic eligibility no longer blocks saving a reviewed draft.
    }
    const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-staging.irpa-governance.workers.dev").replace(/\/+$/,"");
    const idToken=await auth.currentUser?.getIdToken();
