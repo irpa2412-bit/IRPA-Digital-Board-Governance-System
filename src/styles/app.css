@@ -7883,3 +7883,114 @@
     line-height: 1 ;
   }
 }
+
+
+/* 2026-10-11 targeted workspace sizing: wider access/weather panels, compact right-aligned
+   in-portal selector, and standard Back/Next button dimensions. */
+@media (min-width: 1101px) {
+  .main-area > .topbar .topbar-heading-row {
+    grid-template-columns: minmax(180px, .72fr) minmax(360px, 1.28fr) minmax(300px, .95fr);
+    grid-template-areas: "title authority weather";
+    align-items: stretch;
+    gap: 10px;
+  }
+  .main-area > .topbar .topbar-heading-row > .topbar-access-category {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    box-sizing: border-box;
+  }
+  .main-area > .topbar .topbar-heading-row > .google-weather-panel {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    min-height: 190px;
+    height: auto;
+    max-height: none;
+    justify-self: stretch;
+    box-sizing: border-box;
+  }
+}
+@media (min-width: 761px) and (max-width: 1100px) {
+  .main-area > .topbar .topbar-heading-row {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 1.2fr);
+    grid-template-areas: "title authority" "weather weather";
+    gap: 10px;
+  }
+  .main-area > .topbar .topbar-heading-row > .topbar-access-category {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+  }
+  .main-area > .topbar .topbar-heading-row > .google-weather-panel {
+    width: 100%;
+    max-width: none;
+    min-height: 170px;
+    justify-self: stretch;
+  }
+}
+@media (max-width: 760px) {
+  .main-area > .topbar .topbar-heading-row > .topbar-access-category,
+  .main-area > .topbar .topbar-heading-row > .google-weather-panel {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+}
+.main-area > .desktop-webapp-navigation-roller {
+  min-height: 44px;
+  gap: 8px;
+  padding: 4px 8px;
+  box-sizing: border-box;
+}
+.main-area > .desktop-webapp-navigation-roller .webapp-navigation-live-clock {
+  flex: 0 0 auto;
+}
+.main-area > .desktop-webapp-navigation-roller .webapp-navigation-roller-kicker {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.main-area > .desktop-webapp-navigation-roller > strong {
+  flex: 0 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+}
+.main-area > .desktop-webapp-navigation-roller select {
+  flex: 0 1 360px;
+  width: min(360px, 34vw);
+  margin-left: auto;
+}
+.main-area > .page-back-next-navigation {
+  grid-template-columns: minmax(100px, 1fr) minmax(100px, auto) minmax(100px, 1fr);
+  min-height: 44px;
+  padding: 4px 10px;
+  gap: 8px;
+}
+.main-area > .page-back-next-navigation .page-back-next-button {
+  min-width: 100px;
+  width: auto;
+  min-height: 36px;
+  height: 36px;
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.2;
+}
+@media (max-width: 760px) {
+  .main-area > .desktop-webapp-navigation-roller {
+    flex-wrap: wrap;
+    min-height: 0;
+  }
+  .main-area > .desktop-webapp-navigation-roller select {
+    flex: 1 1 100%;
+    width: 100%;
+    margin-left: 0;
+  }
+  .main-area > .page-back-next-navigation .page-back-next-button {
+    min-width: 0;
+    width: auto;
+    min-height: 36px;
+    height: 36px;
+    padding: 7px 8px;
+  }
+}
