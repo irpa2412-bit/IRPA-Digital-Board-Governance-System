@@ -6149,7 +6149,8 @@
 }
 
 
-/* Reference-image size cap: weather must not dominate the header or exceed the access panel. */
+/* Match the weather panel's bottom edge to the access-authority card.
+   Keep the header row's height governed by the authority card, not weather content. */
 .main-area .topbar .topbar-heading-row{
  grid-template-columns:minmax(0,1fr) minmax(360px,0.9fr) minmax(300px,0.8fr);
  align-items:stretch;
@@ -6176,6 +6177,25 @@
  min-height:0;
  gap:7px;
  overflow:hidden;
+}
+.main-area .topbar .topbar-heading-row .topbar-access-category{
+ min-height:0;
+ align-self:stretch;
+}
+.main-area .topbar .topbar-heading-row .google-weather-panel .live-weather-content > *{
+ flex-shrink:0;
+}
+.main-area .topbar .topbar-heading-row .google-weather-panel .live-weather-attribution{
+ margin-top:auto;
+}
+@media(min-width:1101px){
+ .main-area .topbar .topbar-heading-row{grid-template-rows:minmax(0,1fr)}
+ .main-area .topbar .topbar-heading-row .google-weather-panel,
+ .main-area .topbar .topbar-heading-row .topbar-access-category{
+  height:100%;
+  max-height:100%;
+  min-height:0;
+ }
 }
 .main-area .topbar .google-weather-panel .live-weather-location-bar{padding:6px 8px;gap:6px}
 .main-area .topbar .google-weather-panel .live-weather-location-name,
