@@ -336,7 +336,7 @@ function SignerShell({user,profile,signingEnvelopeId}){
     <section className="main-area">
       <header className="topbar">
         <div>
-          <span className="topbar-kicker">IMPROVEMENT OF RANGELAND IN PASTORAL AREAS</span>
+          <span className="topbar-kicker">IMPROVEMENT OF RANGELAND<br/>IN PASTORAL AREAS</span>
           <h2>Signature Invitation</h2>
           <p>Secure Electronic Signing Ceremony</p>
         </div>
