@@ -8985,3 +8985,107 @@ html body #root .main-area > .topbar .topbar-heading-row > .topbar-access-catego
   color: #d1d5db;
   -webkit-text-fill-color: #d1d5db;
 }
+
+
+/* 2026-10-11 Live Weather full-width/full-height forecast expansion.
+   Weather-card and weather-banner scope only; no colour or script changes. */
+@media (min-width: 1101px) {
+  html body #root .main-area > header.topbar:not(.dashboard-topbar):has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row {
+    grid-template-columns: minmax(140px, 0.4fr) minmax(0, 3fr) 6cm;
+    grid-template-areas: "title weather authority";
+    grid-template-rows: auto;
+    height: auto; min-height: 0; max-height: none; overflow: visible;
+    align-items: start;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row {
+    grid-template-columns: minmax(140px, 0.4fr) minmax(0, 3fr) 6cm;
+    grid-template-areas: "title weather authority";
+    grid-template-rows: auto;
+    height: auto; min-height: 0; max-height: none; overflow: visible;
+    align-items: start;
+  }
+}
+@media (min-width: 901px) and (max-width: 1100px) {
+  html body #root .main-area > header.topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row {
+    grid-template-columns: minmax(120px, 0.4fr) minmax(0, 2.5fr) 4cm;
+    grid-template-areas: "title weather authority";
+    grid-template-rows: auto;
+    height: auto; min-height: 0; max-height: none; overflow: visible;
+    align-items: start;
+  }
+}
+html body #root .main-area > header.topbar:has(> .topbar-heading-row > .google-weather-panel) {
+  height: auto; min-height: 0; max-height: none; overflow: visible;
+}
+html body #root .main-area > header.topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row {
+  width: 100%; min-width: 0; height: auto; min-height: 0; max-height: none;
+  grid-auto-rows: auto; overflow: visible; box-sizing: border-box;
+}
+html body #root .main-area > header.topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel {
+  grid-area: weather;
+  width: 100%; min-width: 0; max-width: none; flex: 1 1 auto;
+  height: auto; min-height: 0; max-height: none; overflow: visible;
+  align-self: start; justify-self: stretch; box-sizing: border-box;
+}
+html body #root .main-area > header.topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-content {
+  display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start;
+  width: 100%; min-width: 0; max-width: none; flex: 1 1 auto;
+  height: auto; min-height: 0; max-height: none; overflow: visible;
+  gap: 12px; box-sizing: border-box;
+}
+html body #root .main-area > header.topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-location-bar,
+html body #root .main-area > header.topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-current,
+html body #root .main-area > header.topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-attribution {
+  width: 100%; min-width: 0; max-width: none; flex: 1 1 auto; height: auto; max-height: none;
+  overflow: visible; box-sizing: border-box;
+}
+html body #root .main-area > header.topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-current {
+  align-items: flex-start; justify-content: space-between; flex-wrap: wrap;
+}
+html body #root .main-area > header.topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-current-main,
+html body #root .main-area > header.topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-metrics {
+  min-width: 0; max-width: none; flex: 1 1 220px; box-sizing: border-box;
+}
+html body #root .main-area > header.topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-days {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px;
+  align-content: start; align-items: stretch;
+  width: 100%; min-width: 0; max-width: none; flex: 1 1 auto;
+  height: auto; min-height: 0; max-height: none;
+  margin: 0; padding: 6px 0 8px; overflow: visible; box-sizing: border-box;
+}
+html body #root .main-area > header.topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-day {
+  min-width: 0; max-width: none; width: 100%; height: auto; min-height: 0; max-height: none;
+  white-space: normal; overflow: visible; overflow-wrap: anywhere; box-sizing: border-box;
+}
+html body #root .main-area > header.topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-day > * {
+  max-width: 100%; white-space: normal; overflow: visible; overflow-wrap: anywhere;
+}
+html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .topbar-access-category {
+  align-self: start;
+  height: 250px; min-height: 250px; max-height: 250px;
+  overflow: auto; box-sizing: border-box;
+}
+@media (max-width: 900px) {
+  html body #root .main-area > header.topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "title" "weather" "authority";
+    grid-template-rows: auto;
+    height: auto; min-height: 0; max-height: none; overflow: visible;
+    align-items: start;
+  }
+  html body #root .main-area > header.topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel {
+    width: 100%; min-width: 0; max-width: none; flex: 1 1 auto;
+    height: auto; min-height: 0; max-height: none; overflow: visible;
+  }
+  html body #root .main-area > header.topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-content,
+  html body #root .main-area > header.topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-location-bar,
+  html body #root .main-area > header.topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-current,
+  html body #root .main-area > header.topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-days,
+  html body #root .main-area > header.topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-attribution {
+    width: 100%; min-width: 0; max-width: none; height: auto; min-height: 0; max-height: none;
+    overflow: visible; box-sizing: border-box;
+  }
+  html body #root .main-area > header.topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-days {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px;
+  }
+}
