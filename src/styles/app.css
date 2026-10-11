@@ -8239,3 +8239,51 @@ html body #root .main-area > .topbar .topbar-heading-row > .google-weather-panel
     height: auto;
   }
 }
+
+
+/* 2026-10-11: user-specified physical panel dimensions.
+   Weather Forecast: 6 cm wide × 4 cm high.
+   Authorized User – Access Category: 4 cm wide × 4 cm high. */
+@media (min-width: 1101px) {
+  html body #root .main-area > .topbar .topbar-heading-row {
+    grid-template-columns: minmax(140px, 1fr) 4cm 6cm;
+    grid-template-areas: "title authority weather";
+    align-items: start;
+    gap: 10px;
+  }
+  html body #root .main-area > .topbar .topbar-heading-row > .topbar-access-category {
+    grid-area: authority;
+    width: 4cm;
+    min-width: 4cm;
+    max-width: 4cm;
+    height: 4cm;
+    min-height: 4cm;
+    max-height: 4cm;
+    box-sizing: border-box;
+    overflow: auto;
+    justify-self: stretch;
+    align-self: start;
+  }
+  html body #root .main-area > .topbar .topbar-heading-row > .google-weather-panel {
+    grid-area: weather;
+    width: 6cm;
+    min-width: 6cm;
+    max-width: 6cm;
+    height: 4cm;
+    min-height: 4cm;
+    max-height: 4cm;
+    box-sizing: border-box;
+    overflow: auto;
+    justify-self: stretch;
+    align-self: start;
+  }
+  html body #root .main-area > .topbar .topbar-heading-row > .google-weather-panel .live-weather-content {
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+    min-height: 0;
+    max-height: 100%;
+    overflow: auto;
+    box-sizing: border-box;
+  }
+}
