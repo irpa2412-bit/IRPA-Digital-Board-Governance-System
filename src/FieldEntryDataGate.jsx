@@ -18,7 +18,7 @@ const isEntryControl=el=>{
   if(!(el instanceof HTMLElement)||el.closest("[data-irpa-field-gate]"))return false;
   if(el.closest('[role="search"],[data-irpa-ignore-field-gate="true"]'))return false;
   const type=String(el.type||"").toLowerCase();
-  if(["button","submit","reset","hidden","image","password","search","file"].includes(type))return false;
+  if(["button","submit","reset","hidden","image","password","search"].includes(type))return false;
   if(!el.matches("textarea,select,[contenteditable='true'],[role='textbox'],input"))return false;
   const hint=[el.getAttribute("aria-label"),el.getAttribute("placeholder"),el.getAttribute("name"),el.id,el.getAttribute("data-label")].join(" ");
   if(IGNORE_HINT.test(hint))return false;
@@ -26,7 +26,7 @@ const isEntryControl=el=>{
   if(IGNORE_HINT.test(label?.innerText||""))return false;
   return true;
 };
-const isDiscreteControl=el=>el instanceof HTMLElement&&(el.matches("select,input[type='checkbox'],input[type='radio']"));
+const isDiscreteControl=el=>el instanceof HTMLElement&&(el.matches("select,input[type='checkbox'],input[type='radio'],input[type='file'],input[type='date'],input[type='datetime-local'],input[type='month'],input[type='time'],input[type='week'],input[type='color'],input[type='range'],input[type='number']"));
 const describeField=el=>{
   const id=el.id;
   const label=id?document.querySelector('label[for="'+CSS.escape(id)+'"]'):null;
@@ -70,7 +70,7 @@ export default function FieldEntryDataGate(){
       const el=e.target;
       if(!isDiscreteControl(el))return;
       const key=e.key;
-      const isChoiceKey=el.matches("select")?["ArrowDown","ArrowUp","Home","End","Enter"," "].includes(key):[" ","ArrowDown","ArrowUp"].includes(key);
+      const isChoiceKey=el.matches("select")?["ArrowDown","ArrowUp","Home","End","Enter"," "].includes(key):el.matches("input[type='file']")?["Enter"," "].includes(key):[" ","ArrowDown","ArrowUp","Enter"].includes(key);
       if(isChoiceKey&&openFor(el))e.preventDefault();
     };
     document.addEventListener("pointerdown",onPointerDown,true);
