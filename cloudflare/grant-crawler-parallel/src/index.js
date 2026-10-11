@@ -4,6 +4,7 @@ import { handleApplicationPortal } from "./application-portal-handler.js";
 
 
 const FIREBASE_PROJECT_ID = "irpa-digital-board-governance";
+const MAX_DONOR_SCANNERS_PER_RUN = 18;
 let firebaseJwkCache = { keys: [], expiresAt: 0 };
 
 function decodeBase64Url(value) {
@@ -326,11 +327,19 @@ function assessFit(item) {
 
 async function crawl(env) {
   if (!env.GRANTS_DB) throw new Error("The isolated staging D1 database binding is missing.");
+  // Run all engine types in parallel, rotating donor-specific scanners through
+  // 18-source batches so the combined crawl remains within the Free Workers
+  // external-subrequest ceiling. Every configured donor is checked across successive runs.
+  const donorRotation = Math.floor(Date.now() / (6 * 60 * 60 * 1000)) * MAX_DONOR_SCANNERS_PER_RUN % DONOR_SCANNERS.length;
+  const scheduledDonorScanners = Array.from(
+    { length: Math.min(MAX_DONOR_SCANNERS_PER_RUN, DONOR_SCANNERS.length) },
+    (_, index) => DONOR_SCANNERS[(donorRotation + index) % DONOR_SCANNERS.length]
+  );
   const engines = [
     { name: "rss_atom", run: () => readFeeds(env), configured: (() => { try { return JSON.parse(env.GRANT_FEED_URLS_JSON || env.GRANT_FEED_URLS || "[]").length; } catch { return 0; } })() },
     { name: "official_pages", run: () => readOfficialPages(env), configured: (() => { try { return JSON.parse(env.GRANT_SOURCE_PAGE_URLS_JSON || env.GRANT_SOURCE_PAGE_URLS || "[]").length; } catch { return 0; } })() },
     { name: "web_search", run: () => readWebSearch(env), configured: 1 },
-    ...DONOR_SCANNERS.map(scanner => ({ name: scanner.name, run: () => readDonorScanner(scanner), configured: 1 })),
+    ...scheduledDonorScanners.map(scanner => ({ name: scanner.name, run: () => readDonorScanner(scanner), configured: 1 })),
   ];
   const settled = await Promise.all(engines.map(async engine => {
     try {
@@ -441,7 +450,8 @@ async function crawl(env) {
     sourcePagesConfigured: engines[1].configured,
     webSearchConfigured: Number(settled.find(engine => engine.name === "web_search")?.stats.configured || 0) > 0,
     additionalScannersConfigured: DONOR_SCANNERS.length,
-    additionalScanners: settled.filter(engine => DONOR_SCANNERS.some(scanner => scanner.name === engine.name)).map(engine => ({ engine: engine.name, ...engine.stats })),
+    additionalScannersScheduled: scheduledDonorScanners.map(scanner => scanner.name),
+    additionalScanners: settled.filter(engine => scheduledDonorScanners.some(scanner => scanner.name === engine.name)).map(engine => ({ engine: engine.name, ...engine.stats })),
     uniqueItemsSeen: items.length,
     itemsSeen: items.length,
     recordsChanged: changed,

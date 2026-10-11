@@ -1,8 +1,8 @@
 const MAX_SOURCE_PAGES = 20;
 const MAX_PAGE_BYTES = 1_000_000;
 const MAX_PAGE_LINKS = 8;
-const MAX_TOTAL_DETAIL_PAGES = 2;
-const MAX_SOURCE_PAGES_PER_RUN = 6;
+const MAX_TOTAL_DETAIL_PAGES = 1;
+const MAX_SOURCE_PAGES_PER_RUN = 4;
 const USER_AGENT = "IRPA-GrantDiscovery/1.0 (+https://www.irpa.or.tz)";
 const GRANT_TERMS = /grant|funding|fund|call for proposals|call for applications|expression of interest|small grant|challenge fund|fellowship|award|open call|apply now|application window|tender opportunity/i;
 const HTML_ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
@@ -149,6 +149,10 @@ export const DONOR_SCANNERS = [
   { name: "awhf_grants", label: "African World Heritage Fund Grants", url: "https://awhf.net/grants/" },
   { name: "gfcf_grants", label: "Global Fund for Community Foundations", url: "https://globalfundcommunityfoundations.org/what-we-do/grants/" },
   { name: "mbz_species_grants", label: "Mohamed bin Zayed Species Conservation Fund", url: "https://www.speciesconservation.org/" },
+  { name: "africa_climate_change_fund", label: "Africa Climate Change Fund — AfDB", url: "https://accf.afdb.org/" },
+  { name: "global_eba_fund", label: "Global EbA Fund Small-Size Grants", url: "https://globalebafund.org/small-size-grants/" },
+  { name: "climate_justice_resilience_fund", label: "Climate Justice Resilience Fund — East Africa", url: "https://cjrfund.org/our-grants/" },
+  { name: "whitley_fund_for_nature", label: "Whitley Fund for Nature — Conservation Awards", url: "https://whitleyaward.org/apply-for-conservation-funding/" },
 ];
 
 export async function readDonorScanner(scanner) {
