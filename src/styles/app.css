@@ -8063,8 +8063,8 @@ html body #root .main-area > .topbar .topbar-heading-row > .google-weather-panel
    Authorized User – Access Category: 4 cm wide × 4 cm high. */
 @media (min-width: 1101px) {
   html body #root .main-area > .topbar:not(.dashboard-topbar) .topbar-heading-row {
-    grid-template-columns: minmax(140px, 1fr) 4cm 6cm;
-    grid-template-areas: "title authority weather";
+    grid-template-columns: minmax(140px, 0.6fr) minmax(520px, 2.4fr) 6cm;
+    grid-template-areas: "title weather authority";
     align-items: start;
     gap: 10px;
   }
@@ -8244,8 +8244,8 @@ html body #root .main-area > .topbar .topbar-heading-row > .google-weather-panel
    Authorized User – Access Category: 4 cm wide × 6 cm high. */
 @media (min-width: 1101px) {
   html body #root .main-area > .topbar:not(.dashboard-topbar) .topbar-heading-row {
-    grid-template-columns: minmax(140px, 1fr) 4cm 4cm;
-    grid-template-areas: "title authority weather";
+    grid-template-columns: minmax(140px, 0.6fr) minmax(360px, 2fr) 4cm;
+    grid-template-areas: "title weather authority";
     align-items: start;
     gap: 10px;
   }
@@ -8917,52 +8917,6 @@ html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-ro
 html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel *::after {
   color: var(--weather-blue);
   -webkit-text-fill-color: var(--weather-blue);
-}
-
-
-/* 2026-10-11: weather-only horizontal sizing for the non-Dashboard hero.
-   Access-category dimensions are deliberately not assigned by these weather selectors. */
-@media (min-width: 1101px) {
-  html body #root .main-area > .topbar:not(.dashboard-topbar) .topbar-heading-row:has(> .google-weather-panel) {
-    grid-template-columns: minmax(140px, 0.6fr) minmax(520px, 2.4fr) 6cm;
-    grid-template-areas: "title weather authority";
-  }
-  html body #root .main-area > .topbar:not(.dashboard-topbar) .topbar-heading-row:has(> .google-weather-panel) > .google-weather-panel {
-    grid-area: weather;
-    width: 100%; min-width: 0; max-width: none;
-  }
-}
-@media (min-width: 1101px) {
-  html body #root .main-area > .topbar:not(.dashboard-topbar) .topbar-heading-row:has(> .google-weather-panel) {
-    grid-template-columns: minmax(140px, 0.6fr) minmax(360px, 2fr) 4cm;
-    grid-template-areas: "title weather authority";
-  }
-  html body #root .main-area > .topbar:not(.dashboard-topbar) .topbar-heading-row:has(> .google-weather-panel) > .google-weather-panel {
-    grid-area: weather;
-    width: 100%; min-width: 0; max-width: none;
-  }
-  html body #root .main-area > .topbar:not(.dashboard-topbar) .topbar-heading-row:has(> .google-weather-panel) > .google-weather-panel .live-weather-content,
-  html body #root .main-area > .topbar:not(.dashboard-topbar) .topbar-heading-row:has(> .google-weather-panel) > .google-weather-panel .live-weather-location-bar,
-  html body #root .main-area > .topbar:not(.dashboard-topbar) .topbar-heading-row:has(> .google-weather-panel) > .google-weather-panel .live-weather-current,
-  html body #root .main-area > .topbar:not(.dashboard-topbar) .topbar-heading-row:has(> .google-weather-panel) > .google-weather-panel .live-weather-days,
-  html body #root .main-area > .topbar:not(.dashboard-topbar) .topbar-heading-row:has(> .google-weather-panel) > .google-weather-panel .live-weather-attribution {
-    width: 100%; min-width: 0; max-width: none; flex: 1 1 auto; box-sizing: border-box;
-  }
-  html body #root .main-area > .topbar:not(.dashboard-topbar) .topbar-heading-row:has(> .google-weather-panel) > .google-weather-panel .live-weather-days {
-    display: flex; flex-direction: row; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden;
-  }
-  html body #root .main-area > .topbar:not(.dashboard-topbar) .topbar-heading-row:has(> .google-weather-panel) > .google-weather-panel .live-weather-day {
-    flex: 0 0 110px; min-width: 110px; max-width: none;
-  }
-}
-@media (max-width: 900px) {
-  html body #root .main-area > .topbar:not(.dashboard-topbar) .topbar-heading-row:has(> .google-weather-panel) {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "title" "weather" "authority";
-  }
-  html body #root .main-area > .topbar:not(.dashboard-topbar) .topbar-heading-row:has(> .google-weather-panel) > .google-weather-panel .live-weather-days {
-    display: flex; flex-direction: row; flex-wrap: nowrap; overflow-x: auto;
-  }
 }
 
 /* Authorized User · Access Categories — isolate the original dark/white palette.
