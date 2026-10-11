@@ -183,21 +183,64 @@ export async function readDonorScanner(scanner) {
       },
     };
   } catch (error) {
-    errors.push({ sourceUrl, error: String(error.message || error).slice(0, 180) });
-    const statusMatch = String(error.message || error).match(/HTTP (\d{3})/);
-    httpStatus = statusMatch ? Number(statusMatch[1]) : null;
-    return {
-      items: [],
-      stats: {
-        configured: 1,
-        scanned: pagesScanned,
-        pagesScanned,
-        httpStatus,
-        detailPagesScanned: 0,
-        found: 0,
-        errors,
-      },
-    };
+    const primarySourceError = String(error.message || error).slice(0, 180);
+    const statusMatch = primarySourceError.match(/HTTP (\d{3})/);
+    const primaryHttpStatus = statusMatch ? Number(statusMatch[1]) : null;
+    // Some official donor sites reject automated Worker requests (403) or move
+    // their landing pages (404). Fall back to a live Bing RSS query, explicitly
+    // retaining the primary failure in telemetry instead of masking it.
+    try {
+      const query = scanner.label + " grant funding opportunity Tanzania Africa";
+      const searchUrl = new URL("https://www.bing.com/search");
+      searchUrl.searchParams.set("format", "rss");
+      searchUrl.searchParams.set("q", query);
+      const response = await fetch(searchUrl.href, {
+        headers: { accept: "application/rss+xml, application/xml, text/xml", "user-agent": USER_AGENT },
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (!response.ok) throw new Error("Bing RSS fallback HTTP " + response.status);
+      const xml = await response.text();
+      if (xml.length > MAX_PAGE_BYTES) throw new Error("Bing RSS fallback response exceeds the 1 MB limit.");
+      const items = parseSearchRss(xml, query, "Bing RSS").map(item => ({
+        ...item,
+        discoveryEngine: scanner.name,
+        primarySourceUrl: scanner.url,
+        fallbackProvider: "Bing RSS",
+      }));
+      return {
+        items,
+        stats: {
+          configured: 1,
+          scanned: 1,
+          pagesScanned: 1,
+          httpStatus: response.status,
+          primaryHttpStatus,
+          primarySourceError,
+          fallbackProvider: "Bing RSS",
+          detailPagesScanned: 0,
+          found: items.length,
+          errors: [],
+        },
+      };
+    } catch (fallbackError) {
+      errors.push({ sourceUrl, error: primarySourceError });
+      errors.push({ sourceUrl: "https://www.bing.com/search?format=rss", error: String(fallbackError.message || fallbackError).slice(0, 180) });
+      return {
+        items: [],
+        stats: {
+          configured: 1,
+          scanned: pagesScanned,
+          pagesScanned,
+          httpStatus: primaryHttpStatus,
+          primaryHttpStatus,
+          primarySourceError,
+          fallbackProvider: "Bing RSS",
+          detailPagesScanned: 0,
+          found: 0,
+          errors,
+        },
+      };
+    }
   }
 }
 
