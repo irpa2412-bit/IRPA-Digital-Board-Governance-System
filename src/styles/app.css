@@ -5872,3 +5872,63 @@
  .main-area>.topbar .google-weather-panel .live-weather-metrics{grid-template-columns:minmax(0,1fr)!important}
  .main-area>.topbar .google-weather-panel .live-weather-days{grid-template-columns:repeat(2,minmax(0,1fr))!important}
 }
+
+
+
+/* Freeze the original topmost navigator and dock Back/Next directly beneath it, touching the header. */
+.main-area{display:flex!important;flex-direction:column!important;min-width:0!important}
+.main-area>.desktop-webapp-navigation-roller{
+ order:0!important;position:sticky!important;top:0!important;z-index:100!important;
+ display:grid!important;flex:0 0 auto!important;
+ grid-template-columns:minmax(190px,245px) minmax(130px,auto) minmax(130px,1fr) minmax(180px,360px) 30px!important;
+ width:100%!important;min-width:0!important;height:auto!important;min-height:62px!important;max-height:none!important;
+ margin:0!important;padding:8px 10px!important;overflow:visible!important;box-sizing:border-box!important;
+ background:#eaf4ff!important;color:#1769c2!important;
+ border:1px solid #8fc2fa!important;border-radius:0 0 8px 8px!important;
+ box-shadow:0 3px 9px rgba(16,70,130,.16)!important;
+}
+.main-area>.desktop-webapp-navigation-roller *{color:#1769c2!important}
+.main-area>.page-back-next-navigation{
+ order:1!important;position:relative!important;z-index:90!important;
+ display:grid!important;grid-template-columns:minmax(120px,1fr) minmax(160px,auto) minmax(120px,1fr)!important;
+ align-items:stretch!important;gap:0!important;width:100%!important;min-width:0!important;
+ margin:0 0 0!important;padding:0!important;overflow:visible!important;
+ background:#eaf4ff!important;border:1px solid #8fc2fa!important;border-top:0!important;
+ border-radius:0 0 8px 8px!important;box-sizing:border-box!important;
+}
+.main-area>.page-back-next-navigation .page-back-next-button{
+ display:flex!important;align-items:center!important;justify-content:center!important;gap:8px!important;
+ min-width:0!important;min-height:42px!important;margin:0!important;padding:8px 12px!important;
+ color:#1769c2!important;background:#d9ebff!important;border:1px solid #8fc2fa!important;
+ border-radius:0!important;box-sizing:border-box!important;
+}
+.main-area>.page-back-next-navigation .page-back-next-button:first-child{justify-self:stretch!important}
+.main-area>.page-back-next-navigation .page-back-next-button:last-child{justify-self:stretch!important}
+.main-area>.page-back-next-navigation .page-back-next-status{
+ display:flex!important;flex-direction:column!important;justify-content:center!important;align-items:center!important;
+ gap:2px!important;min-width:0!important;margin:0!important;padding:4px 12px!important;
+ color:#1769c2!important;background:#eaf4ff!important;text-align:center!important;
+}
+.main-area>.page-back-next-navigation .page-back-next-status *{color:#1769c2!important}
+.main-area>.topbar{order:2!important;margin-top:0!important;border-top:0!important;border-radius:0 0 10px 10px!important}
+.main-area>main.content-area{order:3!important;margin-top:0!important;padding-top:8px!important}
+@media(max-width:1100px){
+ .main-area>.desktop-webapp-navigation-roller{grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important}
+}
+@media(max-width:760px){
+ .main-area>.desktop-webapp-navigation-roller{position:sticky!important;top:0!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:6px!important}
+ .main-area>.desktop-webapp-navigation-roller .webapp-navigation-live-clock{grid-column:1!important;grid-row:1!important}
+ .main-area>.desktop-webapp-navigation-roller .webapp-navigation-roller-kicker{grid-column:2!important;grid-row:1!important}
+ .main-area>.desktop-webapp-navigation-roller>strong{grid-column:1!important;grid-row:2!important}
+ .main-area>.desktop-webapp-navigation-roller>select{grid-column:2!important;grid-row:2!important}
+ .main-area>.page-back-next-navigation{grid-template-columns:minmax(72px,1fr) minmax(90px,auto) minmax(72px,1fr)!important}
+ .main-area>.page-back-next-navigation .page-back-next-button{padding:7px 5px!important;font-size:12px!important}
+ .main-area>.page-back-next-navigation .page-back-next-status{padding:4px!important;font-size:11px!important}
+}
+@media(max-width:390px){
+ .main-area>.desktop-webapp-navigation-roller{grid-template-columns:minmax(0,1fr)!important}
+ .main-area>.desktop-webapp-navigation-roller .webapp-navigation-live-clock,
+ .main-area>.desktop-webapp-navigation-roller .webapp-navigation-roller-kicker,
+ .main-area>.desktop-webapp-navigation-roller>strong,
+ .main-area>.desktop-webapp-navigation-roller>select{grid-column:1!important;grid-row:auto!important}
+}
