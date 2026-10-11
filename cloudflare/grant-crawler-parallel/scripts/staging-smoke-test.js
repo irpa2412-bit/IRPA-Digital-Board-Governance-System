@@ -16,7 +16,8 @@ async function main() {
   const expectedScanners = [
     "japan_embassy", "canada_funding", "usadf_grants", "un_tanzania",
     "undp_tanzania", "gef_small_grants", "fao_funding", "eu_tanzania",
-    "tanzania_forest_fund", "world_bank_funding"
+    "tanzania_forest_fund", "world_bank_funding", "fundsforngos_latest",
+    "fundsforngos_africa", "fundsforngos_tanzania", "fundsforngos_news"
   ];
   const scanners = Array.isArray(crawlResult.additionalScanners) ? crawlResult.additionalScanners : [];
   const scannerReport = {

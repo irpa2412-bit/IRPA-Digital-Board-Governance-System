@@ -616,9 +616,12 @@ test("official webpage parser extracts safe title and description text", () => {
   assert.equal(decodeHtml("Women &amp; youth"), "Women & youth");
 });
 
-test("registers ten independent donor scanners with official HTTPS sources", () => {
-  assert.equal(DONOR_SCANNERS.length, 10);
-  assert.equal(new Set(DONOR_SCANNERS.map(scanner => scanner.name)).size, 10);
+test("registers fourteen independent donor scanners with official HTTPS sources", () => {
+  assert.equal(DONOR_SCANNERS.length, 14);
+  assert.equal(new Set(DONOR_SCANNERS.map(scanner => scanner.name)).size, 14);
+  for (const name of ["fundsforngos_latest", "fundsforngos_africa", "fundsforngos_tanzania", "fundsforngos_news"]) {
+    assert.ok(DONOR_SCANNERS.some(scanner => scanner.name === name));
+  }
   for (const scanner of DONOR_SCANNERS) {
     assert.equal(new URL(scanner.url).protocol, "https:");
     assert.ok(scanner.label.length > 3);
@@ -639,6 +642,33 @@ test("donor scanner returns opportunities in the shared candidate shape", async 
     assert.equal(result.items[0].discoveryEngine, "test_donor");
     assert.equal(result.items[0].sourceUrl, "https://example.org/grants");
     assert.match(result.items[0].title, /Call for Proposals/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("FundsforNGOs scanner sends opportunity URL to original issuer, not aggregator article", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async input => {
+    const url = String(input);
+    calls.push(url);
+    if (url === "https://www2.fundsforngos.org/") {
+      return new Response('<html><head><title>FundsforNGOs</title></head><body><a href="https://www2.fundsforngos.org/listing/open-grant-call/">Open Grant Funding Opportunity</a></body></html>', { status: 200, headers: { "content-type": "text/html" } });
+    }
+    if (url === "https://www2.fundsforngos.org/listing/open-grant-call/") {
+      return new Response('<html><head><title>Open Grant Funding Opportunity for Tanzania</title><meta name="description" content="Call for proposals funding community rangeland restoration in Tanzania. Applications close 30 December 2026."></head><body><p>Call for proposals funding community rangeland restoration in Tanzania. Applications close 30 December 2026.</p><a href="https://original-donor.example/calls/2026">Apply now at official donor website</a></body></html>', { status: 200, headers: { "content-type": "text/html" } });
+    }
+    throw new Error("Unexpected URL " + url);
+  };
+  try {
+    const result = await readDonorScanner({ name: "fundsforngos_latest", label: "FundsforNGOs Latest Funding Opportunities", url: "https://www2.fundsforngos.org/" });
+    assert.equal(result.items.length, 1);
+    assert.equal(result.items[0].url, "https://original-donor.example/calls/2026");
+    assert.equal(result.items[0].originalOpportunityUrl, "https://original-donor.example/calls/2026");
+    assert.equal(result.items[0].discoverySourceUrl, "https://www2.fundsforngos.org/");
+    assert.notEqual(result.items[0].url, "https://www2.fundsforngos.org/listing/open-grant-call/");
+    assert.equal(result.stats.detailPagesScanned, 1);
   } finally {
     globalThis.fetch = originalFetch;
   }
