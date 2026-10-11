@@ -7255,3 +7255,96 @@
     justify-self: stretch;
   }
 }
+
+
+/* Final coordinated viewport layout: title starts at the top-left; page controls stay reachable. */
+.main-area>.topbar .topbar-heading-row {
+  grid-template-columns:minmax(0,1fr) minmax(210px,260px) minmax(280px,360px);
+  grid-template-areas:"title authority weather";
+  align-items:start;
+  gap:12px;
+}
+.main-area>.topbar .topbar-heading-row>.topbar-title-block {
+  align-self:start;
+  justify-self:start;
+  margin:0;
+  padding:8px 0 0;
+  text-align:left;
+}
+.main-area>.topbar .topbar-title-block .topbar-kicker {
+  max-width:24ch;
+  margin:0 0 8px;
+  font-size:12px;
+  line-height:1.25;
+  letter-spacing:.07em;
+  color:#1769c2;
+}
+.main-area>.topbar .topbar-title-block h1,
+.main-area>.topbar .topbar-title-block h2,
+.main-area>.topbar .topbar-title-block p {
+  margin-top:0;
+}
+.main-area>.topbar .topbar-heading-row>.google-weather-panel {
+  width:100%;
+  max-width:360px;
+  min-height:360px;
+  height:auto;
+  max-height:none;
+  align-self:stretch;
+  justify-self:stretch;
+  overflow:visible;
+  padding:12px;
+  box-sizing:border-box;
+}
+.main-area>.topbar .topbar-heading-row>.google-weather-panel .live-weather-content {
+  height:auto;
+  min-height:0;
+  max-height:none;
+  overflow:visible;
+  gap:8px;
+}
+.main-area>.topbar .topbar-heading-row>.google-weather-panel .live-weather-current,
+.main-area>.topbar .topbar-heading-row>.google-weather-panel .live-weather-days,
+.main-area>.topbar .topbar-heading-row>.google-weather-panel .live-weather-attribution {
+  flex:0 0 auto;
+}
+.main-area>.desktop-webapp-navigation-roller {
+  position:sticky;
+  top:0;
+  z-index:1300;
+  background:#f4f8fc;
+  border-bottom:1px solid #b8cfe5;
+}
+.main-area>.page-back-next-navigation {
+  position:sticky;
+  top:0;
+  z-index:1290;
+  background:#f4f8fc;
+  box-shadow:0 2px 5px rgb(16 55 92 / 12%);
+}
+@media(max-width:1100px) {
+  .main-area>.topbar .topbar-heading-row {
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+    grid-template-areas:"title authority" "weather weather";
+  }
+  .main-area>.topbar .topbar-heading-row>.google-weather-panel {
+    min-height:340px;
+    max-width:420px;
+  }
+}
+@media(max-width:760px) {
+  .main-area>.topbar .topbar-heading-row {
+    grid-template-columns:minmax(0,1fr);
+    grid-template-areas:"title" "authority" "weather";
+  }
+  .main-area>.topbar .topbar-heading-row>.google-weather-panel {
+    min-height:0;
+    max-width:420px;
+  }
+  .main-area>.desktop-webapp-navigation-roller {
+    top:0;
+  }
+  .main-area>.page-back-next-navigation {
+    top:0;
+  }
+}
