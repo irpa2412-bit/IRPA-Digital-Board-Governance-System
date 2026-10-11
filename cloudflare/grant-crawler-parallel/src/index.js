@@ -1,5 +1,5 @@
 import { analyzeGrant } from "./assistant.js";
-import { readOfficialPages, readWebSearch, normalizeOpportunityUrl } from "./discovery-engines.js";
+import { readOfficialPages, readWebSearch, normalizeOpportunityUrl, readUNAgencyGrants, readEmbassySmallGrants, readClimateFunds, readBiodiversityConservation, readAgricultureLivestock, readWomenYouthEnterprise, readPastoralRangeland, readEastAfricaRegional, readCorporateFoundations, readTanzaniaFunding, readGoogleNewsSearch, readBingSearch, readBraveSearch, readSitemaps, readStructuredData, readGovernmentFundingPages, readFoundationFundingPages, readEmbassyFundingPages, readClimateFundingPages, readMultilateralFundingPages } from "./discovery-engines.js";
 import { handleApplicationPortal } from "./application-portal-handler.js";
 
 
@@ -312,7 +312,27 @@ async function crawl(env) {
   const engines = [
     { name: "rss_atom", run: () => readFeeds(env), configured: (() => { try { return JSON.parse(env.GRANT_FEED_URLS_JSON || env.GRANT_FEED_URLS || "[]").length; } catch { return 0; } })() },
     { name: "official_pages", run: () => readOfficialPages(env), configured: (() => { try { return JSON.parse(env.GRANT_SOURCE_PAGE_URLS_JSON || env.GRANT_SOURCE_PAGE_URLS || "[]").length; } catch { return 0; } })() },
-    { name: "web_search", run: () => readWebSearch(env), configured: String(env.BRAVE_SEARCH_API_KEY || "").trim() ? 1 : 0 },
+    { name: "web_search", run: () => readWebSearch(env), configured: 1 },
+    { name: "un_agency_grants", run: readUNAgencyGrants, configured: 1 },
+    { name: "embassy_small_grants", run: readEmbassySmallGrants, configured: 1 },
+    { name: "climate_funds", run: readClimateFunds, configured: 1 },
+    { name: "biodiversity_conservation", run: readBiodiversityConservation, configured: 1 },
+    { name: "agriculture_livestock", run: readAgricultureLivestock, configured: 1 },
+    { name: "women_youth_enterprise", run: readWomenYouthEnterprise, configured: 1 },
+    { name: "pastoral_rangeland", run: readPastoralRangeland, configured: 1 },
+    { name: "east_africa_regional", run: readEastAfricaRegional, configured: 1 },
+    { name: "corporate_foundations", run: readCorporateFoundations, configured: 1 },
+    { name: "tanzania_funding", run: readTanzaniaFunding, configured: 1 },
+    { name: "google_news_rss", run: readGoogleNewsSearch, configured: 1 },
+    { name: "bing_rss_search", run: readBingSearch, configured: 1 },
+    { name: "brave_web_search", run: () => readBraveSearch(env), configured: String(env.BRAVE_SEARCH_API_KEY || "").trim() ? 1 : 0 },
+    { name: "donor_sitemaps", run: () => readSitemaps(env), configured: (() => { try { return JSON.parse(env.GRANT_SITEMAP_URLS || "[]").length; } catch { return 0; } })() },
+    { name: "structured_data", run: () => readStructuredData(env), configured: (() => { try { return JSON.parse(env.GRANT_STRUCTURED_SOURCE_URLS || env.GRANT_SOURCE_PAGE_URLS || "[]").length; } catch { return 0; } })() },
+    { name: "government_funding_pages", run: () => readGovernmentFundingPages(env), configured: (() => { try { return JSON.parse(env.GRANT_GOVERNMENT_SOURCE_URLS || "[]").length; } catch { return 0; } })() },
+    { name: "foundation_funding_pages", run: () => readFoundationFundingPages(env), configured: (() => { try { return JSON.parse(env.GRANT_FOUNDATION_SOURCE_URLS || "[]").length; } catch { return 0; } })() },
+    { name: "embassy_funding_pages", run: () => readEmbassyFundingPages(env), configured: (() => { try { return JSON.parse(env.GRANT_EMBASSY_SOURCE_URLS || "[]").length; } catch { return 0; } })() },
+    { name: "climate_finance_pages", run: () => readClimateFundingPages(env), configured: (() => { try { return JSON.parse(env.GRANT_CLIMATE_SOURCE_URLS || "[]").length; } catch { return 0; } })() },
+    { name: "multilateral_funding_pages", run: () => readMultilateralFundingPages(env), configured: (() => { try { return JSON.parse(env.GRANT_MULTILATERAL_SOURCE_URLS || "[]").length; } catch { return 0; } })() },
   ];
   const settled = await Promise.all(engines.map(async engine => {
     try {

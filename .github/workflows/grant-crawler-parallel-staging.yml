@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - feature/parallel-grant-crawler-live
+      - feature/ten-parallel-grant-scanners
       - main
     paths:
       - "cloudflare/grant-crawler-parallel/**"
@@ -15,7 +16,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: irpa-grant-crawler-staging-${{ github.event_name }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   test:
@@ -61,7 +62,7 @@ jobs:
         run: npx firebase emulators:exec --config cloudflare/grant-crawler-parallel/firebase-staging/firebase.json --only firestore --project demo-irpa-grant-crawler-staging-test "node --test cloudflare/grant-crawler-parallel/firebase-staging/firestore.rules.test.js"
 
   deploy-staging:
-    # This workflow may deploy only the isolated staging Worker. Allow the same-repository staging branch's PR validation to deploy after tests, because GitHub API commits do not reliably emit a push event. Never deploy from arbitrary fork PRs.\n    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/feature/parallel-grant-crawler-live') }}
+    # This workflow may deploy only the isolated staging Worker. Allow the same-repository staging branch's PR validation to deploy after tests, because GitHub API commits do not reliably emit a push event. Never deploy from arbitrary fork PRs.\n    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref == 'refs/heads/feature/parallel-grant-crawler-live' || github.ref == 'refs/heads/feature/ten-parallel-grant-scanners')) || (github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'feature/ten-parallel-grant-scanners' && github.event.pull_request.head.repo.full_name == github.repository) }}
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 25
