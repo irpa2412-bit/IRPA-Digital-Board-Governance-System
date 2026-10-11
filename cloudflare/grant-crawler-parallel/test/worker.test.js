@@ -650,6 +650,42 @@ test("FundsforNGOs scanner sends opportunity URL to original issuer, not aggrega
   }
 });
 
+test("AfricanNGOs and NGO Portal aggregator engines retain original issuer URLs", async () => {
+  const originalFetch = globalThis.fetch;
+  const cases = [
+    {
+      scanner: { name: "africanngos_roundups", label: "AfricanNGOs Funding Roundups", url: "https://africanngos.org/" },
+      article: "https://africanngos.org/2026/open-grant-call/",
+      issuer: "https://issuer-africanngos.example/apply"
+    },
+    {
+      scanner: { name: "ngo_portal_africa", label: "NGO Portal Africa Funding Calls", url: "https://jobs.ngoportal.africa/grants-funding/" },
+      article: "https://jobs.ngoportal.africa/grants-funding/open-call/",
+      issuer: "https://issuer-ngoportal.example/apply"
+    }
+  ];
+  try {
+    for (const item of cases) {
+      globalThis.fetch = async input => {
+        const url = String(input);
+        if (url === item.scanner.url) {
+          return new Response('<html><head><title>Funding Opportunities</title></head><body><a href="' + item.article + '">Open Grant Funding Opportunity</a></body></html>', { status: 200, headers: { "content-type": "text/html" } });
+        }
+        if (url === item.article) {
+          return new Response('<html><head><title>Open Grant Funding Opportunity for Tanzania</title><meta name="description" content="Call for proposals funding community rangeland restoration in Tanzania. Applications close 30 December 2026."></head><body><p>Call for proposals funding community rangeland restoration in Tanzania. Applications close 30 December 2026.</p><a href="' + item.issuer + '">Apply now at official donor website</a></body></html>', { status: 200, headers: { "content-type": "text/html" } });
+        }
+        throw new Error("Unexpected URL " + url);
+      };
+      const result = await readDonorScanner(item.scanner);
+      assert.equal(result.items.length, 1, item.scanner.name);
+      assert.equal(result.items[0].url, item.issuer, item.scanner.name);
+      assert.notEqual(result.items[0].url, item.article, item.scanner.name);
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("web search RSS parser extracts grant announcements and rejects unsafe links", () => {
   const xml = '<rss><channel><item><title>Open grant for pastoral restoration</title><link>https://donor.example/call?utm_source=news</link><description>Funding for rangeland restoration in Tanzania</description><pubDate>Sat, 10 Oct 2026 10:00:00 GMT</pubDate><source url="https://donor.example">Donor</source></item></channel></rss>';
   const items = parseSearchRss(xml, "grant Tanzania");
