@@ -108,6 +108,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  const [crawlerStatus,setCrawlerStatus]=useState(null);
  const [crawlerSources,setCrawlerSources]=useState([]);
  const [crawlerEngines,setCrawlerEngines]=useState([]);
+ const [crawlerProvision,setCrawlerProvision]=useState([]);
  const [crawlerRunning,setCrawlerRunning]=useState(false);
  const [workspaceOpen,setWorkspaceOpen]=useState(false);
  const [selectedOpportunity,setSelectedOpportunity]=useState(null);
@@ -148,6 +149,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
      if(!response.ok)throw new Error(data.error||"Crawler results request failed ("+response.status+").");
      const items=Array.isArray(data.items)?data.items:[];
      setCrawlerEngines(Array.isArray(data.engineRuns)?data.engineRuns:[]);
+     setCrawlerProvision(Array.isArray(data.engineProvision)?data.engineProvision:[]);
      const uniqueSources=[...new Set(items.map(item=>item.source_url).filter(Boolean))];
      setCrawlerSources(uniqueSources.map(sourceUrl=>({id:sourceUrl,name:(()=>{try{return new URL(sourceUrl).hostname}catch{return sourceUrl}})(),url:sourceUrl,status:"Fetched",candidateCount:items.filter(item=>item.source_url===sourceUrl).length})));
      setCrawlerRecords(items.map(item=>({
@@ -439,6 +441,35 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
       <div style={{...styles.muted,borderLeft:"2px solid #50727b",paddingLeft:9}}>{info.limits}</div>
      </div>
     </details>})}</div>
+   </details>
+   <details>
+    <summary style={{cursor:"pointer",fontSize:14,fontWeight:800}}>Engine provision panel — funding resources ({crawlerProvision.length} engines)</summary>
+    <div style={{...styles.muted,marginTop:8}}>Indicative resource registry. Open an engine to inspect its purpose, source endpoints, search queries and latest run status. All engines feed the same deduplicated opportunity register and the same IRPA fit, deadline, geography and eligibility formula.</div>
+    <div style={{display:"grid",gap:8,marginTop:10}}>
+     {crawlerProvision.map(provision=>{
+      const run=crawlerEngines.find(item=>item.engine===provision.engine);
+      const status=run?.status||"not_run";
+      const statusLabel=status==="success"?"Completed":status==="partial"?"Partial":status==="failed"?"Failed":provision.provisionStatus==="configured"?"Provisioned":"Not run";
+      const statusColor=status==="success"?"#8de0b7":status==="partial"?"#ffcf88":status==="failed"?"#ffb8b8":provision.provisionStatus==="configured"?"#8bd3e6":"#aab6c5";
+      return <details key={provision.engine} style={{border:"1px solid #344255",borderRadius:10,padding:"9px 11px",background:"rgba(255,255,255,0.015)"}}>
+       <summary style={{cursor:"pointer",display:"flex",justifyContent:"space-between",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+        <strong style={{fontSize:13}}>{provision.label||provision.engine}</strong>
+        <span style={{fontSize:11,color:statusColor,fontWeight:800}}>{statusLabel} · {run?(run.items_seen??run.found??0)+" found":provision.engine==="ai_eligibility"?"AI tool":"Awaiting scan"}</span>
+       </summary>
+       <div style={{display:"grid",gap:8,marginTop:10}}>
+        <div style={styles.muted}>{provision.description||"Parallel funding-opportunity discovery engine."}</div>
+        <div style={{fontSize:12}}>Configured resources: <strong>{provision.configured??(provision.sources||[]).length}</strong>{run?.finished_at&&<> · Last run: <strong>{dateLabel(run.finished_at)}</strong></>}</div>
+        {run?.error_message&&<div style={{fontSize:12,color:"#ffcf88"}}>Source report: {run.error_message}</div>}
+        {!!(provision.sources||[]).length&&<div><strong style={{fontSize:12}}>Resource links / source endpoints</strong><div style={{display:"grid",gap:5,marginTop:5}}>{provision.sources.map((source,index)=>{
+          const url=typeof source==="string"?source:source.url;
+          const label=typeof source==="string"?source:(source.label||source.name||source.url);
+          return <div key={url||label||index} style={{fontSize:12,overflowWrap:"anywhere"}}>{url&&/^https:\/\//i.test(url)?<a href={url} target="_blank" rel="noreferrer" style={{color:"#8bd3e6",textDecoration:"underline"}}>{label}</a>:<span>{label}</span>}</div>;
+        })}</div></div>}
+        {!!(provision.queries||[]).length&&<div><strong style={{fontSize:12}}>Parallel search queries</strong><ul style={{margin:"5px 0 0",paddingLeft:20}}>{provision.queries.map(query=><li key={query} style={{fontSize:12,marginBottom:3}}>{query}</li>)}</ul></div>}
+       </div>
+      </details>;
+     })}
+    </div>
    </details>
    <div style={{...styles.muted,borderLeft:"3px solid #b78b3d",padding:"8px 12px"}}><strong>Coverage limitation:</strong> source websites can change, block automated requests or publish calls outside feeds. The crawler records source failures, uses public endpoints only, and does not bypass access controls or submit applications. Official-call verification and IRPA eligibility screening remain necessary.</div>
   </section>
