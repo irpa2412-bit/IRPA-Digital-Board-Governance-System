@@ -92,7 +92,8 @@ test("only administrator can delete a meeting", async () => {
   }).firestore();
   await assertFails(registrarDb.doc("meetings/departmental-meeting").delete());
   const adminDb = testEnv.authenticatedContext("admin-user", {
-    email: "admin@example.test"
+    email: "admin@example.test",
+    admin: true
   }).firestore();
   await assertSucceeds(adminDb.doc("meetings/departmental-meeting").delete());
 });
