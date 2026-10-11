@@ -8486,3 +8486,63 @@ html body #root .main-area > .topbar .topbar-heading-row > .google-weather-panel
   color: #2563eb;
   -webkit-text-fill-color: #2563eb;
 }
+
+
+/* 2026-10-11: expand the weather panel into the unused central header space.
+   Keep the title left and access-category panel right; do not float/reposition
+   either panel. Let weather content use the available width and height. */
+@media (min-width: 1101px) {
+  html body #root .main-area > .topbar .topbar-heading-row {
+    display: grid;
+    grid-template-columns: minmax(220px, 0.9fr) minmax(360px, 1.8fr) minmax(180px, 0.7fr);
+    grid-template-areas: "title weather authority";
+    align-items: stretch;
+    gap: 12px;
+    min-height: 250px;
+  }
+  html body #root .main-area > .topbar .topbar-heading-row > .topbar-title-block {
+    grid-area: title;
+    min-width: 0;
+  }
+  html body #root .main-area > .topbar .topbar-heading-row > .google-weather-panel {
+    grid-area: weather;
+    position: relative;
+    inset: auto;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    height: 100%;
+    min-height: 250px;
+    max-height: none;
+    margin: 0;
+    box-sizing: border-box;
+    align-self: stretch;
+    justify-self: stretch;
+    overflow: auto;
+  }
+  html body #root .main-area > .topbar .topbar-heading-row > .google-weather-panel .live-weather-content {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: start;
+    gap: 10px;
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+    min-height: 0;
+    max-height: none;
+    box-sizing: border-box;
+    overflow: auto;
+  }
+  html body #root .main-area > .topbar .topbar-heading-row > .topbar-access-category {
+    grid-area: authority;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    height: 100%;
+    min-height: 250px;
+    max-height: none;
+    box-sizing: border-box;
+    align-self: stretch;
+    overflow: auto;
+  }
+}
