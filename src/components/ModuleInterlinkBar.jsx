@@ -11,7 +11,7 @@ const PORTAL_GROUPS=[
   {label:"Documents Portal",target:"Documents",children:[
     ["My Documents","Documents","MY_WORK"],["Department Documents","Documents","DEPARTMENT"],
     ["Shared With Me","Documents","SHARED"],["Signing Workspace","Documents","SIGNATURE"],
-    ["Post-Signature Work","Documents","POST"],["Final Archive","Documents","FINAL"],["Upload Document","Documents","UPLOAD"]
+    ["Post-Signature Work","Documents","POST"],["Final Archive","Documents","FINAL"],["Upload Document","Documents","UPLOAD"],["Retrieve Archived Documents","Documents","RETRIEVAL"]
   ]}
 ];
 const CORE=[
