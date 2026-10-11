@@ -23,8 +23,8 @@ jobs:
       - name: Run production verification (uses a real test login only when repository secrets are configured)
         env:
           TARGET_URL: https://irpa-digital-board-governance.web.app
-          IRPA_E2E_EMAIL: \${{ secrets.IRPA_E2E_EMAIL }}
-          IRPA_E2E_PASSWORD: \${{ secrets.IRPA_E2E_PASSWORD }}
+          IRPA_E2E_EMAIL: ${{ secrets.IRPA_E2E_EMAIL }}
+          IRPA_E2E_PASSWORD: ${{ secrets.IRPA_E2E_PASSWORD }}
         run: |
           mkdir -p hero-layout-evidence
           node .github/scripts/verify-hero-layout.cjs | tee hero-layout-evidence/run.log
