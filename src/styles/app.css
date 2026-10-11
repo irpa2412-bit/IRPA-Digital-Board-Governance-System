@@ -9714,26 +9714,23 @@ html body #root .main-area > .topbar.dashboard-topbar .topbar-heading-row > .top
 }
 
 
-/* IRPA dashboard overhead: organization/title above access and weather panels. */
-@media (min-width: 901px) {
+/* IRPA dashboard overhead: title, access authority and live weather share one top row. */
+@media (min-width: 1200px) {
   html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) {
     min-height: 0;
     height: auto;
-    padding-top: 14px;
-    padding-bottom: 14px;
-    align-items: stretch;
+    padding: 12px 20px;
+    align-items: center;
   }
   html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row {
     display: grid;
-    grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1.2fr);
-    grid-template-areas:
-      "title title"
-      "authority weather";
-    grid-template-rows: auto auto;
-    align-items: stretch;
-    align-content: start;
-    column-gap: 14px;
-    row-gap: 12px;
+    grid-template-columns: minmax(230px, 0.9fr) minmax(330px, 1.45fr) minmax(220px, 0.9fr);
+    grid-template-areas: "title weather authority";
+    grid-template-rows: auto;
+    align-items: center;
+    align-content: center;
+    column-gap: 12px;
+    row-gap: 0;
     width: 100%;
     min-width: 0;
   }
@@ -9748,7 +9745,9 @@ html body #root .main-area > .topbar.dashboard-topbar .topbar-heading-row > .top
     grid-area: authority;
     width: 100%;
     min-width: 0;
-    align-self: stretch;
+    max-width: none;
+    margin: 0;
+    align-self: center;
     justify-self: stretch;
   }
   html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel {
@@ -9757,11 +9756,11 @@ html body #root .main-area > .topbar.dashboard-topbar .topbar-heading-row > .top
     min-width: 0;
     max-width: none;
     margin: 0;
-    align-self: stretch;
+    align-self: center;
     justify-self: stretch;
   }
 }
-@media (max-width: 900px) {
+@media (max-width: 1199px) {
   html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
