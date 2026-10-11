@@ -358,98 +358,53 @@ function SignerShell({user,profile,signingEnvelopeId}){
 
 function MobileGlobalNavigation({mobileNav,setMobileNav,active,setActive,modules,groups,admin}){const[expandedPortal,setExpandedPortal]=useState("");const go=target=>{setMobileNav("");setActive(target)};const portalItems=[["IT Operations Portal","IT Operations"],["Meeting Portal","Meetings"],["Members & Personnel Portal","Members & Personnel"],["Invitations Portal","Invitations"],["Documents Portal","Documents"],["Finance Portal","Finance Portfolio"],["Procurement Portal","Procurement"],["Signature Portal","Signature Platform"],["Authorization & Approvals Portal","Authorization & Approvals"],["Employee Payments Portal","Employee Payments"],["Reports Portal","Reports"],["Audit Trail Portal","Audit Trail"],["External Auditor Portal","External Auditor Portal"],["Induction & Orientation Portal","Induction and Orientation"]].filter(([,target])=>modules.includes(target)&&!PORTAL_CHILDREN_SET.has(target)).sort((a,b)=>a[0].localeCompare(b[0],"en",{sensitivity:"base",numeric:true}));const menuItems=sortNavigationItems(groups.flatMap(([,items])=>items).filter(item=>!PORTAL_CHILDREN_SET.has(item)));return <><div className="mobile-global-nav" aria-label="Mobile navigation"><button className={active==="Dashboard"&&!mobileNav?"active":""} type="button" onClick={()=>go("Dashboard")}><span className="mobile-nav-icon"><i className="fa-solid fa-house" aria-hidden="true"></i></span><b>Home</b></button><button className={mobileNav==="portals"?"active":""} type="button" onClick={()=>setMobileNav(mobileNav==="portals"?"":"portals")}><span className="mobile-nav-icon"><i className="fa-solid fa-table-cells-large" aria-hidden="true"></i></span><b>Portals</b></button><button className={mobileNav==="alerts"?"active":""} type="button" onClick={()=>setMobileNav(mobileNav==="alerts"?"":"alerts")}><span className="mobile-nav-icon mobile-nav-bell"><i className="fa-solid fa-bell" aria-hidden="true"></i><b>1</b></span><b>Alerts</b></button><button className={mobileNav==="menu"?"active":""} type="button" onClick={()=>setMobileNav(mobileNav==="menu"?"":"menu")}><span className="mobile-nav-icon"><i className="fa-solid fa-bars" aria-hidden="true"></i></span><b>Menu</b></button></div>{mobileNav&&<div className="mobile-nav-sheet" role="dialog" aria-label="Mobile navigation"><div className="mobile-nav-sheet-header"><strong>{mobileNav==="portals"?"Portals":mobileNav==="alerts"?"Attention Required":"Navigation"}</strong><div style={{display:"flex",gap:8}}><button type="button" className="logout-button" onClick={logout}>Sign Out</button><button type="button" onClick={()=>setMobileNav("")}>Close</button></div></div>{mobileNav==="portals"&&<div className="mobile-nav-sheet-list">{portalItems.map(([label,target])=>{const children=sortNavigationItems((PORTAL_CHILDREN[target]||[]).filter(child=>modules.includes(child)));const expanded=expandedPortal===target||children.includes(active);return <React.Fragment key={target}><button type="button" onClick={()=>{if(children.length){setExpandedPortal(expandedPortal===target?"":target);setActive(target)}else go(target)}} aria-expanded={children.length?expanded:undefined}><span>{label}</span><b>{children.length?(expanded?"⌄":"›"):"›"}</b></button>{expanded&&children.map(child=><button className="mobile-nav-subportal" key={child} type="button" onClick={()=>go(child)}><span>SUB-PORTAL · {displayModuleName(child)}</span><b>›</b></button>)}</React.Fragment>})}</div>}{mobileNav==="alerts"&&<div className="mobile-nav-sheet-list"><button type="button" onClick={()=>go("Authorization & Approvals")}><span>Pending Authorizations</span><b>›</b></button><button type="button" onClick={()=>go("Actions")}><span>Open Actions</span><b>›</b></button>{admin&&<button type="button" onClick={()=>go("Induction Applications")}><span>Induction Applications</span><b>›</b></button>}</div>}{mobileNav==="menu"&&<div className="mobile-nav-sheet-list">{menuItems.map(x=><button key={x} type="button" onClick={()=>go(x)}><span>{PORTAL_LABELS[x]||displayModuleName(x)}</span><b>›</b></button>)}</div>}</div>}</>}
 function LiveWeatherPanel(){
-  const WEATHER_POINTS=[
-   {latitude:-2.73319,longitude:36.69773},
-   {latitude:-2.6098,longitude:36.7355},
-   {latitude:-2.5053,longitude:36.5455},
-   {latitude:-2.73333,longitude:36.26667},
-   {latitude:-3.3697,longitude:36.6881}
-  ];
-  const[weather,setWeather]=useState(null),[error,setError]=useState(""),[loading,setLoading]=useState(true),[lastUpdated,setLastUpdated]=useState("");
-  const apiKey=String(import.meta.env.VITE_GOOGLE_WEATHER_API_KEY||"").trim();
-  useEffect(()=>{
-   const loadWeather=async()=>{
-    if(!apiKey){setError("Google Weather is not configured");setLoading(false);return;}
-    try{
-     setError("");setLoading(true);
-     const requests=WEATHER_POINTS.map(point=>{
-      const params=new URLSearchParams({key:apiKey,"location.latitude":String(point.latitude),"location.longitude":String(point.longitude),unitsSystem:"METRIC"});
-      const currentUrl="https://weather.googleapis.com/v1/currentConditions:lookup?"+params.toString();
-      const hourlyUrl="https://weather.googleapis.com/v1/forecast/hours:lookup?"+params.toString()+"&hours=96";
-      const dailyUrl="https://weather.googleapis.com/v1/forecast/days:lookup?"+params.toString()+"&days=4";
-      return Promise.all([fetch(currentUrl,{cache:"no-store"}),fetch(hourlyUrl,{cache:"no-store"}),fetch(dailyUrl,{cache:"no-store"})]);
-     });
-     const responses=await Promise.all(requests);
-     if(responses.some(([currentResponse,hourlyResponse,dailyResponse])=>!currentResponse.ok||!hourlyResponse.ok||!dailyResponse.ok)) throw new Error("Google Weather service unavailable");
-     const payloads=await Promise.all(responses.map(async([currentResponse,hourlyResponse,dailyResponse])=>[await currentResponse.json(),await hourlyResponse.json(),await dailyResponse.json()]));
-     const valid=payloads.filter(([current,hourly,daily])=>current?.weatherCondition&&hourly?.forecastHours?.length&&daily?.forecastDays?.length);
-     if(!valid.length) throw new Error("Incomplete Google Weather response");
-
-     const average=numbers=>{
-      const values=numbers.filter(value=>Number.isFinite(value));
-      return values.length?values.reduce((sum,value)=>sum+value,0)/values.length:null;
-     };
-     const mode=values=>{
-      const counts=new Map();
-      values.filter(Boolean).forEach(value=>counts.set(value,(counts.get(value)||0)+1));
-      return [...counts.entries()].sort((a,b)=>b[1]-a[1])[0]?.[0]||"";
-     };
-     const currentRows=valid.map(([current])=>current);
-     const googleUpdateTimes=currentRows.map(row=>row.currentTime).filter(Boolean).sort();
-     setLastUpdated(googleUpdateTimes[googleUpdateTimes.length-1]||new Date().toISOString());
-     const current={
-      weatherCondition:{type:mode(currentRows.map(row=>row.weatherCondition?.type)),description:{text:mode(currentRows.map(row=>row.weatherCondition?.description?.text))||"Regional conditions"}},
-      temperature:{degrees:average(currentRows.map(row=>row.temperature?.degrees))},
-      feelsLikeTemperature:{degrees:average(currentRows.map(row=>row.feelsLikeTemperature?.degrees))},
-      relativeHumidity:average(currentRows.map(row=>row.relativeHumidity)),
-      wind:{speed:{value:average(currentRows.map(row=>row.wind?.speed?.value))}},
-      precipitation:{probability:{percent:average(currentRows.map(row=>row.precipitation?.probability?.percent))}}
-     };
-
-     const dailyByDay=new Map();
-     valid.forEach(([,hourly,daily])=>daily.forecastDays.slice(0,4).forEach((day,index)=>{
-      const key=day.interval?.startTime||String(index);
-      if(!dailyByDay.has(key)) dailyByDay.set(key,[]);
-      dailyByDay.get(key).push(day);
-     }));
-     const forecastDays=[...dailyByDay.entries()].sort((a,b)=>a[0].localeCompare(b[0])).slice(0,4).map(([key,days])=>{
-      const forecasts=days.map(day=>day.daytimeForecast||day.nighttimeForecast||{});
-      const conditionTypes=forecasts.map(forecast=>forecast.weatherCondition?.type);
-      const descriptions=forecasts.map(forecast=>forecast.weatherCondition?.description?.text);
-      const precipitation=days.map(day=>day.daytimeForecast?.precipitation?.probability?.percent??day.precipitation?.probability?.percent);
-      return {
-       interval:{startTime:key},
-       maxTemperature:{degrees:average(days.map(day=>day.maxTemperature?.degrees))},
-       minTemperature:{degrees:average(days.map(day=>day.minTemperature?.degrees))},
-       daytimeForecast:{
-        weatherCondition:{type:mode(conditionTypes),description:{text:mode(descriptions)||"Regional forecast"}},
-        precipitation:{probability:{percent:average(precipitation)}}
-       }
-      };
-     });
-     setWeather({current,daily:{forecastDays}});setLoading(false);
-    }catch(x){setError(x?.message||"Unable to load Google Weather");setLoading(false);}
-   };
-   loadWeather();
-   const id=window.setInterval(loadWeather,15*60*1000);
-   return()=>window.clearInterval(id);
-  },[apiKey]);
-  const icon=type=>({CLEAR:"☀️",MOSTLY_CLEAR:"🌤️",PARTLY_CLOUDY:"⛅",MOSTLY_CLOUDY:"☁️",CLOUDY:"☁️",FOG:"🌫️",LIGHT_RAIN:"🌦️",RAIN:"🌧️",HEAVY_RAIN:"🌧️",LIGHT_SNOW:"🌨️",SNOW:"❄️",HEAVY_SNOW:"❄️",THUNDERSTORM:"⛈️"}[type]||"☁️");
-  const current=weather?.current,daily=weather?.daily?.forecastDays||[];
-  const description=current?.weatherCondition?.description?.text||error||(loading?"Loading Google Weather…":"Weather unavailable");
-  const temp=current?.temperature?.degrees,feels=current?.feelsLikeTemperature?.degrees,rain=current?.precipitation?.probability?.percent;
-  return <div className="live-weather-content" aria-live="polite">
-   <div className="live-weather-location-bar">
-    <span>LIVE WEATHER ☁️</span>
-    <small className="live-weather-regional-label">GENERAL REGIONAL OUTLOOK · updates automatically</small>
-   </div>
-   <div className="live-weather-current">
-    <div className="live-weather-current-main"><button type="button" className="live-weather-word-trigger live-weather-current-word" aria-label={"Weather condition: "+description} title={description}><span className="live-weather-icon" aria-hidden="true">{icon(current?.weatherCondition?.type)}</span><span className="live-weather-word-popup" role="tooltip">{description}</span></button><div><strong>{Number.isFinite(temp)?Math.round(temp)+"°C":"Live weather"}</strong><small>Regional average · feels like {Number.isFinite(feels)?Math.round(feels)+"°C":"—"}</small></div></div>
-    <div className="live-weather-metrics"><span>💧 {Number.isFinite(current?.relativeHumidity)?Math.round(current.relativeHumidity):"—"}%</span><span>💨 {Number.isFinite(current?.wind?.speed?.value)?Math.round(current.wind.speed.value):"—"} km/h</span><span>🌧️ {Number.isFinite(rain)?Math.round(rain):"—"}% rain</span></div>
-   </div>
-   <div className="live-weather-days">{daily.map((day,index)=>{const forecast=day.daytimeForecast||day.nighttimeForecast||{};const high=day.maxTemperature?.degrees,low=day.minTemperature?.degrees,type=forecast.weatherCondition?.type,text=forecast.weatherCondition?.description?.text||"Regional forecast",p=forecast.precipitation?.probability?.percent;return <div className="live-weather-day" key={day.interval?.startTime||index}><strong>{index===0?"Today":new Intl.DateTimeFormat("en-GB",{weekday:"short",day:"2-digit",month:"short",timeZone:"Africa/Nairobi"}).format(new Date(day.interval?.startTime||Date.now()))}</strong><button type="button" className="live-weather-day-condition live-weather-word-trigger" aria-label={"Regional forecast condition: "+text} title={text}><span className="live-weather-day-icon" aria-hidden="true">{icon(type)}</span><span className="live-weather-word-popup" role="tooltip">{text}</span></button><b>{high!=null?Math.round(high):"—"}° / {low!=null?Math.round(low):"—"}°</b><small>Rain {p!=null?Math.round(p):"—"}%</small></div>})}</div>
-   <div className="live-weather-attribution"><span>GOOGLE WEATHER · LIVE REGIONAL OUTLOOK</span><small>{lastUpdated?`Google data updated ${new Intl.DateTimeFormat("en-GB",{dateStyle:"medium",timeStyle:"short",timeZone:"Africa/Nairobi"}).format(new Date(lastUpdated))} · current conditions refresh approximately every 15 minutes.`:"Waiting for Google Weather data…"}</small></div>
-  </div>;
+ const WEATHER_POINTS=[
+  {latitude:-2.73319,longitude:36.69773},{latitude:-2.6098,longitude:36.7355},
+  {latitude:-2.5053,longitude:36.5455},{latitude:-2.73333,longitude:36.26667},
+  {latitude:-3.3697,longitude:36.6881}
+ ];
+ const[weather,setWeather]=useState(null),[error,setError]=useState(""),[loading,setLoading]=useState(true),[lastUpdated,setLastUpdated]=useState("");
+ const weatherDescription=code=>{
+  if(code===0)return"Clear sky";if([1,2].includes(code))return"Mostly clear";if(code===3)return"Overcast";
+  if([45,48].includes(code))return"Fog";if([51,53,55,56,57].includes(code))return"Drizzle";
+  if([61,63,65,66,67,80,81,82].includes(code))return"Rain";if([71,73,75,77,85,86].includes(code))return"Snow";
+  if([95,96,99].includes(code))return"Thunderstorm";return"Conditions unavailable";
+ };
+ useEffect(()=>{
+  let disposed=false;
+  const loadWeather=async()=>{
+   try{
+    setError("");
+    const responses=await Promise.all(WEATHER_POINTS.map(point=>{
+     const params=new URLSearchParams({latitude:String(point.latitude),longitude:String(point.longitude),current:"temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m",daily:"weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",forecast_days:"4",timezone:"Africa/Dar_es_Salaam"});
+     return fetch("https://api.open-meteo.com/v1/forecast?"+params.toString(),{cache:"no-store"}).then(response=>{if(!response.ok)throw new Error("Weather service returned HTTP "+response.status);return response.json();});
+    }));
+    const valid=responses.filter(row=>row?.current&&row?.daily?.time?.length);
+    if(!valid.length)throw new Error("No usable live weather observations were returned");
+    const average=values=>{const good=values.filter(Number.isFinite);return good.length?good.reduce((a,b)=>a+b,0)/good.length:null;};
+    const mode=values=>{const counts=new Map();values.filter(v=>v!==null&&v!==undefined).forEach(v=>counts.set(v,(counts.get(v)||0)+1));return [...counts.entries()].sort((a,b)=>b[1]-a[1])[0]?.[0]??null;};
+    const code=mode(valid.map(row=>row.current.weather_code));
+    const current={weatherCondition:{type:code,description:{text:weatherDescription(code)}},temperature:{degrees:average(valid.map(row=>row.current.temperature_2m))},feelsLikeTemperature:{degrees:average(valid.map(row=>row.current.apparent_temperature))},relativeHumidity:average(valid.map(row=>row.current.relative_humidity_2m)),wind:{speed:{value:average(valid.map(row=>row.current.wind_speed_10m))}},precipitation:{probability:{percent:average(valid.map(row=>row.daily.precipitation_probability_max?.[0]))}}};
+    const forecastDays=Array.from({length:4},(_,index)=>{
+     const rows=valid.filter(row=>row.daily.time?.[index]),dayCode=mode(rows.map(row=>row.daily.weather_code[index]));
+     return {interval:{startTime:rows[0]?.daily.time[index]||new Date(Date.now()+index*86400000).toISOString().slice(0,10)},maxTemperature:{degrees:average(rows.map(row=>row.daily.temperature_2m_max[index]))},minTemperature:{degrees:average(rows.map(row=>row.daily.temperature_2m_min[index]))},daytimeForecast:{weatherCondition:{type:dayCode,description:{text:weatherDescription(dayCode)}},precipitation:{probability:{percent:average(rows.map(row=>row.daily.precipitation_probability_max[index]))}}}};
+    });
+    if(!disposed){setWeather({current,daily:{forecastDays}});setLastUpdated(new Date().toISOString());setError("");setLoading(false);}
+   }catch(e){if(!disposed){setError(e?.message||"Live weather is temporarily unavailable");setLoading(false);}}
+  };
+  loadWeather();const id=window.setInterval(loadWeather,15*60*1000);
+  return()=>{disposed=true;window.clearInterval(id);};
+ },[]);
+ const icon=code=>code===0?"☀️":[1,2].includes(code)?"🌤️":code===3?"☁️":[45,48].includes(code)?"🌫️":[51,53,55,56,57].includes(code)?"🌦️":[61,63,65,66,67,80,81,82].includes(code)?"🌧️":[71,73,75,77,85,86].includes(code)?"🌨️":[95,96,99].includes(code)?"⛈️":"🌡️";
+ const current=weather?.current,daily=weather?.daily?.forecastDays||[],temp=current?.temperature?.degrees,feels=current?.feelsLikeTemperature?.degrees,rain=current?.precipitation?.probability?.percent;
+ const fmt=(value,suffix="")=>Number.isFinite(value)?Math.round(value)+suffix:"—";
+ return <div className="live-weather-content" aria-live="polite">
+  <div className="live-weather-current"><div className="live-weather-current-main"><span className="live-weather-icon" aria-hidden="true">{icon(current?.weatherCondition?.type)}</span><div><strong>{Number.isFinite(temp)?fmt(temp,"°C"):(loading?"Loading…":"Weather unavailable")}</strong><small>{current?.weatherCondition?.description?.text||error||"Longido regional conditions"} · feels like {fmt(feels,"°C")}</small></div></div>
+   <div className="live-weather-metrics"><span>💧 Humidity <b>{fmt(current?.relativeHumidity,"%")}</b></span><span>💨 Wind <b>{fmt(current?.wind?.speed?.value," km/h")}</b></span><span>🌧️ Rain chance <b>{fmt(rain,"%")}</b></span></div>
+  </div>
+  <div className="live-weather-days">{daily.map((day,index)=>{const forecast=day.daytimeForecast||{},high=day.maxTemperature?.degrees,low=day.minTemperature?.degrees,type=forecast.weatherCondition?.type,text=forecast.weatherCondition?.description?.text||"Forecast unavailable",p=forecast.precipitation?.probability?.percent;return <div className="live-weather-day" key={day.interval?.startTime||index}><strong>{index===0?"Today":new Intl.DateTimeFormat("en-GB",{weekday:"short",day:"2-digit",month:"short",timeZone:"Africa/Dar_es_Salaam"}).format(new Date(day.interval?.startTime||Date.now()))}</strong><span className="live-weather-day-icon" aria-label={text}>{icon(type)}</span><b>{fmt(high,"°")} / {fmt(low,"°")}</b><small>Rain {fmt(p,"%")}</small></div>})}</div>
+  <div className="live-weather-attribution"><span>LONGIDO · LIVE REGIONAL WEATHER</span><small>{lastUpdated?"Updated "+new Intl.DateTimeFormat("en-GB",{dateStyle:"medium",timeStyle:"short",timeZone:"Africa/Dar_es_Salaam"}).format(new Date(lastUpdated))+" · refreshes every 15 minutes":error?"Live data unavailable: "+error:"Connecting to live weather service…"}</small></div>
+ </div>;
 }
 const IRPA_SESSION_RECOVERY_KEY="irpaSessionRecovery";const IRPA_INACTIVITY_LIMIT_MS=5*60*1000;const IRPA_RECOVERY_MAX_AGE_MS=24*60*60*1000;function readIrpaRecovery(){try{const raw=window.localStorage.getItem(IRPA_SESSION_RECOVERY_KEY);if(!raw)return null;const value=JSON.parse(raw);if(!value||Date.now()-Number(value.savedAt||0)>IRPA_RECOVERY_MAX_AGE_MS){window.localStorage.removeItem(IRPA_SESSION_RECOVERY_KEY);return null}return value}catch{return null}}function writeIrpaRecovery(snapshot){try{window.localStorage.setItem(IRPA_SESSION_RECOVERY_KEY,JSON.stringify({...snapshot,savedAt:Date.now()}))}catch{}}
 
