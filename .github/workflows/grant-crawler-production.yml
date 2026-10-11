@@ -36,7 +36,21 @@ jobs:
           if (!config.includes('IRPA_ENVIRONMENT = "production"')) throw new Error('Production environment marker missing.');
           if (!config.includes('database_name = "irpa-grant-crawler-production"')) throw new Error('Production D1 database missing.');
           NODE
+  dashboard-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dashboard dependencies
+        run: npm ci
+      - name: Build production dashboard
+        run: npm run build
+
   deploy-production:
+    needs: [test, dashboard-build]
     # Main-branch release workflow deploys only the isolated crawler and never targets the Drive Gateway.
     runs-on: ubuntu-latest
     timeout-minutes: 25
