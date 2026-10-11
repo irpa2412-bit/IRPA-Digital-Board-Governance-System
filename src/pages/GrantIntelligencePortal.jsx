@@ -17,15 +17,47 @@ const THEMES=[
  {id:"environment",label:"Environmental Sustainability"}
 ];
 const SOURCES=[
- {name:"UNDP Funding and Procurement",url:"https://www.undp.org/procurement"},
- {name:"FAO Calls and Opportunities",url:"https://www.fao.org"},
- {name:"Global Environment Facility",url:"https://www.thegef.org"},
- {name:"Green Climate Fund",url:"https://www.greenclimate.fund"},
- {name:"Adaptation Fund",url:"https://www.adaptation-fund.org"},
- {name:"African Development Bank",url:"https://www.afdb.org"},
- {name:"Tanzania Forest Services",url:"https://www.tfs.go.tz"},
- {name:"Grants.gov open opportunities",url:"https://www.grants.gov/search-grants"}
+ {name:"AfricanNGOs — funding calls for African NGOs",category:"African NGO funding directories",url:"https://africanngos.org/"},
+ {name:"Grant Catalyst Africa — grant discovery",category:"African NGO funding directories",url:"https://grantcatalyst.africa/"},
+ {name:"Africa Training Institute — funding finder",category:"African NGO funding directories",url:"https://africatraininginstitute.org/grants-funding/"},
+ {name:"NGO Jobs Africa — grants and funding",category:"African NGO funding directories",url:"https://jobs.ngoportal.africa/grants-funding/"},
+ {name:"TrustAfrica — grants and calls",category:"African foundations and civil society",url:"https://trustafrica.org/?Itemid=75&id=24&lang=en&option=com_grants&task=view"},
+ {name:"Foundation for Civil Society Tanzania",category:"African foundations and civil society",url:"https://www.thefoundation.or.tz/what-we-do/grantmaking"},
+ {name:"African Women's Development Fund (AWDF)",category:"African foundations and civil society",url:"https://awdf.org/grants/"},
+ {name:"Urgent Action Fund-Africa",category:"African foundations and civil society",url:"https://uaf-africa.org/"},
+ {name:"African Climate Foundation",category:"African foundations and civil society",url:"https://africanclimatefoundation.org/"},
+ {name:"Global Fund for Community Foundations",category:"African foundations and civil society",url:"https://globalfundcommunityfoundations.org/"},
+ {name:"African Philanthropy Forum",category:"African foundations and civil society",url:"https://africanpf.org/"},
+ {name:"UNDP Tanzania — news and opportunities",category:"UN and multilateral institutions",url:"https://www.undp.org/tanzania/news"},
+ {name:"UN Partner Portal — CSO partnerships",category:"UN and multilateral institutions",url:"https://www.unpartnerportal.org/landing/opportunities/"},
+ {name:"FAO — funding opportunities",category:"UN and multilateral institutions",url:"https://www.fao.org/partnerships/funding-opportunities/en"},
+ {name:"GEF Small Grants Programme",category:"UN and multilateral institutions",url:"https://www.thegef.org/what-we-do/topics/gef-small-grants-programme"},
+ {name:"African Development Bank — procurement and calls",category:"African and regional institutions",url:"https://www.afdb.org/en/projects-and-operations/procurement"},
+ {name:"AUDA-NEPAD",category:"African and regional institutions",url:"https://www.nepad.org/"},
+ {name:"African Enterprise Challenge Fund (AECF)",category:"African and regional institutions",url:"https://www.aecfafrica.org/"},
+ {name:"U.S. African Development Foundation (USADF)",category:"Embassies and bilateral funders",url:"https://www.usadf.gov/"},
+ {name:"Canada Fund for Local Initiatives (CFLI)",category:"Embassies and bilateral funders",url:"https://www.international.gc.ca/world-monde/funding-financement/cfli-fcil/index.aspx?lang=eng"},
+ {name:"EU Delegation to Tanzania",category:"Embassies and bilateral funders",url:"https://www.eeas.europa.eu/tanzania_en"},
+ {name:"U.S. Embassy Tanzania — grants and announcements",category:"Embassies and bilateral funders",url:"https://tz.usembassy.gov/"},
+ {name:"UK Government — international development funding",category:"Embassies and bilateral funders",url:"https://www.gov.uk/international-development-funding"},
+ {name:"Tanzania Forest Fund",category:"Tanzania and East Africa",url:"https://www.mfukowamisitu.go.tz/download-center"},
+ {name:"Tanzania Forest Services Agency",category:"Tanzania and East Africa",url:"https://www.tfs.go.tz/"},
+ {name:"World Bank — grants and project opportunities",category:"International foundations and programmes",url:"https://www.worldbank.org/en/projects-operations/products-and-services/grants"},
+ {name:"Global Greengrants Fund",category:"International foundations and programmes",url:"https://www.greengrants.org/"},
+ {name:"IUCN — conservation funding and initiatives",category:"International foundations and programmes",url:"https://www.iucn.org/our-work/regions/africa"},
+ {name:"Global Innovation Fund",category:"International foundations and programmes",url:"https://www.globalinnovation.fund/"},
+ {name:"Darwin Initiative — biodiversity and livelihoods",category:"International foundations and programmes",url:"https://www.darwininitiative.org.uk/"},
+ {name:"Green Climate Fund",category:"Climate, land and conservation",url:"https://www.greenclimate.fund/"},
+ {name:"Adaptation Fund",category:"Climate, land and conservation",url:"https://www.adaptation-fund.org/"},
+ {name:"Global Environment Facility",category:"Climate, land and conservation",url:"https://www.thegef.org/"},
+ {name:"AfricanNGOs October–November 2026 opportunity roundup",category:"Current opportunity roundups",url:"https://africanngos.org/2026/10/06/african-ngo-funding-opportunities-october-november-2026/"},
+ {name:"NGO Portal Africa — funding listings",category:"Current opportunity roundups",url:"https://jobs.ngoportal.africa/grants-funding/"}
 ];
+const ENGINE_INFO={
+ rss_atom:{title:"RSS / Atom crawler",description:"Reads configured RSS and Atom feeds in parallel, parses funding-call metadata, normalises URLs and sends candidate records into the common deduplication and IRPA screening pipeline.",sources:["UK Government international development funding feeds"],limits:"Feed-only discovery; a funder without a usable feed will not be discovered by this engine."},
+ official_pages:{title:"Official donor webpage scanner",description:"Fetches configured public donor and funding pages, follows a bounded number of grant-related links on the same host, extracts call titles and descriptions, and records source failures.",sources:["UNDP Tanzania","GEF Small Grants Programme","FAO funding opportunities","EU Delegation to Tanzania","Tanzania Forest Fund","AfricanNGOs","TrustAfrica","Foundation for Civil Society","AWDF","UN Partner Portal"],limits:"Some sites block automated requests or render content dynamically. HTTP errors are recorded; access controls are not bypassed."},
+ web_search:{title:"Parallel web-search discovery",description:"Runs targeted funding searches concurrently through Google News RSS, falls back to Bing RSS when Google News fails, and uses Brave Search API when the optional key is configured.",sources:["Google News RSS","Bing RSS fallback","Brave Search API (optional secret)"],limits:"Search results are leads, not verified open calls. Every result still passes the same IRPA fit, deadline, geography and eligibility checks."}
+};
 const statusOptions=["Open","Upcoming","Closed","Under review","Application in progress","Submitted","Awarded","Not pursuing"];
 const styles={
  page:{color:"var(--text-primary, #e8edf5)",display:"grid",gap:18},
