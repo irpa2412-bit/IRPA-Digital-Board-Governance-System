@@ -6942,3 +6942,42 @@
     max-height:none !important;
   }
 }
+
+
+/* Balance weather typography with the application UI; the forecast is secondary. */
+.main-area>.topbar .topbar-heading-row>.google-weather-panel > span:first-child {
+  font-size:11px !important;
+  letter-spacing:.08em !important;
+  line-height:1.2 !important;
+}
+.main-area>.topbar .topbar-heading-row>.google-weather-panel .live-weather-location-name,
+.main-area>.topbar .topbar-heading-row>.google-weather-panel .live-weather-location-name * {
+  font-size:11px !important;
+  line-height:1.2 !important;
+}
+.main-area>.topbar .topbar-heading-row>.google-weather-panel .live-weather-location-controls button {
+  min-height:26px !important;
+  padding:3px 6px !important;
+  font-size:10px !important;
+}
+.main-area>.topbar .topbar-heading-row>.google-weather-panel .live-weather-current-main strong {
+  font-size:17px !important;
+  line-height:1.1 !important;
+}
+.main-area>.topbar .topbar-heading-row>.google-weather-panel .live-weather-current-main small,
+.main-area>.topbar .topbar-heading-row>.google-weather-panel .live-weather-metrics>span,
+.main-area>.topbar .topbar-heading-row>.google-weather-panel .live-weather-day *,
+.main-area>.topbar .topbar-heading-row>.google-weather-panel .live-weather-attribution,
+.main-area>.topbar .topbar-heading-row>.google-weather-panel .live-weather-attribution * {
+  font-size:10px !important;
+  line-height:1.2 !important;
+}
+.main-area>.topbar .topbar-heading-row>.google-weather-panel .live-weather-metrics>span {
+  padding:3px 5px !important;
+}
+.main-area>.topbar .topbar-heading-row>.google-weather-panel .live-weather-day {
+  padding:4px 3px !important;
+}
+.main-area>.topbar .topbar-heading-row>.google-weather-panel .live-weather-content {
+  gap:4px !important;
+}
