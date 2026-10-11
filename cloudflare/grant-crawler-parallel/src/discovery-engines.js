@@ -196,7 +196,31 @@ export async function readDonorScanner(scanner) {
           });
           const original = outgoing.find(candidate => /apply|application|submit|official call|application form|apply here/i.test(candidate.label + " " + candidate.context)) || outgoing[0];
           if (!original) {
-            errors.push({ sourceUrl: detail.finalUrl, error: "No external original-issuer/application URL found; aggregator article was not promoted as the opportunity link." });
+            // Never promote a directory/listing page as the apply target. Search
+            // for the original issuer URL when an aggregator article has no outbound call link.
+            const query = scanner.label + " grant funding opportunity Tanzania Africa";
+            try {
+              const searchUrl = new URL("https://www.bing.com/search");
+              searchUrl.searchParams.set("format", "rss");
+              searchUrl.searchParams.set("q", query);
+              const response = await fetch(searchUrl.href, {
+                headers: { accept: "application/rss+xml, application/xml, text/xml", "user-agent": USER_AGENT },
+                signal: AbortSignal.timeout(12_000),
+              });
+              if (!response.ok) throw new Error("Bing RSS fallback HTTP " + response.status);
+              const xml = await response.text();
+              if (xml.length > MAX_PAGE_BYTES) throw new Error("Bing RSS fallback response exceeds the 1 MB limit.");
+              const fallbackItems = parseSearchRss(xml, query, "Bing RSS").map(item => ({
+                ...item,
+                discoveryEngine: scanner.name,
+                primarySourceUrl: scanner.url,
+                fallbackProvider: "Bing RSS",
+              }));
+              if (fallbackItems.length) items.push(...fallbackItems);
+              else errors.push({ sourceUrl: detail.finalUrl, error: "No original issuer URL was present in the aggregator article; Bing RSS fallback found no matching call." });
+            } catch (error) {
+              errors.push({ sourceUrl: detail.finalUrl, error: String(error.message || error).slice(0, 180) });
+            }
             continue;
           }
           const opportunityTitle = detailParsed.title || title;
