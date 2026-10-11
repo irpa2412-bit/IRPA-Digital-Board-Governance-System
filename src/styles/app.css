@@ -7725,6 +7725,7 @@
 
 /* FINAL CLOCK LAYOUT FIX — compact content-sized panel; remove legacy 112px blank-height override. */
 .main-area > .desktop-webapp-navigation-roller .webapp-navigation-live-clock {
+  display: grid !important;
   height: auto !important;
   min-height: 0 !important;
   max-height: none !important;
