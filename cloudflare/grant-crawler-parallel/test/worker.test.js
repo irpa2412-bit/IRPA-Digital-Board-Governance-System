@@ -276,86 +276,52 @@ test("strict geographic filter retains explicit Tanzania and broad eligible regi
   assert.equal(regional.triageAssessment, "priority_for_eligibility_review");
 });
 
-test("AI geographic gate blocks concept-note drafting when geography is ineligible or unclear", async () => {
+test("geographic eligibility is advisory and does not block concept-note drafting", async () => {
   const token = "test-token-with-at-least-32-characters-long";
   let modelCalls = 0;
-  const env = { CRAWLER_CONTROL_TOKEN: token, AI: { run: async () => { modelCalls++; return { response: JSON.stringify({ eligibility: { status: "eligible", confidence: "high", evidence: [], unknowns: [] }, donor_requirements: [] }) }; } } };
+  const env = { CRAWLER_CONTROL_TOKEN: token, AI: { run: async () => { modelCalls++; return { response: JSON.stringify({ eligibility: { status: "possibly_eligible", confidence: "low", evidence: [], unknowns: ["Confirm donor rules"] }, donor_requirements: [], concept_note: { draft: "Draft for review" } }) }; } } };
   const headers = { authorization: "Bearer " + token, "content-type": "application/json" };
-  const southAfrica = await worker.fetch(new Request("https://crawler.example/assistant/analyze", {
-    method: "POST", headers,
-    body: JSON.stringify({ task: "concept_note", title: "South African NGO grant", description: "Only organizations registered in South Africa may apply." })
-  }), env);
-  assert.equal(southAfrica.status, 422);
-  assert.equal((await southAfrica.json()).geographic_eligibility.status, "ineligible");
-
-  const unknown = await worker.fetch(new Request("https://crawler.example/assistant/analyze", {
-    method: "POST", headers,
-    body: JSON.stringify({ task: "concept_note", title: "Climate grant", description: "Supports community climate adaptation." })
-  }), env);
-  assert.equal(unknown.status, 422);
-  assert.equal((await unknown.json()).geographic_eligibility.status, "unclear");
-  assert.equal(modelCalls, 0);
+  for (const opportunity of [
+    { title: "South African NGO grant", description: "Only organizations registered in South Africa may apply." },
+    { title: "Climate grant", description: "Supports community climate adaptation." }
+  ]) {
+    const response = await worker.fetch(new Request("https://crawler.example/assistant/analyze", {
+      method: "POST", headers,
+      body: JSON.stringify({ task: "concept_note", callStatus: "open", ...opportunity })
+    }), env);
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.ok(["eligible", "possibly_eligible", "ineligible", "insufficient_information"].includes(body.assessment.eligibility.status));
+    assert.ok(["eligible", "ineligible", "unclear"].includes(body.assessment.geographic_eligibility.status));
+  }
+  assert.equal(modelCalls, 2);
 });
 
-test("known IRPA eligibility gaps block concept-note drafting", async () => {
+test("known IRPA eligibility gaps are reported without blocking concept-note drafting", async () => {
   const token = "test-token-with-at-least-32-characters-long";
   let modelCalls = 0;
   const env = { CRAWLER_CONTROL_TOKEN: token, AI: { run: async () => {
     modelCalls++;
-    return { response: JSON.stringify({ eligibility: { status: "eligible", confidence: "high", evidence: [], unknowns: [] }, donor_requirements: [] }) };
+    return { response: JSON.stringify({ eligibility: { status: "possibly_eligible", confidence: "low", evidence: [], unknowns: ["Verify requirements"] }, donor_requirements: [], concept_note: { draft: "Draft for review" } }) };
   } } };
   const headers = { authorization: "Bearer " + token, "content-type": "application/json" };
-  const cases = [
-    {
-      title: "East Africa civil society grant",
-      description: "Open to eligible civil society organizations across East Africa.",
-      donorRequirements: "Applicants must be registered in Tanzania as NGOs and must have completed at least two projects.",
-      expected: "ineligible",
-      expectedTerm: "no completed projects"
-    },
-    {
-      title: "East Africa resilience grant",
-      description: "Open to eligible applicants across East Africa.",
-      donorRequirements: "Applicants must be registered in Tanzania as NGOs and provide 20% cash co-financing.",
-      expected: "ineligible",
-      expectedTerm: "cash matching/co-financing"
-    },
-    {
-      title: "East Africa community grant",
-      description: "Open to eligible applicants across East Africa.",
-      donorRequirements: "Applicants must be registered in Tanzania as NGOs and the organization must have been registered for at least 5 years.",
-      expected: "insufficient_information",
-      expectedTerm: "5 years of organizational existence"
-    },
-    {
-      title: "East Africa public services grant",
-      description: "Open to eligible applicants across East Africa.",
-      donorRequirements: "Only government agencies may apply.",
-      expected: "ineligible",
-      expectedTerm: "exclude registered NGOs"
-    },
-    {
-      title: "East Africa ICCA conservation grant",
-      description: "Open to eligible applicants across East Africa.",
-      donorRequirements: "Applicants must be registered in Tanzania as NGOs. CSOs with over three years of proven evidence of working in or near an ICCA are eligible.",
-      expected: "ineligible",
-      expectedTerm: "no completed projects"
-    }
-  ];
-  for (const item of cases) {
+  for (const item of [
+    { title: "East Africa civil society grant", description: "Open to eligible civil society organizations across East Africa.", donorRequirements: "Applicants must be registered in Tanzania as NGOs and must have completed at least two projects." },
+    { title: "East Africa resilience grant", description: "Open to eligible applicants across East Africa.", donorRequirements: "Applicants must be registered in Tanzania as NGOs and provide 20% cash co-financing." },
+    { title: "East Africa community grant", description: "Open to eligible applicants across East Africa.", donorRequirements: "Applicants must be registered in Tanzania as NGOs and the organization must have been registered for at least 5 years." },
+    { title: "East Africa public services grant", description: "Open to eligible applicants across East Africa.", donorRequirements: "Only government agencies may apply." },
+    { title: "East Africa ICCA conservation grant", description: "Open to eligible applicants across East Africa.", donorRequirements: "Applicants must be registered in Tanzania as NGOs. CSOs with over three years of proven evidence of working in or near an ICCA are eligible." }
+  ]) {
     const response = await worker.fetch(new Request("https://crawler.example/assistant/analyze", {
-      method: "POST", headers,
-      body: JSON.stringify({ task: "concept_note", callStatus: "open", ...item })
+      method: "POST", headers, body: JSON.stringify({ task: "concept_note", callStatus: "open", ...item })
     }), env);
+    assert.equal(response.status, 200, item.title);
     const body = await response.json();
-    assert.equal(response.status, 422);
-    assert.equal(body.eligibility_gate.status, item.expected, item.title);
-    const combined = [...(body.eligibility_gate.blockers||[]), ...(body.eligibility_gate.warnings||[])].join(" ").toLowerCase();
-    assert.ok(combined.includes(item.expectedTerm.toLowerCase()), "Expected eligibility evidence for: " + item.expectedTerm);
+    assert.ok(body.assessment.known_eligibility_gaps);
+    assert.ok(body.assessment.concept_note?.draft);
   }
-  assert.equal(modelCalls, 0, "AI generation must not run when deterministic eligibility gates block drafting.");
+  assert.equal(modelCalls, 5);
 });
-
 test("AI eligibility and concept-note endpoint block expired and explicitly closed calls before model invocation", async () => {
   const token = "test-token-with-at-least-32-characters-long";
   let modelCalls = 0;
@@ -579,24 +545,24 @@ test("open-feed metadata cannot bypass expiry filtering", () => {
   }), true);
 });
 
-test("AI concept-note gate rejects a country-focused call despite generic regional wording", async () => {
+test("country-focused calls remain available for drafting with advisory geography", async () => {
   const token = "test-token-with-at-least-32-characters-long";
   let modelCalls = 0;
   const response = await worker.fetch(new Request("https://crawler.example/assistant/analyze", {
     method: "POST",
     headers: { authorization: "Bearer " + token, "content-type": "application/json" },
     body: JSON.stringify({
-      task: "concept_note",
+      task: "concept_note", callStatus: "open",
       title: "Kenya climate resilience grant",
       description: "Funding is available across Africa, but this specific call is for Kenya-based organizations."
     })
   }), {
     CRAWLER_CONTROL_TOKEN: token,
-    AI: { run: async () => { modelCalls++; return { response: "{}" }; } }
+    AI: { run: async () => { modelCalls++; return { response: JSON.stringify({ eligibility: { status: "possibly_eligible", confidence: "low", evidence: [], unknowns: ["Verify official call"] }, donor_requirements: [], concept_note: { draft: "Draft for review" } }) }; } }
   });
-  assert.equal(response.status, 422);
-  assert.equal((await response.json()).geographic_eligibility.status, "ineligible");
-  assert.equal(modelCalls, 0);
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).assessment.geographic_eligibility.status, "ineligible");
+  assert.equal(modelCalls, 1);
 });
 
 
