@@ -64,7 +64,7 @@ async function fetchHtml(url) {
   if (new URL(finalUrl).hostname !== new URL(url).hostname) throw new Error("Cross-host page redirects are not permitted.");
   if (!/html|xhtml|text\/plain/i.test(response.headers.get("content-type") || "")) throw new Error("Source did not return HTML.");
   const html = await response.text(); if (html.length > MAX_PAGE_BYTES) throw new Error("Page exceeds the 1 MB response limit.");
-  return { html, finalUrl };
+  return { html, finalUrl, status: response.status };
 }
 export function parseOfficialPage(html, pageUrl) {
   const title = htmlTitle(html) || metaContent(html, "og:title");
@@ -134,42 +134,70 @@ export const DONOR_SCANNERS = [
 
 export async function readDonorScanner(scanner) {
   const errors = [];
+  let httpStatus = null;
+  let pagesScanned = 0;
+  let sourceUrl = scanner.url;
   try {
-    const sourceUrl = normalizeOpportunityUrl(scanner.url);
+    sourceUrl = normalizeOpportunityUrl(scanner.url);
     const source = await fetchHtml(sourceUrl);
+    pagesScanned = 1;
+    httpStatus = source.status ?? 200;
+    sourceUrl = source.finalUrl;
     const sourceHost = new URL(source.finalUrl).hostname;
     const anchors = getAnchors(source.html, source.finalUrl)
       .filter(anchor => new URL(anchor.url).hostname === sourceHost)
-      .slice(0, 2);
-    const selected = anchors.slice(0, 1);
-    const found = await Promise.all(selected.map(async anchor => {
-      try {
-        const detail = await fetchHtml(anchor.url);
-        const parsed = parseOfficialPage(detail.html, detail.finalUrl);
-        const title = parsed.title || anchor.label;
-        const description = (parsed.description + " " + anchor.context).trim().slice(0, 5000);
-        if (!isSpecificOpportunity(title, description)) return null;
-        return { ...parsed, title, description, sourceUrl, discoveryEngine: scanner.name };
-      } catch (error) {
-        errors.push({ sourceUrl: anchor.url, error: String(error.message || error).slice(0, 180) });
-        return null;
-      }
-    }));
-    // The page itself can be a current grant scheme; retain it for eligibility review.
+      .slice(0, 20);
+    const items = [];
+    // Keep this engine to one network request per donor per crawl. Link text and
+    // surrounding source-page text are indexed as leads; do not fan out into
+    // detail-page requests that can exhaust the Cloudflare subrequest budget.
     const self = parseOfficialPage(source.html, source.finalUrl);
     if (isSpecificOpportunity(self.title, self.description)) {
-      found.push({ ...self, sourceUrl, discoveryEngine: scanner.name });
+      items.push({ ...self, sourceUrl, discoveryEngine: scanner.name });
     }
+    for (const anchor of anchors) {
+      const title = String(anchor.label || "").trim().slice(0, 500);
+      const description = String(anchor.context || "").trim().slice(0, 5000);
+      if (!title || !isSpecificOpportunity(title, description)) continue;
+      items.push({
+        title,
+        description,
+        url: anchor.url,
+        publishedAt: null,
+        sourceUrl,
+        discoveryEngine: scanner.name,
+        eligibilityEvidence: "source-page link only; detail page not yet verified",
+      });
+    }
+    const unique = [...new Map(items.map(item => [item.url, item])).values()];
     return {
-      items: found.filter(Boolean),
+      items: unique,
       stats: {
-        configured: 1, scanned: 1, detailPagesScanned: selected.length,
-        found: found.filter(Boolean).length, errors
-      }
+        configured: 1,
+        scanned: pagesScanned,
+        pagesScanned,
+        httpStatus,
+        detailPagesScanned: 0,
+        found: unique.length,
+        errors,
+      },
     };
   } catch (error) {
-    errors.push({ sourceUrl: scanner.url, error: String(error.message || error).slice(0, 180) });
-    return { items: [], stats: { configured: 1, scanned: 1, detailPagesScanned: 0, found: 0, errors } };
+    errors.push({ sourceUrl, error: String(error.message || error).slice(0, 180) });
+    const statusMatch = String(error.message || error).match(/HTTP (\d{3})/);
+    httpStatus = statusMatch ? Number(statusMatch[1]) : null;
+    return {
+      items: [],
+      stats: {
+        configured: 1,
+        scanned: pagesScanned,
+        pagesScanned,
+        httpStatus,
+        detailPagesScanned: 0,
+        found: 0,
+        errors,
+      },
+    };
   }
 }
 
