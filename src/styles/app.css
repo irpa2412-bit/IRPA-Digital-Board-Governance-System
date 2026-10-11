@@ -8772,3 +8772,121 @@ html body #root .main-area > .topbar .topbar-heading-row > .topbar-access-catego
   color: #e7f4ee;
   -webkit-text-fill-color: #e7f4ee;
 }
+
+
+/* Dashboard weather correction only: restore the title block's inherited/original
+   appearance by leaving its colours and decoration untouched; expand weather content. */
+.main-area > .topbar.dashboard-topbar .topbar-heading-row > .topbar-title-block {
+  background: initial;
+  background-image: initial;
+  color: inherit;
+  border-color: initial;
+  box-shadow: initial;
+  opacity: 1;
+}
+.main-area > .topbar.dashboard-topbar .topbar-heading-row > .google-weather-panel {
+  width: 100%;
+  max-width: none;
+  height: auto;
+  min-height: 220px;
+  max-height: none;
+  padding: 16px;
+  align-self: stretch;
+  overflow: visible;
+  box-sizing: border-box;
+}
+.main-area > .topbar.dashboard-topbar .google-weather-panel .live-weather-content {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  overflow-x: hidden;
+  overflow-y: visible;
+  box-sizing: border-box;
+}
+.main-area > .topbar.dashboard-topbar .google-weather-panel .live-weather-location-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+.main-area > .topbar.dashboard-topbar .google-weather-panel .live-weather-location-name > strong,
+.main-area > .topbar.dashboard-topbar .google-weather-panel .live-weather-location-bar > strong {
+  font-size: 1.4rem;
+  line-height: 1.25;
+}
+.main-area > .topbar.dashboard-topbar .google-weather-panel .live-weather-current-main strong {
+  font-size: 2.4rem;
+  line-height: 1.1;
+}
+.main-area > .topbar.dashboard-topbar .google-weather-panel .live-weather-current-main span,
+.main-area > .topbar.dashboard-topbar .google-weather-panel .live-weather-current-main small,
+.main-area > .topbar.dashboard-topbar .google-weather-panel .live-weather-metrics,
+.main-area > .topbar.dashboard-topbar .google-weather-panel .live-weather-metrics > span,
+.main-area > .topbar.dashboard-topbar .google-weather-panel .live-weather-days,
+.main-area > .topbar.dashboard-topbar .google-weather-panel .live-weather-days > *,
+.main-area > .topbar.dashboard-topbar .google-weather-panel .live-weather-attribution {
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+.main-area > .topbar.dashboard-topbar .google-weather-panel .live-weather-current,
+.main-area > .topbar.dashboard-topbar .google-weather-panel .live-weather-current-main,
+.main-area > .topbar.dashboard-topbar .google-weather-panel .live-weather-metrics {
+  width: 100%;
+  min-width: 0;
+}
+.main-area > .topbar.dashboard-topbar .google-weather-panel .live-weather-days {
+  display: flex;
+  flex-wrap: nowrap;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  gap: 10px;
+  padding: 6px 0 8px;
+  box-sizing: border-box;
+  -webkit-overflow-scrolling: touch;
+}
+.main-area > .topbar.dashboard-topbar .google-weather-panel .live-weather-days > * {
+  flex: 0 0 auto;
+  min-width: 92px;
+}
+@media (min-width: 901px) {
+  .main-area > .topbar.dashboard-topbar {
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    overflow: visible;
+  }
+  .main-area > .topbar.dashboard-topbar > .topbar-heading-row {
+    height: auto;
+    min-height: 250px;
+    max-height: none;
+    align-items: stretch;
+  }
+  .main-area > .topbar.dashboard-topbar .topbar-heading-row > .google-weather-panel {
+    height: auto;
+    min-height: 220px;
+    max-height: none;
+    overflow: visible;
+  }
+}
+@media (max-width: 900px) {
+  .main-area > .topbar.dashboard-topbar .topbar-heading-row > .google-weather-panel {
+    min-height: 220px;
+    height: auto;
+    max-height: none;
+    padding: 16px;
+    overflow: visible;
+  }
+  .main-area > .topbar.dashboard-topbar .google-weather-panel .live-weather-content {
+    height: auto;
+    overflow: visible;
+  }
+}
