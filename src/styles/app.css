@@ -7994,3 +7994,58 @@
     padding: 7px 8px;
   }
 }
+
+
+/* 2026-10-11: keep the in-portal roller compact and anchored at the far right. */
+.main-area > .desktop-webapp-navigation-roller {
+  width: fit-content;
+  max-width: 100%;
+  margin-left: auto;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+  gap: 6px;
+  padding: 3px 5px;
+  min-height: 0;
+}
+.main-area > .desktop-webapp-navigation-roller .webapp-navigation-live-clock {
+  flex: 0 0 auto;
+  width: max-content;
+  max-width: 235px;
+  gap: 3px 7px;
+  padding: 5px 7px;
+}
+.main-area > .desktop-webapp-navigation-roller .webapp-navigation-roller-kicker {
+  display: none;
+}
+.main-area > .desktop-webapp-navigation-roller > strong {
+  flex: 0 1 auto;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.main-area > .desktop-webapp-navigation-roller select {
+  flex: 0 1 230px;
+  width: min(230px, 24vw);
+  min-width: 150px;
+  margin-left: 0;
+}
+.main-area > .desktop-webapp-navigation-roller .webapp-navigation-roller-chevron {
+  flex: 0 0 auto;
+  margin-left: -4px;
+}
+@media (max-width: 760px) {
+  .main-area > .desktop-webapp-navigation-roller {
+    width: 100%;
+    max-width: 100%;
+    margin-left: 0;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+  .main-area > .desktop-webapp-navigation-roller select {
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+    margin-left: 0;
+  }
+}
