@@ -8903,3 +8903,18 @@ html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-ro
   }
   .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-days { overflow-x: auto; }
 }
+
+
+/* Live Weather colour isolation — original blue recovered from git history (#2563eb).
+   Deliberately scoped to the weather card; Access Categories and shared tokens are untouched. */
+html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel {
+  --weather-blue: #2563eb;
+  color: var(--weather-blue);
+  -webkit-text-fill-color: var(--weather-blue);
+}
+html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel *,
+html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel *::before,
+html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel *::after {
+  color: var(--weather-blue);
+  -webkit-text-fill-color: var(--weather-blue);
+}
