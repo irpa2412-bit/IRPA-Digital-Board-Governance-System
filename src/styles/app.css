@@ -7471,3 +7471,25 @@
     row-gap: 8px !important;
   }
 }
+
+
+/* Remove unused vertical whitespace while preserving the taller, readable clock panel. */
+.main-area>.desktop-webapp-navigation-roller .webapp-navigation-live-clock {
+  grid-template-rows: auto auto !important;
+  align-content: center !important;
+  justify-content: stretch !important;
+  row-gap: 5px !important;
+  padding: 8px 10px !important;
+}
+.main-area>.desktop-webapp-navigation-roller .webapp-navigation-live-clock strong,
+.main-area>.desktop-webapp-navigation-roller .webapp-navigation-live-clock span,
+.main-area>.desktop-webapp-navigation-roller .webapp-navigation-live-clock b,
+.main-area>.desktop-webapp-navigation-roller .webapp-navigation-live-clock button {
+  margin: 0 !important;
+}
+@media (max-width:760px) {
+  .main-area>.desktop-webapp-navigation-roller .webapp-navigation-live-clock {
+    row-gap: 5px !important;
+    padding: 7px 8px !important;
+  }
+}
