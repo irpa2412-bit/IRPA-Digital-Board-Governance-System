@@ -7,8 +7,7 @@ const PORTAL_GROUPS=[
   {label:"Meeting Portal",target:"Meetings",children:[
     ["Meeting Room Portal","Meeting Room"],["Participants Portal","Participants"],["Resolutions Portal","Resolutions"],
     ["Voting Portal","Voting"],["Decisions Portal","Decisions"]
-  ]},
-  {label:"Finance Portal",target:"Finance Portfolio",children:[["Procurement Portal","Procurement"]]}
+  ]}
 ];
 const CORE=[
   ["Documents Portal","Documents"],["Signature Portal","Signature Platform"],["Authorization & Approvals Portal","Authorization & Approvals"],
