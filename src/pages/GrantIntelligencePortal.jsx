@@ -17,15 +17,47 @@ const THEMES=[
  {id:"environment",label:"Environmental Sustainability"}
 ];
 const SOURCES=[
- {name:"UNDP Funding and Procurement",url:"https://www.undp.org/procurement"},
- {name:"FAO Calls and Opportunities",url:"https://www.fao.org"},
- {name:"Global Environment Facility",url:"https://www.thegef.org"},
- {name:"Green Climate Fund",url:"https://www.greenclimate.fund"},
- {name:"Adaptation Fund",url:"https://www.adaptation-fund.org"},
- {name:"African Development Bank",url:"https://www.afdb.org"},
- {name:"Tanzania Forest Services",url:"https://www.tfs.go.tz"},
- {name:"Grants.gov open opportunities",url:"https://www.grants.gov/search-grants"}
+ {name:"AfricanNGOs — funding calls for African NGOs",category:"African NGO funding directories",url:"https://africanngos.org/"},
+ {name:"Grant Catalyst Africa — grant discovery",category:"African NGO funding directories",url:"https://grantcatalyst.africa/"},
+ {name:"Africa Training Institute — funding finder",category:"African NGO funding directories",url:"https://africatraininginstitute.org/grants-funding/"},
+ {name:"NGO Jobs Africa — grants and funding",category:"African NGO funding directories",url:"https://jobs.ngoportal.africa/grants-funding/"},
+ {name:"TrustAfrica — grants and calls",category:"African foundations and civil society",url:"https://trustafrica.org/?Itemid=75&id=24&lang=en&option=com_grants&task=view"},
+ {name:"Foundation for Civil Society Tanzania",category:"African foundations and civil society",url:"https://www.thefoundation.or.tz/what-we-do/grantmaking"},
+ {name:"African Women's Development Fund (AWDF)",category:"African foundations and civil society",url:"https://awdf.org/grants/"},
+ {name:"Urgent Action Fund-Africa",category:"African foundations and civil society",url:"https://uaf-africa.org/"},
+ {name:"African Climate Foundation",category:"African foundations and civil society",url:"https://africanclimatefoundation.org/"},
+ {name:"Global Fund for Community Foundations",category:"African foundations and civil society",url:"https://globalfundcommunityfoundations.org/"},
+ {name:"African Philanthropy Forum",category:"African foundations and civil society",url:"https://africanpf.org/"},
+ {name:"UNDP Tanzania — news and opportunities",category:"UN and multilateral institutions",url:"https://www.undp.org/tanzania/news"},
+ {name:"UN Partner Portal — CSO partnerships",category:"UN and multilateral institutions",url:"https://www.unpartnerportal.org/landing/opportunities/"},
+ {name:"FAO — funding opportunities",category:"UN and multilateral institutions",url:"https://www.fao.org/partnerships/funding-opportunities/en"},
+ {name:"GEF Small Grants Programme",category:"UN and multilateral institutions",url:"https://www.thegef.org/what-we-do/topics/gef-small-grants-programme"},
+ {name:"African Development Bank — procurement and calls",category:"African and regional institutions",url:"https://www.afdb.org/en/projects-and-operations/procurement"},
+ {name:"AUDA-NEPAD",category:"African and regional institutions",url:"https://www.nepad.org/"},
+ {name:"African Enterprise Challenge Fund (AECF)",category:"African and regional institutions",url:"https://www.aecfafrica.org/"},
+ {name:"U.S. African Development Foundation (USADF)",category:"Embassies and bilateral funders",url:"https://www.usadf.gov/"},
+ {name:"Canada Fund for Local Initiatives (CFLI)",category:"Embassies and bilateral funders",url:"https://www.international.gc.ca/world-monde/funding-financement/cfli-fcil/index.aspx?lang=eng"},
+ {name:"EU Delegation to Tanzania",category:"Embassies and bilateral funders",url:"https://www.eeas.europa.eu/tanzania_en"},
+ {name:"U.S. Embassy Tanzania — grants and announcements",category:"Embassies and bilateral funders",url:"https://tz.usembassy.gov/"},
+ {name:"UK Government — international development funding",category:"Embassies and bilateral funders",url:"https://www.gov.uk/international-development-funding"},
+ {name:"Tanzania Forest Fund",category:"Tanzania and East Africa",url:"https://www.mfukowamisitu.go.tz/download-center"},
+ {name:"Tanzania Forest Services Agency",category:"Tanzania and East Africa",url:"https://www.tfs.go.tz/"},
+ {name:"World Bank — grants and project opportunities",category:"International foundations and programmes",url:"https://www.worldbank.org/en/projects-operations/products-and-services/grants"},
+ {name:"Global Greengrants Fund",category:"International foundations and programmes",url:"https://www.greengrants.org/"},
+ {name:"IUCN — conservation funding and initiatives",category:"International foundations and programmes",url:"https://www.iucn.org/our-work/regions/africa"},
+ {name:"Global Innovation Fund",category:"International foundations and programmes",url:"https://www.globalinnovation.fund/"},
+ {name:"Darwin Initiative — biodiversity and livelihoods",category:"International foundations and programmes",url:"https://www.darwininitiative.org.uk/"},
+ {name:"Green Climate Fund",category:"Climate, land and conservation",url:"https://www.greenclimate.fund/"},
+ {name:"Adaptation Fund",category:"Climate, land and conservation",url:"https://www.adaptation-fund.org/"},
+ {name:"Global Environment Facility",category:"Climate, land and conservation",url:"https://www.thegef.org/"},
+ {name:"AfricanNGOs October–November 2026 opportunity roundup",category:"Current opportunity roundups",url:"https://africanngos.org/2026/10/06/african-ngo-funding-opportunities-october-november-2026/"},
+ {name:"NGO Portal Africa — funding listings",category:"Current opportunity roundups",url:"https://jobs.ngoportal.africa/grants-funding/"}
 ];
+const ENGINE_INFO={
+ rss_atom:{title:"RSS / Atom crawler",description:"Reads configured RSS and Atom feeds in parallel, parses funding-call metadata, normalises URLs and sends candidate records into the common deduplication and IRPA screening pipeline.",sources:["UK Government international development funding feeds"],limits:"Feed-only discovery; a funder without a usable feed will not be discovered by this engine."},
+ official_pages:{title:"Official donor webpage scanner",description:"Fetches configured public donor and funding pages, follows a bounded number of grant-related links on the same host, extracts call titles and descriptions, and records source failures.",sources:["UNDP Tanzania","GEF Small Grants Programme","FAO funding opportunities","EU Delegation to Tanzania","Tanzania Forest Fund","AfricanNGOs","TrustAfrica","Foundation for Civil Society","AWDF","UN Partner Portal"],limits:"Some sites block automated requests or render content dynamically. HTTP errors are recorded; access controls are not bypassed."},
+ web_search:{title:"Parallel web-search discovery",description:"Runs targeted funding searches concurrently through Google News RSS, falls back to Bing RSS when Google News fails, and uses Brave Search API when the optional key is configured.",sources:["Google News RSS","Bing RSS fallback","Brave Search API (optional secret)"],limits:"Search results are leads, not verified open calls. Every result still passes the same IRPA fit, deadline, geography and eligibility checks."}
+};
 const statusOptions=["Open","Upcoming","Closed","Under review","Application in progress","Submitted","Awarded","Not pursuing"];
 const styles={
  page:{color:"var(--text-primary, #e8edf5)",display:"grid",gap:18},
@@ -395,7 +427,19 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    </div>
    <div style={styles.muted}>Last scan started: {dateLabel(crawlerStatus?.lastStartedAt)} · Last completed: {dateLabel(crawlerStatus?.lastCompletedAt)} · Cadence: every 6 hours (Tanzania time)</div>
    <details><summary style={{cursor:"pointer",fontSize:13,fontWeight:700}}>Source health and crawl results ({crawlerSources.length})</summary><div style={{display:"grid",gap:7,marginTop:10}}>{crawlerSources.map(source=><div key={source.id} style={{borderTop:"1px solid #344255",paddingTop:8,display:"flex",justifyContent:"space-between",gap:10,alignItems:"start"}}><div><strong style={{fontSize:13}}>{source.name||source.id}</strong><div style={styles.muted}>{source.url}</div>{source.error&&<div style={{fontSize:12,color:"#ffb8b8"}}>{source.error}</div>}</div><div style={{textAlign:"right",minWidth:100,fontSize:12}}><strong>{source.status||"Not checked"}</strong><div style={styles.muted}>{source.candidateCount??0} candidates</div></div></div>)}</div></details>
-   <details open><summary style={{cursor:"pointer",fontSize:13,fontWeight:800}}>Parallel scanning engines ({crawlerEngines.length})</summary><div style={{display:"grid",gap:7,marginTop:10}}>{crawlerEngines.map(engine=><div key={engine.engine} style={{borderTop:"1px solid #344255",paddingTop:8,display:"grid",gridTemplateColumns:"minmax(140px,1fr) auto",gap:10,alignItems:"start"}}><div><strong style={{fontSize:13}}>{{rss_atom:"RSS / Atom feeds",official_pages:"General official-page scanner",web_search:"Web-search discovery",japan_embassy:"Japan Embassy Grassroots Grants",canada_funding:"Canada International Funding Calls",usadf_grants:"U.S. African Development Foundation",un_tanzania:"United Nations Tanzania Calls",undp_tanzania:"UNDP Tanzania Opportunities",gef_small_grants:"GEF Small Grants Programme",fao_funding:"FAO Funding Opportunities",eu_tanzania:"EU Delegation Tanzania",tanzania_forest_fund:"Tanzania Forest Fund",world_bank_funding:"World Bank Funding Opportunities"}[engine.engine]||engine.engine}</strong><div style={styles.muted}>Last checked: {dateLabel(engine.finished_at)}</div>{engine.error_message&&<div style={{fontSize:12,color:"#ffcf88"}}>{engine.error_message}</div>}</div><div style={{textAlign:"right",fontSize:12}}><strong style={{color:engine.status==="success"?"#8de0b7":"#ffb8b8"}}>{engine.status==="success"?"Completed":"Failed"}</strong><div style={styles.muted}>{engine.configured} configured · {engine.items_seen} found</div></div></div>)}</div></details>
+   <details><summary style={{cursor:"pointer",fontSize:14,fontWeight:800}}>Engine provision and scan status (3 engines · click to open)</summary>
+    <p style={styles.muted}>All engines feed one shared opportunity register. Discovered calls use the same deduplication, deadline checks, geography checks, IRPA strategic-fit scoring and eligibility triage. AI analysis is supplementary and cannot override deterministic exclusions.</p>
+    <div style={{display:"grid",gap:8,marginTop:10}}>{["rss_atom","official_pages","web_search"].map(engineKey=>{const engine=crawlerEngines.find(item=>item.engine===engineKey);const info=ENGINE_INFO[engineKey];const configured=engine?.configured;const found=engine?.items_seen??engine?.found;return <details key={engineKey} style={{border:"1px solid #344255",borderRadius:10,padding:11}}>
+     <summary style={{cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,fontSize:13,fontWeight:750}}><span>{info.title}</span><span style={{fontSize:11,color:!engine?"#aab6c5":engine.status==="success"?"#8de0b7":"#ffb8b8"}}>{!engine?"No run recorded":engine.status==="success"?"Completed":"Failed"} · {configured??"—"} sources</span></summary>
+     <div style={{display:"grid",gap:8,marginTop:10}}>
+      <div style={styles.muted}>{info.description}</div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:7}}><span style={styles.tag}>Configured: {configured??"not reported"}</span><span style={styles.tag}>Found: {found??"not reported"}</span><span style={styles.tag}>Last run: {dateLabel(engine?.finished_at)}</span></div>
+      {engine?.error_message&&<div style={{fontSize:12,color:"#ffcf88"}}>Reported issue: {engine.error_message}</div>}
+      <div><strong style={{fontSize:12}}>Sources / provider</strong><ul style={{margin:"5px 0 0",paddingLeft:20}}>{info.sources.map(source=><li key={source} style={{fontSize:12,marginBottom:3}}>{source}</li>)}</ul></div>
+      <div style={{...styles.muted,borderLeft:"2px solid #50727b",paddingLeft:9}}>{info.limits}</div>
+     </div>
+    </details>})}</div>
+   </details>
    <div style={{...styles.muted,borderLeft:"3px solid #b78b3d",padding:"8px 12px"}}><strong>Coverage limitation:</strong> source websites can change, block automated requests or publish calls outside feeds. The crawler records source failures, uses public endpoints only, and does not bypass access controls or submit applications. Official-call verification and IRPA eligibility screening remain necessary.</div>
   </section>
   {notice&&<div role="status" style={{...styles.card,borderColor:"#32846d",color:"#8de0b7"}}>{notice}</div>}
@@ -540,8 +584,14 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    </article>)}
   </section>
   <section style={styles.card}>
-   <h2 style={{fontSize:18,marginTop:0}}>Official funding-source directory</h2><p style={styles.muted}>Open the source to verify the current call, eligible applicants, deadlines and original application documents. Source pages are not proof that a call is currently open.</p>
-   <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:9}}>{SOURCES.map(s=><a key={s.name} href={s.url} target="_blank" rel="noreferrer" style={{border:"1px solid #425064",borderRadius:9,padding:12,color:"var(--text-primary, #e8edf5)",textDecoration:"none",fontSize:13,fontWeight:650}}>{s.name} ↗</a>)}</div>
+   <details><summary style={{cursor:"pointer",fontSize:17,fontWeight:800}}>Funding resource directory ({SOURCES.length} resources · click to expand)</summary>
+    <p style={{...styles.muted,marginTop:9}}>Indicative discovery directory spanning African NGOs, foundations, UN and multilateral agencies, regional institutions, embassies and climate/conservation funders. The directory stays collapsed to preserve dashboard space. Click a source to open its original website and verify the actual call, deadline, geography and applicant requirements.</p>
+    {Array.from(new Set(SOURCES.map(source=>source.category))).map(category=><div key={category} style={{marginTop:14}}>
+     <h3 style={{fontSize:13,margin:"0 0 7px",color:"var(--text-secondary, #aab6c5)"}}>{category}</h3>
+     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(230px,1fr))",gap:7}}>{SOURCES.filter(source=>source.category===category).map(source=><a key={source.name} href={source.url} target="_blank" rel="noreferrer" style={{border:"1px solid #425064",borderRadius:8,padding:"10px 11px",color:"var(--text-primary, #e8edf5)",textDecoration:"none",fontSize:12,fontWeight:650,display:"flex",justifyContent:"space-between",gap:8}}><span>{source.name}</span><span aria-hidden="true">↗</span></a>)}</div>
+    </div>)}
+    <p style={styles.muted}>Directory entries are discovery resources, not a claim that each organisation has an open call or that IRPA is eligible. The crawler and AI-assisted review must check each individual opportunity against the same IRPA criteria.</p>
+   </details>
   </section>
   <div style={{...styles.muted,borderLeft:"3px solid #b78b3d",padding:"8px 12px"}}><strong>Live-data status:</strong> manually registered opportunities continue to come from the IRPA register; crawler-discovered records are retrieved from the isolated Cloudflare D1 crawler. Crawler leads are marked pending verification and do not establish legal eligibility or donor approval.</div>
  </div>;
