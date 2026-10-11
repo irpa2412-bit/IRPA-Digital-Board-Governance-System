@@ -2,7 +2,7 @@ const { chromium } = require("playwright");
 const fs=require("node:fs"),path=require("node:path");
 const target=process.env.TARGET_URL||"https://irpa-digital-board-governance.web.app";
 const out=path.resolve("hero-layout-evidence");fs.mkdirSync(out,{recursive:true});
-const report={target,testedAt:new Date().toISOString(),cache:{},authentication:{attempted:false,used:false},mode:"",viewports:[],interactions:{},consoleErrors:[],pageErrors:[]};
+const report={target,testedAt:new Date().toISOString(),cache:{expectedSourceCacheVersion:"20261011-hero-weather-landscape-18"},authentication:{attempted:false,used:false},mode:"",viewports:[],interactions:{},consoleErrors:[],pageErrors:[]};
 (async()=>{const browser=await chromium.launch({headless:true,args:["--no-sandbox"]});try{
  const page=await browser.newPage({viewport:{width:1366,height:768},deviceScaleFactor:1});
  page.on("console",m=>{if(m.type()==="error")report.consoleErrors.push({text:m.text(),location:m.location()})});
