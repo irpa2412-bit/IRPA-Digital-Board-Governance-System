@@ -13,6 +13,54 @@ async function main() {
   if (crawlResult.status !== "success") throw new Error("Crawler failed: " + String(crawlResult.error || crawlResult.status || "unknown error"));
   if (!Number(crawlResult.feedsConfigured)) throw new Error("No official feeds are configured.");
 
+  const expectedScanners = [
+    "japan_embassy", "canada_funding", "usadf_grants", "un_tanzania",
+    "undp_tanzania", "gef_small_grants", "fao_funding", "eu_tanzania",
+    "tanzania_forest_fund", "world_bank_funding"
+  ];
+  const scanners = Array.isArray(crawlResult.additionalScanners) ? crawlResult.additionalScanners : [];
+  const scannerReport = {
+    expected: expectedScanners.length,
+    configured: crawlResult.additionalScannersConfigured ?? 0,
+    actualEntries: scanners.length,
+    engines: scanners.map(scanner => ({
+      engine: scanner.engine,
+      status: scanner.status,
+      configured: scanner.configured,
+      pagesScanned: scanner.pagesScanned,
+      httpStatus: scanner.httpStatus,
+      primaryHttpStatus: scanner.primaryHttpStatus,
+      primarySourceError: scanner.primarySourceError,
+      fallbackProvider: scanner.fallbackProvider,
+      found: scanner.found,
+      candidatesAfterDeduplication: scanner.candidatesAfterDeduplication,
+      sharedRegisterWrites: scanner.sharedRegisterWrites,
+      errors: scanner.errors || scanner.error || null
+    }))
+  };
+  // Print the actual per-engine run evidence before applying the acceptance gate.
+  console.log("DONOR_SCANNER_LIVE_EVIDENCE " + JSON.stringify(scannerReport));
+  const observedNames = new Set(scanners.map(scanner => scanner.engine));
+  const missing = expectedScanners.filter(name => !observedNames.has(name));
+  if (Number(crawlResult.additionalScannersConfigured) !== expectedScanners.length ||
+      scanners.length !== expectedScanners.length || missing.length) {
+    throw new Error("Donor scanner acceptance failed: expected all 10 scanner runs; missing: " + (missing.join(", ") || "count mismatch"));
+  }
+  const failed = scanners.filter(scanner =>
+    scanner.configured !== 1 ||
+    !Number(scanner.pagesScanned) ||
+    scanner.status !== "success" ||
+    scanner.httpStatus !== 200
+  );
+  if (failed.length) {
+    throw new Error("Donor scanner live-fetch acceptance failed: " + failed.map(scanner =>
+      scanner.engine + " status=" + scanner.status +
+      " pagesScanned=" + scanner.pagesScanned +
+      " httpStatus=" + scanner.httpStatus +
+      " error=" + JSON.stringify(scanner.errors || scanner.error || null)
+    ).join(" | "));
+  }
+
   const headers = {
     Authorization: "Bearer " + token,
     "Content-Type": "application/json",
@@ -95,6 +143,8 @@ async function main() {
     crawlerStatus: crawlResult.status,
     feedsConfigured: crawlResult.feedsConfigured,
     sourcePagesConfigured: crawlResult.sourcePagesConfigured,
+    additionalScannersConfigured: crawlResult.additionalScannersConfigured,
+    additionalScanners: crawlResult.additionalScanners,
     webSearchConfigured: crawlResult.webSearchConfigured,
     engines: crawlResult.engines,
     irpaFitMatches: crawlResult.irpaFitMatches,
@@ -125,6 +175,8 @@ main().catch(error => {
       itemsSeen: crawl.itemsSeen ?? null,
       recordsChanged: crawl.recordsChanged ?? null,
       engines: crawl.engines || [],
+      additionalScannersConfigured: crawl.additionalScannersConfigured ?? 0,
+      additionalScanners: crawl.additionalScanners || [],
       irpaFitMatches: crawl.irpaFitMatches || null,
       topMatches: crawl.topMatches || [],
       aiEligibilitySmokeTest: "skipped_quota_exhausted",

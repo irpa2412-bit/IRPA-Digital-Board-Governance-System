@@ -64,7 +64,7 @@ async function fetchHtml(url) {
   if (new URL(finalUrl).hostname !== new URL(url).hostname) throw new Error("Cross-host page redirects are not permitted.");
   if (!/html|xhtml|text\/plain/i.test(response.headers.get("content-type") || "")) throw new Error("Source did not return HTML.");
   const html = await response.text(); if (html.length > MAX_PAGE_BYTES) throw new Error("Page exceeds the 1 MB response limit.");
-  return { html, finalUrl };
+  return { html, finalUrl, status: response.status };
 }
 export function parseOfficialPage(html, pageUrl) {
   const title = htmlTitle(html) || metaContent(html, "og:title");
@@ -117,6 +117,131 @@ export async function readOfficialPages(env) {
   }));
   const items = results.filter(Boolean);
   return { items, stats: { configured: urls.length, scanned: urls.length, detailPagesScanned: selected.length, found: items.length, errors: errors.slice(0, 20) } };
+}
+
+export const DONOR_SCANNERS = [
+  { name: "japan_embassy", label: "Japan Embassy Grassroots Grants", url: "https://www.tz.emb-japan.go.jp/e_bilateral/kusanone_en.htm" },
+  { name: "canada_funding", label: "Canada International Funding Calls", url: "https://www.international.gc.ca/world-monde/funding-financement/open_calls-appels_ouverts.aspx?lang=eng" },
+  { name: "usadf_grants", label: "U.S. African Development Foundation", url: "https://www.usadf.gov/apply/" },
+  { name: "un_tanzania", label: "United Nations Tanzania Calls", url: "https://tanzania.un.org/en" },
+  { name: "undp_tanzania", label: "UNDP Tanzania Opportunities", url: "https://www.undp.org/tanzania/news-centre" },
+  { name: "gef_small_grants", label: "GEF Small Grants Programme", url: "https://www.thegef.org/what-we-do/topics/gef-small-grants-programme" },
+  { name: "fao_funding", label: "FAO Funding Opportunities", url: "https://fao-grants.smapply.io/" },
+  { name: "eu_tanzania", label: "EU Delegation Tanzania", url: "https://www.eeas.europa.eu/tanzania_en" },
+  { name: "tanzania_forest_fund", label: "Tanzania Forest Fund", url: "https://www.mfukowamisitu.go.tz/download-center" },
+  { name: "world_bank_funding", label: "World Bank Funding Opportunities", url: "https://projects.worldbank.org/en/projects-operations/opportunities" },
+];
+
+export async function readDonorScanner(scanner) {
+  const errors = [];
+  let httpStatus = null;
+  let pagesScanned = 0;
+  let sourceUrl = scanner.url;
+  try {
+    sourceUrl = normalizeOpportunityUrl(scanner.url);
+    const source = await fetchHtml(sourceUrl);
+    pagesScanned = 1;
+    httpStatus = source.status ?? 200;
+    sourceUrl = source.finalUrl;
+    const sourceHost = new URL(source.finalUrl).hostname;
+    const anchors = getAnchors(source.html, source.finalUrl)
+      .filter(anchor => new URL(anchor.url).hostname === sourceHost)
+      .slice(0, 20);
+    const items = [];
+    // Keep this engine to one network request per donor per crawl. Link text and
+    // surrounding source-page text are indexed as leads; do not fan out into
+    // detail-page requests that can exhaust the Cloudflare subrequest budget.
+    const self = parseOfficialPage(source.html, source.finalUrl);
+    if (isSpecificOpportunity(self.title, self.description)) {
+      items.push({ ...self, sourceUrl, discoveryEngine: scanner.name });
+    }
+    for (const anchor of anchors) {
+      const title = String(anchor.label || "").trim().slice(0, 500);
+      const description = String(anchor.context || "").trim().slice(0, 5000);
+      if (!title || !isSpecificOpportunity(title, description)) continue;
+      items.push({
+        title,
+        description,
+        url: anchor.url,
+        publishedAt: null,
+        sourceUrl,
+        discoveryEngine: scanner.name,
+        eligibilityEvidence: "source-page link only; detail page not yet verified",
+      });
+    }
+    const unique = [...new Map(items.map(item => [item.url, item])).values()];
+    return {
+      items: unique,
+      stats: {
+        configured: 1,
+        scanned: pagesScanned,
+        pagesScanned,
+        httpStatus,
+        detailPagesScanned: 0,
+        found: unique.length,
+        errors,
+      },
+    };
+  } catch (error) {
+    const primarySourceError = String(error.message || error).slice(0, 180);
+    const statusMatch = primarySourceError.match(/HTTP (\d{3})/);
+    const primaryHttpStatus = statusMatch ? Number(statusMatch[1]) : null;
+    // Some official donor sites reject automated Worker requests (403) or move
+    // their landing pages (404). Fall back to a live Bing RSS query, explicitly
+    // retaining the primary failure in telemetry instead of masking it.
+    try {
+      const query = scanner.label + " grant funding opportunity Tanzania Africa";
+      const searchUrl = new URL("https://www.bing.com/search");
+      searchUrl.searchParams.set("format", "rss");
+      searchUrl.searchParams.set("q", query);
+      const response = await fetch(searchUrl.href, {
+        headers: { accept: "application/rss+xml, application/xml, text/xml", "user-agent": USER_AGENT },
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (!response.ok) throw new Error("Bing RSS fallback HTTP " + response.status);
+      const xml = await response.text();
+      if (xml.length > MAX_PAGE_BYTES) throw new Error("Bing RSS fallback response exceeds the 1 MB limit.");
+      const items = parseSearchRss(xml, query, "Bing RSS").map(item => ({
+        ...item,
+        discoveryEngine: scanner.name,
+        primarySourceUrl: scanner.url,
+        fallbackProvider: "Bing RSS",
+      }));
+      return {
+        items,
+        stats: {
+          configured: 1,
+          scanned: 1,
+          pagesScanned: 1,
+          httpStatus: response.status,
+          primaryHttpStatus,
+          primarySourceError,
+          fallbackProvider: "Bing RSS",
+          detailPagesScanned: 0,
+          found: items.length,
+          errors: [],
+        },
+      };
+    } catch (fallbackError) {
+      errors.push({ sourceUrl, error: primarySourceError });
+      errors.push({ sourceUrl: "https://www.bing.com/search?format=rss", error: String(fallbackError.message || fallbackError).slice(0, 180) });
+      return {
+        items: [],
+        stats: {
+          configured: 1,
+          scanned: pagesScanned,
+          pagesScanned,
+          httpStatus: primaryHttpStatus,
+          primaryHttpStatus,
+          primarySourceError,
+          fallbackProvider: "Bing RSS",
+          detailPagesScanned: 0,
+          found: 0,
+          errors,
+        },
+      };
+    }
+  }
 }
 
 const SEARCH_QUERIES = ['"grant call" Tanzania NGO climate pastoral livestock rangeland','"call for proposals" Africa NGO environment biodiversity restoration','embassy small grants Tanzania NGO community development'];
