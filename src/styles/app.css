@@ -8430,3 +8430,48 @@ html body #root .main-area > .topbar .topbar-heading-row > .google-weather-panel
   color: #2563eb !important;
   -webkit-text-fill-color: #2563eb !important;
 }
+
+
+/* 2026-10-11 correction: dimensions swapped as requested.
+   Weather Forecast: 4 cm wide × 10 cm high.
+   Authorized User – Access Category: 4 cm wide × 6 cm high. */
+@media (min-width: 1101px) {
+  html body #root .main-area > .topbar .topbar-heading-row {
+    grid-template-columns: minmax(140px, 1fr) 4cm 4cm;
+    grid-template-areas: "title authority weather";
+    align-items: start;
+    gap: 10px;
+  }
+  html body #root .main-area > .topbar .topbar-heading-row > .topbar-access-category {
+    grid-area: authority;
+    width: 4cm;
+    min-width: 4cm;
+    max-width: 4cm;
+    height: 6cm;
+    min-height: 6cm;
+    max-height: 6cm;
+    box-sizing: border-box;
+    overflow-x: auto;
+    overflow-y: auto;
+  }
+  html body #root .main-area > .topbar .topbar-heading-row > .google-weather-panel {
+    grid-area: weather;
+    width: 4cm;
+    min-width: 4cm;
+    max-width: 4cm;
+    height: 10cm;
+    min-height: 10cm;
+    max-height: 10cm;
+    box-sizing: border-box;
+    overflow-x: auto;
+    overflow-y: auto;
+  }
+  html body #root .main-area > .topbar .topbar-heading-row > .google-weather-panel .live-weather-content {
+    height: 100%;
+    min-height: 0;
+    max-height: 100%;
+    box-sizing: border-box;
+    overflow-x: auto;
+    overflow-y: auto;
+  }
+}
