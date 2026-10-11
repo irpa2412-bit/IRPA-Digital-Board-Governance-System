@@ -3263,10 +3263,12 @@ textarea:focus-visible{
     margin:0!important;
     padding:14px!important;
     box-sizing:border-box!important;
-    background:#082d4b!important;
-    border:2px solid #d6a52c!important;
+    background:#111312!important;
+    border:1px solid #343735!important;
     border-radius:12px!important;
-    color:#edf5f1!important;
+    color:#f5f5f5!important;
+    -webkit-text-fill-color:#f5f5f5!important;
+    box-shadow:0 8px 22px rgba(0,0,0,.22)!important;
     z-index:3!important;
   }
   .app-shell .main-area>.topbar .topbar-access-category *{
@@ -3275,10 +3277,21 @@ textarea:focus-visible{
   }
   .app-shell .main-area>.topbar .topbar-access-category>span,
   .app-shell .main-area>.topbar .topbar-access-category .login-category-heading,
-  .app-shell .main-area>.topbar .topbar-access-category .login-category-note{
+  .app-shell .main-area>.topbar .topbar-access-category .login-category-note,
+  .app-shell .main-area>.topbar .topbar-access-category .login-category-explanation,
+  .app-shell .main-area>.topbar .topbar-access-category .login-category-identifiers strong{
     display:block!important;
-    color:#edf5f1!important;
+    color:#f5f5f5!important;
+    -webkit-text-fill-color:#f5f5f5!important;
     white-space:normal!important;
+  }
+  .app-shell .main-area>.topbar .topbar-access-category .login-category-identifiers{
+    border-top-color:rgba(245,245,245,.18)!important;
+  }
+  .app-shell .main-area>.topbar .topbar-access-category .login-category-identifiers small,
+  .app-shell .main-area>.topbar .topbar-access-category .login-category-empty{
+    color:#d1d5db!important;
+    -webkit-text-fill-color:#d1d5db!important;
   }
   .app-shell .main-area>.topbar .topbar-access-category .login-category-list{
     display:flex!important;
@@ -3288,9 +3301,10 @@ textarea:focus-visible{
   }
   .app-shell .main-area>.topbar .topbar-access-category .login-category-pill{
     display:inline-flex!important;
-    color:#f3d36a!important;
-    background:#082d4b!important;
-    border:1px solid #d6a52c!important;
+    color:#f5f5f5!important;
+    -webkit-text-fill-color:#f5f5f5!important;
+    background:transparent!important;
+    border:1px solid #e5e7eb!important;
   }
   .app-shell .main-area>.topbar .mobile-access-live-date{
     display:flex!important;
