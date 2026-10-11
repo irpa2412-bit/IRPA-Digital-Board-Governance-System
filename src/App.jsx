@@ -7,13 +7,15 @@ function isRegisteredSubPortal(module){return PORTAL_ROLLER_GROUPS.some(([,child
 function portalNavigationLabel(module){const label=PORTAL_LABELS[module]||displayModuleName(module);if(isRegisteredSubPortal(module))return "SUB-PORTAL · "+label;const group=getPortalGroupForModule(module);return group?"PARENT PORTAL · "+label:label;}
 function getPortalContentItems(active,modules){const group=getPortalGroupForModule(active);if(group){const [parent,children]=group;return [parent,...sortNavigationItems(children)].filter(item=>modules.includes(item));}return modules.includes(active)?[active]:[];}
 function getPageNavigationItems(active,modules){
-  // NEXT/BACK are the whole-web-app navigator: never constrain them to a portal subgroup.
-  return sortNavigationItems(modules);
+  // The whole-web-app Back/Next navigator lists parent portals only; sub-portals stay in in-portal navigation.
+  return sortNavigationItems(modules.filter(module=>!PORTAL_CHILDREN_SET.has(module)));
 }
 function PageBackNextNavigation({active,modules,onNavigate}){
   const items=getPageNavigationItems(active,modules);
   if(!items.length)return null;
-  const index=Math.max(0,items.indexOf(active));
+  const activeGroup=getPortalGroupForModule(active);
+  const navigationActive=items.includes(active)?active:(activeGroup&&items.includes(activeGroup[0])?activeGroup[0]:active);
+  const index=Math.max(0,items.indexOf(navigationActive));
   const previous=index>0?items[index-1]:null;
   const next=index<items.length-1?items[index+1]:null;
   const label=PORTAL_LABELS[active]||displayModuleName(active);
