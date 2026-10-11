@@ -8246,10 +8246,7 @@ html body #root .main-area > .topbar .topbar-heading-row > .topbar-access-catego
   padding: 6px 0 8px;
   box-sizing: border-box;
   -webkit-overflow-scrolling: touch;}
-.main-area > .topbar.dashboard-topbar .google-weather-panel .live-weather-days > * {
-  flex: 0 0 auto;
-  min-width: 92px;
-}
+.main-area > .topbar.dashboard-topbar .google-weather-panel .live-weather-days > * {}
 @media (min-width: 901px) {
   .main-area > .topbar.dashboard-topbar {
     height: auto;
@@ -8471,8 +8468,6 @@ html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-ro
 .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-content,
 .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-location-bar,
 .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-current,
-.main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-current-main,
-.main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-metrics,
 .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-days,
 .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-attribution {
   width: 100%;
@@ -8500,7 +8495,15 @@ html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-ro
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "title" "weather" "authority";
   }
-  .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-days {
+ .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-current-main,
+.main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-metrics {
+  width: auto;
+  max-width: none;
+  min-width: 0;
+  flex: 1 1 220px;
+  box-sizing: border-box;
+}
+ .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-days {
     overflow-x: auto;
   }
 }
