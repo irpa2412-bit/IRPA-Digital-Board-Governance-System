@@ -51,7 +51,16 @@ const SOURCES=[
  {name:"Adaptation Fund",category:"Climate, land and conservation",url:"https://www.adaptation-fund.org/"},
  {name:"Global Environment Facility",category:"Climate, land and conservation",url:"https://www.thegef.org/"},
  {name:"AfricanNGOs October–November 2026 opportunity roundup",category:"Current opportunity roundups",url:"https://africanngos.org/2026/10/06/african-ngo-funding-opportunities-october-november-2026/"},
- {name:"NGO Portal Africa — funding listings",category:"Current opportunity roundups",url:"https://jobs.ngoportal.africa/grants-funding/"}
+ {name:"NGO Portal Africa — funding listings",category:"Current opportunity roundups",url:"https://jobs.ngoportal.africa/grants-funding/"},
+ {name:"Africa Climate Change Fund — call portal",category:"African climate and resilience funding",url:"https://accf.afdb.org/"},
+ {name:"Global EbA Fund — small-size grant calls",category:"African climate and resilience funding",url:"https://globalebafund.org/small-size-grants/"},
+ {name:"Climate Justice Resilience Fund — grants and East Africa",category:"African climate and resilience funding",url:"https://cjrfund.org/our-grants/"},
+ {name:"Whitley Fund for Nature — conservation funding applications",category:"Conservation and biodiversity funding",url:"https://whitleyaward.org/apply-for-conservation-funding/"},
+ {name:"Critical Ecosystem Partnership Fund — grant opportunities",category:"Conservation and biodiversity funding",url:"https://www.cepf.net/grants"},
+ {name:"Segal Family Foundation — grantmaking information (referral-based)",category:"African foundations and civil society",url:"https://www.segalfamilyfoundation.org/what-we-do/invest/grantmaking/"},
+ {name:"Africa No Filter — grants and eligibility information",category:"African foundations and civil society",url:"https://africanofilter.org/what-we-do/community/faqs/"},
+ {name:"The Pollination Project — grant application information",category:"International foundations and programmes",url:"https://thepollinationproject.org/apply/"},
+ {name:"Africa Climate Change Fund — official information",category:"African and regional institutions",url:"https://www.afdb.org/en/topics-and-sectors/initiatives-partnerships/africa-climate-change-fund"},
 ];
 
 const statusOptions=["Open","Upcoming","Closed","Under review","Application in progress","Submitted","Awarded","Not pursuing"];
@@ -425,35 +434,6 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    </div>
    <div style={styles.muted}>Last scan started: {dateLabel(crawlerStatus?.lastStartedAt)} · Last completed: {dateLabel(crawlerStatus?.lastCompletedAt)} · Cadence: every 6 hours (Tanzania time)</div>
    <details><summary style={{cursor:"pointer",fontSize:13,fontWeight:700}}>Source health and crawl results ({crawlerSources.length})</summary><div style={{display:"grid",gap:7,marginTop:10}}>{crawlerSources.map(source=><div key={source.id} style={{borderTop:"1px solid #344255",paddingTop:8,display:"flex",justifyContent:"space-between",gap:10,alignItems:"start"}}><div><strong style={{fontSize:13}}>{source.name||source.id}</strong><div style={styles.muted}>{source.url}</div>{source.error&&<div style={{fontSize:12,color:"#ffb8b8"}}>{source.error}</div>}</div><div style={{textAlign:"right",minWidth:100,fontSize:12}}><strong>{source.status||"Not checked"}</strong><div style={styles.muted}>{source.candidateCount??0} candidates</div></div></div>)}</div></details>
-   <details>
-    <summary style={{cursor:"pointer",fontSize:14,fontWeight:800}}>Engine provision panel — source registry ({crawlerProvision.length} engines)</summary>
-    <div style={{...styles.muted,marginTop:8}}>Select an engine to inspect its technical function, configured sources, search queries and latest run result. All engines feed the same deduplicated opportunity register and common IRPA screening formula.</div>
-    <div style={{display:"grid",gap:8,marginTop:10}}>
-     {crawlerProvision.map(provision=>{
-      const run=crawlerEngines.find(item=>item.engine===provision.engine);
-      const status=run?.status||"not_run";
-      const statusLabel=status==="success"?"Completed":status==="partial"?"Partial":status==="failed"?"Failed":provision.provisionStatus==="configured"?"Provisioned":"Not run";
-      const statusColor=status==="success"?"#8de0b7":status==="partial"?"#ffcf88":status==="failed"?"#ffb8b8":provision.provisionStatus==="configured"?"#8bd3e6":"#aab6c5";
-      return <details key={provision.engine} style={{border:"1px solid #344255",borderRadius:10,padding:"9px 11px",background:"rgba(255,255,255,0.015)"}}>
-       <summary style={{cursor:"pointer",display:"flex",justifyContent:"space-between",gap:10,alignItems:"center",flexWrap:"wrap"}}>
-        <strong style={{fontSize:13}}>{provision.label||provision.engine}</strong>
-        <span style={{fontSize:11,color:statusColor,fontWeight:800}}>{statusLabel} · {run?(run.items_seen??run.found??0)+" found":provision.engine==="ai_eligibility"?"AI tool":"Awaiting scan"}</span>
-       </summary>
-       <div style={{display:"grid",gap:8,marginTop:10}}>
-        <div style={styles.muted}>{provision.description||"Parallel funding-opportunity discovery engine."}</div>
-        <div style={{fontSize:12}}>Configured sources: <strong>{provision.configured??(provision.sources||[]).length}</strong>{run?.finished_at&&<> · Last run: <strong>{dateLabel(run.finished_at)}</strong></>}</div>
-        {run?.error_message&&<div style={{fontSize:12,color:"#ffcf88"}}>Source report: {run.error_message}</div>}
-        {!!(provision.sources||[]).length&&<div><strong style={{fontSize:12}}>Source endpoints</strong><div style={{display:"grid",gap:5,marginTop:5}}>{provision.sources.map((source,index)=>{
-          const url=typeof source==="string"?source:source.url;
-          const label=typeof source==="string"?source:(source.label||source.name||source.url);
-          return <div key={url||label||index} style={{fontSize:12,overflowWrap:"anywhere"}}>{url&&/^https:\/\//i.test(url)?<a href={url} target="_blank" rel="noreferrer" style={{color:"#8bd3e6",textDecoration:"underline"}}>{label}</a>:<span>{label}</span>}</div>;
-        })}</div></div>}
-        {!!(provision.queries||[]).length&&<div><strong style={{fontSize:12}}>Parallel search queries</strong><ul style={{margin:"5px 0 0",paddingLeft:20}}>{provision.queries.map(query=><li key={query} style={{fontSize:12,marginBottom:3}}>{query}</li>)}</ul></div>}
-       </div>
-      </details>;
-     })}
-    </div>
-   </details>
    <details><summary style={{cursor:"pointer",fontSize:13,fontWeight:800}}>Parallel scanning engine health ({crawlerEngines.length})</summary><div style={{display:"grid",gap:7,marginTop:10}}>{crawlerEngines.map(engine=><div key={engine.engine} style={{borderTop:"1px solid #344255",paddingTop:8,display:"grid",gridTemplateColumns:"minmax(140px,1fr) auto",gap:10,alignItems:"start"}}><div><strong style={{fontSize:13}}>{(crawlerProvision.find(item=>item.engine===engine.engine)||{}).label||engine.engine}</strong><div style={styles.muted}>Last checked: {dateLabel(engine.finished_at)}</div>{engine.error_message&&<div style={{fontSize:12,color:"#ffcf88"}}>{engine.error_message}</div>}</div><div style={{textAlign:"right",fontSize:12}}><strong style={{color:engine.status==="success"?"#8de0b7":engine.status==="partial"?"#ffcf88":"#ffb8b8"}}>{engine.status==="success"?"Completed":engine.status==="partial"?"Partial":"Failed"}</strong><div style={styles.muted}>{engine.configured} configured · {engine.items_seen} found</div></div></div>)}</div></details>
    <details>
     <summary style={{cursor:"pointer",fontSize:14,fontWeight:800}}>Engine provision panel — funding resources ({crawlerProvision.length} engines)</summary>
