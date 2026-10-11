@@ -34,6 +34,8 @@ Run the IRPA Grant Crawler — Isolated Staging workflow manually after its pull
 - `POST /crawl`: requires `Authorization: Bearer <CRAWLER_CONTROL_TOKEN>`.
 - Scheduled scan: every six hours in the staging environment; with no feed URLs configured, it safely scans zero feeds.
 
+The production frontend build workflows set `VITE_GRANT_CRAWLER_WORKER_URL` to `https://irpa-grant-crawler-production.irpa-governance.workers.dev` (or an explicit repository secret override), while staging remains isolated on the staging Worker.
+
 ## Grant application and concept-note workspace
 
 The primary user experience is the existing IRPA-DBGS **Grant Intelligence & Funding Opportunities** portal. Its integrated concept-note workspace selects an opportunity from the existing register, screens eligibility, generates/edits a draft, and lets the user download a text version for filing through the DBGS Documents module. It provides navigation to the existing Finance Portfolio, Authorization & Approvals and Meetings modules; saving a draft does not itself submit or approve it.
