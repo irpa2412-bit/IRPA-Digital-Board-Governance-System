@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import worker, { assessFit, isCurrentOpportunity, parseFeed, safeUrl } from "../src/index.js";
 import { assessGeographicEligibility } from "../src/assistant.js";
-import { decodeHtml, normalizeOpportunityUrl, parseOfficialPage, parseSearchRss, readOfficialPages, readWebSearch } from "../src/discovery-engines.js";
+import { DONOR_SCANNERS, decodeHtml, normalizeOpportunityUrl, parseOfficialPage, parseSearchRss, readDonorScanner, readOfficialPages, readWebSearch } from "../src/discovery-engines.js";
 
 test("accepts only credential-free HTTPS feed URLs", () => {
   assert.equal(safeUrl("https://example.org/feed.xml").hostname, "example.org");
@@ -614,6 +614,36 @@ test("official webpage parser extracts safe title and description text", () => {
   assert.doesNotMatch(item.description, /secret\(\)/);
   assert.equal(item.url, "https://donor.example/grants");
   assert.equal(decodeHtml("Women &amp; youth"), "Women & youth");
+});
+
+test("registers ten independent donor scanners with official HTTPS sources", () => {
+  assert.equal(DONOR_SCANNERS.length, 10);
+  assert.equal(new Set(DONOR_SCANNERS.map(scanner => scanner.name)).size, 10);
+  for (const scanner of DONOR_SCANNERS) {
+    assert.equal(new URL(scanner.url).protocol, "https:");
+    assert.ok(scanner.label.length > 3);
+  }
+});
+
+test("donor scanner returns opportunities in the shared candidate shape", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async input => {
+    const url = String(input);
+    const html = url.includes("example.org/grants")
+      ? '<html><head><title>Call for Proposals: Pastoral Resilience Grant</title><meta name="description" content="Funding opportunity for community rangeland restoration in Tanzania. Applications close 30 December 2026."></head><body>Funding opportunity for community rangeland restoration in Tanzania. Applications close 30 December 2026.</body></html>'
+      : '<html><head><title>Call for Proposals: Pastoral Resilience Grant</title><meta name="description" content="Funding opportunity for community rangeland restoration in Tanzania. Applications close 30 December 2026."></head><body>Funding opportunity for community rangeland restoration in Tanzania. Applications close 30 December 2026.</body></html>';
+    return new Response(html, { status: 200, headers: { "content-type": "text/html" } });
+  };
+  try {
+    const result = await readDonorScanner({ name: "test_donor", label: "Test Donor", url: "https://example.org/grants" });
+    assert.equal(result.stats.configured, 1);
+    assert.ok(result.items.length >= 1);
+    assert.equal(result.items[0].discoveryEngine, "test_donor");
+    assert.equal(result.items[0].sourceUrl, "https://example.org/grants");
+    assert.match(result.items[0].title, /Call for Proposals/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("web search RSS parser extracts grant announcements and rejects unsafe links", () => {
