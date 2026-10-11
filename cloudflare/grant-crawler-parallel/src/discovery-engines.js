@@ -75,23 +75,27 @@ export function parseOfficialPage(html, pageUrl) {
   return { title: title.slice(0, 500), description: (description + (description && text ? " " : "") + text).slice(0, 5000), url: normalizeOpportunityUrl(pageUrl), publishedAt: null, sourceUrl: normalizeOpportunityUrl(pageUrl) };
 }
 export async function readOfficialPages(env) {
-  const urls = configuredUrls(env.GRANT_SOURCE_PAGE_URLS_JSON || env.GRANT_SOURCE_PAGE_URLS, "GRANT_SOURCE_PAGE_URLS", MAX_SOURCE_PAGES);
+  const urls = [...new Set(configuredUrls(env.GRANT_SOURCE_PAGE_URLS_JSON || env.GRANT_SOURCE_PAGE_URLS, "GRANT_SOURCE_PAGE_URLS", MAX_SOURCE_PAGES))];
   const errors = [];
+  const warnings = [];
+  let pagesFetched = 0;
+  let notFoundLinksSkipped = 0;
   const sources = await Promise.all(urls.map(async sourceUrl => {
     try {
       const source = await fetchHtml(sourceUrl);
+      pagesFetched++;
       const sourceHost = new URL(source.finalUrl).hostname;
       const anchors = getAnchors(source.html, source.finalUrl)
         .filter(anchor => new URL(anchor.url).hostname === sourceHost)
         .slice(0, MAX_PAGE_LINKS);
-      return { sourceUrl: source.finalUrl, anchors };
+      return { sourceUrl: source.finalUrl, html: source.html, anchors };
     } catch (error) {
       errors.push({ sourceUrl, error: String(error.message || error).slice(0, 180) });
-      return { sourceUrl, anchors: [] };
+      return { sourceUrl, html: "", anchors: [] };
     }
   }));
-  // Round-robin across configured donor pages and cap detail requests. This keeps
-  // the combined feed + page + search scan below Cloudflare's subrequest ceiling.
+  // Round-robin across configured donor pages and cap detail requests to stay
+  // below Cloudflare's subrequest ceiling when feeds and search run in parallel.
   const selected = [];
   for (let index = 0; selected.length < MAX_TOTAL_DETAIL_PAGES; index++) {
     let added = false;
@@ -113,12 +117,39 @@ export async function readOfficialPages(env) {
       if (!isSpecificOpportunity(title, description)) return null;
       return { ...parsed, title, description, sourceUrl, discoveryEngine: "official_pages" };
     } catch (error) {
-      errors.push({ sourceUrl: anchor.url, error: String(error.message || error).slice(0, 180) });
+      const message = String(error.message || error);
+      if (/^HTTP 404\b/.test(message)) {
+        notFoundLinksSkipped++;
+        return null;
+      }
+      warnings.push({ sourceUrl: anchor.url, error: message.slice(0, 180) });
       return null;
     }
   }));
-  const items = results.filter(Boolean);
-  return { items, stats: { configured: urls.length, scanned: urls.length, detailPagesScanned: selected.length, found: items.length, errors: errors.slice(0, 20) } };
+  // Also evaluate the configured page itself: some official pages are direct
+  // calls rather than index pages. A stale child link must not discard a valid
+  // announcement on the parent page.
+  const landingItems = [];
+  for (const source of sources) {
+    if (!source.html) continue;
+    const parsed = parseOfficialPage(source.html, source.sourceUrl);
+    if (isSpecificOpportunity(parsed.title, parsed.description)) {
+      landingItems.push({ ...parsed, sourceUrl: source.sourceUrl, discoveryEngine: "official_pages" });
+    }
+  }
+  const items = [...landingItems, ...results.filter(Boolean)];
+  const status = pagesFetched === 0 ? "failed" : errors.length || warnings.length ? "partial" : "success";
+  return {
+    items,
+    stats: {
+      status, configured: urls.length, scanned: urls.length, pagesFetched,
+      detailPagesScanned: selected.length, found: items.length,
+      notFoundLinksSkipped,
+      errors: errors.slice(0, 20),
+      warnings: warnings.slice(0, 20),
+      message: pagesFetched > 0 && items.length === 0 ? "Scan completed; no specific grant calls matched on the checked pages." : null
+    }
+  };
 }
 
 export const DONOR_SCANNERS = [
