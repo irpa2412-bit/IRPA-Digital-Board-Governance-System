@@ -6644,3 +6644,101 @@
   .main-area>.page-back-next-navigation{grid-template-columns:minmax(0,1fr) minmax(64px,auto) minmax(0,1fr)}
   .main-area>.page-back-next-navigation .page-back-next-button{padding:7px 4px;font-size:12px}
 }
+
+
+/* Consolidated root fix: compact weather, sticky readable navigation, responsive controls. */
+.main-area>.desktop-webapp-navigation-roller {
+  position: sticky;
+  top: 0;
+  z-index: 120;
+  background: #eef5fb;
+  border-bottom: 1px solid #8baed2;
+  color: #123f73;
+}
+.main-area>.page-back-next-navigation {
+  position: sticky;
+  top: var(--irpa-portal-navigation-height, 64px);
+  z-index: 119;
+  background: #eef5fb;
+  border-bottom: 1px solid #8baed2;
+}
+.main-area>.desktop-webapp-navigation-roller *,
+.main-area>.page-back-next-navigation * {
+  text-shadow: none;
+}
+.main-area>.desktop-webapp-navigation-roller .webapp-navigation-roller-kicker,
+.main-area>.desktop-webapp-navigation-roller .webapp-navigation-live-clock,
+.main-area>.desktop-webapp-navigation-roller>strong {
+  color: #123f73;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.main-area>.page-back-next-navigation .page-back-next-status {
+  font-size: 13px;
+  line-height: 1.4;
+}
+.main-area>.topbar .topbar-heading-row {
+  grid-template-columns: minmax(0,1fr) minmax(190px,0.85fr) minmax(220px,280px);
+  grid-template-areas: "title authority weather";
+  align-items: start;
+}
+.main-area>.topbar .topbar-heading-row>.google-weather-panel {
+  width: 100%;
+  max-width: 280px;
+  justify-self: end;
+  align-self: start;
+  padding: 8px 10px;
+}
+.main-area>.topbar .google-weather-panel .live-weather-content {
+  gap: 5px;
+}
+.main-area>.topbar .google-weather-panel .live-weather-current-main strong {
+  font-size: 20px;
+}
+.main-area>.topbar .google-weather-panel .live-weather-metrics>span,
+.main-area>.topbar .google-weather-panel .live-weather-day {
+  font-size: 12px;
+}
+.main-area>.topbar .google-weather-panel .live-weather-days {
+  gap: 4px;
+}
+.main-area>.topbar .google-weather-panel .live-weather-day {
+  padding: 5px 4px;
+}
+@media(max-width:1100px) {
+  .main-area>.topbar .topbar-heading-row {
+    grid-template-columns: minmax(0,1fr) minmax(0,1fr);
+    grid-template-areas: "title authority" "weather weather";
+  }
+  .main-area>.topbar .topbar-heading-row>.google-weather-panel {
+    justify-self: start;
+    max-width: 280px;
+  }
+  .main-area>.desktop-webapp-navigation-roller {
+    top: 0;
+    grid-template-columns: minmax(0,1fr) minmax(0,1fr);
+  }
+  .main-area>.page-back-next-navigation {
+    top: 0;
+  }
+}
+@media(max-width:760px) {
+  .main-area>.desktop-webapp-navigation-roller,
+  .main-area>.page-back-next-navigation {
+    position: relative;
+    top: auto;
+  }
+  .main-area>.topbar .topbar-heading-row {
+    grid-template-columns: minmax(0,1fr);
+    grid-template-areas: "title" "authority" "weather";
+  }
+  .main-area>.topbar .topbar-heading-row>.google-weather-panel {
+    justify-self: start;
+    max-width: 280px;
+  }
+  .main-area>.page-back-next-navigation .page-back-next-button {
+    min-height: 44px;
+    font-size: 13px;
+    overflow-wrap: anywhere;
+  }
+}
