@@ -9771,3 +9771,15 @@ html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-headin
     margin-bottom: 0;
   }
 }
+
+
+/* IRPA dashboard: reduce lower whitespace in the right access-category panel, matching the left title panel. */
+@media (min-width: 1200px) {
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .topbar-access-category {
+    align-self: start;
+    height: fit-content;
+    min-height: 0;
+    padding-bottom: 0;
+    margin-bottom: 0;
+  }
+}
