@@ -163,7 +163,7 @@ export async function readDonorScanner(scanner) {
       .slice(0, 20);
     const items = [];
     const self = parseOfficialPage(source.html, source.finalUrl);
-    const isAggregator = /(?:^|\.)fundsforngos\.org$/i.test(new URL(source.finalUrl).hostname);
+    const isAggregator = /(?:^|\.)(?:fundsforngos\.org|africanngos\.org|ngoportal\.africa)$/i.test(new URL(source.finalUrl).hostname);
     // Aggregator articles are discovery leads, not the opportunity issuance.
     // Resolve the article and extract an external application/call URL; never
     // make a FundsforNGOs listing the primary tap target.
