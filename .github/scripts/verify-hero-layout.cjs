@@ -2,7 +2,7 @@ const { chromium } = require("playwright");
 const fs=require("node:fs"),path=require("node:path");
 const target=process.env.TARGET_URL||"https://irpa-digital-board-governance.web.app";
 const out=path.resolve("hero-layout-evidence");fs.mkdirSync(out,{recursive:true});
-const report={target,testedAt:new Date().toISOString(),cache:{expectedSourceCacheVersion:"20261011-hero-weather-landscape-19"},authentication:{attempted:false,used:false},mode:"",viewports:[],interactions:{},consoleErrors:[],pageErrors:[]};
+const report={target,testedAt:new Date().toISOString(),cache:{expectedSourceCacheVersion:"20261011-hero-weather-landscape-20"},authentication:{attempted:false,used:false},mode:"",viewports:[],interactions:{},consoleErrors:[],pageErrors:[]};
 (async()=>{const browser=await chromium.launch({headless:true,args:["--no-sandbox"]});try{
  const page=await browser.newPage({viewport:{width:1366,height:768},deviceScaleFactor:1});
  page.on("console",m=>{if(m.type()==="error")report.consoleErrors.push({text:m.text(),location:m.location()})});
@@ -17,7 +17,7 @@ const report={target,testedAt:new Date().toISOString(),cache:{expectedSourceCach
   catch(e){report.cache.deployedAssets.push({url:u,error:String(e).slice(0,250)})}
  }
 
- try{const sw=await page.request.get(new URL("/sw.js",target).href,{timeout:20000});const t=await sw.text();report.cache.swHttpStatus=sw.status();report.cache.serviceWorkerVersion=t.match(/CACHE_NAME\s*=\s*["']([^"']+)/)?.[1]||null;report.cache.swContainsV23=t.includes("irpa-dbgs-app-shell-v23")}catch(e){report.cache.swFetchError=String(e)}
+ try{const sw=await page.request.get(new URL("/sw.js",target).href,{timeout:20000});const t=await sw.text();report.cache.swHttpStatus=sw.status();report.cache.serviceWorkerVersion=t.match(/CACHE_NAME\s*=\s*["']([^"']+)/)?.[1]||null;report.cache.swContainsV24=t.includes("irpa-dbgs-app-shell-v24")}catch(e){report.cache.swFetchError=String(e)}
  report.authScreenVisible=await page.locator(".auth-screen").count()>0;
  let dashboard=await page.locator(".google-weather-panel").count()>0&&await page.locator(".topbar-access-category").count()>0;
  if(!dashboard&&process.env.IRPA_E2E_EMAIL&&process.env.IRPA_E2E_PASSWORD){
