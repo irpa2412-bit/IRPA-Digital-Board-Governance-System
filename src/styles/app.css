@@ -4955,3 +4955,98 @@
   display:block;font-size:12px;line-height:1.35;white-space:normal;overflow-wrap:anywhere;
  }
 }
+
+
+/* 2026-10-11: keep the verified login authority singular and place the live clock
+   directly before the in-portal navigation label without clipping either panel. */
+.login-category-heading{
+  display:block;
+  max-width:100%;
+  white-space:normal;
+  overflow-wrap:anywhere;
+  font-size:12px;
+  line-height:1.3;
+}
+.login-category-list{min-width:0;max-width:100%}
+.login-category-item{min-width:0;max-width:100%}
+.login-category-pill{max-width:100%;white-space:normal;overflow-wrap:anywhere}
+.topbar-access-category{min-width:0;max-width:100%;overflow:visible}
+.desktop-webapp-navigation-roller{
+  grid-template-columns:minmax(190px,245px) auto minmax(110px,1fr) minmax(200px,360px) 30px;
+  align-items:center;
+  min-height:66px;
+  height:auto;
+  overflow:visible;
+  row-gap:8px;
+}
+.desktop-webapp-navigation-roller .webapp-navigation-live-clock{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  grid-template-areas:"day date" "time button";
+  align-items:center;
+  column-gap:7px;
+  row-gap:4px;
+  min-width:0;
+  padding:5px 8px;
+  border:1px solid rgba(255,255,255,.22);
+  border-radius:8px;
+  background:#0b385e;
+  color:#fff;
+  box-sizing:border-box;
+}
+.desktop-webapp-navigation-roller .webapp-navigation-live-clock strong{
+  grid-area:day;
+  min-width:0;
+  color:#fff;
+  font-size:12px;
+  line-height:1.2;
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
+.desktop-webapp-navigation-roller .webapp-navigation-live-clock span{
+  grid-area:date;
+  color:#d7eaff;
+  font-size:12px;
+  line-height:1.2;
+  text-align:right;
+  white-space:normal;
+}
+.desktop-webapp-navigation-roller .webapp-navigation-live-clock b{
+  grid-area:time;
+  color:#ffe28a;
+  font-size:13px;
+  line-height:1.2;
+  letter-spacing:.02em;
+  white-space:nowrap;
+}
+.desktop-webapp-navigation-roller .webapp-navigation-live-clock button{
+  grid-area:button;
+  justify-self:end;
+  min-width:44px;
+  min-height:28px;
+  padding:4px 7px;
+  border:1px solid #55b85b;
+  border-radius:7px;
+  background:#178c37;
+  color:#fff;
+  font-size:12px;
+  line-height:1;
+  font-weight:900;
+  cursor:pointer;
+}
+@media (min-width:761px) and (max-width:1100px){
+  .desktop-webapp-navigation-roller{
+    grid-template-columns:minmax(190px,245px) minmax(0,1fr);
+    grid-template-rows:auto auto;
+  }
+  .desktop-webapp-navigation-roller .webapp-navigation-live-clock{grid-column:1;grid-row:1}
+  .desktop-webapp-navigation-roller .webapp-navigation-roller-kicker{grid-column:2;grid-row:1;white-space:normal;line-height:1.25}
+  .desktop-webapp-navigation-roller>strong{grid-column:1;grid-row:2;white-space:normal;overflow-wrap:anywhere}
+  .desktop-webapp-navigation-roller>select{grid-column:2;grid-row:2}
+  .desktop-webapp-navigation-roller .webapp-navigation-roller-chevron{display:none}
+}
+@media(max-width:760px){
+  .topbar-access-category{width:100%;min-width:0}
+  .login-category-badges{width:100%;min-width:0}
+  .login-category-heading{font-size:12px;line-height:1.3}
+}
