@@ -1,0 +1,68 @@
+/* IRPA-DBGS page-layout stability guard — 2026-10-12
+   Prevent individual portals and sub-portals from inheriting oversized dimensions.
+   Content remains naturally sized; data tables retain their own horizontal scrolling.
+   This is presentation-only: no routing, data, permissions, or workflow changes.
+*/
+:root, html, body, #root, .app-shell, .main-area, .content-area, .dashboard-content-area {
+  min-width: 0;
+  box-sizing: border-box;
+}
+.main-area, .content-area, .dashboard-content-area {
+  max-width: 100%;
+}
+.content-area .page,
+.dashboard-content-area .page,
+.content-area .page-header,
+.content-area .module-header,
+.content-area .panel,
+.content-area .module-panel,
+.content-area .welcome-panel {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+.content-area .page,
+.dashboard-content-area .page {
+  width: 100%;
+  min-height: 0;
+  height: auto;
+  overflow-wrap: anywhere;
+}
+.content-area .page > *,
+.dashboard-content-area .page > *,
+.content-area .panel > *,
+.content-area .module-panel > *,
+.content-area .welcome-panel > * {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.content-area .page img,
+.content-area .page video,
+.content-area .page canvas,
+.content-area .page iframe,
+.dashboard-content-area .page img,
+.dashboard-content-area .page video,
+.dashboard-content-area .page canvas,
+.dashboard-content-area .page iframe {
+  max-width: 100%;
+}
+.content-area .page table,
+.dashboard-content-area .page table {
+  max-width: 100%;
+}
+.content-area .page :is(input, select, textarea),
+.dashboard-content-area .page :is(input, select, textarea) {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+@media (max-width: 760px) {
+  .content-area .page,
+  .dashboard-content-area .page {
+    padding-inline: 0;
+  }
+  .content-area .page :is(h1, h2, h3, h4),
+  .dashboard-content-area .page :is(h1, h2, h3, h4) {
+    overflow-wrap: anywhere;
+  }
+}
