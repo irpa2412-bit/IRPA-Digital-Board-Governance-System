@@ -43,6 +43,7 @@ async function hash(s){const b=await crypto.subtle.digest("SHA-256",new TextEnco
 function candidate(title,url,description="",publishedAt=null){title=clean(title).slice(0,400);description=clean(description);try{const u=new URL(url);if(!["http:","https:"].includes(u.protocol)||u.username||u.password||title.length<8||!TERMS.test(title+" "+description)||NON_GRANT.test(title))return null;const d=publishedAt?new Date(publishedAt):null;return {title,url:u.href,description,publishedAt:d&&!isNaN(d)&&d.getTime()<=Date.now()+86400000?d:null}}catch{return null}}
 function feed(xml,base){const blocks=[...xml.matchAll(/<(?:item|entry)\b[^>]*>[\s\S]*?<\/(?:item|entry)\s*>/gi)].slice(0,80);return blocks.map(m=>{const b=m[0],tag=n=>{const x=b.match(new RegExp("<(?:[\\w.-]+:)?" + n + "\\b[^>]*>([\\s\\S]*?)<\\/(?:[\\w.-]+:)?" + n + "\\s*>","i"));return x?clean(x[1]):""};const link=b.match(/<link\b[^>]*href=["']([^"']+)["'][^>]*>/i);return candidate(tag("title"),resolve(link?.[1]||tag("link")||tag("guid")||tag("id"),base),tag("description")||tag("summary")||tag("content"),tag("pubDate")||tag("published")||tag("updated"))}).filter(Boolean)}
 function hub(html,base){const root=new URL(base);const re=/<a\b([^>]*?)href\s*=\s*(["'])(.*?)\2([^>]*)>([\s\S]*?)<\/a\s*>/gi;let m,out=[];while((m=re.exec(html))&&out.length<80){const url=resolve(m[3],base),title=clean(m[5]||"");try{const u=new URL(url);if((u.hostname===root.hostname||u.hostname.endsWith("."+root.hostname))&&u.href!==root.href){const c=candidate(title,url);if(c)out.push(c)}}catch{}}const seen=new Set();return out.filter(x=>!seen.has(canonical(x.url))&&seen.add(canonical(x.url)))}
+function retryDelayMs(response,attempt){const header=response.headers.get("retry-after");if(!header)return 250*(2**attempt);const seconds=Number(header);const requested=Number.isFinite(seconds)&&header.trim()!==""?seconds*1000:Math.max(0,Date.parse(header)-Date.now());return requested>10000?null:Math.max(requested,250*(2**attempt))}
 async function fetchSource(s){
   let lastError;
   const googleUrl=publicSourceUrl(s);
@@ -54,9 +55,10 @@ async function fetchSource(s){
       if(!r.ok){
         const err=new Error("HTTP "+r.status);
         if((r.status===429||r.status>=500)&&attempt<2){
+          const delay=retryDelayMs(r,attempt);
+          if(delay===null){err.retryable=false;throw err}
           lastError=err;
-          const retryAfter=Number(r.headers.get("retry-after")||0);
-          await new Promise(resolve=>setTimeout(resolve,Math.min(2000,Math.max(retryAfter*1000,250*(2**attempt)))));
+          await new Promise(resolve=>setTimeout(resolve,delay));
           continue;
         }
         throw err;
@@ -71,7 +73,16 @@ async function fetchSource(s){
         const results=feed(body,r.url);
         if(results.length||targetUrl===bingUrl)return results;
         const fallback=await fetch(bingUrl,{headers:{"user-agent":USER_AGENT,accept:"application/rss+xml, application/xml, text/xml"},signal:AbortSignal.timeout(12000),redirect:"follow"});
-        if(!fallback.ok)throw Error("Search fallback HTTP "+fallback.status);
+        if(!fallback.ok){
+          const err=new Error("Search fallback HTTP "+fallback.status);
+          if((fallback.status===429||fallback.status>=500)&&attempt<2){
+            const delay=retryDelayMs(fallback,attempt);
+            if(delay===null){err.retryable=false;throw err}
+            await new Promise(resolve=>setTimeout(resolve,delay));
+            continue;
+          }
+          throw err;
+        }
         const fallbackBody=await fallback.text();
         if(new TextEncoder().encode(fallbackBody).length>1500000)throw Error("Search fallback response too large");
         return feed(fallbackBody,fallback.url);
