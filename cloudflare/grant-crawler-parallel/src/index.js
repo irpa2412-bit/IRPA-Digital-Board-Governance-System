@@ -1,5 +1,5 @@
 import { analyzeGrant } from "./assistant.js";
-import { DONOR_SCANNERS, SEARCH_QUERIES, readDonorScanner, readOfficialPages, readWebSearch, normalizeOpportunityUrl } from "./discovery-engines.js";
+import { DONOR_SCANNERS, SEARCH_QUERIES, GDELT_QUERIES, readDonorScanner, readOfficialPages, readWebSearch, readGdeltSearch, normalizeOpportunityUrl } from "./discovery-engines.js";
 import { handleApplicationPortal } from "./application-portal-handler.js";
 
 
@@ -91,7 +91,8 @@ async function listOpportunities(env) {
   const engineProvision = [
     { engine: "rss_atom", label: "RSS / Atom Feed Crawler", description: "Fetches public RSS and Atom feeds in parallel, extracts call metadata, then sends candidates through the shared deduplication, IRPA fit, deadline, geography and eligibility pipeline.", sources: feedUrls, configured: feedUrls.length },
     { engine: "official_pages", label: "Official Funding Page Scanner", description: "Reads configured official donor pages, follows grant-related links on the same host, extracts public call details, and records HTTP failures without bypassing access controls.", sources: pageUrls, configured: pageUrls.length },
-    { engine: "web_search", label: "Web Search Discovery", description: "Runs targeted funding searches in parallel using Google News RSS, falls back to Bing RSS when needed, and can use Brave Search API when its secret is configured. Results retain publisher/source provenance and original opportunity URLs.", sources: ["Google News RSS", "Bing RSS fallback", "Brave Search API (optional)"], queries: SEARCH_QUERIES, configured: 1 },
+    { engine: "web_search", label: "Web Search Discovery", description: "Rotates 12 targeted queries across Google News RSS, Bing RSS fallback, or Brave Search API when configured; searches rolling calls, deadline-based calls, and all IRPA strategic pillars and cross-cutting themes.", sources: ["Google News RSS", "Bing RSS fallback", "Brave Search API (optional)"], queries: SEARCH_QUERIES, configured: 1 },
+    { engine: "gdelt_search", label: "GDELT Global News and Web Index", description: "Runs rotating queries against the public GDELT DOC API for grant announcements, official calls, rolling opportunities, and deadline-based funding across pastoralism, rangelands, livestock, markets, climate, gender, youth and inclusion. Results are discovery leads and require official-call verification.", sources: ["GDELT DOC API"], queries: GDELT_QUERIES, configured: 1 },
     { engine: "ai_eligibility", label: "AI Eligibility & Concept-Note Assistant", description: "Uses Cloudflare Workers AI for donor-requirement extraction, evidence-based eligibility analysis, compliance matrices and concept-note drafting. Deterministic deadline and known-applicant eligibility checks run first; AI output cannot override hard exclusions or invent IRPA track record. Inference availability depends on the Cloudflare AI account quota.", sources: ["POST /assistant/analyze", "Cloudflare Workers AI binding"], configured: 1, provisionStatus: "configured" },
     ...DONOR_SCANNERS.map(scanner => ({
       engine: scanner.name,
@@ -246,8 +247,9 @@ function isCurrentOpportunity(item, today = todayInTanzania()) {
   const deadline = extractDeadline(item);
   if (deadline && deadline < today) return false;
   if (deadline) return true; // Deadline is today or in the future (Tanzania local date).
-  const rolling = /\b(?:rolling basis|rolling applications?|year[- ]round|open throughout the year|no fixed deadline|no application deadline)\b/i.test(text);
-  return status === "open" || rolling;
+  // Discovery is intentionally permissive: only confirmed closed/expired calls and past deadlines are excluded.
+  // Unknown geography, eligibility, status, deadline, or low preliminary fit remain visible for human verification.
+  return true;
 }
 
 function assessFit(item) {
@@ -255,25 +257,34 @@ function assessFit(item) {
   const deadlineAt = extractDeadline(item);
   const isExpired = Boolean(deadlineAt && deadlineAt < todayInTanzania());
   const signals = [
-    { label: "pastoralism/rangelands", weight: 35, terms: ["pastoral", "pastoralist", "rangeland", "herder", "grazing", "dryland", "nomadic"] },
-    { label: "restoration/environment", weight: 20, terms: ["restoration", "land degradation", "biodiversity", "ecosystem", "conservation", "desertification", "reforestation", "natural resource"] },
-    { label: "livestock/agriculture", weight: 15, terms: ["livestock", "animal health", "veterinary", "fodder", "agriculture", "food system", "smallholder", "value chain"] },
-    { label: "market development/value addition", weight: 10, terms: ["market access", "market linkage", "market development", "value addition", "value-added", "livestock market", "leather processing", "meat processing", "market systems"] },
-    { label: "governance/institutional capacity", weight: 10, terms: ["institutional strengthening", "institutional capacity", "organizational development", "organisational development", "governance", "accountability", "transparency", "board management", "nonprofit management", "non-profit management"] },
-    { label: "digital governance/DBGS investment", weight: 25, terms: ["digital governance", "board management system", "board governance", "governance technology", "digital transformation", "civic technology", "cybersecurity", "cloud infrastructure", "digital public infrastructure", "nonprofit technology", "non-profit technology", "responsible ai", "software development", "digital capacity building"] },
-    { label: "climate resilience", weight: 15, terms: ["climate adaptation", "climate resilience", "climate change", "drought", "resilience", "early warning"] },
-    { label: "community/NGO delivery", weight: 10, terms: ["civil society", "non-governmental", "ngo", "community-led", "community based", "local communities", "indigenous peoples"] },
-    { label: "women/youth inclusion", weight: 8, terms: ["women", "gender", "youth", "young people", "social inclusion"] },
-    { label: "water/livelihoods", weight: 8, terms: ["water", "livelihood", "income generation", "economic empowerment", "food security"] },
-    { label: "research/innovation", weight: 5, terms: ["research", "innovation", "digital", "knowledge management", "data"] },
-  ];
-  const matched = signals.filter(signal => signal.terms.some(term => text.includes(term)));
+    { label: "pastoralism/rangelands", weight: 30, terms: ["pastoral", "pastoralist", "pastoralism", "rangeland", "herder", "grazing", "dryland", "drylands", "grassland", "transhumance", "pastoral mobility", "communal land", "range management", "land degradation", "soil restoration"] },
+    { label: "restoration/environment", weight: 18, terms: ["restoration", "land restoration", "ecosystem restoration", "invasive species", "biodiversity", "ecosystem", "conservation", "desertification", "reforestation", "native trees", "nature-based solutions", "natural resource management", "landscape restoration", "rangeland rehabilitation"] },
+    { label: "livestock development", weight: 20, terms: ["livestock", "animal health", "veterinary", "veterinary services", "fodder", "forage", "feed bank", "fodder bank", "animal breeding", "improved breeds", "animal husbandry", "dairy", "herd health", "one health", "livestock resilience", "pasture management", "livestock insurance"] },
+    { label: "market development/value addition", weight: 18, terms: ["market access", "market linkage", "market development", "market linkages", "value addition", "value-added", "livestock market", "livestock markets", "market systems", "market system development", "leather processing", "hides and skins", "meat processing", "milk processing", "dairy value chain", "cold chain", "aggregation", "trade facilitation", "producer groups", "market information"] },
+    { label: "climate adaptation/resilience", weight: 12, terms: ["climate adaptation", "climate resilience", "climate change adaptation", "drought", "resilience", "early warning", "climate information services", "climate finance", "disaster risk reduction", "climate-smart", "climate smart", "water security", "water access", "water harvesting", "solar water"] },
+    { label: "gender equality/social inclusion", weight: 10, terms: ["women", "gender", "gender equality", "gender equity", "social inclusion", "disability inclusion", "persons with disabilities", "marginalized groups", "marginalised groups", "inclusive development", "women-led", "women led", "girls and women", "gender transformative"] },
+    { label: "youth empowerment", weight: 8, terms: ["youth", "young people", "youth-led", "youth led", "youth employment", "youth entrepreneurship", "youth enterprise", "young entrepreneurs", "skills development", "vocational training", "youth groups"] },
+    { label: "community participation/indigenous peoples", weight: 8, terms: ["community-led", "community led", "community-based", "community based", "community participation", "community-driven", "community driven", "indigenous peoples", "indigenous communities", "local communities", "civil society", "pastoral communities", "locally led", "participatory planning", "customary institutions"] },
+    { label: "research/innovation/knowledge management", weight: 6, terms: ["research", "innovation", "knowledge management", "knowledge exchange", "action research", "living laboratory", "living labs", "community monitoring", "citizen science", "evidence-based", "evidence based", "data systems", "digital innovation", "scaling innovation"] },
+    { label: "governance/institutional capacity", weight: 6, terms: ["institutional strengthening", "institutional capacity", "organizational development", "organisational development", "governance", "accountability", "transparency", "nonprofit management", "non-profit management", "civil society capacity", "organizational capacity", "organisational capacity"] },
+    { label: "water/food security/livelihoods", weight: 8, terms: ["water", "livelihood", "income generation", "economic empowerment", "food security", "nutrition", "food systems", "water point", "water points", "sustainable livelihoods", "income diversification", "community enterprise"] },
+    { label: "digital governance/DBGS investment", weight: 5, terms: ["digital governance", "board management system", "board governance", "governance technology", "digital transformation", "civic technology", "cybersecurity", "cloud infrastructure", "digital public infrastructure", "nonprofit technology", "non-profit technology", "responsible ai", "software development", "digital capacity building"] },
+  ];  const matched = signals.filter(signal => signal.terms.some(term => text.includes(term)));
   const score = Math.min(100, matched.reduce((sum, signal) => sum + signal.weight, 0));
   const digitalGovernanceMatch = matched.some(signal => signal.label === "digital governance/DBGS investment");
-  const strategicTrack = digitalGovernanceMatch ? "digital_governance_DBGS_investment" : "rangeland_livestock_market_and_cross_cutting";
-  const fitAssessment = score >= 35 ? "strong_topic_match" : score >= 15 ? "possible_topic_match" : "low_topic_match";
+  const coreTracks = [
+    ["pastoralism/rangelands", "sustainable_rangeland_management"],
+    ["restoration/environment", "sustainable_rangeland_management"],
+    ["livestock development", "livestock_development"],
+    ["market development/value addition", "market_development"]
+  ];
+  const strategicTracks = [...new Set(coreTracks.filter(([label]) => matched.some(signal => signal.label === label)).map(([, track]) => track))];
+  if (matched.some(signal => ["climate adaptation/resilience", "gender equality/social inclusion", "youth empowerment", "community participation/indigenous peoples", "research/innovation/knowledge management", "governance/institutional capacity", "water/food security/livelihoods"].includes(signal.label))) strategicTracks.push("cross_cutting");
+  if (digitalGovernanceMatch && strategicTracks.length === 0) strategicTracks.push("digital_governance_DBGS_investment");
+  const strategicTrack = strategicTracks[0] || (digitalGovernanceMatch ? "digital_governance_DBGS_investment" : "cross_cutting");
+  const fitAssessment = score >= 30 ? "strong_topic_match" : score >= 12 ? "possible_topic_match" : "low_topic_match";
   const sourceIsOpenFeed = /(?:^|[?&])fund_state=open(?:&|$)/i.test(item.sourceUrl || "");
-  const callStatus = text.includes("closed")
+  const callStatus = /\b(?:fund state:\s*closed|call (?:is )?closed|applications? (?:are )?closed|this call has closed|closed opportunity)\b/i.test(text)
     ? "closed"
     : isExpired
       ? "expired"
@@ -305,17 +316,18 @@ function assessFit(item) {
     : geographyAssessment === "other_country_focus"
       ? "geographic_mismatch_review"
       : geographyAssessment === "not_stated"
-        ? "geography_unverified_suppressed"
+        ? "eligibility_review_required"
         : callStatus === "unknown" && !deadlineAt && !rollingIntake
-          ? "deadline_unverified_suppressed"
-          : score >= 15
+          ? "status_and_deadline_review"
+          : score >= 12
             ? "priority_for_eligibility_review"
-            : "low_priority";
+            : "low_priority_review";
   return {
     score,
     fitAssessment,
     reasons: matched.map(signal => signal.label),
     strategicTrack,
+    strategicTracks,
     digitalGovernanceMatch,
     deadlineAt,
     callStatus,
@@ -339,6 +351,7 @@ async function crawl(env) {
     { name: "rss_atom", run: () => readFeeds(env), configured: (() => { try { return JSON.parse(env.GRANT_FEED_URLS_JSON || env.GRANT_FEED_URLS || "[]").length; } catch { return 0; } })() },
     { name: "official_pages", run: () => readOfficialPages(env), configured: (() => { try { return JSON.parse(env.GRANT_SOURCE_PAGE_URLS_JSON || env.GRANT_SOURCE_PAGE_URLS || "[]").length; } catch { return 0; } })() },
     { name: "web_search", run: () => readWebSearch(env), configured: 1 },
+    { name: "gdelt_search", run: () => readGdeltSearch(), configured: 1 },
     ...scheduledDonorScanners.map(scanner => ({ name: scanner.name, run: () => readDonorScanner(scanner), configured: 1 })),
   ];
   const settled = await Promise.all(engines.map(async engine => {
@@ -438,7 +451,7 @@ async function crawl(env) {
     .map(item => ({
       title: item.title, description: item.description, url: item.url, sourceUrl: item.sourceUrl,
       discoveryEngine: item.discoveryEngine, fitScore: item.fit.score, fitAssessment: item.fit.fitAssessment,
-      fitReasons: item.fit.reasons, strategicTrack: item.fit.strategicTrack,
+      fitReasons: item.fit.reasons, strategicTrack: item.fit.strategicTrack, strategicTracks: item.fit.strategicTracks,
       digitalGovernanceMatch: item.fit.digitalGovernanceMatch, deadlineAt: item.fit.deadlineAt,
       callStatus: item.fit.callStatus, geographyAssessment: item.fit.geographyAssessment,
       triageAssessment: item.fit.triageAssessment, eligibilityStatus: item.fit.eligibilityStatus,
@@ -449,6 +462,7 @@ async function crawl(env) {
     feedsConfigured: engines[0].configured,
     sourcePagesConfigured: engines[1].configured,
     webSearchConfigured: Number(settled.find(engine => engine.name === "web_search")?.stats.configured || 0) > 0,
+    gdeltSearchConfigured: Number(settled.find(engine => engine.name === "gdelt_search")?.stats.configured || 0) > 0,
     additionalScannersConfigured: DONOR_SCANNERS.length,
     additionalScannersScheduled: scheduledDonorScanners.map(scanner => scanner.name),
     additionalScanners: settled.filter(engine => scheduledDonorScanners.some(scanner => scanner.name === engine.name)).map(engine => ({ engine: engine.name, ...engine.stats })),
