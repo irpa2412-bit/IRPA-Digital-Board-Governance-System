@@ -498,8 +498,8 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
      {crawlerProvision.map(provision=>{
       const run=crawlerEngines.find(item=>item.engine===provision.engine);
       const status=run?.status||"not_run";
-      const statusLabel=status==="success"?"Completed":status==="partial"?"Partial":status==="failed"?"Failed":provision.provisionStatus==="configured"?"Provisioned":Number(provision.configured??(provision.sources||[]).length)>0?"Configured · rotation":"Not configured";
-      const statusColor=status==="success"?"#8de0b7":status==="partial"?"#ffcf88":status==="failed"?"#ffb8b8":provision.provisionStatus==="configured"?"#8bd3e6":"#aab6c5";
+      const statusLabel=status==="success"?"Completed":status==="partial"?"Partial":status==="failed"?"Failed":Number(provision.configured??(provision.sources||[]).length)>0?"Configured":"Not configured";
+      const statusColor=status==="success"?"#8de0b7":status==="partial"?"#ffcf88":status==="failed"?"#ffb8b8":Number(provision.configured??(provision.sources||[]).length)>0?"#8bd3e6":"#aab6c5";
       return <details key={provision.engine} style={{border:"1px solid #344255",borderRadius:10,padding:"9px 11px",background:"rgba(255,255,255,0.015)"}}>
        <summary style={{cursor:"pointer",display:"flex",justifyContent:"space-between",gap:10,alignItems:"center",flexWrap:"wrap"}}>
         <strong style={{fontSize:13}}>{provision.label||provision.engine}</strong>
