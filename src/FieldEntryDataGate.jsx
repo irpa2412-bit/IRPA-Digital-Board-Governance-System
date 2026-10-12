@@ -117,7 +117,15 @@ export default function FieldEntryDataGate({portal}){
   portalRef.current=currentPortal;
   const actualOnly=ACTUAL_ONLY_TYPES.has(dataType)||portalRequiresActual(field?field.portal:currentPortal);
 
-  const isVerified=useCallback(name=>{const map=readMap();return Boolean(map&&map[name])},[]);
+  const isVerified=useCallback(name=>{
+    const map=readMap();
+    const record=map&&map[name];
+    if(!record||record.portal!==name)return false;
+    try{
+      return record.environment===String(window.sessionStorage.getItem("irpaDataEnvironment")||"").toUpperCase()
+        &&window.sessionStorage.getItem("irpaDataEnvironmentTarget")===name;
+    }catch{return false}
+  },[]);
   const openGate=useCallback((name,attempt)=>{
     pending.current=attempt||null;
     setStorageError("");setDataType("");setEnvironment("");setConfirmed(false);
