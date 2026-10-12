@@ -50,15 +50,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if grep -R -q 'irpa-grant-crawler-production.irpa-governance.workers.dev' dist; then
+          if grep -R -q 'irpa-dbgs-grant-crawler.irpa-governance.workers.dev' dist; then
             echo 'Production bundle still references the obsolete grant crawler Worker hostname.' >&2
             exit 1
           fi
           if ! grep -R -q 'https://irpa-grant-crawler-production.irpa-governance.workers.dev' dist; then
-            echo 'Production bundle does not reference the deployed irpa-dbgs-grant-crawler Worker.' >&2
+            echo 'Production bundle does not reference the deployed irpa-grant-crawler-production Worker.' >&2
             exit 1
           fi
-          echo 'Production bundle points to the deployed irpa-dbgs-grant-crawler Worker.'
+          echo 'Production bundle points to the deployed irpa-grant-crawler-production Worker.'
 
       - name: Independent production readability verification
         run: npm run verify:production-readability
