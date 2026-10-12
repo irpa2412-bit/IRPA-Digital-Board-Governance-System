@@ -1,0 +1,90 @@
+/* Shared whole-app Back/Next navigation.
+   This element is a direct child of .main-area in src/App.jsx, not a descendant
+   of .content-area. Keep its layout scoped to the rendered component and let
+   this final stylesheet override the legacy mobile display:none rule. */
+#root .app-shell .main-area > .page-back-next-navigation {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2.2fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 10px clamp(12px, 2.2vw, 34px);
+  box-sizing: border-box;
+  flex: 0 1 auto;
+  overflow: visible;
+}
+#root .app-shell .main-area > .page-back-next-navigation > * {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+#root .app-shell .main-area > .page-back-next-navigation .page-back-next-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 42px;
+  padding: 8px clamp(5px, 1vw, 15px);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+#root .app-shell .main-area > .page-back-next-navigation .page-back-next-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+#root .app-shell .main-area > .page-back-next-navigation .page-back-next-status > span {
+  font-size: 11px;
+  line-height: 1.25;
+  letter-spacing: .08em;
+  overflow-wrap: anywhere;
+}
+#root .app-shell .main-area > .page-back-next-navigation .page-back-next-status > strong {
+  display: block;
+  max-width: 100%;
+  font-size: clamp(12px, 1.1vw, 15px);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+#root .app-shell .main-area > .page-back-next-navigation .page-back-next-status > small {
+  font-size: 11px;
+  line-height: 1.25;
+}
+@media (max-width: 760px) {
+  #root .app-shell .main-area > .page-back-next-navigation {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) minmax(0, 1fr);
+    gap: 6px;
+    padding: 8px 10px;
+  }
+  #root .app-shell .main-area > .page-back-next-navigation .page-back-next-button {
+    min-height: 40px;
+    gap: 3px;
+    padding: 7px 4px;
+    font-size: 12px;
+    line-height: 1.25;
+  }
+  #root .app-shell .main-area > .page-back-next-navigation .page-back-next-status > span {
+    font-size: 10px;
+    letter-spacing: .04em;
+  }
+  #root .app-shell .main-area > .page-back-next-navigation .page-back-next-status > strong {
+    font-size: 12px;
+    line-height: 1.25;
+  }
+}
