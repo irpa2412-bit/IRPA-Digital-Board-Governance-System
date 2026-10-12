@@ -581,7 +581,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
     <p style={{...styles.muted,margin:0}}>This is a working draft, not an approved IRPA submission. Verify figures, evidence, eligibility, budgets and donor instructions before circulation.</p>
     <textarea aria-label="Editable concept-note draft" rows="16" style={{...styles.input,resize:"vertical",fontFamily:"inherit",lineHeight:1.6}} value={conceptDraft||analysisResult?.concept_note?.draft||""} onChange={e=>setConceptDraft(e.target.value)}/>
     <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-     <button type="button" disabled={draftSaving||!text(conceptDraft||analysisResult?.concept_note?.draft)} style={{...styles.button,opacity:draftSaving?0.6:1}} onClick={saveConceptDraft}>{draftSaving?"Saving draft…":"Save draft to Cloudflare workspace"}</button>
+     <button type="button" disabled={draftSaving||!text(conceptDraft||analysisResult?.concept_note?.draft)} style={{...styles.button,opacity:draftSaving?0.6:1}} onClick={saveConceptDraft}>{draftSaving?"Saving draft…":"Save draft to IRPA workspace"}</button>
      <button type="button" style={{...styles.button,background:"transparent"}} onClick={downloadConceptDraft}>Download .txt for DBGS Documents</button>
      <button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>{if(!navigator.clipboard?.writeText){setError("Clipboard access is unavailable in this browser.");return;}navigator.clipboard.writeText(conceptDraft||analysisResult?.concept_note?.draft||"").then(()=>setWorkspaceNotice("Concept-note text copied to clipboard.")).catch(()=>setError("Clipboard access was blocked by the browser."));}}>Copy concept-note text</button>
     </div>
@@ -669,7 +669,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
     <p style={styles.muted}>Directory entries are discovery resources, not a claim that each organisation has an open call or that IRPA is eligible. The crawler and AI-assisted review must check each individual opportunity against the same IRPA criteria.</p>
    </details>
   </section>
-  <div style={{...styles.muted,borderLeft:"3px solid #b78b3d",padding:"8px 12px"}}><strong>Live-data status:</strong> manually registered opportunities continue to come from the IRPA register; crawler-discovered records are retrieved from the isolated Cloudflare D1 crawler. Crawler leads are marked pending verification and do not establish legal eligibility or donor approval.</div>
+  <div style={{...styles.muted,borderLeft:"3px solid #b78b3d",padding:"8px 12px"}}><strong>Live-data status:</strong> manually registered opportunities continue to come from the IRPA register; crawler-discovered records are retrieved from the canonical Cloudflare Worker and its existing Firestore register. Crawler leads are marked pending verification and do not establish legal eligibility or donor approval.</div>
  </div>;
 }
 function dateMillis(v){if(!v)return 0;const d=v?.toDate?v.toDate():new Date(v);return Number.isNaN(d.getTime())?0:d.getTime();}
