@@ -768,3 +768,29 @@ test("AI document drafting rejects an empty instruction", async () => {
   }), { CRAWLER_CONTROL_TOKEN: token, AI: { run: async () => { throw new Error("model must not run"); } } });
   assert.equal(response.status, 400);
 });
+
+
+test("concept-note endpoint composes a draft from generated application fields", async () => {
+  const token = "test-token-with-at-least-32-characters-long";
+  const response = await worker.fetch(new Request("https://crawler.example/assistant/analyze", {
+    method: "POST",
+    headers: { authorization: "Bearer " + token, "content-type": "application/json" },
+    body: JSON.stringify({ task: "concept_note", callStatus: "open", title: "Longido Rangeland Restoration", description: "Call for proposals supporting community restoration in Tanzania." })
+  }), {
+    CRAWLER_CONTROL_TOKEN: token,
+    AI: { run: async () => ({ response: JSON.stringify({
+      eligibility: { status: "possibly_eligible", confidence: "low", evidence: [], unknowns: ["Confirm donor criteria"] },
+      donor_requirements: [],
+      concept_note: { application_fields: {
+        title: "Longido Rangeland Restoration",
+        executive_summary: "A community-led restoration initiative in Longido.",
+        problem_statement: "Rangeland condition requires locally led assessment and restoration."
+      } }
+    }) }) }
+  });
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.match(body.assessment.concept_note.draft, /Longido Rangeland Restoration/);
+  assert.match(body.assessment.concept_note.draft, /Executive Summary/);
+  assert.match(body.assessment.concept_note.draft, /Problem Statement/);
+});
