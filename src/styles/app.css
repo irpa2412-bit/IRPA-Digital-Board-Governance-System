@@ -10187,7 +10187,7 @@ html body #root .main-area > .topbar.dashboard-topbar .topbar-heading-row > .top
 }
 
 /* DASHBOARD HERO OWNER-SPECIFIED GEOMETRY — 20261012-0625 */
-html body #root .main-area > .desktop-webapp-navigation-roller { margin-bottom: 0 !important; }
+html body #root .main-area:has(> header.topbar.dashboard-topbar) > .desktop-webapp-navigation-roller { margin-bottom: 0 !important; }
 html body #root .main-area > header.topbar.dashboard-topbar { margin-top: 0 !important; padding-top: 0 !important; }
 html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row {
   margin-top: 0 !important; padding-top: 0 !important; align-items: start !important;
