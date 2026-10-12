@@ -155,7 +155,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  async function generateAssistantDraft(){
    const request=text(assistantInstructions);
    if(!request){setAssistantError("Describe what you want the AI Assistant to prepare.");return;}
-   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-dbgs-grant-crawler.irpa-governance.workers.dev").replace(/\/+$/,"");
+   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-production.irpa-governance.workers.dev").replace(/\/+$/,"");
    const token=await auth.currentUser?.getIdToken(true);
    if(!token){setAssistantError("Your session has expired. Sign in again.");return;}
    setAssistantBusy(true);setAssistantError("");setAssistantNotice("Preparing your requested format…");
@@ -176,7 +176,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  }
 
  async function loadCrawlerResults(showNotice=false){
-   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-dbgs-grant-crawler.irpa-governance.workers.dev").replace(/\/+$/,"");
+   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-production.irpa-governance.workers.dev").replace(/\/+$/,"");
    const token=await auth.currentUser?.getIdToken();
    if(!token){if(showNotice)setError("Your session has expired. Sign in again to load crawler results.");return;}
    setCrawlerResultsBusy(true);
@@ -276,7 +276,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    if(!auth.currentUser){setError("Sign in to IRPA to start a grant scan.");return;}
    try{
      setCrawlerRunning(true);setError("");setNotice("Manual donor-source scan requested. This can take several minutes.");
-     const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-dbgs-grant-crawler.irpa-governance.workers.dev").replace(/\/+$/, "");
+     const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-production.irpa-governance.workers.dev").replace(/\/+$/, "");
      const idToken=await auth.currentUser?.getIdToken();
      if(!idToken) throw new Error("Your session has expired. Sign in again.");
      const response=await fetch(workerUrl+"/run",{method:"POST",headers:{"Authorization":"Bearer "+idToken,"Content-Type":"application/json"},body:"{}",signal:AbortSignal.timeout(90000)});
@@ -288,7 +288,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    finally{setCrawlerRunning(false);}
  }
  async function loadSavedDrafts(){
-   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-dbgs-grant-crawler.irpa-governance.workers.dev").replace(/\/+$/,"");
+   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-production.irpa-governance.workers.dev").replace(/\/+$/,"");
    const idToken=await auth.currentUser?.getIdToken();
    if(!idToken)return;
    setDraftsBusy(true);
@@ -311,7 +311,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    setWorkspaceOpen(true);
  }
  async function loadDraftAuditEvents(id){
-   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-dbgs-grant-crawler.irpa-governance.workers.dev").replace(/\/+$/,"");
+   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-production.irpa-governance.workers.dev").replace(/\/+$/,"");
    const idToken=await auth.currentUser?.getIdToken();
    if(!idToken||!id)return;
    setAuditBusy(true);
@@ -359,20 +359,20 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  async function runWorkspaceAnalysis(task="eligibility"){
    if(!selectedOpportunity?.title){setError("Select a grant opportunity before screening eligibility.");return;}
    const currentStatusIssue=getOpportunityCurrentStatusIssue({...selectedOpportunity,summary:[selectedOpportunity.summary,opportunityDescription].filter(Boolean).join(" "),applicationRequirements:donorRequirements});
-   if(currentStatusIssue){
-     const stale=currentStatusIssue!=="unverified";
-     setAnalysisResult({geographic_eligibility:{status:"unclear",reason:stale?"The application deadline has passed or the call is explicitly closed/expired.":"The official deadline or current open/rolling status is not established by the supplied opportunity record.",evidence:["Deterministic deadline/status gate applied before AI analysis."]},eligibility:{status:stale?"ineligible":"insufficient_information",confidence:"high",evidence:[stale?"Expired or closed call":"Current deadline/status not verified"],unknowns:[stale?"Select a current call with a future deadline or verify that the donor has formally reopened it.":"Paste the official deadline or verify the donor's current open/rolling-intake status."]}});
+   if(currentStatusIssue&&currentStatusIssue!=="unverified"){
+     setAnalysisResult({geographic_eligibility:{status:"unclear",reason:"The application deadline has passed or the call is explicitly closed/expired.",evidence:["Deterministic expiry gate applied before AI analysis."]},eligibility:{status:"ineligible",confidence:"high",evidence:["Expired or closed call"],unknowns:["Select a current call with a future deadline or verify that the donor has formally reopened it."]}});
      setConceptDraft("");
-     setError(stale?"This call is expired or closed. AI analysis and concept-note drafting are blocked.":"The call's deadline/current status is unverified. Add the official deadline or confirm rolling/open status before AI analysis.");
-     setWorkspaceNotice("Deadline/current-status gate blocked this call before AI analysis.");
+     setError("This call is expired or closed. AI analysis and concept-note drafting are blocked.");
+     setWorkspaceNotice("Closed/expired-call gate blocked this call before AI analysis.");
      return;
    }
+   const statusUnverified=currentStatusIssue==="unverified";
    // Geographic eligibility no longer blocks opportunity analysis; show and assess all calls.
    if(!text(opportunityDescription)&&!text(donorRequirements)){setError("Provide the opportunity description or paste the official donor eligibility and application criteria.");return;}
-   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-dbgs-grant-crawler.irpa-governance.workers.dev").replace(/\/+$/,"");
+   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-production.irpa-governance.workers.dev").replace(/\/+$/,"");
    const idToken=await auth.currentUser?.getIdToken();
    if(!idToken){setError("Your session has expired. Sign in again.");return;}
-   setAnalysisBusy(true);setError("");setWorkspaceNotice(task==="concept_note"?"Checking eligibility and preparing the concept-note draft…":"Checking geographic, organizational and donor eligibility criteria…");
+   setAnalysisBusy(true);setError("");setWorkspaceNotice(task==="concept_note"?(statusUnverified?"Preparing a review-only draft; current call status still needs verification…":"Checking eligibility and preparing the concept-note draft…"):"Checking geographic, organizational and donor eligibility criteria…");
    try{
      const response=await fetch(workerUrl+"/assistant/analyze",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({task,title:selectedOpportunity.title,description:text(opportunityDescription),donorRequirements:text(donorRequirements),url:text(selectedOpportunity.url),deadline:dateKeyInTanzania(selectedOpportunity.deadline||selectedOpportunity.deadline_at)||"",callStatus:text(selectedOpportunity.callStatus||selectedOpportunity.call_status||"")}),signal:AbortSignal.timeout(90000)});
      const data=await response.json().catch(()=>({}));
@@ -385,9 +385,9 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
        const generated=text(data.assessment?.concept_note?.draft);
        setConceptDraft(generated);
        setDraftId(id=>id||crypto.randomUUID());
-       setWorkspaceNotice(generated?"Eligibility screening completed and a concept-note draft was generated. Edit it before saving.":"Eligibility screening completed, but the model did not return a concept-note draft. Review the assessment and retry.");
+       setWorkspaceNotice(generated?(statusUnverified?"Concept-note draft generated. Current call status is unverified; verify the official donor page before submission.":"Eligibility screening completed and a concept-note draft was generated. Edit it before saving."):"Eligibility screening completed, but the model did not return a concept-note draft. Review the assessment and retry.");
      }else{
-       setWorkspaceNotice("Eligibility screening completed. Geographic status: "+String(data.assessment?.geographic_eligibility?.status||"unclear")+". Review every requirement before drafting.");
+       setWorkspaceNotice("Eligibility screening completed. Geographic status: "+String(data.assessment?.geographic_eligibility?.status||"unclear")+"."+(statusUnverified?" Current call status is unverified; confirm it before submission.":" Review every requirement before drafting."));
      }
    }catch(err){setError(err?.name==="TimeoutError"?"The AI analysis exceeded 90 seconds. Retry after checking the staging Worker.":err?.message||"The AI eligibility analysis failed.");}
    finally{setAnalysisBusy(false);}
@@ -395,12 +395,13 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  async function saveConceptDraft(){
    if(!selectedOpportunity?.title||!text(conceptDraft)){setError("Select an opportunity and enter a concept-note draft before saving.");return;}
    const currentStatusIssue=getOpportunityCurrentStatusIssue({...selectedOpportunity,summary:[selectedOpportunity.summary,opportunityDescription].filter(Boolean).join(" "),applicationRequirements:donorRequirements});
-   if(currentStatusIssue){
-     setError(currentStatusIssue==="unverified"?"The official deadline/current status is unverified. A concept note cannot be saved as an active application until verified.":"This call is expired or closed. A concept note cannot be saved as an active application.");
+   if(currentStatusIssue&&currentStatusIssue!=="unverified"){
+     setError("This call is expired or closed. A concept note cannot be saved for an active application.");
      return;
    }
+   const statusUnverified=currentStatusIssue==="unverified";
    // Geographic eligibility no longer blocks saving a reviewed draft.
-   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-dbgs-grant-crawler.irpa-governance.workers.dev").replace(/\/+$/,"");
+   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-production.irpa-governance.workers.dev").replace(/\/+$/,"");
    const idToken=await auth.currentUser?.getIdToken();
    if(!idToken){setError("Your session has expired. Sign in again.");return;}
    const id=draftId||crypto.randomUUID();
@@ -410,7 +411,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
      const data=await response.json().catch(()=>({}));
      if(!response.ok)throw new Error(data.error||"Concept-note draft could not be saved.");
      setDraftId(id);
-     setWorkspaceNotice("Concept-note draft saved to the isolated Cloudflare D1 workspace; an audit event was recorded.");
+     setWorkspaceNotice(statusUnverified?"Concept-note draft saved to the isolated Cloudflare D1 workspace with an audit event. The call status remains unverified; confirm the official donor page before submission.":"Concept-note draft saved to the isolated Cloudflare D1 workspace; an audit event was recorded.");
      await loadSavedDrafts();
      await loadDraftAuditEvents(id);
    }catch(err){setError(err?.message||"Concept-note draft could not be saved.");}
@@ -536,7 +537,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
   </form>}
   {workspaceOpen&&<section style={{...styles.card,display:"grid",gap:13,borderColor:"#4e8b91"}} aria-labelledby="concept-workspace-heading">
    <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"start",flexWrap:"wrap"}}>
-    <div><div style={styles.eyebrow}>IRPA-DBGS · APPLICATION PREPARATION</div><h2 id="concept-workspace-heading" style={{fontSize:21,margin:"5px 0"}}>AI eligibility & concept-note workspace</h2><p style={{...styles.muted,margin:0}}>Screen geography and donor requirements first. Drafting is blocked unless Tanzania or eligible regional/global coverage is established by the supplied call text.</p></div>
+    <div><div style={styles.eyebrow}>IRPA-DBGS · APPLICATION PREPARATION</div><h2 id="concept-workspace-heading" style={{fontSize:21,margin:"5px 0"}}>AI eligibility & concept-note workspace</h2><p style={{...styles.muted,margin:0}}>Eligibility findings are advisory and do not block drafting. Closed or expired calls are blocked; an unverified current status is flagged for review before submission.</p></div>
     <button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>setWorkspaceOpen(false)}>Close workspace</button>
    </div>
    <label style={{fontSize:12}}>Funding opportunity
