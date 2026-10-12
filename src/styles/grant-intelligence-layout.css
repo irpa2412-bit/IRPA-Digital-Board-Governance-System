@@ -67,3 +67,63 @@
     overflow-wrap: anywhere;
   }
 }
+
+/* Desktop-only recovery: keep the navigation strip in document flow and
+   constrain the funding portal's flex cards to the actual content column.
+   Mobile rules are intentionally untouched. */
+@media (min-width: 761px) {
+  html body #root .app-shell .main-area {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  html body #root .app-shell .main-area > .page-back-next-navigation {
+    position: relative !important;
+    inset: auto !important;
+    float: none !important;
+    transform: none !important;
+    z-index: 1;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    margin: 0 0 12px !important;
+  }
+
+  html body #root .app-shell .main-area > .content-area {
+    position: relative !important;
+    clear: both !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+  }
+
+  .grant-intelligence-portal {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  .grant-intelligence-portal > *,
+  .grant-intelligence-portal section,
+  .grant-intelligence-portal article {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .grant-intelligence-portal article [style*="flex: 1 1 380px"],
+  .grant-intelligence-portal article [style*="flex:1 1 380px"] {
+    flex: 1 1 0% !important;
+    min-width: 0 !important;
+  }
+
+  .grant-intelligence-portal article > div {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .grant-intelligence-portal article > div:last-child > div {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+}
