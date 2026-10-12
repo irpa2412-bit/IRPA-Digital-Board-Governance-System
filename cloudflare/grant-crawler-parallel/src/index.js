@@ -4,7 +4,7 @@ import { handleApplicationPortal } from "./application-portal-handler.js";
 
 
 const FIREBASE_PROJECT_ID = "irpa-digital-board-governance";
-const MAX_DONOR_SCANNERS_PER_RUN = 18;
+const MAX_DONOR_SCANNERS_PER_RUN = 14;
 let firebaseJwkCache = { keys: [], expiresAt: 0 };
 
 function decodeBase64Url(value) {
@@ -341,7 +341,7 @@ function assessFit(item) {
 async function crawl(env) {
   if (!env.GRANTS_DB) throw new Error("The isolated staging D1 database binding is missing.");
   // Run all engine types in parallel, rotating donor-specific scanners through
-  // 18-source batches so the combined crawl remains within the Free Workers
+  // 14-source batches so the combined crawl remains within the Free Workers
   // external-subrequest ceiling. Every configured donor is checked across successive runs.
   const donorRotation = Math.floor(Date.now() / (6 * 60 * 60 * 1000)) * MAX_DONOR_SCANNERS_PER_RUN % DONOR_SCANNERS.length;
   const scheduledDonorScanners = Array.from(
