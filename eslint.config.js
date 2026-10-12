@@ -12,6 +12,8 @@ export default [
       "src/main.jsx",
       "src/config/portalRegistry.js",
       "src/components/PortalNavigation.jsx",
+      "public/dashboard-hero-fix.js",
+      "tests/dashboard-hero-stylesheet.test.mjs",
       "tests/e2e/app-shell.spec.js",
       "playwright.config.js"
     ],
