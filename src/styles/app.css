@@ -10726,43 +10726,68 @@ html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar
 
 
 /* DASHBOARD FORECAST PANE MINIMUM HEIGHT — 20261012-0700 */
-/* Use the established Dashboard :has() selector specificity so earlier hero rules
-   cannot collapse the forecast row. The forecast panes must fill a >=140px row. */
+/* Dashboard-only cascade correction. Match the legacy duplicated-class selector
+   at its source specificity; do not use !important. Forecast day panes fill a
+   minimum 140px third row and share the entire card width equally. */
 @media (min-width: 1200px) {
-  html body #root .main-area:has(> header.topbar.dashboard-topbar) > header.topbar.dashboard-topbar > .topbar-heading-row {
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row {
     min-height: 360px;
   }
-  html body #root .main-area:has(> header.topbar.dashboard-topbar) > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel {
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel.google-weather-panel {
     display: grid;
     grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr);
     grid-template-rows: auto auto minmax(140px, 1fr) auto;
-    grid-template-areas: "label location" "current metrics" "forecast forecast" "footer footer";
+    grid-template-areas: "location location" "current metrics" "forecast forecast" "footer footer";
     align-items: stretch;
     align-content: stretch;
     height: 100%;
     min-height: 340px;
     max-height: none;
   }
-  html body #root .main-area:has(> header.topbar.dashboard-topbar) > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-content {
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel.google-weather-panel .live-weather-content.live-weather-content {
     display: contents;
     height: auto;
     min-height: 0;
     max-height: none;
   }
-  html body #root .main-area:has(> header.topbar.dashboard-topbar) > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-days {
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel.google-weather-panel .live-weather-current.live-weather-current {
+    display: contents;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel.google-weather-panel .live-weather-current-main {
+    grid-area: current;
+    align-self: stretch;
+    min-width: 0;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel.google-weather-panel .live-weather-metrics {
+    grid-area: metrics;
+    align-self: stretch;
+    min-width: 0;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel.google-weather-panel .live-weather-days {
+    grid-area: forecast;
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     grid-template-rows: minmax(140px, 1fr);
     align-items: stretch;
     align-content: stretch;
+    width: 100%;
+    min-width: 0;
     height: auto;
     min-height: 140px;
     max-height: none;
+    margin: 0;
+    padding: 0;
   }
-  html body #root .main-area:has(> header.topbar.dashboard-topbar) > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-day {
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel.google-weather-panel .live-weather-day {
+    width: 100%;
     height: 100%;
+    min-width: 0;
     min-height: 140px;
     align-self: stretch;
     box-sizing: border-box;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel.google-weather-panel .live-weather-attribution {
+    grid-area: footer;
+    align-self: end;
   }
 }
