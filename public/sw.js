@@ -1,8 +1,12 @@
-const CACHE_NAME="irpa-dbgs-app-shell-v40";
+const CACHE_NAME="irpa-dbgs-app-shell-v41";
 const APP_SHELL=["/","/index.html","/manifest.webmanifest"];
 
 self.addEventListener("install",(event)=>{
-  event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(APP_SHELL)).then(()=>self.skipWaiting()));
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache=>cache.addAll(APP_SHELL))
+      .then(()=>self.skipWaiting())
+  );
 });
 
 self.addEventListener("activate",(event)=>{
@@ -22,6 +26,25 @@ function isAppAsset(request){
   );
 }
 
+// Cache writes are deliberately best-effort. A cache failure must never turn
+// a successful network response into an unhandled service-worker rejection.
+function cacheResponse(request,response,event){
+  if(!response || !response.ok || response.type==="opaque") return;
+  try{
+    // Clone synchronously, before handing the original response to the page.
+    // A locked/already-consumed body is skipped instead of breaking the fetch.
+    if(response.bodyUsed || response.body?.locked) return;
+    const copy=response.clone();
+    event.waitUntil(
+      caches.open(CACHE_NAME)
+        .then(cache=>cache.put(request,copy))
+        .catch(error=>console.warn("IRPA app-shell cache write skipped:",error))
+    );
+  }catch(error){
+    console.warn("IRPA app-shell response could not be cloned; returning network response unchanged:",error);
+  }
+}
+
 self.addEventListener("fetch",(event)=>{
   const request=event.request;
   if(request.method!=="GET") return;
@@ -31,8 +54,7 @@ self.addEventListener("fetch",(event)=>{
   if(request.mode==="navigate"){
     event.respondWith(
       fetch(request).then(response=>{
-        const copy=response.clone();
-        caches.open(CACHE_NAME).then(cache=>cache.put("/",copy));
+        cacheResponse("/",response,event);
         return response;
       }).catch(()=>caches.match("/").then(cached=>cached||Response.error()))
     );
@@ -43,9 +65,9 @@ self.addEventListener("fetch",(event)=>{
     event.respondWith(
       caches.match(request).then(cached=>{
         const network=fetch(request).then(response=>{
-          if(response.ok) caches.open(CACHE_NAME).then(cache=>cache.put(request,response.clone()));
+          cacheResponse(request,response,event);
           return response;
-        }).catch(()=>cached);
+        }).catch(()=>cached||Response.error());
         return cached||network;
       })
     );
