@@ -14,7 +14,7 @@
 - [x] Add opt-in Firebase App Check initialization for both the primary and applicant Firebase app instances, controlled by `VITE_FIREBASE_APPCHECK_SITE_KEY`.
 - [x] Upgrade the lint baseline to supported ESLint 10 and add a CLI compatibility check for the Mammoth/argparse dependency override.
 - [x] The refreshed dependency tree reports **0 npm audit vulnerabilities**; assessment, security-baseline and promotion workflows now fail at moderate severity rather than only high/critical.
-- [x] The latest merged candidate `9db7e02` passed `npm audit --audit-level=moderate` with zero vulnerabilities, ESLint 10, production build, Functions syntax checks, Firestore Emulator regression tests, Mammoth CLI compatibility, desktop/mobile Playwright smoke tests and the dashboard hero headless layout check. Evidence: [Assessment Remediation Gates run 38217397946](https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/38217397946).
+- [x] The latest full assessment run on PR head `dc78e3a2` passed `npm audit --audit-level=moderate` with zero vulnerabilities, ESLint 10, production build, Functions syntax checks, Firestore Emulator regression tests, Mammoth CLI compatibility, desktop/mobile Playwright smoke tests and the dashboard hero headless layout check. Evidence: [Assessment Remediation Gates run 38217554480](https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/38217554480).
 - [ ] Review the remaining `glob@10.5.0` deprecation warning; it is not currently reported as an npm audit vulnerability.
 
 ## Required release procedure
