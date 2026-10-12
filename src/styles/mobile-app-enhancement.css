@@ -127,7 +127,7 @@
   }
   html body #root .app-shell .main-area > header.topbar > .topbar-heading-row > .google-weather-panel .live-weather-current-main small {
     display:block!important; margin-top:5px!important; font-size:13px!important;
-    line-height:1.35!important; white-space:normal!important; overflow-wrap:anywhere!important;
+    line-height:1.35!important; white-space:nowrap!important; overflow:hidden!important; text-overflow:ellipsis!important; overflow-wrap:normal!important;
   }
   html body #root .app-shell .main-area > header.topbar > .topbar-heading-row > .google-weather-panel .live-weather-metrics {
     grid-area:metrics!important; display:grid!important;
