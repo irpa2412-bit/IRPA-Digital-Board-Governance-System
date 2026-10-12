@@ -285,3 +285,73 @@ body { margin: 0; }
   min-width: 0;
   max-width: 100%;
 }
+
+
+/* RIGHT-EDGE OVERFLOW CORRECTION — keep navigation and page descendants inside
+   the authoritative content frame without clipping scrollable data tables. */
+.content-area,
+.dashboard-content-area,
+.content-area .page,
+.dashboard-content-area .page {
+  min-width: 0;
+  max-width: 100%;
+}
+.content-area .page :is(
+  .desktop-webapp-navigation-roller,
+  .page-back-next-navigation,
+  .page-back-next-status,
+  .mobile-portal-content-roller,
+  .mobile-nav-sheet,
+  .mobile-nav-sheet-list,
+  .mobile-global-nav,
+  nav,
+  [role="navigation"]
+),
+.dashboard-content-area .page :is(
+  .desktop-webapp-navigation-roller,
+  .page-back-next-navigation,
+  .page-back-next-status,
+  .mobile-portal-content-roller,
+  .mobile-nav-sheet,
+  .mobile-nav-sheet-list,
+  .mobile-global-nav,
+  nav,
+  [role="navigation"]
+) {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+.content-area .page :is(
+  .desktop-webapp-navigation-roller,
+  .page-back-next-navigation,
+  .mobile-nav-sheet-list,
+  .mobile-global-nav
+) > *,
+.dashboard-content-area .page :is(
+  .desktop-webapp-navigation-roller,
+  .page-back-next-navigation,
+  .mobile-nav-sheet-list,
+  .mobile-global-nav
+) > * {
+  min-width: 0;
+  max-width: 100%;
+  flex-shrink: 1;
+}
+.content-area .page :is(
+  .desktop-webapp-navigation-roller,
+  .page-back-next-navigation,
+  .mobile-nav-sheet-list,
+  .mobile-global-nav
+) :is(button, a, [role="button"]),
+.dashboard-content-area .page :is(
+  .desktop-webapp-navigation-roller,
+  .page-back-next-navigation,
+  .mobile-nav-sheet-list,
+  .mobile-global-nav
+) :is(button, a, [role="button"]) {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
