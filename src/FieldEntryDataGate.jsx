@@ -1,4 +1,4 @@
-import React,{useEffect,useState}from"react";
+import React,{useCallback,useEffect,useRef,useState}from"react";
 
 const DATA_TYPES=[
   ["governance","Governance, meetings and resolutions"],
@@ -17,72 +17,164 @@ const ACTUAL_ONLY_PORTAL_HINT=/member|personnel|employee|signature|signer|audito
 const portalRequiresActual=portal=>ACTUAL_ONLY_PORTAL_HINT.test(String(portal||""));
 const verificationMapKey="irpaPortalDataEntryVerifications";
 
-export default function FieldEntryDataGate({portal,bypassPortal=""}){
+/* Portals that must read environment-specific storage as soon as they open (their gateway needs the
+   environment even before any data is typed). The gate still opens only once per portal. Empty this list
+   to make every portal wait for a real data-entry attempt. */
+const OPEN_ON_SELECTION=new Set(["Documents"]);
+
+/* Controls that never count as data entry. Add data-irpa-no-gate to any element or container to opt it out. */
+const NEVER_GATE='[data-irpa-field-gate],[data-irpa-no-gate],.sidebar,.topbar,nav,[role="navigation"],[role="search"],[role="searchbox"]';
+const NON_ENTRY_INPUT=/^(hidden|button|submit|reset|image|search|range)$/i;
+const SEARCH_HINT=/^\s*(search|filter|find)\b/i;
+/* Buttons count as data entry when their label starts with one of these actions. */
+const ENTRY_BUTTON=/^\s*(?:\+\s*)?(add|create|new|save|submit|register|upload|send|invite|approve|reject|issue|record|import|publish|post|vote|cast|sign(?!\s*(in|out)\b)|delete|remove)\b/i;
+
+const readMap=()=>{try{const v=JSON.parse(window.sessionStorage.getItem(verificationMapKey)||"{}");return v&&typeof v==="object"?v:{}}catch{return null}};
+const applyRecord=record=>{
+  try{
+    window.sessionStorage.setItem("irpaFieldEntryVerification",JSON.stringify(record));
+    window.sessionStorage.setItem("irpaDataTypeVerified",record.dataType);
+    window.sessionStorage.setItem("irpaDataEnvironment",record.environment);
+    window.sessionStorage.setItem("irpaDataEnvironmentTarget",record.portal);
+    window.sessionStorage.setItem("irpaDataEnvironmentSelectedAt",record.verifiedAt);
+    window.sessionStorage.setItem("irpaIdentityDataEnvironment","ACTUAL");
+    return true;
+  }catch{return false}
+};
+const labelOf=el=>String(el.getAttribute("aria-label")||el.value||el.textContent||"").trim();
+const isEntryField=el=>{
+  if(!el||!el.matches||el.closest(NEVER_GATE))return false;
+  if(el.matches("textarea,select,[contenteditable=''],[contenteditable='true']"))return !SEARCH_HINT.test(String(el.getAttribute("aria-label")||el.getAttribute("placeholder")||""));
+  if(el.matches("input")){
+    const type=el.getAttribute("type")||"text";
+    if(NON_ENTRY_INPUT.test(type))return false;
+    return !SEARCH_HINT.test(String(el.getAttribute("aria-label")||el.getAttribute("placeholder")||""));
+  }
+  return false;
+};
+const isEntryClick=el=>{
+  if(!el||!el.matches||el.closest(NEVER_GATE))return false;
+  if(el.matches('input[type="checkbox"],input[type="radio"],input[type="file"],input[type="submit"]'))return !SEARCH_HINT.test(String(el.getAttribute("aria-label")||""));
+  if(el.matches('button[type="submit"]'))return true;
+  if(el.matches('button,[role="button"]'))return ENTRY_BUTTON.test(labelOf(el));
+  return false;
+};
+
+export default function FieldEntryDataGate({portal}){
   const currentPortal=String(portal||"Dashboard").trim().replace(/\s+/g," ").slice(0,100)||"Dashboard";
   const[field,setField]=useState(null);
   const[dataType,setDataType]=useState("");
   const[environment,setEnvironment]=useState("");
   const[confirmed,setConfirmed]=useState(false);
   const[storageError,setStorageError]=useState("");
-  const actualOnly=ACTUAL_ONLY_TYPES.has(dataType)||portalRequiresActual(currentPortal);
+  const pending=useRef(null);
+  const openRef=useRef(false);
+  const replaying=useRef(false);
+  const portalRef=useRef(currentPortal);
+  portalRef.current=currentPortal;
+  const actualOnly=ACTUAL_ONLY_TYPES.has(dataType)||portalRequiresActual(field?field.portal:currentPortal);
 
+  const isVerified=useCallback(name=>{const map=readMap();return Boolean(map&&map[name])},[]);
+  const openGate=useCallback((name,attempt)=>{
+    pending.current=attempt||null;
+    setStorageError("");setDataType("");setEnvironment("");setConfirmed(false);
+    openRef.current=true;
+    setField({portal:name});
+  },[]);
+
+  /* Selecting a portal never opens the gate. It re-applies that portal's earlier choice, so the session always matches the portal in view. */
   useEffect(()=>{
-    setStorageError("");
-    if(bypassPortal===currentPortal){setField(null);return;}
-    let verified=false;
-    try{
-      const records=JSON.parse(window.sessionStorage.getItem(verificationMapKey)||"{}");
-      verified=Boolean(records&&records[currentPortal]);
-    }catch{
-      setStorageError("This browser session could not read the verification record. Enable session storage and retry.");
-    }
-    setDataType("");
-    setEnvironment("");
-    setConfirmed(false);
-    if(verified){
-      setField(null);
-      return;
-    }
-    setField({portal:currentPortal});
-  },[currentPortal,bypassPortal]);
+    const map=readMap();
+    if(map===null){setStorageError("This browser session could not read the verification record. Enable session storage and retry.");return}
+    const record=map[currentPortal];
+    if(record)applyRecord(record);
+    else if(OPEN_ON_SELECTION.has(currentPortal)){openGate(currentPortal,null);return}
+    setField(null);openRef.current=false;pending.current=null;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[currentPortal]);
 
+  /* The gate opens only when the user attempts to enter data in a portal that has not been verified yet. */
+  useEffect(()=>{
+    const attempt=(event,el,kind)=>{
+      if(replaying.current||openRef.current)return false;
+      const scope=el.closest("[data-irpa-portal]");
+      const name=String((scope&&scope.getAttribute("data-irpa-portal"))||portalRef.current).trim().replace(/\s+/g," ").slice(0,100)||"Dashboard";
+      if(isVerified(name))return false;
+      event.preventDefault();event.stopPropagation();event.stopImmediatePropagation();
+      if(kind==="field"&&typeof el.blur==="function")el.blur();
+      openGate(name,{el,kind});
+      return true;
+    };
+    const onMouseDown=e=>{const el=e.target&&e.target.closest?e.target.closest("input,textarea,select,[contenteditable]"):null;if(el&&isEntryField(el))attempt(e,el,"field")};
+    const onKeyDown=e=>{
+      if(e.ctrlKey||e.metaKey||e.altKey)return;
+      const printable=e.key&&(e.key.length===1||e.key==="Backspace"||e.key==="Delete"||e.key==="Enter");
+      if(!printable)return;
+      const el=e.target;
+      if(el&&el.matches&&el.matches("input,textarea,select,[contenteditable]")&&isEntryField(el))attempt(e,el,"field");
+    };
+    const onBeforeInput=e=>{const el=e.target;if(el&&el.matches&&isEntryField(el))attempt(e,el,"field")};
+    const onClick=e=>{const el=e.target&&e.target.closest?e.target.closest('button,[role="button"],input'):null;if(el&&isEntryClick(el))attempt(e,el,"click")};
+    const onSubmit=e=>{const form=e.target;if(form&&form.matches&&form.matches("form")&&!form.closest(NEVER_GATE))attempt(e,form,"submit")};
+    document.addEventListener("mousedown",onMouseDown,true);
+    document.addEventListener("keydown",onKeyDown,true);
+    document.addEventListener("beforeinput",onBeforeInput,true);
+    document.addEventListener("click",onClick,true);
+    document.addEventListener("submit",onSubmit,true);
+    return()=>{
+      document.removeEventListener("mousedown",onMouseDown,true);
+      document.removeEventListener("keydown",onKeyDown,true);
+      document.removeEventListener("beforeinput",onBeforeInput,true);
+      document.removeEventListener("click",onClick,true);
+      document.removeEventListener("submit",onSubmit,true);
+    };
+  },[isVerified,openGate]);
+
+  const close=()=>{setField(null);openRef.current=false;pending.current=null};
   const proceed=()=>{
     if(!field||!dataType||!environment||(environment==="ACTUAL"&&!confirmed))return;
     if(actualOnly&&environment!=="ACTUAL")return;
     const selectedEnvironment=actualOnly?"ACTUAL":environment;
-    const verifiedAt=new Date().toISOString();
-    const record={dataType,environment:selectedEnvironment,portal:currentPortal,verifiedAt};
-    try{
-      const existing=JSON.parse(window.sessionStorage.getItem(verificationMapKey)||"{}");
-      window.sessionStorage.setItem(verificationMapKey,JSON.stringify({...existing,[currentPortal]:record}));
-      window.sessionStorage.setItem("irpaFieldEntryVerification",JSON.stringify(record));
-      window.sessionStorage.setItem("irpaDataTypeVerified",dataType);
-      window.sessionStorage.setItem("irpaDataEnvironment",selectedEnvironment);
-      window.sessionStorage.setItem("irpaDataEnvironmentTarget",currentPortal);
-      window.sessionStorage.setItem("irpaDataEnvironmentSelectedAt",verifiedAt);
-      window.sessionStorage.setItem("irpaIdentityDataEnvironment","ACTUAL");
-    }catch{
+    const record={dataType,environment:selectedEnvironment,portal:field.portal,verifiedAt:new Date().toISOString()};
+    const existing=readMap();
+    if(existing===null||!applyRecord(record)){
       setStorageError("Verification could not be saved in this browser session. The gate remains locked; enable session storage and retry.");
       return;
     }
-    setField(null);
+    try{window.sessionStorage.setItem(verificationMapKey,JSON.stringify({...existing,[field.portal]:record}))}catch{
+      setStorageError("Verification could not be saved in this browser session. The gate remains locked; enable session storage and retry.");
+      return;
+    }
+    const resume=pending.current;
+    close();
+    /* Give the person back what they were doing: refocus the field, or repeat the click/submit once the gate has closed. */
+    if(resume&&resume.el&&document.contains(resume.el)){
+      replaying.current=true;
+      setTimeout(()=>{
+        try{
+          if(resume.kind==="field"&&resume.el.focus)resume.el.focus();
+          else if(resume.kind==="click"&&resume.el.click)resume.el.click();
+          else if(resume.kind==="submit"&&resume.el.requestSubmit)resume.el.requestSubmit();
+        }finally{replaying.current=false}
+      },0);
+    }
   };
 
   if(!field)return null;
   const disabled=!dataType||!environment||(environment==="ACTUAL"&&!confirmed)||(actualOnly&&environment!=="ACTUAL");
-  return <div data-irpa-field-gate role="dialog" aria-modal="true" aria-labelledby="irpa-field-gate-title" onKeyDown={e=>{if(e.key==="Escape")e.preventDefault();}} style={{position:"fixed",inset:0,zIndex:30000,display:"flex",alignItems:"center",justifyContent:"center",padding:20,background:"rgba(3,12,10,.78)",backdropFilter:"blur(5px)",overflowY:"auto"}}>
+  return <div data-irpa-field-gate role="dialog" aria-modal="true" aria-labelledby="irpa-field-gate-title" onKeyDown={e=>{if(e.key==="Escape"){e.preventDefault();close()}}} style={{position:"fixed",inset:0,zIndex:30000,display:"flex",alignItems:"center",justifyContent:"center",padding:20,background:"rgba(3,12,10,.78)",backdropFilter:"blur(5px)",overflowY:"auto"}}>
     <section style={{width:"min(100%,680px)",maxHeight:"92vh",overflowY:"auto",background:"var(--surface, #fff)",color:"var(--text, #14231f)",border:"1px solid var(--border, #cbd5d1)",borderRadius:18,padding:24,boxShadow:"0 24px 80px rgba(0,0,0,.35)"}}>
       <div style={{fontSize:12,fontWeight:800,letterSpacing:1.4,textTransform:"uppercase",opacity:.75}}>IRPA · Data Control</div>
       <h2 id="irpa-field-gate-title" style={{margin:"8px 0 6px",fontSize:25}}>Confirm this portal’s data environment</h2>
-      <p style={{margin:"0 0 16px",lineHeight:1.5}}>This gate opens when a portal or sub-portal is selected. Confirm its data environment once to enable data entry throughout this portal for the current browser session. Each different portal or sub-portal is verified separately.</p>
+      <p style={{margin:"0 0 16px",lineHeight:1.5}}>You are about to enter data. Confirm this portal’s data environment once to continue. It then stays closed throughout this portal for the current browser session, and opens again only when you first try to enter data in a different portal or sub-portal. Each different portal or sub-portal is verified separately.</p>
       <div style={{padding:12,borderRadius:10,background:"var(--surface-muted, #f1f5f3)",marginBottom:18}}>
-        <strong>Selected portal / sub-portal:</strong> {currentPortal}
+        <strong>Selected portal / sub-portal:</strong> {field.portal}
       </div>
       <fieldset style={{border:0,padding:0,margin:"0 0 18px"}}>
         <legend style={{fontWeight:750,marginBottom:10}}>1. What type of data will this portal handle? (Required)</legend>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:8}}>
           {DATA_TYPES.map(([value,label])=><label key={value} style={{display:"flex",alignItems:"flex-start",gap:9,padding:11,border:"1px solid var(--border, #cbd5d1)",borderRadius:9,cursor:"pointer"}}>
-            <input type="radio" name="irpa-data-type" value={value} checked={dataType===value} onChange={()=>{setDataType(value);if(ACTUAL_ONLY_TYPES.has(value)||portalRequiresActual(currentPortal)){setEnvironment("ACTUAL");setConfirmed(false)}else if(environment==="ACTUAL"){setConfirmed(false)}}} style={{marginTop:3}}/>
+            <input type="radio" name="irpa-data-type" value={value} checked={dataType===value} onChange={()=>{setDataType(value);if(ACTUAL_ONLY_TYPES.has(value)||portalRequiresActual(field.portal)){setEnvironment("ACTUAL");setConfirmed(false)}else if(environment==="ACTUAL"){setConfirmed(false)}}} style={{marginTop:3}}/>
             <span>{label}</span>
           </label>)}
         </div>
@@ -101,7 +193,7 @@ export default function FieldEntryDataGate({portal,bypassPortal=""}){
       </label>}
       {environment==="TRIAL"&&<p style={{padding:12,borderRadius:9,background:"var(--surface-muted, #f1f5f3)",lineHeight:1.45}}>Use test records only. Do not enter confidential live information into trial records. Identity and security configuration remain in ACTUAL DATA.</p>}
       {storageError&&<p role="alert" style={{padding:12,borderRadius:9,background:"#fff1f0",color:"#9b1c1c"}}>{storageError}</p>}
-      <button type="button" disabled={disabled} onClick={proceed} style={{width:"100%",minHeight:46,marginTop:8,border:0,borderRadius:9,fontWeight:800,cursor:disabled?"not-allowed":"pointer",opacity:disabled?.55:1}}>Confirm environment and enter portal</button>
+      <button type="button" disabled={disabled} onClick={proceed} style={{width:"100%",minHeight:46,marginTop:8,border:0,borderRadius:9,fontWeight:800,cursor:disabled?"not-allowed":"pointer",opacity:disabled?.55:1}}>Confirm environment and continue</button><button type="button" onClick={close} style={{width:"100%",minHeight:42,marginTop:8,border:"1px solid var(--border, #cbd5d1)",borderRadius:9,background:"transparent",fontWeight:700,cursor:"pointer"}}>Cancel — I am not entering data</button>
     </section>
   </div>;
 }
