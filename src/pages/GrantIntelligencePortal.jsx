@@ -191,7 +191,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
      setCrawlerSources(uniqueSources.map(sourceUrl=>({id:sourceUrl,name:(()=>{try{return new URL(sourceUrl).hostname}catch{return sourceUrl}})(),url:sourceUrl,status:"Fetched",candidateCount:items.filter(item=>item.source_url===sourceUrl).length})));
      setCrawlerRecords(items.map(item=>({
        id:"crawler-"+item.id,title:item.title||"Untitled opportunity",
-       funder:item.funder||item.source_name||(()=>{try{return new URL(item.source_url||item.url).hostname.replace(/^www\\./,"")}catch{return "Funder not verified"}})(),
+       funder:item.funder||item.source_name||(()=>{try{return new URL(item.source_url||item.url).hostname.replace(/^www\./,"")}catch{return "Funder not verified"}})(),
        url:item.url||item.source_url||"",source_url:item.source_url||"",deadline:item.deadline_at||null,
        country:item.country||(item.geography_assessment==="tanzania_mentioned"?"Tanzania":item.geography_assessment==="regional_or_lmic_scope"?"Regional / LMIC":"Not verified"),
        amount:item.amount||"Not stated",summary:item.description||"No description supplied by source.",
