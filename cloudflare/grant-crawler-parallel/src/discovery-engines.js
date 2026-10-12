@@ -335,12 +335,12 @@ export async function readDonorScanner(scanner) {
 }
 
 export const SEARCH_QUERIES = [
-  '"call for proposals" OR grant OR funding pastoralism rangeland grazing dryland restoration Tanzania East Africa',
-  '"livestock development" OR "animal health" OR veterinary OR fodder OR forage grants Tanzania Africa',
-  '"livestock market" OR "market access" OR "value addition" OR "value chain" leather dairy meat funding Africa',
+  '"call for proposals" OR grant OR funding pastoralism rangeland grazing dryland restoration "pastoral mobility" "communal rangelands" "invasive plant species" Maasai Tanzania East Africa',
+  '"livestock development" OR "animal health" OR "veterinary services" OR "livestock breeding" OR "fodder banks" OR forage grants Tanzania Africa',
+  '"livestock market" OR "market access" OR "value addition" OR "livestock value chain" OR "hides and skins" OR "meat processing" OR leather dairy funding Africa',
   '"climate adaptation" OR drought OR "early warning" OR "water security" OR "renewable energy" OR solar grant Tanzania East Africa',
   '"biodiversity conservation" OR "ecosystem restoration" OR "invasive species" OR "nature-based solutions" funding Africa',
-  '"women-led" OR youth OR "gender equality" OR "social inclusion" grants livelihoods Tanzania Africa',
+  '"women-led" OR youth OR "gender equality" OR "social inclusion" OR "women economic empowerment" OR "youth groups" OR GESI grants livelihoods Tanzania Africa',
   '"Indigenous Peoples" OR pastoralist OR "community-led" grants climate resilience East Africa',
   '"market systems" OR "market linkages" OR "small enterprise" OR entrepreneurship OR "seed funding" OR "capacity building grant" women youth Africa',
   '"research grant" OR innovation OR "knowledge management" OR "community monitoring" rangeland livestock Africa',
