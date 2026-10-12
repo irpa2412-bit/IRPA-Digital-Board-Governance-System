@@ -266,32 +266,22 @@ body { margin: 0; }
 }
 
 
-/* STANDARD PAGE FRAME — shared measurement for every portal and sub-portal.
-   The outer content area owns viewport gutters; the page owns a consistent
-   readable maximum width. Narrow viewports use the full available inner width.
-   This changes layout sizing only; it does not alter portal behavior or data.
+/* AUTHORITATIVE PAGE-WIDTH CONTRACT
+   The page owns its width; contents must conform to this boundary.
+   Preserve each page's existing display model and specialised layout.
+   Parent content areas continue to own viewport gutters and sidebar geometry.
 */
-.content-area > .page,
-.dashboard-content-area > .page {
-  display: grid;
+.content-area .page,
+.dashboard-content-area .page {
+  box-sizing: border-box;
   width: 100%;
   max-width: 1500px;
   min-width: 0;
   margin-inline: auto;
-  box-sizing: border-box;
 }
-.content-area > .page > *,
-.dashboard-content-area > .page > * {
+.content-area .page > *,
+.dashboard-content-area .page > * {
+  box-sizing: border-box;
   min-width: 0;
   max-width: 100%;
-  box-sizing: border-box;
-}
-@media (max-width: 760px) {
-  .content-area > .page,
-  .dashboard-content-area > .page {
-    width: 100%;
-    max-width: 100%;
-    margin-inline: 0;
-    gap: 12px;
-  }
 }
