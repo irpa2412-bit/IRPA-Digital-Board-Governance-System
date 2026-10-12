@@ -10727,7 +10727,7 @@ html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar
 
 /* DASHBOARD FORECAST PANE MINIMUM HEIGHT — 20261012-0700 */
 /* Dashboard-only cascade correction. Match the legacy duplicated-class selector
-   at its source specificity; do not use !important. Forecast day panes fill a
+   at its source specificity without forced-priority overrides. Forecast day panes fill a
    minimum 140px third row and share the entire card width equally. */
 @media (min-width: 1200px) {
   html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row {
