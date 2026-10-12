@@ -50,6 +50,11 @@
   "overrides": {
     "@grpc/grpc-js": "^1.13.6",
     "basic-ftp": "^6.2.1",
-    "chokidar": "^4.0.3"
+    "chokidar": "^4.0.3",
+    "@opentelemetry/core": "^2.8.0",
+    "uuid": "^11.1.1",
+    "mammoth": {
+      "argparse": "2.0.1"
+    }
   }
 }
