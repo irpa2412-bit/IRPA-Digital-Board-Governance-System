@@ -148,7 +148,7 @@ export default function FieldEntryDataGate({portal}){
       openGate(name,{el,kind,key:event.type==="keydown"?event.key:null,inputType:event.inputType||"",data:event.data??null,selectionStart:Number.isInteger(el.selectionStart)?el.selectionStart:null,selectionEnd:Number.isInteger(el.selectionEnd)?el.selectionEnd:null});
       return true;
     };
-    const onMouseDown=e=>{const el=e.target&&e.target.closest?e.target.closest("select,input[type="checkbox"],input[type="radio"],input[type="file"]"):null;if(el&&isEntryField(el))attempt(e,el,"field")};
+    const onMouseDown=e=>{const el=e.target&&e.target.closest?e.target.closest('select,input[type="checkbox"],input[type="radio"],input[type="file"]'):null;if(el&&isEntryField(el))attempt(e,el,"field")};
     const onKeyDown=e=>{
       if(e.ctrlKey||e.metaKey||e.altKey)return;
       const printable=e.key&&(e.key.length===1||e.key==="Backspace"||e.key==="Delete"||e.key==="Enter");
