@@ -91,7 +91,7 @@ async function fetchSource(s){
       return hub(body,r.url);
     }catch(error){
       lastError=error;
-      if(attempt<2&&/HTTP 429|HTTP 5\d\d|timed out|timeout|network|fetch failed|Search fallback HTTP 429/i.test(String(error?.message||error))){
+      if(error?.retryable!==false&&attempt<2&&/HTTP 429|HTTP 5\d\d|timed out|timeout|network|fetch failed|Search fallback HTTP 429/i.test(String(error?.message||error))){
         await new Promise(resolve=>setTimeout(resolve,250*(2**attempt)));
         continue;
       }
