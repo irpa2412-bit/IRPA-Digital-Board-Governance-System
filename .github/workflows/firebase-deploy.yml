@@ -42,7 +42,7 @@ jobs:
           VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
           VITE_GOOGLE_DRIVE_GATEWAY_URL: ${{ secrets.VITE_GOOGLE_DRIVE_GATEWAY_URL }}
           VITE_GATEWAY_ORIGIN: ${{ secrets.VITE_GATEWAY_ORIGIN || 'https://irpa-google-drive-gateway.irpa-governance.workers.dev' }}
-          VITE_GRANT_CRAWLER_WORKER_URL: https://irpa-grant-crawler-production.irpa-governance.workers.dev
+          VITE_GRANT_CRAWLER_WORKER_URL: https://irpa-dbgs-grant-crawler.irpa-governance.workers.dev
           VITE_GOOGLE_WEATHER_API_KEY: ${{ secrets.VITE_GOOGLE_WEATHER_API_KEY }}
         run: npm run build
 
@@ -50,15 +50,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if grep -R -q 'irpa-dbgs-grant-crawler.irpa-governance.workers.dev' dist; then
-            echo 'Production bundle still references the obsolete grant crawler Worker.' >&2
+          if grep -R -q 'irpa-grant-crawler-production.irpa-governance.workers.dev' dist; then
+            echo 'Production bundle still references the obsolete grant crawler Worker hostname.' >&2
             exit 1
           fi
-          if ! grep -R -q 'irpa-grant-crawler-production.irpa-governance.workers.dev' dist; then
-            echo 'Production bundle does not reference the isolated production grant crawler Worker.' >&2
+          if ! grep -R -q 'https://irpa-dbgs-grant-crawler.irpa-governance.workers.dev' dist; then
+            echo 'Production bundle does not reference the deployed irpa-dbgs-grant-crawler Worker.' >&2
             exit 1
           fi
-          echo 'Production bundle points to the isolated grant crawler Worker.'
+          echo 'Production bundle points to the deployed irpa-dbgs-grant-crawler Worker.'
 
       - name: Independent production readability verification
         run: npm run verify:production-readability
