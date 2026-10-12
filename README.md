@@ -77,3 +77,21 @@ Before production use, verify Firebase Authentication providers, authorized doma
 ## PDF Upload and E-Signature Module
 
 The controlled repair branch contains the isolated PDF upload/e-signature implementation under `drive-gateway/src/`. Run `cd drive-gateway && npm install && npm test` for the 18-case CI suite. The module remains isolated until adapter and Worker-route integration is explicitly approved.
+
+## Assessment remediation and release evidence
+
+The current remediation priorities, operational prerequisites, acceptance criteria, and controlled-release procedure are tracked in [the Assessment Remediation Runbook](docs/ASSESSMENT_REMEDIATION_RUNBOOK.md).
+
+The repository also contains more modules and supporting services than the short historical list above. Treat the module list as a high-level summary, not a complete inventory. The assessment remediation gates validate the dependency audit, production build, selected governance policy tests, and a Playwright app-shell smoke test. A passing smoke test is not a substitute for full authenticated end-to-end tests or an independent security assessment.
+
+### Verification commands
+
+```bash
+npm ci
+npm audit --audit-level=high
+npm run build
+npx playwright install chromium
+npx playwright test
+```
+
+Firestore rules tests require the Firebase emulator and should be run through the existing security-baseline workflow. Production promotion remains blocked until the exact candidate passes all required gates and the operational controls in the runbook have been verified.
