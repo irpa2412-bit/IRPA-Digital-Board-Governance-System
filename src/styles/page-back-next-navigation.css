@@ -48,7 +48,7 @@
   overflow-wrap: anywhere;
 }
 #root .app-shell .main-area > .page-back-next-navigation .page-back-next-status > span {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.25;
   letter-spacing: .08em;
   overflow-wrap: anywhere;
@@ -80,7 +80,7 @@
     line-height: 1.25;
   }
   #root .app-shell .main-area > .page-back-next-navigation .page-back-next-status > span {
-    font-size: 10px;
+    font-size: 12px;
     letter-spacing: .04em;
   }
   #root .app-shell .main-area > .page-back-next-navigation .page-back-next-status > strong {
