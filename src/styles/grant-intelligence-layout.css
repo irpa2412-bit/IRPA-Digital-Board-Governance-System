@@ -1,0 +1,65 @@
+/* Scoped containment for the Grant Intelligence & Funding Opportunities portal.
+   Keep long opportunity titles, publisher URLs and result metadata inside the page
+   without clipping the overall document or changing shared navigation. */
+.grant-intelligence-portal {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.grant-intelligence-portal,
+.grant-intelligence-portal * {
+  box-sizing: border-box;
+  min-width: 0;
+}
+.grant-intelligence-portal > *,
+.grant-intelligence-portal article,
+.grant-intelligence-portal section,
+.grant-intelligence-portal form,
+.grant-intelligence-portal details {
+  max-width: 100%;
+}
+.grant-intelligence-portal article,
+.grant-intelligence-portal article > *,
+.grant-intelligence-portal article > * > * {
+  overflow-wrap: anywhere;
+}
+.grant-intelligence-portal article [style*="flex: 1 1 300px"] {
+  flex: 1 1 0%;
+  min-width: 0;
+}
+.grant-intelligence-portal article [style*="minWidth: 150"],
+.grant-intelligence-portal article [style*="minWidth:150"],
+.grant-intelligence-portal article [style*="minWidth: 105"],
+.grant-intelligence-portal article [style*="minWidth:105"] {
+  min-width: 0 !important;
+}
+.grant-intelligence-portal button,
+.grant-intelligence-portal a,
+.grant-intelligence-portal input,
+.grant-intelligence-portal select,
+.grant-intelligence-portal textarea {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.grant-intelligence-portal form > *,
+.grant-intelligence-portal article > div {
+  min-width: 0;
+}
+@media (max-width: 760px) {
+  .grant-intelligence-portal {
+    width: 100%;
+    max-width: 100%;
+  }
+  .grant-intelligence-portal article > div:first-child {
+    gap: 8px;
+  }
+  .grant-intelligence-portal article [style*="justify-content: space-between"] {
+    justify-content: flex-start !important;
+  }
+  .grant-intelligence-portal article a,
+  .grant-intelligence-portal article button {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
