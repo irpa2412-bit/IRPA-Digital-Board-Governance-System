@@ -414,6 +414,43 @@ async function readBingSearch() {
   const items = results.flatMap(result => result.items), errors = results.filter(result => result.error).map(result => result.error);
   return { items, stats: { configured: true, provider: "Bing RSS", queries: SEARCH_QUERIES.length, found: items.length, errors } };
 }
+export async function readGdeltSearch() {
+  const batchCount = Math.ceil(GDELT_QUERIES.length / SEARCH_BATCH_SIZE);
+  const batch = Math.floor(Date.now() / (6 * 60 * 60 * 1000)) % batchCount;
+  const queries = GDELT_QUERIES.slice(batch * SEARCH_BATCH_SIZE, Math.min((batch + 1) * SEARCH_BATCH_SIZE, GDELT_QUERIES.length));
+  const settled = await Promise.all(queries.map(async query => {
+    try {
+      const url = new URL("https://api.gdeltproject.org/api/v2/doc/doc");
+      url.searchParams.set("query", query);
+      url.searchParams.set("mode", "ArtList");
+      url.searchParams.set("format", "json");
+      url.searchParams.set("maxrecords", "10");
+      url.searchParams.set("sort", "HybridRel");
+      url.searchParams.set("timespan", "1y");
+      const response = await fetch(url.href, { headers: { accept: "application/json", "user-agent": USER_AGENT }, signal: AbortSignal.timeout(12_000) });
+      if (!response.ok) throw new Error("GDELT search HTTP " + response.status);
+      const body = await response.json();
+      const items = (Array.isArray(body.articles) ? body.articles : []).map(article => {
+        let articleUrl = ""; try { articleUrl = normalizeOpportunityUrl(article.url); } catch {}
+        const title = decodeHtml(article.title || "").slice(0, 500);
+        const description = [article.domain, article.sourceCountry, article.language].filter(Boolean).join(" · ").slice(0, 1000);
+        const dateText = String(article.seendate || "");
+        const publishedAt = /^\\d{8}T\\d{6}Z$/.test(dateText)
+          ? dateText.slice(0, 4) + "-" + dateText.slice(4, 6) + "-" + dateText.slice(6, 8) + "T" + dateText.slice(9, 11) + ":" + dateText.slice(11, 13) + ":" + dateText.slice(13, 15) + "Z"
+          : null;
+        if (!title || !articleUrl || !isSpecificOpportunity(title, description)) return null;
+        return { title, description, url: articleUrl, publishedAt, sourceUrl: articleUrl, discoveryEngine: "gdelt_search", discoveryEvidence: "GDELT index result; verify the linked publisher page and original issuer call before applying." };
+      }).filter(Boolean);
+      return { items, error: null };
+    } catch (error) {
+      return { items: [], error: { query, error: String(error.message || error).slice(0, 180) } };
+    }
+  }));
+  const items = settled.flatMap(result => result.items);
+  const errors = settled.filter(result => result.error).map(result => result.error);
+  return { items, stats: { configured: true, provider: "GDELT DOC API", queries: queries.length, queryCatalogSize: GDELT_QUERIES.length, found: items.length, errors } };
+}
+
 export async function readWebSearch(env) {
   const apiKey = String(env.BRAVE_SEARCH_API_KEY || "").trim();
   if (!apiKey) {
