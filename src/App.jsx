@@ -445,10 +445,10 @@ function LiveWeatherPanel(){
     <div className="live-weather-current-main"><span className="live-weather-icon" aria-hidden="true">{icon(current?.weatherCondition?.type)}</span><div><strong>{Number.isFinite(temp)?fmt(temp,"°C"):(loading?"Loading…":"—")}</strong><small>{placeWeather?condition:(error||"Connecting to live weather…")} · feels like {fmt(feels,"°C")}</small></div></div>
     <div className="live-weather-metrics"><span>💧 Humidity <b>{fmt(current?.relativeHumidity,"%")}</b></span><span>💨 Wind <b>{fmt(current?.wind?.speed?.value," km/h")}</b></span><span>🌧️ Rain chance <b>{fmt(rain,"%")}</b></span></div>
    </div>
-   {forecastExpanded&&<>
+   <>
    <div className="live-weather-days">{daily.slice(0,3).map((day,index)=>{const forecast=day.daytimeForecast||day.nighttimeForecast||{},high=day.maxTemperature?.degrees,low=day.minTemperature?.degrees,type=forecast.weatherCondition?.type,text=forecast.weatherCondition?.description?.text||"Forecast unavailable",p=forecast.precipitation?.probability?.percent??day.precipitation?.probability?.percent;const date=day.interval?.startTime||day.interval?.startDate;return <div className="live-weather-day" key={date||index}><strong>{index===0?"Today":new Intl.DateTimeFormat("en-GB",{weekday:"short",day:"2-digit",month:"short",timeZone:"Africa/Dar_es_Salaam"}).format(new Date(date||Date.now()))}</strong><span className="live-weather-day-icon" aria-label={text} title={text}>{icon(type)}</span><b>{fmt(high,"°")} / {fmt(low,"°")}</b><small>{text}</small><small>Rain {fmt(p,"%")}</small></div>})}</div>
    <div className="live-weather-attribution"><span>LIVE FORECAST</span><small>{lastUpdated?"Updated "+new Intl.DateTimeFormat("en-GB",{dateStyle:"medium",timeStyle:"short",timeZone:"Africa/Dar_es_Salaam"}).format(new Date(lastUpdated))+" · refreshes every 15 minutes · location rolls every 8 seconds":error||"Fetching live forecasts for 12 locations…"}</small></div>
-  </>}
+  </>
  </div>;
 }
 const IRPA_SESSION_RECOVERY_KEY="irpaSessionRecovery";const IRPA_INACTIVITY_LIMIT_MS=5*60*1000;const IRPA_RECOVERY_MAX_AGE_MS=24*60*60*1000;function readIrpaRecovery(){try{const raw=window.localStorage.getItem(IRPA_SESSION_RECOVERY_KEY);if(!raw)return null;const value=JSON.parse(raw);if(!value||Date.now()-Number(value.savedAt||0)>IRPA_RECOVERY_MAX_AGE_MS){window.localStorage.removeItem(IRPA_SESSION_RECOVERY_KEY);return null}return value}catch{return null}}function writeIrpaRecovery(snapshot){try{window.localStorage.setItem(IRPA_SESSION_RECOVERY_KEY,JSON.stringify({...snapshot,savedAt:Date.now()}))}catch{}}
