@@ -280,7 +280,8 @@ function assessFit(item) {
   ];
   const strategicTracks = [...new Set(coreTracks.filter(([label]) => matched.some(signal => signal.label === label)).map(([, track]) => track))];
   if (matched.some(signal => ["climate adaptation/resilience", "gender equality/social inclusion", "youth empowerment", "community participation/indigenous peoples", "research/innovation/knowledge management", "governance/institutional capacity", "water/food security/livelihoods"].includes(signal.label))) strategicTracks.push("cross_cutting");
-  if (digitalGovernanceMatch && strategicTracks.length === 0) strategicTracks.push("digital_governance_DBGS_investment");
+  const hasCoreTrack = strategicTracks.some(track => ["sustainable_rangeland_management", "livestock_development", "market_development"].includes(track));
+  if (digitalGovernanceMatch && !hasCoreTrack && !strategicTracks.includes("digital_governance_DBGS_investment")) strategicTracks.unshift("digital_governance_DBGS_investment");
   const strategicTrack = strategicTracks[0] || (digitalGovernanceMatch ? "digital_governance_DBGS_investment" : "cross_cutting");
   const fitAssessment = score >= 30 ? "strong_topic_match" : score >= 12 ? "possible_topic_match" : "low_topic_match";
   const sourceIsOpenFeed = /(?:^|[?&])fund_state=open(?:&|$)/i.test(item.sourceUrl || "");
