@@ -1,0 +1,52 @@
+name: Dashboard Hero Headless Layout Check
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/styles/readability-harmony.css"
+      - "src/styles/portal-typography.css"
+      - "index.html"
+      - "public/dashboard-hero-fix.js"
+      - "scripts/dashboard-hero-layout-check.mjs"
+      - ".github/workflows/dashboard-hero-check.yml"
+permissions:
+  contents: write
+jobs:
+  dashboard-hero-layout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install application dependencies
+        run: npm ci
+      - name: Install headless Chromium
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Build production CSS
+        run: npm run build
+      - name: Diagnose, measure, and capture Dashboard hero
+        run: node scripts/dashboard-hero-layout-check.mjs
+      - name: Save screenshot in repository
+        run: |
+          cp dashboard-hero-check.png "$RUNNER_TEMP/dashboard-hero-check.png"
+          git fetch origin main
+          git checkout -B dashboard-hero-screenshot origin/main
+          cp "$RUNNER_TEMP/dashboard-hero-check.png" dashboard-hero-check.png
+          git add dashboard-hero-check.png
+          if ! git diff --cached --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "Add Dashboard hero headless layout screenshot [skip ci]"
+            git push origin HEAD:main
+          else
+            echo "Screenshot is unchanged; no commit required."
+          fi
