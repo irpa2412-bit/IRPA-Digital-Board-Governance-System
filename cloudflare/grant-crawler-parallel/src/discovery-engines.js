@@ -1,7 +1,7 @@
 const MAX_SOURCE_PAGES = 20;
 const MAX_PAGE_BYTES = 1_000_000;
 const MAX_PAGE_LINKS = 8;
-const MAX_TOTAL_DETAIL_PAGES = 1;
+const MAX_TOTAL_DETAIL_PAGES = 4;
 const MAX_SOURCE_PAGES_PER_RUN = 4;
 const USER_AGENT = "IRPA-GrantDiscovery/1.0 (+https://www.irpa.or.tz)";
 const GRANT_TERMS = /grant|funding|fund|call for proposals|call for applications|request for proposals|request for applications|expression of interest|small grant|challenge fund|fellowship|award|open call|apply now|application window|tender opportunity|rolling calls?|rolling basis|rolling applications?|year.round applications?|ongoing calls?|continuous application|no fixed deadline|deadline|closing date|capacity building|seed funding|pastoralism|pastoralist|rangeland|dryland|grazing|land restoration|land degradation|invasive species|grassland|livestock|animal health|veterinary|fodder|forage|livestock market|value chain|value addition|meat processing|dairy|leather|hides and skins|market access|market systems|climate adaptation|climate resilience|drought|early warning|water security|biodiversity|ecosystem restoration|nature-based solutions|agroecology|irrigation|women.s empowerment|gender equality|gender equity|social inclusion|disability inclusion|indigenous peoples|youth|young people|women-led|community-led|community based|civil society|local organizations|livelihoods?|food security|nutrition|renewable energy|solar energy|energy access|entrepreneurship|economic empowerment|research|innovation|knowledge management|digital inclusion|community development/i;
