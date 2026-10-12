@@ -14,7 +14,8 @@
     "check:production-readability": "node scripts/check-production-readability.mjs",
     "verify:production-readability": "node scripts/verify-production-readability.mjs",
     "test:finance-policy": "node --test tests/finance-portal-policy.test.cjs",
-    "test:security-rules": "node --test tests/meeting-category-firestore-rules.test.cjs tests/finance-portal-policy.test.cjs"
+    "test:security-rules": "node --test tests/meeting-category-firestore-rules.test.cjs tests/finance-portal-policy.test.cjs",
+    "lint": "eslint src/App.jsx src/main.jsx src/config/portalRegistry.js src/components/PortalNavigation.jsx tests/e2e/app-shell.spec.js playwright.config.js"
   },
   "dependencies": {
     "firebase": "^11.10.0",
@@ -41,7 +42,10 @@
     "@capacitor/cli": "^8.0.0",
     "typescript": "^5.9.2",
     "@firebase/rules-unit-testing": "^4.0.1",
-    "@playwright/test": "^1.55.0"
+    "@playwright/test": "^1.55.0",
+    "@eslint/js": "^9.36.0",
+    "eslint": "^9.36.0",
+    "globals": "^16.4.0"
   },
   "overrides": {
     "@grpc/grpc-js": "^1.13.6",
