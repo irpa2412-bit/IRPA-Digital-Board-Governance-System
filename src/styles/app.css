@@ -10565,3 +10565,14 @@ html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-ro
 
 /* Dashboard-only overhead-to-hero spacing */
 html body #root .main-area:has(> header.topbar.dashboard-topbar) > .page-back-next-navigation { margin-bottom: 0; }
+
+
+/* Institutional Evidence Exchange: reclaim excess vertical gap above the panel. */
+.main-area > .content-area > .institutional-evidence-exchange-panel {
+  margin-top: -24px;
+}
+@media (max-width: 767px) {
+  .main-area > .content-area > .institutional-evidence-exchange-panel {
+    margin-top: -12px;
+  }
+}
