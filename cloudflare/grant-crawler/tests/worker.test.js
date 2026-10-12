@@ -8,7 +8,7 @@ test("health endpoint exposes service identity without credentials", async () =>
   const body = await response.json();
   assert.equal(body.ok, true);
   assert.equal(body.project, "irpa-digital-board-governance");
-  assert.equal(body.sourceCount, 11);
+  assert.equal(body.sourceCount, 15);
   assert.ok(body.capabilities.includes("opportunities"));
   assert.ok(body.capabilities.includes("saved_drafts"));
 });
