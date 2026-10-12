@@ -37,7 +37,7 @@ The intended governance chain is:
 
 **Meeting → Proceedings → Resolution → Voting → Decision → Action → Accountability**
 
-The repository currently contains the Meeting, Resolution and Voting foundations. The remaining workflow integrations are deliberately being completed only after the repository and application foundation has been cleaned and verified.
+The application contains meeting, resolution, voting and shared governance workspace modules, including Actions, Decisions and Reports. End-to-end traceability across the full chain still requires authenticated integration tests and independent evidence review before the platform is represented as audit-validated.
 
 ## Repository hygiene
 
@@ -89,9 +89,11 @@ The repository also contains more modules and supporting services than the short
 ```bash
 npm ci
 npm audit --audit-level=high
+npm run lint
 npm run build
+npx firebase emulators:exec --only firestore "node tests/firestore.rules.test.cjs && node --test --test-concurrency=1 tests/meeting-category-policy.test.mjs tests/meeting-category-firestore-rules.test.cjs tests/finance-portal-policy.test.cjs tests/portal-registry.test.mjs tests/dashboard-hero-stylesheet.test.mjs"
 npx playwright install chromium
 npx playwright test
 ```
 
-Firestore rules tests require the Firebase emulator and should be run through the existing security-baseline workflow. Production promotion remains blocked until the exact candidate passes all required gates and the operational controls in the runbook have been verified.
+Firebase App Check initialization is opt-in and reads `VITE_FIREBASE_APPCHECK_SITE_KEY` from the build environment. Register the web app/provider in Firebase Console first, then test in monitoring mode before enforcing App Check. The runbook records the remaining Console work for key restrictions, error alerts, scheduled Firestore exports and restore rehearsal. Production promotion remains blocked until all required gates pass on the exact candidate and project-level controls are verified.
