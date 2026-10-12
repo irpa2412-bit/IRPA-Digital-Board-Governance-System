@@ -156,7 +156,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    const request=text(assistantInstructions);
    if(!request){setAssistantError("Describe what you want the AI Assistant to prepare.");return;}
    const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-dbgs-grant-crawler.irpa-governance.workers.dev").replace(/\/+$/,"");
-   const token=await auth.currentUser?.getIdToken();
+   const token=await auth.currentUser?.getIdToken(true);
    if(!token){setAssistantError("Your session has expired. Sign in again.");return;}
    setAssistantBusy(true);setAssistantError("");setAssistantNotice("Preparing your requested format…");
    try{
