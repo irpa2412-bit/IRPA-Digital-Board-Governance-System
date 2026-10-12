@@ -140,13 +140,21 @@ async function main() {
     throw new Error("The assistant failed to reject the South Africa-only fixture.");
   }
 
-  const blockedDraftResponse = await fetch(workerUrl + "/assistant/analyze", {
+  // Geography is advisory for drafting: preserve the ineligible finding, but allow
+  // a review draft so IRPA can assess the official call and correct any source errors.
+  const reviewDraftResponse = await fetch(workerUrl + "/assistant/analyze", {
     method: "POST",
     headers,
     body: JSON.stringify({ ...southAfricaFixture, task: "concept_note" })
   });
-  if (blockedDraftResponse.status !== 422) {
-    throw new Error("Concept-note drafting was not blocked for the South Africa-only fixture.");
+  const reviewDraftBody = await reviewDraftResponse.json();
+  if (!reviewDraftResponse.ok ||
+      reviewDraftBody.service !== "irpa-grant-application-assistant" ||
+      reviewDraftBody.assessment?.geographic_eligibility?.status !== "ineligible" ||
+      typeof reviewDraftBody.assessment?.concept_note?.draft !== "string" ||
+      reviewDraftBody.assessment.concept_note.draft.trim().length < 100) {
+    throw new Error("The South Africa-only review-draft test failed: preserve the geographic warning while returning a usable concept-note draft. HTTP " +
+      reviewDraftResponse.status + "; " + String(reviewDraftBody.error || "missing draft or advisory eligibility result").slice(0, 240));
   }
 
   console.log(JSON.stringify({
@@ -168,7 +176,7 @@ async function main() {
     publicTrackRecordGate: "passed",
     positiveTanzaniaGeographyTest: "passed",
     southAfricaExclusionTest: "passed",
-    ineligibleConceptNoteBlock: "passed",
+    ineligibleOpportunityReviewDraft: "passed",
     secretsPrinted: false
   }, null, 2));
 }
