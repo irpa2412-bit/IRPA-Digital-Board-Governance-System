@@ -15,7 +15,7 @@
     "verify:production-readability": "node scripts/verify-production-readability.mjs",
     "test:finance-policy": "node --test tests/finance-portal-policy.test.cjs",
     "test:security-rules": "node --test tests/meeting-category-firestore-rules.test.cjs tests/finance-portal-policy.test.cjs",
-    "lint": "eslint src/App.jsx src/main.jsx src/config/portalRegistry.js src/components/PortalNavigation.jsx tests/e2e/app-shell.spec.js tests/portal-registry.test.mjs playwright.config.js"
+    "lint": "eslint src/App.jsx src/main.jsx src/config/portalRegistry.js src/components/PortalNavigation.jsx public/dashboard-hero-fix.js tests/e2e/app-shell.spec.js tests/portal-registry.test.mjs tests/dashboard-hero-stylesheet.test.mjs playwright.config.js"
   },
   "dependencies": {
     "firebase": "^11.10.0",
