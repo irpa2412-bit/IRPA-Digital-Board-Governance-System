@@ -42,5 +42,10 @@
     "typescript": "^5.9.2",
     "@firebase/rules-unit-testing": "^4.0.1",
     "@playwright/test": "^1.55.0"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "^1.13.6",
+    "basic-ftp": "^6.2.1",
+    "braces": "^3.0.3"
   }
 }
