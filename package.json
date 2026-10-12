@@ -53,8 +53,6 @@
     "chokidar": "^4.0.3",
     "@opentelemetry/core": "^2.8.0",
     "uuid": "^11.1.1",
-    "mammoth": {
-      "argparse": "2.0.1"
-    }
+    "argparse": "2.0.1"
   }
 }
