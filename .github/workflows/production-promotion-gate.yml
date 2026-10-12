@@ -46,7 +46,7 @@ jobs:
         run: |
           set -euo pipefail
           npm ci --no-audit --no-fund
-          npm audit --audit-level=high
+          npm audit --audit-level=moderate
           npm run check:production-readability -- --changed-only
           npm run build
           npm run verify:production-readability -- --changed-only
@@ -142,7 +142,7 @@ jobs:
         run: |
           set -euo pipefail
           npm ci --no-audit --no-fund
-          npm audit --audit-level=high
+          npm audit --audit-level=moderate
           npm run check:production-readability -- --changed-only
           npm run build
           npm run verify:production-readability -- --changed-only
