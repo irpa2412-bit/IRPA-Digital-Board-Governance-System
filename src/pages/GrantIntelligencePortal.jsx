@@ -134,6 +134,12 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  const [notice,setNotice]=useState("");
  const [queryText,setQueryText]=useState("");
  const [smartKeywords,setSmartKeywords]=useState("");
+ const [fundraisingQuery,setFundraisingQuery]=useState("");
+ const [fundraisingMode,setFundraisingMode]=useState("all");
+ const [fundraisingResults,setFundraisingResults]=useState([]);
+ const [fundraisingSearchBusy,setFundraisingSearchBusy]=useState(false);
+ const [fundraisingSearchError,setFundraisingSearchError]=useState("");
+ const [fundraisingSearchMeta,setFundraisingSearchMeta]=useState(null);
  const [assistantFormat,setAssistantFormat]=useState("Partnership request message");
  const [assistantTone,setAssistantTone]=useState("Professional and persuasive");
  const [assistantLength,setAssistantLength]=useState("Concise");
@@ -279,6 +285,35 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
      .sort((a,b)=>b._smartScore-a._smartScore||dateMillis(a.deadline||a.deadline_at)-dateMillis(b.deadline||b.deadline_at))
      .slice(0,8);
  },[currentOpportunityRecords,smartKeywords]);
+ async function runFundraisingSearch(){
+   const query=text(fundraisingQuery);
+   if(query.length<2){setFundraisingSearchError("Enter at least two characters, such as rangeland restoration, livestock markets, women-led enterprises, CSR or digital governance.");return;}
+   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-production.irpa-governance.workers.dev").replace(/\/+$/,"");
+   const token=await auth.currentUser?.getIdToken(true);
+   if(!token){setFundraisingSearchError("Sign in to search fundraising sources.");return;}
+   setFundraisingSearchBusy(true);setFundraisingSearchError("");setFundraisingSearchMeta(null);
+   try{
+     const response=await fetch(workerUrl+"/fundraising/search",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({query,mode:fundraisingMode,pillar:pillar==="all"?"":pillar,theme:theme==="all"?"":theme}),signal:AbortSignal.timeout(35000)});
+     const data=await response.json().catch(()=>({}));
+     if(!response.ok)throw new Error(data.error||"Fundraising research search failed ("+response.status+").");
+     setFundraisingResults(Array.isArray(data.items)?data.items:[]);
+     setFundraisingSearchMeta({providers:data.providers||[],resultCount:Number(data.resultCount||0),errors:Array.isArray(data.errors)?data.errors:[]});
+   }catch(err){setFundraisingSearchError(err?.name==="TimeoutError"?"The live search exceeded 35 seconds. Try a more specific query.":err?.message||"Fundraising search failed.");}
+   finally{setFundraisingSearchBusy(false);}
+ }
+ function useFundraisingLeadInAssistant(lead){
+   const contextBlock=[
+     "LIVE FUNDRAISING RESEARCH LEAD (unverified; do not present as a confirmed open call)",
+     "Title: "+text(lead.title),"Lead type: "+text(lead.fundraisingType),
+     "Search result date: "+text(lead.publishedAt||"Not supplied"),"Deadline signal: "+text(lead.deadlineSignal||"Not established"),
+     "Publisher: "+text(lead.sourceName),"Lead URL: "+text(lead.url),"Publisher/source URL: "+text(lead.sourceUrl||lead.url),
+     "Search snippet: "+text(lead.description),"Discovery engine: "+text(lead.discoveryEngine),
+     "Required validation: open the issuer's original page; confirm the funder, applicant eligibility for a Tanzania-registered NGO, deadline or rolling status, funding range, eligible costs, co-funding, required track record and application route before recommending an application."
+   ].join("\n");
+   setAssistantContext(previous=>[text(previous),contextBlock].filter(Boolean).join("\n\n"));
+   if(!text(assistantInstructions))setAssistantInstructions("Assess this fundraising lead for the Improvement of Rangeland in Pastoral Areas (IRPA). Verify the original issuer, Tanzania applicant eligibility, funding mechanism, deadline or rolling status, grant size and restrictions. Separate confirmed facts from unknowns, assess fit against IRPA's three strategic pillars and cross-cutting themes, and recommend practical next steps. Do not invent facts or claim this lead is confirmed open.");
+   setAssistantNotice("Research lead added to the AI Assistant context. Validate the source before using it in a fundraising approach.");
+ }
  async function startCrawlerScan(){
    if(!auth.currentUser){setError("Sign in to IRPA to start a grant scan.");return;}
    try{
@@ -618,6 +653,23 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    <div style={{...styles.muted,borderLeft:"3px solid #b78b3d",padding:"8px 12px"}}><strong>Governance control:</strong> saved drafts remain drafts in the IRPA workspace. Saving does not submit an application, approve expenditure, authorize a commitment, or replace IRPA's formal internal review and approval procedures.</div>
   </section>}
 
+  <section style={{...styles.card,display:"grid",gap:12,borderColor:"#4e8b91"}} aria-labelledby="grant-fundraising-search-heading">
+   <div><div style={styles.eyebrow}>FUNDRAISING INTELLIGENCE · LIVE PUBLIC-WEB SEARCH</div><h2 id="grant-fundraising-search-heading" style={{margin:"5px 0",fontSize:20}}>Research funding, donors and partnership leads</h2><p style={{...styles.muted,margin:0}}>Search live public indexes for grants, rolling opportunities, deadline-based calls, corporate social responsibility (CSR), sponsorship, philanthropy, partnerships, fellowships and in-kind support. Results are research leads—not verified offers or proof of eligibility.</p></div>
+   <form onSubmit={e=>{e.preventDefault();runFundraisingSearch();}} style={{display:"grid",gridTemplateColumns:"minmax(0,1fr)",gap:9}}>
+    <input aria-label="Fundraising research keywords" style={styles.input} value={fundraisingQuery} onChange={e=>setFundraisingQuery(e.target.value)} placeholder="e.g. pastoral rangeland restoration, livestock markets, women youth, digital governance"/>
+    <select aria-label="Fundraising opportunity type" style={styles.input} value={fundraisingMode} onChange={e=>setFundraisingMode(e.target.value)}><option value="all">All fundraising leads</option><option value="rolling">Rolling / year-round</option><option value="deadlines">Calls with deadlines</option><option value="corporate_support">CSR / corporate / in-kind</option></select>
+    <button type="submit" style={styles.button} disabled={fundraisingSearchBusy}>{fundraisingSearchBusy?"Searching…":"Search public web"}</button>
+   </form>
+   <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>{["sustainable rangeland restoration Tanzania","pastoral livelihoods climate resilience","livestock health veterinary fodder banks","livestock market access value addition","women youth green enterprises","CSR sponsorship water solar","digital governance nonprofit technology","rolling grants Tanzania NGOs"].map(q=><button key={q} type="button" style={{...styles.button,background:"transparent",fontSize:12,padding:"7px 10px"}} onClick={()=>setFundraisingQuery(q)}>{q}</button>)}</div>
+   {fundraisingSearchError&&<div role="alert" style={{...styles.card,borderColor:"#b65c5c",color:"#ffb8b8"}}>{fundraisingSearchError}</div>}
+   {fundraisingSearchMeta&&<div aria-live="polite" style={styles.muted}>Found {fundraisingSearchMeta.resultCount} research lead{fundraisingSearchMeta.resultCount===1?"":"s"} using {(fundraisingSearchMeta.providers||[]).join(" and ")||"public search sources"}. Each lead requires source and eligibility verification.</div>}
+   {fundraisingSearchMeta?.errors?.length>0&&<div style={{...styles.card,borderStyle:"dashed"}}><strong>Some search sources did not respond</strong><p style={{...styles.muted,margin:"5px 0 0"}}>{fundraisingSearchMeta.errors.map(e=>e.provider+": "+e.error).join(" · ")}</p></div>}
+   {fundraisingResults.map((lead,index)=><article key={lead.url||lead.title+index} style={{...styles.card,display:"grid",gap:8}}>
+    <div style={{display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap",alignItems:"start"}}><div style={{flex:"1 1 300px"}}><div style={styles.eyebrow}>{text(lead.fundraisingType)} · {text(lead.sourceName||lead.discoveryEngine)}</div><strong style={{display:"block",fontSize:15,marginTop:4}}>{lead.title}</strong><p style={{...styles.muted,margin:"5px 0"}}>{text(lead.description).slice(0,420)||"The search result contains limited detail; open the source to inspect the original information."}</p></div><div style={{fontSize:12,minWidth:150}}><div style={styles.muted}>Date indexed</div><strong>{dateLabel(lead.publishedAt)}</strong><div style={{...styles.muted,marginTop:5}}>Status</div><strong>Unverified research lead</strong></div></div>
+    <div style={{...styles.muted,fontSize:12}}>{text(lead.deadlineSignal)} · Relevance score: {Number(lead.relevanceScore||0)}</div>
+    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button type="button" style={styles.button} onClick={()=>useFundraisingLeadInAssistant(lead)}>Analyse with AI Assistant</button>{lead.url&&<a href={lead.url} target="_blank" rel="noreferrer" style={{...styles.button,textDecoration:"none",display:"inline-block"}}>Open result ↗</a>}{lead.sourceUrl&&lead.sourceUrl!==lead.url&&<a href={lead.sourceUrl} target="_blank" rel="noreferrer" style={{...styles.button,background:"transparent",textDecoration:"none",display:"inline-block"}}>Open publisher ↗</a>}</div>
+   </article>)}
+  </section>
   <section style={{...styles.card,display:"grid",gap:12,borderColor:"#4e8b91"}} aria-labelledby="grant-smart-assistant-heading">
    <div>
     <div style={styles.eyebrow}>AI SMART ASSISTANT · KEYWORD ROUTING</div>

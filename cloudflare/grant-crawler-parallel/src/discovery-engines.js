@@ -480,3 +480,43 @@ export async function readWebSearch(env) {
   const errors = results.filter(result => result.error).map(result => result.error), items = results.flatMap(result => result.items);
   return { items, stats: { configured: true, provider: "Brave Search API", queries: activeSearchQueries().length, queryCatalogSize: SEARCH_QUERIES.length, found: items.length, errors } };
 }
+
+
+export async function searchFundraisingSources(query, mode = "all") {
+ const cleanQuery=String(query||"").replace(/[<>]/g," ").replace(/\s+/g," ").trim().slice(0,240);
+ if(cleanQuery.length<2)throw new Error("Enter at least two characters to search fundraising sources.");
+ const safeMode=["all","rolling","deadlines","corporate_support"].includes(mode)?mode:"all";
+ const region='(Tanzania OR "East Africa" OR Africa)';
+ const core='(grant OR funding OR donor OR foundation OR philanthropy OR partnership OR sponsorship OR CSR)';
+ const q1=cleanQuery+" "+core+" "+region;
+ const q2=safeMode==="rolling"?cleanQuery+' ("rolling basis" OR "year-round" OR "no fixed deadline") '+region:safeMode==="deadlines"?cleanQuery+' (deadline OR "closing date" OR "call for proposals") '+region:safeMode==="corporate_support"?cleanQuery+' ("corporate social responsibility" OR CSR OR sponsorship OR philanthropy OR "in-kind support") '+region:cleanQuery+' ("funding opportunity" OR "partnership opportunity" OR "call for proposals" OR sponsorship OR philanthropy) '+region;
+ const queries=[...new Set([q1,q2])];
+ const tasks=queries.flatMap(searchQuery=>[
+  (async()=>{try{
+   const url=new URL("https://news.google.com/rss/search");url.searchParams.set("q",searchQuery);url.searchParams.set("hl","en-TZ");url.searchParams.set("gl","TZ");url.searchParams.set("ceid","TZ:en");
+   const response=await fetch(url.href,{headers:{accept:"application/rss+xml, application/xml, text/xml","user-agent":USER_AGENT},signal:AbortSignal.timeout(12000)});
+   if(!response.ok)throw new Error("Google News HTTP "+response.status);
+   const xml=await response.text();if(xml.length>MAX_PAGE_BYTES)throw new Error("Search response exceeds 1 MB.");
+   const items=[...xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item\s*>/gi)].map(match=>{
+    const block=match[1],title=xmlField(block,"title").slice(0,500),description=xmlField(block,"description").slice(0,2500);let url="";try{url=normalizeOpportunityUrl(xmlField(block,"link"))}catch{}
+    const signal=/\b(grant|funding|donor|foundation|philanthrop|csr|corporate social responsibility|sponsorship|partnership|in[- ]kind|award|fellowship|accelerator|rolling|deadline|call for proposals|funding opportunity)\b/i;
+    if(!title||!url||!signal.test(title+" "+description))return null;
+    const sm=block.match(/<source\b[^>]*\burl=["']([^"']+)["'][^>]*>([\s\S]*?)<\/source\s*>/i);let sourceUrl="https://news.google.com/";try{if(sm?.[1])sourceUrl=normalizeOpportunityUrl(sm[1])}catch{}
+    const value=title+" "+description;
+    return {title,description,url,sourceUrl,sourceName:sm?decodeHtml(sm[2]).slice(0,120):"Google News indexed source",publishedAt:xmlField(block,"pubDate")||null,discoveryEngine:"google_news_rss",fundraisingType:/\b(csr|corporate social responsibility|sponsorship|in[- ]kind)\b/i.test(value)?"Corporate partnership / CSR":/\b(partnership|philanthrop)\b/i.test(value)?"Partnership / philanthropy":"Grant / funding lead",deadlineSignal:/\b(rolling basis|rolling applications?|year[- ]round|no fixed deadline|ongoing applications)\b/i.test(value)?"Possible rolling opportunity — verify issuer page":/\b(deadline|closing date|apply by|due date|applications close)\b/i.test(value)?"Deadline language detected — verify exact date":"Deadline not established from search result",verificationStatus:"unverified_lead",searchQuery};
+   }).filter(Boolean);
+   return {provider:"Google News RSS",searchQuery,items,error:null};
+  }catch(error){return {provider:"Google News RSS",searchQuery,items:[],error:String(error.message||error).slice(0,180)}}})(),
+  (async()=>{try{
+   const url=new URL("https://api.gdeltproject.org/api/v2/doc/doc");const q="("+cleanQuery.replace(/["']/g," ")+") AND (grant OR funding OR donor OR foundation OR philanthropy OR partnership OR sponsorship OR CSR) AND (Tanzania OR \"East Africa\" OR Africa)"+(safeMode==="rolling"?' AND (rolling OR "year-round" OR "no fixed deadline")':safeMode==="deadlines"?' AND (deadline OR "closing date" OR "call for proposals")':safeMode==="corporate_support"?' AND (CSR OR sponsorship OR philanthropy OR partnership OR "in-kind")':"");
+   url.searchParams.set("query",q);url.searchParams.set("mode","ArtList");url.searchParams.set("format","json");url.searchParams.set("maxrecords","20");url.searchParams.set("sort","HybridRel");url.searchParams.set("timespan","1y");
+   const response=await fetch(url.href,{headers:{accept:"application/json","user-agent":USER_AGENT},signal:AbortSignal.timeout(12000)});if(!response.ok)throw new Error("GDELT HTTP "+response.status);const body=await response.json();
+   const items=(Array.isArray(body.articles)?body.articles:[]).map(article=>{let url="";try{url=normalizeOpportunityUrl(article.url)}catch{}const title=decodeHtml(article.title||"").slice(0,500),description=[article.domain,article.sourceCountry,article.language].filter(Boolean).join(" · ").slice(0,1000);const signal=/\b(grant|funding|donor|foundation|philanthrop|csr|corporate social responsibility|sponsorship|partnership|in[- ]kind|award|fellowship|accelerator|rolling|deadline|call for proposals|funding opportunity)\b/i;if(!title||!url||!signal.test(title+" "+description))return null;const date=String(article.seendate||""),publishedAt=/^\d{8}T\d{6}Z$/.test(date)?date.slice(0,4)+"-"+date.slice(4,6)+"-"+date.slice(6,8)+"T"+date.slice(9,11)+":"+date.slice(11,13)+":"+date.slice(13,15)+"Z":null;const value=title+" "+description;return {title,description,url,sourceUrl:url,sourceName:article.domain||"GDELT indexed publisher",publishedAt,discoveryEngine:"gdelt_search",fundraisingType:/\b(csr|corporate social responsibility|sponsorship|in[- ]kind)\b/i.test(value)?"Corporate partnership / CSR":/\b(partnership|philanthrop)\b/i.test(value)?"Partnership / philanthropy":"Grant / funding lead",deadlineSignal:/\b(rolling basis|rolling applications?|year[- ]round|no fixed deadline|ongoing applications)\b/i.test(value)?"Possible rolling opportunity — verify issuer page":/\b(deadline|closing date|apply by|due date|applications close)\b/i.test(value)?"Deadline language detected — verify exact date":"Deadline not established from search result",verificationStatus:"unverified_lead",searchQuery}});
+   return {provider:"GDELT DOC API",searchQuery,items:items.filter(Boolean),error:null};
+  }catch(error){return {provider:"GDELT DOC API",searchQuery,items:[],error:String(error.message||error).slice(0,180)}}})()
+ ]);
+ const results=await Promise.all(tasks),unique=new Map(),terms=cleanQuery.toLowerCase().split(/[^a-z0-9]+/).filter(t=>t.length>2);
+ for(const result of results)for(const item of result.items){const key=item.url.replace(/[?#].*$/,"").replace(/\/$/,""),all=(item.title+" "+item.description).toLowerCase();item.relevanceScore=terms.reduce((n,t)=>n+(all.includes(t)?2:0),0);const prior=unique.get(key);if(!prior||item.relevanceScore>prior.relevanceScore)unique.set(key,item)}
+ const items=[...unique.values()].sort((a,b)=>b.relevanceScore-a.relevanceScore||String(b.publishedAt||"").localeCompare(String(a.publishedAt||""))).slice(0,20);
+ return {query:cleanQuery,mode:safeMode,providers:[...new Set(results.map(r=>r.provider))],items,resultCount:items.length,errors:results.filter(r=>r.error).map(r=>({provider:r.provider,query:r.searchQuery,error:r.error}))};
+}

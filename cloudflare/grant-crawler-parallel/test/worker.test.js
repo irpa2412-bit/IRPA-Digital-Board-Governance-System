@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import worker, { assessFit, isCurrentOpportunity, parseFeed, safeUrl } from "../src/index.js";
 import { assessGeographicEligibility } from "../src/assistant.js";
-import { DONOR_SCANNERS, SEARCH_QUERIES, GDELT_QUERIES, decodeHtml, normalizeOpportunityUrl, parseOfficialPage, parseSearchRss, readDonorScanner, readOfficialPages, readWebSearch, readGdeltSearch } from "../src/discovery-engines.js";
+import { DONOR_SCANNERS, SEARCH_QUERIES, GDELT_QUERIES, decodeHtml, normalizeOpportunityUrl, parseOfficialPage, parseSearchRss, readDonorScanner, readOfficialPages, readWebSearch, readGdeltSearch, searchFundraisingSources } from "../src/discovery-engines.js";
 
 test("expanded engine registry includes African NGO aggregators and conservation funders", () => {
   const names = new Set(DONOR_SCANNERS.map(scanner => scanner.name));
@@ -824,4 +824,24 @@ test("concept-note endpoint composes a draft from generated application fields",
   assert.match(body.assessment.concept_note.draft, /Longido Rangeland Restoration/);
   assert.match(body.assessment.concept_note.draft, /Executive Summary/);
   assert.match(body.assessment.concept_note.draft, /Problem Statement/);
+});
+
+
+test("on-demand fundraising search combines public search engines and labels leads unverified", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async input => {
+    const url = new URL(String(input));
+    if (url.hostname === "news.google.com") return new Response('<rss><channel><item><title>Corporate partnership and CSR funding opportunity for Tanzania NGOs</title><link>https://donor.example/csr-call</link><description>Applications for sponsorship and community resilience partnership.</description><pubDate>Mon, 12 Oct 2026 10:00:00 GMT</pubDate><source url="https://donor.example">Donor Foundation</source></item></channel></rss>', { status: 200, headers: { "content-type": "application/rss+xml" } });
+    if (url.hostname === "api.gdeltproject.org") return new Response(JSON.stringify({ articles: [{ title: "Rolling grant funding for pastoral livelihoods", url: "https://funder.example/rolling", domain: "funder.example", seendate: "20261012T120000Z" }] }), { status: 200, headers: { "content-type": "application/json" } });
+    throw new Error("Unexpected search provider " + url.hostname);
+  };
+  try {
+    const result = await searchFundraisingSources("pastoral livelihoods", "rolling");
+    assert.ok(result.providers.includes("Google News RSS"));
+    assert.ok(result.providers.includes("GDELT DOC API"));
+    assert.ok(result.items.length >= 2);
+    assert.ok(result.items.every(item => item.verificationStatus === "unverified_lead"));
+    assert.ok(result.items.some(item => /Corporate partnership/.test(item.title)));
+    assert.ok(result.items.some(item => /rolling/i.test(item.deadlineSignal)));
+  } finally { globalThis.fetch = originalFetch; }
 });

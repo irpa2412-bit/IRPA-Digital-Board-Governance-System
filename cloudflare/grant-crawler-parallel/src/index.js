@@ -1,5 +1,5 @@
 import { analyzeGrant } from "./assistant.js";
-import { DONOR_SCANNERS, SEARCH_QUERIES, GDELT_QUERIES, readDonorScanner, readOfficialPages, readWebSearch, readGdeltSearch, normalizeOpportunityUrl } from "./discovery-engines.js";
+import { DONOR_SCANNERS, SEARCH_QUERIES, GDELT_QUERIES, readDonorScanner, readOfficialPages, readWebSearch, readGdeltSearch, searchFundraisingSources, normalizeOpportunityUrl } from "./discovery-engines.js";
 import { handleApplicationPortal } from "./application-portal-handler.js";
 
 
@@ -492,8 +492,8 @@ export default {
         return json({ error: String(error.message || "Unable to retrieve grant results").slice(0, 300) }, 401);
       }
     }
-    if (request.method !== "POST" || !["/crawl", "/run", "/assistant/analyze"].includes(url.pathname)) return json({ error: "Not found" }, 404);
-    if (url.pathname === "/run") {
+    if (request.method !== "POST" || !["/crawl", "/run", "/assistant/analyze", "/fundraising/search"].includes(url.pathname)) return json({ error: "Not found" }, 404);
+    if (url.pathname === "/run" || url.pathname === "/fundraising/search") {
       try {
         const token = String(request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
         await verifyFirebaseIdToken(token, env, false);
@@ -511,7 +511,14 @@ export default {
       const expected = String(env.CRAWLER_CONTROL_TOKEN || "");
       if (expected.length < 32 || request.headers.get("authorization") !== "Bearer " + expected) return json({ error: "Unauthorized" }, 401);
     }
-    try { return json(await crawl(env)); }
+    try {
+      if (url.pathname === "/fundraising/search") {
+        let body; try { body = await request.json(); } catch { return json({ error: "Request body must be valid JSON." }, 400); }
+        const extra = [body?.pillar, body?.theme].filter(value => typeof value === "string" && value.trim()).join(" ");
+        return json(await searchFundraisingSources([body?.query, extra].filter(Boolean).join(" "), body?.mode));
+      }
+      return json(await crawl(env));
+    }
     catch (error) {
       if (env.GRANTS_DB) {
         try { await env.GRANTS_DB.prepare("INSERT INTO crawler_runs (status, error_message, finished_at) VALUES ('failed', ?, CURRENT_TIMESTAMP)").bind(String(error.message || "Crawler failed").slice(0, 500)).run(); } catch {}
