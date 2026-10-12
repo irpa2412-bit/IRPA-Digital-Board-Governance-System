@@ -12,9 +12,12 @@ test("expanded engine registry includes African NGO aggregators and conservation
   assert.ok(DONOR_SCANNERS.every(scanner => scanner.url.startsWith("https://")));
   assert.ok(SEARCH_QUERIES.length >= 3);
   const expandedQueries = SEARCH_QUERIES.join(" ").toLowerCase();
-  for (const term of ["youth", "children", "livelihoods", "health", "renewable energy", "solar", "pastoralism", "rangeland", "livestock"]) {
+  for (const term of ["youth", "children", "livelihoods", "health", "renewable energy", "solar", "pastoralism", "rangeland", "livestock", "rolling call", "rolling basis", "capacity building", "seed funding", "year-round applications"]) {
     assert.ok(expandedQueries.includes(term), "missing expanded search term: " + term);
   }
+  const rollingCallResults = parseSearchRss('<rss><channel><item><title>Seed Funding on a Rolling Basis for Capacity Building</title><link>https://donor.example/rolling-call</link><description>Ongoing applications accepted year-round for community capacity building.</description></item></channel></rss>', "rolling seed funding");
+  assert.equal(rollingCallResults.length, 1);
+  assert.match(rollingCallResults[0].title, /Rolling Basis/);
   assert.equal(new Set(DONOR_SCANNERS.map(scanner => scanner.name)).size, DONOR_SCANNERS.length);
 });
 
