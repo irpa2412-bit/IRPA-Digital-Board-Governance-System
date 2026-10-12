@@ -1,0 +1,77 @@
+name: Assessment Remediation Gates
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches:
+      - security/assessment-remediation-20261012
+
+permissions:
+  contents: read
+
+concurrency:
+  group: irpa-assessment-remediation-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  dependency-security:
+    name: Block high-severity production dependency advisories
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install from the committed lockfile
+        run: npm ci
+      - name: Verify Mammoth CLI compatibility after argparse override
+        run: npx mammoth --help
+      - name: Require zero moderate-or-higher npm audit findings
+        run: npm audit --audit-level=moderate
+
+  application-verification:
+    name: Build, policy tests and browser smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install from the committed lockfile
+        run: npm ci
+      - name: Verify security baseline and Functions syntax
+        run: |
+          node scripts/security-baseline-check.js
+          node --check functions/index.js
+      - name: Lint the application shell and extracted modules
+        run: npm run lint
+      - name: Run production build
+        run: npm run build
+      - name: Setup Java for Firebase Emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Run Firestore rules and governance regression tests
+        run: npx firebase emulators:exec --only firestore "node tests/firestore.rules.test.cjs && node --test --test-concurrency=1 tests/meeting-category-policy.test.mjs tests/meeting-category-firestore-rules.test.cjs tests/finance-portal-policy.test.cjs tests/portal-registry.test.mjs"
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+      - name: Verify dashboard hero layout at desktop and mobile widths
+        run: node scripts/dashboard-hero-layout-check.mjs
+      - name: Run production app-shell browser smoke test
+        run: npx playwright test
+      - name: Upload browser test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: irpa-dbgs-playwright-evidence
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
+          retention-days: 14
