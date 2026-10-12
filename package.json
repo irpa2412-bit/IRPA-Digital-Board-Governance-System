@@ -46,6 +46,6 @@
   "overrides": {
     "@grpc/grpc-js": "^1.13.6",
     "basic-ftp": "^6.2.1",
-    "braces": "^3.0.3"
+    "chokidar": "^4.0.3"
   }
 }
