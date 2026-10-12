@@ -355,3 +355,55 @@ body { margin: 0; }
   max-width: 100%;
   overflow-wrap: anywhere;
 }
+
+/* FIX: the global app.css "nav" rule is intended for the fixed sidebar and
+   leaks flex:1, vertical scrolling, and sidebar padding into PAGE navigation.
+   Reset those inherited sidebar behaviours on the in-page Back/Next control.
+   This is a layout-only correction; it does not hide document overflow. */
+.page-back-next-navigation {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2.2fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  flex: 0 1 auto;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  box-sizing: border-box;
+}
+.page-back-next-navigation > * {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.page-back-next-navigation .page-back-next-button {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  padding-inline: clamp(6px, 1vw, 15px);
+}
+.page-back-next-navigation .page-back-next-status {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+.page-back-next-navigation .page-back-next-status strong {
+  display: block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 760px) {
+  .page-back-next-navigation {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1fr);
+    gap: 6px;
+  }
+  .page-back-next-navigation .page-back-next-button {
+    font-size: 12px;
+    padding: 8px 5px;
+  }
+}
