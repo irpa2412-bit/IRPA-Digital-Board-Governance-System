@@ -1,0 +1,44 @@
+name: Dependency Lockfile Refresh (Assessment Remediation)
+
+on:
+  push:
+    branches:
+      - security/assessment-remediation-20261012
+
+permissions:
+  contents: write
+
+concurrency:
+  group: irpa-lock-refresh-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  refresh-lockfile:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout remediation branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Resolve and write the lockfile without running install scripts
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Commit lockfile only when it changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- package-lock.json; then
+            echo "LOCKFILE_ALREADY_CURRENT=true"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "security: refresh lockfile for patched dependencies"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
