@@ -126,3 +126,87 @@
     -webkit-overflow-scrolling:touch;
   }
 }
+
+/* Desktop and tablet content-frame correction: include padding in the viewport width. */
+html, body, #root, .app-shell, .main-area, .content-area, .dashboard-content-area {
+  box-sizing: border-box;
+  min-width: 0;
+}
+@media (min-width: 1101px) {
+  .main-area {
+    width: calc(100% - 286px);
+    min-width: 0;
+    margin-left: 286px;
+    margin-right: 0;
+  }
+  .content-area, .dashboard-content-area {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    padding-left: clamp(12px, 2.2vw, 34px);
+    padding-right: clamp(12px, 2.2vw, 34px);
+    box-sizing: border-box;
+  }
+}
+@media (min-width: 761px) {
+  .page-back-next-navigation,
+  .desktop-webapp-navigation-roller {
+    position: relative;
+    inset: auto;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+  .page-back-next-navigation {
+    display: grid;
+    grid-template-columns: minmax(90px, auto) minmax(0, 1fr) minmax(90px, auto);
+    align-items: center;
+    gap: 12px;
+    margin: 0;
+  }
+  .page-back-next-status {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+}
+.content-area .page,
+.dashboard-content-area .page,
+.content-area .page > *,
+.dashboard-content-area .page > *,
+.content-area .panel,
+.content-area .module-panel,
+.content-area .welcome-panel {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.content-area .page .dashboard-grid,
+.dashboard-content-area .page .dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+  min-width: 0;
+  max-width: 100%;
+}
+.content-area .page .panel,
+.content-area .page .module-panel,
+.content-area .page .welcome-panel {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 1100px) {
+  .main-area {
+    width: 100%;
+    max-width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+  .content-area, .dashboard-content-area {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+}
+
