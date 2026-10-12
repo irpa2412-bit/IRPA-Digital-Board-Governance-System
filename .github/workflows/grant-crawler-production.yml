@@ -181,23 +181,29 @@ jobs:
           GRANT_CRAWLER_CONTROL_TOKEN: ${{ secrets.GRANT_CRAWLER_CONTROL_TOKEN }}
           PRODUCTION_WORKER_URL: ${{ steps.deploy_production.outputs.worker_url }}
         run: |
-          set -euo pipefail
-          result="$(curl --silent --show-error --max-time 40 -w '\n__STATUS__%{http_code}' -X POST \
-            -H "Authorization: Bearer $GRANT_CRAWLER_CONTROL_TOKEN" \
-            -H "Content-Type: application/json" \
-            --data '{"query":"pastoral rangeland restoration","mode":"all"}' \
-            "$PRODUCTION_WORKER_URL/fundraising/search")"
-          http_status="$(printf '%s' "$result" | tail -n1 | sed 's/^__STATUS__//')"
-          body="$(printf '%s' "$result" | sed '$d')"
-          node - "$body" "$http_status" <<'NODE'
-          const body = JSON.parse(process.argv[2]);
-          const status = Number(process.argv[3]);
-          if (status !== 200) throw new Error('Production fundraising search HTTP ' + status + ': ' + String(body.error || body.message || 'No error detail').slice(0, 250));
-          if (body.query !== 'pastoral rangeland restoration' || !Array.isArray(body.items) || !Array.isArray(body.providers) || !Array.isArray(body.errors)) {
-            throw new Error('Production fundraising search response contract failed.');
-          }
-          if (body.errors.length >= 4) throw new Error('All live fundraising search requests failed.');
-          console.log('Live fundraising search passed with ' + body.resultCount + ' research leads; providers: ' + body.providers.join(', ') + '.');
+          node <<'NODE'
+          const url = process.env.PRODUCTION_WORKER_URL + '/fundraising/search';
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 40000);
+          try {
+            const response = await fetch(url, {
+              method: 'POST',
+              headers: {
+                Authorization: 'Bearer ' + process.env.GRANT_CRAWLER_CONTROL_TOKEN,
+                'Content-Type': 'application/json',
+                Accept: 'application/json'
+              },
+              body: JSON.stringify({ query: 'pastoral rangeland restoration', mode: 'all' }),
+              signal: controller.signal
+            });
+            const body = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error('Production fundraising search HTTP ' + response.status + ': ' + String(body.error || body.message || 'No error detail').slice(0, 250));
+            if (body.query !== 'pastoral rangeland restoration' || !Array.isArray(body.items) || !Array.isArray(body.providers) || !Array.isArray(body.errors)) {
+              throw new Error('Production fundraising search response contract failed.');
+            }
+            if (body.errors.length >= 4) throw new Error('All live fundraising search requests failed.');
+            console.log('Live fundraising search passed with ' + body.resultCount + ' research leads; providers: ' + body.providers.join(', ') + '.');
+          } finally { clearTimeout(timeout); }
           NODE
 
       - name: Smoke-test production AI document drafting and concept-note generation
