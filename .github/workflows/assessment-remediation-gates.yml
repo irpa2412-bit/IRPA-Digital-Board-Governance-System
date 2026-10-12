@@ -27,6 +27,8 @@ jobs:
           cache: npm
       - name: Install from the committed lockfile
         run: npm ci
+      - name: Verify Mammoth CLI compatibility after argparse override
+        run: npx mammoth --help
       - name: Require zero high or critical npm audit findings
         run: npm audit --audit-level=high
 
