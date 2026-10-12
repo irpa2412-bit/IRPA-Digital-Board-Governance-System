@@ -145,8 +145,12 @@ jobs:
           if [ -n "${BRAVE_SEARCH_API_KEY:-}" ]; then
             printf '%s' "$BRAVE_SEARCH_API_KEY" | npx wrangler secret put BRAVE_SEARCH_API_KEY --config wrangler.toml --env production
           fi
-          deploy_log="$(npx wrangler deploy --config wrangler.toml --env production 2>&1)"
-          printf '%s\n' "$deploy_log"
+          if deploy_log="$(npx wrangler deploy --config wrangler.toml --env production 2>&1)"; then
+            printf '%s\n' "$deploy_log"
+          else
+            printf '%s\n' "$deploy_log" >&2
+            exit 1
+          fi
           worker_url="$(printf '%s\n' "$deploy_log" | grep -Eo 'https://irpa-grant-crawler-production\.[a-zA-Z0-9.-]+\.workers\.dev' | head -n 1 || true)"
           if [ -z "$worker_url" ]; then
             echo "Could not safely resolve the deployed production URL from Wrangler output." >&2
