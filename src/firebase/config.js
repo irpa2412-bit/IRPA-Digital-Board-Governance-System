@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
 export const firebaseConfig = {
   apiKey: "AIzaSyC2aMdxHD14nMnGiRyf4mSL1ixXdzBoOtE",
@@ -15,10 +16,29 @@ export const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+const appCheckSiteKey = import.meta.env.VITE_FIREBASE_APPCHECK_SITE_KEY?.trim() || "";
+
+function initializeOptionalAppCheck(firebaseApp) {
+  if (!appCheckSiteKey) {
+    if (import.meta.env.PROD) {
+      console.warn("Firebase App Check is not initialized: VITE_FIREBASE_APPCHECK_SITE_KEY is missing.");
+    }
+    return null;
+  }
+  return initializeAppCheck(firebaseApp, {
+    provider: new ReCaptchaV3Provider(appCheckSiteKey),
+    isTokenAutoRefreshEnabled: true
+  });
+}
+
+// Initialize App Check before Auth/Firestore clients are created. Console enforcement
+// remains a separate project-level control and must be enabled only after verification.
+export const appCheck = initializeOptionalAppCheck(app);
 
 // Applicant enrollment uses a separate Firebase Auth/Firestore client so
 // invitation-based assistance can never replace or poison the primary login session.
 export const applicantApp = initializeApp(firebaseConfig, "irpa-applicant-enrollment");
+export const applicantAppCheck = initializeOptionalAppCheck(applicantApp);
 export const applicantAuth = getAuth(applicantApp);
 export const applicantDb = getFirestore(applicantApp);
 
