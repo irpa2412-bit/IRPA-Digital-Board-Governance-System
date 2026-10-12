@@ -477,7 +477,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    catch(err){setError(err?.message||"Status update failed.");}
  }
  function toggleDraftArray(key,value){setDraft(d=>({...d,[key]:d[key].includes(value)?d[key].filter(x=>x!==value):[...d[key],value]}));}
- return <div style={styles.page}>
+ return <div className="grant-intelligence-portal" style={{...styles.page,width:"100%",minWidth:0,maxWidth:"100%",boxSizing:"border-box"}}>
   <section style={styles.hero}>
    <div style={{maxWidth:760}}>
     <div style={styles.eyebrow}>IRPA-DBGS · FUNDING INTELLIGENCE</div>
