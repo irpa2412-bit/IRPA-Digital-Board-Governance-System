@@ -35,6 +35,7 @@ jobs:
             "https://irpa-digital-board-governance.web.app/",
             "https://irpa-digital-board-governance-frontend.irpa-governance.workers.dev/"
           ];
+          const viewportWidths = [360, 390, 768, 1024, 1366, 1920];
           const browser = await chromium.launch({ headless: true });
           let failed = false;
 
@@ -56,8 +57,29 @@ jobs:
                   const root = document.querySelector("#root");
                   return Boolean(root && root.children.length > 0);
                 }, { timeout: 30000 });
-                await page.waitForTimeout(2500);
+                await page.waitForTimeout(1500);
 
+                const viewportResults = [];
+                for (const width of viewportWidths) {
+                  await page.setViewportSize({ width, height: 900 });
+                  await page.waitForTimeout(150);
+                  const audit = await page.evaluate(() => ({
+                    viewportWidth: window.innerWidth,
+                    documentWidth: document.documentElement.scrollWidth,
+                    bodyWidth: document.body.scrollWidth,
+                    viewportMeta: document.querySelector('meta[name="viewport"]')?.content ?? null
+                  }));
+                  viewportResults.push({ requestedWidth: width, ...audit });
+                  if (audit.documentWidth > audit.viewportWidth) {
+                    failed = true;
+                    console.error(JSON.stringify({ url, viewportOverflow: true, ...viewportResults.at(-1) }));
+                  }
+                  if (!audit.viewportMeta || !audit.viewportMeta.includes("width=device-width")) {
+                    failed = true;
+                    console.error(JSON.stringify({ url, missingOrInvalidViewportMeta: true, ...viewportResults.at(-1) }));
+                  }
+                }
+                await page.setViewportSize({ width: 1366, height: 900 });
                 const result = await page.evaluate(() => ({
                   title: document.title,
                   rootChildren: document.querySelector("#root")?.children.length ?? 0,
@@ -74,7 +96,7 @@ jobs:
                 if (pageErrors.length) {
                   throw new Error(`Uncaught browser errors: ${pageErrors.join(" | ")}`);
                 }
-                console.log(JSON.stringify({ url, status: response.status(), ...result, pageErrors }));
+                console.log(JSON.stringify({ url, status: response.status(), ...result, viewportResults, pageErrors }));
               } catch (error) {
                 failed = true;
                 console.error(JSON.stringify({ url, error: error.message, pageErrors }));
@@ -87,5 +109,5 @@ jobs:
           }
 
           if (failed) process.exit(1);
-          console.log("Production Chromium smoke tests passed for all configured frontend endpoints.");
+          console.log("Production Chromium smoke tests and six-width viewport audits completed for all configured frontend endpoints.");
           NODE
