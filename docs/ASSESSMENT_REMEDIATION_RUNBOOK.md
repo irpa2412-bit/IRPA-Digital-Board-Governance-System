@@ -9,7 +9,8 @@
 - [x] Add a high-severity npm audit blocker and reproducible lockfile-based CI installs.
 - [x] Add a Playwright production-build app-shell smoke test with screenshot/trace artifacts.
 - [x] Regenerate and commit the lockfile; pin patched `@grpc/grpc-js` and `basic-ftp`, and move the watcher dependency to `chokidar` 4.x to remove the unpatched `braces` advisory from the resolved tree.
-- [x] Add ESLint, desktop/mobile Playwright smoke tests, portal-registry tests, and a Firestore Emulator regression step to the remediation workflow.
+- [x] Add ESLint, desktop/mobile Playwright smoke tests, portal-registry and dashboard-style wiring tests, and a Firestore Emulator regression step to the remediation workflow.
+- [x] Move the dashboard hero CSS payload out of the DOM-discovery script into `public/dashboard-hero-fix.css`, retaining its existing scoped selectors and declarations; visual comparison is still required before simplifying `!important` rules.
 - [x] Add opt-in Firebase App Check initialization for both the primary and applicant Firebase app instances, controlled by `VITE_FIREBASE_APPCHECK_SITE_KEY`.
 - [ ] Run and inspect the dependency audit, production build, lint, Firestore emulator suite, and desktop/mobile browser tests on the exact final PR head. The most recent lockfile-refresh audit output reported 10 moderate findings and no high/critical findings; the final candidate still needs a fresh, dedicated audit.
 
@@ -36,7 +37,7 @@ These controls cannot safely be completed from source code alone. Configure them
 
 ## Next 30 days — maintainability and performance
 - [x] Begin the `src/App.jsx` decomposition by extracting the portal registry and navigation components into dedicated modules; continue extracting dashboard/topbar and session responsibilities in separate behavior-preserving changes.
-- [ ] Replace dashboard/weather CSS override layering with a scoped component stylesheet and existing design tokens; remove duplicate/dead rules only after desktop/mobile screenshot comparison.
+- [ ] Reduce dashboard/weather `!important` override layering and migrate hard-coded colors to approved design tokens only after desktop/mobile screenshot comparison; do not alter the approved layout based on source inspection alone.
 - [x] Add an ESLint flat-config baseline for the app shell, navigation modules, and smoke-test configuration; extend coverage incrementally to avoid unrelated mass reformatting.
 - [ ] Add Prettier check in a follow-up once the formatting baseline is agreed; do not mass-format the 459 KB app stylesheet or 135 KB App component as part of this remediation.
 - [ ] Replace silent catches with structured error handling or monitored reporting; never log credentials, tokens, signatures or sensitive member/finance records.
