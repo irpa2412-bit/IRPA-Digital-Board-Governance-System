@@ -37,6 +37,7 @@ jobs:
           VITE_GOOGLE_DRIVE_GATEWAY_URL: ${{ secrets.VITE_GOOGLE_DRIVE_GATEWAY_URL }}
           VITE_GATEWAY_ORIGIN: ${{ secrets.VITE_GATEWAY_ORIGIN || 'https://irpa-google-drive-gateway.irpa-governance.workers.dev' }}
           VITE_GOOGLE_WEATHER_API_KEY: ${{ secrets.VITE_GOOGLE_WEATHER_API_KEY }}
+          VITE_GRANT_CRAWLER_WORKER_URL: https://irpa-grant-crawler-production.irpa-governance.workers.dev
         run: npm run build
 
       - name: Independent production readability verification
@@ -47,7 +48,15 @@ jobs:
           test -s dist/index.html
           grep -qi '<html' dist/index.html
           test -d dist/assets
-          echo "Production bundle exists; Firebase Auth and Firestore configuration remains unchanged."
+          if grep -R -q 'irpa-dbgs-grant-crawler.irpa-governance.workers.dev' dist; then
+            echo 'Production frontend bundle still references the legacy grant crawler Worker.' >&2
+            exit 1
+          fi
+          if ! grep -R -q 'irpa-grant-crawler-production.irpa-governance.workers.dev' dist; then
+            echo 'Production frontend bundle does not reference the production D1 crawler Worker.' >&2
+            exit 1
+          fi
+          echo "Production bundle targets the production D1 grant crawler; Firebase Auth and Firestore configuration remains unchanged."
       - name: Verify Cloudflare credentials
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
