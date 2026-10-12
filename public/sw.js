@@ -1,4 +1,4 @@
-const CACHE_NAME="irpa-dbgs-app-shell-v41";
+const CACHE_NAME="irpa-dbgs-app-shell-v42";
 const APP_SHELL=["/","/index.html","/manifest.webmanifest"];
 
 self.addEventListener("install",(event)=>{
@@ -28,20 +28,22 @@ function isAppAsset(request){
 
 // Cache writes are deliberately best-effort. A cache failure must never turn
 // a successful network response into an unhandled service-worker rejection.
-function cacheResponse(request,response,event){
-  if(!response || !response.ok || response.type==="opaque") return;
+function cacheResponse(request,response){
+  if(!response || !response.ok || response.type==="opaque") return Promise.resolve();
   try{
-    // Clone synchronously, before handing the original response to the page.
-    // A locked/already-consumed body is skipped instead of breaking the fetch.
-    if(response.bodyUsed || response.body?.locked) return;
+    // Clone synchronously while the response is available. Do not call
+    // event.waitUntil here: this function runs inside an async fetch promise
+    // callback, after the ExtendableEvent dispatch may already have finished.
+    if(response.bodyUsed || response.body?.locked) return Promise.resolve();
     const copy=response.clone();
-    event.waitUntil(
-      caches.open(CACHE_NAME)
-        .then(cache=>cache.put(request,copy))
-        .catch(error=>console.warn("IRPA app-shell cache write skipped:",error))
-    );
+    // The fetch handler's respondWith promise keeps this best-effort cache
+    // operation alive. Cache failures never replace a successful response.
+    return caches.open(CACHE_NAME)
+      .then(cache=>cache.put(request,copy))
+      .catch(error=>console.warn("IRPA app-shell cache write skipped:",error));
   }catch(error){
     console.warn("IRPA app-shell response could not be cloned; returning network response unchanged:",error);
+    return Promise.resolve();
   }
 }
 
@@ -54,8 +56,7 @@ self.addEventListener("fetch",(event)=>{
   if(request.mode==="navigate"){
     event.respondWith(
       fetch(request).then(response=>{
-        cacheResponse("/",response,event);
-        return response;
+        return cacheResponse("/",response).then(()=>response);
       }).catch(()=>caches.match("/").then(cached=>cached||Response.error()))
     );
     return;
@@ -65,8 +66,7 @@ self.addEventListener("fetch",(event)=>{
     event.respondWith(
       caches.match(request).then(cached=>{
         const network=fetch(request).then(response=>{
-          cacheResponse(request,response,event);
-          return response;
+          return cacheResponse(request,response).then(()=>response);
         }).catch(()=>cached||Response.error());
         return cached||network;
       })
