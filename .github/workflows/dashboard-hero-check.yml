@@ -6,6 +6,9 @@ on:
       - "src/styles/readability-harmony.css"
       - "src/styles/app.css"
       - "src/styles/portal-typography.css"
+      - "src/styles/shared-header-hero.css"
+      - "src/main.jsx"
+      - "src/App.jsx"
       - "index.html"
       - "public/dashboard-hero-fix.js"
       - "scripts/dashboard-hero-layout-check.mjs"
@@ -42,7 +45,9 @@ jobs:
           git fetch origin main
           git checkout -B dashboard-hero-screenshot origin/main
           cp "$RUNNER_TEMP/dashboard-hero-check.png" dashboard-hero-check.png
-          git add dashboard-hero-check.png
+          cp dashboard-hero-phone-check.png "$RUNNER_TEMP/dashboard-hero-phone-check.png"
+          cp "$RUNNER_TEMP/dashboard-hero-phone-check.png" dashboard-hero-phone-check.png
+          git add dashboard-hero-check.png dashboard-hero-phone-check.png
           if ! git diff --cached --quiet; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
