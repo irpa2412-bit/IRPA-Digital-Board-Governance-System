@@ -13,7 +13,7 @@
     '[data-irpa-access] *{background-color:transparent!important;border-color:#8a6d1f!important;box-shadow:none!important}',
     '[data-irpa-access] h1,[data-irpa-access] h2,[data-irpa-access] h3,[data-irpa-access] h4,[data-irpa-access] strong,[data-irpa-access] b,[data-irpa-access] [class*="label"],[data-irpa-access] [class*="badge"],[data-irpa-access] [class*="chip"],[data-irpa-access] [class*="pill"]{color:#f5c542!important}',
     '@media(max-width:900px){[data-irpa-hero]{flex-direction:column!important}[data-irpa-title],[data-irpa-weather],[data-irpa-access]{max-width:100%!important;width:100%!important;flex:1 1 auto!important;border-radius:14px!important;margin:0 0 12px 0!important}}'
-  ].join('\\n');
+  ].join('\n');
 
   function injectCSS() {
     var s = document.getElementById('irpa-hero-fix-css');
@@ -31,7 +31,7 @@
     for (var i = 0; i < all.length; i++) {
       var el = all[i];
       if (/^(SCRIPT|STYLE|NOSCRIPT)$/.test(el.tagName)) continue;
-      var t = (el.textContent || '').replace(/\\s+/g, ' ').trim();
+      var t = (el.textContent || '').replace(/\s+/g, ' ').trim();
       if (t.length < bestLen && re.test(t)) { best = el; bestLen = t.length; }
     }
     return best;
@@ -49,8 +49,8 @@
   }
 
   function apply() {
-    var w = findByText(/^live weather\\b/i);
-    var a = findByText(/^authori[sz]ed user\\b.*access/i);
+    var w = findByText(/^live weather\b/i);
+    var a = findByText(/^authori[sz]ed user\b.*access/i);
     var t = findByText(/improvement of rangeland/i);
     if (!w || !a) return;
 
@@ -69,7 +69,7 @@
     aCol.setAttribute('data-irpa-access', '');
     if (tCol && tCol !== wCol && tCol !== aCol) tCol.setAttribute('data-irpa-title', '');
 
-    var f = findByText(/^forecast\\b.*\\d/i);
+    var f = findByText(/^forecast\b.*\\d/i);
     if (f && wCol.contains(f) && f !== wCol) {
       var fc = f.parentElement && f.parentElement !== wCol ? f.parentElement : f;
       fc.setAttribute('data-irpa-forecast', '');
