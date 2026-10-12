@@ -19,7 +19,7 @@
 2. Use pull requests only; do not commit interface fixes directly to `main`.
 3. Require the dependency audit, production build, Firestore rules emulator, governance-policy tests and Playwright browser checks to pass.
 4. Review the generated dashboard screenshot at 1440px and mobile width for interface changes.
-5. Deploy to a preview/staging target and verify the actual URL and commit identity before production promotion.
+5. Deploy to a preview/staging target and verify the actual URL and commit identity before production promotion. Check the current `main` deployment workflow and endpoint SHA separately; a remediation PR passing CI does not establish which commit is live.
 6. Keep Firebase Hosting at `https://irpa-digital-board-governance.web.app/` as the intended production address until the owner approves a measured cutover. Do not delete or redirect the existing Cloudflare endpoint without verifying its users and dependencies.
 7. Record the deployed commit SHA, workflow run, endpoint smoke-test result and rollback target.
 
@@ -46,7 +46,8 @@ These controls cannot safely be completed from source code alone. Configure them
 
 ## Next 90 days — independent assurance and governance evidence
 - [ ] Commission an independent penetration test and privacy/data-protection review with counsel against Tanzania's Personal Data Protection Act, 2022.
-- [ ] Implement dedicated Decisions, Actions, Risk Register, Reports and Audit Trail views; verify traceability from meeting through resolution, approval and payment.
+- [x] Confirmed `GovernanceWorkspaces.jsx` already provides module-specific Actions, Decisions, Risk Register, Reports and read-only Audit Trail workspaces.
+- [ ] Add authenticated end-to-end traceability tests from Meeting → Proceedings → Resolution → Voting → Decision → Action → accountability evidence, including links to report and audit records.
 - [ ] Train named pilot users and measure meeting adoption, resolution-to-action time, paper/email reduction and open audit points.
 - [ ] Update the README, architecture documentation and operator runbooks.
 - [ ] Obtain independent approval before unrestricted rollout or representing the platform as auditor-validated.
