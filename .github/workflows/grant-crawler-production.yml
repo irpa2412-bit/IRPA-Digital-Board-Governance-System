@@ -171,3 +171,36 @@ jobs:
             -H "Content-Type: application/json" \
             "$PRODUCTION_WORKER_URL/crawl")"
           printf '%s' "$result" | node scripts/staging-smoke-test.js
+
+      - name: Smoke-test production AI document drafting and concept-note generation
+        env:
+          GRANT_CRAWLER_CONTROL_TOKEN: ${{ secrets.GRANT_CRAWLER_CONTROL_TOKEN }}
+          PRODUCTION_WORKER_URL: ${{ steps.deploy_production.outputs.worker_url }}
+        run: |
+          set -euo pipefail
+          document_result="$(curl --fail --silent --show-error --max-time 90 -X POST \
+            -H "Authorization: Bearer $GRANT_CRAWLER_CONTROL_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data '{"task":"draft_message","format":"Formal letter","tone":"Professional","length":"Concise","instructions":"Write a short production smoke-test draft confirming the IRPA document drafting assistant is available."}' \
+            "$PRODUCTION_WORKER_URL/assistant/analyze")"
+          node - "$document_result" <<'NODE'
+          const body = JSON.parse(process.argv[2]);
+          if (body.task !== 'draft_message' || typeof body.draft !== 'string' || body.draft.trim().length < 30) {
+            throw new Error('Production AI document-drafting smoke test failed.');
+          }
+          console.log('Production AI document drafting returned a usable draft.');
+          NODE
+
+          concept_result="$(curl --fail --silent --show-error --max-time 90 -X POST \
+            -H "Authorization: Bearer $GRANT_CRAWLER_CONTROL_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data '{"task":"concept_note","title":"IRPA AI smoke test: community rangeland restoration","description":"Call for proposals for community-led rangeland restoration in Tanzania. Applications close 31 December 2026. Open to registered NGOs in Tanzania.","donorRequirements":"Open to registered NGOs in Tanzania; deadline 31 December 2026.","url":"https://example.org/irpa-ai-smoke-test","deadline":"2026-12-31","callStatus":"open"}' \
+            "$PRODUCTION_WORKER_URL/assistant/analyze")"
+          node - "$concept_result" <<'NODE'
+          const body = JSON.parse(process.argv[2]);
+          const draft = body.assessment?.concept_note?.draft;
+          if (body.task !== 'concept_note' || typeof draft !== 'string' || draft.trim().length < 40) {
+            throw new Error('Production AI concept-note smoke test failed.');
+          }
+          console.log('Production AI concept-note drafting returned a usable draft.');
+          NODE
