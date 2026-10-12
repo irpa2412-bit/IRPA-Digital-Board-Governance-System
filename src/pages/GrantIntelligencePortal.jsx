@@ -219,7 +219,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  const combinedRecords=useMemo(()=>{const seen=new Set(records.map(r=>String(r.url||"").trim()).filter(Boolean));return [...records,...crawlerRecords.filter(r=>r.url&&!seen.has(String(r.url).trim()))]},[records,crawlerRecords]);
  const currentOpportunityRecords=useMemo(()=>combinedRecords.filter(r=>!isNotCurrentOpportunity(r)),[combinedRecords]);
  const expiredExclusionCount=combinedRecords.length-currentOpportunityRecords.length;
- const crawlerDiscoveryActive=crawlerRecords.length>0;
+ const crawlerDiscoveryActive=crawlerRunning||crawlerRecords.length>0;
  const filtered=useMemo(()=>currentOpportunityRecords.filter(r=>{
    const hay=[r.title,r.funder,r.summary,r.country,r.amount].join(" ").toLowerCase();
    return (!queryText||hay.includes(queryText.toLowerCase()))&&(pillar==="all"||cleanArray(r.pillars).includes(pillar))&&(theme==="all"||cleanArray(r.themes).includes(theme))&&(status==="all"||r.status===status);
