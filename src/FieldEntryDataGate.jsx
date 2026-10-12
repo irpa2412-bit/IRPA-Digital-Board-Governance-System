@@ -17,7 +17,7 @@ const ACTUAL_ONLY_PORTAL_HINT=/member|personnel|employee|signature|signer|audito
 const portalRequiresActual=portal=>ACTUAL_ONLY_PORTAL_HINT.test(String(portal||""));
 const verificationMapKey="irpaPortalDataEntryVerifications";
 
-export default function FieldEntryDataGate({portal}){
+export default function FieldEntryDataGate({portal,bypassPortal=""}){
   const currentPortal=String(portal||"Dashboard").trim().replace(/\s+/g," ").slice(0,100)||"Dashboard";
   const[field,setField]=useState(null);
   const[dataType,setDataType]=useState("");
@@ -28,6 +28,7 @@ export default function FieldEntryDataGate({portal}){
 
   useEffect(()=>{
     setStorageError("");
+    if(bypassPortal===currentPortal){setField(null);return;}
     let verified=false;
     try{
       const records=JSON.parse(window.sessionStorage.getItem(verificationMapKey)||"{}");
@@ -43,7 +44,7 @@ export default function FieldEntryDataGate({portal}){
       return;
     }
     setField({portal:currentPortal});
-  },[currentPortal]);
+  },[currentPortal,bypassPortal]);
 
   const proceed=()=>{
     if(!field||!dataType||!environment||(environment==="ACTUAL"&&!confirmed))return;
