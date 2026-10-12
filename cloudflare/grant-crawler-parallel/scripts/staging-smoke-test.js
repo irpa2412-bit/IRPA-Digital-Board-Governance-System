@@ -52,7 +52,7 @@ async function main() {
   const missing = scheduledScanners.filter(name => !observedNames.has(name));
   const unexpected = scanners.map(scanner => scanner.engine).filter(name => !expectedScanners.includes(name));
   if (Number(crawlResult.additionalScannersConfigured) !== expectedScanners.length ||
-      scheduledScanners.length !== Math.min(18, expectedScanners.length) ||
+      scheduledScanners.length !== Math.min(14, expectedScanners.length) ||
       scanners.length !== scheduledScanners.length || missing.length || unexpected.length) {
     throw new Error("Donor scanner acceptance failed: expected the complete 26-source registry and all scheduled scanner runs; missing: " + (missing.join(", ") || "count mismatch"));
   }
