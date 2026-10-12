@@ -10726,21 +10726,40 @@ html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar
 
 
 /* DASHBOARD FORECAST PANE MINIMUM HEIGHT — 20261012-0700 */
-/* Keep the forecast row materially tall while preserving three equal, stretch-filled day panes.
-   Scoped exclusively to the Dashboard hero; the mobile stack remains content-sized. */
+/* Use the established Dashboard :has() selector specificity so earlier hero rules
+   cannot collapse the forecast row. The forecast panes must fill a >=140px row. */
 @media (min-width: 1200px) {
-  html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row {
+  html body #root .main-area:has(> header.topbar.dashboard-topbar) > header.topbar.dashboard-topbar > .topbar-heading-row {
     min-height: 360px;
   }
-  html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel {
-    min-height: 340px;
+  html body #root .main-area:has(> header.topbar.dashboard-topbar) > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel {
+    display: grid;
+    grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr);
     grid-template-rows: auto auto minmax(140px, 1fr) auto;
+    grid-template-areas: "label location" "current metrics" "forecast forecast" "footer footer";
+    align-items: stretch;
+    align-content: stretch;
+    height: 100%;
+    min-height: 340px;
+    max-height: none;
   }
-  html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-days {
+  html body #root .main-area:has(> header.topbar.dashboard-topbar) > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-content {
+    display: contents;
+    height: auto;
+    min-height: 0;
+    max-height: none;
+  }
+  html body #root .main-area:has(> header.topbar.dashboard-topbar) > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-days {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     grid-template-rows: minmax(140px, 1fr);
     align-items: stretch;
+    align-content: stretch;
+    height: auto;
+    min-height: 140px;
+    max-height: none;
   }
-  html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-day {
+  html body #root .main-area:has(> header.topbar.dashboard-topbar) > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-day {
     height: 100%;
     min-height: 140px;
     align-self: stretch;
