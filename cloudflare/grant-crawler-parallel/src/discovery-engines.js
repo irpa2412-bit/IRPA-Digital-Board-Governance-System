@@ -338,7 +338,7 @@ export const SEARCH_QUERIES = [
   '"call for proposals" OR grant OR funding pastoralism rangeland grazing dryland restoration Tanzania East Africa',
   '"livestock development" OR "animal health" OR veterinary OR fodder OR forage grants Tanzania Africa',
   '"livestock market" OR "market access" OR "value addition" OR "value chain" leather dairy meat funding Africa',
-  '"climate adaptation" OR drought OR "early warning" OR "water security" grant Tanzania East Africa',
+  '"climate adaptation" OR drought OR "early warning" OR "water security" OR "renewable energy" OR solar grant Tanzania East Africa',
   '"biodiversity conservation" OR "ecosystem restoration" OR "invasive species" OR "nature-based solutions" funding Africa',
   '"women-led" OR youth OR "gender equality" OR "social inclusion" grants livelihoods Tanzania Africa',
   '"Indigenous Peoples" OR pastoralist OR "community-led" grants climate resilience East Africa',
