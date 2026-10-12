@@ -191,19 +191,20 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
      setCrawlerSources(uniqueSources.map(sourceUrl=>({id:sourceUrl,name:(()=>{try{return new URL(sourceUrl).hostname}catch{return sourceUrl}})(),url:sourceUrl,status:"Fetched",candidateCount:items.filter(item=>item.source_url===sourceUrl).length})));
      setCrawlerRecords(items.map(item=>({
        id:"crawler-"+item.id,title:item.title||"Untitled opportunity",
-       funder:(()=>{try{return new URL(item.source_url||item.url).hostname.replace(/^www\./,"")}catch{return "Official source"}})(),
+       funder:item.funder||item.source_name||(()=>{try{return new URL(item.source_url||item.url).hostname.replace(/^www\./,"")}catch{return "Funder not verified"}})(),
        url:item.url||item.source_url||"",source_url:item.source_url||"",deadline:item.deadline_at||null,
-       country:item.geography_assessment==="tanzania_mentioned"?"Tanzania":item.geography_assessment==="regional_or_lmic_scope"?"Regional / LMIC":"Not verified",
-       amount:"Not stated",summary:item.description||"No description supplied in source feed.",
-       status:["closed","expired"].includes(String(item.call_status||"").toLowerCase())?"Closed":item.call_status==="open"?"Open":"Under review",
+       country:item.country||(item.geography_assessment==="tanzania_mentioned"?"Tanzania":item.geography_assessment==="regional_or_lmic_scope"?"Regional / LMIC":"Not verified"),
+       amount:item.amount||"Not stated",summary:item.description||"No description supplied by source.",
+       status:["closed","expired","closed_do_not_prioritize"].includes(String(item.call_status||"").toLowerCase())?"Closed":String(item.call_status||"").toLowerCase()==="open"?"Open":"Under review",
        callStatus:item.call_status||"unknown",
-       pillars:["livestock/agriculture"].includes(JSON.parse(item.fit_reasons||"[]")[0])?["livestock"]:["rangeland"],
-       themes:[],verificationStatus:"Pending official-call verification",sourceType:"Cloudflare crawler",
+       pillars:Array.isArray(item.pillars)?item.pillars:(()=>{try{return JSON.parse(item.pillars||"[]")}catch{return []}})(),
+       themes:Array.isArray(item.themes)?item.themes:(()=>{try{return JSON.parse(item.themes||"[]")}catch{return []}})(),
+       verificationStatus:item.verification_status||"Pending official-call verification",sourceType:"Cloudflare crawler",
        fitScore:Number(item.fit_score||0),fitReasons:item.fit_reasons||"[]",
        eligibilityStatus:item.eligibility_status||"unverified",triageAssessment:item.triage_assessment||"manual_eligibility_review",
        createdAt:item.first_seen_at||null
      })));
-     if(data.lastRun)setCrawlerStatus({status:data.lastRun.status,created:data.lastRun.items_changed,candidatesFound:data.lastRun.items_seen,lastCompletedAt:data.lastRun.finished_at,lastStartedAt:data.lastRun.finished_at,configuredSources:data.feedsConfigured,healthySources:uniqueSources.length});
+     if(data.lastRun)setCrawlerStatus({status:data.lastRun.status,created:data.lastRun.created??data.lastRun.items_changed,candidatesFound:data.lastRun.candidatesFound??data.lastRun.items_seen,lastCompletedAt:data.lastRun.finished_at,lastStartedAt:data.lastRun.started_at,configuredSources:data.lastRun.configuredSources??data.sourceCount??data.feedsConfigured,healthySources:data.lastRun.healthySources??uniqueSources.length,failedSources:data.lastRun.failedSources??0});
      if(showNotice)setNotice("Refreshed "+String(data.count||0)+" grant records from the Cloudflare crawler. Eligibility remains unverified.");
    }catch(err){console.error("Crawler result retrieval failed",err);if(showNotice)setError(err?.message||"Unable to load crawler results.");}
    finally{setCrawlerResultsBusy(false);}
@@ -218,7 +219,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  const combinedRecords=useMemo(()=>{const seen=new Set(records.map(r=>String(r.url||"").trim()).filter(Boolean));return [...records,...crawlerRecords.filter(r=>r.url&&!seen.has(String(r.url).trim()))]},[records,crawlerRecords]);
  const currentOpportunityRecords=useMemo(()=>combinedRecords.filter(r=>!isNotCurrentOpportunity(r)),[combinedRecords]);
  const expiredExclusionCount=combinedRecords.length-currentOpportunityRecords.length;
- const crawlerDiscoveryActive=crawlerRecords.length>0;
+ const crawlerDiscoveryActive=crawlerRunning||crawlerRecords.length>0;
  const filtered=useMemo(()=>currentOpportunityRecords.filter(r=>{
    const hay=[r.title,r.funder,r.summary,r.country,r.amount].join(" ").toLowerCase();
    return (!queryText||hay.includes(queryText.toLowerCase()))&&(pillar==="all"||cleanArray(r.pillars).includes(pillar))&&(theme==="all"||cleanArray(r.themes).includes(theme))&&(status==="all"||r.status===status);
@@ -228,11 +229,15 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  const smartAssistantResults=useMemo(()=>{
    // Comma/semicolon/newline separates keyword phrases; a space-only query is treated as individual keywords.
    const raw=smartKeywords.toLowerCase().split(/[,;\n]+/).map(term=>term.trim()).filter(Boolean);
-   const terms=(raw.length?raw:smartKeywords.toLowerCase().split(/\s+/)).filter(term=>term.length>1).slice(0,20);
+   const terms=[...new Set((raw.length?raw:smartKeywords.toLowerCase().split(/\s+/)).flatMap(term=>[term,...term.split(/\s+/).filter(token=>token.length>2)]))].filter(term=>term.length>1).slice(0,20);
    if(!terms.length)return [];
    const aliases={
      pastoralism:["pastoralist","pastoral","rangeland","nomadic"],
      pastoral:["pastoralism","pastoralist","rangeland"],
+     rangeland:["pastoral","dryland","grazing","range land","grassland"],
+     funding:["grant","grants","call for proposals","open call"],
+     fodder:["forage","feed","livestock","pasture"],
+     livelihoods:["income generation","economic empowerment","pastoral livelihoods"],
      livestock:["animal health","veterinary","herd","cattle","goat","sheep"],
      climate:["drought","adaptation","resilience","climate change"],
      women:["gender","female","women-led","girls"],
@@ -282,7 +287,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
      const response=await fetch(workerUrl+"/run",{method:"POST",headers:{"Authorization":"Bearer "+idToken,"Content-Type":"application/json"},body:"{}",signal:AbortSignal.timeout(90000)});
      const data=await response.json().catch(()=>({}));
      if(!response.ok) throw new Error(data.error||"Cloudflare grant crawler request failed ("+response.status+").");
-     setNotice("Grant crawler scan "+String(data.status||"finished")+". Feeds configured: "+String(data.feedsConfigured||0)+", source entries found: "+String(data.itemsSeen||0)+", records changed: "+String(data.recordsChanged||0)+". Legal eligibility remains unverified.");
+     setNotice("Grant crawler scan "+String(data.status||"finished")+". Sources checked: "+String(data.sourceCount||data.configuredSources||0)+", candidates found: "+String(data.candidatesFound||data.itemsSeen||0)+", records created or updated: "+String(Number(data.created||0)+Number(data.updated||0)||data.recordsChanged||0)+". New leads remain pending official-call verification.");
      await loadCrawlerResults(false);
    }catch(err){console.error("Manual grant crawler scan failed",err);setError(err?.name==="TimeoutError"?"The scan exceeded 90 seconds. Refresh results and inspect crawler health before retrying.":err?.message||"Manual scan failed. Check crawler authorization and Worker health.");}
    finally{setCrawlerRunning(false);}
@@ -411,7 +416,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
      const data=await response.json().catch(()=>({}));
      if(!response.ok)throw new Error(data.error||"Concept-note draft could not be saved.");
      setDraftId(id);
-     setWorkspaceNotice(statusUnverified?"Concept-note draft saved to the isolated Cloudflare D1 workspace with an audit event. The call status remains unverified; confirm the official donor page before submission.":"Concept-note draft saved to the isolated Cloudflare D1 workspace; an audit event was recorded.");
+     setWorkspaceNotice(statusUnverified?"Concept-note draft saved to the IRPA workspace with an audit event. The call status remains unverified; confirm the official donor page before submission.":"Concept-note draft saved to the IRPA workspace; an audit event was recorded.");
      await loadSavedDrafts();
      await loadDraftAuditEvents(id);
    }catch(err){setError(err?.message||"Concept-note draft could not be saved.");}
@@ -441,9 +446,9 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
     <div style={styles.eyebrow}>IRPA-DBGS · FUNDING INTELLIGENCE</div>
     <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
      <h1 style={{...styles.title,margin:"7px 0"}}>Live Grants & Calls for Proposals</h1>
-     <span role="status" aria-live="polite" title={crawlerDiscoveryActive?"The crawler has returned one or more funding opportunities.":"The crawler has not returned any funding opportunities."} style={{display:"inline-flex",alignItems:"center",gap:7,padding:"6px 10px",borderRadius:999,border:"1px solid "+(crawlerDiscoveryActive?"#32846d":"#b65c5c"),background:crawlerDiscoveryActive?"#123b32":"#3b2228",color:crawlerDiscoveryActive?"#8de0b7":"#ffb8b8",fontSize:12,fontWeight:800,whiteSpace:"nowrap"}}>
+     <span role="status" aria-live="polite" title={crawlerRunning?"A grant-source scan is running.":crawlerRecords.length?"Crawler results are loaded.":"No crawler results are currently loaded."} style={{display:"inline-flex",alignItems:"center",gap:7,padding:"6px 10px",borderRadius:999,border:"1px solid "+(crawlerDiscoveryActive?"#32846d":"#b65c5c"),background:crawlerDiscoveryActive?"#123b32":"#3b2228",color:crawlerDiscoveryActive?"#8de0b7":"#ffb8b8",fontSize:12,fontWeight:800,whiteSpace:"nowrap"}}>
       <span aria-hidden="true" style={{width:7,height:7,borderRadius:"50%",background:crawlerDiscoveryActive?"#54d6a4":"#ff8585",display:"inline-block"}}/>
-      {crawlerDiscoveryActive?"Active":"In Active"}
+      {crawlerRunning?"Scanning":crawlerRecords.length?"Results loaded":"Awaiting results"}
      </span>
     </div>
     <div style={{fontSize:14,lineHeight:1.6,color:"#e1edf2"}}>Discover, classify and manage funding opportunities against IRPA's three strategic pillars and seven cross-cutting themes. All authenticated profiles can access this portal at no additional cost.</div>
@@ -481,20 +486,20 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
     {<div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button type="button" disabled={crawlerResultsBusy} style={{...styles.button,background:"transparent",opacity:crawlerResultsBusy?0.6:1}} onClick={()=>loadCrawlerResults(true)}>{crawlerResultsBusy?"Refreshing results…":"Refresh results"}</button><button type="button" disabled={crawlerRunning||(!isAdmin&&!canManage)} title="Run a full scan of configured donor sources" style={{...styles.button,opacity:crawlerRunning?0.6:1}} onClick={startCrawlerScan}>{crawlerRunning?"Scanning sources…":"Run scan now"}</button></div>}
    </div>
    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(145px,1fr))",gap:10}}>
-    {[[ "Crawler state",crawlerStatus?.status||"Awaiting first scan"],[ "Sources with results",String(crawlerStatus?.healthySources??0)+" / "+String(crawlerStatus?.configuredSources??11)],[ "New records last run",String(crawlerStatus?.created??0)],[ "Candidates last run",String(crawlerStatus?.candidatesFound??0)]].map(([label,value])=><div key={label} style={{border:"1px solid #344255",borderRadius:10,padding:11}}><div style={styles.muted}>{label}</div><strong style={{display:"block",fontSize:17,marginTop:5}}>{value}</strong></div>)}
+    {[[ "Crawler state",crawlerStatus?.status||"Awaiting first scan"],[ "Sources with results",String(crawlerStatus?.healthySources??0)+" / "+String(crawlerStatus?.configuredSources??15)],[ "New records last run",String(crawlerStatus?.created??0)],[ "Candidates last run",String(crawlerStatus?.candidatesFound??0)]].map(([label,value])=><div key={label} style={{border:"1px solid #344255",borderRadius:10,padding:11}}><div style={styles.muted}>{label}</div><strong style={{display:"block",fontSize:17,marginTop:5}}>{value}</strong></div>)}
    </div>
    <div style={styles.muted}>Last scan started: {dateLabel(crawlerStatus?.lastStartedAt)} · Last completed: {dateLabel(crawlerStatus?.lastCompletedAt)} · Cadence: every 6 hours (Tanzania time)</div>
    <details><summary style={{cursor:"pointer",fontSize:13,fontWeight:700}}>Source health and crawl results ({crawlerSources.length})</summary><div style={{display:"grid",gap:7,marginTop:10}}>{crawlerSources.map(source=><div key={source.id} style={{borderTop:"1px solid #344255",paddingTop:8,display:"flex",justifyContent:"space-between",gap:10,alignItems:"start"}}><div><strong style={{fontSize:13}}>{source.name||source.id}</strong><div style={styles.muted}>{source.url}</div>{source.error&&<div style={{fontSize:12,color:"#ffb8b8"}}>{source.error}</div>}</div><div style={{textAlign:"right",minWidth:100,fontSize:12}}><strong>{source.status||"Not checked"}</strong><div style={styles.muted}>{source.candidateCount??0} candidates</div></div></div>)}</div></details>
-   <details><summary style={{cursor:"pointer",fontSize:13,fontWeight:800}}>Parallel scanning engine health ({crawlerEngines.length})</summary><div style={{display:"grid",gap:7,marginTop:10}}>{crawlerEngines.map(engine=><div key={engine.engine} style={{borderTop:"1px solid #344255",paddingTop:8,display:"grid",gridTemplateColumns:"minmax(140px,1fr) auto",gap:10,alignItems:"start"}}><div><strong style={{fontSize:13}}>{(crawlerProvision.find(item=>item.engine===engine.engine)||{}).label||engine.engine}</strong><div style={styles.muted}>Last checked: {dateLabel(engine.finished_at)}</div>{engine.error_message&&<div style={{fontSize:12,color:"#ffcf88"}}>{engine.error_message}</div>}</div><div style={{textAlign:"right",fontSize:12}}><strong style={{color:engine.status==="success"?"#8de0b7":engine.status==="partial"?"#ffcf88":"#ffb8b8"}}>{engine.status==="success"?"Completed":engine.status==="partial"?"Partial":"Failed"}</strong><div style={styles.muted}>{engine.configured} configured · {engine.items_seen} found</div></div></div>)}</div></details>
+   <details><summary style={{cursor:"pointer",fontSize:13,fontWeight:800}}>Crawler source-engine health ({crawlerEngines.length})</summary><div style={{display:"grid",gap:7,marginTop:10}}>{crawlerEngines.map(engine=><div key={engine.engine} style={{borderTop:"1px solid #344255",paddingTop:8,display:"grid",gridTemplateColumns:"minmax(140px,1fr) auto",gap:10,alignItems:"start"}}><div><strong style={{fontSize:13}}>{(crawlerProvision.find(item=>item.engine===engine.engine)||{}).label||engine.engine}</strong><div style={styles.muted}>Last checked: {dateLabel(engine.finished_at)}</div>{engine.error_message&&<div style={{fontSize:12,color:"#ffcf88"}}>{engine.error_message}</div>}</div><div style={{textAlign:"right",fontSize:12}}><strong style={{color:engine.status==="success"?"#8de0b7":engine.status==="partial"?"#ffcf88":"#ffb8b8"}}>{engine.status==="success"?"Completed":engine.status==="partial"?"Partial":"Failed"}</strong><div style={styles.muted}>{engine.configured} configured · {engine.items_seen} found</div></div></div>)}</div></details>
    <details>
     <summary style={{cursor:"pointer",fontSize:14,fontWeight:800}}>Engine provision panel — funding resources ({crawlerProvision.length} engines)</summary>
-    <div style={{...styles.muted,marginTop:8}}>Indicative resource registry. Open an engine to inspect its purpose, source endpoints, search queries and latest run status. All engines feed the same deduplicated opportunity register and the same IRPA fit, deadline, geography and eligibility formula.</div>
+    <div style={{...styles.muted,marginTop:8}}>Configured public-source registry. Each entry shows the discovery source and latest recorded health. A source listing is not proof that it has an active call or that IRPA is eligible; verify every lead against the official call.</div>
     <div style={{display:"grid",gap:8,marginTop:10}}>
      {crawlerProvision.map(provision=>{
       const run=crawlerEngines.find(item=>item.engine===provision.engine);
       const status=run?.status||"not_run";
-      const statusLabel=status==="success"?"Completed":status==="partial"?"Partial":status==="failed"?"Failed":provision.provisionStatus==="configured"?"Provisioned":Number(provision.configured??(provision.sources||[]).length)>0?"Configured · rotation":"Not configured";
-      const statusColor=status==="success"?"#8de0b7":status==="partial"?"#ffcf88":status==="failed"?"#ffb8b8":provision.provisionStatus==="configured"?"#8bd3e6":"#aab6c5";
+      const statusLabel=status==="success"?"Completed":status==="partial"?"Partial":status==="failed"?"Failed":Number(provision.configured??(provision.sources||[]).length)>0?"Configured":"Not configured";
+      const statusColor=status==="success"?"#8de0b7":status==="partial"?"#ffcf88":status==="failed"?"#ffb8b8":Number(provision.configured??(provision.sources||[]).length)>0?"#8bd3e6":"#aab6c5";
       return <details key={provision.engine} style={{border:"1px solid #344255",borderRadius:10,padding:"9px 11px",background:"rgba(255,255,255,0.015)"}}>
        <summary style={{cursor:"pointer",display:"flex",justifyContent:"space-between",gap:10,alignItems:"center",flexWrap:"wrap"}}>
         <strong style={{fontSize:13}}>{provision.label||provision.engine}</strong>
@@ -580,19 +585,19 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
     <p style={{...styles.muted,margin:0}}>This is a working draft, not an approved IRPA submission. Verify figures, evidence, eligibility, budgets and donor instructions before circulation.</p>
     <textarea aria-label="Editable concept-note draft" rows="16" style={{...styles.input,resize:"vertical",fontFamily:"inherit",lineHeight:1.6}} value={conceptDraft||analysisResult?.concept_note?.draft||""} onChange={e=>setConceptDraft(e.target.value)}/>
     <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-     <button type="button" disabled={draftSaving||!text(conceptDraft||analysisResult?.concept_note?.draft)} style={{...styles.button,opacity:draftSaving?0.6:1}} onClick={saveConceptDraft}>{draftSaving?"Saving draft…":"Save draft to Cloudflare workspace"}</button>
+     <button type="button" disabled={draftSaving||!text(conceptDraft||analysisResult?.concept_note?.draft)} style={{...styles.button,opacity:draftSaving?0.6:1}} onClick={saveConceptDraft}>{draftSaving?"Saving draft…":"Save draft to IRPA workspace"}</button>
      <button type="button" style={{...styles.button,background:"transparent"}} onClick={downloadConceptDraft}>Download .txt for DBGS Documents</button>
      <button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>{if(!navigator.clipboard?.writeText){setError("Clipboard access is unavailable in this browser.");return;}navigator.clipboard.writeText(conceptDraft||analysisResult?.concept_note?.draft||"").then(()=>setWorkspaceNotice("Concept-note text copied to clipboard.")).catch(()=>setError("Clipboard access was blocked by the browser."));}}>Copy concept-note text</button>
     </div>
    </section>}
    <section style={{display:"grid",gap:8}}>
     <div style={{display:"flex",justifyContent:"space-between",gap:10,alignItems:"center",flexWrap:"wrap"}}><h3 style={{fontSize:16,margin:0}}>My saved concept-note drafts</h3><span style={styles.muted}>{savedDrafts.length} saved</span></div>
-    {draftsBusy&&<div style={styles.muted}>Loading drafts from the Cloudflare workspace…</div>}
+    {draftsBusy&&<div style={styles.muted}>Loading drafts from the IRPA workspace…</div>}
     {!draftsBusy&&!savedDrafts.length&&<div style={styles.muted}>No saved drafts yet. Screen a grant, generate a concept note and save the draft here.</div>}
     {savedDrafts.map(draft=><div key={draft.id} style={{border:"1px solid #344255",borderRadius:10,padding:11,display:"flex",justifyContent:"space-between",gap:10,alignItems:"center",flexWrap:"wrap"}}><div><strong style={{fontSize:13}}>{draft.name||draft.opportunity?.title||"Untitled concept note"}</strong><div style={styles.muted}>Status: {draft.status||"draft"} · Updated: {dateLabel(draft.updated_at||draft.updatedAt||draft.created_at)}</div></div><button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>openSavedConceptDraft(draft)}>Open draft</button></div>)}
    </section>
    <section style={{...styles.card,display:"grid",gap:9}}>
-    <div><strong style={{fontSize:14}}>Draft audit trail</strong><p style={{...styles.muted,margin:"4px 0"}}>Append-only Cloudflare D1 events record when this draft was created or updated, without copying the full concept-note text into the event log.</p></div>
+    <div><strong style={{fontSize:14}}>Draft audit trail</strong><p style={{...styles.muted,margin:"4px 0"}}>Append-only audit events record when this draft was created or updated, without copying the full concept-note text into the event log.</p></div>
     {auditBusy&&<div style={styles.muted}>Loading draft audit events…</div>}
     {!auditBusy&&draftId&&!draftAuditEvents.length&&<div style={styles.muted}>No audit events loaded yet. Save the draft or reopen it to retrieve the event history.</div>}
     {!draftId&&<div style={styles.muted}>Save the draft to create its first audit event.</div>}
@@ -608,7 +613,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
      <button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>onNavigate?.("Meetings")}>Open Meetings</button>
     </div>
    </section>
-   <div style={{...styles.muted,borderLeft:"3px solid #b78b3d",padding:"8px 12px"}}><strong>Governance control:</strong> saved drafts remain drafts in the isolated Cloudflare D1 workspace. Saving does not submit an application, approve expenditure, authorize a commitment, or replace IRPA's formal internal review and approval procedures.</div>
+   <div style={{...styles.muted,borderLeft:"3px solid #b78b3d",padding:"8px 12px"}}><strong>Governance control:</strong> saved drafts remain drafts in the IRPA workspace. Saving does not submit an application, approve expenditure, authorize a commitment, or replace IRPA's formal internal review and approval procedures.</div>
   </section>}
 
   <section style={{...styles.card,display:"grid",gap:12,borderColor:"#4e8b91"}} aria-labelledby="grant-smart-assistant-heading">
@@ -668,7 +673,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
     <p style={styles.muted}>Directory entries are discovery resources, not a claim that each organisation has an open call or that IRPA is eligible. The crawler and AI-assisted review must check each individual opportunity against the same IRPA criteria.</p>
    </details>
   </section>
-  <div style={{...styles.muted,borderLeft:"3px solid #b78b3d",padding:"8px 12px"}}><strong>Live-data status:</strong> manually registered opportunities continue to come from the IRPA register; crawler-discovered records are retrieved from the isolated Cloudflare D1 crawler. Crawler leads are marked pending verification and do not establish legal eligibility or donor approval.</div>
+  <div style={{...styles.muted,borderLeft:"3px solid #b78b3d",padding:"8px 12px"}}><strong>Live-data status:</strong> manually registered opportunities continue to come from the IRPA register; crawler-discovered records are retrieved from the canonical Cloudflare Worker and its existing Firestore register. Crawler leads are marked pending verification and do not establish legal eligibility or donor approval.</div>
  </div>;
 }
 function dateMillis(v){if(!v)return 0;const d=v?.toDate?v.toDate():new Date(v);return Number.isNaN(d.getTime())?0:d.getTime();}
