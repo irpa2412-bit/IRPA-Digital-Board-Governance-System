@@ -10791,3 +10791,19 @@ html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar
     align-self: end;
   }
 }
+
+
+/* 2026-10-12: move only the dashboard weather forecast pad left.
+   Preserve its existing height and keep its right edge aligned to the same grid track. */
+@media (min-width: 1200px) {
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel {
+    width: calc(100% + 16px);
+    transform: translateX(-16px);
+  }
+}
+@media (min-width: 761px) and (max-width: 1199px) {
+  html body #root .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel {
+    width: calc(100% + 12px);
+    transform: translateX(-12px);
+  }
+}
