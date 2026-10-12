@@ -229,11 +229,15 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  const smartAssistantResults=useMemo(()=>{
    // Comma/semicolon/newline separates keyword phrases; a space-only query is treated as individual keywords.
    const raw=smartKeywords.toLowerCase().split(/[,;\n]+/).map(term=>term.trim()).filter(Boolean);
-   const terms=(raw.length?raw:smartKeywords.toLowerCase().split(/\s+/)).filter(term=>term.length>1).slice(0,20);
+   const terms=[...new Set((raw.length?raw:smartKeywords.toLowerCase().split(/\s+/)).flatMap(term=>[term,...term.split(/\s+/).filter(token=>token.length>2)]))].filter(term=>term.length>1).slice(0,20);
    if(!terms.length)return [];
    const aliases={
      pastoralism:["pastoralist","pastoral","rangeland","nomadic"],
      pastoral:["pastoralism","pastoralist","rangeland"],
+     rangeland:["pastoral","dryland","grazing","range land","grassland"],
+     funding:["grant","grants","call for proposals","open call"],
+     fodder:["forage","feed","livestock","pasture"],
+     livelihoods:["income generation","economic empowerment","pastoral livelihoods"],
      livestock:["animal health","veterinary","herd","cattle","goat","sheep"],
      climate:["drought","adaptation","resilience","climate change"],
      women:["gender","female","women-led","girls"],
