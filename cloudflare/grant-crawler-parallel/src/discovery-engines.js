@@ -397,7 +397,7 @@ async function readGoogleNewsSearch() {
     } catch (error) { return { items: [], error: { query, error: String(error.message || error).slice(0, 180) } }; }
   }));
   const items = results.flatMap(result => result.items), errors = results.filter(result => result.error).map(result => result.error);
-  return { items, stats: { configured: true, provider: "Google News RSS", queries: SEARCH_QUERIES.length, found: items.length, errors } };
+  return { items, stats: { configured: true, provider: "Google News RSS", queries: activeSearchQueries().length, queryCatalogSize: SEARCH_QUERIES.length, found: items.length, errors } };
 }
 async function readBingSearch() {
   const results = await Promise.all(activeSearchQueries().map(async query => {
@@ -412,7 +412,7 @@ async function readBingSearch() {
     } catch (error) { return { items: [], error: { query, error: String(error.message || error).slice(0, 180) } }; }
   }));
   const items = results.flatMap(result => result.items), errors = results.filter(result => result.error).map(result => result.error);
-  return { items, stats: { configured: true, provider: "Bing RSS", queries: SEARCH_QUERIES.length, found: items.length, errors } };
+  return { items, stats: { configured: true, provider: "Bing RSS", queries: activeSearchQueries().length, queryCatalogSize: SEARCH_QUERIES.length, found: items.length, errors } };
 }
 export async function readGdeltSearch() {
   const batchCount = Math.ceil(GDELT_QUERIES.length / SEARCH_BATCH_SIZE);
@@ -458,7 +458,7 @@ export async function readWebSearch(env) {
     if (google.items.length > 0 || google.stats.errors.length === 0 && google.stats.found > 0) return google;
     const bing = await readBingSearch();
     if (bing.items.length || bing.stats.errors.length === 0) return bing;
-    return { items: [], stats: { configured: true, provider: "Google News RSS / Bing RSS", queries: SEARCH_QUERIES.length, found: 0, errors: [...google.stats.errors, ...bing.stats.errors] } };
+    return { items: [], stats: { configured: true, provider: "Google News RSS / Bing RSS", queries: activeSearchQueries().length, queryCatalogSize: SEARCH_QUERIES.length, found: 0, errors: [...google.stats.errors, ...bing.stats.errors] } };
   }
   const results = await Promise.all(activeSearchQueries().map(async query => {
     const items = [];
@@ -478,5 +478,5 @@ export async function readWebSearch(env) {
     } catch (error) { return { items: [], error: { query, error: String(error.message || error).slice(0, 180) } }; }
   }));
   const errors = results.filter(result => result.error).map(result => result.error), items = results.flatMap(result => result.items);
-  return { items, stats: { configured: true, provider: "Brave Search API", queries: SEARCH_QUERIES.length, found: items.length, errors } };
+  return { items, stats: { configured: true, provider: "Brave Search API", queries: activeSearchQueries().length, queryCatalogSize: SEARCH_QUERIES.length, found: items.length, errors } };
 }
