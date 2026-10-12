@@ -739,3 +739,32 @@ test("parallel webpage scanner and no-key web search use the configured public s
   assert.equal(pages.items.length, 0);
   assert.equal(pages.stats.configured, 0);
 });
+
+
+test("AI document drafting route returns a generated draft", async () => {
+  const token = "test-token-with-at-least-32-characters-long";
+  let modelCalls = 0;
+  const response = await worker.fetch(new Request("https://crawler.example/assistant/analyze", {
+    method: "POST",
+    headers: { authorization: "Bearer " + token, "content-type": "application/json" },
+    body: JSON.stringify({ task: "draft_message", format: "Formal letter", tone: "Professional", length: "Concise", instructions: "Draft a formal letter about a proposed rangeland restoration partnership." })
+  }), {
+    CRAWLER_CONTROL_TOKEN: token,
+    AI: { run: async () => { modelCalls++; return { draft: "Subject: Rangeland restoration partnership\\n\\nDear Partner,\\nIRPA proposes to explore a partnership." }; } }
+  });
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.task, "draft_message");
+  assert.match(body.draft, /rangeland restoration partnership/i);
+  assert.equal(modelCalls, 1);
+});
+
+test("AI document drafting rejects an empty instruction", async () => {
+  const token = "test-token-with-at-least-32-characters-long";
+  const response = await worker.fetch(new Request("https://crawler.example/assistant/analyze", {
+    method: "POST",
+    headers: { authorization: "Bearer " + token, "content-type": "application/json" },
+    body: JSON.stringify({ task: "draft_message", instructions: " " })
+  }), { CRAWLER_CONTROL_TOKEN: token, AI: { run: async () => { throw new Error("model must not run"); } } });
+  assert.equal(response.status, 400);
+});
