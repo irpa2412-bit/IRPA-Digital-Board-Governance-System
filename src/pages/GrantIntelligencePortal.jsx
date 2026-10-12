@@ -105,7 +105,7 @@ const getOpportunityCurrentStatusIssue=record=>{
  if(pipelineStatus==="open"&&/\bverified\b|\bconfirmed\b/i.test(text(record?.verificationStatus)))return null;
  return "unverified";
 };
-const isNotCurrentOpportunity=record=>Boolean(getOpportunityCurrentStatusIssue(record));
+const isNotCurrentOpportunity=record=>["closed","expired"].includes(getOpportunityCurrentStatusIssue(record));
 export default function GrantIntelligencePortal({profile,employee,isAdmin=false,onNavigate}){
  const [records,setRecords]=useState([]);
  const [crawlerRecords,setCrawlerRecords]=useState([]);
