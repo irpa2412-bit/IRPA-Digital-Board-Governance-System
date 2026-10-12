@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import worker, { assessFit, isCurrentOpportunity, parseFeed, safeUrl } from "../src/index.js";
 import { assessGeographicEligibility } from "../src/assistant.js";
-import { DONOR_SCANNERS, SEARCH_QUERIES, decodeHtml, normalizeOpportunityUrl, parseOfficialPage, parseSearchRss, readDonorScanner, readOfficialPages, readWebSearch } from "../src/discovery-engines.js";
+import { DONOR_SCANNERS, SEARCH_QUERIES, GDELT_QUERIES, decodeHtml, normalizeOpportunityUrl, parseOfficialPage, parseSearchRss, readDonorScanner, readOfficialPages, readWebSearch, readGdeltSearch } from "../src/discovery-engines.js";
 
 test("expanded engine registry includes African NGO aggregators and conservation funders", () => {
   const names = new Set(DONOR_SCANNERS.map(scanner => scanner.name));
@@ -10,15 +10,46 @@ test("expanded engine registry includes African NGO aggregators and conservation
     assert.ok(names.has(name), "missing configured discovery engine: " + name);
   }
   assert.ok(DONOR_SCANNERS.every(scanner => scanner.url.startsWith("https://")));
-  assert.ok(SEARCH_QUERIES.length >= 3);
+  assert.ok(SEARCH_QUERIES.length >= 12);
+  assert.ok(GDELT_QUERIES.length >= 6);
   const expandedQueries = SEARCH_QUERIES.join(" ").toLowerCase();
-  for (const term of ["youth", "children", "livelihoods", "health", "renewable energy", "solar", "pastoralism", "rangeland", "livestock", "rolling call", "rolling basis", "capacity building", "seed funding", "year-round applications"]) {
+  for (const term of ["youth", "livelihoods", "renewable energy", "solar", "pastoralism", "rangeland", "livestock", "fodder", "animal health", "market access", "value addition", "gender equality", "social inclusion", "Indigenous Peoples", "rolling call", "rolling basis", "capacity building", "seed funding", "year-round applications", "closing date", "application deadline"]) {
     assert.ok(expandedQueries.includes(term), "missing expanded search term: " + term);
   }
   const rollingCallResults = parseSearchRss('<rss><channel><item><title>Seed Funding on a Rolling Basis for Capacity Building</title><link>https://donor.example/rolling-call</link><description>Ongoing applications accepted year-round for community capacity building.</description></item></channel></rss>', "rolling seed funding");
   assert.equal(rollingCallResults.length, 1);
   assert.match(rollingCallResults[0].title, /Rolling Basis/);
   assert.equal(new Set(DONOR_SCANNERS.map(scanner => scanner.name)).size, DONOR_SCANNERS.length);
+});
+
+test("GDELT discovery queries cover IRPA themes and records results as verification leads", async () => {
+  assert.ok(GDELT_QUERIES.some(query => /rangeland|pastoralism/i.test(query)));
+  assert.ok(GDELT_QUERIES.some(query => /livestock|veterinary/i.test(query)));
+  assert.ok(GDELT_QUERIES.some(query => /market access|value addition/i.test(query)));
+  assert.ok(GDELT_QUERIES.some(query => /rolling|year-round|no fixed deadline/i.test(query)));
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async url => {
+    assert.match(String(url), /api\.gdeltproject\.org\/api\/v2\/doc\/doc/);
+    return new Response(JSON.stringify({ articles: [{
+      title: "Call for Proposals: Rangeland Restoration Grant",
+      url: "https://donor.example/rangeland-call",
+      seendate: "20261012T120000Z",
+      domain: "donor.example",
+      sourceCountry: "Tanzania",
+      language: "English"
+    }] }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  try {
+    const result = await readGdeltSearch();
+    assert.equal(result.stats.provider, "GDELT DOC API");
+    assert.ok(result.stats.queries > 0);
+    assert.equal(result.items.length, 1);
+    assert.equal(result.items[0].discoveryEngine, "gdelt_search");
+    assert.match(result.items[0].discoveryEvidence, /verify/i);
+    assert.equal(result.items[0].publishedAt, "2026-10-12T12:00:00Z");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("accepts only credential-free HTTPS feed URLs", () => {
@@ -98,13 +129,13 @@ test("closed and country-specific opportunities are not promoted as IRPA priorit
 });
 
 
-test("announcements with no deadline and no verified current status are suppressed", () => {
+test("announcements with no deadline and unverified current status remain visible for review", () => {
   const unverified = assessFit({
     title: "Pastoral resilience grant across East Africa",
     description: "Supports pastoral communities and climate resilience."
   });
   assert.equal(unverified.callStatus, "unknown");
-  assert.equal(unverified.triageAssessment, "deadline_unverified_suppressed");
+  assert.equal(unverified.triageAssessment, "status_and_deadline_review");
 
   const rolling = assessFit({
     title: "Rolling community restoration fund",
@@ -149,12 +180,12 @@ test("deadline parser detects closing dates, ISO dates and structured deadline f
   assert.equal(structuredDeadline.callStatus, "expired");
 });
 
-test("expired and unverified calls are suppressed from the live opportunity list", () => {
+test("only closed/expired or past-deadline calls are suppressed from the live opportunity list", () => {
   const today = "2026-10-10";
   assert.equal(isCurrentOpportunity({ title: "Old climate grant", description: "Apply by 1 January 2020.", call_status: "open" }, today), false);
   assert.equal(isCurrentOpportunity({ title: "Stale metadata", description: "Climate resilience", call_status: "expired", deadline_at: "2099-12-31" }, today), false);
   assert.equal(isCurrentOpportunity({ title: "Closed announcement", description: "Applications are closed.", call_status: "open", deadline_at: "2099-12-31" }, today), false);
-  assert.equal(isCurrentOpportunity({ title: "Unverified call", description: "Community climate support", call_status: "unknown" }, today), false);
+  assert.equal(isCurrentOpportunity({ title: "Unverified call", description: "Community climate support", call_status: "unknown" }, today), true);
   assert.equal(isCurrentOpportunity({ title: "Current call", description: "Deadline for applications is 31 December 2099.", call_status: "unknown", deadline_at: "2099-12-31" }, today), true);
   assert.equal(isCurrentOpportunity({ title: "Rolling call", description: "Applications accepted on a rolling basis.", call_status: "unknown" }, today), true);
   assert.equal(isCurrentOpportunity({ title: "Deadline today", description: "Climate grant", call_status: "unknown", deadline_at: today }, today), true);
@@ -272,7 +303,7 @@ test("strict geographic filter suppresses calls whose eligible geography is unst
     sourceUrl: "https://donor.example/calls"
   });
   assert.equal(fit.geographyAssessment, "not_stated");
-  assert.equal(fit.triageAssessment, "geography_unverified_suppressed");
+  assert.equal(fit.triageAssessment, "eligibility_review_required");
   assert.equal(fit.eligibilityStatus, "geography_unverified");
 });
 
