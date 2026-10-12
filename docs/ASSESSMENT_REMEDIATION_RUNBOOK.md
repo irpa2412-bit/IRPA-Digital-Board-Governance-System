@@ -12,8 +12,10 @@
 - [x] Add ESLint, desktop/mobile Playwright smoke tests, portal-registry and dashboard-style wiring tests, and a Firestore Emulator regression step to the remediation workflow.
 - [x] Preserve the newer dashboard hero implementation on `main` and its existing headless layout check. The merge deliberately does not reintroduce the removed `public/dashboard-hero-fix.js` script or its temporary stylesheet; review the headless layout evidence on the merged candidate.
 - [x] Add opt-in Firebase App Check initialization for both the primary and applicant Firebase app instances, controlled by `VITE_FIREBASE_APPCHECK_SITE_KEY`.
-- [x] The merged candidate based on main commit `01d4bdf` passed the high/critical audit gate, lint, production build, Firestore Emulator regressions and desktop/mobile Playwright smoke tests before the supported-linter upgrade.
-- [ ] Re-run all gates on the latest final PR head after upgrading to ESLint 10 and refreshing the lockfile. The last dedicated audit reported 10 moderate findings and no high/critical findings; those moderate transitive advisories still require triage and must not be described as zero vulnerabilities.
+- [x] Upgrade the lint baseline to supported ESLint 10 and add a CLI compatibility check for the Mammoth/argparse dependency override.
+- [x] The refreshed dependency tree reports **0 npm audit vulnerabilities**; assessment, security-baseline and promotion workflows now fail at moderate severity rather than only high/critical.
+- [x] CI on commit `b13abe2` passed lockfile installation, lint, production build, Firestore Emulator regressions, Mammoth CLI compatibility, and desktop/mobile Playwright smoke tests.
+- [ ] Complete the stricter `--audit-level=moderate` gate on the latest final PR head before merge; review the remaining `glob@10.5.0` deprecation warning even though npm audit reports zero vulnerabilities.
 
 ## Required release procedure
 1. Protect the reviewed `main` commit with a backup tag before promotion.
@@ -41,6 +43,7 @@ These controls cannot safely be completed from source code alone. Configure them
 - [ ] Reduce dashboard/weather `!important` override layering and migrate hard-coded colors to approved design tokens only after desktop/mobile screenshot comparison; do not alter the approved layout based on source inspection alone.
 - [x] Add an ESLint flat-config baseline for the app shell, navigation modules, and smoke-test configuration; extend coverage incrementally to avoid unrelated mass reformatting.
 - [ ] Add Prettier check in a follow-up once the formatting baseline is agreed; do not mass-format the 459 KB app stylesheet or 135 KB App component as part of this remediation.
+- [ ] Upgrade remaining `actions/checkout@v4` / `actions/setup-node@v4` workflows to supported Node 24-compatible action releases after reviewing workflow compatibility.
 - [ ] Replace silent catches with structured error handling or monitored reporting; never log credentials, tokens, signatures or sensitive member/finance records.
 - [x] Lazy-load the meeting room, signature, finance and procurement portals behind explicit loading fallbacks.
 - [ ] Measure production bundle size and add authenticated Playwright flows for sign-in, meeting-to-vote and signature using controlled test identities and non-production data.

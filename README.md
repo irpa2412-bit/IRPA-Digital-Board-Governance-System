@@ -88,7 +88,7 @@ The repository also contains more modules and supporting services than the short
 
 ```bash
 npm ci
-npm audit --audit-level=high
+npm audit --audit-level=moderate
 npm run lint
 npm run build
 npx firebase emulators:exec --only firestore "node tests/firestore.rules.test.cjs && node --test --test-concurrency=1 tests/meeting-category-policy.test.mjs tests/meeting-category-firestore-rules.test.cjs tests/finance-portal-policy.test.cjs tests/portal-registry.test.mjs"
