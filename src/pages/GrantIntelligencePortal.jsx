@@ -134,6 +134,15 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  const [notice,setNotice]=useState("");
  const [queryText,setQueryText]=useState("");
  const [smartKeywords,setSmartKeywords]=useState("");
+ const [assistantFormat,setAssistantFormat]=useState("Partnership request message");
+ const [assistantTone,setAssistantTone]=useState("Professional and persuasive");
+ const [assistantLength,setAssistantLength]=useState("Concise");
+ const [assistantInstructions,setAssistantInstructions]=useState("");
+ const [assistantContext,setAssistantContext]=useState("");
+ const [assistantDraft,setAssistantDraft]=useState("");
+ const [assistantBusy,setAssistantBusy]=useState(false);
+ const [assistantError,setAssistantError]=useState("");
+ const [assistantNotice,setAssistantNotice]=useState("");
  const [pillar,setPillar]=useState("all");
  const [theme,setTheme]=useState("all");
  const [status,setStatus]=useState("all");
@@ -143,6 +152,29 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  const uid=auth.currentUser?.uid||"";
  const roleList=[profile?.role,profile?.roles,employee?.role,employee?.roles].flatMap(v=>Array.isArray(v)?v:String(v||"").split(",")).map(v=>String(v||"").trim().toLowerCase());
  const canManage=isAdmin||roleList.some(r=>["administrator","executive director","director outreach","director finance & administration","director research","research director","research manager","fundraising officer","research officer"].includes(r));
+ async function generateAssistantDraft(){
+   const request=text(assistantInstructions);
+   if(!request){setAssistantError("Describe what you want the AI Assistant to prepare.");return;}
+   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-production.irpa-governance.workers.dev").replace(/\/+$/,"");
+   const token=await auth.currentUser?.getIdToken();
+   if(!token){setAssistantError("Your session has expired. Sign in again.");return;}
+   setAssistantBusy(true);setAssistantError("");setAssistantNotice("Preparing your requested format…");
+   try{
+     const response=await fetch(workerUrl+"/assistant/analyze",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({task:"draft_message",format:assistantFormat,tone:assistantTone,length:assistantLength,instructions:request,context:text(assistantContext),organization:"Improvement of Rangeland in Pastoral Areas (IRPA)",strategicContext:"Tanzania-based NGO focused on sustainable rangeland management, livestock development and market development; early-stage organization with limited resources. Do not claim prior project implementation or secured funding unless supplied by the user."}),signal:AbortSignal.timeout(90000)});
+     const data=await response.json().catch(()=>({}));
+     if(!response.ok)throw new Error(data.error||"The AI Assistant request failed ("+response.status+").");
+     const generated=text(data.draft||data.message||data.assessment?.draft||data.assessment?.concept_note?.draft);
+     if(!generated)throw new Error("The AI service returned no draft. Please retry.");
+     setAssistantDraft(generated);setAssistantNotice("Draft generated. Review and edit it before use.");
+   }catch(err){setAssistantError(err?.name==="TimeoutError"?"The AI Assistant took longer than 90 seconds. Please retry.":err?.message||"The AI Assistant could not generate a draft.");setAssistantNotice("");}
+   finally{setAssistantBusy(false);}
+ }
+ function downloadAssistantDraft(){
+   if(!text(assistantDraft)){setAssistantError("Generate or enter a draft first.");return;}
+   const blob=new Blob([assistantDraft],{type:"text/plain;charset=utf-8"});
+   const href=URL.createObjectURL(blob);const a=document.createElement("a");a.href=href;a.download="irpa-ai-assistant-draft.txt";document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(href);
+ }
+
  async function loadCrawlerResults(showNotice=false){
    const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-production.irpa-governance.workers.dev").replace(/\/+$/,"");
    const token=await auth.currentUser?.getIdToken();
@@ -420,6 +452,24 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
     <button style={styles.button} onClick={()=>openConceptWorkspace(null)}>Concept-note workspace</button>
     <button style={{...styles.button,background:"transparent"}} onClick={()=>{setQueryText("");setPillar("all");setTheme("all");setStatus("all")}}>Reset filters</button>
    </div>
+  </section>
+
+  <section style={{...styles.card,display:"grid",gap:12,borderColor:"#4e8b91"}} aria-labelledby="grant-writing-assistant-heading">
+   <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"start",flexWrap:"wrap"}}>
+    <div><div style={styles.eyebrow}>AI ASSISTANT · FLEXIBLE WRITING STUDIO</div><h2 id="grant-writing-assistant-heading" style={{fontSize:21,margin:"5px 0"}}>AI Writing & Funding Assistant</h2><p style={{...styles.muted,margin:0}}>Request the format you need. The assistant adapts structure, length and tone to your instructions and keeps the result editable. It does not submit messages or applications.</p></div>
+    <span style={{...styles.tag,borderColor:"#4e8b91"}}>User-directed formats</span>
+   </div>
+   <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:10}}>
+    <label style={{fontSize:12}}>Output format<select aria-label="AI Assistant output format" style={{...styles.input,marginTop:5}} value={assistantFormat} onChange={e=>setAssistantFormat(e.target.value)}>{["Partnership request message","Email","Formal letter","Expression of interest","Concept note","Full project proposal","Executive summary","Briefing note","Donor enquiry","Proposal narrative","Budget narrative","Meeting talking points","Social media post","Report","Other / follow my instructions"].map(v=><option key={v}>{v}</option>)}</select></label>
+    <label style={{fontSize:12}}>Tone<select aria-label="AI Assistant tone" style={{...styles.input,marginTop:5}} value={assistantTone} onChange={e=>setAssistantTone(e.target.value)}>{["Professional and persuasive","Formal and diplomatic","Concise and direct","Warm and collaborative","Technical and evidence-led","Compelling and donor-focused","Plain language","Follow my instructions"].map(v=><option key={v}>{v}</option>)}</select></label>
+    <label style={{fontSize:12}}>Length<select aria-label="AI Assistant output length" style={{...styles.input,marginTop:5}} value={assistantLength} onChange={e=>setAssistantLength(e.target.value)}>{["Very short","Concise","Standard","Detailed","Comprehensive","Follow my instructions"].map(v=><option key={v}>{v}</option>)}</select></label>
+   </div>
+   <label style={{fontSize:12}}>What should the assistant prepare? <span style={styles.muted}>Required</span><textarea aria-label="AI Assistant request" rows="4" style={{...styles.input,marginTop:5,resize:"vertical"}} value={assistantInstructions} onChange={e=>setAssistantInstructions(e.target.value)} placeholder="Example: Draft a first-contact message to the Climate Justice Resilience Fund asking about suitable funding pathways for IRPA's community-led climate resilience work in Longido. Do not assume a call is open or claim we have implemented projects." /></label>
+   <label style={{fontSize:12}}>Additional context, source text or required points <span style={styles.muted}>(optional)</span><textarea aria-label="AI Assistant additional context" rows="3" style={{...styles.input,marginTop:5,resize:"vertical"}} value={assistantContext} onChange={e=>setAssistantContext(e.target.value)} placeholder="Paste donor guidelines, recipient details, required facts, word limits, language or formatting instructions." /></label>
+   <div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button type="button" disabled={assistantBusy} style={{...styles.button,opacity:assistantBusy?0.6:1}} onClick={generateAssistantDraft}>{assistantBusy?"Generating draft…":"Generate requested output"}</button><button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>{setAssistantInstructions("");setAssistantContext("");setAssistantDraft("");setAssistantError("");setAssistantNotice("");}}>Clear workspace</button></div>
+   {assistantNotice&&<div role="status" style={{...styles.card,borderColor:"#32846d",color:"#8de0b7"}}>{assistantNotice}</div>}
+   {assistantError&&<div role="alert" style={{...styles.card,borderColor:"#b65c5c",color:"#ffb8b8"}}>{assistantError}</div>}
+   {assistantDraft&&<div style={{display:"grid",gap:8}}><label style={{fontSize:13,fontWeight:800}} htmlFor="grant-ai-draft-output">Editable AI output</label><textarea id="grant-ai-draft-output" aria-label="Editable AI output" rows="14" style={{...styles.input,resize:"vertical",fontFamily:"inherit",lineHeight:1.65}} value={assistantDraft} onChange={e=>setAssistantDraft(e.target.value)}/><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button type="button" style={styles.button} onClick={()=>{if(!navigator.clipboard?.writeText){setAssistantError("Clipboard access is unavailable in this browser.");return;}navigator.clipboard.writeText(assistantDraft).then(()=>setAssistantNotice("Draft copied to clipboard.")).catch(()=>setAssistantError("Clipboard access was blocked by the browser."));}}>Copy draft</button><button type="button" style={{...styles.button,background:"transparent"}} onClick={downloadAssistantDraft}>Download .txt</button></div><p style={{...styles.muted,margin:0}}>Check facts, eligibility, dates, budgets and donor instructions before sending or submitting.</p></div>}
   </section>
   <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12}}>
    {[["Discovered opportunities",combinedRecords.length,"All geographic eligibility categories included"],["Open calls",counts.open,"Status: Open"],["In preparation",counts.review,"Review / drafting"],["Submitted or awarded",counts.submitted,"Pipeline progress"],["Expired / closed / unverified calls suppressed",expiredExclusionCount,"Past deadlines, explicit closure, or no verified current deadline/status"]].map(([label,value,sub])=><div key={label} style={styles.card}><div style={styles.muted}>{label}</div><div style={{fontSize:28,fontWeight:800,margin:"7px 0"}}>{value}</div><div style={{fontSize:11,color:"#8ba2b8"}}>{sub}</div></div>)}
