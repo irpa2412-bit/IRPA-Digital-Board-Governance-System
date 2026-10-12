@@ -201,7 +201,7 @@ jobs:
             if (body.query !== 'pastoral rangeland restoration' || !Array.isArray(body.items) || !Array.isArray(body.providers) || !Array.isArray(body.errors)) {
               throw new Error('Production fundraising search response contract failed.');
             }
-            if (body.errors.length >= 4) throw new Error('All live fundraising search requests failed.');
+            if (body.errors.length >= 2) throw new Error('All live fundraising search requests failed: ' + JSON.stringify(body.errors).slice(0, 500));
             console.log('Live fundraising search passed with ' + body.resultCount + ' research leads; providers: ' + body.providers.join(', ') + '.');
           } finally { clearTimeout(timeout); }
           NODE

@@ -490,7 +490,7 @@ export async function searchFundraisingSources(query, mode = "all") {
  const core='(grant OR funding OR donor OR foundation OR philanthropy OR partnership OR sponsorship OR CSR)';
  const q1=cleanQuery+" "+core+" "+region;
  const q2=safeMode==="rolling"?cleanQuery+' ("rolling basis" OR "year-round" OR "no fixed deadline") '+region:safeMode==="deadlines"?cleanQuery+' (deadline OR "closing date" OR "call for proposals") '+region:safeMode==="corporate_support"?cleanQuery+' ("corporate social responsibility" OR CSR OR sponsorship OR philanthropy OR "in-kind support") '+region:cleanQuery+' ("funding opportunity" OR "partnership opportunity" OR "call for proposals" OR sponsorship OR philanthropy) '+region;
- const queries=[...new Set([q1,q2])];
+ const queries=[safeMode==="all"?q1:q2];
  const tasks=queries.flatMap(searchQuery=>[
   (async()=>{try{
    const url=new URL("https://news.google.com/rss/search");url.searchParams.set("q",searchQuery);url.searchParams.set("hl","en-TZ");url.searchParams.set("gl","TZ");url.searchParams.set("ceid","TZ:en");
