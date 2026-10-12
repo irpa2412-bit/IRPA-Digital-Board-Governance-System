@@ -66,3 +66,63 @@
     overflow-wrap: anywhere;
   }
 }
+
+
+/* Grant Intelligence & Funding Opportunities: prevent wide desktop tables/cards from expanding the whole page. */
+.grant-intelligence,
+.grant-intelligence-portal,
+.grant-funding-opportunities,
+.grant-opportunities-portal,
+[class*="grant-intelligence"],
+[id*="grant-intelligence"],
+[class*="funding-opportunit"],
+[id*="funding-opportunit"] {
+  box-sizing:border-box;
+  min-width:0;
+  max-width:100%;
+}
+[class*="grant-intelligence"] *,
+[id*="grant-intelligence"] *,
+[class*="funding-opportunit"] *,
+[id*="funding-opportunit"] * {
+  box-sizing:border-box;
+  min-width:0;
+  max-width:100%;
+}
+[class*="grant-intelligence"] table,
+[id*="grant-intelligence"] table,
+[class*="funding-opportunit"] table,
+[id*="funding-opportunit"] table {
+  width:100%;
+  max-width:100%;
+  table-layout:fixed;
+}
+[class*="grant-intelligence"] th,
+[class*="grant-intelligence"] td,
+[id*="grant-intelligence"] th,
+[id*="grant-intelligence"] td,
+[class*="funding-opportunit"] th,
+[class*="funding-opportunit"] td,
+[id*="funding-opportunit"] th,
+[id*="funding-opportunit"] td {
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+@media (max-width:760px) {
+  [class*="grant-intelligence"],
+  [id*="grant-intelligence"],
+  [class*="funding-opportunit"],
+  [id*="funding-opportunit"] {
+    width:100%!important;
+    max-width:100vw!important;
+    overflow-x:hidden;
+  }
+  [class*="grant-intelligence"] table,
+  [id*="grant-intelligence"] table,
+  [class*="funding-opportunit"] table,
+  [id*="funding-opportunit"] table {
+    display:block;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+}
