@@ -28,10 +28,14 @@
   flex: 1 1 0%;
   min-width: 0;
 }
-.grant-intelligence-portal article [style*="minWidth: 150"],
-.grant-intelligence-portal article [style*="minWidth:150"],
-.grant-intelligence-portal article [style*="minWidth: 105"],
-.grant-intelligence-portal article [style*="minWidth:105"] {
+.grant-intelligence-portal article [style*="min-width: 150px"],
+.grant-intelligence-portal article [style*="min-width:150px"],
+.grant-intelligence-portal article [style*="min-width: 105px"],
+.grant-intelligence-portal article [style*="min-width:105px"],
+.grant-intelligence-portal article [style*="min-width: 150"],
+.grant-intelligence-portal article [style*="min-width:150"],
+.grant-intelligence-portal article [style*="min-width: 105"],
+.grant-intelligence-portal article [style*="min-width:105"] {
   min-width: 0 !important;
 }
 .grant-intelligence-portal button,
