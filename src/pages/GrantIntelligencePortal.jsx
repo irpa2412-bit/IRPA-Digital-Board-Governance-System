@@ -389,7 +389,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
      }else{
        setWorkspaceNotice("Eligibility screening completed. Geographic status: "+String(data.assessment?.geographic_eligibility?.status||"unclear")+"."+(statusUnverified?" Current call status is unverified; confirm it before submission.":" Review every requirement before drafting."));
      }
-   }catch(err){setError(err?.name==="TimeoutError"?"The AI analysis exceeded 90 seconds. Retry after checking the staging Worker.":err?.message||"The AI eligibility analysis failed.");}
+   }catch(err){setError(err?.name==="TimeoutError"?"The AI analysis exceeded 90 seconds. Retry after checking production Worker health.":err?.message||"The AI eligibility analysis failed.");}
    finally{setAnalysisBusy(false);}
  }
  async function saveConceptDraft(){
