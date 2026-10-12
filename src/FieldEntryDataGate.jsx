@@ -23,7 +23,7 @@ const verificationMapKey="irpaPortalDataEntryVerifications";
 const OPEN_ON_SELECTION=new Set(["Documents"]);
 
 /* Controls that never count as data entry. Add data-irpa-no-gate to any element or container to opt it out. */
-const NEVER_GATE='[data-irpa-field-gate],[data-irpa-no-gate],.sidebar,.topbar,nav,[role="navigation"],[role="search"],[role="searchbox"]';
+const NEVER_GATE='[data-irpa-field-gate],[data-irpa-no-gate],.sidebar,.topbar,nav,[role="navigation"],[role="search"],[role="searchbox"],.desktop-webapp-navigation-roller,.page-back-next-navigation,[aria-label="Navigate to a sub-portal within the current portal"]';
 const NON_ENTRY_INPUT=/^(hidden|button|submit|reset|image|search|range)$/i;
 const SEARCH_HINT=/^\s*(search|filter|find)\b/i;
 /* Buttons count as data entry when their label starts with one of these actions. */
@@ -52,6 +52,49 @@ const isEntryField=el=>{
   }
   return false;
 };
+function replayFieldAttempt(resume){
+  const el=resume&&resume.el;
+  if(!el||!document.contains(el))return;
+  if(resume.kind!=="field"){el.focus?.();return}
+  el.focus?.();
+  const key=resume.key;
+  let inputType=resume.inputType||"";
+  let data=resume.data;
+  if(key==="Enter"){
+    if(el.matches("textarea,[contenteditable='true']")){
+      if(el.matches("[contenteditable='true']")){document.execCommand("insertLineBreak");return}
+      inputType="insertLineBreak";data="\n";
+    }else{
+      if(el.form&&el.form.requestSubmit)el.form.requestSubmit();
+      return;
+    }
+  }else if(key==="Backspace")inputType="deleteContentBackward";
+  else if(key==="Delete")inputType="deleteContentForward";
+  else if(typeof key==="string"&&key.length===1){inputType="insertText";data=key}
+  if(el.matches("[contenteditable='true']")){
+    if(inputType==="insertText"&&data!=null)document.execCommand("insertText",false,String(data));
+    else if(inputType==="deleteContentBackward")document.execCommand("delete",false);
+    else if(inputType==="insertLineBreak")document.execCommand("insertLineBreak",false);
+    return;
+  }
+  if(!el.matches("input,textarea"))return;
+  const value=String(el.value||"");
+  let start=Number.isInteger(resume.selectionStart)?resume.selectionStart:value.length;
+  let end=Number.isInteger(resume.selectionEnd)?resume.selectionEnd:start;
+  if(inputType==="deleteContentBackward"&&start===end&&start>0)start-=1;
+  else if(inputType==="deleteContentForward"&&start===end&&end<value.length)end+=1;
+  let replacement="";
+  if(inputType==="insertText"||inputType==="insertCompositionText")replacement=String(data??"");
+  else if(inputType==="insertLineBreak"||inputType==="insertParagraph")replacement="\n";
+  else if(!/^delete/.test(inputType))return;
+  const nextValue=value.slice(0,start)+replacement+value.slice(end);
+  const proto=el instanceof HTMLTextAreaElement?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;
+  const setter=Object.getOwnPropertyDescriptor(proto,"value")?.set;
+  if(setter)setter.call(el,nextValue);else el.value=nextValue;
+  const caret=start+replacement.length;
+  try{el.setSelectionRange(caret,caret)}catch{}
+  el.dispatchEvent(new InputEvent("input",{bubbles:true,inputType:inputType||"insertText",data:replacement||null}));
+}
 const isEntryClick=el=>{
   if(!el||!el.matches||el.closest(NEVER_GATE))return false;
   if(el.matches('input[type="checkbox"],input[type="radio"],input[type="file"],input[type="submit"]'))return !SEARCH_HINT.test(String(el.getAttribute("aria-label")||""));
@@ -102,10 +145,10 @@ export default function FieldEntryDataGate({portal}){
       if(isVerified(name))return false;
       event.preventDefault();event.stopPropagation();event.stopImmediatePropagation();
       if(kind==="field"&&typeof el.blur==="function")el.blur();
-      openGate(name,{el,kind});
+      openGate(name,{el,kind,key:event.type==="keydown"?event.key:null,inputType:event.inputType||"",data:event.data??null,selectionStart:Number.isInteger(el.selectionStart)?el.selectionStart:null,selectionEnd:Number.isInteger(el.selectionEnd)?el.selectionEnd:null});
       return true;
     };
-    const onMouseDown=e=>{const el=e.target&&e.target.closest?e.target.closest("input,textarea,select,[contenteditable]"):null;if(el&&isEntryField(el))attempt(e,el,"field")};
+    const onMouseDown=e=>{const el=e.target&&e.target.closest?e.target.closest("select"):null;if(el&&isEntryField(el))attempt(e,el,"field")};
     const onKeyDown=e=>{
       if(e.ctrlKey||e.metaKey||e.altKey)return;
       const printable=e.key&&(e.key.length===1||e.key==="Backspace"||e.key==="Delete"||e.key==="Enter");
@@ -152,7 +195,7 @@ export default function FieldEntryDataGate({portal}){
       replaying.current=true;
       setTimeout(()=>{
         try{
-          if(resume.kind==="field"&&resume.el.focus)resume.el.focus();
+          if(resume.kind==="field")replayFieldAttempt(resume);
           else if(resume.kind==="click"&&resume.el.click)resume.el.click();
           else if(resume.kind==="submit"&&resume.el.requestSubmit)resume.el.requestSubmit();
         }finally{replaying.current=false}
