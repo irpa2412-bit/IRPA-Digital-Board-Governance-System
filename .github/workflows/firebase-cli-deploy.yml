@@ -5,6 +5,11 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+
+# Serialize Firebase deploys to prevent duplicate Firestore Rules release creation (HTTP 409).
+concurrency:
+  group: irpa-firebase-production-deploy
+  cancel-in-progress: false
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -86,8 +91,23 @@ jobs:
       - name: Deploy Firestore only while crawler cutover is blocked
         if: steps.cloudflare_gate.outcome != 'success'
         run: |
+          set -euo pipefail
           echo "::warning::Cloudflare grant-crawler cutover is blocked by missing or invalid Cloudflare migration secrets. Firebase Hosting will not be updated with an empty crawler URL; deploying Firestore configuration only."
-          npx --yes firebase-tools deploy --project irpa-digital-board-governance --only firestore --non-interactive
+          # A concurrent Firebase Rules release can briefly return HTTP 409 when
+          # the release already exists. Serialize deploy jobs above and retry only
+          # this idempotent Firestore deployment for transient release conflicts.
+          for attempt in 1 2 3; do
+            if npx --yes firebase-tools deploy --project irpa-digital-board-governance --only firestore --non-interactive; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::Firestore deployment failed after $attempt attempts."
+              exit 1
+            fi
+            delay=$((attempt * 10))
+            echo "::warning::Firestore deployment attempt $attempt failed; retrying in $delay seconds."
+            sleep "$delay"
+          done
       - name: Deploy multilingual transcript translation callable
         id: translation
         continue-on-error: true
