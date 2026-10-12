@@ -9989,3 +9989,199 @@ html body #root .main-area > .topbar.dashboard-topbar .topbar-heading-row > .top
     padding-bottom: 0;
   }
 }
+
+/* DASHBOARD HERO FINAL GEOMETRY — 20261012-0624 */
+/* Dashboard-only geometry. Preserve weather component markup/content and existing palette. */
+@media (min-width: 1200px) {
+  html body #root .main-area > .desktop-webapp-navigation-roller {
+    margin-bottom: 0 !important;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar {
+    margin-top: 0 !important;
+    padding: 0 16px 16px !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    align-items: flex-start !important;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row {
+    display: grid !important;
+    grid-template-columns: minmax(220px, 260px) minmax(0, 1fr) minmax(200px, 240px) !important;
+    grid-template-areas: "title weather authority" !important;
+    grid-template-rows: auto !important;
+    align-items: start !important;
+    align-content: start !important;
+    column-gap: 0 !important;
+    row-gap: 0 !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .topbar-title-block {
+    grid-area: title !important;
+    align-self: start !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 12px 0 0 !important;
+    padding: 0 !important;
+    transform: none !important;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel {
+    grid-area: weather !important;
+    align-self: stretch !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 12px 14px !important;
+    box-sizing: border-box !important;
+    overflow: visible !important;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-content {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: auto auto auto auto !important;
+    grid-template-areas: "location" "current" "forecast" "attribution" !important;
+    align-content: start !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    box-sizing: border-box !important;
+    color: #2563eb !important;
+    -webkit-text-fill-color: #2563eb !important;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-current {
+    grid-area: current !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr) !important;
+    align-items: center !important;
+    gap: 14px !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-current-main {
+    min-width: 0 !important;
+    margin: 0 !important;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-metrics {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-days {
+    grid-area: forecast !important;
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 8px 0 0 !important;
+    overflow: visible !important;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-day {
+    width: auto !important;
+    min-width: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .topbar-access-category {
+    grid-area: authority !important;
+    align-self: start !important;
+    justify-self: stretch !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 12px !important;
+    box-sizing: border-box !important;
+    overflow: visible !important;
+    background: #17212b !important;
+    color: #ffffff !important;
+    -webkit-text-fill-color: #ffffff !important;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .topbar-access-category * {
+    color: #ffffff !important;
+    -webkit-text-fill-color: #ffffff !important;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .topbar-access-category strong,
+  html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .topbar-access-category [aria-current="true"],
+  html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .topbar-access-category .active {
+    color: #facc15 !important;
+    -webkit-text-fill-color: #facc15 !important;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel,
+  html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-content,
+  html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-content * {
+    color: #2563eb !important;
+    -webkit-text-fill-color: #2563eb !important;
+  }
+}
+@media (min-width: 761px) and (max-width: 1199px) {
+  html body #root .main-area > .desktop-webapp-navigation-roller { margin-bottom: 0 !important; }
+  html body #root .main-area > header.topbar.dashboard-topbar { margin-top: 0 !important; padding: 0 12px 12px !important; }
+  html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row {
+    display: grid !important;
+    grid-template-columns: minmax(190px, 1fr) minmax(0, 1.4fr) !important;
+    grid-template-areas: "title weather" "authority authority" !important;
+    gap: 12px !important;
+    align-items: start !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .topbar-title-block { margin: 0 !important; padding: 0 !important; align-self: start !important; }
+  html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel { min-width: 0 !important; margin: 0 !important; }
+  html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .topbar-access-category { align-self: start !important; height: auto !important; min-height: 0 !important; margin: 0 !important; }
+}
+@media (max-width: 760px) {
+  html body #root .main-area > .desktop-webapp-navigation-roller { margin-bottom: 0 !important; }
+  html body #root .main-area > header.topbar.dashboard-topbar { margin-top: 0 !important; padding: 0 12px 12px !important; }
+  html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .topbar-title-block,
+  html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel,
+  html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .topbar-access-category {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+  }
+  html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .topbar-title-block { padding: 0 !important; align-self: flex-start !important; }
+  html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel { padding: 12px !important; }
+  html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-days { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 6px !important; overflow: visible !important; }
+  html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .topbar-access-category { align-self: flex-start !important; padding: 12px !important; }
+}
