@@ -9,6 +9,7 @@ import "./styles/tokens.css";
 import "./styles/portal-typography.css";
 import "./styles/shared-header-hero.css";
 import "./styles/page-layout-stability.css";
+import "./styles/mobile-app-enhancement.css";
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
