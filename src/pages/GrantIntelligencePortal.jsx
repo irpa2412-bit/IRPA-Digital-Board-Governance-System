@@ -191,14 +191,15 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
      setCrawlerSources(uniqueSources.map(sourceUrl=>({id:sourceUrl,name:(()=>{try{return new URL(sourceUrl).hostname}catch{return sourceUrl}})(),url:sourceUrl,status:"Fetched",candidateCount:items.filter(item=>item.source_url===sourceUrl).length})));
      setCrawlerRecords(items.map(item=>({
        id:"crawler-"+item.id,title:item.title||"Untitled opportunity",
-       funder:(()=>{try{return new URL(item.source_url||item.url).hostname.replace(/^www\./,"")}catch{return "Official source"}})(),
+       funder:item.funder||item.source_name||(()=>{try{return new URL(item.source_url||item.url).hostname.replace(/^www\\./,"")}catch{return "Funder not verified"}})(),
        url:item.url||item.source_url||"",source_url:item.source_url||"",deadline:item.deadline_at||null,
-       country:item.geography_assessment==="tanzania_mentioned"?"Tanzania":item.geography_assessment==="regional_or_lmic_scope"?"Regional / LMIC":"Not verified",
-       amount:"Not stated",summary:item.description||"No description supplied in source feed.",
-       status:["closed","expired"].includes(String(item.call_status||"").toLowerCase())?"Closed":item.call_status==="open"?"Open":"Under review",
+       country:item.country||(item.geography_assessment==="tanzania_mentioned"?"Tanzania":item.geography_assessment==="regional_or_lmic_scope"?"Regional / LMIC":"Not verified"),
+       amount:item.amount||"Not stated",summary:item.description||"No description supplied by source.",
+       status:["closed","expired","closed_do_not_prioritize"].includes(String(item.call_status||"").toLowerCase())?"Closed":String(item.call_status||"").toLowerCase()==="open"?"Open":"Under review",
        callStatus:item.call_status||"unknown",
-       pillars:["livestock/agriculture"].includes(JSON.parse(item.fit_reasons||"[]")[0])?["livestock"]:["rangeland"],
-       themes:[],verificationStatus:"Pending official-call verification",sourceType:"Cloudflare crawler",
+       pillars:Array.isArray(item.pillars)?item.pillars:(()=>{try{return JSON.parse(item.pillars||"[]")}catch{return []}})(),
+       themes:Array.isArray(item.themes)?item.themes:(()=>{try{return JSON.parse(item.themes||"[]")}catch{return []}})(),
+       verificationStatus:item.verification_status||"Pending official-call verification",sourceType:"Cloudflare crawler",
        fitScore:Number(item.fit_score||0),fitReasons:item.fit_reasons||"[]",
        eligibilityStatus:item.eligibility_status||"unverified",triageAssessment:item.triage_assessment||"manual_eligibility_review",
        createdAt:item.first_seen_at||null
@@ -282,7 +283,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
      const response=await fetch(workerUrl+"/run",{method:"POST",headers:{"Authorization":"Bearer "+idToken,"Content-Type":"application/json"},body:"{}",signal:AbortSignal.timeout(90000)});
      const data=await response.json().catch(()=>({}));
      if(!response.ok) throw new Error(data.error||"Cloudflare grant crawler request failed ("+response.status+").");
-     setNotice("Grant crawler scan "+String(data.status||"finished")+". Feeds configured: "+String(data.feedsConfigured||0)+", source entries found: "+String(data.itemsSeen||0)+", records changed: "+String(data.recordsChanged||0)+". Legal eligibility remains unverified.");
+     setNotice("Grant crawler scan "+String(data.status||"finished")+". Sources checked: "+String(data.sourceCount||data.configuredSources||0)+", candidates found: "+String(data.candidatesFound||data.itemsSeen||0)+", records created or updated: "+String(Number(data.created||0)+Number(data.updated||0)||data.recordsChanged||0)+". New leads remain pending official-call verification.");
      await loadCrawlerResults(false);
    }catch(err){console.error("Manual grant crawler scan failed",err);setError(err?.name==="TimeoutError"?"The scan exceeded 90 seconds. Refresh results and inspect crawler health before retrying.":err?.message||"Manual scan failed. Check crawler authorization and Worker health.");}
    finally{setCrawlerRunning(false);}
@@ -411,7 +412,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
      const data=await response.json().catch(()=>({}));
      if(!response.ok)throw new Error(data.error||"Concept-note draft could not be saved.");
      setDraftId(id);
-     setWorkspaceNotice(statusUnverified?"Concept-note draft saved to the isolated Cloudflare D1 workspace with an audit event. The call status remains unverified; confirm the official donor page before submission.":"Concept-note draft saved to the isolated Cloudflare D1 workspace; an audit event was recorded.");
+     setWorkspaceNotice(statusUnverified?"Concept-note draft saved to the IRPA workspace with an audit event. The call status remains unverified; confirm the official donor page before submission.":"Concept-note draft saved to the IRPA workspace; an audit event was recorded.");
      await loadSavedDrafts();
      await loadDraftAuditEvents(id);
    }catch(err){setError(err?.message||"Concept-note draft could not be saved.");}
@@ -441,9 +442,9 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
     <div style={styles.eyebrow}>IRPA-DBGS · FUNDING INTELLIGENCE</div>
     <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
      <h1 style={{...styles.title,margin:"7px 0"}}>Live Grants & Calls for Proposals</h1>
-     <span role="status" aria-live="polite" title={crawlerDiscoveryActive?"The crawler has returned one or more funding opportunities.":"The crawler has not returned any funding opportunities."} style={{display:"inline-flex",alignItems:"center",gap:7,padding:"6px 10px",borderRadius:999,border:"1px solid "+(crawlerDiscoveryActive?"#32846d":"#b65c5c"),background:crawlerDiscoveryActive?"#123b32":"#3b2228",color:crawlerDiscoveryActive?"#8de0b7":"#ffb8b8",fontSize:12,fontWeight:800,whiteSpace:"nowrap"}}>
+     <span role="status" aria-live="polite" title={crawlerRunning?"A grant-source scan is running.":crawlerRecords.length?"Crawler results are loaded.":"No crawler results are currently loaded."} style={{display:"inline-flex",alignItems:"center",gap:7,padding:"6px 10px",borderRadius:999,border:"1px solid "+(crawlerDiscoveryActive?"#32846d":"#b65c5c"),background:crawlerDiscoveryActive?"#123b32":"#3b2228",color:crawlerDiscoveryActive?"#8de0b7":"#ffb8b8",fontSize:12,fontWeight:800,whiteSpace:"nowrap"}}>
       <span aria-hidden="true" style={{width:7,height:7,borderRadius:"50%",background:crawlerDiscoveryActive?"#54d6a4":"#ff8585",display:"inline-block"}}/>
-      {crawlerDiscoveryActive?"Active":"In Active"}
+      {crawlerRunning?"Scanning":crawlerRecords.length?"Results loaded":"Awaiting results"}
      </span>
     </div>
     <div style={{fontSize:14,lineHeight:1.6,color:"#e1edf2"}}>Discover, classify and manage funding opportunities against IRPA's three strategic pillars and seven cross-cutting themes. All authenticated profiles can access this portal at no additional cost.</div>
@@ -587,12 +588,12 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    </section>}
    <section style={{display:"grid",gap:8}}>
     <div style={{display:"flex",justifyContent:"space-between",gap:10,alignItems:"center",flexWrap:"wrap"}}><h3 style={{fontSize:16,margin:0}}>My saved concept-note drafts</h3><span style={styles.muted}>{savedDrafts.length} saved</span></div>
-    {draftsBusy&&<div style={styles.muted}>Loading drafts from the Cloudflare workspace…</div>}
+    {draftsBusy&&<div style={styles.muted}>Loading drafts from the IRPA workspace…</div>}
     {!draftsBusy&&!savedDrafts.length&&<div style={styles.muted}>No saved drafts yet. Screen a grant, generate a concept note and save the draft here.</div>}
     {savedDrafts.map(draft=><div key={draft.id} style={{border:"1px solid #344255",borderRadius:10,padding:11,display:"flex",justifyContent:"space-between",gap:10,alignItems:"center",flexWrap:"wrap"}}><div><strong style={{fontSize:13}}>{draft.name||draft.opportunity?.title||"Untitled concept note"}</strong><div style={styles.muted}>Status: {draft.status||"draft"} · Updated: {dateLabel(draft.updated_at||draft.updatedAt||draft.created_at)}</div></div><button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>openSavedConceptDraft(draft)}>Open draft</button></div>)}
    </section>
    <section style={{...styles.card,display:"grid",gap:9}}>
-    <div><strong style={{fontSize:14}}>Draft audit trail</strong><p style={{...styles.muted,margin:"4px 0"}}>Append-only Cloudflare D1 events record when this draft was created or updated, without copying the full concept-note text into the event log.</p></div>
+    <div><strong style={{fontSize:14}}>Draft audit trail</strong><p style={{...styles.muted,margin:"4px 0"}}>Append-only audit events record when this draft was created or updated, without copying the full concept-note text into the event log.</p></div>
     {auditBusy&&<div style={styles.muted}>Loading draft audit events…</div>}
     {!auditBusy&&draftId&&!draftAuditEvents.length&&<div style={styles.muted}>No audit events loaded yet. Save the draft or reopen it to retrieve the event history.</div>}
     {!draftId&&<div style={styles.muted}>Save the draft to create its first audit event.</div>}
@@ -608,7 +609,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
      <button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>onNavigate?.("Meetings")}>Open Meetings</button>
     </div>
    </section>
-   <div style={{...styles.muted,borderLeft:"3px solid #b78b3d",padding:"8px 12px"}}><strong>Governance control:</strong> saved drafts remain drafts in the isolated Cloudflare D1 workspace. Saving does not submit an application, approve expenditure, authorize a commitment, or replace IRPA's formal internal review and approval procedures.</div>
+   <div style={{...styles.muted,borderLeft:"3px solid #b78b3d",padding:"8px 12px"}}><strong>Governance control:</strong> saved drafts remain drafts in the IRPA workspace. Saving does not submit an application, approve expenditure, authorize a commitment, or replace IRPA's formal internal review and approval procedures.</div>
   </section>}
 
   <section style={{...styles.card,display:"grid",gap:12,borderColor:"#4e8b91"}} aria-labelledby="grant-smart-assistant-heading">
