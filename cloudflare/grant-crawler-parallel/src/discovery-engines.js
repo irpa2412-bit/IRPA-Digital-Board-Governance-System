@@ -446,7 +446,7 @@ export async function readGdeltSearch() {
       return { items: [], error: { query, error: String(error.message || error).slice(0, 180) } };
     }
   }));
-  const items = settled.flatMap(result => result.items);
+  const items = [...new Map(settled.flatMap(result => result.items).map(item => [item.url, item])).values()];
   const errors = settled.filter(result => result.error).map(result => result.error);
   return { items, stats: { configured: true, provider: "GDELT DOC API", queries: queries.length, queryCatalogSize: GDELT_QUERIES.length, found: items.length, errors } };
 }
