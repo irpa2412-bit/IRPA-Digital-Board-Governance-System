@@ -184,7 +184,7 @@ export default function FieldEntryDataGate({portal}){
       setStorageError("Verification could not be saved in this browser session. The gate remains locked; enable session storage and retry.");
       return;
     }
-    try{window.sessionStorage.setItem(verificationMapKey,JSON.stringify({...existing,[field.portal]:record}))}catch{
+    try{window.sessionStorage.setItem(verificationMapKey,JSON.stringify({...existing,[field.portal]:record}));window.dispatchEvent(new CustomEvent("irpa:data-environment-changed",{detail:record}))}catch{
       setStorageError("Verification could not be saved in this browser session. The gate remains locked; enable session storage and retry.");
       return;
     }
