@@ -172,35 +172,65 @@ jobs:
             "$PRODUCTION_WORKER_URL/crawl")"
           printf '%s' "$result" | node scripts/staging-smoke-test.js
 
+      - name: Smoke-test live fundraising search
+        env:
+          GRANT_CRAWLER_CONTROL_TOKEN: ${{ secrets.GRANT_CRAWLER_CONTROL_TOKEN }}
+          PRODUCTION_WORKER_URL: ${{ steps.deploy_production.outputs.worker_url }}
+        run: |
+          set -euo pipefail
+          result="$(curl --fail --silent --show-error --max-time 40 -X POST \
+            -H "Authorization: Bearer $GRANT_CRAWLER_CONTROL_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data '{"query":"pastoral rangeland restoration","mode":"all"}' \
+            "$PRODUCTION_WORKER_URL/fundraising/search")"
+          node - "$result" <<'NODE'
+          const body = JSON.parse(process.argv[2]);
+          if (body.query !== 'pastoral rangeland restoration' || !Array.isArray(body.items) || !Array.isArray(body.providers) || !Array.isArray(body.errors)) {
+            throw new Error('Production fundraising search response contract failed.');
+          }
+          if (body.errors.length >= 4) throw new Error('All live fundraising search requests failed.');
+          console.log('Live fundraising search passed with ' + body.resultCount + ' research leads; providers: ' + body.providers.join(', ') + '.');
+          NODE
+
       - name: Smoke-test production AI document drafting and concept-note generation
         env:
           GRANT_CRAWLER_CONTROL_TOKEN: ${{ secrets.GRANT_CRAWLER_CONTROL_TOKEN }}
           PRODUCTION_WORKER_URL: ${{ steps.deploy_production.outputs.worker_url }}
         run: |
           set -euo pipefail
-          document_result="$(curl --fail --silent --show-error --max-time 90 -X POST \
+          document_result="$(curl --silent --show-error --max-time 90 -X POST \
             -H "Authorization: Bearer $GRANT_CRAWLER_CONTROL_TOKEN" \
             -H "Content-Type: application/json" \
             --data '{"task":"draft_message","format":"Formal letter","tone":"Professional","length":"Concise","instructions":"Write a short production smoke-test draft confirming the IRPA document drafting assistant is available."}' \
             "$PRODUCTION_WORKER_URL/assistant/analyze")"
-          node - "$document_result" <<'NODE'
+          document_status="$(node - "$document_result" <<'NODE'
           const body = JSON.parse(process.argv[2]);
-          if (body.task !== 'draft_message' || typeof body.draft !== 'string' || body.draft.trim().length < 30) {
-            throw new Error('Production AI document-drafting smoke test failed.');
-          }
-          console.log('Production AI document drafting returned a usable draft.');
+          if (body.error && /4006|quota|neurons|daily free allocation|upgrade/i.test(body.error)) { console.log('quota'); process.exit(0); }
+          if (body.task !== 'draft_message' || typeof body.draft !== 'string' || body.draft.trim().length < 30) throw new Error('Production AI document-drafting smoke test failed.');
+          console.log('success');
           NODE
-
-          concept_result="$(curl --fail --silent --show-error --max-time 90 -X POST \
+          )"
+          if [ "$document_status" = "quota" ]; then
+            echo "::warning::Workers AI daily quota is exhausted. Live fundraising search and non-AI discovery checks continue; AI drafting smoke is skipped until quota replenishes or is upgraded."
+            exit 0
+          fi
+          echo "Production AI document drafting returned a usable draft."
+          concept_result="$(curl --silent --show-error --max-time 90 -X POST \
             -H "Authorization: Bearer $GRANT_CRAWLER_CONTROL_TOKEN" \
             -H "Content-Type: application/json" \
             --data '{"task":"concept_note","title":"IRPA AI smoke test: community rangeland restoration","description":"Call for proposals for community-led rangeland restoration in Tanzania. Applications close 31 December 2026. Open to registered NGOs in Tanzania.","donorRequirements":"Open to registered NGOs in Tanzania; deadline 31 December 2026.","url":"https://example.org/irpa-ai-smoke-test","deadline":"2026-12-31","callStatus":"open"}' \
             "$PRODUCTION_WORKER_URL/assistant/analyze")"
-          node - "$concept_result" <<'NODE'
+          concept_status="$(node - "$concept_result" <<'NODE'
           const body = JSON.parse(process.argv[2]);
+          if (body.error && /4006|quota|neurons|daily free allocation|upgrade/i.test(body.error)) { console.log('quota'); process.exit(0); }
           const draft = body.assessment?.concept_note?.draft;
-          if (body.task !== 'concept_note' || typeof draft !== 'string' || draft.trim().length < 40) {
-            throw new Error('Production AI concept-note smoke test failed.');
-          }
-          console.log('Production AI concept-note drafting returned a usable draft.');
+          if (body.task !== 'concept_note' || typeof draft !== 'string' || draft.trim().length < 40) throw new Error('Production AI concept-note drafting smoke test failed.');
+          console.log('success');
           NODE
+          )"
+          if [ "$concept_status" = "quota" ]; then
+            echo "::warning::Workers AI quota became exhausted during the smoke test. Concept-note generation could not be verified in this run."
+            exit 0
+          fi
+          echo "Production AI concept-note drafting returned a usable draft."
+

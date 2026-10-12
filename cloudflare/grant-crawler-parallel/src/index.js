@@ -493,12 +493,19 @@ export default {
       }
     }
     if (request.method !== "POST" || !["/crawl", "/run", "/assistant/analyze", "/fundraising/search"].includes(url.pathname)) return json({ error: "Not found" }, 404);
-    if (url.pathname === "/run" || url.pathname === "/fundraising/search") {
+    if (url.pathname === "/run") {
       try {
         const token = String(request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
         await verifyFirebaseIdToken(token, env, false);
       } catch (error) {
         return json({ error: String(error.message || "Unauthorized").slice(0, 300) }, 401);
+      }
+    } else if (url.pathname === "/fundraising/search") {
+      const token = String(request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+      const expected = String(env.CRAWLER_CONTROL_TOKEN || "");
+      if (!(expected.length >= 32 && token === expected)) {
+        try { await verifyFirebaseIdToken(token, env, false); }
+        catch (error) { return json({ error: String(error.message || "Unauthorized").slice(0, 300) }, 401); }
       }
     } else if (url.pathname === "/assistant/analyze") {
       const token = String(request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
