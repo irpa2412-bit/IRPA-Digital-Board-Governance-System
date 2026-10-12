@@ -29,7 +29,7 @@ jobs:
         run: npm ci
       - name: Verify Mammoth CLI compatibility after argparse override
         run: npx mammoth --help
-      - name: Require zero high or critical npm audit findings
+      - name: Require zero moderate-or-higher npm audit findings
         run: npm audit --audit-level=moderate
 
   application-verification:

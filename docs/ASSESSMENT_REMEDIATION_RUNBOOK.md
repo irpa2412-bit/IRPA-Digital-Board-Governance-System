@@ -14,8 +14,9 @@
 - [x] Add opt-in Firebase App Check initialization for both the primary and applicant Firebase app instances, controlled by `VITE_FIREBASE_APPCHECK_SITE_KEY`.
 - [x] Upgrade the lint baseline to supported ESLint 10 and add a CLI compatibility check for the Mammoth/argparse dependency override.
 - [x] The refreshed dependency tree reports **0 npm audit vulnerabilities**; assessment, security-baseline and promotion workflows now fail at moderate severity rather than only high/critical.
-- [x] CI on commit `b13abe2` passed lockfile installation, lint, production build, Firestore Emulator regressions, Mammoth CLI compatibility, and desktop/mobile Playwright smoke tests.
-- [ ] Complete the stricter `--audit-level=moderate` gate on the latest final PR head before merge; review the remaining `glob@10.5.0` deprecation warning even though npm audit reports zero vulnerabilities.
+- [x] The stricter `npm audit --audit-level=moderate` gate passed with zero vulnerabilities on candidate `a2a179`; the latest merged candidate `e6d65ef` passed the same audit, production build, Functions syntax checks and Firestore Emulator regression suite.
+- [ ] Complete desktop/mobile Playwright smoke tests on the latest merged candidate `e6d65ef`; the assessment workflow is queued after the latest `main` merge. Do not merge until the exact final PR head completes browser verification.
+- [ ] Review the remaining `glob@10.5.0` deprecation warning; it is not currently reported as an npm audit vulnerability.
 
 ## Required release procedure
 1. Protect the reviewed `main` commit with a backup tag before promotion.
