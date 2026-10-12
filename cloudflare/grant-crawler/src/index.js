@@ -175,18 +175,26 @@ if(draftEventsMatch&&request.method==="GET"){
    userPrompt="Assess the supplied funding opportunity for IRPA. Do not browse or claim to have verified the official website. Use only supplied text; mark missing facts unknown. Organization: "+organization+"\nOrganization context: "+strategicContext+"\nTask: "+task+"\nOpportunity title: "+title+"\nOfficial URL supplied by user: "+url+"\nDeadline supplied: "+deadline+"\nCall status supplied: "+callStatus+"\nDescription:\n"+description+"\nOfficial requirements pasted by user:\n"+requirements+"\nReturn a JSON object with keys geographic_eligibility {status: eligible|ineligible|unclear, reason, evidence: string[]}, eligibility {status: eligible|ineligible|insufficient_information, confidence: low|medium|high, evidence: string[], unknowns: string[]}, donor_requirements: [{requirement,status,evidence,action}], strategic_alignment {rationale,relevant_pillars:string[],relevant_cross_cutting_themes:string[]}, application_checklist:string[], risks_and_gaps:string[]. For task concept_note also include concept_note:{draft:string}. Draft a concept note only if supplied details are sufficient to make a useful clearly qualified draft; use placeholders for missing budget, target numbers, duration, and evidence. Do not assert that the call is open or that IRPA is eligible unless the provided text supports it. Return JSON only.";
    maxTokens=task==="concept_note"?6000:3500;
   }else return response({error:"Unsupported assistant task."},400,origin);
-  let result,aiErr;
+  let output="",parsed=null,aiErr=null;
   for(const model of ["@cf/meta/llama-3.1-8b-instruct","@cf/meta/llama-3.3-70b-instruct-fp8-fast","@cf/meta/llama-3-8b-instruct"]){
-    try{result=await env.AI.run(model,{messages:[{role:"system",content:systemPrompt},{role:"user",content:userPrompt}],max_tokens:Math.min(maxTokens,4096),temperature:0.25});aiErr=null;break}
-    catch(err){aiErr=err;console.error("AI model failed:",model,err&&err.stack||err)}
+    try{
+      const result=await env.AI.run(model,{messages:[{role:"system",content:systemPrompt},{role:"user",content:userPrompt}],max_tokens:Math.min(maxTokens,4096),temperature:0.25});
+      const rawOut=result?.response??result?.output_text??result?.result?.response??result?.choices?.[0]?.message?.content??"";
+      output=(typeof rawOut==="string"?rawOut:JSON.stringify(rawOut)).trim();
+      if(!output)throw new Error("AI model returned an empty response");
+      if(task!=="draft_message"){
+        try{parsed=JSON.parse(output.replace(/^\x60{3}(?:json)?\s*/i,"").replace(/\s*\x60{3}$/,""))}
+        catch{throw new Error("AI model returned invalid structured JSON")}
+      }
+      aiErr=null;
+      break;
+    }catch(err){
+      aiErr=err;
+      console.error("AI model failed validation or generation:",model,String(err?.message||err).slice(0,200));
+    }
   }
-  if(aiErr)return response({error:"AI model call failed: "+String(aiErr?.message||aiErr).slice(0,300)},502,origin);
-  const rawOut=result?.response??result?.output_text??result?.result?.response??result?.choices?.[0]?.message?.content??"";
-  const output=(typeof rawOut==="string"?rawOut:JSON.stringify(rawOut)).trim();
-  if(!output)return response({error:"The AI model returned an empty response. Please retry."},502,origin);
+  if(aiErr)return response({error:"All available AI models failed to return a usable response: "+String(aiErr?.message||aiErr).slice(0,250)},502,origin);
   if(task==="draft_message")return response({ok:true,task,format,draft:output},200,origin);
-  let parsed;
-  try{parsed=JSON.parse(output.replace(/^\x60{3}(?:json)?\s*/i,"").replace(/\s*\x60{3}$/,""))}catch{return response({error:"The AI model returned an invalid structured assessment. Please retry."},502,origin)}
   return response({ok:true,task,assessment:parsed},200,origin);
  }catch(e){
   const msg=String(e?.message||e).slice(0,400);console.error("assistant/analyze failed:",e&&e.stack||msg);
