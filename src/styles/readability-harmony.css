@@ -946,14 +946,14 @@ textarea:focus-visible{
   border-color:#5b8f78!important;
   box-shadow:0 8px 24px rgba(0,0,0,.28)!important;
 }
-.topbar .google-weather-panel small{
+.topbar:not(.dashboard-topbar) .google-weather-panel small{
   display:block!important;
   margin-top:6px!important;
   color:#d8e9e2!important;
   font-size:13px!important;
   line-height:1.35!important;
 }
-.topbar .open-portal-panel{
+.topbar:not(.dashboard-topbar) .open-portal-panel{
   position:absolute!important;
   left:16%!important;
   right:235px!important;
@@ -972,7 +972,7 @@ textarea:focus-visible{
   pointer-events:auto!important;
   overflow:hidden!important;
 }
-.topbar .open-portal-panel span{
+.topbar:not(.dashboard-topbar) .open-portal-panel span{
   display:block!important;
   color:#f4d474!important;
   font-size:12px!important;
@@ -980,7 +980,7 @@ textarea:focus-visible{
   font-weight:850!important;
   letter-spacing:.14em!important;
 }
-.topbar .open-portal-panel strong{
+.topbar:not(.dashboard-topbar) .open-portal-panel strong{
   display:block!important;
   margin-top:4px!important;
   color:#ffffff!important;
@@ -993,20 +993,20 @@ textarea:focus-visible{
   max-width:100%!important;
 }
 @media(max-width:1200px){
-  .topbar .open-portal-panel{
+  .topbar:not(.dashboard-topbar) .open-portal-panel{
     left:21%!important;
     right:205px!important;
   }
 }
 @media(max-width:1050px){
-  .topbar .open-portal-panel{
+  .topbar:not(.dashboard-topbar) .open-portal-panel{
     left:18%!important;
     right:180px!important;
     padding:11px 18px!important;
   }
 }
 @media(max-width:760px){
-  .topbar .open-portal-panel{
+  .topbar:not(.dashboard-topbar) .open-portal-panel{
     display:none!important;
   }
   .desktop-date-card.open-portal-panel{
@@ -1233,7 +1233,7 @@ textarea:focus-visible{
    Keep the OPEN PORTAL label anchored at the panel's upper-left while
    centering the complete popup within the available topbar space. */
 @media(min-width:1101px){
-  .topbar-heading-row{
+  .topbar:not(.dashboard-topbar) .topbar-heading-row{
     display:grid!important;
     grid-template-columns:minmax(240px,1fr) minmax(260px,1.35fr) minmax(190px,250px)!important;
     align-items:center!important;
@@ -1241,12 +1241,12 @@ textarea:focus-visible{
     min-width:0!important;
     flex:1 1 auto!important;
   }
-  .topbar-title-block{
+  .topbar:not(.dashboard-topbar) .topbar-title-block{
     grid-column:1!important;
     grid-row:1!important;
     min-width:0!important;
   }
-  .topbar .open-portal-panel{
+  .topbar:not(.dashboard-topbar) .open-portal-panel{
     position:relative!important;
     left:auto!important;
     right:auto!important;
@@ -1268,18 +1268,18 @@ textarea:focus-visible{
     box-sizing:border-box!important;
     text-align:left!important;
   }
-  .topbar .open-portal-panel span{
+  .topbar:not(.dashboard-topbar) .open-portal-panel span{
     display:block!important;
     text-align:left!important;
   }
-  .topbar .open-portal-panel strong{
+  .topbar:not(.dashboard-topbar) .open-portal-panel strong{
     display:block!important;
     text-align:left!important;
     white-space:nowrap!important;
     overflow:hidden!important;
     text-overflow:ellipsis!important;
   }
-  .topbar-access-category{
+  .topbar:not(.dashboard-topbar) .topbar-access-category{
     grid-column:3!important;
     grid-row:1!important;
     min-width:0!important;
@@ -1287,13 +1287,13 @@ textarea:focus-visible{
   }
 }
 @media(min-width:761px) and (max-width:1100px){
-  .topbar-heading-row{
+  .topbar:not(.dashboard-topbar) .topbar-heading-row{
     display:flex!important;
     align-items:center!important;
     gap:10px!important;
     min-width:0!important;
   }
-  .topbar .open-portal-panel{
+  .topbar:not(.dashboard-topbar) .open-portal-panel{
     position:relative!important;
     left:auto!important;
     right:auto!important;
@@ -1308,15 +1308,15 @@ textarea:focus-visible{
     z-index:1!important;
     text-align:left!important;
   }
-  .topbar .open-portal-panel span,
-  .topbar .open-portal-panel strong{
+  .topbar:not(.dashboard-topbar) .open-portal-panel span,
+  .topbar:not(.dashboard-topbar) .open-portal-panel strong{
     text-align:left!important;
   }
-  .topbar-title-block{
+  .topbar:not(.dashboard-topbar) .topbar-title-block{
     flex:1 1 260px!important;
     min-width:0!important;
   }
-  .topbar-access-category{
+  .topbar:not(.dashboard-topbar) .topbar-access-category{
     flex:0 1 210px!important;
     width:auto!important;
     min-width:160px!important;
@@ -1546,38 +1546,18 @@ textarea:focus-visible{
    forecast and attribution without clipping. Colours follow the Google Weather
    visual language: sky blue, Google blue, white surfaces and dark neutral text. */
 .topbar .google-weather-panel{
-  cursor:default!important;
-  pointer-events:auto!important;
-  position:relative!important;
-  left:auto!important;
-  right:auto!important;
-  top:auto!important;
-  bottom:auto!important;
-  transform:none!important;
-  width:78%!important;
-  min-width:0!important;
-  height:auto!important;
-  min-height:170px!important;
-  max-height:none!important;
-  margin:0!important;
-  padding:12px 16px!important;
-  box-sizing:border-box!important;
-  overflow:visible!important;
-  align-self:center!important;
-  justify-self:center!important;
-  display:flex!important;
-  flex-direction:column!important;
-  justify-content:flex-start!important;
-  align-items:stretch!important;
-  text-align:left!important;
-  text-decoration:none!important;
-  color:#202124!important;
-  background:linear-gradient(135deg,#e8f0fe 0%,#d2e3fc 52%,#aecbfa 100%)!important;
-  border:1px solid #8ab4f8!important;
-  border-radius:14px!important;
-  box-shadow:0 8px 24px rgba(66,133,244,.20)!important;
+  cursor:default!important; pointer-events:auto!important; text-align:left!important; text-decoration:none!important;
+  color:#202124!important; background:linear-gradient(135deg,#e8f0fe 0%,#d2e3fc 52%,#aecbfa 100%)!important;
+  border:1px solid #8ab4f8!important; border-radius:14px!important; box-shadow:0 8px 24px rgba(66,133,244,.20)!important;
 }
-.topbar .google-weather-panel>span{
+.topbar:not(.dashboard-topbar) .google-weather-panel{
+  position:relative!important; left:auto!important; right:auto!important; top:auto!important; bottom:auto!important; transform:none!important;
+  width:78%!important; min-width:0!important; height:auto!important; min-height:170px!important; max-height:none!important;
+  margin:0!important; padding:12px 16px!important; box-sizing:border-box!important; overflow:visible!important;
+  align-self:center!important; justify-self:center!important; display:flex!important; flex-direction:column!important;
+  justify-content:flex-start!important; align-items:stretch!important;
+}
+.topbar:not(.dashboard-topbar) .google-weather-panel>span{
   display:block!important;
   flex:0 0 auto!important;
   margin:0 0 7px!important;
@@ -1588,26 +1568,26 @@ textarea:focus-visible{
   letter-spacing:.14em!important;
   text-align:left!important;
 }
-.topbar .google-weather-panel .live-weather-content{
+.topbar:not(.dashboard-topbar) .google-weather-panel .live-weather-content{
   width:100%!important;
   min-width:0!important;
   color:#202124!important;
 }
-.topbar .google-weather-panel .live-weather-current{
+.topbar:not(.dashboard-topbar) .google-weather-panel .live-weather-current{
   display:flex!important;
   align-items:center!important;
   justify-content:space-between!important;
   gap:12px!important;
   width:100%!important;
 }
-.topbar .google-weather-panel .live-weather-current-main{
+.topbar:not(.dashboard-topbar) .google-weather-panel .live-weather-current-main{
   display:flex!important;
   align-items:center!important;
   gap:9px!important;
   min-width:0!important;
   flex:1 1 auto!important;
 }
-.topbar .google-weather-panel .live-weather-icon{
+.topbar:not(.dashboard-topbar) .google-weather-panel .live-weather-icon{
   width:42px!important;
   height:42px!important;
   display:grid!important;
@@ -1619,8 +1599,8 @@ textarea:focus-visible{
   border-radius:12px!important;
   box-shadow:0 2px 8px rgba(60,64,67,.10)!important;
 }
-.topbar .google-weather-panel .live-weather-current-main div{min-width:0!important;}
-.topbar .google-weather-panel .live-weather-current-main strong{
+.topbar:not(.dashboard-topbar) .google-weather-panel .live-weather-current-main div{min-width:0!important;}
+.topbar:not(.dashboard-topbar) .google-weather-panel .live-weather-current-main strong{
   display:block!important;
   margin:0!important;
   color:#202124!important;
@@ -1628,7 +1608,7 @@ textarea:focus-visible{
   line-height:1.05!important;
   font-weight:850!important;
 }
-.topbar .google-weather-panel .live-weather-current-main span{
+.topbar:not(.dashboard-topbar) .google-weather-panel .live-weather-current-main span{
   display:block!important;
   margin-top:3px!important;
   color:#3c4043!important;
@@ -1639,7 +1619,7 @@ textarea:focus-visible{
   overflow:hidden!important;
   text-overflow:ellipsis!important;
 }
-.topbar .google-weather-panel .live-weather-current-main small{
+.topbar:not(.dashboard-topbar) .google-weather-panel .live-weather-current-main small{
   display:block!important;
   margin-top:3px!important;
   color:#5f6368!important;
@@ -1647,7 +1627,7 @@ textarea:focus-visible{
   line-height:1.2!important;
   white-space:nowrap!important;
 }
-.topbar .google-weather-panel .live-weather-metrics{
+.topbar:not(.dashboard-topbar) .google-weather-panel .live-weather-metrics{
   display:flex!important;
   flex-wrap:wrap!important;
   justify-content:flex-end!important;
@@ -1657,21 +1637,21 @@ textarea:focus-visible{
   font-size:12px!important;
   line-height:1.2!important;
 }
-.topbar .google-weather-panel .live-weather-metrics span{
+.topbar:not(.dashboard-topbar) .google-weather-panel .live-weather-metrics span{
   padding:4px 6px!important;
   border-radius:999px!important;
   background:rgba(255,255,255,.72)!important;
   border:1px solid rgba(66,133,244,.18)!important;
   white-space:nowrap!important;
 }
-.topbar .google-weather-panel .live-weather-days{
+.topbar:not(.dashboard-topbar) .google-weather-panel .live-weather-days{
   display:grid!important;
   grid-template-columns:repeat(4,minmax(0,1fr))!important;
   gap:6px!important;
   margin-top:9px!important;
   width:100%!important;
 }
-.topbar .google-weather-panel .live-weather-day{
+.topbar:not(.dashboard-topbar) .google-weather-panel .live-weather-day{
   min-width:0!important;
   padding:6px 7px!important;
   background:rgba(255,255,255,.70)!important;
@@ -1679,13 +1659,13 @@ textarea:focus-visible{
   border-radius:9px!important;
   box-shadow:0 1px 5px rgba(60,64,67,.06)!important;
 }
-.topbar .google-weather-panel .live-weather-day strong{
+.topbar:not(.dashboard-topbar) .google-weather-panel .live-weather-day strong{
   display:block!important;
   color:#1a73e8!important;
   font-size:12px!important;
   line-height:1.1!important;
 }
-.topbar .google-weather-panel .live-weather-day span{
+.topbar:not(.dashboard-topbar) .google-weather-panel .live-weather-day span{
   display:block!important;
   margin-top:3px!important;
   color:#3c4043!important;
@@ -1695,21 +1675,21 @@ textarea:focus-visible{
   overflow:hidden!important;
   text-overflow:ellipsis!important;
 }
-.topbar .google-weather-panel .live-weather-day b{
+.topbar:not(.dashboard-topbar) .google-weather-panel .live-weather-day b{
   display:block!important;
   margin-top:3px!important;
   color:#202124!important;
   font-size:12px!important;
   line-height:1.1!important;
 }
-.topbar .google-weather-panel .live-weather-day small{
+.topbar:not(.dashboard-topbar) .google-weather-panel .live-weather-day small{
   display:block!important;
   margin-top:3px!important;
   color:#5f6368!important;
   font-size:12px!important;
   line-height:1.1!important;
 }
-.topbar .google-weather-panel .live-weather-attribution{
+.topbar:not(.dashboard-topbar) .google-weather-panel .live-weather-attribution{
   display:flex!important;
   justify-content:space-between!important;
   gap:8px!important;
@@ -1718,21 +1698,21 @@ textarea:focus-visible{
   font-size:12px!important;
   line-height:1.1!important;
 }
-.topbar .google-weather-panel .live-weather-attribution small{
+.topbar:not(.dashboard-topbar) .google-weather-panel .live-weather-attribution small{
   margin:0!important;
   color:#5f6368!important;
   font-size:12px!important;
   line-height:1.1!important;
 }
 @media(min-width:761px) and (max-width:1100px){
-  .topbar .google-weather-panel{
+  .topbar:not(.dashboard-topbar) .google-weather-panel{
     width:78%!important;
     min-height:180px!important;
     height:auto!important;
     max-height:none!important;
     padding:12px 14px!important;
   }
-  .topbar .google-weather-panel .live-weather-current{
+  .topbar:not(.dashboard-topbar) .google-weather-panel .live-weather-current{
     align-items:flex-start!important;
   }
 }
@@ -3039,9 +3019,9 @@ textarea:focus-visible{
   .main-area{padding-top:76px!important;}
   .main-area .content-area{padding-top:14px!important;padding-bottom:92px!important;}
   .topbar{height:auto!important;min-height:0!important;overflow:visible!important;}
-  .topbar-heading-row{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:12px!important;overflow:visible!important;}
-  .topbar-title-block{width:100%!important;min-width:0!important;}
-  .topbar-access-category{
+  .topbar:not(.dashboard-topbar) .topbar-heading-row{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:12px!important;overflow:visible!important;}
+  .topbar:not(.dashboard-topbar) .topbar-title-block{width:100%!important;min-width:0!important;}
+  .topbar:not(.dashboard-topbar) .topbar-access-category{
     display:block!important;position:relative!important;inset:auto!important;transform:none!important;
     order:2!important;grid-column:auto!important;grid-row:auto!important;
     width:100%!important;min-width:0!important;max-width:100%!important;
@@ -3051,20 +3031,20 @@ textarea:focus-visible{
     border-radius:12px!important;color:#f5f5f5!important;-webkit-text-fill-color:#f5f5f5!important;
     box-shadow:0 8px 22px rgba(0,0,0,.22)!important;z-index:2!important;
   }
-  .topbar-access-category>span,
-  .topbar-access-category .login-category-heading,
-  .topbar-access-category .login-category-note,
-  .topbar-access-category .login-category-explanation,
-  .topbar-access-category .login-category-identifiers strong{display:block!important;visibility:visible!important;opacity:1!important;color:#f5f5f5!important;-webkit-text-fill-color:#f5f5f5!important;white-space:normal!important;}
-  .topbar-access-category .login-category-identifiers{border-top-color:rgba(245,245,245,.18)!important;}
-  .topbar-access-category .login-category-identifiers small,
-  .topbar-access-category .login-category-empty{color:#d1d5db!important;-webkit-text-fill-color:#d1d5db!important;}
-  .topbar-access-category .login-category-list,
-  .topbar-access-category .login-category-item{display:flex!important;visibility:visible!important;opacity:1!important;flex-wrap:wrap!important;gap:8px!important;}
-  .topbar-access-category .login-category-pill{color:#f5f5f5!important;-webkit-text-fill-color:#f5f5f5!important;border-color:#e5e7eb!important;background:transparent!important;}
-  .topbar-access-category select,
-  .topbar-access-category .authority-select,
-  .topbar-access-category .access-category-select{color:#173b2d!important;background:#fff!important;opacity:1!important;}
+  .topbar:not(.dashboard-topbar) .topbar-access-category>span,
+  .topbar:not(.dashboard-topbar) .topbar-access-category .login-category-heading,
+  .topbar:not(.dashboard-topbar) .topbar-access-category .login-category-note,
+  .topbar:not(.dashboard-topbar) .topbar-access-category .login-category-explanation,
+  .topbar:not(.dashboard-topbar) .topbar-access-category .login-category-identifiers strong{display:block!important;visibility:visible!important;opacity:1!important;color:#f5f5f5!important;-webkit-text-fill-color:#f5f5f5!important;white-space:normal!important;}
+  .topbar:not(.dashboard-topbar) .topbar-access-category .login-category-identifiers{border-top-color:rgba(245,245,245,.18)!important;}
+  .topbar:not(.dashboard-topbar) .topbar-access-category .login-category-identifiers small,
+  .topbar:not(.dashboard-topbar) .topbar-access-category .login-category-empty{color:#d1d5db!important;-webkit-text-fill-color:#d1d5db!important;}
+  .topbar:not(.dashboard-topbar) .topbar-access-category .login-category-list,
+  .topbar:not(.dashboard-topbar) .topbar-access-category .login-category-item{display:flex!important;visibility:visible!important;opacity:1!important;flex-wrap:wrap!important;gap:8px!important;}
+  .topbar:not(.dashboard-topbar) .topbar-access-category .login-category-pill{color:#f5f5f5!important;-webkit-text-fill-color:#f5f5f5!important;border-color:#e5e7eb!important;background:transparent!important;}
+  .topbar:not(.dashboard-topbar) .topbar-access-category select,
+  .topbar:not(.dashboard-topbar) .topbar-access-category .authority-select,
+  .topbar:not(.dashboard-topbar) .topbar-access-category .access-category-select{color:#173b2d!important;background:#fff!important;opacity:1!important;}
   .mobile-access-live-date{position:relative!important;display:flex!important;flex-wrap:wrap!important;gap:5px 10px!important;inset:auto!important;margin-top:12px!important;}
   .desktop-webapp-navigation-roller,
   .mobile-portal-content-roller{display:none!important;visibility:hidden!important;pointer-events:none!important;}
@@ -3212,7 +3192,7 @@ textarea:focus-visible{
     padding-top:76px!important;
     min-height:100vh!important;
   }
-  .app-shell .main-area>.topbar{
+  .app-shell .main-area>.topbar:not(.dashboard-topbar){
     display:block!important;
     position:relative!important;
     inset:auto!important;
@@ -3227,7 +3207,7 @@ textarea:focus-visible{
     background:#07140f!important;
     z-index:1!important;
   }
-  .app-shell .main-area>.topbar .topbar-heading-row{
+  .app-shell .main-area>.topbar:not(.dashboard-topbar) .topbar-heading-row{
     display:flex!important;
     position:relative!important;
     flex-direction:column!important;
@@ -3240,7 +3220,7 @@ textarea:focus-visible{
     overflow:visible!important;
     transform:none!important;
   }
-  .app-shell .main-area>.topbar .topbar-title-block{
+  .app-shell .main-area>.topbar:not(.dashboard-topbar) .topbar-title-block{
     display:block!important;
     position:relative!important;
     width:100%!important;
@@ -3249,7 +3229,7 @@ textarea:focus-visible{
     overflow:visible!important;
     order:0!important;
   }
-  .app-shell .main-area>.topbar .topbar-access-category{
+  .app-shell .main-area>.topbar:not(.dashboard-topbar) .topbar-access-category{
     display:block!important;
     position:relative!important;
     inset:auto!important;
@@ -3277,42 +3257,42 @@ textarea:focus-visible{
     box-shadow:0 8px 22px rgba(0,0,0,.22)!important;
     z-index:3!important;
   }
-  .app-shell .main-area>.topbar .topbar-access-category *{
+  .app-shell .main-area>.topbar:not(.dashboard-topbar) .topbar-access-category *{
     visibility:visible!important;
     opacity:1!important;
   }
-  .app-shell .main-area>.topbar .topbar-access-category>span,
-  .app-shell .main-area>.topbar .topbar-access-category .login-category-heading,
-  .app-shell .main-area>.topbar .topbar-access-category .login-category-note,
-  .app-shell .main-area>.topbar .topbar-access-category .login-category-explanation,
-  .app-shell .main-area>.topbar .topbar-access-category .login-category-identifiers strong{
+  .app-shell .main-area>.topbar:not(.dashboard-topbar) .topbar-access-category>span,
+  .app-shell .main-area>.topbar:not(.dashboard-topbar) .topbar-access-category .login-category-heading,
+  .app-shell .main-area>.topbar:not(.dashboard-topbar) .topbar-access-category .login-category-note,
+  .app-shell .main-area>.topbar:not(.dashboard-topbar) .topbar-access-category .login-category-explanation,
+  .app-shell .main-area>.topbar:not(.dashboard-topbar) .topbar-access-category .login-category-identifiers strong{
     display:block!important;
     color:#f5f5f5!important;
     -webkit-text-fill-color:#f5f5f5!important;
     white-space:normal!important;
   }
-  .app-shell .main-area>.topbar .topbar-access-category .login-category-identifiers{
+  .app-shell .main-area>.topbar:not(.dashboard-topbar) .topbar-access-category .login-category-identifiers{
     border-top-color:rgba(245,245,245,.18)!important;
   }
-  .app-shell .main-area>.topbar .topbar-access-category .login-category-identifiers small,
-  .app-shell .main-area>.topbar .topbar-access-category .login-category-empty{
+  .app-shell .main-area>.topbar:not(.dashboard-topbar) .topbar-access-category .login-category-identifiers small,
+  .app-shell .main-area>.topbar:not(.dashboard-topbar) .topbar-access-category .login-category-empty{
     color:#d1d5db!important;
     -webkit-text-fill-color:#d1d5db!important;
   }
-  .app-shell .main-area>.topbar .topbar-access-category .login-category-list{
+  .app-shell .main-area>.topbar:not(.dashboard-topbar) .topbar-access-category .login-category-list{
     display:flex!important;
     flex-wrap:wrap!important;
     gap:8px!important;
     margin-top:8px!important;
   }
-  .app-shell .main-area>.topbar .topbar-access-category .login-category-pill{
+  .app-shell .main-area>.topbar:not(.dashboard-topbar) .topbar-access-category .login-category-pill{
     display:inline-flex!important;
     color:#f5f5f5!important;
     -webkit-text-fill-color:#f5f5f5!important;
     background:transparent!important;
     border:1px solid #e5e7eb!important;
   }
-  .app-shell .main-area>.topbar .mobile-access-live-date{
+  .app-shell .main-area>.topbar:not(.dashboard-topbar) .mobile-access-live-date{
     display:flex!important;
     position:relative!important;
     flex-wrap:wrap!important;
@@ -3320,19 +3300,19 @@ textarea:focus-visible{
     margin-top:12px!important;
     color:#fff!important;
   }
-  .app-shell .main-area>.topbar .mobile-access-live-date *{
+  .app-shell .main-area>.topbar:not(.dashboard-topbar) .mobile-access-live-date *{
     color:#fff!important;
   }
-  .app-shell .main-area>.topbar .mobile-access-live-date button{
+  .app-shell .main-area>.topbar:not(.dashboard-topbar) .mobile-access-live-date button{
     background:#0b5fa8!important;
     border:1px solid #d6a52c!important;
     color:#fff!important;
   }
-  .app-shell .main-area>.topbar .open-portal-panel,
-  .app-shell .main-area>.topbar .user-info{
+  .app-shell .main-area>.topbar:not(.dashboard-topbar):not(.dashboard-topbar) .open-portal-panel,
+  .app-shell .main-area>.topbar:not(.dashboard-topbar) .user-info{
     display:none!important;
   }
-  .app-shell .main-area>.topbar+.content-area{
+  .app-shell .main-area>.topbar:not(.dashboard-topbar)+.content-area{
     padding-top:14px!important;
   }
 }
@@ -3356,106 +3336,3 @@ textarea:focus-visible{
  .signature-field-palette img{max-height:64px!important;}
  .signature-workflow-grid .panel{min-width:0;max-width:100%;}
 }
-
-/* DASHBOARD HERO FINAL OVERRIDES — measured desktop layout corrections only. */
-  @media (min-width: 901px) {
-    html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) {
-      height:auto!important; min-height:0!important; max-height:300px!important; overflow:visible!important;
-    }
-    html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row {
-      display:grid!important; grid-template-columns:minmax(200px,260px) minmax(0,1fr) 250px!important;
-      grid-template-areas:"title weather authority"!important; grid-template-rows:auto!important;
-      column-gap:0!important; row-gap:0!important; align-items:center!important; max-height:300px!important; overflow:visible!important;
-    }
-    html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .topbar-title-block { grid-area:title!important; width:calc(100% - 12px)!important; max-width:260px!important; margin-right:0!important; justify-self:start!important; align-self:center!important; }
-    html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .topbar-access-category { grid-area:authority!important; justify-self:stretch!important; align-self:center!important; }
-    html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel {
-      grid-area:weather!important; display:grid!important; grid-template-columns:minmax(110px,.8fr) repeat(3,minmax(0,1fr))!important;
-      grid-template-rows:22px 32px 56px 12px!important; align-items:center!important; align-content:start!important; gap:3px 4px!important;
-      width:100%!important; min-width:0!important; max-width:none!important; height:auto!important; min-height:0!important; max-height:145px!important;
-      margin:0!important; padding:6px!important; justify-self:stretch!important; align-self:center!important; overflow:visible!important; box-sizing:border-box!important;
-      color:#2563eb!important; -webkit-text-fill-color:#2563eb!important;
-    }
-    html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel > span {
-      grid-column:1!important; grid-row:1!important; margin:0!important; font-size:.62rem!important; line-height:1!important; white-space:nowrap!important;
-    }
-    html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-content,
-    html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-current { display:contents!important; }
-    html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-location-bar {
-      grid-column:2/-1!important; grid-row:1!important; display:flex!important; flex-direction:row!important; flex-wrap:nowrap!important;
-      align-items:center!important; justify-content:space-between!important; gap:4px!important; width:100%!important; min-width:0!important; height:22px!important; margin:0!important; padding:0!important; overflow:hidden!important;
-    }
-    html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-location-name {
-      display:flex!important; flex-direction:row!important; align-items:center!important; gap:5px!important; flex:1 1 auto!important; min-width:0!important; overflow:hidden!important;
-    }
-    html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-location-name > span {
-      min-width:0!important; overflow:hidden!important; text-overflow:ellipsis!important; white-space:nowrap!important; font-size:.58rem!important;
-    }
-    html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-location-controls {
-      display:flex!important; flex-direction:row!important; align-items:center!important; flex:0 0 auto!important; gap:2px!important; margin:0!important;
-    }
-    html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-current-main {
-      grid-column:1/3!important; grid-row:2!important; display:flex!important; flex-direction:row!important; align-items:center!important; gap:4px!important;
-      width:100%!important; min-width:0!important; height:32px!important; max-height:32px!important; margin:0!important; overflow:hidden!important;
-    }
-    html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-current-main > div { min-width:0!important; overflow:hidden!important; }
-    html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-current-main strong { font-size:.9rem!important; line-height:1!important; white-space:nowrap!important; }
-    html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-current-main small {
-      display:-webkit-box!important; -webkit-box-orient:vertical!important; -webkit-line-clamp:2!important; overflow:hidden!important; font-size:.5rem!important; line-height:1!important; overflow-wrap:anywhere!important;
-    }
-    html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-icon { flex:0 0 auto!important; font-size:1rem!important; }
-    html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-metrics {
-      grid-column:3/-1!important; grid-row:2!important; display:flex!important; flex-direction:row!important; flex-wrap:nowrap!important; align-items:center!important;
-      justify-content:space-between!important; gap:3px!important; min-width:0!important; height:32px!important; max-height:32px!important; margin:0!important; overflow:hidden!important;
-    }
-    html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-metrics > span {
-      display:inline-flex!important; align-items:center!important; justify-content:center!important; flex:1 1 0!important; min-width:0!important; padding:3px 2px!important;
-      gap:2px!important; font-size:.5rem!important; line-height:1!important; white-space:nowrap!important; box-sizing:border-box!important;
-    }
-    html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-days {
-      grid-column:1/-1!important; grid-row:3!important; grid-auto-flow:column!important; grid-auto-columns:minmax(110px,1fr)!important; grid-template-columns:none!important;
-      grid-template-rows:1fr!important; align-items:stretch!important; gap:4px!important; width:100%!important; min-width:0!important; max-width:100%!important;
-      height:56px!important; min-height:0!important; max-height:56px!important; margin:0!important; padding:0!important; overflow-x:auto!important; overflow-y:hidden!important; box-sizing:border-box!important;
-    }
-    html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-day {
-      display:flex!important; flex-direction:column!important; align-items:flex-start!important; justify-content:flex-start!important; gap:1px!important; width:100%!important;
-      min-width:110px!important; max-width:none!important; height:56px!important; min-height:0!important; max-height:56px!important; padding:2px 4px!important; margin:0!important; overflow:hidden!important; box-sizing:border-box!important;
-    }
-    html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-day > * {
-      max-width:100%!important; font-size:.5rem!important; line-height:1!important; overflow-wrap:anywhere!important;
-    }
-    html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-attribution {
-      grid-column:1/-1!important; grid-row:4!important; min-width:0!important; max-width:100%!important; height:12px!important; max-height:12px!important; margin:0!important; padding:0!important; overflow:hidden!important;
-    }
-    html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel *,
-    html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel *::before,
-    html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel *::after {
-      color:#2563eb!important; -webkit-text-fill-color:#2563eb!important;
-    }
-    html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-attribution > * { font-size:.45rem!important; line-height:1!important; }
-  }
-
-  @media (min-width: 1800px) {
-    html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel {
-      grid-template-columns:100px minmax(170px,210px) minmax(170px,220px) minmax(220px,260px) minmax(0,1fr)!important;
-      grid-template-rows:56px 12px!important;
-      gap:4px 6px!important;
-      max-height:100px!important;
-      padding:6px!important;
-    }
-    html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-location-bar {
-      grid-column:2!important; grid-row:1!important;
-    }
-    html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-current-main {
-      grid-column:3!important; grid-row:1!important;
-    }
-    html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-metrics {
-      grid-column:4!important; grid-row:1!important;
-    }
-    html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-days {
-      grid-column:5!important; grid-row:1!important; height:56px!important; max-height:56px!important;
-    }
-    html body #root .app-shell .main-area > header.topbar.dashboard-topbar:has(> .topbar-heading-row > .google-weather-panel) > .topbar-heading-row > .google-weather-panel .live-weather-attribution {
-      grid-column:1/-1!important; grid-row:2!important;
-    }
-  }

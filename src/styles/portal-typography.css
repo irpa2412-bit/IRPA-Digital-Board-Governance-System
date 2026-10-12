@@ -78,3 +78,157 @@
     line-height: 1.4;
   }
 }
+/* DASHBOARD HERO SINGLE SOURCE OF TRUTH — 20261012-0637 */
+/* Dashboard-only hero geometry. The layout lives here; no runtime script mutates the DOM. */
+html body #root .app-shell .main-area:has(> header.topbar.dashboard-topbar) { padding-top: 0; }
+html body #root .app-shell .main-area:has(> header.topbar.dashboard-topbar) > .desktop-webapp-navigation-roller { margin: 0; }
+html body #root .app-shell .main-area:has(> header.topbar.dashboard-topbar) > .page-back-next-navigation { margin: 0; }
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar {
+  position: relative; margin: 0; padding: 0 12px 8px; height: auto; min-height: 320px; max-height: none; overflow: visible; box-sizing: border-box;
+}
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row {
+  display: grid; grid-template-columns: minmax(220px,24%) minmax(0,1fr) minmax(280px,22%);
+  grid-template-areas: "title weather authority"; grid-template-rows: minmax(0,1fr); column-gap: 12px; row-gap: 0;
+  align-items: start; align-content: stretch; width: 100%; min-width: 0; min-height: 312px; height: auto; max-height: none;
+  margin: 0; padding: 8px 0 0; box-sizing: border-box;
+}
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .topbar-title-block {
+  grid-area: title; align-self: start; justify-self: stretch; width: auto; min-width: 0; max-width: none; height: auto;
+  min-height: 0; max-height: none; margin: 0; padding: 0; overflow: visible;
+}
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel {
+  grid-area: weather; position: relative; align-self: stretch; justify-self: stretch; display: grid;
+  grid-template-columns: minmax(0,.85fr) minmax(0,1.15fr); grid-template-rows: auto auto minmax(0,1fr) auto;
+  grid-template-areas: "label location" "current metrics" "forecast forecast" "footer footer";
+  align-items: stretch; align-content: stretch; gap: 8px 12px; width: 100%; min-width: 0; max-width: none;
+  height: 100%; min-height: 292px; max-height: none; margin: 0; padding: 10px 12px; overflow: visible; box-sizing: border-box;
+  color: #2563eb; -webkit-text-fill-color: #2563eb; background: linear-gradient(135deg,#e8f0fe 0%,#d2e3fc 52%,#aecbfa 100%);
+  border: 1px solid #8ab4f8; border-radius: 14px; box-shadow: 0 8px 24px rgba(66,133,244,.20);
+}
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel > span {
+  grid-area: label; align-self: center; display: block; min-width: 0; margin: 0; color: #174ea6!important; -webkit-text-fill-color: #174ea6!important;
+  font-size: 12px; line-height: 1.2; font-weight: 850; letter-spacing: .08em; text-align: left;
+}
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-content {
+  display: contents; width: 100%; min-width: 0; height: auto; min-height: 0; max-height: none; margin: 0; padding: 0; overflow: visible;
+  color: #2563eb!important; -webkit-text-fill-color: #2563eb!important;
+}
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-location-bar {
+  grid-area: location; display: flex; align-self: stretch; align-items: center; justify-content: space-between; gap: 8px;
+  width: 100%; min-width: 0; height: auto; min-height: 0; max-height: none; margin: 0; padding: 0; overflow: visible;
+}
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-location-name {
+  display: flex; flex: 1 1 auto; align-items: center; gap: 8px; min-width: 0; overflow: hidden;
+}
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-location-name strong,
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-location-name span {
+  min-width: 0; color: #174ea6!important; -webkit-text-fill-color: #174ea6!important; font-size: 12px; line-height: 1.25; overflow-wrap: anywhere;
+}
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-location-controls {
+  display: flex; flex: 0 0 auto; align-items: center; gap: 4px; margin: 0;
+}
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-location-controls button {
+  min-width: 28px; min-height: 28px; margin: 0; padding: 2px 7px; border: 1px solid rgba(26,115,232,.3); border-radius: 7px;
+  background: rgba(255,255,255,.78); color: #174ea6!important; -webkit-text-fill-color: #174ea6!important;
+}
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-current { display: contents; }
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-current-main {
+  grid-area: current; display: flex; align-self: stretch; align-items: center; gap: 10px; width: 100%; min-width: 0;
+  height: auto; min-height: 0; max-height: none; margin: 0; padding: 0; overflow: visible;
+}
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-icon {
+  display: grid; flex: 0 0 42px; place-items: center; width: 42px; height: 42px; border: 1px solid rgba(66,133,244,.3);
+  border-radius: 10px; background: rgba(255,255,255,.78); color: #1a73e8!important; -webkit-text-fill-color: #1a73e8!important; font-size: 24px;
+}
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-current-main > div { min-width: 0; overflow-wrap: anywhere; }
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-current-main strong {
+  display: block; margin: 0; color: #174ea6!important; -webkit-text-fill-color: #174ea6!important; font-size: 22px; line-height: 1.1; font-weight: 850;
+}
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-current-main small {
+  display: block; margin: 4px 0 0; color: #3c4043!important; -webkit-text-fill-color: #3c4043!important; font-size: 11px; line-height: 1.25; overflow-wrap: anywhere;
+}
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-metrics {
+  grid-area: metrics; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); align-items: stretch; align-content: center;
+  gap: 6px; width: 100%; min-width: 0; height: auto; min-height: 0; max-height: none; margin: 0; padding: 0; overflow: visible;
+}
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-metrics > span {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px; min-width: 0; margin: 0; padding: 8px 6px;
+  border: 1px solid rgba(66,133,244,.18); border-radius: 9px; background: rgba(255,255,255,.72); color: #2563eb!important;
+  -webkit-text-fill-color: #2563eb!important; font-size: 11px; line-height: 1.2; white-space: normal; overflow-wrap: anywhere; box-sizing: border-box;
+}
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-metrics b {
+  color: #174ea6!important; -webkit-text-fill-color: #174ea6!important; font-size: 12px; font-weight: 850;
+}
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-days {
+  grid-area: forecast; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); grid-template-rows: minmax(0,1fr); grid-auto-flow: row;
+  align-items: stretch; gap: 8px; width: 100%; min-width: 0; height: 100%; min-height: 0; max-height: none; margin: 0; padding: 0; overflow: visible; box-sizing: border-box;
+}
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-day {
+  display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 4px; width: 100%; min-width: 0;
+  height: 100%; min-height: 0; max-height: none; margin: 0; padding: 8px; border: 1px solid rgba(66,133,244,.18); border-radius: 10px;
+  background: rgba(255,255,255,.72); color: #2563eb!important; -webkit-text-fill-color: #2563eb!important; overflow: hidden; box-sizing: border-box;
+}
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-day strong {
+  display: block; margin: 0; color: #1a73e8!important; -webkit-text-fill-color: #1a73e8!important; font-size: 12px; line-height: 1.1;
+}
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-day span {
+  display: block; margin: 0; color: #3c4043!important; -webkit-text-fill-color: #3c4043!important; font-size: 14px; line-height: 1.15;
+}
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-day b {
+  display: block; margin: 0; color: #174ea6!important; -webkit-text-fill-color: #174ea6!important; font-size: 12px; line-height: 1.1;
+}
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-day small {
+  display: block; margin: 0; color: #3c4043!important; -webkit-text-fill-color: #3c4043!important; font-size: 10px; line-height: 1.2; overflow-wrap: anywhere;
+}
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-attribution {
+  grid-area: footer; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 10px;
+  width: 100%; min-width: 0; height: auto; min-height: 0; max-height: none; margin: 0; padding: 0; overflow: visible;
+  color: #174ea6!important; -webkit-text-fill-color: #174ea6!important; font-size: 10px; line-height: 1.2;
+}
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-attribution * {
+  color: #174ea6!important; -webkit-text-fill-color: #174ea6!important;
+}
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .topbar-access-category {
+  grid-area: authority; align-self: start; justify-self: stretch; display: block; position: relative; width: 100%; min-width: 0; max-width: none;
+  height: auto; min-height: 0; max-height: none; margin: 0; padding: 12px; overflow: visible; box-sizing: border-box;
+  border: 1px solid rgba(125,211,160,.35); border-radius: 10px; background: #17212b!important; color: #ffffff!important; -webkit-text-fill-color: #ffffff!important;
+}
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .topbar-access-category * { color: #ffffff!important; -webkit-text-fill-color: #ffffff!important; }
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .topbar-access-category strong,
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .topbar-access-category b,
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .topbar-access-category .login-category-heading,
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .topbar-access-category .login-category-note,
+html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .topbar-access-category .login-category-explanation {
+  color: #facc15!important; -webkit-text-fill-color: #facc15!important;
+}
+@media (min-width: 761px) and (max-width: 1199px) {
+  html body #root .app-shell .main-area > header.topbar.dashboard-topbar { min-height: 0; padding-bottom: 12px; }
+  html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row {
+    grid-template-columns: minmax(190px,1fr) minmax(0,1.4fr); grid-template-areas: "title weather" "authority authority";
+    grid-template-rows: auto auto; gap: 12px; min-height: 0; padding-top: 8px;
+  }
+  html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel { grid-template-rows: auto auto minmax(120px,1fr) auto; height: auto; min-height: 280px; }
+  html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .topbar-access-category { grid-area: authority; align-self: start; }
+}
+@media (max-width: 760px) {
+  html body #root .app-shell .main-area > header.topbar.dashboard-topbar { min-height: 0; padding: 0 12px 12px; }
+  html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row {
+    display: flex; flex-direction: column; align-items: stretch; gap: 12px; min-height: 0; padding-top: 8px;
+  }
+  html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .topbar-title-block,
+  html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel,
+  html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .topbar-access-category {
+    width: 100%; max-width: 100%; min-width: 0; height: auto; min-height: 0; max-height: none; margin: 0;
+  }
+  html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel { display: block; padding: 12px; }
+  html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-content {
+    display: grid; grid-template-columns: minmax(0,1fr); grid-template-rows: auto auto auto auto auto;
+    grid-template-areas: "location" "current" "metrics" "forecast" "attribution"; gap: 10px; height: auto;
+  }
+  html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-current { display: contents; }
+  html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-current-main { grid-area: current; }
+  html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-metrics { grid-area: metrics; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; }
+  html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-days { grid-area: forecast; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; }
+  html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-attribution { grid-area: attribution; }
+}
+
