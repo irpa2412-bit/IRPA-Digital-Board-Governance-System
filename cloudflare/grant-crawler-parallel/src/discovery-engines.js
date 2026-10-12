@@ -342,7 +342,7 @@ export const SEARCH_QUERIES = [
   '"biodiversity conservation" OR "ecosystem restoration" OR "invasive species" OR "nature-based solutions" funding Africa',
   '"women-led" OR youth OR "gender equality" OR "social inclusion" grants livelihoods Tanzania Africa',
   '"Indigenous Peoples" OR pastoralist OR "community-led" grants climate resilience East Africa',
-  '"market systems" OR "market linkages" OR "small enterprise" OR entrepreneurship grant women youth Africa',
+  '"market systems" OR "market linkages" OR "small enterprise" OR entrepreneurship OR "seed funding" OR "capacity building grant" women youth Africa',
   '"research grant" OR innovation OR "knowledge management" OR "community monitoring" rangeland livestock Africa',
   '"rolling call for proposals" OR "rolling grant" OR "rolling basis" OR "year-round applications" NGO Africa',
   '"no fixed deadline" OR "ongoing applications" OR "rolling applications" grant funding Tanzania Africa',
