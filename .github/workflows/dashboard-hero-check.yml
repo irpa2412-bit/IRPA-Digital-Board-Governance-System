@@ -42,10 +42,10 @@ jobs:
       - name: Save screenshot in repository
         run: |
           cp dashboard-hero-check.png "$RUNNER_TEMP/dashboard-hero-check.png"
+          cp dashboard-hero-phone-check.png "$RUNNER_TEMP/dashboard-hero-phone-check.png"
           git fetch origin main
           git checkout -B dashboard-hero-screenshot origin/main
           cp "$RUNNER_TEMP/dashboard-hero-check.png" dashboard-hero-check.png
-          cp dashboard-hero-phone-check.png "$RUNNER_TEMP/dashboard-hero-phone-check.png"
           cp "$RUNNER_TEMP/dashboard-hero-phone-check.png" dashboard-hero-phone-check.png
           git add dashboard-hero-check.png dashboard-hero-phone-check.png
           if ! git diff --cached --quiet; then
