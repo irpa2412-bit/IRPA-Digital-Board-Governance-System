@@ -435,7 +435,7 @@ export async function readGdeltSearch() {
         const title = decodeHtml(article.title || "").slice(0, 500);
         const description = [article.domain, article.sourceCountry, article.language].filter(Boolean).join(" · ").slice(0, 1000);
         const dateText = String(article.seendate || "");
-        const publishedAt = /^\\d{8}T\\d{6}Z$/.test(dateText)
+        const publishedAt = /^\d{8}T\d{6}Z$/.test(dateText)
           ? dateText.slice(0, 4) + "-" + dateText.slice(4, 6) + "-" + dateText.slice(6, 8) + "T" + dateText.slice(9, 11) + ":" + dateText.slice(11, 13) + ":" + dateText.slice(13, 15) + "Z"
           : null;
         if (!title || !articleUrl || !isSpecificOpportunity(title, description)) return null;
