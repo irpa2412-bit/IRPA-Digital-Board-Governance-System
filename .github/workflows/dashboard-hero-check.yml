@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - "src/styles/readability-harmony.css"
+      - "src/styles/app.css"
       - "src/styles/portal-typography.css"
       - "index.html"
       - "public/dashboard-hero-fix.js"
