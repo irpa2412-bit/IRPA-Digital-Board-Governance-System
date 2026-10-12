@@ -12,7 +12,8 @@
 - [x] Add ESLint, desktop/mobile Playwright smoke tests, portal-registry and dashboard-style wiring tests, and a Firestore Emulator regression step to the remediation workflow.
 - [x] Preserve the newer dashboard hero implementation on `main` and its existing headless layout check. The merge deliberately does not reintroduce the removed `public/dashboard-hero-fix.js` script or its temporary stylesheet; review the headless layout evidence on the merged candidate.
 - [x] Add opt-in Firebase App Check initialization for both the primary and applicant Firebase app instances, controlled by `VITE_FIREBASE_APPCHECK_SITE_KEY`.
-- [ ] Run and inspect the dependency audit, production build, lint, Firestore emulator suite, and desktop/mobile browser tests on the exact final PR head. The most recent lockfile-refresh audit output reported 10 moderate findings and no high/critical findings; the final candidate still needs a fresh, dedicated audit.
+- [x] The merged candidate based on main commit `01d4bdf` passed the high/critical audit gate, lint, production build, Firestore Emulator regressions and desktop/mobile Playwright smoke tests before the supported-linter upgrade.
+- [ ] Re-run all gates on the latest final PR head after upgrading to ESLint 10 and refreshing the lockfile. The last dedicated audit reported 10 moderate findings and no high/critical findings; those moderate transitive advisories still require triage and must not be described as zero vulnerabilities.
 
 ## Required release procedure
 1. Protect the reviewed `main` commit with a backup tag before promotion.
