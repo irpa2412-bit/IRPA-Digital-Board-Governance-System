@@ -144,3 +144,7 @@ vite.config.ts.timestamp-*
 
 # Firebase service account key
 irpa-digital-board-governance-firebase-adminsdk-fbsvc-85043d56c5.json
+
+# Playwright authenticated production session (sensitive; never commit)
+auth.json
+production-viewport-audit.json
