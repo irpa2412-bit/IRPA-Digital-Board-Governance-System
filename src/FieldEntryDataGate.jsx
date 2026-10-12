@@ -125,10 +125,32 @@ export default function FieldEntryDataGate({portal}){
     setField({portal:name});
   },[]);
 
-  /* Selecting a portal never opens the gate. It re-applies that portal's earlier choice, so the session always matches the portal in view. */
+  const previousPortalRef=useRef(currentPortal);
+
+  /* Leaving a portal invalidates its environment declaration. On return, the user must
+     declare the environment again on the first data-entry attempt. Navigation alone
+     (including Back/Next) still never opens the gate. */
   useEffect(()=>{
-    const map=readMap();
+    const previousPortal=previousPortalRef.current;
+    previousPortalRef.current=currentPortal;
+    let map=readMap();
     if(map===null){setStorageError("This browser session could not read the verification record. Enable session storage and retry.");return}
+    if(previousPortal!==currentPortal){
+      const nextMap={...map};
+      delete nextMap[previousPortal];
+      try{
+        window.sessionStorage.setItem(verificationMapKey,JSON.stringify(nextMap));
+        for(const key of ["irpaFieldEntryVerification","irpaDataTypeVerified","irpaDataEnvironment","irpaDataEnvironmentTarget","irpaDataEnvironmentSelectedAt"]){
+          window.sessionStorage.removeItem(key);
+        }
+        window.dispatchEvent(new CustomEvent("irpa:data-environment-left",{detail:{portal:previousPortal}}));
+      }catch{
+        setStorageError("The previous portal's data-environment declaration could not be cleared. The gate remains locked; enable session storage and retry.");
+        setField(null);openRef.current=false;pending.current=null;
+        return;
+      }
+      map=nextMap;
+    }
     const record=map[currentPortal];
     if(record)applyRecord(record);
     else if(OPEN_ON_SELECTION.has(currentPortal)){openGate(currentPortal,null);return}
