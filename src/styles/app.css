@@ -10562,3 +10562,6 @@ html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-ro
   }
   html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-attribution { grid-area: attribution ; }
 }
+
+/* Dashboard-only overhead-to-hero spacing */
+html body #root .main-area:has(> header.topbar.dashboard-topbar) > .page-back-next-navigation { margin-bottom: 0; }
