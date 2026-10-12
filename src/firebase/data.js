@@ -67,6 +67,16 @@ export async function getAccessibleMeetingRecords(){
     ...(Array.isArray(token?.claims?.irpaRoles)?token.claims.irpaRoles:[])
   ]).map(v=>String(v||"").trim()).filter(Boolean))];
   const identity={...(member||employee||{}),uid:user.uid,email,active:activeMember||activeEmployee,isAdmin,activeMember,activeEmployee,roles};
+  if(isTrialDataMode()){
+    const trialMeetings=await getFinanceTrialRecords(COLLECTIONS.meetings);
+    if(isAdmin)return trialMeetings;
+    return trialMeetings.filter(m=>canAccessMeetingCategory(m,identity,{
+      isInitiator:String(m.initiatorUid||"")===uid,
+      isInvited:["participantUids","attendeeUids","memberUids","invitedUids","subscriberUids"].some(k=>Array.isArray(m[k])&&m[k].includes(uid))||
+        (email&&["participantEmails","attendeeEmails","invitedEmails","subscriberEmails"].some(k=>Array.isArray(m[k])&&m[k].map(v=>String(v||"").toLowerCase()).includes(email))),
+      isRegisteredParticipant:["participantUids","attendeeUids","memberUids","subscriberUids"].some(k=>Array.isArray(m[k])&&m[k].includes(uid))
+    })).sort((a,b)=>meetingCreatedAt(b)-meetingCreatedAt(a));
+  }
   const ref=collection(db,COLLECTIONS.meetings);
   const jobs=[];
   if(isAdmin){
