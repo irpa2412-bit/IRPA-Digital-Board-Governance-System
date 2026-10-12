@@ -10263,3 +10263,65 @@ html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-ro
     max-height: none; margin: 0;
   }
 }
+
+/* DASHBOARD HERO OWNER-SPECIFIED WEATHER PANE DISTRIBUTION — 20261012-0628 */
+@media (min-width: 1200px) {
+  html body #root .main-area:has(> header.topbar.dashboard-topbar) > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-content {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto auto auto auto;
+    grid-template-areas: "location location location" "current metrics metrics" "forecast forecast forecast" "attribution attribution attribution";
+    align-items: center;
+    gap: 10px 14px;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    margin: 0;
+    box-sizing: border-box;
+  }
+  html body #root .main-area:has(> header.topbar.dashboard-topbar) > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-location-bar {
+    grid-area: location;
+    min-width: 0;
+    margin: 0;
+  }
+  html body #root .main-area:has(> header.topbar.dashboard-topbar) > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-current {
+    display: contents;
+  }
+  html body #root .main-area:has(> header.topbar.dashboard-topbar) > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-current-main {
+    grid-area: current;
+    min-width: 0;
+    margin: 0;
+  }
+  html body #root .main-area:has(> header.topbar.dashboard-topbar) > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-metrics {
+    grid-area: metrics;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+  }
+  html body #root .main-area:has(> header.topbar.dashboard-topbar) > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-days {
+    grid-area: forecast;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-auto-flow: row;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    max-height: none;
+    margin: 0;
+    padding: 8px 0 0;
+    overflow: visible;
+  }
+  html body #root .main-area:has(> header.topbar.dashboard-topbar) > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-attribution {
+    grid-area: attribution;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 10px;
+    margin: 0;
+    padding: 0;
+  }
+}
