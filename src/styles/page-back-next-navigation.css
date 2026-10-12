@@ -62,7 +62,7 @@
   word-break: normal;
 }
 #root .app-shell .main-area > .page-back-next-navigation .page-back-next-status > small {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.25;
 }
 @media (max-width: 760px) {
