@@ -845,3 +845,27 @@ test("on-demand fundraising search combines public search engines and labels lea
     assert.ok(result.items.some(item => /rolling/i.test(item.deadlineSignal)));
   } finally { globalThis.fetch = originalFetch; }
 });
+
+
+test("fundraising search endpoint accepts control-token smoke auth and returns engine contract", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async input => {
+    const url = new URL(String(input));
+    if (url.hostname === "news.google.com") return new Response('<rss><channel><item><title>Rolling grant funding for pastoral livelihoods</title><link>https://funder.example/rolling</link><description>Rolling applications for pastoral resilience.</description></item></channel></rss>', { status: 200, headers: { "content-type": "application/rss+xml" } });
+    if (url.hostname === "api.gdeltproject.org") return new Response(JSON.stringify({ articles: [{ title: "Rolling grant funding for pastoral livelihoods", url: "https://funder.example/rolling", domain: "funder.example", seendate: "20261012T120000Z" }] }), { status: 200, headers: { "content-type": "application/json" } });
+    throw new Error("Unexpected provider " + url.hostname);
+  };
+  try {
+    const token = "smoke-test-control-token-value-0123456789";
+    const response = await worker.fetch(new Request("https://crawler.example/fundraising/search", {
+      method: "POST", headers: { authorization: "Bearer " + token, "content-type": "application/json" },
+      body: JSON.stringify({ query: "pastoral livelihoods", mode: "rolling" })
+    }), { CRAWLER_CONTROL_TOKEN: token });
+    const body = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(body.query, "pastoral livelihoods");
+    assert.ok(Array.isArray(body.items));
+    assert.ok(body.providers.includes("Google News RSS"));
+    assert.ok(body.providers.includes("GDELT DOC API"));
+  } finally { globalThis.fetch = originalFetch; }
+});

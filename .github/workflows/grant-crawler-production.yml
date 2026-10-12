@@ -182,13 +182,17 @@ jobs:
           PRODUCTION_WORKER_URL: ${{ steps.deploy_production.outputs.worker_url }}
         run: |
           set -euo pipefail
-          result="$(curl --fail --silent --show-error --max-time 40 -X POST \
+          result="$(curl --silent --show-error --max-time 40 -w '\n__STATUS__%{http_code}' -X POST \
             -H "Authorization: Bearer $GRANT_CRAWLER_CONTROL_TOKEN" \
             -H "Content-Type: application/json" \
             --data '{"query":"pastoral rangeland restoration","mode":"all"}' \
             "$PRODUCTION_WORKER_URL/fundraising/search")"
-          node - "$result" <<'NODE'
+          http_status="$(printf '%s' "$result" | tail -n1 | sed 's/^__STATUS__//')"
+          body="$(printf '%s' "$result" | sed '$d')"
+          node - "$body" "$http_status" <<'NODE'
           const body = JSON.parse(process.argv[2]);
+          const status = Number(process.argv[3]);
+          if (status !== 200) throw new Error('Production fundraising search HTTP ' + status + ': ' + String(body.error || body.message || 'No error detail').slice(0, 250));
           if (body.query !== 'pastoral rangeland restoration' || !Array.isArray(body.items) || !Array.isArray(body.providers) || !Array.isArray(body.errors)) {
             throw new Error('Production fundraising search response contract failed.');
           }
