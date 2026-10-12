@@ -10187,79 +10187,79 @@ html body #root .main-area > .topbar.dashboard-topbar .topbar-heading-row > .top
 }
 
 /* DASHBOARD HERO OWNER-SPECIFIED GEOMETRY — 20261012-0625 */
-html body #root .main-area:has(> header.topbar.dashboard-topbar) > .desktop-webapp-navigation-roller { margin-bottom: 0 !important; }
-html body #root .main-area > header.topbar.dashboard-topbar { margin-top: 0 !important; padding-top: 0 !important; }
+html body #root .main-area:has(> header.topbar.dashboard-topbar) > .desktop-webapp-navigation-roller { margin-bottom: 0; }
+html body #root .main-area > header.topbar.dashboard-topbar { margin-top: 0; padding-top: 0; }
 html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row {
-  margin-top: 0 !important; padding-top: 0 !important; align-items: start !important;
+  margin-top: 0; padding-top: 0; align-items: start;
 }
 @media (min-width: 1200px) {
   html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row {
-    display: grid !important;
-    grid-template-columns: minmax(190px, 240px) minmax(0, 1fr) 6cm !important;
-    grid-template-areas: "title weather authority" !important;
-    grid-template-rows: auto !important; column-gap: 0 !important; row-gap: 0 !important;
-    align-items: start !important;
+    display: grid;
+    grid-template-columns: minmax(190px, 240px) minmax(0, 1fr) 6cm;
+    grid-template-areas: "title weather authority";
+    grid-template-rows: auto; column-gap: 0; row-gap: 0;
+    align-items: start;
   }
   html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .topbar-title-block {
-    grid-area: title !important; align-self: start !important; margin: 0 12px 0 0 !important;
-    padding: 0 !important; min-height: 0 !important; height: auto !important;
+    grid-area: title; align-self: start; margin: 0 12px 0 0;
+    padding: 0; min-height: 0; height: auto;
   }
   html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel {
-    grid-area: weather !important; align-self: stretch !important; min-width: 0 !important;
-    width: 100% !important; max-width: none !important; height: auto !important;
-    min-height: 0 !important; max-height: none !important; margin: 0 !important;
-    box-sizing: border-box !important; color: #2563eb !important; -webkit-text-fill-color: #2563eb !important;
+    grid-area: weather; align-self: stretch; min-width: 0;
+    width: 100%; max-width: none; height: auto;
+    min-height: 0; max-height: none; margin: 0;
+    box-sizing: border-box; color: #2563eb; -webkit-text-fill-color: #2563eb;
   }
   html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-content {
-    width: 100% !important; min-width: 0 !important; box-sizing: border-box !important;
+    width: 100%; min-width: 0; box-sizing: border-box;
   }
   html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel .live-weather-days {
-    display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-    grid-auto-flow: row !important; width: 100% !important; min-width: 0 !important;
-    height: auto !important; max-height: none !important; overflow: visible !important;
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-auto-flow: row; width: 100%; min-width: 0;
+    height: auto; max-height: none; overflow: visible;
   }
   html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .topbar-access-category {
-    grid-area: authority !important; align-self: start !important; height: auto !important;
-    min-height: 0 !important; max-height: none !important; margin: 0 !important;
-    box-sizing: border-box !important; background: #17212b !important;
-    color: #fff !important; -webkit-text-fill-color: #fff !important;
+    grid-area: authority; align-self: start; height: auto;
+    min-height: 0; max-height: none; margin: 0;
+    box-sizing: border-box; background: #17212b;
+    color: #fff; -webkit-text-fill-color: #fff;
   }
   html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .topbar-access-category * {
-    color: #fff !important; -webkit-text-fill-color: #fff !important;
+    color: #fff; -webkit-text-fill-color: #fff;
   }
   html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .topbar-access-category strong,
   html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .topbar-access-category [aria-current="true"],
   html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .topbar-access-category .active {
-    color: #facc15 !important; -webkit-text-fill-color: #facc15 !important;
+    color: #facc15; -webkit-text-fill-color: #facc15;
   }
 }
 @media (min-width: 761px) and (max-width: 1199px) {
   html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row {
-    grid-template-columns: minmax(190px, 1fr) minmax(0, 1.4fr) !important;
-    grid-template-areas: "title weather" "authority authority" !important;
-    gap: 12px !important; align-items: start !important;
+    grid-template-columns: minmax(190px, 1fr) minmax(0, 1.4fr);
+    grid-template-areas: "title weather" "authority authority";
+    gap: 12px; align-items: start;
   }
   html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .topbar-title-block {
-    grid-area: title !important; align-self: start !important; margin: 0 !important; padding: 0 !important;
+    grid-area: title; align-self: start; margin: 0; padding: 0;
   }
   html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel {
-    grid-area: weather !important; align-self: start !important; margin: 0 !important; min-width: 0 !important;
+    grid-area: weather; align-self: start; margin: 0; min-width: 0;
   }
   html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .topbar-access-category {
-    grid-area: authority !important; align-self: start !important; height: auto !important; min-height: 0 !important;
+    grid-area: authority; align-self: start; height: auto; min-height: 0;
   }
 }
 @media (max-width: 760px) {
   html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row {
-    display: flex !important; flex-direction: column !important; align-items: stretch !important; gap: 12px !important;
+    display: flex; flex-direction: column; align-items: stretch; gap: 12px;
   }
   html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .topbar-title-block {
-    align-self: flex-start !important; margin: 0 !important; padding: 0 !important;
+    align-self: flex-start; margin: 0; padding: 0;
   }
   html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .google-weather-panel,
   html body #root .main-area > header.topbar.dashboard-topbar > .topbar-heading-row > .topbar-access-category {
-    align-self: stretch !important; width: 100% !important; max-width: 100% !important;
-    min-width: 0 !important; height: auto !important; min-height: 0 !important;
-    max-height: none !important; margin: 0 !important;
+    align-self: stretch; width: 100%; max-width: 100%;
+    min-width: 0; height: auto; min-height: 0;
+    max-height: none; margin: 0;
   }
 }
