@@ -57,11 +57,15 @@ function certificateSpki(der){
 }
 async function verifyIdToken(token){
   const parts=token.split(".");if(parts.length!==3)throw Error("Invalid bearer token");
-  const h=JSON.parse(dec(parts[0])),p=JSON.parse(dec(parts[1]));
+  let h,p;try{h=JSON.parse(dec(parts[0]));p=JSON.parse(dec(parts[1]))}catch{throw Error("Invalid bearer token")}
   if(h.alg!=="RS256"||!h.kid)throw Error("Unsupported token");
-  const r=await fetch("https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com");
-  if(!r.ok)throw Error("Firebase token verification unavailable");
-  const keys=await r.json(),pem=keys[h.kid];if(!pem)throw Error("Unknown token signing key");
+  let keys=globalThis.__irpaKeys&&globalThis.__irpaKeys.exp>Date.now()?globalThis.__irpaKeys.keys:null;
+  if(!keys||!keys[h.kid]){
+    let r;try{r=await fetch("https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com",{cf:{cacheTtl:3600,cacheEverything:true}})}catch(err){throw Error("Firebase token verification unavailable (network): "+String(err?.message||err).slice(0,120))}
+    if(!r.ok)throw Error("Firebase token verification unavailable (HTTP "+r.status+")");
+    keys=await r.json();globalThis.__irpaKeys={keys,exp:Date.now()+3600000};
+  }
+  const pem=keys[h.kid];if(!pem)throw Error("Unknown token signing key");
   const der=Uint8Array.from(atob(pem.replace(/-----BEGIN CERTIFICATE-----|-----END CERTIFICATE-----|\\s/g,"")),c=>c.charCodeAt(0));
   const key=await crypto.subtle.importKey("spki",certificateSpki(der),{name:"RSASSA-PKCS1-v1_5",hash:"SHA-256"},false,["verify"]);
   const signature=Uint8Array.from(atob(parts[2].replace(/-/g,"+").replace(/_/g,"/")),c=>c.charCodeAt(0));
@@ -72,7 +76,7 @@ async function verifyIdToken(token){
 }
 function response(data,status=200,origin=""){const allowed=["https://irpa.or.tz","https://www.irpa.or.tz","https://irpa-digital-board-governance.web.app","https://irpa-digital-board-governance.firebaseapp.com"];const headers={"content-type":"application/json; charset=utf-8","cache-control":"no-store","access-control-allow-headers":"authorization,content-type","access-control-allow-methods":"POST,OPTIONS","vary":"Origin"};if(allowed.includes(origin))headers["access-control-allow-origin"]=origin;return new Response(JSON.stringify(data),{status,headers})}
 async function runCrawler(env,trigger){const started=new Date(),runId=crypto.randomUUID();await put(env,"grantCrawlerRuns/"+runId,{runId,trigger,status:"running",startedAt:started,sourceCount:SOURCES.length,completedSources:0,candidatesFound:0,created:0,updated:0,errors:[]});await put(env,"grantCrawlerStatus/current",{active:true,status:"running",currentRunId:runId,lastStartedAt:started,configuredSources:SOURCES.length,schedule:"Every 6 hours (UTC cron; Africa/Dar_es_Salaam is UTC+3)",updatedAt:started},true);let created=0,updated=0,candidatesFound=0,errors=0;const sourceResults=[];for(const s of SOURCES){const tick=Date.now();try{const list=await fetchSource(s),subset=list.slice(0,Math.max(0,250-candidatesFound));let sc=0,su=0;for(const c of subset){const id=await hash(canonical(c.url)),path="grantOpportunities/"+id,current=await getDoc(env,path),text=c.title+" "+c.description,classification={pillars:PILLARS.filter(x=>x[1].test(text)).map(x=>x[0]),themes:THEMES.filter(x=>x[1].test(text)).map(x=>x[0])};const payload={title:c.title,funder:current?.funder||s.name,url:c.url,summary:c.description||current?.summary||"Automatically discovered from a public funding source. Verify the official call.",country:current?.country||(/tanzania|east africa|africa/.test(text.toLowerCase())?"Tanzania / Africa (verify call rules)":/global|worldwide/.test(text.toLowerCase())?"Global (verify call rules)":"Not verified — check official call"),amount:current?.amount||"Not verified — see official call",status:current?.status&&!["Open","Under review"].includes(current.status)?current.status:"Under review",pillars:current?.pillars?.length?current.pillars:classification.pillars,themes:current?.themes?.length?current.themes:classification.themes,eligibleCountries:current?.eligibleCountries||[],eligibleApplicantTypes:current?.eligibleApplicantTypes||[],requiredDocuments:current?.requiredDocuments||[],applicationRequirements:current?.applicationRequirements||"Not extracted or verified. Read the official call.",applicationMethod:current?.applicationMethod||"See official call",deadline:current?.deadline||null,verificationStatus:"Pending verification",sourceType:s.scope,sourceId:s.id,sourceName:s.name,recordOrigin:"AUTOMATED_CRAWLER",discoveredAt:current?.discoveredAt||started,lastSeenAt:started,lastCrawlRunId:runId,updatedAt:started,crawlerVersion:2};if(c.publishedAt)payload.sourcePublishedAt=c.publishedAt;if(!current){payload.createdAt=started;payload.createdByUid="irpa-grant-crawler";payload.createdByEmail="automated-crawler@irpa.or.tz";await put(env,path,payload);created++;sc++}else{const safe={lastSeenAt:started,lastCrawlRunId:runId,crawlerVersion:2};if(!current.sourceName)safe.sourceName=s.name;if(!current.sourceId)safe.sourceId=s.id;if(!current.verificationStatus)safe.verificationStatus="Pending verification";if(!current.summary&&c.description)safe.summary=c.description;await put(env,path,safe,true);updated++;su++}}candidatesFound+=subset.length;sourceResults.push({sourceId:s.id,name:s.name,url:s.url,scope:s.scope,status:"healthy",candidateCount:list.length,created:sc,updated:su,durationMs:Date.now()-tick,checkedAt:new Date(),error:null})}catch(e){errors++;sourceResults.push({sourceId:s.id,name:s.name,url:s.url,scope:s.scope,status:"error",candidateCount:0,durationMs:Date.now()-tick,checkedAt:new Date(),error:String(e.message||e).slice(0,300)})}await put(env,"grantCrawlerSources/"+s.id,sourceResults.at(-1),true)}const status=errors===SOURCES.length?"failed":errors?"completed_with_errors":"completed",summary={runId,trigger,status,startedAt:started,completedAt:new Date(),sourceCount:SOURCES.length,healthySources:sourceResults.filter(x=>x.status==="healthy").length,failedSources:errors,candidatesFound,created,updated,errors:sourceResults.filter(x=>x.error).slice(0,30)};await put(env,"grantCrawlerRuns/"+runId,summary,true);await put(env,"grantCrawlerStatus/current",{active:true,status,currentRunId:runId,lastStartedAt:started,lastCompletedAt:new Date(),configuredSources:SOURCES.length,healthySources:summary.healthySources,failedSources:errors,candidatesFound,created,updated,schedule:"Every 6 hours (UTC cron; Africa/Dar_es_Salaam is UTC+3)",updatedAt:new Date()},true);return summary}
-export default {async scheduled(controller,env,ctx){ctx.waitUntil(runCrawler(env,"scheduled"))},async fetch(request,env){const origin=request.headers.get("Origin")||"";if(request.method==="OPTIONS")return response({ok:true},200,origin);const url=new URL(request.url);if(url.pathname==="/health"&&request.method==="GET")return response({ok:true,service:"irpa-dbgs-grant-crawler",project:PROJECT,sourceCount:SOURCES.length,schedule:"0 */6 * * * UTC"},200,origin);if(url.pathname==="/assistant/analyze"&&request.method==="POST"){
+const __worker={async scheduled(controller,env,ctx){ctx.waitUntil(runCrawler(env,"scheduled"))},async fetch(request,env){const origin=request.headers.get("Origin")||"";if(request.method==="OPTIONS")return response({ok:true},200,origin);const url=new URL(request.url);if(url.pathname==="/health"&&request.method==="GET")return response({ok:true,service:"irpa-dbgs-grant-crawler",project:PROJECT,sourceCount:SOURCES.length,schedule:"0 */6 * * * UTC"},200,origin);if(url.pathname==="/assistant/analyze"&&request.method==="POST"){
  try{
   const header=request.headers.get("authorization")||"";
   if(!header.startsWith("Bearer "))return response({error:"Authentication required"},401,origin);
@@ -104,12 +108,33 @@ export default {async scheduled(controller,env,ctx){ctx.waitUntil(runCrawler(env
    userPrompt="Assess the supplied funding opportunity for IRPA. Do not browse or claim to have verified the official website. Use only supplied text; mark missing facts unknown. Organization: "+organization+"\nOrganization context: "+strategicContext+"\nTask: "+task+"\nOpportunity title: "+title+"\nOfficial URL supplied by user: "+url+"\nDeadline supplied: "+deadline+"\nCall status supplied: "+callStatus+"\nDescription:\n"+description+"\nOfficial requirements pasted by user:\n"+requirements+"\nReturn a JSON object with keys geographic_eligibility {status: eligible|ineligible|unclear, reason, evidence: string[]}, eligibility {status: eligible|ineligible|insufficient_information, confidence: low|medium|high, evidence: string[], unknowns: string[]}, donor_requirements: [{requirement,status,evidence,action}], strategic_alignment {rationale,relevant_pillars:string[],relevant_cross_cutting_themes:string[]}, application_checklist:string[], risks_and_gaps:string[]. For task concept_note also include concept_note:{draft:string}. Draft a concept note only if supplied details are sufficient to make a useful clearly qualified draft; use placeholders for missing budget, target numbers, duration, and evidence. Do not assert that the call is open or that IRPA is eligible unless the provided text supports it. Return JSON only.";
    maxTokens=task==="concept_note"?6000:3500;
   }else return response({error:"Unsupported assistant task."},400,origin);
-  const result=await env.AI.run("@cf/meta/llama-3.1-8b-instruct",{messages:[{role:"system",content:systemPrompt},{role:"user",content:userPrompt}],max_tokens:maxTokens,temperature:0.25});
-  const output=String(result?.response||result?.output_text||"").trim();
+  let result,aiErr;
+  for(const model of ["@cf/meta/llama-3.1-8b-instruct","@cf/meta/llama-3.3-70b-instruct-fp8-fast","@cf/meta/llama-3-8b-instruct"]){
+    try{result=await env.AI.run(model,{messages:[{role:"system",content:systemPrompt},{role:"user",content:userPrompt}],max_tokens:Math.min(maxTokens,2048),temperature:0.25});aiErr=null;break}
+    catch(err){aiErr=err;console.error("AI model failed:",model,err&&err.stack||err)}
+  }
+  if(aiErr)return response({error:"AI model call failed: "+String(aiErr?.message||aiErr).slice(0,300)},502,origin);
+  const rawOut=result?.response??result?.output_text??result?.result?.response??result?.choices?.[0]?.message?.content??"";
+  const output=(typeof rawOut==="string"?rawOut:JSON.stringify(rawOut)).trim();
   if(!output)return response({error:"The AI model returned an empty response. Please retry."},502,origin);
   if(task==="draft_message")return response({ok:true,task,format,draft:output},200,origin);
   let parsed;
   try{parsed=JSON.parse(output.replace(/^\x60{3}(?:json)?\s*/i,"").replace(/\s*\x60{3}$/,""))}catch{return response({error:"The AI model returned an invalid structured assessment. Please retry."},502,origin)}
   return response({ok:true,task,assessment:parsed},200,origin);
- }catch(e){return response({error:String(e?.message||e).slice(0,400)},500,origin)}
+ }catch(e){
+  const msg=String(e?.message||e).slice(0,400);console.error("assistant/analyze failed:",e&&e.stack||msg);
+  if(/Invalid bearer|Unsupported token|Unknown token|Invalid token|Expired or invalid/i.test(msg))return response({error:"Sign-in check failed: "+msg+". Sign out and sign in again."},401,origin);
+  if(e instanceof SyntaxError)return response({error:"Request body must be valid JSON."},400,origin);
+  return response({error:msg},/unavailable/i.test(msg)?503:500,origin);
+ }
 }if(url.pathname!=="/run"||request.method!=="POST")return response({error:"Not found"},404,origin);try{const header=request.headers.get("authorization")||"";if(!header.startsWith("Bearer "))return response({error:"Authentication required"},401,origin);if(!env.FIREBASE_SERVICE_ACCOUNT_JSON)throw Error("Missing service account secret");const claims=await verifyIdToken(header.slice(7));const roles=[claims.role,claims.roles,claims.profileRole].flat().filter(Boolean).join(" ").toLowerCase();if(!(claims.admin===true||claims.isAdmin===true||/administrator|executive director|director outreach|fundraising officer|research director|research manager|research officer/.test(roles)))return response({error:"Administrator grant-management role required"},403,origin);const result=await runCrawler(env,"manual");return response(result,200,origin)}catch(e){return response({error:String(e.message||e).slice(0,300)},500,origin)}}};
+export default {
+  scheduled:(c,e,x)=>__worker.scheduled(c,e,x),
+  async fetch(request,env,ctx){
+    try{return await __worker.fetch(request,env,ctx)}
+    catch(e){
+      console.error("Unhandled Worker error:",e&&e.stack||e);
+      return response({error:"Worker error: "+String(e?.message||e).slice(0,300)},500,request.headers.get("Origin")||"");
+    }
+  }
+};
