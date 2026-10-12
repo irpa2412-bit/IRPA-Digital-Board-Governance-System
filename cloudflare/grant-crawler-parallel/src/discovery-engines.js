@@ -334,7 +334,36 @@ export async function readDonorScanner(scanner) {
   }
 }
 
-export const SEARCH_QUERIES = ['"rolling call for proposals" OR "rolling grant" OR "rolling basis" Tanzania Africa NGO capacity building seed funding','"call for proposals" OR "seed funding" OR "capacity building grants" youth children livelihoods health education nutrition Tanzania Africa','"rolling funding opportunities" OR "year-round applications" OR "ongoing grant calls" renewable energy solar water sanitation women entrepreneurship climate biodiversity restoration','funding opportunities pastoralism rangeland livestock food security community development Tanzania East Africa renewable energy capacity building seed funding'];
+export const SEARCH_QUERIES = [
+  '"call for proposals" OR grant OR funding pastoralism rangeland grazing dryland restoration Tanzania East Africa',
+  '"livestock development" OR "animal health" OR veterinary OR fodder OR forage grants Tanzania Africa',
+  '"livestock market" OR "market access" OR "value addition" OR "value chain" leather dairy meat funding Africa',
+  '"climate adaptation" OR drought OR "early warning" OR "water security" grant Tanzania East Africa',
+  '"biodiversity conservation" OR "ecosystem restoration" OR "invasive species" OR "nature-based solutions" funding Africa',
+  '"women-led" OR youth OR "gender equality" OR "social inclusion" grants livelihoods Tanzania Africa',
+  '"Indigenous Peoples" OR pastoralist OR "community-led" grants climate resilience East Africa',
+  '"market systems" OR "market linkages" OR "small enterprise" OR entrepreneurship grant women youth Africa',
+  '"research grant" OR innovation OR "knowledge management" OR "community monitoring" rangeland livestock Africa',
+  '"rolling call for proposals" OR "rolling grant" OR "rolling basis" OR "year-round applications" NGO Africa',
+  '"no fixed deadline" OR "ongoing applications" OR "rolling applications" grant funding Tanzania Africa',
+  '"call for proposals" OR "application deadline" OR "closing date" grant climate livestock rangeland Tanzania Africa'
+];
+const SEARCH_BATCH_SIZE = 4;
+function activeSearchQueries() {
+  const batchCount = Math.ceil(SEARCH_QUERIES.length / SEARCH_BATCH_SIZE);
+  const batch = Math.floor(Date.now() / (6 * 60 * 60 * 1000)) % batchCount;
+  const start = batch * SEARCH_BATCH_SIZE;
+  return SEARCH_QUERIES.slice(start, Math.min(start + SEARCH_BATCH_SIZE, SEARCH_QUERIES.length));
+}
+export const GDELT_QUERIES = [
+  '("call for proposals" OR grant OR funding) AND (pastoralism OR rangeland OR dryland OR grazing) AND (Tanzania OR "East Africa" OR Africa)',
+  '(grant OR funding OR "call for applications") AND (livestock OR veterinary OR fodder OR "animal health") AND (Tanzania OR Africa)',
+  '(grant OR funding OR "call for proposals") AND ("market access" OR "value addition" OR "livestock market" OR leather OR dairy) AND Africa',
+  '(grant OR funding OR "call for proposals") AND (women OR youth OR gender OR "Indigenous Peoples" OR "social inclusion") AND (climate OR livelihoods OR biodiversity) AND Africa',
+  '(rolling OR "year-round" OR "no fixed deadline") AND (grant OR funding OR "call for proposals") AND (NGO OR civil society OR Africa)',
+  '(deadline OR "closing date") AND ("call for proposals" OR grant) AND ("climate adaptation" OR water OR resilience OR restoration) AND Africa'
+];
+
 function xmlField(block, name) {
   const pattern = "<" + name + "\\b[^>]*>([\\s\\S]*?)<\\/" + name + "\\s*>";
   const match = block.match(new RegExp(pattern, "i"));
@@ -356,7 +385,7 @@ export function parseSearchRss(xml, query, provider = "Google News RSS") {
   }).filter(Boolean);
 }
 async function readGoogleNewsSearch() {
-  const results = await Promise.all(SEARCH_QUERIES.map(async query => {
+  const results = await Promise.all(activeSearchQueries().map(async query => {
     try {
       const url = new URL("https://news.google.com/rss/search");
       url.searchParams.set("q", query); url.searchParams.set("hl", "en-TZ"); url.searchParams.set("gl", "TZ"); url.searchParams.set("ceid", "TZ:en");
@@ -371,7 +400,7 @@ async function readGoogleNewsSearch() {
   return { items, stats: { configured: true, provider: "Google News RSS", queries: SEARCH_QUERIES.length, found: items.length, errors } };
 }
 async function readBingSearch() {
-  const results = await Promise.all(SEARCH_QUERIES.map(async query => {
+  const results = await Promise.all(activeSearchQueries().map(async query => {
     try {
       const url = new URL("https://www.bing.com/search");
       url.searchParams.set("format", "rss"); url.searchParams.set("q", query);
@@ -394,7 +423,7 @@ export async function readWebSearch(env) {
     if (bing.items.length || bing.stats.errors.length === 0) return bing;
     return { items: [], stats: { configured: true, provider: "Google News RSS / Bing RSS", queries: SEARCH_QUERIES.length, found: 0, errors: [...google.stats.errors, ...bing.stats.errors] } };
   }
-  const results = await Promise.all(SEARCH_QUERIES.map(async query => {
+  const results = await Promise.all(activeSearchQueries().map(async query => {
     const items = [];
     try {
       const url = new URL("https://api.search.brave.com/res/v1/web/search");
