@@ -25,6 +25,8 @@ function identityRoles(identity={}){
 export function canRegisterMeeting(identity={}){
   if(identity.isAdmin===true||identity.admin===true)return true;
   if(identity.active!==true)return false;
+  // Registration is available to every authenticated active IRPA member or employee, as agreed for the Meeting Centre.
+  if(identity.activeMember===true||identity.activeEmployee===true)return true;
   const roles=identityRoles(identity);
   return MEETING_REGISTRATION_ROLES.some(role=>roles.has(NORMALIZE_ROLE(role)));
 }
