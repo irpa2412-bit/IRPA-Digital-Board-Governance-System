@@ -1,5 +1,14 @@
 name: Meeting Portal Isolated Browser Regression
 on:
+  push:
+    branches: [feat/secure-meeting-invitation-flow-20261013]
+    paths:
+      - "src/pages/Meetings.jsx"
+      - "functions/meetingGateway.emulator.test.cjs"
+      - ".github/workflows/meeting-invitation-nonprod-e2e.yml"
+      - ".github/workflows/meeting-portal-fixture-browser.yml"
+      - "drive-gateway/src/invitationRedemption.mjs"
+      - "drive-gateway/tests/invitation-redemption.test.mjs"
   pull_request:
     branches: [main]
     paths:
@@ -49,6 +58,8 @@ jobs:
             "drive-gateway/src/invitationRedemption.mjs",
             "drive-gateway/tests/mail-invitation.unit.mjs",
             "drive-gateway/tests/invitation-redemption.test.mjs",
+            ".github/workflows/meeting-invitation-nonprod-e2e.yml",
+            "functions/meetingGateway.emulator.test.cjs",
             "functions/meetingEntryPolicy.js",
             "functions/meetingEntryPolicy.test.cjs",
             "functions/meetingGateway.js",
