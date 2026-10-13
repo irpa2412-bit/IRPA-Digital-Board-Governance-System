@@ -220,15 +220,23 @@ jobs:
           document_status="$(node - "$document_result" <<'NODE'
           const body = JSON.parse(process.argv[2]);
           if (body.error && /4006|quota|neurons|daily free allocation|upgrade/i.test(body.error)) { console.log('quota'); process.exit(0); }
-          if (body.task !== 'draft_message' || typeof body.draft !== 'string' || body.draft.trim().length < 30) throw new Error('Production AI document-drafting smoke test failed.');
-          console.log('success');
+          if (body.task !== 'draft_message' || typeof body.draft !== 'string' || body.draft.trim().length < 30) {
+            throw new Error('Production document-drafting endpoint returned neither a usable draft nor a labelled fallback. Response keys: ' + Object.keys(body).join(', '));
+          }
+          if (body.draft_source === 'deterministic_fallback' && body.requires_human_completion !== true) throw new Error('Fallback draft is missing its human-review marker.');
+          if (body.draft_source && !['workers_ai', 'deterministic_fallback'].includes(body.draft_source)) throw new Error('Unexpected document draft source marker.');
+          console.log(body.draft_source === 'deterministic_fallback' ? 'fallback' : 'success');
           NODE
           )"
           if [ "$document_status" = "quota" ]; then
             echo "::warning::Workers AI daily quota is exhausted. Live fundraising search and non-AI discovery checks continue; AI drafting smoke is skipped until quota replenishes or is upgraded."
             exit 0
           fi
-          echo "Production AI document drafting returned a usable draft."
+          if [ "$document_status" = "fallback" ]; then
+            echo "::warning::Production document endpoint returned a clearly labelled fallback scaffold because Workers AI did not return a usable draft. The endpoint is responsive, but AI generation is degraded; human completion is required."
+          else
+            echo "Production Workers AI document drafting returned a usable draft."
+          fi
           concept_result="$(curl --silent --show-error --max-time 90 -X POST \
             -H "Authorization: Bearer $GRANT_CRAWLER_CONTROL_TOKEN" \
             -H "Content-Type: application/json" \
@@ -238,13 +246,17 @@ jobs:
           const body = JSON.parse(process.argv[2]);
           if (body.error && /4006|quota|neurons|daily free allocation|upgrade/i.test(body.error)) { console.log('quota'); process.exit(0); }
           const draft = body.assessment?.concept_note?.draft;
-          if (body.task !== 'concept_note' || typeof draft !== 'string' || draft.trim().length < 40) throw new Error('Production AI concept-note drafting smoke test failed.');
-          console.log('success');
+          if (body.task !== 'concept_note' || typeof draft !== 'string' || draft.trim().length < 40) throw new Error('Production concept-note endpoint returned no usable draft.');
+          if (body.assessment?.concept_note?.draft_source === 'deterministic_fallback' && body.assessment.concept_note.requires_human_completion !== true) throw new Error('Concept-note fallback is missing its human-review marker.');
+          console.log(body.assessment?.concept_note?.draft_source === 'deterministic_fallback' ? 'fallback' : 'success');
           NODE
           )"
           if [ "$concept_status" = "quota" ]; then
             echo "::warning::Workers AI quota became exhausted during the smoke test. Concept-note generation could not be verified in this run."
             exit 0
+          elif [ "$concept_status" = "fallback" ]; then
+            echo "::warning::Production concept-note endpoint returned a labelled fallback scaffold. AI generation is degraded; human completion is required."
+          else
+            echo "Production Workers AI concept-note drafting returned a usable draft."
           fi
-          echo "Production AI concept-note drafting returned a usable draft."
 

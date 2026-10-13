@@ -831,6 +831,43 @@ test("AI document drafting rejects an empty instruction", async () => {
   assert.equal(response.status, 400);
 });
 
+test("AI document drafting returns a clearly labelled scaffold when Workers AI throws", async () => {
+  const token = "test-token-with-at-least-32-characters-long";
+  const response = await worker.fetch(new Request("https://crawler.example/assistant/analyze", {
+    method: "POST",
+    headers: { authorization: "Bearer " + token, "content-type": "application/json" },
+    body: JSON.stringify({ task: "draft_message", format: "Formal letter", instructions: "Confirm a proposed rangeland restoration discussion." })
+  }), {
+    CRAWLER_CONTROL_TOKEN: token,
+    AI: { run: async () => { throw new Error("provider details must not be exposed"); } }
+  });
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.task, "draft_message");
+  assert.equal(body.draft_source, "deterministic_fallback");
+  assert.equal(body.requires_human_completion, true);
+  assert.match(body.draft, /INTERNAL DRAFT SCAFFOLD/);
+  assert.match(body.draft, /Confirm a proposed rangeland restoration discussion/);
+  assert.doesNotMatch(JSON.stringify(body), /provider details must not be exposed/);
+});
+
+test("AI document drafting returns a clearly labelled scaffold for an empty model response", async () => {
+  const token = "test-token-with-at-least-32-characters-long";
+  const response = await worker.fetch(new Request("https://crawler.example/assistant/analyze", {
+    method: "POST",
+    headers: { authorization: "Bearer " + token, "content-type": "application/json" },
+    body: JSON.stringify({ task: "draft_message", format: "Formal letter", instructions: "Confirm the assistant is responding." })
+  }), {
+    CRAWLER_CONTROL_TOKEN: token,
+    AI: { run: async () => ({ response: "" }) }
+  });
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.draft_source, "deterministic_fallback");
+  assert.equal(body.requires_human_completion, true);
+  assert.ok(body.draft.trim().length >= 30);
+});
+
 
 test("concept-note endpoint composes a draft from generated application fields", async () => {
   const token = "test-token-with-at-least-32-characters-long";
