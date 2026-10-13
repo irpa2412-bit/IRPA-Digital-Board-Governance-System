@@ -107,8 +107,9 @@ exports.authorizeMeetingEntry=onCall({region:"us-central1",timeoutSeconds:30},as
  const meeting={id:meetingSnap.id,...meetingSnap.data()};
  if(!active(meeting.status))throw new HttpsError("failed-precondition","This meeting is closed and cannot be entered.");
  const entryMode=text(meeting.meetingEntryMode||"HOST_APPROVAL").toUpperCase()==="DIRECT"?"DIRECT":"HOST_APPROVAL";
- const requestQuery=await db.collection("meetingEntryRequests").where("accessId","==",doc.id).where("participantUid","==",uid).limit(1).get();
- let entryRequest=requestQuery.empty?null:{id:requestQuery.docs[0].id,...requestQuery.docs[0].data()};
+ const requestQuery=await db.collection("meetingEntryRequests").where("accessId","==",doc.id).limit(10).get();
+ const matchingRequest=requestQuery.docs.find(item=>text(item.data()?.participantUid)===uid);
+ let entryRequest=matchingRequest?{id:matchingRequest.id,...matchingRequest.data()}:null;
  if(entryMode==="DIRECT"||entryRequest?.status==="ADMITTED"){
   if(entryRequest&&entryRequest.status!=="ADMITTED")await db.collection("meetingEntryRequests").doc(entryRequest.id).update({status:"ADMITTED",resolvedAt:FieldValue.serverTimestamp(),resolvedBy:"DIRECT_ENTRY_POLICY"});
   await db.collection("audit").add({action:"MEETING_ENTRY_AUTHORIZED",collection:"meetingAccessTokens",recordId:doc.id,details:{meetingId:grant.meetingId,participantId:grant.participantId,entryMode,gateway:"IRPA Meeting Entry Gateway"},actorUid:uid,actorEmail:email,createdAt:FieldValue.serverTimestamp()});
@@ -118,7 +119,7 @@ exports.authorizeMeetingEntry=onCall({region:"us-central1",timeoutSeconds:30},as
  if(!entryRequest){
   const requestRef=db.collection("meetingEntryRequests").doc();
   entryRequest={id:requestRef.id};
-  await requestRef.set({meetingId:grant.meetingId,meetingReference:grant.meetingReference||meeting.reference||meeting.title||"",participantId:grant.participantId,participantUid:uid,participantEmail:email,accessId:doc.id,status:"PENDING",entryMode,requestedAt:FieldValue.serverTimestamp(),expiresAt:grant.expiresAt||null});
+  await requestRef.set({meetingId:grant.meetingId,meetingReference:grant.meetingReference||meeting.reference||meeting.title||"",participantId:grant.participantId,participantName:text(participant.participantName||participant.name)||email,participantUid:uid,participantEmail:email,accessId:doc.id,status:"PENDING",entryMode,requestedAt:FieldValue.serverTimestamp(),expiresAt:grant.expiresAt||null});
   await db.collection("audit").add({action:"MEETING_ENTRY_REQUESTED",collection:"meetingEntryRequests",recordId:requestRef.id,details:{meetingId:grant.meetingId,participantId:grant.participantId,entryMode},actorUid:uid,actorEmail:email,createdAt:FieldValue.serverTimestamp()});
  }
  return {ok:true,entryState:"WAITING_FOR_HOST",entryMode,entryRequestId:entryRequest.id,meetingId:grant.meetingId,participantId:grant.participantId,meetingReference:grant.meetingReference||meeting.reference||meeting.title,meetingCategory:text(meeting.meetingCategory||meeting.category||meeting.meetingType||"General Meeting"),meetingStatus:meeting.status||"Scheduled",participantName:text(participant.participantName||participant.name)||email};
@@ -131,8 +132,8 @@ exports.listMeetingEntryRequests=onCall({region:"us-central1",timeoutSeconds:30}
  const meeting=meetingSnap.data()||{},email=text(request.auth?.token?.email).toLowerCase();
  const authorised=await activeAdmin(request)||text(meeting.initiatorUid)===uid||text(meeting.chairpersonEmail).toLowerCase()===email||text(meeting.secretaryEmail).toLowerCase()===email;
  if(!authorised)throw new HttpsError("permission-denied","Only the meeting initiator, chairperson, secretary or active administrator may view entry requests.");
- const snap=await db.collection("meetingEntryRequests").where("meetingId","==",meetingId).where("status","==","PENDING").limit(100).get();
- return {requests:snap.docs.map(d=>({id:d.id,participantId:text(d.data().participantId),participantName:text(d.data().participantName||d.data().participantEmail),participantEmail:text(d.data().participantEmail),requestedAt:d.data().requestedAt?.toDate?.()?.toISOString()||null}))};
+ const snap=await db.collection("meetingEntryRequests").where("meetingId","==",meetingId).limit(200).get();
+ return {requests:snap.docs.filter(d=>d.data()?.status==="PENDING").map(d=>({id:d.id,participantId:text(d.data().participantId),participantName:text(d.data().participantName||d.data().participantEmail),participantEmail:text(d.data().participantEmail),requestedAt:d.data().requestedAt?.toDate?.()?.toISOString()||null}))};
 });
 
 exports.resolveMeetingEntryRequest=onCall({region:"us-central1",timeoutSeconds:30},async request=>{
