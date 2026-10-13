@@ -1,6 +1,4 @@
-const { initializeApp } = require("../functions/node_modules/firebase-admin/app");
-const { getAuth } = require("../functions/node_modules/firebase-admin/auth");
-const { getFirestore } = require("../functions/node_modules/firebase-admin/firestore");
+const { initializeApp, getAuth, getFirestore } = require("../functions/node_modules/firebase-admin");
 
 const projectId = process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || "demo-irpa-dgbs";
 const email = "irpa-browser-fixture-admin@example.test";
