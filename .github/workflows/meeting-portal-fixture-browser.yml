@@ -1,4 +1,5 @@
 name: Meeting Portal Isolated Browser Regression
+# Verification-only regression workflow; no production deployment is performed.
 # Isolated fixture-only browser checks; no production credentials or live meeting sessions.
 on:
   push:

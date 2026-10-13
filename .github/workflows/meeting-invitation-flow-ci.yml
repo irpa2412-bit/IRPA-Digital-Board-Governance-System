@@ -1,4 +1,5 @@
 name: Meeting Invitation Flow CI
+# Verification-only regression workflow; no production deployment is performed.
 
 on:
   push:

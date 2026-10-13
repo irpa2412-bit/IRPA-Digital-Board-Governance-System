@@ -1,4 +1,5 @@
 name: Meeting Invitation Non-Production Firebase E2E
+# Verification-only regression workflow; no production deployment is performed.
 # Emulator-only authorization regression; this workflow does not deploy or contact production.
 
 on:

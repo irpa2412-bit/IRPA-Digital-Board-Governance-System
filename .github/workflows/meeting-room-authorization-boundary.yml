@@ -1,4 +1,5 @@
 name: Meeting Room Authorization Boundary
+# Verification-only regression workflow; no production deployment is performed.
 on:
   push:
     branches: [feat/secure-meeting-invitation-flow-20261013]
