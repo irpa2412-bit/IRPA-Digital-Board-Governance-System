@@ -138,6 +138,25 @@ exports.listMeetingEntryRequests=onCall({region:"us-central1",timeoutSeconds:30}
  return {requests:snap.docs.filter(d=>d.data()?.status==="PENDING").map(d=>({id:d.id,participantId:text(d.data().participantId),participantName:text(d.data().participantName||d.data().participantEmail),participantEmail:text(d.data().participantEmail),requestedAt:d.data().requestedAt?.toDate?.()?.toISOString()||null}))};
 });
 
+exports.listMeetingInviteCandidates=onCall({region:"us-central1",timeoutSeconds:30},async request=>{
+ const uid=request.auth?.uid;if(!uid)throw new HttpsError("unauthenticated","Authentication is required.");
+ const meetingId=text(request.data?.meetingId);if(!meetingId)throw new HttpsError("invalid-argument","Meeting ID is required.");
+ const meetingSnap=await db.collection("meetings").doc(meetingId).get();if(!meetingSnap.exists)throw new HttpsError("not-found","Meeting was not found.");
+ const meeting=meetingSnap.data()||{},email=text(request.auth?.token?.email).toLowerCase();
+ const authorised=await activeAdmin(request)||text(meeting.initiatorUid)===uid||text(meeting.chairpersonUid)===uid||text(meeting.secretaryUid)===uid||text(meeting.chairpersonEmail).toLowerCase()===email||text(meeting.secretaryEmail).toLowerCase()===email;
+ if(!authorised)throw new HttpsError("permission-denied","Only the meeting initiator, authorised chairperson/secretary or active administrator may access invitation candidates.");
+ const [memberSnap,employeeSnap]=await Promise.all([db.collection("members").get(),db.collection("employees").get()]);
+ const activeRecord=row=>["active","activated"].includes(text(row.status||row.employmentStatus||row.registrationStatus).toLowerCase())||text(row.registrationStatus).toLowerCase()==="activated";
+ const clean=(doc,type)=>{
+  const row=doc.data()||{},candidateEmail=text(row.email||row.emailAddress||row.contactEmail).toLowerCase();
+  if(!activeRecord(row)||!candidateEmail)return null;
+  return {id:doc.id,name:text(row.name||row.fullName||row.memberName||row.employeeName||row.displayName)||candidateEmail,email:candidateEmail,role:text(row.role||type),memberType:text(row.memberType||row.employeeType||type),department:text(row.department),status:text(row.status||row.employmentStatus||row.registrationStatus),uid:text(row.uid||row.authUid||row.userUid),memberNumber:text(row.memberNumber||row.registrationNumber),employeeNumber:text(row.employeeNumber),boardMember:row.boardMember===true||Boolean(row.boardPosition)||text(row.department)==="Board of Directors"||text(row.role)==="Board Member",boardPosition:text(row.boardPosition)};
+ };
+ const members=memberSnap.docs.map(d=>clean(d,"Member")).filter(Boolean);
+ const employees=employeeSnap.docs.map(d=>clean(d,"Employee")).filter(Boolean);
+ return {members,employees,source:"AUTHORITATIVE_REGISTERS",meetingId};
+});
+
 exports.resolveMeetingEntryRequest=onCall({region:"us-central1",timeoutSeconds:30},async request=>{
  const uid=request.auth?.uid;if(!uid)throw new HttpsError("unauthenticated","Authentication is required.");
  const requestId=text(request.data?.requestId),decision=text(request.data?.decision).toUpperCase();
