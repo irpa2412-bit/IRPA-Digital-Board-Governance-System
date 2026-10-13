@@ -27,6 +27,7 @@ exports.createMeetingAccessInvitation=onCall({region:"us-central1",timeoutSecond
  const participantSnap=await db.collection("participants").doc(participantId).get();
  if(!meetingSnap.exists||!participantSnap.exists)throw new HttpsError("not-found","Meeting or participant was not found.");
  const meeting={id:meetingSnap.id,...meetingSnap.data()},participant={id:participantSnap.id,...participantSnap.data()};
+ if(!active(meeting.status))throw new HttpsError("failed-precondition","Closed meetings cannot issue new invitation passes.");
  logStage("RECORDS_LOADED",{meetingFound:true,participantFound:true,participantMeetingMatches:participant.meetingId===meetingId});
  if(participant.meetingId!==meetingId)throw new HttpsError("failed-precondition","Participant is not linked to the selected meeting.");
  const chair=String(meeting.chairpersonEmail||"").toLowerCase()===String(request.auth.token.email||"").toLowerCase();
@@ -132,6 +133,7 @@ exports.listMeetingEntryRequests=onCall({region:"us-central1",timeoutSeconds:30}
  const meetingId=text(request.data?.meetingId);if(!meetingId)throw new HttpsError("invalid-argument","Meeting ID is required.");
  const meetingSnap=await db.collection("meetings").doc(meetingId).get();if(!meetingSnap.exists)throw new HttpsError("not-found","Meeting was not found.");
  const meeting=meetingSnap.data()||{},email=text(request.auth?.token?.email).toLowerCase();
+ if(!active(meeting.status))throw new HttpsError("failed-precondition","Closed meetings cannot load invitation candidates.");
  const authorised=await activeAdmin(request)||text(meeting.initiatorUid)===uid||text(meeting.chairpersonEmail).toLowerCase()===email||text(meeting.secretaryEmail).toLowerCase()===email;
  if(!authorised)throw new HttpsError("permission-denied","Only the meeting initiator, chairperson, secretary or active administrator may view entry requests.");
  const snap=await db.collection("meetingEntryRequests").where("meetingId","==",meetingId).limit(200).get();
