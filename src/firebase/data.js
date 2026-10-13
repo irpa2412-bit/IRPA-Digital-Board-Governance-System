@@ -459,3 +459,10 @@ export async function getResearchToolPermissions(){
   const snap=await getDocs(query(collection(db,COLLECTIONS.researchToolPermissions),where("userUid","==",uid),where("status","==","Active")));
   return snap.docs.map(x=>({id:x.id,...x.data()}));
 }
+
+export async function listMeetingBoardMembers() {
+  if (!auth.currentUser) throw new Error("Sign in to load the Board Members register.");
+  const call = httpsCallable(getFunctions(undefined, "us-central1"), "listMeetingBoardMembers");
+  const result = await call({});
+  return Array.isArray(result.data?.members) ? result.data.members : [];
+}
