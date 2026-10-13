@@ -143,6 +143,26 @@ test("Cloudflare invitation redemption rejects malformed tokens before contactin
 });
 
 
+test("Cloudflare invitation redemption rejects explicitly revoked invitations before Firebase account lookup", async()=>{
+  const originalFetch=global.fetch;
+  const calls=[];
+  const revokedFields={...invitationFields,status:{stringValue:"Revoked"}};
+  global.fetch=async(url,options={})=>{
+    const target=String(url); calls.push({target,options});
+    if(target==="https://oauth2.googleapis.com/token") return new Response(JSON.stringify({access_token:"test-google-access-token",expires_in:3600}),{status:200});
+    if(target.includes("/databases/(default)/documents/invitations/revoked-invitation")) return new Response(JSON.stringify({fields:revokedFields,updateTime:"2026-10-13T12:00:00.000000Z"}),{status:200});
+    if(target.includes("identitytoolkit.googleapis.com")) throw new Error("Revoked invitation must not reach Firebase Identity Toolkit.");
+    throw new Error("Unexpected external request: "+target);
+  };
+  try {
+    const response=await handler.fetch(new Request("https://gw.test/api/invitations/redeem",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:"revoked-invitation."+tokenSecret})}),{
+      FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)
+    });
+    assert.equal(response.status,412);
+    assert.match((await response.json()).error,/invitation has been revoked/i);
+    assert.equal(calls.some(c=>c.target.includes("identitytoolkit.googleapis.com")),false);
+  } finally { global.fetch=originalFetch; }
+});
 test("password-set returns 401 when Firebase authentication is missing", async()=>{
   const response=await handler.fetch(new Request("https://gw.test/api/invitations/password-set",{
     method:"POST",
