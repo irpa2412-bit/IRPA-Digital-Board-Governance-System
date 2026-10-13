@@ -310,6 +310,47 @@ function extractDraftText(result) {
   return raw.replace(/^\x60{3}(?:markdown|md|text)?\s*/i, "").replace(/\s*\x60{3}$/i, "").trim();
 }
 
+function buildFallbackDocumentDraft({ format, tone, organization, instructions, reason }) {
+  const requestedFormat = String(format || "Document").slice(0, 100);
+  const requestedTone = String(tone || "Professional").slice(0, 120);
+  const requestedOrganization = String(organization || IRPA_PROFILE.name).slice(0, 300);
+  const requestedPurpose = String(instructions || "Complete the requested document").slice(0, 800);
+  const scaffold = /letter|email|memo/i.test(requestedFormat)
+    ? [
+        "Subject: [Insert verified subject]",
+        "",
+        "Dear [Recipient],",
+        "",
+        "[Opening: state the purpose of this communication in relation to: " + requestedPurpose + "]",
+        "",
+        "[Main message: add verified background, the specific request or decision, and any relevant dates. Do not invent commitments, figures, partners or completed work.]",
+        "",
+        "[State the requested next step and any confirmed deadline.]",
+        "",
+        "Yours sincerely,",
+        "[Name and title]"
+      ].join("\n")
+    : [
+        "Purpose and context",
+        "[Summarize the purpose using verified facts relevant to: " + requestedPurpose + "]",
+        "",
+        "Main content",
+        "[Complete the sections required by the requested format. Clearly distinguish verified facts, proposals and assumptions.]",
+        "",
+        "Actions and next steps",
+        "[Add responsible persons, dates and actions only after confirmation.]"
+      ].join("\n");
+  return [
+    "INTERNAL DRAFT SCAFFOLD — AI GENERATION DID NOT RETURN A USABLE DRAFT",
+    "Organization: " + requestedOrganization,
+    "Format: " + requestedFormat + " | Tone: " + requestedTone,
+    "",
+    scaffold,
+    "",
+    "Human completion required: replace every bracketed instruction, verify all factual claims, and obtain appropriate review before use."
+  ].join("\n");
+}
+
 async function generateDocumentDraft(body, env) {
   const instructions = typeof body.instructions === "string" ? body.instructions.trim().slice(0, 8_000) : "";
   const format = typeof body.format === "string" ? body.format.trim().slice(0, 100) : "Document";
@@ -349,16 +390,36 @@ async function generateDocumentDraft(body, env) {
       temperature: 0.2
     });
     const draft = extractDraftText(result);
-    if (!draft) return json({ error: "The AI model returned an empty document draft. Retry with more specific instructions." }, 502);
+    if (!draft) {
+      return json({
+        service: "irpa-grant-application-assistant",
+        task: "draft_message",
+        format,
+        draft: buildFallbackDocumentDraft({ format, tone, organization, instructions, reason: "empty_model_response" }),
+        draft_source: "deterministic_fallback",
+        requires_human_completion: true,
+        disclaimer: "Workers AI returned no usable draft. This is a structured scaffold, not an AI-generated document; complete and verify it before use."
+      });
+    }
     return json({
       service: "irpa-grant-application-assistant",
       task: "draft_message",
       format,
       draft,
+      draft_source: "workers_ai",
+      requires_human_completion: false,
       disclaimer: "AI-generated draft for human review. Verify facts, eligibility, budgets, deadlines and organizational claims before use."
     });
-  } catch (error) {
-    return json({ error: String(error?.message || "AI document drafting failed").slice(0, 300) }, 502);
+  } catch {
+    return json({
+      service: "irpa-grant-application-assistant",
+      task: "draft_message",
+      format,
+      draft: buildFallbackDocumentDraft({ format, tone, organization, instructions, reason: "model_error" }),
+      draft_source: "deterministic_fallback",
+      requires_human_completion: true,
+      disclaimer: "Workers AI did not return a usable draft. This is a structured scaffold, not an AI-generated document; complete and verify it before use."
+    });
   }
 }
 
