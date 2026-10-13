@@ -56,7 +56,12 @@ async function navigateModule(page, viewportName, module) {
 
 async function assertPortalAndNoOverflow(page, expectedText, width) {
   await expect(page.locator(".topbar h2")).toContainText(expectedText, { timeout: 30000 });
-  await expect(page.locator("main.content-area")).toBeVisible();
+  const workspace = page.locator("main.content-area");
+  await expect(workspace).toBeVisible();
+  await expect.poll(
+    () => workspace.evaluate(el => Math.abs(el.getBoundingClientRect().top)),
+    { message: "destination workspace should align with the viewport top instead of leaving the global header as the scroll target", timeout: 10000 }
+  ).toBeLessThanOrEqual(8);
   const dimensions = await page.evaluate(() => ({
     viewport: document.documentElement.clientWidth,
     document: document.documentElement.scrollWidth
