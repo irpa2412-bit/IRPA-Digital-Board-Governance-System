@@ -1,0 +1,79 @@
+name: Meeting Portal Isolated Browser Regression
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/pages/Meetings.jsx"
+      - "src/firebase/meetingPolicy.js"
+      - "tests/meeting-portal-browser.test.mjs"
+      - "tests/fixtures/**"
+      - "vite.meeting-fixture.config.js"
+      - ".github/workflows/meeting-portal-fixture-browser.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  isolated-meeting-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout pull request revision
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked application dependencies
+        run: npm ci
+      - name: Install isolated browser runner
+        run: |
+          npm install --no-save --package-lock=false playwright
+          npx playwright install --with-deps chromium
+      - name: Assert runtime source isolation from unrelated portals
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          node --input-type=module <<'NODE'
+          import { execFileSync } from "node:child_process";
+          const changed = execFileSync("git", ["diff", "--name-only", "origin/main...HEAD"], { encoding: "utf8" })
+            .trim().split("\n").filter(Boolean).sort();
+          const allowed = new Set([
+            ".github/workflows/meeting-portal-fixture-browser.yml",
+            "src/pages/Meetings.jsx",
+            "tests/fixtures/meeting-portal-fixture.html",
+            "tests/fixtures/meeting-portal-fixture.jsx",
+            "tests/fixtures/mocks.js",
+            "tests/meeting-portal-browser.test.mjs",
+            "vite.meeting-fixture.config.js"
+          ]);
+          const unexpected = changed.filter(path => !allowed.has(path));
+          if (unexpected.length) {
+            console.error("Unexpected files changed outside the isolated meeting repair:", unexpected);
+            process.exit(1);
+          }
+          if (!changed.includes("src/pages/Meetings.jsx")) throw new Error("Meeting portal source change is missing.");
+          console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));
+          NODE
+      - name: Start the isolated Vite fixture
+        run: |
+          set -euo pipefail
+          npm exec vite -- --config vite.meeting-fixture.config.js --host 127.0.0.1 --port 4179 > "$RUNNER_TEMP/meeting-fixture.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/meeting-fixture.pid"
+          for attempt in $(seq 1 40); do
+            if curl --fail --silent http://127.0.0.1:4179/tests/fixtures/meeting-portal-fixture.html >/dev/null; then
+              echo "ISOLATED_FIXTURE_READY=true"
+              exit 0
+            fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/meeting-fixture.log"
+          exit 1
+      - name: Run mobile and desktop authenticated-identity fixture tests
+        run: node tests/meeting-portal-browser.test.mjs
+      - name: Upload fixture server diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: meeting-portal-fixture-diagnostics
+          path: ${{ runner.temp }}/meeting-fixture.log
