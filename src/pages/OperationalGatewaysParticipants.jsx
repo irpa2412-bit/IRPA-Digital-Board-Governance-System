@@ -33,11 +33,8 @@ export default function OperationalGatewaysParticipants(){
    const value=Array.isArray(result.value)?result.value:[];
    if(index===0)setRows(value);
    else if(index===1)setMeetings(value);
-   else if(index===2)setEmployees(value);
-   else if(index===3){
-    setBoardMembers(value.filter(x=>x.boardMember===true||x.boardPosition||x.department==="Board of Directors"||x.role==="Board Member"));
-    setMembers(value.filter(x=>!x.boardMember&&!x.boardPosition&&x.department!=="Board of Directors"&&x.role!=="Board Member"));
-   }else if(index===4)setInvitations(value);
+   else if(index===2||index===3){/* Candidate registers are loaded only by the meeting-authorized server callable. */}
+   else if(index===4)setInvitations(value);
   });
   if(failures.length)setErr("Some participant registers could not be retrieved: "+failures.join(" | "));
   else setErr("");
