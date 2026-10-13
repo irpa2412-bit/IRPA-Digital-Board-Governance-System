@@ -286,8 +286,8 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
      .sort((a,b)=>b._smartScore-a._smartScore||dateMillis(a.deadline||a.deadline_at)-dateMillis(b.deadline||b.deadline_at))
      .slice(0,8);
  },[currentOpportunityRecords,smartKeywords]);
- async function runFundraisingSearch(){
-   const query=text(fundraisingQuery);
+ async function runFundraisingSearch(searchQuery=fundraisingQuery, searchMode=fundraisingMode){
+   const query=text(searchQuery);
    if(query.length<2){setFundraisingSearchError("Enter at least two characters, such as rangeland restoration, livestock markets, women-led enterprises, CSR or digital governance.");return;}
    const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-production.irpa-governance.workers.dev").replace(/\/+$/,"");
    const token=await auth.currentUser?.getIdToken(true);
