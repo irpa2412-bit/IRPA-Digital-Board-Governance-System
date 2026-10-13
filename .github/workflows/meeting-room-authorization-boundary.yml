@@ -1,0 +1,27 @@
+name: Meeting Room Authorization Boundary
+on:
+  push:
+    branches: [feat/secure-meeting-invitation-flow-20261013]
+    paths:
+      - "src/pages/MeetingRoom.jsx"
+      - "tests/meeting-room-authorization-boundary.test.mjs"
+      - ".github/workflows/meeting-room-authorization-boundary.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/pages/MeetingRoom.jsx"
+      - "tests/meeting-room-authorization-boundary.test.mjs"
+      - ".github/workflows/meeting-room-authorization-boundary.yml"
+permissions:
+  contents: read
+jobs:
+  verify-room-authorization-boundary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Verify host and participant separation
+        run: node --test tests/meeting-room-authorization-boundary.test.mjs
