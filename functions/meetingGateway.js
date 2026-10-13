@@ -108,9 +108,9 @@ exports.authorizeMeetingEntry=onCall({region:"us-central1",timeoutSeconds:30},as
  const meeting={id:meetingSnap.id,...meetingSnap.data()};
  if(!active(meeting.status))throw new HttpsError("failed-precondition","This meeting is closed and cannot be entered.");
  const entryMode=normalizeMeetingEntryMode(meeting);
- const requestQuery=await db.collection("meetingEntryRequests").where("accessId","==",doc.id).limit(10).get();
- const matchingRequest=requestQuery.docs.find(item=>text(item.data()?.participantUid)===uid);
- let entryRequest=matchingRequest?{id:matchingRequest.id,...matchingRequest.data()}:null;
+ const entryRequestRef=db.collection("meetingEntryRequests").doc(hash("meeting-entry:"+doc.id+":"+uid));
+ const entryRequestSnap=await entryRequestRef.get();
+ let entryRequest=entryRequestSnap.exists?{id:entryRequestSnap.id,...entryRequestSnap.data()}:null;
  const entryState=resolveMeetingEntryState(entryMode,entryRequest?.status);
  if(entryState==="AUTHORIZED"){
   if(entryRequest&&entryRequest.status!=="ADMITTED")await db.collection("meetingEntryRequests").doc(entryRequest.id).update({status:"ADMITTED",resolvedAt:FieldValue.serverTimestamp(),resolvedBy:"DIRECT_ENTRY_POLICY"});
@@ -119,10 +119,10 @@ exports.authorizeMeetingEntry=onCall({region:"us-central1",timeoutSeconds:30},as
  }
  if(entryState==="DENIED")throw new HttpsError("permission-denied","The meeting host declined this entry request. Contact the meeting initiator for assistance.");
  if(!entryRequest){
-  const requestRef=db.collection("meetingEntryRequests").doc();
-  entryRequest={id:requestRef.id};
-  await requestRef.set({meetingId:grant.meetingId,meetingReference:grant.meetingReference||meeting.reference||meeting.title||"",participantId:grant.participantId,participantName:text(participant.participantName||participant.name)||email,participantUid:uid,participantEmail:email,accessId:doc.id,status:"PENDING",entryMode,requestedAt:FieldValue.serverTimestamp(),expiresAt:grant.expiresAt||null});
-  await db.collection("audit").add({action:"MEETING_ENTRY_REQUESTED",collection:"meetingEntryRequests",recordId:requestRef.id,details:{meetingId:grant.meetingId,participantId:grant.participantId,entryMode},actorUid:uid,actorEmail:email,createdAt:FieldValue.serverTimestamp()});
+  const requestData={meetingId:grant.meetingId,meetingReference:grant.meetingReference||meeting.reference||meeting.title||"",participantId:grant.participantId,participantName:text(participant.participantName||participant.name)||email,participantUid:uid,participantEmail:email,accessId:doc.id,status:"PENDING",entryMode,requestedAt:FieldValue.serverTimestamp(),expiresAt:grant.expiresAt||null};
+  try{await entryRequestRef.create(requestData);entryRequest={id:entryRequestRef.id,...requestData};}
+  catch(error){if(!["already-exists","6"].includes(String(error?.code||"")))throw error;const latest=await entryRequestRef.get();if(!latest.exists)throw error;entryRequest={id:latest.id,...latest.data()};if(entryRequest.status==="DENIED")throw new HttpsError("permission-denied","The meeting host declined this entry request. Contact the meeting initiator for assistance.");}
+  await db.collection("audit").add({action:"MEETING_ENTRY_REQUESTED",collection:"meetingEntryRequests",recordId:entryRequestRef.id,details:{meetingId:grant.meetingId,participantId:grant.participantId,entryMode},actorUid:uid,actorEmail:email,createdAt:FieldValue.serverTimestamp()});
  }
  return {ok:true,entryState:"WAITING_FOR_HOST",entryMode,entryRequestId:entryRequest.id,meetingId:grant.meetingId,participantId:grant.participantId,meetingReference:grant.meetingReference||meeting.reference||meeting.title,meetingCategory:text(meeting.meetingCategory||meeting.category||meeting.meetingType||"General Meeting"),meetingStatus:meeting.status||"Scheduled",participantName:text(participant.participantName||participant.name)||email};
 });
