@@ -34,8 +34,10 @@ async function navigateModule(page, viewportName, module) {
   } else {
     const sidebar = page.locator(".sidebar");
     if (module === "Meeting Room" || module === "Voting") {
-      // Desktop in-portal navigation is a select control, not a button list.
-      await sidebar.getByLabel("Navigate to a sub-portal within the current portal").selectOption(module);
+      // Child portal buttons are rendered after opening their parent in the sidebar.
+      await sidebar.getByRole("button", { name: /Meeting Portal/ }).click();
+      const childLabel = module === "Meeting Room" ? /SUB-PORTAL.*Meeting Room Portal/ : /SUB-PORTAL.*Voting Portal/;
+      await sidebar.getByRole("button", { name: childLabel }).click();
     } else {
       const label = module === "Finance Portfolio" ? /Finance Portal|Finance Portfolio/ :
         module === "Documents" ? /Documents Portal|Documents/ :
