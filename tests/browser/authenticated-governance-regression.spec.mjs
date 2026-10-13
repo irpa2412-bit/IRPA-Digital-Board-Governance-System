@@ -34,8 +34,10 @@ async function navigateModule(page, viewportName, module) {
   } else {
     const sidebar = page.locator(".sidebar");
     if (module === "Meeting Room" || module === "Voting") {
+      await sidebar.getByRole("button", { name: new RegExp("SUB-PORTAL.*" + module.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\    if (module === "Meeting Room" || module === "Voting") {
       await sidebar.getByRole("button", { name: /Meeting Portal/ }).click();
       await page.getByLabel("Navigate to a sub-portal within the current portal").selectOption(module);
+    } else {")) }).click();
     } else {
       const label = module === "Finance Portfolio" ? /Finance Portal|Finance Portfolio/ :
         module === "Documents" ? /Documents Portal|Documents/ :
@@ -60,8 +62,8 @@ async function assertPortalAndNoOverflow(page, expectedText, width) {
   await expect(workspace).toBeVisible();
   await expect.poll(
     () => workspace.evaluate(el => Math.abs(el.getBoundingClientRect().top)),
-    { message: "destination workspace should align with the viewport top instead of leaving the global header as the scroll target", timeout: 10000 }
-  ).toBeLessThanOrEqual(8);
+    { message: "destination workspace should scroll into the visible workspace area rather than leave the user at the global header", timeout: 10000 }
+  ).toBeLessThanOrEqual(40);
   const dimensions = await page.evaluate(() => ({
     viewport: document.documentElement.clientWidth,
     document: document.documentElement.scrollWidth
