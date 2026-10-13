@@ -5,13 +5,16 @@ const fixturePassword = "FixtureOnly-Password-2026!";
 
 async function navigateModule(page, viewportName, module) {
   if (viewportName === "mobile") {
-    if (module === "Finance Portfolio" || module === "Meeting Room" || module === "Documents") {
+    if (module === "Finance Portfolio" || module === "Meeting Room" || module === "Documents" || module === "Voting") {
       await page.getByRole("button", { name: "Portals" }).click();
       const dialog = page.getByRole("dialog", { name: "Mobile navigation" });
       if (module === "Finance Portfolio") {
         await dialog.getByRole("button", { name: /Finance Portal/ }).click();
       } else if (module === "Documents") {
         await dialog.getByRole("button", { name: /Documents Portal/ }).click();
+      } else if (module === "Voting") {
+        await dialog.getByRole("button", { name: /Meeting Portal/ }).click();
+        await dialog.getByRole("button", { name: /SUB-PORTAL.*Voting Portal/ }).click();
       } else {
         await dialog.getByRole("button", { name: /Meeting Portal/ }).click();
         await dialog.getByRole("button", { name: /SUB-PORTAL.*Meeting Room Portal/ }).click();
