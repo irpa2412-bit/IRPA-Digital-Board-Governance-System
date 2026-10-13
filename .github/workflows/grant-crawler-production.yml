@@ -212,10 +212,34 @@ jobs:
           PRODUCTION_WORKER_URL: ${{ steps.deploy_production.outputs.worker_url }}
         run: |
           set -euo pipefail
+          smoke_payload_dir="$(mktemp -d)"
+          trap 'rm -rf "$smoke_payload_dir"' EXIT
+          node - "$smoke_payload_dir" <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const dir = process.argv[2];
+          fs.writeFileSync(path.join(dir, 'draft-message.json'), JSON.stringify({
+            task: 'draft_message',
+            format: 'Formal letter',
+            tone: 'Professional',
+            length: 'Concise',
+            instructions: 'Write a short production smoke-test draft confirming the IRPA document drafting assistant is available.'
+          }), { mode: 0o600 });
+          fs.writeFileSync(path.join(dir, 'concept-note.json'), JSON.stringify({
+            task: 'concept_note',
+            title: 'IRPA AI smoke test: community rangeland restoration',
+            description: 'Call for proposals for community-led rangeland restoration in Tanzania. Applications close 31 December 2026. Open to registered NGOs in Tanzania.',
+            donorRequirements: 'Open to registered NGOs in Tanzania; deadline 31 December 2026.',
+            url: 'https://example.org/irpa-ai-smoke-test',
+            deadline: '2026-12-31',
+            callStatus: 'open'
+          }), { mode: 0o600 });
+          NODE
           document_result="$(curl --silent --show-error --max-time 90 -X POST \
             -H "Authorization: Bearer $GRANT_CRAWLER_CONTROL_TOKEN" \
             -H "Content-Type: application/json" \
-            --data '{"task":"draft_message","format":"Formal letter","tone":"Professional","length":"Concise","instructions":"Write a short production smoke-test draft confirming the IRPA document drafting assistant is available."}' \
+            -H "Accept: application/json" \
+            --data-binary "@$smoke_payload_dir/draft-message.json" \
             "$PRODUCTION_WORKER_URL/assistant/analyze")"
           document_status="$(node - "$document_result" <<'NODE'
           const body = JSON.parse(process.argv[2]);
@@ -240,7 +264,8 @@ jobs:
           concept_result="$(curl --silent --show-error --max-time 90 -X POST \
             -H "Authorization: Bearer $GRANT_CRAWLER_CONTROL_TOKEN" \
             -H "Content-Type: application/json" \
-            --data '{"task":"concept_note","title":"IRPA AI smoke test: community rangeland restoration","description":"Call for proposals for community-led rangeland restoration in Tanzania. Applications close 31 December 2026. Open to registered NGOs in Tanzania.","donorRequirements":"Open to registered NGOs in Tanzania; deadline 31 December 2026.","url":"https://example.org/irpa-ai-smoke-test","deadline":"2026-12-31","callStatus":"open"}' \
+            -H "Accept: application/json" \
+            --data-binary "@$smoke_payload_dir/concept-note.json" \
             "$PRODUCTION_WORKER_URL/assistant/analyze")"
           concept_status="$(node - "$concept_result" <<'NODE'
           const body = JSON.parse(process.argv[2]);
