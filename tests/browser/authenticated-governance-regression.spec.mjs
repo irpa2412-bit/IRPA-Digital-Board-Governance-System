@@ -43,6 +43,14 @@ async function navigateModule(page, viewportName, module) {
       await sidebar.getByRole("button", { name: label }).first().click();
     }
   }
+  if (module === "Documents") {
+    const entryGate = page.locator("[data-irpa-field-gate]");
+    await expect(entryGate).toBeVisible({ timeout: 15000 });
+    await entryGate.getByRole("radio", { name: /Documents, correspondence and files/ }).check();
+    await entryGate.getByRole("radio", { name: /Trial data/ }).check();
+    await entryGate.getByRole("button", { name: "Confirm environment and continue" }).click();
+    await expect(entryGate).toHaveCount(0);
+  }
 }
 
 async function assertPortalAndNoOverflow(page, expectedText, width) {
