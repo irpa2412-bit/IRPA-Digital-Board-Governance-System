@@ -28,6 +28,7 @@ const good = { to:"a@example.org", name:"Amina", link:"https://app.example.test/
 test("meeting-linked invitation includes the access link and gate password without affecting normal invitations", () => {
   const message=buildInvitationMessage({
     name:"Amina",
+    username:"a@example.org",
     link:"https://app.example.test/?invitationToken=invite-secret",
     meetingAccess:{
       link:"https://app.example.test/?meetingToken=opaque-token&meetingId=MEET-1",
@@ -39,9 +40,11 @@ test("meeting-linked invitation includes the access link and gate password witho
   assert.match(message.subject,/meeting access/i);
   assert.match(message.text,/meetingToken=opaque-token/);
   assert.match(message.text,/AB12CD34EF56/);
+  assert.match(message.text,/IRPA username: a@example.org/);
+  assert.match(message.html,/IRPA username/);
   assert.match(message.html,/Open IRPA Meeting/);
   assert.match(message.html,/AB12CD34EF56/);
-  const registered=buildInvitationMessage({name:"Amina",link:"https://app.example.test/?invitationToken=invite-secret",meetingAccess:{link:"https://app.example.test/?meetingToken=opaque-token&meetingId=MEET-1",meetingIdentity:"IRPA-MEET-MEET-1",meetingReference:"IRPA-MTG-2026-000123",meetingTitle:"Quarterly Board Meeting",meetingDate:"2026-10-30",meetingStartTime:"10:00",meetingEndTime:"12:00",meetingPlatform:"Microsoft Teams",platformAccessUrl:"https://teams.example.test/meeting",platformMeetingId:"TEAM-123",platformPasscode:"JOIN-456",meetingVenue:"IRPA Board Room",meetingChairperson:"Board Chairperson",meetingAgenda:"Approve minutes and review actions",password:"AB12CD34EF56",expiresAt:"2026-10-30T10:00:00.000Z"}});
+  const registered=buildInvitationMessage({name:"Amina",username:"a@example.org",link:"https://app.example.test/?invitationToken=invite-secret",meetingAccess:{link:"https://app.example.test/?meetingToken=opaque-token&meetingId=MEET-1",meetingIdentity:"IRPA-MEET-MEET-1",meetingReference:"IRPA-MTG-2026-000123",meetingTitle:"Quarterly Board Meeting",meetingDate:"2026-10-30",meetingStartTime:"10:00",meetingEndTime:"12:00",meetingPlatform:"Microsoft Teams",platformAccessUrl:"https://teams.example.test/meeting",platformMeetingId:"TEAM-123",platformPasscode:"JOIN-456",meetingVenue:"IRPA Board Room",meetingChairperson:"Board Chairperson",meetingAgenda:"Approve minutes and review actions",password:"AB12CD34EF56",expiresAt:"2026-10-30T10:00:00.000Z"}});
   assert.match(registered.text,/IRPA-MEET-MEET-1/);
   assert.match(registered.text,/IRPA-MTG-2026-000123/);
   assert.match(registered.text,/Microsoft Teams/);
