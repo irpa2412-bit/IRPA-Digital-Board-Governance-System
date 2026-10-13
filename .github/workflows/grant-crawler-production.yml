@@ -221,7 +221,7 @@ jobs:
           const body = JSON.parse(process.argv[2]);
           if (body.error && /4006|quota|neurons|daily free allocation|upgrade/i.test(body.error)) { console.log('quota'); process.exit(0); }
           if (body.task !== 'draft_message' || typeof body.draft !== 'string' || body.draft.trim().length < 30) {
-            throw new Error('Production document-drafting endpoint returned neither a usable draft nor a labelled fallback. Response keys: ' + Object.keys(body).join(', '));
+            throw new Error('Production document-drafting endpoint returned neither a usable draft nor a labelled fallback. Response keys: ' + Object.keys(body).join(', ') + '; sanitized error: ' + String(body.error || body.message || 'none').slice(0, 180));
           }
           if (body.draft_source === 'deterministic_fallback' && body.requires_human_completion !== true) throw new Error('Fallback draft is missing its human-review marker.');
           if (body.draft_source && !['workers_ai', 'deterministic_fallback'].includes(body.draft_source)) throw new Error('Unexpected document draft source marker.');
