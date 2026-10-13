@@ -135,7 +135,7 @@ exports.listMeetingEntryRequests=onCall({region:"us-central1",timeoutSeconds:30}
  const authorised=await activeAdmin(request)||text(meeting.initiatorUid)===uid||text(meeting.chairpersonEmail).toLowerCase()===email||text(meeting.secretaryEmail).toLowerCase()===email;
  if(!authorised)throw new HttpsError("permission-denied","Only the meeting initiator, chairperson, secretary or active administrator may view entry requests.");
  const snap=await db.collection("meetingEntryRequests").where("meetingId","==",meetingId).limit(200).get();
- return {requests:snap.docs.filter(d=>d.data()?.status==="PENDING").map(d=>({id:d.id,participantId:text(d.data().participantId),participantName:text(d.data().participantName||d.data().participantEmail),participantEmail:text(d.data().participantEmail),requestedAt:d.data().requestedAt?.toDate?.()?.toISOString()||null}))};
+ return {requests:snap.docs.filter(d=>{const row=d.data()||{},expiry=row.expiresAt?.toDate?.()||new Date(row.expiresAt||0);return row.status==="PENDING"&&!Number.isNaN(expiry.getTime())&&expiry.getTime()>Date.now();}).map(d=>({id:d.id,participantId:text(d.data().participantId),participantName:text(d.data().participantName||d.data().participantEmail),participantEmail:text(d.data().participantEmail),requestedAt:d.data().requestedAt?.toDate?.()?.toISOString()||null}))};
 });
 
 exports.listMeetingInviteCandidates=onCall({region:"us-central1",timeoutSeconds:30},async request=>{
@@ -146,7 +146,7 @@ exports.listMeetingInviteCandidates=onCall({region:"us-central1",timeoutSeconds:
  const authorised=await activeAdmin(request)||text(meeting.initiatorUid)===uid||text(meeting.chairpersonUid)===uid||text(meeting.secretaryUid)===uid||text(meeting.chairpersonEmail).toLowerCase()===email||text(meeting.secretaryEmail).toLowerCase()===email;
  if(!authorised)throw new HttpsError("permission-denied","Only the meeting initiator, authorised chairperson/secretary or active administrator may access invitation candidates.");
  const [memberSnap,employeeSnap]=await Promise.all([db.collection("members").get(),db.collection("employees").get()]);
- const activeRecord=row=>["active","activated"].includes(text(row.status||row.employmentStatus||row.registrationStatus).toLowerCase())||text(row.registrationStatus).toLowerCase()==="activated";
+ const activeRecord=row=>{const statuses=[row.status,row.employmentStatus,row.registrationStatus].map(v=>text(v).toLowerCase()).filter(Boolean);if(statuses.some(v=>["inactive","terminated","suspended","deleted","cancelled","canceled","archived"].includes(v)))return false;return statuses.some(v=>["active","activated"].includes(v));};
  const clean=(doc,type)=>{
   const row=doc.data()||{},candidateEmail=text(row.email||row.emailAddress||row.contactEmail).toLowerCase();
   if(!activeRecord(row)||!candidateEmail)return null;
@@ -175,7 +175,7 @@ exports.resolveMeetingEntryRequest=onCall({region:"us-central1",timeoutSeconds:3
   if(row.status!=="PENDING")throw new HttpsError("failed-precondition","This entry request has already been resolved.");
   const tokenRef=db.collection("meetingAccessTokens").doc(text(row.accessId));
   const tokenSnap=await tx.get(tokenRef);
-  if(!tokenSnap.exists||tokenSnap.data()?.status!=="Active")throw new HttpsError("failed-precondition","The invitation pass is no longer active.");
+  const tokenData=tokenSnap.exists?(tokenSnap.data()||{}):{};const tokenExpiry=tokenData.expiresAt?.toDate?.()||new Date(tokenData.expiresAt||0);if(!tokenSnap.exists||tokenData.status!=="Active"||Number.isNaN(tokenExpiry.getTime())||tokenExpiry.getTime()<=Date.now())throw new HttpsError("failed-precondition","The invitation pass is expired, revoked or no longer active.");
   const next=decision==="ADMIT"?"ADMITTED":"DENIED";
   tx.update(ref,{status:next,resolvedByUid:uid,resolvedByEmail:email,resolvedAt:FieldValue.serverTimestamp()});
   tx.set(db.collection("audit").doc(),{action:decision==="ADMIT"?"MEETING_ENTRY_ADMITTED":"MEETING_ENTRY_DENIED",collection:"meetingEntryRequests",recordId:requestId,details:{meetingId:row.meetingId,participantId:row.participantId},actorUid:uid,actorEmail:email,createdAt:FieldValue.serverTimestamp()});
