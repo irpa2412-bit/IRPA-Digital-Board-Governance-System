@@ -4,6 +4,8 @@ on:
     branches: [main]
     paths:
       - "src/pages/Meetings.jsx"
+      - "src/firebase/data.js"
+      - "functions/index.js"
       - "src/firebase/meetingPolicy.js"
       - "tests/meeting-portal-browser.test.mjs"
       - "tests/fixtures/**"
@@ -43,6 +45,8 @@ jobs:
           const allowed = new Set([
             ".github/workflows/meeting-portal-fixture-browser.yml",
             "src/pages/Meetings.jsx",
+            "src/firebase/data.js",
+            "functions/index.js",
             "tests/fixtures/meeting-portal-fixture.html",
             "tests/fixtures/meeting-portal-fixture.jsx",
             "tests/fixtures/mocks.js",
