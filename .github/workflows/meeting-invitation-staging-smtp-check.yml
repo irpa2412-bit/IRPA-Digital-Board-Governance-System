@@ -18,10 +18,10 @@ jobs:
     steps:
       - name: Require isolated staging configuration
         env:
-          STAGING_GATEWAY_URL: \${{ secrets.STAGING_GATEWAY_URL }}
-          STAGING_INVITE_SERVICE_KEY: \${{ secrets.STAGING_INVITE_SERVICE_KEY }}
-          STAGING_FIREBASE_PROJECT_ID: \${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
-          TEST_RECIPIENT: \${{ inputs.recipient }}
+          STAGING_GATEWAY_URL: ${{ secrets.STAGING_GATEWAY_URL }}
+          STAGING_INVITE_SERVICE_KEY: ${{ secrets.STAGING_INVITE_SERVICE_KEY }}
+          STAGING_FIREBASE_PROJECT_ID: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
+          TEST_RECIPIENT: ${{ inputs.recipient }}
         run: |
           set -euo pipefail
           test -n "$STAGING_GATEWAY_URL"
@@ -32,13 +32,13 @@ jobs:
           const u = new URL(process.env.STAGING_GATEWAY_URL);
           if (u.protocol !== "https:") throw new Error("Staging gateway must use HTTPS.");
           const email = process.env.TEST_RECIPIENT || "";
-          if (!/^[^\\s@<>\"',;:\\\\]+@[^\\s@<>\"',;:\\\\]+\\.[^\\s@<>\"',;:\\\\]+$/.test(email)) {
+          if (!/^[^\s@<>\"',;:\\]+@[^\s@<>\"',;:\\]+\.[^\s@<>\"',;:\\]+$/.test(email)) {
             throw new Error("Provide a valid controlled test mailbox.");
           }
           NODE
       - name: Verify endpoint identifies itself as staging
         env:
-          STAGING_GATEWAY_URL: \${{ secrets.STAGING_GATEWAY_URL }}
+          STAGING_GATEWAY_URL: ${{ secrets.STAGING_GATEWAY_URL }}
         run: |
           set -euo pipefail
           curl --fail --silent --show-error "$STAGING_GATEWAY_URL/health" -o "$RUNNER_TEMP/staging-health.json"
@@ -50,15 +50,15 @@ jobs:
           NODE
       - name: Send controlled real-SMTP message and reject mock acceptance
         env:
-          STAGING_GATEWAY_URL: \${{ secrets.STAGING_GATEWAY_URL }}
-          STAGING_INVITE_SERVICE_KEY: \${{ secrets.STAGING_INVITE_SERVICE_KEY }}
-          TEST_RECIPIENT: \${{ inputs.recipient }}
+          STAGING_GATEWAY_URL: ${{ secrets.STAGING_GATEWAY_URL }}
+          STAGING_INVITE_SERVICE_KEY: ${{ secrets.STAGING_INVITE_SERVICE_KEY }}
+          TEST_RECIPIENT: ${{ inputs.recipient }}
         run: |
           set -euo pipefail
           node <<'NODE'
           const crypto = require("node:crypto");
           const recipient = process.env.TEST_RECIPIENT;
-          const base = process.env.STAGING_GATEWAY_URL.replace(/\\/+$/, "");
+          const base = process.env.STAGING_GATEWAY_URL.replace(/\/+$/, "");
           const marker = crypto.randomUUID();
           const username = recipient;
           const password = "STG" + crypto.randomBytes(6).toString("hex").toUpperCase();
@@ -68,7 +68,7 @@ jobs:
             "IRPA username: " + username,
             "Meeting gate password: " + password,
             "This message verifies the staging SMTP hand-off only. The token and password are test-only and grant no access."
-          ].join("\\n");
+          ].join("\n");
           const html = "<!doctype html><html><body><h2>IRPA STAGING DELIVERY TEST</h2>" +
             "<p><strong>Not a real meeting invitation.</strong></p><p>Test reference: " + marker +
             "</p><p><strong>IRPA username:</strong> " + username +
