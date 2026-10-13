@@ -24,10 +24,10 @@ jobs:
           TEST_RECIPIENT: ${{ inputs.recipient }}
         run: |
           set -euo pipefail
-          test -n "$STAGING_GATEWAY_URL"
-          test -n "$STAGING_INVITE_SERVICE_KEY"
-          test -n "$STAGING_FIREBASE_PROJECT_ID"
-          test "$STAGING_FIREBASE_PROJECT_ID" = "irpa-dbg-staging-a73ec"
+          if [ -z "$STAGING_GATEWAY_URL" ]; then echo "::error::STAGING_GATEWAY_URL secret is missing."; exit 1; fi
+          if [ -z "$STAGING_INVITE_SERVICE_KEY" ]; then echo "::error::STAGING_INVITE_SERVICE_KEY secret is missing."; exit 1; fi
+          if [ -z "$STAGING_FIREBASE_PROJECT_ID" ]; then echo "::error::STAGING_FIREBASE_PROJECT_ID secret is missing or empty."; exit 1; fi
+          if [ "$STAGING_FIREBASE_PROJECT_ID" != "irpa-dbg-staging-a73ec" ]; then echo "::error::STAGING_FIREBASE_PROJECT_ID does not match the approved staging project ID irpa-dbg-staging-a73ec. Update the GitHub Actions secret; do not use the production project ID."; exit 1; fi
           node - <<'NODE'
           const u = new URL(process.env.STAGING_GATEWAY_URL);
           if (u.protocol !== "https:") throw new Error("Staging gateway must use HTTPS.");
