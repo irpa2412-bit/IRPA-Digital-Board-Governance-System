@@ -1,0 +1,87 @@
+name: Meeting Invitation Staging SMTP Delivery Check
+
+on:
+  workflow_dispatch:
+    inputs:
+      recipient:
+        description: "Controlled test mailbox that you are authorised to receive mail at"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  staging-smtp-delivery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require isolated staging configuration
+        env:
+          STAGING_GATEWAY_URL: \${{ secrets.STAGING_GATEWAY_URL }}
+          STAGING_INVITE_SERVICE_KEY: \${{ secrets.STAGING_INVITE_SERVICE_KEY }}
+          STAGING_FIREBASE_PROJECT_ID: \${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
+          TEST_RECIPIENT: \${{ inputs.recipient }}
+        run: |
+          set -euo pipefail
+          test -n "$STAGING_GATEWAY_URL"
+          test -n "$STAGING_INVITE_SERVICE_KEY"
+          test -n "$STAGING_FIREBASE_PROJECT_ID"
+          test "$STAGING_FIREBASE_PROJECT_ID" != "irpa-digital-board-governance"
+          node - <<'NODE'
+          const u = new URL(process.env.STAGING_GATEWAY_URL);
+          if (u.protocol !== "https:") throw new Error("Staging gateway must use HTTPS.");
+          const email = process.env.TEST_RECIPIENT || "";
+          if (!/^[^\\s@<>\"',;:\\\\]+@[^\\s@<>\"',;:\\\\]+\\.[^\\s@<>\"',;:\\\\]+$/.test(email)) {
+            throw new Error("Provide a valid controlled test mailbox.");
+          }
+          NODE
+      - name: Verify endpoint identifies itself as staging
+        env:
+          STAGING_GATEWAY_URL: \${{ secrets.STAGING_GATEWAY_URL }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error "$STAGING_GATEWAY_URL/health" -o "$RUNNER_TEMP/staging-health.json"
+          node - "$RUNNER_TEMP/staging-health.json" <<'NODE'
+          const fs = require("node:fs");
+          const h = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+          if (h.environment !== "staging") throw new Error("Gateway health endpoint did not confirm staging; refusing to send.");
+          console.log(JSON.stringify({health:"PASS",environment:h.environment,service:h.service}));
+          NODE
+      - name: Send controlled real-SMTP message and reject mock acceptance
+        env:
+          STAGING_GATEWAY_URL: \${{ secrets.STAGING_GATEWAY_URL }}
+          STAGING_INVITE_SERVICE_KEY: \${{ secrets.STAGING_INVITE_SERVICE_KEY }}
+          TEST_RECIPIENT: \${{ inputs.recipient }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const crypto = require("node:crypto");
+          const recipient = process.env.TEST_RECIPIENT;
+          const base = process.env.STAGING_GATEWAY_URL.replace(/\\/+$/, "");
+          const marker = crypto.randomUUID();
+          const username = recipient;
+          const password = "STG" + crypto.randomBytes(6).toString("hex").toUpperCase();
+          const text = [
+            "IRPA STAGING DELIVERY TEST — NOT A REAL MEETING INVITATION",
+            "Test reference: " + marker,
+            "IRPA username: " + username,
+            "Meeting gate password: " + password,
+            "This message verifies the staging SMTP hand-off only. The token and password are test-only and grant no access."
+          ].join("\\n");
+          const html = "<!doctype html><html><body><h2>IRPA STAGING DELIVERY TEST</h2>" +
+            "<p><strong>Not a real meeting invitation.</strong></p><p>Test reference: " + marker +
+            "</p><p><strong>IRPA username:</strong> " + username +
+            "</p><p><strong>Meeting gate password:</strong> <code>" + password +
+            "</code></p><p>Test-only credentials; no meeting access is granted.</p></body></html>";
+          fetch(base + "/api/send-invitation-email", {
+            method: "POST",
+            headers: {"content-type":"application/json","x-irpa-service-key":process.env.STAGING_INVITE_SERVICE_KEY},
+            body: JSON.stringify({to:recipient,subject:"[IRPA STAGING TEST] Meeting invitation email delivery",text,html})
+          }).then(async response => {
+            const body = await response.json().catch(() => ({}));
+            if (!response.ok || body.ok !== true || !body.messageId) throw new Error("SMTP endpoint failed with HTTP " + response.status + " (" + (body.error || "no provider receipt") + ").");
+            if (/mock|test accepted/i.test(String(body.messageId))) throw new Error("Gateway returned a mock receipt; real SMTP delivery is not verified.");
+            console.log(JSON.stringify({result:"SMTP_ACCEPTED",recipientDomain:recipient.split("@").pop(),messageId:body.messageId,reference:marker}));
+          }).catch(error => { console.error(error.message); process.exitCode=1; });
+          NODE
