@@ -56,6 +56,23 @@ test("active designated departmental director can create a categorized meeting",
   }).firestore();
   await assertSucceeds(db.doc("meetings/departmental-meeting").set(meeting()));
 });
+test("any active IRPA employee can register a meeting but cannot edit it after release", async () => {
+  const db = testEnv.authenticatedContext("staff-user", {
+    email: "staff@example.test"
+  }).firestore();
+  await assertSucceeds(db.doc("meetings/staff-created-meeting").set(meeting({
+    initiatorUid: "staff-user",
+    initiatorEmail: "staff@example.test",
+    registerStatus: "Registration Pending"
+  })));
+  await assertSucceeds(db.doc("meetings/staff-created-meeting").update({
+    registerStatus: "Registered",
+    registeredAt: "2026-10-13T20:00:00.000Z"
+  }));
+  await assertFails(db.doc("meetings/staff-created-meeting").update({
+    title: "Unauthorised post-release edit"
+  }));
+});
 test("designated initiator can complete initial registration release exactly once", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     await context.firestore().doc("meetings/departmental-meeting").set(meeting());
