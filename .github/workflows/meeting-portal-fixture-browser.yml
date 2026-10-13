@@ -59,6 +59,7 @@ jobs:
             "drive-gateway/tests/mail-invitation.unit.mjs",
             "drive-gateway/tests/invitation-redemption.test.mjs",
             ".github/workflows/meeting-invitation-nonprod-e2e.yml",
+            ".github/workflows/meeting-invitation-staging-smtp-check.yml",
             "functions/meetingGateway.emulator.test.cjs",
             "functions/meetingEntryPolicy.js",
             "functions/meetingEntryPolicy.test.cjs",
