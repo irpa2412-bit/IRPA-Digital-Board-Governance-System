@@ -459,3 +459,9 @@ export async function getResearchToolPermissions(){
   const snap=await getDocs(query(collection(db,COLLECTIONS.researchToolPermissions),where("userUid","==",uid),where("status","==","Active")));
   return snap.docs.map(x=>({id:x.id,...x.data()}));
 }
+
+export async function listMeetingInviteeDirectory(){
+ if(!auth.currentUser?.uid)throw new Error("Authentication is required to load meeting participants.");
+ const call=httpsCallable(getFunctions(undefined,"us-central1"),"listMeetingInviteeDirectory");const result=await call({});
+ return {boardMembers:Array.isArray(result.data?.boardMembers)?result.data.boardMembers:[],members:Array.isArray(result.data?.members)?result.data.members:[],employees:Array.isArray(result.data?.employees)?result.data.employees:[]};
+}
