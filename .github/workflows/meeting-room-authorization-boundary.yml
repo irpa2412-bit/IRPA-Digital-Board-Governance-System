@@ -22,6 +22,7 @@ on:
       - "tests/meeting-room-authorization-boundary.test.mjs"
       - "tests/meeting-working-documents-security.test.mjs"
       - ".github/workflows/meeting-room-authorization-boundary.yml"
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
