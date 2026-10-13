@@ -1,4 +1,4 @@
-import React,{useEffect,useMemo,useState} from "react";
+import React,{useEffect,useMemo,useRef,useState} from "react";
 import {addDoc,collection,onSnapshot,serverTimestamp,updateDoc,doc} from "firebase/firestore";
 import app,{auth,db} from "../firebase/config";
 
@@ -116,6 +116,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  const [crawlerProvision,setCrawlerProvision]=useState([]);
  const [crawlerRunning,setCrawlerRunning]=useState(false);
  const [workspaceOpen,setWorkspaceOpen]=useState(false);
+ const workspaceRef=useRef(null);
  const [selectedOpportunity,setSelectedOpportunity]=useState(null);
  const [opportunityDescription,setOpportunityDescription]=useState("");
  const [donorRequirements,setDonorRequirements]=useState("");
@@ -319,104 +320,11 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    try{
      setCrawlerRunning(true);setError("");setNotice("Manual donor-source scan requested. This can take several minutes.");
      const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-production.irpa-governance.workers.dev").replace(/\/+$/, "");
-     const idToken=await auth.currentUser?.getIdToken();
-     if(!idToken) throw new Error("Your session has expired. Sign in again.");
-     const response=await fetch(workerUrl+"/run",{method:"POST",headers:{"Authorization":"Bearer "+idToken,"Content-Type":"application/json"},body:"{}",signal:AbortSignal.timeout(90000)});
-     const data=await response.json().catch(()=>({}));
-     if(!response.ok) throw new Error(data.error||"Cloudflare grant crawler request failed ("+response.status+").");
-     setNotice("Grant crawler scan "+String(data.status||"finished")+". Sources checked: "+String(data.sourceCount||data.configuredSources||0)+", candidates found: "+String(data.candidatesFound||data.itemsSeen||0)+", records created or updated: "+String(Number(data.created||0)+Number(data.updated||0)||data.recordsChanged||0)+". New leads remain pending official-call verification.");
-     await loadCrawlerResults(false);
-   }catch(err){console.error("Manual grant crawler scan failed",err);setError(err?.name==="TimeoutError"?"The scan exceeded 90 seconds. Refresh results and inspect crawler health before retrying.":err?.message||"Manual scan failed. Check crawler authorization and Worker health.");}
-   finally{setCrawlerRunning(false);}
- }
- async function loadSavedDrafts(){
-   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-production.irpa-governance.workers.dev").replace(/\/+$/,"");
-   const idToken=await auth.currentUser?.getIdToken();
-   if(!idToken)return;
-   setDraftsBusy(true);
-   try{
-     const response=await fetch(workerUrl+"/application/drafts",{headers:{Authorization:"Bearer "+idToken,Accept:"application/json"},signal:AbortSignal.timeout(15000)});
-     const data=await response.json().catch(()=>({}));
-     if(!response.ok)throw new Error(data.error||"Saved concept notes could not be loaded.");
-     setSavedDrafts(Array.isArray(data.drafts)?data.drafts:[]);
-   }catch(err){setError(err?.message||"Saved concept notes could not be loaded.");}
-   finally{setDraftsBusy(false);}
- }
- function openConceptWorkspace(record=null){
-   setSelectedOpportunity(record);
-   setOpportunityDescription(text(record?.summary||record?.description||""));
-   setDonorRequirements(text(record?.applicationRequirements||record?.donorRequirements||""));
-   setAnalysisResult(null);
-   setConceptDraft("");
-   setDraftId("");
-   setWorkspaceNotice("");
-   setWorkspaceOpen(true);
- }
- async function loadDraftAuditEvents(id){
-   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-production.irpa-governance.workers.dev").replace(/\/+$/,"");
-   const idToken=await auth.currentUser?.getIdToken();
-   if(!idToken||!id)return;
-   setAuditBusy(true);
-   try{
-     const response=await fetch(workerUrl+"/application/drafts/"+encodeURIComponent(id)+"/events",{headers:{Authorization:"Bearer "+idToken,Accept:"application/json"},signal:AbortSignal.timeout(15000)});
-     const data=await response.json().catch(()=>({}));
-     if(!response.ok)throw new Error(data.error||"Draft audit trail could not be loaded.");
-     setDraftAuditEvents(Array.isArray(data.events)?data.events:[]);
-   }catch(err){setError(err?.message||"Draft audit trail could not be loaded.");}
-   finally{setAuditBusy(false);}
- }
- function downloadConceptDraft(){
-   const draft=text(conceptDraft||analysisResult?.concept_note?.draft);
-   if(!draft){setError("Generate or enter a concept note before downloading.");return;}
-   const blob=new Blob([draft],{type:"text/plain;charset=utf-8"});
-   const href=URL.createObjectURL(blob);
-   const link=document.createElement("a");
-   link.href=href;
-   link.download="IRPA-Concept-Note-"+String(selectedOpportunity?.title||"Draft").replace(/[^A-Za-z0-9-]+/g,"-").slice(0,80)+".txt";
-   document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(href);
-   setWorkspaceNotice("Concept-note text downloaded. Upload the reviewed document through the existing DBGS Documents portal when ready.");
- }
- function openSavedConceptDraft(draft){
-   setDraftAuditEvents([]);
-   setSelectedOpportunity({
-     id:draft.id,
-     title:draft.opportunity?.title||draft.name||"Saved concept note",
-     url:draft.opportunity?.url||"",
-     summary:draft.opportunity?.description||"",
-     funder:"Saved concept-note draft",
-     applicationRequirements:draft.opportunity?.donorRequirements||"",
-     status:"Under review",
-     deadline:draft.opportunity?.deadline||null,
-     callStatus:draft.opportunity?.callStatus||""
-   });
-   setOpportunityDescription(text(draft.opportunity?.description||""));
-   setDonorRequirements(text(draft.opportunity?.donorRequirements||""));
-   setAnalysisResult(draft.assessment||null);
-   setConceptDraft(text(draft.applicationFields?.conceptNoteDraft||""));
-   setDraftId(draft.id);
-   setWorkspaceNotice("Loaded saved draft. Review eligibility and official call criteria before reuse.");
-   setWorkspaceOpen(true);
-   loadDraftAuditEvents(draft.id);
- }
- async function runWorkspaceAnalysis(task="eligibility"){
-   if(!selectedOpportunity?.title){setError("Select a grant opportunity before screening eligibility.");return;}
-   const currentStatusIssue=getOpportunityCurrentStatusIssue({...selectedOpportunity,summary:[selectedOpportunity.summary,opportunityDescription].filter(Boolean).join(" "),applicationRequirements:donorRequirements});
-   if(currentStatusIssue&&currentStatusIssue!=="unverified"){
-     setAnalysisResult({geographic_eligibility:{status:"unclear",reason:"The application deadline has passed or the call is explicitly closed/expired.",evidence:["Deterministic expiry gate applied before AI analysis."]},eligibility:{status:"ineligible",confidence:"high",evidence:["Expired or closed call"],unknowns:["Select a current call with a future deadline or verify that the donor has formally reopened it."]}});
-     setConceptDraft("");
-     setError("This call is expired or closed. AI analysis and concept-note drafting are blocked.");
-     setWorkspaceNotice("Closed/expired-call gate blocked this call before AI analysis.");
-     return;
-   }
-   const statusUnverified=currentStatusIssue==="unverified";
-   // Geographic eligibility no longer blocks opportunity analysis; show and assess all calls.
-   if(!text(opportunityDescription)&&!text(donorRequirements)){setError("Provide the opportunity description or paste the official donor eligibility and application criteria.");return;}
-   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-production.irpa-governance.workers.dev").replace(/\/+$/,"");
-   const idToken=await auth.currentUser?.getIdToken();
-   if(!idToken){setError("Your session has expired. Sign in again.");return;}
-   setAnalysisBusy(true);setError("");setWorkspaceNotice(task==="concept_note"?(statusUnverified?"Preparing a review-only draft; current call status still needs verification…":"Checking eligibility and preparing the concept-note draft…"):"Checking geographic, organizational and donor eligibility criteria…");
-   try{
-     const response=await fetch(workerUrl+"/assistant/analyze",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({task,title:selectedOpportunity.title,description:text(opportunityDescription),donorRequirements:text(donorRequirements),url:text(selectedOpportunity.url),deadline:dateKeyInTanzania(selectedOpportunity.deadline||selectedOpportunity.deadline_at)||"",callStatus:text(selectedOpportunity.callStatus||selectedOpportunity.call_status||"")}),signal:AbortSignal.timeout(90000)});
+    setAnalysisBusy(true);setError("");setWorkspaceNotice(task==="concept_note"?(statusUnverified?"Preparing a review-only draft; current call status still needs verification…":"Checking eligibility and preparing the concept-note draft…"):"Checking geographic, organizational and donor eligibility criteria…");
+    try{
+      const idToken=await auth.currentUser?.getIdToken(true);
+      if(!idToken)throw new Error("Your session has expired. Sign in again.");
+      const response=await fetch(workerUrl+"/assistant/analyze",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({task,title:selectedOpportunity.title,description:screeningDescription,donorRequirements:text(donorRequirements),url:text(selectedOpportunity.url),deadline:dateKeyInTanzania(selectedOpportunity.deadline||selectedOpportunity.deadline_at)||"",callStatus:text(selectedOpportunity.callStatus||selectedOpportunity.call_status||"")}),signal:AbortSignal.timeout(90000)});
      const data=await response.json().catch(()=>({}));
      if(!response.ok){
        if(data.geographic_eligibility||data.eligibility_gate)setAnalysisResult({geographic_eligibility:data.geographic_eligibility||null,eligibility_gate:data.eligibility_gate||null,eligibility:{status:data.eligibility_gate?.status==="ineligible"||data.geographic_eligibility?.status==="ineligible"?"ineligible":"insufficient_information",confidence:"high",evidence:data.geographic_eligibility?.evidence||[],unknowns:[data.geographic_eligibility?.reason||data.next_step||"Verify official eligibility criteria.",...(data.eligibility_gate?.warnings||[])]}});
@@ -577,7 +485,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    <fieldset style={{border:"1px solid #425064",borderRadius:10,padding:12}}><legend style={{padding:"0 6px",fontSize:12}}>Cross-cutting themes</legend><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:8}}>{THEMES.map(t=><label key={t.id} style={{display:"flex",gap:8,alignItems:"center",fontSize:12}}><input type="checkbox" checked={draft.themes.includes(t.id)} onChange={()=>toggleDraftArray("themes",t.id)}/>{t.label}</label>)}</div></fieldset>
    <div><button disabled={saving} type="submit" style={{...styles.button,opacity:saving ? 0.6 : 1}}>{saving?"Saving…":"Save opportunity"}</button></div>
   </form>}
-  {workspaceOpen&&<section style={{...styles.card,display:"grid",gap:13,borderColor:"#4e8b91"}} aria-labelledby="concept-workspace-heading">
+  {workspaceOpen&&<section ref={workspaceRef} style={{...styles.card,display:"grid",gap:13,borderColor:"#4e8b91",scrollMarginTop:16}} aria-labelledby="concept-workspace-heading">
    <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"start",flexWrap:"wrap"}}>
     <div><div style={styles.eyebrow}>IRPA-DBGS · APPLICATION PREPARATION</div><h2 id="concept-workspace-heading" style={{fontSize:21,margin:"5px 0"}}>AI eligibility & concept-note workspace</h2><p style={{...styles.muted,margin:0}}>Eligibility findings are advisory and do not block drafting. Closed or expired calls are blocked; an unverified current status is flagged for review before submission.</p></div>
     <button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>setWorkspaceOpen(false)}>Close workspace</button>
