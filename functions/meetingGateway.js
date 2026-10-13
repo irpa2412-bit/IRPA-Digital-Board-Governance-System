@@ -154,6 +154,7 @@ exports.listMeetingInviteCandidates=onCall({region:"us-central1",timeoutSeconds:
  };
  const members=memberSnap.docs.map(d=>clean(d,"Member")).filter(Boolean);
  const employees=employeeSnap.docs.map(d=>clean(d,"Employee")).filter(Boolean);
+ await db.collection("audit").add({action:"MEETING_INVITATION_CANDIDATES_ACCESSED",collection:"meetings",recordId:meetingId,details:{memberCandidateCount:members.length,employeeCandidateCount:employees.length},actorUid:uid,actorEmail:email,createdAt:FieldValue.serverTimestamp()});
  return {members,employees,source:"AUTHORITATIVE_REGISTERS",meetingId};
 });
 
