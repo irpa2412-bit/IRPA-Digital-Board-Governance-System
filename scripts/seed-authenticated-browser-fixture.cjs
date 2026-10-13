@@ -1,4 +1,4 @@
-const { initializeApp, getAuth, getFirestore } = require("../functions/node_modules/firebase-admin");
+const admin = require("../functions/node_modules/firebase-admin");
 
 const projectId = process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || "demo-irpa-dgbs";
 const email = "irpa-browser-fixture-admin@example.test";
@@ -8,9 +8,9 @@ async function main() {
   if (!process.env.FIREBASE_AUTH_EMULATOR_HOST || !process.env.FIRESTORE_EMULATOR_HOST) {
     throw new Error("Refusing to seed the browser fixture unless both Firebase emulators are active.");
   }
-  initializeApp({ projectId });
-  const auth = getAuth();
-  const db = getFirestore();
+  admin.initializeApp({ projectId });
+  const auth = admin.auth();
+  const db = admin.firestore();
   const user = await auth.createUser({ email, password, emailVerified: true, displayName: "IRPA Browser Fixture Administrator" });
   await db.collection("adminProfiles").doc(user.uid).set({
     uid: user.uid,
