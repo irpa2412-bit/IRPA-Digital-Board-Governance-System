@@ -3,14 +3,6 @@ import { test, expect } from "@playwright/test";
 const fixtureEmail = "irpa-browser-fixture-admin@example.test";
 const fixturePassword = "FixtureOnly-Password-2026!";
 
-async function chooseTrialEnvironment(page) {
-  const gate = page.getByRole("dialog", { name: "Data Environment Gate" });
-  await expect(gate).toBeVisible({ timeout: 45000 });
-  await gate.getByRole("button", { name: /TRIAL DATA/ }).click();
-  await gate.getByRole("button", { name: "Enter Trial Data Gate" }).click();
-  await expect(gate).toHaveCount(0, { timeout: 20000 });
-}
-
 async function navigateModule(page, viewportName, module) {
   if (viewportName === "mobile") {
     if (module === "Finance Portfolio" || module === "Meeting Room" || module === "Documents") {
@@ -89,7 +81,9 @@ for (const viewport of [
     await page.locator('.auth-card input[type="email"]').fill(fixtureEmail);
     await page.locator('.auth-card input[type="password"]').fill(fixturePassword);
     await page.getByRole("button", { name: "Sign In Securely" }).click();
-    await chooseTrialEnvironment(page);
+    // A valid emulator administrator should enter the requested portal directly;
+    // this workflow performs no data-entry writes except confirming Trial for Documents.
+    await expect(page.locator(".topbar h2")).toContainText(/Grant Intelligence.*Funding Opportunities/, { timeout: 45000 });
 
     await assertPortalAndNoOverflow(page, /Grant Intelligence.*Funding Opportunities/, viewport.width);
     await expect(page.getByRole("heading", { name: "Corporate, climate and partnership sources" })).toBeVisible();

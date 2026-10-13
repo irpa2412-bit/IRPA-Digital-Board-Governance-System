@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
-      GCLOUD_PROJECT: demo-irpa-dgbs
+      GCLOUD_PROJECT: irpa-digital-board-governance
     steps:
       - name: Checkout isolated pull request
         uses: actions/checkout@v4
@@ -49,7 +49,7 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Authenticate against isolated Firebase Auth and Firestore emulators; test mobile and desktop
-        run: npx firebase emulators:exec --config firebase.emulator.test.json --only auth,firestore --project demo-irpa-dgbs "node scripts/seed-authenticated-browser-fixture.cjs && npx playwright test --config=playwright.authenticated-governance.config.mjs"
+        run: npx firebase emulators:exec --config firebase.emulator.test.json --only auth,firestore --project irpa-digital-board-governance "node scripts/seed-authenticated-browser-fixture.cjs && npx playwright test --config=playwright.authenticated-governance.config.mjs"
       - name: Upload browser evidence on failure
         if: failure()
         uses: actions/upload-artifact@v4
