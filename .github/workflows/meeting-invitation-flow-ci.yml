@@ -44,6 +44,8 @@ on:
       - "drive-gateway/tests/invitation-redemption.test.mjs"
       - "functions/meetingGateway.emulator.test.cjs"
 
+  workflow_dispatch:
+
 permissions:
   contents: read
 
