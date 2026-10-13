@@ -14,6 +14,7 @@ on:
     branches: [main]
     paths:
       - "src/pages/Meetings.jsx"
+      - "firestore.rules"
       - "src/firebase/meetingPolicy.js"
       - "tests/meeting-portal-browser.test.mjs"
       - "tests/fixtures/**"
@@ -79,6 +80,7 @@ jobs:
             "src/pages/MeetingRoom.jsx",
             "src/pages/OperationalGatewaysParticipants.jsx",
             "src/pages/Meetings.jsx",
+            "firestore.rules",
             "tests/fixtures/meeting-portal-fixture.html",
             "tests/fixtures/meeting-portal-fixture.jsx",
             "tests/fixtures/mocks.js",
