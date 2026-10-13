@@ -1,4 +1,4 @@
-import React,{useEffect,useMemo,useState} from "react";
+import React,{useEffect,useMemo,useRef,useState} from "react";
 import {addDoc,collection,onSnapshot,serverTimestamp,updateDoc,doc} from "firebase/firestore";
 import app,{auth,db} from "../firebase/config";
 
@@ -116,6 +116,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  const [crawlerProvision,setCrawlerProvision]=useState([]);
  const [crawlerRunning,setCrawlerRunning]=useState(false);
  const [workspaceOpen,setWorkspaceOpen]=useState(false);
+ const workspaceRef=useRef(null);
  const [selectedOpportunity,setSelectedOpportunity]=useState(null);
  const [opportunityDescription,setOpportunityDescription]=useState("");
  const [donorRequirements,setDonorRequirements]=useState("");
@@ -342,6 +343,9 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    }catch(err){setError(err?.message||"Saved concept notes could not be loaded.");}
    finally{setDraftsBusy(false);}
  }
+ useEffect(()=>{
+  if(workspaceOpen&&workspaceRef.current)workspaceRef.current.scrollIntoView({behavior:"smooth",block:"start"});
+ },[workspaceOpen,selectedOpportunity]);
  function openConceptWorkspace(record=null){
    setSelectedOpportunity(record);
    setOpportunityDescription(text(record?.summary||record?.description||""));
@@ -410,13 +414,14 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    }
    const statusUnverified=currentStatusIssue==="unverified";
    // Geographic eligibility no longer blocks opportunity analysis; show and assess all calls.
-   if(!text(opportunityDescription)&&!text(donorRequirements)){setError("Provide the opportunity description or paste the official donor eligibility and application criteria.");return;}
+   // Permit first-pass screening when crawler metadata is sparse; the assessment must identify missing evidence as unknown.
+   const screeningDescription=text(opportunityDescription)||"No opportunity description was supplied. Assess only the title, URL and donor requirements provided; mark unsupported eligibility criteria as unknown and list evidence to verify in the official call.";
    const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-production.irpa-governance.workers.dev").replace(/\/+$/,"");
-   const idToken=await auth.currentUser?.getIdToken();
-   if(!idToken){setError("Your session has expired. Sign in again.");return;}
    setAnalysisBusy(true);setError("");setWorkspaceNotice(task==="concept_note"?(statusUnverified?"Preparing a review-only draft; current call status still needs verification…":"Checking eligibility and preparing the concept-note draft…"):"Checking geographic, organizational and donor eligibility criteria…");
    try{
-     const response=await fetch(workerUrl+"/assistant/analyze",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({task,title:selectedOpportunity.title,description:text(opportunityDescription),donorRequirements:text(donorRequirements),url:text(selectedOpportunity.url),deadline:dateKeyInTanzania(selectedOpportunity.deadline||selectedOpportunity.deadline_at)||"",callStatus:text(selectedOpportunity.callStatus||selectedOpportunity.call_status||"")}),signal:AbortSignal.timeout(90000)});
+     const idToken=await auth.currentUser?.getIdToken(true);
+     if(!idToken)throw new Error("Your session has expired. Sign in again.");
+     const response=await fetch(workerUrl+"/assistant/analyze",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({task,title:selectedOpportunity.title,description:screeningDescription,donorRequirements:text(donorRequirements),url:text(selectedOpportunity.url),deadline:dateKeyInTanzania(selectedOpportunity.deadline||selectedOpportunity.deadline_at)||"",callStatus:text(selectedOpportunity.callStatus||selectedOpportunity.call_status||"")}),signal:AbortSignal.timeout(90000)});
      const data=await response.json().catch(()=>({}));
      if(!response.ok){
        if(data.geographic_eligibility||data.eligibility_gate)setAnalysisResult({geographic_eligibility:data.geographic_eligibility||null,eligibility_gate:data.eligibility_gate||null,eligibility:{status:data.eligibility_gate?.status==="ineligible"||data.geographic_eligibility?.status==="ineligible"?"ineligible":"insufficient_information",confidence:"high",evidence:data.geographic_eligibility?.evidence||[],unknowns:[data.geographic_eligibility?.reason||data.next_step||"Verify official eligibility criteria.",...(data.eligibility_gate?.warnings||[])]}});
@@ -577,7 +582,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    <fieldset style={{border:"1px solid #425064",borderRadius:10,padding:12}}><legend style={{padding:"0 6px",fontSize:12}}>Cross-cutting themes</legend><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:8}}>{THEMES.map(t=><label key={t.id} style={{display:"flex",gap:8,alignItems:"center",fontSize:12}}><input type="checkbox" checked={draft.themes.includes(t.id)} onChange={()=>toggleDraftArray("themes",t.id)}/>{t.label}</label>)}</div></fieldset>
    <div><button disabled={saving} type="submit" style={{...styles.button,opacity:saving ? 0.6 : 1}}>{saving?"Saving…":"Save opportunity"}</button></div>
   </form>}
-  {workspaceOpen&&<section style={{...styles.card,display:"grid",gap:13,borderColor:"#4e8b91"}} aria-labelledby="concept-workspace-heading">
+  {workspaceOpen&&<section ref={workspaceRef} style={{...styles.card,display:"grid",gap:13,borderColor:"#4e8b91",scrollMarginTop:16}} aria-labelledby="concept-workspace-heading">
    <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"start",flexWrap:"wrap"}}>
     <div><div style={styles.eyebrow}>IRPA-DBGS · APPLICATION PREPARATION</div><h2 id="concept-workspace-heading" style={{fontSize:21,margin:"5px 0"}}>AI eligibility & concept-note workspace</h2><p style={{...styles.muted,margin:0}}>Eligibility findings are advisory and do not block drafting. Closed or expired calls are blocked; an unverified current status is flagged for review before submission.</p></div>
     <button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>setWorkspaceOpen(false)}>Close workspace</button>
