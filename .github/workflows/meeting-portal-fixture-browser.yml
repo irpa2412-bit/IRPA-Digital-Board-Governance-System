@@ -60,6 +60,7 @@ jobs:
             "drive-gateway/tests/invitation-redemption.test.mjs",
             ".github/workflows/meeting-invitation-nonprod-e2e.yml",
             ".github/workflows/meeting-invitation-staging-smtp-check.yml",
+            ".github/workflows/meeting-room-authorization-boundary.yml",
             "functions/meetingGateway.emulator.test.cjs",
             "functions/meetingEntryPolicy.js",
             "functions/meetingEntryPolicy.test.cjs",
@@ -75,6 +76,7 @@ jobs:
             "tests/fixtures/meeting-portal-fixture.jsx",
             "tests/fixtures/mocks.js",
             "tests/meeting-portal-browser.test.mjs",
+            "tests/meeting-room-authorization-boundary.test.mjs",
             "vite.meeting-fixture.config.js"
           ]);
           const unexpected = changed.filter(path => !allowed.has(path));
