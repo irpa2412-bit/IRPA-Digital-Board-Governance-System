@@ -142,19 +142,35 @@ async function main() {
 
   // Geography is advisory for drafting: preserve the ineligible finding, but allow
   // a review draft so IRPA can assess the official call and correct any source errors.
-  const reviewDraftResponse = await fetch(workerUrl + "/assistant/analyze", {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ ...southAfricaFixture, task: "concept_note" })
-  });
-  const reviewDraftBody = await reviewDraftResponse.json();
-  if (!reviewDraftResponse.ok ||
+  // Workers AI may transiently return an eligibility assessment without a draft.
+  // Retry the authenticated staging request a bounded number of times; never treat
+  // a missing draft as success and preserve the geographic exclusion assertion.
+  let reviewDraftResponse = null;
+  let reviewDraftBody = {};
+  let reviewDraftFailure = "missing draft or advisory eligibility result";
+  for (let attempt = 0; attempt < 3; attempt++) {
+    reviewDraftResponse = await fetch(workerUrl + "/assistant/analyze", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ ...southAfricaFixture, task: "concept_note" })
+    });
+    reviewDraftBody = await reviewDraftResponse.json().catch(() => ({}));
+    const validReviewDraft = reviewDraftResponse.ok &&
+      reviewDraftBody.service === "irpa-grant-application-assistant" &&
+      reviewDraftBody.assessment?.geographic_eligibility?.status === "ineligible" &&
+      typeof reviewDraftBody.assessment?.concept_note?.draft === "string" &&
+      reviewDraftBody.assessment.concept_note.draft.trim().length >= 100;
+    if (validReviewDraft) break;
+    reviewDraftFailure = String(reviewDraftBody.error || "missing draft or advisory eligibility result").slice(0, 240);
+    if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 1500 * (attempt + 1)));
+  }
+  if (!reviewDraftResponse?.ok ||
       reviewDraftBody.service !== "irpa-grant-application-assistant" ||
       reviewDraftBody.assessment?.geographic_eligibility?.status !== "ineligible" ||
       typeof reviewDraftBody.assessment?.concept_note?.draft !== "string" ||
       reviewDraftBody.assessment.concept_note.draft.trim().length < 100) {
-    throw new Error("The South Africa-only review-draft test failed: preserve the geographic warning while returning a usable concept-note draft. HTTP " +
-      reviewDraftResponse.status + "; " + String(reviewDraftBody.error || "missing draft or advisory eligibility result").slice(0, 240));
+    throw new Error("The South Africa-only review-draft test failed after 3 bounded attempts: preserve the geographic warning while returning a usable concept-note draft. HTTP " +
+      reviewDraftResponse?.status + "; " + reviewDraftFailure);
   }
 
   console.log(JSON.stringify({
