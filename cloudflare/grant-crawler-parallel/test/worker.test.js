@@ -831,6 +831,21 @@ test("AI document drafting rejects an empty instruction", async () => {
   assert.equal(response.status, 400);
 });
 
+test("AI document drafting returns a labelled scaffold when the AI binding is missing", async () => {
+  const token = "test-token-with-at-least-32-characters-long";
+  const response = await worker.fetch(new Request("https://crawler.example/assistant/analyze", {
+    method: "POST",
+    headers: { authorization: "Bearer " + token, "content-type": "application/json" },
+    body: JSON.stringify({ task: "draft_message", format: "Formal letter", instructions: "Confirm the endpoint is responsive." })
+  }), { CRAWLER_CONTROL_TOKEN: token });
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.task, "draft_message");
+  assert.equal(body.draft_source, "deterministic_fallback");
+  assert.equal(body.requires_human_completion, true);
+  assert.match(body.draft, /INTERNAL DRAFT SCAFFOLD/);
+});
+
 test("AI document drafting returns a clearly labelled scaffold when Workers AI throws", async () => {
   const token = "test-token-with-at-least-32-characters-long";
   const response = await worker.fetch(new Request("https://crawler.example/assistant/analyze", {
