@@ -41,10 +41,12 @@ test("explicitly invited participants can access their meeting regardless of ins
   }, { isInvited: true }), true);
 });
 
-test("meeting registration requires an active designated institutional role", () => {
+test("meeting registration is available to active IRPA members and employees", () => {
   assert.equal(canRegisterMeeting({ active: true, role: "Departmental Director" }), true);
-  assert.equal(canRegisterMeeting({ active: false, role: "Departmental Director" }), false);
-  assert.equal(canRegisterMeeting({ active: true, role: "Staff" }), false);
+  assert.equal(canRegisterMeeting({ active: true, activeMember: true, role: "Ordinary Member" }), true);
+  assert.equal(canRegisterMeeting({ active: true, activeEmployee: true, role: "Staff" }), true);
+  assert.equal(canRegisterMeeting({ active: false, activeEmployee: true, role: "Staff" }), false);
+  assert.equal(canRegisterMeeting({ active: true, role: "External Expert" }), false);
   assert.equal(canRegisterMeeting({ isAdmin: true }), true);
 });
 
