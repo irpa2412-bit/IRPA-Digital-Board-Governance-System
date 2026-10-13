@@ -2,6 +2,7 @@ const {onCall,HttpsError}=require("firebase-functions/v2/https");
 const logger=require("firebase-functions/logger");
 const {getFirestore,FieldValue}=require("firebase-admin/firestore");
 const crypto=require("crypto");
+const {normalizeMeetingEntryMode,resolveMeetingEntryState}=require("./meetingEntryPolicy");
 const db=getFirestore();
 
 function text(v){return String(v??"").trim();}
@@ -106,16 +107,17 @@ exports.authorizeMeetingEntry=onCall({region:"us-central1",timeoutSeconds:30},as
  if(!meetingSnap.exists)throw new HttpsError("not-found","The meeting record no longer exists.");
  const meeting={id:meetingSnap.id,...meetingSnap.data()};
  if(!active(meeting.status))throw new HttpsError("failed-precondition","This meeting is closed and cannot be entered.");
- const entryMode=text(meeting.meetingEntryMode||"HOST_APPROVAL").toUpperCase()==="DIRECT"?"DIRECT":"HOST_APPROVAL";
+ const entryMode=normalizeMeetingEntryMode(meeting);
  const requestQuery=await db.collection("meetingEntryRequests").where("accessId","==",doc.id).limit(10).get();
  const matchingRequest=requestQuery.docs.find(item=>text(item.data()?.participantUid)===uid);
  let entryRequest=matchingRequest?{id:matchingRequest.id,...matchingRequest.data()}:null;
- if(entryMode==="DIRECT"||entryRequest?.status==="ADMITTED"){
+ const entryState=resolveMeetingEntryState(entryMode,entryRequest?.status);
+ if(entryState==="AUTHORIZED"){
   if(entryRequest&&entryRequest.status!=="ADMITTED")await db.collection("meetingEntryRequests").doc(entryRequest.id).update({status:"ADMITTED",resolvedAt:FieldValue.serverTimestamp(),resolvedBy:"DIRECT_ENTRY_POLICY"});
   await db.collection("audit").add({action:"MEETING_ENTRY_AUTHORIZED",collection:"meetingAccessTokens",recordId:doc.id,details:{meetingId:grant.meetingId,participantId:grant.participantId,entryMode,gateway:"IRPA Meeting Entry Gateway"},actorUid:uid,actorEmail:email,createdAt:FieldValue.serverTimestamp()});
   return {ok:true,entryState:"AUTHORIZED",entryMode,meetingId:grant.meetingId,participantId:grant.participantId,meetingReference:grant.meetingReference||meeting.reference||meeting.title,meetingCategory:text(meeting.meetingCategory||meeting.category||meeting.meetingType||"General Meeting"),meetingStatus:meeting.status||"Scheduled",participantName:text(participant.participantName||participant.name)||email};
  }
- if(entryRequest?.status==="DENIED")throw new HttpsError("permission-denied","The meeting host declined this entry request. Contact the meeting initiator for assistance.");
+ if(entryState==="DENIED")throw new HttpsError("permission-denied","The meeting host declined this entry request. Contact the meeting initiator for assistance.");
  if(!entryRequest){
   const requestRef=db.collection("meetingEntryRequests").doc();
   entryRequest={id:requestRef.id};
