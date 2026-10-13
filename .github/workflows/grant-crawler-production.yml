@@ -211,52 +211,88 @@ jobs:
           GRANT_CRAWLER_CONTROL_TOKEN: ${{ secrets.GRANT_CRAWLER_CONTROL_TOKEN }}
           PRODUCTION_WORKER_URL: ${{ steps.deploy_production.outputs.worker_url }}
         run: |
-          set -euo pipefail
-          document_result="$(curl --silent --show-error --max-time 90 -X POST \
-            -H "Authorization: Bearer $GRANT_CRAWLER_CONTROL_TOKEN" \
-            -H "Content-Type: application/json" \
-            --data '{"task":"draft_message","format":"Formal letter","tone":"Professional","length":"Concise","instructions":"Write a short production smoke-test draft confirming the IRPA document drafting assistant is available."}' \
-            "$PRODUCTION_WORKER_URL/assistant/analyze")"
-          document_status="$(node - "$document_result" <<'NODE'
-          const body = JSON.parse(process.argv[2]);
-          if (body.error && /4006|quota|neurons|daily free allocation|upgrade/i.test(body.error)) { console.log('quota'); process.exit(0); }
-          if (body.task !== 'draft_message' || typeof body.draft !== 'string' || body.draft.trim().length < 30) {
-            throw new Error('Production document-drafting endpoint returned neither a usable draft nor a labelled fallback. Response keys: ' + Object.keys(body).join(', ') + '; sanitized error: ' + String(body.error || body.message || 'none').slice(0, 180));
-          }
-          if (body.draft_source === 'deterministic_fallback' && body.requires_human_completion !== true) throw new Error('Fallback draft is missing its human-review marker.');
-          if (body.draft_source && !['workers_ai', 'deterministic_fallback'].includes(body.draft_source)) throw new Error('Unexpected document draft source marker.');
-          console.log(body.draft_source === 'deterministic_fallback' ? 'fallback' : 'success');
-          NODE
-          )"
-          if [ "$document_status" = "quota" ]; then
-            echo "::warning::Workers AI daily quota is exhausted. Live fundraising search and non-AI discovery checks continue; AI drafting smoke is skipped until quota replenishes or is upgraded."
-            exit 0
-          fi
-          if [ "$document_status" = "fallback" ]; then
-            echo "::warning::Production document endpoint returned a clearly labelled fallback scaffold because Workers AI did not return a usable draft. The endpoint is responsive, but AI generation is degraded; human completion is required."
-          else
-            echo "Production Workers AI document drafting returned a usable draft."
-          fi
-          concept_result="$(curl --silent --show-error --max-time 90 -X POST \
-            -H "Authorization: Bearer $GRANT_CRAWLER_CONTROL_TOKEN" \
-            -H "Content-Type: application/json" \
-            --data '{"task":"concept_note","title":"IRPA AI smoke test: community rangeland restoration","description":"Call for proposals for community-led rangeland restoration in Tanzania. Applications close 31 December 2026. Open to registered NGOs in Tanzania.","donorRequirements":"Open to registered NGOs in Tanzania; deadline 31 December 2026.","url":"https://example.org/irpa-ai-smoke-test","deadline":"2026-12-31","callStatus":"open"}' \
-            "$PRODUCTION_WORKER_URL/assistant/analyze")"
-          concept_status="$(node - "$concept_result" <<'NODE'
-          const body = JSON.parse(process.argv[2]);
-          if (body.error && /4006|quota|neurons|daily free allocation|upgrade/i.test(body.error)) { console.log('quota'); process.exit(0); }
-          const draft = body.assessment?.concept_note?.draft;
-          if (body.task !== 'concept_note' || typeof draft !== 'string' || draft.trim().length < 40) throw new Error('Production concept-note endpoint returned no usable draft.');
-          if (body.assessment?.concept_note?.draft_source === 'deterministic_fallback' && body.assessment.concept_note.requires_human_completion !== true) throw new Error('Concept-note fallback is missing its human-review marker.');
-          console.log(body.assessment?.concept_note?.draft_source === 'deterministic_fallback' ? 'fallback' : 'success');
-          NODE
-          )"
-          if [ "$concept_status" = "quota" ]; then
-            echo "::warning::Workers AI quota became exhausted during the smoke test. Concept-note generation could not be verified in this run."
-            exit 0
-          elif [ "$concept_status" = "fallback" ]; then
-            echo "::warning::Production concept-note endpoint returned a labelled fallback scaffold. AI generation is degraded; human completion is required."
-          else
-            echo "Production Workers AI concept-note drafting returned a usable draft."
-          fi
+          node --input-type=module <<'NODE'
+          const endpoint = process.env.PRODUCTION_WORKER_URL + '/assistant/analyze';
+          const quotaError = /4006|quota|neurons|daily free allocation|upgrade/i;
+          const headers = {
+            Authorization: 'Bearer ' + process.env.GRANT_CRAWLER_CONTROL_TOKEN,
+            'Content-Type': 'application/json',
+            Accept: 'application/json'
+          };
 
+          async function postAndParse(payload) {
+            const response = await fetch(endpoint, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(payload),
+              signal: AbortSignal.timeout(90000)
+            });
+            const body = await response.json().catch(() => ({}));
+            if (body.error && quotaError.test(String(body.error))) return { quota: true, body, status: response.status };
+            if (!response.ok) {
+              throw new Error('Production document endpoint HTTP ' + response.status +
+                '; response keys: ' + Object.keys(body).join(', ') +
+                '; sanitized error: ' + String(body.error || body.message || 'none').slice(0, 180));
+            }
+            return { quota: false, body, status: response.status };
+          }
+
+          const documentPayload = {
+            task: 'draft_message',
+            format: 'Formal letter',
+            tone: 'Professional',
+            length: 'Concise',
+            instructions: 'Write a short production smoke-test draft confirming the IRPA document drafting assistant is available.'
+          };
+          const documentResult = await postAndParse(documentPayload);
+          if (documentResult.quota) {
+            console.log('::warning::Workers AI daily quota is exhausted. The live document endpoint reports quota exhaustion; AI-only smoke is skipped until quota replenishes or is upgraded.');
+            process.exit(0);
+          }
+          const document = documentResult.body;
+          if (document.task !== 'draft_message' || typeof document.draft !== 'string' || document.draft.trim().length < 30) {
+            throw new Error('Production document-drafting endpoint returned neither a usable draft nor a labelled fallback. Response keys: ' +
+              Object.keys(document).join(', ') + '; sanitized error: ' + String(document.error || document.message || 'none').slice(0, 180));
+          }
+          if (document.draft_source === 'deterministic_fallback' && document.requires_human_completion !== true) {
+            throw new Error('Fallback draft is missing its human-review marker.');
+          }
+          if (document.draft_source && !['workers_ai', 'deterministic_fallback'].includes(document.draft_source)) {
+            throw new Error('Unexpected document draft source marker.');
+          }
+          if (document.draft_source === 'deterministic_fallback') {
+            console.log('::warning::Production document endpoint returned a labelled fallback scaffold. AI generation is degraded; human completion is required.');
+          } else {
+            console.log('Production Workers AI document drafting returned a usable draft.');
+          }
+
+          const conceptPayload = {
+            task: 'concept_note',
+            title: 'IRPA AI smoke test: community rangeland restoration',
+            description: 'Call for proposals for community-led rangeland restoration in Tanzania. Applications close 31 December 2026. Open to registered NGOs in Tanzania.',
+            donorRequirements: 'Open to registered NGOs in Tanzania; deadline 31 December 2026.',
+            url: 'https://example.org/irpa-ai-smoke-test',
+            deadline: '2026-12-31',
+            callStatus: 'open'
+          };
+          const conceptResult = await postAndParse(conceptPayload);
+          if (conceptResult.quota) {
+            console.log('::warning::Workers AI quota became exhausted during the smoke test. Concept-note generation could not be verified in this run.');
+            process.exit(0);
+          }
+          const concept = conceptResult.body;
+          const conceptDraft = concept.assessment?.concept_note?.draft;
+          if (concept.task !== 'concept_note' || typeof conceptDraft !== 'string' || conceptDraft.trim().length < 40) {
+            throw new Error('Production concept-note endpoint returned no usable draft. Response keys: ' +
+              Object.keys(concept).join(', ') + '; sanitized error: ' + String(concept.error || concept.message || 'none').slice(0, 180));
+          }
+          if (concept.assessment?.concept_note?.draft_source === 'deterministic_fallback' &&
+              concept.assessment.concept_note.requires_human_completion !== true) {
+            throw new Error('Concept-note fallback is missing its human-review marker.');
+          }
+          if (concept.assessment?.concept_note?.draft_source === 'deterministic_fallback') {
+            console.log('::warning::Production concept-note endpoint returned a labelled fallback scaffold. AI generation is degraded; human completion is required.');
+          } else {
+            console.log('Production Workers AI concept-note drafting returned a usable draft.');
+          }
+          NODE
