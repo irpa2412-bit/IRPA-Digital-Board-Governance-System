@@ -345,6 +345,37 @@ test("geographic eligibility is advisory and does not block concept-note draftin
   assert.equal(modelCalls, 2);
 });
 
+test("concept-note analysis returns a safe review scaffold when AI omits draft fields", async () => {
+  const token = "test-token-with-at-least-32-characters-long";
+  const env = { CRAWLER_CONTROL_TOKEN: token, AI: { run: async () => ({
+    response: JSON.stringify({
+      eligibility: { status: "ineligible", confidence: "high", evidence: ["South Africa-only restriction"], unknowns: [] },
+      donor_requirements: [],
+      concept_note: {}
+    })
+  }) } };
+  const response = await worker.fetch(new Request("https://crawler.example/assistant/analyze", {
+    method: "POST",
+    headers: { authorization: "Bearer " + token, "content-type": "application/json" },
+    body: JSON.stringify({
+      task: "concept_note",
+      callStatus: "open",
+      title: "South Africa-only NGO climate grant",
+      description: "Only organizations registered in South Africa may apply. Funding supports community climate resilience.",
+      donorRequirements: "Only South African registered NGOs are eligible.",
+      url: "https://example.org/call"
+    })
+  }), env);
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.assessment.geographic_eligibility.status, "ineligible");
+  assert.equal(body.assessment.concept_note.draft_source, "deterministic_fallback");
+  assert.equal(body.assessment.concept_note.requires_human_completion, true);
+  assert.match(body.assessment.concept_note.draft, /IMPORTANT GEOGRAPHIC ELIGIBILITY WARNING/);
+  assert.match(body.assessment.concept_note.draft, /do not invent/i);
+  assert.ok(body.assessment.concept_note.draft.length > 500);
+});
+
 test("known IRPA eligibility gaps are reported without blocking concept-note drafting", async () => {
   const token = "test-token-with-at-least-32-characters-long";
   let modelCalls = 0;
