@@ -4,7 +4,12 @@ on:
     branches: [feat/secure-meeting-invitation-flow-20261013]
     paths:
       - "src/pages/MeetingRoom.jsx"
+      - "src/components/ControlledDocumentUpload.jsx"
+      - "src/firebase/meetingRecords.js"
+      - "functions/meetingRecords.js"
+      - "functions/index.js"
       - "tests/meeting-room-authorization-boundary.test.mjs"
+      - "tests/meeting-working-documents-security.test.mjs"
       - ".github/workflows/meeting-room-authorization-boundary.yml"
   pull_request:
     branches: [main]
@@ -24,4 +29,4 @@ jobs:
         with:
           node-version: "20"
       - name: Verify host and participant separation
-        run: node --test tests/meeting-room-authorization-boundary.test.mjs
+        run: node --test tests/meeting-room-authorization-boundary.test.mjs tests/meeting-working-documents-security.test.mjs
