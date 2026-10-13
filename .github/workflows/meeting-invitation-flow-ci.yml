@@ -16,6 +16,12 @@ on:
       - "src/pages/OperationalGatewaysParticipants.jsx"
       - "package.json"
       - "package-lock.json"
+      - "drive-gateway/src/index.js"
+      - "drive-gateway/src/invitationEmail.mjs"
+      - "drive-gateway/src/invitationRedemption.mjs"
+      - "drive-gateway/tests/mail-invitation.unit.mjs"
+      - "drive-gateway/tests/invitation-redemption.test.mjs"
+      - "functions/meetingGateway.emulator.test.cjs"
   pull_request:
     branches:
       - main
@@ -31,6 +37,12 @@ on:
       - "src/pages/OperationalGatewaysParticipants.jsx"
       - "package.json"
       - "package-lock.json"
+      - "drive-gateway/src/index.js"
+      - "drive-gateway/src/invitationEmail.mjs"
+      - "drive-gateway/src/invitationRedemption.mjs"
+      - "drive-gateway/tests/mail-invitation.unit.mjs"
+      - "drive-gateway/tests/invitation-redemption.test.mjs"
+      - "functions/meetingGateway.emulator.test.cjs"
 
 permissions:
   contents: read
