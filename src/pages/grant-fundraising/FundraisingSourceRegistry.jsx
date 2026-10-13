@@ -11,14 +11,17 @@ export default function FundraisingSourceRegistry({ onResearchSource }) {
   const [query, setQuery] = useState("");
   const [region, setRegion] = useState("all");
   const [type, setType] = useState("all");
+  const [registryOpen, setRegistryOpen] = useState(false);
   const sources = useMemo(() => searchFundingSources(FUNDRAISING_SOURCES, { query, region, type }), [query, region, type]);
 
   return <section style={panel} aria-labelledby="fundraising-source-registry-heading">
     <div>
       <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.3, textTransform: "uppercase", color: "var(--text-secondary, #aab6c5)" }}>CSR / ESG · FUNDRAISING SOURCE REGISTRY</div>
       <h2 id="fundraising-source-registry-heading" style={{ margin: "5px 0", fontSize: 20 }}>Corporate, climate and partnership sources</h2>
-      <p style={{ margin: 0, color: "var(--text-secondary, #aab6c5)", fontSize: 13, lineHeight: 1.55 }}>A curated set of official discovery routes across Tanzania, Africa and international programmes. Filter by geography, support type or focus, then open the issuer's site or use it to seed a live public-web search. A source listing does not mean a current call is open or that IRPA is eligible.</p>
+      <p style={{ margin: 0, color: "var(--text-secondary, #aab6c5)", fontSize: 13, lineHeight: 1.55 }}>A curated set of official discovery routes across Tanzania, Africa and international programmes. Open the registry to filter sources and start a source-specific public-web search. A source listing does not mean a current call is open or that IRPA is eligible.</p>
+      <button type="button" style={button} aria-expanded={registryOpen} onClick={() => setRegistryOpen((open) => !open)}>{registryOpen ? "Collapse source registry" : "Browse source registry"} · {FUNDRAISING_SOURCES.length} sources</button>
     </div>
+    {registryOpen && <>
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 9 }}>
       <label style={{ fontSize: 12, fontWeight: 700 }}>Search source, focus or support
         <input aria-label="Search fundraising source registry" style={{ ...input, marginTop: 5 }} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="e.g. livestock, CSR, youth, climate" />
@@ -52,5 +55,6 @@ export default function FundraisingSourceRegistry({ onResearchSource }) {
       </article>)}
     </div>
     <p style={{ margin: 0, color: "var(--text-secondary, #aab6c5)", fontSize: 12, lineHeight: 1.5 }}>Status: discovery source only. The portal must verify an actual programme, current deadline or rolling status, Tanzania eligibility, funding terms and application route before classifying any opportunity as actionable. CSR/ESG descriptions are indicative categories, not claims of a published commitment.</p>
+    </>}
   </section>;
 }
