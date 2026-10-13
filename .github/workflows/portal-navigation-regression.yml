@@ -1,3 +1,4 @@
+# Isolated regression workflow for the portal destination-scroll repair.
 name: Portal Navigation Regression
 
 on:
