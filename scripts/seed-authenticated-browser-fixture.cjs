@@ -23,6 +23,8 @@ async function main() {
     fixtureOnly: true
   });
   process.stdout.write("Seeded isolated Firebase Emulator administrator fixture: " + email + "\n");
+  await db.terminate();
+  await admin.app().delete();
 }
 main().catch((error) => {
   console.error(error);
