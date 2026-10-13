@@ -362,6 +362,38 @@ async function generateDocumentDraft(body, env) {
   }
 }
 
+function buildFallbackConceptNoteDraft(opportunity, geographicEligibility, knownGaps) {
+  // Deterministic, evidence-limited draft keeps staging and users productive when
+  // the model returns a valid eligibility assessment but omits concept-note fields.
+  // Do not invent budgets, reach, partners, impact figures or organizational history.
+  const title = String(opportunity.title || "Funding opportunity").slice(0, 500);
+  const description = String(opportunity.description || "").trim();
+  const requirements = String(opportunity.donorRequirements || "").trim();
+  const source = opportunity.url ? "Source supplied for review: " + opportunity.url : "Official source URL: not supplied; verify the original call before use.";
+  const geography = geographicEligibility?.status === "ineligible"
+    ? "IMPORTANT GEOGRAPHIC ELIGIBILITY WARNING: the supplied call appears restricted to another geography. This draft is for internal review only; do not submit unless the official call confirms IRPA is eligible."
+    : geographicEligibility?.status === "unclear"
+      ? "Geographic eligibility is unclear from the supplied evidence. Confirm applicant-country eligibility in the official call before submission."
+      : "Reconfirm geographic and applicant eligibility against the official call before submission.";
+  const blockers = Array.isArray(knownGaps?.blockers) && knownGaps.blockers.length
+    ? knownGaps.blockers.map(item => "- " + String(item)).join("\n")
+    : "- Confirm IRPA's applicant eligibility, track record and any mandatory donor conditions.";
+  return [
+    "INTERNAL REVIEW DRAFT — REQUIRES HUMAN COMPLETION",
+    "Working title\n" + title,
+    "Opportunity and rationale\n" + (description || "Summarize the documented problem and local evidence relevant to this call. Add verified baseline evidence; none was supplied in this request."),
+    "Donor requirements\n" + (requirements || "Official requirements were not supplied. Extract eligibility, geography, eligible activities, budget limits and submission instructions from the original call."),
+    "Proposed goal and approach\n" + "Develop a community-led response aligned to the verified call requirements and IRPA's relevant strategic pillars: Sustainable Rangeland Management, Livestock Development and Market Development. Select only activities directly supported by the call and local evidence.",
+    "Target beneficiaries and location\n" + "Specify the eligible villages, participant groups, selection criteria and estimated reach using verified project data. No beneficiary counts or commitments were supplied; do not invent them.",
+    "Activities and implementation\n" + "Define activities, responsibilities, timeline and delivery partners after stakeholder consultation and confirmation of donor rules. Distinguish proposed activities from approved commitments.",
+    "Expected results and monitoring\n" + "Set measurable outputs, outcomes, indicators, baselines and targets after a baseline assessment. No impact figures or baseline values were supplied.",
+    "Budget and sustainability\n" + "Prepare a costed budget from verified quotations, staffing, transport, monitoring and operational requirements. Amounts, co-financing and partner contributions are not supplied and must not be invented.",
+    "Risks, safeguards and inclusion\n" + "Assess climate, environmental, safeguarding, financial, delivery and eligibility risks; include gender equality, youth participation and community accountability where relevant to the call.",
+    "Eligibility and evidence to verify\n" + geography + "\n" + blockers + "\n- Confirm the deadline and call status.\n- Confirm registration, required experience, audits, co-financing and eligible costs.\n- Verify all factual claims and obtain required approvals.",
+    "Source and disclaimer\n" + source + "\nThis is an AI fallback scaffold, not a verified donor application or eligibility decision. IRPA must complete and review every section against the official call before submission."
+  ].join("\n\n");
+}
+
 function buildConceptNoteDraft(conceptNote) {
   if (typeof conceptNote?.draft === "string" && conceptNote.draft.trim()) return conceptNote.draft.trim();
   const fields = conceptNote?.application_fields;
@@ -516,7 +548,9 @@ export async function analyzeGrant(request, env) {
       if (!analysis.concept_note || typeof analysis.concept_note !== "object") analysis.concept_note = {};
       analysis.concept_note.draft = buildConceptNoteDraft(analysis.concept_note);
       if (!analysis.concept_note.draft) {
-        return json({ error: "AI returned the eligibility assessment but no usable concept-note draft or application fields. Retry with the official call requirements or shorten the supplied text." }, 502);
+        analysis.concept_note.draft = buildFallbackConceptNoteDraft(opportunity, geographicEligibility, knownGaps);
+        analysis.concept_note.draft_source = "deterministic_fallback";
+        analysis.concept_note.requires_human_completion = true;
       }
     }
     const allowed = new Set(["eligible", "possibly_eligible", "ineligible", "insufficient_information"]);

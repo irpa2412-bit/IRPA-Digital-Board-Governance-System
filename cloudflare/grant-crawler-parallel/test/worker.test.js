@@ -345,6 +345,37 @@ test("geographic eligibility is advisory and does not block concept-note draftin
   assert.equal(modelCalls, 2);
 });
 
+test("concept-note analysis returns a safe review scaffold when AI omits draft fields", async () => {
+  const token = "test-token-with-at-least-32-characters-long";
+  const env = { CRAWLER_CONTROL_TOKEN: token, AI: { run: async () => ({
+    response: JSON.stringify({
+      eligibility: { status: "ineligible", confidence: "high", evidence: ["South Africa-only restriction"], unknowns: [] },
+      donor_requirements: [],
+      concept_note: {}
+    })
+  }) } };
+  const response = await worker.fetch(new Request("https://crawler.example/assistant/analyze", {
+    method: "POST",
+    headers: { authorization: "Bearer " + token, "content-type": "application/json" },
+    body: JSON.stringify({
+      task: "concept_note",
+      callStatus: "open",
+      title: "South Africa-only NGO climate grant",
+      description: "Only organizations registered in South Africa may apply. Funding supports community climate resilience.",
+      donorRequirements: "Only South African registered NGOs are eligible.",
+      url: "https://example.org/call"
+    })
+  }), env);
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.assessment.geographic_eligibility.status, "ineligible");
+  assert.equal(body.assessment.concept_note.draft_source, "deterministic_fallback");
+  assert.equal(body.assessment.concept_note.requires_human_completion, true);
+  assert.match(body.assessment.concept_note.draft, /IMPORTANT GEOGRAPHIC ELIGIBILITY WARNING/);
+  assert.match(body.assessment.concept_note.draft, /must not be invented|do not invent/i);
+  assert.ok(body.assessment.concept_note.draft.length > 500);
+});
+
 test("known IRPA eligibility gaps are reported without blocking concept-note drafting", async () => {
   const token = "test-token-with-at-least-32-characters-long";
   let modelCalls = 0;
@@ -846,6 +877,24 @@ test("on-demand fundraising search combines public search engines and labels lea
   } finally { globalThis.fetch = originalFetch; }
 });
 
+
+test("fundraising search falls back to Bing when Google has no relevant leads and isolates GDELT timeouts", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async input => {
+    const url = new URL(String(input));
+    if (url.hostname === "news.google.com") return new Response("<rss><channel></channel></rss>", { status: 200, headers: { "content-type": "application/rss+xml" } });
+    if (url.hostname === "www.bing.com") return new Response('<rss><channel><item><title>Open grant funding for pastoral rangeland restoration in Tanzania</title><link>https://funder.example/bing-call</link><description>Applications open for community-led rangeland restoration.</description><pubDate>Mon, 12 Oct 2026 10:00:00 GMT</pubDate></item></channel></rss>', { status: 200, headers: { "content-type": "application/rss+xml" } });
+    if (url.hostname === "api.gdeltproject.org") throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
+    throw new Error("Unexpected search provider " + url.hostname);
+  };
+  try {
+    const result = await searchFundraisingSources("pastoral rangeland", "all");
+    assert.ok(result.items.some(item => item.url === "https://funder.example/bing-call"));
+    assert.ok(result.items.every(item => item.verificationStatus === "unverified_lead"));
+    assert.ok(result.providers.includes("Bing RSS fallback"));
+    assert.ok(result.errors.some(item => item.provider === "GDELT DOC API"));
+  } finally { globalThis.fetch = originalFetch; }
+});
 
 test("fundraising search endpoint accepts control-token smoke auth and returns engine contract", async () => {
   const originalFetch = globalThis.fetch;
