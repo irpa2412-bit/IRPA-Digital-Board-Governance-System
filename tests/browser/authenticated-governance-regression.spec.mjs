@@ -32,9 +32,9 @@ async function navigateModule(page, viewportName, module) {
     }
   } else {
     const sidebar = page.locator(".sidebar");
-    if (module === "Meeting Room") {
+    if (module === "Meeting Room" || module === "Voting") {
       await sidebar.getByRole("button", { name: /Meeting Portal/ }).click();
-      await page.getByLabel("Navigate to a sub-portal within the current portal").selectOption("Meeting Room");
+      await page.getByLabel("Navigate to a sub-portal within the current portal").selectOption(module);
     } else {
       const label = module === "Finance Portfolio" ? /Finance Portal|Finance Portfolio/ :
         module === "Documents" ? /Documents Portal|Documents/ :
@@ -63,8 +63,13 @@ for (const viewport of [
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
 
     const externalRequests = [];
+    const successfulExternalRequests = [];
     const uncaughtErrors = [];
     page.on("pageerror", error => uncaughtErrors.push(error.message));
+    page.on("requestfinished", request => {
+      const url = new URL(request.url());
+      if (url.hostname !== "localhost" && url.hostname !== "127.0.0.1") successfulExternalRequests.push(url.href);
+    });
     await page.route("**/*", route => {
       const url = new URL(route.request().url());
       if (url.hostname === "localhost" || url.hostname === "127.0.0.1") return route.continue();
@@ -97,6 +102,7 @@ for (const viewport of [
     }
 
     expect(uncaughtErrors, "uncaught JavaScript errors during portal navigation").toEqual([]);
-    expect(externalRequests, "the test fixture must not contact production or third-party services").toEqual([]);
+    expect(successfulExternalRequests, "no external or production request may complete in the isolated fixture").toEqual([]);
+    test.info().annotations.push({ type: "network-isolation", description: `Blocked ${externalRequests.length} attempted external request(s); none completed.` });
   });
 }
