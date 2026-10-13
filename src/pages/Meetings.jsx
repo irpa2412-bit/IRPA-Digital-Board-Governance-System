@@ -1,6 +1,6 @@
 import React,{useEffect,useMemo,useRef,useState}from"react";
 // Live synchronization verification: meeting resolutions and decisions.
-import{createRecord,deleteRecord,getRecords,getAccessibleMeetingRecords,updateRecord,COLLECTIONS,openVotingIssue,listMeetingInviteeDirectory,listMeetingBoardMembers,getCurrentMemberProfile,getCurrentEmployeeProfile}from"../firebase/data";
+import{createRecord,deleteRecord,getRecords,getAccessibleMeetingRecords,updateRecord,COLLECTIONS,openVotingIssue,listMeetingInviteeDirectory,getCurrentMemberProfile,getCurrentEmployeeProfile}from"../firebase/data";
 import{MEETING_CATEGORIES,MEETING_CATEGORY_OPTIONS,MEETING_POLICIES,MEETING_TYPE_OPTIONS,normalizeMeetingForV3,meetingCapabilities,canRegisterMeeting,canAccessMeetingCategory,canEditMeeting,canVoteInMeeting}from"../firebase/meetingPolicy";
 import{auth}from"../firebase/config";
 import{listMeetingRecords,retrieveMeetingRecord,saveMeetingAssistantDraft,compileAndEmailMeetingReport,saveLiveMeetingProceedings}from"../firebase/meetingRecords";
