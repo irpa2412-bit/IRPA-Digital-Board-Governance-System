@@ -32,7 +32,7 @@ export async function sendWithRetry(fn, opts = {}) {
   }
   throw lastErr;
 }
-export function buildInvitationMessage({name,link,meetingAccess=null}) {
+export function buildInvitationMessage({name,link,meetingAccess=null,username=""}) {
   const safeName=validateName(name);
   if(!safeName) throw new Error("Invalid name");
   const safeLink=new URL(link).toString();
@@ -43,6 +43,9 @@ export function buildInvitationMessage({name,link,meetingAccess=null}) {
     const meetingName=validateName(String(meetingAccess.meetingReference||"IRPA Meeting"));
     const gateLink=new URL(String(meetingAccess.link||"")).toString();
     const password=String(meetingAccess.password||"").trim();
+    const cleanUsername=validateRecipient(String(username||""))||"";
+    const usernameText=cleanUsername?"\\nIRPA username: "+cleanUsername:"";
+    const usernameHtml=cleanUsername?"<p><strong>IRPA username:</strong> "+escapeHtml(cleanUsername)+"</p>":"";
     if(!meetingName||!password||password.length>32||CRLF_RE.test(password))throw new Error("Invalid meeting access details");
     const detail=(value,max=240)=>String(value??"").replace(/[\r\n\u2028\u2029]+/g," ").trim().slice(0,max);
     const meetingIdentity=detail(meetingAccess.meetingIdentity||"System identity not recorded",180);
@@ -62,7 +65,7 @@ export function buildInvitationMessage({name,link,meetingAccess=null}) {
     }
     subject="IRPA account activation and meeting access";
     meetingText=`\n\nREGISTERED MEETING PARTICULARS\nMeeting identity: ${meetingIdentity}\nMeeting reference: ${meetingName}\nMeeting title: ${meetingTitle}\nDate: ${meetingDate||"Not recorded"}\nTime: ${meetingTime||"Not recorded"}\nPlatform: ${meetingPlatform}\nPlatform access URL: ${platformUrl||"Not recorded"}\nPlatform meeting ID: ${platformMeetingId||"Not recorded"}\nPlatform passcode: ${platformPasscode||"Not recorded"}\nPhysical venue: ${meetingVenue||"Not recorded"}\nChairperson: ${meetingChairperson||"Not recorded"}\nAgenda / purpose: ${meetingAgenda||"Refer to the official meeting agenda"}\n\nMEETING ACCESS\nOpen the IRPA meeting gate after activating your account: ${gateLink}\nMeeting gate password: ${password}\nThis gate pass expires on ${String(meetingAccess.expiresAt||"the date shown by IRPA Administration")}. Do not forward it to another person.`;
-    meetingHtml=`<hr><h3>Registered Meeting Particulars</h3><table><tbody><tr><th align="left">Meeting identity</th><td>${escapeHtml(meetingIdentity)}</td></tr><tr><th align="left">Meeting reference</th><td>${escapeHtml(meetingName)}</td></tr><tr><th align="left">Meeting title</th><td>${escapeHtml(meetingTitle)}</td></tr><tr><th align="left">Date</th><td>${escapeHtml(meetingDate||"Not recorded")}</td></tr><tr><th align="left">Time</th><td>${escapeHtml(meetingTime||"Not recorded")}</td></tr><tr><th align="left">Platform</th><td>${escapeHtml(meetingPlatform)}</td></tr><tr><th align="left">Platform access</th><td>${platformUrl?`<a href="${escapeHtml(platformUrl)}">Open ${escapeHtml(meetingPlatform)} platform</a>`:"Not recorded"}</td></tr><tr><th align="left">Platform meeting ID</th><td>${escapeHtml(platformMeetingId||"Not recorded")}</td></tr><tr><th align="left">Platform passcode</th><td>${escapeHtml(platformPasscode||"Not recorded")}</td></tr><tr><th align="left">Physical venue</th><td>${escapeHtml(meetingVenue||"Not recorded")}</td></tr><tr><th align="left">Chairperson</th><td>${escapeHtml(meetingChairperson||"Not recorded")}</td></tr><tr><th align="left">Agenda / purpose</th><td>${escapeHtml(meetingAgenda||"Refer to the official meeting agenda")}</td></tr></tbody></table><h3>IRPA Meeting Access</h3><p>After activating your account, open the meeting gate:</p><p><a href="${escapeHtml(gateLink)}">Open IRPA Meeting Gateway</a></p><p><strong>Meeting gate password:</strong> <code>${escapeHtml(password)}</code></p><p>This gate pass expires on ${escapeHtml(String(meetingAccess.expiresAt||"the date shown by IRPA Administration"))}. Do not forward it to another person.</p>`;
+    meetingHtml=`<hr><h3>Registered Meeting Particulars</h3><table><tbody><tr><th align="left">Meeting identity</th><td>${escapeHtml(meetingIdentity)}</td></tr><tr><th align="left">Meeting reference</th><td>${escapeHtml(meetingName)}</td></tr><tr><th align="left">Meeting title</th><td>${escapeHtml(meetingTitle)}</td></tr><tr><th align="left">Date</th><td>${escapeHtml(meetingDate||"Not recorded")}</td></tr><tr><th align="left">Time</th><td>${escapeHtml(meetingTime||"Not recorded")}</td></tr><tr><th align="left">Platform</th><td>${escapeHtml(meetingPlatform)}</td></tr><tr><th align="left">Platform access</th><td>${platformUrl?`<a href="${escapeHtml(platformUrl)}">Open ${escapeHtml(meetingPlatform)} platform</a>`:"Not recorded"}</td></tr><tr><th align="left">Platform meeting ID</th><td>${escapeHtml(platformMeetingId||"Not recorded")}</td></tr><tr><th align="left">Platform passcode</th><td>${escapeHtml(platformPasscode||"Not recorded")}</td></tr><tr><th align="left">Physical venue</th><td>${escapeHtml(meetingVenue||"Not recorded")}</td></tr><tr><th align="left">Chairperson</th><td>${escapeHtml(meetingChairperson||"Not recorded")}</td></tr><tr><th align="left">Agenda / purpose</th><td>${escapeHtml(meetingAgenda||"Refer to the official meeting agenda")}</td></tr></tbody></table><h3>IRPA Meeting Access</h3>${usernameHtml}<p>After activating your account, open the meeting gate:</p><p><a href="${escapeHtml(gateLink)}">Open IRPA Meeting Gateway</a></p><p><strong>Meeting gate password:</strong> <code>${escapeHtml(password)}</code></p><p>This gate pass expires on ${escapeHtml(String(meetingAccess.expiresAt||"the date shown by IRPA Administration"))}. Do not forward it to another person.</p>`;
   }
   return {
     subject,
@@ -73,7 +76,7 @@ export function buildInvitationMessage({name,link,meetingAccess=null}) {
 export async function sendInvitationEmail({email,name,link,meetingAccess=null,smtpSend,logger=console,sleep}) {
   const to=validateRecipient(email);
   if(!to) throw new Error("Invalid recipient");
-  const message=buildInvitationMessage({name,link,meetingAccess});
+  const message=buildInvitationMessage({name,link,meetingAccess,username:to});
   return sendWithRetry(()=>smtpSend({to,...message}),{logger,sleep});
 }
 
