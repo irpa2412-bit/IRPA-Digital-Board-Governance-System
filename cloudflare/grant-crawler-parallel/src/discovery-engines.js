@@ -493,17 +493,7 @@ export async function searchFundraisingSources(query, mode = "all") {
  const queries=[safeMode==="all"?q1:q2];
  const tasks=queries.flatMap(searchQuery=>[
   (async()=>{try{
-   const url=new URL("https://news.google.com/rss/search");url.searchParams.set("q",searchQuery);url.searchParams.set("hl","en-TZ");url.searchParams.set("gl","TZ");url.searchParams.set("ceid","TZ:en");
-   let provider="Google News RSS";
-   let response=await fetch(url.href,{headers:{accept:"application/rss+xml, application/xml, text/xml","user-agent":USER_AGENT},signal:AbortSignal.timeout(12000)});
-   if(!response.ok){
-    const bingUrl=new URL("https://www.bing.com/search");bingUrl.searchParams.set("format","rss");bingUrl.searchParams.set("q",searchQuery);
-    response=await fetch(bingUrl.href,{headers:{accept:"application/rss+xml, application/xml, text/xml","user-agent":USER_AGENT},signal:AbortSignal.timeout(12000)});
-    provider="Bing RSS fallback";
-   }
-   if(!response.ok)throw new Error(provider+" HTTP "+response.status);
-   const xml=await response.text();if(xml.length>MAX_PAGE_BYTES)throw new Error("Search response exceeds 1 MB.");
-   const items=[...xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item\s*>/gi)].map(match=>{
+   const parseRssItems=(xml,provider)=>[...xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item\s*>/gi)].map(match=>{
     const block=match[1],title=xmlField(block,"title").slice(0,500),description=xmlField(block,"description").slice(0,2500);let url="";try{url=normalizeOpportunityUrl(xmlField(block,"link"))}catch{}
     const signal=/\b(grant|funding|donor|foundation|philanthrop|csr|corporate social responsibility|sponsorship|partnership|in[- ]kind|award|fellowship|accelerator|rolling|deadline|call for proposals|funding opportunity)\b/i;
     if(!title||!url||!signal.test(title+" "+description))return null;
@@ -511,8 +501,26 @@ export async function searchFundraisingSources(query, mode = "all") {
     const value=title+" "+description;
     return {title,description,url,sourceUrl,sourceName:sm?decodeHtml(sm[2]).slice(0,120):provider+" indexed source",publishedAt:xmlField(block,"pubDate")||null,discoveryEngine:provider==="Bing RSS fallback"?"bing_rss":"google_news_rss",fundraisingType:/\b(csr|corporate social responsibility|sponsorship|in[- ]kind)\b/i.test(value)?"Corporate partnership / CSR":/\b(partnership|philanthrop)\b/i.test(value)?"Partnership / philanthropy":"Grant / funding lead",deadlineSignal:/\b(rolling basis|rolling applications?|rolling grants?|rolling calls?|year[- ]round|no fixed deadline|ongoing applications)\b/i.test(value)?"Possible rolling opportunity — verify issuer page":/\b(deadline|closing date|apply by|due date|applications close)\b/i.test(value)?"Deadline language detected — verify exact date":"Deadline not established from search result",verificationStatus:"unverified_lead",searchQuery};
    }).filter(Boolean);
+   const googleUrl=new URL("https://news.google.com/rss/search");googleUrl.searchParams.set("q",searchQuery);googleUrl.searchParams.set("hl","en-TZ");googleUrl.searchParams.set("gl","TZ");googleUrl.searchParams.set("ceid","TZ:en");
+   let provider="Google News RSS",items=[],fallbackReason="";
+   try{
+    const response=await fetch(googleUrl.href,{headers:{accept:"application/rss+xml, application/xml, text/xml","user-agent":USER_AGENT},signal:AbortSignal.timeout(12000)});
+    if(!response.ok)throw new Error("Google News RSS HTTP "+response.status);
+    const xml=await response.text();if(xml.length>MAX_PAGE_BYTES)throw new Error("Google News RSS response exceeds 1 MB.");
+    items=parseRssItems(xml,provider);
+    if(!items.length)fallbackReason="Google News RSS returned no relevant leads";
+   }catch(error){fallbackReason=String(error.message||error).slice(0,120);}
+   // Try Bing on both empty and failed Google responses; one provider's failure
+   // must not turn a multi-provider search into a zero-result failure.
+   if(!items.length){
+    const bingUrl=new URL("https://www.bing.com/search");bingUrl.searchParams.set("format","rss");bingUrl.searchParams.set("q",searchQuery);
+    const bingResponse=await fetch(bingUrl.href,{headers:{accept:"application/rss+xml, application/xml, text/xml","user-agent":USER_AGENT},signal:AbortSignal.timeout(12000)});
+    if(!bingResponse.ok)throw new Error(fallbackReason+"; Bing RSS fallback HTTP "+bingResponse.status);
+    const xml=await bingResponse.text();if(xml.length>MAX_PAGE_BYTES)throw new Error("Bing RSS fallback response exceeds 1 MB.");
+    provider="Bing RSS fallback";items=parseRssItems(xml,provider);
+   }
    return {provider,searchQuery,items,error:null};
-  }catch(error){return {provider:"Google News RSS",searchQuery,items:[],error:String(error.message||error).slice(0,180)}}})(),
+  }catch(error){return {provider:"Google News RSS / Bing RSS fallback",searchQuery,items:[],error:String(error.message||error).slice(0,180)}}})(),
   (async()=>{try{
    const url=new URL("https://api.gdeltproject.org/api/v2/doc/doc");const q="("+cleanQuery.replace(/["']/g," ")+") AND (grant OR funding OR donor OR foundation OR philanthropy OR partnership OR sponsorship OR CSR) AND (Tanzania OR \"East Africa\" OR Africa)"+(safeMode==="rolling"?' AND (rolling OR "year-round" OR "no fixed deadline")':safeMode==="deadlines"?' AND (deadline OR "closing date" OR "call for proposals")':safeMode==="corporate_support"?' AND (CSR OR sponsorship OR philanthropy OR partnership OR "in-kind")':"");
    url.searchParams.set("query",q);url.searchParams.set("mode","ArtList");url.searchParams.set("format","json");url.searchParams.set("maxrecords","20");url.searchParams.set("sort","HybridRel");url.searchParams.set("timespan","1y");
