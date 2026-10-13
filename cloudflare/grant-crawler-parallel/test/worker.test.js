@@ -847,6 +847,24 @@ test("on-demand fundraising search combines public search engines and labels lea
 });
 
 
+test("fundraising search falls back to Bing when Google has no relevant leads and isolates GDELT timeouts", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async input => {
+    const url = new URL(String(input));
+    if (url.hostname === "news.google.com") return new Response("<rss><channel></channel></rss>", { status: 200, headers: { "content-type": "application/rss+xml" } });
+    if (url.hostname === "www.bing.com") return new Response('<rss><channel><item><title>Open grant funding for pastoral rangeland restoration in Tanzania</title><link>https://funder.example/bing-call</link><description>Applications open for community-led rangeland restoration.</description><pubDate>Mon, 12 Oct 2026 10:00:00 GMT</pubDate></item></channel></rss>', { status: 200, headers: { "content-type": "application/rss+xml" } });
+    if (url.hostname === "api.gdeltproject.org") throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
+    throw new Error("Unexpected search provider " + url.hostname);
+  };
+  try {
+    const result = await searchFundraisingSources("pastoral rangeland", "all");
+    assert.ok(result.items.some(item => item.url === "https://funder.example/bing-call"));
+    assert.ok(result.items.every(item => item.verificationStatus === "unverified_lead"));
+    assert.ok(result.providers.includes("Bing RSS fallback"));
+    assert.ok(result.errors.some(item => item.provider === "GDELT DOC API"));
+  } finally { globalThis.fetch = originalFetch; }
+});
+
 test("fundraising search endpoint accepts control-token smoke auth and returns engine contract", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async input => {
