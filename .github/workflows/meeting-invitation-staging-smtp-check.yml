@@ -32,7 +32,7 @@ jobs:
           const u = new URL(process.env.STAGING_GATEWAY_URL);
           if (u.protocol !== "https:") throw new Error("Staging gateway must use HTTPS.");
           const email = process.env.TEST_RECIPIENT || "";
-          if (!/^[^\s@<>"',;:\\]+@[^\s@<>"',;:\\]+\.[^\s@<>"',;:\\]+$/.test(email)) {
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
             throw new Error("Provide a valid controlled test mailbox.");
           }
           NODE
