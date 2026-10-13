@@ -466,3 +466,10 @@ export async function listMeetingBoardMembers() {
   const result = await call({});
   return Array.isArray(result.data?.members) ? result.data.members : [];
 }
+
+export async function listMeetingInviteeDirectory(){
+ if(!auth.currentUser?.uid)throw new Error("Authentication is required to load meeting participants.");
+ const call=httpsCallable(getFunctions(undefined,"us-central1"),"listMeetingInviteeDirectory");
+ const result=await call({});
+ return {boardMembers:Array.isArray(result.data?.boardMembers)?result.data.boardMembers:[],members:Array.isArray(result.data?.members)?result.data.members:[],employees:Array.isArray(result.data?.employees)?result.data.employees:[]};
+}
