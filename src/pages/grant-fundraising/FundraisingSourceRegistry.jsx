@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import {
   FUNDRAISING_SOURCES, FUNDRAISING_SOURCE_REGIONS, FUNDRAISING_SOURCE_TYPES, searchFundingSources
-} from "./fundraising/sourceRegistry.js";
+} from "./sourceRegistry.js";
 
 const panel = { border: "1px solid var(--border-color, #344255)", borderRadius: 14, padding: 16, background: "var(--panel-bg, #111c2b)", color: "var(--text-primary, #e8edf5)", display: "grid", gap: 12 };
 const input = { width: "100%", minWidth: 0, boxSizing: "border-box", padding: "10px 12px", borderRadius: 9, border: "1px solid var(--border-color, #425064)", background: "var(--input-bg, #0b1420)", color: "var(--text-primary, #e8edf5)", fontSize: 14 };
