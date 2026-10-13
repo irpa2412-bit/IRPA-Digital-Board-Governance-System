@@ -668,7 +668,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
     <div style={{display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap",alignItems:"start"}}><div style={{flex:"1 1 300px"}}><div style={styles.eyebrow}>{text(lead.fundraisingType)} · {text(lead.sourceName||lead.discoveryEngine)}</div><strong style={{display:"block",fontSize:15,marginTop:4}}>{lead.title}</strong><p style={{...styles.muted,margin:"5px 0"}}>{text(lead.description).slice(0,420)||"The search result contains limited detail; open the source to inspect the original information."}</p></div><div style={{fontSize:12,minWidth:150}}><div style={styles.muted}>Date indexed</div><strong>{dateLabel(lead.publishedAt)}</strong><div style={{...styles.muted,marginTop:5}}>Status</div><strong>Unverified research lead</strong></div></div>
     <div style={{...styles.muted,fontSize:12}}>{text(lead.deadlineSignal)} · Relevance score: {Number(lead.relevanceScore||0)}</div>
     <div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button type="button" style={styles.button} onClick={()=>useFundraisingLeadInAssistant(lead)}>Analyse with AI Assistant</button>{lead.url&&<a href={lead.url} target="_blank" rel="noreferrer" style={{...styles.button,textDecoration:"none",display:"inline-block"}}>Open result ↗</a>}{lead.sourceUrl&&lead.sourceUrl!==lead.url&&<a href={lead.sourceUrl} target="_blank" rel="noreferrer" style={{...styles.button,background:"transparent",textDecoration:"none",display:"inline-block"}}>Open publisher ↗</a>}</div>
-   </div></details></article>)}</article>)}
+   </div></details></article>)}
   </section>
   <section style={{...styles.card,display:"grid",gap:12,borderColor:"#4e8b91"}} aria-labelledby="grant-smart-assistant-heading">
    <div>
@@ -694,7 +694,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
       <button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>openConceptWorkspace(r)}>Screen call with AI Assistant</button>
       {r.url&&<a href={r.url} target="_blank" rel="noreferrer" style={{...styles.button,textDecoration:"none",display:"inline-block"}}>Open original call ↗</a>}
      </div>
-    </div></details></article>)}</article>)}
+    </div></details></article>)}
    </div>}
   </section>
   <section style={{...styles.card,display:"grid",gap:12}}>
