@@ -1718,3 +1718,7 @@ const meetingWorkingDocuments = require("./meetingRecords");
 exports.registerMeetingWorkingDocument = meetingWorkingDocuments.registerMeetingWorkingDocument;
 exports.listMeetingWorkingDocuments = meetingWorkingDocuments.listMeetingWorkingDocuments;
 exports.submitMeetingDocumentReview = meetingWorkingDocuments.submitMeetingDocumentReview;
+
+// Explicitly expose the authorised server-side meeting invitee directory callable.
+const meetingGateway = require("./meetingGateway");
+exports.listMeetingInviteeDirectory = meetingGateway.listMeetingInviteeDirectory;
