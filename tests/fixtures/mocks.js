@@ -94,3 +94,17 @@ export async function compileAndEmailMeetingReport() { return { ok: true }; }
 export async function saveLiveMeetingProceedings() { return { version: 1 }; }
 export async function uploadMeetingProductToDrive() { throw new Error("External storage is disabled in this isolated fixture."); }
 export async function provisionAllMeetingCategoryArchives() { throw new Error("External storage is disabled in this isolated fixture."); }
+
+export async function listMeetingInviteeDirectory() {
+  const store = readStore();
+  const active = rows => clone(rows.filter(m =>
+    ["active", "activated"].includes(String(m.status || m.employmentStatus || m.registrationStatus || "").toLowerCase())
+  ));
+  const boardMembers = active(store.members.filter(m =>
+    m.boardMember === true || String(m.role || "").toLowerCase() === "board member" || Boolean(m.boardPosition)
+  ));
+  const members = active(store.members.filter(m =>
+    !(m.boardMember === true || String(m.role || "").toLowerCase() === "board member" || Boolean(m.boardPosition))
+  ));
+  return { boardMembers, members, employees: active(store.employees || []) };
+}

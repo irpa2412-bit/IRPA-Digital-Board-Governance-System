@@ -109,3 +109,31 @@ exports.authorizeMeetingEntry=onCall({region:"us-central1",timeoutSeconds:30},as
  await db.collection("audit").add({action:"MEETING_ENTRY_AUTHORIZED",collection:"meetingAccessTokens",recordId:doc.id,details:{meetingId:grant.meetingId,participantId:grant.participantId,gateway:"IRPA Meeting Entry Gateway"},actorUid:uid,actorEmail:email,createdAt:FieldValue.serverTimestamp()});
  return {ok:true,meetingId:grant.meetingId,participantId:grant.participantId,meetingReference:grant.meetingReference||meeting.reference||meeting.title,meetingCategory:text(meeting.meetingCategory||meeting.category||meeting.meetingType||"General Meeting"),meetingStatus:meeting.status||"Scheduled",participantName:text(participant.participantName||participant.name)||email};
 });
+/** Scoped server-side directory for authorized meeting registration and invitation workflows. */
+exports.listMeetingInviteeDirectory=onCall({region:"us-central1",timeoutSeconds:20},async request=>{
+ const uid=request.auth?.uid;
+ if(!uid)throw new HttpsError("unauthenticated","Sign in to load the meeting invitee directory.");
+ const email=text(request.auth?.token?.email).toLowerCase();
+ const isAdmin=await activeAdmin(request);
+ const allowed=new Set(["executive director","director internal oversight","director finance & administration","director human resources","hr director","operations manager","departmental director","departmental manager","director outreach","director community development","director livestock","director environment","director field department","board secretary","secretary to the board","meeting secretary"]);
+ const [memberUid,employeeUid,memberEmail,employeeEmail]=await Promise.all([
+  db.collection("members").doc(uid).get(),db.collection("employees").doc(uid).get(),
+  email?db.collection("members").where("email","==",email).limit(2).get():Promise.resolve({docs:[]}),
+  email?db.collection("employees").where("email","==",email).limit(2).get():Promise.resolve({docs:[]})
+ ]);
+ const candidates=[...(memberUid.exists?[memberUid.data()]:[]),...(employeeUid.exists?[employeeUid.data()]:[]),...memberEmail.docs.map(x=>x.data()),...employeeEmail.docs.map(x=>x.data())];
+ const roles=d=>[d?.role,d?.title,d?.position,d?.departmentalRole,...(Array.isArray(d?.roles)?d.roles:[]),...(Array.isArray(d?.assignedRoles)?d.assignedRoles:[]),...(Array.isArray(d?.selectedRoles)?d.selectedRoles:[]),...(Array.isArray(d?.roleAssignments)?d.roleAssignments:[])].map(x=>text(x).toLowerCase());
+ const active=d=>["active","activated"].includes(text(d?.status||d?.employmentStatus||d?.registrationStatus).toLowerCase());
+ const registrar=candidates.some(d=>active(d)&&roles(d).some(r=>allowed.has(r)));
+ const claims=Array.isArray(request.auth?.token?.irpaRoles)?request.auth.token.irpaRoles.map(x=>text(x).toLowerCase()):[];
+ if(!isAdmin&&!registrar&&!claims.some(r=>allowed.has(r)))throw new HttpsError("permission-denied","Only an authorised meeting registrar can load the meeting invitee directory.");
+ const [members,employees]=await Promise.all([db.collection("members").get(),db.collection("employees").get()]);
+ const project=(snap,kind)=>snap.docs.map(s=>{
+  const d=s.data()||{},status=text(d.status||d.employmentStatus||d.registrationStatus);
+  if(!["active","activated"].includes(status.toLowerCase()))return null;
+  const board=d.boardMember===true||text(d.role).toLowerCase()==="board member"||Boolean(d.boardPosition)||text(d.department)==="Board of Directors";
+  if(kind==="board"&&!board||kind==="member"&&board)return null;
+  return {id:s.id,uid:text(d.uid||d.authUid||d.userUid),name:text(d.name||d.fullName||d.memberName||d.displayName),email:text(d.email||d.emailAddress||d.contactEmail).toLowerCase(),memberNumber:text(d.memberNumber||d.registrationNumber),employeeNumber:text(d.employeeNumber),role:text(d.role),roles:Array.isArray(d.roles)?d.roles:[],boardMember:d.boardMember===true,boardPosition:text(d.boardPosition),department:text(d.department),memberType:text(d.memberType),status,employmentStatus:text(d.employmentStatus),registrationStatus:text(d.registrationStatus),title:text(d.title),position:text(d.position),departmentalRole:text(d.departmentalRole)};
+ }).filter(Boolean);
+ return {boardMembers:project(members,"board"),members:project(members,"member"),employees:project(employees,"employee")};
+});
