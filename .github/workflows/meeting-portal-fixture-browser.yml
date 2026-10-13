@@ -6,8 +6,8 @@ on:
       - "src/pages/Meetings.jsx"
       - "src/firebase/data.js"
       - "functions/index.js"
-      - "src/firebase/data.js"
-      - "functions/index.js"
+      - "functions/meetingGateway.js"
+      - "src/pages/OperationalGatewaysParticipants.jsx"
       - "src/firebase/meetingPolicy.js"
       - "tests/meeting-portal-browser.test.mjs"
       - "tests/fixtures/**"
@@ -49,8 +49,8 @@ jobs:
             "src/pages/Meetings.jsx",
             "src/firebase/data.js",
             "functions/index.js",
-            "src/firebase/data.js",
-            "functions/index.js",
+            "functions/meetingGateway.js",
+            "src/pages/OperationalGatewaysParticipants.jsx",
             "tests/fixtures/meeting-portal-fixture.html",
             "tests/fixtures/meeting-portal-fixture.jsx",
             "tests/fixtures/mocks.js",
