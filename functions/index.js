@@ -1710,3 +1710,57 @@ exports.resetTrialData = onCall({region:"us-central1"}, async request => {
     throw new HttpsError("internal","The trial-data reset failed. The audit record has been retained.");
   }
 });
+
+
+// Returns only the minimum participant directory fields needed by the meeting
+// registrar. Browser collection reads of /members are intentionally restricted
+// by Firestore rules, so do not broaden those rules to make a collection query work.
+exports.listMeetingBoardMembers = onCall({ region: "us-central1" }, async request => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Sign in to load the Board Members register.");
+  const email = String(request.auth?.token?.email || "").trim().toLowerCase();
+  const adminSnap = await db.collection("adminProfiles").doc(uid).get();
+  const isAdmin = email === "irpa2412@gmail.com" || request.auth?.token?.admin === true ||
+    (adminSnap.exists && adminSnap.data()?.active === true);
+  const [memberSnap, employeeSnap] = await Promise.all([
+    db.collection("members").doc(uid).get(),
+    db.collection("employees").doc(uid).get()
+  ]);
+  const active = d => ["active", "activated"].includes(String(d?.status || d?.employmentStatus || d?.registrationStatus || "").trim().toLowerCase());
+  const rolesOf = d => [
+    d?.role, d?.title, d?.position, d?.departmentalRole,
+    ...(Array.isArray(d?.roles) ? d.roles : []),
+    ...(Array.isArray(d?.assignedRoles) ? d.assignedRoles : []),
+    ...(Array.isArray(d?.selectedRoles) ? d.selectedRoles : []),
+    ...(Array.isArray(d?.roleAssignments) ? d.roleAssignments : [])
+  ].map(v => String(v || "").trim().toLowerCase()).filter(Boolean);
+  const member = memberSnap.exists ? memberSnap.data() : {};
+  const employee = employeeSnap.exists ? employeeSnap.data() : {};
+  const tokenRoles = Array.isArray(request.auth?.token?.irpaRoles) ? request.auth.token.irpaRoles.map(v => String(v).trim().toLowerCase()) : [];
+  const roles = [...rolesOf(member), ...rolesOf(employee), ...tokenRoles];
+  const registrarRoles = [
+    "executive director", "director internal oversight", "director finance & administration",
+    "director human resources", "hr director", "operations manager", "departmental director",
+    "departmental manager", "director outreach", "director community development",
+    "director livestock", "director environment", "director field department",
+    "board secretary", "secretary to the board", "meeting secretary"
+  ];
+  if (!isAdmin && !((active(member) || active(employee)) && roles.some(r => registrarRoles.includes(r)))) {
+    throw new HttpsError("permission-denied", "Only an authorised meeting registrar can load the Board Members directory.");
+  }
+  const snap = await db.collection("members").get();
+  return { members: snap.docs.map(docSnap => {
+    const d = docSnap.data() || {};
+    const status = String(d.status || d.employmentStatus || d.registrationStatus || "").trim().toLowerCase();
+    const isBoard = d.boardMember === true || String(d.role || "").trim().toLowerCase() === "board member" || Boolean(d.boardPosition);
+    if (!isBoard || !["active", "activated"].includes(status)) return null;
+    return {
+      id: docSnap.id, uid: String(d.uid || d.authUid || d.userUid || ""),
+      name: String(d.name || d.fullName || d.memberName || d.displayName || ""),
+      email: String(d.email || d.emailAddress || d.contactEmail || "").trim().toLowerCase(),
+      memberNumber: String(d.memberNumber || d.registrationNumber || ""),
+      role: String(d.role || ""), boardMember: d.boardMember === true,
+      boardPosition: String(d.boardPosition || ""), status: String(d.status || d.employmentStatus || d.registrationStatus || "")
+    };
+  }).filter(Boolean) };
+});
