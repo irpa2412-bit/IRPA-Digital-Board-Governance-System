@@ -1,5 +1,13 @@
 name: Meeting Portal Isolated Browser Regression
 on:
+  push:
+    branches: [feat/secure-meeting-invitation-flow-20261013]
+    paths:
+      - "src/pages/Meetings.jsx"
+      - "drive-gateway/src/invitationRedemption.mjs"
+      - "drive-gateway/tests/invitation-redemption.test.mjs"
+      - "functions/meetingGateway.emulator.test.cjs"
+      - ".github/workflows/meeting-portal-fixture-browser.yml"
   pull_request:
     branches: [main]
     paths:
@@ -36,9 +44,9 @@ jobs:
         run: |
           set -euo pipefail
           git fetch origin main
-          PR_BASE_SHA="${{ github.event.pull_request.base.sha || 'origin/main' }}" node --input-type=module <<'NODE'
+          PR_BASE_SHA="${{ github.event.pull_request.base.sha }}" node --input-type=module <<'NODE'
           import { execFileSync } from "node:child_process";
-          const base = process.env.PR_BASE_SHA || "origin/main";
+          const base = process.env.PR_BASE_SHA || execFileSync("git", ["merge-base", "origin/main", "HEAD"], { encoding: "utf8" }).trim();
           const changed = execFileSync("git", ["diff", "--name-only", base, "HEAD"], { encoding: "utf8" })
             .trim().split("\n").filter(Boolean).sort();
           const allowed = new Set([
