@@ -63,7 +63,7 @@ try {
       console.log(JSON.stringify({ test: "meeting-register-board-member-fixture", width, result: "PASS", layout }));
     } catch (error) {
       failures++;
-      console.error(JSON.stringify({ test: "meeting-register-board-member-fixture", width, result: "FAIL", error: error.message, pageErrors }));
+      console.error(JSON.stringify({ test: "meeting-register-board-member-fixture", width, result: "FAIL", error: error.message, pageErrors, consoleErrors, bodyText: await page.locator("body").innerText().catch(() => ""), currentUrl: page.url() }));
     } finally {
       await context.close();
     }
