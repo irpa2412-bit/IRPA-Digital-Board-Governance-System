@@ -6,9 +6,13 @@ const fixturePassword = "FixtureOnly-Password-2026!";
 async function navigateModule(page, viewportName, module) {
   if (viewportName === "mobile") {
     if (module === "Finance Portfolio" || module === "Meeting Room" || module === "Documents" || module === "Voting") {
-      await page.locator(".mobile-global-nav").getByRole("button", { name: "Portals" }).click();
       const dialog = page.getByRole("dialog", { name: "Mobile navigation" });
-      await expect(dialog.locator(".mobile-nav-sheet-header strong")).toHaveText("Portals");
+      const sheetTitle = dialog.locator(".mobile-nav-sheet-header strong");
+      const isPortalsSheet = await dialog.isVisible() && await sheetTitle.textContent() === "Portals";
+      if (!isPortalsSheet) {
+        await page.locator(".mobile-global-nav").getByRole("button", { name: "Portals" }).click();
+      }
+      await expect(sheetTitle).toHaveText("Portals");
       if (module === "Finance Portfolio") {
         await dialog.getByRole("button", { name: /Finance Portal/ }).click();
       } else if (module === "Documents") {
@@ -65,6 +69,7 @@ for (const viewport of [
   { name: "desktop", width: 1440, height: 900 }
 ]) {
   test(`authenticated fundraising and governance portal regression at ${viewport.name} size`, async ({ page }) => {
+    page.setDefaultTimeout(10000);
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
 
     const externalRequests = [];
