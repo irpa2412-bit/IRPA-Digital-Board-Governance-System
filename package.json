@@ -14,7 +14,8 @@
     "check:production-readability": "node scripts/check-production-readability.mjs",
     "verify:production-readability": "node scripts/verify-production-readability.mjs",
     "test:finance-policy": "node --test tests/finance-portal-policy.test.cjs",
-    "test:security-rules": "node --test tests/meeting-category-firestore-rules.test.cjs tests/finance-portal-policy.test.cjs"
+    "test:security-rules": "node --test tests/meeting-category-firestore-rules.test.cjs tests/finance-portal-policy.test.cjs",
+    "test:fundraising-registry": "node --test tests/fundraising-source-registry.test.mjs"
   },
   "dependencies": {
     "firebase": "^11.10.0",
