@@ -1,6 +1,7 @@
 import React,{useEffect,useMemo,useState} from "react";
 import {addDoc,collection,onSnapshot,serverTimestamp,updateDoc,doc} from "firebase/firestore";
 import app,{auth,db} from "../firebase/config";
+import FundraisingSourceRegistry from "./grant-fundraising/FundraisingSourceRegistry.jsx";
 
 const PILLARS=[
  {id:"rangeland",label:"Sustainable Rangeland Management",short:"Rangeland"},
@@ -293,7 +294,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    if(!token){setFundraisingSearchError("Sign in to search fundraising sources.");return;}
    setFundraisingSearchBusy(true);setFundraisingSearchError("");setFundraisingSearchMeta(null);
    try{
-     const response=await fetch(workerUrl+"/fundraising/search",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({query,mode:fundraisingMode,pillar:pillar==="all"?"":pillar,theme:theme==="all"?"":theme}),signal:AbortSignal.timeout(35000)});
+     const response=await fetch(workerUrl+"/fundraising/search",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({query,mode:searchMode,pillar:pillar==="all"?"":pillar,theme:theme==="all"?"":theme}),signal:AbortSignal.timeout(35000)});
      const data=await response.json().catch(()=>({}));
      if(!response.ok)throw new Error(data.error||"Fundraising research search failed ("+response.status+").");
      setFundraisingResults(Array.isArray(data.items)?data.items:[]);
@@ -653,6 +654,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    <div style={{...styles.muted,borderLeft:"3px solid #b78b3d",padding:"8px 12px"}}><strong>Governance control:</strong> saved drafts remain drafts in the IRPA workspace. Saving does not submit an application, approve expenditure, authorize a commitment, or replace IRPA's formal internal review and approval procedures.</div>
   </section>}
 
+  <FundraisingSourceRegistry onResearchSource={(source)=>{const query=source.name+" CSR ESG funding partnership";setFundraisingQuery(query);setFundraisingMode("corporate_support");runFundraisingSearch(query,"corporate_support");}} />
   <section style={{...styles.card,display:"grid",gap:12,borderColor:"#4e8b91"}} aria-labelledby="grant-fundraising-search-heading">
    <div><div style={styles.eyebrow}>FUNDRAISING INTELLIGENCE · LIVE PUBLIC-WEB SEARCH</div><h2 id="grant-fundraising-search-heading" style={{margin:"5px 0",fontSize:20}}>Research funding, donors and partnership leads</h2><p style={{...styles.muted,margin:0}}>Search live public indexes for grants, rolling opportunities, deadline-based calls, corporate social responsibility (CSR), sponsorship, philanthropy, partnerships, fellowships and in-kind support. Results are research leads—not verified offers or proof of eligibility.</p></div>
    <form onSubmit={e=>{e.preventDefault();runFundraisingSearch();}} style={{display:"grid",gridTemplateColumns:"minmax(0,1fr)",gap:9}}>
