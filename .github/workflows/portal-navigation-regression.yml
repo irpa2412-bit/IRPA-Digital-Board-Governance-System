@@ -1,0 +1,39 @@
+name: Portal Navigation Regression
+
+on:
+  pull_request:
+    paths:
+      - "src/App.jsx"
+      - "tests/portal-workspace-navigation.test.mjs"
+      - "package.json"
+      - ".github/workflows/portal-navigation-regression.yml"
+  push:
+    branches:
+      - "fix/portal-worksheet-navigation-20261013"
+    paths:
+      - "src/App.jsx"
+      - "tests/portal-workspace-navigation.test.mjs"
+      - "package.json"
+      - ".github/workflows/portal-navigation-regression.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: portal-navigation-regression-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  portal-navigation-regression:
+    name: Portal navigation regression tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run isolated navigation regression tests
+        run: npm run test:portal-navigation
