@@ -6,8 +6,9 @@ const fixturePassword = "FixtureOnly-Password-2026!";
 async function navigateModule(page, viewportName, module) {
   if (viewportName === "mobile") {
     if (module === "Finance Portfolio" || module === "Meeting Room" || module === "Documents" || module === "Voting") {
-      await page.getByRole("button", { name: "Portals" }).click();
+      await page.locator(".mobile-global-nav").getByRole("button", { name: "Portals" }).click();
       const dialog = page.getByRole("dialog", { name: "Mobile navigation" });
+      await expect(dialog.locator(".mobile-nav-sheet-header strong")).toHaveText("Portals");
       if (module === "Finance Portfolio") {
         await dialog.getByRole("button", { name: /Finance Portal/ }).click();
       } else if (module === "Documents") {
@@ -20,8 +21,9 @@ async function navigateModule(page, viewportName, module) {
         await dialog.getByRole("button", { name: /SUB-PORTAL.*Meeting Room Portal/ }).click();
       }
     } else {
-      await page.getByRole("button", { name: "Menu" }).click();
+      await page.locator(".mobile-global-nav").getByRole("button", { name: "Menu" }).click();
       const dialog = page.getByRole("dialog", { name: "Mobile navigation" });
+      await expect(dialog.locator(".mobile-nav-sheet-header strong")).toHaveText("Navigation");
       const label = module === "Grant Intelligence & Funding Opportunities" ? /Grant Intelligence.*Funding Opportunities/ : /Voting Portal/;
       await dialog.getByRole("button", { name: label }).click();
     }
