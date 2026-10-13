@@ -34,10 +34,8 @@ async function navigateModule(page, viewportName, module) {
   } else {
     const sidebar = page.locator(".sidebar");
     if (module === "Meeting Room" || module === "Voting") {
-      await sidebar.getByRole("button", { name: new RegExp("SUB-PORTAL.*" + module.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\    if (module === "Meeting Room" || module === "Voting") {
-      await sidebar.getByRole("button", { name: /Meeting Portal/ }).click();
-      await page.getByLabel("Navigate to a sub-portal within the current portal").selectOption(module);
-    } else {")) }).click();
+      const subPortalLabel = module === "Meeting Room" ? /SUB-PORTAL.*Meeting Room/ : /SUB-PORTAL.*Voting/;
+      await sidebar.getByRole("button", { name: subPortalLabel }).click();
     } else {
       const label = module === "Finance Portfolio" ? /Finance Portal|Finance Portfolio/ :
         module === "Documents" ? /Documents Portal|Documents/ :
