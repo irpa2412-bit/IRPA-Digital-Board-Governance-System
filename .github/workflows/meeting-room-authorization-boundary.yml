@@ -15,7 +15,12 @@ on:
     branches: [main]
     paths:
       - "src/pages/MeetingRoom.jsx"
+      - "src/components/ControlledDocumentUpload.jsx"
+      - "src/firebase/meetingRecords.js"
+      - "functions/meetingRecords.js"
+      - "functions/index.js"
       - "tests/meeting-room-authorization-boundary.test.mjs"
+      - "tests/meeting-working-documents-security.test.mjs"
       - ".github/workflows/meeting-room-authorization-boundary.yml"
 permissions:
   contents: read
