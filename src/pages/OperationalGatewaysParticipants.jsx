@@ -27,8 +27,20 @@ export default function OperationalGatewaysParticipants(){
   const labels=["Participants Register","Meetings Register","Meeting Invitee Directory","Invitations Register"];
   const results=await Promise.allSettled(requests);
   const failures=[];
+  let inviteeDirectoryUnavailable=false;
   results.forEach((result,index)=>{
-   if(result.status==="rejected"){failures.push(labels[index]+": "+(result.reason?.message||"load failed"));return}
+   if(result.status==="rejected"){
+    if(index===2){
+     // The authoritative directory is helpful but must not block meeting-specific external invitees.
+     // Keep the manual invitation path available; never invent or promote an institutional identity.
+     inviteeDirectoryUnavailable=true;
+     setEmployees([]);setBoardMembers([]);setMembers([]);
+     setSourceMode("manual");
+     setForm(current=>({...current,sourceType:"Manual Invitee",participantType:"External Invitee",participantRole:MANUAL_INVITEE_ROLES.includes(current.participantRole)?current.participantRole:"Invited Guest",employeeId:"",boardMemberId:"",memberId:"",sourceRecordId:"",participantUid:""}));
+     return;
+    }
+    failures.push(labels[index]+": "+(result.reason?.message||"load failed"));return;
+   }
    const value=Array.isArray(result.value)?result.value:[];
    if(index===0)setRows(value);
    else if(index===1)setMeetings(value);
@@ -36,6 +48,7 @@ export default function OperationalGatewaysParticipants(){
    else if(index===3)setInvitations(value);
   });
   if(failures.length)setErr("Some participant registers could not be retrieved: "+failures.join(" | "));
+  else if(inviteeDirectoryUnavailable)setErr("Meeting Invitee Directory is temporarily unavailable. Manual external invitees remain enabled; enter the participant's name and email, then use Register & Send Invitation. Institutional identities are not inferred.");
   else setErr("");
  }
  useEffect(()=>{
