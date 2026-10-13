@@ -343,3 +343,49 @@ exports.compileAndEmailMeetingReport=onCall({
  await audit("MEETING_REPORT_COMPILED_AND_DISTRIBUTED",{uid,email,meeting,category:categoryOf(meeting),confidentiality:text(meeting.confidentialityClass)||"INTERNAL"},recordRef.id,{reportHash,dispatchId,recipientCount:recipients.length,sentCount,failedCount,aggregatedVoteCounts:voteCounts});
  return{ok:failedCount===0,reportRecordId:recordRef.id,dispatchId,reportHash,recipientCount:recipients.length,sentCount,failedCount,status:failedCount?"Partially Failed":"Sent"};
 });
+
+
+function workingDocumentId(meetingId,documentId){return hash(String(meetingId)+":"+String(documentId)).slice(0,40);}
+exports.registerMeetingWorkingDocument=onCall({region:"us-central1",timeoutSeconds:30},async req=>{
+ const meetingId=text(req.data?.meetingId),documentId=text(req.data?.documentId);
+ const ctx=await context(req,meetingId);
+ if(!ctx.canManage)throw new HttpsError("permission-denied","Only the meeting host, chairperson or secretary may add working documents.");
+ if(!documentId)throw new HttpsError("invalid-argument","Document ID is required.");
+ const snap=await db.collection("documents").doc(documentId).get();
+ if(!snap.exists)throw new HttpsError("not-found","The controlled document was not found.");
+ const d=snap.data()||{};
+ if(text(d.meetingId)!==meetingId)throw new HttpsError("failed-precondition","The document must be explicitly linked to this meeting before it can be registered as a working document.");
+ const id=workingDocumentId(meetingId,documentId),ref=db.collection("meetingWorkingDocuments").doc(id);
+ await ref.set({meetingId,documentId,title:text(d.title||d.fileName||"Meeting document"),reference:text(d.reference||d.documentReference),fileName:text(d.fileName),webViewLink:text(d.webViewLink||d.archiveFileWebViewLink),classification:text(d.classification||"INTERNAL"),status:"ACTIVE",registeredByUid:ctx.uid,registeredByEmail:ctx.email||null,registeredAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()},{merge:true});
+ await audit("MEETING_WORKING_DOCUMENT_REGISTERED",ctx,id,{documentId,documentReference:text(d.reference||d.documentReference)});
+ return {ok:true,workingDocumentId:id};
+});
+exports.listMeetingWorkingDocuments=onCall({region:"us-central1",timeoutSeconds:30},async req=>{
+ const meetingId=text(req.data?.meetingId),ctx=await context(req,meetingId);
+ if(!ctx.canRead)throw new HttpsError("permission-denied","Meeting participant access is required.");
+ const snap=await db.collection("meetingWorkingDocuments").where("meetingId","==",meetingId).where("status","==","ACTIVE").get();
+ const docs=[];
+ for(const row of snap.docs){
+  const d=row.data()||{};
+  const reviews=await db.collection("meetingDocumentReviews").where("workingDocumentId","==",row.id).get();
+  docs.push({id:row.id,documentId:text(d.documentId),title:text(d.title),reference:text(d.reference),fileName:text(d.fileName),webViewLink:text(d.webViewLink),classification:text(d.classification||"INTERNAL"),reviews:reviews.docs.map(r=>{const v=r.data()||{};return{id:r.id,reviewType:text(v.reviewType),comment:text(v.comment),status:text(v.status),reviewerName:text(v.reviewerName),createdAt:v.createdAt?.toDate?.()?.toISOString?.()||null};})});
+ }
+ return {ok:true,documents:docs};
+});
+exports.submitMeetingDocumentReview=onCall({region:"us-central1",timeoutSeconds:30},async req=>{
+ const meetingId=text(req.data?.meetingId),id=text(req.data?.workingDocumentId),type=text(req.data?.reviewType).toUpperCase(),comment=text(req.data?.comment);
+ const ctx=await context(req,meetingId);
+ if(!ctx.canRead||!ctx.participant&&!ctx.canManage)throw new HttpsError("permission-denied","Only an authorised meeting participant may review working documents.");
+ if(!id||!["ASSESSMENT","COMMENT","SIGNATURE_REQUEST"].includes(type))throw new HttpsError("invalid-argument","A working document and supported review type are required.");
+ if(!comment||comment.length>5000)throw new HttpsError("invalid-argument","Enter a comment or assessment of up to 5,000 characters.");
+ const docRef=db.collection("meetingWorkingDocuments").doc(id),docSnap=await docRef.get();
+ if(!docSnap.exists||text(docSnap.data()?.meetingId)!==meetingId||text(docSnap.data()?.status)!=="ACTIVE")throw new HttpsError("not-found","Active working document not found for this meeting.");
+ const reviewRef=db.collection("meetingDocumentReviews").doc();
+ const memberSnap=await db.collection("members").doc(ctx.uid).get(),employeeSnap=await db.collection("employees").doc(ctx.uid).get();
+ const participantSnap=await db.collection("participants").where("meetingId","==",meetingId).get();
+ const participant=participantSnap.docs.map(d=>d.data()||{}).find(p=>[p.uid,p.userId,p.participantUid,p.memberUid,p.invitedUid].map(v=>text(v)).includes(ctx.uid)||!!ctx.email&&[p.email,p.participantEmail,p.invitedEmail].some(v=>text(v).toLowerCase()===ctx.email));
+ const reviewerName=text(participant?.participantName||participant?.name||memberSnap.data()?.name||employeeSnap.data()?.name||ctx.email||ctx.uid);
+ await reviewRef.set({meetingId,workingDocumentId:id,documentId:text(docSnap.data()?.documentId),reviewType:type,comment,reviewerUid:ctx.uid,reviewerEmail:ctx.email||null,reviewerName,status:"SUBMITTED",createdAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()});
+ await audit("MEETING_WORKING_DOCUMENT_REVIEW_SUBMITTED",ctx,reviewRef.id,{workingDocumentId:id,reviewType:type,commentLength:comment.length});
+ return {ok:true,reviewId:reviewRef.id,status:"SUBMITTED"};
+});

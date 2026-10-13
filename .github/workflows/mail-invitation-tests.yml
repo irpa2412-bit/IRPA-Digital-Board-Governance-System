@@ -1,7 +1,7 @@
 name: Mail Invitation Tests
 on:
   push:
-    branches: ["fix/member-signature-invitation-email-20261004"]
+    branches: ["fix/member-signature-invitation-email-20261004", "feat/secure-meeting-invitation-flow-20261013"]
   pull_request:
     branches: ["main", "integration/collective-portals-20261009"]
     paths:

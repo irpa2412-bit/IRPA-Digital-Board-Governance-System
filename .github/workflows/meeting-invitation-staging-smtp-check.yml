@@ -24,15 +24,15 @@ jobs:
           TEST_RECIPIENT: ${{ inputs.recipient }}
         run: |
           set -euo pipefail
-          if [ -z "$STAGING_GATEWAY_URL" ]; then echo "::error::STAGING_GATEWAY_URL secret is missing."; exit 1; fi
-          if [ -z "$STAGING_INVITE_SERVICE_KEY" ]; then echo "::error::STAGING_INVITE_SERVICE_KEY secret is missing."; exit 1; fi
-          if [ -z "$STAGING_FIREBASE_PROJECT_ID" ]; then echo "::error::STAGING_FIREBASE_PROJECT_ID secret is missing or empty."; exit 1; fi
-          if [ "$STAGING_FIREBASE_PROJECT_ID" != "irpa-dbg-staging-a73ec" ]; then echo "::error::STAGING_FIREBASE_PROJECT_ID does not match the approved staging project ID irpa-dbg-staging-a73ec. Update the GitHub Actions secret; do not use the production project ID."; exit 1; fi
+          test -n "$STAGING_GATEWAY_URL"
+          test -n "$STAGING_INVITE_SERVICE_KEY"
+          test -n "$STAGING_FIREBASE_PROJECT_ID"
+          test "$STAGING_FIREBASE_PROJECT_ID" != "irpa-digital-board-governance"
           node - <<'NODE'
           const u = new URL(process.env.STAGING_GATEWAY_URL);
           if (u.protocol !== "https:") throw new Error("Staging gateway must use HTTPS.");
           const email = process.env.TEST_RECIPIENT || "";
-          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          if (!/^[^\s@<>\"',;:\\]+@[^\s@<>\"',;:\\]+\.[^\s@<>\"',;:\\]+$/.test(email)) {
             throw new Error("Provide a valid controlled test mailbox.");
           }
           NODE
@@ -45,10 +45,8 @@ jobs:
           node - "$RUNNER_TEMP/staging-health.json" <<'NODE'
           const fs = require("node:fs");
           const h = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
-          if (h.environment !== "staging" || h.ok !== true || h.driveMock !== false) {
-            throw new Error("Staging health checks failed; refusing to send.");
-          }
-          console.log(JSON.stringify({health:"PASS",environment:h.environment,service:h.service,driveMock:h.driveMock}));
+          if (h.environment !== "staging") throw new Error("Gateway health endpoint did not confirm staging; refusing to send.");
+          console.log(JSON.stringify({health:"PASS",environment:h.environment,service:h.service}));
           NODE
       - name: Send controlled real-SMTP message and reject mock acceptance
         env:

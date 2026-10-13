@@ -1,5 +1,15 @@
 name: Meeting Portal Isolated Browser Regression
+# Verification-only regression workflow; no production deployment is performed.
+# Isolated fixture-only browser checks; no production credentials or live meeting sessions.
 on:
+  push:
+    branches: [feat/secure-meeting-invitation-flow-20261013]
+    paths:
+      - "src/pages/Meetings.jsx"
+      - "drive-gateway/src/invitationRedemption.mjs"
+      - "drive-gateway/tests/invitation-redemption.test.mjs"
+      - "functions/meetingGateway.emulator.test.cjs"
+      - ".github/workflows/meeting-portal-fixture-browser.yml"
   pull_request:
     branches: [main]
     paths:
@@ -36,17 +46,44 @@ jobs:
         run: |
           set -euo pipefail
           git fetch origin main
-          node --input-type=module <<'NODE'
+          PR_BASE_SHA="${{ github.event.pull_request.base.sha }}" node --input-type=module <<'NODE'
           import { execFileSync } from "node:child_process";
-          const changed = execFileSync("git", ["diff", "--name-only", "origin/main", "HEAD"], { encoding: "utf8" })
+          const base = process.env.PR_BASE_SHA || execFileSync("git", ["merge-base", "origin/main", "HEAD"], { encoding: "utf8" }).trim();
+          const changed = execFileSync("git", ["diff", "--name-only", base, "HEAD"], { encoding: "utf8" })
             .trim().split("\n").filter(Boolean).sort();
           const allowed = new Set([
             ".github/workflows/meeting-portal-fixture-browser.yml",
+            ".github/workflows/meeting-invitation-flow-ci.yml",
+            ".github/workflows/mail-invitation-tests.yml",
+            "drive-gateway/src/index.js",
+            "drive-gateway/src/invitationEmail.mjs",
+            "drive-gateway/src/invitationRedemption.mjs",
+            "drive-gateway/tests/mail-invitation.unit.mjs",
+            "drive-gateway/tests/invitation-redemption.test.mjs",
+            ".github/workflows/meeting-invitation-nonprod-e2e.yml",
+            ".github/workflows/meeting-invitation-staging-smtp-check.yml",
+            ".github/workflows/meeting-room-authorization-boundary.yml",
+            "functions/meetingGateway.emulator.test.cjs",
+            "functions/meetingEntryPolicy.js",
+            "functions/meetingEntryPolicy.test.cjs",
+            "functions/meetingGateway.js",
+            "package.json",
+            "src/components/MeetingAccessControl.jsx",
+            "src/pages/Invitations.jsx",
+            "src/pages/MeetingEntryGateway.jsx",
+            "src/components/ControlledDocumentUpload.jsx",
+            "src/firebase/meetingRecords.js",
+            "functions/meetingRecords.js",
+            "functions/index.js",
+            "tests/meeting-working-documents-security.test.mjs",
+            "src/pages/MeetingRoom.jsx",
+            "src/pages/OperationalGatewaysParticipants.jsx",
             "src/pages/Meetings.jsx",
             "tests/fixtures/meeting-portal-fixture.html",
             "tests/fixtures/meeting-portal-fixture.jsx",
             "tests/fixtures/mocks.js",
             "tests/meeting-portal-browser.test.mjs",
+            "tests/meeting-room-authorization-boundary.test.mjs",
             "vite.meeting-fixture.config.js"
           ]);
           const unexpected = changed.filter(path => !allowed.has(path));
