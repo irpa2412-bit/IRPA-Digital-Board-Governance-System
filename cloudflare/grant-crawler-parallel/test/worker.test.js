@@ -372,7 +372,7 @@ test("concept-note analysis returns a safe review scaffold when AI omits draft f
   assert.equal(body.assessment.concept_note.draft_source, "deterministic_fallback");
   assert.equal(body.assessment.concept_note.requires_human_completion, true);
   assert.match(body.assessment.concept_note.draft, /IMPORTANT GEOGRAPHIC ELIGIBILITY WARNING/);
-  assert.match(body.assessment.concept_note.draft, /do not invent/i);
+  assert.match(body.assessment.concept_note.draft, /must not be invented|do not invent/i);
   assert.ok(body.assessment.concept_note.draft.length > 500);
 });
 
