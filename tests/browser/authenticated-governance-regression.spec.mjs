@@ -34,8 +34,10 @@ async function navigateModule(page, viewportName, module) {
   } else {
     const sidebar = page.locator(".sidebar");
     if (module === "Meeting Room" || module === "Voting") {
+      // Child portal buttons are rendered after opening their parent in the sidebar.
       await sidebar.getByRole("button", { name: /Meeting Portal/ }).click();
-      await page.getByLabel("Navigate to a sub-portal within the current portal").selectOption(module);
+      const childLabel = module === "Meeting Room" ? /SUB-PORTAL.*Meeting Room Portal/ : /SUB-PORTAL.*Voting Portal/;
+      await sidebar.getByRole("button", { name: childLabel }).click();
     } else {
       const label = module === "Finance Portfolio" ? /Finance Portal|Finance Portfolio/ :
         module === "Documents" ? /Documents Portal|Documents/ :
@@ -56,7 +58,12 @@ async function navigateModule(page, viewportName, module) {
 
 async function assertPortalAndNoOverflow(page, expectedText, width) {
   await expect(page.locator(".topbar h2")).toContainText(expectedText, { timeout: 30000 });
-  await expect(page.locator("main.content-area")).toBeVisible();
+  const workspace = page.locator("main.content-area");
+  await expect(workspace).toBeVisible();
+  await expect.poll(
+    () => workspace.evaluate(el => Math.abs(el.getBoundingClientRect().top)),
+    { message: "destination workspace should scroll into the visible workspace area rather than leave the user at the global header", timeout: 10000 }
+  ).toBeLessThanOrEqual(40);
   const dimensions = await page.evaluate(() => ({
     viewport: document.documentElement.clientWidth,
     document: document.documentElement.scrollWidth
