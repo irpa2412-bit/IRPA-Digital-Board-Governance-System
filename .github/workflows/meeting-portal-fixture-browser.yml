@@ -54,7 +54,7 @@ jobs:
             console.error("Unexpected files changed outside the isolated meeting repair:", unexpected);
             process.exit(1);
           }
-          if (!changed.includes("src/pages/Meetings.jsx")) throw new Error("Meeting portal source change is missing.");
+          if (!changed.includes("tests/meeting-portal-browser.test.mjs")) throw new Error("Meeting fixture browser test is missing.");
           console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));
           NODE
       - name: Start the isolated Vite fixture
