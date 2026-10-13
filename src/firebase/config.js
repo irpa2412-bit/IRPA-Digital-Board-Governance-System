@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getAuth, GoogleAuthProvider, connectAuthEmulator } from "firebase/auth";
+import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 
 export const firebaseConfig = {
   apiKey: "AIzaSyC2aMdxHD14nMnGiRyf4mSL1ixXdzBoOtE",
@@ -32,3 +32,17 @@ googleProvider.setCustomParameters({
 });
 
 export default app;
+
+
+// Test-only emulator wiring. Production builds do not set this flag; if it is
+// accidentally enabled on a non-local origin, fail closed instead of connecting.
+if (import.meta.env.VITE_USE_FIREBASE_EMULATORS === "true") {
+  const localHosts = new Set(["localhost", "127.0.0.1"]);
+  if (typeof window === "undefined" || !localHosts.has(window.location.hostname)) {
+    throw new Error("Firebase emulator mode is restricted to localhost test fixtures.");
+  }
+  connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
+  connectAuthEmulator(applicantAuth, "http://127.0.0.1:9099", { disableWarnings: true });
+  connectFirestoreEmulator(db, "127.0.0.1", 8080);
+  connectFirestoreEmulator(applicantDb, "127.0.0.1", 8080);
+}
