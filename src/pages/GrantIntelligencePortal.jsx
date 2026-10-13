@@ -1,4 +1,4 @@
-import React,{useEffect,useMemo,useRef,useState} from "react";
+import React,{useEffect,useMemo,useState} from "react";
 import {addDoc,collection,onSnapshot,serverTimestamp,updateDoc,doc} from "firebase/firestore";
 import app,{auth,db} from "../firebase/config";
 
@@ -116,7 +116,6 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  const [crawlerProvision,setCrawlerProvision]=useState([]);
  const [crawlerRunning,setCrawlerRunning]=useState(false);
  const [workspaceOpen,setWorkspaceOpen]=useState(false);
- const workspaceRef=useRef(null);
  const [selectedOpportunity,setSelectedOpportunity]=useState(null);
  const [opportunityDescription,setOpportunityDescription]=useState("");
  const [donorRequirements,setDonorRequirements]=useState("");
@@ -343,9 +342,6 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    }catch(err){setError(err?.message||"Saved concept notes could not be loaded.");}
    finally{setDraftsBusy(false);}
  }
- useEffect(()=>{
-  if(workspaceOpen&&workspaceRef.current)workspaceRef.current.scrollIntoView({behavior:"smooth",block:"start"});
- },[workspaceOpen,selectedOpportunity]);
  function openConceptWorkspace(record=null){
    setSelectedOpportunity(record);
    setOpportunityDescription(text(record?.summary||record?.description||""));
@@ -414,14 +410,13 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    }
    const statusUnverified=currentStatusIssue==="unverified";
    // Geographic eligibility no longer blocks opportunity analysis; show and assess all calls.
-   // Permit first-pass screening when crawler metadata is sparse; the assessment must identify missing evidence as unknown.
-   const screeningDescription=text(opportunityDescription)||"No opportunity description was supplied. Assess only the title, URL and donor requirements provided; mark unsupported eligibility criteria as unknown and list evidence to verify in the official call.";
+   if(!text(opportunityDescription)&&!text(donorRequirements)){setError("Provide the opportunity description or paste the official donor eligibility and application criteria.");return;}
    const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-production.irpa-governance.workers.dev").replace(/\/+$/,"");
+   const idToken=await auth.currentUser?.getIdToken();
+   if(!idToken){setError("Your session has expired. Sign in again.");return;}
    setAnalysisBusy(true);setError("");setWorkspaceNotice(task==="concept_note"?(statusUnverified?"Preparing a review-only draft; current call status still needs verification…":"Checking eligibility and preparing the concept-note draft…"):"Checking geographic, organizational and donor eligibility criteria…");
    try{
-     const idToken=await auth.currentUser?.getIdToken(true);
-     if(!idToken)throw new Error("Your session has expired. Sign in again.");
-     const response=await fetch(workerUrl+"/assistant/analyze",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({task,title:selectedOpportunity.title,description:screeningDescription,donorRequirements:text(donorRequirements),url:text(selectedOpportunity.url),deadline:dateKeyInTanzania(selectedOpportunity.deadline||selectedOpportunity.deadline_at)||"",callStatus:text(selectedOpportunity.callStatus||selectedOpportunity.call_status||"")}),signal:AbortSignal.timeout(90000)});
+     const response=await fetch(workerUrl+"/assistant/analyze",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({task,title:selectedOpportunity.title,description:text(opportunityDescription),donorRequirements:text(donorRequirements),url:text(selectedOpportunity.url),deadline:dateKeyInTanzania(selectedOpportunity.deadline||selectedOpportunity.deadline_at)||"",callStatus:text(selectedOpportunity.callStatus||selectedOpportunity.call_status||"")}),signal:AbortSignal.timeout(90000)});
      const data=await response.json().catch(()=>({}));
      if(!response.ok){
        if(data.geographic_eligibility||data.eligibility_gate)setAnalysisResult({geographic_eligibility:data.geographic_eligibility||null,eligibility_gate:data.eligibility_gate||null,eligibility:{status:data.eligibility_gate?.status==="ineligible"||data.geographic_eligibility?.status==="ineligible"?"ineligible":"insufficient_information",confidence:"high",evidence:data.geographic_eligibility?.evidence||[],unknowns:[data.geographic_eligibility?.reason||data.next_step||"Verify official eligibility criteria.",...(data.eligibility_gate?.warnings||[])]}});
@@ -582,7 +577,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    <fieldset style={{border:"1px solid #425064",borderRadius:10,padding:12}}><legend style={{padding:"0 6px",fontSize:12}}>Cross-cutting themes</legend><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:8}}>{THEMES.map(t=><label key={t.id} style={{display:"flex",gap:8,alignItems:"center",fontSize:12}}><input type="checkbox" checked={draft.themes.includes(t.id)} onChange={()=>toggleDraftArray("themes",t.id)}/>{t.label}</label>)}</div></fieldset>
    <div><button disabled={saving} type="submit" style={{...styles.button,opacity:saving ? 0.6 : 1}}>{saving?"Saving…":"Save opportunity"}</button></div>
   </form>}
-  {workspaceOpen&&<section ref={workspaceRef} style={{...styles.card,display:"grid",gap:13,borderColor:"#4e8b91",scrollMarginTop:16}} aria-labelledby="concept-workspace-heading">
+  {workspaceOpen&&<section style={{...styles.card,display:"grid",gap:13,borderColor:"#4e8b91"}} aria-labelledby="concept-workspace-heading">
    <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"start",flexWrap:"wrap"}}>
     <div><div style={styles.eyebrow}>IRPA-DBGS · APPLICATION PREPARATION</div><h2 id="concept-workspace-heading" style={{fontSize:21,margin:"5px 0"}}>AI eligibility & concept-note workspace</h2><p style={{...styles.muted,margin:0}}>Eligibility findings are advisory and do not block drafting. Closed or expired calls are blocked; an unverified current status is flagged for review before submission.</p></div>
     <button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>setWorkspaceOpen(false)}>Close workspace</button>
@@ -669,19 +664,11 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    {fundraisingSearchError&&<div role="alert" style={{...styles.card,borderColor:"#b65c5c",color:"#ffb8b8"}}>{fundraisingSearchError}</div>}
    {fundraisingSearchMeta&&<div aria-live="polite" style={styles.muted}>Found {fundraisingSearchMeta.resultCount} research lead{fundraisingSearchMeta.resultCount===1?"":"s"} using {(fundraisingSearchMeta.providers||[]).join(" and ")||"public search sources"}. Each lead requires source and eligibility verification.</div>}
    {fundraisingSearchMeta?.errors?.length>0&&<div style={{...styles.card,borderStyle:"dashed"}}><strong>Some search sources did not respond</strong><p style={{...styles.muted,margin:"5px 0 0"}}>{fundraisingSearchMeta.errors.map(e=>e.provider+": "+e.error).join(" · ")}</p></div>}
-{fundraisingResults.map((lead,index)=><article key={lead.url||lead.title+index} style={{...styles.card,display:"grid",gap:8}}>
-     <details>
-      <summary style={{cursor:"pointer",display:"grid",gridTemplateColumns:"minmax(0,1fr) auto",gap:10,alignItems:"start"}}>
-       <div style={{minWidth:0}}><div style={styles.eyebrow}>{text(lead.fundraisingType)} · {text(lead.sourceName||lead.discoveryEngine)}</div><strong style={{display:"block",fontSize:15,marginTop:4}}>{lead.title}</strong><p style={{...styles.muted,margin:"5px 0"}}>{text(lead.description).slice(0,180)||"Open to review the source details."}</p><span style={{...styles.muted,fontSize:12}}>Expand for details and actions</span></div>
-       <div style={{fontSize:12,minWidth:0,textAlign:"right"}}><div style={styles.muted}>Indexed</div><strong>{dateLabel(lead.publishedAt)}</strong><div style={{...styles.muted,marginTop:5}}>Status</div><strong>Unverified</strong></div>
-      </summary>
-      <div style={{display:"grid",gap:8,marginTop:12,borderTop:"1px solid var(--border-color, #344255)",paddingTop:12}}>
-       <p style={{...styles.muted,margin:0}}>{text(lead.description)||"The search result contains limited detail; open the source to inspect the original information."}</p>
-       <div style={{...styles.muted,fontSize:12}}>{text(lead.deadlineSignal)} · Relevance score: {Number(lead.relevanceScore||0)}</div>
-       <div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button type="button" style={styles.button} onClick={()=>useFundraisingLeadInAssistant(lead)}>Analyse with AI Assistant</button>{lead.url&&<a href={lead.url} target="_blank" rel="noreferrer" style={{...styles.button,textDecoration:"none",display:"inline-block"}}>Open result ↗</a>}{lead.sourceUrl&&lead.sourceUrl!==lead.url&&<a href={lead.sourceUrl} target="_blank" rel="noreferrer" style={{...styles.button,background:"transparent",textDecoration:"none",display:"inline-block"}}>Open publisher ↗</a>}</div>
-      </div>
-     </details>
-    </article>)}
+   {fundraisingResults.map((lead,index)=><article key={lead.url||lead.title+index} style={{...styles.card,display:"grid",gap:8}}>
+    <div style={{display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap",alignItems:"start"}}><div style={{flex:"1 1 300px"}}><div style={styles.eyebrow}>{text(lead.fundraisingType)} · {text(lead.sourceName||lead.discoveryEngine)}</div><strong style={{display:"block",fontSize:15,marginTop:4}}>{lead.title}</strong><p style={{...styles.muted,margin:"5px 0"}}>{text(lead.description).slice(0,420)||"The search result contains limited detail; open the source to inspect the original information."}</p></div><div style={{fontSize:12,minWidth:150}}><div style={styles.muted}>Date indexed</div><strong>{dateLabel(lead.publishedAt)}</strong><div style={{...styles.muted,marginTop:5}}>Status</div><strong>Unverified research lead</strong></div></div>
+    <div style={{...styles.muted,fontSize:12}}>{text(lead.deadlineSignal)} · Relevance score: {Number(lead.relevanceScore||0)}</div>
+    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button type="button" style={styles.button} onClick={()=>useFundraisingLeadInAssistant(lead)}>Analyse with AI Assistant</button>{lead.url&&<a href={lead.url} target="_blank" rel="noreferrer" style={{...styles.button,textDecoration:"none",display:"inline-block"}}>Open result ↗</a>}{lead.sourceUrl&&lead.sourceUrl!==lead.url&&<a href={lead.sourceUrl} target="_blank" rel="noreferrer" style={{...styles.button,background:"transparent",textDecoration:"none",display:"inline-block"}}>Open publisher ↗</a>}</div>
+   </article>)}
   </section>
   <section style={{...styles.card,display:"grid",gap:12,borderColor:"#4e8b91"}} aria-labelledby="grant-smart-assistant-heading">
    <div>
@@ -697,19 +684,17 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    {smartKeywords.trim()&&<div aria-live="polite" style={{display:"grid",gap:9}}>
     <div style={styles.muted}>{smartAssistantResults.length} ranked open call{smartAssistantResults.length===1?"":"s"} match these keywords.</div>
     {!smartAssistantResults.length&&<div style={{...styles.card,borderStyle:"dashed"}}><strong>No matching open calls found</strong><p style={{...styles.muted,margin:"5px 0 0"}}>Try a broader keyword such as climate, community, livestock, restoration or grants, or refresh crawler results.</p></div>}
-{smartAssistantResults.map(r=><article key={r.id} style={{...styles.card,display:"grid",gap:7}}>
-      <details>
-       <summary style={{cursor:"pointer",display:"grid",gridTemplateColumns:"minmax(0,1fr) auto",gap:10,alignItems:"start"}}>
-        <div style={{minWidth:0}}><div style={styles.eyebrow}>{r.funder||"Funder not verified"} · Open call</div><strong style={{display:"block",fontSize:15,marginTop:4}}>{r.title}</strong><p style={{...styles.muted,margin:"5px 0"}}>{text(r.summary||r.description).slice(0,180)||"No description supplied."}</p><span style={{...styles.muted,fontSize:12}}>Expand for details and actions</span></div>
-        <div style={{fontSize:12,textAlign:"right"}}><div style={styles.muted}>Deadline</div><strong>{dateLabel(r.deadline||r.deadline_at)}</strong><div style={{...styles.muted,marginTop:5}}>Keyword score</div><strong>{r._smartScore}</strong></div>
-       </summary>
-       <div style={{display:"grid",gap:8,marginTop:12,borderTop:"1px solid var(--border-color, #344255)",paddingTop:12}}>
-        <p style={{...styles.muted,margin:0}}>{text(r.summary||r.description)||"No description supplied."}</p>
-        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{r._matchedKeywords.map(term=><span key={term} style={styles.tag}>{term}</span>)}</div>
-        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>openConceptWorkspace(r)}>Screen call with AI Assistant</button>{r.url&&<a href={r.url} target="_blank" rel="noreferrer" style={{...styles.button,textDecoration:"none",display:"inline-block"}}>Open original call ↗</a>}</div>
-       </div>
-      </details>
-     </article>)}
+    {smartAssistantResults.map(r=><article key={r.id} style={{...styles.card,display:"grid",gap:7}}>
+     <div style={{display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap",alignItems:"start"}}>
+      <div style={{flex:"1 1 300px"}}><div style={styles.eyebrow}>{r.funder||"Funder not verified"} · Open call</div><strong style={{display:"block",fontSize:15,marginTop:4}}>{r.title}</strong><p style={{...styles.muted,margin:"5px 0"}}>{text(r.summary||r.description).slice(0,320)||"No description supplied."}</p></div>
+      <div style={{fontSize:12,minWidth:105}}><div style={styles.muted}>Deadline</div><strong>{dateLabel(r.deadline||r.deadline_at)}</strong><div style={{...styles.muted,marginTop:5}}>Keyword score: {r._smartScore}</div></div>
+     </div>
+     <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{r._matchedKeywords.map(term=><span key={term} style={styles.tag}>{term}</span>)}</div>
+     <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+      <button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>openConceptWorkspace(r)}>Screen call with AI Assistant</button>
+      {r.url&&<a href={r.url} target="_blank" rel="noreferrer" style={{...styles.button,textDecoration:"none",display:"inline-block"}}>Open original call ↗</a>}
+     </div>
+    </article>)}
    </div>}
   </section>
   <section style={{...styles.card,display:"grid",gap:12}}>
@@ -723,19 +708,14 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
   </section>
   <section style={{display:"grid",gap:12}}>
    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}><h2 style={{fontSize:19,margin:0}}>Opportunity register</h2><span style={styles.muted}>{filtered.length} matching records</span></div>
-filtered.map(r=><article key={r.id} style={styles.card}>
-     <details>
-      <summary style={{cursor:"pointer",display:"grid",gridTemplateColumns:"minmax(0,1fr) auto",gap:10,alignItems:"start"}}>
-       <div style={{minWidth:0}}><div style={styles.eyebrow}>{r.funder||"Funder not specified"} · {r.verificationStatus||"Verification status unavailable"}{r.discoveryEngine&&r.discoveryEngine!=="unknown"?" · Found by "+r.discoveryEngine.replace(/_/g," "):""}{r.fitScore!==undefined?" · IRPA topic fit "+r.fitScore+"/100":""}</div><h3 style={{fontSize:17,margin:"7px 0"}}>{r.title}</h3><p style={{...styles.muted,margin:"0 0 5px"}}>{text(r.summary||"No summary provided.").slice(0,220)}</p><span style={{...styles.muted,fontSize:12}}>Expand for full details, eligibility screening and links</span></div>
-       <div style={{fontSize:12,textAlign:"right"}}><div style={{color:"#9fb0c3"}}>Deadline</div><strong>{dateLabel(r.deadline||r.deadline_at)}</strong><div style={{marginTop:8,color:"#9fb0c3"}}>Status</div><strong>{r.status||"Unclassified"}</strong></div>
-      </summary>
-      <div style={{display:"grid",gap:9,marginTop:12,borderTop:"1px solid var(--border-color, #344255)",paddingTop:12}}>
-       <p style={{...styles.muted,margin:0}}>{r.summary||"No summary provided."}</p>
-       <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>{cleanArray(r.pillars).map(id=><span key={id} style={styles.tag}>{PILLARS.find(p=>p.id===id)?.label||id}</span>)}{cleanArray(r.themes).map(id=><span key={id} style={{...styles.tag,borderColor:"#6c5b8f"}}>{THEMES.find(t=>t.id===id)?.label||id}</span>)}</div>
-       <div style={{display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap",alignItems:"center"}}><span style={styles.muted}>Geography: {r.country||"Not specified"} · Funding: {r.amount||"Not specified"} · Updated: {dateLabel(r.updatedAt||r.createdAt)}{r.sourceUrl&&r.sourceUrl!==r.url?" · Discovery source recorded":""}</span><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>openConceptWorkspace(r)}>Screen eligibility / draft</button>{r.url&&<a href={r.url} target="_blank" rel="noreferrer" style={{...styles.button,textDecoration:"none",display:"inline-block"}}>{r.sourceType==="Cloudflare crawler"?"Open discovered call/source ↗":"Open official call ↗"}</a>}{r.sourceUrl&&r.sourceUrl!==r.url&&<a href={r.sourceUrl} target="_blank" rel="noreferrer" style={{...styles.button,background:"transparent",textDecoration:"none",display:"inline-block"}}>Discovery source ↗</a>}{canManage&&r.sourceType!=="Cloudflare crawler"&&<select aria-label={"Update status for "+r.title} style={{...styles.input,width:"auto"}} value={r.status||"Open"} onChange={e=>changeStatus(r,e.target.value)}>{statusOptions.map(s=><option key={s}>{s}</option>)}</select>}</div></div>
-      </div>
-     </details>
-    </article>)}
+   {loading&&crawlerResultsBusy?<div style={styles.card} role="status">Loading live opportunity records and Cloudflare crawler results…</div>:filtered.length===0?<div style={styles.card}><strong>No matching opportunities yet</strong><p style={styles.muted}>No records currently match these filters. The dashboard checks both manually registered opportunities and Cloudflare crawler results. Refresh results or run a scan if authorized, then verify each call against the donor’s official guidance.</p></div>:filtered.map(r=><article key={r.id} style={styles.card}>
+    <div style={{display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+     <div style={{flex:"1 1 380px"}}><div style={styles.eyebrow}>{r.funder||"Funder not specified"} · {r.verificationStatus||"Verification status unavailable"}{r.discoveryEngine&&r.discoveryEngine!=="unknown"?" · Found by "+r.discoveryEngine.replace(/_/g," "):""}{r.fitScore!==undefined?" · IRPA topic fit "+r.fitScore+"/100":""}</div><h3 style={{fontSize:18,margin:"7px 0"}}>{r.title}</h3><p style={{...styles.muted,margin:"0 0 10px"}}>{r.summary||"No summary provided."}</p></div>
+     <div style={{minWidth:150}}><div style={{fontSize:12,color:"#9fb0c3"}}>Deadline</div><strong>{dateLabel(r.deadline)}</strong><div style={{fontSize:12,marginTop:8,color:"#9fb0c3"}}>Status</div><strong>{r.status||"Unclassified"}</strong></div>
+    </div>
+    <div style={{display:"flex",gap:5,flexWrap:"wrap",margin:"8px 0"}}>{cleanArray(r.pillars).map(id=><span key={id} style={styles.tag}>{PILLARS.find(p=>p.id===id)?.label||id}</span>)}{cleanArray(r.themes).map(id=><span key={id} style={{...styles.tag,borderColor:"#6c5b8f"}}>{THEMES.find(t=>t.id===id)?.label||id}</span>)}</div>
+    <div style={{display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap",alignItems:"center"}}><span style={styles.muted}>Geography: {r.country||"Not specified"} · Funding: {r.amount||"Not specified"} · Updated: {dateLabel(r.updatedAt||r.createdAt)}{r.sourceUrl&&r.sourceUrl!==r.url?" · Discovery source recorded":""}</span><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>openConceptWorkspace(r)}>Screen eligibility / draft</button><a href={r.url} target="_blank" rel="noreferrer" style={{...styles.button,textDecoration:"none",display:"inline-block"}}>{r.sourceType==="Cloudflare crawler"?"Open discovered call/source ↗":"Open official call ↗"}</a>{r.sourceUrl&&r.sourceUrl!==r.url&&<a href={r.sourceUrl} target="_blank" rel="noreferrer" style={{...styles.button,background:"transparent",textDecoration:"none",display:"inline-block"}}>Discovery source ↗</a>}{canManage&&r.sourceType!=="Cloudflare crawler"&&<select aria-label={"Update status for "+r.title} style={{...styles.input,width:"auto"}} value={r.status||"Open"} onChange={e=>changeStatus(r,e.target.value)}>{statusOptions.map(s=><option key={s}>{s}</option>)}</select>}</div></div>
+   </article>)}
   </section>
   <section style={styles.card}>
    <details><summary style={{cursor:"pointer",fontSize:17,fontWeight:800}}>Funding resource directory ({SOURCES.length} resources · click to expand)</summary>
