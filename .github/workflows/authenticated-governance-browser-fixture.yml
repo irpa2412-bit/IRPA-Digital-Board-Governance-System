@@ -13,21 +13,6 @@ on:
       - ".github/workflows/authenticated-governance-browser-fixture.yml"
       - "firebase.json"
       - "firestore.rules"
-  push:
-    branches:
-      - "plan/fundraising-csr-esg-safe-expansion"
-    paths:
-      - "src/firebase/config.js"
-      - "src/App.jsx"
-      - "src/pages/GrantIntelligencePortal.jsx"
-      - "src/pages/grant-fundraising/**"
-      - "tests/browser/**"
-      - "scripts/seed-authenticated-browser-fixture.cjs"
-      - "playwright.authenticated-governance.config.mjs"
-      - ".github/workflows/authenticated-governance-browser-fixture.yml"
-      - "firebase.json"
-      - "firestore.rules"
-
 permissions:
   contents: read
 
