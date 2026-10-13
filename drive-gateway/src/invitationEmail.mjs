@@ -44,7 +44,7 @@ export function buildInvitationMessage({name,link,meetingAccess=null,username=""
     const gateLink=new URL(String(meetingAccess.link||"")).toString();
     const password=String(meetingAccess.password||"").trim();
     const cleanUsername=validateRecipient(String(username||""))||"";
-    const usernameText=cleanUsername?"\\nIRPA username: "+cleanUsername:"";
+    const usernameText=cleanUsername?"\nIRPA username: "+cleanUsername:"";
     const usernameHtml=cleanUsername?"<p><strong>IRPA username:</strong> "+escapeHtml(cleanUsername)+"</p>":"";
     if(!meetingName||!password||password.length>32||CRLF_RE.test(password))throw new Error("Invalid meeting access details");
     const detail=(value,max=240)=>String(value??"").replace(/[\r\n\u2028\u2029]+/g," ").trim().slice(0,max);
