@@ -34,9 +34,13 @@ jobs:
           for (const marker of [
             "draft_source === 'deterministic_fallback'",
             "requires_human_completion !== true",
-            "AI generation is degraded"
+            "AI generation is degraded",
+            "body: JSON.stringify(payload)",
+            "AbortSignal.timeout(90000)"
           ]) {
-            if (!workflow.includes(marker)) throw new Error('Production smoke workflow is missing fallback safety assertion: ' + marker);
+            if (!workflow.includes(marker)) throw new Error('Production smoke workflow is missing required assertion or JSON transport marker: ' + marker);
           }
-          console.log('Production smoke workflow distinguishes AI-generated drafts from human-review fallback scaffolds.');
+          const smokeStep = workflow.slice(workflow.indexOf('- name: Smoke-test production AI document drafting and concept-note generation'));
+          if (smokeStep.includes('curl --silent')) throw new Error('Production AI smoke test must serialize JSON through fetch rather than shell-quoted curl data.');
+          console.log('Production smoke workflow uses explicit JSON serialization and distinguishes AI-generated drafts from human-review fallback scaffolds.');
           NODE
