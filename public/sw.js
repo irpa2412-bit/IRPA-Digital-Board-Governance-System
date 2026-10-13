@@ -1,4 +1,4 @@
-const CACHE_NAME="irpa-dbgs-app-shell-v42";
+const CACHE_NAME="irpa-dbgs-app-shell-v43";
 const APP_SHELL=["/","/index.html","/manifest.webmanifest"];
 
 self.addEventListener("install",(event)=>{
@@ -63,13 +63,12 @@ self.addEventListener("fetch",(event)=>{
   }
 
   if(isAppAsset(request)){
+    // Network-first prevents an old cached Vite chunk from being paired with
+    // a newly deployed index.html. Fall back to cache only when offline.
     event.respondWith(
-      caches.match(request).then(cached=>{
-        const network=fetch(request).then(response=>{
-          return cacheResponse(request,response).then(()=>response);
-        }).catch(()=>cached||Response.error());
-        return cached||network;
-      })
+      fetch(request).then(response=>{
+        return cacheResponse(request,response).then(()=>response);
+      }).catch(()=>caches.match(request).then(cached=>cached||Response.error()))
     );
   }
 });
