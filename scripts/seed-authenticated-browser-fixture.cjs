@@ -1,6 +1,6 @@
 const admin = require("../functions/node_modules/firebase-admin");
 
-const projectId = process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || "irpa-digital-board-governance";
+const projectId = process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || "demo-irpa-dgbs";
 const email = "irpa-browser-fixture-admin@example.test";
 const password = "FixtureOnly-Password-2026!";
 
