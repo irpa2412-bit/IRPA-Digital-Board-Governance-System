@@ -486,10 +486,6 @@ function buildConceptNoteDraft(conceptNote) {
 }
 
 export async function analyzeGrant(request, env) {
-  if (!env.AI || typeof env.AI.run !== "function") {
-    return json({ error: "Cloudflare Workers AI is not configured for this environment." }, 503);
-  }
-
   let body;
   try {
     const declaredLength = Number(request.headers.get("content-length") || 0);
@@ -501,7 +497,12 @@ export async function analyzeGrant(request, env) {
     return json({ error: "Request body must be valid JSON." }, 400);
   }
   if (!body || typeof body !== "object" || Array.isArray(body)) return json({ error: "Request body must be a JSON object." }, 400);
+  // Document drafting can return a clearly labelled scaffold if Workers AI is unavailable.
+  // Other analysis tasks still require a functioning model binding.
   if (body.task === "draft_message") return generateDocumentDraft(body, env);
+  if (!env.AI || typeof env.AI.run !== "function") {
+    return json({ error: "Cloudflare Workers AI is not configured for this environment." }, 503);
+  }
 
   const title = typeof body.title === "string" ? body.title.trim().slice(0, 500) : "";
   const description = typeof body.description === "string" ? body.description.trim().slice(0, 10_000) : "";
