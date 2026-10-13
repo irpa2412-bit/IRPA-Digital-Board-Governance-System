@@ -1409,7 +1409,7 @@ async function sendMemberInvitation(request, env) {
     invitationTokenHash:{stringValue:invitationTokenHash},invitationTokenVersion:{stringValue:"2"},invitationExpiresAt:{timestampValue:invitationExpiresAt},invitationRedeemedAt:{nullValue:null},invitationRedeemedUid:{nullValue:null},
     deliveryStatus:{stringValue:"Queued"},deliveryQueuedAt:{timestampValue:new Date().toISOString()},deliveryError:{stringValue:""},deliveryProvider:{stringValue:"IRPA Mail Server via Cloudflare Worker"}
   },["invitationTokenHash","invitationTokenVersion","invitationExpiresAt","invitationRedeemedAt","invitationRedeemedUid","deliveryStatus","deliveryQueuedAt","deliveryError","deliveryProvider"]);
-  const message=buildInvitationMessage({name:name||"Member",link,meetingAccess});
+  const message=buildInvitationMessage({name:name||"Member",link,meetingAccess,username:email});
   try{
     const result=await sendInvitationEmail({email,name:name||"Member",link,meetingAccess,smtpSend:async ({to,subject,text,html})=>smtpSend(env,{to,subject,text,html}),logger:{error:(label,meta)=>console.error(label,{recipientDomain:recipientDomain(email),attempt:meta?.attempt})}});
     const sentAt=new Date().toISOString();

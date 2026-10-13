@@ -1710,3 +1710,11 @@ exports.resetTrialData = onCall({region:"us-central1"}, async request => {
     throw new HttpsError("internal","The trial-data reset failed. The audit record has been retained.");
   }
 });
+
+
+// Meeting Room working-document review endpoints. The underlying handlers enforce
+// meeting-scoped host/participant permissions and write audit events.
+const meetingWorkingDocuments = require("./meetingRecords");
+exports.registerMeetingWorkingDocument = meetingWorkingDocuments.registerMeetingWorkingDocument;
+exports.listMeetingWorkingDocuments = meetingWorkingDocuments.listMeetingWorkingDocuments;
+exports.submitMeetingDocumentReview = meetingWorkingDocuments.submitMeetingDocumentReview;

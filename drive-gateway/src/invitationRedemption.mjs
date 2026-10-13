@@ -248,7 +248,12 @@ async function getOrCreateFirebaseUser(projectId, email, displayName, accessToke
 }
 
 function validateInvitation(invitation, invitationId, secret) {
-  if (invitation.status === "Cancelled" || invitation.invitationRedemptionState === "CANCELLED") {
+  const invitationStatus = String(invitation.status || "").trim().toUpperCase();
+  const redemptionState = String(invitation.invitationRedemptionState || "").trim().toUpperCase();
+  if (invitationStatus === "REVOKED" || redemptionState === "REVOKED") {
+    throw new InvitationRedemptionError(412, "This IRPA invitation has been revoked. Ask an administrator to issue a fresh invitation.");
+  }
+  if (["CANCELLED", "CANCELED"].includes(invitationStatus) || ["CANCELLED", "CANCELED"].includes(redemptionState)) {
     throw new InvitationRedemptionError(412, "This IRPA invitation has been cancelled.");
   }
   if (invitation.invitationTokenVersion !== "2" || !invitation.invitationTokenHash) {

@@ -1,0 +1,71 @@
+name: Meeting Invitation Flow CI
+# Build and entry-policy verification only; this workflow never deploys.
+# Verification-only regression workflow; no production deployment is performed.
+
+on:
+  push:
+    branches:
+      - feat/secure-meeting-invitation-flow-20261013
+    paths:
+      - ".github/workflows/meeting-invitation-flow-ci.yml"
+      - "functions/meetingEntryPolicy.js"
+      - "functions/meetingEntryPolicy.test.cjs"
+      - "functions/meetingGateway.js"
+      - "src/components/MeetingAccessControl.jsx"
+      - "src/pages/MeetingEntryGateway.jsx"
+      - "src/pages/MeetingRoom.jsx"
+      - "src/pages/Meetings.jsx"
+      - "src/pages/OperationalGatewaysParticipants.jsx"
+      - "package.json"
+      - "package-lock.json"
+      - "drive-gateway/src/index.js"
+      - "drive-gateway/src/invitationEmail.mjs"
+      - "drive-gateway/src/invitationRedemption.mjs"
+      - "drive-gateway/tests/mail-invitation.unit.mjs"
+      - "drive-gateway/tests/invitation-redemption.test.mjs"
+      - "functions/meetingGateway.emulator.test.cjs"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/meeting-invitation-flow-ci.yml"
+      - "functions/meetingEntryPolicy.js"
+      - "functions/meetingEntryPolicy.test.cjs"
+      - "functions/meetingGateway.js"
+      - "src/components/MeetingAccessControl.jsx"
+      - "src/pages/MeetingEntryGateway.jsx"
+      - "src/pages/MeetingRoom.jsx"
+      - "src/pages/Meetings.jsx"
+      - "src/pages/OperationalGatewaysParticipants.jsx"
+      - "package.json"
+      - "package-lock.json"
+      - "drive-gateway/src/index.js"
+      - "drive-gateway/src/invitationEmail.mjs"
+      - "drive-gateway/src/invitationRedemption.mjs"
+      - "drive-gateway/tests/mail-invitation.unit.mjs"
+      - "drive-gateway/tests/invitation-redemption.test.mjs"
+      - "functions/meetingGateway.emulator.test.cjs"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-meeting-invitation-flow:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Test meeting entry policy
+        run: npm run test:meeting-entry-policy
+      - name: Build web application
+        run: npm run build

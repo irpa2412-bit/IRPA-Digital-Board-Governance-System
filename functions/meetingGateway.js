@@ -2,6 +2,7 @@ const {onCall,HttpsError}=require("firebase-functions/v2/https");
 const logger=require("firebase-functions/logger");
 const {getFirestore,FieldValue}=require("firebase-admin/firestore");
 const crypto=require("crypto");
+const {normalizeMeetingEntryMode,resolveMeetingEntryState}=require("./meetingEntryPolicy");
 const db=getFirestore();
 
 function text(v){return String(v??"").trim();}
@@ -26,6 +27,7 @@ exports.createMeetingAccessInvitation=onCall({region:"us-central1",timeoutSecond
  const participantSnap=await db.collection("participants").doc(participantId).get();
  if(!meetingSnap.exists||!participantSnap.exists)throw new HttpsError("not-found","Meeting or participant was not found.");
  const meeting={id:meetingSnap.id,...meetingSnap.data()},participant={id:participantSnap.id,...participantSnap.data()};
+ if(!active(meeting.status))throw new HttpsError("failed-precondition","Closed meetings cannot issue new invitation passes.");
  logStage("RECORDS_LOADED",{meetingFound:true,participantFound:true,participantMeetingMatches:participant.meetingId===meetingId});
  if(participant.meetingId!==meetingId)throw new HttpsError("failed-precondition","Participant is not linked to the selected meeting.");
  const chair=String(meeting.chairpersonEmail||"").toLowerCase()===String(request.auth.token.email||"").toLowerCase();
@@ -96,7 +98,7 @@ exports.authorizeMeetingEntry=onCall({region:"us-central1",timeoutSeconds:30},as
  if(snap.empty)throw new HttpsError("permission-denied","This meeting access link is invalid.");
  const doc=snap.docs[0],grant={id:doc.id,...doc.data()};
  if(suppliedMeetingId&&suppliedMeetingId!==grant.meetingId)throw new HttpsError("permission-denied","The supplied meeting ID does not match this gate pass.");
- if(grant.status!=="Active"||grant.expiresAt?.toDate?.()<new Date())throw new HttpsError("permission-denied","This meeting access link has expired or been revoked.");
+ const expiry=grant.expiresAt?.toDate?.()||new Date(grant.expiresAt||0);if(grant.status!=="Active"||Number.isNaN(expiry.getTime())||expiry.getTime()<=Date.now())throw new HttpsError("permission-denied","This meeting access link has expired or been revoked.");
  if(grant.passwordHash&&hash(suppliedPassword)!==grant.passwordHash)throw new HttpsError("permission-denied","The meeting ID and gate password do not match the issued gate pass.");
  const participantSnap=await db.collection("participants").doc(grant.participantId).get();
  const participant=participantSnap.exists?participantSnap.data():{};
@@ -106,6 +108,79 @@ exports.authorizeMeetingEntry=onCall({region:"us-central1",timeoutSeconds:30},as
  if(!meetingSnap.exists)throw new HttpsError("not-found","The meeting record no longer exists.");
  const meeting={id:meetingSnap.id,...meetingSnap.data()};
  if(!active(meeting.status))throw new HttpsError("failed-precondition","This meeting is closed and cannot be entered.");
- await db.collection("audit").add({action:"MEETING_ENTRY_AUTHORIZED",collection:"meetingAccessTokens",recordId:doc.id,details:{meetingId:grant.meetingId,participantId:grant.participantId,gateway:"IRPA Meeting Entry Gateway"},actorUid:uid,actorEmail:email,createdAt:FieldValue.serverTimestamp()});
- return {ok:true,meetingId:grant.meetingId,participantId:grant.participantId,meetingReference:grant.meetingReference||meeting.reference||meeting.title,meetingCategory:text(meeting.meetingCategory||meeting.category||meeting.meetingType||"General Meeting"),meetingStatus:meeting.status||"Scheduled",participantName:text(participant.participantName||participant.name)||email};
+ const entryMode=normalizeMeetingEntryMode(meeting);
+ const entryRequestRef=db.collection("meetingEntryRequests").doc(hash("meeting-entry:"+doc.id+":"+uid));
+ const entryRequestSnap=await entryRequestRef.get();
+ let entryRequest=entryRequestSnap.exists?{id:entryRequestSnap.id,...entryRequestSnap.data()}:null;
+ const entryState=resolveMeetingEntryState(entryMode,entryRequest?.status);
+ if(entryState==="AUTHORIZED"){
+  if(entryRequest&&entryRequest.status!=="ADMITTED")await db.collection("meetingEntryRequests").doc(entryRequest.id).update({status:"ADMITTED",resolvedAt:FieldValue.serverTimestamp(),resolvedBy:"DIRECT_ENTRY_POLICY"});
+  await db.collection("audit").add({action:"MEETING_ENTRY_AUTHORIZED",collection:"meetingAccessTokens",recordId:doc.id,details:{meetingId:grant.meetingId,participantId:grant.participantId,entryMode,gateway:"IRPA Meeting Entry Gateway"},actorUid:uid,actorEmail:email,createdAt:FieldValue.serverTimestamp()});
+  return {ok:true,entryState:"AUTHORIZED",entryMode,meetingId:grant.meetingId,participantId:grant.participantId,meetingReference:grant.meetingReference||meeting.reference||meeting.title,meetingCategory:text(meeting.meetingCategory||meeting.category||meeting.meetingType||"General Meeting"),meetingStatus:meeting.status||"Scheduled",participantName:text(participant.participantName||participant.name)||email};
+ }
+ if(entryState==="DENIED")throw new HttpsError("permission-denied","The meeting host declined this entry request. Contact the meeting initiator for assistance.");
+ if(!entryRequest){
+  const requestData={meetingId:grant.meetingId,meetingReference:grant.meetingReference||meeting.reference||meeting.title||"",participantId:grant.participantId,participantName:text(participant.participantName||participant.name)||email,participantUid:uid,participantEmail:email,accessId:doc.id,status:"PENDING",entryMode,requestedAt:FieldValue.serverTimestamp(),expiresAt:grant.expiresAt||null};
+  try{await entryRequestRef.create(requestData);entryRequest={id:entryRequestRef.id,...requestData};}
+  catch(error){if(!["already-exists","6"].includes(String(error?.code||"")))throw error;const latest=await entryRequestRef.get();if(!latest.exists)throw error;entryRequest={id:latest.id,...latest.data()};if(entryRequest.status==="DENIED")throw new HttpsError("permission-denied","The meeting host declined this entry request. Contact the meeting initiator for assistance.");}
+  await db.collection("audit").add({action:"MEETING_ENTRY_REQUESTED",collection:"meetingEntryRequests",recordId:entryRequestRef.id,details:{meetingId:grant.meetingId,participantId:grant.participantId,entryMode},actorUid:uid,actorEmail:email,createdAt:FieldValue.serverTimestamp()});
+ }
+ return {ok:true,entryState:"WAITING_FOR_HOST",entryMode,entryRequestId:entryRequest.id,meetingId:grant.meetingId,participantId:grant.participantId,meetingReference:grant.meetingReference||meeting.reference||meeting.title,meetingCategory:text(meeting.meetingCategory||meeting.category||meeting.meetingType||"General Meeting"),meetingStatus:meeting.status||"Scheduled",participantName:text(participant.participantName||participant.name)||email};
+});
+
+exports.listMeetingEntryRequests=onCall({region:"us-central1",timeoutSeconds:30},async request=>{
+ const uid=request.auth?.uid;if(!uid)throw new HttpsError("unauthenticated","Authentication is required.");
+ const meetingId=text(request.data?.meetingId);if(!meetingId)throw new HttpsError("invalid-argument","Meeting ID is required.");
+ const meetingSnap=await db.collection("meetings").doc(meetingId).get();if(!meetingSnap.exists)throw new HttpsError("not-found","Meeting was not found.");
+ const meeting=meetingSnap.data()||{},email=text(request.auth?.token?.email).toLowerCase();
+ if(!active(meeting.status))throw new HttpsError("failed-precondition","Closed meetings cannot load invitation candidates.");
+ const authorised=await activeAdmin(request)||text(meeting.initiatorUid)===uid||text(meeting.chairpersonEmail).toLowerCase()===email||text(meeting.secretaryEmail).toLowerCase()===email;
+ if(!authorised)throw new HttpsError("permission-denied","Only the meeting initiator, chairperson, secretary or active administrator may view entry requests.");
+ const snap=await db.collection("meetingEntryRequests").where("meetingId","==",meetingId).limit(200).get();
+ return {requests:snap.docs.filter(d=>{const row=d.data()||{},expiry=row.expiresAt?.toDate?.()||new Date(row.expiresAt||0);return row.status==="PENDING"&&!Number.isNaN(expiry.getTime())&&expiry.getTime()>Date.now();}).map(d=>({id:d.id,participantId:text(d.data().participantId),participantName:text(d.data().participantName||d.data().participantEmail),participantEmail:text(d.data().participantEmail),requestedAt:d.data().requestedAt?.toDate?.()?.toISOString()||null}))};
+});
+
+exports.listMeetingInviteCandidates=onCall({region:"us-central1",timeoutSeconds:30},async request=>{
+ const uid=request.auth?.uid;if(!uid)throw new HttpsError("unauthenticated","Authentication is required.");
+ const meetingId=text(request.data?.meetingId);if(!meetingId)throw new HttpsError("invalid-argument","Meeting ID is required.");
+ const meetingSnap=await db.collection("meetings").doc(meetingId).get();if(!meetingSnap.exists)throw new HttpsError("not-found","Meeting was not found.");
+ const meeting=meetingSnap.data()||{},email=text(request.auth?.token?.email).toLowerCase();
+ const authorised=await activeAdmin(request)||text(meeting.initiatorUid)===uid||text(meeting.chairpersonUid)===uid||text(meeting.secretaryUid)===uid||text(meeting.chairpersonEmail).toLowerCase()===email||text(meeting.secretaryEmail).toLowerCase()===email;
+ if(!authorised)throw new HttpsError("permission-denied","Only the meeting initiator, authorised chairperson/secretary or active administrator may access invitation candidates.");
+ const [memberSnap,employeeSnap]=await Promise.all([db.collection("members").get(),db.collection("employees").get()]);
+ const activeRecord=row=>{const statuses=[row.status,row.employmentStatus,row.registrationStatus].map(v=>text(v).toLowerCase()).filter(Boolean);if(statuses.some(v=>["inactive","terminated","suspended","deleted","cancelled","canceled","archived"].includes(v)))return false;return statuses.some(v=>["active","activated"].includes(v));};
+ const clean=(doc,type)=>{
+  const row=doc.data()||{},candidateEmail=text(row.email||row.emailAddress||row.contactEmail).toLowerCase();
+  if(!activeRecord(row)||!candidateEmail)return null;
+  return {id:doc.id,name:text(row.name||row.fullName||row.memberName||row.employeeName||row.displayName)||candidateEmail,email:candidateEmail,role:text(row.role||type),memberType:text(row.memberType||row.employeeType||type),department:text(row.department),status:text(row.status||row.employmentStatus||row.registrationStatus),uid:text(row.uid||row.authUid||row.userUid),memberNumber:text(row.memberNumber||row.registrationNumber),employeeNumber:text(row.employeeNumber),boardMember:row.boardMember===true||Boolean(row.boardPosition)||text(row.department)==="Board of Directors"||text(row.role)==="Board Member",boardPosition:text(row.boardPosition)};
+ };
+ const members=memberSnap.docs.map(d=>clean(d,"Member")).filter(Boolean);
+ const employees=employeeSnap.docs.map(d=>clean(d,"Employee")).filter(Boolean);
+ await db.collection("audit").add({action:"MEETING_INVITATION_CANDIDATES_ACCESSED",collection:"meetings",recordId:meetingId,details:{memberCandidateCount:members.length,employeeCandidateCount:employees.length},actorUid:uid,actorEmail:email,createdAt:FieldValue.serverTimestamp()});
+ return {members,employees,source:"AUTHORITATIVE_REGISTERS",meetingId};
+});
+
+exports.resolveMeetingEntryRequest=onCall({region:"us-central1",timeoutSeconds:30},async request=>{
+ const uid=request.auth?.uid;if(!uid)throw new HttpsError("unauthenticated","Authentication is required.");
+ const requestId=text(request.data?.requestId),decision=text(request.data?.decision).toUpperCase();
+ if(!requestId||!["ADMIT","DENY"].includes(decision))throw new HttpsError("invalid-argument","A request ID and ADMIT or DENY decision are required.");
+ const ref=db.collection("meetingEntryRequests").doc(requestId);
+ return db.runTransaction(async tx=>{
+  const reqSnap=await tx.get(ref);if(!reqSnap.exists)throw new HttpsError("not-found","Entry request was not found.");
+  const row=reqSnap.data()||{};
+  const meetingRef=db.collection("meetings").doc(text(row.meetingId));
+  const meetingSnap=await tx.get(meetingRef);if(!meetingSnap.exists)throw new HttpsError("not-found","Meeting was not found.");
+  const meeting=meetingSnap.data()||{},email=text(request.auth?.token?.email).toLowerCase();
+  const isAdmin=await activeAdmin(request);
+  const authorised=isAdmin||text(meeting.initiatorUid)===uid||text(meeting.chairpersonEmail).toLowerCase()===email||text(meeting.secretaryEmail).toLowerCase()===email;
+  if(!authorised)throw new HttpsError("permission-denied","Only the meeting initiator, chairperson, secretary or active administrator may resolve entry requests.");
+  if(row.status!=="PENDING")throw new HttpsError("failed-precondition","This entry request has already been resolved.");
+  const tokenRef=db.collection("meetingAccessTokens").doc(text(row.accessId));
+  const tokenSnap=await tx.get(tokenRef);
+  const tokenData=tokenSnap.exists?(tokenSnap.data()||{}):{};const tokenExpiry=tokenData.expiresAt?.toDate?.()||new Date(tokenData.expiresAt||0);if(!tokenSnap.exists||tokenData.status!=="Active"||Number.isNaN(tokenExpiry.getTime())||tokenExpiry.getTime()<=Date.now())throw new HttpsError("failed-precondition","The invitation pass is expired, revoked or no longer active.");
+  const next=decision==="ADMIT"?"ADMITTED":"DENIED";
+  tx.update(ref,{status:next,resolvedByUid:uid,resolvedByEmail:email,resolvedAt:FieldValue.serverTimestamp()});
+  tx.set(db.collection("audit").doc(),{action:decision==="ADMIT"?"MEETING_ENTRY_ADMITTED":"MEETING_ENTRY_DENIED",collection:"meetingEntryRequests",recordId:requestId,details:{meetingId:row.meetingId,participantId:row.participantId},actorUid:uid,actorEmail:email,createdAt:FieldValue.serverTimestamp()});
+  return {ok:true,status:next};
+ }); 
 });

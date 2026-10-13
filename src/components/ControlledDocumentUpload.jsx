@@ -18,7 +18,7 @@ function resolveContentType(file) {
   return MIME_BY_EXTENSION[ext] || "application/octet-stream";
 }
 
-export default function ControlledDocumentUpload({ purpose = "Controlled Document", onUploaded, allowRestrictedUpload = false, submitLabel = "Upload Document", compact = false, deferSave = false, showSaveButton = false }) {
+export default function ControlledDocumentUpload({ purpose = "Controlled Document", onUploaded, allowRestrictedUpload = false, submitLabel = "Upload Document", compact = false, deferSave = false, showSaveButton = false, workflowContextOverride = {} }) {
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState("");
   const [generatedReference, setGeneratedReference] = useState("");
@@ -159,7 +159,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
       const archive = routed.categoryArchive;
       const governanceArchive = routed.governanceArchive;
       const now = new Date().toISOString();
-      const workflowContext = readWorkflowContext();
+      const workflowContext = {...(readWorkflowContext() || {}), ...(workflowContextOverride || {})};
       const documentPayload = withWorkflowLinks({
         title: name,
         reference: documentReference,

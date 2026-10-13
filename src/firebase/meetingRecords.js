@@ -13,3 +13,8 @@ export async function getMeetingRecordingStatus(meetingId){const r=await call("g
 export async function compileAndEmailMeetingReport(payload){const r=await call("compileAndEmailMeetingReport")(payload);return r.data;}
 
 export async function saveLiveMeetingProceedings(payload){const r=await call("saveLiveMeetingProceedings")(payload);return r.data;}
+
+
+export async function registerMeetingWorkingDocument(payload){const r=await call("registerMeetingWorkingDocument")(payload);return r.data;}
+export async function listMeetingWorkingDocuments(meetingId){const r=await call("listMeetingWorkingDocuments")({meetingId});return r.data?.documents||[];}
+export async function submitMeetingDocumentReview(payload){const r=await call("submitMeetingDocumentReview")(payload);return r.data;}
