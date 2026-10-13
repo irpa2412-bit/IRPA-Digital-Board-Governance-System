@@ -143,6 +143,26 @@ test("Cloudflare invitation redemption rejects malformed tokens before contactin
 });
 
 
+test("Cloudflare invitation redemption rejects an expired invitation token before Firebase account lookup", async()=>{
+  const originalFetch=global.fetch;
+  const calls=[];
+  const expiredFields={...invitationFields,invitationExpiresAt:{timestampValue:"2020-01-01T00:00:00Z"}};
+  global.fetch=async(url,options={})=>{
+    const target=String(url); calls.push({target,options});
+    if(target==="https://oauth2.googleapis.com/token") return new Response(JSON.stringify({access_token:"test-google-access-token",expires_in:3600}),{status:200});
+    if(target.includes("/databases/(default)/documents/invitations/expired-invitation")) return new Response(JSON.stringify({fields:expiredFields,updateTime:"2026-10-13T12:00:00.000000Z"}),{status:200});
+    if(target.includes("identitytoolkit.googleapis.com")) throw new Error("Expired invitation must not reach Firebase Identity Toolkit.");
+    throw new Error("Unexpected external request: "+target);
+  };
+  try {
+    const response=await handler.fetch(new Request("https://gw.test/api/invitations/redeem",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:"expired-invitation."+tokenSecret})}),{
+      FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)
+    });
+    assert.equal(response.status,410);
+    assert.match((await response.json()).error,/invitation has expired/i);
+    assert.equal(calls.some(c=>c.target.includes("identitytoolkit.googleapis.com")),false);
+  } finally { global.fetch=originalFetch; }
+});
 test("Cloudflare invitation redemption rejects explicitly revoked invitations before Firebase account lookup", async()=>{
   const originalFetch=global.fetch;
   const calls=[];
