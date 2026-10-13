@@ -78,8 +78,8 @@ for (const viewport of [
     });
 
     await page.goto("/?adminModule=Grant%20Intelligence%20%26%20Funding%20Opportunities");
-    await page.getByLabel("Email address").fill(fixtureEmail);
-    await page.getByLabel("Password").fill(fixturePassword);
+    await page.locator('.auth-card input[type="email"]').fill(fixtureEmail);
+    await page.locator('.auth-card input[type="password"]').fill(fixturePassword);
     await page.getByRole("button", { name: "Sign In Securely" }).click();
     await chooseTrialEnvironment(page);
 
