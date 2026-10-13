@@ -1,6 +1,8 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getAuth, GoogleAuthProvider, connectAuthEmulator } from "firebase/auth";
+import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
+
+const useFirebaseEmulators = import.meta.env.VITE_USE_FIREBASE_EMULATORS === "true";
 
 export const firebaseConfig = {
   apiKey: "AIzaSyC2aMdxHD14nMnGiRyf4mSL1ixXdzBoOtE",
@@ -8,7 +10,7 @@ export const firebaseConfig = {
   // registered for this Firebase handler; changing this to web.app without
   // adding the matching OAuth redirect URI causes Google Error 400.
   authDomain: "irpa-digital-board-governance.firebaseapp.com",
-  projectId: "irpa-digital-board-governance",
+  projectId: useFirebaseEmulators ? "demo-irpa-dgbs" : "irpa-digital-board-governance",
   messagingSenderId: "217055978789",
   appId: "1:217055978789:web:937d1f2f781202cc1e26cc",
   measurementId: "G-XDJEBRBEVC"
@@ -32,3 +34,17 @@ googleProvider.setCustomParameters({
 });
 
 export default app;
+
+
+// Test-only emulator wiring. Production builds do not set this flag; if it is
+// accidentally enabled on a non-local origin, fail closed instead of connecting.
+if (useFirebaseEmulators) {
+  const localHosts = new Set(["localhost", "127.0.0.1"]);
+  if (typeof window === "undefined" || !localHosts.has(window.location.hostname)) {
+    throw new Error("Firebase emulator mode is restricted to localhost test fixtures.");
+  }
+  connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
+  connectAuthEmulator(applicantAuth, "http://127.0.0.1:9099", { disableWarnings: true });
+  connectFirestoreEmulator(db, "127.0.0.1", 8080);
+  connectFirestoreEmulator(applicantDb, "127.0.0.1", 8080);
+}

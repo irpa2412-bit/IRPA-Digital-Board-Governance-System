@@ -1,0 +1,51 @@
+name: Fundraising Responsive Browser Smoke
+
+on:
+  pull_request:
+    paths:
+      - "src/pages/GrantIntelligencePortal.jsx"
+      - "src/pages/grant-fundraising/**"
+      - "tests/browser/**"
+      - "playwright.fundraising.config.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/fundraising-responsive-smoke.yml"
+  push:
+    branches:
+      - "plan/fundraising-csr-esg-safe-expansion"
+    paths:
+      - "src/pages/GrantIntelligencePortal.jsx"
+      - "src/pages/grant-fundraising/**"
+      - "tests/browser/**"
+      - "playwright.fundraising.config.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/fundraising-responsive-smoke.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fundraising-responsive-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout isolated fundraising change
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked application dependencies
+        run: npm ci
+      - name: Install Playwright test runner without changing lockfile
+        run: npm install --no-save --package-lock=false @playwright/test
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run desktop and mobile fundraising registry smoke tests
+        run: npx playwright test --config=playwright.fundraising.config.mjs
