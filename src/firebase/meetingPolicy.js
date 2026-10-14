@@ -37,7 +37,8 @@ export const MEETING_CONFIDENTIALITY_CLASSES=[
 ];
 export const BOARD_SESSION_TYPES=[
   {value:"OPEN_SESSION",label:"Open Session"},
-  {value:"CLOSED_SESSION",label:"Closed Session"}
+  {value:"CLOSED_SESSION",label:"Closed Session"},
+  {value:"MIXED_SESSION",label:"Mixed Session (separate Open and Closed records)"}
 ];
 export function canAccessMeetingCategory(meeting={},identity={},options={}){
   if(identity.isAdmin===true||identity.admin===true)return true;
