@@ -21,10 +21,10 @@ async function navigateModule(page, viewportName, module) {
         await dialog.getByRole("button", { name: /Meeting Portal/ }).click();
         // The mobile portal sheet exposes child labels without the desktop SUB-PORTAL prefix.
         const child = {
-          "Meeting Room": /Meeting Room Portal/,
-          "Voting": /Voting Portal/,
-          "Resolutions": /Resolutions Portal/,
-          "Decisions": /Decisions Portal/
+          "Meeting Room": /Meeting Room/,
+          "Voting": /Voting/,
+          "Resolutions": /Resolutions/,
+          "Decisions": /Decisions/
         }[module];
         await dialog.getByRole("button", { name: child }).click();
       }
