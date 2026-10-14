@@ -143,6 +143,8 @@ jobs:
             "tests/fixtures/mocks.js",
             "tests/meeting-portal-browser.test.mjs",
             "tests/meeting-room-authorization-boundary.test.mjs",
+            // Explicitly permit the separate authenticated cross-portal mobile navigation race regression.
+            "tests/browser/authenticated-governance-regression.spec.mjs",
             "vite.meeting-fixture.config.js"
           ]);
           const unexpected = changed.filter(path => !allowed.has(path));
