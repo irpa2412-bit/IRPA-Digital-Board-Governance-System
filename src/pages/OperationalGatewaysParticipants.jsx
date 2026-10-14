@@ -57,6 +57,7 @@ export default function OperationalGatewaysParticipants(){
   });
   if(failures.length)setErr("Some participant registers could not be retrieved: "+failures.join(" | "));
   else if(inviteeDirectoryUnavailable)setErr("Meeting Invitee Directory is temporarily unavailable. Manual external invitees remain enabled; enter the participant's name and email, then use Register & Send Invitation. Institutional identities are not inferred.");
+  else if(!results[2].value?.boardMembers?.length&&!results[2].value?.members?.length&&!results[2].value?.employees?.length)setErr("The directory service responded, but returned no active Board Members, Members, or Employees. Verify that the authoritative records have an Active/Activated status in at least one of status, employmentStatus, or registrationStatus, then select Retry.");
   else setErr("");
   }catch(error){setErr("Unable to retrieve the meeting and attendance registers: "+String(error?.message||"Please retry."));}
   finally{setRegistersLoading(false);}
