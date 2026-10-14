@@ -18,8 +18,10 @@ export default function OperationalGatewaysParticipants(){
  }
  async function load(){
   const includeParticipantRecords=participantEnvironmentConfirmed();
+  // Never convert a missing environment confirmation into an apparently empty register.
+  // Keep the last verified rows visible and clearly report why a fresh read was skipped.
   const requests=[
-   includeParticipantRecords?getRecords(COLLECTIONS.participants):Promise.resolve([]),
+   includeParticipantRecords?getRecords(COLLECTIONS.participants):Promise.resolve({environmentUnverified:true}),
    getRecords(COLLECTIONS.meetings),
    listMeetingInviteeDirectory(),
    getRecords(COLLECTIONS.invitations)
@@ -28,6 +30,7 @@ export default function OperationalGatewaysParticipants(){
   const results=await Promise.allSettled(requests);
   const failures=[];
   let inviteeDirectoryUnavailable=false;
+  const participantRegisterUnverified=!includeParticipantRecords;
   results.forEach((result,index)=>{
    if(result.status==="rejected"){
     if(index===2){
@@ -41,15 +44,18 @@ export default function OperationalGatewaysParticipants(){
     }
     failures.push(labels[index]+": "+(result.reason?.message||"load failed"));return;
    }
+   if(index===0&&result.value?.environmentUnverified===true)return;
    const value=Array.isArray(result.value)?result.value:[];
    if(index===0)setRows(value);
    else if(index===1)setMeetings(value);
    else if(index===2){setEmployees(Array.isArray(result.value?.employees)?result.value.employees:[]);setBoardMembers(Array.isArray(result.value?.boardMembers)?result.value.boardMembers:[]);setMembers(Array.isArray(result.value?.members)?result.value.members:[])}
    else if(index===3)setInvitations(value);
   });
-  if(failures.length)setErr("Some participant registers could not be retrieved: "+failures.join(" | "));
-  else if(inviteeDirectoryUnavailable)setErr("Meeting Invitee Directory is temporarily unavailable. Manual external invitees remain enabled; enter the participant's name and email, then use Register & Send Invitation. Institutional identities are not inferred.");
-  else setErr("");
+  const notices=[];
+  if(participantRegisterUnverified)notices.push("Participant records were not reloaded because this session has not confirmed the Participants data environment. Existing displayed rows were preserved; confirm the correct ACTUAL or TRIAL environment in the portal before refreshing. The register is not being reported as empty.");
+  if(failures.length)notices.push("Some participant registers could not be retrieved: "+failures.join(" | "));
+  if(inviteeDirectoryUnavailable)notices.push("Meeting Invitee Directory is temporarily unavailable. Manual external invitees remain enabled; enter the participant's name and email, then use Register & Send Invitation. Institutional identities are not inferred.");
+  setErr(notices.join(" "));
  }
  useEffect(()=>{
   load();
