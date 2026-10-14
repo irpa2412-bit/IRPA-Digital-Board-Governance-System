@@ -227,7 +227,8 @@ const MEETING_ARCHIVE_CATEGORIES = Object.freeze({
   ADMINISTRATIVE: { label: "Administrative Meetings", archiveCategory: "Administrative Meeting Archive", classification: "Restricted" },
   STAFF: { label: "Staff Meetings", archiveCategory: "Staff Meeting Archive", classification: "Internal" },
   GENERAL: { label: "General Meetings", archiveCategory: "General Meeting Archive", classification: "Internal" },
-  OTHER: { label: "Other Meetings", archiveCategory: "Other Meeting Archive", classification: "Restricted" }
+  DISCIPLINARY: { label: "Disciplinary Meetings", archiveCategory: "Disciplinary Meeting Archive", classification: "Restricted" },
+  OTHER: { label: "Legacy Other Meetings", archiveCategory: "Other Meeting Archive", classification: "Restricted" }
 });
 
 export async function provisionMeetingCategoryArchive({ meetingCategory, meetingId = null } = {}) {
@@ -336,7 +337,7 @@ export async function uploadMeetingProductToDrive({
 }
 
 export async function provisionAllMeetingCategoryArchives() {
-  const categories = Object.keys(MEETING_ARCHIVE_CATEGORIES);
+  const categories = ["GOVERNANCE","ADMINISTRATIVE","STAFF","GENERAL","DISCIPLINARY"];
   const results = [];
   for (const meetingCategory of categories) {
     results.push(await provisionMeetingCategoryArchive({ meetingCategory }));
