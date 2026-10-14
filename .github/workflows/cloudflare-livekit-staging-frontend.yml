@@ -13,6 +13,8 @@ on:
       - "package-lock.json"
       - "wrangler.livekit-staging.jsonc"
       - ".github/workflows/cloudflare-livekit-staging-frontend.yml"
+      - "functions/scripts/deploy-staging-firestore-rules.js"
+      - "functions/scripts/verify-cloudflare-livekit-token-worker.js"
   workflow_dispatch:
 
 permissions:
