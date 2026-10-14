@@ -96,7 +96,7 @@ jobs:
           echo "Isolated staging frontend is deployed."
 
       - name: Install Firebase Admin SDK for temporary staging acceptance fixture
-        run: npm ci --prefix functions --omit=dev
+        run: npm --prefix functions install --omit=dev
 
       - name: Verify authenticated Cloudflare token issuance and Firestore audit
         env:
