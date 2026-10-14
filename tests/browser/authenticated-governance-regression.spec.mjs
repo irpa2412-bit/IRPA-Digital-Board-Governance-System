@@ -5,7 +5,16 @@ const fixturePassword = "FixtureOnly-Password-2026!";
 
 async function navigateModule(page, viewportName, module) {
   if (viewportName === "mobile") {
-    if (module === "Finance Portfolio" || module === "Meeting Room" || module === "Documents" || module === "Voting" || module === "Resolutions" || module === "Decisions") {
+    if (["Meeting Room", "Voting", "Resolutions", "Decisions"].includes(module)) {
+      // Exercise the connected-workflow buttons directly; these remain available on mobile.
+      const child = {
+        "Meeting Room": /Meeting Room Portal/,
+        "Voting": /Voting Portal/,
+        "Resolutions": /Resolutions Portal/,
+        "Decisions": /Decisions Portal/
+      }[module];
+      await page.locator(".module-interlink-bar").getByRole("button", { name: child }).click();
+    } else if (module === "Finance Portfolio" || module === "Documents") {
       const dialog = page.getByRole("dialog", { name: "Mobile navigation" });
       const sheetTitle = dialog.locator(".mobile-nav-sheet-header strong");
       const isPortalsSheet = await dialog.isVisible() && await sheetTitle.textContent() === "Portals";
@@ -13,26 +22,13 @@ async function navigateModule(page, viewportName, module) {
         await page.locator(".mobile-global-nav").getByRole("button", { name: "Portals" }).click();
       }
       await expect(sheetTitle).toHaveText("Portals");
-      if (module === "Finance Portfolio") {
-        await dialog.getByRole("button", { name: /Finance Portal/ }).click();
-      } else if (module === "Documents") {
-        await dialog.getByRole("button", { name: /Documents Portal/ }).click();
-      } else if (["Meeting Room", "Voting", "Resolutions", "Decisions"].includes(module)) {
-        await dialog.getByRole("button", { name: /Meeting Portal/ }).click();
-        // The mobile portal sheet exposes child labels without the desktop SUB-PORTAL prefix.
-        const child = {
-          "Meeting Room": /Meeting Room/,
-          "Voting": /Voting/,
-          "Resolutions": /Resolutions/,
-          "Decisions": /Decisions/
-        }[module];
-        await dialog.getByRole("button", { name: child }).click();
-      }
+      const label = module === "Finance Portfolio" ? /Finance Portal/ : /Documents Portal/;
+      await dialog.getByRole("button", { name: label }).click();
     } else {
       await page.locator(".mobile-global-nav").getByRole("button", { name: "Menu" }).click();
       const dialog = page.getByRole("dialog", { name: "Mobile navigation" });
       await expect(dialog.locator(".mobile-nav-sheet-header strong")).toHaveText("Navigation");
-      const label = module === "Grant Intelligence & Funding Opportunities" ? /Grant Intelligence.*Funding Opportunities/ : /Voting Portal/;
+      const label = /Grant Intelligence.*Funding Opportunities/;
       await dialog.getByRole("button", { name: label }).click();
     }
   } else {
