@@ -8,8 +8,9 @@ const email=process.env.STAGING_CRYPTO_TEST_EMAIL||"";
 const password=process.env.STAGING_CRYPTO_TEST_PASSWORD||"";
 const authority=process.env.STAGING_CRYPTO_TEST_AUTHORITY||"";
 const expectedUid=process.env.STAGING_CRYPTO_TEST_SIGNER_UID||"";
+const expectedKeyId=process.env.STAGING_CRYPTO_TEST_KEY_ID||"";
 const base=String(process.env.STAGING_GATEWAY_URL||"").replace(/\/+$/,"");
-for(const [name,value] of Object.entries({STAGING_FIREBASE_WEB_API_KEY:apiKey,STAGING_FIREBASE_PROJECT_ID:project,STAGING_CRYPTO_TEST_EMAIL:email,STAGING_CRYPTO_TEST_PASSWORD:password,STAGING_CRYPTO_TEST_AUTHORITY:authority,STAGING_CRYPTO_TEST_SIGNER_UID:expectedUid,STAGING_GATEWAY_URL:base}))assert.ok(value,name+" is required.");
+for(const [name,value] of Object.entries({STAGING_FIREBASE_WEB_API_KEY:apiKey,STAGING_FIREBASE_PROJECT_ID:project,STAGING_CRYPTO_TEST_EMAIL:email,STAGING_CRYPTO_TEST_PASSWORD:password,STAGING_CRYPTO_TEST_AUTHORITY:authority,STAGING_CRYPTO_TEST_SIGNER_UID:expectedUid,STAGING_CRYPTO_TEST_KEY_ID:expectedKeyId,STAGING_GATEWAY_URL:base}))assert.ok(value,name+" is required.");
 assert.notEqual(project,"irpa-digital-board-governance","Production Firebase project is forbidden in staging acceptance.");
 
 const loginResponse=await fetch("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key="+encodeURIComponent(apiKey),{
@@ -147,6 +148,7 @@ assert.equal(evidenceResult.evidence.length,1);
 const evidence=evidenceResult.evidence[0];
 assert.equal(evidence.envelopeId,envelope.envelopeId);
 assert.equal(evidence.signerUid,expectedUid);
+assert.equal(evidence.keyId,expectedKeyId,"Gateway did not use the exact ephemeral key injected for this staging signer.");
 assert.equal(evidence.documentHash,completedHash);
 assert.equal(evidence.status,"SEALED");
 assert.equal("privateKey" in evidence,false);
