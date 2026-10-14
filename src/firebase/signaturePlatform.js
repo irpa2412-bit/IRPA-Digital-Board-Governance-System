@@ -343,6 +343,46 @@ export async function startSignatureWorkflow(envelope){
 }
 
 export async function createSignatureEnvelope({title,documentId,documentReference,documentUrl,documentClassification="Public",documentArchiveCategory="Administrative Documents",documentType="Governance Document",documentUploadedAt=null,authorizationRequestId=null,authorizationReference="",signingMode,recipients,fields=[]}){signingMode=requireSupportedSignatureRoutingMode(signingMode);const u=user();const workflowContext=readWorkflowContext();authorizationRequestId=authorizationRequestId||workflowContext?.authorizationRequestId||null;authorizationReference=authorizationReference||workflowContext?.authorizationReference||"";if(!title?.trim())throw new Error("Envelope title is required.");if(!documentId)throw new Error("An authorized document must be selected.");if(!documentUrl)throw new Error("The selected document has no PDF file URL. Upload/link the controlled PDF before sending for signature.");if(!recipients?.length)throw new Error("At least the document owner is required.");const envelopeId=`IRPA-ENV-${new Date().getFullYear()}-${Date.now().toString().slice(-8)}`;const owner={...(recipients.find(r=>r?.uid===u.uid)||{}),uid:u.uid,name:u.displayName||u.email||"Document Owner",email:u.email||"",role:"Document Owner",routingOrder:1,status:"Pending"};const supplied=recipients.filter(r=>r?.uid&&r.uid!==u.uid);const orderedRecipients=[owner,...supplied.map((r,i)=>({...r,accessOnly:isViewOnlyRecipient(r),routingOrder:signingMode==="Sequential"?i+2:r.routingOrder||1}))];const participantUids=orderedRecipients.map(r=>r.uid).filter(Boolean);const viewOnlyUids=new Set(orderedRecipients.filter(isViewOnlyRecipient).map(r=>r.uid));if((fields||[]).some(f=>f?.signerUid&&viewOnlyUids.has(f.signerUid)))throw new Error("View-only recipients cannot be assigned action fields. Assign fields only to the document owner or an action officer.");const actionUids=[...new Set((fields||[]).map(f=>f?.signerUid).filter(Boolean))];const firstActionRecipient=orderedRecipients.find(isActionRecipient);const payload={envelopeReference:envelopeId,title:title.trim(),documentId,documentReference:documentReference||"",documentUrl,senderUid:u.uid,senderEmail:u.email||"",ownerUid:u.uid,ownerName:owner.name,ownerEmail:owner.email,documentClassification:documentClassification||"Public",documentArchiveCategory:documentArchiveCategory||"Administrative Documents",documentType:documentType||"Governance Document",documentUploadedAt:documentUploadedAt||null,authorizationRequestId:authorizationRequestId||null,authorizationReference:authorizationReference||null,status:"Draft",signingMode:signingMode||"Sequential",recipients:orderedRecipients,fields,participantUids,actionUids,currentSignerUid:signingMode==="Sequential"?(firstActionRecipient?.uid||null):null,createdAt:serverTimestamp(),updatedAt:serverTimestamp()};const batch=writeBatch(db);batch.set(doc(db,ENVELOPE_COLLECTION,envelopeId),payload);batch.update(doc(db,"documents",documentId),{signatureEnvelopeId:envelopeId,signatureReference:envelopeId,signatureStatus:"Draft",signatureOwnerUid:u.uid,workflowOwnerSectionSaved:true,authorizationRequestId:authorizationRequestId||null,authorizationReference:authorizationReference||null,updatedAt:serverTimestamp()});await batch.commit();await recordEnvelopeEvent(envelopeId,"Envelope Created",{status:"Draft",ownerUid:u.uid,signingOrder:orderedRecipients.map(r=>({uid:r.uid,name:r.name,email:r.email,routingOrder:r.routingOrder,role:r.role,accessOnly:isViewOnlyRecipient(r),actionRequired:isActionRecipient(r)}))});const viewOnlyRecipients=orderedRecipients.filter(isViewOnlyRecipient);if(viewOnlyRecipients.length)await Promise.all(viewOnlyRecipients.map(r=>releaseViewOnlyRecipient({...payload,id:envelopeId},r).catch(async error=>{await recordEnvelopeEvent(envelopeId,"View-Only Invitation Failed",{signerUid:r.uid,signerEmail:r.email,error:error?.message||"Unable to send view-only invitation"});return null;})));return{id:envelopeId,...payload};}
+export async function syncGatewaySigningMirror(envelopeId,gatewayStatus){
+  const u=user();
+  if(!envelopeId||gatewayStatus?.externalReference!==envelopeId)throw new Error("Gateway status does not match the Signature Portal envelope.");
+  if(gatewayStatus.auditChainValid!==true)throw new Error("The Gateway audit chain did not verify. The Signature Portal status will not be synchronized.");
+  const ref=doc(db,ENVELOPE_COLLECTION,envelopeId),snap=await getDoc(ref);
+  if(!snap.exists())throw new Error("The Signature Portal envelope no longer exists.");
+  const envelope={id:snap.id,...snap.data()};
+  if(!Array.isArray(envelope.participantUids)||!envelope.participantUids.includes(u.uid))throw new Error("You are not assigned to this Signature Portal envelope.");
+  if(!envelope.gatewayEnvelopeId||envelope.gatewayEnvelopeId!==gatewayStatus.envelopeId)throw new Error("The Gateway envelope ID does not match the linked Signature Portal record.");
+  const gatewaySigners=Array.isArray(gatewayStatus.signers)?gatewayStatus.signers:[];
+  const recipients=(envelope.recipients||[]).map(recipient=>{
+    const signer=gatewaySigners.find(item=>item.uid&&item.uid===recipient.uid);
+    if(!signer)return recipient;
+    const status=signer.status==="Signed"?"Signed":signer.status==="Declined"?"Declined":signer.status==="Pending"?(gatewayStatus.signingMode==="Parallel"?"Pending":recipient.uid===gatewaySigners.filter(x=>x.status==="Pending").sort((a,b)=>a.order-b.order)[0]?.uid?"Current":"Pending"):recipient.status;
+    return {...recipient,status,completedAt:signer.signedAt||recipient.completedAt||null};
+  });
+  const pending=gatewaySigners.filter(x=>x.status==="Pending").sort((a,b)=>a.order-b.order);
+  const overall=gatewayStatus.status==="Completed"?"Completed":gatewayStatus.status==="Declined"?"Declined":gatewayStatus.status==="Voided"?"Cancelled":"In Progress";
+  const patch={
+    recipients,
+    status:overall,
+    currentSignerUid:gatewayStatus.signingMode==="Parallel"?null:(pending[0]?.uid||null),
+    gatewaySigningStatus:gatewayStatus.status,
+    gatewayFinalHash:gatewayStatus.completion?.finalHash||null,
+    gatewayCryptographicEvidenceIds:gatewayStatus.completion?.cryptographicEvidenceIds||[],
+    gatewayAuditChainValid:true,
+    gatewayStatusUpdatedAt:serverTimestamp(),
+    updatedAt:serverTimestamp()
+  };
+  await updateDoc(ref,patch);
+  await recordEnvelopeEvent(envelopeId,"Gateway Signing Status Verified",{
+    gatewayEnvelopeId:gatewayStatus.envelopeId,
+    gatewayStatus:gatewayStatus.status,
+    gatewayFinalHash:gatewayStatus.completion?.finalHash||null,
+    cryptographicEvidenceCount:(gatewayStatus.completion?.cryptographicEvidenceIds||[]).length,
+    auditChainValid:true
+  });
+  return {...envelope,...patch};
+}
+
 export async function recordEnvelopeEvent(envelopeId,event,details={}){const u=user();await setDoc(doc(collection(db,EVENT_COLLECTION)),{envelopeId,event,details,actorUid:u.uid,actorEmail:u.email||"",createdAt:serverTimestamp()});}
 async function fetchBytes(url,documentId=null,envelopeId=null){const value=String(url||"");if(value.startsWith("drive://"))return downloadSignatureBytes(value.slice("drive://".length),documentId,envelopeId);const r=await fetch(value);if(!r.ok)throw new Error(`Unable to retrieve the controlled PDF (${r.status}).`);return new Uint8Array(await r.arrayBuffer());}
 async function embedImage(pdfDoc,url){const bytes=await fetchBytes(url);const lower=url.toLowerCase();if(lower.includes(".jpg")||lower.includes(".jpeg"))return pdfDoc.embedJpg(bytes);return pdfDoc.embedPng(bytes);}
