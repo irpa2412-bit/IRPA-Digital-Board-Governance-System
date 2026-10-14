@@ -28,6 +28,11 @@ jobs:
       - run: npm install
       - name: Build production web bundle
         run: npm run build
+      - name: Setup Java for Firebase Emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
       - name: Meeting category and Firestore rules tests
         run: npx firebase-tools emulators:exec --only firestore --project irpa-digital-board-governance "npm run test:meeting-category"
       - name: Meeting entry authorization tests
