@@ -1,6 +1,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
-const { AccessToken, EgressClient, EncodedFileOutput, EncodedFileType } = require("livekit-server-sdk");
+const { AccessToken, EgressClient, RoomServiceClient, EncodedFileOutput, EncodedFileType, GCPUpload } = require("livekit-server-sdk");
+const { Storage } = require("@google-cloud/storage");
 const { defineSecret } = require("firebase-functions/params");
 const crypto = require("crypto");
 
@@ -10,6 +11,8 @@ const db = getFirestore();
 const LIVEKIT_URL = defineSecret("LIVEKIT_URL");
 const LIVEKIT_API_KEY = defineSecret("LIVEKIT_API_KEY");
 const LIVEKIT_API_SECRET = defineSecret("LIVEKIT_API_SECRET");
+const LIVEKIT_RECORDING_STORAGE_GCP_CREDENTIALS = defineSecret("LIVEKIT_RECORDING_STORAGE_GCP_CREDENTIALS");
+const LIVEKIT_RECORDING_STORAGE_GCP_BUCKET = defineSecret("LIVEKIT_RECORDING_STORAGE_GCP_BUCKET");
 
 function text(value) {
   return String(value ?? "").trim();
@@ -249,10 +252,57 @@ exports.issueLiveMeetingToken = onCall({
 });
 
 
+function liveKitHttpsHost() {
+  return text(LIVEKIT_URL.value()).replace(/^wss:/i, "https:").replace(/^ws:/i, "http:");
+}
 function egressClient() {
   if (!liveKitConfigured()) throw new HttpsError("failed-precondition", "Live meeting infrastructure is not configured on the server.");
-  const host = text(LIVEKIT_URL.value()).replace(/^wss:/i, "https:").replace(/^ws:/i, "http:");
-  return new EgressClient(host, LIVEKIT_API_KEY.value(), LIVEKIT_API_SECRET.value());
+  return new EgressClient(liveKitHttpsHost(), LIVEKIT_API_KEY.value(), LIVEKIT_API_SECRET.value());
+}
+function recordingStorageConfig() {
+  const credentialsJson = text(LIVEKIT_RECORDING_STORAGE_GCP_CREDENTIALS.value());
+  const bucket = text(LIVEKIT_RECORDING_STORAGE_GCP_BUCKET.value());
+  if (!credentialsJson || !bucket) {
+    throw new HttpsError("failed-precondition", "Recording storage is not configured. Proceedings cannot start until protected recording storage is available.");
+  }
+  let credentials;
+  try { credentials = JSON.parse(credentialsJson); }
+  catch { throw new HttpsError("failed-precondition", "The protected recording storage credential is invalid JSON."); }
+  if (credentials.type !== "service_account" || !text(credentials.client_email) || !text(credentials.private_key) || !text(credentials.project_id)) {
+    throw new HttpsError("failed-precondition", "The protected recording storage credential is incomplete.");
+  }
+  const runtimeProject = text(process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT);
+  if (runtimeProject && credentials.project_id !== runtimeProject) {
+    throw new HttpsError("failed-precondition", "Recording storage credential belongs to a different Firebase project.");
+  }
+  return { credentialsJson, credentials, bucket };
+}
+function recordingFileOutput(filepath) {
+  const storage = recordingStorageConfig();
+  return {
+    storageBucket: storage.bucket,
+    file: new EncodedFileOutput({
+      filepath,
+      fileType: EncodedFileType.MP4,
+      output: {
+        case: "gcp",
+        value: new GCPUpload({ bucket: storage.bucket, credentials: storage.credentialsJson })
+      }
+    })
+  };
+}
+async function ensureRecordingRoom(roomName) {
+  const service = new RoomServiceClient(liveKitHttpsHost(), LIVEKIT_API_KEY.value(), LIVEKIT_API_SECRET.value());
+  let rooms = await service.listRooms([roomName]);
+  if (!rooms.some(room => text(room.name) === roomName)) {
+    try {
+      await service.createRoom({ name: roomName, emptyTimeout: 3600, maxParticipants: 250 });
+    } catch (error) {
+      // Another authorized start may have created the room between list and create.
+      rooms = await service.listRooms([roomName]);
+      if (!rooms.some(room => text(room.name) === roomName)) throw error;
+    }
+  }
 }
 async function resolveRecordingControl(request, meetingId, options = {}) {
   const uid = request.auth?.uid;
@@ -338,56 +388,97 @@ function recordingStateForEgress(info) {
 }
 exports.startMeetingRecording = onCall({
   region: "us-central1", timeoutSeconds: 60,
-  secrets: [LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET]
+  secrets: [LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET, LIVEKIT_RECORDING_STORAGE_GCP_CREDENTIALS, LIVEKIT_RECORDING_STORAGE_GCP_BUCKET]
 }, async request => {
   const ctx = await resolveRecordingControl(request, text(request.data?.meetingId));
   if (!ctx.controller) throw new HttpsError("permission-denied", "Only the meeting administrator, initiator, chairperson or secretary may start recording.");
+  const storageConfig = recordingStorageConfig();
   const roomName = recordingRoomName(ctx.meeting.id);
   const activeRecordings = await db.collection("meetingMediaRecordings").where("meetingId", "==", ctx.meeting.id).get();
-  if (activeRecordings.docs.some(doc => ["STARTING", "RECORDING", "STOPPING"].includes(text(doc.data()?.recordingStatus)))) {
-    throw new HttpsError("already-exists", "A recording is already active or stopping for this meeting.");
+  const activeRecording = activeRecordings.docs.find(doc => ["STARTING", "RECORDING", "STOPPING"].includes(text(doc.data()?.recordingStatus)));
+  if (activeRecording) {
+    const active = activeRecording.data() || {};
+    return {
+      ok: true, alreadyActive: true, recordingId: active.egressId || activeRecording.id,
+      egressId: active.egressId || activeRecording.id, recordingStatus: active.recordingStatus,
+      outputPath: active.outputPath || null, storageDestination: active.storageDestination || "GOOGLE_CLOUD_STORAGE"
+    };
   }
+  const lockId = crypto.createHash("sha256").update(ctx.meeting.id).digest("hex");
+  const lockRef = db.collection("meetingRecordingLocks").doc(lockId);
+  const reservationId = crypto.randomBytes(16).toString("hex");
+  await db.runTransaction(async tx => {
+    const lockSnap = await tx.get(lockRef);
+    const lockStatus = text(lockSnap.data()?.status).toUpperCase();
+    if (["STARTING", "RECORDING", "STOPPING"].includes(lockStatus)) {
+      throw new HttpsError("already-exists", "Recording start is already in progress for this meeting.");
+    }
+    tx.set(lockRef, {
+      meetingId: ctx.meeting.id, status: "STARTING", reservationId,
+      startedByUid: ctx.uid, updatedAt: FieldValue.serverTimestamp()
+    }, { merge: true });
+  });
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   const filepath = "irpa-governance-recordings/" + safeRecordingId(ctx.meeting.id) + "/" + stamp + ".mp4";
+  const output = recordingFileOutput(filepath);
   let egress;
   try {
+    await ensureRecordingRoom(roomName);
     egress = await egressClient().startRoomCompositeEgress(
       roomName,
-      { file: new EncodedFileOutput({ filepath, fileType: EncodedFileType.MP4 }) },
+      { file: output.file },
       { layout: "grid", audioOnly: false }
     );
   } catch (error) {
+    await lockRef.set({
+      meetingId: ctx.meeting.id, reservationId, status: "FAILED",
+      failureReason: text(error?.message).slice(0, 500), updatedAt: FieldValue.serverTimestamp()
+    }, { merge: true }).catch(() => {});
     await db.collection("audit").add({
       action: "LIVE_MEETING_RECORDING_START_FAILED", collection: "meetingMediaRecordings", recordId: null,
-      details: { meetingId: ctx.meeting.id, reason: text(error?.message).slice(0, 500), storageDestination: "LIVEKIT_EGRESS_CONFIGURED_STORAGE" },
+      details: { meetingId: ctx.meeting.id, reason: text(error?.message).slice(0, 500), storageDestination: "GOOGLE_CLOUD_STORAGE", storageBucket: storageConfig.bucket },
       actorUid: ctx.uid, actorEmail: ctx.email || null, createdAt: FieldValue.serverTimestamp()
     });
-    throw new HttpsError("failed-precondition", "Recording could not start. Verify that LiveKit Egress is running and its recording storage is configured; no recording has been confirmed.");
+    throw new HttpsError("failed-precondition", "Recording could not start. Verify the LiveKit egress service and protected Google Cloud Storage configuration; proceedings were not marked live.");
   }
   const egressId = text(egress.egressId);
-  if (!egressId) throw new HttpsError("internal", "LiveKit did not return a recording identifier.");
+  if (!egressId) {
+    await lockRef.set({ meetingId: ctx.meeting.id, reservationId, status: "FAILED", updatedAt: FieldValue.serverTimestamp() }, { merge: true }).catch(() => {});
+    throw new HttpsError("internal", "LiveKit did not return a recording identifier.");
+  }
   const row = {
     meetingId: ctx.meeting.id,
     meetingReference: text(ctx.meeting.meetingReference || ctx.meeting.reference || ctx.meeting.title),
     meetingTitle: text(ctx.meeting.title), meetingCategory: categoryOf(ctx.meeting), roomName,
-    egressId, outputPath: filepath, recordingStatus: "RECORDING",
-    egressStatus: egressState(egress),
-    recordingProvider: "LIVEKIT_EGRESS", storageDestination: "LIVEKIT_EGRESS_CONFIGURED_STORAGE",
+    egressId, outputPath: filepath, storageBucket: storageConfig.bucket,
+    recordingStatus: "RECORDING", egressStatus: egressState(egress),
+    recordingProvider: "LIVEKIT_EGRESS", storageDestination: "GOOGLE_CLOUD_STORAGE",
     startedByUid: ctx.uid, startedByEmail: ctx.email || null,
     startedAt: FieldValue.serverTimestamp(), createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp()
   };
-  await db.collection("meetingMediaRecordings").doc(egressId).set(row);
-  await db.collection("meetings").doc(ctx.meeting.id).update({
-    recordingStatus: "RECORDING", recordingEgressId: egressId,
-    recordingStartedAt: FieldValue.serverTimestamp(), recordingStartedByUid: ctx.uid,
-    recordingStorage: row.storageDestination
-  });
-  await db.collection("audit").add({
-    action: "LIVE_MEETING_RECORDING_STARTED", collection: "meetingMediaRecordings", recordId: egressId,
-    details: { meetingId: ctx.meeting.id, meetingCategory: row.meetingCategory, egressId, outputPath: filepath, storageDestination: row.storageDestination },
-    actorUid: ctx.uid, actorEmail: ctx.email || null, createdAt: FieldValue.serverTimestamp()
-  });
-  return { ok: true, recordingId: egressId, egressId, recordingStatus: "RECORDING", outputPath: filepath, storageDestination: row.storageDestination };
+  try {
+    await db.collection("meetingMediaRecordings").doc(egressId).set(row);
+    await db.collection("meetings").doc(ctx.meeting.id).update({
+      recordingStatus: "RECORDING", recordingEgressId: egressId,
+      recordingStartedAt: FieldValue.serverTimestamp(), recordingStartedByUid: ctx.uid,
+      recordingStorage: row.storageDestination, recordingStorageBucket: storageConfig.bucket,
+      recordingOutputPath: filepath
+    });
+    await db.collection("audit").add({
+      action: "LIVE_MEETING_RECORDING_STARTED", collection: "meetingMediaRecordings", recordId: egressId,
+      details: { meetingId: ctx.meeting.id, meetingCategory: row.meetingCategory, egressId, outputPath: filepath, storageDestination: row.storageDestination, storageBucket: storageConfig.bucket },
+      actorUid: ctx.uid, actorEmail: ctx.email || null, createdAt: FieldValue.serverTimestamp()
+    });
+    await lockRef.set({ meetingId: ctx.meeting.id, reservationId, egressId, status: "RECORDING", updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  } catch (error) {
+    try { await egressClient().stopEgress(egressId); } catch {}
+    await db.collection("meetingMediaRecordings").doc(egressId).set({
+      ...row, recordingStatus: "FAILED", failureReason: "Recording metadata/audit persistence failed."
+    }, { merge: true }).catch(() => {});
+    await lockRef.set({ meetingId: ctx.meeting.id, reservationId, egressId, status: "FAILED", updatedAt: FieldValue.serverTimestamp() }, { merge: true }).catch(() => {});
+    throw new HttpsError("internal", "LiveKit started recording but IRPA could not persist the recording register. The egress was stopped; verify audit and recording status before retrying.");
+  }
+  return { ok: true, recordingId: egressId, egressId, recordingStatus: "RECORDING", outputPath: filepath, storageBucket: storageConfig.bucket, storageDestination: row.storageDestination };
 });
 exports.stopMeetingRecording = onCall({
   region: "us-central1", timeoutSeconds: 60,
@@ -396,7 +487,7 @@ exports.stopMeetingRecording = onCall({
   const meetingId = text(request.data?.meetingId);
   const recordingId = text(request.data?.recordingId || request.data?.egressId);
   if (!recordingId) throw new HttpsError("invalid-argument", "Recording ID is required.");
-  const ctx = await resolveRecordingControl(request, meetingId);
+  const ctx = await resolveRecordingControl(request, meetingId, { allowClosed: true });
   if (!ctx.controller) throw new HttpsError("permission-denied", "Only the meeting administrator, initiator, chairperson or secretary may stop recording.");
   const ref = db.collection("meetingMediaRecordings").doc(recordingId);
   const snap = await ref.get();
@@ -420,6 +511,8 @@ exports.stopMeetingRecording = onCall({
     fileResults: files, stoppedByUid: ctx.uid, stoppedByEmail: ctx.email || null,
     stopRequestedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp()
   });
+  const lockId = crypto.createHash("sha256").update(meetingId).digest("hex");
+  await db.collection("meetingRecordingLocks").doc(lockId).set({ meetingId, egressId: recordingId, status: recordingStatus, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
   await db.collection("meetings").doc(meetingId).update({
     recordingStatus, recordingStoppedAt: FieldValue.serverTimestamp(),
     recordingStoppedByUid: ctx.uid
@@ -452,6 +545,8 @@ exports.getMeetingRecordingStatus = onCall({
         const patch = { recordingStatus: nextStatus, egressStatus: egressState(latest), fileResults: files, updatedAt: FieldValue.serverTimestamp() };
         if (nextStatus === "COMPLETED") patch.completedAt = FieldValue.serverTimestamp();
         await db.collection("meetingMediaRecordings").doc(row.id).update(patch);
+        const lockId = crypto.createHash("sha256").update(ctx.meeting.id).digest("hex");
+        await db.collection("meetingRecordingLocks").doc(lockId).set({ meetingId: ctx.meeting.id, egressId: row.egressId, status: nextStatus, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
         await db.collection("meetings").doc(ctx.meeting.id).update({ recordingStatus: nextStatus, ...(nextStatus === "COMPLETED" ? { recordingCompletedAt: FieldValue.serverTimestamp() } : {}) });
         row = { ...row, ...patch, fileResults: files, recordingStatus: nextStatus, egressStatus: egressState(latest) };
       }
@@ -464,10 +559,71 @@ exports.getMeetingRecordingStatus = onCall({
     recordingStatus: row.recordingStatus || "UNKNOWN",
     recording: {
       id: row.id, egressId: row.egressId, outputPath: row.outputPath || null,
+      storageBucket: row.storageBucket || null, storageDestination: row.storageDestination || null,
       status: row.recordingStatus || "UNKNOWN", egressStatus: row.egressStatus || null,
       startedAt: row.startedAt?.toDate?.().toISOString?.() || null,
       stoppedAt: row.stopRequestedAt?.toDate?.().toISOString?.() || null,
       files: Array.isArray(row.fileResults) ? row.fileResults.map(file => ({ filename: file.filename || "", location: file.location || "", size: file.size || 0 })) : []
     }
   };
+});
+
+
+/**
+ * Return a short-lived signed URL only after server-side meeting/participant
+ * authorization. The GCS bucket is private; object names and permissions never
+ * come from an untrusted browser request.
+ */
+exports.getMeetingRecordingDownloadUrl = onCall({
+  region: "us-central1",
+  timeoutSeconds: 30,
+  secrets: [LIVEKIT_RECORDING_STORAGE_GCP_CREDENTIALS, LIVEKIT_RECORDING_STORAGE_GCP_BUCKET]
+}, async request => {
+  const meetingId = text(request.data?.meetingId);
+  const recordingId = text(request.data?.recordingId);
+  if (!recordingId) throw new HttpsError("invalid-argument", "Recording ID is required.");
+  const ctx = await resolveRecordingControl(request, meetingId, { requireRecordingAllowed: false, allowClosed: true });
+  if (!ctx.isAdmin && !ctx.invited && !ctx.controller) {
+    throw new HttpsError("permission-denied", "An authorised meeting participant is required to download this recording.");
+  }
+  const snap = await db.collection("meetingMediaRecordings").doc(recordingId).get();
+  if (!snap.exists) throw new HttpsError("not-found", "Meeting recording was not found.");
+  const recording = snap.data() || {};
+  if (text(recording.meetingId) !== meetingId) throw new HttpsError("permission-denied", "Recording does not belong to this meeting.");
+  if (text(recording.recordingStatus).toUpperCase() !== "COMPLETED") {
+    throw new HttpsError("failed-precondition", "The recording file is not yet confirmed complete.");
+  }
+  const filepath = text(recording.outputPath);
+  const prefix = "irpa-governance-recordings/" + safeRecordingId(meetingId) + "/";
+  if (!filepath.startsWith(prefix) || filepath.includes("..")) {
+    throw new HttpsError("failed-precondition", "Recording storage path failed validation.");
+  }
+  const config = recordingStorageConfig();
+  if (recording.storageBucket && recording.storageBucket !== config.bucket) {
+    throw new HttpsError("failed-precondition", "Recording storage bucket does not match the configured private bucket.");
+  }
+  try {
+    const storage = new Storage({
+      projectId: config.credentials.project_id,
+      credentials: { client_email: config.credentials.client_email, private_key: config.credentials.private_key }
+    });
+    const filename = filepath.split("/").pop().replace(/["\\\\\r\n]/g, "_");
+    const [downloadUrl] = await storage.bucket(config.bucket).file(filepath).getSignedUrl({
+      version: "v4",
+      action: "read",
+      expires: Date.now() + 5 * 60 * 1000,
+      responseDisposition: `attachment; filename="${filename}"`
+    });
+    await db.collection("audit").add({
+      action: "LIVE_MEETING_RECORDING_DOWNLOAD_URL_ISSUED",
+      collection: "meetingMediaRecordings",
+      recordId: recordingId,
+      details: { meetingId, outputPath: filepath, expiresInSeconds: 300 },
+      actorUid: ctx.uid, actorEmail: ctx.email || null, createdAt: FieldValue.serverTimestamp()
+    });
+    return { ok: true, downloadUrl, filename, expiresInSeconds: 300 };
+  } catch (error) {
+    if (error instanceof HttpsError) throw error;
+    throw new HttpsError("failed-precondition", "A temporary recording download link could not be issued. Verify private storage access and signing credentials.");
+  }
 });
