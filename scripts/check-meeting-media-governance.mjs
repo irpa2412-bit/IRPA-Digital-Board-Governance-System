@@ -84,7 +84,7 @@ const checks=[
  ["General restricts signature and authorization",policy.includes('GENERAL:{')&&policy.includes("signatureAccess:false")&&policy.includes("authorizationAccess:false")],
  ["Other is restricted to operational facilities",policy.includes('OTHER:{')&&policy.includes("signatureAccess:false")&&policy.includes("authorizationAccess:false")],
  ["Disciplinary meetings have a separate policy category",policy.includes('DISCIPLINARY:{id:"DISCIPLINARY",label:"Disciplinary Meetings"')],
- ["Meeting registration requires explicit confidentiality and recording notice",meetingsCentre.includes("Select the meeting confidentiality classification before registration.")&&meetingsCentre.includes("recordingNoticeAcknowledged")],
+ ["Meeting registration requires explicit confidentiality, Board session type and recording notice",meetingsCentre.includes("Select the meeting confidentiality classification before registration.")&&meetingsCentre.includes("recordingNoticeAcknowledged")&&meetingsCentre.includes('value={form.confidentialityClass||""}')&&meetingsCentre.includes("Select session type")],
  ["Recording starts automatically when proceedings begin and is status-verified",media.includes("proceedingsActive")&&media.includes("autoRecordingAttemptedRef")&&media.includes("AUTOMATIC RECORDING NOT CONFIRMED")&&media.includes('==="RECORDING"')],
  ["Recording failures are visible and not represented as captured proceedings",media.includes("AUTOMATIC RECORDING FAILED")&&media.includes("Proceedings must not be treated as recorded")&&media.includes("AUTOMATIC RECORDING NOT CONFIRMED")],
  ["Disciplinary records have a dedicated retention policy",records.includes("DISCIPLINARY:7")&&records.includes('return"DISCIPLINARY"')],
