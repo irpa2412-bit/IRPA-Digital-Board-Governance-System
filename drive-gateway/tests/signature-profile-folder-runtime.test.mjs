@@ -10,6 +10,6 @@ const handler = source.slice(start, end);
 test("signature profile folder provisioning uses a defined active-admin authorization result", () => {
   assert.ok(start >= 0 && end > start, "signature profile folder handler must be present");
   assert.match(handler, /const isAdmin = Boolean\(adminRecord\?\.fields\?\.active\?\.booleanValue\)/);
-  assert.match(handler, /if \(!isAdmin && requestedUid !== claims\.user_id\)/);
+  assert.match(handler, /canProvisionSignatureProfileFolder\(\{[\s\S]*authenticatedUid: claims\.user_id,[\s\S]*requestedUid,[\s\S]*isAdmin[\s\S]*\}\)/);
   assert.doesNotMatch(handler, /isAdminForRequest/);
 });
