@@ -64,6 +64,8 @@ jobs:
             "cloudflare/livekit-production/worker.js",
             "functions/scripts/verify-cloudflare-livekit-production-worker.js",
             "functions/scripts/verify-livekit-recording-storage.js",
+            "functions/scripts/deploy-livekit-production-worker.sh",
+            "scripts/check-meeting-media-governance.mjs",
             "src/components/IRPADGBSMeetingRoomMedia.jsx",
             "src/App.jsx",
             "src/styles/mobile-viewport-containment.css",
