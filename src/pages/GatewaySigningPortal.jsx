@@ -56,16 +56,17 @@ export default function GatewaySigningPortal({token}){
   async function refreshStatus(){
     const next=await fetchGatewaySigningResource("/api/sign/status",token);
     setStatus(next);
-    if(next.externalReference&&next.auditChainValid===true){
-      try{await syncGatewaySigningMirror(next.externalReference,next)}catch(error){console.warn("Gateway signing status is valid but Signature Portal mirror sync needs reconciliation.",error);}
-    }
     if(next.status==="Completed"){
       const completedBytes=await fetchGatewaySigningResource("/api/sign/pdf",token,{pdf:true});
       const verification=await verifyGatewaySignedPdf({token,bytes:completedBytes});
       if(verification.documentHash!==next.completion?.finalHash)throw new Error("Completed PDF hash does not match the Gateway completion record.");
       const found=await fetchGatewaySigningResource("/api/sign/evidence",token);
+      if(found.auditChainValid!==true||found.documentHash!==next.completion?.finalHash||!Array.isArray(found.evidence)||found.evidence.length===0)throw new Error("Persisted cryptographic evidence does not match the completed PDF and audit chain.");
       setEvidence(found);
       setMessage("Signing completed. The Gateway returned persisted cryptographic evidence and verified the audit chain.");
+    }
+    if(next.externalReference&&next.auditChainValid===true){
+      try{await syncGatewaySigningMirror(next.externalReference,next)}catch(error){console.warn("Gateway signing status is valid but Signature Portal mirror sync needs reconciliation.",error);}
     }
     return next;
   }
