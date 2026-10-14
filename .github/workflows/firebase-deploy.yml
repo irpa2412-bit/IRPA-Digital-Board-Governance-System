@@ -320,6 +320,26 @@ jobs:
           args: deploy --project irpa-digital-board-governance --only functions:preparePasswordResetPhone
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+      
+      - name: Deploy signed meeting attendance register callables
+        id: attendance_register
+        continue-on-error: true
+        uses: w9jds/firebase-action@v14.17.0
+        with:
+          args: deploy --project irpa-digital-board-governance --only functions:signMeetingAttendance,functions:getMeetingAttendanceRegister
+        env:
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+
+      - name: Report meeting attendance callable deployment status
+        if: always()
+        env:
+          ATTENDANCE_REGISTER_OUTCOME: ${{ steps.attendance_register.outcome }}
+        run: |
+          if [ "$ATTENDANCE_REGISTER_OUTCOME" = "success" ]; then
+            echo "MEETING_ATTENDANCE_REGISTER_CALLABLES_DEPLOYED=true"
+          else
+            echo "::warning::Meeting attendance UI is published, but its server-side signing/retrieval callables were not deployed. Check Firebase Cloud Functions billing, API enablement and service-account permissions before treating the register as live."
+          fi
       - name: Verify live Firebase application
         run: |
           set -e
