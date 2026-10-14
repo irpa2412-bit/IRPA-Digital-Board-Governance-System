@@ -57,6 +57,7 @@ jobs:
             .trim().split("\n").filter(Boolean).sort();
           const allowed = new Set([
             ".github/workflows/meeting-portal-fixture-browser.yml",
+            ".github/workflows/provision-meeting-archives.yml",
             ".github/workflows/meeting-invitation-flow-ci.yml",
             ".github/workflows/mail-invitation-tests.yml",
             "drive-gateway/src/index.js",
@@ -92,6 +93,7 @@ jobs:
             "src/firebase/data.js",
             "src/firebase/meetingPolicy.js",
             "functions/liveMeeting.js",
+            "src/firebase/signatureStorage.js",
             "functions/meetingGateway.js",
             "src/pages/OperationalGatewaysParticipants.jsx",
             "firestore.rules",
