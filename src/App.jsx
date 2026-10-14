@@ -515,7 +515,7 @@ useEffect(()=>{
     let scrolled=false;
     while(ancestor&&ancestor!==document.body&&ancestor!==document.documentElement){
       const style=window.getComputedStyle(ancestor);
-      if(/auto|scroll|overlay/.test(style.overflowY)&&ancestor.scrollHeight>ancestor.clientHeight+1){
+      if(/auto|scroll|overlay|hidden/.test(style.overflowY)&&ancestor.scrollHeight>ancestor.clientHeight+1){
         ancestor.scrollTop+=rect.top-16;
         scrolled=true;
         break;
