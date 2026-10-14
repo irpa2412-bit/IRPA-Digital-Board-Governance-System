@@ -58,14 +58,17 @@ async function navigateModule(page, viewportName, module) {
   }
 }
 
-async function assertPortalAndNoOverflow(page, expectedText, width) {
+async function assertPortalAndNoOverflow(page, expectedText, width, verifyDestinationFocus = true) {
   await expect(page.locator(".topbar h2")).toContainText(expectedText, { timeout: 30000 });
-  const workspace = page.locator("main.content-area");
+  const workspace = page.locator("#portal-workspace-content");
   await expect(workspace).toBeVisible();
-  await expect.poll(
-    () => workspace.evaluate(el => Math.abs(el.getBoundingClientRect().top)),
-    { message: "destination workspace should scroll into the visible workspace area rather than leave the user at the global header", timeout: 10000 }
-  ).toBeLessThanOrEqual(40);
+  if (verifyDestinationFocus) {
+    await expect.poll(
+      () => workspace.evaluate(el => Math.abs(el.getBoundingClientRect().top)),
+      { message: "destination portal body should scroll into view below the global header and connected-workflow controls after navigation", timeout: 10000 }
+    ).toBeLessThanOrEqual(40);
+    await expect(workspace, "focus should land on the destination portal body after navigation").toBeFocused();
+  }
   const dimensions = await page.evaluate(() => ({
     viewport: document.documentElement.clientWidth,
     document: document.documentElement.scrollWidth
@@ -128,7 +131,7 @@ for (const viewport of [
     // this workflow performs no data-entry writes except confirming Trial for Documents.
     await expect(page.locator(".topbar h2")).toContainText(/Grant Intelligence.*Funding Opportunities/, { timeout: 45000 });
 
-    await assertPortalAndNoOverflow(page, /Grant Intelligence.*Funding Opportunities/, viewport.width);
+    await assertPortalAndNoOverflow(page, /Grant Intelligence.*Funding Opportunities/, viewport.width, false);
     await expect(page.getByRole("heading", { name: "Corporate, climate and partnership sources" })).toBeVisible();
     const registryToggle = page.getByRole("button", { name: /Browse source registry/ });
     await expect(registryToggle).toHaveAttribute("aria-expanded", "false");
