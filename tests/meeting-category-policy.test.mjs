@@ -41,7 +41,7 @@ test("explicitly invited participants can access their meeting regardless of ins
   }, { isInvited: true }), true);
 });
 
-test("any signed-in individual profile can initiate a meeting", () => {
+test("any active individual profile can initiate a meeting without role gating", () => {
   assert.equal(canRegisterMeeting({ uid: "department-director", active: true, role: "Departmental Director" }), true);
   assert.equal(canRegisterMeeting({ uid: "staff-user", active: true, role: "Staff" }), true);
   assert.equal(canRegisterMeeting({ uid: "ordinary-member", active: false, role: "Member" }), false);
