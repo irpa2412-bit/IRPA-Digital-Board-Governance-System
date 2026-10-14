@@ -10,10 +10,11 @@ export const firebaseConfig = {
   // registered for this Firebase handler; changing this to web.app without
   // adding the matching OAuth redirect URI causes Google Error 400.
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "irpa-digital-board-governance.firebaseapp.com",
+  ...(import.meta.env.VITE_FIREBASE_STORAGE_BUCKET ? { storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET } : {}),
   projectId: useFirebaseEmulators ? "demo-irpa-dgbs" : (import.meta.env.VITE_FIREBASE_PROJECT_ID || "irpa-digital-board-governance"),
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "217055978789",
   appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:217055978789:web:937d1f2f781202cc1e26cc",
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-XDJEBRBEVC"
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID ?? "G-XDJEBRBEVC"
 };
 
 const app = initializeApp(firebaseConfig);
