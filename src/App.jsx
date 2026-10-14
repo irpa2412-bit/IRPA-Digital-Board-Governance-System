@@ -519,7 +519,7 @@ useEffect(()=>{
     window.cancelAnimationFrame(firstFrame);
     window.cancelAnimationFrame(secondFrame);
   };
-},[active]);
+},[active,user?.uid,sessionAdministrator]);
 useEffect(()=>{
   if(!user?.uid)return;
   let lastActivity=Date.now();
