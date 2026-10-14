@@ -41,11 +41,20 @@ test("explicitly invited participants can access their meeting regardless of ins
   }, { isInvited: true }), true);
 });
 
-test("meeting registration requires an active designated institutional role", () => {
-  assert.equal(canRegisterMeeting({ active: true, role: "Departmental Director" }), true);
-  assert.equal(canRegisterMeeting({ active: false, role: "Departmental Director" }), false);
-  assert.equal(canRegisterMeeting({ active: true, role: "Staff" }), false);
+test("any signed-in individual profile can initiate a meeting", () => {
+  assert.equal(canRegisterMeeting({ uid: "department-director", active: true, role: "Departmental Director" }), true);
+  assert.equal(canRegisterMeeting({ uid: "staff-user", active: true, role: "Staff" }), true);
+  assert.equal(canRegisterMeeting({ uid: "ordinary-member", active: false, role: "Member" }), true);
+  assert.equal(canRegisterMeeting({}), false);
   assert.equal(canRegisterMeeting({ isAdmin: true }), true);
+});
+
+test("disciplinary meetings have their own category and strict default confidentiality", async () => {
+  const { MEETING_CATEGORIES, MEETING_CATEGORY_OPTIONS, normalizeMeetingForV3 } = await import("../src/firebase/meetingPolicy.js");
+  assert.equal(MEETING_CATEGORIES.DISCIPLINARY.label, "Disciplinary Meetings");
+  assert.ok(MEETING_CATEGORY_OPTIONS.some(option => option.value === "DISCIPLINARY"));
+  assert.equal(normalizeMeetingForV3({ meetingCategory: "GOVERNANCE", confidentialityClass: "BOARD_RESTRICTED" }).confidentialityClass, "STRICTLY_CONFIDENTIAL");
+  assert.equal(normalizeMeetingForV3({ meetingCategory: "GOVERNANCE" }).boardSessionType, "CLOSED_SESSION");
 });
 
 test("released meeting edits are administrator-only", () => {
