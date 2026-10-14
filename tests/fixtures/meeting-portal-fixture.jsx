@@ -10,5 +10,7 @@ import "../../src/styles/mobile-app-enhancement.css";
 import "../../src/styles/page-back-next-navigation.css";
 import "../../src/styles/grant-intelligence-layout.css";
 createRoot(document.getElementById("root")).render(
-  <React.StrictMode><Meetings onNavigate={() => {}} /></React.StrictMode>
+  <React.StrictMode><Meetings onNavigate={(module, context = {}) => {
+    window.__irpaNavigationCalls = [...(window.__irpaNavigationCalls || []), { module, context }];
+  }} /></React.StrictMode>
 );
