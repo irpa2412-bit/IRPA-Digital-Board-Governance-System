@@ -44,9 +44,9 @@ jobs:
       - name: Build production web bundle
         run: npm run build
       - name: Run meeting category and Firestore authorization tests
-        run: npm run test:meeting-category
+        run: npx firebase emulators:exec --project demo-irpa-meeting-tests --only firestore "npm run test:meeting-category"
       - name: Run security rules tests
-        run: npm run test:security-rules
+        run: npx firebase emulators:exec --project demo-irpa-meeting-tests --only firestore "npm run test:security-rules"
       - name: Run portal navigation regression tests
         run: npm run test:portal-navigation
       - name: Run meeting entry policy tests
