@@ -751,14 +751,23 @@ async function downloadSignatureFile(request, env) {
     if (!document) return json({ok:false,error:"The controlled document record was not found."},404,corsHeaders(request));
     const fields = document.fields || {};
     const admin = await getFirestoreDocument(env, "adminProfiles/" + claims.user_id, claims.token);
+    let envelopeFields = {};
+    if (envelopeId) {
+      const envelope = await getFirestoreDocument(env, "signatureEnvelopes/" + envelopeId, claims.token);
+      const candidate = envelope?.fields || {};
+      if (candidate.documentId?.stringValue === documentId) envelopeFields = candidate;
+    }
     allowed = canReadSignatureAsset({
       authenticatedUid: claims.user_id,
       purpose,
       documentId,
+      envelopeId,
       metadataDocumentId: description.documentId || "",
       isAdmin: Boolean(admin?.fields?.active?.booleanValue),
       documentOwnerUid: fields.ownerUid?.stringValue || "",
       authorizedUids: firestoreStringArray(fields.authorizedUids),
+      envelopeParticipantUids: firestoreStringArray(envelopeFields.participantUids),
+      envelopeDocumentId: envelopeFields.documentId?.stringValue || "",
     });
   }
   if (!allowed) return json({ok:false,error:"You are not authorized to retrieve this Signature Portal asset."},403,corsHeaders(request));
