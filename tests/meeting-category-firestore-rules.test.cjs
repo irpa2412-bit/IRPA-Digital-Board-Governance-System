@@ -152,8 +152,8 @@ test("category-constrained meeting queries are allowed only for the matching cat
   const boardDb = testEnv.authenticatedContext("board-member", {
     email: "board@example.test"
   }).firestore();
-  await assertFails(staffDb.collection("meetings").where("meetingCategory", "==", "GOVERNANCE").get());
-  await assertSucceeds(boardDb.collection("meetings").where("meetingCategory", "==", "GOVERNANCE").get());
+  await assertFails(staffDb.collection("meetings").where("meetingCategory", "==", "GOVERNANCE").where("confidentialityClass", "==", "INTERNAL").where("boardSessionType", "==", "OPEN_SESSION").get());
+  await assertSucceeds(boardDb.collection("meetings").where("meetingCategory", "==", "GOVERNANCE").where("confidentialityClass", "==", "INTERNAL").where("boardSessionType", "==", "OPEN_SESSION").get());
 });
 
 test("explicit category metadata overrides a conflicting legacy meeting type", async () => {
