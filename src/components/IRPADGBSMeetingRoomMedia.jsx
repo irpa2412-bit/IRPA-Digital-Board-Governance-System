@@ -12,7 +12,7 @@ function safeJson(value){
   try{return JSON.parse(decoder.decode(value))}catch{return null}
 }
 
-export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",controller=false,proceedingsActive=false}){
+export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",controller=false,recordingController=false,proceedingsActive=false}){
  const roomRef=useRef(null),remoteRef=useRef(null),localRef=useRef(null),autoRecordingAttemptedRef=useRef("");
  const[status,setStatus]=useState("READY"),[error,setError]=useState(""),[muted,setMuted]=useState(true),[camera,setCamera]=useState(false),[screen,setScreen]=useState(false),[hand,setHand]=useState(false),[moderator,setModerator]=useState(false),[recordingAllowed,setRecordingAllowed]=useState(false);
  const[participants,setParticipants]=useState([]),[messages,setMessages]=useState([]),[chat,setChat]=useState(""),[deviceReady,setDeviceReady]=useState(false),[deviceCheck,setDeviceCheck]=useState("NOT CHECKED"),[sessionId,setSessionId]=useState(""),[recordingStatus,setRecordingStatus]=useState("NOT_STARTED"),[recordingInfo,setRecordingInfo]=useState(null),[recordingBusy,setRecordingBusy]=useState(false);
@@ -43,11 +43,13 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
  useEffect(()=>{
   let cancelled=false;
   async function startWhenProceedingsBegin(){
-   if(!meeting?.id||!proceedingsActive||!controller||!roomRef.current||!auth.currentUser||meeting.recordingRequired===false)return;
+   if(!meeting?.id||!proceedingsActive||!recordingController||!auth.currentUser||meeting.recordingRequired===false)return;
    if(autoRecordingAttemptedRef.current===meeting.id)return;
    autoRecordingAttemptedRef.current=meeting.id;
    setRecordingBusy(true);setError("");
    try{
+    if(!roomRef.current){await connect();if(!roomRef.current){setRecordingStatus("FAILED");setError("AUTOMATIC RECORDING FAILED. The live room could not connect when proceedings began. Proceedings must not be treated as recorded.");return;}}
+    if(!recordingAllowed){const status=await refreshRecordingStatus();if(status?.recordingAllowed!==true){setRecordingStatus("FAILED");setError("AUTOMATIC RECORDING FAILED. Server policy did not enable capture for this meeting. Proceedings must not be treated as recorded.");return;}}
     const context=JSON.parse(sessionStorage.getItem("irpaMeetingEntryContext")||"null");
     const participantId=context?.meetingId===meeting.id?String(context?.participantId||""):"";
     const recording=await startMeetingRecording({meetingId:meeting.id,selectedAuthority:participantId?"":String(selectedAuthority||""),participantId});
@@ -70,7 +72,7 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
   }
   if(proceedingsActive&&recordingStatus!=="RECORDING"&&recordingStatus!=="STARTING")startWhenProceedingsBegin();
   return()=>{cancelled=true};
- },[meeting?.id,meeting?.recordingRequired,proceedingsActive,controller,recordingAllowed,recordingStatus,selectedAuthority]);
+ },[meeting?.id,meeting?.recordingRequired,proceedingsActive,recordingController,recordingAllowed,recordingStatus,selectedAuthority]);
 
  async function connect(){
    if(!meeting?.id)return setError("Select an IRPA meeting first.");
