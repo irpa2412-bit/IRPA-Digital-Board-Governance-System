@@ -63,11 +63,6 @@ async function assertPortalAndNoOverflow(page, expectedText, width, verifyDestin
   const workspace = page.locator("#portal-workspace-content");
   await expect(workspace).toBeVisible();
   if (verifyDestinationFocus) {
-    console.log("PORTAL_SCROLL_DIAGNOSTICS", JSON.stringify(await workspace.evaluate(el => {
-      const rows=[]; let node=el;
-      while(node){const style=getComputedStyle(node);rows.push({tag:node.tagName,id:node.id,cls:typeof node.className==="string"?node.className:"",overflowY:style.overflowY,position:style.position,scrollTop:node.scrollTop,scrollHeight:node.scrollHeight,clientHeight:node.clientHeight,top:node.getBoundingClientRect().top});node=node.parentElement;}
-      return {windowScrollY:window.scrollY,documentScrollTop:document.documentElement.scrollTop,bodyScrollTop:document.body.scrollTop,rows};
-    })));
     await expect.poll(
       () => workspace.evaluate(el => Math.abs(el.getBoundingClientRect().top)),
       { message: "destination portal body should scroll into view below the global header and connected-workflow controls after navigation", timeout: 10000 }
