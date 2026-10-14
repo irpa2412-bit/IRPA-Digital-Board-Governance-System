@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   local-e2e:
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004' || github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015' || github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015' || github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004' || github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -30,6 +30,9 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: npm ci --no-audit --no-fund
         working-directory: drive-gateway
+      - name: Validate runtime acceptance script syntax
+        working-directory: drive-gateway
+        run: node --check tests/staging-runtime-acceptance.mjs
       - name: Firestore emulator E2E
         run: |
           set -o pipefail
