@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { PDFDocument } from "pdf-lib";
-import { declineSigning, getSigningPdf, openSigning, sign } from "../src/signing.mjs";
+import { declineSigning, getSigningPdf, openSigning, sign, verifySigningPdf } from "../src/signing.mjs";
 import { route } from "../src/router.mjs";
 import { sha256Hex } from "../src/util.mjs";
 
@@ -284,6 +284,34 @@ test("Gateway idempotent signing retry still requires the invited authenticated 
       consent:true,
       user:{uid:"wrong-user",email:"member@example.org"}
     }),
+    error=>error.status===403
+  );
+});
+
+
+test("Gateway completed-PDF verification accepts the exact hash and rejects tampered bytes", async () => {
+  const fixture=await makeFixture({signerUid:"member-uid",signerEmail:"member@example.org"});
+  const finalHash=await sha256Hex(ORIGINAL);
+  fixture.envelope.status="Completed";
+  fixture.envelope.completion={finalHash,cryptographicEvidenceIds:["CRYPTO-TEST"]};
+  const user={uid:"member-uid",email:"member@example.org"};
+  const accepted=await verifySigningPdf(fixture.ctx,fixture.token,user,new Uint8Array(ORIGINAL));
+  assert.equal(accepted.verified,true);
+  assert.equal(accepted.documentHash,finalHash);
+  const tampered=new Uint8Array(ORIGINAL);
+  tampered[tampered.length-1]^=1;
+  await assert.rejects(
+    ()=>verifySigningPdf(fixture.ctx,fixture.token,user,tampered),
+    error=>error.status===409&&error.message.includes("does not match")
+  );
+});
+
+test("Gateway completed-PDF verification requires the invited UID even for a valid hash", async () => {
+  const fixture=await makeFixture({signerUid:"member-uid",signerEmail:"member@example.org"});
+  fixture.envelope.status="Completed";
+  fixture.envelope.completion={finalHash:await sha256Hex(ORIGINAL),cryptographicEvidenceIds:[]};
+  await assert.rejects(
+    ()=>verifySigningPdf(fixture.ctx,fixture.token,{uid:"wrong-user",email:"member@example.org"},new Uint8Array(ORIGINAL)),
     error=>error.status===403
   );
 });
