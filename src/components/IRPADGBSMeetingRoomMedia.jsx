@@ -41,6 +41,13 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
 
  useEffect(()=>()=>{roomRef.current?.disconnect();roomRef.current=null},[]);
  useEffect(()=>{
+  if(!meeting?.id||!proceedingsActive||recordingStatus!=="RECORDING")return;
+  let stopped=false;
+  const poll=async()=>{if(stopped)return;const result=await refreshRecordingStatus();if(stopped||!result)return;const current=String(result.recordingStatus||"UNKNOWN").toUpperCase();if(current==="FAILED"){setError("RECORDING FAILURE DETECTED. The recording service reports failure during active proceedings. Do not treat the affected interval as recorded; preserve the failure notice in the audit trail.");}else if(current!=="RECORDING"&&current!=="STOPPING"){setError("RECORDING STATUS LOST DURING ACTIVE PROCEEDINGS: "+current+". Verify the capture service before continuing.");}};
+  const timer=setInterval(poll,15000);
+  return()=>{stopped=true;clearInterval(timer)};
+ },[meeting?.id,proceedingsActive,recordingStatus]);
+ useEffect(()=>{
   let cancelled=false;
   async function startWhenProceedingsBegin(){
    if(!meeting?.id||!proceedingsActive||!recordingController||!auth.currentUser||meeting.recordingRequired===false)return;
