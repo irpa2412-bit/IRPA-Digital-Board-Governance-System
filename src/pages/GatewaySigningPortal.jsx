@@ -23,17 +23,19 @@ export default function GatewaySigningPortal({token}){
     if(!token)throw new Error("The Gateway signing token is missing.");
     const [result,savedProfile,identity]=await Promise.all([
       fetchGatewaySigningResource("/api/sign/open",token),
-      getMySignatureProfile(),
-      getMySignerIdentity()
+      getMySignatureProfile().catch(()=>null),
+      getMySignerIdentity().catch(()=>null)
     ]);
     if(!result.signer?.authenticated)throw new Error("Sign in with the invited IRPA account before continuing.");
-    if(!savedProfile||savedProfile.status!=="Active"||!savedProfile.signatureUrl)throw new Error("An active Signature Profile is required before signing this Gateway envelope.");
-    if(!identity?.authorityRole||identity.authorityRole==="Not yet assigned")throw new Error("Your current signing authority has not been registered. Update your Signer Identity capacity before signing.");
-    if(identity.authorityStatus!=="Current")throw new Error("Your signing authority is "+String(identity.authorityStatus||"not verified")+". A Current authority is required to sign.");
+    const signingRequired=Boolean(result.canSign&&result.status!=="Completed");
+    if(signingRequired&&(!savedProfile||savedProfile.status!=="Active"||!savedProfile.signatureUrl))throw new Error("An active Signature Profile is required before signing this Gateway envelope.");
+    if(signingRequired&&(!identity?.authorityRole||identity.authorityRole==="Not yet assigned"))throw new Error("Your current signing authority has not been registered. Update your Signer Identity capacity before signing.");
+    if(signingRequired&&identity.authorityStatus!=="Current")throw new Error("Your signing authority is "+String(identity?.authorityStatus||"not verified")+". A Current authority is required to sign.");
     const [sig,initials]=await Promise.all([
-      pngDataUrl(savedProfile.signatureUrl),
-      savedProfile.initialsUrl?pngDataUrl(savedProfile.initialsUrl).catch(()=> ""):Promise.resolve("")
+      savedProfile?.status==="Active"&&savedProfile.signatureUrl?pngDataUrl(savedProfile.signatureUrl):Promise.resolve(""),
+      savedProfile?.status==="Active"&&savedProfile.initialsUrl?pngDataUrl(savedProfile.initialsUrl).catch(()=> ""):Promise.resolve("")
     ]);
+    if(signingRequired&&!sig)throw new Error("The saved Signature Profile specimen could not be prepared for signing.");
     const gatewayStatus=await fetchGatewaySigningResource("/api/sign/status",token);
     let initialEvidence=null;
     if(gatewayStatus.status==="Completed")initialEvidence=await fetchGatewaySigningResource("/api/sign/evidence",token);
