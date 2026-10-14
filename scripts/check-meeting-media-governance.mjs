@@ -77,7 +77,7 @@ const checks=[
  ["Category options are exported",policy.includes("MEETING_CATEGORY_OPTIONS")],
  ["Meeting category selector exists",fs.readFileSync("src/pages/Meetings.jsx","utf8").includes('name="meetingCategory"')],
  ["Board mixed sessions are split into independently access-controlled records",policy.includes('value:"MIXED_SESSION"')&&meetingsCentre.includes("IRPA-BOARD-SERIES-")&&meetingsCentre.includes("boardSessionType:session.type")],
- ["Recording starts only when proceedings are in progress",media.includes('String(meeting.status||"").toLowerCase()!=="in progress"')&&media.includes("startRecording();")],
+ ["Recording starts only when proceedings are in progress",media.includes('if(!meeting?.id||String(meeting.status||"").toLowerCase()!=="in progress"||status!=="CONNECTED"')&&media.includes("const result=await startMeetingRecording({meetingId:meeting.id") ],
  ["Recording status is monitored and final sessions trigger stop",media.includes("setInterval(()=>{refreshRecordingStatus()},5000)")&&media.includes("autoRecordingStopAttemptedRef.current.add(meeting.id)")],
  ["Recording storage is partitioned by category, classification and Board session",liveMeeting.includes("safeRecordingId(archiveCategory)")&&liveMeeting.includes("safeRecordingId(archiveClassification)")&&liveMeeting.includes("safeRecordingId(boardSessionType)")],
  ["Category controls Meeting Room facilities",room.includes("meetingCapabilities")&&room.includes("capabilities.facilities")],
