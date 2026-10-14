@@ -407,3 +407,13 @@ body { margin: 0; }
     padding: 8px 5px;
   }
 }
+
+
+/* Portal changes should land on the active workspace itself, below global navigation. */
+#root .app-shell .main-area > .content-area .active-portal-content {
+  display: flow-root;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  scroll-margin-top: 8px;
+}
