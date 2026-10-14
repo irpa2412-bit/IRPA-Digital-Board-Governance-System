@@ -122,9 +122,9 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
   if(!meeting?.id||String(meeting.status||"").toLowerCase()!=="in progress"||status!=="CONNECTED"||!controller||!recordingAllowed||recordingStatus!=="NOT_STARTED")return;
   if(autoRecordingAttemptedRef.current.has(meeting.id))return;
   autoRecordingAttemptedRef.current.add(meeting.id);
-  // Recording starts automatically when the meeting controller joins an active meeting.
-  // A failure is surfaced in the room UI; it is never reported as a successful recording.
-  startRecording();
+  // Re-check the server before starting so the parent proceedings gate cannot race
+  // with this fallback. Only the confirmed server recording state is authoritative.
+  (async()=>{try{const current=await getMeetingRecordingStatus(meeting.id);setRecordingAllowed(current.recordingAllowed===true);setRecordingStatus(current.recordingStatus||"UNKNOWN");setRecordingInfo(current.recording||null);if(current.recordingAllowed!==true){setError("Mandatory recording is not enabled; proceedings must not continue.");return}const state=String(current.recordingStatus||"UNKNOWN").toUpperCase();if(["NOT_STARTED","FAILED","UNKNOWN","COMPLETED"].includes(state)){const result=await startMeetingRecording({meetingId:meeting.id,selectedAuthority:String(selectedAuthority||""),participantId:currentParticipantId()});setRecordingStatus(result.recordingStatus||"RECORDING");await refreshRecordingStatus()}else if(state!=="RECORDING"){setError("The recording service has not confirmed an active recording. Proceedings must remain paused.")}}catch(e){setError(e?.message||"Automatic recording could not be confirmed; proceedings must remain paused.")}})();
  },[meeting?.id,meeting?.status,status,controller,recordingAllowed,recordingStatus]);
  useEffect(()=>{
   if(status!=="CONNECTED"||!meeting?.id||!["RECORDING","STARTING","STOPPING"].includes(String(recordingStatus||"").toUpperCase()))return;
