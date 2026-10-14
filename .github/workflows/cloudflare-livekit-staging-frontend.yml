@@ -93,4 +93,17 @@ jobs:
           health="$(curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 2 --max-time 20 "$url/__irpa_health")"
           echo "$health"
           echo "$health" | grep -q '"ok":true'
-          echo "Isolated staging frontend is deployed. Authenticated token, recording, and two-browser media tests remain separate acceptance tests."
+          echo "Isolated staging frontend is deployed."
+
+      - name: Install Firebase Admin SDK for temporary staging acceptance fixture
+        run: npm ci --prefix functions --omit=dev
+
+      - name: Verify authenticated Cloudflare token issuance and Firestore audit
+        env:
+          STAGING_FIREBASE_SERVICE_ACCOUNT: ${{ secrets.LIVEKIT_STAGING_FIREBASE_SERVICE_ACCOUNT }}
+          STAGING_FIREBASE_WEB_API_KEY: "AIzaSyA6UmHtP-mRr99rBw57_-qrD4_mFSBnZ38"
+          LIVEKIT_TOKEN_WORKER_URL: "https://irpa-dgb-livekit-token-staging.irpa-governance.workers.dev"
+        run: |
+          set -euo pipefail
+          test -n "$STAGING_FIREBASE_SERVICE_ACCOUNT"
+          node functions/scripts/verify-cloudflare-livekit-token-worker.js
