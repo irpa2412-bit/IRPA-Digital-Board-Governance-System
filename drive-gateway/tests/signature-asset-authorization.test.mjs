@@ -44,6 +44,22 @@ test("controlled documents require matching document metadata and document-level
   assert.equal(canReadSignatureAsset({ ...base, authorizedUids: [], isAdmin: true }), true);
 });
 
+test("an assigned envelope participant can read the exact controlled source document", () => {
+  const base = {
+    authenticatedUid: "signer-1",
+    purpose: "Controlled Documents",
+    documentId: "DOC-1",
+    metadataDocumentId: "DOC-1",
+    envelopeId: "ENV-1",
+    envelopeDocumentId: "DOC-1",
+    envelopeParticipantUids: ["signer-1", "signer-2"],
+  };
+  assert.equal(canReadSignatureAsset(base), true);
+  assert.equal(canReadSignatureAsset({ ...base, envelopeDocumentId: "DOC-2" }), false);
+  assert.equal(canReadSignatureAsset({ ...base, envelopeParticipantUids: ["signer-2"] }), false);
+  assert.equal(canReadSignatureAsset({ ...base, metadataDocumentId: "DOC-2" }), false);
+});
+
 test("signed workflow PDFs require the matching document, envelope, and participant identity", () => {
   const base = {
     authenticatedUid: "signer-1",
