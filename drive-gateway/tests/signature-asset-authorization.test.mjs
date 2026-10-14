@@ -116,4 +116,6 @@ test("Signature Portal gateway routes are wired to the fail-closed authorization
   assert.match(gateway, /url\.pathname === "\/api\/signature-file\/download"/);
   assert.match(gateway, /downloadSignatureFile\(request, env\)/);
   assert.match(gateway, /canUploadSignedDocument/);
+  assert.ok(gateway.includes("Signed workflow PDFs must be retrieved through the Signature Portal envelope-authorized route."));
+  assert.ok(gateway.includes("Controlled document retrieval requires a matching document ID."));
 });
