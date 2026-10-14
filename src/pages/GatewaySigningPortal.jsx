@@ -1,6 +1,6 @@
 import React,{useEffect,useState}from"react";
 import{getMySignatureProfile,syncGatewaySigningMirror}from"../firebase/signaturePlatform";
-import{fetchGatewaySigningResource,submitGatewaySignature}from"../firebase/signatureStorage";
+import{fetchGatewaySigningResource,submitGatewaySignature,verifyGatewaySignedPdf}from"../firebase/signatureStorage";
 
 async function pngDataUrl(source){
   const value=String(source||"");
@@ -43,6 +43,7 @@ export default function GatewaySigningPortal({token}){
       else nextValues[field.fieldId]="";
     }
     const pdfBytes=await fetchGatewaySigningResource("/api/sign/pdf",token,{pdf:true});
+    if(gatewayStatus.status==="Completed"){const verification=await verifyGatewaySignedPdf({token,bytes:pdfBytes});if(verification.documentHash!==gatewayStatus.completion?.finalHash)throw new Error("Completed PDF hash does not match the Gateway completion record.");}
     objectUrl=URL.createObjectURL(new Blob([pdfBytes],{type:"application/pdf"}));
     if(!cancelled){setOpened(result);setProfile(savedProfile);setSignaturePng(sig);setInitialsPng(initials);setValues(nextValues);setPdfUrl(objectUrl);setStatus(gatewayStatus);setEvidence(initialEvidence);if(gatewayStatus.externalReference&&gatewayStatus.auditChainValid===true){try{await syncGatewaySigningMirror(gatewayStatus.externalReference,gatewayStatus)}catch(syncError){console.warn("Gateway status loaded; Signature Portal mirror reconciliation is pending.",syncError)}}}
   }catch(error){if(!cancelled)setMessage(error?.message||"Unable to load the Gateway signing transaction.");}finally{if(!cancelled)setLoading(false)}})();return()=>{cancelled=true;if(objectUrl)URL.revokeObjectURL(objectUrl)}},[token]);
@@ -53,6 +54,9 @@ export default function GatewaySigningPortal({token}){
       try{await syncGatewaySigningMirror(next.externalReference,next)}catch(error){console.warn("Gateway signing status is valid but Signature Portal mirror sync needs reconciliation.",error);}
     }
     if(next.status==="Completed"){
+      const completedBytes=await fetchGatewaySigningResource("/api/sign/pdf",token,{pdf:true});
+      const verification=await verifyGatewaySignedPdf({token,bytes:completedBytes});
+      if(verification.documentHash!==next.completion?.finalHash)throw new Error("Completed PDF hash does not match the Gateway completion record.");
       const found=await fetchGatewaySigningResource("/api/sign/evidence",token);
       setEvidence(found);
       setMessage("Signing completed. The Gateway returned persisted cryptographic evidence and verified the audit chain.");
