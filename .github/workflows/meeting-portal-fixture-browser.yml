@@ -57,6 +57,7 @@ jobs:
             .trim().split("\n").filter(Boolean).sort();
           const allowed = new Set([
             ".github/workflows/meeting-portal-fixture-browser.yml",
+            "tests/portal-workspace-navigation.test.mjs",
             ".github/workflows/meeting-invitation-flow-ci.yml",
             ".github/workflows/firebase-deploy.yml",
             ".github/workflows/livekit-production-worker-ci.yml",
