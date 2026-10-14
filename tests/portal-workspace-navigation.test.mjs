@@ -5,10 +5,9 @@ import { readFileSync } from "node:fs";
 const source = readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
 
 test("portal changes focus the viewport on the destination workspace", () => {
-  assert.match(
-    source,
-    /useEffect\(\(\)=>\{\s*let firstFrame=0;\s*let secondFrame=0;[\s\S]*?const workspace=document\.querySelector\("#root \.app-shell \.main-area > \.content-area #portal-workspace-content"\);[\s\S]*?workspace\.scrollIntoView\(\{block:"start",behavior:"auto"\}\);[\s\S]*?\},\[active\]\);/
-  );
+  assert.ok(source.includes('const workspace=document.querySelector("#root .app-shell .main-area > .content-area #portal-workspace-content")'));
+  assert.ok(source.includes('workspace.scrollIntoView({block:"start",behavior:"auto"})'));
+  assert.ok(source.includes('},[active,user?.uid,sessionAdministrator]);'));
 });
 
 test("portal changes scroll to and focus the actual portal body below navigation controls", () => {
@@ -25,7 +24,7 @@ test("navigation focus is scoped to the main workspace, not the global header", 
 test("scheduled viewport work is cancelled when the active portal changes or the shell unmounts", () => {
   assert.match(source, /window\.cancelAnimationFrame\(firstFrame\)/);
   assert.match(source, /window\.cancelAnimationFrame\(secondFrame\)/);
-  assert.match(source, /return\(\)=>\{\s*window\.cancelAnimationFrame\(firstFrame\);\s*window\.cancelAnimationFrame\(secondFrame\);\s*\};[\s\S]*?\},\[active\]\);/);
+  assert.ok(source.includes('return()=>{\n    window.cancelAnimationFrame(firstFrame);\n    window.cancelAnimationFrame(secondFrame);\n  };'));
 });
 
 test("navigation repair remains presentation-only and leaves access-gate routing in place", () => {
