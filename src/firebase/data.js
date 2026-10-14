@@ -87,7 +87,7 @@ export async function getAccessibleMeetingRecords(){
   // Category controls continue to govern editing and access to linked proceedings/records; they do not hide
   // the meeting register itself from an authenticated institutional user.
   const ref=collection(db,COLLECTIONS.meetings);
-  if(isAdmin||(activeMember||activeEmployee)){
+  if(user.uid){
     const all=await getDocs(ref);
     return all.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>meetingCreatedAt(b)-meetingCreatedAt(a));
   }
