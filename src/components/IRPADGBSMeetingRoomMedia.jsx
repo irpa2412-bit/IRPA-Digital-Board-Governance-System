@@ -53,9 +53,25 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
        const gateContext=JSON.parse(sessionStorage.getItem("irpaMeetingEntryContext")||"null");
        if(gateContext?.meetingId===meeting.id)gateParticipantId=String(gateContext?.participantId||"");
      }catch{}
-     const call=httpsCallable(getFunctions(undefined,"us-central1"),"issueLiveMeetingToken");
-     const result=await call({meetingId:meeting.id,selectedAuthority:gateParticipantId?"":String(selectedAuthority||"").trim(),participantId:gateParticipantId});
-     const data=result.data||{};
+     const tokenRequest={meetingId:meeting.id,selectedAuthority:gateParticipantId?"":String(selectedAuthority||"").trim(),participantId:gateParticipantId};
+      const workerEndpoint=String(import.meta.env.VITE_LIVEKIT_TOKEN_WORKER_URL||"").trim().replace(/\/+$/,"");
+      let data;
+      if(workerEndpoint){
+        const idToken=await auth.currentUser.getIdToken();
+        const response=await fetch(`${workerEndpoint}/token`,{
+          method:"POST",
+          headers:{"Authorization":`Bearer ${idToken}`,"Content-Type":"application/json"},
+          body:JSON.stringify(tokenRequest)
+        });
+        let payload;
+        try{payload=await response.json()}catch{throw new Error("Cloudflare LiveKit authorization returned an invalid response.")}
+        if(!response.ok||payload?.ok!==true)throw new Error(`Cloudflare LiveKit authorization failed: ${String(payload?.error||"HTTP_"+response.status)}`);
+        data=payload;
+      }else{
+        const call=httpsCallable(getFunctions(undefined,"us-central1"),"issueLiveMeetingToken");
+        const result=await call(tokenRequest);
+        data=result.data||{};
+      }
      if(!data.serverUrl||!data.participantToken)throw new Error("The IRPA live meeting authorization response was incomplete.");
      const room=new Room({adaptiveStream:true,dynacast:true});
      room.on(RoomEvent.TrackSubscribed,(track)=>attach(track,remoteRef.current));
