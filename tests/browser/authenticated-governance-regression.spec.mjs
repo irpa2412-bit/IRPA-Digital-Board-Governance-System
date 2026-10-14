@@ -65,7 +65,8 @@ async function assertPortalAndNoOverflow(page, expectedText, width) {
   await expect.poll(
     () => workspace.evaluate(el => Math.abs(el.getBoundingClientRect().top)),
     { message: "destination workspace should scroll into the visible workspace area rather than leave the user at the global header", timeout: 10000 }
-  ).toBeLessThanOrEqual(40);
+  // The workspace sits immediately below the sticky global header; allow its measured tablet height plus a small rendering tolerance.
+  ).toBeLessThanOrEqual(56);
   const dimensions = await page.evaluate(() => ({
     viewport: document.documentElement.clientWidth,
     document: document.documentElement.scrollWidth

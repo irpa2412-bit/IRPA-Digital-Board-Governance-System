@@ -15,8 +15,11 @@ function safeJson(value){
 export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",controller=false}){
  const roomRef=useRef(null),remoteRef=useRef(null),localRef=useRef(null);
  const[status,setStatus]=useState("READY"),[error,setError]=useState(""),[muted,setMuted]=useState(true),[camera,setCamera]=useState(false),[screen,setScreen]=useState(false),[hand,setHand]=useState(false),[moderator,setModerator]=useState(false),[recordingAllowed,setRecordingAllowed]=useState(false);
- const[participants,setParticipants]=useState([]),[messages,setMessages]=useState([]),[chat,setChat]=useState(""),[deviceReady,setDeviceReady]=useState(false),[deviceCheck,setDeviceCheck]=useState("NOT CHECKED"),[sessionId,setSessionId]=useState(""),[recordingStatus,setRecordingStatus]=useState("NOT_STARTED"),[recordingInfo,setRecordingInfo]=useState(null),[recordingBusy,setRecordingBusy]=useState(false);
+ const[participants,setParticipants]=useState([]),[messages,setMessages]=useState([]),[chat,setChat]=useState(""),[deviceReady,setDeviceReady]=useState(false),[deviceCheck,setDeviceCheck]=useState("NOT CHECKED"),[sessionId,setSessionId]=useState(""),[recordingStatus,setRecordingStatus]=useState("CHECKING"),[recordingInfo,setRecordingInfo]=useState(null),[recordingBusy,setRecordingBusy]=useState(false);
 
+ const autoRecordingAttemptedRef=useRef(new Set());
+ const autoArchiveAttemptedRef=useRef(new Set());
+ const autoRecordingStopAttemptedRef=useRef(new Set());
  const clear=node=>{if(node)while(node.firstChild)node.removeChild(node.firstChild)};
  const refreshParticipants=room=>{
    if(!room)return;
@@ -115,6 +118,36 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
   catch(e){setError(e?.message||"The recording service did not confirm that recording started.")}
   finally{setRecordingBusy(false)}
  }
+ useEffect(()=>{
+  if(!meeting?.id||String(meeting.status||"").toLowerCase()!=="in progress"||status!=="CONNECTED"||!controller||!recordingAllowed||recordingStatus!=="NOT_STARTED")return;
+  if(autoRecordingAttemptedRef.current.has(meeting.id))return;
+  autoRecordingAttemptedRef.current.add(meeting.id);
+  // Re-check the server before starting so the parent proceedings gate cannot race
+  // with this fallback. Only the confirmed server recording state is authoritative.
+  (async()=>{try{const current=await getMeetingRecordingStatus(meeting.id);setRecordingAllowed(current.recordingAllowed===true);setRecordingStatus(current.recordingStatus||"UNKNOWN");setRecordingInfo(current.recording||null);if(current.recordingAllowed!==true){setError("Mandatory recording is not enabled; proceedings must not continue.");return}const state=String(current.recordingStatus||"UNKNOWN").toUpperCase();if(["NOT_STARTED","FAILED","UNKNOWN","COMPLETED"].includes(state)){const result=await startMeetingRecording({meetingId:meeting.id,selectedAuthority:String(selectedAuthority||""),participantId:currentParticipantId()});setRecordingStatus(result.recordingStatus||"RECORDING");await refreshRecordingStatus()}else if(state!=="RECORDING"){setError("The recording service has not confirmed an active recording. Proceedings must remain paused.")}}catch(e){setError(e?.message||"Automatic recording could not be confirmed; proceedings must remain paused.")}})();
+ },[meeting?.id,meeting?.status,status,controller,recordingAllowed,recordingStatus]);
+ useEffect(()=>{
+  if(status!=="CONNECTED"||!meeting?.id||!["RECORDING","STARTING","STOPPING"].includes(String(recordingStatus||"").toUpperCase()))return;
+  const timer=window.setInterval(()=>{refreshRecordingStatus()},5000);
+  return()=>window.clearInterval(timer);
+ },[status,meeting?.id,recordingStatus]);
+ useEffect(()=>{
+  const finalMeetingStatus=["completed","cancelled","canceled","archived"].includes(String(meeting?.status||"").toLowerCase());
+  const activeRecording=["RECORDING","STARTING","STOPPING"].includes(String(recordingStatus||"").toUpperCase());
+  const recordingId=recordingInfo?.egressId||recordingInfo?.id;
+  if(!meeting?.id||!finalMeetingStatus||!controller||!activeRecording||!recordingId||autoRecordingStopAttemptedRef.current.has(meeting.id))return;
+  autoRecordingStopAttemptedRef.current.add(meeting.id);
+  stopRecording();
+ },[meeting?.id,meeting?.status,controller,recordingStatus,recordingInfo?.egressId,recordingInfo?.id]);
+ useEffect(()=>{
+  const files=recordingInfo?.files||[];
+  if(!meeting?.id||recordingStatus!=="COMPLETED"||!files.length||recordingInfo?.driveArchive)return;
+  if(autoArchiveAttemptedRef.current.has(meeting.id))return;
+  autoArchiveAttemptedRef.current.add(meeting.id);
+  // Archive immediately when LiveKit supplies a retrievable file URL. A storage key
+  // is not treated as a downloadable file; that gap is surfaced by archiveRecordingToDrive.
+  archiveRecordingToDrive();
+ },[meeting?.id,recordingStatus,recordingInfo]);
  async function stopRecording(){
   const recordingId=recordingInfo?.egressId||recordingInfo?.id;
   if(!controller||!recordingId)return setError("No active meeting recording was found to stop.");
@@ -166,7 +199,7 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
   <div className="form-actions" style={{marginTop:14}}>
    {status!=="CONNECTED"&&<button onClick={connect} disabled={!controller||status==="AUTHORIZING"}>{status==="AUTHORIZING"?"Authorizing…":"Join IRPA-DGBS Meeting Room"}</button>}
    {status==="CONNECTED"&&<>
-    {controller&&recordingAllowed&&<button className={recordingStatus==="RECORDING"?"danger-button":"secondary-button"} onClick={recordingStatus==="RECORDING"?stopRecording:startRecording} disabled={recordingBusy||["STARTING","STOPPING"].includes(recordingStatus)}>{recordingBusy?(recordingStatus==="RECORDING"?"Stopping Recording…":"Working…"):recordingStatus==="RECORDING"?"Stop Recording":"Start Recording"}</button>}
+    {controller&&recordingAllowed&&String(meeting.status||"").toLowerCase()==="in progress"&&<button className={recordingStatus==="RECORDING"?"danger-button":"secondary-button"} onClick={recordingStatus==="RECORDING"?stopRecording:startRecording} disabled={recordingBusy||["STARTING","STOPPING"].includes(recordingStatus)}>{recordingBusy?(recordingStatus==="RECORDING"?"Stopping Recording…":"Working…"):recordingStatus==="RECORDING"?"Stop Recording":"Start Recording"}</button>}
     <button className="secondary-button" onClick={toggleMic}>{muted?"Unmute microphone":"Mute microphone"}</button>
     <button className="secondary-button" onClick={toggleCamera}>{camera?"Stop camera":"Start camera"}</button>
     <button className="secondary-button" onClick={toggleScreen}>{screen?"Stop screen share":"Share screen"}</button>
