@@ -50,9 +50,7 @@ export async function signMeetingAttendance({meetingId,participantId,typedName,c
 export async function getMeetingAttendanceRegister(meetingId,{canManage=false}={}){
  const user=auth.currentUser;if(!user)throw new Error("Sign in to retrieve the attendance register.");
  const participantsSnap=await getDocs(query(collection(db,"participants"),where("meetingId","==",meetingId)));
- const signatureConstraints=[where("meetingId","==",meetingId)];
- if(!canManage)signatureConstraints.push(where("signerUid","==",user.uid));
- const signaturesSnap=await getDocs(query(collection(db,"meetingAttendanceSignatures"),...signatureConstraints));
+ const signaturesSnap=await getDocs(query(collection(db,"meetingAttendanceSignatures"),where("meetingId","==",meetingId)));
  const signatures=new Map(signaturesSnap.docs.map(s=>[String(s.data()?.participantId||""),{id:s.id,...s.data(),signedAt:s.data()?.signedAt?.toDate?.()?.toISOString()||null}]));
  const records=participantsSnap.docs.map(d=>{const p={id:d.id,...d.data()},sig=signatures.get(d.id);return{participantId:d.id,name:attendanceSignatureName(p),role:String(p.role||p.participantRole||p.participantType||""),email:String(p.email||p.participantEmail||p.invitedEmail||p.subscriberEmail||""),attendanceStatus:String(p.attendanceStatus||p.status||"Unmarked"),signed:!!sig,signatureMethod:sig?.signatureMethod||null,typedName:sig?.typedName||null,signedAt:sig?.signedAt||null,signatureId:sig?.id||null};});
  return{meetingId,records};
