@@ -39,7 +39,7 @@ assert.equal(firestoreString(signatureProfile,"status"),"Active","Staging test s
 assert.ok(firestoreString(signatureProfile,"signatureUrl").startsWith("data:image/"),"Staging test signer must have a saved Signature Profile specimen.");
 assert.equal(firestoreString(signerIdentity,"authorityStatus"),"Current","Staging test signer must have Current Signer Identity authority.");
 assert.ok(firestoreString(signerIdentity,"authorityRole")&&firestoreString(signerIdentity,"authorityRole")!=="Not yet assigned","Staging test signer must have a registered signing authority.");
-const normalizeAuthority=value=>String(value||"").toLowerCase().replace(/^(the|irpa)\\s+/,"").replace(/[._-]+/g," ").replace(/\\s+/g," ").trim();
+const normalizeAuthority=value=>String(value||"").toLowerCase().replace(/^(the|irpa)\s+/,"").replace(/[._-]+/g," ").replace(/\s+/g," ").trim();
 assert.equal(normalizeAuthority(authority),normalizeAuthority(firestoreString(signerIdentity,"authorityRole")),"The staging authority secret must match the Current Signer Identity role.");
 
 async function readJson(response,label){
