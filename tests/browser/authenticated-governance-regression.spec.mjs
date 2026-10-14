@@ -67,18 +67,16 @@ async function assertPortalAndNoOverflow(page, expectedText, width) {
     () => workspace.evaluate(el => {
       const rect = el.getBoundingClientRect();
       const header = document.querySelector(".main-area > header.topbar");
-      const headerBottom = header?.getBoundingClientRect().bottom || 0;
-      return { top: rect.top, bottom: rect.bottom, headerBottom, viewportHeight: window.innerHeight };
+      return rect.top - (header?.getBoundingClientRect().bottom || 0);
     }),
     { message: "destination portal body should be aligned directly below the shared header", timeout: 10000 }
-  ).toMatchObject({ top: expect.any(Number) });
+  ).toBeGreaterThanOrEqual(-2);
   const destination = await workspace.evaluate(el => {
     const rect = el.getBoundingClientRect();
     const header = document.querySelector(".main-area > header.topbar");
-    return { top: rect.top, bottom: rect.bottom, headerBottom: header?.getBoundingClientRect().bottom || 0 };
+    return { top: rect.top, headerBottom: header?.getBoundingClientRect().bottom || 0, viewportHeight: window.innerHeight };
   });
-  expect(destination.top, "destination content must not be hidden behind the header").toBeGreaterThanOrEqual(destination.headerBottom - 2);
-  expect(destination.top, "destination content must be brought into the viewport rather than leaving the header as the focus target").toBeLessThan(window.innerHeight);
+  expect(destination.top, "destination content must be brought into the viewport rather than leaving the header as the focus target").toBeLessThan(destination.viewportHeight);
   const dimensions = await page.evaluate(() => ({
     viewport: document.documentElement.clientWidth,
     document: document.documentElement.scrollWidth
