@@ -35,6 +35,7 @@ function PageBackNextNavigation({active,modules,onNavigate}){
 function WebAppNavigationRoller({active,modules,onNavigate,liveDay,liveDate,liveTime,mobileTimeFormat,onToggleTimeFormat}){const items=getPortalContentItems(active,modules);if(!items.length)return null;const label=portalNavigationLabel(active);return <div className="desktop-webapp-navigation-roller" aria-label="In-portal sub-portal navigation"><div className="webapp-navigation-live-clock" aria-label="Live date and time"><strong>{liveDay}</strong><span>{liveDate}</span><b>{liveTime}</b><button type="button" onClick={onToggleTimeFormat} aria-label={"Change time format. Current format: "+mobileTimeFormat}>{mobileTimeFormat==="24h"?"24H":"12H"}</button></div><span className="webapp-navigation-roller-kicker">IN-PORTAL NAVIGATION</span><strong>{label}</strong><select aria-label="Navigate to a sub-portal within the current portal" value={active} onChange={e=>onNavigate(e.target.value)}>{items.map((item,index)=><option key={item} value={item}>{index===0?portalNavigationLabel(item):"　↳ "+portalNavigationLabel(item)}</option>)}</select><span className="webapp-navigation-roller-chevron" aria-hidden="true">⌄</span></div>}
 
 import React,{useEffect,useMemo,useState}from"react";const DocumentLifecycleModule=React.lazy(()=>import("./pages/DocumentLifecycleModule"));import Invitations from"./pages/Invitations";import Employees from"./pages/Employees";import BoardMembers from"./pages/BoardMembers";import Members from"./pages/Members";import EmployeePayments from"./pages/EmployeePayments";import Meetings from"./pages/Meetings";import MeetingRoom from"./pages/MeetingRoom";import Resolutions from"./pages/Resolutions";import Voting from"./pages/Voting";import OperationalGateways from"./pages/OperationalGateways";import OperationalGatewaysParticipants from"./pages/OperationalGatewaysParticipants";import AuthorizationApprovals from"./pages/AuthorizationApprovals";import SignaturePlatformWithUpload from"./pages/SignaturePlatformWithUpload";import FinancePortfolio from"./pages/FinancePortfolio";import ProcurementPortal from"./pages/ProcurementPortal";import Settings from"./pages/Settings";import ITOperationsPortal from"./pages/ITOperationsPortal";import InductionOrientation from"./pages/InductionOrientation";import InductionAdmin from"./pages/InductionAdmin";import ExternalAuditorPortal from"./pages/ExternalAuditorPortal";import AuditorsSpecialInvitees from"./pages/AuditorsSpecialInvitees";const ResearchStatisticsKnowledgePortal=React.lazy(()=>import("./pages/ResearchStatisticsKnowledgePortal"));const GrantIntelligencePortal=React.lazy(()=>import("./pages/GrantIntelligencePortal"));import GrantOpportunityNotifications from "./components/GrantOpportunityNotifications";import AddAdministratorPortal from"./pages/AddAdministratorPortal";import MeetingEntryGateway from"./pages/MeetingEntryGateway";import ModuleInterlinkBar from"./components/ModuleInterlinkBar";import PortalDocumentAccessPoint from"./components/PortalDocumentAccessPoint";import DocumentRetrievalAccessPoint from"./components/DocumentRetrievalAccessPoint";import{ResearchPortalAlert,ResearchUpdatesPanel}from"./components/ResearchInformationGovernance";import{observeAuthState,loginWithEmail,loginWithGoogle,completeGoogleRedirect,registerWithEmail,sendPasswordReset,sendAdminMagicLink,isMagicLink,completeMagicLink,completeInvitationToken,configureInvitationPassword,getInvitationSessionState,logout,beginPasswordResetMobileVerification,verifyPasswordResetMobileOtp,clearPasswordAttemptState}from"./firebase/auth";import{getAdminProfile,getCurrentMemberProfile,getCurrentEmployeeProfile,getCurrentAuditorProfile,resolveAuthenticatedLoginContext,getCurrentInductionContext,getRecords,COLLECTIONS}from"./firebase/data";import{provisionCurrentMemberFromInvitationV2}from"./firebase/invitationWorkflow";import{doc,getDoc}from"firebase/firestore";import{auth,db}from"./firebase/config";import FieldEntryDataGate from "./FieldEntryDataGate";
+import GatewaySigningPortal from "./pages/GatewaySigningPortal";
 // TEMPORARY BUILD/STABILISATION CONTROL: preserve the gate implementation, but temporarily disconnect it from the gateway so the pre-gateway interface remains usable.
 const IRPA_TEMPORARY_DATA_GATE_ENABLED=true;
 // TEMPORARY GATEWAY DISCONNECT: newer gateway/security code remains in place; only its resolver communication is paused.
@@ -621,7 +622,7 @@ export default function App(){
     [signingEnvelopeId,setSigningEnvelopeId]=useState(
       ()=>window.sessionStorage.getItem("irpaSigningEnvelopeId")||
         new URLSearchParams(window.location.search).get("signEnvelope")||null
-    );useEffect(()=>{
+    );const[gatewaySigningToken,setGatewaySigningToken]=useState(()=>{const token=params.get("token");try{if(token){window.sessionStorage.setItem("irpaGatewaySigningToken",token);return token;}return window.sessionStorage.getItem("irpaGatewaySigningToken")||null;}catch{return token||null;}});useEffect(()=>{if(gatewaySigningToken){try{window.sessionStorage.setItem("irpaGatewaySigningToken",gatewaySigningToken)}catch{}}},[gatewaySigningToken]);useEffect(()=>{
   const handler=e=>{
     const id=e?.detail?.envelopeId;
     if(id)setSigningEnvelopeId(id);
@@ -946,9 +947,10 @@ useEffect(()=>{async function magic(){
   let e=window.localStorage.getItem("irpaEmailForSignIn")||window.localStorage.getItem("irpaMemberEmailForSignIn");
   const url=new URL(window.location.href);
   const signingEnvelopeId=url.searchParams.get("signEnvelope");
+  const gatewaySigningToken=url.searchParams.get("token")||window.sessionStorage.getItem("irpaGatewaySigningToken");
 
   if(!e){
-    const promptText=signingEnvelopeId
+    const promptText=signingEnvelopeId||gatewaySigningToken
       ?"Enter the email address that received this IRPA signing invitation:"
       :"Enter the email address that received this IRPA sign-in link:";
     e=window.prompt(promptText);
@@ -986,6 +988,7 @@ const invitationRouteState=invitationSessionState?.state;
 if(user&&invitationSessionState===undefined&&(window.sessionStorage.getItem("irpaInvitationId")||new URLSearchParams(window.location.search).get("memberInvite"))&&!administratorSession)return <Loading message="Verifying invitation session..."/>;
 if(user&&["PASSWORD_SETUP_PENDING","PROVISIONING_PENDING"].includes(invitationRouteState)&&!administratorSession)return <InvitationPasswordSetupScreen user={user}/>;
 if(!profile)return <AccessDenied user={user}reason={error}/>;
+if(gatewaySigningToken)return <GatewaySigningPortal token={gatewaySigningToken}/>;
 if(profile.authorizationType==="signer"){
   return <SignerShell user={user} profile={profile} signingEnvelopeId={signingEnvelopeId}/>;
 }
