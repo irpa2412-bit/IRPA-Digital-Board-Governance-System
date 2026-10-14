@@ -27,3 +27,11 @@ test("workflow-only guard maintenance requires its paired regression test", () =
   assert.match(workflow, /changed\.includes\("tests\/meeting-isolation-guard\.test\.mjs"\)/);
   assert.match(workflow, /!guardOnlyWorkflowRepair/);
 });
+
+
+test("Signature Gateway integration must include its portal bridge and authenticated flow test", () => {
+  assert.match(workflow, /const signatureGatewayIntegration = changed\.includes\("src\/firebase\/signaturePlatform\.js"\)/);
+  assert.match(workflow, /changed\.includes\("drive-gateway\/src\/signing\.mjs"\)/);
+  assert.match(workflow, /changed\.includes\("drive-gateway\/tests\/controlled-authenticated-signing-flow\.test\.mjs"\)/);
+  assert.match(workflow, /!signatureGatewayIntegration/);
+});
