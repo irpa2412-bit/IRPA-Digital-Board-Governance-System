@@ -7,7 +7,7 @@ import{MAA_DICTIONARY,MAA_DICTIONARY_SOURCES,searchMaaDictionary}from"../data/ma
 import{COLLECTIONS,createRecord,getAccessibleMeetingRecords,getAdminProfile,getCurrentMemberProfile,getRecord,getRecords,openVotingIssue,updateRecord}from"../firebase/data";
 import{withWorkflowLinks,navigateWorkflow}from"../firebase/workflowLinks";
 import{normalizeMeetingForV3,meetingCapabilities}from"../firebase/meetingPolicy";
-import{captureMeetingRecord,listMeetingRecords,retrieveMeetingRecord,updateMeetingRecordProtection,disposeMeetingRecord,saveLiveMeetingProceedings,listMeetingWorkingDocuments,registerMeetingWorkingDocument,submitMeetingDocumentReview,getMeetingRecordingStatus,startMeetingRecording,stopMeetingRecording}from"../firebase/meetingRecords";
+import{captureMeetingRecord,listMeetingRecords,retrieveMeetingRecord,updateMeetingRecordProtection,disposeMeetingRecord,saveLiveMeetingProceedings,listMeetingWorkingDocuments,registerMeetingWorkingDocument,submitMeetingDocumentReview,getMeetingRecordingStatus,getMeetingRecordingDownloadUrl,startMeetingRecording,stopMeetingRecording}from"../firebase/meetingRecords";
 import IRPADGBSMeetingRoomMedia from"../components/IRPADGBSMeetingRoomMedia";
 import ControlledDocumentUpload from"../components/ControlledDocumentUpload";
 import GovernanceFieldPalette from"../components/GovernanceFieldPalette";import MeetingAccessControl from"../components/MeetingAccessControl";
@@ -125,7 +125,7 @@ export default function MeetingRoom({onNavigate}){
   if(selected.votingRequired&&canVote&&selected.votingStatus!=="Completed")return setError("Required voting is unresolved; the meeting cannot be closed.");
   if(currentIndex>=0&&!["Completed","Deferred"].includes(itemStatus))return setError("Complete or defer the current agenda item before closing the meeting.");
   setBusy(true);setError("");
-  let currentRecording=null,recordingId="",finalStatus="UNVERIFIED",recordingError="";
+  let currentRecording=null,recordingId="",finalStatus="UNVERIFIED",recordingError="",storageVerified=false;
   try{
    const finalTranscript=String(transcriptRef.current||"").trim();
    if(finalTranscript)await saveLiveMeetingProceedings({meetingId:selected.id,content:finalTranscript});
@@ -133,34 +133,44 @@ export default function MeetingRoom({onNavigate}){
    recordingId=String(currentRecording?.recording?.egressId||selected.recordingEgressId||"").trim();
    if(recordingId&&["RECORDING","STARTING","STOPPING"].includes(String(currentRecording?.recordingStatus||"").toUpperCase())){
     await stopMeetingRecording({meetingId:selected.id,recordingId,selectedAuthority:String(window.sessionStorage.getItem("irpaActiveAccessAuthority")||"")});
-    finalStatus="STOPPING";
+   }
+   if(recordingId){
     for(let i=0;i<18;i++){
-     await new Promise(resolve=>setTimeout(resolve,2000));
-     const updated=await getMeetingRecordingStatus(selected.id);
-     currentRecording=updated;
-     finalStatus=String(updated?.recordingStatus||"UNKNOWN").toUpperCase();
-     if(["COMPLETED","FAILED"].includes(finalStatus))break;
+     currentRecording=await getMeetingRecordingStatus(selected.id);
+     finalStatus=String(currentRecording?.recordingStatus||"UNKNOWN").toUpperCase();
+     if(finalStatus==="FAILED")break;
+     if(finalStatus==="COMPLETED"){
+      try{
+       const verified=await getMeetingRecordingDownloadUrl({meetingId:selected.id,recordingId});
+       if(verified?.storageVerification==="VERIFIED"&&Number(verified.sizeBytes)>0){storageVerified=true;recordingError="";break;}
+       recordingError="Storage verification did not return a verified non-empty recording object.";
+      }catch(e){recordingError=e?.message||"Recording file is not yet present in private storage.";}
+      finalStatus="STORAGE_PENDING";
+     }
+     if(i<17)await new Promise(resolve=>setTimeout(resolve,2000));
     }
    }else finalStatus=String(currentRecording?.recordingStatus||selected.recordingStatus||"NOT_STARTED").toUpperCase();
   }catch(e){recordingError=e?.message||"Recording stop/storage verification failed.";finalStatus="FINALIZATION_UNVERIFIED";}
-  const completed=finalStatus==="COMPLETED";
+  const completed=finalStatus==="COMPLETED"&&storageVerified;
   const nextMessage=completed
-   ?"Meeting closed. Audio/video recording completed and its file is available for verified retrieval."
+   ?"Meeting closed. Audio/video recording completed; private storage contains a non-empty verified file ready for authorised retrieval."
    :finalStatus==="NOT_STARTED"||finalStatus==="UNKNOWN"||!recordingId
     ?"Meeting closed. No completed audio/video recording was confirmed; review the recording status before finalising the meeting record."
-    :"Meeting closed. Recording finalisation is recorded as "+finalStatus+"; use the recording status to verify the stored file before circulation.";
+    :"Meeting closed. Recording finalisation is "+finalStatus+"; do not circulate a recording until private storage verification succeeds.";
   try{
    await patch({
     status:"Completed",closedAt:new Date().toISOString(),recordingStatus:finalStatus,
-    recordingCompletedAt:completed?new Date().toISOString():null,recordingCaptureVerified:completed,
+    recordingCompletedAt:finalStatus==="COMPLETED"?new Date().toISOString():null,
+    recordingCaptureVerified:completed,recordingStorageVerified:storageVerified,
     recordingCaptureVerificationAt:completed?new Date().toISOString():null,
     recordingEgressId:recordingId||selected.recordingEgressId||null
    },nextMessage,{
     eventType:"LIVE_SESSION_ENDED",status:"Closed",recordingId:recordingId||null,
-    recordingStatus:finalStatus,recordingCaptureVerified:completed,recordingError:recordingError||null
+    recordingStatus:finalStatus,recordingCaptureVerified:completed,
+    recordingStorageVerified:storageVerified,recordingError:recordingError||null
    });
-   if(recordingError)setError("Meeting closed, but recording finalisation could not be verified: "+recordingError);
-   else if(!completed)setError("Meeting closed. Recording status is "+finalStatus+"; do not circulate a recording link until status becomes COMPLETED and storage verification succeeds.");
+   if(recordingError)setError("Meeting closed, but recording/storage verification is not complete: "+recordingError);
+   else if(!completed)setError("Meeting closed. Recording status is "+finalStatus+"; storage is not verified yet.");
   }catch(e){setError(e?.message||"Meeting closure could not be saved. Retry the closure and check the meeting record.");}
   finally{setBusy(false)}
  }
