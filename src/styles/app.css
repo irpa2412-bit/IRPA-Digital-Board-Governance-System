@@ -10807,3 +10807,74 @@ html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar
     transform: translateX(-12px);
   }
 }
+
+
+
+/* Shared portal-width contract for connected workflow navigation.
+   Content adapts to its parent width; it must never force a portal wider.
+   Presentation only: preserve portal destinations, workflow state, and access checks. */
+.module-interlink-bar {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  overflow: visible;
+}
+.module-interlink-bar .module-interlink-heading {
+  min-width: 0;
+  max-width: 100%;
+  flex: 0 1 170px;
+  overflow-wrap: anywhere;
+}
+.module-interlink-bar .module-interlink-list {
+  flex: 1 1 320px;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+  overflow: visible;
+}
+.module-interlink-bar .workflow-portal-group {
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+.module-interlink-bar .workflow-portal-children {
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+.module-interlink-bar .workflow-portal-parent,
+.module-interlink-bar .workflow-portal-children button,
+.module-interlink-bar .module-interlink-list > button,
+.module-interlink-bar .workflow-linked-records button {
+  box-sizing: border-box;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+}
+.module-interlink-bar .workflow-linked-records {
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+.module-interlink-bar .workflow-linked-records > span {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}
+@media (max-width: 900px) {
+  .module-interlink-bar .module-interlink-heading,
+  .module-interlink-bar .module-interlink-list {
+    width: 100%;
+    min-width: 0;
+    flex-basis: 100%;
+  }
+  .module-interlink-bar .workflow-portal-group {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .module-interlink-bar .workflow-portal-children {
+    width: 100%;
+  }
+}
