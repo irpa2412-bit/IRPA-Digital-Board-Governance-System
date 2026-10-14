@@ -38,7 +38,10 @@ export default function GatewaySigningPortal({token}){
     if(signingRequired&&!sig)throw new Error("The saved Signature Profile specimen could not be prepared for signing.");
     const gatewayStatus=await fetchGatewaySigningResource("/api/sign/status",token);
     let initialEvidence=null;
-    if(gatewayStatus.status==="Completed")initialEvidence=await fetchGatewaySigningResource("/api/sign/evidence",token);
+    if(gatewayStatus.status==="Completed"){
+      initialEvidence=await fetchGatewaySigningResource("/api/sign/evidence",token);
+      if(initialEvidence.auditChainValid!==true||initialEvidence.documentHash!==gatewayStatus.completion?.finalHash||!Array.isArray(initialEvidence.evidence)||initialEvidence.evidence.length===0)throw new Error("Persisted cryptographic evidence does not match the completed PDF and audit chain.");
+    }
     const nextValues={};
     for(const field of result.fields||[]){
       if(field.type==="Signature")nextValues[field.fieldId]=sig;
