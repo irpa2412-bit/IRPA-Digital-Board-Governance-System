@@ -58,6 +58,15 @@ jobs:
           const allowed = new Set([
             ".github/workflows/meeting-portal-fixture-browser.yml",
             ".github/workflows/meeting-invitation-flow-ci.yml",
+            ".github/workflows/firebase-deploy.yml",
+            ".github/workflows/livekit-production-worker-ci.yml",
+            "cloudflare/livekit-production/worker.js",
+            "functions/scripts/verify-cloudflare-livekit-production-worker.js",
+            "functions/scripts/verify-livekit-recording-storage.js",
+            "src/components/IRPADGBSMeetingRoomMedia.jsx",
+            "src/App.jsx",
+            "tests/livekit-production-worker.test.mjs",
+            "wrangler.livekit-production.jsonc",
             ".github/workflows/mail-invitation-tests.yml",
             "drive-gateway/src/index.js",
             "drive-gateway/src/invitationEmail.mjs",
@@ -99,7 +108,7 @@ jobs:
             console.error("Unexpected files changed outside the isolated meeting repair:", unexpected);
             process.exit(1);
           }
-          if (!changed.includes("src/pages/Meetings.jsx") && !changed.includes("src/pages/OperationalGatewaysParticipants.jsx")) throw new Error("Meeting or participant portal source change is missing.");
+          if (!changed.some(path => ["src/pages/Meetings.jsx","src/pages/OperationalGatewaysParticipants.jsx","src/components/IRPADGBSMeetingRoomMedia.jsx","src/firebase/meetingRecords.js","src/pages/MeetingRoom.jsx"].includes(path))) throw new Error("Meeting, participant, or meeting-media source change is missing.");
           console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));
           NODE
       - name: Start the isolated Vite fixture
