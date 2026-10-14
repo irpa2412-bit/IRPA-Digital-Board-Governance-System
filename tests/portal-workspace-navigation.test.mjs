@@ -7,12 +7,12 @@ const source = readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
 test("portal changes focus the viewport on the destination workspace", () => {
   assert.match(
     source,
-    /useEffect\(\(\)=>\{\s*let firstFrame=0;\s*let secondFrame=0;[\s\S]*?const workspace=document\.querySelector\("#root \.app-shell \.main-area > \.content-area"\);[\s\S]*?workspace\.scrollIntoView\(\{block:"start",behavior:"auto"\}\);[\s\S]*?\},\[active\]\);/
+    /useEffect\(\(\)=>\{\s*let firstFrame=0;\s*let secondFrame=0;[\s\S]*?const workspace=document.querySelector("#root .app-shell .main-area > .content-area [data-active-portal-content]");[\s\S]*?workspace\.scrollIntoView\(\{block:"start",behavior:"auto"\}\);[\s\S]*?\},\[active\]\);/
   );
 });
 
 test("navigation focus is scoped to the main workspace, not the global header", () => {
-  assert.match(source, /#root \.app-shell \.main-area > \.content-area/);
+  assert.match(source, /#root \.app-shell \.main-area > \.content-area \[data-active-portal-content\]/);\n  assert.match(source, /data-active-portal-content=\{active\}/);
   assert.doesNotMatch(source, /window\.scrollTo\(\s*0\s*,\s*0\s*\)/);
 });
 
