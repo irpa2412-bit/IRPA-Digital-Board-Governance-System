@@ -7,6 +7,7 @@ on:
       - "src/App.jsx"
       - "src/pages/GrantIntelligencePortal.jsx"
       - "src/pages/grant-fundraising/**"
+      - "src/styles/app.css"
       - "tests/browser/**"
       - "scripts/seed-authenticated-browser-fixture.cjs"
       - "playwright.authenticated-governance.config.mjs"
