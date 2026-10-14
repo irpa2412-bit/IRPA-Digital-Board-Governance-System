@@ -777,8 +777,9 @@ async function ensureSignatureProfileFolder(request, env) {
     return json({ ok: false, error: "The signature-folder email does not match the authenticated account." }, 403, corsHeaders(request));
   }
 
-  const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
-  if (!isAdminForRequest && requestedUid !== claims.user_id) {
+  // Reuse the already verified active-admin state. The old identifier
+  // is undefined and throws before either owner or administrator can proceed.
+  if (!isAdmin && requestedUid !== claims.user_id) {
     return json({ ok: false, error: "You may only provision your own signature folder." }, 403, corsHeaders(request));
   }
 
