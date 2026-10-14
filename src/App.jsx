@@ -622,7 +622,7 @@ export default function App(){
     [signingEnvelopeId,setSigningEnvelopeId]=useState(
       ()=>window.sessionStorage.getItem("irpaSigningEnvelopeId")||
         new URLSearchParams(window.location.search).get("signEnvelope")||null
-    );const[gatewaySigningToken,setGatewaySigningToken]=useState(()=>{const token=params.get("gatewayToken");try{if(token){window.sessionStorage.setItem("irpaGatewaySigningToken",token);return token;}return window.sessionStorage.getItem("irpaGatewaySigningToken")||null;}catch{return token||null;}});useEffect(()=>{if(gatewaySigningToken){try{window.sessionStorage.setItem("irpaGatewaySigningToken",gatewaySigningToken)}catch{}}},[gatewaySigningToken]);useEffect(()=>{
+    );const[gatewaySigningToken,setGatewaySigningToken]=useState(()=>{const token=params.get("gatewayToken");try{if(token){window.sessionStorage.setItem("irpaGatewaySigningToken",token);return token;}return window.sessionStorage.getItem("irpaGatewaySigningToken")||null;}catch{return token||null;}});useEffect(()=>{if(gatewaySigningToken){try{window.sessionStorage.setItem("irpaGatewaySigningToken",gatewaySigningToken)}catch{}}},[gatewaySigningToken]);useEffect(()=>{if(params.has("gatewayToken")){try{const cleanUrl=new URL(window.location.href);cleanUrl.searchParams.delete("gatewayToken");window.history.replaceState({},document.title,cleanUrl.pathname+cleanUrl.search+cleanUrl.hash)}catch{}}},[]);useEffect(()=>{
   const handler=e=>{
     const id=e?.detail?.envelopeId;
     if(id)setSigningEnvelopeId(id);
