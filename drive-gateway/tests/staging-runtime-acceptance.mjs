@@ -23,6 +23,21 @@ const tokenClaims=JSON.parse(Buffer.from(String(login.idToken||"").split(".")[1]
 assert.equal(tokenClaims.aud,project,"Firebase ID token audience is not the staging project.");
 assert.equal(tokenClaims.iss,"https://securetoken.google.com/"+project,"Firebase ID token issuer is not the staging project.");
 const authHeaders={Authorization:"Bearer "+login.idToken};
+async function ownFirestoreDocument(collection){
+  const response=await fetch("https://firestore.googleapis.com/v1/projects/"+encodeURIComponent(project)+"/databases/(default)/documents/"+collection+"/"+encodeURIComponent(expectedUid),{headers:authHeaders});
+  const data=await response.json().catch(()=>({}));
+  assert.equal(response.ok,true,"Staging "+collection+" record is not readable for the authenticated test account.");
+  return data;
+}
+const [signatureProfile,signerIdentity]=await Promise.all([
+  ownFirestoreDocument("signatureProfiles"),
+  ownFirestoreDocument("signerIdentities")
+]);
+const firestoreString=(record,key)=>record?.fields?.[key]?.stringValue||"";
+assert.equal(firestoreString(signatureProfile,"status"),"Active","Staging test signer must have an Active Signature Profile.");
+assert.ok(firestoreString(signatureProfile,"signatureUrl").startsWith("data:image/"),"Staging test signer must have a saved Signature Profile specimen.");
+assert.equal(firestoreString(signerIdentity,"authorityStatus"),"Current","Staging test signer must have Current Signer Identity authority.");
+assert.ok(firestoreString(signerIdentity,"authorityRole")&&firestoreString(signerIdentity,"authorityRole")!=="Not yet assigned","Staging test signer must have a registered signing authority.");
 
 async function readJson(response,label){
   const body=await response.json().catch(()=>({}));
