@@ -10878,3 +10878,229 @@ html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar
     width: 100%;
   }
 }
+
+
+/* Shared horizontal workflow layout: all portals, presentation-only.
+   Keep the portal content within its own width; stack only at narrow breakpoints. */
+.module-interlink-bar {
+  display: grid;
+  grid-template-columns: minmax(170px, 0.22fr) minmax(0, 1fr);
+  align-items: start;
+  column-gap: 12px;
+  row-gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+.module-interlink-bar > .action-feedback {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+.module-interlink-bar > .module-interlink-heading {
+  grid-column: 1;
+  grid-row: 2;
+  min-width: 0;
+  max-width: 100%;
+  align-content: start;
+}
+.module-interlink-bar > .module-interlink-list {
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 7px;
+  overflow: visible;
+}
+.module-interlink-bar > .workflow-linked-records {
+  grid-column: 1 / -1;
+  min-width: 0;
+  max-width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+}
+.module-interlink-bar .workflow-portal-group {
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+.module-interlink-bar .workflow-portal-children {
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+.module-interlink-bar .workflow-portal-parent,
+.module-interlink-bar .workflow-portal-children button,
+.module-interlink-bar .module-interlink-list > button,
+.module-interlink-bar .workflow-linked-records button {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+}
+@media (max-width: 900px) {
+  .module-interlink-bar {
+    grid-template-columns: minmax(0, 1fr);
+    column-gap: 0;
+  }
+  .module-interlink-bar > .module-interlink-heading,
+  .module-interlink-bar > .module-interlink-list,
+  .module-interlink-bar > .workflow-linked-records {
+    grid-column: 1;
+    grid-row: auto;
+    width: 100%;
+    min-width: 0;
+  }
+  .module-interlink-bar > .module-interlink-list {
+    flex-wrap: wrap;
+  }
+  .module-interlink-bar .workflow-portal-group {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .module-interlink-bar .workflow-portal-children {
+    width: 100%;
+  }
+}
+
+
+/* Horizontal alignment refinement across all governance portals.
+   Responsive-only presentation changes; no routing, data, or access-control selectors. */
+.module-interlink-bar {
+  width: 100%;
+  margin-inline: 0;
+  box-sizing: border-box;
+  grid-template-columns: minmax(150px, 0.2fr) minmax(0, 1fr);
+}
+.module-interlink-bar > .module-interlink-heading,
+.module-interlink-bar > .module-interlink-list,
+.module-interlink-bar > .workflow-linked-records {
+  min-width: 0;
+  max-width: 100%;
+}
+.module-interlink-bar > .module-interlink-heading {
+  overflow-wrap: anywhere;
+}
+.module-interlink-bar > .module-interlink-list {
+  justify-content: flex-start;
+  align-content: flex-start;
+}
+.module-interlink-bar .workflow-portal-group {
+  flex: 0 1 auto;
+  width: auto;
+  max-width: 100%;
+  align-items: center;
+}
+.module-interlink-bar .workflow-portal-children {
+  width: auto;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+.module-interlink-bar .workflow-portal-parent,
+.module-interlink-bar .workflow-portal-children button,
+.module-interlink-bar .module-interlink-list > button,
+.module-interlink-bar .workflow-linked-records button {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+@media (min-width: 761px) and (max-width: 1100px) {
+  .module-interlink-bar {
+    grid-template-columns: minmax(120px, 0.18fr) minmax(0, 1fr);
+    column-gap: 8px;
+  }
+  .module-interlink-bar .workflow-portal-group {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+}
+@media (max-width: 900px) {
+  .module-interlink-bar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .module-interlink-bar > .module-interlink-heading,
+  .module-interlink-bar > .module-interlink-list,
+  .module-interlink-bar > .workflow-linked-records {
+    grid-column: 1;
+    width: 100%;
+    min-width: 0;
+  }
+  .module-interlink-bar > .module-interlink-list {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+  .module-interlink-bar .workflow-portal-group {
+    flex: 0 1 auto;
+    width: auto;
+    max-width: 100%;
+    flex-direction: row;
+    align-items: flex-start;
+  }
+  .module-interlink-bar .workflow-portal-children {
+    width: auto;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 480px) {
+  .module-interlink-bar {
+    padding-inline: 8px;
+  }
+  .module-interlink-bar .workflow-portal-group {
+    flex: 1 1 100%;
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .module-interlink-bar .workflow-portal-parent,
+  .module-interlink-bar .workflow-portal-children {
+    width: 100%;
+  }
+  .module-interlink-bar .workflow-portal-children {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}
+
+
+/* Responsive overflow correction — shared governance portals.
+   Presentation-only: preserve all navigation and authorization logic. */
+.module-interlink-bar,
+.module-interlink-bar * { box-sizing: border-box; }
+.module-interlink-bar { width:100%; min-width:0; max-width:100%; }
+.module-interlink-heading,
+.module-interlink-list,
+.workflow-portal-group,
+.workflow-portal-children,
+.workflow-linked-records { min-width:0; max-width:100%; }
+.module-interlink-list {
+  width:100%; overflow:visible; flex-wrap:wrap; align-items:stretch;
+}
+.workflow-portal-group { flex-wrap:wrap; }
+.workflow-portal-children { display:flex; flex-wrap:wrap; white-space:normal; }
+.module-interlink-list button,
+.workflow-portal-parent,
+.workflow-portal-children button,
+.workflow-linked-records button {
+  min-width:0; max-width:100%; white-space:normal;
+  overflow-wrap:anywhere; word-break:normal; line-height:1.3;
+}
+.workflow-linked-records { display:flex; flex-wrap:wrap; align-items:center; }
+.workflow-context-chip,
+.workflow-linked-records > span { max-width:100%; white-space:normal; overflow-wrap:anywhere; }
+@media (max-width:900px) {
+  .module-interlink-bar .module-interlink-heading,
+  .module-interlink-bar .module-interlink-list { width:100%; min-width:0; flex-basis:100%; }
+  .module-interlink-bar .workflow-portal-group { width:100%; flex-direction:column; align-items:stretch; }
+  .module-interlink-bar .workflow-portal-parent,
+  .module-interlink-bar .workflow-portal-children { width:100%; }
+  .module-interlink-bar .workflow-portal-children { border-left:0; flex-wrap:wrap; }
+}
+html, body, #root { min-width:0; max-width:100%; }

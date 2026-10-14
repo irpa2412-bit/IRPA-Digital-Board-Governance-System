@@ -71,6 +71,29 @@ async function assertPortalAndNoOverflow(page, expectedText, width) {
     document: document.documentElement.scrollWidth
   }));
   expect(dimensions.document, "unexpected horizontal page overflow").toBeLessThanOrEqual(dimensions.viewport + 1);
+  const controls = await page.locator(".module-interlink-bar button:visible").evaluateAll(nodes => nodes.map(node => {
+    const rect = node.getBoundingClientRect();
+    return {
+      label: (node.innerText || node.getAttribute("aria-label") || "").trim(),
+      left: rect.left,
+      right: rect.right,
+      top: rect.top,
+      bottom: rect.bottom,
+      width: rect.width,
+      height: rect.height,
+      clientWidth: node.clientWidth,
+      scrollWidth: node.scrollWidth,
+      clientHeight: node.clientHeight,
+      scrollHeight: node.scrollHeight
+    };
+  }));
+  for (const control of controls) {
+    expect(control.width, `zero-width workflow control: ${control.label}`).toBeGreaterThan(0);
+    expect(control.left, `workflow control left edge outside viewport: ${control.label}`).toBeGreaterThanOrEqual(-1);
+    expect(control.right, `workflow control right edge outside viewport: ${control.label}`).toBeLessThanOrEqual(dimensions.viewport + 1);
+    expect(control.scrollWidth, `clipped horizontal label: ${control.label}`).toBeLessThanOrEqual(control.clientWidth + 1);
+    expect(control.scrollHeight, `clipped vertical label: ${control.label}`).toBeLessThanOrEqual(control.clientHeight + 1);
+  }
 }
 
 for (const viewport of [
