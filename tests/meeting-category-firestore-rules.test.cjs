@@ -131,7 +131,8 @@ test("direct meeting reads enforce category roles server-side", async () => {
     email: "staff@example.test"
   }).firestore();
   const boardDb = testEnv.authenticatedContext("board-member", {
-    email: "board@example.test"
+    email: "board@example.test",
+    irpaRoles: ["Board Member"]
   }).firestore();
   await assertFails(staffDb.doc("meetings/governance-record").get());
   await assertSucceeds(boardDb.doc("meetings/governance-record").get());
