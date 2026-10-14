@@ -19,6 +19,8 @@ import { route as esignRoute } from "./router.mjs";
 import { buildEsignContext, EsignRecordDurableObject } from "./esignContext.mjs";
 import { runCleanup } from "./upload.mjs";
 import { createDocumentLifecycleRouter } from "./documentLifecycle.mjs";
+import { canProvisionSignatureProfileFolder } from "./signatureProfileAuthorization.mjs";
+import { canReadSignatureAsset, canUploadSignedDocument } from "./signatureAssetAuthorization.mjs";
 import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPasswordSetup, getInvitationSessionState } from "./invitationRedemption.mjs";
 import { buildGoogleDriveAuthorizationParams } from "./googleDriveOAuth.mjs";
 
@@ -124,6 +126,10 @@ export default {
       }
       if (pathname === "/api/signature-workflow/folder" && request.method === "POST") {
         return await ensureSignatureWorkflowFolder(request, env);
+      }
+
+      if (url.pathname === "/api/signature-file/download" && request.method === "POST") {
+        return await downloadSignatureFile(request, env);
       }
 
       if (url.pathname === "/api/download" && request.method === "POST") {
@@ -352,6 +358,32 @@ async function upload(request, env) {
   const purpose = cleanName(data.purpose || "Controlled Documents");
   const requestedFolderId = String(data.folderId || "").trim();
   const ownerUid = String(data.ownerUid || claims.user_id).trim();
+  const signatureDocumentId = cleanId(data.documentId || "");
+  const signatureEnvelopeId = cleanId(data.envelopeId || "");
+  const signatureSignerUid = cleanId(data.signerUid || "");
+
+  if (purpose === "Signed Documents Archive") {
+    if (!requestedFolderId || !signatureDocumentId || !signatureEnvelopeId || !signatureSignerUid) {
+      return json({ ok:false, error:"Signed-document uploads require a document, envelope and authenticated signer identity." },400,corsHeaders(request));
+    }
+    if (signatureSignerUid !== claims.user_id) {
+      return json({ ok:false, error:"A signed document may only be uploaded by the authenticated assigned signer." },403,corsHeaders(request));
+    }
+    const envelope = await getFirestoreDocument(env, "signatureEnvelopes/" + signatureEnvelopeId, claims.token);
+    if (!envelope) return json({ ok:false, error:"The signing envelope was not found." },404,corsHeaders(request));
+    const envelopeFields = envelope.fields || {};
+    const allowed = canUploadSignedDocument({
+      authenticatedUid: claims.user_id,
+      signerUid: signatureSignerUid,
+      documentId: signatureDocumentId,
+      envelopeDocumentId: envelopeFields.documentId?.stringValue || "",
+      envelopeParticipantUids: firestoreStringArray(envelopeFields.participantUids),
+      actionUids: firestoreStringArray(envelopeFields.actionUids),
+      signingMode: envelopeFields.signingMode?.stringValue || "Sequential",
+      currentSignerUid: envelopeFields.currentSignerUid?.stringValue || null,
+    });
+    if (!allowed) return json({ ok:false, error:"The authenticated account is not the current assigned action signer for this document." },403,corsHeaders(request));
+  }
 
   if (purpose === "Signature Profile") {
     if (ownerUid !== claims.user_id) {
@@ -407,6 +439,9 @@ async function upload(request, env) {
     if ((purpose === "Signed Documents Archive" || purpose === "Documents Portal" || purpose === "Controlled Documents") && folderDescription.irpaGovernanceArchive !== true) {
       return json({ ok: false, error: "The requested folder is not an IRPA controlled-document archive folder." }, 403, corsHeaders(request));
     }
+    if (purpose === "Signed Documents Archive" && String(folderDescription.documentId || "") !== signatureDocumentId) {
+      return json({ ok:false, error:"The requested signed-document archive does not match the signing document." },403,corsHeaders(request));
+    }
     if (purpose === "Meeting Products" && (folderDescription.irpaGovernanceArchive !== true || folderDescription.purpose !== "IRPA Meeting Category Archive" || String(folderDescription.meetingCategory || "").toUpperCase() !== String(data.meetingCategory || "").toUpperCase())) {
       return json({ok:false,error:"The requested folder is not the authorised archive for this meeting category."},403,corsHeaders(request));
     }
@@ -425,6 +460,9 @@ async function upload(request, env) {
       uploadedByUid: claims.user_id,
       purpose,
       ownerUid,
+      documentId: purpose === "Signed Documents Archive" ? signatureDocumentId : null,
+      envelopeId: purpose === "Signed Documents Archive" ? signatureEnvelopeId : null,
+      signerUid: purpose === "Signed Documents Archive" ? signatureSignerUid : null,
       driveFolderId: purpose === "Signature Profile" ? purposeId : null
     })
   };
@@ -639,6 +677,15 @@ async function download(request, env) {
   if (!description?.irpaGovernance) {
     return json({ ok: false, error: "The requested file is not an IRPA governance document." }, 403, corsHeaders(request));
   }
+  const purpose = String(description.purpose || "");
+  if (purpose === "Signed Documents Archive") {
+    return json({ ok:false, error:"Signed workflow PDFs must be retrieved through the Signature Portal envelope-authorized route." },403,corsHeaders(request));
+  }
+  if (purpose === "Controlled Documents" || purpose === "Board of Directors Governance Documents") {
+    if (!data.documentId || String(description.documentId || "") !== cleanId(data.documentId)) {
+      return json({ ok:false, error:"Controlled document retrieval requires a matching document ID." },403,corsHeaders(request));
+    }
+  }
   if (description.purpose === "Signature Profile" && description.ownerUid !== claims.user_id) {
     return json({ ok: false, error: "This signature asset is restricted to its owner." }, 403, corsHeaders(request));
   }
@@ -662,6 +709,87 @@ async function download(request, env) {
 }
 
 
+
+async function downloadSignatureFile(request, env) {
+  const claims = await authenticateFirebaseRequest(request, env);
+  const data = await request.json();
+  const fileId = String(data.fileId || "").trim();
+  const documentId = cleanId(data.documentId || "");
+  const envelopeId = cleanId(data.envelopeId || "");
+  if (!fileId) return json({ok:false,error:"Google Drive file ID is required."},400,corsHeaders(request));
+
+  const accessToken = await getDriveAccessToken(env);
+  const metadata = await driveFetch(env, accessToken, "/drive/v3/files/" + encodeURIComponent(fileId) + "?fields=id,name,mimeType,size,description");
+  const description = parseDescription(metadata.description);
+  if (!description?.irpaGovernance) return json({ok:false,error:"The requested file is not an IRPA governance document."},403,corsHeaders(request));
+
+  const purpose = String(description.purpose || "");
+  let allowed = false;
+  if (purpose === "Signature Profile") {
+    allowed = canReadSignatureAsset({
+      authenticatedUid: claims.user_id,
+      purpose,
+      ownerUid: description.ownerUid,
+    });
+  } else if (purpose === "Signed Documents Archive") {
+    if (!documentId || !envelopeId) return json({ok:false,error:"Signed workflow PDF retrieval requires its document and envelope IDs."},400,corsHeaders(request));
+    const envelope = await getFirestoreDocument(env, "signatureEnvelopes/" + envelopeId, claims.token);
+    const envelopeFields = envelope?.fields || {};
+    const envelopeDocumentId = envelopeFields.documentId?.stringValue || "";
+    if (!envelope || envelopeDocumentId !== documentId) return json({ok:false,error:"The signing envelope does not match the requested document."},403,corsHeaders(request));
+    const envelopeParticipantUids = firestoreStringArray(envelopeFields.participantUids);
+    const envelopeFileMatches = [
+      envelopeFields.signedDocumentUrl?.stringValue,
+      envelopeFields.ownerCompletedDocumentUrl?.stringValue,
+      envelopeFields.completedDocumentUrl?.stringValue,
+    ].some(value => String(value || "") === "drive://" + fileId);
+    allowed = canReadSignatureAsset({
+      authenticatedUid: claims.user_id,
+      purpose,
+      ownerUid: description.ownerUid,
+      documentId,
+      envelopeId,
+      metadataDocumentId: description.documentId || "",
+      metadataEnvelopeId: description.envelopeId || "",
+      envelopeParticipantUids,
+      envelopeFileMatches,
+    });
+  } else {
+    if (!documentId) return json({ok:false,error:"Controlled document retrieval requires its document ID."},400,corsHeaders(request));
+    const document = await getFirestoreDocument(env, "documents/" + documentId, claims.token);
+    if (!document) return json({ok:false,error:"The controlled document record was not found."},404,corsHeaders(request));
+    const fields = document.fields || {};
+    const admin = await getFirestoreDocument(env, "adminProfiles/" + claims.user_id, claims.token);
+    let envelopeFields = {};
+    if (envelopeId) {
+      const envelope = await getFirestoreDocument(env, "signatureEnvelopes/" + envelopeId, claims.token);
+      const candidate = envelope?.fields || {};
+      if (candidate.documentId?.stringValue === documentId) envelopeFields = candidate;
+    }
+    allowed = canReadSignatureAsset({
+      authenticatedUid: claims.user_id,
+      purpose,
+      documentId,
+      envelopeId,
+      metadataDocumentId: description.documentId || "",
+      isAdmin: Boolean(admin?.fields?.active?.booleanValue),
+      documentOwnerUid: fields.ownerUid?.stringValue || "",
+      authorizedUids: firestoreStringArray(fields.authorizedUids),
+      envelopeParticipantUids: firestoreStringArray(envelopeFields.participantUids),
+      envelopeDocumentId: envelopeFields.documentId?.stringValue || "",
+    });
+  }
+  if (!allowed) return json({ok:false,error:"You are not authorized to retrieve this Signature Portal asset."},403,corsHeaders(request));
+
+  const size = Number(metadata.size || 0);
+  if (size > MAX_BYTES) return json({ok:false,error:"The requested file exceeds the 10 MB limit."},400,corsHeaders(request));
+  const media = await fetch("https://www.googleapis.com/drive/v3/files/" + encodeURIComponent(fileId) + "?alt=media", {
+    headers: { Authorization: "Bearer " + accessToken },
+  });
+  if (!media.ok) throw new Error("Google Drive download failed.");
+  const buffer = new Uint8Array(await media.arrayBuffer());
+  return json({ok:true,fileId,fileName:metadata.name,contentType:metadata.mimeType,base64:uint8ToBase64(buffer)},200,corsHeaders(request));
+}
 
 async function finalizeSignatureProfileArchives(request, env) {
   const claims = await authenticateFirebaseRequest(request, env);
@@ -777,8 +905,7 @@ async function ensureSignatureProfileFolder(request, env) {
     return json({ ok: false, error: "The signature-folder email does not match the authenticated account." }, 403, corsHeaders(request));
   }
 
-  const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
-  if (!isAdminForRequest && requestedUid !== claims.user_id) {
+  if (!canProvisionSignatureProfileFolder({ authenticatedUid: claims.user_id, requestedUid, isAdmin })) {
     return json({ ok: false, error: "You may only provision your own signature folder." }, 403, corsHeaders(request));
   }
 
