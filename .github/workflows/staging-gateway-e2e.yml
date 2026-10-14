@@ -57,14 +57,13 @@ jobs:
           DRIVE_SECRET: ${{ secrets.STAGING_GOOGLE_DRIVE_CLIENT_SECRET }}
           DRIVE_KEY: ${{ secrets.STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY }}
           SMTP: ${{ secrets.STAGING_SMTP_PASSWORD }}
-          FIREBASE_WEB_API_KEY: ${{ secrets.STAGING_FIREBASE_WEB_API_KEY }}
           CRYPTO_TEST_EMAIL: ${{ secrets.STAGING_CRYPTO_TEST_EMAIL }}
           CRYPTO_TEST_PASSWORD: ${{ secrets.STAGING_CRYPTO_TEST_PASSWORD }}
           CRYPTO_TEST_AUTHORITY: ${{ secrets.STAGING_CRYPTO_TEST_AUTHORITY }}
         run: |
           set -euo pipefail
           missing=0
-          for pair in             "CLOUDFLARE_API_TOKEN:$CF_TOKEN"             "CLOUDFLARE_ACCOUNT_ID:$CF_ACCOUNT"             "STAGING_FIREBASE_PROJECT_ID:$PROJECT"             "STAGING_IRPA_APP_URL:$APP_URL"             "STAGING_GOOGLE_DRIVE_CLIENT_ID:$DRIVE_ID"             "STAGING_GOOGLE_DRIVE_CLIENT_SECRET:$DRIVE_SECRET"             "STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY:$DRIVE_KEY"             "STAGING_SMTP_PASSWORD:$SMTP"             "STAGING_FIREBASE_WEB_API_KEY:$FIREBASE_WEB_API_KEY"             "STAGING_CRYPTO_TEST_EMAIL:$CRYPTO_TEST_EMAIL"             "STAGING_CRYPTO_TEST_PASSWORD:$CRYPTO_TEST_PASSWORD" "STAGING_CRYPTO_TEST_AUTHORITY:$CRYPTO_TEST_AUTHORITY"; do
+          for pair in             "CLOUDFLARE_API_TOKEN:$CF_TOKEN"             "CLOUDFLARE_ACCOUNT_ID:$CF_ACCOUNT"             "STAGING_FIREBASE_PROJECT_ID:$PROJECT"             "STAGING_IRPA_APP_URL:$APP_URL"             "STAGING_GOOGLE_DRIVE_CLIENT_ID:$DRIVE_ID"             "STAGING_GOOGLE_DRIVE_CLIENT_SECRET:$DRIVE_SECRET"             "STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY:$DRIVE_KEY"             "STAGING_SMTP_PASSWORD:$SMTP"             "STAGING_CRYPTO_TEST_EMAIL:$CRYPTO_TEST_EMAIL"             "STAGING_CRYPTO_TEST_PASSWORD:$CRYPTO_TEST_PASSWORD" "STAGING_CRYPTO_TEST_AUTHORITY:$CRYPTO_TEST_AUTHORITY"; do
             name="${pair%%:*}"; value="${pair#*:}"
             if [ -z "$value" ]; then echo "Missing staging secret: $name"; missing=1; fi
           done
@@ -211,7 +210,7 @@ jobs:
       - name: Generate and inject an isolated staging signer key
         id: staging_crypto_key
         env:
-          FIREBASE_WEB_API_KEY: ${{ secrets.STAGING_FIREBASE_WEB_API_KEY }}
+          FIREBASE_WEB_API_KEY: "AIzaSyA6UmHtP-mRr99rBw57_-qrD4_mFSBnZ38"
           FIREBASE_PROJECT_ID: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
           TEST_EMAIL: ${{ secrets.STAGING_CRYPTO_TEST_EMAIL }}
           TEST_PASSWORD: ${{ secrets.STAGING_CRYPTO_TEST_PASSWORD }}
@@ -281,7 +280,7 @@ jobs:
       - name: Run real-runtime staging cryptographic acceptance
         env:
           STAGING_GATEWAY_URL: ${{ steps.staging_health.outputs.gateway_url }}
-          STAGING_FIREBASE_WEB_API_KEY: ${{ secrets.STAGING_FIREBASE_WEB_API_KEY }}
+          STAGING_FIREBASE_WEB_API_KEY: "AIzaSyA6UmHtP-mRr99rBw57_-qrD4_mFSBnZ38"
           STAGING_FIREBASE_PROJECT_ID: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
           STAGING_CRYPTO_TEST_EMAIL: ${{ secrets.STAGING_CRYPTO_TEST_EMAIL }}
           STAGING_CRYPTO_TEST_PASSWORD: ${{ secrets.STAGING_CRYPTO_TEST_PASSWORD }}
