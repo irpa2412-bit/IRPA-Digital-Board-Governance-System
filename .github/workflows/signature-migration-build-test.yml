@@ -56,9 +56,56 @@ jobs:
         run: npm run build
 
 
+  staging-isolation-preflight:
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify isolated staging Firebase project and dedicated KV namespace
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          STAGING_FIREBASE_PROJECT_ID: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
+          STAGING_DRIVE_KV_ID: "7b50627e29fc4fe1abaa8dc8665edd02"
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$STAGING_FIREBASE_PROJECT_ID"
+          test "$STAGING_FIREBASE_PROJECT_ID" != "irpa-digital-board-governance"
+          test "$STAGING_DRIVE_KV_ID" != "ccdbffa662ac48bfbdf7f4b1f62ca941"
+          node <<'NODE'
+          const fs = require("node:fs");
+          const config = fs.readFileSync("drive-gateway/wrangler.toml", "utf8");
+          const staging = config.split("[env.staging]")[1] || "";
+          if (!staging.includes('id = "' + process.env.STAGING_DRIVE_KV_ID + '"')) {
+            throw new Error("Staging DRIVE_KV must use the explicitly dedicated namespace ID.");
+          }
+          if (staging.includes('id = "ccdbffa662ac48bfbdf7f4b1f62ca941"')) {
+            throw new Error("Production DRIVE_KV cannot be used by staging.");
+          }
+          NODE
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces?per_page=1000" \
+            -o "$RUNNER_TEMP/kv-namespaces.json"
+          node <<'NODE'
+          const fs = require("node:fs");
+          const payload = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/kv-namespaces.json", "utf8"));
+          const expected = process.env.STAGING_DRIVE_KV_ID;
+          if (payload.success !== true || !Array.isArray(payload.result)) {
+            throw new Error("Cloudflare did not return a verified KV namespace inventory.");
+          }
+          if (!payload.result.some(namespace => namespace.id === expected)) {
+            throw new Error("The dedicated staging DRIVE_KV namespace is not present in this Cloudflare account.");
+          }
+          console.log(JSON.stringify({stagingKV:"verified",productionKVRejected:true,stagingFirebaseProject:"non-production"}));
+          NODE
+
   deploy-cloudflare-staging:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_staging == true }}
-    needs: build
+    needs: [build, staging-isolation-preflight]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
@@ -69,6 +116,8 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Verify isolated staging configuration
+        env:
+          STAGING_FIREBASE_PROJECT_ID: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
         run: |
           set -euo pipefail
           node <<'NODE'
@@ -78,7 +127,8 @@ jobs:
           if (!/name = "irpa-google-drive-gateway-staging"/.test(text)) throw new Error("Staging Worker name is incorrect.");
           if (!/\[env\.staging\.vars\][\s\S]*CLOUDFLARE_AUTH_FUNCTIONS_ENABLED = "true"/.test(text)) throw new Error("Staging migration flag must be true.");
           if (!/\[env\.staging\.vars\][\s\S]*DRIVE_MOCK = "false"/.test(text)) throw new Error("Staging must use real Durable Object state (DRIVE_MOCK=false).");
-          if (!/\[\[env\.staging\.kv_namespaces\]\][\s\S]*binding = "DRIVE_KV"/.test(text)) throw new Error("Staging DRIVE_KV binding is missing.");
+          if (!/\[\[env\.staging\.kv_namespaces\]\][\s\S]*binding = "DRIVE_KV"[\s\S]*id = "7b50627e29fc4fe1abaa8dc8665edd02"/.test(text)) throw new Error("Dedicated staging DRIVE_KV binding is missing.");
+          if (process.env.STAGING_FIREBASE_PROJECT_ID !== process.env.STAGING_FIREBASE_PROJECT_ID.trim() || !/^[a-z0-9-]{6,63}$/.test(process.env.STAGING_FIREBASE_PROJECT_ID) || process.env.STAGING_FIREBASE_PROJECT_ID === "irpa-digital-board-governance") throw new Error("Staging Firebase project must be explicitly configured and separate from production.");
           if (!/\[\[env\.staging\.durable_objects\.bindings\]\][\s\S]*name = "ESIGN_DO"[\s\S]*class_name = "EsignRecordDurableObject"/.test(text)) throw new Error("Staging ESIGN_DO binding is missing.");
           if (!/\[\[env\.staging\.migrations\]\][\s\S]*tag = "esign-do-staging-v1"/.test(text)) throw new Error("Staging DO migration is missing.");
           const top = text.split("[env.staging]")[0];
@@ -90,7 +140,9 @@ jobs:
         run: npm ci --no-audit --no-fund
 
       - name: Validate staging configuration
-        run: npx wrangler deploy --env staging --dry-run
+        env:
+          STAGING_FIREBASE_PROJECT_ID: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
+        run: npx wrangler deploy --env staging --var "FIREBASE_PROJECT_ID:$STAGING_FIREBASE_PROJECT_ID" --dry-run
 
       - name: Deploy isolated Cloudflare staging Worker
         uses: cloudflare/wrangler-action@v3
@@ -98,13 +150,13 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: drive-gateway
-          command: deploy --env staging
+          command: deploy --env staging --var FIREBASE_PROJECT_ID:${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
 
       - name: Confirm deployed staging environment
         run: |
           set -euo pipefail
           echo "Cloudflare staging Worker deployed as irpa-google-drive-gateway-staging."
-          echo "Environment-specific DRIVE_KV and ESIGN_DO bindings were validated before deployment by the Wrangler dry-run."
+          echo "Dedicated staging DRIVE_KV and non-production Firebase project were verified before deployment."
           echo "Live endpoint checks below are the authoritative runtime verification."
           
       - name: Verify staging health
