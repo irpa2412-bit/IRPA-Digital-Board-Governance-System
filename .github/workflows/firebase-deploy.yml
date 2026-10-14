@@ -45,6 +45,8 @@ jobs:
           VITE_GRANT_CRAWLER_WORKER_URL: https://irpa-grant-crawler-production.irpa-governance.workers.dev
           VITE_GRANT_ASSISTANT_WORKER_URL: https://irpa-dbgs-grant-crawler.irpa-governance.workers.dev
           VITE_GOOGLE_WEATHER_API_KEY: ${{ secrets.VITE_GOOGLE_WEATHER_API_KEY }}
+          VITE_LIVEKIT_TOKEN_WORKER_URL: https://irpa-dgb-livekit-production-token.irpa-governance.workers.dev
+          VITE_LIVEKIT_RECORDING_WORKER_URL: https://irpa-dgb-livekit-production-token.irpa-governance.workers.dev
         run: npm run build
 
       - name: Verify grant crawler endpoint in the production bundle
