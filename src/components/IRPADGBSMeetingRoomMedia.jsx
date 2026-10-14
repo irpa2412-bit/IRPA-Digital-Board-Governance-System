@@ -18,6 +18,7 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
  const[participants,setParticipants]=useState([]),[messages,setMessages]=useState([]),[chat,setChat]=useState(""),[deviceReady,setDeviceReady]=useState(false),[deviceCheck,setDeviceCheck]=useState("NOT CHECKED"),[sessionId,setSessionId]=useState(""),[recordingStatus,setRecordingStatus]=useState("CHECKING"),[recordingInfo,setRecordingInfo]=useState(null),[recordingBusy,setRecordingBusy]=useState(false);
 
  const autoRecordingAttemptedRef=useRef(new Set());
+ const autoArchiveAttemptedRef=useRef(new Set());
  const clear=node=>{if(node)while(node.firstChild)node.removeChild(node.firstChild)};
  const refreshParticipants=room=>{
    if(!room)return;
@@ -124,6 +125,20 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
   // A failure is surfaced in the room UI; it is never reported as a successful recording.
   startRecording();
  },[meeting?.id,status,controller,recordingAllowed,recordingStatus]);
+ useEffect(()=>{
+  if(status!=="CONNECTED"||!meeting?.id||!["RECORDING","STARTING","STOPPING"].includes(String(recordingStatus||"").toUpperCase()))return;
+  const timer=window.setInterval(()=>{refreshRecordingStatus()},5000);
+  return()=>window.clearInterval(timer);
+ },[status,meeting?.id,recordingStatus]);
+ useEffect(()=>{
+  const files=recordingInfo?.files||[];
+  if(!meeting?.id||recordingStatus!=="COMPLETED"||!files.length||recordingInfo?.driveArchive)return;
+  if(autoArchiveAttemptedRef.current.has(meeting.id))return;
+  autoArchiveAttemptedRef.current.add(meeting.id);
+  // Archive immediately when LiveKit supplies a retrievable file URL. A storage key
+  // is not treated as a downloadable file; that gap is surfaced by archiveRecordingToDrive.
+  archiveRecordingToDrive();
+ },[meeting?.id,recordingStatus,recordingInfo]);
  async function stopRecording(){
   const recordingId=recordingInfo?.egressId||recordingInfo?.id;
   if(!controller||!recordingId)return setError("No active meeting recording was found to stop.");
