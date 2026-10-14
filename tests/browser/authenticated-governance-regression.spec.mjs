@@ -4,8 +4,8 @@ const fixtureEmail = "irpa-browser-fixture-admin@example.test";
 const fixturePassword = "FixtureOnly-Password-2026!";
 
 async function navigateModule(page, viewportName, module) {
-  if (viewportName !== "desktop") {
-    if (module === "Finance Portfolio" || module === "Meeting Room" || module === "Documents" || module === "Voting") {
+  if (viewportName === "mobile") {
+    if (module === "Finance Portfolio" || module === "Meeting Room" || module === "Documents" || module === "Voting" || module === "Resolutions" || module === "Decisions") {
       const dialog = page.getByRole("dialog", { name: "Mobile navigation" });
       const sheetTitle = dialog.locator(".mobile-nav-sheet-header strong");
       const isPortalsSheet = await dialog.isVisible() && await sheetTitle.textContent() === "Portals";
