@@ -34,6 +34,10 @@ try {
       await page.locator('input[name="chairperson"]').fill("Fixture Chairperson");
       await page.locator('textarea[name="agenda"]').fill("Test persistence of selected Board Member associations.");
       await picker.locator("label").filter({ hasText: "Active Board Member Fixture" }).locator('input[type="checkbox"]').check();
+      await page.locator('select[name="confidentialityClass"]').selectOption("INTERNAL");
+      const boardSessionType = page.locator('select[name="boardSessionType"]');
+      if (await boardSessionType.count()) await boardSessionType.selectOption("OPEN_SESSION");
+      await page.locator('input[name="recordingNoticeAcknowledged"]').check();
       await page.getByRole("button", { name: "Schedule Meeting" }).click();
       await page.getByText(/has been saved in the Meeting Particulars & Platforms Register/).waitFor();
       const persisted = await page.evaluate(key => JSON.parse(localStorage.getItem(key)), storeKey);
