@@ -20,7 +20,7 @@ const livekitCaddy=fs.readFileSync("infra/livekit/caddy.yaml.template","utf8");
 const livekitDeploy=fs.readFileSync("infra/livekit/deploy-staging.sh","utf8");
 const livekitWorkflow=fs.readFileSync(".github/workflows/deploy-livekit-staging.yml","utf8");
 const checks=[
- ["Registration buttons use the authoritative active-role policy",meetingsCentre.includes('{canRegisterMeeting({...actorIdentity,isAdmin:admin})&&<button type="button" onClick={startCreate}>+ Register Meeting</button>}')&&meetingsCentre.includes('{canRegisterMeeting({...actorIdentity,isAdmin:admin})&&<button className="secondary-button" onClick={startCreate}>+ New Meeting</button>}')],
+ ["Registration buttons expose meeting initiation to individual signed-in profiles",meetingsCentre.includes("function startCreate(){if(!canRegisterMeeting(")&&meetingsCentre.includes("uid:auth.currentUser?.uid||actorIdentity.uid")],
  ["Released meeting edits remain administrator-only",meetingsCentre.includes("if(editing&&!canEditMeeting(editing,{...actorIdentity,isAdmin:admin}))")&&meetingsCentre.includes("function edit(m){if(!canEditMeeting(m,{...actorIdentity,isAdmin:admin}))")&&meetingsCentre.includes("released. Only an authorised administrator may edit it.")],
  ["Firestore create permits signed-in individual initiators while enforcing registration controls",fs.readFileSync("firestore.rules","utf8").includes('allow create:if signedIn()&&request.resource.data.get("initiatorUid","")==request.auth.uid&&validMeetingCategory(request.resource.data)')],
  ["Meeting media client exists",fs.existsSync("src/components/IRPADGBSMeetingRoomMedia.jsx")],
@@ -83,6 +83,11 @@ const checks=[
  ["Staff restricts signature and authorization",policy.includes('STAFF:{')&&policy.includes("signatureAccess:false")&&policy.includes("authorizationAccess:false")],
  ["General restricts signature and authorization",policy.includes('GENERAL:{')&&policy.includes("signatureAccess:false")&&policy.includes("authorizationAccess:false")],
  ["Other is restricted to operational facilities",policy.includes('OTHER:{')&&policy.includes("signatureAccess:false")&&policy.includes("authorizationAccess:false")],
+ ["Disciplinary meetings have a separate policy category",policy.includes('DISCIPLINARY:{id:"DISCIPLINARY",label:"Disciplinary Meetings"')],
+ ["Meeting registration requires explicit confidentiality and recording notice",meetingsCentre.includes("Select the meeting confidentiality classification before registration.")&&meetingsCentre.includes("recordingNoticeAcknowledged")],
+ ["Recording starts automatically on meeting room connection and is status-verified",media.includes("autoRecordingAttemptedRef")&&media.includes("Automatic recording has not been confirmed as active")&&media.includes('==="RECORDING"')],
+ ["Recording failures are visible and not represented as captured proceedings",media.includes("AUTOMATIC RECORDING FAILED")&&media.includes("Do not treat the meeting as recorded")],
+ ["Disciplinary records have a dedicated retention policy",records.includes("DISCIPLINARY:7")&&records.includes('return"DISCIPLINARY"')],
  ["Meeting record lifecycle callable registered",fs.readFileSync("functions/bootstrap.js","utf8").includes('require("./meetingRecords")')],
  ["Record capture is server-authorized",records.includes("exports.captureMeetingRecord")&&records.includes("ctx.canManage")],
  ["Record storage uses dedicated meetingRecords collection",records.includes('db.collection("meetingRecords")')],
