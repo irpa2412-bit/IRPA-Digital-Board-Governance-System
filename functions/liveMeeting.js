@@ -348,7 +348,10 @@ exports.startMeetingRecording = onCall({
     throw new HttpsError("already-exists", "A recording is already active or stopping for this meeting.");
   }
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const filepath = "irpa-governance-recordings/" + safeRecordingId(ctx.meeting.id) + "/" + stamp + ".mp4";
+  const archiveCategory = categoryOf(ctx.meeting);
+  const archiveClassification = text(ctx.meeting.confidentialityClass || "INTERNAL").toUpperCase();
+  const boardSessionType = text(ctx.meeting.boardSessionType || "NOT_APPLICABLE").toUpperCase();
+  const filepath = ["irpa-governance-recordings", safeRecordingId(archiveCategory), safeRecordingId(archiveClassification), safeRecordingId(boardSessionType), safeRecordingId(ctx.meeting.id), stamp + ".mp4"].join("/");
   let egress;
   try {
     egress = await egressClient().startRoomCompositeEgress(
@@ -369,7 +372,8 @@ exports.startMeetingRecording = onCall({
   const row = {
     meetingId: ctx.meeting.id,
     meetingReference: text(ctx.meeting.meetingReference || ctx.meeting.reference || ctx.meeting.title),
-    meetingTitle: text(ctx.meeting.title), meetingCategory: categoryOf(ctx.meeting), roomName,
+    meetingTitle: text(ctx.meeting.title), meetingCategory: archiveCategory, roomName,
+    confidentialityClass: archiveClassification, boardSessionType, archivePath: filepath,
     egressId, outputPath: filepath, recordingStatus: "RECORDING",
     egressStatus: egressState(egress),
     recordingProvider: "LIVEKIT_EGRESS", storageDestination: "LIVEKIT_EGRESS_CONFIGURED_STORAGE",
