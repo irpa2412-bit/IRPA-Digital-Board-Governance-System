@@ -22,3 +22,19 @@ test("host governance mutations retain the explicit controller guard", () => {
 test("meeting room UI describes host restrictions accurately", () => {
   assert.match(source, /Governance controls are restricted to the active administrator or the meeting's authorised initiator, chairperson or secretary/);
 });
+
+
+test("invited participants may join media but cannot start, stop, or archive recordings", () => {
+  const media = readFileSync(new URL("../src/components/IRPADGBSMeetingRoomMedia.jsx", import.meta.url), "utf8");
+  assert.match(source, /recordingController=\{Boolean\(hostController\)\}/);
+  assert.match(media, /recordingController=controller/);
+  assert.match(media, /if\(!recordingController\|\|!recordingAllowed\|\|status!=="CONNECTED"\)/);
+  assert.match(media, /if\(!recordingController\|\|!recordingId\)/);
+  assert.match(media, /recordingController&&recordingInfo\?\.files\?\.some/);
+});
+
+test("automatic recording is fail-closed until the production recording worker is configured", () => {
+  const media = readFileSync(new URL("../src/components/IRPADGBSMeetingRoomMedia.jsx", import.meta.url), "utf8");
+  assert.match(media, /automaticRecordingEnabled=Boolean\(String\(import\.meta\.env\.VITE_LIVEKIT_RECORDING_WORKER_URL\|\|""\)\.trim\(\)\)/);
+  assert.match(media, /if\(!automaticRecordingEnabled\|\|!meeting\?\.id\|\|!recordingController/);
+});
