@@ -60,7 +60,7 @@ test("token issuance authorizes the live meeting, signs a 10-minute room token, 
   const previousFetch = globalThis.fetch;
   const requests = [];
   globalThis.fetch = async (input, init = {}) => {
-    const url = new URL(typeof input === "string" ? input : input.url);
+    const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
     requests.push({ url: url.toString(), method: init.method || "GET", body: init.body });
     if (url.hostname === "identitytoolkit.googleapis.com") {
       return Response.json({ users: [{ localId: "user-123", email: "chair@example.com", displayName: "Test Chair" }] });
