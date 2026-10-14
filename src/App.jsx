@@ -512,6 +512,25 @@ useEffect(()=>{
       const workspace=document.querySelector("#root .app-shell .main-area > .content-area [data-active-portal-content]");
       if(!workspace)return;
       workspace.scrollIntoView({block:"start",behavior:"auto"});
+      const header=document.querySelector("#root .app-shell .main-area > header.topbar");
+      const headerBottom=header?.getBoundingClientRect().bottom||0;
+      const alignWorkspace=()=>{
+        const rect=workspace.getBoundingClientRect();
+        const delta=rect.top-headerBottom-8;
+        if(Math.abs(delta)<2)return;
+        let ancestor=workspace.parentElement;
+        while(ancestor&&ancestor!==document.body){
+          const style=window.getComputedStyle(ancestor);
+          if(/auto|scroll|overlay/.test(style.overflowY)&&ancestor.scrollHeight>ancestor.clientHeight+1){
+            ancestor.scrollTop+=delta;
+            return;
+          }
+          ancestor=ancestor.parentElement;
+        }
+        window.scrollBy({top:delta,left:0,behavior:"auto"});
+      };
+      alignWorkspace();
+      workspace.focus({preventScroll:true});
     });
   });
   return()=>{
