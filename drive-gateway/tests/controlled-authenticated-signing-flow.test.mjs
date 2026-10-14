@@ -216,3 +216,54 @@ test("External token signer remains usable without Firebase authentication", asy
   const pdf = await getSigningPdf(fixture.ctx, fixture.token, null);
   assert.deepEqual(pdf.bytes, ORIGINAL);
 });
+
+
+test("Gateway open returns only fields assigned to the authenticated signer", async () => {
+  const fixture = await makeFixture({ signerUid:"member-uid", signerEmail:"member@example.org" });
+  fixture.envelope.fields = [
+    {fieldId:"member-name",type:"Name",page:1,x:10,y:20,width:30,height:8,signerUid:"member-uid",required:true},
+    {fieldId:"second-signature",type:"Signature",page:1,x:50,y:20,width:30,height:8,signerUid:"second-user",required:true}
+  ];
+  const opened = await openSigning(fixture.ctx,fixture.token,{uid:"member-uid",email:"member@example.org"});
+  assert.equal(opened.fields.length,1);
+  assert.equal(opened.fields[0].fieldId,"member-name");
+  assert.equal(opened.fields.some(field=>field.signerUid==="second-user"),false);
+});
+
+test("Gateway signing refuses missing required assigned fields before mutating the signer", async () => {
+  const fixture = await makeFixture({ signerUid:"member-uid", signerEmail:"member@example.org" });
+  fixture.envelope.fields = [
+    {fieldId:"approval-reason",type:"Text",page:1,x:10,y:20,width:30,height:8,signerUid:"member-uid",required:true}
+  ];
+  await assert.rejects(
+    () => sign(fixture.ctx,{
+      token:fixture.token,
+      signature:{type:"typed",value:"Member Signer"},
+      fieldValues:{},
+      consent:true,
+      user:{uid:"member-uid",email:"member@example.org"}
+    }),
+    error=>error.status===400&&error.message.includes("required text field")
+  );
+  const current=await fixture.ctx.meta.get("envelopes",fixture.envelope.id);
+  assert.equal(current.signers[0].status,"Pending");
+});
+
+test("Gateway signing stores only the authenticated signer's assigned field values", async () => {
+  const fixture = await makeFixture({ signerUid:"member-uid", signerEmail:"member@example.org" });
+  fixture.envelope.fields = [
+    {fieldId:"member-name",type:"Name",page:1,x:10,y:20,width:30,height:8,signerUid:"member-uid",required:true},
+    {fieldId:"second-name",type:"Name",page:1,x:50,y:20,width:30,height:8,signerUid:"second-user",required:true}
+  ];
+  const result=await sign(fixture.ctx,{
+    token:fixture.token,
+    signature:{type:"typed",value:"Member Signer"},
+    fieldValues:{"member-name":"Member Name","second-name":"Injected Other Signer"},
+    consent:true,
+    user:{uid:"member-uid",email:"member@example.org"}
+  });
+  assert.equal(result.status,"InProgress");
+  const current=await fixture.ctx.meta.get("envelopes",fixture.envelope.id);
+  assert.deepEqual(current.signers[0].fieldValues,{"member-name":"Member Name"});
+  assert.equal(current.signers[0].fieldValues["second-name"],undefined);
+});
