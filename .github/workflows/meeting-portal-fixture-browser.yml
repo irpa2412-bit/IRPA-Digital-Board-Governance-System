@@ -3,7 +3,7 @@ name: Meeting Portal Isolated Browser Regression
 # Isolated fixture-only browser checks; no production credentials or live meeting sessions.
 on:
   push:
-    branches: [feat/secure-meeting-invitation-flow-20261013]
+    branches: [feat/secure-meeting-invitation-flow-20261013, test/meeting-signature-portal-browser-regression-20261014]
     paths:
       - "src/pages/Meetings.jsx"
       - "drive-gateway/src/invitationRedemption.mjs"
