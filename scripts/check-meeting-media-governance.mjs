@@ -7,6 +7,9 @@ const room=fs.readFileSync("src/pages/MeetingRoom.jsx","utf8");
 const meetingsCentre=fs.readFileSync("src/pages/Meetings.jsx","utf8");
 const policy=fs.readFileSync("src/firebase/meetingPolicy.js","utf8");
 const records=fs.readFileSync("functions/meetingRecords.js","utf8");
+const archiveClient=fs.readFileSync("src/firebase/signatureStorage.js","utf8");
+const driveGateway=fs.readFileSync("drive-gateway/src/index.js","utf8");
+const archiveWorkflow=fs.readFileSync(".github/workflows/provision-meeting-archives.yml","utf8");
 const liveMeeting=fs.readFileSync("functions/liveMeeting.js","utf8");
 const styles=fs.readFileSync("src/styles/tokens.css","utf8");
 const participantPage=fs.readFileSync("src/pages/OperationalGatewaysParticipants.jsx","utf8");
@@ -84,6 +87,9 @@ const checks=[
  ["General restricts signature and authorization",policy.includes('GENERAL:{')&&policy.includes("signatureAccess:false")&&policy.includes("authorizationAccess:false")],
  ["Other is restricted to operational facilities",policy.includes('OTHER:{')&&policy.includes("signatureAccess:false")&&policy.includes("authorizationAccess:false")],
  ["Disciplinary meetings have a separate policy category",policy.includes('DISCIPLINARY:{id:"DISCIPLINARY",label:"Disciplinary Meetings"')],
+ ["Exactly five meeting categories are selectable and legacy Other is not selectable",policy.includes('filter(p=>p.id!=="OTHER")')&&["GOVERNANCE","ADMINISTRATIVE","STAFF","GENERAL","DISCIPLINARY"].every(x=>policy.includes(x+":"))],
+ ["Google Drive client and gateway define the disciplinary archive",archiveClient.includes('DISCIPLINARY: { label: "Disciplinary Meetings"')&&driveGateway.includes('DISCIPLINARY: { label: "Disciplinary Meetings"')],
+ ["Archive provisioner creates the five required categories",archiveClient.includes('["GOVERNANCE","ADMINISTRATIVE","STAFF","GENERAL","DISCIPLINARY"]')&&archiveWorkflow.includes('["GOVERNANCE", "ADMINISTRATIVE", "STAFF", "GENERAL", "DISCIPLINARY"]')],
  ["Meeting registration requires explicit confidentiality, Board session type and recording notice",meetingsCentre.includes("Select the meeting confidentiality classification before registration.")&&meetingsCentre.includes("recordingNoticeAcknowledged")&&meetingsCentre.includes('value={form.confidentialityClass||""}')&&meetingsCentre.includes("Select session type")],
  ["Registration cannot bypass the Meeting Room proceedings start",meetingsCentre.includes("Start proceedings from the Meeting Room so automatic recording and transcript capture can begin with the session.")],
  ["Recording starts automatically when proceedings begin and is status-verified",media.includes("proceedingsActive")&&media.includes("autoRecordingAttemptedRef")&&media.includes("AUTOMATIC RECORDING NOT CONFIRMED")&&media.includes('==="RECORDING"')],
@@ -97,6 +103,8 @@ const checks=[
  ["Recording metadata and category/classification are audit-trailed",liveMeeting.includes("LIVE_MEETING_RECORDING_STARTED")&&liveMeeting.includes("confidentialityClass: row.confidentialityClass")&&liveMeeting.includes("filesVerified: files.length > 0")],
  ["Recording connection/policy failures persist status and audit events",liveMeeting.includes("exports.reportMeetingRecordingFailure")&&liveMeeting.includes("LIVE_MEETING_RECORDING_FAILURE_REPORTED")&&media.includes("reportMeetingRecordingFailure")],
  ["Live transcript auto-saves separately from media recording",roomSource.includes("saveLiveMeetingProceedings({meetingId:selected.id,content:latest})")&&roomSource.includes("transcriptAutoSavedAt")&&liveMeeting.includes('recordingProvider: "LIVEKIT_EGRESS"')&&liveMeeting.includes("egressId")],
+ ["Closed proceedings archive the transcript to the category-specific Drive folder",roomSource.includes("uploadMeetingProductToDrive")&&roomSource.includes('recordType:"TRANSCRIPT"')&&roomSource.includes("final-live-proceedings-transcript.txt")],
+ ["Completed recording metadata is automatically archived to Google Drive",media.includes("recording-manifest-")&&media.includes('recordType:"RECORDING_MANIFEST"')&&media.includes("privateStoragePath")&&media.includes("uploadMeetingProductToDrive")],
  ["AI-generated minutes and summaries remain drafts pending human review",records.includes("draftOnly:true,approved:false,approvalStatus:\"NOT_SUBMITTED\",requiresHumanReview:true")],
  ["Meeting record lifecycle callable registered",fs.readFileSync("functions/bootstrap.js","utf8").includes('require("./meetingRecords")')],
  ["Record capture is server-authorized",records.includes("exports.captureMeetingRecord")&&records.includes("ctx.canManage")],
