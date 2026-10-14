@@ -12,7 +12,7 @@ function safeJson(value){
   try{return JSON.parse(decoder.decode(value))}catch{return null}
 }
 
-export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",controller=false}){
+export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",controller=false,proceedingsActive=false}){
  const roomRef=useRef(null),remoteRef=useRef(null),localRef=useRef(null),autoRecordingAttemptedRef=useRef("");
  const[status,setStatus]=useState("READY"),[error,setError]=useState(""),[muted,setMuted]=useState(true),[camera,setCamera]=useState(false),[screen,setScreen]=useState(false),[hand,setHand]=useState(false),[moderator,setModerator]=useState(false),[recordingAllowed,setRecordingAllowed]=useState(false);
  const[participants,setParticipants]=useState([]),[messages,setMessages]=useState([]),[chat,setChat]=useState(""),[deviceReady,setDeviceReady]=useState(false),[deviceCheck,setDeviceCheck]=useState("NOT CHECKED"),[sessionId,setSessionId]=useState(""),[recordingStatus,setRecordingStatus]=useState("NOT_STARTED"),[recordingInfo,setRecordingInfo]=useState(null),[recordingBusy,setRecordingBusy]=useState(false);
@@ -40,6 +40,37 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
  const detach=(track)=>track?.detach().forEach(node=>node.remove());
 
  useEffect(()=>()=>{roomRef.current?.disconnect();roomRef.current=null},[]);
+ useEffect(()=>{
+  let cancelled=false;
+  async function startWhenProceedingsBegin(){
+   if(!meeting?.id||!proceedingsActive||!controller||!roomRef.current||!auth.currentUser||meeting.recordingRequired===false)return;
+   if(autoRecordingAttemptedRef.current===meeting.id)return;
+   autoRecordingAttemptedRef.current=meeting.id;
+   setRecordingBusy(true);setError("");
+   try{
+    const context=JSON.parse(sessionStorage.getItem("irpaMeetingEntryContext")||"null");
+    const participantId=context?.meetingId===meeting.id?String(context?.participantId||""):"";
+    const recording=await startMeetingRecording({meetingId:meeting.id,selectedAuthority:participantId?"":String(selectedAuthority||""),participantId});
+    if(cancelled)return;
+    setRecordingStatus(recording.recordingStatus||"STARTING");
+    let verification=null;
+    for(let attempt=0;attempt<8;attempt++){
+     verification=await refreshRecordingStatus();
+     if(cancelled)return;
+     if(String(verification?.recordingStatus||"").toUpperCase()==="RECORDING")break;
+     await new Promise(resolve=>setTimeout(resolve,1500));
+    }
+    if(String(verification?.recordingStatus||"").toUpperCase()!=="RECORDING"){
+     setRecordingStatus(String(verification?.recordingStatus||recording.recordingStatus||"STARTING").toUpperCase());
+     setError("AUTOMATIC RECORDING NOT CONFIRMED. Proceedings must not be treated as recorded. Check LiveKit Egress and recording storage, then retry recording.");
+    }
+   }catch(recordingError){
+    if(!cancelled){setRecordingStatus("FAILED");setError("AUTOMATIC RECORDING FAILED. Proceedings must not be treated as recorded. Check LiveKit Egress/storage and retry; details: "+(recordingError?.message||"no confirmation returned."));}
+   }finally{if(!cancelled)setRecordingBusy(false)}
+  }
+  if(proceedingsActive&&recordingStatus!=="RECORDING"&&recordingStatus!=="STARTING")startWhenProceedingsBegin();
+  return()=>{cancelled=true};
+ },[meeting?.id,meeting?.recordingRequired,proceedingsActive,controller,recordingAllowed,recordingStatus,selectedAuthority]);
 
  async function connect(){
    if(!meeting?.id)return setError("Select an IRPA meeting first.");
@@ -70,12 +101,6 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
      room.on(RoomEvent.Disconnected,()=>{setStatus("DISCONNECTED");setCamera(false);setMuted(true);setScreen(false);setHand(false);setModerator(false);setRecordingAllowed(false);clear(localRef.current);clear(remoteRef.current);setParticipants([]);roomRef.current=null});
      await room.connect(data.serverUrl,data.participantToken);
      roomRef.current=room;setSessionId(data.sessionId||"");setModerator(data.moderator===true);setRecordingAllowed(data.recordingAllowed===true);setStatus("CONNECTED");refreshParticipants(room);await refreshRecordingStatus();
-     if(controller&&data.recordingAllowed===true&&meeting.recordingRequired!==false&&autoRecordingAttemptedRef.current!==meeting.id){
-       autoRecordingAttemptedRef.current=meeting.id;setRecordingBusy(true);setError("");
-       try{const recording=await startMeetingRecording({meetingId:meeting.id,selectedAuthority:String(selectedAuthority||""),participantId:gateParticipantId});setRecordingStatus(recording.recordingStatus||"STARTING");let verification=null;for(let attempt=0;attempt<6;attempt++){verification=await refreshRecordingStatus();if(String(verification?.recordingStatus||"").toUpperCase()==="RECORDING")break;await new Promise(resolve=>setTimeout(resolve,1500));}if(String(verification?.recordingStatus||"").toUpperCase()!=="RECORDING"){setRecordingStatus(String(verification?.recordingStatus||recording.recordingStatus||"STARTING").toUpperCase());setError("Automatic recording has not been confirmed as active. Do not treat the meeting as recorded; check LiveKit Egress/storage and retry Start Recording.");}}
-       catch(recordingError){setRecordingStatus("FAILED");setError("AUTOMATIC RECORDING FAILED. Do not treat the meeting as recorded. Check LiveKit Egress/storage and retry Start Recording; failure details: "+(recordingError?.message||"no confirmation returned."));}
-       finally{setRecordingBusy(false)}
-     }else if(meeting.recordingRequired!==false&&data.recordingAllowed!==true){setRecordingStatus("FAILED");setError("Recording is mandatory for this meeting, but the server did not enable recording. Do not treat proceedings as recorded; resolve the meeting recording configuration before proceeding.");}
      await room.localParticipant.setMicrophoneEnabled(true,{audioCaptureOptions:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});setMuted(false);
      await room.localParticipant.setCameraEnabled(false);setCamera(false);
      try{const devices=await navigator.mediaDevices?.enumerateDevices?.();setDeviceReady(Boolean(devices?.some(d=>d.kind==="audioinput")&&devices?.some(d=>d.kind==="videoinput")))}catch{setDeviceReady(false)}
