@@ -53,6 +53,7 @@ test("disciplinary meetings have their own category and strict default confident
   const { MEETING_CATEGORIES, MEETING_CATEGORY_OPTIONS, normalizeMeetingForV3 } = await import("../src/firebase/meetingPolicy.js");
   assert.equal(MEETING_CATEGORIES.DISCIPLINARY.label, "Disciplinary Meetings");
   assert.ok(MEETING_CATEGORY_OPTIONS.some(option => option.value === "DISCIPLINARY"));
+  assert.equal(MEETING_CATEGORY_OPTIONS.some(option => option.value === "OTHER"), false);
   assert.equal(normalizeMeetingForV3({ meetingCategory: "GOVERNANCE", confidentialityClass: "BOARD_RESTRICTED" }).confidentialityClass, "STRICTLY_CONFIDENTIAL");
   assert.equal(normalizeMeetingForV3({ meetingCategory: "GOVERNANCE" }).boardSessionType, "CLOSED_SESSION");
 });
