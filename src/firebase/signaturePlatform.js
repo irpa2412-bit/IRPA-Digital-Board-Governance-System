@@ -301,7 +301,7 @@ export async function startSignatureWorkflow(envelope){
   let gateway=null;
   if(CRYPTOGRAPHIC_GATEWAY_BRIDGE_ENABLED){
     if(envelope.gatewayEnvelopeId){
-      gateway={gatewayEnvelopeId:envelope.gatewayEnvelopeId,gatewayDocumentId:envelope.gatewayDocumentId||null,gatewayOriginalHash:envelope.gatewayOriginalHash||null,status:envelope.gatewaySigningStatus||"Sent",existing:true};
+      gateway={gatewayEnvelopeId:envelope.gatewayEnvelopeId,gatewayDocumentId:envelope.gatewayDocumentId||null,gatewayOriginalHash:envelope.gatewayOriginalHash||null,gatewaySigningStatus:envelope.gatewaySigningStatus||"Sent",existing:true};
     }else{
       const sourceBytes=await fetchBytes(envelope.documentUrl,envelope.documentId,envelope.id);
       gateway=await createGatewaySignatureEnvelope({envelope,sourceBytes});
@@ -316,7 +316,7 @@ export async function startSignatureWorkflow(envelope){
       gatewayEnvelopeId:gateway.gatewayEnvelopeId,
       gatewayDocumentId:gateway.gatewayDocumentId,
       gatewayOriginalHash:gateway.gatewayOriginalHash,
-      gatewaySigningStatus:gateway.status||"Sent",
+      gatewaySigningStatus:gateway.gatewaySigningStatus||"Sent",
       gatewayBridgeStatus:"Connected",
       gatewayEvidenceSchema:"IRPA-CRYPTOGRAPHIC-EVIDENCE-1"
     }:{})
