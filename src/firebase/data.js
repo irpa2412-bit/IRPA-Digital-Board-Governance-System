@@ -43,6 +43,21 @@ export async function provisionCurrentMemberFromInvitation(invitationId){const u
 /* Trial mode may READ real institutional registers as reference data. Isolation applies to writes: newly created operational records are tagged TRIAL and actual records cannot be modified or deleted through the shared record helpers. */
 export async function getRecord(collectionName,id){const s=await getDoc(doc(db,collectionName,id));if(!s.exists())return null;return{id:s.id,...(s.data()||{})};}
 export async function getRecords(collectionName){const s=await getDocs(query(collection(db,collectionName),orderBy("createdAt","desc")));return s.docs.map(x=>({id:x.id,...x.data()}));}
+
+// Read participant/invitation records only within meetings the caller is authorized to access.
+// Firestore rules remain authoritative for every returned document; this helper does not broaden access.
+export async function getMeetingScopedRecords(collectionName,meetingIds=[]){
+  if(!auth.currentUser?.uid)throw new Error("Authentication is required to retrieve meeting records.");
+  if(![COLLECTIONS.participants,COLLECTIONS.invitations].includes(collectionName))throw new Error("Meeting-scoped retrieval is only available for participant and invitation registers.");
+  const ids=[...new Set((Array.isArray(meetingIds)?meetingIds:[]).map(id=>String(id||"").trim()).filter(Boolean))];
+  if(!ids.length)return [];
+  const results=await Promise.allSettled(ids.map(meetingId=>getDocs(query(collection(db,collectionName),where("meetingId","==",meetingId)))));
+  const failures=results.filter(r=>r.status==="rejected");
+  if(failures.length){const error=failures[0]?.reason;throw new Error("Unable to read every authorized "+collectionName+" meeting register: "+String(error?.message||"permission denied"));}
+  const records=new Map();
+  results.forEach(result=>{if(result.status==="fulfilled")result.value.docs.forEach(item=>records.set(item.id,{id:item.id,...item.data()}));});
+  return [...records.values()];
+}
 export async function getFinanceTrialRecords(collectionName){const ref=collection(db,collectionName);const queries=[query(ref,where("recordOrigin","==","TRIAL")),query(ref,where("trialData","==",true)),query(ref,where("isTrial","==",true))];const results=await Promise.all(queries.map(q=>getDocs(q)));const byId=new Map();for(const snap of results){for(const item of snap.docs){const data=item.data()||{};if(String(data.recordOrigin||"").toUpperCase()==="TRIAL"||data.trialData===true||data.isTrial===true)byId.set(item.id,{id:item.id,...data});}}return[...byId.values()].sort((a,b)=>{const at=a.createdAt?.toMillis?a.createdAt.toMillis():Date.parse(a.createdAt||"")||0;const bt=b.createdAt?.toMillis?b.createdAt.toMillis():Date.parse(b.createdAt||"")||0;return bt-at;});}
 export async function getAccessibleMeetingRecords(){
   const user=auth.currentUser;
@@ -68,30 +83,16 @@ export async function getAccessibleMeetingRecords(){
     ...(Array.isArray(token?.claims?.irpaRoles)?token.claims.irpaRoles:[])
   ]).map(v=>String(v||"").trim()).filter(Boolean))];
   const identity={...(member||employee||{}),uid:user.uid,email,active:activeMember||activeEmployee,isAdmin,activeMember,activeEmployee,roles};
-  if(isTrialDataMode()){
-    /* Trial workflows need the real meeting register as reference context, plus trial meetings created for testing. */
-    const [actualMeetings,trialMeetings]=await Promise.all([
-      getDocs(collection(db,COLLECTIONS.meetings)),
-      getFinanceTrialRecords(COLLECTIONS.meetings)
-    ]);
-    const byId=new Map();
-    for(const snap of actualMeetings.docs){const data=snap.data()||{};byId.set(snap.id,{id:snap.id,...data});}
-    for(const meeting of trialMeetings)byId.set(meeting.id,meeting);
-    const availableMeetings=[...byId.values()];
-    if(isAdmin)return availableMeetings.sort((a,b)=>meetingCreatedAt(b)-meetingCreatedAt(a));
-    return availableMeetings.filter(m=>canAccessMeetingCategory(m,identity,{
-      isInitiator:String(m.initiatorUid||"")===uid,
-      isInvited:["participantUids","attendeeUids","memberUids","invitedUids","subscriberUids"].some(k=>Array.isArray(m[k])&&m[k].includes(uid))||
-        (email&&["participantEmails","attendeeEmails","invitedEmails","subscriberEmails"].some(k=>Array.isArray(m[k])&&m[k].map(v=>String(v||"").toLowerCase()).includes(email))),
-      isRegisteredParticipant:["participantUids","attendeeUids","memberUids","subscriberUids"].some(k=>Array.isArray(m[k])&&m[k].includes(uid))
-    })).sort((a,b)=>meetingCreatedAt(b)-meetingCreatedAt(a));
-  }
+  // Institutional registers are read-only directory/reference views for active members and employees.
+  // Category controls continue to govern editing and access to linked proceedings/records; they do not hide
+  // the meeting register itself from an authenticated institutional user.
   const ref=collection(db,COLLECTIONS.meetings);
-  const jobs=[];
-  if(isAdmin){
+  if(user.uid){
     const all=await getDocs(ref);
     return all.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>meetingCreatedAt(b)-meetingCreatedAt(a));
   }
+  // External/non-institutional users retain category, initiator, and explicit-invitation scoping.
+  const jobs=[];
   for(const policy of Object.values(MEETING_CATEGORIES)){
     if(!canAccessMeetingCategory({meetingCategory:policy.id,meetingPolicyId:policy.id},identity))continue;
     jobs.push(query(ref,where("meetingCategory","==",policy.id)));
@@ -99,7 +100,6 @@ export async function getAccessibleMeetingRecords(){
     for(const type of policy.meetingTypes)jobs.push(query(ref,where("meetingType","==",type)));
   }
   const uid=user.uid;
-  // Always query the authenticated initiator's own meetings, independently of category access roles.
   jobs.push(query(ref,where("initiatorUid","==",uid)));
   for(const field of ["participantUids","attendeeUids","memberUids","invitedUids","subscriberUids"])jobs.push(query(ref,where(field,"array-contains",uid)));
   if(email)for(const field of ["participantEmails","attendeeEmails","invitedEmails","subscriberEmails"])jobs.push(query(ref,where(field,"array-contains",email)));
