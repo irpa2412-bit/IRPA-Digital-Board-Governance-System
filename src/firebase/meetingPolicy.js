@@ -69,6 +69,8 @@ export function inferMeetingPolicy(meetingType="Other Meeting"){
 
 export function normalizeMeetingForV3(meeting={}){
   const policy=resolveCategory(meeting.meetingCategory||meeting.category||meeting.meetingType);
+  const legacyClass=String(meeting.confidentialityClass||"").toUpperCase();
+  const confidentialityClass=({BOARD_RESTRICTED:"STRICTLY_CONFIDENTIAL",MANAGEMENT:"CONFIDENTIAL",PUBLIC:"OPEN"})[legacyClass]||(["OPEN","INTERNAL","CONFIDENTIAL","STRICTLY_CONFIDENTIAL"].includes(legacyClass)?legacyClass:policy.confidentiality);
   return {
     ...meeting,
     meetingCategory:policy.id,
@@ -76,8 +78,9 @@ export function normalizeMeetingForV3(meeting={}){
     meetingCategoryLabel:policy.label,
     meetingRecordVersion:meeting.meetingRecordVersion||"V3.0",
     aiRecordMode:meeting.aiRecordMode||policy.aiMode,
-    confidentialityClass:meeting.confidentialityClass||policy.confidentiality,
-    boardSessionType:meeting.boardSessionType||"OPEN_SESSION",
+    confidentialityClass,
+    // Unknown legacy Board session types default to closed to avoid accidental disclosure.
+    boardSessionType:meeting.boardSessionType||(policy.id==="GOVERNANCE"?"CLOSED_SESSION":"NOT_APPLICABLE"),
     recordingRequired:meeting.recordingRequired!==false,
     recordingStatus:meeting.recordingStatus||"PENDING"
   };
