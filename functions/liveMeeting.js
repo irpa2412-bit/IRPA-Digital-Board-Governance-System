@@ -530,9 +530,14 @@ exports.getMeetingRecordingStatus = onCall({
     recordingStatus: row.recordingStatus || "UNKNOWN",
     recording: {
       id: row.id, egressId: row.egressId, outputPath: row.outputPath || null,
+      meetingCategory: row.meetingCategory || recordingCategory(ctx.meeting),
+      confidentialityClass: row.confidentialityClass || text(ctx.meeting.confidentialityClass || "INTERNAL"),
+      boardSessionType: row.boardSessionType || text(ctx.meeting.boardSessionType || "NOT_APPLICABLE"),
+      storageDestination: row.storageDestination || "LIVEKIT_EGRESS_CONFIGURED_STORAGE",
       status: row.recordingStatus || "UNKNOWN", egressStatus: row.egressStatus || null,
       startedAt: row.startedAt?.toDate?.().toISOString?.() || null,
       stoppedAt: row.stopRequestedAt?.toDate?.().toISOString?.() || null,
+      completedAt: row.completedAt?.toDate?.().toISOString?.() || null,
       files: Array.isArray(row.fileResults) ? row.fileResults.map(file => ({ filename: file.filename || "", location: file.location || "", size: file.size || 0 })) : []
     }
   };
