@@ -74,13 +74,14 @@ exports.getMeetingAttendanceRegister=onCall({region:"us-central1",timeoutSeconds
   db.collection("participants").where("meetingId","==",meetingId).get(),
   db.collection("meetingAttendanceSignatures").where("meetingId","==",meetingId).get()
  ]);
+ const own=participantSnap.docs.find(d=>matchesIdentity(req,{id:d.id,...d.data()}));
+ if(!manager&&!own)throw new HttpsError("permission-denied","You are not registered as a participant in this meeting.");
  const signatures=new Map(signatureSnap.docs.map(d=>[text(d.data()?.participantId),{id:d.id,...d.data(),signedAt:d.data()?.signedAt?.toDate?.()?.toISOString()||null}]));
- const ownEmail=text(req.auth.token.email).toLowerCase();
  const records=participantSnap.docs.map(d=>({id:d.id,...d.data()}))
   .filter(p=>manager||matchesIdentity(req,p))
   .map(p=>{
    const sig=signatures.get(p.id);
    return {participantId:p.id,name:registeredName(p),role:text(p.role||p.participantRole||p.participantType),email:registeredEmail(p),attendanceStatus:text(p.attendanceStatus||p.status)||"Unmarked",signed:!!sig,signatureMethod:sig?.signatureMethod||null,typedName:sig?.typedName||null,signedAt:sig?.signedAt||null,signatureId:sig?.id||null};
-  }).filter(p=>manager||p.email===ownEmail||participantSnap.docs.some(d=>d.id===p.participantId&&matchesIdentity(req,{id:d.id,...d.data()})));
+  });
  return {meetingId,meetingReference:text(meeting.meetingReference||meeting.reference||meeting.title),meetingTitle:text(meeting.title),meetingDate:text(meeting.date),retrievedAt:new Date().toISOString(),canManage:manager,records};
 });
