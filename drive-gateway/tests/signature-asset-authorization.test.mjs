@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import fs from "node:fs";
 import {
   canProvisionSignatureProfileFolder,
   canReadSignatureAsset,
@@ -106,4 +107,13 @@ test("signed-document upload is restricted to the authenticated assigned action 
   assert.equal(canUploadSignedDocument({ ...base, actionUids: [] }), false);
   assert.equal(canUploadSignedDocument({ ...base, signingMode: "Parallel", currentSignerUid: null }), true);
   assert.equal(canUploadSignedDocument({ ...base, signingMode: "Direct" }), false);
+});
+
+test("Signature Portal gateway routes are wired to the fail-closed authorization policies", () => {
+  const gateway = fs.readFileSync(new URL("../src/index.js", import.meta.url), "utf8");
+  assert.doesNotMatch(gateway, /isAdminForRequest/);
+  assert.match(gateway, /canProvisionSignatureProfileFolder/);
+  assert.match(gateway, /url\.pathname === "\/api\/signature-file\/download"/);
+  assert.match(gateway, /downloadSignatureFile\(request, env\)/);
+  assert.match(gateway, /canUploadSignedDocument/);
 });
