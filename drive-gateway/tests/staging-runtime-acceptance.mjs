@@ -63,6 +63,7 @@ assert.equal(await sha256(new Uint8Array(await retrievedOriginal.arrayBuffer()))
 
 const envelopePayload={
   externalReference,
+  returnTokens:true,
   documentId,
   title:"IRPA Staging Cryptographic Acceptance",
   classification:"Restricted",
