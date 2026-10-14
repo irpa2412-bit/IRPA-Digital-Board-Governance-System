@@ -1,5 +1,6 @@
 import admin from "firebase-admin";
 import crypto from "node:crypto";
+import { Storage } from "@google-cloud/storage";
 import { Room, AudioFrame, AudioSource, LocalAudioTrack, TrackPublishOptions, TrackSource, VideoBufferType, VideoFrame, VideoSource, LocalVideoTrack, dispose } from "@livekit/rtc-node";
 
 const PROJECT_ID = "irpa-dbg-staging-a73ec";
@@ -73,6 +74,7 @@ async function main() {
   let downloadVerified = false;
   let mediaPublished = { audio: false, video: false };
   let dbCleanupOk = true;
+  let storageCleanupOk = true;
 
   const cleanup = async () => {
     try { if (recordingId && user) await invokeCallable("stopMeetingRecording", await createIdToken(auth, user), { meetingId, recordingId }).catch(() => {}); } catch {}
@@ -85,6 +87,21 @@ async function main() {
     if (fixtureCreated) {
       try {
         const snapshot = await db.collection("meetingMediaRecordings").where("meetingId", "==", meetingId).get();
+        try {
+          const storage = new Storage({
+            projectId: PROJECT_ID,
+            credentials: { client_email: serviceAccount.client_email, private_key: serviceAccount.private_key }
+          });
+          for (const doc of snapshot.docs) {
+            const row = doc.data() || {};
+            if (row.outputPath && row.storageBucket) {
+              await storage.bucket(row.storageBucket).file(row.outputPath).delete({ ignoreNotFound: true });
+            }
+          }
+        } catch (error) {
+          storageCleanupOk = false;
+          console.error("TEST CLEANUP WARNING: temporary recording object cleanup needs review:", error?.message || "unknown error");
+        }
         const batch = db.batch();
         snapshot.docs.forEach(doc => batch.delete(doc.ref));
         const locks = await db.collection("meetingRecordingLocks").where("meetingId", "==", meetingId).get();
@@ -112,6 +129,7 @@ async function main() {
     user = await auth.createUser({
       email, emailVerified: true, displayName: "Temporary IRPA recording acceptance test", disabled: false
     });
+    fixtureCreated = true;
     await db.collection("members").doc(user.uid).set({
       uid: user.uid, email, status: "Active", role: "Board Chairperson",
       boardPosition: "Board Chairperson", name: "Temporary IRPA recording acceptance test",
@@ -126,7 +144,6 @@ async function main() {
       recordingPolicyVersion: "IRPA-AUTO-RECORDING-1.0",
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     });
-    fixtureCreated = true;
 
     const customToken = await auth.createCustomToken(user.uid);
     const exchange = await fetch(
@@ -245,7 +262,7 @@ async function main() {
       storageSizeBytes: verifiedResponse.sizeBytes,
       shortLivedDownloadAuthorization: "passed",
       recordingId,
-      cleanup: "pending"
+      temporaryAudioVideoTracksPublished: true
     }, null, 2));
   } catch (error) {
     primaryFailure = error;
@@ -253,7 +270,7 @@ async function main() {
     await cleanup();
   }
 
-  if (!dbCleanupOk) primaryFailure ||= new Error("The temporary staging acceptance fixture could not be fully removed.");
+  if (!dbCleanupOk || !storageCleanupOk) primaryFailure ||= new Error("The temporary staging acceptance fixture could not be fully removed.");
   if (primaryFailure) {
     console.error(JSON.stringify({
       ok: false,
