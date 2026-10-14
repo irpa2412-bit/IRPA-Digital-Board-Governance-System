@@ -294,6 +294,15 @@ jobs:
           });
           NODE
 
+      # This callable is required by the Participants portal. Deploy it before Hosting so
+      # a billing/Cloud Build failure cannot publish a frontend that depends on a missing function.
+      - name: Deploy authorized meeting register callable (required)
+        uses: w9jds/firebase-action@v14.17.0
+        with:
+          args: deploy --project irpa-digital-board-governance --only functions:listAccessibleMeetingRecords
+        env:
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+
       - name: Deploy Hosting and Firestore
         uses: w9jds/firebase-action@v14.17.0
         with:
