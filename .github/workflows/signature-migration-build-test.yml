@@ -46,6 +46,9 @@ jobs:
           npm ci --no-audit --no-fund
           npm test
 
+      - name: Run Signature Portal routing policy tests
+        run: node --test tests/signature-workflow-policy.test.mjs
+
       - name: Build web application
         env:
           VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
