@@ -66,7 +66,11 @@ jobs:
           git fetch origin main
           PR_BASE_SHA="${{ github.event.pull_request.base.sha }}" node --input-type=module <<'NODE'
           import { execFileSync } from "node:child_process";
-          const base = execFileSync("git", ["merge-base", "origin/main", "HEAD"], { encoding: "utf8" }).trim();
+          // Pull-request runs must compare against the base SHA captured for that event.
+          // origin/main may advance during the run, making merge-base include unrelated commits.
+          const eventBase = process.env.PR_BASE_SHA?.trim();
+          const base = eventBase || execFileSync("git", ["merge-base", "origin/main", "HEAD"], { encoding: "utf8" }).trim();
+          execFileSync("git", ["cat-file", "-e", `${base}^{commit}`]);
           const changed = execFileSync("git", ["diff", "--name-only", base, "HEAD"], { encoding: "utf8" })
             .trim().split("\n").filter(Boolean).sort();
           const allowed = new Set([
