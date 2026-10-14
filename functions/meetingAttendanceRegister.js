@@ -54,16 +54,25 @@ exports.signMeetingAttendance=onCall({region:"us-central1",timeoutSeconds:30},as
  const ref=db.collection("meetingAttendanceSignatures").doc(signatureId(meetingId,participantId));
  const existing=await ref.get();
  if(existing.exists)return {signed:true,alreadySigned:true,signatureId:ref.id,participantId,signedAt:existing.data()?.signedAt?.toDate?.()?.toISOString()||null};
+ const signedAt=FieldValue.serverTimestamp();
  const signature={
   meetingId,participantId,meetingReference:text(meeting.meetingReference||meeting.reference||meeting.title)||null,
   participantName:expected,participantRole:text(p.role||p.participantRole||p.participantType)||null,
   signerUid:req.auth.uid,signerEmail:text(req.auth.token.email).toLowerCase()||null,
   typedName:expected,signatureMethod:"AUTHENTICATED_TYPED_NAME_ATTESTATION",
   declaration:"I confirm that I am the registered participant and that this signature records my attendance at this meeting.",
-  signatureVersion:"1.0",signedAt:FieldValue.serverTimestamp(),createdAt:FieldValue.serverTimestamp()
+  signatureVersion:"1.0",signedAt,createdAt:signedAt
  };
- await ref.create(signature);
- await audit(req,meeting,p,ref);
+ const auditRef=db.collection("audit").doc();
+ const already=await db.runTransaction(async tx=>{
+  const current=await tx.get(ref);
+  if(current.exists)return current.data();
+  tx.create(ref,signature);
+  tx.update(db.collection("participants").doc(participantId),{attendanceStatus:"Present",attendanceRecordedAt:signedAt,attendanceRecordedByUid:req.auth.uid,updatedAt:signedAt});
+  tx.create(auditRef,{action:"MEETING_ATTENDANCE_SIGNED",collection:"meetingAttendanceSignatures",recordId:ref.id,details:{meetingId,participantId,meetingReference:text(meeting.meetingReference||meeting.reference||meeting.title),signatureVersion:"1.0",signatureMethod:"AUTHENTICATED_TYPED_NAME_ATTESTATION"},actorUid:req.auth.uid,actorEmail:text(req.auth.token.email)||null,createdAt:signedAt});
+  return null;
+ });
+ if(already)return {signed:true,alreadySigned:true,signatureId:ref.id,participantId,signedAt:already.signedAt?.toDate?.()?.toISOString()||null};
  return {signed:true,alreadySigned:false,signatureId:ref.id,participantId,signedAt:new Date().toISOString()};
 });
 exports.getMeetingAttendanceRegister=onCall({region:"us-central1",timeoutSeconds:30},async req=>{
