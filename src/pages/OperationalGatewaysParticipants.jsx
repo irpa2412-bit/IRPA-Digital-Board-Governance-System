@@ -62,14 +62,13 @@ export default function OperationalGatewaysParticipants(){
   if(!form.meetingId){setEmployees([]);setBoardMembers([]);setMembers([]);return()=>{live=false};}
   (async()=>{
    try{
-    const call=httpsCallable(getFunctions(undefined,"us-central1"),"listMeetingInviteCandidates");
-    const result=await call({meetingId:form.meetingId});
+    // Reuse the already deployed, role-authorized directory callable. Do not depend on
+    // a newly introduced Cloud Function while production Functions deployment is billing-blocked.
+    const directory=await listMeetingInviteeDirectory();
     if(!live)return;
-    const memberRows=Array.isArray(result.data?.members)?result.data.members:[];
-    const employeeRows=Array.isArray(result.data?.employees)?result.data.employees:[];
-    setEmployees(employeeRows);
-    setBoardMembers(memberRows.filter(x=>x.boardMember===true||x.boardPosition||x.department==="Board of Directors"||x.role==="Board Member"));
-    setMembers(memberRows.filter(x=>!(x.boardMember===true||x.boardPosition||x.department==="Board of Directors"||x.role==="Board Member")));
+    setEmployees(Array.isArray(directory.employees)?directory.employees:[]);
+    setBoardMembers(Array.isArray(directory.boardMembers)?directory.boardMembers:[]);
+    setMembers(Array.isArray(directory.members)?directory.members:[]);
    }catch(error){
     if(!live)return;
     setEmployees([]);setBoardMembers([]);setMembers([]);
