@@ -88,6 +88,8 @@ jobs:
             "src/pages/OperationalGatewaysParticipants.jsx",
             "src/pages/Meetings.jsx",
             "src/firebase/data.js",
+            "src/firebase/meetingPolicy.js",
+            "functions/liveMeeting.js",
             "functions/meetingGateway.js",
             "src/pages/OperationalGatewaysParticipants.jsx",
             "firestore.rules",
