@@ -73,6 +73,7 @@ async function assertPortalAndNoOverflow(page, expectedText, width) {
 
 for (const viewport of [
   { name: "mobile", width: 390, height: 844 },
+  { name: "tablet", width: 768, height: 1024 },
   { name: "desktop", width: 1440, height: 900 }
 ]) {
   test(`authenticated fundraising and governance portal regression at ${viewport.name} size`, async ({ page }) => {
