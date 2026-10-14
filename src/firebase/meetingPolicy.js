@@ -75,6 +75,7 @@ export function normalizeMeetingForV3(meeting={}){
     ...meeting,
     meetingCategory:policy.id,
     meetingPolicyId:meeting.meetingPolicyId||policy.id,
+    recordingAllowed:meeting.recordingAllowed!==false,
     meetingCategoryLabel:policy.label,
     meetingRecordVersion:meeting.meetingRecordVersion||"V3.0",
     aiRecordMode:meeting.aiRecordMode||policy.aiMode,
