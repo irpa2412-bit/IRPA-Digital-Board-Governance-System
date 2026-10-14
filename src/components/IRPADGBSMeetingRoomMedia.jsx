@@ -15,8 +15,9 @@ function safeJson(value){
 export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",controller=false}){
  const roomRef=useRef(null),remoteRef=useRef(null),localRef=useRef(null);
  const[status,setStatus]=useState("READY"),[error,setError]=useState(""),[muted,setMuted]=useState(true),[camera,setCamera]=useState(false),[screen,setScreen]=useState(false),[hand,setHand]=useState(false),[moderator,setModerator]=useState(false),[recordingAllowed,setRecordingAllowed]=useState(false);
- const[participants,setParticipants]=useState([]),[messages,setMessages]=useState([]),[chat,setChat]=useState(""),[deviceReady,setDeviceReady]=useState(false),[deviceCheck,setDeviceCheck]=useState("NOT CHECKED"),[sessionId,setSessionId]=useState(""),[recordingStatus,setRecordingStatus]=useState("NOT_STARTED"),[recordingInfo,setRecordingInfo]=useState(null),[recordingBusy,setRecordingBusy]=useState(false);
+ const[participants,setParticipants]=useState([]),[messages,setMessages]=useState([]),[chat,setChat]=useState(""),[deviceReady,setDeviceReady]=useState(false),[deviceCheck,setDeviceCheck]=useState("NOT CHECKED"),[sessionId,setSessionId]=useState(""),[recordingStatus,setRecordingStatus]=useState("CHECKING"),[recordingInfo,setRecordingInfo]=useState(null),[recordingBusy,setRecordingBusy]=useState(false);
 
+ const autoRecordingAttemptedRef=useRef(new Set());
  const clear=node=>{if(node)while(node.firstChild)node.removeChild(node.firstChild)};
  const refreshParticipants=room=>{
    if(!room)return;
@@ -115,6 +116,14 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
   catch(e){setError(e?.message||"The recording service did not confirm that recording started.")}
   finally{setRecordingBusy(false)}
  }
+ useEffect(()=>{
+  if(!meeting?.id||status!=="CONNECTED"||!controller||!recordingAllowed||recordingStatus!=="NOT_STARTED")return;
+  if(autoRecordingAttemptedRef.current.has(meeting.id))return;
+  autoRecordingAttemptedRef.current.add(meeting.id);
+  // Recording starts automatically when the meeting controller joins an active meeting.
+  // A failure is surfaced in the room UI; it is never reported as a successful recording.
+  startRecording();
+ },[meeting?.id,status,controller,recordingAllowed,recordingStatus]);
  async function stopRecording(){
   const recordingId=recordingInfo?.egressId||recordingInfo?.id;
   if(!controller||!recordingId)return setError("No active meeting recording was found to stop.");
