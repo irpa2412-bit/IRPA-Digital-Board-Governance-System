@@ -1,5 +1,6 @@
 import React,{useEffect,useState}from"react";
-import{getMySignatureProfile,getMySignerIdentity,verifyManualSigningAuthority,syncGatewaySigningMirror}from"../firebase/signaturePlatform";
+import{getMySignatureProfile,verifyManualSigningAuthority,syncGatewaySigningMirror}from"../firebase/signaturePlatform";
+import{getMySignerIdentity}from"../firebase/signerIdentity";
 import{fetchGatewaySigningResource,submitGatewaySignature,verifyGatewaySignedPdf}from"../firebase/signatureStorage";
 
 async function pngDataUrl(source){
