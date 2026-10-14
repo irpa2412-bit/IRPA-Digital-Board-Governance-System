@@ -154,7 +154,17 @@ test("direct meeting reads enforce category roles server-side", async () => {
   await assertSucceeds(staffDb.doc("meetings/staff-record").get());
 });
 
-test("closed Board session denies category-role access unless the profile is on its explicit access list", async () => {\n  await testEnv.withSecurityRulesDisabled(async context => {\n    await context.firestore().doc("meetings/closed-board").set(meeting({ meetingCategory: "GOVERNANCE", meetingPolicyId: "GOVERNANCE", meetingType: "Board Meeting", boardSessionType: "CLOSED_SESSION", confidentialityClass: "INTERNAL", closedSessionAccessUids: ["board-member"], participantUids: ["board-member"] }));\n  });\n  const boardDb = testEnv.authenticatedContext("board-member", { email: "board@example.test" }).firestore();\n  const staffDb = testEnv.authenticatedContext("staff-user", { email: "staff@example.test" }).firestore();\n  await assertSucceeds(boardDb.doc("meetings/closed-board").get());\n  await assertFails(staffDb.doc("meetings/closed-board").get());\n});\n\ntest("category-constrained meeting queries are allowed only for the matching category role", async () => {
+test("closed Board session denies category-role access unless the profile is on its explicit access list", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("meetings/closed-board").set(meeting({ meetingCategory: "GOVERNANCE", meetingPolicyId: "GOVERNANCE", meetingType: "Board Meeting", boardSessionType: "CLOSED_SESSION", confidentialityClass: "INTERNAL", closedSessionAccessUids: ["board-member"], participantUids: ["board-member"] }));
+  });
+  const boardDb = testEnv.authenticatedContext("board-member", { email: "board@example.test" }).firestore();
+  const staffDb = testEnv.authenticatedContext("staff-user", { email: "staff@example.test" }).firestore();
+  await assertSucceeds(boardDb.doc("meetings/closed-board").get());
+  await assertFails(staffDb.doc("meetings/closed-board").get());
+});
+
+test("category-constrained meeting queries are allowed only for the matching category role", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     await context.firestore().doc("meetings/governance-record").set(meeting({
       meetingCategory: "GOVERNANCE",
