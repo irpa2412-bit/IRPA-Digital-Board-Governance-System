@@ -128,6 +128,10 @@ export default {
         return await ensureSignatureWorkflowFolder(request, env);
       }
 
+      if (url.pathname === "/api/signature-file/download" && request.method === "POST") {
+        return await downloadSignatureFile(request, env);
+      }
+
       if (url.pathname === "/api/download" && request.method === "POST") {
         return await download(request, env);
       }
@@ -696,6 +700,78 @@ async function download(request, env) {
 }
 
 
+
+async function downloadSignatureFile(request, env) {
+  const claims = await authenticateFirebaseRequest(request, env);
+  const data = await request.json();
+  const fileId = String(data.fileId || "").trim();
+  const documentId = cleanId(data.documentId || "");
+  const envelopeId = cleanId(data.envelopeId || "");
+  if (!fileId) return json({ok:false,error:"Google Drive file ID is required."},400,corsHeaders(request));
+
+  const accessToken = await getDriveAccessToken(env);
+  const metadata = await driveFetch(env, accessToken, "/drive/v3/files/" + encodeURIComponent(fileId) + "?fields=id,name,mimeType,size,description");
+  const description = parseDescription(metadata.description);
+  if (!description?.irpaGovernance) return json({ok:false,error:"The requested file is not an IRPA governance document."},403,corsHeaders(request));
+
+  const purpose = String(description.purpose || "");
+  let allowed = false;
+  if (purpose === "Signature Profile") {
+    allowed = canReadSignatureAsset({
+      authenticatedUid: claims.user_id,
+      purpose,
+      ownerUid: description.ownerUid,
+    });
+  } else if (purpose === "Signed Documents Archive") {
+    if (!documentId || !envelopeId) return json({ok:false,error:"Signed workflow PDF retrieval requires its document and envelope IDs."},400,corsHeaders(request));
+    const envelope = await getFirestoreDocument(env, "signatureEnvelopes/" + envelopeId, claims.token);
+    const envelopeFields = envelope?.fields || {};
+    const envelopeDocumentId = envelopeFields.documentId?.stringValue || "";
+    if (!envelope || envelopeDocumentId !== documentId) return json({ok:false,error:"The signing envelope does not match the requested document."},403,corsHeaders(request));
+    const envelopeParticipantUids = firestoreStringArray(envelopeFields.participantUids);
+    const envelopeFileMatches = [
+      envelopeFields.signedDocumentUrl?.stringValue,
+      envelopeFields.ownerCompletedDocumentUrl?.stringValue,
+      envelopeFields.completedDocumentUrl?.stringValue,
+    ].some(value => String(value || "") === "drive://" + fileId);
+    allowed = canReadSignatureAsset({
+      authenticatedUid: claims.user_id,
+      purpose,
+      ownerUid: description.ownerUid,
+      documentId,
+      envelopeId,
+      metadataDocumentId: description.documentId || "",
+      metadataEnvelopeId: description.envelopeId || "",
+      envelopeParticipantUids,
+      envelopeFileMatches,
+    });
+  } else {
+    if (!documentId) return json({ok:false,error:"Controlled document retrieval requires its document ID."},400,corsHeaders(request));
+    const document = await getFirestoreDocument(env, "documents/" + documentId, claims.token);
+    if (!document) return json({ok:false,error:"The controlled document record was not found."},404,corsHeaders(request));
+    const fields = document.fields || {};
+    const admin = await getFirestoreDocument(env, "adminProfiles/" + claims.user_id, claims.token);
+    allowed = canReadSignatureAsset({
+      authenticatedUid: claims.user_id,
+      purpose,
+      documentId,
+      metadataDocumentId: description.documentId || "",
+      isAdmin: Boolean(admin?.fields?.active?.booleanValue),
+      documentOwnerUid: fields.ownerUid?.stringValue || "",
+      authorizedUids: firestoreStringArray(fields.authorizedUids),
+    });
+  }
+  if (!allowed) return json({ok:false,error:"You are not authorized to retrieve this Signature Portal asset."},403,corsHeaders(request));
+
+  const size = Number(metadata.size || 0);
+  if (size > MAX_BYTES) return json({ok:false,error:"The requested file exceeds the 10 MB limit."},400,corsHeaders(request));
+  const media = await fetch("https://www.googleapis.com/drive/v3/files/" + encodeURIComponent(fileId) + "?alt=media", {
+    headers: { Authorization: "Bearer " + accessToken },
+  });
+  if (!media.ok) throw new Error("Google Drive download failed.");
+  const buffer = new Uint8Array(await media.arrayBuffer());
+  return json({ok:true,fileId,fileName:metadata.name,contentType:metadata.mimeType,base64:uint8ToBase64(buffer)},200,corsHeaders(request));
+}
 
 async function finalizeSignatureProfileArchives(request, env) {
   const claims = await authenticateFirebaseRequest(request, env);
