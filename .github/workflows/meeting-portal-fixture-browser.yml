@@ -58,6 +58,8 @@ jobs:
           const allowed = new Set([
             ".github/workflows/meeting-portal-fixture-browser.yml",
             ".github/workflows/provision-meeting-archives.yml",
+            ".github/workflows/verify-livekit-staging.yml",
+            "functions/scripts/verify-livekit-recording-storage.js",
             ".github/workflows/meeting-invitation-flow-ci.yml",
             ".github/workflows/mail-invitation-tests.yml",
             "drive-gateway/src/index.js",
