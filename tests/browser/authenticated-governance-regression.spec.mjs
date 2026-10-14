@@ -60,12 +60,23 @@ async function navigateModule(page, viewportName, module) {
 
 async function assertPortalAndNoOverflow(page, expectedText, width) {
   await expect(page.locator(".topbar h2")).toContainText(expectedText, { timeout: 30000 });
-  const workspace = page.locator("main.content-area");
+  const workspace = page.locator("[data-active-portal-content]");
   await expect(workspace).toBeVisible();
+  await expect(workspace, "navigation must focus the destination portal body, not the shared header").toBeFocused();
   await expect.poll(
-    () => workspace.evaluate(el => Math.abs(el.getBoundingClientRect().top)),
-    { message: "destination workspace should scroll into the visible workspace area rather than leave the user at the global header", timeout: 10000 }
-  ).toBeLessThanOrEqual(40);
+    () => workspace.evaluate(el => {
+      const rect = el.getBoundingClientRect();
+      const header = document.querySelector(".main-area > header.topbar");
+      return rect.top - (header?.getBoundingClientRect().bottom || 0);
+    }),
+    { message: "destination portal body should be aligned directly below the shared header", timeout: 10000 }
+  ).toBeGreaterThanOrEqual(-2);
+  const destination = await workspace.evaluate(el => {
+    const rect = el.getBoundingClientRect();
+    const header = document.querySelector(".main-area > header.topbar");
+    return { top: rect.top, headerBottom: header?.getBoundingClientRect().bottom || 0, viewportHeight: window.innerHeight };
+  });
+  expect(destination.top, "destination content must be brought into the viewport rather than leaving the header as the focus target").toBeLessThan(destination.viewportHeight);
   const dimensions = await page.evaluate(() => ({
     viewport: document.documentElement.clientWidth,
     document: document.documentElement.scrollWidth

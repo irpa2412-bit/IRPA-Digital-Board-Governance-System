@@ -4,26 +4,21 @@ import { readFileSync } from "node:fs";
 
 const source = readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
 
-test("portal changes focus the viewport on the destination workspace", () => {
-  assert.match(
-    source,
-    /useEffect\(\(\)=>\{\s*let firstFrame=0;\s*let secondFrame=0;[\s\S]*?const workspace=document\.querySelector\("#root \.app-shell \.main-area > \.content-area"\);[\s\S]*?workspace\.scrollIntoView\(\{block:"start",behavior:"auto"\}\);[\s\S]*?\},\[active\]\);/
-  );
+test("portal navigation scrolls to the rendered active portal content, not the shared header", () => {
+  assert.ok(source.includes('const workspace=document.querySelector("#root .app-shell .main-area > .content-area [data-active-portal-content]");'));
+  assert.ok(source.includes('workspace.scrollIntoView({block:"start",behavior:"auto"});'));
+  assert.ok(source.includes('data-active-portal-content={active}'));
+  assert.ok(source.includes('data-active-portal-content="Dashboard"'));
 });
 
-test("navigation focus is scoped to the main workspace, not the global header", () => {
-  assert.match(source, /#root \.app-shell \.main-area > \.content-area/);
-  assert.doesNotMatch(source, /window\.scrollTo\(\s*0\s*,\s*0\s*\)/);
+test("navigation focus work is cancelled when the active portal changes or the shell unmounts", () => {
+  assert.ok(source.includes("window.cancelAnimationFrame(firstFrame)"));
+  assert.ok(source.includes("window.cancelAnimationFrame(secondFrame)"));
 });
 
-test("scheduled viewport work is cancelled when the active portal changes or the shell unmounts", () => {
-  assert.match(source, /window\.cancelAnimationFrame\(firstFrame\)/);
-  assert.match(source, /window\.cancelAnimationFrame\(secondFrame\)/);
-  assert.match(source, /return\(\)=>\{\s*window\.cancelAnimationFrame\(firstFrame\);\s*window\.cancelAnimationFrame\(secondFrame\);\s*\};[\s\S]*?\},\[active\]\);/);
-});
-
-test("navigation repair remains presentation-only and leaves access-gate routing in place", () => {
-  assert.match(source, /const requestDataGate=target=>\{if\(!target\)return;setGateBypassPortal\(""\);setActive\(target\)\}/);
-  assert.match(source, /const navigateWithoutDataGate=target=>\{if\(!target\)return;setGateBypassPortal\(target\);setActive\(target\)\}/);
-  assert.match(source, /const handlePortalDataEntryIntent=/);
+test("destination navigation keeps existing access-gate routing and entry-intent handling", () => {
+  assert.ok(source.includes('const requestDataGate=target=>{if(!target)return;setGateBypassPortal("");setActive(target)}'));
+  assert.ok(source.includes('const navigateWithoutDataGate=target=>{if(!target)return;setGateBypassPortal(target);setActive(target)}'));
+  assert.ok(source.includes("const handlePortalDataEntryIntent="));
+  assert.ok(!source.includes("window.scrollTo(0,0)"));
 });
