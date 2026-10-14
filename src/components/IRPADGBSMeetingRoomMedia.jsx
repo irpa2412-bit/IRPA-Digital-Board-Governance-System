@@ -12,7 +12,7 @@ function safeJson(value){
   try{return JSON.parse(decoder.decode(value))}catch{return null}
 }
 
-export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",controller=false}){
+export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",controller=false,onConnectionChange=()=>{}}){
  const roomRef=useRef(null),remoteRef=useRef(null),localRef=useRef(null);
  const[status,setStatus]=useState("READY"),[error,setError]=useState(""),[muted,setMuted]=useState(true),[camera,setCamera]=useState(false),[screen,setScreen]=useState(false),[hand,setHand]=useState(false),[moderator,setModerator]=useState(false),[recordingAllowed,setRecordingAllowed]=useState(false);
  const[participants,setParticipants]=useState([]),[messages,setMessages]=useState([]),[chat,setChat]=useState(""),[deviceReady,setDeviceReady]=useState(false),[deviceCheck,setDeviceCheck]=useState("NOT CHECKED"),[sessionId,setSessionId]=useState(""),[recordingStatus,setRecordingStatus]=useState("NOT_STARTED"),[recordingInfo,setRecordingInfo]=useState(null),[recordingBusy,setRecordingBusy]=useState(false);
@@ -39,7 +39,7 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
  };
  const detach=(track)=>track?.detach().forEach(node=>node.remove());
 
- useEffect(()=>()=>{roomRef.current?.disconnect();roomRef.current=null},[]);
+ useEffect(()=>()=>{onConnectionChange(false);roomRef.current?.disconnect();roomRef.current=null},[]);
 
  async function connect(){
    if(!meeting?.id)return setError("Select an IRPA meeting first.");
@@ -82,13 +82,13 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
      room.on(RoomEvent.DataReceived,(payload,participant)=>{const msg=safeJson(payload);if(msg?.type==="chat")setMessages(v=>[...v,{from:participant?.name||participant?.identity||"Participant",text:String(msg.text||"")}].slice(-30));if(msg?.type==="hand")refreshParticipants(room)});
      room.on(RoomEvent.Reconnecting,()=>setStatus("RECONNECTING"));
      room.on(RoomEvent.Reconnected,()=>{setStatus("CONNECTED");refreshParticipants(room)});
-     room.on(RoomEvent.Disconnected,()=>{setStatus("DISCONNECTED");setCamera(false);setMuted(true);setScreen(false);setHand(false);setModerator(false);setRecordingAllowed(false);clear(localRef.current);clear(remoteRef.current);setParticipants([]);roomRef.current=null});
+     room.on(RoomEvent.Disconnected,()=>{onConnectionChange(false);setStatus("DISCONNECTED");setCamera(false);setMuted(true);setScreen(false);setHand(false);setModerator(false);setRecordingAllowed(false);clear(localRef.current);clear(remoteRef.current);setParticipants([]);roomRef.current=null});
      await room.connect(data.serverUrl,data.participantToken);
-     roomRef.current=room;setSessionId(data.sessionId||"");setModerator(data.moderator===true);setRecordingAllowed(data.recordingAllowed===true);setStatus("CONNECTED");refreshParticipants(room);refreshRecordingStatus();
+     roomRef.current=room;onConnectionChange(true);setSessionId(data.sessionId||"");setModerator(data.moderator===true);setRecordingAllowed(data.recordingAllowed===true);setStatus("CONNECTED");refreshParticipants(room);refreshRecordingStatus();
      await room.localParticipant.setMicrophoneEnabled(true,{audioCaptureOptions:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});setMuted(false);
      await room.localParticipant.setCameraEnabled(false);setCamera(false);
      try{const devices=await navigator.mediaDevices?.enumerateDevices?.();setDeviceReady(Boolean(devices?.some(d=>d.kind==="audioinput")&&devices?.some(d=>d.kind==="videoinput")))}catch{setDeviceReady(false)}
-   }catch(e){console.error("IRPA-DGBS Meeting Room media connection failed",e);setStatus("READY");setError(e?.message||"Unable to connect to the IRPA-DGBS Meeting Room.")}
+   }catch(e){onConnectionChange(false);console.error("IRPA-DGBS Meeting Room media connection failed",e);setStatus("READY");setError(e?.message||"Unable to connect to the IRPA-DGBS Meeting Room.")}
  }
  async function checkDevices(){
    setError("");setDeviceCheck("CHECKING");
