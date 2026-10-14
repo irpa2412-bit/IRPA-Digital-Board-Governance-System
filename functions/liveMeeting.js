@@ -345,6 +345,33 @@ function recordingStateForEgress(info) {
   if (state === "EGRESS_ACTIVE") return "RECORDING";
   return "STARTING";
 }
+exports.reportMeetingRecordingFailure = onCall({ region: "us-central1", timeoutSeconds: 30 }, async request => {
+  const meetingId = text(request.data?.meetingId);
+  const failureCode = text(request.data?.failureCode);
+  const allowedCodes = new Set(["ROOM_CONNECTION_FAILED", "RECORDING_NOT_CONFIRMED", "RECORDING_POLICY_FAILURE"]);
+  if (!allowedCodes.has(failureCode)) throw new HttpsError("invalid-argument", "Unsupported recording failure code.");
+  const ctx = await resolveRecordingControl(request, meetingId, { requireRecordingAllowed: false, allowClosed: true });
+  if (!ctx.controller) throw new HttpsError("permission-denied", "Only the meeting administrator, initiator, chairperson or secretary may report a recording failure.");
+  const current = await db.collection("meetingMediaRecordings").where("meetingId", "==", meetingId).get();
+  const active = current.docs.some(doc => ["RECORDING", "STARTING", "STOPPING"].includes(text(doc.data()?.recordingStatus)));
+  const status = failureCode === "RECORDING_NOT_CONFIRMED" && active ? "UNCONFIRMED" : "FAILED";
+  const reason = failureCode === "ROOM_CONNECTION_FAILED"
+    ? "The live room could not connect when proceedings began."
+    : failureCode === "RECORDING_POLICY_FAILURE"
+      ? "The server-side recording policy did not enable capture."
+      : "The recording service did not confirm active capture.";
+  await db.collection("meetings").doc(meetingId).update({
+    recordingStatus: status, recordingFailureCode: failureCode, recordingFailureReason: reason,
+    recordingFailureAt: FieldValue.serverTimestamp(), recordingFailureByUid: ctx.uid
+  });
+  await db.collection("audit").add({
+    action: "LIVE_MEETING_RECORDING_FAILURE_REPORTED", collection: "meetings", recordId: meetingId,
+    details: { meetingId, meetingCategory: recordingCategory(ctx.meeting), confidentialityClass: text(ctx.meeting.confidentialityClass || "INTERNAL"), failureCode, recordingStatus: status, reason },
+    actorUid: ctx.uid, actorEmail: ctx.email || null, createdAt: FieldValue.serverTimestamp()
+  });
+  return { ok: true, recordingStatus: status, failureCode };
+});
+
 exports.startMeetingRecording = onCall({
   region: "us-central1", timeoutSeconds: 60,
   secrets: [LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET]
