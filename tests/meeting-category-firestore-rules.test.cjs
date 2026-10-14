@@ -47,16 +47,19 @@ function meeting(overrides = {}) {
     initiatorEmail: "director@example.test",
     registerStatus: "Draft",
     status: "Scheduled",
+    confidentialityClass: "INTERNAL",
+    boardSessionType: "OPEN_SESSION",
+    recordingAllowed: true,
     ...overrides
   };
 }
-test("active designated departmental director can create a categorized meeting", async () => {
+test("active individual profile can create a categorized meeting", async () => {
   const db = testEnv.authenticatedContext("departmental-director", {
     email: "director@example.test"
   }).firestore();
   await assertSucceeds(db.doc("meetings/departmental-meeting").set(meeting()));
 });
-test("designated initiator can complete initial registration release exactly once", async () => {
+test("active staff profile can initiate a meeting without a departmental registrar role", async () => {\n  const db = testEnv.authenticatedContext("staff-user", { email: "staff@example.test" }).firestore();\n  await assertSucceeds(db.doc("meetings/staff-initiated").set(meeting({ initiatorUid: "staff-user", initiatorEmail: "staff@example.test", meetingCategory: "GENERAL", meetingPolicyId: "GENERAL", meetingType: "General Meeting" })));\n});\n\ntest("new meeting creation requires an explicit confidentiality and recording policy", async () => {\n  const db = testEnv.authenticatedContext("staff-user", { email: "staff@example.test" }).firestore();\n  await assertFails(db.doc("meetings/missing-policy").set(meeting({ initiatorUid: "staff-user", confidentialityClass: "", recordingAllowed: false })));\n});\n\ntest("designated initiator can complete initial registration release exactly once", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     await context.firestore().doc("meetings/departmental-meeting").set(meeting());
   });
@@ -133,7 +136,7 @@ test("direct meeting reads enforce category roles server-side", async () => {
   await assertSucceeds(staffDb.doc("meetings/staff-record").get());
 });
 
-test("category-constrained meeting queries are allowed only for the matching category role", async () => {
+test("closed Board session denies category-role access unless the profile is on its explicit access list", async () => {\n  await testEnv.withSecurityRulesDisabled(async context => {\n    await context.firestore().doc("meetings/closed-board").set(meeting({ meetingCategory: "GOVERNANCE", meetingPolicyId: "GOVERNANCE", meetingType: "Board Meeting", boardSessionType: "CLOSED_SESSION", confidentialityClass: "INTERNAL", closedSessionAccessUids: ["board-member"], participantUids: ["board-member"] }));\n  });\n  const boardDb = testEnv.authenticatedContext("board-member", { email: "board@example.test" }).firestore();\n  const staffDb = testEnv.authenticatedContext("staff-user", { email: "staff@example.test" }).firestore();\n  await assertSucceeds(boardDb.doc("meetings/closed-board").get());\n  await assertFails(staffDb.doc("meetings/closed-board").get());\n});\n\ntest("category-constrained meeting queries are allowed only for the matching category role", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     await context.firestore().doc("meetings/governance-record").set(meeting({
       meetingCategory: "GOVERNANCE",
