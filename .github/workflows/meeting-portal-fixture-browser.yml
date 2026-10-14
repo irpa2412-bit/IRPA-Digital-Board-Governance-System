@@ -103,10 +103,12 @@ jobs:
           }
                     const testOnlySignatureNavigation = changed.includes("tests/meeting-portal-browser.test.mjs") &&
             changed.includes("tests/fixtures/meeting-portal-fixture.jsx");
+          const testOnlyRegisterScope = changed.includes("src/firebase/data.js") &&
+            changed.includes("tests/meeting-category-policy.test.mjs");
           if (!changed.includes("src/pages/Meetings.jsx") &&
               !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
-              !testOnlySignatureNavigation) {
-            throw new Error("Meeting/participant portal source change or paired isolated signature-navigation regression test is missing.");
+              !testOnlySignatureNavigation && !testOnlyRegisterScope) {
+            throw new Error("Meeting/participant source change or a paired isolated signature-navigation/register-scope regression test is missing.");
           }
           console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));
           NODE
