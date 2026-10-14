@@ -102,7 +102,7 @@ export async function getAccessibleMeetingRecords(){
   const uid=user.uid;
   jobs.push(query(ref,where("initiatorUid","==",uid)));
   for(const field of ["participantUids","attendeeUids","memberUids","invitedUids","subscriberUids"])jobs.push(query(ref,where(field,"array-contains",uid)));
-  if(email)for(const field of ["participantEmails","attendeeEmails","invitedEmails","subscriberEmails"])jobs.push(query(ref,where(field,"array-contains",email));
+  if(email)for(const field of ["participantEmails","attendeeEmails","invitedEmails","subscriberEmails"])jobs.push(query(ref,where(field,"array-contains",email)));
   const results=await Promise.all(jobs.map(q=>getDocs(q).catch(()=>null)));
   const records=new Map();
   results.forEach(s=>s?.docs?.forEach(d=>records.set(d.id,{id:d.id,...d.data()})));
