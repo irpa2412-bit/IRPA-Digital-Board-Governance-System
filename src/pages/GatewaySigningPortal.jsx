@@ -58,7 +58,6 @@ export default function GatewaySigningPortal({token}){
   }catch(error){if(!cancelled)setMessage(error?.message||"Unable to load the Gateway signing transaction.");}finally{if(!cancelled)setLoading(false)}})();return()=>{cancelled=true;if(objectUrl)URL.revokeObjectURL(objectUrl)}},[token]);
   async function refreshStatus(){
     const next=await fetchGatewaySigningResource("/api/sign/status",token);
-    setStatus(next);
     if(next.status==="Completed"){
       const completedBytes=await fetchGatewaySigningResource("/api/sign/pdf",token,{pdf:true});
       const verification=await verifyGatewaySignedPdf({token,bytes:completedBytes});
@@ -68,6 +67,7 @@ export default function GatewaySigningPortal({token}){
       setEvidence(found);
       setMessage("Signing completed. The Gateway returned persisted cryptographic evidence and verified the audit chain.");
     }
+    setStatus(next);
     if(next.externalReference&&next.auditChainValid===true){
       try{await syncGatewaySigningMirror(next.externalReference,next)}catch(error){console.warn("Gateway signing status is valid but Signature Portal mirror sync needs reconciliation.",error);}
     }
