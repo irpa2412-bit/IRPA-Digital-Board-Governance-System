@@ -1,0 +1,96 @@
+name: Deploy IRPA Meeting Room Staging Frontend
+
+on:
+  push:
+    branches:
+      - staging/cloudflare-livekit-token-integration-20261014
+    paths:
+      - "src/**"
+      - "public/**"
+      - "index.html"
+      - "cloudflare-frontend-worker.js"
+      - "package.json"
+      - "package-lock.json"
+      - "wrangler.livekit-staging.jsonc"
+      - ".github/workflows/cloudflare-livekit-staging-frontend.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: irpa-meeting-room-staging-frontend
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy-staging:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout isolated staging branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Verify readability policy
+        run: npm run check:production-readability
+
+      - name: Build with isolated staging Firebase and LiveKit configuration
+        env:
+          VITE_FIREBASE_API_KEY: "AIzaSyA6UmHtP-mRr99rBw57_-qrD4_mFSBnZ38"
+          VITE_FIREBASE_AUTH_DOMAIN: "irpa-dbg-staging-a73ec.firebaseapp.com"
+          VITE_FIREBASE_PROJECT_ID: "irpa-dbg-staging-a73ec"
+          VITE_FIREBASE_STORAGE_BUCKET: "irpa-dbg-staging-a73ec.firebasestorage.app"
+          VITE_FIREBASE_MESSAGING_SENDER_ID: "1018976634858"
+          VITE_FIREBASE_APP_ID: "1:1018976634858:web:e73e9e09f55a76ade25493"
+          VITE_FIREBASE_MEASUREMENT_ID: ""
+          VITE_LIVEKIT_TOKEN_WORKER_URL: "https://irpa-dgb-livekit-token-staging.irpa-governance.workers.dev"
+          VITE_GATEWAY_ORIGIN: "https://staging-disabled.invalid"
+          VITE_GOOGLE_DRIVE_GATEWAY_URL: "https://staging-disabled.invalid"
+          VITE_GRANT_CRAWLER_WORKER_URL: "https://staging-disabled.invalid"
+          VITE_GRANT_ASSISTANT_WORKER_URL: "https://staging-disabled.invalid"
+        run: |
+          set -euo pipefail
+          npm run build
+          test -s dist/index.html
+          grep -R -q 'irpa-dbg-staging-a73ec' dist
+          grep -R -q 'irpa-dgb-livekit-token-staging.irpa-governance.workers.dev' dist
+          echo "Staging build uses the isolated Firebase project and Cloudflare LiveKit token Worker."
+
+      - name: Verify Cloudflare deployment credentials
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Accept: application/json" \
+            https://api.cloudflare.com/client/v4/user/tokens/verify > "$RUNNER_TEMP/cf-token.json"
+          node -e 'const x=require(process.argv[1]); if(!x.success) process.exit(1);' "$RUNNER_TEMP/cf-token.json"
+
+      - name: Deploy isolated staging frontend Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler deploy --config wrangler.livekit-staging.jsonc
+
+      - name: Verify staging frontend health
+        run: |
+          set -euo pipefail
+          url="https://irpa-dgb-meeting-room-staging.irpa-governance.workers.dev"
+          curl --fail --silent --show-error --retry 8 --retry-delay 3 --max-time 30 "$url/" -o "$RUNNER_TEMP/staging.html"
+          grep -qi '<html' "$RUNNER_TEMP/staging.html"
+          health="$(curl --fail --silent --show-error --retry 5 --retry-delay 2 --max-time 20 "$url/__irpa_health")"
+          echo "$health"
+          echo "$health" | grep -q '"ok":true'
+          echo "Isolated staging frontend is deployed. Authenticated token, recording, and two-browser media tests remain separate acceptance tests."
