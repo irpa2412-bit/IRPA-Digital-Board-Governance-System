@@ -322,6 +322,15 @@ function recordingRoomName(meetingId) {
 function safeRecordingId(value) {
   return String(value || "").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 120);
 }
+function recordingCategory(meeting = {}) {
+  const raw = text(meeting.meetingCategory || meeting.meetingPolicyId || meeting.category || meeting.meetingType).toUpperCase();
+  if (["GOVERNANCE","BOARD","BOARD MEETING","BOARD COMMITTEE MEETING","ANNUAL GENERAL MEETING","SPECIAL MEETING"].includes(raw)) return "GOVERNANCE";
+  if (["ADMINISTRATIVE","MANAGEMENT","MANAGEMENT MEETING","ADMINISTRATION MEETING","OPERATIONS MEETING"].includes(raw)) return "ADMINISTRATIVE";
+  if (["STAFF","STAFF MEETING"].includes(raw)) return "STAFF";
+  if (["GENERAL","GENERAL MEETING"].includes(raw)) return "GENERAL";
+  if (["DISCIPLINARY","DISCIPLINARY MEETING","DISCIPLINARY HEARING"].includes(raw)) return "DISCIPLINARY";
+  return "OTHER";
+}
 function egressState(info) {
   const value = info?.status;
   const numeric = Number(value);
@@ -348,7 +357,8 @@ exports.startMeetingRecording = onCall({
     throw new HttpsError("already-exists", "A recording is already active or stopping for this meeting.");
   }
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const filepath = "irpa-governance-recordings/" + safeRecordingId(ctx.meeting.id) + "/" + stamp + ".mp4";
+  const category = recordingCategory(ctx.meeting);
+  const filepath = "irpa-governance-recordings/" + category.toLowerCase() + "/" + safeRecordingId(ctx.meeting.id) + "/" + stamp + ".mp4";
   let egress;
   try {
     egress = await egressClient().startRoomCompositeEgress(
@@ -369,7 +379,7 @@ exports.startMeetingRecording = onCall({
   const row = {
     meetingId: ctx.meeting.id,
     meetingReference: text(ctx.meeting.meetingReference || ctx.meeting.reference || ctx.meeting.title),
-    meetingTitle: text(ctx.meeting.title), meetingCategory: categoryOf(ctx.meeting), roomName,
+    meetingTitle: text(ctx.meeting.title), meetingCategory: category, confidentialityClass: text(ctx.meeting.confidentialityClass || "INTERNAL"), boardSessionType: text(ctx.meeting.boardSessionType || "NOT_APPLICABLE"), roomName,
     egressId, outputPath: filepath, recordingStatus: "RECORDING",
     egressStatus: egressState(egress),
     recordingProvider: "LIVEKIT_EGRESS", storageDestination: "LIVEKIT_EGRESS_CONFIGURED_STORAGE",
@@ -384,7 +394,7 @@ exports.startMeetingRecording = onCall({
   });
   await db.collection("audit").add({
     action: "LIVE_MEETING_RECORDING_STARTED", collection: "meetingMediaRecordings", recordId: egressId,
-    details: { meetingId: ctx.meeting.id, meetingCategory: row.meetingCategory, egressId, outputPath: filepath, storageDestination: row.storageDestination },
+    details: { meetingId: ctx.meeting.id, meetingCategory: row.meetingCategory, confidentialityClass: row.confidentialityClass, boardSessionType: row.boardSessionType, egressId, outputPath: filepath, storageDestination: row.storageDestination, recordingStatus: row.recordingStatus },
     actorUid: ctx.uid, actorEmail: ctx.email || null, createdAt: FieldValue.serverTimestamp()
   });
   return { ok: true, recordingId: egressId, egressId, recordingStatus: "RECORDING", outputPath: filepath, storageDestination: row.storageDestination };
@@ -426,7 +436,7 @@ exports.stopMeetingRecording = onCall({
   });
   await db.collection("audit").add({
     action: "LIVE_MEETING_RECORDING_STOP_REQUESTED", collection: "meetingMediaRecordings", recordId: recordingId,
-    details: { meetingId, egressStatus, recordingStatus, fileCount: files.length },
+    details: { meetingId, meetingCategory: text(snap.data()?.meetingCategory || snap.data()?.meetingPolicyId || "OTHER"), confidentialityClass: text(snap.data()?.confidentialityClass || "INTERNAL"), egressStatus, recordingStatus, fileCount: files.length, filesVerified: files.length > 0 },
     actorUid: ctx.uid, actorEmail: ctx.email || null, createdAt: FieldValue.serverTimestamp()
   });
   return { ok: true, recordingId, recordingStatus, egressStatus, files };
