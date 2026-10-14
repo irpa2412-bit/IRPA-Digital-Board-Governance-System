@@ -17,12 +17,15 @@ async function navigateModule(page, viewportName, module) {
         await dialog.getByRole("button", { name: /Finance Portal/ }).click();
       } else if (module === "Documents") {
         await dialog.getByRole("button", { name: /Documents Portal/ }).click();
-      } else if (module === "Voting") {
+      } else if (["Meeting Room", "Voting", "Resolutions", "Decisions"].includes(module)) {
         await dialog.getByRole("button", { name: /Meeting Portal/ }).click();
-        await dialog.getByRole("button", { name: /SUB-PORTAL.*Voting Portal/ }).click();
-      } else {
-        await dialog.getByRole("button", { name: /Meeting Portal/ }).click();
-        await dialog.getByRole("button", { name: /SUB-PORTAL.*Meeting Room Portal/ }).click();
+        const child = {
+          "Meeting Room": /SUB-PORTAL.*Meeting Room Portal/,
+          "Voting": /SUB-PORTAL.*Voting Portal/,
+          "Resolutions": /SUB-PORTAL.*Resolutions Portal/,
+          "Decisions": /SUB-PORTAL.*Decisions Portal/
+        }[module];
+        await dialog.getByRole("button", { name: child }).click();
       }
     } else {
       await page.locator(".mobile-global-nav").getByRole("button", { name: "Menu" }).click();
@@ -33,10 +36,15 @@ async function navigateModule(page, viewportName, module) {
     }
   } else {
     const sidebar = page.locator(".sidebar");
-    if (module === "Meeting Room" || module === "Voting") {
+    if (["Meeting Room", "Voting", "Resolutions", "Decisions"].includes(module)) {
       // Child portal buttons are rendered after opening their parent in the sidebar.
       await sidebar.getByRole("button", { name: /Meeting Portal/ }).click();
-      const childLabel = module === "Meeting Room" ? /SUB-PORTAL.*Meeting Room Portal/ : /SUB-PORTAL.*Voting Portal/;
+      const childLabel = {
+        "Meeting Room": /SUB-PORTAL.*Meeting Room Portal/,
+        "Voting": /SUB-PORTAL.*Voting Portal/,
+        "Resolutions": /SUB-PORTAL.*Resolutions Portal/,
+        "Decisions": /SUB-PORTAL.*Decisions Portal/
+      }[module];
       await sidebar.getByRole("button", { name: childLabel }).click();
     } else {
       const label = module === "Finance Portfolio" ? /Finance Portal|Finance Portfolio/ :
@@ -114,12 +122,21 @@ for (const viewport of [
       ["Finance Portfolio", /Finance/],
       ["Meeting Room", /Meeting Room/],
       ["Documents", /Documents/],
+      ["Resolutions", /Resolutions/],
       ["Voting", /Voting/],
+      ["Decisions", /Decisions/],
       ["Grant Intelligence & Funding Opportunities", /Grant Intelligence.*Funding Opportunities/]
     ]) {
       await navigateModule(page, viewport.name, module);
       await assertPortalAndNoOverflow(page, heading, viewport.width);
     }
+
+    // Exercise the document-to-signing workflow navigation without creating or signing records.
+    await navigateModule(page, viewport.name, "Documents");
+    await page.locator(".module-interlink-bar").getByRole("button", { name: "Signing Workspace" }).click();
+    await expect(page.locator(".module-interlink-bar .workflow-action-portal.active")).toContainText("Signing Workspace");
+    await page.locator(".module-interlink-bar").getByRole("button", { name: "Post-Signature Work" }).click();
+    await expect(page.locator(".module-interlink-bar .workflow-action-portal.active")).toContainText("Post-Signature Work");
 
     expect(uncaughtErrors, "uncaught JavaScript errors during portal navigation").toEqual([]);
     expect(successfulExternalRequests, "no external or production request may complete in the isolated fixture").toEqual([]);
