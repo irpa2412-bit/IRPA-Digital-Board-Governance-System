@@ -367,9 +367,14 @@ exports.startMeetingRecording = onCall({
       { layout: "grid", audioOnly: false }
     );
   } catch (error) {
+    const failureReason = text(error?.message).slice(0, 500) || "LiveKit Egress did not confirm startup.";
+    await db.collection("meetings").doc(ctx.meeting.id).update({
+      recordingStatus: "FAILED", recordingFailureReason: failureReason,
+      recordingFailureAt: FieldValue.serverTimestamp(), recordingFailureByUid: ctx.uid
+    });
     await db.collection("audit").add({
       action: "LIVE_MEETING_RECORDING_START_FAILED", collection: "meetingMediaRecordings", recordId: null,
-      details: { meetingId: ctx.meeting.id, reason: text(error?.message).slice(0, 500), storageDestination: "LIVEKIT_EGRESS_CONFIGURED_STORAGE" },
+      details: { meetingId: ctx.meeting.id, meetingCategory: recordingCategory(ctx.meeting), confidentialityClass: text(ctx.meeting.confidentialityClass || "INTERNAL"), reason: failureReason, storageDestination: "LIVEKIT_EGRESS_CONFIGURED_STORAGE", recordingStatus: "FAILED" },
       actorUid: ctx.uid, actorEmail: ctx.email || null, createdAt: FieldValue.serverTimestamp()
     });
     throw new HttpsError("failed-precondition", "Recording could not start. Verify that LiveKit Egress is running and its recording storage is configured; no recording has been confirmed.");
@@ -452,7 +457,12 @@ exports.getMeetingRecordingStatus = onCall({
     (b.startedAt?.toMillis?.() || 0) - (a.startedAt?.toMillis?.() || 0)
   );
   let row = rows[0];
-  if (!row) return { ok: true, recordingAllowed: ctx.meeting.recordingAllowed === true, recordingStatus: "NOT_STARTED", recording: null };
+  if (!row) return {
+    ok: true, recordingAllowed: ctx.meeting.recordingAllowed === true,
+    recordingStatus: text(ctx.meeting.recordingStatus || "NOT_STARTED"),
+    failureReason: text(ctx.meeting.recordingFailureReason || "") || null,
+    recording: null
+  };
   if (row.egressId && ["RECORDING", "STOPPING", "STARTING"].includes(text(row.recordingStatus))) {
     try {
       const latest = (await egressClient().listEgress("", row.egressId)).find(item => text(item.egressId) === text(row.egressId));
