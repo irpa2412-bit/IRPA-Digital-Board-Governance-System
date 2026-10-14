@@ -349,8 +349,21 @@ exports.startMeetingRecording = onCall({
   region: "us-central1", timeoutSeconds: 60,
   secrets: [LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET]
 }, async request => {
-  const ctx = await resolveRecordingControl(request, text(request.data?.meetingId));
+  const ctx = await resolveRecordingControl(request, text(request.data?.meetingId), { requireRecordingAllowed: false });
   if (!ctx.controller) throw new HttpsError("permission-denied", "Only the meeting administrator, initiator, chairperson or secretary may start recording.");
+  if (ctx.meeting.recordingAllowed !== true) {
+    const reason = "Recording is not enabled in the meeting's server-side recording policy.";
+    await db.collection("meetings").doc(ctx.meeting.id).update({
+      recordingStatus: "FAILED", recordingFailureReason: reason,
+      recordingFailureAt: FieldValue.serverTimestamp(), recordingFailureByUid: ctx.uid
+    });
+    await db.collection("audit").add({
+      action: "LIVE_MEETING_RECORDING_POLICY_FAILURE", collection: "meetings", recordId: ctx.meeting.id,
+      details: { meetingId: ctx.meeting.id, meetingCategory: recordingCategory(ctx.meeting), confidentialityClass: text(ctx.meeting.confidentialityClass || "INTERNAL"), recordingStatus: "FAILED", reason },
+      actorUid: ctx.uid, actorEmail: ctx.email || null, createdAt: FieldValue.serverTimestamp()
+    });
+    throw new HttpsError("failed-precondition", "Recording is not enabled in the server-side meeting policy. Proceedings must not be treated as recorded.");
+  }
   const roomName = recordingRoomName(ctx.meeting.id);
   const activeRecordings = await db.collection("meetingMediaRecordings").where("meetingId", "==", ctx.meeting.id).get();
   if (activeRecordings.docs.some(doc => ["STARTING", "RECORDING", "STOPPING"].includes(text(doc.data()?.recordingStatus)))) {
