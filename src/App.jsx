@@ -510,6 +510,7 @@ useEffect(()=>{
   let finalFrame=0;
   let retryTimer1=0;
   let retryTimer2=0;
+  let retryTimer3=0;
   firstFrame=window.requestAnimationFrame(()=>{
     secondFrame=window.requestAnimationFrame(()=>{
       const workspace=document.querySelector("#root .app-shell .main-area > .content-area [data-active-portal-content]");
@@ -545,6 +546,9 @@ useEffect(()=>{
       // Reassert focus after mount settles without changing navigation or access decisions.
       retryTimer1=window.setTimeout(focusDestination,120);
       retryTimer2=window.setTimeout(focusDestination,360);
+      // Some lazy portal descendants settle after the first mount cycle. Keep the
+      // final focus correction bounded and only for the current destination.
+      retryTimer3=window.setTimeout(focusDestination,1000);
     });
   });
   return()=>{
@@ -553,6 +557,7 @@ useEffect(()=>{
     window.cancelAnimationFrame(finalFrame);
     window.clearTimeout(retryTimer1);
     window.clearTimeout(retryTimer2);
+    window.clearTimeout(retryTimer3);
   };
 },[active]);
 useEffect(()=>{
