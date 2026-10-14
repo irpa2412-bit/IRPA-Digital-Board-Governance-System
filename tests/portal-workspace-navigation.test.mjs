@@ -4,10 +4,10 @@ import { readFileSync } from "node:fs";
 
 const source = readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
 
-test("portal changes focus the viewport on the destination workspace", () => {
+test("portal changes focus the viewport on the destination workspace and correct responsive residual offset", () => {
   assert.match(
     source,
-    /useEffect\(\(\)=>\{\s*let firstFrame=0;\s*let secondFrame=0;[\s\S]*?const workspace=document\.querySelector\("#root \.app-shell \.main-area > \.content-area"\);[\s\S]*?workspace\.scrollIntoView\(\{block:"start",behavior:"auto"\}\);[\s\S]*?\},\[active\]\);/
+    /useEffect\(\(\)=>\{\s*let firstFrame=0;\s*let secondFrame=0;\s*let alignFrame=0;[\s\S]*?const workspace=document\.querySelector\("#root \.app-shell \.main-area > \.content-area"\);[\s\S]*?workspace\.scrollIntoView\(\{block:"start",behavior:"auto"\}\);[\s\S]*?const top=current\.getBoundingClientRect\(\)\.top;[\s\S]*?window\.scrollBy\(\{top:top-12,left:0,behavior:"auto"\}\);[\s\S]*?\},\[active\]\);/
   );
 });
 
@@ -16,10 +16,11 @@ test("navigation focus is scoped to the main workspace, not the global header", 
   assert.doesNotMatch(source, /window\.scrollTo\(\s*0\s*,\s*0\s*\)/);
 });
 
-test("scheduled viewport work is cancelled when the active portal changes or the shell unmounts", () => {
+test("all scheduled viewport work is cancelled when the active portal changes or the shell unmounts", () => {
   assert.match(source, /window\.cancelAnimationFrame\(firstFrame\)/);
   assert.match(source, /window\.cancelAnimationFrame\(secondFrame\)/);
-  assert.match(source, /return\(\)=>\{\s*window\.cancelAnimationFrame\(firstFrame\);\s*window\.cancelAnimationFrame\(secondFrame\);\s*\};[\s\S]*?\},\[active\]\);/);
+  assert.match(source, /window\.cancelAnimationFrame\(alignFrame\)/);
+  assert.match(source, /return\(\)=>\{\s*window\.cancelAnimationFrame\(firstFrame\);\s*window\.cancelAnimationFrame\(secondFrame\);\s*window\.cancelAnimationFrame\(alignFrame\);\s*\};[\s\S]*?\},\[active\]\);/);
 });
 
 test("navigation repair remains presentation-only and leaves access-gate routing in place", () => {
