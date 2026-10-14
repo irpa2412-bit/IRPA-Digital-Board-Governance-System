@@ -17,6 +17,7 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
  const[status,setStatus]=useState("READY"),[error,setError]=useState(""),[muted,setMuted]=useState(true),[camera,setCamera]=useState(false),[screen,setScreen]=useState(false),[hand,setHand]=useState(false),[moderator,setModerator]=useState(false),[recordingAllowed,setRecordingAllowed]=useState(false);
  const[participants,setParticipants]=useState([]),[messages,setMessages]=useState([]),[chat,setChat]=useState(""),[deviceReady,setDeviceReady]=useState(false),[deviceCheck,setDeviceCheck]=useState("NOT CHECKED"),[sessionId,setSessionId]=useState(""),[recordingStatus,setRecordingStatus]=useState("NOT_STARTED"),[recordingInfo,setRecordingInfo]=useState(null),[recordingBusy,setRecordingBusy]=useState(false),[recordingStatusLoaded,setRecordingStatusLoaded]=useState(false),[recordingRunNumber,setRecordingRunNumber]=useState(0);
  const lastMeetingStatusRef=useRef({meetingId:"",status:""}),automaticStartRunRef=useRef(-1),automaticStopRef=useRef("");
+ const automaticRecordingEnabled=Boolean(String(import.meta.env.VITE_LIVEKIT_RECORDING_WORKER_URL||"").trim());
 
  const clear=node=>{if(node)while(node.firstChild)node.removeChild(node.firstChild)};
  const refreshParticipants=room=>{
@@ -173,7 +174,7 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
   lastMeetingStatusRef.current={meetingId:meeting.id,status:String(meeting.status||"")};
  },[meeting?.id,meeting?.status]);
  useEffect(()=>{
-  if(!meeting?.id||!recordingController||status!=="CONNECTED"||!recordingAllowed||!recordingStatusLoaded||recordingBusy)return;
+  if(!automaticRecordingEnabled||!meeting?.id||!recordingController||status!=="CONNECTED"||!recordingAllowed||!recordingStatusLoaded||recordingBusy)return;
   const active=["STARTING","RECORDING","STOPPING"].includes(recordingStatus);
   if(meeting.status==="In Progress"&&recordingRunNumber>0&&automaticStartRunRef.current!==recordingRunNumber&&["NOT_STARTED","COMPLETED","FAILED"].includes(recordingStatus)){
    automaticStartRunRef.current=recordingRunNumber;
@@ -182,7 +183,7 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
    automaticStopRef.current=recordingInfo.egressId||recordingInfo.id;
    void stopRecording(true);
   }
- },[meeting?.id,meeting?.status,recordingController,status,recordingAllowed,recordingStatusLoaded,recordingBusy,recordingStatus,recordingInfo,recordingRunNumber]);
+ },[automaticRecordingEnabled,meeting?.id,meeting?.status,recordingController,status,recordingAllowed,recordingStatusLoaded,recordingBusy,recordingStatus,recordingInfo,recordingRunNumber]);
  useEffect(()=>{
   if(status!=="CONNECTED"||!meeting?.id||!recordingStatusLoaded||!["STARTING","RECORDING","STOPPING"].includes(recordingStatus))return;
   const timer=setInterval(()=>{void refreshRecordingStatus()},3000);
