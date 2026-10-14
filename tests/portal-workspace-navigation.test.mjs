@@ -14,7 +14,7 @@ test("portal changes focus the viewport on the destination workspace", () => {
 test("portal changes scroll to and focus the actual portal body below navigation controls", () => {
   assert.match(source, /workspace\.focus\(\{preventScroll:true\}\)/);
   assert.ok(source.includes('<div id="portal-workspace-content" className="portal-workspace-content" tabIndex={-1}>'));
-  assert.ok(source.includes('</EmployeePayments></div></main>') || source.includes('/></div></main>'));
+  assert.ok(source.includes('</EmployeePayments></div></main>') || source.includes('/>}</div></main>'));
 });
 
 test("navigation focus is scoped to the main workspace, not the global header", () => {
