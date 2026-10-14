@@ -1,6 +1,6 @@
 // V3.0 participant/invitation integration: system records + controlled external invitees.
 import React,{useEffect,useMemo,useState}from"react";
-import{createRecord,getRecords,updateRecord,deleteRecord,COLLECTIONS,listMeetingInviteeDirectory,getAccessibleMeetingRecords}from"../firebase/data";
+import{createRecord,getRecords,getMeetingScopedRecords,updateRecord,deleteRecord,COLLECTIONS,listMeetingInviteeDirectory,getAccessibleMeetingRecords}from"../firebase/data";
 import{sendMemberInvitationEmail}from"../firebase/auth";
 import{getFunctions,httpsCallable}from"firebase/functions";
 const MANUAL_INVITEE_ROLES=["Technical Expert","Government Representative","Partner / Donor","Invited Guest","External Participant — Non-Voting","Consultant"];
@@ -18,11 +18,15 @@ export default function OperationalGatewaysParticipants(){
  }
  async function load(){
   const includeParticipantRecords=participantEnvironmentConfirmed();
+  // Resolve category/role-authorized meetings first, then scope dependent registers to those meetings.
+  const meetingsResult=await getAccessibleMeetingRecords();
+  const accessibleMeetings=Array.isArray(meetingsResult)?meetingsResult:[];
+  const accessibleMeetingIds=accessibleMeetings.map(meeting=>meeting.id).filter(Boolean);
   const requests=[
-   includeParticipantRecords?getRecords(COLLECTIONS.participants):Promise.resolve([]),
-   getAccessibleMeetingRecords(),
+   includeParticipantRecords?getMeetingScopedRecords(COLLECTIONS.participants,accessibleMeetingIds):Promise.resolve([]),
+   Promise.resolve(accessibleMeetings),
    listMeetingInviteeDirectory(),
-   getRecords(COLLECTIONS.invitations)
+   getMeetingScopedRecords(COLLECTIONS.invitations,accessibleMeetingIds)
   ];
   const labels=["Participants Register","Meetings Register","Meeting Invitee Directory","Invitations Register"];
   const results=await Promise.allSettled(requests);
