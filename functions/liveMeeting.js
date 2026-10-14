@@ -294,7 +294,7 @@ async function resolveRecordingControl(request, meetingId, options = {}) {
   ]);
   const invited = Boolean(invitedParticipant) || participantListed(meeting, uid) || subQueries.some(s => !s.empty);
   if (!isAdmin && (!activeIdentity && !invited)) throw new HttpsError("permission-denied", "An active IRPA identity or verified invitee is required.");
-  if (!isAdmin && !invited) throw new HttpsError("permission-denied", "This account is not registered or subscribed to the selected meeting.");
+  if (!isAdmin && !invited && text(meeting.initiatorUid) !== uid && text(meeting.chairpersonUid) !== uid && text(meeting.secretaryUid) !== uid && text(meeting.chairpersonEmail).toLowerCase() !== email && text(meeting.secretaryEmail).toLowerCase() !== email) throw new HttpsError("permission-denied", "This account is not registered or subscribed to the selected meeting.");
   const authority = text(request.data?.selectedAuthority);
   const profileRoles = profiles.flatMap(registeredRoles);
   const invitedRoles = invitedParticipant ? [
