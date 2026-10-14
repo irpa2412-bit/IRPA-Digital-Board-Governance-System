@@ -19,6 +19,7 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
 
  const autoRecordingAttemptedRef=useRef(new Set());
  const autoArchiveAttemptedRef=useRef(new Set());
+ const autoRecordingStopAttemptedRef=useRef(new Set());
  const clear=node=>{if(node)while(node.firstChild)node.removeChild(node.firstChild)};
  const refreshParticipants=room=>{
    if(!room)return;
@@ -118,18 +119,26 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
   finally{setRecordingBusy(false)}
  }
  useEffect(()=>{
-  if(!meeting?.id||status!=="CONNECTED"||!controller||!recordingAllowed||recordingStatus!=="NOT_STARTED")return;
+  if(!meeting?.id||String(meeting.status||"").toLowerCase()!=="in progress"||status!=="CONNECTED"||!controller||!recordingAllowed||recordingStatus!=="NOT_STARTED")return;
   if(autoRecordingAttemptedRef.current.has(meeting.id))return;
   autoRecordingAttemptedRef.current.add(meeting.id);
   // Recording starts automatically when the meeting controller joins an active meeting.
   // A failure is surfaced in the room UI; it is never reported as a successful recording.
   startRecording();
- },[meeting?.id,status,controller,recordingAllowed,recordingStatus]);
+ },[meeting?.id,meeting?.status,status,controller,recordingAllowed,recordingStatus]);
  useEffect(()=>{
   if(status!=="CONNECTED"||!meeting?.id||!["RECORDING","STARTING","STOPPING"].includes(String(recordingStatus||"").toUpperCase()))return;
   const timer=window.setInterval(()=>{refreshRecordingStatus()},5000);
   return()=>window.clearInterval(timer);
  },[status,meeting?.id,recordingStatus]);
+ useEffect(()=>{
+  const finalMeetingStatus=["completed","cancelled","canceled","archived"].includes(String(meeting?.status||"").toLowerCase());
+  const activeRecording=["RECORDING","STARTING","STOPPING"].includes(String(recordingStatus||"").toUpperCase());
+  const recordingId=recordingInfo?.egressId||recordingInfo?.id;
+  if(!meeting?.id||!finalMeetingStatus||!controller||!activeRecording||!recordingId||autoRecordingStopAttemptedRef.current.has(meeting.id))return;
+  autoRecordingStopAttemptedRef.current.add(meeting.id);
+  stopRecording();
+ },[meeting?.id,meeting?.status,controller,recordingStatus,recordingInfo?.egressId,recordingInfo?.id]);
  useEffect(()=>{
   const files=recordingInfo?.files||[];
   if(!meeting?.id||recordingStatus!=="COMPLETED"||!files.length||recordingInfo?.driveArchive)return;
