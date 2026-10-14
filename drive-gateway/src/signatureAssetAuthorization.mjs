@@ -38,6 +38,7 @@ export function canReadSignatureAsset({
   documentOwnerUid = "",
   authorizedUids = [],
   envelopeParticipantUids = [],
+  envelopeDocumentId = "",
   envelopeFileMatches = false,
 } = {}) {
   const actor = String(authenticatedUid || "").trim();
@@ -63,5 +64,9 @@ export function canReadSignatureAsset({
   if (!docId || String(metadataDocumentId || "") !== docId) return false;
   return isAdmin === true
     || String(documentOwnerUid || "") === actor
-    || (Array.isArray(authorizedUids) && authorizedUids.includes(actor));
+    || (Array.isArray(authorizedUids) && authorizedUids.includes(actor))
+    || (String(envelopeId || "").trim() !== ""
+      && String(envelopeDocumentId || "") === docId
+      && Array.isArray(envelopeParticipantUids)
+      && envelopeParticipantUids.includes(actor));
 }
