@@ -23,6 +23,12 @@ function activeRecord(record = {}) {
   return !status || ["active", "activated", "current"].includes(status);
 }
 
+function designatedMeetingController(meeting = {}, uid, email) {
+  if (!uid) return false;
+  const assignedUids = [meeting.initiatorUid, meeting.createdByUid, meeting.chairpersonUid, meeting.secretaryUid].map(text);
+  const assignedEmails = [meeting.initiatorEmail, meeting.createdByEmail, meeting.chairpersonEmail, meeting.secretaryEmail].map(value => text(value).toLowerCase()).filter(Boolean);
+  return assignedUids.includes(uid) || Boolean(email && assignedEmails.includes(email));
+}
 function registeredRoles(record = {}) {
   return [
     record.role,
@@ -163,7 +169,8 @@ exports.issueLiveMeetingToken = onCall({
   if (!activeIdentity) throw new HttpsError("permission-denied", "An active IRPA member, employee, or verified meeting invitee identity is required.");
 
   const listed = Boolean(invitedParticipant) || participantListed(meeting, uid);
-  if (!isAdmin && !listed) {
+  const designatedController = designatedMeetingController(meeting, uid, email);
+  if (!isAdmin && !listed && !designatedController) {
     throw new HttpsError("permission-denied", "This account is not registered as a participant in the selected meeting.");
   }
 
@@ -186,7 +193,7 @@ exports.issueLiveMeetingToken = onCall({
   // unique audit records and must not partition host and invitee into separate rooms.
   const roomName = opaqueRoomName(meetingId, "shared-live-room");
   const participantIdentity = `uid-${uid}`;
-  const moderator = isAdmin || moderatorForMeeting(meeting, uid, email, selectedAuthority);
+  const moderator = isAdmin || designatedController || moderatorForMeeting(meeting, uid, email, selectedAuthority);
   const token = new AccessToken(LIVEKIT_API_KEY.value(), LIVEKIT_API_SECRET.value(), {
     identity: participantIdentity,
     name: text(meeting.displayName || meeting.title || "IRPA participant"),
@@ -343,8 +350,9 @@ async function resolveRecordingControl(request, meetingId, options = {}) {
     db.collection("meetingSubscriptions").where("meetingId", "==", meetingId).where("subscriberUid", "==", uid).limit(1).get().catch(() => ({ empty: true }))
   ]);
   const invited = Boolean(invitedParticipant) || participantListed(meeting, uid) || subQueries.some(s => !s.empty);
+  const designatedController = designatedMeetingController(meeting, uid, email);
   if (!isAdmin && (!activeIdentity && !invited)) throw new HttpsError("permission-denied", "An active IRPA identity or verified invitee is required.");
-  if (!isAdmin && !invited) throw new HttpsError("permission-denied", "This account is not registered or subscribed to the selected meeting.");
+  if (!isAdmin && !invited && !designatedController) throw new HttpsError("permission-denied", "This account is not registered or subscribed to the selected meeting.");
   const authority = text(request.data?.selectedAuthority);
   const profileRoles = profiles.flatMap(registeredRoles);
   const invitedRoles = invitedParticipant ? [
@@ -356,14 +364,7 @@ async function resolveRecordingControl(request, meetingId, options = {}) {
   const trustedModeratorRole = profileRoles.concat(invitedRoles).find(role =>
     ["board chairperson", "board secretary", "chairperson", "meeting chair", "meeting secretary", "secretary"].includes(text(role).toLowerCase())
   ) || "";
-  const controller = isAdmin ||
-    (meeting.chairpersonUid && text(meeting.chairpersonUid) === uid) ||
-    (meeting.secretaryUid && text(meeting.secretaryUid) === uid) ||
-    (text(meeting.chairpersonEmail).toLowerCase() === email && Boolean(email)) ||
-    (text(meeting.secretaryEmail).toLowerCase() === email && Boolean(email)) ||
-    text(meeting.createdByUid) === uid ||
-    text(meeting.initiatorUid) === uid ||
-    moderatorForMeeting(meeting, uid, email, trustedModeratorRole);
+  const controller = isAdmin || designatedController || moderatorForMeeting(meeting, uid, email, trustedModeratorRole);
   return { uid, email, meeting, isAdmin, invited, controller };
 }
 function recordingRoomName(meetingId) {
@@ -526,7 +527,7 @@ exports.stopMeetingRecording = onCall({
 });
 exports.getMeetingRecordingStatus = onCall({
   region: "us-central1", timeoutSeconds: 30,
-  secrets: [LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET]
+  secrets: [LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET, LIVEKIT_RECORDING_STORAGE_GCP_CREDENTIALS, LIVEKIT_RECORDING_STORAGE_GCP_BUCKET]
 }, async request => {
   const ctx = await resolveRecordingControl(request, text(request.data?.meetingId), { requireRecordingAllowed: false, allowClosed: true });
   if (!ctx.invited && !ctx.isAdmin && !ctx.controller) throw new HttpsError("permission-denied", "An authorised meeting participant is required to view recording status.");
@@ -607,21 +608,29 @@ exports.getMeetingRecordingDownloadUrl = onCall({
       projectId: config.credentials.project_id,
       credentials: { client_email: config.credentials.client_email, private_key: config.credentials.private_key }
     });
+    const file = storage.bucket(config.bucket).file(filepath);
+    const [exists] = await file.exists();
+    if (!exists) throw new HttpsError("failed-precondition", "Recording egress completed, but the file is not yet present in private recording storage.");
+    const [metadata] = await file.getMetadata();
+    const sizeBytes = Number(metadata.size || 0);
+    if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) throw new HttpsError("failed-precondition", "Recording storage contains an empty file; do not treat this recording as verified.");
     const filename = filepath.split("/").pop().replace(/["\\\\\r\n]/g, "_");
-    const [downloadUrl] = await storage.bucket(config.bucket).file(filepath).getSignedUrl({
+    const [downloadUrl] = await file.getSignedUrl({
       version: "v4",
       action: "read",
       expires: Date.now() + 5 * 60 * 1000,
       responseDisposition: `attachment; filename="${filename}"`
     });
+    await db.collection("meetingMediaRecordings").doc(recordingId).update({storageVerification:"VERIFIED",storageSizeBytes:sizeBytes,storageVerifiedAt:FieldValue.serverTimestamp(),storageBucket:config.bucket,updatedAt:FieldValue.serverTimestamp()});
+    await db.collection("meetings").doc(meetingId).update({recordingStorage:"GOOGLE_CLOUD_STORAGE",recordingStorageVerified:true,recordingStorageVerifiedAt:FieldValue.serverTimestamp(),recordingStorageSizeBytes:sizeBytes});
     await db.collection("audit").add({
       action: "LIVE_MEETING_RECORDING_DOWNLOAD_URL_ISSUED",
       collection: "meetingMediaRecordings",
       recordId: recordingId,
-      details: { meetingId, outputPath: filepath, expiresInSeconds: 300 },
+      details: { meetingId, outputPath: filepath, expiresInSeconds: 300, storageBucket: config.bucket, storageSizeBytes: sizeBytes, storageVerification: "VERIFIED" },
       actorUid: ctx.uid, actorEmail: ctx.email || null, createdAt: FieldValue.serverTimestamp()
     });
-    return { ok: true, downloadUrl, filename, expiresInSeconds: 300 };
+    return { ok: true, downloadUrl, filename, sizeBytes, storageBucket: config.bucket, storageVerification: "VERIFIED", expiresInSeconds: 300 };
   } catch (error) {
     if (error instanceof HttpsError) throw error;
     throw new HttpsError("failed-precondition", "A temporary recording download link could not be issued. Verify private storage access and signing credentials.");
