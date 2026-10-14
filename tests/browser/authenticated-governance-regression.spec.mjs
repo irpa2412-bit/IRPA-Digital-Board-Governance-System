@@ -60,12 +60,13 @@ async function navigateModule(page, viewportName, module) {
 
 async function assertPortalAndNoOverflow(page, expectedText, width) {
   await expect(page.locator(".topbar h2")).toContainText(expectedText, { timeout: 30000 });
-  const workspace = page.locator("main.content-area");
+  const workspace = page.locator("#portal-workspace-content");
   await expect(workspace).toBeVisible();
   await expect.poll(
     () => workspace.evaluate(el => Math.abs(el.getBoundingClientRect().top)),
-    { message: "destination workspace should scroll into the visible workspace area rather than leave the user at the global header", timeout: 10000 }
+    { message: "destination portal body should scroll into view below the global header and connected-workflow controls", timeout: 10000 }
   ).toBeLessThanOrEqual(40);
+  await expect(workspace, "focus should land on the destination portal body").toBeFocused();
   const dimensions = await page.evaluate(() => ({
     viewport: document.documentElement.clientWidth,
     document: document.documentElement.scrollWidth
