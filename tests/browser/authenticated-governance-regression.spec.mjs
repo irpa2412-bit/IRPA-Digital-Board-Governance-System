@@ -4,7 +4,7 @@ const fixtureEmail = "irpa-browser-fixture-admin@example.test";
 const fixturePassword = "FixtureOnly-Password-2026!";
 
 async function navigateModule(page, viewportName, module) {
-  if (viewportName === "mobile") {
+  if (viewportName !== "desktop") {
     if (module === "Finance Portfolio" || module === "Meeting Room" || module === "Documents" || module === "Voting") {
       const dialog = page.getByRole("dialog", { name: "Mobile navigation" });
       const sheetTitle = dialog.locator(".mobile-nav-sheet-header strong");
