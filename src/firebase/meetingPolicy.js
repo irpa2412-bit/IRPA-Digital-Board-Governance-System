@@ -52,7 +52,7 @@ export function canVoteInMeeting(meeting={},identity={}){
   return policy.votingRoles.some(role=>roles.has(NORMALIZE_ROLE(role)))&&identity.isBoardMember===true;
 }
 
-export const MEETING_CATEGORY_OPTIONS=Object.values(MEETING_CATEGORIES).map(p=>({value:p.id,label:p.label}));
+export const MEETING_CATEGORY_OPTIONS=Object.values(MEETING_CATEGORIES).filter(p=>p.id!=="OTHER").map(p=>({value:p.id,label:p.label}));
 
 export const MEETING_TYPE_OPTIONS=Object.values(MEETING_CATEGORIES).flatMap(p=>p.meetingTypes);
 export const MEETING_POLICIES=MEETING_CATEGORIES;
