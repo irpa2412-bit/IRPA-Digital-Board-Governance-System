@@ -94,7 +94,7 @@ const checks=[
  ["Registration cannot bypass the Meeting Room proceedings start",meetingsCentre.includes("Start proceedings from the Meeting Room so automatic recording and transcript capture can begin with the session.")],
  ["Recording starts automatically when proceedings begin and is status-verified",media.includes("proceedingsActive")&&media.includes("autoRecordingAttemptedRef")&&media.includes("AUTOMATIC RECORDING NOT CONFIRMED")&&media.includes('==="RECORDING"')],
  ["Recording failures are visible and not represented as captured proceedings",media.includes("AUTOMATIC RECORDING FAILED")&&media.includes("Proceedings must not be treated as recorded")&&media.includes("AUTOMATIC RECORDING NOT CONFIRMED")],
- ["Recording is automatically stopped when the meeting is closed",media.includes("autoStopAttemptedRef")&&media.includes("AUTOMATIC RECORDING STOP FAILED")&&liveMeeting.includes("resolveRecordingControl(request, meetingId, { allowClosed: true })"],
+ ["Recording is automatically stopped when the meeting is closed",media.includes("autoStopAttemptedRef")&&media.includes("AUTOMATIC RECORDING STOP FAILED")&&liveMeeting.includes("resolveRecordingControl(request, meetingId, { allowClosed: true })")],
  ["Recording files are stored under category-specific archive paths",liveMeeting.includes('"irpa-governance-recordings/" + category.toLowerCase() + "/"')],
  ["Recording completion is audit-logged",liveMeeting.includes("LIVE_MEETING_RECORDING_COMPLETED")],
  ["Active recording is monitored and failures are audit-logged",media.includes("setInterval(poll,15000)")&&liveMeeting.includes("LIVE_MEETING_RECORDING_FAILED")],
