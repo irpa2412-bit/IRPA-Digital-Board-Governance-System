@@ -23,6 +23,7 @@ on:
       - "tests/meeting-category-firestore-rules.test.cjs"
       - "tests/meeting-category-policy.test.mjs"
       - ".github/workflows/signature-migration-build-test.yml"
+      - "drive-gateway/wrangler.toml"
       - "drive-gateway/src/signatureAssetAuthorization.mjs"
       - "drive-gateway/src/signatureProfileAuthorization.mjs"
       - "drive-gateway/tests/signature-asset-authorization.test.mjs"
@@ -101,6 +102,7 @@ jobs:
             "tests/meeting-category-firestore-rules.test.cjs",
             "tests/meeting-category-policy.test.mjs",
             ".github/workflows/signature-migration-build-test.yml",
+            "drive-gateway/wrangler.toml",
             "drive-gateway/src/signatureAssetAuthorization.mjs",
             "drive-gateway/src/signatureProfileAuthorization.mjs",
             "drive-gateway/tests/signature-asset-authorization.test.mjs",
