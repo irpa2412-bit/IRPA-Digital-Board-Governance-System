@@ -9,6 +9,7 @@ on:
       - "functions/package.json"
       - "functions/scripts/verify-cloudflare-livekit-token-worker.js"
       - "functions/scripts/verify-livekit-recording-storage.mjs"
+      - "scripts/check-meeting-media-governance.mjs"
       - "src/components/IRPADGBSMeetingRoomMedia.jsx"
       - "src/firebase/meetingRecords.js"
       - "src/firebase/meetingPolicy.js"
@@ -243,7 +244,6 @@ jobs:
           STAGING_FIREBASE_WEB_API_KEY: "AIzaSyA6UmHtP-mRr99rBw57_-qrD4_mFSBnZ38"
           LIVEKIT_TOKEN_WORKER_URL: "https://irpa-dgb-livekit-token-staging.irpa-governance.workers.dev"
           STAGING_PROJECT_ID: irpa-dbg-staging-a73ec
-          LIVEKIT_RECORDING_STORAGE_CREDENTIALS: ${{ runner.temp }}/unused-private-key-is-read-through-firestore
         run: |
           set -euo pipefail
           npx firebase functions:secrets:access LIVEKIT_URL --project "$STAGING_PROJECT_ID" > "$RUNNER_TEMP/livekit-url"
