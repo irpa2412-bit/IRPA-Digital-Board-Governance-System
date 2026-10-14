@@ -71,7 +71,7 @@ test("active staff profile can initiate a meeting without a departmental registr
     registeredAt: "2026-10-09T17:00:00.000Z"
   }));
 });
-test("departmental registrar cannot edit a released meeting", async () => {
+test("active staff initiator can complete initial meeting registration", async () => {\n  await testEnv.withSecurityRulesDisabled(async context => {\n    await context.firestore().doc("meetings/staff-initiated").set(meeting({ initiatorUid: "staff-user", initiatorEmail: "staff@example.test", meetingCategory: "GENERAL", meetingPolicyId: "GENERAL", meetingType: "General Meeting" }));\n  });\n  const db = testEnv.authenticatedContext("staff-user", { email: "staff@example.test" }).firestore();\n  await assertSucceeds(db.doc("meetings/staff-initiated").update({ registerStatus: "Registered", registeredAt: "2026-10-14T05:00:00.000Z" }));\n});\n\ntest("departmental registrar cannot edit a released meeting", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     await context.firestore().doc("meetings/departmental-meeting").set(meeting({
       registerStatus: "Registered",
