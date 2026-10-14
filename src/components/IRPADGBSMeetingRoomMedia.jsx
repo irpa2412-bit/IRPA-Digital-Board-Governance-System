@@ -121,7 +121,7 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
  useEffect(()=>{
   const terminal=["completed","closed","cancelled","canceled","archived"].includes(String(meeting?.status||"").toLowerCase());
   const recordingId=recordingInfo?.egressId||recordingInfo?.id;
-  if(!meeting?.id||!terminal||proceedingsActive||!recordingController||!auth.currentUser||recordingStatus!=="RECORDING"||!recordingId||autoStopAttemptedRef.current===meeting.id)return;
+  if(!meeting?.id||!terminal||proceedingsActive||!recordingController||!auth.currentUser||!["RECORDING","STARTING","STOPPING"].includes(recordingStatus)||!recordingId||autoStopAttemptedRef.current===meeting.id)return;
   autoStopAttemptedRef.current=meeting.id;
   setRecordingBusy(true);
   stopMeetingRecording({meetingId:meeting.id,recordingId,selectedAuthority:String(selectedAuthority||""),participantId:currentParticipantId()})
