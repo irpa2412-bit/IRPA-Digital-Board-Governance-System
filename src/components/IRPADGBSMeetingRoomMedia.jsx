@@ -41,6 +41,43 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
 
  useEffect(()=>()=>{roomRef.current?.disconnect();roomRef.current=null},[]);
  useEffect(()=>{
+  const info=recordingInfo;
+  const recordingId=String(info?.egressId||info?.id||"");
+  if(!meeting?.id||recordingStatus!=="COMPLETED"||!recordingId||info?.driveArchive?.fileId||!recordingController||!auth.currentUser||manifestArchiveAttemptedRef.current===recordingId)return;
+  manifestArchiveAttemptedRef.current=recordingId;
+  (async()=>{
+   try{
+    const category=String(info.meetingCategory||meeting.meetingCategory||meeting.meetingPolicyId||"OTHER").toUpperCase();
+    const manifest={
+     recordType:"RECORDING_MANIFEST",recordingProvider:"LIVEKIT_EGRESS",
+     meetingId:meeting.id,meetingReference:meeting.meetingReference||meeting.reference||meeting.title||"",
+     meetingTitle:meeting.title||"",meetingCategory:category,
+     confidentialityClass:info.confidentialityClass||meeting.confidentialityClass||"INTERNAL",
+     boardSessionType:info.boardSessionType||meeting.boardSessionType||"NOT_APPLICABLE",
+     recordingId,recordingStatus:"COMPLETED",egressStatus:info.egressStatus||null,
+     storageDestination:info.storageDestination||"LIVEKIT_EGRESS_CONFIGURED_STORAGE",
+     privateStoragePath:info.outputPath||null,startedAt:info.startedAt||null,
+     stoppedAt:info.stoppedAt||null,completedAt:info.completedAt||null,
+     files:(Array.isArray(info.files)?info.files:[]).map(file=>({filename:file.filename||"",size:Number(file.size||0)})),
+     transcriptStoredSeparately:true,archivedAt:new Date().toISOString()
+    };
+    const archive=await uploadMeetingProductToDrive({
+     meetingCategory:category,meetingId:meeting.id,meetingReference:manifest.meetingReference,
+     recordId:recordingId,recordType:"RECORDING_MANIFEST",
+     title:"Recording Manifest — "+(meeting.title||meeting.id),
+     fileName:"recording-manifest-"+recordingId+".txt",
+     content:JSON.stringify(manifest,null,2),contentType:"text/plain",
+     ownerUid:auth.currentUser?.uid||null
+    });
+    setRecordingInfo(prev=>({...prev,driveArchive:archive}));
+    setMessage("Recording completion verified. The recording manifest and private storage location were archived to the meeting's Google Drive category folder; the audio/video remains in configured private recording storage.");
+   }catch(archiveError){
+    manifestArchiveAttemptedRef.current="";
+    setError("Recording completed, but its Google Drive archive manifest could not be confirmed. The recording remains in configured private storage; retry archive after restoring the Drive gateway. "+(archiveError?.message||""));
+   }
+  })();
+ },[meeting?.id,meeting?.title,meeting?.meetingCategory,meeting?.meetingPolicyId,meeting?.confidentialityClass,meeting?.boardSessionType,recordingStatus,recordingInfo?.id,recordingInfo?.egressId,recordingInfo?.driveArchive?.fileId,recordingController]);
+ useEffect(()=>{
   if(!meeting?.id||!proceedingsActive||recordingStatus!=="RECORDING")return;
   let stopped=false;
   const poll=async()=>{if(stopped)return;const result=await refreshRecordingStatus();if(stopped||!result)return;const current=String(result.recordingStatus||"UNKNOWN").toUpperCase();if(current==="FAILED"){setError("RECORDING FAILURE DETECTED. The recording service reports failure during active proceedings. Do not treat the affected interval as recorded; preserve the failure notice in the audit trail.");}else if(current!=="RECORDING"&&current!=="STOPPING"){setError("RECORDING STATUS LOST DURING ACTIVE PROCEEDINGS: "+current+". Verify the capture service before continuing.");}};
