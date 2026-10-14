@@ -357,3 +357,115 @@ export async function provisionAllMeetingCategoryArchives() {
   }
   return results;
 }
+
+
+async function sha256HexBytes(bytes) {
+  const digest = await crypto.subtle.digest("SHA-256", bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes));
+  return Array.from(new Uint8Array(digest), value => value.toString(16).padStart(2, "0")).join("");
+}
+
+async function gatewayAuthenticatedRequest(path, {method="GET",body,contentType="application/json",signingToken=null}={}) {
+  if (!auth.currentUser) throw new Error("Authentication is required.");
+  const token = await getIdToken(auth.currentUser);
+  const headers = {Authorization:"Bearer " + token};
+  if (contentType) headers["Content-Type"] = contentType;
+  if (signingToken) headers["x-signing-token"] = signingToken;
+  return fetch(requireGateway() + path, {
+    method,
+    headers,
+    ...(body !== undefined ? {body} : {})
+  });
+}
+
+export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) {
+  if (!envelope?.id || !sourceBytes?.length) throw new Error("The Signature Portal envelope and controlled PDF are required for Gateway signing.");
+  if (!auth.currentUser || envelope.ownerUid !== auth.currentUser.uid || envelope.senderUid !== auth.currentUser.uid) {
+    throw new Error("Only the authenticated document owner can connect this signing workflow to the Gateway.");
+  }
+  const recipients = Array.isArray(envelope.recipients) ? envelope.recipients : [];
+  const actionRecipients = recipients.filter(r => r?.uid && r?.actionRequired !== false && r?.optionalSigning !== true && !r?.accessOnly && !["View Only","Read Only","Information / FYI","Observer"].includes(String(r?.role || "").trim()));
+  if (!actionRecipients.length) throw new Error("At least one authorized action signer is required.");
+  const signerUids = new Set(actionRecipients.map(r => r.uid));
+  if ((envelope.fields || []).some(field => field?.signerUid && !signerUids.has(field.signerUid))) {
+    throw new Error("A signing field is assigned to a view-only or optional signer. Correct the field assignments before Gateway activation.");
+  }
+  const bytes = sourceBytes instanceof Uint8Array ? sourceBytes : new Uint8Array(sourceBytes);
+  if (bytes.length < 8 || new TextDecoder().decode(bytes.subarray(0, 5)) !== "%PDF-") {
+    throw new Error("The Gateway signing source must be the controlled PDF.");
+  }
+  const documentId = ("DOC-" + String(envelope.id)).replace(/[^A-Za-z0-9_-]/g, "-").slice(0, 64);
+  const title = String(envelope.title || envelope.documentReference || "IRPA Signing Document").trim().slice(0, 180);
+  const classification = ["Public","Internal","Restricted","Confidential"].includes(envelope.documentClassification) ? envelope.documentClassification : "Restricted";
+  const archiveType = String(envelope.documentType || "").toLowerCase();
+  const archiveKey = archiveType.includes("finance") ? "finance" :
+    archiveType.includes("human") || archiveType.includes("personnel") ? "human-resources" :
+    archiveType.includes("legal") || archiveType.includes("contract") ? "legal-contracts" :
+    archiveType.includes("board") || archiveType.includes("governance") ? "board-governance" : "administrative-documents";
+  const expectedHash = await sha256HexBytes(bytes);
+  const existingResponse = await gatewayAuthenticatedRequest("/api/documents/" + encodeURIComponent(documentId) + "/pdf");
+  if (existingResponse.ok) {
+    const existingBytes = new Uint8Array(await existingResponse.arrayBuffer());
+    if (await sha256HexBytes(existingBytes) !== expectedHash) {
+      throw new Error("A Gateway document with this workflow reference exists but does not match the controlled PDF. Refusing to overwrite it.");
+    }
+  } else if (existingResponse.status === 404) {
+    const form = new FormData();
+    form.append("documentId", documentId);
+    form.append("title", title);
+    form.append("classification", classification);
+    form.append("archives", archiveKey);
+    form.append("file", new Blob([bytes], {type:"application/pdf"}), documentId + ".pdf");
+    const uploadResponse = await gatewayAuthenticatedRequest("/api/documents", {method:"POST",body:form,contentType:null});
+    const uploadData = await uploadResponse.json().catch(() => ({}));
+    if (!uploadResponse.ok || uploadData.ok === false) throw new Error(uploadData.error || "The controlled PDF could not be registered in the authenticated Gateway.");
+    if (uploadData.documentId && uploadData.documentId !== documentId) throw new Error("The Gateway registered a different document ID than the signing workflow requested.");
+  } else {
+    const data = await existingResponse.json().catch(() => ({}));
+    throw new Error(data.error || ("The Gateway could not verify the existing source document (HTTP " + existingResponse.status + ")."));
+  }
+  const ordered = [...actionRecipients].sort((a,b) => Number(a.routingOrder || 1) - Number(b.routingOrder || 1));
+  const fields = (envelope.fields || []).filter(field => signerUids.has(field?.signerUid)).map(field => ({
+    fieldId:field.fieldId,type:field.type,page:Number(field.page || 1),x:Number(field.x ?? 10),y:Number(field.y ?? 80),
+    width:Number(field.width ?? 24),height:Number(field.height ?? 9),signerUid:field.signerUid,required:field.required === true,
+    placeholder:field.placeholder || ""
+  }));
+  const payload = {
+    externalReference:envelope.id,
+    documentId,
+    title,
+    classification,
+    archives:[archiveKey],
+    signingMode:envelope.signingMode === "Parallel" ? "Parallel" : "Sequential",
+    signers:ordered.map((recipient,index) => ({
+      uid:recipient.uid,
+      email:String(recipient.email || "").trim().toLowerCase(),
+      name:String(recipient.name || recipient.displayName || recipient.email || "IRPA Signer").trim(),
+      order:envelope.signingMode === "Parallel" ? 1 : index + 1
+    })),
+    fields
+  };
+  const response = await gatewayAuthenticatedRequest("/api/envelopes", {method:"POST",body:JSON.stringify(payload)});
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || result.ok === false || !result.envelopeId) {
+    throw new Error(result.error || "The authenticated Gateway signing envelope was not created.");
+  }
+  return {gatewayEnvelopeId:result.envelopeId,gatewayDocumentId:documentId,gatewayOriginalHash:expectedHash,signingMode:payload.signingMode,status:result.status || "Sent",existing:result.existing === true};
+}
+
+export async function voidGatewaySignatureEnvelope(envelopeId, reason="Signature Portal activation could not be committed") {
+  if (!envelopeId) return {ok:true,skipped:true};
+  const response = await gatewayAuthenticatedRequest("/api/envelopes/" + encodeURIComponent(envelopeId) + "/void", {
+    method:"POST",body:JSON.stringify({reason})
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || result.ok === false) throw new Error(result.error || "Unable to void the unlinked Gateway signing envelope.");
+  return result;
+}
+
+export async function fetchGatewaySigningStatus(token) {
+  if (!token) throw new Error("A Gateway signing token is required.");
+  const response = await gatewayAuthenticatedRequest("/api/sign/status", {signingToken:token});
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data.ok === false) throw new Error(data.error || "Unable to retrieve Gateway signing status.");
+  return data;
+}
