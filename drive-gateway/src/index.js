@@ -354,6 +354,32 @@ async function upload(request, env) {
   const purpose = cleanName(data.purpose || "Controlled Documents");
   const requestedFolderId = String(data.folderId || "").trim();
   const ownerUid = String(data.ownerUid || claims.user_id).trim();
+  const signatureDocumentId = cleanId(data.documentId || "");
+  const signatureEnvelopeId = cleanId(data.envelopeId || "");
+  const signatureSignerUid = cleanId(data.signerUid || "");
+
+  if (purpose === "Signed Documents Archive") {
+    if (!requestedFolderId || !signatureDocumentId || !signatureEnvelopeId || !signatureSignerUid) {
+      return json({ ok:false, error:"Signed-document uploads require a document, envelope and authenticated signer identity." },400,corsHeaders(request));
+    }
+    if (signatureSignerUid !== claims.user_id) {
+      return json({ ok:false, error:"A signed document may only be uploaded by the authenticated assigned signer." },403,corsHeaders(request));
+    }
+    const envelope = await getFirestoreDocument(env, "signatureEnvelopes/" + signatureEnvelopeId, claims.token);
+    if (!envelope) return json({ ok:false, error:"The signing envelope was not found." },404,corsHeaders(request));
+    const envelopeFields = envelope.fields || {};
+    const allowed = canUploadSignedDocument({
+      authenticatedUid: claims.user_id,
+      signerUid: signatureSignerUid,
+      documentId: signatureDocumentId,
+      envelopeDocumentId: envelopeFields.documentId?.stringValue || "",
+      envelopeParticipantUids: firestoreStringArray(envelopeFields.participantUids),
+      actionUids: firestoreStringArray(envelopeFields.actionUids),
+      signingMode: envelopeFields.signingMode?.stringValue || "Sequential",
+      currentSignerUid: envelopeFields.currentSignerUid?.stringValue || null,
+    });
+    if (!allowed) return json({ ok:false, error:"The authenticated account is not the current assigned action signer for this document." },403,corsHeaders(request));
+  }
 
   if (purpose === "Signature Profile") {
     if (ownerUid !== claims.user_id) {
@@ -409,6 +435,9 @@ async function upload(request, env) {
     if ((purpose === "Signed Documents Archive" || purpose === "Documents Portal" || purpose === "Controlled Documents") && folderDescription.irpaGovernanceArchive !== true) {
       return json({ ok: false, error: "The requested folder is not an IRPA controlled-document archive folder." }, 403, corsHeaders(request));
     }
+    if (purpose === "Signed Documents Archive" && String(folderDescription.documentId || "") !== signatureDocumentId) {
+      return json({ ok:false, error:"The requested signed-document archive does not match the signing document." },403,corsHeaders(request));
+    }
     if (purpose === "Meeting Products" && (folderDescription.irpaGovernanceArchive !== true || folderDescription.purpose !== "IRPA Meeting Category Archive" || String(folderDescription.meetingCategory || "").toUpperCase() !== String(data.meetingCategory || "").toUpperCase())) {
       return json({ok:false,error:"The requested folder is not the authorised archive for this meeting category."},403,corsHeaders(request));
     }
@@ -427,6 +456,9 @@ async function upload(request, env) {
       uploadedByUid: claims.user_id,
       purpose,
       ownerUid,
+      documentId: purpose === "Signed Documents Archive" ? signatureDocumentId : null,
+      envelopeId: purpose === "Signed Documents Archive" ? signatureEnvelopeId : null,
+      signerUid: purpose === "Signed Documents Archive" ? signatureSignerUid : null,
       driveFolderId: purpose === "Signature Profile" ? purposeId : null
     })
   };
