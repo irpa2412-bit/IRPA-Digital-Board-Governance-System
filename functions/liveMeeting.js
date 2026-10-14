@@ -387,6 +387,23 @@ function recordingStateForEgress(info) {
   if (state === "EGRESS_ACTIVE") return "RECORDING";
   return "STARTING";
 }
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+async function waitForActiveEgress(client, roomName, egressId, initial = null) {
+  let latest = initial;
+  for (let attempt = 0; attempt < 15; attempt++) {
+    if (latest) {
+      const status = recordingStateForEgress(latest);
+      if (status === "RECORDING") return latest;
+      if (status === "FAILED" || status === "COMPLETED") {
+        throw new Error("LiveKit Egress reached terminal state " + status + " before recording was confirmed active.");
+      }
+    }
+    await delay(1000);
+    const items = await client.listEgress(roomName, egressId);
+    latest = items.find(item => text(item.egressId) === text(egressId)) || null;
+  }
+  throw new Error("LiveKit Egress did not reach the active recording state within 15 seconds.");
+}
 exports.startMeetingRecording = onCall({
   region: "us-central1", timeoutSeconds: 60,
   secrets: [LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET, LIVEKIT_RECORDING_STORAGE_GCP_CREDENTIALS, LIVEKIT_RECORDING_STORAGE_GCP_BUCKET]
@@ -395,23 +412,51 @@ exports.startMeetingRecording = onCall({
   if (!ctx.controller) throw new HttpsError("permission-denied", "Only the meeting administrator, initiator, chairperson or secretary may start recording.");
   const storageConfig = recordingStorageConfig();
   const roomName = recordingRoomName(ctx.meeting.id);
+  const lockId = crypto.createHash("sha256").update(ctx.meeting.id).digest("hex");
+  const lockRef = db.collection("meetingRecordingLocks").doc(lockId);
   const activeRecordings = await db.collection("meetingMediaRecordings").where("meetingId", "==", ctx.meeting.id).get();
   const activeRecording = activeRecordings.docs.find(doc => ["STARTING", "RECORDING", "STOPPING"].includes(text(doc.data()?.recordingStatus)));
   if (activeRecording) {
     const active = activeRecording.data() || {};
-    return {
-      ok: true, alreadyActive: true, recordingId: active.egressId || activeRecording.id,
-      egressId: active.egressId || activeRecording.id, recordingStatus: active.recordingStatus,
-      outputPath: active.outputPath || null, storageDestination: active.storageDestination || "GOOGLE_CLOUD_STORAGE"
-    };
+    const activeId = text(active.egressId || activeRecording.id);
+    let latest = null;
+    if (activeId) {
+      try {
+        latest = (await egressClient().listEgress(recordingRoomName(ctx.meeting.id), activeId))
+          .find(item => text(item.egressId) === activeId) || null;
+      } catch (error) {
+        throw new HttpsError("unavailable", "Cannot verify the existing recording state. No duplicate recording was started; retry after the LiveKit control plane is reachable.");
+      }
+    }
+    if (latest && ["STARTING", "RECORDING"].includes(recordingStateForEgress(latest))) {
+      let confirmed = latest;
+      if (recordingStateForEgress(confirmed) !== "RECORDING") {
+        try { confirmed = await waitForActiveEgress(egressClient(), recordingRoomName(ctx.meeting.id), activeId, confirmed); }
+        catch (error) { throw new HttpsError("failed-precondition", "The existing recording could not be confirmed active: " + text(error.message)); }
+      }
+      const confirmedStatus = recordingStateForEgress(confirmed);
+      const files = Array.isArray(confirmed.fileResults) ? confirmed.fileResults.map(file => ({ filename: text(file.filename), location: text(file.location), size: Number(file.size || 0) })) : [];
+      await activeRecording.ref.update({ recordingStatus: confirmedStatus, egressStatus: egressState(confirmed), fileResults: files, updatedAt: FieldValue.serverTimestamp() });
+      await lockRef.set({ meetingId: ctx.meeting.id, egressId: activeId, status: confirmedStatus, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      return { ok: true, alreadyActive: true, recordingId: activeId, egressId: activeId, recordingStatus: confirmedStatus, outputPath: active.outputPath || null, storageBucket: active.storageBucket || storageConfig.bucket, storageDestination: active.storageDestination || "GOOGLE_CLOUD_STORAGE" };
+    }
+    const staleStatus = latest ? recordingStateForEgress(latest) : "FAILED";
+    const staleFiles = Array.isArray(latest?.fileResults) ? latest.fileResults.map(file => ({ filename: text(file.filename), location: text(file.location), size: Number(file.size || 0) })) : [];
+    await activeRecording.ref.update({
+      recordingStatus: staleStatus, egressStatus: latest ? egressState(latest) : "EGRESS_NOT_FOUND",
+      fileResults: staleFiles, failureReason: latest ? null : "An active recording register entry had no active LiveKit egress.",
+      updatedAt: FieldValue.serverTimestamp()
+    });
+    await lockRef.set({ meetingId: ctx.meeting.id, egressId: activeId || null, status: staleStatus, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+    if (staleStatus === "STOPPING") throw new HttpsError("failed-precondition", "The previous recording is still finalising. Wait for its status to become COMPLETED or FAILED, then retry.");
   }
-  const lockId = crypto.createHash("sha256").update(ctx.meeting.id).digest("hex");
-  const lockRef = db.collection("meetingRecordingLocks").doc(lockId);
   const reservationId = crypto.randomBytes(16).toString("hex");
   await db.runTransaction(async tx => {
     const lockSnap = await tx.get(lockRef);
     const lockStatus = text(lockSnap.data()?.status).toUpperCase();
-    if (["STARTING", "RECORDING", "STOPPING"].includes(lockStatus)) {
+    const lockUpdated = lockSnap.data()?.updatedAt?.toMillis?.() || 0;
+    const lockLeaseFresh = lockUpdated > 0 && Date.now() - lockUpdated < 120000;
+    if (["STARTING", "RECORDING", "STOPPING"].includes(lockStatus) && lockLeaseFresh) {
       throw new HttpsError("already-exists", "Recording start is already in progress for this meeting.");
     }
     tx.set(lockRef, {
@@ -425,12 +470,18 @@ exports.startMeetingRecording = onCall({
   let egress;
   try {
     await ensureRecordingRoom(roomName);
-    egress = await egressClient().startRoomCompositeEgress(
+    const client = egressClient();
+    egress = await client.startRoomCompositeEgress(
       roomName,
       { file: output.file },
       { layout: "grid", audioOnly: false }
     );
+    if (!text(egress?.egressId)) throw new Error("LiveKit returned no egress ID.");
+    const egressId = text(egress.egressId);
+    egress = await waitForActiveEgress(client, roomName, egressId, egress);
+    await lockRef.set({ meetingId: ctx.meeting.id, reservationId, egressId, status: "RECORDING", updatedAt: FieldValue.serverTimestamp() }, { merge: true });
   } catch (error) {
+    if (text(egress?.egressId)) { try { await egressClient().stopEgress(text(egress.egressId)); } catch {} }
     await lockRef.set({
       meetingId: ctx.meeting.id, reservationId, status: "FAILED",
       failureReason: text(error?.message).slice(0, 500), updatedAt: FieldValue.serverTimestamp()
@@ -443,9 +494,9 @@ exports.startMeetingRecording = onCall({
     throw new HttpsError("failed-precondition", "Recording could not start. Verify the LiveKit egress service and protected Google Cloud Storage configuration; proceedings were not marked live.");
   }
   const egressId = text(egress.egressId);
-  if (!egressId) {
-    await lockRef.set({ meetingId: ctx.meeting.id, reservationId, status: "FAILED", updatedAt: FieldValue.serverTimestamp() }, { merge: true }).catch(() => {});
-    throw new HttpsError("internal", "LiveKit did not return a recording identifier.");
+  if (!egressId || recordingStateForEgress(egress) !== "RECORDING") {
+    await lockRef.set({ meetingId: ctx.meeting.id, reservationId, status: "FAILED", egressId: egressId || null, updatedAt: FieldValue.serverTimestamp() }, { merge: true }).catch(() => {});
+    throw new HttpsError("failed-precondition", "LiveKit did not confirm an active recording; proceedings have not been marked live.");
   }
   const row = {
     meetingId: ctx.meeting.id,
@@ -488,7 +539,7 @@ exports.stopMeetingRecording = onCall({
   const meetingId = text(request.data?.meetingId);
   const recordingId = text(request.data?.recordingId || request.data?.egressId);
   if (!recordingId) throw new HttpsError("invalid-argument", "Recording ID is required.");
-  const ctx = await resolveRecordingControl(request, meetingId, { allowClosed: true });
+  const ctx = await resolveRecordingControl(request, meetingId, { requireRecordingAllowed: false, allowClosed: true });
   if (!ctx.controller) throw new HttpsError("permission-denied", "Only the meeting administrator, initiator, chairperson or secretary may stop recording.");
   const ref = db.collection("meetingMediaRecordings").doc(recordingId);
   const snap = await ref.get();
@@ -564,6 +615,9 @@ exports.getMeetingRecordingStatus = onCall({
       status: row.recordingStatus || "UNKNOWN", egressStatus: row.egressStatus || null,
       startedAt: row.startedAt?.toDate?.().toISOString?.() || null,
       stoppedAt: row.stopRequestedAt?.toDate?.().toISOString?.() || null,
+      storageVerification: row.storageVerification || "UNVERIFIED",
+      storageSizeBytes: Number(row.storageSizeBytes || 0),
+      storageVerifiedAt: row.storageVerifiedAt?.toDate?.().toISOString?.() || null,
       files: Array.isArray(row.fileResults) ? row.fileResults.map(file => ({ filename: file.filename || "", location: file.location || "", size: file.size || 0 })) : []
     }
   };
