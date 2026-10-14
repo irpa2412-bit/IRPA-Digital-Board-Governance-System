@@ -449,7 +449,7 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
   if (!response.ok || result.ok === false || !result.envelopeId) {
     throw new Error(result.error || "The authenticated Gateway signing envelope was not created.");
   }
-  return {gatewayEnvelopeId:result.envelopeId,gatewayDocumentId:documentId,gatewayOriginalHash:expectedHash,signingMode:payload.signingMode,status:result.status || "Sent",existing:result.existing === true};
+  return {gatewayEnvelopeId:result.envelopeId,gatewayDocumentId:documentId,gatewayOriginalHash:expectedHash,signingMode:payload.signingMode,gatewaySigningStatus:result.status || "Sent",existing:result.existing === true};
 }
 
 export async function voidGatewaySignatureEnvelope(envelopeId, reason="Signature Portal activation could not be committed") {
