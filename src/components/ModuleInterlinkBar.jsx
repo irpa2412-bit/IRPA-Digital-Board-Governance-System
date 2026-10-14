@@ -49,7 +49,7 @@ export default function ModuleInterlinkBar({active,onNavigate,admin=false,role="
   const label=contextLabel(context);
   const linked=workflowLinkEntries(context||{});
   const connectedPortals=(INTERACTIVE_PORTAL_CONNECTIONS[active]||[]).filter(target=>target!==active&&modules.includes(target)&&((target!=="Finance Portfolio"&&target!=="Procurement")||finance));
-  return <><ResearchEvidenceExchange active={active} onNavigate={onNavigate}/><section className={"module-interlink-bar"+(active==="Decisions"?" decisions-workflow-layout":"")} aria-label="Related governance modules">{feedback&&<div className="action-feedback" role="status" aria-live="polite">{feedback}</div>}
+  return <><ResearchEvidenceExchange active={active} onNavigate={onNavigate}/><section className="module-interlink-bar" aria-label="Related governance modules">{feedback&&<div className="action-feedback" role="status" aria-live="polite">{feedback}</div>}
     <div className="module-interlink-heading"><span>CONNECTED WORKFLOW</span><small>Move directly between linked institutional records</small>{label&&<strong className="workflow-context-chip">Linked record: {label}</strong>}</div>
     <div className="module-interlink-list">
       {PORTAL_GROUPS.filter(group=>group.target!=="Finance Portfolio"||finance).map(group=><div key={group.target} className={"workflow-portal-group"+(active===group.target||group.children.some(([,target])=>target===active)?" active-group":"")}>
