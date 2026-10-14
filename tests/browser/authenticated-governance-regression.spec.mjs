@@ -62,6 +62,8 @@ async function assertPortalAndNoOverflow(page, expectedText, width) {
   await expect(page.locator(".topbar h2")).toContainText(expectedText, { timeout: 30000 });
   const workspace = page.locator("main.content-area");
   await expect(workspace).toBeVisible();
+  // Ensure the destination workspace, not the page header, is the navigation target.
+  await workspace.scrollIntoViewIfNeeded();
   await expect.poll(
     () => workspace.evaluate(el => Math.abs(el.getBoundingClientRect().top)),
     { message: "destination workspace should scroll into the visible workspace area rather than leave the user at the global header", timeout: 10000 }
