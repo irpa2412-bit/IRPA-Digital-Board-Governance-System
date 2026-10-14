@@ -217,3 +217,46 @@ test("meeting initiator can register an invitee and create the linked invitation
   await assertSucceeds(db.doc("participants/new-invitee").set({meetingId:"organizer-meeting",participantEmail:"guest@example.test",participantName:"Guest",participantRole:"Invited Guest",attendanceStatus:"Invited"}));
   await assertSucceeds(db.doc("invitations/guest-invitation").set({meetingId:"organizer-meeting",participantId:"new-invitee",email:"guest@example.test",name:"Guest",status:"Pending"}));
 });
+
+
+test("participant and invitation registers follow the linked meeting category policy", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    const db = context.firestore();
+    await db.doc("meetings/governance-record").set(meeting({
+      meetingCategory: "GOVERNANCE",
+      meetingPolicyId: "GOVERNANCE",
+      meetingType: "Board Meeting",
+      initiatorUid: "departmental-director",
+      initiatorEmail: "director@example.test"
+    }));
+    await db.doc("participants/governance-participant").set({
+      meetingId: "governance-record",
+      participantName: "Board participant",
+      participantEmail: "board@example.test",
+      attendanceStatus: "Invited"
+    });
+    await db.doc("invitations/governance-invitation").set({
+      meetingId: "governance-record",
+      email: "external@example.test",
+      status: "Pending"
+    });
+  });
+  const boardDb = testEnv.authenticatedContext("board-member", {
+    email: "board@example.test"
+  }).firestore();
+  const staffDb = testEnv.authenticatedContext("staff-user", {
+    email: "staff@example.test"
+  }).firestore();
+  await assertSucceeds(boardDb.doc("participants/governance-participant").get());
+  await assertSucceeds(boardDb.doc("invitations/governance-invitation").get());
+  await assertFails(staffDb.doc("participants/governance-participant").get());
+  await assertFails(staffDb.doc("invitations/governance-invitation").get());
+});
+
+test("active institutional users can read the organisation-wide member and employee directories", async () => {
+  const db = testEnv.authenticatedContext("board-member", {
+    email: "board@example.test"
+  }).firestore();
+  await assertSucceeds(db.collection("members").get());
+  await assertSucceeds(db.collection("employees").get());
+});
