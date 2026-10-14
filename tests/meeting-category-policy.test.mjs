@@ -41,11 +41,25 @@ test("explicitly invited participants can access their meeting regardless of ins
   }, { isInvited: true }), true);
 });
 
-test("meeting registration requires an active designated institutional role", () => {
-  assert.equal(canRegisterMeeting({ active: true, role: "Departmental Director" }), true);
+test("any active individual profile can initiate and organise meetings", () => {
+  assert.equal(canRegisterMeeting({ active: true, activeEmployee: true, role: "Departmental Director" }), true);
+  assert.equal(canRegisterMeeting({ active: true, activeEmployee: true, role: "Staff" }), true);
+  assert.equal(canRegisterMeeting({ active: true, activeMember: true, role: "Board Member" }), true);
   assert.equal(canRegisterMeeting({ active: false, role: "Departmental Director" }), false);
-  assert.equal(canRegisterMeeting({ active: true, role: "Staff" }), false);
   assert.equal(canRegisterMeeting({ isAdmin: true }), true);
+});
+
+test("closed Board sessions are limited to the initiator and explicit session access list", () => {
+  const closed = { ...governance, boardSessionType: "CLOSED_SESSION", confidentialityClass: "INTERNAL", closedSessionAccessUids: ["board-1"] };
+  assert.equal(canAccessMeetingCategory(closed, { uid: "board-2", active: true, activeMember: true, role: "Board Member" }), false);
+  assert.equal(canAccessMeetingCategory(closed, { uid: "board-1", active: true, activeMember: true, role: "Board Member" }), true);
+  assert.equal(canAccessMeetingCategory(closed, { uid: "secretary-1", active: true, role: "Meeting Secretary" }), true);
+});
+
+test("strictly confidential meetings are not exposed by category role alone", () => {
+  const disciplinary = { meetingCategory: "DISCIPLINARY", meetingPolicyId: "DISCIPLINARY", confidentialityClass: "STRICTLY_CONFIDENTIAL", initiatorUid: "hr-1", confidentialAccessUids: ["hr-2"] };
+  assert.equal(canAccessMeetingCategory(disciplinary, { uid: "hr-3", active: true, activeEmployee: true, role: "HR Director" }), false);
+  assert.equal(canAccessMeetingCategory(disciplinary, { uid: "hr-2", active: true, activeEmployee: true, role: "Staff" }), true);
 });
 
 test("released meeting edits are administrator-only", () => {
