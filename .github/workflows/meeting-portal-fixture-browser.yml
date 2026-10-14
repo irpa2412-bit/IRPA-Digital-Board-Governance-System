@@ -37,6 +37,7 @@ on:
       - "tests/fixtures/**"
       - "vite.meeting-fixture.config.js"
       - ".github/workflows/meeting-portal-fixture-browser.yml"
+      - "tests/meeting-isolation-guard.test.mjs"
   workflow_dispatch:
 permissions:
   contents: read
@@ -56,6 +57,8 @@ jobs:
           cache: npm
       - name: Install locked application dependencies
         run: npm ci
+      - name: Test source-isolation guard policy
+        run: node --test tests/meeting-isolation-guard.test.mjs
       - name: Install isolated browser runner
         run: |
           npm install --no-save --package-lock=false playwright
@@ -76,6 +79,7 @@ jobs:
             .trim().split("\n").filter(Boolean).sort();
           const allowed = new Set([
             ".github/workflows/meeting-portal-fixture-browser.yml",
+            "tests/meeting-isolation-guard.test.mjs",
             ".github/workflows/meeting-invitation-flow-ci.yml",
             ".github/workflows/mail-invitation-tests.yml",
             "drive-gateway/src/index.js",
@@ -130,7 +134,36 @@ jobs:
             console.error("Unexpected files changed outside the isolated meeting repair:", unexpected);
             process.exit(1);
           }
-                    const testOnlySignatureNavigation = changed.includes("tests/meeting-portal-browser.test.mjs") &&
+                    // If Wrangler configuration changes, permit only the staging section to differ.
+          // The production section must be byte-for-byte identical to the captured PR base.
+          const wranglerPath = "drive-gateway/wrangler.toml";
+          if (changed.includes(wranglerPath)) {
+            const readAt = ref => execFileSync("git", ["show", `${ref}:${wranglerPath}`], { encoding: "utf8" });
+            const productionSection = (text, label) => {
+              const marker = "\n[env.staging]";
+              const first = text.indexOf(marker);
+              if (first < 0 || text.indexOf(marker, first + marker.length) >= 0) {
+                throw new Error(`${label} must contain exactly one [env.staging] boundary.`);
+              }
+              return text.slice(0, first);
+            };
+            const baselineConfig = readAt(base);
+            const currentConfig = readAt("HEAD");
+            if (productionSection(baselineConfig, "Baseline Wrangler config") !== productionSection(currentConfig, "Current Wrangler config")) {
+              throw new Error("Production Wrangler configuration changed; only staging-only changes are permitted.");
+            }
+            const stagingConfig = currentConfig.slice(currentConfig.indexOf("\n[env.staging]"));
+            if (!stagingConfig.includes('id = "7b50627e29fc4fe1abaa8dc8665edd02"')) {
+              throw new Error("Staging DRIVE_KV must retain the explicitly approved dedicated namespace.");
+            }
+            if (stagingConfig.includes('id = "ccdbffa662ac48bfbdf7f4b1f62ca941"')) {
+              throw new Error("Production DRIVE_KV cannot be used by staging.");
+            }
+          }
+          const guardOnlyWorkflowRepair = changed.includes(".github/workflows/meeting-portal-fixture-browser.yml") &&
+            changed.includes("tests/meeting-isolation-guard.test.mjs") &&
+            changed.every(path => path === ".github/workflows/meeting-portal-fixture-browser.yml" || path === "tests/meeting-isolation-guard.test.mjs");
+          const testOnlySignatureNavigation = changed.includes("tests/meeting-portal-browser.test.mjs") &&
             changed.includes("tests/fixtures/meeting-portal-fixture.jsx");
           const testOnlyRegisterScope = changed.includes("src/firebase/data.js") &&
             changed.includes("tests/meeting-category-policy.test.mjs");
@@ -139,8 +172,8 @@ jobs:
           if (eventName !== "workflow_dispatch" &&
               !changed.includes("src/pages/Meetings.jsx") &&
               !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
-              !testOnlySignatureNavigation && !testOnlyRegisterScope) {
-            throw new Error("Meeting/participant source change or a paired isolated signature-navigation/register-scope regression test is missing.");
+              !testOnlySignatureNavigation && !testOnlyRegisterScope && !guardOnlyWorkflowRepair) {
+            throw new Error("Meeting/participant source change or an explicitly paired isolated regression/guard test is missing.");
           }
           console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));
           NODE
