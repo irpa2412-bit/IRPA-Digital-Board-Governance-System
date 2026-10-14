@@ -134,6 +134,16 @@ async function main() {
       .where("actorUid", "==", user.uid)
       .get();
 
+    if (process.env.LIVEKIT_PUBLIC_CONFIG_OUT) {
+      // Only public routing values are written: serverUrl and the public JWT issuer/key ID.
+      // The API secret is never read from, or emitted by, this test.
+      require("node:fs").writeFileSync(
+        process.env.LIVEKIT_PUBLIC_CONFIG_OUT,
+        JSON.stringify({ serverUrl: tokenBody.serverUrl, apiKey: jwtClaims.iss }),
+        { mode: 0o600 }
+      );
+    }
+
     auditWritten = auditSnapshot.docs.some(doc => {
       const row = doc.data();
       return row.action === "LIVE_MEETING_TOKEN_ISSUED" &&
