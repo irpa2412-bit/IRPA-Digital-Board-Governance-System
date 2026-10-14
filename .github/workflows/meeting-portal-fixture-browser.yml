@@ -64,11 +64,12 @@ jobs:
         run: |
           set -euo pipefail
           git fetch origin main
-          PR_BASE_SHA="${{ github.event.pull_request.base.sha }}" node --input-type=module <<'NODE'
+          PR_BASE_SHA="${{ github.event.pull_request.base.sha }}" EVENT_NAME="${{ github.event_name }}" node --input-type=module <<'NODE'
           import { execFileSync } from "node:child_process";
           // Pull-request runs must compare against the base SHA captured for that event.
           // origin/main may advance during the run, making merge-base include unrelated commits.
           const eventBase = process.env.PR_BASE_SHA?.trim();
+          const eventName = process.env.EVENT_NAME?.trim();
           const base = eventBase || execFileSync("git", ["merge-base", "origin/main", "HEAD"], { encoding: "utf8" }).trim();
           execFileSync("git", ["cat-file", "-e", `${base}^{commit}`]);
           const changed = execFileSync("git", ["diff", "--name-only", base, "HEAD"], { encoding: "utf8" })
@@ -133,7 +134,10 @@ jobs:
             changed.includes("tests/fixtures/meeting-portal-fixture.jsx");
           const testOnlyRegisterScope = changed.includes("src/firebase/data.js") &&
             changed.includes("tests/meeting-category-policy.test.mjs");
-          if (!changed.includes("src/pages/Meetings.jsx") &&
+          // A manual dispatch on an already-merged ref is a regression rerun, not a PR diff.
+          // Keep the changed-path isolation guard, but require a source/test delta only for event diffs.
+          if (eventName !== "workflow_dispatch" &&
+              !changed.includes("src/pages/Meetings.jsx") &&
               !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
               !testOnlySignatureNavigation && !testOnlyRegisterScope) {
             throw new Error("Meeting/participant source change or a paired isolated signature-navigation/register-scope regression test is missing.");
