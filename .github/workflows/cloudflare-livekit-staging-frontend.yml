@@ -45,17 +45,12 @@ jobs:
       - name: Verify readability policy
         run: npm run check:production-readability
 
-      - name: Require isolated Firebase and Gateway test configuration
+      - name: Require isolated staging Firebase configuration
         env:
           STAGING_FIREBASE_PROJECT_ID: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
-          STAGING_CRYPTO_TEST_EMAIL: ${{ secrets.STAGING_CRYPTO_TEST_EMAIL }}
-          STAGING_CRYPTO_TEST_PASSWORD: ${{ secrets.STAGING_CRYPTO_TEST_PASSWORD }}
         run: |
           set -euo pipefail
           test "$STAGING_FIREBASE_PROJECT_ID" = "irpa-dbg-staging-a73ec"
-          test -n "$STAGING_CRYPTO_TEST_EMAIL"
-          test -n "$STAGING_CRYPTO_TEST_PASSWORD"
-
       - name: Build with isolated staging Firebase and LiveKit configuration
         env:
           VITE_FIREBASE_API_KEY: "AIzaSyA6UmHtP-mRr99rBw57_-qrD4_mFSBnZ38"
