@@ -193,8 +193,14 @@ exports.listMeetingInviteeDirectory=onCall({region:"us-central1",timeoutSeconds:
  const [members,employees]=await Promise.all([db.collection("members").get(),db.collection("employees").get()]);
  const textValue=v=>String(v??"").trim();
  const project=(snap,kind)=>snap.docs.map(s=>{
-  const d=s.data()||{},status=textValue(d.status||d.employmentStatus||d.registrationStatus);
-  if(!["active","activated"].includes(status.toLowerCase()))return null;
+  const d=s.data()||{};
+  // Registration records can carry a stale/general status alongside the authoritative
+  // employment or registration status. Evaluate each field independently so a non-empty
+  // "Pending" status cannot mask an Active/Activated institutional registration.
+  const statusValues=[d.status,d.employmentStatus,d.registrationStatus].map(value=>textValue(value).toLowerCase()).filter(Boolean);
+  const activeStatus=statusValues.some(value=>["active","activated"].includes(value));
+  const status=activeStatus?"Active":textValue(d.status||d.employmentStatus||d.registrationStatus);
+  if(!activeStatus)return null;
   const role=textValue(d.role),board=d.boardMember===true||role.toLowerCase()==="board member"||Boolean(d.boardPosition)||textValue(d.department)==="Board of Directors";
   if(kind==="board"&&!board||kind==="member"&&board)return null;
   return {id:s.id,uid:textValue(d.uid||d.authUid||d.userUid),name:textValue(d.name||d.fullName||d.memberName||d.displayName),email:textValue(d.email||d.emailAddress||d.contactEmail).toLowerCase(),memberNumber:textValue(d.memberNumber||d.registrationNumber),employeeNumber:textValue(d.employeeNumber),role,roles:Array.isArray(d.roles)?d.roles:[],boardMember:d.boardMember===true,boardPosition:textValue(d.boardPosition),department:textValue(d.department),memberType:textValue(d.memberType),status,employmentStatus:textValue(d.employmentStatus),registrationStatus:textValue(d.registrationStatus),title:textValue(d.title),position:textValue(d.position),departmentalRole:textValue(d.departmentalRole)};
