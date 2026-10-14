@@ -72,7 +72,7 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
      roomRef.current=room;setSessionId(data.sessionId||"");setModerator(data.moderator===true);setRecordingAllowed(data.recordingAllowed===true);setStatus("CONNECTED");refreshParticipants(room);await refreshRecordingStatus();
      if(controller&&data.recordingAllowed===true&&meeting.recordingRequired!==false&&autoRecordingAttemptedRef.current!==meeting.id){
        autoRecordingAttemptedRef.current=meeting.id;setRecordingBusy(true);setError("");
-       try{const recording=await startMeetingRecording({meetingId:meeting.id,selectedAuthority:String(selectedAuthority||""),participantId:gateParticipantId});setRecordingStatus(recording.recordingStatus||"STARTING");await refreshRecordingStatus();if(!["RECORDING","STARTING"].includes(String(recordingStatus||"").toUpperCase()))setError("Automatic recording was requested. Verify that the recording status reaches RECORDING before proceeding.");}
+       try{const recording=await startMeetingRecording({meetingId:meeting.id,selectedAuthority:String(selectedAuthority||""),participantId:gateParticipantId});setRecordingStatus(recording.recordingStatus||"STARTING");let verification=null;for(let attempt=0;attempt<6;attempt++){verification=await refreshRecordingStatus();if(String(verification?.recordingStatus||"").toUpperCase()==="RECORDING")break;await new Promise(resolve=>setTimeout(resolve,1500));}if(String(verification?.recordingStatus||"").toUpperCase()!=="RECORDING"){setRecordingStatus(String(verification?.recordingStatus||recording.recordingStatus||"STARTING").toUpperCase());setError("Automatic recording has not been confirmed as active. Do not treat the meeting as recorded; check LiveKit Egress/storage and retry Start Recording.");}}
        catch(recordingError){setRecordingStatus("FAILED");setError("AUTOMATIC RECORDING FAILED. Do not treat the meeting as recorded. Check LiveKit Egress/storage and retry Start Recording; failure details: "+(recordingError?.message||"no confirmation returned."));}
        finally{setRecordingBusy(false)}
      }else if(meeting.recordingRequired!==false&&data.recordingAllowed!==true){setRecordingStatus("FAILED");setError("Recording is mandatory for this meeting, but the server did not enable recording. Do not treat proceedings as recorded; resolve the meeting recording configuration before proceeding.");}
@@ -109,9 +109,9 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
  async function sendChat(e){e?.preventDefault();const text=chat.trim();if(!text||!roomRef.current)return;try{await roomRef.current.localParticipant.publishData(encoder.encode(JSON.stringify({type:"chat",text})),{reliable:true});setMessages(v=>[...v,{from:"You",text}].slice(-30));setChat("")}catch(err){setError(err?.message||"Unable to send meeting message.")}}
 
  async function refreshRecordingStatus(){
-  if(!meeting?.id||!auth.currentUser)return;
-  try{const result=await getMeetingRecordingStatus(meeting.id);setRecordingAllowed(result.recordingAllowed===true);setRecordingStatus(result.recordingStatus||"UNKNOWN");setRecordingInfo(result.recording||null)}
-  catch(e){setError(e?.message||"Unable to retrieve meeting recording status.")}
+  if(!meeting?.id||!auth.currentUser)return null;
+  try{const result=await getMeetingRecordingStatus(meeting.id);setRecordingAllowed(result.recordingAllowed===true);setRecordingStatus(result.recordingStatus||"UNKNOWN");setRecordingInfo(result.recording||null);return result}
+  catch(e){setError(e?.message||"Unable to retrieve meeting recording status.");return null}
  }
  function currentParticipantId(){try{const gate=JSON.parse(sessionStorage.getItem("irpaMeetingEntryContext")||"null");return gate?.meetingId===meeting?.id?String(gate?.participantId||""):""}catch{return ""}}
  async function startRecording(){
