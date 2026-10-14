@@ -167,6 +167,6 @@ export function buildEsignContext({env,verifyUser,sendInvitation,logger,now,driv
     now:now||(()=>new Date()),
     config:{appUrl:String(env.IRPA_APP_URL||"https://irpa-digital-board-governance.web.app").replace(/\/$/,""),ttlDays:14},
     crypto:env.DRIVE_MOCK==="true"?null:{keyProvider:createCloudflareSignerKeyProvider(env)},
-    allowReturnTokens:env.DRIVE_MOCK==="true"
+    allowReturnTokens:env.DRIVE_MOCK==="true"||(env.IRPA_ENVIRONMENT==="staging"&&env.IRPA_STAGING_CRYPTO_TEST_MODE==="true")
   };
 }
