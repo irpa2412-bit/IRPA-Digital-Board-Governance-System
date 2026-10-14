@@ -63,7 +63,8 @@ jobs:
           VITE_LIVEKIT_TOKEN_WORKER_URL: "https://irpa-dgb-livekit-token-staging.irpa-governance.workers.dev"
           VITE_GATEWAY_ORIGIN: "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
           VITE_GOOGLE_DRIVE_GATEWAY_URL: "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
-          VITE_IRPA_CRYPTOGRAPHIC_SIGNING_ENABLED: "true"
+          # Enable only after the staging Gateway runtime acceptance workflow passes.
+          VITE_IRPA_CRYPTOGRAPHIC_SIGNING_ENABLED: "false"
           VITE_GRANT_CRAWLER_WORKER_URL: "https://staging-disabled.invalid"
           VITE_GRANT_ASSISTANT_WORKER_URL: "https://staging-disabled.invalid"
         run: |
