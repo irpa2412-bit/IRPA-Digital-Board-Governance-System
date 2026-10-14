@@ -197,7 +197,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
        if(!value)return "";
        if(!value.startsWith("drive://"))return value;
        try{
-         const bytes=await downloadSignatureBytes(value.slice("drive://".length),documentId,envelopeId);
+         const bytes=await downloadSignatureBytes(value.slice("drive://".length));
          let binary="";
          const chunk=0x8000;
          for(let i=0;i<bytes.length;i+=chunk)binary+=String.fromCharCode(...bytes.subarray(i,Math.min(i+chunk,bytes.length)));
