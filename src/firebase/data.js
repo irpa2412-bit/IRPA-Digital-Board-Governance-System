@@ -83,24 +83,8 @@ export async function getAccessibleMeetingRecords(){
     ...(Array.isArray(token?.claims?.irpaRoles)?token.claims.irpaRoles:[])
   ]).map(v=>String(v||"").trim()).filter(Boolean))];
   const identity={...(member||employee||{}),uid:user.uid,email,active:activeMember||activeEmployee,isAdmin,activeMember,activeEmployee,roles};
-  if(isTrialDataMode()){
-    /* Trial workflows need the real meeting register as reference context, plus trial meetings created for testing. */
-    const [actualMeetings,trialMeetings]=await Promise.all([
-      getDocs(collection(db,COLLECTIONS.meetings)),
-      getFinanceTrialRecords(COLLECTIONS.meetings)
-    ]);
-    const byId=new Map();
-    for(const snap of actualMeetings.docs){const data=snap.data()||{};byId.set(snap.id,{id:snap.id,...data});}
-    for(const meeting of trialMeetings)byId.set(meeting.id,meeting);
-    const availableMeetings=[...byId.values()];
-    if(isAdmin)return availableMeetings.sort((a,b)=>meetingCreatedAt(b)-meetingCreatedAt(a));
-    return availableMeetings.filter(m=>canAccessMeetingCategory(m,identity,{
-      isInitiator:String(m.initiatorUid||"")===uid,
-      isInvited:["participantUids","attendeeUids","memberUids","invitedUids","subscriberUids"].some(k=>Array.isArray(m[k])&&m[k].includes(uid))||
-        (email&&["participantEmails","attendeeEmails","invitedEmails","subscriberEmails"].some(k=>Array.isArray(m[k])&&m[k].map(v=>String(v||"").toLowerCase()).includes(email))),
-      isRegisteredParticipant:["participantUids","attendeeUids","memberUids","subscriberUids"].some(k=>Array.isArray(m[k])&&m[k].includes(uid))
-    })).sort((a,b)=>meetingCreatedAt(b)-meetingCreatedAt(a));
-  }
+  // Trial mode must not bypass Firestore's meeting-category authorization with a collection-wide read.
+  // The same authorized category/identity queries below include trial records when the caller is allowed to read them.
   const ref=collection(db,COLLECTIONS.meetings);
   const jobs=[];
   if(isAdmin){
