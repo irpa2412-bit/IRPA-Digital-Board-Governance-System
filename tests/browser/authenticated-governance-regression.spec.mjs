@@ -5,7 +5,11 @@ const fixturePassword = "FixtureOnly-Password-2026!";
 
 async function navigateModule(page, viewportName, module) {
   if (viewportName === "mobile") {
-    if (module === "Finance Portfolio" || module === "Meeting Room" || module === "Documents" || module === "Voting" || module === "Resolutions" || module === "Decisions") {
+    if (["Meeting Room", "Voting", "Resolutions", "Decisions"].includes(module)) {
+      // The mobile connected-workflow strip is intentionally hidden; verify each authorized destination directly.
+      await page.goto("/?adminModule=" + encodeURIComponent(module));
+      await expect(page.locator(".topbar h2")).toContainText(module, { timeout: 30000 });
+    } else if (module === "Finance Portfolio" || module === "Documents") {
       const dialog = page.getByRole("dialog", { name: "Mobile navigation" });
       const sheetTitle = dialog.locator(".mobile-nav-sheet-header strong");
       const isPortalsSheet = await dialog.isVisible() && await sheetTitle.textContent() === "Portals";
@@ -13,31 +17,13 @@ async function navigateModule(page, viewportName, module) {
         await page.locator(".mobile-global-nav").getByRole("button", { name: "Portals" }).click();
       }
       await expect(sheetTitle).toHaveText("Portals");
-      if (module === "Finance Portfolio") {
-        await dialog.getByRole("button", { name: /Finance Portal/ }).click();
-      } else if (module === "Documents") {
-        await dialog.getByRole("button", { name: /Documents Portal/ }).click();
-      } else {
-        const child = {
-          "Meeting Room": /Meeting Room/,
-          "Voting": /Voting/,
-          "Resolutions": /Resolutions/,
-          "Decisions": /Decisions/
-        }[module];
-        const childButton = dialog.getByRole("button", { name: child });
-        // The parent may already be expanded from the previous portal visit; do not toggle it closed.
-        if (!(await childButton.isVisible())) {
-          await dialog.getByRole("button", { name: /Meeting Portal/ }).click();
-        }
-        await expect(childButton).toBeVisible();
-        await childButton.click();
-      }
+      const label = module === "Finance Portfolio" ? /Finance Portal/ : /Documents Portal/;
+      await dialog.getByRole("button", { name: label }).click();
     } else {
       await page.locator(".mobile-global-nav").getByRole("button", { name: "Menu" }).click();
       const dialog = page.getByRole("dialog", { name: "Mobile navigation" });
       await expect(dialog.locator(".mobile-nav-sheet-header strong")).toHaveText("Navigation");
-      const label = /Grant Intelligence.*Funding Opportunities/;
-      await dialog.getByRole("button", { name: label }).click();
+      await dialog.getByRole("button", { name: /Grant Intelligence.*Funding Opportunities/ }).click();
     }
   } else {
     const sidebar = page.locator(".sidebar");
@@ -139,12 +125,14 @@ for (const viewport of [
       await assertPortalAndNoOverflow(page, heading, viewport.width);
     }
 
-    // Exercise the document-to-signing workflow navigation without creating or signing records.
-    await navigateModule(page, viewport.name, "Documents");
-    await page.locator(".module-interlink-bar").getByRole("button", { name: "Signing Workspace" }).click();
-    await expect(page.locator(".module-interlink-bar .workflow-action-portal.active")).toContainText("Signing Workspace");
-    await page.locator(".module-interlink-bar").getByRole("button", { name: "Post-Signature Work" }).click();
-    await expect(page.locator(".module-interlink-bar .workflow-action-portal.active")).toContainText("Post-Signature Work");
+    // Exercise signing-workflow links where the connected-workflow strip is available; no records are created or signed.
+    if (viewport.name !== "mobile") {
+      await navigateModule(page, viewport.name, "Documents");
+      await page.locator(".module-interlink-bar").getByRole("button", { name: "Signing Workspace" }).click();
+      await expect(page.locator(".module-interlink-bar .workflow-action-portal.active")).toContainText("Signing Workspace");
+      await page.locator(".module-interlink-bar").getByRole("button", { name: "Post-Signature Work" }).click();
+      await expect(page.locator(".module-interlink-bar .workflow-action-portal.active")).toContainText("Post-Signature Work");
+    }
 
     expect(uncaughtErrors, "uncaught JavaScript errors during portal navigation").toEqual([]);
     expect(successfulExternalRequests, "no external or production request may complete in the isolated fixture").toEqual([]);
