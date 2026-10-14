@@ -91,6 +91,7 @@ const checks=[
  ["Recording is automatically stopped when the meeting is closed",media.includes("autoStopAttemptedRef")&&media.includes("AUTOMATIC RECORDING STOP FAILED")],
  ["Recording files are stored under category-specific archive paths",liveMeeting.includes('"irpa-governance-recordings/" + category.toLowerCase() + "/"')],
  ["Recording completion is audit-logged",liveMeeting.includes("LIVE_MEETING_RECORDING_COMPLETED")],
+ ["Active recording is monitored and failures are audit-logged",media.includes("setInterval(poll,15000)")&&liveMeeting.includes("LIVE_MEETING_RECORDING_FAILED")],
  ["Disciplinary records have a dedicated retention policy",records.includes("DISCIPLINARY:7")&&records.includes('return"DISCIPLINARY"')],
  ["Audio/video recordings are archived under the meeting category",liveMeeting.includes('"irpa-governance-recordings/" + category.toLowerCase() + "/"')&&liveMeeting.includes("fileResults: files")],
  ["Recording metadata and category/classification are audit-trailed",liveMeeting.includes("LIVE_MEETING_RECORDING_STARTED")&&liveMeeting.includes("confidentialityClass: row.confidentialityClass")&&liveMeeting.includes("filesVerified: files.length > 0")],
