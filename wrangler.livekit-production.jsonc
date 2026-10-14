@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "irpa-dgb-livekit-production-token",
+  "main": "cloudflare/livekit-production/worker.js",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "preview_urls": false,
+  "vars": {
+    "FIREBASE_PROJECT_ID": "irpa-digital-board-governance",
+    "FIREBASE_WEB_API_KEY": "AIzaSyC2aMdxHD14nMnGiRyf4mSL1ixXdzBoOtE"
+  }
+}
