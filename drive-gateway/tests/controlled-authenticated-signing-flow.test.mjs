@@ -267,3 +267,23 @@ test("Gateway signing stores only the authenticated signer's assigned field valu
   assert.deepEqual(current.signers[0].fieldValues,{"member-name":"Member Name"});
   assert.equal(current.signers[0].fieldValues["second-name"],undefined);
 });
+
+
+test("Gateway idempotent signing retry still requires the invited authenticated UID", async () => {
+  const fixture = await makeFixture({ signerUid:"member-uid", signerEmail:"member@example.org" });
+  await sign(fixture.ctx,{
+    token:fixture.token,
+    signature:{type:"typed",value:"Member Signer"},
+    consent:true,
+    user:{uid:"member-uid",email:"member@example.org"}
+  });
+  await assert.rejects(
+    () => sign(fixture.ctx,{
+      token:fixture.token,
+      signature:{type:"typed",value:"Member Signer"},
+      consent:true,
+      user:{uid:"wrong-user",email:"member@example.org"}
+    }),
+    error=>error.status===403
+  );
+});
