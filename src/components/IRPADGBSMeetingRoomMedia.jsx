@@ -15,7 +15,8 @@ function safeJson(value){
 export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",controller=false}){
  const roomRef=useRef(null),remoteRef=useRef(null),localRef=useRef(null);
  const[status,setStatus]=useState("READY"),[error,setError]=useState(""),[muted,setMuted]=useState(true),[camera,setCamera]=useState(false),[screen,setScreen]=useState(false),[hand,setHand]=useState(false),[moderator,setModerator]=useState(false),[recordingAllowed,setRecordingAllowed]=useState(false);
- const[participants,setParticipants]=useState([]),[messages,setMessages]=useState([]),[chat,setChat]=useState(""),[deviceReady,setDeviceReady]=useState(false),[deviceCheck,setDeviceCheck]=useState("NOT CHECKED"),[sessionId,setSessionId]=useState(""),[recordingStatus,setRecordingStatus]=useState("NOT_STARTED"),[recordingInfo,setRecordingInfo]=useState(null),[recordingBusy,setRecordingBusy]=useState(false);
+ const[participants,setParticipants]=useState([]),[messages,setMessages]=useState([]),[chat,setChat]=useState(""),[deviceReady,setDeviceReady]=useState(false),[deviceCheck,setDeviceCheck]=useState("NOT CHECKED"),[sessionId,setSessionId]=useState(""),[recordingStatus,setRecordingStatus]=useState("NOT_STARTED"),[recordingInfo,setRecordingInfo]=useState(null),[recordingBusy,setRecordingBusy]=useState(false),[recordingStatusLoaded,setRecordingStatusLoaded]=useState(false),[recordingRunNumber,setRecordingRunNumber]=useState(0);
+ const lastMeetingStatusRef=useRef({meetingId:"",status:""}),automaticStartRunRef=useRef(-1),automaticStopRef=useRef("");
 
  const clear=node=>{if(node)while(node.firstChild)node.removeChild(node.firstChild)};
  const refreshParticipants=room=>{
@@ -111,7 +112,7 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
      setError(e?.message||"Camera/microphone permission or device check failed.");
    }finally{stream?.getTracks?.().forEach(track=>track.stop())}
  }
- async function disconnect(){roomRef.current?.disconnect()}
+ async function disconnect(){if(controller&&recordingInfo?.egressId&&["STARTING","RECORDING","STOPPING"].includes(recordingStatus)){await stopRecording(true)}roomRef.current?.disconnect()}
  async function toggleMic(){if(!roomRef.current)return;const enabled=!roomRef.current.localParticipant.isMicrophoneEnabled;await roomRef.current.localParticipant.setMicrophoneEnabled(enabled);setMuted(!enabled);refreshParticipants(roomRef.current)}
  async function toggleCamera(){if(!roomRef.current)return;const enabled=!roomRef.current.localParticipant.isCameraEnabled;await roomRef.current.localParticipant.setCameraEnabled(enabled,{videoCaptureOptions:{resolution:{width:1280,height:720},frameRate:30}});setCamera(enabled);refreshParticipants(roomRef.current)}
  async function toggleScreen(){if(!roomRef.current)return;try{const enabled=!screen;await roomRef.current.localParticipant.setScreenShareEnabled(enabled);setScreen(enabled)}catch(e){setError(e?.message||"Screen sharing was not enabled by the device or browser.")}}
@@ -120,38 +121,73 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
 
  async function refreshRecordingStatus(){
   if(!meeting?.id||!auth.currentUser)return;
-  try{const result=await getMeetingRecordingStatus(meeting.id);setRecordingAllowed(result.recordingAllowed===true);setRecordingStatus(result.recordingStatus||"UNKNOWN");setRecordingInfo(result.recording||null)}
+  try{const result=await getMeetingRecordingStatus(meeting.id);setRecordingAllowed(result.recordingAllowed===true);setRecordingStatus(result.recordingStatus||"UNKNOWN");setRecordingInfo(result.recording||null);setRecordingStatusLoaded(true)}
   catch(e){setError(e?.message||"Unable to retrieve meeting recording status.")}
  }
  function currentParticipantId(){try{const gate=JSON.parse(sessionStorage.getItem("irpaMeetingEntryContext")||"null");return gate?.meetingId===meeting?.id?String(gate?.participantId||""):""}catch{return ""}}
- async function startRecording(){
-  if(!controller||!recordingAllowed||status!=="CONNECTED")return setError("Join the meeting and verify that recording is authorised before starting.");
+ async function startRecording(automatic=false){
+  if(!controller||!recordingAllowed||status!=="CONNECTED"){setError("Join the meeting and verify that recording is authorised before starting.");return false}
   setRecordingBusy(true);setError("");
-  try{const result=await startMeetingRecording({meetingId:meeting.id,selectedAuthority:String(selectedAuthority||""),participantId:currentParticipantId()});setRecordingStatus(result.recordingStatus||"RECORDING");await refreshRecordingStatus()}
-  catch(e){setError(e?.message||"The recording service did not confirm that recording started.")}
+  try{const result=await startMeetingRecording({meetingId:meeting.id,selectedAuthority:String(selectedAuthority||""),participantId:currentParticipantId()});setRecordingStatus(result.recordingStatus||"STARTING");setRecordingStatusLoaded(false);await refreshRecordingStatus();return true}
+  catch(e){setError((automatic?"Automatic recording could not start: ":"")+ (e?.message||"The recording service did not confirm that recording started."));return false}
   finally{setRecordingBusy(false)}
  }
- async function stopRecording(){
+ async function stopRecording(automatic=false){
   const recordingId=recordingInfo?.egressId||recordingInfo?.id;
-  if(!controller||!recordingId)return setError("No active meeting recording was found to stop.");
+  if(!controller||!recordingId){setError("No active meeting recording was found to stop.");return false}
   setRecordingBusy(true);setError("");
-  try{const result=await stopMeetingRecording({meetingId:meeting.id,recordingId,selectedAuthority:String(selectedAuthority||""),participantId:currentParticipantId()});setRecordingStatus(result.recordingStatus||"STOPPING");await refreshRecordingStatus()}
-  catch(e){setError(e?.message||"The recording service did not confirm that recording stopped.")}
+  try{const result=await stopMeetingRecording({meetingId:meeting.id,recordingId,selectedAuthority:String(selectedAuthority||""),participantId:currentParticipantId()});setRecordingStatus(result.recordingStatus||"STOPPING");setRecordingStatusLoaded(false);await refreshRecordingStatus();return true}
+  catch(e){setError((automatic?"Automatic recording stop needs attention: ":"")+(e?.message||"The recording service did not confirm that recording stopped."));return false}
   finally{setRecordingBusy(false)}
  }
  async function archiveRecordingToDrive(){
   const file=(recordingInfo?.files||[]).find(f=>f.location||f.filename);
   if(!file)return setError("No recording file location has been returned by LiveKit yet.");
-  if(!/^https?:\/\//i.test(String(file.location||"")))return setError("LiveKit returned a storage key rather than a browser-downloadable URL. Configure an authorised recording download endpoint before archiving this file to Google Drive.");
   setRecordingBusy(true);setError("");
   try{
-   const response=await fetch(file.location);if(!response.ok)throw new Error("Recording download failed with HTTP "+response.status+".");
+   const recordingWorker=String(import.meta.env.VITE_LIVEKIT_RECORDING_WORKER_URL||"").trim().replace(/\/+$/,"");
+   let response;
+   if(recordingWorker&&String(file.location||"").startsWith("/recording/download")){
+    if(!auth.currentUser)throw new Error("Sign in again before downloading the meeting recording.");
+    const token=await auth.currentUser.getIdToken();
+    response=await fetch(recordingWorker+file.location,{headers:{Authorization:"Bearer "+token}});
+   }else if(/^https?:\/\//i.test(String(file.location||""))){
+    response=await fetch(file.location);
+   }else{
+    throw new Error("The recording storage download route is not configured.");
+   }
+   if(!response.ok)throw new Error("Recording download failed with HTTP "+response.status+".");
    const blob=await response.blob();
    const archive=await uploadMeetingProductToDrive({meetingCategory:String(meeting?.meetingCategory||meeting?.meetingPolicyId||"OTHER").toUpperCase(),meetingId:meeting.id,meetingReference:meeting?.reference||meeting?.meetingReference||meeting?.title||"",recordId:recordingInfo?.id||recordingInfo?.egressId||"",recordType:"RECORDING",title:"Meeting Recording — "+(meeting?.title||meeting?.reference||meeting.id),fileName:file.filename||("IRPA-Meeting-"+meeting.id+".mp4"),content:blob,contentType:blob.type||"video/mp4",ownerUid:auth.currentUser?.uid||null});
    setRecordingInfo(info=>({...info,driveArchive:archive}));
   }catch(e){setError(e?.message||"Unable to archive the recording to Google Drive.")}
   finally{setRecordingBusy(false)}
  }
+ useEffect(()=>{
+  if(!meeting?.id)return;
+  let previous=lastMeetingStatusRef.current;
+  if(previous.meetingId!==meeting.id){previous={meetingId:meeting.id,status:""};lastMeetingStatusRef.current=previous;setRecordingStatusLoaded(false);automaticStartRunRef.current=-1;automaticStopRef.current=""}
+  if(meeting.status==="In Progress"&&previous.status!=="In Progress"){
+   const nextRun=recordingRunNumber+1;setRecordingRunNumber(nextRun);automaticStartRunRef.current=-1;automaticStopRef.current="";
+  }
+  lastMeetingStatusRef.current={meetingId:meeting.id,status:String(meeting.status||"")};
+ },[meeting?.id,meeting?.status]);
+ useEffect(()=>{
+  if(!meeting?.id||!controller||status!=="CONNECTED"||!recordingAllowed||!recordingStatusLoaded||recordingBusy)return;
+  const active=["STARTING","RECORDING","STOPPING"].includes(recordingStatus);
+  if(meeting.status==="In Progress"&&recordingRunNumber>0&&automaticStartRunRef.current!==recordingRunNumber&&["NOT_STARTED","COMPLETED","FAILED"].includes(recordingStatus)){
+   automaticStartRunRef.current=recordingRunNumber;
+   void startRecording(true);
+  }else if(meeting.status!=="In Progress"&&active&&(recordingStatus==="STARTING"||recordingStatus==="RECORDING")&&(recordingInfo?.egressId||recordingInfo?.id)&&automaticStopRef.current!==(recordingInfo.egressId||recordingInfo.id)){
+   automaticStopRef.current=recordingInfo.egressId||recordingInfo.id;
+   void stopRecording(true);
+  }
+ },[meeting?.id,meeting?.status,controller,status,recordingAllowed,recordingStatusLoaded,recordingBusy,recordingStatus,recordingInfo,recordingRunNumber]);
+ useEffect(()=>{
+  if(status!=="CONNECTED"||!meeting?.id||!recordingStatusLoaded||!["STARTING","RECORDING","STOPPING"].includes(recordingStatus))return;
+  const timer=setInterval(()=>{void refreshRecordingStatus()},3000);
+  return()=>clearInterval(timer);
+ },[status,meeting?.id,recordingStatusLoaded,recordingStatus]);
  const participantCount=participants.length;
  const readiness=useMemo(()=>status==="CONNECTED"?(deviceReady?"READY":"CHECK DEVICE"):(controller?"READY TO JOIN":"READ ONLY"),[status,deviceReady,controller]);
 
