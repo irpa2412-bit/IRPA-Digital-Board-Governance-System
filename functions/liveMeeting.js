@@ -322,6 +322,15 @@ function recordingRoomName(meetingId) {
 function safeRecordingId(value) {
   return String(value || "").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 120);
 }
+function recordingCategory(meeting = {}) {
+  const raw = text(meeting.meetingCategory || meeting.meetingPolicyId || meeting.category || meeting.meetingType).toUpperCase();
+  if (["GOVERNANCE","BOARD","BOARD MEETING","BOARD COMMITTEE MEETING","ANNUAL GENERAL MEETING","SPECIAL MEETING"].includes(raw)) return "GOVERNANCE";
+  if (["ADMINISTRATIVE","MANAGEMENT","MANAGEMENT MEETING","ADMINISTRATION MEETING","OPERATIONS MEETING"].includes(raw)) return "ADMINISTRATIVE";
+  if (["STAFF","STAFF MEETING"].includes(raw)) return "STAFF";
+  if (["GENERAL","GENERAL MEETING"].includes(raw)) return "GENERAL";
+  if (["DISCIPLINARY","DISCIPLINARY MEETING","DISCIPLINARY HEARING"].includes(raw)) return "DISCIPLINARY";
+  return "OTHER";
+}
 function egressState(info) {
   const value = info?.status;
   const numeric = Number(value);
@@ -336,19 +345,60 @@ function recordingStateForEgress(info) {
   if (state === "EGRESS_ACTIVE") return "RECORDING";
   return "STARTING";
 }
+exports.reportMeetingRecordingFailure = onCall({ region: "us-central1", timeoutSeconds: 30 }, async request => {
+  const meetingId = text(request.data?.meetingId);
+  const failureCode = text(request.data?.failureCode);
+  const allowedCodes = new Set(["ROOM_CONNECTION_FAILED", "RECORDING_NOT_CONFIRMED", "RECORDING_POLICY_FAILURE"]);
+  if (!allowedCodes.has(failureCode)) throw new HttpsError("invalid-argument", "Unsupported recording failure code.");
+  const ctx = await resolveRecordingControl(request, meetingId, { requireRecordingAllowed: false, allowClosed: true });
+  if (!ctx.controller) throw new HttpsError("permission-denied", "Only the meeting administrator, initiator, chairperson or secretary may report a recording failure.");
+  const current = await db.collection("meetingMediaRecordings").where("meetingId", "==", meetingId).get();
+  const active = current.docs.some(doc => ["RECORDING", "STARTING", "STOPPING"].includes(text(doc.data()?.recordingStatus)));
+  const status = failureCode === "RECORDING_NOT_CONFIRMED" && active ? "UNCONFIRMED" : "FAILED";
+  const reason = failureCode === "ROOM_CONNECTION_FAILED"
+    ? "The live room could not connect when proceedings began."
+    : failureCode === "RECORDING_POLICY_FAILURE"
+      ? "The server-side recording policy did not enable capture."
+      : "The recording service did not confirm active capture.";
+  await db.collection("meetings").doc(meetingId).update({
+    recordingStatus: status, recordingFailureCode: failureCode, recordingFailureReason: reason,
+    recordingFailureAt: FieldValue.serverTimestamp(), recordingFailureByUid: ctx.uid
+  });
+  await db.collection("audit").add({
+    action: "LIVE_MEETING_RECORDING_FAILURE_REPORTED", collection: "meetings", recordId: meetingId,
+    details: { meetingId, meetingCategory: recordingCategory(ctx.meeting), confidentialityClass: text(ctx.meeting.confidentialityClass || "INTERNAL"), failureCode, recordingStatus: status, reason },
+    actorUid: ctx.uid, actorEmail: ctx.email || null, createdAt: FieldValue.serverTimestamp()
+  });
+  return { ok: true, recordingStatus: status, failureCode };
+});
+
 exports.startMeetingRecording = onCall({
   region: "us-central1", timeoutSeconds: 60,
   secrets: [LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET]
 }, async request => {
-  const ctx = await resolveRecordingControl(request, text(request.data?.meetingId));
+  const ctx = await resolveRecordingControl(request, text(request.data?.meetingId), { requireRecordingAllowed: false });
   if (!ctx.controller) throw new HttpsError("permission-denied", "Only the meeting administrator, initiator, chairperson or secretary may start recording.");
+  if (ctx.meeting.recordingAllowed !== true) {
+    const reason = "Recording is not enabled in the meeting's server-side recording policy.";
+    await db.collection("meetings").doc(ctx.meeting.id).update({
+      recordingStatus: "FAILED", recordingFailureReason: reason,
+      recordingFailureAt: FieldValue.serverTimestamp(), recordingFailureByUid: ctx.uid
+    });
+    await db.collection("audit").add({
+      action: "LIVE_MEETING_RECORDING_POLICY_FAILURE", collection: "meetings", recordId: ctx.meeting.id,
+      details: { meetingId: ctx.meeting.id, meetingCategory: recordingCategory(ctx.meeting), confidentialityClass: text(ctx.meeting.confidentialityClass || "INTERNAL"), recordingStatus: "FAILED", reason },
+      actorUid: ctx.uid, actorEmail: ctx.email || null, createdAt: FieldValue.serverTimestamp()
+    });
+    throw new HttpsError("failed-precondition", "Recording is not enabled in the server-side meeting policy. Proceedings must not be treated as recorded.");
+  }
   const roomName = recordingRoomName(ctx.meeting.id);
   const activeRecordings = await db.collection("meetingMediaRecordings").where("meetingId", "==", ctx.meeting.id).get();
   if (activeRecordings.docs.some(doc => ["STARTING", "RECORDING", "STOPPING"].includes(text(doc.data()?.recordingStatus)))) {
     throw new HttpsError("already-exists", "A recording is already active or stopping for this meeting.");
   }
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const filepath = "irpa-governance-recordings/" + safeRecordingId(ctx.meeting.id) + "/" + stamp + ".mp4";
+  const category = recordingCategory(ctx.meeting);
+  const filepath = "irpa-governance-recordings/" + category.toLowerCase() + "/" + safeRecordingId(ctx.meeting.id) + "/" + stamp + ".mp4";
   let egress;
   try {
     egress = await egressClient().startRoomCompositeEgress(
@@ -357,9 +407,14 @@ exports.startMeetingRecording = onCall({
       { layout: "grid", audioOnly: false }
     );
   } catch (error) {
+    const failureReason = text(error?.message).slice(0, 500) || "LiveKit Egress did not confirm startup.";
+    await db.collection("meetings").doc(ctx.meeting.id).update({
+      recordingStatus: "FAILED", recordingFailureReason: failureReason,
+      recordingFailureAt: FieldValue.serverTimestamp(), recordingFailureByUid: ctx.uid
+    });
     await db.collection("audit").add({
       action: "LIVE_MEETING_RECORDING_START_FAILED", collection: "meetingMediaRecordings", recordId: null,
-      details: { meetingId: ctx.meeting.id, reason: text(error?.message).slice(0, 500), storageDestination: "LIVEKIT_EGRESS_CONFIGURED_STORAGE" },
+      details: { meetingId: ctx.meeting.id, meetingCategory: recordingCategory(ctx.meeting), confidentialityClass: text(ctx.meeting.confidentialityClass || "INTERNAL"), reason: failureReason, storageDestination: "LIVEKIT_EGRESS_CONFIGURED_STORAGE", recordingStatus: "FAILED" },
       actorUid: ctx.uid, actorEmail: ctx.email || null, createdAt: FieldValue.serverTimestamp()
     });
     throw new HttpsError("failed-precondition", "Recording could not start. Verify that LiveKit Egress is running and its recording storage is configured; no recording has been confirmed.");
@@ -369,7 +424,7 @@ exports.startMeetingRecording = onCall({
   const row = {
     meetingId: ctx.meeting.id,
     meetingReference: text(ctx.meeting.meetingReference || ctx.meeting.reference || ctx.meeting.title),
-    meetingTitle: text(ctx.meeting.title), meetingCategory: categoryOf(ctx.meeting), roomName,
+    meetingTitle: text(ctx.meeting.title), meetingCategory: category, confidentialityClass: text(ctx.meeting.confidentialityClass || "INTERNAL"), boardSessionType: text(ctx.meeting.boardSessionType || "NOT_APPLICABLE"), roomName,
     egressId, outputPath: filepath, recordingStatus: "RECORDING",
     egressStatus: egressState(egress),
     recordingProvider: "LIVEKIT_EGRESS", storageDestination: "LIVEKIT_EGRESS_CONFIGURED_STORAGE",
@@ -384,7 +439,7 @@ exports.startMeetingRecording = onCall({
   });
   await db.collection("audit").add({
     action: "LIVE_MEETING_RECORDING_STARTED", collection: "meetingMediaRecordings", recordId: egressId,
-    details: { meetingId: ctx.meeting.id, meetingCategory: row.meetingCategory, egressId, outputPath: filepath, storageDestination: row.storageDestination },
+    details: { meetingId: ctx.meeting.id, meetingCategory: row.meetingCategory, confidentialityClass: row.confidentialityClass, boardSessionType: row.boardSessionType, egressId, outputPath: filepath, storageDestination: row.storageDestination, recordingStatus: row.recordingStatus },
     actorUid: ctx.uid, actorEmail: ctx.email || null, createdAt: FieldValue.serverTimestamp()
   });
   return { ok: true, recordingId: egressId, egressId, recordingStatus: "RECORDING", outputPath: filepath, storageDestination: row.storageDestination };
@@ -396,7 +451,7 @@ exports.stopMeetingRecording = onCall({
   const meetingId = text(request.data?.meetingId);
   const recordingId = text(request.data?.recordingId || request.data?.egressId);
   if (!recordingId) throw new HttpsError("invalid-argument", "Recording ID is required.");
-  const ctx = await resolveRecordingControl(request, meetingId);
+  const ctx = await resolveRecordingControl(request, meetingId, { allowClosed: true });
   if (!ctx.controller) throw new HttpsError("permission-denied", "Only the meeting administrator, initiator, chairperson or secretary may stop recording.");
   const ref = db.collection("meetingMediaRecordings").doc(recordingId);
   const snap = await ref.get();
@@ -426,7 +481,7 @@ exports.stopMeetingRecording = onCall({
   });
   await db.collection("audit").add({
     action: "LIVE_MEETING_RECORDING_STOP_REQUESTED", collection: "meetingMediaRecordings", recordId: recordingId,
-    details: { meetingId, egressStatus, recordingStatus, fileCount: files.length },
+    details: { meetingId, meetingCategory: text(snap.data()?.meetingCategory || snap.data()?.meetingPolicyId || "OTHER"), confidentialityClass: text(snap.data()?.confidentialityClass || "INTERNAL"), egressStatus, recordingStatus, fileCount: files.length, filesVerified: files.length > 0 },
     actorUid: ctx.uid, actorEmail: ctx.email || null, createdAt: FieldValue.serverTimestamp()
   });
   return { ok: true, recordingId, recordingStatus, egressStatus, files };
@@ -442,7 +497,12 @@ exports.getMeetingRecordingStatus = onCall({
     (b.startedAt?.toMillis?.() || 0) - (a.startedAt?.toMillis?.() || 0)
   );
   let row = rows[0];
-  if (!row) return { ok: true, recordingAllowed: ctx.meeting.recordingAllowed === true, recordingStatus: "NOT_STARTED", recording: null };
+  if (!row) return {
+    ok: true, recordingAllowed: ctx.meeting.recordingAllowed === true,
+    recordingStatus: text(ctx.meeting.recordingStatus || "NOT_STARTED"),
+    failureReason: text(ctx.meeting.recordingFailureReason || "") || null,
+    recording: null
+  };
   if (row.egressId && ["RECORDING", "STOPPING", "STARTING"].includes(text(row.recordingStatus))) {
     try {
       const latest = (await egressClient().listEgress("", row.egressId)).find(item => text(item.egressId) === text(row.egressId));
@@ -450,7 +510,13 @@ exports.getMeetingRecordingStatus = onCall({
         const nextStatus = recordingStateForEgress(latest);
         const files = Array.isArray(latest.fileResults) ? latest.fileResults.map(file => ({ filename: text(file.filename), location: text(file.location), size: Number(file.size || 0) })) : [];
         const patch = { recordingStatus: nextStatus, egressStatus: egressState(latest), fileResults: files, updatedAt: FieldValue.serverTimestamp() };
-        if (nextStatus === "COMPLETED") patch.completedAt = FieldValue.serverTimestamp();
+        if (nextStatus === "COMPLETED") {
+          patch.completedAt = FieldValue.serverTimestamp();
+          await db.collection("audit").add({ action: "LIVE_MEETING_RECORDING_COMPLETED", collection: "meetingMediaRecordings", recordId: row.id, details: { meetingId: ctx.meeting.id, meetingCategory: recordingCategory(ctx.meeting), egressId: row.egressId, files }, actorUid: ctx.uid, actorEmail: ctx.email || null, createdAt: FieldValue.serverTimestamp() });
+        } else if (nextStatus === "FAILED" && text(row.recordingStatus) !== "FAILED") {
+          patch.failedAt = FieldValue.serverTimestamp();
+          await db.collection("audit").add({ action: "LIVE_MEETING_RECORDING_FAILED", collection: "meetingMediaRecordings", recordId: row.id, details: { meetingId: ctx.meeting.id, meetingCategory: recordingCategory(ctx.meeting), egressId: row.egressId, egressStatus: egressState(latest), files }, actorUid: ctx.uid, actorEmail: ctx.email || null, createdAt: FieldValue.serverTimestamp() });
+        }
         await db.collection("meetingMediaRecordings").doc(row.id).update(patch);
         await db.collection("meetings").doc(ctx.meeting.id).update({ recordingStatus: nextStatus, ...(nextStatus === "COMPLETED" ? { recordingCompletedAt: FieldValue.serverTimestamp() } : {}) });
         row = { ...row, ...patch, fileResults: files, recordingStatus: nextStatus, egressStatus: egressState(latest) };
@@ -464,9 +530,14 @@ exports.getMeetingRecordingStatus = onCall({
     recordingStatus: row.recordingStatus || "UNKNOWN",
     recording: {
       id: row.id, egressId: row.egressId, outputPath: row.outputPath || null,
+      meetingCategory: row.meetingCategory || recordingCategory(ctx.meeting),
+      confidentialityClass: row.confidentialityClass || text(ctx.meeting.confidentialityClass || "INTERNAL"),
+      boardSessionType: row.boardSessionType || text(ctx.meeting.boardSessionType || "NOT_APPLICABLE"),
+      storageDestination: row.storageDestination || "LIVEKIT_EGRESS_CONFIGURED_STORAGE",
       status: row.recordingStatus || "UNKNOWN", egressStatus: row.egressStatus || null,
       startedAt: row.startedAt?.toDate?.().toISOString?.() || null,
       stoppedAt: row.stopRequestedAt?.toDate?.().toISOString?.() || null,
+      completedAt: row.completedAt?.toDate?.().toISOString?.() || null,
       files: Array.isArray(row.fileResults) ? row.fileResults.map(file => ({ filename: file.filename || "", location: file.location || "", size: file.size || 0 })) : []
     }
   };

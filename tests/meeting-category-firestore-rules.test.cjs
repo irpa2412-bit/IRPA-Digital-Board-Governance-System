@@ -45,6 +45,11 @@ function meeting(overrides = {}) {
     meetingType: "Management Meeting",
     initiatorUid: "departmental-director",
     initiatorEmail: "director@example.test",
+    confidentialityClass: "INTERNAL",
+    boardSessionType: "OPEN_SESSION",
+    recordingRequired: true,
+    recordingAllowed: true,
+    recordingNoticeAcknowledged: true,
     registerStatus: "Draft",
     status: "Scheduled",
     ...overrides
@@ -126,7 +131,8 @@ test("direct meeting reads enforce category roles server-side", async () => {
     email: "staff@example.test"
   }).firestore();
   const boardDb = testEnv.authenticatedContext("board-member", {
-    email: "board@example.test"
+    email: "board@example.test",
+    irpaRoles: ["Board Member"]
   }).firestore();
   await assertFails(staffDb.doc("meetings/governance-record").get());
   await assertSucceeds(boardDb.doc("meetings/governance-record").get());
@@ -147,8 +153,8 @@ test("category-constrained meeting queries are allowed only for the matching cat
   const boardDb = testEnv.authenticatedContext("board-member", {
     email: "board@example.test"
   }).firestore();
-  await assertFails(staffDb.collection("meetings").where("meetingCategory", "==", "GOVERNANCE").get());
-  await assertSucceeds(boardDb.collection("meetings").where("meetingCategory", "==", "GOVERNANCE").get());
+  await assertFails(staffDb.collection("meetings").where("meetingCategory", "==", "GOVERNANCE").where("confidentialityClass", "==", "INTERNAL").where("boardSessionType", "==", "OPEN_SESSION").get());
+  await assertSucceeds(boardDb.collection("meetings").where("meetingCategory", "==", "GOVERNANCE").where("confidentialityClass", "==", "INTERNAL").where("boardSessionType", "==", "OPEN_SESSION").get());
 });
 
 test("explicit category metadata overrides a conflicting legacy meeting type", async () => {
@@ -216,4 +222,36 @@ test("meeting initiator can register an invitee and create the linked invitation
   const db=testEnv.authenticatedContext("departmental-director",{email:"director@example.test"}).firestore();
   await assertSucceeds(db.doc("participants/new-invitee").set({meetingId:"organizer-meeting",participantEmail:"guest@example.test",participantName:"Guest",participantRole:"Invited Guest",attendanceStatus:"Invited"}));
   await assertSucceeds(db.doc("invitations/guest-invitation").set({meetingId:"organizer-meeting",participantId:"new-invitee",email:"guest@example.test",name:"Guest",status:"Pending"}));
+});
+
+
+test("any signed-in profile may initiate while confidential meetings remain participant-restricted", async () => {
+  const staffDb = testEnv.authenticatedContext("staff-user", { email: "staff@example.test" }).firestore();
+  await assertSucceeds(staffDb.doc("meetings/staff-created").set(meeting({ initiatorUid: "staff-user", initiatorEmail: "staff@example.test", meetingCategory: "GENERAL", meetingPolicyId: "GENERAL" })));
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("meetings/strict-case").set(meeting({ meetingCategory: "DISCIPLINARY", meetingPolicyId: "DISCIPLINARY", meetingType: "Disciplinary Hearing", confidentialityClass: "STRICTLY_CONFIDENTIAL", initiatorUid: "departmental-director" }));
+  });
+  await assertFails(staffDb.doc("meetings/strict-case").get());
+  const initiatorDb = testEnv.authenticatedContext("departmental-director", { email: "director@example.test" }).firestore();
+  await assertSucceeds(initiatorDb.doc("meetings/strict-case").get());
+});
+
+test("meeting registration rejects missing recording notice or confidentiality", async () => {
+  const db = testEnv.authenticatedContext("staff-user", { email: "staff@example.test" }).firestore();
+  await assertFails(db.doc("meetings/missing-notice").set(meeting({ initiatorUid: "staff-user", recordingNoticeAcknowledged: false })));
+  await assertFails(db.doc("meetings/missing-classification").set(meeting({ initiatorUid: "staff-user", confidentialityClass: "" })));
+});
+
+
+test("closed Board sessions are not exposed to unrelated Board-role profiles", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("meetings/closed-board").set(meeting({ meetingCategory: "GOVERNANCE", meetingPolicyId: "GOVERNANCE", meetingType: "Board Meeting", confidentialityClass: "OPEN", boardSessionType: "CLOSED_SESSION", initiatorUid: "board-secretary" }));
+  });
+  const boardDb = testEnv.authenticatedContext("uninvited-board-member", { irpaRoles: ["Board Member"], email: "board@example.test" }).firestore();
+  await assertFails(boardDb.doc("meetings/closed-board").get());
+  const inviteeDb = testEnv.authenticatedContext("invited-board-member", { email: "invitee@example.test" }).firestore();
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("meetings/closed-board").update({ participantUids: ["invited-board-member"] });
+  });
+  await assertSucceeds(inviteeDb.doc("meetings/closed-board").get());
 });

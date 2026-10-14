@@ -57,6 +57,9 @@ jobs:
             .trim().split("\n").filter(Boolean).sort();
           const allowed = new Set([
             ".github/workflows/meeting-portal-fixture-browser.yml",
+            ".github/workflows/provision-meeting-archives.yml",
+            ".github/workflows/verify-livekit-staging.yml",
+            "functions/scripts/verify-livekit-recording-storage.js",
             ".github/workflows/meeting-invitation-flow-ci.yml",
             ".github/workflows/mail-invitation-tests.yml",
             "drive-gateway/src/index.js",
@@ -73,6 +76,12 @@ jobs:
             "functions/meetingGateway.js",
             "package.json",
             "src/components/MeetingAccessControl.jsx",
+            "src/components/IRPADGBSMeetingRoomMedia.jsx",
+            "functions/liveMeeting.js",
+            "src/firebase/meetingPolicy.js",
+            "scripts/check-meeting-media-governance.mjs",
+            "tests/meeting-category-policy.test.mjs",
+            "tests/meeting-category-firestore-rules.test.cjs",
             "src/pages/Invitations.jsx",
             "src/pages/MeetingEntryGateway.jsx",
             "src/components/ControlledDocumentUpload.jsx",
@@ -84,6 +93,9 @@ jobs:
             "src/pages/OperationalGatewaysParticipants.jsx",
             "src/pages/Meetings.jsx",
             "src/firebase/data.js",
+            "src/firebase/meetingPolicy.js",
+            "functions/liveMeeting.js",
+            "src/firebase/signatureStorage.js",
             "functions/meetingGateway.js",
             "src/pages/OperationalGatewaysParticipants.jsx",
             "firestore.rules",
@@ -91,6 +103,7 @@ jobs:
             "tests/fixtures/meeting-portal-fixture.jsx",
             "tests/fixtures/mocks.js",
             "tests/meeting-portal-browser.test.mjs",
+            "tests/browser/authenticated-governance-regression.spec.mjs",
             "tests/meeting-room-authorization-boundary.test.mjs",
             "vite.meeting-fixture.config.js"
           ]);

@@ -37,7 +37,7 @@ jobs:
           const { initializeApp, cert } = require("firebase-admin/app");
           const { getAuth } = require("firebase-admin/auth");
 
-          const categories = ["GOVERNANCE", "ADMINISTRATIVE", "STAFF", "GENERAL", "OTHER"];
+          const categories = ["GOVERNANCE", "ADMINISTRATIVE", "STAFF", "GENERAL", "DISCIPLINARY"];
           const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || "{}");
           const apiKey = String(process.env.FIREBASE_WEB_API_KEY || "").trim();
           const gateway = String(process.env.MEETING_ARCHIVE_GATEWAY_URL || "").replace(/\/+$/, "");

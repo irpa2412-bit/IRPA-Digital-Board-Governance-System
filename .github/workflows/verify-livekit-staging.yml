@@ -2,6 +2,12 @@ name: Verify IRPA LiveKit Staging Control Plane
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/verify-livekit-staging.yml'
+      - 'functions/scripts/verify-livekit-control-plane.js'
+      - 'functions/scripts/verify-livekit-recording-storage.js'
 
 permissions:
   contents: read
@@ -15,16 +21,51 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: Diagnose configured repository secret names without exposing values
+        env:
+          C_LIVEKIT_STAGING_URL: ${{ secrets.LIVEKIT_STAGING_URL }}
+          C_LIVEKIT_STAGING_DOMAIN: ${{ secrets.LIVEKIT_STAGING_DOMAIN }}
+          C_LIVEKIT_URL: ${{ secrets.LIVEKIT_URL }}
+          C_LIVEKIT_WS_URL: ${{ secrets.LIVEKIT_WS_URL }}
+          C_LIVEKIT_SERVER_URL: ${{ secrets.LIVEKIT_SERVER_URL }}
+          C_LIVEKIT_STAGING_API_KEY: ${{ secrets.LIVEKIT_STAGING_API_KEY }}
+          C_LIVEKIT_API_KEY: ${{ secrets.LIVEKIT_API_KEY }}
+          C_LIVEKIT_SERVER_API_KEY: ${{ secrets.LIVEKIT_SERVER_API_KEY }}
+          C_LIVEKIT_KEY: ${{ secrets.LIVEKIT_KEY }}
+          C_LIVEKIT_STAGING_API_SECRET: ${{ secrets.LIVEKIT_STAGING_API_SECRET }}
+          C_LIVEKIT_API_SECRET: ${{ secrets.LIVEKIT_API_SECRET }}
+          C_LIVEKIT_SERVER_API_SECRET: ${{ secrets.LIVEKIT_SERVER_API_SECRET }}
+          C_LIVEKIT_SECRET: ${{ secrets.LIVEKIT_SECRET }}
+        run: |
+          set -euo pipefail
+          for name in C_LIVEKIT_STAGING_URL C_LIVEKIT_STAGING_DOMAIN C_LIVEKIT_URL C_LIVEKIT_WS_URL C_LIVEKIT_SERVER_URL C_LIVEKIT_STAGING_API_KEY C_LIVEKIT_API_KEY C_LIVEKIT_SERVER_API_KEY C_LIVEKIT_KEY C_LIVEKIT_STAGING_API_SECRET C_LIVEKIT_API_SECRET C_LIVEKIT_SERVER_API_SECRET C_LIVEKIT_SECRET; do
+            if [ -n "${!name:-}" ]; then
+              printf '%s=present\n' "${name#C_}"
+            else
+              printf '%s=not-available-to-workflow\n' "${name#C_}"
+            fi
+          done
       - name: Install server SDK
         run: npm --prefix functions install --omit=dev
       - name: Verify secure endpoint and API credentials
         env:
-          LIVEKIT_URL: ${{ secrets.LIVEKIT_STAGING_URL }}
-          LIVEKIT_API_KEY: ${{ secrets.LIVEKIT_STAGING_API_KEY }}
-          LIVEKIT_API_SECRET: ${{ secrets.LIVEKIT_STAGING_API_SECRET }}
+          LIVEKIT_URL: ${{ secrets.LIVEKIT_STAGING_URL || (secrets.LIVEKIT_STAGING_DOMAIN != '' && format('wss://{0}', secrets.LIVEKIT_STAGING_DOMAIN)) || secrets.LIVEKIT_URL || secrets.LIVEKIT_WS_URL || secrets.LIVEKIT_SERVER_URL }}
+          LIVEKIT_API_KEY: ${{ secrets.LIVEKIT_STAGING_API_KEY || secrets.LIVEKIT_API_KEY || secrets.LIVEKIT_SERVER_API_KEY || secrets.LIVEKIT_KEY }}
+          LIVEKIT_API_SECRET: ${{ secrets.LIVEKIT_STAGING_API_SECRET || secrets.LIVEKIT_API_SECRET || secrets.LIVEKIT_SERVER_API_SECRET || secrets.LIVEKIT_SECRET }}
         run: |
           set -euo pipefail
           for name in LIVEKIT_URL LIVEKIT_API_KEY LIVEKIT_API_SECRET; do
-            if [ -z "${!name:-}" ]; then echo "::error::Missing GitHub Actions secret ${name}"; exit 1; fi
+            if [ -z "${!name:-}" ]; then echo "::error::No recognized repository secret mapped for required LiveKit setting: ${name}. Review the preceding name-only diagnostic and map your existing secret names to the LIVEKIT_* aliases in this workflow; secret values are never printed."; exit 1; fi
           done
           node functions/scripts/verify-livekit-control-plane.js
+      - name: Verify actual staging recording output and stored object
+        env:
+          LIVEKIT_URL: ${{ secrets.LIVEKIT_STAGING_URL || (secrets.LIVEKIT_STAGING_DOMAIN != '' && format('wss://{0}', secrets.LIVEKIT_STAGING_DOMAIN)) || secrets.LIVEKIT_URL || secrets.LIVEKIT_WS_URL || secrets.LIVEKIT_SERVER_URL }}
+          LIVEKIT_API_KEY: ${{ secrets.LIVEKIT_STAGING_API_KEY || secrets.LIVEKIT_API_KEY || secrets.LIVEKIT_SERVER_API_KEY || secrets.LIVEKIT_KEY }}
+          LIVEKIT_API_SECRET: ${{ secrets.LIVEKIT_STAGING_API_SECRET || secrets.LIVEKIT_API_SECRET || secrets.LIVEKIT_SERVER_API_SECRET || secrets.LIVEKIT_SECRET }}
+        run: |
+          set -euo pipefail
+          for name in LIVEKIT_URL LIVEKIT_API_KEY LIVEKIT_API_SECRET; do
+            if [ -z "${!name:-}" ]; then echo "::error::No recognized repository secret mapped for required LiveKit setting: ${name}."; exit 1; fi
+          done
+          node functions/scripts/verify-livekit-recording-storage.js

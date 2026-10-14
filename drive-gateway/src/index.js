@@ -834,7 +834,8 @@ const MEETING_ARCHIVE_POLICIES = Object.freeze({
   ADMINISTRATIVE: { label: "Administrative Meetings", classification: "Restricted" },
   STAFF: { label: "Staff Meetings", classification: "Internal" },
   GENERAL: { label: "General Meetings", classification: "Internal" },
-  OTHER: { label: "Other Meetings", classification: "Restricted" }
+  DISCIPLINARY: { label: "Disciplinary Meetings", classification: "Restricted" },
+  OTHER: { label: "Legacy Other Meetings", classification: "Restricted" }
 });
 
 async function meetingArchiveContext(request, env) {

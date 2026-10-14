@@ -1,7 +1,7 @@
 import React,{useEffect,useMemo,useRef,useState}from"react";
 import{httpsCallable,getFunctions}from"firebase/functions";
 import{auth}from"../firebase/config";
-import{getMeetingRecordingStatus,startMeetingRecording,stopMeetingRecording}from"../firebase/meetingRecords";
+import{getMeetingRecordingStatus,startMeetingRecording,stopMeetingRecording,reportMeetingRecordingFailure}from"../firebase/meetingRecords";
 import{uploadMeetingProductToDrive}from"../firebase/signatureStorage";
 import{Room,RoomEvent}from"livekit-client";
 
@@ -12,8 +12,8 @@ function safeJson(value){
   try{return JSON.parse(decoder.decode(value))}catch{return null}
 }
 
-export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",controller=false}){
- const roomRef=useRef(null),remoteRef=useRef(null),localRef=useRef(null);
+export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",controller=false,recordingController=false,proceedingsActive=false}){
+ const roomRef=useRef(null),remoteRef=useRef(null),localRef=useRef(null),autoRecordingAttemptedRef=useRef(""),autoStopAttemptedRef=useRef("");
  const[status,setStatus]=useState("READY"),[error,setError]=useState(""),[muted,setMuted]=useState(true),[camera,setCamera]=useState(false),[screen,setScreen]=useState(false),[hand,setHand]=useState(false),[moderator,setModerator]=useState(false),[recordingAllowed,setRecordingAllowed]=useState(false);
  const[participants,setParticipants]=useState([]),[messages,setMessages]=useState([]),[chat,setChat]=useState(""),[deviceReady,setDeviceReady]=useState(false),[deviceCheck,setDeviceCheck]=useState("NOT CHECKED"),[sessionId,setSessionId]=useState(""),[recordingStatus,setRecordingStatus]=useState("NOT_STARTED"),[recordingInfo,setRecordingInfo]=useState(null),[recordingBusy,setRecordingBusy]=useState(false);
 
@@ -40,6 +40,95 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
  const detach=(track)=>track?.detach().forEach(node=>node.remove());
 
  useEffect(()=>()=>{roomRef.current?.disconnect();roomRef.current=null},[]);
+ useEffect(()=>{
+  const info=recordingInfo;
+  const recordingId=String(info?.egressId||info?.id||"");
+  if(!meeting?.id||recordingStatus!=="COMPLETED"||!recordingId||info?.driveArchive?.fileId||!recordingController||!auth.currentUser||manifestArchiveAttemptedRef.current===recordingId)return;
+  manifestArchiveAttemptedRef.current=recordingId;
+  (async()=>{
+   try{
+    const category=String(info.meetingCategory||meeting.meetingCategory||meeting.meetingPolicyId||"OTHER").toUpperCase();
+    const manifest={
+     recordType:"RECORDING_MANIFEST",recordingProvider:"LIVEKIT_EGRESS",
+     meetingId:meeting.id,meetingReference:meeting.meetingReference||meeting.reference||meeting.title||"",
+     meetingTitle:meeting.title||"",meetingCategory:category,
+     confidentialityClass:info.confidentialityClass||meeting.confidentialityClass||"INTERNAL",
+     boardSessionType:info.boardSessionType||meeting.boardSessionType||"NOT_APPLICABLE",
+     recordingId,recordingStatus:"COMPLETED",egressStatus:info.egressStatus||null,
+     storageDestination:info.storageDestination||"LIVEKIT_EGRESS_CONFIGURED_STORAGE",
+     privateStoragePath:info.outputPath||null,startedAt:info.startedAt||null,
+     stoppedAt:info.stoppedAt||null,completedAt:info.completedAt||null,
+     files:(Array.isArray(info.files)?info.files:[]).map(file=>({filename:file.filename||"",size:Number(file.size||0)})),
+     transcriptStoredSeparately:true,archivedAt:new Date().toISOString()
+    };
+    const archive=await uploadMeetingProductToDrive({
+     meetingCategory:category,meetingId:meeting.id,meetingReference:manifest.meetingReference,
+     recordId:recordingId,recordType:"RECORDING_MANIFEST",
+     title:"Recording Manifest — "+(meeting.title||meeting.id),
+     fileName:"recording-manifest-"+recordingId+".txt",
+     content:JSON.stringify(manifest,null,2),contentType:"text/plain",
+     ownerUid:auth.currentUser?.uid||null
+    });
+    setRecordingInfo(prev=>({...prev,driveArchive:archive}));
+    setMessage("Recording completion verified. The recording manifest and private storage location were archived to the meeting's Google Drive category folder; the audio/video remains in configured private recording storage.");
+   }catch(archiveError){
+    manifestArchiveAttemptedRef.current="";
+    setError("Recording completed, but its Google Drive archive manifest could not be confirmed. The recording remains in configured private storage; retry archive after restoring the Drive gateway. "+(archiveError?.message||""));
+   }
+  })();
+ },[meeting?.id,meeting?.title,meeting?.meetingCategory,meeting?.meetingPolicyId,meeting?.confidentialityClass,meeting?.boardSessionType,recordingStatus,recordingInfo?.id,recordingInfo?.egressId,recordingInfo?.driveArchive?.fileId,recordingController]);
+ useEffect(()=>{
+  if(!meeting?.id||!proceedingsActive||recordingStatus!=="RECORDING")return;
+  let stopped=false;
+  const poll=async()=>{if(stopped)return;const result=await refreshRecordingStatus();if(stopped||!result)return;const current=String(result.recordingStatus||"UNKNOWN").toUpperCase();if(current==="FAILED"){setError("RECORDING FAILURE DETECTED. The recording service reports failure during active proceedings. Do not treat the affected interval as recorded; preserve the failure notice in the audit trail.");}else if(current!=="RECORDING"&&current!=="STOPPING"){setError("RECORDING STATUS LOST DURING ACTIVE PROCEEDINGS: "+current+". Verify the capture service before continuing.");}};
+  const timer=setInterval(poll,15000);
+  return()=>{stopped=true;clearInterval(timer)};
+ },[meeting?.id,proceedingsActive,recordingStatus]);
+ useEffect(()=>{
+  let cancelled=false;
+  async function startWhenProceedingsBegin(){
+   if(!meeting?.id||!proceedingsActive||!recordingController||!auth.currentUser||meeting.recordingRequired===false)return;
+   if(autoRecordingAttemptedRef.current===meeting.id)return;
+   autoRecordingAttemptedRef.current=meeting.id;
+   setRecordingBusy(true);setError("");
+   try{
+    if(!roomRef.current){await connect();if(!roomRef.current){setRecordingStatus("FAILED");try{await reportMeetingRecordingFailure({meetingId:meeting.id,failureCode:"ROOM_CONNECTION_FAILED",selectedAuthority:String(selectedAuthority||"")})}catch{}setError("AUTOMATIC RECORDING FAILED. The live room could not connect when proceedings began. Proceedings must not be treated as recorded.");return;}}
+    if(!recordingAllowed){const status=await refreshRecordingStatus();if(status?.recordingAllowed!==true){setRecordingStatus("FAILED");try{await reportMeetingRecordingFailure({meetingId:meeting.id,failureCode:"RECORDING_POLICY_FAILURE",selectedAuthority:String(selectedAuthority||"")})}catch{}setError("AUTOMATIC RECORDING FAILED. Server policy did not enable capture for this meeting. Proceedings must not be treated as recorded.");return;}}
+    const context=JSON.parse(sessionStorage.getItem("irpaMeetingEntryContext")||"null");
+    const participantId=context?.meetingId===meeting.id?String(context?.participantId||""):"";
+    const recording=await startMeetingRecording({meetingId:meeting.id,selectedAuthority:participantId?"":String(selectedAuthority||""),participantId});
+    if(cancelled)return;
+    setRecordingStatus(recording.recordingStatus||"STARTING");
+    let verification=null;
+    for(let attempt=0;attempt<8;attempt++){
+     verification=await refreshRecordingStatus();
+     if(cancelled)return;
+     if(String(verification?.recordingStatus||"").toUpperCase()==="RECORDING")break;
+     await new Promise(resolve=>setTimeout(resolve,1500));
+    }
+    if(String(verification?.recordingStatus||"").toUpperCase()!=="RECORDING"){
+     setRecordingStatus(String(verification?.recordingStatus||recording.recordingStatus||"STARTING").toUpperCase());
+     try{await reportMeetingRecordingFailure({meetingId:meeting.id,failureCode:"RECORDING_NOT_CONFIRMED",selectedAuthority:String(selectedAuthority||"")})}catch{}setError("AUTOMATIC RECORDING NOT CONFIRMED. Proceedings must not be treated as recorded. Check LiveKit Egress and recording storage, then retry recording.");
+    }
+   }catch(recordingError){
+    if(!cancelled){setRecordingStatus("FAILED");setError("AUTOMATIC RECORDING FAILED. Proceedings must not be treated as recorded. Check LiveKit Egress/storage and retry; details: "+(recordingError?.message||"no confirmation returned."));}
+   }finally{if(!cancelled)setRecordingBusy(false)}
+  }
+  if(proceedingsActive&&recordingStatus!=="RECORDING"&&recordingStatus!=="STARTING")startWhenProceedingsBegin();
+  return()=>{cancelled=true};
+ },[meeting?.id,meeting?.recordingRequired,proceedingsActive,recordingController,selectedAuthority]);
+
+ useEffect(()=>{
+  const terminal=["completed","closed","cancelled","canceled","archived"].includes(String(meeting?.status||"").toLowerCase());
+  const recordingId=recordingInfo?.egressId||recordingInfo?.id;
+  if(!meeting?.id||!terminal||proceedingsActive||!recordingController||!auth.currentUser||!["RECORDING","STARTING","STOPPING"].includes(recordingStatus)||!recordingId||autoStopAttemptedRef.current===meeting.id)return;
+  autoStopAttemptedRef.current=meeting.id;
+  setRecordingBusy(true);
+  stopMeetingRecording({meetingId:meeting.id,recordingId,selectedAuthority:String(selectedAuthority||""),participantId:currentParticipantId()})
+   .then(async result=>{setRecordingStatus(result.recordingStatus||"STOPPING");await refreshRecordingStatus();})
+   .catch(error=>{setError("AUTOMATIC RECORDING STOP FAILED. The meeting is closed but the recording service did not confirm that capture stopped. Verify the egress session; details: "+(error?.message||"no confirmation returned."));})
+   .finally(()=>setRecordingBusy(false));
+ },[meeting?.id,meeting?.status,proceedingsActive,recordingController,recordingStatus,recordingInfo?.egressId,recordingInfo?.id,selectedAuthority]);
 
  async function connect(){
    if(!meeting?.id)return setError("Select an IRPA meeting first.");
@@ -85,7 +174,7 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
      room.on(RoomEvent.Reconnected,()=>{setStatus("CONNECTED");refreshParticipants(room)});
      room.on(RoomEvent.Disconnected,()=>{setStatus("DISCONNECTED");setCamera(false);setMuted(true);setScreen(false);setHand(false);setModerator(false);setRecordingAllowed(false);clear(localRef.current);clear(remoteRef.current);setParticipants([]);roomRef.current=null});
      await room.connect(data.serverUrl,data.participantToken);
-     roomRef.current=room;setSessionId(data.sessionId||"");setModerator(data.moderator===true);setRecordingAllowed(data.recordingAllowed===true);setStatus("CONNECTED");refreshParticipants(room);refreshRecordingStatus();
+     roomRef.current=room;setSessionId(data.sessionId||"");setModerator(data.moderator===true);setRecordingAllowed(data.recordingAllowed===true);setStatus("CONNECTED");refreshParticipants(room);await refreshRecordingStatus();
      await room.localParticipant.setMicrophoneEnabled(true,{audioCaptureOptions:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});setMuted(false);
      await room.localParticipant.setCameraEnabled(false);setCamera(false);
      try{const devices=await navigator.mediaDevices?.enumerateDevices?.();setDeviceReady(Boolean(devices?.some(d=>d.kind==="audioinput")&&devices?.some(d=>d.kind==="videoinput")))}catch{setDeviceReady(false)}
@@ -119,9 +208,9 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
  async function sendChat(e){e?.preventDefault();const text=chat.trim();if(!text||!roomRef.current)return;try{await roomRef.current.localParticipant.publishData(encoder.encode(JSON.stringify({type:"chat",text})),{reliable:true});setMessages(v=>[...v,{from:"You",text}].slice(-30));setChat("")}catch(err){setError(err?.message||"Unable to send meeting message.")}}
 
  async function refreshRecordingStatus(){
-  if(!meeting?.id||!auth.currentUser)return;
-  try{const result=await getMeetingRecordingStatus(meeting.id);setRecordingAllowed(result.recordingAllowed===true);setRecordingStatus(result.recordingStatus||"UNKNOWN");setRecordingInfo(result.recording||null)}
-  catch(e){setError(e?.message||"Unable to retrieve meeting recording status.")}
+  if(!meeting?.id||!auth.currentUser)return null;
+  try{const result=await getMeetingRecordingStatus(meeting.id);setRecordingAllowed(result.recordingAllowed===true);setRecordingStatus(result.recordingStatus||"UNKNOWN");setRecordingInfo(result.recording||null);return result}
+  catch(e){setError(e?.message||"Unable to retrieve meeting recording status.");return null}
  }
  function currentParticipantId(){try{const gate=JSON.parse(sessionStorage.getItem("irpaMeetingEntryContext")||"null");return gate?.meetingId===meeting?.id?String(gate?.participantId||""):""}catch{return ""}}
  async function startRecording(){
@@ -190,7 +279,7 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
     <button className="danger-button" onClick={disconnect}>Leave Meeting Room</button>
    </>}
   </div>
-  {status==="CONNECTED"&&<div className="panel" style={{marginTop:12,padding:12}}><strong>Meeting Recording</strong><p className="muted">Status: {recordingStatus} · Recording is available only when the authoritative meeting policy permits it and LiveKit Egress plus its storage are configured.</p>{recordingInfo?.files?.length>0&&<ul>{recordingInfo.files.map((f,i)=><li key={i}>{f.filename||"Recording output"} · {f.size?Math.round(f.size/1024/1024)+" MB":"size not reported"}</li>)}</ul>}{recordingInfo?.files?.some(f=>f.location||f.filename)&&!recordingInfo?.driveArchive&&<button className="secondary-button" onClick={archiveRecordingToDrive} disabled={recordingBusy}>Archive Recording to Google Drive</button>}{recordingInfo?.driveArchive&&<p><a href={recordingInfo.driveArchive.webViewLink||recordingInfo.driveArchive.folderUrl} target="_blank" rel="noreferrer">Open archived recording in Google Drive</a></p>}</div>}
+  {status==="CONNECTED"&&<div className="panel" style={{marginTop:12,padding:12}}><strong>Meeting Recording</strong><p className="muted">Status: {recordingStatus} · Recording is mandatory for registered meetings. Proceed only after the server confirms RECORDING; a FAILED or UNKNOWN status is not a recording.</p>{recordingInfo?.files?.length>0&&<ul>{recordingInfo.files.map((f,i)=><li key={i}>{f.filename||"Recording output"} · {f.size?Math.round(f.size/1024/1024)+" MB":"size not reported"}</li>)}</ul>}{recordingInfo?.files?.some(f=>f.location||f.filename)&&!recordingInfo?.driveArchive&&<button className="secondary-button" onClick={archiveRecordingToDrive} disabled={recordingBusy}>Archive Recording to Google Drive</button>}{recordingInfo?.driveArchive&&<p><a href={recordingInfo.driveArchive.webViewLink||recordingInfo.driveArchive.folderUrl} target="_blank" rel="noreferrer">Open archived recording in Google Drive</a></p>}</div>}
   {status==="CONNECTED"&&<form onSubmit={sendChat} className="form-grid" style={{marginTop:12}}>
    <div className="form-field form-field-wide"><label>Meeting Chat / Floor Message</label><input value={chat} onChange={e=>setChat(e.target.value)} placeholder="Send a short governance-session message"/></div>
    <div className="form-actions"><button type="submit">Send Message</button></div>

@@ -7,6 +7,9 @@ const room=fs.readFileSync("src/pages/MeetingRoom.jsx","utf8");
 const meetingsCentre=fs.readFileSync("src/pages/Meetings.jsx","utf8");
 const policy=fs.readFileSync("src/firebase/meetingPolicy.js","utf8");
 const records=fs.readFileSync("functions/meetingRecords.js","utf8");
+const archiveClient=fs.readFileSync("src/firebase/signatureStorage.js","utf8");
+const driveGateway=fs.readFileSync("drive-gateway/src/index.js","utf8");
+const archiveWorkflow=fs.readFileSync(".github/workflows/provision-meeting-archives.yml","utf8");
 const liveMeeting=fs.readFileSync("functions/liveMeeting.js","utf8");
 const styles=fs.readFileSync("src/styles/tokens.css","utf8");
 const participantPage=fs.readFileSync("src/pages/OperationalGatewaysParticipants.jsx","utf8");
@@ -20,9 +23,9 @@ const livekitCaddy=fs.readFileSync("infra/livekit/caddy.yaml.template","utf8");
 const livekitDeploy=fs.readFileSync("infra/livekit/deploy-staging.sh","utf8");
 const livekitWorkflow=fs.readFileSync(".github/workflows/deploy-livekit-staging.yml","utf8");
 const checks=[
- ["Registration buttons use the authoritative active-role policy",meetingsCentre.includes('{canRegisterMeeting({...actorIdentity,isAdmin:admin})&&<button type="button" onClick={startCreate}>+ Register Meeting</button>}')&&meetingsCentre.includes('{canRegisterMeeting({...actorIdentity,isAdmin:admin})&&<button className="secondary-button" onClick={startCreate}>+ New Meeting</button>}')],
+ ["Registration buttons expose meeting initiation to individual signed-in profiles",meetingsCentre.includes("function startCreate(){if(!canRegisterMeeting(")&&meetingsCentre.includes("uid:auth.currentUser?.uid||actorIdentity.uid")],
  ["Released meeting edits remain administrator-only",meetingsCentre.includes("if(editing&&!canEditMeeting(editing,{...actorIdentity,isAdmin:admin}))")&&meetingsCentre.includes("function edit(m){if(!canEditMeeting(m,{...actorIdentity,isAdmin:admin}))")&&meetingsCentre.includes("released. Only an authorised administrator may edit it.")],
- ["Firestore create retains registrar, initiator and meeting-category validation",fs.readFileSync("firestore.rules","utf8").includes('allow create:if meetingRegistrar()&&request.resource.data.get("initiatorUid","")==request.auth.uid&&validMeetingCategory(request.resource.data)')],
+ ["Firestore create permits signed-in individual initiators while enforcing registration controls",fs.readFileSync("firestore.rules","utf8").includes('allow create:if signedIn()&&request.resource.data.get("initiatorUid","")==request.auth.uid&&validMeetingCategory(request.resource.data)')],
  ["Meeting media client exists",fs.existsSync("src/components/IRPADGBSMeetingRoomMedia.jsx")],
  ["Participant invitation creates a meeting access pass",participantPage.includes("createMeetingAccessInvitation")&&participantPage.includes("meetingAccess")],
  ["Meeting access pass is sent through the authenticated IRPA mail gateway",participantPage.includes("sendMemberInvitationEmail(payload.participantEmail,invitationId,payload.participantRole,payload.memberType,meetingAccess)")],
@@ -65,15 +68,15 @@ const checks=[
  ["Governance chat signalling",media.includes('type:"chat"')],
  ["Hand raise signalling",media.includes('type:"hand"')],
  ["Meeting token route",fs.readFileSync("src/main.jsx","utf8").includes("meetingToken")],
- ["Firestore rules present and not part of this feature contract",fs.existsSync("firestore.rules")],
+ ["Firestore rules enforce meeting confidentiality and category access",fs.existsSync("firestore.rules")&&fs.readFileSync("firestore.rules","utf8").includes("meetingConfidentialityReadAllowed")&&fs.readFileSync("firestore.rules","utf8").includes("meetingCategoryRoleAllowed")],
  ["Meeting gate issues meeting ID",gateway.includes("meetingId,meetingPassword")],
  ["Meeting gate issues gate password",gateway.includes("meetingPassword=gatePassword")],
  ["Meeting gate stores password hash",gateway.includes("passwordHash")],
  ["Meeting gate has 30-day expiry",gateway.includes("1000*60*60*24*30")],
  ["Meeting gate is reusable",gateway.includes("reusable:true")],
  ["Meeting entry validates ID and password",gateway.includes("suppliedMeetingId")&&gateway.includes("suppliedPassword")],
- ["Five meeting categories are defined",["GOVERNANCE","ADMINISTRATIVE","STAFF","GENERAL","OTHER"].every(x=>policy.includes(x))],
- ["Five category labels are selectable",["Governance Meetings","Administrative Meetings","Staff Meetings","General Meetings","Other Meetings"].every(x=>policy.includes(x))],
+ ["Five required meeting categories are defined",["GOVERNANCE","ADMINISTRATIVE","STAFF","GENERAL","DISCIPLINARY"].every(x=>policy.includes(x+":"))],
+ ["Five required category labels are selectable",["Governance Meetings","Administrative Meetings","Staff Meetings","General Meetings","Disciplinary Meetings"].every(x=>policy.includes(x))],
  ["Category options are exported",policy.includes("MEETING_CATEGORY_OPTIONS")],
  ["Meeting category selector exists",fs.readFileSync("src/pages/Meetings.jsx","utf8").includes('name="meetingCategory"')],
  ["Category controls Meeting Room facilities",room.includes("meetingCapabilities")&&room.includes("capabilities.facilities")],
@@ -82,14 +85,34 @@ const checks=[
  ["Administrative restricts quorum and voting",policy.includes('ADMINISTRATIVE:{')&&policy.includes("quorumAccess:false")&&policy.includes("votingEnabled:false")],
  ["Staff restricts signature and authorization",policy.includes('STAFF:{')&&policy.includes("signatureAccess:false")&&policy.includes("authorizationAccess:false")],
  ["General restricts signature and authorization",policy.includes('GENERAL:{')&&policy.includes("signatureAccess:false")&&policy.includes("authorizationAccess:false")],
- ["Other is restricted to operational facilities",policy.includes('OTHER:{')&&policy.includes("signatureAccess:false")&&policy.includes("authorizationAccess:false")],
+ ["Legacy Other meetings remain restricted for backwards compatibility",policy.includes('OTHER:{')&&policy.includes("signatureAccess:false")&&policy.includes("authorizationAccess:false")],
+ ["Disciplinary meetings have a separate policy category",policy.includes('DISCIPLINARY:{id:"DISCIPLINARY",label:"Disciplinary Meetings"')],
+ ["Exactly five meeting categories are selectable and legacy Other is not selectable",policy.includes('filter(p=>p.id!=="OTHER")')&&["GOVERNANCE","ADMINISTRATIVE","STAFF","GENERAL","DISCIPLINARY"].every(x=>policy.includes(x+":"))],
+ ["Google Drive client and gateway define the disciplinary archive",archiveClient.includes('DISCIPLINARY: { label: "Disciplinary Meetings"')&&driveGateway.includes('DISCIPLINARY: { label: "Disciplinary Meetings"')],
+ ["Archive provisioner creates the five required categories",archiveClient.includes('["GOVERNANCE","ADMINISTRATIVE","STAFF","GENERAL","DISCIPLINARY"]')&&archiveWorkflow.includes('["GOVERNANCE", "ADMINISTRATIVE", "STAFF", "GENERAL", "DISCIPLINARY"]')],
+ ["Meeting registration requires explicit confidentiality, Board session type and recording notice",meetingsCentre.includes("Select the meeting confidentiality classification before registration.")&&meetingsCentre.includes("recordingNoticeAcknowledged")&&meetingsCentre.includes('value={form.confidentialityClass||""}')&&meetingsCentre.includes("Select session type")],
+ ["Registration cannot bypass the Meeting Room proceedings start",meetingsCentre.includes("Start proceedings from the Meeting Room so automatic recording and transcript capture can begin with the session.")],
+ ["Recording starts automatically when proceedings begin and is status-verified",media.includes("proceedingsActive")&&media.includes("autoRecordingAttemptedRef")&&media.includes("AUTOMATIC RECORDING NOT CONFIRMED")&&media.includes('==="RECORDING"')],
+ ["Recording failures are visible and not represented as captured proceedings",media.includes("AUTOMATIC RECORDING FAILED")&&media.includes("Proceedings must not be treated as recorded")&&media.includes("AUTOMATIC RECORDING NOT CONFIRMED")],
+ ["Recording is automatically stopped when the meeting is closed",media.includes("autoStopAttemptedRef")&&media.includes("AUTOMATIC RECORDING STOP FAILED")&&liveMeeting.includes("resolveRecordingControl(request, meetingId, { allowClosed: true })")],
+ ["Recording files are stored under category-specific archive paths",liveMeeting.includes('"irpa-governance-recordings/" + category.toLowerCase() + "/"')],
+ ["Recording completion is audit-logged",liveMeeting.includes("LIVE_MEETING_RECORDING_COMPLETED")],
+ ["Active recording is monitored and failures are audit-logged",media.includes("setInterval(poll,15000)")&&liveMeeting.includes("LIVE_MEETING_RECORDING_FAILED")],
+ ["Disciplinary records have a dedicated retention policy",records.includes("DISCIPLINARY:7")&&records.includes('return"DISCIPLINARY"')],
+ ["Audio/video recordings are archived under the meeting category",liveMeeting.includes('"irpa-governance-recordings/" + category.toLowerCase() + "/"')&&liveMeeting.includes("fileResults: files")],
+ ["Recording metadata and category/classification are audit-trailed",liveMeeting.includes("LIVE_MEETING_RECORDING_STARTED")&&liveMeeting.includes("confidentialityClass: row.confidentialityClass")&&liveMeeting.includes("filesVerified: files.length > 0")],
+ ["Recording connection/policy failures persist status and audit events",liveMeeting.includes("exports.reportMeetingRecordingFailure")&&liveMeeting.includes("LIVE_MEETING_RECORDING_FAILURE_REPORTED")&&media.includes("reportMeetingRecordingFailure")],
+ ["Live transcript auto-saves separately from media recording",roomSource.includes("saveLiveMeetingProceedings({meetingId:selected.id,content:latest})")&&roomSource.includes("transcriptAutoSavedAt")&&liveMeeting.includes('recordingProvider: "LIVEKIT_EGRESS"')&&liveMeeting.includes("egressId")],
+ ["Closed proceedings archive the transcript to the category-specific Drive folder",roomSource.includes("uploadMeetingProductToDrive")&&roomSource.includes('recordType:"TRANSCRIPT"')&&roomSource.includes("final-live-proceedings-transcript.txt")],
+ ["Completed recording metadata is automatically archived to Google Drive",media.includes("recording-manifest-")&&media.includes('recordType:"RECORDING_MANIFEST"')&&media.includes("privateStoragePath")&&media.includes("uploadMeetingProductToDrive")],
+ ["AI-generated minutes and summaries remain drafts pending human review",records.includes("draftOnly:true,approved:false,approvalStatus:\"NOT_SUBMITTED\",requiresHumanReview:true")],
  ["Meeting record lifecycle callable registered",fs.readFileSync("functions/bootstrap.js","utf8").includes('require("./meetingRecords")')],
  ["Record capture is server-authorized",records.includes("exports.captureMeetingRecord")&&records.includes("ctx.canManage")],
  ["Record storage uses dedicated meetingRecords collection",records.includes('db.collection("meetingRecords")')],
  ["Record integrity hash stored and checked",records.includes('integrityAlgorithm:"SHA-256"')&&records.includes('actual!==record.contentHash')],
  ["Retrieval is audited",records.includes('MEETING_RECORD_RETRIEVED')],
  ["Integrity failure blocks retrieval and audits",records.includes('MEETING_RECORD_INTEGRITY_FAILURE')&&records.includes('data-loss')],
- ["Retention periods are category-defined",records.includes("GOVERNANCE:7")&&records.includes("ADMINISTRATIVE:5")&&records.includes("STAFF:3")&&records.includes("GENERAL:3")&&records.includes("OTHER:3")],
+ ["Retention periods are category-defined",records.includes("GOVERNANCE:7")&&records.includes("ADMINISTRATIVE:5")&&records.includes("STAFF:3")&&records.includes("GENERAL:3")&&records.includes("DISCIPLINARY:7")&&records.includes("OTHER:3")],
  ["Legal hold prevents purge",records.includes('if(record.legalHold===true)throw new HttpsError("failed-precondition","A legal hold prevents deletion.")')],
  ["Purge requires retention expiry and reviewed request",records.includes('record.deletionStatus!=="PENDING_REVIEW"')&&records.includes("retainUntil>new Date()")],
  ["Purge restricted to primary administrator",records.includes('if(!admin(req))throw new HttpsError("permission-denied","Only the primary administrator may execute a final purge.")')],
@@ -110,9 +133,10 @@ const report={
   "Administrative Meetings":"Auto registration, attendance, live media, Administrative Documents, Authorization & Approvals, Signature Portal, Decisions & Actions and transcript/proceedings; no quorum or formal resolutions/voting by default.",
   "Staff Meetings":"Auto registration, attendance, live media, Staff Meeting Documents, Decisions & Actions and transcript/proceedings; no quorum, voting, resolutions, authorization or signature by default.",
   "General Meetings":"Auto registration, attendance, live media, General Meeting Documents, Decisions & Actions and transcript/proceedings; no quorum, voting, resolutions, authorization or signature by default.",
+  "Disciplinary Meetings":"Case-restricted attendance, live media, Disciplinary Documents, Decisions & Actions and transcript/proceedings; AI-generated minutes require human review and approval.",
   "Other Meetings":"Auto registration, attendance, live media, Other Meeting Documents, Decisions & Actions and transcript/proceedings; no quorum, voting, resolutions, authorization or signature by default."
  },
- limitation:"This is an automated repository/software contract report. Actual audio/video quality, latency, packet loss, device compatibility and long-session endurance require a deployed staging LiveKit endpoint and browser/device E2E run; this script does not falsely mark those as passed. Category gating here defines the Meeting Room workflow surface; downstream portal authorization remains governed by the existing Firebase authorization model and no Firebase rules are changed by this feature."
+ limitation:"This is an automated repository/software contract report. Actual audio/video quality, latency, packet loss, device compatibility and long-session endurance require a deployed staging LiveKit endpoint and browser/device E2E run; this script does not falsely mark those as passed. Category gating is checked in the Meeting Room workflow and Firestore rules. Existing portal authorization remains enforced; category and confidentiality changes are tested in the Firestore emulator."
 };
 fs.mkdirSync("reports",{recursive:true});
 fs.writeFileSync("reports/meeting-media-governance-verification.json",JSON.stringify(report,null,2)+"\n");

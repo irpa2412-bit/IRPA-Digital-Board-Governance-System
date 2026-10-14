@@ -9,8 +9,8 @@ const db=getFirestore();
 const text=v=>String(v??"").trim();
 const hash=v=>crypto.createHash("sha256").update(String(v),"utf8").digest("hex");
 const TERMINAL=new Set(["completed","closed","cancelled","canceled","archived"]);
-const RETENTION_YEARS={GOVERNANCE:7,ADMINISTRATIVE:5,STAFF:3,GENERAL:3,OTHER:3};
-function categoryOf(m){const raw=text(m.meetingCategory||m.meetingPolicyId||m.category||m.meetingType).toUpperCase();if(["GOVERNANCE","BOARD","BOARD MEETING","BOARD COMMITTEE MEETING","ANNUAL GENERAL MEETING","SPECIAL MEETING"].includes(raw))return"GOVERNANCE";if(["ADMINISTRATIVE","MANAGEMENT","MANAGEMENT MEETING","ADMINISTRATION MEETING","OPERATIONS MEETING"].includes(raw))return"ADMINISTRATIVE";if(raw==="STAFF"||raw==="STAFF MEETING")return"STAFF";if(raw==="GENERAL"||raw==="GENERAL MEETING")return"GENERAL";return"OTHER";}
+const RETENTION_YEARS={GOVERNANCE:7,ADMINISTRATIVE:5,STAFF:3,GENERAL:3,DISCIPLINARY:7,OTHER:3};
+function categoryOf(m){const raw=text(m.meetingCategory||m.meetingPolicyId||m.category||m.meetingType).toUpperCase();if(["GOVERNANCE","BOARD","BOARD MEETING","BOARD COMMITTEE MEETING","ANNUAL GENERAL MEETING","SPECIAL MEETING"].includes(raw))return"GOVERNANCE";if(["ADMINISTRATIVE","MANAGEMENT","MANAGEMENT MEETING","ADMINISTRATION MEETING","OPERATIONS MEETING"].includes(raw))return"ADMINISTRATIVE";if(raw==="STAFF"||raw==="STAFF MEETING")return"STAFF";if(raw==="GENERAL"||raw==="GENERAL MEETING")return"GENERAL";if(["DISCIPLINARY","DISCIPLINARY MEETING","DISCIPLINARY HEARING"].includes(raw))return"DISCIPLINARY";return"OTHER";}
 function addYears(date,years){const d=new Date(date);d.setUTCFullYear(d.getUTCFullYear()+years);return d;}
 function admin(req){return req.auth?.token?.admin===true||text(req.auth?.token?.email).toLowerCase()==="irpa2412@gmail.com";}
 async function context(req,meetingId){
