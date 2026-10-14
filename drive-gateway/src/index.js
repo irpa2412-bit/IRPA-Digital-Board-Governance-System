@@ -677,6 +677,15 @@ async function download(request, env) {
   if (!description?.irpaGovernance) {
     return json({ ok: false, error: "The requested file is not an IRPA governance document." }, 403, corsHeaders(request));
   }
+  const purpose = String(description.purpose || "");
+  if (purpose === "Signed Documents Archive") {
+    return json({ ok:false, error:"Signed workflow PDFs must be retrieved through the Signature Portal envelope-authorized route." },403,corsHeaders(request));
+  }
+  if (purpose === "Controlled Documents" || purpose === "Board of Directors Governance Documents") {
+    if (!data.documentId || String(description.documentId || "") !== cleanId(data.documentId)) {
+      return json({ ok:false, error:"Controlled document retrieval requires a matching document ID." },403,corsHeaders(request));
+    }
+  }
   if (description.purpose === "Signature Profile" && description.ownerUid !== claims.user_id) {
     return json({ ok: false, error: "This signature asset is restricted to its owner." }, 403, corsHeaders(request));
   }
