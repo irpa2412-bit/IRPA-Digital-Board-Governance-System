@@ -834,6 +834,7 @@ const MEETING_ARCHIVE_POLICIES = Object.freeze({
   ADMINISTRATIVE: { label: "Administrative Meetings", classification: "Restricted" },
   STAFF: { label: "Staff Meetings", classification: "Internal" },
   GENERAL: { label: "General Meetings", classification: "Internal" },
+  DISCIPLINARY: { label: "Disciplinary Meetings", classification: "Confidential" },
   OTHER: { label: "Other Meetings", classification: "Restricted" }
 });
 
