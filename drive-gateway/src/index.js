@@ -20,6 +20,7 @@ import { buildEsignContext, EsignRecordDurableObject } from "./esignContext.mjs"
 import { runCleanup } from "./upload.mjs";
 import { createDocumentLifecycleRouter } from "./documentLifecycle.mjs";
 import { canProvisionSignatureProfileFolder } from "./signatureProfileAuthorization.mjs";
+import { canReadSignatureAsset, canUploadSignedDocument } from "./signatureAssetAuthorization.mjs";
 import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPasswordSetup, getInvitationSessionState } from "./invitationRedemption.mjs";
 import { buildGoogleDriveAuthorizationParams } from "./googleDriveOAuth.mjs";
 
