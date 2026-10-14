@@ -47,7 +47,7 @@ export async function signMeetingAttendance({meetingId,participantId,typedName,c
   throw error;
  }
 }
-export async function getMeetingAttendanceRegister(meetingId,{canManage=false}={}){
+export async function getMeetingAttendanceRegister(meetingId){
  const user=auth.currentUser;if(!user)throw new Error("Sign in to retrieve the attendance register.");
  const participantsSnap=await getDocs(query(collection(db,"participants"),where("meetingId","==",meetingId)));
  const signaturesSnap=await getDocs(query(collection(db,"meetingAttendanceSignatures"),where("meetingId","==",meetingId)));
