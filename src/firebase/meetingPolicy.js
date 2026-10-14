@@ -27,7 +27,7 @@ export function canRegisterMeeting(identity={}){
   if(identity.isAdmin===true||identity.admin===true)return true;
   // Meeting initiation is available to each signed-in individual profile. The initiator is
   // still recorded, while category/confidentiality policies govern access to the records.
-  return typeof identity.uid==="string"&&identity.uid.trim().length>0;
+  return identity.active===true&&typeof identity.uid==="string"&&identity.uid.trim().length>0;
 }
 export function canAccessMeetingCategory(meeting={},identity={},options={}){
   if(identity.isAdmin===true||identity.admin===true)return true;
