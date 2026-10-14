@@ -51,6 +51,14 @@ try {
       await page.getByRole("heading", { name: "Meeting Centre" }).waitFor();
       await page.getByText("Previously Scheduled Board Meeting", { exact: true }).waitFor();
       await page.getByText(createdTitle, { exact: true }).waitFor();
+      const createdRow = page.locator("tr").filter({ hasText: createdTitle });
+      await createdRow.getByRole("button", { name: "Open Workspace" }).click();
+      await page.getByRole("button", { name: "Prepare Document for Signature" }).waitFor();
+      await page.getByRole("button", { name: "Prepare Document for Signature" }).click();
+      const signatureNavigation = await page.evaluate(() => (window.__irpaNavigationCalls || []).at(-1) || null);
+      assert.equal(signatureNavigation?.module, "Signature Platform", "meeting action must navigate to the Signature Portal");
+      assert.equal(signatureNavigation?.context?.meetingId, created.id, "Signature Portal context must include the selected meeting ID");
+      assert.equal(signatureNavigation?.context?.meetingReference, created.meetingReference, "Signature Portal context must include the canonical meeting reference");
       const layout = await page.evaluate(() => ({
         viewportWidth: window.innerWidth,
         documentWidth: document.documentElement.scrollWidth,
