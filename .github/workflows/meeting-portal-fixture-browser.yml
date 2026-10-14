@@ -185,12 +185,18 @@ jobs:
             changed.includes("tests/fixtures/meeting-portal-fixture.jsx");
           const testOnlyRegisterScope = changed.includes("src/firebase/data.js") &&
             changed.includes("tests/meeting-category-policy.test.mjs");
+          // The signature migration PR is a separate, explicitly paired integration scope:
+          // require the portal bridge, Gateway signing implementation, and its authenticated flow test.
+          const signatureGatewayIntegration = changed.includes("src/firebase/signaturePlatform.js") &&
+            changed.includes("drive-gateway/src/signing.mjs") &&
+            changed.includes("drive-gateway/tests/controlled-authenticated-signing-flow.test.mjs");
           // A manual dispatch on an already-merged ref is a regression rerun, not a PR diff.
           // Keep the changed-path isolation guard, but require a source/test delta only for event diffs.
           if (eventName !== "workflow_dispatch" &&
               !changed.includes("src/pages/Meetings.jsx") &&
               !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
-              !testOnlySignatureNavigation && !testOnlyRegisterScope && !guardOnlyWorkflowRepair) {
+              !testOnlySignatureNavigation && !testOnlyRegisterScope &&
+              !signatureGatewayIntegration && !guardOnlyWorkflowRepair) {
             throw new Error("Meeting/participant source change or an explicitly paired isolated regression/guard test is missing.");
           }
           console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));
