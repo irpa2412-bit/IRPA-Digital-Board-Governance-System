@@ -13,7 +13,7 @@ function safeJson(value){
 }
 
 export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",controller=false,recordingController=false,proceedingsActive=false}){
- const roomRef=useRef(null),remoteRef=useRef(null),localRef=useRef(null),autoRecordingAttemptedRef=useRef("");
+ const roomRef=useRef(null),remoteRef=useRef(null),localRef=useRef(null),autoRecordingAttemptedRef=useRef(""),autoStopAttemptedRef=useRef("");
  const[status,setStatus]=useState("READY"),[error,setError]=useState(""),[muted,setMuted]=useState(true),[camera,setCamera]=useState(false),[screen,setScreen]=useState(false),[hand,setHand]=useState(false),[moderator,setModerator]=useState(false),[recordingAllowed,setRecordingAllowed]=useState(false);
  const[participants,setParticipants]=useState([]),[messages,setMessages]=useState([]),[chat,setChat]=useState(""),[deviceReady,setDeviceReady]=useState(false),[deviceCheck,setDeviceCheck]=useState("NOT CHECKED"),[sessionId,setSessionId]=useState(""),[recordingStatus,setRecordingStatus]=useState("NOT_STARTED"),[recordingInfo,setRecordingInfo]=useState(null),[recordingBusy,setRecordingBusy]=useState(false);
 
@@ -73,6 +73,18 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
   if(proceedingsActive&&recordingStatus!=="RECORDING"&&recordingStatus!=="STARTING")startWhenProceedingsBegin();
   return()=>{cancelled=true};
  },[meeting?.id,meeting?.recordingRequired,proceedingsActive,recordingController,selectedAuthority]);
+
+ useEffect(()=>{
+  const terminal=["completed","closed","cancelled","canceled","archived"].includes(String(meeting?.status||"").toLowerCase());
+  const recordingId=recordingInfo?.egressId||recordingInfo?.id;
+  if(!meeting?.id||!terminal||proceedingsActive||!recordingController||!auth.currentUser||recordingStatus!=="RECORDING"||!recordingId||autoStopAttemptedRef.current===meeting.id)return;
+  autoStopAttemptedRef.current=meeting.id;
+  setRecordingBusy(true);
+  stopMeetingRecording({meetingId:meeting.id,recordingId,selectedAuthority:String(selectedAuthority||""),participantId:currentParticipantId()})
+   .then(async result=>{setRecordingStatus(result.recordingStatus||"STOPPING");await refreshRecordingStatus();})
+   .catch(error=>{setError("AUTOMATIC RECORDING STOP FAILED. The meeting is closed but the recording service did not confirm that capture stopped. Verify the egress session; details: "+(error?.message||"no confirmation returned."));})
+   .finally(()=>setRecordingBusy(false));
+ },[meeting?.id,meeting?.status,proceedingsActive,recordingController,recordingStatus,recordingInfo?.egressId,recordingInfo?.id,selectedAuthority]);
 
  async function connect(){
    if(!meeting?.id)return setError("Select an IRPA meeting first.");
