@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 const source = readFileSync(new URL("../src/pages/MeetingRoom.jsx", import.meta.url), "utf8");
 
 test("participant invitation context grants media entry but not host governance control", () => {
-  assert.match(source, /hostController=!!admin\?\.active\|\|roleControl\(member,selected\),controller=hostController/);
+  assert.match(source, /hostController=!!admin\?\.active\|\|String\(selected\?\.initiatorUid\|\|""\)===String\(auth\.currentUser\?\.uid\|\|""\)\|\|roleControl\(member,selected\),controller=hostController/);
   assert.doesNotMatch(source, /controller=!!admin\?\.active\|\|roleControl\(member,selected\)\|\|Boolean\(entryContext\?\.participantId/);
   assert.match(source, /controller=\{Boolean\(hostController\|\|\(auth\.currentUser&&entryContext\?\.participantId&&entryContext\?\.meetingId===selected\?\.id\)\)\}/);
 });
@@ -20,5 +20,5 @@ test("host governance mutations retain the explicit controller guard", () => {
 });
 
 test("meeting room UI describes host restrictions accurately", () => {
-  assert.match(source, /Governance controls are restricted to the active administrator or the meeting's authorised initiator, chairperson or secretary/);
+  assert.match(source, /Governance controls are restricted to the active administrator, meeting initiator, chairperson or secretary/);
 });
