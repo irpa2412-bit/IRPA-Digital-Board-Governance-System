@@ -53,9 +53,9 @@ export async function getMeetingScopedRecords(collectionName,meetingIds=[]){
   if(!ids.length)return [];
   const results=await Promise.allSettled(ids.map(meetingId=>getDocs(query(collection(db,collectionName),where("meetingId","==",meetingId)))));
   const failures=results.filter(r=>r.status==="rejected");
+  if(failures.length){const error=failures[0]?.reason;throw new Error("Unable to read every authorized "+collectionName+" meeting register: "+String(error?.message||"permission denied"));}
   const records=new Map();
   results.forEach(result=>{if(result.status==="fulfilled")result.value.docs.forEach(item=>records.set(item.id,{id:item.id,...item.data()}));});
-  if(failures.length===results.length){const error=failures[0]?.reason;throw new Error("Unable to read the authorized "+collectionName+" records: "+String(error?.message||"permission denied"));}
   return [...records.values()];
 }
 export async function getFinanceTrialRecords(collectionName){const ref=collection(db,collectionName);const queries=[query(ref,where("recordOrigin","==","TRIAL")),query(ref,where("trialData","==",true)),query(ref,where("isTrial","==",true))];const results=await Promise.all(queries.map(q=>getDocs(q)));const byId=new Map();for(const snap of results){for(const item of snap.docs){const data=item.data()||{};if(String(data.recordOrigin||"").toUpperCase()==="TRIAL"||data.trialData===true||data.isTrial===true)byId.set(item.id,{id:item.id,...data});}}return[...byId.values()].sort((a,b)=>{const at=a.createdAt?.toMillis?a.createdAt.toMillis():Date.parse(a.createdAt||"")||0;const bt=b.createdAt?.toMillis?b.createdAt.toMillis():Date.parse(b.createdAt||"")||0;return bt-at;});}
