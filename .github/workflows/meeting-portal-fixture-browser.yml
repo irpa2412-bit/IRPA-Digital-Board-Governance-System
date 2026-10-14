@@ -74,6 +74,8 @@ jobs:
             "package.json",
             "src/components/MeetingAccessControl.jsx",
             "src/components/IRPADGBSMeetingRoomMedia.jsx",
+            "functions/liveMeeting.js",
+            "src/firebase/meetingPolicy.js",
             "scripts/check-meeting-media-governance.mjs",
             "tests/meeting-category-policy.test.mjs",
             "tests/meeting-category-firestore-rules.test.cjs",
