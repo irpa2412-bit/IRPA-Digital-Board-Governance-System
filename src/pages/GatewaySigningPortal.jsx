@@ -30,6 +30,9 @@ export default function GatewaySigningPortal({token}){
       pngDataUrl(savedProfile.signatureUrl),
       savedProfile.initialsUrl?pngDataUrl(savedProfile.initialsUrl).catch(()=> ""):Promise.resolve("")
     ]);
+    const gatewayStatus=await fetchGatewaySigningResource("/api/sign/status",token);
+    let initialEvidence=null;
+    if(gatewayStatus.status==="Completed")initialEvidence=await fetchGatewaySigningResource("/api/sign/evidence",token);
     const nextValues={};
     for(const field of result.fields||[]){
       if(field.type==="Signature")nextValues[field.fieldId]=sig;
@@ -41,7 +44,7 @@ export default function GatewaySigningPortal({token}){
     }
     const pdfBytes=await fetchGatewaySigningResource("/api/sign/pdf",token,{pdf:true});
     objectUrl=URL.createObjectURL(new Blob([pdfBytes],{type:"application/pdf"}));
-    if(!cancelled){setOpened(result);setProfile(savedProfile);setSignaturePng(sig);setInitialsPng(initials);setValues(nextValues);setPdfUrl(objectUrl);setStatus({status:result.status,signers:result.signers||[]});}
+    if(!cancelled){setOpened(result);setProfile(savedProfile);setSignaturePng(sig);setInitialsPng(initials);setValues(nextValues);setPdfUrl(objectUrl);setStatus(gatewayStatus);setEvidence(initialEvidence);if(gatewayStatus.externalReference&&gatewayStatus.auditChainValid===true){try{await syncGatewaySigningMirror(gatewayStatus.externalReference,gatewayStatus)}catch(syncError){console.warn("Gateway status loaded; Signature Portal mirror reconciliation is pending.",syncError)}}}
   }catch(error){if(!cancelled)setMessage(error?.message||"Unable to load the Gateway signing transaction.");}finally{if(!cancelled)setLoading(false)}})();return()=>{cancelled=true;if(objectUrl)URL.revokeObjectURL(objectUrl)}},[token]);
   async function refreshStatus(){
     const next=await fetchGatewaySigningResource("/api/sign/status",token);
