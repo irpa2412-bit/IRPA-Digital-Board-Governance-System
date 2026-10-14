@@ -62,7 +62,7 @@ test("strictly confidential meetings are not exposed by category role alone", ()
   assert.equal(canAccessMeetingCategory(disciplinary, { uid: "hr-2", active: true, activeEmployee: true, role: "Staff" }), true);
 });
 
-test("released meeting edits are administrator-only", () => {
+test("an active profile can organise its own unreleased meeting without a designated role", () => {\n  assert.equal(canEditMeeting({ ...governance, registerStatus: "Draft" }, { uid: "staff-1", active: true, activeEmployee: true, role: "Staff" }), false);\n  assert.equal(canEditMeeting({ ...governance, initiatorUid: "staff-1", registerStatus: "Draft" }, { uid: "staff-1", active: true, activeEmployee: true, role: "Staff" }), true);\n});\n\ntest("released meeting edits are administrator-only", () => {
   assert.equal(canEditMeeting({ ...governance, registerStatus: "Registered" }, {
     uid: "secretary-1", active: true, role: "Board Secretary"
   }), false);
