@@ -92,3 +92,22 @@ test("C-I02 production finalize fails closed when signer key custody is unavaila
   assert.equal(f.storage.objs.size,before);
   assert.equal((await f.meta.list("cryptographicEvidence")).length,0);
 });
+
+
+test("C-I03 production completion fails closed when the cryptographic key provider is absent", async () => {
+  const f = await fixture();
+  const before = f.storage.objs.size;
+  const result = await finalizeEnvelope({
+    meta:f.meta,
+    storage:f.storage,
+    env:{DRIVE_MOCK:"false",IRPA_ENVIRONMENT:"production"},
+    now:()=>new Date("2026-10-07T19:00:00.000Z"),
+    config:{ttlDays:14}
+  },f.envelope.id);
+  assert.deepEqual(result,{ok:false,completed:false,error:"COMPLETION_FAILED"});
+  const state=await f.meta.get("envelopes",f.envelope.id);
+  assert.equal(state.status,"CompletionFailed");
+  assert.equal(state.completion,null);
+  assert.equal(f.storage.objs.size,before);
+  assert.equal((await f.meta.list("cryptographicEvidence")).length,0);
+});
