@@ -83,15 +83,10 @@ export async function getAccessibleMeetingRecords(){
     ...(Array.isArray(token?.claims?.irpaRoles)?token.claims.irpaRoles:[])
   ]).map(v=>String(v||"").trim()).filter(Boolean))];
   const identity={...(member||employee||{}),uid:user.uid,email,active:activeMember||activeEmployee,isAdmin,activeMember,activeEmployee,roles};
-  // Institutional registers are read-only directory/reference views for active members and employees.
-  // Category controls continue to govern editing and access to linked proceedings/records; they do not hide
-  // the meeting register itself from an authenticated institutional user.
+  // Never issue an unscoped collection read: Firestore rules cannot safely prove access
+  // to every meeting in a collection. Use category-authorized and explicit-invitation
+  // queries, then apply the same policy filter to the merged records.
   const ref=collection(db,COLLECTIONS.meetings);
-  if(user.uid){
-    const all=await getDocs(ref);
-    return all.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>meetingCreatedAt(b)-meetingCreatedAt(a));
-  }
-  // External/non-institutional users retain category, initiator, and explicit-invitation scoping.
   const jobs=[];
   for(const policy of Object.values(MEETING_CATEGORIES)){
     if(!canAccessMeetingCategory({meetingCategory:policy.id,meetingPolicyId:policy.id},identity))continue;

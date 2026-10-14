@@ -54,7 +54,10 @@ export async function uploadBytes(target, file, metadata = {}) {
     base64: btoa(binary),
     purpose: metadata.purpose || "Controlled Documents",
     folderId: metadata.folderId || null,
-    ownerUid: metadata.ownerUid || null
+    ownerUid: metadata.ownerUid || null,
+    documentId: metadata.documentId || metadata.customMetadata?.documentId || null,
+    envelopeId: metadata.envelopeId || metadata.customMetadata?.envelopeId || null,
+    signerUid: metadata.signerUid || metadata.customMetadata?.signerUid || null
   });
 
   target.fileId = result.fileId || null;
@@ -185,6 +188,17 @@ export async function downloadDriveBytes(fileId, documentId = null) {
   const result = await gatewayPost("/api/download", { fileId, documentId });
   const base64 = result.base64;
   if (!base64) throw new Error("Google Drive returned no file content.");
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+export async function downloadSignatureBytes(fileId, documentId = null, envelopeId = null) {
+  if (!fileId) throw new Error("Google Drive file ID is required.");
+  const result = await gatewayPost("/api/signature-file/download", { fileId, documentId, envelopeId });
+  const base64 = result.base64;
+  if (!base64) throw new Error("Google Drive returned no Signature Portal file content.");
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);

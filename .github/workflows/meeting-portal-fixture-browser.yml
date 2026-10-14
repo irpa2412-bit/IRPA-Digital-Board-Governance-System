@@ -21,6 +21,19 @@ on:
       - "src/firebase/meetingPolicy.js"
       - "tests/meeting-portal-browser.test.mjs"
       - "tests/meeting-category-firestore-rules.test.cjs"
+      - "tests/meeting-category-policy.test.mjs"
+      - ".github/workflows/signature-migration-build-test.yml"
+      - "drive-gateway/wrangler.toml"
+      - "drive-gateway/src/signatureAssetAuthorization.mjs"
+      - "drive-gateway/src/signatureProfileAuthorization.mjs"
+      - "drive-gateway/tests/signature-asset-authorization.test.mjs"
+      - "drive-gateway/tests/signature-profile-folder-authorization.test.mjs"
+      - "drive-gateway/tests/signature-profile-folder-runtime.test.mjs"
+      - "src/firebase/signaturePlatform.js"
+      - "src/firebase/signatureStorage.js"
+      - "src/firebase/signatureWorkflowPolicy.js"
+      - "src/pages/SignaturePlatform.jsx"
+      - "tests/signature-workflow-policy.test.mjs"
       - "tests/fixtures/**"
       - "vite.meeting-fixture.config.js"
       - ".github/workflows/meeting-portal-fixture-browser.yml"
@@ -87,6 +100,19 @@ jobs:
             "src/firebase/data.js",
             "firestore.rules",
             "tests/meeting-category-firestore-rules.test.cjs",
+            "tests/meeting-category-policy.test.mjs",
+            ".github/workflows/signature-migration-build-test.yml",
+            "drive-gateway/wrangler.toml",
+            "drive-gateway/src/signatureAssetAuthorization.mjs",
+            "drive-gateway/src/signatureProfileAuthorization.mjs",
+            "drive-gateway/tests/signature-asset-authorization.test.mjs",
+            "drive-gateway/tests/signature-profile-folder-authorization.test.mjs",
+            "drive-gateway/tests/signature-profile-folder-runtime.test.mjs",
+            "src/firebase/signaturePlatform.js",
+            "src/firebase/signatureStorage.js",
+            "src/firebase/signatureWorkflowPolicy.js",
+            "src/pages/SignaturePlatform.jsx",
+            "tests/signature-workflow-policy.test.mjs",
             "tests/fixtures/meeting-portal-fixture.html",
             "tests/fixtures/meeting-portal-fixture.jsx",
             "tests/fixtures/mocks.js",
@@ -101,10 +127,12 @@ jobs:
           }
                     const testOnlySignatureNavigation = changed.includes("tests/meeting-portal-browser.test.mjs") &&
             changed.includes("tests/fixtures/meeting-portal-fixture.jsx");
+          const testOnlyRegisterScope = changed.includes("src/firebase/data.js") &&
+            changed.includes("tests/meeting-category-policy.test.mjs");
           if (!changed.includes("src/pages/Meetings.jsx") &&
               !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
-              !testOnlySignatureNavigation) {
-            throw new Error("Meeting/participant portal source change or paired isolated signature-navigation regression test is missing.");
+              !testOnlySignatureNavigation && !testOnlyRegisterScope) {
+            throw new Error("Meeting/participant source change or a paired isolated signature-navigation/register-scope regression test is missing.");
           }
           console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));
           NODE
