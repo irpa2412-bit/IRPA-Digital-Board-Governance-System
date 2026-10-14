@@ -6,7 +6,8 @@ const source = readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
 
 test("portal changes focus the viewport on the destination workspace", () => {
   assert.ok(source.includes('const workspace=document.querySelector("#root .app-shell .main-area > .content-area #portal-workspace-content")'));
-  assert.ok(source.includes('workspace.scrollIntoView({block:"start",behavior:"auto"})'));
+  assert.ok(source.includes('ancestor.scrollTop+=rect.top-16'));
+  assert.ok(source.includes('window.scrollBy({top:rect.top-16,left:0,behavior:"auto"})'));
   assert.ok(source.includes('},[active,user?.uid,sessionAdministrator]);'));
 });
 
