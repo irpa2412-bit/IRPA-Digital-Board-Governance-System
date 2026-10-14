@@ -145,21 +145,30 @@ exports.listMeetingInviteCandidates=onCall({region:"us-central1",timeoutSeconds:
  const meetingId=text(request.data?.meetingId);if(!meetingId)throw new HttpsError("invalid-argument","Meeting ID is required.");
  const meetingSnap=await db.collection("meetings").doc(meetingId).get();if(!meetingSnap.exists)throw new HttpsError("not-found","Meeting was not found.");
  const meeting=meetingSnap.data()||{},email=text(request.auth?.token?.email).toLowerCase();
- const authorised=await activeAdmin(request)||text(meeting.initiatorUid)===uid||text(meeting.chairpersonUid)===uid||text(meeting.secretaryUid)===uid||text(meeting.chairpersonEmail).toLowerCase()===email||text(meeting.secretaryEmail).toLowerCase()===email;
- if(!authorised)throw new HttpsError("permission-denied","Only the meeting initiator, authorised chairperson/secretary or active administrator may access invitation candidates.");
+ const registrarRoles=new Set(["executive director","director internal oversight","director finance & administration","director human resources","hr director","operations manager","departmental director","departmental manager","director outreach","director community development","director livestock","director environment","director field department","board secretary","secretary to the board","meeting secretary"]);
+ const [ownMember,ownEmployee,emailMembers,emailEmployees]=await Promise.all([
+  db.collection("members").doc(uid).get(),db.collection("employees").doc(uid).get(),
+  email?db.collection("members").where("email","==",email).limit(2).get():Promise.resolve({docs:[]}),
+  email?db.collection("employees").where("email","==",email).limit(2).get():Promise.resolve({docs:[]})
+ ]);
+ const profiles=[...(ownMember.exists?[ownMember.data()]:[]),...(ownEmployee.exists?[ownEmployee.data()]:[]),...emailMembers.docs.map(d=>d.data()),...emailEmployees.docs.map(d=>d.data())];
+ const profileActive=d=>{const statuses=[d?.status,d?.employmentStatus,d?.registrationStatus].map(v=>text(v).toLowerCase()).filter(Boolean);return !statuses.some(v=>["inactive","terminated","suspended","deleted","cancelled","canceled","archived"].includes(v))&&statuses.some(v=>["active","activated"].includes(v));};
+ const profileRoles=d=>[d?.role,d?.title,d?.position,d?.departmentalRole,...(Array.isArray(d?.roles)?d.roles:[]),...(Array.isArray(d?.assignedRoles)?d.assignedRoles:[]),...(Array.isArray(d?.selectedRoles)?d.selectedRoles:[]),...(Array.isArray(d?.roleAssignments)?d.roleAssignments:[])].map(v=>text(v).toLowerCase());
+ const claims=Array.isArray(request.auth?.token?.irpaRoles)?request.auth.token.irpaRoles.map(v=>text(v).toLowerCase()):[];
+ const registrar=profiles.some(d=>profileActive(d)&&profileRoles(d).some(r=>registrarRoles.has(r)))||claims.some(r=>registrarRoles.has(r));
+ const authorised=await activeAdmin(request)||registrar||text(meeting.initiatorUid)===uid||text(meeting.chairpersonUid)===uid||text(meeting.secretaryUid)===uid||text(meeting.chairpersonEmail).toLowerCase()===email||text(meeting.secretaryEmail).toLowerCase()===email;
+ if(!authorised)throw new HttpsError("permission-denied","Only an authorised meeting registrar, meeting initiator, chairperson, secretary or active administrator may access invitation candidates.");
  const [memberSnap,employeeSnap]=await Promise.all([db.collection("members").get(),db.collection("employees").get()]);
- const activeRecord=row=>{const statuses=[row.status,row.employmentStatus,row.registrationStatus].map(v=>text(v).toLowerCase()).filter(Boolean);if(statuses.some(v=>["inactive","terminated","suspended","deleted","cancelled","canceled","archived"].includes(v)))return false;return statuses.some(v=>["active","activated"].includes(v));};
  const clean=(doc,type)=>{
   const row=doc.data()||{},candidateEmail=text(row.email||row.emailAddress||row.contactEmail).toLowerCase();
-  if(!activeRecord(row)||!candidateEmail)return null;
-  return {id:doc.id,name:text(row.name||row.fullName||row.memberName||row.employeeName||row.displayName)||candidateEmail,email:candidateEmail,role:text(row.role||type),memberType:text(row.memberType||row.employeeType||type),department:text(row.department),status:text(row.status||row.employmentStatus||row.registrationStatus),uid:text(row.uid||row.authUid||row.userUid),memberNumber:text(row.memberNumber||row.registrationNumber),employeeNumber:text(row.employeeNumber),boardMember:row.boardMember===true||Boolean(row.boardPosition)||text(row.department)==="Board of Directors"||text(row.role)==="Board Member",boardPosition:text(row.boardPosition)};
+  if(!profileActive(row)||!candidateEmail)return null;
+  return {id:doc.id,name:text(row.name||row.fullName||row.memberName||row.employeeName||row.displayName)||candidateEmail,email:candidateEmail,role:text(row.role||row.title||row.position||row.departmentalRole||type),memberType:text(row.memberType||row.employeeType||type),department:text(row.department),status:text(row.status||row.employmentStatus||row.registrationStatus),uid:text(row.uid||row.authUid||row.userUid),memberNumber:text(row.memberNumber||row.registrationNumber),employeeNumber:text(row.employeeNumber),boardMember:row.boardMember===true||Boolean(row.boardPosition)||text(row.department)==="Board of Directors"||text(row.role)==="Board Member",boardPosition:text(row.boardPosition)};
  };
  const members=memberSnap.docs.map(d=>clean(d,"Member")).filter(Boolean);
  const employees=employeeSnap.docs.map(d=>clean(d,"Employee")).filter(Boolean);
  await db.collection("audit").add({action:"MEETING_INVITATION_CANDIDATES_ACCESSED",collection:"meetings",recordId:meetingId,details:{memberCandidateCount:members.length,employeeCandidateCount:employees.length},actorUid:uid,actorEmail:email,createdAt:FieldValue.serverTimestamp()});
  return {members,employees,source:"AUTHORITATIVE_REGISTERS",meetingId};
 });
-
 exports.resolveMeetingEntryRequest=onCall({region:"us-central1",timeoutSeconds:30},async request=>{
  const uid=request.auth?.uid;if(!uid)throw new HttpsError("unauthenticated","Authentication is required.");
  const requestId=text(request.data?.requestId),decision=text(request.data?.decision).toUpperCase();
