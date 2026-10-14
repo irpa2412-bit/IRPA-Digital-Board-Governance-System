@@ -103,6 +103,7 @@ jobs:
             "tests/fixtures/meeting-portal-fixture.jsx",
             "tests/fixtures/mocks.js",
             "tests/meeting-portal-browser.test.mjs",
+            "tests/browser/authenticated-governance-regression.spec.mjs",
             "tests/meeting-room-authorization-boundary.test.mjs",
             "vite.meeting-fixture.config.js"
           ]);
