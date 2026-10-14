@@ -508,6 +508,8 @@ useEffect(()=>{
   let firstFrame=0;
   let secondFrame=0;
   let finalFrame=0;
+  let retryTimer1=0;
+  let retryTimer2=0;
   firstFrame=window.requestAnimationFrame(()=>{
     secondFrame=window.requestAnimationFrame(()=>{
       const workspace=document.querySelector("#root .app-shell .main-area > .content-area [data-active-portal-content]");
@@ -532,18 +534,25 @@ useEffect(()=>{
       workspace.scrollIntoView({block:"start",behavior:"auto"});
       alignWorkspace();
       // Run after portal mount effects so child controls cannot leave focus at the shared header.
-      finalFrame=window.requestAnimationFrame(()=>{
+      const focusDestination=()=>{
         const current=document.querySelector("#root .app-shell .main-area > .content-area [data-active-portal-content]");
         if(!current||current.dataset.activePortalContent!==active)return;
         alignWorkspace();
         current.focus({preventScroll:true});
-      });
+      };
+      finalFrame=window.requestAnimationFrame(()=>{focusDestination();});
+      // Lazy portal mounts may apply their own focus after the first animation frame.
+      // Reassert focus after mount settles without changing navigation or access decisions.
+      retryTimer1=window.setTimeout(focusDestination,120);
+      retryTimer2=window.setTimeout(focusDestination,360);
     });
   });
   return()=>{
     window.cancelAnimationFrame(firstFrame);
     window.cancelAnimationFrame(secondFrame);
     window.cancelAnimationFrame(finalFrame);
+    window.clearTimeout(retryTimer1);
+    window.clearTimeout(retryTimer2);
   };
 },[active]);
 useEffect(()=>{
