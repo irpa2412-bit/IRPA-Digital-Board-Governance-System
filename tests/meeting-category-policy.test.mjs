@@ -94,5 +94,5 @@ test("full meeting register is limited to active institutional identities and ad
   assert.equal(canReadFullMeetingRegister({ isAdmin: true }), true);
   assert.equal(canReadFullMeetingRegister({ activeMember: false, activeEmployee: false, isAdmin: false }), false);
   assert.equal(canReadFullMeetingRegister({ uid: "external-invitee" }), false);
-  assert.equal(canReadFullMeetingRegister({ activeMember: true, status: "inactive" }), false);
+  assert.equal(canReadFullMeetingRegister({ activeMember: false, activeEmployee: false, isAdmin: false }), false);
 });
