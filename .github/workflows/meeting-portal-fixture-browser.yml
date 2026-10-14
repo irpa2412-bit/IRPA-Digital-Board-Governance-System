@@ -21,6 +21,7 @@ on:
       - "src/firebase/meetingPolicy.js"
       - "tests/meeting-portal-browser.test.mjs"
       - "tests/meeting-category-firestore-rules.test.cjs"
+      - "tests/meeting-category-policy.test.mjs"
       - "tests/fixtures/**"
       - "vite.meeting-fixture.config.js"
       - ".github/workflows/meeting-portal-fixture-browser.yml"
@@ -87,6 +88,7 @@ jobs:
             "src/firebase/data.js",
             "firestore.rules",
             "tests/meeting-category-firestore-rules.test.cjs",
+            "tests/meeting-category-policy.test.mjs",
             "tests/fixtures/meeting-portal-fixture.html",
             "tests/fixtures/meeting-portal-fixture.jsx",
             "tests/fixtures/mocks.js",
