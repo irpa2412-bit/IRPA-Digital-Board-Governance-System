@@ -3,6 +3,7 @@ export const MEETING_CATEGORIES={
   ADMINISTRATIVE:{id:"ADMINISTRATIVE",label:"Administrative Meetings",meetingTypes:["Administrative","Management","Management Meeting","Administration Meeting","Operations Meeting"],quorumRequired:false,votingEnabled:false,resolutionsEnabled:false,documentsLabel:"Administrative Documents",documentsAccess:true,authorizationAccess:true,signatureAccess:true,decisionsAccess:true,actionsAccess:true,transcriptAccess:true,mediaAccess:true,attendanceAccess:true,autoRegistration:true,quorumAccess:false,aiReviewRequired:true,confidentiality:"MANAGEMENT",aiMode:"OPERATIONAL",accessScope:"MANAGEMENT_RESTRICTED",accessRoles:["Executive Director","Director Finance & Administration","Director Human Resources","HR Director","Operations Manager","Departmental Director","Departmental Manager","Director Outreach","Director Community Development","Director Livestock","Director Environment","Director Field Department"],registrationRoles:["Executive Director","Director Finance & Administration","Director Human Resources","HR Director","Operations Manager","Departmental Director","Departmental Manager","Director Outreach","Director Community Development","Director Livestock","Director Environment","Director Field Department"],votingRoles:[],editAfterRelease:"ADMINISTRATOR_ONLY",minutesApprovalRoles:["Executive Director","Meeting Secretary"]},
   STAFF:{id:"STAFF",label:"Staff Meetings",meetingTypes:["Staff","Staff Meeting"],quorumRequired:false,votingEnabled:false,resolutionsEnabled:false,documentsLabel:"Staff Meeting Documents",documentsAccess:true,authorizationAccess:false,signatureAccess:false,decisionsAccess:true,actionsAccess:true,transcriptAccess:true,mediaAccess:true,attendanceAccess:true,autoRegistration:true,quorumAccess:false,aiReviewRequired:false,confidentiality:"INTERNAL",aiMode:"OPERATIONAL",accessScope:"INVITED_STAFF",accessRoles:["Executive Director","Director Human Resources","HR Director","Operations Manager","Departmental Director","Departmental Manager","Employee","Staff"],registrationRoles:["Executive Director","Director Human Resources","HR Director","Operations Manager","Departmental Director","Departmental Manager"],votingRoles:[],editAfterRelease:"ADMINISTRATOR_ONLY",minutesApprovalRoles:["Meeting Secretary","Departmental Director"]},
   GENERAL:{id:"GENERAL",label:"General Meetings",meetingTypes:["General","General Meeting"],quorumRequired:false,votingEnabled:false,resolutionsEnabled:false,documentsLabel:"General Meeting Documents",documentsAccess:true,authorizationAccess:false,signatureAccess:false,decisionsAccess:true,actionsAccess:true,transcriptAccess:true,mediaAccess:true,attendanceAccess:true,autoRegistration:true,quorumAccess:false,aiReviewRequired:false,confidentiality:"INTERNAL",aiMode:"OPERATIONAL",accessScope:"INSTITUTIONAL_OR_INVITED",accessRoles:["Executive Director","Departmental Director","Departmental Manager","Board Member","Employee","Staff","Member"],registrationRoles:["Executive Director","Departmental Director","Departmental Manager","Operations Manager","Meeting Secretary"],votingRoles:[],editAfterRelease:"ADMINISTRATOR_ONLY",minutesApprovalRoles:["Meeting Secretary","Meeting Chairperson"]},
+  DISCIPLINARY:{id:"DISCIPLINARY",label:"Disciplinary Meetings",meetingTypes:["Disciplinary","Disciplinary Meeting","Disciplinary Hearing"],quorumRequired:false,votingEnabled:false,resolutionsEnabled:false,documentsLabel:"Disciplinary Documents",documentsAccess:true,authorizationAccess:false,signatureAccess:true,decisionsAccess:true,actionsAccess:true,transcriptAccess:true,mediaAccess:true,attendanceAccess:true,autoRegistration:true,quorumAccess:false,aiReviewRequired:true,confidentiality:"STRICTLY_CONFIDENTIAL",aiMode:"OPERATIONAL",accessScope:"CASE_RESTRICTED",accessRoles:[],registrationRoles:[],votingRoles:[],editAfterRelease:"ADMINISTRATOR_ONLY",minutesApprovalRoles:["Executive Director","Director Human Resources","HR Director"]},
   OTHER:{id:"OTHER",label:"Other Meetings",meetingTypes:["Other","Other Meeting"],quorumRequired:false,votingEnabled:false,resolutionsEnabled:false,documentsLabel:"Other Meeting Documents",documentsAccess:true,authorizationAccess:false,signatureAccess:false,decisionsAccess:true,actionsAccess:true,transcriptAccess:true,mediaAccess:true,attendanceAccess:true,autoRegistration:true,quorumAccess:false,aiReviewRequired:false,confidentiality:"INTERNAL",aiMode:"OPERATIONAL",accessScope:"INVITATION_OR_EXPLICIT_ROLE",accessRoles:["Executive Director","Departmental Director","Departmental Manager","Operations Manager"],registrationRoles:["Executive Director","Departmental Director","Departmental Manager","Operations Manager","Meeting Secretary"],votingRoles:[],editAfterRelease:"ADMINISTRATOR_ONLY",minutesApprovalRoles:["Meeting Secretary","Meeting Chairperson"]}
 };
 
@@ -24,9 +25,9 @@ function identityRoles(identity={}){
 }
 export function canRegisterMeeting(identity={}){
   if(identity.isAdmin===true||identity.admin===true)return true;
-  if(identity.active!==true)return false;
-  const roles=identityRoles(identity);
-  return MEETING_REGISTRATION_ROLES.some(role=>roles.has(NORMALIZE_ROLE(role)));
+  // Meeting initiation is available to each signed-in individual profile. The initiator is
+  // still recorded, while category/confidentiality policies govern access to the records.
+  return typeof identity.uid==="string"&&identity.uid.trim().length>0;
 }
 export function canAccessMeetingCategory(meeting={},identity={},options={}){
   if(identity.isAdmin===true||identity.admin===true)return true;
@@ -41,11 +42,8 @@ export function canEditMeeting(meeting={},identity={}){
   if(identity.isAdmin===true||identity.admin===true)return true;
   const released=Boolean(meeting.registeredAt||meeting.registerStatus==="Registered"||meeting.status==="Released");
   if(released)return false;
-  if(identity.active!==true)return false;
-  const roles=identityRoles(identity);
-  const policy=resolveCategory(meeting.meetingCategory||meeting.meetingPolicyId||meeting.category||meeting.meetingType);
-  return policy.registrationRoles.some(role=>roles.has(NORMALIZE_ROLE(role)))&&
-    String(meeting.initiatorUid||"")===String(identity.uid||"");
+  if(identity.active!==true&&String(meeting.initiatorUid||"")!==String(identity.uid||""))return false;
+  return String(meeting.initiatorUid||"")===String(identity.uid||"");
 }
 export function canVoteInMeeting(meeting={},identity={}){
   const policy=resolveCategory(meeting.meetingCategory||meeting.meetingPolicyId||meeting.category||meeting.meetingType);
@@ -78,7 +76,10 @@ export function normalizeMeetingForV3(meeting={}){
     meetingCategoryLabel:policy.label,
     meetingRecordVersion:meeting.meetingRecordVersion||"V3.0",
     aiRecordMode:meeting.aiRecordMode||policy.aiMode,
-    confidentialityClass:meeting.confidentialityClass||policy.confidentiality
+    confidentialityClass:meeting.confidentialityClass||policy.confidentiality,
+    boardSessionType:meeting.boardSessionType||"OPEN_SESSION",
+    recordingRequired:meeting.recordingRequired!==false,
+    recordingStatus:meeting.recordingStatus||"PENDING"
   };
 }
 
