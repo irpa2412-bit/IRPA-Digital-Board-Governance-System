@@ -104,11 +104,12 @@ jobs:
         run: |
           set -euo pipefail
           credential_file="$RUNNER_TEMP/staging-firebase-service-account.json"
+          trap 'rm -f "$credential_file"' EXIT
           printf '%s' "$STAGING_FIREBASE_SERVICE_ACCOUNT" > "$credential_file"
           node -e 'const x=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")); if(x.project_id!=="irpa-dbg-staging-a73ec") { console.error("Refusing Firestore rules deployment: service account is not for the isolated staging project."); process.exit(1); }' "$credential_file"
           export GOOGLE_APPLICATION_CREDENTIALS="$credential_file"
-          npx --yes firebase-tools deploy --only firestore:rules --project irpa-dbg-staging-a73ec --non-interactive
-          rm -f "$credential_file"
+          node functions/scripts/deploy-staging-firestore-rules.js
+          sleep 3
 
       - name: Verify authenticated Cloudflare token issuance and Firestore audit
         env:
