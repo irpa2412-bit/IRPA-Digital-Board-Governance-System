@@ -99,7 +99,13 @@ jobs:
             console.error("Unexpected files changed outside the isolated meeting repair:", unexpected);
             process.exit(1);
           }
-          if (!changed.includes("src/pages/Meetings.jsx") && !changed.includes("src/pages/OperationalGatewaysParticipants.jsx")) throw new Error("Meeting or participant portal source change is missing.");
+          const testOnlySignatureNavigation = changed.includes("tests/meeting-portal-browser.test.mjs") &&
+  changed.includes("tests/fixtures/meeting-portal-fixture.jsx");
+if (!changed.includes("src/pages/Meetings.jsx") &&
+    !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
+    !testOnlySignatureNavigation) {
+  throw new Error("Meeting/participant portal source change or paired isolated signature-navigation regression test is missing.");
+}
           console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));
           NODE
       - name: Start the isolated Vite fixture
