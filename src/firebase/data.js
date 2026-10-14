@@ -83,14 +83,16 @@ export async function getAccessibleMeetingRecords(){
     ...(Array.isArray(token?.claims?.irpaRoles)?token.claims.irpaRoles:[])
   ]).map(v=>String(v||"").trim()).filter(Boolean))];
   const identity={...(member||employee||{}),uid:user.uid,email,active:activeMember||activeEmployee,isAdmin,activeMember,activeEmployee,roles};
-  // Trial mode must not bypass Firestore's meeting-category authorization with a collection-wide read.
-  // The same authorized category/identity queries below include trial records when the caller is allowed to read them.
+  // Institutional registers are read-only directory/reference views for active members and employees.
+  // Category controls continue to govern editing and access to linked proceedings/records; they do not hide
+  // the meeting register itself from an authenticated institutional user.
   const ref=collection(db,COLLECTIONS.meetings);
-  const jobs=[];
-  if(isAdmin){
+  if(isAdmin||(activeMember||activeEmployee)){
     const all=await getDocs(ref);
     return all.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>meetingCreatedAt(b)-meetingCreatedAt(a));
   }
+  // External/non-institutional users retain category, initiator, and explicit-invitation scoping.
+  const jobs=[];
   for(const policy of Object.values(MEETING_CATEGORIES)){
     if(!canAccessMeetingCategory({meetingCategory:policy.id,meetingPolicyId:policy.id},identity))continue;
     jobs.push(query(ref,where("meetingCategory","==",policy.id)));
@@ -98,10 +100,9 @@ export async function getAccessibleMeetingRecords(){
     for(const type of policy.meetingTypes)jobs.push(query(ref,where("meetingType","==",type)));
   }
   const uid=user.uid;
-  // Always query the authenticated initiator's own meetings, independently of category access roles.
   jobs.push(query(ref,where("initiatorUid","==",uid)));
   for(const field of ["participantUids","attendeeUids","memberUids","invitedUids","subscriberUids"])jobs.push(query(ref,where(field,"array-contains",uid)));
-  if(email)for(const field of ["participantEmails","attendeeEmails","invitedEmails","subscriberEmails"])jobs.push(query(ref,where(field,"array-contains",email)));
+  if(email)for(const field of ["participantEmails","attendeeEmails","invitedEmails","subscriberEmails"])jobs.push(query(ref,where(field,"array-contains",email));
   const results=await Promise.all(jobs.map(q=>getDocs(q).catch(()=>null)));
   const records=new Map();
   results.forEach(s=>s?.docs?.forEach(d=>records.set(d.id,{id:d.id,...d.data()})));
