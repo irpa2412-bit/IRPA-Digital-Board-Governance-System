@@ -244,7 +244,7 @@ jobs:
           const secretName="IRPA_CRYPTO_KEY_"+createHash("sha256").update(auth.localId).digest("hex").slice(0,32).toUpperCase();
           fs.writeFileSync(process.env.RUNNER_TEMP+"/irpa-staging-crypto-key-record",record,{mode:0o600});
           fs.writeFileSync(process.env.RUNNER_TEMP+"/irpa-staging-crypto-secret-name",secretName,{mode:0o600});
-          fs.appendFileSync(process.env.GITHUB_OUTPUT,"signer_uid="+auth.localId+"\n");
+          fs.appendFileSync(process.env.GITHUB_OUTPUT,"signer_uid="+auth.localId+"\nkey_id="+keyId+"\n");
           console.log("STAGING_SIGNER_UID_BOUND=true");
           console.log("STAGING_CRYPTO_KEY_GENERATED=true");
           NODE
@@ -286,6 +286,7 @@ jobs:
           STAGING_CRYPTO_TEST_PASSWORD: ${{ secrets.STAGING_CRYPTO_TEST_PASSWORD }}
           STAGING_CRYPTO_TEST_AUTHORITY: ${{ secrets.STAGING_CRYPTO_TEST_AUTHORITY }}
           STAGING_CRYPTO_TEST_SIGNER_UID: ${{ steps.staging_crypto_key.outputs.signer_uid }}
+          STAGING_CRYPTO_TEST_KEY_ID: ${{ steps.staging_crypto_key.outputs.key_id }}
         working-directory: drive-gateway
         run: node tests/staging-runtime-acceptance.mjs
 
