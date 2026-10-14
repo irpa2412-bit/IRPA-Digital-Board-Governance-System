@@ -55,6 +55,7 @@ IRPA_PRODUCTION_CUTOVER = "false"
 
 [[env.staging.kv_namespaces]]
 binding = "DRIVE_KV"
+id = "7b50627e29fc4fe1abaa8dc8665edd02"
 
 [[env.staging.durable_objects.bindings]]
 name = "ESIGN_DO"
