@@ -1,0 +1,256 @@
+name: Verify and deploy IRPA LiveKit recording in isolated staging
+
+on:
+  push:
+    branches:
+      - fix/livekit-recording-production-20261014
+    paths:
+      - "functions/liveMeeting.js"
+      - "functions/package.json"
+      - "functions/scripts/verify-cloudflare-livekit-token-worker.js"
+      - "functions/scripts/verify-livekit-recording-storage.mjs"
+      - "src/components/IRPADGBSMeetingRoomMedia.jsx"
+      - "src/firebase/meetingRecords.js"
+      - "src/firebase/meetingPolicy.js"
+      - "src/pages/MeetingRoom.jsx"
+      - "src/pages/Meetings.jsx"
+      - ".github/workflows/livekit-recording-staging.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: irpa-livekit-recording-staging
+  cancel-in-progress: false
+
+jobs:
+  validate-build-and-stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      STAGING_PROJECT_ID: irpa-dbg-staging-a73ec
+      STAGING_FIREBASE_WEB_API_KEY: "AIzaSyA6UmHtP-mRr99rBw57_-qrD4_mFSBnZ38"
+      LIVEKIT_TOKEN_WORKER_URL: "https://irpa-dgb-livekit-token-staging.irpa-governance.workers.dev"
+      STAGING_RECORDING_BUCKET: irpa-dbg-staging-a73ec-meeting-recordings-1018976634858
+    steps:
+      - name: Checkout release candidate
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install web dependencies and run repository acceptance checks
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run check:production-readability
+          npm run check:meeting-media
+          npm run test:meeting-category
+          npm run test:meeting-entry-policy
+          npm run test:security-rules
+          npm run build
+          test -s dist/index.html
+
+      - name: Verify Cloudflare deployment authorization
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Accept: application/json" \
+            https://api.cloudflare.com/client/v4/user/tokens/verify > "$RUNNER_TEMP/cf-token.json"
+          node -e 'const x=require(process.argv[1]); if(!x.success) process.exit(1)' "$RUNNER_TEMP/cf-token.json"
+
+      - name: Build isolated staging Firebase frontend
+        env:
+          VITE_FIREBASE_API_KEY: "AIzaSyA6UmHtP-mRr99rBw57_-qrD4_mFSBnZ38"
+          VITE_FIREBASE_AUTH_DOMAIN: "irpa-dbg-staging-a73ec.firebaseapp.com"
+          VITE_FIREBASE_PROJECT_ID: "irpa-dbg-staging-a73ec"
+          VITE_FIREBASE_STORAGE_BUCKET: "irpa-dbg-staging-a73ec.firebasestorage.app"
+          VITE_FIREBASE_MESSAGING_SENDER_ID: "1018976634858"
+          VITE_FIREBASE_APP_ID: "1:1018976634858:web:e73e9e09f55a76ade25493"
+          VITE_FIREBASE_MEASUREMENT_ID: ""
+          VITE_LIVEKIT_TOKEN_WORKER_URL: "https://irpa-dgb-livekit-token-staging.irpa-governance.workers.dev"
+          VITE_GATEWAY_ORIGIN: "https://staging-disabled.invalid"
+          VITE_GOOGLE_DRIVE_GATEWAY_URL: "https://staging-disabled.invalid"
+          VITE_GRANT_CRAWLER_WORKER_URL: "https://staging-disabled.invalid"
+          VITE_GRANT_ASSISTANT_WORKER_URL: "https://staging-disabled.invalid"
+        run: |
+          set -euo pipefail
+          npm run build
+          grep -R -q 'irpa-dbg-staging-a73ec' dist
+          grep -R -q 'irpa-dgb-livekit-token-staging.irpa-governance.workers.dev' dist
+
+      - name: Deploy isolated staging frontend
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler deploy --config wrangler.livekit-staging.jsonc
+
+      - name: Confirm staging frontend health
+        run: |
+          set -euo pipefail
+          url="https://irpa-dgb-meeting-room-staging.irpa-governance.workers.dev"
+          curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 3 --max-time 30 "$url/" -o "$RUNNER_TEMP/staging.html"
+          grep -qi '<html' "$RUNNER_TEMP/staging.html"
+          health="$(curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 2 --max-time 20 "$url/__irpa_health")"
+          echo "$health" | grep -q '"ok":true'
+          echo "Staging frontend is reachable."
+
+      - name: Install staging Firebase and LiveKit acceptance dependencies
+        run: |
+          set -euo pipefail
+          npm --prefix functions install --omit=dev
+          npm --prefix functions install --no-save --no-package-lock @livekit/rtc-node@1.1.0
+          test -d functions/node_modules/@livekit/rtc-node
+
+      - name: Authenticate to the isolated staging Google Cloud project
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.LIVEKIT_STAGING_FIREBASE_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Provision private staging recording storage
+        env:
+          STAGING_FIREBASE_SERVICE_ACCOUNT: ${{ secrets.LIVEKIT_STAGING_FIREBASE_SERVICE_ACCOUNT }}
+          STAGING_PROJECT_ID: irpa-dbg-staging-a73ec
+          STAGING_RECORDING_BUCKET: irpa-dbg-staging-a73ec-meeting-recordings-1018976634858
+        run: |
+          set -euo pipefail
+          umask 077
+          tmp="$RUNNER_TEMP/irpa-recording-storage"
+          mkdir -p "$tmp"
+          trap 'rm -rf "$tmp"' EXIT
+          printf '%s' "$STAGING_FIREBASE_SERVICE_ACCOUNT" > "$tmp/firebase-admin.json"
+          service_project="$(node -e 'const x=require(process.argv[1]); process.stdout.write(String(x.project_id||""))' "$tmp/firebase-admin.json")"
+          service_email="$(node -e 'const x=require(process.argv[1]); process.stdout.write(String(x.client_email||""))' "$tmp/firebase-admin.json")"
+          test "$service_project" = "$STAGING_PROJECT_ID"
+          test -n "$service_email"
+          echo "Verified staging-only service account for $STAGING_PROJECT_ID."
+          gcloud config set project "$STAGING_PROJECT_ID" >/dev/null
+          gcloud services enable storage.googleapis.com iam.googleapis.com secretmanager.googleapis.com --project "$STAGING_PROJECT_ID"
+
+          if ! gcloud storage buckets describe "gs://$STAGING_RECORDING_BUCKET" --project "$STAGING_PROJECT_ID" >/dev/null 2>&1; then
+            gcloud storage buckets create "gs://$STAGING_RECORDING_BUCKET" \
+              --project="$STAGING_PROJECT_ID" --location=us-central1 \
+              --uniform-bucket-level-access --public-access-prevention
+          fi
+          gcloud storage buckets update "gs://$STAGING_RECORDING_BUCKET" \
+            --project="$STAGING_PROJECT_ID" --uniform-bucket-level-access --public-access-prevention
+          cat > "$tmp/cors.json" <<'JSON'
+          [
+            {
+              "origin": [
+                "https://irpa-dgb-meeting-room-staging.irpa-governance.workers.dev",
+                "https://irpa-digital-board-governance.web.app",
+                "https://irpa-digital-board-governance.firebaseapp.com"
+              ],
+              "method": ["GET", "HEAD"],
+              "responseHeader": ["Content-Type", "Content-Length", "Content-Disposition", "Range"],
+              "maxAgeSeconds": 3600
+            }
+          ]
+          JSON
+          gcloud storage buckets update "gs://$STAGING_RECORDING_BUCKET" \
+            --project="$STAGING_PROJECT_ID" --cors-file="$tmp/cors.json"
+
+          writer="irpa-livekit-recording-writer@$STAGING_PROJECT_ID.iam.gserviceaccount.com"
+          if ! gcloud iam service-accounts describe "$writer" --project "$STAGING_PROJECT_ID" >/dev/null 2>&1; then
+            gcloud iam service-accounts create irpa-livekit-recording-writer \
+              --project "$STAGING_PROJECT_ID" \
+              --display-name "IRPA LiveKit private recording writer"
+          fi
+          gcloud storage buckets add-iam-policy-binding "gs://$STAGING_RECORDING_BUCKET" \
+            --project="$STAGING_PROJECT_ID" --member="serviceAccount:$writer" --role="roles/storage.objectCreator"
+          gcloud storage buckets add-iam-policy-binding "gs://$STAGING_RECORDING_BUCKET" \
+            --project="$STAGING_PROJECT_ID" --member="serviceAccount:$writer" --role="roles/storage.objectViewer"
+          # The deployment-only identity can remove temporary E2E test files. The
+          # runtime writer remains limited to object creation and viewing.
+          gcloud storage buckets add-iam-policy-binding "gs://$STAGING_RECORDING_BUCKET" \
+            --project="$STAGING_PROJECT_ID" --member="serviceAccount:$service_email" --role="roles/storage.objectAdmin"
+
+          current="$tmp/current-gcs-credential.json"
+          if npx firebase functions:secrets:access LIVEKIT_RECORDING_STORAGE_GCP_CREDENTIALS \
+              --project "$STAGING_PROJECT_ID" > "$current" 2>/dev/null \
+              && node -e 'const x=require(process.argv[1]); if(x.project_id!==process.argv[2]||x.client_email!==process.argv[3]||!x.private_key) process.exit(1)' "$current" "$STAGING_PROJECT_ID" "$writer"; then
+            cp "$current" "$tmp/gcs-credential.json"
+            echo "Reusing the existing dedicated staging recording credential."
+          else
+            gcloud iam service-accounts keys create "$tmp/gcs-credential.json" \
+              --iam-account="$writer" --project="$STAGING_PROJECT_ID"
+            node -e 'const x=require(process.argv[1]); if(x.project_id!==process.argv[2]||x.client_email!==process.argv[3]||!x.private_key) process.exit(1)' "$tmp/gcs-credential.json" "$STAGING_PROJECT_ID" "$writer"
+            npx firebase functions:secrets:set LIVEKIT_RECORDING_STORAGE_GCP_CREDENTIALS \
+              --data-file "$tmp/gcs-credential.json" --project "$STAGING_PROJECT_ID"
+          fi
+          printf '%s' "$STAGING_RECORDING_BUCKET" > "$tmp/gcs-bucket.txt"
+          npx firebase functions:secrets:set LIVEKIT_RECORDING_STORAGE_GCP_BUCKET \
+            --data-file "$tmp/gcs-bucket.txt" --project "$STAGING_PROJECT_ID"
+
+          bucket_policy="$tmp/bucket-policy.json"
+          gcloud storage buckets get-iam-policy "gs://$STAGING_RECORDING_BUCKET" \
+            --project="$STAGING_PROJECT_ID" --format=json > "$bucket_policy"
+          node -e 'const p=require(process.argv[1]); const bindings=p.bindings||[]; if(bindings.some(b=>["allUsers","allAuthenticatedUsers"].some(m=>(b.members||[]).includes(m)))) process.exit(1)' "$bucket_policy"
+          public_access="$(gcloud storage buckets describe "gs://$STAGING_RECORDING_BUCKET" --project="$STAGING_PROJECT_ID" --format='value(public_access_prevention)')"
+          test "$public_access" = "enforced"
+          echo "Private staging recording bucket, least-privilege runtime writer, protected secrets, and CORS policy verified."
+
+      - name: Verify LiveKit secrets exist and align public endpoint identity with the token issuer
+        env:
+          STAGING_FIREBASE_SERVICE_ACCOUNT: ${{ secrets.LIVEKIT_STAGING_FIREBASE_SERVICE_ACCOUNT }}
+          STAGING_FIREBASE_WEB_API_KEY: "AIzaSyA6UmHtP-mRr99rBw57_-qrD4_mFSBnZ38"
+          LIVEKIT_TOKEN_WORKER_URL: "https://irpa-dgb-livekit-token-staging.irpa-governance.workers.dev"
+          LIVEKIT_PUBLIC_CONFIG_OUT: ${{ runner.temp }}/livekit-public-config.json
+          STAGING_PROJECT_ID: irpa-dbg-staging-a73ec
+        run: |
+          set -euo pipefail
+          npx firebase functions:secrets:access LIVEKIT_API_SECRET --project "$STAGING_PROJECT_ID" >/dev/null
+          node functions/scripts/verify-cloudflare-livekit-token-worker.js
+          test -s "$LIVEKIT_PUBLIC_CONFIG_OUT"
+          tmp="$RUNNER_TEMP/livekit-public"
+          mkdir -p "$tmp"
+          trap 'rm -rf "$tmp"' EXIT
+          node -e 'const x=require(process.argv[1]); if(!x.serverUrl||!x.apiKey||!String(x.apiKey).trim())process.exit(1)' "$LIVEKIT_PUBLIC_CONFIG_OUT"
+          node -e 'const x=require(process.argv[1]); process.stdout.write(String(x.serverUrl))' "$LIVEKIT_PUBLIC_CONFIG_OUT" > "$tmp/url"
+          node -e 'const x=require(process.argv[1]); process.stdout.write(String(x.apiKey))' "$LIVEKIT_PUBLIC_CONFIG_OUT" > "$tmp/key"
+          npx firebase functions:secrets:set LIVEKIT_URL --data-file "$tmp/url" --project "$STAGING_PROJECT_ID"
+          npx firebase functions:secrets:set LIVEKIT_API_KEY --data-file "$tmp/key" --project "$STAGING_PROJECT_ID"
+          echo "Staging callable URL and public API-key ID now match the authenticated token issuer; API secret remains protected in Secret Manager."
+
+      - name: Deploy recording and token callables to staging only
+        env:
+          STAGING_PROJECT_ID: irpa-dbg-staging-a73ec
+        run: |
+          set -euo pipefail
+          npx firebase deploy \
+            --only functions:issueLiveMeetingToken,functions:startMeetingRecording,functions:stopMeetingRecording,functions:getMeetingRecordingStatus,functions:getMeetingRecordingDownloadUrl \
+            --project "$STAGING_PROJECT_ID" --non-interactive
+
+      - name: Verify authenticated two-way media publishing, recording, and private storage
+        env:
+          STAGING_FIREBASE_SERVICE_ACCOUNT: ${{ secrets.LIVEKIT_STAGING_FIREBASE_SERVICE_ACCOUNT }}
+          STAGING_FIREBASE_WEB_API_KEY: "AIzaSyA6UmHtP-mRr99rBw57_-qrD4_mFSBnZ38"
+          LIVEKIT_TOKEN_WORKER_URL: "https://irpa-dgb-livekit-token-staging.irpa-governance.workers.dev"
+          STAGING_PROJECT_ID: irpa-dbg-staging-a73ec
+          LIVEKIT_RECORDING_STORAGE_CREDENTIALS: ${{ runner.temp }}/unused-private-key-is-read-through-firestore
+        run: |
+          set -euo pipefail
+          npx firebase functions:secrets:access LIVEKIT_URL --project "$STAGING_PROJECT_ID" > "$RUNNER_TEMP/livekit-url"
+          npx firebase functions:secrets:access LIVEKIT_API_KEY --project "$STAGING_PROJECT_ID" > "$RUNNER_TEMP/livekit-api-key"
+          export LIVEKIT_URL="$(cat "$RUNNER_TEMP/livekit-url")"
+          export LIVEKIT_API_KEY="$(cat "$RUNNER_TEMP/livekit-api-key")"
+          echo "::add-mask::$LIVEKIT_URL"
+          echo "::add-mask::$LIVEKIT_API_KEY"
+          npm --prefix functions install --no-save --no-package-lock @livekit/rtc-node@1.1.0
+          node functions/scripts/verify-livekit-recording-storage.mjs
