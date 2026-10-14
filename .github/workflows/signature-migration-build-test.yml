@@ -40,6 +40,15 @@ jobs:
           fi
           node --input-type=module -e 'import fs from "node:fs"; const s=fs.readFileSync("src/firebase/signaturePlatform.js","utf8"); const identity=s.indexOf("const signerIdentity=await ensureMySignerIdentity"); const upload=s.indexOf("await uploadBytes(storageRef,signedBytes"); if(identity<0||upload<0||identity>=upload) { console.error({identity,upload}); process.exit(1); } if(!s.includes("recordSignerAuthenticationEvidence")) process.exit(1); console.log("Signature migration safety invariants passed.",{identity,upload});'
 
+      - name: Run Signature Portal gateway and authorization regression tests
+        working-directory: drive-gateway
+        run: |
+          npm ci --no-audit --no-fund
+          npm test
+
+      - name: Run Signature Portal routing policy tests
+        run: node --test tests/signature-workflow-policy.test.mjs
+
       - name: Build web application
         env:
           VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
