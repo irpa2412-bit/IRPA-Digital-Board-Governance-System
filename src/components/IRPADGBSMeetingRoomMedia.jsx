@@ -199,7 +199,7 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
   <div className="form-actions" style={{marginTop:14}}>
    {status!=="CONNECTED"&&<button onClick={connect} disabled={!controller||status==="AUTHORIZING"}>{status==="AUTHORIZING"?"Authorizing…":"Join IRPA-DGBS Meeting Room"}</button>}
    {status==="CONNECTED"&&<>
-    {controller&&recordingAllowed&&<button className={recordingStatus==="RECORDING"?"danger-button":"secondary-button"} onClick={recordingStatus==="RECORDING"?stopRecording:startRecording} disabled={recordingBusy||["STARTING","STOPPING"].includes(recordingStatus)}>{recordingBusy?(recordingStatus==="RECORDING"?"Stopping Recording…":"Working…"):recordingStatus==="RECORDING"?"Stop Recording":"Start Recording"}</button>}
+    {controller&&recordingAllowed&&String(meeting.status||"").toLowerCase()==="in progress"&&<button className={recordingStatus==="RECORDING"?"danger-button":"secondary-button"} onClick={recordingStatus==="RECORDING"?stopRecording:startRecording} disabled={recordingBusy||["STARTING","STOPPING"].includes(recordingStatus)}>{recordingBusy?(recordingStatus==="RECORDING"?"Stopping Recording…":"Working…"):recordingStatus==="RECORDING"?"Stop Recording":"Start Recording"}</button>}
     <button className="secondary-button" onClick={toggleMic}>{muted?"Unmute microphone":"Mute microphone"}</button>
     <button className="secondary-button" onClick={toggleCamera}>{camera?"Stop camera":"Start camera"}</button>
     <button className="secondary-button" onClick={toggleScreen}>{screen?"Stop screen share":"Share screen"}</button>
