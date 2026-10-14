@@ -5,16 +5,7 @@ const fixturePassword = "FixtureOnly-Password-2026!";
 
 async function navigateModule(page, viewportName, module) {
   if (viewportName === "mobile") {
-    if (["Meeting Room", "Voting", "Resolutions", "Decisions"].includes(module)) {
-      // Exercise the connected-workflow buttons directly; these remain available on mobile.
-      const child = {
-        "Meeting Room": /Meeting Room Portal/,
-        "Voting": /Voting Portal/,
-        "Resolutions": /Resolutions Portal/,
-        "Decisions": /Decisions Portal/
-      }[module];
-      await page.locator(".module-interlink-bar").getByRole("button", { name: child }).click();
-    } else if (module === "Finance Portfolio" || module === "Documents") {
+    if (module === "Finance Portfolio" || module === "Meeting Room" || module === "Documents" || module === "Voting" || module === "Resolutions" || module === "Decisions") {
       const dialog = page.getByRole("dialog", { name: "Mobile navigation" });
       const sheetTitle = dialog.locator(".mobile-nav-sheet-header strong");
       const isPortalsSheet = await dialog.isVisible() && await sheetTitle.textContent() === "Portals";
@@ -22,8 +13,25 @@ async function navigateModule(page, viewportName, module) {
         await page.locator(".mobile-global-nav").getByRole("button", { name: "Portals" }).click();
       }
       await expect(sheetTitle).toHaveText("Portals");
-      const label = module === "Finance Portfolio" ? /Finance Portal/ : /Documents Portal/;
-      await dialog.getByRole("button", { name: label }).click();
+      if (module === "Finance Portfolio") {
+        await dialog.getByRole("button", { name: /Finance Portal/ }).click();
+      } else if (module === "Documents") {
+        await dialog.getByRole("button", { name: /Documents Portal/ }).click();
+      } else {
+        const child = {
+          "Meeting Room": /Meeting Room/,
+          "Voting": /Voting/,
+          "Resolutions": /Resolutions/,
+          "Decisions": /Decisions/
+        }[module];
+        const childButton = dialog.getByRole("button", { name: child });
+        // The parent may already be expanded from the previous portal visit; do not toggle it closed.
+        if (!(await childButton.isVisible())) {
+          await dialog.getByRole("button", { name: /Meeting Portal/ }).click();
+        }
+        await expect(childButton).toBeVisible();
+        await childButton.click();
+      }
     } else {
       await page.locator(".mobile-global-nav").getByRole("button", { name: "Menu" }).click();
       const dialog = page.getByRole("dialog", { name: "Mobile navigation" });
