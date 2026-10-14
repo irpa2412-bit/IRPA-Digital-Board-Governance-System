@@ -72,7 +72,7 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
   }
   if(proceedingsActive&&recordingStatus!=="RECORDING"&&recordingStatus!=="STARTING")startWhenProceedingsBegin();
   return()=>{cancelled=true};
- },[meeting?.id,meeting?.recordingRequired,proceedingsActive,recordingController,recordingAllowed,recordingStatus,selectedAuthority]);
+ },[meeting?.id,meeting?.recordingRequired,proceedingsActive,recordingController,selectedAuthority]);
 
  async function connect(){
    if(!meeting?.id)return setError("Select an IRPA meeting first.");
