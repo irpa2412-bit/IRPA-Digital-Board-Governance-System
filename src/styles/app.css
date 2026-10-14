@@ -11068,3 +11068,39 @@ html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar
     flex-wrap: wrap;
   }
 }
+
+
+/* Responsive overflow correction — shared governance portals.
+   Presentation-only: preserve all navigation and authorization logic. */
+.module-interlink-bar,
+.module-interlink-bar * { box-sizing: border-box; }
+.module-interlink-bar { width:100%; min-width:0; max-width:100%; }
+.module-interlink-heading,
+.module-interlink-list,
+.workflow-portal-group,
+.workflow-portal-children,
+.workflow-linked-records { min-width:0; max-width:100%; }
+.module-interlink-list {
+  width:100%; overflow:visible; flex-wrap:wrap; align-items:stretch;
+}
+.workflow-portal-group { flex-wrap:wrap; }
+.workflow-portal-children { display:flex; flex-wrap:wrap; white-space:normal; }
+.module-interlink-list button,
+.workflow-portal-parent,
+.workflow-portal-children button,
+.workflow-linked-records button {
+  min-width:0; max-width:100%; white-space:normal;
+  overflow-wrap:anywhere; word-break:normal; line-height:1.3;
+}
+.workflow-linked-records { display:flex; flex-wrap:wrap; align-items:center; }
+.workflow-context-chip,
+.workflow-linked-records > span { max-width:100%; white-space:normal; overflow-wrap:anywhere; }
+@media (max-width:900px) {
+  .module-interlink-bar .module-interlink-heading,
+  .module-interlink-bar .module-interlink-list { width:100%; min-width:0; flex-basis:100%; }
+  .module-interlink-bar .workflow-portal-group { width:100%; flex-direction:column; align-items:stretch; }
+  .module-interlink-bar .workflow-portal-parent,
+  .module-interlink-bar .workflow-portal-children { width:100%; }
+  .module-interlink-bar .workflow-portal-children { border-left:0; flex-wrap:wrap; }
+}
+html, body, #root { min-width:0; max-width:100%; }
