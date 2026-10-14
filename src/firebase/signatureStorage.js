@@ -408,7 +408,7 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
     if (await sha256HexBytes(existingBytes) !== expectedHash) {
       throw new Error("A Gateway document with this workflow reference exists but does not match the controlled PDF. Refusing to overwrite it.");
     }
-  } else if (existingResponse.status === 404) {
+  } else if (existingResponse.status === 404 || existingResponse.status === 403) {
     const form = new FormData();
     form.append("documentId", documentId);
     form.append("title", title);
