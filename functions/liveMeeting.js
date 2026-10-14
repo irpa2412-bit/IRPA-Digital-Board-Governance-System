@@ -460,7 +460,10 @@ exports.getMeetingRecordingStatus = onCall({
         const nextStatus = recordingStateForEgress(latest);
         const files = Array.isArray(latest.fileResults) ? latest.fileResults.map(file => ({ filename: text(file.filename), location: text(file.location), size: Number(file.size || 0) })) : [];
         const patch = { recordingStatus: nextStatus, egressStatus: egressState(latest), fileResults: files, updatedAt: FieldValue.serverTimestamp() };
-        if (nextStatus === "COMPLETED") patch.completedAt = FieldValue.serverTimestamp();
+        if (nextStatus === "COMPLETED") {
+          patch.completedAt = FieldValue.serverTimestamp();
+          await db.collection("audit").add({ action: "LIVE_MEETING_RECORDING_COMPLETED", collection: "meetingMediaRecordings", recordId: row.id, details: { meetingId: ctx.meeting.id, meetingCategory: category, egressId: row.egressId, files }, actorUid: ctx.uid, actorEmail: ctx.email || null, createdAt: FieldValue.serverTimestamp() });
+        }
         await db.collection("meetingMediaRecordings").doc(row.id).update(patch);
         await db.collection("meetings").doc(ctx.meeting.id).update({ recordingStatus: nextStatus, ...(nextStatus === "COMPLETED" ? { recordingCompletedAt: FieldValue.serverTimestamp() } : {}) });
         row = { ...row, ...patch, fileResults: files, recordingStatus: nextStatus, egressStatus: egressState(latest) };
