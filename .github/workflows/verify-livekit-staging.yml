@@ -14,7 +14,6 @@ permissions:
 
 jobs:
   verify-control-plane:
-    environment: livekit-staging
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -32,12 +31,17 @@ jobs:
         run: |
           set -euo pipefail
           for name in LIVEKIT_URL LIVEKIT_API_KEY LIVEKIT_API_SECRET; do
-            if [ -z "${!name:-}" ]; then echo "::error::Missing GitHub Actions secret ${name}"; exit 1; fi
+            if [ -z "${!name:-}" ]; then echo "::error::No repository secret mapped for required LiveKit setting: ${name}. Configure LIVEKIT_STAGING_URL (or LIVEKIT_STAGING_DOMAIN / LIVEKIT_URL), LIVEKIT_STAGING_API_KEY (or LIVEKIT_API_KEY), and LIVEKIT_STAGING_API_SECRET (or LIVEKIT_API_SECRET) under Settings > Secrets and variables > Actions > Repository secrets."; exit 1; fi
           done
           node functions/scripts/verify-livekit-control-plane.js
       - name: Verify actual staging recording output and stored object
         env:
-          LIVEKIT_URL: ${{ secrets.LIVEKIT_STAGING_URL }}
-          LIVEKIT_API_KEY: ${{ secrets.LIVEKIT_STAGING_API_KEY }}
-          LIVEKIT_API_SECRET: ${{ secrets.LIVEKIT_STAGING_API_SECRET }}
-        run: node functions/scripts/verify-livekit-recording-storage.js
+          LIVEKIT_URL: ${{ secrets.LIVEKIT_STAGING_URL || (secrets.LIVEKIT_STAGING_DOMAIN != '' && format('wss://{0}', secrets.LIVEKIT_STAGING_DOMAIN)) || secrets.LIVEKIT_URL }}
+          LIVEKIT_API_KEY: ${{ secrets.LIVEKIT_STAGING_API_KEY || secrets.LIVEKIT_API_KEY }}
+          LIVEKIT_API_SECRET: ${{ secrets.LIVEKIT_STAGING_API_SECRET || secrets.LIVEKIT_API_SECRET }}
+        run: |
+          set -euo pipefail
+          for name in LIVEKIT_URL LIVEKIT_API_KEY LIVEKIT_API_SECRET; do
+            if [ -z "${!name:-}" ]; then echo "::error::No repository secret mapped for required LiveKit setting: ${name}."; exit 1; fi
+          done
+          node functions/scripts/verify-livekit-recording-storage.js
