@@ -469,3 +469,24 @@ export async function fetchGatewaySigningStatus(token) {
   if (!response.ok || data.ok === false) throw new Error(data.error || "Unable to retrieve Gateway signing status.");
   return data;
 }
+
+
+export async function fetchGatewaySigningResource(path, token, {pdf=false}={}) {
+  const response = await gatewayAuthenticatedRequest(path, {signingToken:token,contentType:pdf?null:"application/json"});
+  if (!response.ok) {
+    const data = pdf ? {} : await response.json().catch(() => ({}));
+    throw new Error(data.error || ("Gateway signing request failed (HTTP " + response.status + ")."));
+  }
+  return pdf ? new Uint8Array(await response.arrayBuffer()) : response.json();
+}
+
+export async function submitGatewaySignature({token,signature,fieldValues={},consent=true}={}) {
+  if (!token) throw new Error("A Gateway signing token is required.");
+  const response = await gatewayAuthenticatedRequest("/api/sign/submit", {
+    method:"POST",
+    body:JSON.stringify({token,signature,fieldValues,consent})
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data.ok === false) throw new Error(data.error || "The Gateway did not accept the signing action.");
+  return data;
+}
