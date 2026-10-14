@@ -227,6 +227,7 @@ const MEETING_ARCHIVE_CATEGORIES = Object.freeze({
   ADMINISTRATIVE: { label: "Administrative Meetings", archiveCategory: "Administrative Meeting Archive", classification: "Restricted" },
   STAFF: { label: "Staff Meetings", archiveCategory: "Staff Meeting Archive", classification: "Internal" },
   GENERAL: { label: "General Meetings", archiveCategory: "General Meeting Archive", classification: "Internal" },
+  DISCIPLINARY: { label: "Disciplinary Meetings", archiveCategory: "Disciplinary Meeting Archive", classification: "Confidential" },
   OTHER: { label: "Other Meetings", archiveCategory: "Other Meeting Archive", classification: "Restricted" }
 });
 
