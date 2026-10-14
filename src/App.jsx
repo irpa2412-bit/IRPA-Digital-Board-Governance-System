@@ -507,14 +507,14 @@ try{window.sessionStorage.setItem("irpaActiveAccessAuthority",role);window.sessi
 useEffect(()=>{
   let firstFrame=0;
   let secondFrame=0;
+  let finalFrame=0;
   firstFrame=window.requestAnimationFrame(()=>{
     secondFrame=window.requestAnimationFrame(()=>{
       const workspace=document.querySelector("#root .app-shell .main-area > .content-area [data-active-portal-content]");
       if(!workspace)return;
-      workspace.scrollIntoView({block:"start",behavior:"auto"});
-      const header=document.querySelector("#root .app-shell .main-area > header.topbar");
-      const headerBottom=header?.getBoundingClientRect().bottom||0;
       const alignWorkspace=()=>{
+        const header=document.querySelector("#root .app-shell .main-area > header.topbar");
+        const headerBottom=header?.getBoundingClientRect().bottom||0;
         const rect=workspace.getBoundingClientRect();
         const delta=rect.top-headerBottom-8;
         if(Math.abs(delta)<2)return;
@@ -529,13 +529,21 @@ useEffect(()=>{
         }
         window.scrollBy({top:delta,left:0,behavior:"auto"});
       };
+      workspace.scrollIntoView({block:"start",behavior:"auto"});
       alignWorkspace();
-      workspace.focus({preventScroll:true});
+      // Run after portal mount effects so child controls cannot leave focus at the shared header.
+      finalFrame=window.requestAnimationFrame(()=>{
+        const current=document.querySelector("#root .app-shell .main-area > .content-area [data-active-portal-content]");
+        if(!current||current.dataset.activePortalContent!==active)return;
+        alignWorkspace();
+        current.focus({preventScroll:true});
+      });
     });
   });
   return()=>{
     window.cancelAnimationFrame(firstFrame);
     window.cancelAnimationFrame(secondFrame);
+    window.cancelAnimationFrame(finalFrame);
   };
 },[active]);
 useEffect(()=>{
