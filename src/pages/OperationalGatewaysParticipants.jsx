@@ -1,6 +1,6 @@
 // V3.0 participant/invitation integration: system records + controlled external invitees.
 import React,{useEffect,useMemo,useState}from"react";
-import{createRecord,getRecords,updateRecord,deleteRecord,COLLECTIONS,listMeetingInviteeDirectory}from"../firebase/data";
+import{createRecord,getRecords,updateRecord,deleteRecord,COLLECTIONS,listMeetingInviteeDirectory,getAccessibleMeetingRecords}from"../firebase/data";
 import{sendMemberInvitationEmail}from"../firebase/auth";
 import{getFunctions,httpsCallable}from"firebase/functions";
 const MANUAL_INVITEE_ROLES=["Technical Expert","Government Representative","Partner / Donor","Invited Guest","External Participant — Non-Voting","Consultant"];
@@ -20,7 +20,7 @@ export default function OperationalGatewaysParticipants(){
   const includeParticipantRecords=participantEnvironmentConfirmed();
   const requests=[
    includeParticipantRecords?getRecords(COLLECTIONS.participants):Promise.resolve([]),
-   getRecords(COLLECTIONS.meetings),
+   getAccessibleMeetingRecords(),
    listMeetingInviteeDirectory(),
    getRecords(COLLECTIONS.invitations)
   ];
