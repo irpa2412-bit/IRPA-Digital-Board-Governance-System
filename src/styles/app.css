@@ -11104,3 +11104,13 @@ html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar
   .module-interlink-bar .workflow-portal-children { border-left:0; flex-wrap:wrap; }
 }
 html, body, #root { min-width:0; max-width:100%; }
+
+
+/* Portal navigation lands on the actual destination workspace below the global header and controls. */
+#root .app-shell .main-area > .content-area #portal-workspace-content {
+  display: flow-root;
+  min-width: 0;
+  max-width: 100%;
+  scroll-margin-top: 1rem;
+  outline: none;
+}
