@@ -284,3 +284,18 @@
     height:auto!important;
   }
 }
+
+
+/* Tablet layouts stack the sidebar above the workspace. Keep enough document
+   scroll range so the workspace can actually align beneath the viewport after
+   scrollIntoView; without this slack the document's max-scroll boundary leaves
+   the workspace stranded a few pixels below the top despite correct routing. */
+@media (min-width: 761px) and (max-width: 1100px) {
+  html body #root .app-shell::after {
+    content: "";
+    display: block;
+    height: 96px;
+    width: 1px;
+    pointer-events: none;
+  }
+}
