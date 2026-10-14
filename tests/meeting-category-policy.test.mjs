@@ -5,7 +5,8 @@ import {
   canRegisterMeeting,
   canEditMeeting,
   canVoteInMeeting,
-  meetingCapabilities
+  meetingCapabilities,
+  canReadFullMeetingRegister
 } from "../src/firebase/meetingPolicy.js";
 
 const governance = {
@@ -84,4 +85,14 @@ test("category capabilities keep voting and resolutions disabled outside governa
   const governanceCapabilities = meetingCapabilities(governance);
   assert.equal(governanceCapabilities.voting, true);
   assert.equal(governanceCapabilities.resolutions, true);
+});
+
+
+test("full meeting register is limited to active institutional identities and administrators", () => {
+  assert.equal(canReadFullMeetingRegister({ activeMember: true }), true);
+  assert.equal(canReadFullMeetingRegister({ activeEmployee: true }), true);
+  assert.equal(canReadFullMeetingRegister({ isAdmin: true }), true);
+  assert.equal(canReadFullMeetingRegister({ activeMember: false, activeEmployee: false, isAdmin: false }), false);
+  assert.equal(canReadFullMeetingRegister({ uid: "external-invitee" }), false);
+  assert.equal(canReadFullMeetingRegister({ activeMember: true, status: "inactive" }), false);
 });
