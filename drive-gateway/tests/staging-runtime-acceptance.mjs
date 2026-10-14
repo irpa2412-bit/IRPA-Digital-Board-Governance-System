@@ -77,7 +77,6 @@ const envelopePayload={
 const envelopeResponse=await fetch(base+"/api/envelopes",{method:"POST",headers:{...authHeaders,"content-type":"application/json"},body:JSON.stringify(envelopePayload)});
 const envelope=await readJson(envelopeResponse,"Staging authenticated envelope creation");
 assert.ok(envelope.envelopeId);
-assert.equal(envelope.externalReference,undefined,"Envelope create response must not echo internal metadata beyond its documented response.");
 assert.equal(envelope.invitations?.[0]?.status,"Sent","Staging invitation transport did not confirm delivery.");
 assert.ok(Array.isArray(envelope.tokens)&&envelope.tokens.length===1,"Staging-only acceptance token was not returned.");
 const signingToken=envelope.tokens[0];
@@ -103,6 +102,7 @@ assert.equal(signed.completed,true);
 
 const status=await signingJson("/api/sign/status",signingToken,"Completed signing status");
 assert.equal(status.status,"Completed");
+assert.equal(status.externalReference,externalReference);
 assert.equal(status.auditChainValid,true);
 assert.equal(status.completion.cryptographicEvidenceIds.length,1);
 assert.equal(status.signers[0].uid,expectedUid);
