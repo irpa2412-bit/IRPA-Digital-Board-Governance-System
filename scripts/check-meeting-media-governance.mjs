@@ -90,7 +90,7 @@ const checks=[
  ["Disciplinary records have a dedicated retention policy",records.includes("DISCIPLINARY:7")&&records.includes('return"DISCIPLINARY"')],
  ["Audio/video recordings are archived under the meeting category",liveMeeting.includes('"irpa-governance-recordings/" + category.toLowerCase() + "/"')&&liveMeeting.includes("fileResults: files")],
  ["Recording metadata and category/classification are audit-trailed",liveMeeting.includes("LIVE_MEETING_RECORDING_STARTED")&&liveMeeting.includes("confidentialityClass: row.confidentialityClass")&&liveMeeting.includes("filesVerified: files.length > 0")],
- ["Live transcript auto-saves separately from media recording",roomSource.includes("saveLiveMeetingProceedings({meetingId:selected.id,content:latest})")&&roomSource.includes("transcriptAutoSavedAt")&&media.includes("recordingProvider:")===false],
+ ["Live transcript auto-saves separately from media recording",roomSource.includes("saveLiveMeetingProceedings({meetingId:selected.id,content:latest})")&&roomSource.includes("transcriptAutoSavedAt")&&liveMeeting.includes('recordingProvider: "LIVEKIT_EGRESS"')&&liveMeeting.includes("egressId")],
  ["AI-generated minutes and summaries remain drafts pending human review",records.includes("draftOnly:true,approved:false,approvalStatus:\"NOT_SUBMITTED\",requiresHumanReview:true")],
  ["Meeting record lifecycle callable registered",fs.readFileSync("functions/bootstrap.js","utf8").includes('require("./meetingRecords")')],
  ["Record capture is server-authorized",records.includes("exports.captureMeetingRecord")&&records.includes("ctx.canManage")],
