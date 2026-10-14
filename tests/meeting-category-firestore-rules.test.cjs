@@ -240,3 +240,17 @@ test("meeting registration rejects missing recording notice or confidentiality",
   await assertFails(db.doc("meetings/missing-notice").set(meeting({ initiatorUid: "staff-user", recordingNoticeAcknowledged: false })));
   await assertFails(db.doc("meetings/missing-classification").set(meeting({ initiatorUid: "staff-user", confidentialityClass: "" })));
 });
+
+
+test("closed Board sessions are not exposed to unrelated Board-role profiles", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("meetings/closed-board").set(meeting({ meetingCategory: "GOVERNANCE", meetingPolicyId: "GOVERNANCE", meetingType: "Board Meeting", confidentialityClass: "OPEN", boardSessionType: "CLOSED_SESSION", initiatorUid: "board-secretary" }));
+  });
+  const boardDb = testEnv.authenticatedContext("uninvited-board-member", { irpaRoles: ["Board Member"], email: "board@example.test" }).firestore();
+  await assertFails(boardDb.doc("meetings/closed-board").get());
+  const inviteeDb = testEnv.authenticatedContext("invited-board-member", { email: "invitee@example.test" }).firestore();
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("meetings/closed-board").update({ participantUids: ["invited-board-member"] });
+  });
+  await assertSucceeds(inviteeDb.doc("meetings/closed-board").get());
+});
