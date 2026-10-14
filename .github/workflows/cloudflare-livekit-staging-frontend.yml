@@ -88,9 +88,9 @@ jobs:
         run: |
           set -euo pipefail
           url="https://irpa-dgb-meeting-room-staging.irpa-governance.workers.dev"
-          curl --fail --silent --show-error --retry 8 --retry-delay 3 --max-time 30 "$url/" -o "$RUNNER_TEMP/staging.html"
+          curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 3 --max-time 30 "$url/" -o "$RUNNER_TEMP/staging.html"
           grep -qi '<html' "$RUNNER_TEMP/staging.html"
-          health="$(curl --fail --silent --show-error --retry 5 --retry-delay 2 --max-time 20 "$url/__irpa_health")"
+          health="$(curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 2 --max-time 20 "$url/__irpa_health")"
           echo "$health"
           echo "$health" | grep -q '"ok":true'
           echo "Isolated staging frontend is deployed. Authenticated token, recording, and two-browser media tests remain separate acceptance tests."
