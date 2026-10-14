@@ -61,10 +61,8 @@ export function canEditMeeting(meeting={},identity={}){
   const released=Boolean(meeting.registeredAt||meeting.registerStatus==="Registered"||meeting.status==="Released");
   if(released)return false;
   if(identity.active!==true)return false;
-  const roles=identityRoles(identity);
-  const policy=resolveCategory(meeting.meetingCategory||meeting.meetingPolicyId||meeting.category||meeting.meetingType);
-  return policy.registrationRoles.some(role=>roles.has(NORMALIZE_ROLE(role)))&&
-    String(meeting.initiatorUid||"")===String(identity.uid||"");
+  // The active profile that initiated an unreleased meeting can organise it regardless of department role.
+  return Boolean(String(identity.uid||""))&&String(meeting.initiatorUid||"")===String(identity.uid||"");
 }
 export function canVoteInMeeting(meeting={},identity={}){
   const policy=resolveCategory(meeting.meetingCategory||meeting.meetingPolicyId||meeting.category||meeting.meetingType);
