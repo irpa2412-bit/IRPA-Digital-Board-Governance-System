@@ -7,7 +7,7 @@ const source = readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
 test("portal changes focus the viewport on the destination workspace", () => {
   assert.match(
     source,
-    /useEffect\(\(\)=>\{\s*let firstFrame=0;\s*let secondFrame=0;[\s\S]*?const workspace=document.querySelector("#root .app-shell .main-area > .content-area [data-active-portal-content]");[\s\S]*?workspace\.scrollIntoView\(\{block:"start",behavior:"auto"\}\);[\s\S]*?\},\[active\]\);/
+    /useEffect\(\(\)=>\{\s*let firstFrame=0;\s*let secondFrame=0;[\s\S]*?const workspace=document.querySelector("#root .app-shell .main-area > .content-area \\[data-active-portal-content\\]");[\s\S]*?workspace\.scrollIntoView\(\{block:"start",behavior:"auto"\}\);[\s\S]*?\},\[active\]\);/
   );
 });
 
