@@ -22,10 +22,12 @@ test("navigation focus is scoped to the main workspace, not the global header", 
   assert.doesNotMatch(source, /window\.scrollTo\(\s*0\s*,\s*0\s*\)/);
 });
 
-test("scheduled viewport work is cancelled when the active portal changes or the shell unmounts", () => {
+test("scheduled viewport work and mutation observers are cleaned up on portal changes", () => {
   assert.match(source, /window\.cancelAnimationFrame\(firstFrame\)/);
   assert.match(source, /window\.cancelAnimationFrame\(secondFrame\)/);
-  assert.ok(source.includes('return()=>{\n    window.cancelAnimationFrame(firstFrame);\n    window.cancelAnimationFrame(secondFrame);\n  };'));
+  assert.match(source, /window\.clearTimeout\(retryTimer\)/);
+  assert.match(source, /observer\?\.disconnect\(\)/);
+  assert.ok(source.includes('},[active,user?.uid,sessionAdministrator]);'));
 });
 
 test("navigation repair remains presentation-only and leaves access-gate routing in place", () => {
