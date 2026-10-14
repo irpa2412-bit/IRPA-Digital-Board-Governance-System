@@ -1,0 +1,76 @@
+name: Participants Meeting Retrieval CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/pages/OperationalGatewaysParticipants.jsx"
+      - "src/firebase/data.js"
+      - "functions/meetingGateway.js"
+      - "functions/index.js"
+      - "functions/bootstrap.js"
+      - "functions/meetingEntryPolicy.cjs"
+      - "firestore.rules"
+      - "tests/**"
+      - ".github/workflows/participants-meeting-retrieval-ci.yml"
+      - "package.json"
+      - "package-lock.json"
+      - "functions/package.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-security-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Setup Java for Firebase Emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install web dependencies
+        run: npm ci
+      - name: Validate function JavaScript syntax
+        run: |
+          node --check functions/meetingGateway.js
+          node --check functions/index.js
+          node --check functions/bootstrap.js
+      - name: Run production readability and contrast gate
+        run: npm run check:production-readability
+      - name: Build production web bundle
+        run: npm run build
+      - name: Run meeting category and Firestore authorization tests
+        run: npx firebase emulators:exec --project demo-irpa-meeting-tests --only firestore "npm run test:meeting-category"
+      - name: Run security rules tests
+        run: npx firebase emulators:exec --project demo-irpa-meeting-tests --only firestore "npm run test:security-rules"
+      - name: Run portal navigation regression tests
+        run: npm run test:portal-navigation
+      - name: Run meeting entry policy tests
+        run: npm run test:meeting-entry-policy
+      - name: Verify authorized meeting callable is wired end-to-end
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const gateway = fs.readFileSync('functions/meetingGateway.js','utf8');
+          const index = fs.readFileSync('functions/index.js','utf8');
+          const data = fs.readFileSync('src/firebase/data.js','utf8');
+          const participants = fs.readFileSync('src/pages/OperationalGatewaysParticipants.jsx','utf8');
+          const checks = [
+            ['server callable implemented', gateway.includes('exports.listAccessibleMeetingRecords=onCall(')],
+            ['callable exported', index.includes('exports.listAccessibleMeetingRecords = meetingGateway.listAccessibleMeetingRecords;')],
+            ['client invokes callable', data.includes('"listAccessibleMeetingRecords"')],
+            ['participants portal uses authorized helper', participants.includes('getAccessibleMeetingRecords()')],
+            ['no client-side unrestricted meetings query in helper', !data.slice(data.indexOf('export async function getAccessibleMeetingRecords(){'),data.indexOf('function meetingCreatedAt')).includes('getDocs(ref)')]
+          ];
+          for (const [label, ok] of checks) console.log((ok?'PASS':'FAIL')+' '+label);
+          if (checks.some(([,ok])=>!ok)) process.exit(1);
+          NODE

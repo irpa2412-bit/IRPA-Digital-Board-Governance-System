@@ -140,26 +140,75 @@ exports.listMeetingEntryRequests=onCall({region:"us-central1",timeoutSeconds:30}
  return {requests:snap.docs.filter(d=>{const row=d.data()||{},expiry=row.expiresAt?.toDate?.()||new Date(row.expiresAt||0);return row.status==="PENDING"&&!Number.isNaN(expiry.getTime())&&expiry.getTime()>Date.now();}).map(d=>({id:d.id,participantId:text(d.data().participantId),participantName:text(d.data().participantName||d.data().participantEmail),participantEmail:text(d.data().participantEmail),requestedAt:d.data().requestedAt?.toDate?.()?.toISOString()||null}))};
 });
 
+exports.listAccessibleMeetingRecords=onCall({region:"us-central1",timeoutSeconds:30},async request=>{
+ const uid=request.auth?.uid;if(!uid)throw new HttpsError("unauthenticated","Authentication is required.");
+ const email=text(request.auth?.token?.email).toLowerCase();
+ const [memberDoc,employeeDoc,memberByEmail,employeeByEmail,adminProfile]=await Promise.all([
+  db.collection("members").doc(uid).get(),db.collection("employees").doc(uid).get(),
+  email?db.collection("members").where("email","==",email).limit(2).get():Promise.resolve({docs:[]}),
+  email?db.collection("employees").where("email","==",email).limit(2).get():Promise.resolve({docs:[]}),
+  db.collection("adminProfiles").doc(uid).get()
+ ]);
+ const profiles=[...(memberDoc.exists?[memberDoc.data()]:[]),...(employeeDoc.exists?[employeeDoc.data()]:[]),...memberByEmail.docs.map(d=>d.data()),...employeeByEmail.docs.map(d=>d.data())];
+ const activeProfile=d=>{const statuses=[d?.status,d?.employmentStatus,d?.registrationStatus].map(v=>text(v).toLowerCase()).filter(Boolean);return !statuses.some(v=>["inactive","terminated","suspended","deleted","cancelled","canceled","archived"].includes(v))&&statuses.some(v=>["active","activated"].includes(v));};
+ const roles=new Set(profiles.filter(activeProfile).flatMap(d=>[d.role,d.title,d.position,d.departmentalRole,d.boardPosition,...(Array.isArray(d.roles)?d.roles:[]),...(Array.isArray(d.assignedRoles)?d.assignedRoles:[]),...(Array.isArray(d.selectedRoles)?d.selectedRoles:[]),...(Array.isArray(d.roleAssignments)?d.roleAssignments:[])].map(v=>text(v).toLowerCase()).filter(Boolean)));
+ for(const role of Array.isArray(request.auth?.token?.irpaRoles)?request.auth.token.irpaRoles:[])roles.add(text(role).toLowerCase());
+ const isAdmin=await activeAdmin(request);
+ const roleIn=(...values)=>values.some(v=>roles.has(v.toLowerCase()));
+ const roleCategory=(m)=>{
+  const category=text(m.meetingCategory||m.meetingPolicyId).toUpperCase();
+  const type=text(m.meetingType||m.type);
+  const hasType=(...values)=>values.includes(type);
+  if(["GOVERNANCE","BOARD","BOARD_RESTRICTED"].includes(category)||hasType("Governance","Board","Board Meeting","Board Committee Meeting","Annual General Meeting","Special Meeting"))return roleIn("Board Member","Board Chairperson","Board Secretary","Secretary to the Board","Executive Director","Director Internal Oversight");
+  if(["ADMINISTRATIVE","ADMINISTRATION"].includes(category)||hasType("Administrative","Management","Management Meeting","Administration Meeting","Operations Meeting"))return roleIn("Executive Director","Director Finance & Administration","Director Human Resources","HR Director","Operations Manager","Departmental Director","Departmental Manager","Director Outreach","Director Community Development","Director Livestock","Director Environment","Director Field Department");
+  if(["STAFF","STAFF_MEETING"].includes(category)||hasType("Staff","Staff Meeting"))return roleIn("Executive Director","Director Human Resources","HR Director","Operations Manager","Departmental Director","Departmental Manager","Employee","Staff");
+  if(["GENERAL","GENERAL_MEETING"].includes(category)||hasType("General","General Meeting"))return profiles.some(activeProfile)||roleIn("Executive Director","Departmental Director","Departmental Manager","Board Member");
+  if(["OTHER","OTHER_MEETING"].includes(category)||hasType("Other","Other Meeting"))return roleIn("Executive Director","Departmental Director","Departmental Manager","Operations Manager");
+  return false;
+ };
+ const snap=await db.collection("meetings").get();
+ const meetings=snap.docs.map(d=>({id:d.id,...(d.data()||{})})).filter(m=>{
+  if(isAdmin)return true;
+  const uidFields=["initiatorUid","createdByUid","chairpersonUid","secretaryUid"];
+  if(uidFields.some(k=>text(m[k])===uid))return true;
+  if(email&&["initiatorEmail","chairpersonEmail","secretaryEmail"].some(k=>text(m[k]).toLowerCase()===email))return true;
+  if(["participantUids","attendeeUids","memberUids","invitedUids","subscriberUids"].some(k=>Array.isArray(m[k])&&m[k].includes(uid)))return true;
+  if(email&&["participantEmails","attendeeEmails","invitedEmails","subscriberEmails"].some(k=>Array.isArray(m[k])&&m[k].some(v=>text(v).toLowerCase()===email)))return true;
+  return roleCategory(m);
+ }).sort((a,b)=>{const time=v=>v?.toMillis?v.toMillis():typeof v==="number"?v:Date.parse(v||"")||0;return time(b.createdAt)-time(a.createdAt);});
+ await db.collection("audit").add({action:"ACCESSIBLE_MEETING_REGISTER_LISTED",collection:"meetings",details:{count:meetings.length,admin:isAdmin},actorUid:uid,actorEmail:email,createdAt:FieldValue.serverTimestamp()});
+ return {meetings};
+});
+
 exports.listMeetingInviteCandidates=onCall({region:"us-central1",timeoutSeconds:30},async request=>{
  const uid=request.auth?.uid;if(!uid)throw new HttpsError("unauthenticated","Authentication is required.");
  const meetingId=text(request.data?.meetingId);if(!meetingId)throw new HttpsError("invalid-argument","Meeting ID is required.");
  const meetingSnap=await db.collection("meetings").doc(meetingId).get();if(!meetingSnap.exists)throw new HttpsError("not-found","Meeting was not found.");
  const meeting=meetingSnap.data()||{},email=text(request.auth?.token?.email).toLowerCase();
- const authorised=await activeAdmin(request)||text(meeting.initiatorUid)===uid||text(meeting.chairpersonUid)===uid||text(meeting.secretaryUid)===uid||text(meeting.chairpersonEmail).toLowerCase()===email||text(meeting.secretaryEmail).toLowerCase()===email;
- if(!authorised)throw new HttpsError("permission-denied","Only the meeting initiator, authorised chairperson/secretary or active administrator may access invitation candidates.");
+ const registrarRoles=new Set(["executive director","director internal oversight","director finance & administration","director human resources","hr director","operations manager","departmental director","departmental manager","director outreach","director community development","director livestock","director environment","director field department","board secretary","secretary to the board","meeting secretary"]);
+ const [ownMember,ownEmployee,emailMembers,emailEmployees]=await Promise.all([
+  db.collection("members").doc(uid).get(),db.collection("employees").doc(uid).get(),
+  email?db.collection("members").where("email","==",email).limit(2).get():Promise.resolve({docs:[]}),
+  email?db.collection("employees").where("email","==",email).limit(2).get():Promise.resolve({docs:[]})
+ ]);
+ const profiles=[...(ownMember.exists?[ownMember.data()]:[]),...(ownEmployee.exists?[ownEmployee.data()]:[]),...emailMembers.docs.map(d=>d.data()),...emailEmployees.docs.map(d=>d.data())];
+ const profileActive=d=>{const statuses=[d?.status,d?.employmentStatus,d?.registrationStatus].map(v=>text(v).toLowerCase()).filter(Boolean);return !statuses.some(v=>["inactive","terminated","suspended","deleted","cancelled","canceled","archived"].includes(v))&&statuses.some(v=>["active","activated"].includes(v));};
+ const profileRoles=d=>[d?.role,d?.title,d?.position,d?.departmentalRole,...(Array.isArray(d?.roles)?d.roles:[]),...(Array.isArray(d?.assignedRoles)?d.assignedRoles:[]),...(Array.isArray(d?.selectedRoles)?d.selectedRoles:[]),...(Array.isArray(d?.roleAssignments)?d.roleAssignments:[])].map(v=>text(v).toLowerCase());
+ const claims=Array.isArray(request.auth?.token?.irpaRoles)?request.auth.token.irpaRoles.map(v=>text(v).toLowerCase()):[];
+ const registrar=profiles.some(d=>profileActive(d)&&profileRoles(d).some(r=>registrarRoles.has(r)))||claims.some(r=>registrarRoles.has(r));
+ const authorised=await activeAdmin(request)||registrar||text(meeting.initiatorUid)===uid||text(meeting.chairpersonUid)===uid||text(meeting.secretaryUid)===uid||text(meeting.chairpersonEmail).toLowerCase()===email||text(meeting.secretaryEmail).toLowerCase()===email;
+ if(!authorised)throw new HttpsError("permission-denied","Only an authorised meeting registrar, meeting initiator, chairperson, secretary or active administrator may access invitation candidates.");
  const [memberSnap,employeeSnap]=await Promise.all([db.collection("members").get(),db.collection("employees").get()]);
- const activeRecord=row=>{const statuses=[row.status,row.employmentStatus,row.registrationStatus].map(v=>text(v).toLowerCase()).filter(Boolean);if(statuses.some(v=>["inactive","terminated","suspended","deleted","cancelled","canceled","archived"].includes(v)))return false;return statuses.some(v=>["active","activated"].includes(v));};
  const clean=(doc,type)=>{
   const row=doc.data()||{},candidateEmail=text(row.email||row.emailAddress||row.contactEmail).toLowerCase();
-  if(!activeRecord(row)||!candidateEmail)return null;
-  return {id:doc.id,name:text(row.name||row.fullName||row.memberName||row.employeeName||row.displayName)||candidateEmail,email:candidateEmail,role:text(row.role||type),memberType:text(row.memberType||row.employeeType||type),department:text(row.department),status:text(row.status||row.employmentStatus||row.registrationStatus),uid:text(row.uid||row.authUid||row.userUid),memberNumber:text(row.memberNumber||row.registrationNumber),employeeNumber:text(row.employeeNumber),boardMember:row.boardMember===true||Boolean(row.boardPosition)||text(row.department)==="Board of Directors"||text(row.role)==="Board Member",boardPosition:text(row.boardPosition)};
+  if(!profileActive(row)||!candidateEmail)return null;
+  return {id:doc.id,name:text(row.name||row.fullName||row.memberName||row.employeeName||row.displayName)||candidateEmail,email:candidateEmail,role:text(row.role||row.title||row.position||row.departmentalRole||type),memberType:text(row.memberType||row.employeeType||type),department:text(row.department),status:text(row.status||row.employmentStatus||row.registrationStatus),uid:text(row.uid||row.authUid||row.userUid),memberNumber:text(row.memberNumber||row.registrationNumber),employeeNumber:text(row.employeeNumber),boardMember:row.boardMember===true||Boolean(row.boardPosition)||text(row.department)==="Board of Directors"||text(row.role)==="Board Member",boardPosition:text(row.boardPosition)};
  };
  const members=memberSnap.docs.map(d=>clean(d,"Member")).filter(Boolean);
  const employees=employeeSnap.docs.map(d=>clean(d,"Employee")).filter(Boolean);
  await db.collection("audit").add({action:"MEETING_INVITATION_CANDIDATES_ACCESSED",collection:"meetings",recordId:meetingId,details:{memberCandidateCount:members.length,employeeCandidateCount:employees.length},actorUid:uid,actorEmail:email,createdAt:FieldValue.serverTimestamp()});
  return {members,employees,source:"AUTHORITATIVE_REGISTERS",meetingId};
 });
-
 exports.resolveMeetingEntryRequest=onCall({region:"us-central1",timeoutSeconds:30},async request=>{
  const uid=request.auth?.uid;if(!uid)throw new HttpsError("unauthenticated","Authentication is required.");
  const requestId=text(request.data?.requestId),decision=text(request.data?.decision).toUpperCase();
@@ -192,10 +241,10 @@ exports.listMeetingInviteeDirectory=onCall({region:"us-central1",timeoutSeconds:
  const [mu,eu,me,ee]=await Promise.all([db.collection("members").doc(uid).get(),db.collection("employees").doc(uid).get(),email?db.collection("members").where("email","==",email).limit(2).get():Promise.resolve({docs:[]}),email?db.collection("employees").where("email","==",email).limit(2).get():Promise.resolve({docs:[]})]);
  const candidates=[...(mu.exists?[mu.data()]:[]),...(eu.exists?[eu.data()]:[]),...me.docs.map(x=>x.data()),...ee.docs.map(x=>x.data())];
  const roles=d=>[d?.role,d?.title,d?.position,d?.departmentalRole,...(Array.isArray(d?.roles)?d.roles:[]),...(Array.isArray(d?.assignedRoles)?d.assignedRoles:[]),...(Array.isArray(d?.selectedRoles)?d.selectedRoles:[]),...(Array.isArray(d?.roleAssignments)?d.roleAssignments:[])].map(x=>text(x).toLowerCase());
- const active=d=>["active","activated"].includes(text(d?.status||d?.employmentStatus||d?.registrationStatus).toLowerCase());
+ const active=d=>{const statuses=[d?.status,d?.employmentStatus,d?.registrationStatus].map(v=>text(v).toLowerCase()).filter(Boolean);if(statuses.some(v=>["inactive","terminated","suspended","deleted","cancelled","canceled","archived"].includes(v)))return false;return statuses.some(v=>["active","activated"].includes(v));};
  const registrar=candidates.some(d=>active(d)&&roles(d).some(r=>allowed.has(r))),claims=Array.isArray(request.auth?.token?.irpaRoles)?request.auth.token.irpaRoles.map(x=>text(x).toLowerCase()):[];
  if(!isAdmin&&!registrar&&!claims.some(r=>allowed.has(r)))throw new HttpsError("permission-denied","Only an authorised meeting registrar can load the meeting invitee directory.");
  const [members,employees]=await Promise.all([db.collection("members").get(),db.collection("employees").get()]);
- const project=(snap,kind)=>snap.docs.map(s=>{const d=s.data()||{},status=text(d.status||d.employmentStatus||d.registrationStatus);if(!["active","activated"].includes(status.toLowerCase()))return null;const board=d.boardMember===true||text(d.role).toLowerCase()==="board member"||Boolean(d.boardPosition)||text(d.department)==="Board of Directors";if(kind==="board"&&!board||kind==="member"&&board)return null;return {id:s.id,uid:text(d.uid||d.authUid||d.userUid),name:text(d.name||d.fullName||d.memberName||d.displayName),email:text(d.email||d.emailAddress||d.contactEmail).toLowerCase(),memberNumber:text(d.memberNumber||d.registrationNumber),employeeNumber:text(d.employeeNumber),role:text(d.role),roles:Array.isArray(d.roles)?d.roles:[],boardMember:d.boardMember===true,boardPosition:text(d.boardPosition),department:text(d.department),memberType:text(d.memberType),status,employmentStatus:text(d.employmentStatus),registrationStatus:text(d.registrationStatus),title:text(d.title),position:text(d.position),departmentalRole:text(d.departmentalRole)}}).filter(Boolean);
+ const project=(snap,kind)=>snap.docs.map(s=>{const d=s.data()||{},statuses=[d.status,d.employmentStatus,d.registrationStatus].map(v=>text(v).toLowerCase()).filter(Boolean);if(statuses.some(v=>["inactive","terminated","suspended","deleted","cancelled","canceled","archived"].includes(v))||!statuses.some(v=>["active","activated"].includes(v)))return null;const status=text(d.status)||text(d.employmentStatus)||text(d.registrationStatus);const board=d.boardMember===true||text(d.role).toLowerCase()==="board member"||Boolean(d.boardPosition)||text(d.department)==="Board of Directors";if(kind==="board"&&!board||kind==="member"&&board)return null;return {id:s.id,uid:text(d.uid||d.authUid||d.userUid),name:text(d.name||d.fullName||d.memberName||d.employeeName||d.displayName)||text(d.email||d.emailAddress||d.contactEmail),email:text(d.email||d.emailAddress||d.contactEmail).toLowerCase(),memberNumber:text(d.memberNumber||d.registrationNumber),employeeNumber:text(d.employeeNumber),role:text(d.role||d.title||d.position||d.departmentalRole),roles:Array.isArray(d.roles)?d.roles:[],boardMember:d.boardMember===true,boardPosition:text(d.boardPosition),department:text(d.department),memberType:text(d.memberType||d.employeeType),status,employmentStatus:text(d.employmentStatus),registrationStatus:text(d.registrationStatus),title:text(d.title),position:text(d.position),departmentalRole:text(d.departmentalRole)}}).filter(Boolean);
  return {boardMembers:project(members,"board"),members:project(members,"member"),employees:project(employees,"employee")};
 });

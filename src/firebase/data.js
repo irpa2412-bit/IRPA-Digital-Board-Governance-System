@@ -45,73 +45,12 @@ export async function getRecord(collectionName,id){const s=await getDoc(doc(db,c
 export async function getRecords(collectionName){const s=await getDocs(query(collection(db,collectionName),orderBy("createdAt","desc")));return s.docs.map(x=>({id:x.id,...x.data()}));}
 export async function getFinanceTrialRecords(collectionName){const ref=collection(db,collectionName);const queries=[query(ref,where("recordOrigin","==","TRIAL")),query(ref,where("trialData","==",true)),query(ref,where("isTrial","==",true))];const results=await Promise.all(queries.map(q=>getDocs(q)));const byId=new Map();for(const snap of results){for(const item of snap.docs){const data=item.data()||{};if(String(data.recordOrigin||"").toUpperCase()==="TRIAL"||data.trialData===true||data.isTrial===true)byId.set(item.id,{id:item.id,...data});}}return[...byId.values()].sort((a,b)=>{const at=a.createdAt?.toMillis?a.createdAt.toMillis():Date.parse(a.createdAt||"")||0;const bt=b.createdAt?.toMillis?b.createdAt.toMillis():Date.parse(b.createdAt||"")||0;return bt-at;});}
 export async function getAccessibleMeetingRecords(){
-  const user=auth.currentUser;
-  if(!user?.uid)throw new Error("Sign in to view the meeting register.");
-  const email=String(user.email||"").trim().toLowerCase();
-  const [member,employee,token,adminProfile]=await Promise.all([
-    getCurrentMemberProfile().catch(()=>null),
-    getCurrentEmployeeProfile().catch(()=>null),
-    user.getIdTokenResult().catch(()=>null),
-    getRecord(COLLECTIONS.adminProfiles,user.uid).catch(()=>null)
-  ]);
-  const activeStatus=record=>["active","activated"].includes(String(record?.status||record?.employmentStatus||record?.registrationStatus||"").trim().toLowerCase());
-  const activeMember=!!member&&activeStatus(member);
-  const activeEmployee=!!employee&&activeStatus(employee);
-  const isAdmin=email==="irpa2412@gmail.com"||token?.claims?.admin===true||adminProfile?.active===true;
-  const profiles=[member||{},employee||{}];
-  const roles=[...new Set(profiles.flatMap(p=>[
-    p.role,p.title,p.position,p.departmentalRole,p.boardPosition,
-    ...(Array.isArray(p.roles)?p.roles:[]),
-    ...(Array.isArray(p.assignedRoles)?p.assignedRoles:[]),
-    ...(Array.isArray(p.selectedRoles)?p.selectedRoles:[]),
-    ...(Array.isArray(p.roleAssignments)?p.roleAssignments:[]),
-    ...(Array.isArray(token?.claims?.irpaRoles)?token.claims.irpaRoles:[])
-  ]).map(v=>String(v||"").trim()).filter(Boolean))];
-  const identity={...(member||employee||{}),uid:user.uid,email,active:activeMember||activeEmployee,isAdmin,activeMember,activeEmployee,roles};
-  if(isTrialDataMode()){
-    /* Trial workflows need the real meeting register as reference context, plus trial meetings created for testing. */
-    const [actualMeetings,trialMeetings]=await Promise.all([
-      getDocs(collection(db,COLLECTIONS.meetings)),
-      getFinanceTrialRecords(COLLECTIONS.meetings)
-    ]);
-    const byId=new Map();
-    for(const snap of actualMeetings.docs){const data=snap.data()||{};byId.set(snap.id,{id:snap.id,...data});}
-    for(const meeting of trialMeetings)byId.set(meeting.id,meeting);
-    const availableMeetings=[...byId.values()];
-    if(isAdmin)return availableMeetings.sort((a,b)=>meetingCreatedAt(b)-meetingCreatedAt(a));
-    return availableMeetings.filter(m=>canAccessMeetingCategory(m,identity,{
-      isInitiator:String(m.initiatorUid||"")===uid,
-      isInvited:["participantUids","attendeeUids","memberUids","invitedUids","subscriberUids"].some(k=>Array.isArray(m[k])&&m[k].includes(uid))||
-        (email&&["participantEmails","attendeeEmails","invitedEmails","subscriberEmails"].some(k=>Array.isArray(m[k])&&m[k].map(v=>String(v||"").toLowerCase()).includes(email))),
-      isRegisteredParticipant:["participantUids","attendeeUids","memberUids","subscriberUids"].some(k=>Array.isArray(m[k])&&m[k].includes(uid))
-    })).sort((a,b)=>meetingCreatedAt(b)-meetingCreatedAt(a));
-  }
-  const ref=collection(db,COLLECTIONS.meetings);
-  const jobs=[];
-  if(isAdmin){
-    const all=await getDocs(ref);
-    return all.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>meetingCreatedAt(b)-meetingCreatedAt(a));
-  }
-  for(const policy of Object.values(MEETING_CATEGORIES)){
-    if(!canAccessMeetingCategory({meetingCategory:policy.id,meetingPolicyId:policy.id},identity))continue;
-    jobs.push(query(ref,where("meetingCategory","==",policy.id)));
-    jobs.push(query(ref,where("meetingPolicyId","==",policy.id)));
-    for(const type of policy.meetingTypes)jobs.push(query(ref,where("meetingType","==",type)));
-  }
-  const uid=user.uid;
-  // Always query the authenticated initiator's own meetings, independently of category access roles.
-  jobs.push(query(ref,where("initiatorUid","==",uid)));
-  for(const field of ["participantUids","attendeeUids","memberUids","invitedUids","subscriberUids"])jobs.push(query(ref,where(field,"array-contains",uid)));
-  if(email)for(const field of ["participantEmails","attendeeEmails","invitedEmails","subscriberEmails"])jobs.push(query(ref,where(field,"array-contains",email)));
-  const results=await Promise.all(jobs.map(q=>getDocs(q).catch(()=>null)));
-  const records=new Map();
-  results.forEach(s=>s?.docs?.forEach(d=>records.set(d.id,{id:d.id,...d.data()})));
-  return [...records.values()].filter(m=>canAccessMeetingCategory(m,identity,{
-    isInitiator:String(m.initiatorUid||"")===uid,
-    isInvited:["participantUids","attendeeUids","memberUids","invitedUids","subscriberUids"].some(k=>Array.isArray(m[k])&&m[k].includes(uid))||
-      (email&&["participantEmails","attendeeEmails","invitedEmails","subscriberEmails"].some(k=>Array.isArray(m[k])&&m[k].map(v=>String(v||"").toLowerCase()).includes(email))),
-    isRegisteredParticipant:["participantUids","attendeeUids","memberUids","subscriberUids"].some(k=>Array.isArray(m[k])&&m[k].includes(uid))
-  })).sort((a,b)=>meetingCreatedAt(b)-meetingCreatedAt(a));
+ const user=auth.currentUser;
+ if(!user?.uid)throw new Error("Sign in to view the meeting register.");
+ const call=httpsCallable(getFunctions(undefined,"us-central1"),"listAccessibleMeetingRecords");
+ const result=await call({});
+ const meetings=Array.isArray(result?.data?.meetings)?result.data.meetings:[];
+ return meetings.sort((a,b)=>meetingCreatedAt(b)-meetingCreatedAt(a));
 }
 function meetingCreatedAt(record={}){const value=record.createdAt;return typeof value?.toMillis==="function"?value.toMillis():typeof value==="number"?value:Date.parse(value||"")||0;}
 
