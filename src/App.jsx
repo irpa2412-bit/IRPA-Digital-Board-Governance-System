@@ -503,34 +503,56 @@ function Shell({user,profile,admin,employee,inductionComplete,onInductionComplet
 if(!verifiedAuthority){const activeStatus=[profile?.status,profile?.employmentStatus,profile?.registrationStatus].map(v=>String(v||"").trim().toLowerCase());const activeIdentity=activeStatus.some(v=>["active","activated"].includes(v))||admin?.active===true;const roleDeclared=authorityCategories.includes(role)||authorityRecords.some(a=>a?.active!==false&&String(a.role||"").trim()===role)||roleValues(profile?.roles||profile?.role).includes(role)||roleValues(employee?.roles||employee?.role).includes(role)||role==="Administrator";if(!activeIdentity||!roleDeclared)throw new Error("This access authority could not be verified for the current authenticated IRPA identity. Please sign in again.");verifiedAuthority={...authority,authorityId,id:authorityId,role,active:true,verificationMode:"authenticated-identity-fallback"};}
 try{window.sessionStorage.setItem("irpaActiveAccessAuthority",role);window.sessionStorage.setItem("irpaActiveAccessAuthorityId",authorityId);window.sessionStorage.setItem("irpaActiveAccessAuthorityRecord",JSON.stringify(verifiedAuthority));window.sessionStorage.removeItem("irpaPendingAccessAuthority");window.sessionStorage.setItem("irpaAccessAuthoritySelectionState",verifiedAuthority.verificationMode==="authenticated-identity-fallback"?"IDENTITY_VERIFIED_FALLBACK":"SERVER_VERIFIED");}catch{}setStoredAuthority(role);setActiveAuthorityLoginRequired(false);};useEffect(()=>{if(sessionAdministrator||!selectedAuthority)return;try{window.sessionStorage.setItem("irpaActiveAccessAuthority",selectedAuthority);window.sessionStorage.removeItem("irpaPendingAccessAuthority")}catch{}},[admin,selectedAuthority]);const[activeAuthorityLoginRequired,setActiveAuthorityLoginRequired]=useState(false);const effectiveAuthority=sessionAdministrator?"ADMINISTRATOR":selectedAuthority;const authorityProfile=selectedAuthority?{roles:[selectedAuthority],role:selectedAuthority}:null;const authorityEmployee=selectedAuthority&&employee&&(roleValues(employee?.roles||employee?.role).includes(selectedAuthority)||IT_ROLES.includes(selectedAuthority))?{...employee,roles:[selectedAuthority],role:selectedAuthority}:null;const financePortalAccess=sessionAdministrator||isFinancePortalMember(authorityProfile,authorityEmployee);const meetingInviteSession=useMemo(()=>{try{const c=JSON.parse(window.sessionStorage.getItem("irpaMeetingEntryContext")||"null");return Boolean(c?.meetingId&&c?.participantId&&window.sessionStorage.getItem("irpaMeetingGatewayTarget")===c.meetingId)}catch{return false}},[]);const portalAccessFrozen=!sessionAdministrator&&!selectedAuthority&&!meetingInviteSession;const[gateBypassPortal,setGateBypassPortal]=useState("");const requestDataGate=target=>{if(!target)return;setGateBypassPortal("");setActive(target)};const navigateWithoutDataGate=target=>{if(!target)return;setGateBypassPortal(target);setActive(target)};const handlePortalDataEntryIntent=e=>{const target=e?.target;if(!target||!gateBypassPortal||gateBypassPortal!==active)return;const field=target.closest?.("input:not([type=button]):not([type=submit]):not([type=reset]),textarea,select,[contenteditable=true]");const button=target.closest?.("button");const actionLabel=(button?.getAttribute("aria-label")||button?.textContent||"").replace(/\\s+/g," ").trim();const mutatingAction=/\\b(add|create|save|submit|update|delete|remove|edit|upload|import|approve|reject|send|publish|register|record|confirm|issue|archive|restore|process|pay|transfer|sign|assign|invite|new)\\b/i.test(actionLabel);if(field||mutatingAction)setGateBypassPortal("");};const navigateWithWorkflowContext=(target,context={})=>{try{const payload=context&&typeof context==="object"?Object.fromEntries(Object.entries(context).filter(([,value])=>value!==undefined&&value!==null&&String(value).trim()!=="")):{};if(Object.keys(payload).length)window.sessionStorage.setItem("irpaWorkflowContext",JSON.stringify({module:target,...payload,updatedAt:new Date().toISOString()}));else window.sessionStorage.removeItem("irpaWorkflowContext")}catch{}requestDataGate(target)};const[recoverySnapshot,setRecoverySnapshot]=useState(()=>readIrpaRecovery());const[recoveryMessage,setRecoveryMessage]=useState("");const[mobileNav,setMobileNav]=useState("");const[mobileTimeFormat,setMobileTimeFormat]=useState(()=>{try{return window.localStorage.getItem("irpa-mobile-time-format")==="12h"?"12h":"24h"}catch{return"24h"}});const[shellLiveNow,setShellLiveNow]=useState(()=>new Date());useEffect(()=>{const clockId=setInterval(()=>setShellLiveNow(new Date()),1000);return()=>clearInterval(clockId)},[]);const toggleMobileTimeFormat=()=>setMobileTimeFormat(previous=>{const next=previous==="24h"?"12h":"24h";try{window.localStorage.setItem("irpa-mobile-time-format",next)}catch{}return next});const liveDate=new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Nairobi",day:"2-digit",month:"long",year:"numeric"}).format(shellLiveNow);const liveDay=new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Nairobi",weekday:"long"}).format(shellLiveNow);const liveTime=new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Nairobi",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:mobileTimeFormat==="12h"}).format(shellLiveNow);const itPortalAccess=sessionAdministrator||IT_ROLES.includes(selectedAuthority);const procurementPortalAccess=sessionAdministrator||Boolean(selectedAuthority);const portalRestrictedDocumentUpload=sessionAdministrator||[...(Array.isArray(profile?.specialPermissions)?profile.specialPermissions:[]),...(Array.isArray(profile?.permissions)?profile.permissions:[]),...(Array.isArray(employee?.specialPermissions)?employee.specialPermissions:[]),...(Array.isArray(employee?.permissions)?employee.permissions:[])].map(v=>String(v||"").trim().toUpperCase()).includes("RESTRICTED_DOCUMENT_UPLOAD");const signatureProfileAccess=!sessionAdministrator&&(profile?.status==="Active"||employee?.status==="Active"||employee?.employmentStatus==="Active"||employee?.registrationStatus==="Activated");const meetingProfileAccess=!sessionAdministrator&&(profile?.status==="Active"||employee?.status==="Active"||employee?.employmentStatus==="Active"||employee?.registrationStatus==="Activated");const[active,setActive]=useState(()=>{const params=new URLSearchParams(window.location.search);const requested=params.get("adminModule");const induction=params.get("induction")==="1";return sessionAdministrator&&requested&&ALL_MODULES.includes(requested)?requested:induction?"Induction and Orientation":meetingInviteSession?"Meeting Room":(IT_ROLES.includes(selectedAuthority)?"IT Operations":"Dashboard")}),meetingPortalModules=["Dashboard","Meetings","Meeting Room",...(selectedAuthority?memberModules(profile,employee,selectedAuthority).filter(module=>["Participants","Resolutions","Voting","Actions","Decisions"].includes(module)):authorityCategories.some(role=>["Board Member","Board Chairperson","Board Committee Member","Board Secretary","Board Treasurer","Board Vice Chairperson"].includes(role))?["Participants","Resolutions","Voting","Actions","Decisions"]:[])],modules=sessionAdministrator?ALL_MODULES:(meetingInviteSession?meetingPortalModules:portalAccessFrozen?["Dashboard"]:memberModules(profile,employee,selectedAuthority));
 // Focus the actual destination workspace after portal changes, not the global header or navigation controls.
-// Explicitly adjust the nearest scrollable container; nested portal layouts do not always honor scrollIntoView.
 useEffect(()=>{
   let firstFrame=0;
   let secondFrame=0;
+  let retryTimer=0;
+  let observer=null;
   const alignWorkspace=()=>{
     const workspace=document.querySelector("#root .app-shell .main-area > .content-area #portal-workspace-content");
-    if(!workspace)return;
-    const rect=workspace.getBoundingClientRect();
+    if(!workspace)return false;
+    let rect=workspace.getBoundingClientRect();
     let ancestor=workspace.parentElement;
-    let scrolled=false;
-    while(ancestor&&ancestor!==document.body&&ancestor!==document.documentElement){
-      const style=window.getComputedStyle(ancestor);
-      if(/auto|scroll|overlay|hidden/.test(style.overflowY)&&ancestor.scrollHeight>ancestor.clientHeight+1){
+    while(ancestor&&ancestor!==document.body&&ancestor!==document.documentElement&&Math.abs(rect.top)>40){
+      if(ancestor.scrollHeight>ancestor.clientHeight+1){
+        const before=rect.top;
         ancestor.scrollTop+=rect.top-16;
-        scrolled=true;
-        break;
+        rect=workspace.getBoundingClientRect();
+        if(Math.abs(rect.top-before)>1&&Math.abs(rect.top)<=40)break;
       }
       ancestor=ancestor.parentElement;
     }
-    if(!scrolled)window.scrollBy({top:rect.top-16,left:0,behavior:"auto"});
+    if(Math.abs(rect.top)>40){
+      const scroller=document.scrollingElement;
+      if(scroller&&scroller.scrollHeight>scroller.clientHeight+1){
+        scroller.scrollTop+=rect.top-16;
+        rect=workspace.getBoundingClientRect();
+      }
+    }
+    if(Math.abs(rect.top)>40){
+      window.scrollBy({top:rect.top-16,left:0,behavior:"auto"});
+      rect=workspace.getBoundingClientRect();
+    }
     workspace.focus({preventScroll:true});
+    return Math.abs(rect.top)<=40;
   };
   firstFrame=window.requestAnimationFrame(()=>{
-    secondFrame=window.requestAnimationFrame(alignWorkspace);
+    secondFrame=window.requestAnimationFrame(()=>{
+      if(!alignWorkspace()){
+        const root=document.querySelector("#root .app-shell .main-area");
+        if(root&&window.MutationObserver){
+          observer=new MutationObserver(()=>{if(alignWorkspace()){observer?.disconnect();observer=null;}});
+          observer.observe(root,{childList:true,subtree:true});
+        }
+        retryTimer=window.setTimeout(()=>{alignWorkspace();observer?.disconnect();observer=null;},180);
+      }
+    });
   });
   return()=>{
     window.cancelAnimationFrame(firstFrame);
     window.cancelAnimationFrame(secondFrame);
+    window.clearTimeout(retryTimer);
+    observer?.disconnect();
   };
 },[active,user?.uid,sessionAdministrator]);
 useEffect(()=>{
