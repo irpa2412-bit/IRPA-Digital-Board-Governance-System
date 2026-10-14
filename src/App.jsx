@@ -507,16 +507,27 @@ try{window.sessionStorage.setItem("irpaActiveAccessAuthority",role);window.sessi
 useEffect(()=>{
   let firstFrame=0;
   let secondFrame=0;
+  let alignFrame=0;
   firstFrame=window.requestAnimationFrame(()=>{
     secondFrame=window.requestAnimationFrame(()=>{
       const workspace=document.querySelector("#root .app-shell .main-area > .content-area");
       if(!workspace)return;
       workspace.scrollIntoView({block:"start",behavior:"auto"});
+      // scrollIntoView can leave a residual offset in tablet layouts after the
+      // topbar reflows. Correct the actual post-layout geometry, not a guessed
+      // fixed scroll amount, so navigation lands on the workspace consistently.
+      alignFrame=window.requestAnimationFrame(()=>{
+        const current=document.querySelector("#root .app-shell .main-area > .content-area");
+        if(!current)return;
+        const top=current.getBoundingClientRect().top;
+        if(Math.abs(top)>12)window.scrollBy({top:top-12,left:0,behavior:"auto"});
+      });
     });
   });
   return()=>{
     window.cancelAnimationFrame(firstFrame);
     window.cancelAnimationFrame(secondFrame);
+    window.cancelAnimationFrame(alignFrame);
   };
 },[active]);
 useEffect(()=>{
