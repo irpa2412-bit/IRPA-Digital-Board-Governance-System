@@ -2,7 +2,7 @@ import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, orderBy, query, ru
 import { auth, db, applicantAuth, applicantDb, applicantApp } from "./config";
 import { sendEmployeeRegistrationEmail } from "./auth";
 import { getFunctions, httpsCallable } from "firebase/functions";
-import { canAccessMeetingCategory, MEETING_CATEGORIES } from "./meetingPolicy.js";
+import { canAccessMeetingCategory, canReadFullMeetingRegister, MEETING_CATEGORIES } from "./meetingPolicy.js";
 
 const uniqueInductionValues=(values)=>[...new Set(values.flatMap(v=>Array.isArray(v)?v:String(v||"").split(",")).map(v=>String(v||"").trim()).filter(Boolean))];
 
@@ -86,7 +86,7 @@ export async function getAccessibleMeetingRecords(){
   // Only active institutional identities and administrators may read the full register.
   // Other authenticated users must be scoped to categories, initiation, or explicit invitation below.
   const ref=collection(db,COLLECTIONS.meetings);
-  if(activeMember||activeEmployee||isAdmin){
+  if(canReadFullMeetingRegister({activeMember,activeEmployee,isAdmin})){
     const all=await getDocs(ref);
     return all.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>meetingCreatedAt(b)-meetingCreatedAt(a));
   }
