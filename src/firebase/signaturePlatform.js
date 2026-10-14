@@ -352,6 +352,8 @@ export async function syncGatewaySigningMirror(envelopeId,gatewayStatus){
   const envelope={id:snap.id,...snap.data()};
   if(!Array.isArray(envelope.participantUids)||!envelope.participantUids.includes(u.uid))throw new Error("You are not assigned to this Signature Portal envelope.");
   if(!envelope.gatewayEnvelopeId||envelope.gatewayEnvelopeId!==gatewayStatus.envelopeId)throw new Error("The Gateway envelope ID does not match the linked Signature Portal record.");
+  if(envelope.gatewayOriginalHash&&gatewayStatus.documentHash!==envelope.gatewayOriginalHash)throw new Error("The Gateway source PDF hash does not match the linked Signature Portal document.");
+  if(gatewayStatus.status==="Completed"&&(!gatewayStatus.completion?.finalHash||!Array.isArray(gatewayStatus.completion?.cryptographicEvidenceIds)||gatewayStatus.completion.cryptographicEvidenceIds.length===0))throw new Error("The Gateway completion record has no verified PDF hash or cryptographic evidence reference.");
   const gatewaySigners=Array.isArray(gatewayStatus.signers)?gatewayStatus.signers:[];
   const recipients=(envelope.recipients||[]).map(recipient=>{
     const signer=gatewaySigners.find(item=>item.uid&&item.uid===recipient.uid);
