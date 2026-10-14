@@ -11,6 +11,12 @@ test("portal changes focus the viewport on the destination workspace", () => {
   );
 });
 
+test("portal changes scroll to and focus the actual portal body below navigation controls", () => {
+  assert.match(source, /workspace\\.focus\\(\\{preventScroll:true\\}\\)/);
+  assert.match(source, /<div id="portal-workspace-content" className="portal-workspace-content" tabIndex={-1}>/);
+  assert.match(source, /EmployeePayments profile=\\{\\{\\.\\.\\.profile,\\.\\.\\.employee\\}\\}\\/>\\}<\\/div><\\/main>/);
+});
+
 test("navigation focus is scoped to the main workspace, not the global header", () => {
   assert.match(source, /#root \.app-shell \.main-area > \.content-area #portal-workspace-content/);
   assert.doesNotMatch(source, /window\.scrollTo\(\s*0\s*,\s*0\s*\)/);
