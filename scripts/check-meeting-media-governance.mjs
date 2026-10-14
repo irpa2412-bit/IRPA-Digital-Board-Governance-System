@@ -25,7 +25,7 @@ const livekitWorkflow=fs.readFileSync(".github/workflows/deploy-livekit-staging.
 const checks=[
  ["Registration buttons expose meeting initiation to individual signed-in profiles",meetingsCentre.includes("function startCreate(){if(!canRegisterMeeting(")&&meetingsCentre.includes("uid:auth.currentUser?.uid||actorIdentity.uid")],
  ["Released meeting edits remain administrator-only",meetingsCentre.includes("if(editing&&!canEditMeeting(editing,{...actorIdentity,isAdmin:admin}))")&&meetingsCentre.includes("function edit(m){if(!canEditMeeting(m,{...actorIdentity,isAdmin:admin}))")&&meetingsCentre.includes("released. Only an authorised administrator may edit it.")],
- ["Firestore create permits signed-in individual initiators while enforcing registration controls",fs.readFileSync("firestore.rules","utf8").includes('allow create:if meetingUser()&&request.resource.data.get("initiatorUid","")==request.auth.uid&&validMeetingCategory(request.resource.data)')],
+ ["Firestore create permits signed-in individual initiators while enforcing registration controls",fs.readFileSync("firestore.rules","utf8").includes('allow create:if signedIn()&&request.resource.data.get("initiatorUid","")==request.auth.uid&&validMeetingCategory(request.resource.data)')],
  ["Meeting media client exists",fs.existsSync("src/components/IRPADGBSMeetingRoomMedia.jsx")],
  ["Participant invitation creates a meeting access pass",participantPage.includes("createMeetingAccessInvitation")&&participantPage.includes("meetingAccess")],
  ["Meeting access pass is sent through the authenticated IRPA mail gateway",participantPage.includes("sendMemberInvitationEmail(payload.participantEmail,invitationId,payload.participantRole,payload.memberType,meetingAccess)")],
