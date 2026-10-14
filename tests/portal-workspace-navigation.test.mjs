@@ -30,8 +30,10 @@ test("scheduled viewport work and mutation observers are cleaned up on portal ch
   assert.ok(source.includes('},[active,user?.uid,sessionAdministrator]);'));
 });
 
-test("navigation repair remains presentation-only and leaves access-gate routing in place", () => {
-  assert.match(source, /const requestDataGate=target=>\{if\(!target\)return;setGateBypassPortal\(""\);setActive\(target\)\}/);
-  assert.match(source, /const navigateWithoutDataGate=target=>\{if\(!target\)return;setGateBypassPortal\(target\);setActive\(target\)\}/);
+test("navigation repair preserves data-gate routing and schedules destination focus", () => {
+  assert.match(source, /const requestDataGate=target=>\\{if\\(!target\\)return;setGateBypassPortal\\("\\"\\);setActive\\(target\\);scheduleDestinationFocus\\(\\)\\}/);
+  assert.match(source, /const navigateWithoutDataGate=target=>\\{if\\(!target\\)return;setGateBypassPortal\\(target\\);setActive\\(target\\);scheduleDestinationFocus\\(\\)\\}/);
   assert.match(source, /const handlePortalDataEntryIntent=/);
+  assert.ok(source.includes('onNavigate={requestDataGate}'));
+  assert.ok(source.includes('setActive={requestDataGate}'));
 });
