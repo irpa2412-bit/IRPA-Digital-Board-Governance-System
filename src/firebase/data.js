@@ -83,11 +83,10 @@ export async function getAccessibleMeetingRecords(){
     ...(Array.isArray(token?.claims?.irpaRoles)?token.claims.irpaRoles:[])
   ]).map(v=>String(v||"").trim()).filter(Boolean))];
   const identity={...(member||employee||{}),uid:user.uid,email,active:activeMember||activeEmployee,isAdmin,activeMember,activeEmployee,roles};
-  // Institutional registers are read-only directory/reference views for active members and employees.
-  // Category controls continue to govern editing and access to linked proceedings/records; they do not hide
-  // the meeting register itself from an authenticated institutional user.
+  // Only active institutional identities and administrators may read the full register.
+  // Other authenticated users must be scoped to categories, initiation, or explicit invitation below.
   const ref=collection(db,COLLECTIONS.meetings);
-  if(user.uid){
+  if(activeMember||activeEmployee||isAdmin){
     const all=await getDocs(ref);
     return all.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>meetingCreatedAt(b)-meetingCreatedAt(a));
   }
