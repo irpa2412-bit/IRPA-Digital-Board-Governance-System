@@ -1,6 +1,6 @@
 import { arrayUnion, collection, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, setDoc, updateDoc, where, writeBatch } from "firebase/firestore";
 import { requireSupportedSignatureRoutingMode } from "./signatureWorkflowPolicy.js";
-import { downloadSignatureBytes, ensureSignatureWorkflowFolder, ensureSignedDocumentArchive, ensureSignatureProfileFolder, finalizeSignatureProfileArchives, getDownloadURL, ref, uploadBytes } from "./signatureStorage";
+import { createGatewaySignatureEnvelope, voidGatewaySignatureEnvelope, downloadSignatureBytes, ensureSignatureWorkflowFolder, ensureSignedDocumentArchive, ensureSignatureProfileFolder, finalizeSignatureProfileArchives, getDownloadURL, ref, uploadBytes } from "./signatureStorage";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { auth, db } from "./config";
 import { ensureMySignerIdentity, getMySignerIdentity, recordSignerAuthenticationEvidence, IRPA_ORGANISATION } from "./signerIdentity";
@@ -8,6 +8,7 @@ import { getCurrentSigningAuthorityRegisterEntries } from "./data";
 import { readWorkflowContext } from "./workflowLinks";
 const PROFILE_COLLECTION="signatureProfiles";const ENVELOPE_COLLECTION="signatureEnvelopes";const EVENT_COLLECTION="signatureEvents";
 const GATEWAY_URL=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").replace(/\/$/,"");
+const CRYPTOGRAPHIC_GATEWAY_BRIDGE_ENABLED=import.meta.env.VITE_IRPA_CRYPTOGRAPHIC_SIGNING_ENABLED==="true";
 async function sendSignatureMail(envelope,recipient){
   if(!auth.currentUser) throw new Error("Authentication is required. Sign in again before sending the signing invitation.");
   try{
@@ -289,7 +290,57 @@ export async function finalizeSignatureWorkflowDraft(args){
   return saveSignatureWorkflowDraft(args);
 }
 
-export async function startSignatureWorkflow(envelope){requireSupportedSignatureRoutingMode(envelope?.signingMode);const u=user();if(!envelope?.id)throw new Error("A valid workflow envelope is required.");if(envelope.senderUid!==u.uid&&envelope.ownerUid!==u.uid)throw new Error("Only the document owner can start this workflow.");if(envelope.status!=="Draft")return envelope;const current=(envelope.recipients||[]).find(r=>r.uid===envelope.currentSignerUid);const actionRecipients=(envelope.recipients||[]).filter(isActionRecipient);const update={status:envelope.currentSignerUid?"In Progress":"Shared",workflowStartedAt:serverTimestamp(),workflowStartedByUid:u.uid,updatedAt:serverTimestamp()};await updateDoc(doc(db,ENVELOPE_COLLECTION,envelope.id),update);if(current&&current.uid!==u.uid&&current.email)await releaseNextSigner({...envelope,...update},current);await recordEnvelopeEvent(envelope.id,"Workflow Started",{ownerUid:u.uid,currentSignerUid:envelope.currentSignerUid||null,currentSignerName:current?.name||"",requiredActionCount:actionRecipients.length});return{...envelope,...update};}
+export async function startSignatureWorkflow(envelope){
+  requireSupportedSignatureRoutingMode(envelope?.signingMode);
+  const u=user();
+  if(!envelope?.id)throw new Error("A valid workflow envelope is required.");
+  if(envelope.senderUid!==u.uid&&envelope.ownerUid!==u.uid)throw new Error("Only the document owner can start this workflow.");
+  if(envelope.status!=="Draft")return envelope;
+  const current=(envelope.recipients||[]).find(r=>r.uid===envelope.currentSignerUid);
+  const actionRecipients=(envelope.recipients||[]).filter(isActionRecipient);
+  let gateway=null;
+  if(CRYPTOGRAPHIC_GATEWAY_BRIDGE_ENABLED){
+    if(envelope.gatewayEnvelopeId){
+      gateway={gatewayEnvelopeId:envelope.gatewayEnvelopeId,gatewayDocumentId:envelope.gatewayDocumentId||null,gatewayOriginalHash:envelope.gatewayOriginalHash||null,status:envelope.gatewaySigningStatus||"Sent",existing:true};
+    }else{
+      const sourceBytes=await fetchBytes(envelope.documentUrl,envelope.documentId,envelope.id);
+      gateway=await createGatewaySignatureEnvelope({envelope,sourceBytes});
+    }
+  }
+  const update={
+    status:envelope.currentSignerUid?"In Progress":"Shared",
+    workflowStartedAt:serverTimestamp(),
+    workflowStartedByUid:u.uid,
+    updatedAt:serverTimestamp(),
+    ...(gateway?{
+      gatewayEnvelopeId:gateway.gatewayEnvelopeId,
+      gatewayDocumentId:gateway.gatewayDocumentId,
+      gatewayOriginalHash:gateway.gatewayOriginalHash,
+      gatewaySigningStatus:gateway.status||"Sent",
+      gatewayBridgeStatus:"Connected",
+      gatewayEvidenceSchema:"IRPA-CRYPTOGRAPHIC-EVIDENCE-1"
+    }:{})
+  };
+  try{
+    await updateDoc(doc(db,ENVELOPE_COLLECTION,envelope.id),update);
+  }catch(error){
+    if(gateway?.gatewayEnvelopeId&&!gateway.existing){
+      try{await voidGatewaySignatureEnvelope(gateway.gatewayEnvelopeId,"Firebase Signature Portal link could not be committed");}
+      catch(rollbackError){console.error("Gateway envelope rollback failed; preserve the Gateway reference for reconciliation.",{gatewayEnvelopeId:gateway.gatewayEnvelopeId,message:rollbackError?.message||"rollback failed"});}
+    }
+    throw error;
+  }
+  if(!gateway&&current&&current.uid!==u.uid&&current.email)await releaseNextSigner({...envelope,...update},current);
+  await recordEnvelopeEvent(envelope.id,"Workflow Started",{
+    ownerUid:u.uid,
+    currentSignerUid:envelope.currentSignerUid||null,
+    currentSignerName:current?.name||"",
+    requiredActionCount:actionRecipients.length,
+    gatewayEnvelopeId:gateway?.gatewayEnvelopeId||null,
+    gatewayBridgeStatus:gateway?"Connected":"Not Enabled"
+  });
+  return{...envelope,...update,...(gateway||{})};
+}
 
 export async function createSignatureEnvelope({title,documentId,documentReference,documentUrl,documentClassification="Public",documentArchiveCategory="Administrative Documents",documentType="Governance Document",documentUploadedAt=null,authorizationRequestId=null,authorizationReference="",signingMode,recipients,fields=[]}){signingMode=requireSupportedSignatureRoutingMode(signingMode);const u=user();const workflowContext=readWorkflowContext();authorizationRequestId=authorizationRequestId||workflowContext?.authorizationRequestId||null;authorizationReference=authorizationReference||workflowContext?.authorizationReference||"";if(!title?.trim())throw new Error("Envelope title is required.");if(!documentId)throw new Error("An authorized document must be selected.");if(!documentUrl)throw new Error("The selected document has no PDF file URL. Upload/link the controlled PDF before sending for signature.");if(!recipients?.length)throw new Error("At least the document owner is required.");const envelopeId=`IRPA-ENV-${new Date().getFullYear()}-${Date.now().toString().slice(-8)}`;const owner={...(recipients.find(r=>r?.uid===u.uid)||{}),uid:u.uid,name:u.displayName||u.email||"Document Owner",email:u.email||"",role:"Document Owner",routingOrder:1,status:"Pending"};const supplied=recipients.filter(r=>r?.uid&&r.uid!==u.uid);const orderedRecipients=[owner,...supplied.map((r,i)=>({...r,accessOnly:isViewOnlyRecipient(r),routingOrder:signingMode==="Sequential"?i+2:r.routingOrder||1}))];const participantUids=orderedRecipients.map(r=>r.uid).filter(Boolean);const viewOnlyUids=new Set(orderedRecipients.filter(isViewOnlyRecipient).map(r=>r.uid));if((fields||[]).some(f=>f?.signerUid&&viewOnlyUids.has(f.signerUid)))throw new Error("View-only recipients cannot be assigned action fields. Assign fields only to the document owner or an action officer.");const actionUids=[...new Set((fields||[]).map(f=>f?.signerUid).filter(Boolean))];const firstActionRecipient=orderedRecipients.find(isActionRecipient);const payload={envelopeReference:envelopeId,title:title.trim(),documentId,documentReference:documentReference||"",documentUrl,senderUid:u.uid,senderEmail:u.email||"",ownerUid:u.uid,ownerName:owner.name,ownerEmail:owner.email,documentClassification:documentClassification||"Public",documentArchiveCategory:documentArchiveCategory||"Administrative Documents",documentType:documentType||"Governance Document",documentUploadedAt:documentUploadedAt||null,authorizationRequestId:authorizationRequestId||null,authorizationReference:authorizationReference||null,status:"Draft",signingMode:signingMode||"Sequential",recipients:orderedRecipients,fields,participantUids,actionUids,currentSignerUid:signingMode==="Sequential"?(firstActionRecipient?.uid||null):null,createdAt:serverTimestamp(),updatedAt:serverTimestamp()};const batch=writeBatch(db);batch.set(doc(db,ENVELOPE_COLLECTION,envelopeId),payload);batch.update(doc(db,"documents",documentId),{signatureEnvelopeId:envelopeId,signatureReference:envelopeId,signatureStatus:"Draft",signatureOwnerUid:u.uid,workflowOwnerSectionSaved:true,authorizationRequestId:authorizationRequestId||null,authorizationReference:authorizationReference||null,updatedAt:serverTimestamp()});await batch.commit();await recordEnvelopeEvent(envelopeId,"Envelope Created",{status:"Draft",ownerUid:u.uid,signingOrder:orderedRecipients.map(r=>({uid:r.uid,name:r.name,email:r.email,routingOrder:r.routingOrder,role:r.role,accessOnly:isViewOnlyRecipient(r),actionRequired:isActionRecipient(r)}))});const viewOnlyRecipients=orderedRecipients.filter(isViewOnlyRecipient);if(viewOnlyRecipients.length)await Promise.all(viewOnlyRecipients.map(r=>releaseViewOnlyRecipient({...payload,id:envelopeId},r).catch(async error=>{await recordEnvelopeEvent(envelopeId,"View-Only Invitation Failed",{signerUid:r.uid,signerEmail:r.email,error:error?.message||"Unable to send view-only invitation"});return null;})));return{id:envelopeId,...payload};}
 export async function recordEnvelopeEvent(envelopeId,event,details={}){const u=user();await setDoc(doc(collection(db,EVENT_COLLECTION)),{envelopeId,event,details,actorUid:u.uid,actorEmail:u.email||"",createdAt:serverTimestamp()});}
