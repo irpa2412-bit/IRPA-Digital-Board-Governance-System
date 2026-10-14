@@ -490,3 +490,15 @@ export async function submitGatewaySignature({token,signature,fieldValues={},con
   if (!response.ok || data.ok === false) throw new Error(data.error || "The Gateway did not accept the signing action.");
   return data;
 }
+
+
+export async function verifyGatewaySignedPdf({token,bytes}={}) {
+  if (!token || !bytes?.length) throw new Error("A Gateway token and completed PDF are required for integrity verification.");
+  const body = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  const response = await gatewayAuthenticatedRequest("/api/sign/verify", {
+    method:"POST",body,contentType:"application/pdf",signingToken:token
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || result.ok === false || result.verified !== true) throw new Error(result.error || "The completed PDF failed Gateway integrity verification.");
+  return result;
+}
