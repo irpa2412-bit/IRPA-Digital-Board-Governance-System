@@ -62,7 +62,7 @@ async function main() {
   if (!ruleset?.name) throw new Error("Firebase Rules API did not return a ruleset name.");
 
   if (release) {
-    await api(`${RULES_API}/v1/${RELEASE_NAME}`, "PATCH", { rulesetName: ruleset.name }, { updateMask: "rulesetName" });
+    await api(`${RULES_API}/v1/${RELEASE_NAME}`, "PATCH", { release: { name: RELEASE_NAME, rulesetName: ruleset.name }, updateMask: "rulesetName" });
   } else {
     await api(`${RULES_API}/v1/projects/${PROJECT_ID}/releases`, "POST", {
       name: RELEASE_NAME,
