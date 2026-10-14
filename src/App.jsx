@@ -622,7 +622,7 @@ export default function App(){
     [signingEnvelopeId,setSigningEnvelopeId]=useState(
       ()=>window.sessionStorage.getItem("irpaSigningEnvelopeId")||
         new URLSearchParams(window.location.search).get("signEnvelope")||null
-    );const[gatewaySigningToken,setGatewaySigningToken]=useState(()=>{const token=params.get("token");try{if(token){window.sessionStorage.setItem("irpaGatewaySigningToken",token);return token;}return window.sessionStorage.getItem("irpaGatewaySigningToken")||null;}catch{return token||null;}});useEffect(()=>{if(gatewaySigningToken){try{window.sessionStorage.setItem("irpaGatewaySigningToken",gatewaySigningToken)}catch{}}},[gatewaySigningToken]);useEffect(()=>{
+    );const[gatewaySigningToken,setGatewaySigningToken]=useState(()=>{const token=params.get("gatewayToken");try{if(token){window.sessionStorage.setItem("irpaGatewaySigningToken",token);return token;}return window.sessionStorage.getItem("irpaGatewaySigningToken")||null;}catch{return token||null;}});useEffect(()=>{if(gatewaySigningToken){try{window.sessionStorage.setItem("irpaGatewaySigningToken",gatewaySigningToken)}catch{}}},[gatewaySigningToken]);useEffect(()=>{
   const handler=e=>{
     const id=e?.detail?.envelopeId;
     if(id)setSigningEnvelopeId(id);
@@ -947,7 +947,7 @@ useEffect(()=>{async function magic(){
   let e=window.localStorage.getItem("irpaEmailForSignIn")||window.localStorage.getItem("irpaMemberEmailForSignIn");
   const url=new URL(window.location.href);
   const signingEnvelopeId=url.searchParams.get("signEnvelope");
-  const gatewaySigningToken=url.searchParams.get("token")||window.sessionStorage.getItem("irpaGatewaySigningToken");
+  const gatewaySigningToken=url.searchParams.get("gatewayToken")||window.sessionStorage.getItem("irpaGatewaySigningToken");
 
   if(!e){
     const promptText=signingEnvelopeId||gatewaySigningToken
