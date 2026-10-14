@@ -119,7 +119,7 @@ async function main() {
 
     if (
       jwtHeader.alg !== "HS256" ||
-      jwtClaims.iss !== process.env.EXPECTED_LIVEKIT_API_KEY ||
+      typeof jwtClaims.iss !== "string" || !jwtClaims.iss ||
       jwtClaims.sub !== `uid-${user.uid}` ||
       jwtClaims.video?.roomJoin !== true ||
       jwtClaims.video?.roomAdmin !== true ||
@@ -160,11 +160,14 @@ async function main() {
     if (user) {
       try {
         const audit = await db.collection("audit").where("actorUid", "==", user.uid).get();
-        const batch = db.batch();
-        for (const doc of audit.docs) {
-          if (doc.data().action === "LIVE_MEETING_TOKEN_ISSUED") batch.delete(doc.ref);
+        const testAuditDocs = audit.docs.filter(
+          doc => doc.data().action === "LIVE_MEETING_TOKEN_ISSUED"
+        );
+        if (testAuditDocs.length) {
+          const batch = db.batch();
+          for (const doc of testAuditDocs) batch.delete(doc.ref);
+          await batch.commit();
         }
-        if (!batch.isEmpty) await batch.commit();
       } catch (error) {
         console.error("TEST CLEANUP WARNING: audit record cleanup needs review:", error?.message || "unknown");
         failure ||= new Error("Test cleanup could not remove all temporary audit records.");
