@@ -6,9 +6,10 @@ const apiKey=process.env.STAGING_FIREBASE_WEB_API_KEY||"";
 const project=process.env.STAGING_FIREBASE_PROJECT_ID||"";
 const email=process.env.STAGING_CRYPTO_TEST_EMAIL||"";
 const password=process.env.STAGING_CRYPTO_TEST_PASSWORD||"";
+const authority=process.env.STAGING_CRYPTO_TEST_AUTHORITY||"";
 const expectedUid=process.env.STAGING_CRYPTO_TEST_SIGNER_UID||"";
 const base=String(process.env.STAGING_GATEWAY_URL||"").replace(/\/+$/,"");
-for(const [name,value] of Object.entries({STAGING_FIREBASE_WEB_API_KEY:apiKey,STAGING_FIREBASE_PROJECT_ID:project,STAGING_CRYPTO_TEST_EMAIL:email,STAGING_CRYPTO_TEST_PASSWORD:password,STAGING_CRYPTO_TEST_SIGNER_UID:expectedUid,STAGING_GATEWAY_URL:base}))assert.ok(value,name+" is required.");
+for(const [name,value] of Object.entries({STAGING_FIREBASE_WEB_API_KEY:apiKey,STAGING_FIREBASE_PROJECT_ID:project,STAGING_CRYPTO_TEST_EMAIL:email,STAGING_CRYPTO_TEST_PASSWORD:password,STAGING_CRYPTO_TEST_AUTHORITY:authority,STAGING_CRYPTO_TEST_SIGNER_UID:expectedUid,STAGING_GATEWAY_URL:base}))assert.ok(value,name+" is required.");
 assert.notEqual(project,"irpa-digital-board-governance","Production Firebase project is forbidden in staging acceptance.");
 
 const loginResponse=await fetch("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key="+encodeURIComponent(apiKey),{
@@ -94,6 +95,7 @@ const signedResponse=await fetch(base+"/api/sign/submit",{
     token:signingToken,
     signature:{type:"typed",value:"IRPA Staging Crypto Test Signer"},
     fieldValues:{"staging-name":"IRPA Staging Crypto Test Signer","staging-signature":"IRPA Staging Crypto Test Signer"},
+    manualAuthorityIdentification:authority,
     consent:true
   })
 });
@@ -153,7 +155,7 @@ assert.equal(tamperedResponse.status,409,"Gateway did not reject a tampered comp
 const beforeRetry=status.eventCount;
 const retryResponse=await fetch(base+"/api/sign/submit",{
   method:"POST",headers:{...authHeaders,"content-type":"application/json"},
-  body:JSON.stringify({token:signingToken,signature:{type:"typed",value:"IRPA Staging Crypto Test Signer"},fieldValues:{"staging-name":"IRPA Staging Crypto Test Signer","staging-signature":"IRPA Staging Crypto Test Signer"},consent:true})
+  body:JSON.stringify({token:signingToken,signature:{type:"typed",value:"IRPA Staging Crypto Test Signer"},fieldValues:{"staging-name":"IRPA Staging Crypto Test Signer","staging-signature":"IRPA Staging Crypto Test Signer"},manualAuthorityIdentification:authority,consent:true})
 });
 const retry=await readJson(retryResponse,"Idempotent signing retry");
 assert.equal(retry.idempotent,true);
