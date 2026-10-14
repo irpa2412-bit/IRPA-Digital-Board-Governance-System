@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { PDFDocument } from "pdf-lib";
-import { declineSigning, getSigningPdf, openSigning, sign, verifySigningPdf } from "../src/signing.mjs";
+import { chainEvents, declineSigning, getSigningPdf, openSigning, sign, verifySigningPdf } from "../src/signing.mjs";
 import { route } from "../src/router.mjs";
 import { sha256Hex } from "../src/util.mjs";
 
@@ -55,7 +55,7 @@ async function makeFixture({ signerUid, signerEmail, secondSigner = true } = {})
     archiveTargets: [],
     createdAt: NOW.toISOString(),
     expiresAt: new Date(NOW.getTime() + 86400000).toISOString(),
-    events: [{ type: "envelope.created", hash: "GENESIS", prevHash: "GENESIS" }],
+    events: await chainEvents([], { type: "envelope.created", at: NOW.toISOString(), actor: "owner-user" }),
     completion: null,
     _v: 1
   };
