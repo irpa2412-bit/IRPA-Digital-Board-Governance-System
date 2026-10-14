@@ -68,7 +68,7 @@ const checks=[
  ["Governance chat signalling",media.includes('type:"chat"')],
  ["Hand raise signalling",media.includes('type:"hand"')],
  ["Meeting token route",fs.readFileSync("src/main.jsx","utf8").includes("meetingToken")],
- ["Firestore rules present and not part of this feature contract",fs.existsSync("firestore.rules")],
+ ["Firestore rules enforce meeting confidentiality and category access",fs.existsSync("firestore.rules")&&fs.readFileSync("firestore.rules","utf8").includes("meetingConfidentialityReadAllowed")&&fs.readFileSync("firestore.rules","utf8").includes("meetingCategoryRoleAllowed")],
  ["Meeting gate issues meeting ID",gateway.includes("meetingId,meetingPassword")],
  ["Meeting gate issues gate password",gateway.includes("meetingPassword=gatePassword")],
  ["Meeting gate stores password hash",gateway.includes("passwordHash")],
