@@ -1,7 +1,7 @@
 import React,{useEffect,useMemo,useRef,useState}from"react";
 import{httpsCallable,getFunctions}from"firebase/functions";
 import{auth}from"../firebase/config";
-import{getMeetingRecordingStatus,startMeetingRecording,stopMeetingRecording}from"../firebase/meetingRecords";
+import{getMeetingRecordingStatus,startMeetingRecording,stopMeetingRecording,reportMeetingRecordingFailure}from"../firebase/meetingRecords";
 import{uploadMeetingProductToDrive}from"../firebase/signatureStorage";
 import{Room,RoomEvent}from"livekit-client";
 
@@ -48,8 +48,8 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
    autoRecordingAttemptedRef.current=meeting.id;
    setRecordingBusy(true);setError("");
    try{
-    if(!roomRef.current){await connect();if(!roomRef.current){setRecordingStatus("FAILED");setError("AUTOMATIC RECORDING FAILED. The live room could not connect when proceedings began. Proceedings must not be treated as recorded.");return;}}
-    if(!recordingAllowed){const status=await refreshRecordingStatus();if(status?.recordingAllowed!==true){setRecordingStatus("FAILED");setError("AUTOMATIC RECORDING FAILED. Server policy did not enable capture for this meeting. Proceedings must not be treated as recorded.");return;}}
+    if(!roomRef.current){await connect();if(!roomRef.current){setRecordingStatus("FAILED");try{await reportMeetingRecordingFailure({meetingId:meeting.id,failureCode:"ROOM_CONNECTION_FAILED",selectedAuthority:String(selectedAuthority||"")})}catch{}setError("AUTOMATIC RECORDING FAILED. The live room could not connect when proceedings began. Proceedings must not be treated as recorded.");return;}}
+    if(!recordingAllowed){const status=await refreshRecordingStatus();if(status?.recordingAllowed!==true){setRecordingStatus("FAILED");try{await reportMeetingRecordingFailure({meetingId:meeting.id,failureCode:"RECORDING_POLICY_FAILURE",selectedAuthority:String(selectedAuthority||"")})}catch{}setError("AUTOMATIC RECORDING FAILED. Server policy did not enable capture for this meeting. Proceedings must not be treated as recorded.");return;}}
     const context=JSON.parse(sessionStorage.getItem("irpaMeetingEntryContext")||"null");
     const participantId=context?.meetingId===meeting.id?String(context?.participantId||""):"";
     const recording=await startMeetingRecording({meetingId:meeting.id,selectedAuthority:participantId?"":String(selectedAuthority||""),participantId});
@@ -64,7 +64,7 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
     }
     if(String(verification?.recordingStatus||"").toUpperCase()!=="RECORDING"){
      setRecordingStatus(String(verification?.recordingStatus||recording.recordingStatus||"STARTING").toUpperCase());
-     setError("AUTOMATIC RECORDING NOT CONFIRMED. Proceedings must not be treated as recorded. Check LiveKit Egress and recording storage, then retry recording.");
+     try{await reportMeetingRecordingFailure({meetingId:meeting.id,failureCode:"RECORDING_NOT_CONFIRMED",selectedAuthority:String(selectedAuthority||"")})}catch{}setError("AUTOMATIC RECORDING NOT CONFIRMED. Proceedings must not be treated as recorded. Check LiveKit Egress and recording storage, then retry recording.");
     }
    }catch(recordingError){
     if(!cancelled){setRecordingStatus("FAILED");setError("AUTOMATIC RECORDING FAILED. Proceedings must not be treated as recorded. Check LiveKit Egress/storage and retry; details: "+(recordingError?.message||"no confirmation returned."));}
