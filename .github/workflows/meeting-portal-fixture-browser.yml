@@ -66,6 +66,7 @@ jobs:
             "functions/scripts/verify-livekit-recording-storage.js",
             "src/components/IRPADGBSMeetingRoomMedia.jsx",
             "src/App.jsx",
+            "src/styles/mobile-viewport-containment.css",
             "tests/livekit-production-worker.test.mjs",
             "wrangler.livekit-production.jsonc",
             ".github/workflows/mail-invitation-tests.yml",
