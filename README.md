@@ -77,3 +77,4 @@ Before production use, verify Firebase Authentication providers, authorized doma
 ## PDF Upload and E-Signature Module
 
 The controlled repair branch contains the isolated PDF upload/e-signature implementation under `drive-gateway/src/`. Run `cd drive-gateway && npm install && npm test` for the 18-case CI suite. The module remains isolated until adapter and Worker-route integration is explicitly approved.
+<!-- Production deployment trigger: meeting register and participant selector repair, 2026-10-14 -->
