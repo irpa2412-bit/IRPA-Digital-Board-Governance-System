@@ -451,7 +451,7 @@ exports.stopMeetingRecording = onCall({
   const meetingId = text(request.data?.meetingId);
   const recordingId = text(request.data?.recordingId || request.data?.egressId);
   if (!recordingId) throw new HttpsError("invalid-argument", "Recording ID is required.");
-  const ctx = await resolveRecordingControl(request, meetingId);
+  const ctx = await resolveRecordingControl(request, meetingId, { allowClosed: true });
   if (!ctx.controller) throw new HttpsError("permission-denied", "Only the meeting administrator, initiator, chairperson or secretary may stop recording.");
   const ref = db.collection("meetingMediaRecordings").doc(recordingId);
   const snap = await ref.get();
