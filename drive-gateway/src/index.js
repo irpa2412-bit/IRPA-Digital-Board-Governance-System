@@ -19,6 +19,7 @@ import { route as esignRoute } from "./router.mjs";
 import { buildEsignContext, EsignRecordDurableObject } from "./esignContext.mjs";
 import { runCleanup } from "./upload.mjs";
 import { createDocumentLifecycleRouter } from "./documentLifecycle.mjs";
+import { canProvisionSignatureProfileFolder } from "./signatureProfileAuthorization.mjs";
 import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPasswordSetup, getInvitationSessionState } from "./invitationRedemption.mjs";
 import { buildGoogleDriveAuthorizationParams } from "./googleDriveOAuth.mjs";
 
@@ -777,8 +778,7 @@ async function ensureSignatureProfileFolder(request, env) {
     return json({ ok: false, error: "The signature-folder email does not match the authenticated account." }, 403, corsHeaders(request));
   }
 
-  const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
-  if (!isAdminForRequest && requestedUid !== claims.user_id) {
+  if (!canProvisionSignatureProfileFolder({ authenticatedUid: claims.user_id, requestedUid, isAdmin })) {
     return json({ ok: false, error: "You may only provision your own signature folder." }, 403, corsHeaders(request));
   }
 
