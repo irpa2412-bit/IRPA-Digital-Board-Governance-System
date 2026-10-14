@@ -139,7 +139,7 @@ jobs:
           if (changed.includes(wranglerPath)) {
             const readAt = ref => execFileSync("git", ["show", `${ref}:${wranglerPath}`], { encoding: "utf8" });
             const productionSection = (text, label) => {
-              const marker = "\\n[env.staging]";
+              const marker = "\n[env.staging]";
               const first = text.indexOf(marker);
               if (first < 0 || text.indexOf(marker, first + marker.length) >= 0) {
                 throw new Error(`${label} must contain exactly one [env.staging] boundary.`);
@@ -151,7 +151,7 @@ jobs:
             if (productionSection(baselineConfig, "Baseline Wrangler config") !== productionSection(currentConfig, "Current Wrangler config")) {
               throw new Error("Production Wrangler configuration changed; only staging-only changes are permitted.");
             }
-            const stagingConfig = currentConfig.slice(currentConfig.indexOf("\\n[env.staging]"));
+            const stagingConfig = currentConfig.slice(currentConfig.indexOf("\n[env.staging]"));
             if (!stagingConfig.includes('id = "7b50627e29fc4fe1abaa8dc8665edd02"')) {
               throw new Error("Staging DRIVE_KV must retain the explicitly approved dedicated namespace.");
             }
