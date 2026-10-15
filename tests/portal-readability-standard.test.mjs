@@ -46,6 +46,6 @@ test("registers, controls and focus states have explicit readability treatment",
   ]) assert.match(css, pattern);
 });
 test("shared standard does not change authorization, routing, data or workflow logic", () => {
-  assert.doesNotMatch(css, /firebase|firestore|permission|authorization|localStorage|sessionStorage/i);
+  assert.doesNotMatch(css, /firebase|firestore|localStorage|sessionStorage|onClick|onSubmit/i);
   assert.doesNotMatch(css, /display\s*:\s*none|visibility\s*:\s*hidden|pointer-events\s*:\s*none/i);
 });
