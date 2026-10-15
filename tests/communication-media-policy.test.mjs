@@ -52,6 +52,8 @@ test("cPanel access is secret-backed and static-file editor denies executable or
  for(const secret of ["CPANEL_BASE_URL","CPANEL_USERNAME","CPANEL_API_TOKEN"]) assert.ok(site.includes(secret),secret);
  assert.ok(site.includes('new Set([".html", ".htm", ".css", ".txt", ".json"])'));
  assert.ok(site.includes('p === ".."'));
+ assert.ok(site.includes("safeCpanelDirectory"));
+ assert.ok(site.includes("Fileman/list_files"));
  assert.ok(site.includes("Fileman/get_file_content"));
  assert.ok(site.includes("Fileman/save_file_content"));
  assert.ok(site.includes("CPANEL_STATIC_FILE_EDITED"));
