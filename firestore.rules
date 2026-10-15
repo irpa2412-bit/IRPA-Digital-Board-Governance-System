@@ -428,6 +428,28 @@ service cloud.firestore {
     allow update,delete:if admin();
   }
   match /inductionRecords/{uid}{allow read:if self(uid)||admin();allow create,update:if self(uid)&&request.resource.data.uid==request.auth.uid&&(activeMember()||request.auth.token.firebase.sign_in_provider=="anonymous");allow delete:if admin();}
+  // Media binaries live in the existing authenticated Google Drive gateway; Firestore stores only the asset register.
+  match /communicationMediaAssets/{id}{
+    allow read:if communicationMediaUser();
+    allow create:if communicationMediaUser()
+      &&request.resource.data.get("uploadedByUid","")==request.auth.uid
+      &&request.resource.data.get("status","")=="Available"
+      &&request.resource.data.get("recordOrigin","")=="PRODUCTION"
+      &&request.resource.data.get("title","") is string
+      &&request.resource.data.get("title","").size()>0
+      &&request.resource.data.get("title","").size()<=180
+      &&request.resource.data.get("originalFileName","") is string
+      &&request.resource.data.get("originalFileName","").size()>0
+      &&request.resource.data.get("fileId","") is string
+      &&request.resource.data.get("fileId","").size()>0
+      &&request.resource.data.get("fileSize",0) is int
+      &&request.resource.data.get("fileSize",0)>0
+      &&request.resource.data.get("fileSize",0)<=10485760
+      &&request.resource.data.get("storageProvider","")=="Google Drive"
+      &&request.resource.data.keys().hasOnly(["title","originalFileName","contentType","fileSize","fileId","webViewLink","storageProvider","purpose","tags","mediaKind","status","recordOrigin","uploadedByUid","uploadedByEmail","createdAt","updatedAt"]);
+    // Asset binaries and immutable upload identity are not editable or deletable through client-side Firestore writes.
+    allow update,delete:if false;
+  }
   match /communicationMediaItems/{id}{
     allow read:if communicationMediaUser();
     allow create:if communicationMediaUser()
