@@ -139,8 +139,8 @@
 }
 
 
-/* Preserve the Dashboard's own light-card/dark-gradient text pairing; force readable white copy only on dark hero surfaces. */
-#root .app-shell .content-area.dashboard-content-area .page :where(.dashboard-hero, .mobile-dashboard-hero) :where(p, span, small, .muted) {
+/* The Dashboard greeting sits on image/gradient hero surfaces; override the generic dark-copy rule there. */
+#root .app-shell .content-area.dashboard-content-area .page :where(.desktop-quote4-hero, .mobile-quote1-hero, .mobile-dashboard-hero) p {
   color: #ffffff !important;
   -webkit-text-fill-color: #ffffff !important;
 }
