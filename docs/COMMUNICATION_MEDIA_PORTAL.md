@@ -46,6 +46,17 @@ npx wrangler secret put CPANEL_API_TOKEN
 ```
 For staging, explicitly target the staging Worker environment using the supported Wrangler `--env staging` option. Do not copy production credentials into staging. Do not log or print secret values.
 
+## Automated staging acceptance prerequisites
+
+The staging workflow runs on the Communication & Media integration pull request and deploys only the dedicated `irpa-google-drive-gateway-staging` Worker. It requires the following repository Actions secrets; values are never printed by the workflow:
+
+- Existing isolated staging infrastructure: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `STAGING_FIREBASE_PROJECT_ID`, `STAGING_IRPA_APP_URL`, `STAGING_GOOGLE_DRIVE_CLIENT_ID`, `STAGING_GOOGLE_DRIVE_CLIENT_SECRET`, `STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY`, `STAGING_SMTP_PASSWORD`.
+- Isolated staging Firebase: `STAGING_FIREBASE_SERVICE_ACCOUNT_JSON`, `STAGING_FIREBASE_WEB_API_KEY`, `STAGING_TEST_EMAIL`, `STAGING_TEST_PASSWORD`. The service account project ID must exactly match the staging Firebase project ID, which must not be the production project.
+- Isolated staging WordPress: `STAGING_WORDPRESS_BASE_URL`, `STAGING_WORDPRESS_USERNAME`, `STAGING_WORDPRESS_APPLICATION_PASSWORD`. The WordPress hostname must not be `irpa.or.tz` or `www.irpa.or.tz`.
+- Isolated staging cPanel account: `STAGING_CPANEL_BASE_URL`, `STAGING_CPANEL_USERNAME`, `STAGING_CPANEL_API_TOKEN`, `STAGING_CPANEL_DOCUMENT_ROOT`, `STAGING_CPANEL_TEST_FILE`. The test-file secret must be a safe relative `.txt` filename within the isolated staging document root.
+
+The workflow verifies the explicit staging health marker, authenticates a staging reviewer, checks both server-side connections, updates a dedicated staging WordPress test page and verifies its public rendering before restoring the prior state, edits a staging cPanel test file and exercises its seven-day rollback, then verifies path-traversal/executable-path rejection. Missing staging secrets or failed acceptance block release; production credentials must never be substituted for staging credentials.
+
 ## Authorization and audit
 - Every website and cPanel route verifies the Firebase ID token at the Cloudflare Worker.
 - Write operations require a registered reviewer role; credentials stay server-side.
