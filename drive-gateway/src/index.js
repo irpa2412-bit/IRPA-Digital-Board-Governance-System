@@ -23,6 +23,7 @@ import { canProvisionSignatureProfileFolder } from "./signatureProfileAuthorizat
 import { canReadSignatureAsset, canUploadSignedDocument } from "./signatureAssetAuthorization.mjs";
 import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPasswordSetup, getInvitationSessionState } from "./invitationRedemption.mjs";
 import { buildGoogleDriveAuthorizationParams } from "./googleDriveOAuth.mjs";
+import { createCommunicationsSiteRouter } from "./communicationsSite.mjs";
 
 function getFirebaseProjectId(env) {
   const projectId = String(env?.FIREBASE_PROJECT_ID || "").trim();
@@ -51,6 +52,16 @@ const documentLifecycleRouter = createDocumentLifecycleRouter({
   firestoreDocumentToPlain,
   commitDocumentAndAudit: commitFirestoreDocumentAndAudit,
   recordLifecycleFailure: recordDocumentLifecycleFailure,
+  json,
+  corsHeaders
+});
+
+const communicationsSiteRouter = createCommunicationsSiteRouter({
+  authenticateFirebaseRequest,
+  getFirestoreDocument,
+  getInstitutionalProfileForUser,
+  firestoreDocumentToPlain,
+  commitDocumentAndAudit: commitFirestoreDocumentAndAudit,
   json,
   corsHeaders
 });
@@ -93,6 +104,11 @@ export default {
       if (pathname.startsWith("/api/document-lifecycle/")) {
         const lifecycleResponse = await documentLifecycleRouter(request, env);
         if (lifecycleResponse) return lifecycleResponse;
+      }
+
+      if (pathname.startsWith("/api/communications/")) {
+        const communicationsResponse = await communicationsSiteRouter(request, env);
+        if (communicationsResponse) return communicationsResponse;
       }
 
       if (pathname === "/api/upload" && request.method === "POST") {
