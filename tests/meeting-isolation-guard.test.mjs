@@ -7,8 +7,8 @@ const workflow = readFileSync(new URL("../.github/workflows/meeting-portal-fixtu
 test("isolation baseline uses captured PR base SHA or branch merge-base for push runs", () => {
   assert.match(workflow, /const eventBase = process\.env\.PR_BASE_SHA\?\.trim\(\)/);
   assert.match(workflow, /git fetch origin main:refs\/remotes\/origin\/main/);
-  assert.match(workflow, /const base = eventBase \\|\\| execFileSync\\("git", \\["merge-base", "origin\\/main", "HEAD"\\]/);
-  assert.match(workflow, /git", \\["diff", "--name-only", `\\$\\{base\\}\\.\\.\\.HEAD`\\]/);
+  assert.match(workflow, /const base = eventBase \|\| execFileSync\("git", \["merge-base", "origin\/main", "HEAD"\]/);
+  assert.match(workflow, /git", \["diff", "--name-only", `\$\{base\}\.\.\.HEAD`\]/);
 });
 
 test("Wrangler changes cannot alter production configuration", () => {
