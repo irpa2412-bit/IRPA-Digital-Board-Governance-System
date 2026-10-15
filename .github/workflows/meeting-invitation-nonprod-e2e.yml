@@ -11,6 +11,15 @@ on:
       - "functions/meetingGateway.emulator.test.cjs"
       - ".github/workflows/meeting-invitation-nonprod-e2e.yml"
       - "firebase.json"
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/styles/portal-readability-standard.css"
+      - "functions/meetingGateway.js"
+      - "functions/meetingEntryPolicy.js"
+      - "functions/meetingGateway.emulator.test.cjs"
+      - "firebase.json"
+      - ".github/workflows/meeting-invitation-nonprod-e2e.yml"
   workflow_dispatch:
 
 permissions:
