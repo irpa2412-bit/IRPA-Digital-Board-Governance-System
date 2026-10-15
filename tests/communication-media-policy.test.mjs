@@ -56,6 +56,9 @@ test("cPanel access is secret-backed and static-file editor denies executable or
  assert.ok(site.includes("Fileman/save_file_content"));
  assert.ok(site.includes("CPANEL_STATIC_FILE_EDITED"));
  assert.ok(site.includes("MAX_EDIT_BYTES = 512 * 1024"));
+ assert.ok(site.includes("function sanitizeWordPressContent(value)"));
+ assert.ok(site.includes("vbscript|data"));
+ assert.ok(site.includes("base.port !== \"2083\""));
  assert.ok(!site.includes("Fileman/delete_file"));
 });
 
