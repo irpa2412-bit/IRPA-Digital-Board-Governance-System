@@ -43,7 +43,7 @@ jobs:
 
   deploy-staging:
     needs: local-e2e
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004'
+    if: github.ref == 'refs/heads/staging/cloudflare-livekit-token-integration-20261014'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -198,7 +198,7 @@ jobs:
             kv_namespaces:[{binding:"DRIVE_KV",id:process.env.STAGING_KV_ID}],
             triggers:{crons:["0 * * * *"]}
           };
-          if(c.vars.FIREBASE_PROJECT_ID==="irpa-digital-board-governance") throw new Error("Production Firebase project forbidden.");
+          if(c.vars.FIREBASE_PROJECT_ID!=="irpa-dbg-staging-a73ec" || c.vars.FIREBASE_PROJECT_ID==="irpa-digital-board-governance") throw new Error("Only the approved isolated staging Firebase project is permitted.");
           fs.writeFileSync("wrangler.staging.generated.json",JSON.stringify(c,null,2)+"\n");
           NODE
 
@@ -253,6 +253,7 @@ jobs:
           subdomain_json="$(curl --fail --silent --show-error -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Accept: application/json" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain")"
           subdomain="$(node -e 'const a=JSON.parse(process.argv[1]); if(!a.success || !a.result?.subdomain) process.exit(1); process.stdout.write(a.result.subdomain)' "$subdomain_json")"
           test -n "$subdomain"
+          if [ "$subdomain" != "irpa-governance" ]; then echo "Unexpected Cloudflare Workers subdomain; refusing health approval because frontend URL must match."; exit 1; fi
           url="https://irpa-google-drive-gateway-staging.$subdomain.workers.dev/health"
           echo "STAGING_HEALTH_URL=$url"
           curl --fail --silent --show-error --retry 5 --retry-delay 2 "$url" | tee staging-health.json
