@@ -23,6 +23,7 @@ import { canProvisionSignatureProfileFolder } from "./signatureProfileAuthorizat
 import { canReadSignatureAsset, canUploadSignedDocument } from "./signatureAssetAuthorization.mjs";
 import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPasswordSetup, getInvitationSessionState } from "./invitationRedemption.mjs";
 import { buildGoogleDriveAuthorizationParams } from "./googleDriveOAuth.mjs";
+import { handleAdminRegistrationReset } from "./adminRegistrationReset.mjs";
 
 function getFirebaseProjectId(env) {
   const projectId = String(env?.FIREBASE_PROJECT_ID || "").trim();
@@ -89,6 +90,16 @@ export default {
 
       // Normalize trailing slashes so portal upload/archive actions cannot be blocked by URL formatting.
       const pathname = url.pathname.replace(/\/+$/, "") || "/";
+
+      if (pathname === "/api/admin-registration/reset") {
+        return await handleAdminRegistrationReset(request, env, {
+          authenticate: authenticateFirebaseRequest,
+          getFirestoreDocument,
+          getFirebaseProjectId,
+          json,
+          corsHeaders
+        });
+      }
 
       if (pathname.startsWith("/api/document-lifecycle/")) {
         const lifecycleResponse = await documentLifecycleRouter(request, env);
@@ -1926,7 +1937,7 @@ async function authenticateFirebaseRequest(request, env, options = {}) {
   );
   if (!valid) throw new Error("Invalid Firebase ID token signature.");
 
-  const claims = { token, user_id: payload.user_id || payload.sub, email: payload.email || null };
+  const claims = { token, user_id: payload.user_id || payload.sub, email: payload.email || null, auth_time: Number(payload.auth_time || 0) };
   if (options.skipActivation !== true) await assertActivatedPortalUser(claims, env);
   return claims;
 }
@@ -2347,7 +2358,7 @@ function corsHeaders(request) {
   const allowed = origin === "https://irpa.or.tz" || origin === "https://www.irpa.or.tz" || origin === "https://irpa-digital-board-governance.web.app" || origin === "https://irpa-digital-board-governance.firebaseapp.com" || origin === "http://localhost:5173";
   return {
     "Access-Control-Allow-Origin": allowed ? origin : "https://irpa.or.tz",
-    "Access-Control-Allow-Headers": "Authorization, Content-Type, X-IRPA-Invitation-Version, x-signing-token",
+"Access-Control-Allow-Headers": "Authorization, Content-Type, X-IRPA-Invitation-Version, X-IRPA-Reset-Secret, x-signing-token",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Vary": "Origin"
   };
