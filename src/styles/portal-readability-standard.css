@@ -98,6 +98,17 @@
   background-color: #f4f8f5;
   border-color: #718a80;
 }
+#root .app-shell .content-area:not(.dashboard-content-area) .page :where(a, .text-button) {
+  color: var(--irpa-readable-action);
+  -webkit-text-fill-color: var(--irpa-readable-action);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+#root .app-shell .content-area:not(.dashboard-content-area) .page :where(a, .text-button):hover {
+  color: var(--irpa-readable-action-hover);
+  -webkit-text-fill-color: var(--irpa-readable-action-hover);
+  text-decoration: underline;
+}
 #root .app-shell .content-area:not(.dashboard-content-area) .page :where(.form-field > label, .form-field label, label) {
   font-size: 15px;
   font-weight: 650;
