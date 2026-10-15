@@ -2,7 +2,7 @@ name: Staging Gateway E2E and Deploy
 
 on:
   push:
-    branches: [main, fix/member-signature-invitation-email-20261004]
+    branches: [main, fix/member-signature-invitation-email-20261004, fix/communications-cloudflare-website-integration]
     paths:
       - "drive-gateway/**"
       - "src/firebase/documentLifecycle.js"
@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   local-e2e:
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004' || github.ref == 'refs/heads/fix/communications-cloudflare-website-integration'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -57,15 +57,42 @@ jobs:
           DRIVE_SECRET: ${{ secrets.STAGING_GOOGLE_DRIVE_CLIENT_SECRET }}
           DRIVE_KEY: ${{ secrets.STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY }}
           SMTP: ${{ secrets.STAGING_SMTP_PASSWORD }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT_JSON }}
+          FIREBASE_WEB_API_KEY: ${{ secrets.STAGING_FIREBASE_WEB_API_KEY }}
+          TEST_EMAIL: ${{ secrets.STAGING_TEST_EMAIL }}
+          TEST_PASSWORD: ${{ secrets.STAGING_TEST_PASSWORD }}
+          WP_BASE: ${{ secrets.STAGING_WORDPRESS_BASE_URL }}
+          WP_USER: ${{ secrets.STAGING_WORDPRESS_USERNAME }}
+          WP_PASSWORD: ${{ secrets.STAGING_WORDPRESS_APPLICATION_PASSWORD }}
+          CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
+          CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
+          CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
+          CP_ROOT: ${{ secrets.STAGING_CPANEL_DOCUMENT_ROOT }}
+          CP_TEST_FILE: ${{ secrets.STAGING_CPANEL_TEST_FILE }}
         run: |
           set -euo pipefail
           missing=0
-          for pair in             "CLOUDFLARE_API_TOKEN:$CF_TOKEN"             "CLOUDFLARE_ACCOUNT_ID:$CF_ACCOUNT"             "STAGING_FIREBASE_PROJECT_ID:$PROJECT"             "STAGING_IRPA_APP_URL:$APP_URL"             "STAGING_GOOGLE_DRIVE_CLIENT_ID:$DRIVE_ID"             "STAGING_GOOGLE_DRIVE_CLIENT_SECRET:$DRIVE_SECRET"             "STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY:$DRIVE_KEY"             "STAGING_SMTP_PASSWORD:$SMTP"; do
+          for pair in             "CLOUDFLARE_API_TOKEN:$CF_TOKEN"             "CLOUDFLARE_ACCOUNT_ID:$CF_ACCOUNT"             "STAGING_FIREBASE_PROJECT_ID:$PROJECT"             "STAGING_IRPA_APP_URL:$APP_URL"             "STAGING_GOOGLE_DRIVE_CLIENT_ID:$DRIVE_ID"             "STAGING_GOOGLE_DRIVE_CLIENT_SECRET:$DRIVE_SECRET"             "STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY:$DRIVE_KEY"             "STAGING_SMTP_PASSWORD:$SMTP"             "STAGING_FIREBASE_SERVICE_ACCOUNT_JSON:$FIREBASE_SERVICE_ACCOUNT"             "STAGING_FIREBASE_WEB_API_KEY:$FIREBASE_WEB_API_KEY"             "STAGING_TEST_EMAIL:$TEST_EMAIL"             "STAGING_TEST_PASSWORD:$TEST_PASSWORD"             "STAGING_WORDPRESS_BASE_URL:$WP_BASE"             "STAGING_WORDPRESS_USERNAME:$WP_USER"             "STAGING_WORDPRESS_APPLICATION_PASSWORD:$WP_PASSWORD"             "STAGING_CPANEL_BASE_URL:$CP_BASE"             "STAGING_CPANEL_USERNAME:$CP_USER"             "STAGING_CPANEL_API_TOKEN:$CP_TOKEN"             "STAGING_CPANEL_DOCUMENT_ROOT:$CP_ROOT"             "STAGING_CPANEL_TEST_FILE:$CP_TEST_FILE"; do
             name="${pair%%:*}"; value="${pair#*:}"
             if [ -z "$value" ]; then echo "Missing staging secret: $name"; missing=1; fi
           done
           test "$PROJECT" != "irpa-digital-board-governance"
           test "$missing" -eq 0
+          node <<'NODE'
+          const fs=require("fs");
+          const project=process.env.PROJECT;
+          const sa=JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT||"{}");
+          if(sa.project_id!==project) throw new Error("Staging service account must belong to the isolated staging Firebase project.");
+          const wp=new URL(process.env.WP_BASE);
+          if(wp.protocol!=="https:" || ["irpa.or.tz","www.irpa.or.tz"].includes(wp.hostname.toLowerCase())) throw new Error("Staging WordPress must use HTTPS on an isolated non-production hostname.");
+          const cp=new URL(process.env.CP_BASE);
+          if(cp.protocol!=="https:" || cp.port!=="2083" || cp.pathname!=="/") throw new Error("Staging cPanel endpoint must use HTTPS port 2083.");
+          const root=process.env.CP_ROOT.replace(/^\\/+|\\/+$/g,"");
+          if(!root || root.split("/").some(p=>!p || p==="." || p===".." || p.startsWith("."))) throw new Error("Staging cPanel document root is invalid.");
+          const file=process.env.CP_TEST_FILE;
+          if(!file || file.startsWith("/") || file.split("/").some(p=>!p || p==="." || p===".." || p.startsWith(".")) || !/\\.txt$/i.test(file)) throw new Error("Staging cPanel test file must be a safe relative .txt path.");
+          console.log("ISOLATED_STAGING_CREDENTIALS_VALID");
+          NODE
 
       - name: Diagnostic - verify Cloudflare staging token
         env:
@@ -159,7 +186,8 @@ jobs:
               IRPA_APP_URL:process.env.APP_URL,
               SMTP_HOST:"mail.irpa.or.tz",SMTP_PORT:"465",SMTP_FROM:"info@irpa.or.tz",
               DRIVE_ROOT_FOLDER_NAME:"IRPA Governance System - STAGING",
-              FIRESTORE_COLLECTION_PREFIX:"staging_",DRIVE_MOCK:"false",LOCAL_TEST_MODE:"false"
+              FIRESTORE_COLLECTION_PREFIX:"staging_",DRIVE_MOCK:"false",LOCAL_TEST_MODE:"false",
+              CPANEL_DOCUMENT_ROOT:process.env.CP_ROOT
             },
             kv_namespaces:[{binding:"DRIVE_KV",id:process.env.STAGING_KV_ID}],
             triggers:{crons:["0 * * * *"]}
@@ -189,6 +217,13 @@ jobs:
           GOOGLE_DRIVE_CLIENT_SECRET: ${{ secrets.STAGING_GOOGLE_DRIVE_CLIENT_SECRET }}
           GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY: ${{ secrets.STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY }}
           SMTP_PASSWORD: ${{ secrets.STAGING_SMTP_PASSWORD }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT_JSON }}
+          WP_BASE: ${{ secrets.STAGING_WORDPRESS_BASE_URL }}
+          WP_USER: ${{ secrets.STAGING_WORDPRESS_USERNAME }}
+          WP_PASSWORD: ${{ secrets.STAGING_WORDPRESS_APPLICATION_PASSWORD }}
+          CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
+          CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
+          CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
         working-directory: drive-gateway
         run: |
           set -euo pipefail
@@ -196,6 +231,13 @@ jobs:
           printf '%s' "$GOOGLE_DRIVE_CLIENT_SECRET" | npx wrangler secret put GOOGLE_DRIVE_CLIENT_SECRET --config wrangler.staging.generated.json
           printf '%s' "$GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY" | npx wrangler secret put GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY --config wrangler.staging.generated.json
           printf '%s' "$SMTP_PASSWORD" | npx wrangler secret put SMTP_PASSWORD --config wrangler.staging.generated.json
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" | npx wrangler secret put FIREBASE_SERVICE_ACCOUNT_JSON --config wrangler.staging.generated.json
+          printf '%s' "$WP_BASE" | npx wrangler secret put WORDPRESS_BASE_URL --config wrangler.staging.generated.json
+          printf '%s' "$WP_USER" | npx wrangler secret put WORDPRESS_USERNAME --config wrangler.staging.generated.json
+          printf '%s' "$WP_PASSWORD" | npx wrangler secret put WORDPRESS_APPLICATION_PASSWORD --config wrangler.staging.generated.json
+          printf '%s' "$CP_BASE" | npx wrangler secret put CPANEL_BASE_URL --config wrangler.staging.generated.json
+          printf '%s' "$CP_USER" | npx wrangler secret put CPANEL_USERNAME --config wrangler.staging.generated.json
+          printf '%s' "$CP_TOKEN" | npx wrangler secret put CPANEL_API_TOKEN --config wrangler.staging.generated.json
 
       - name: Install gateway dependencies for bundling
         working-directory: drive-gateway
@@ -209,7 +251,30 @@ jobs:
           workingDirectory: drive-gateway
           command: deploy --config wrangler.staging.generated.json
 
+      - name: Prepare isolated staging reviewer identity
+        env:
+          PROJECT: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT_JSON }}
+          TEST_EMAIL: ${{ secrets.STAGING_TEST_EMAIL }}
+        run: |
+          set -euo pipefail
+          npm --prefix functions install --omit=dev --no-audit --no-fund
+          node <<'NODE'
+          const {initializeApp,cert}=require("./functions/node_modules/firebase-admin/app");
+          const {getAuth}=require("./functions/node_modules/firebase-admin/auth");
+          const {getFirestore}=require("./functions/node_modules/firebase-admin/firestore");
+          const sa=JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+          if(sa.project_id!==process.env.PROJECT) throw new Error("Staging service account project mismatch.");
+          initializeApp({credential:cert(sa),projectId:process.env.PROJECT});
+          (async()=>{
+            const user=await getAuth().getUserByEmail(process.env.TEST_EMAIL);
+            await getFirestore().collection("adminProfiles").doc(user.uid).set({uid:user.uid,email:user.email,role:"Administrator",active:true,updatedAt:new Date().toISOString()},{merge:true});
+            console.log("STAGING_REVIEWER_IDENTITY_READY");
+          })().catch(e=>{console.error("Unable to prepare isolated staging reviewer identity:",e.message);process.exit(1)});
+          NODE
+
       - name: Verify staging health
+        id: staging-health
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -218,9 +283,82 @@ jobs:
           subdomain_json="$(curl --fail --silent --show-error -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Accept: application/json" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain")"
           subdomain="$(node -e 'const a=JSON.parse(process.argv[1]); if(!a.success || !a.result?.subdomain) process.exit(1); process.stdout.write(a.result.subdomain)' "$subdomain_json")"
           test -n "$subdomain"
-          url="https://irpa-google-drive-gateway-staging.$subdomain.workers.dev/health"
-          echo "STAGING_HEALTH_URL=$url"
-          curl --fail --silent --show-error --retry 5 --retry-delay 2 "$url" | tee staging-health.json
+          url="https://irpa-google-drive-gateway-staging.$subdomain.workers.dev"
+          echo "staging_url=$url" >> "$GITHUB_OUTPUT"
+          curl --fail --silent --show-error --retry 5 --retry-delay 2 "$url/health" | tee staging-health.json
           grep -q '"ok":true' staging-health.json
+          grep -q '"environment":"staging"' staging-health.json
+
+      - name: Verify WordPress and cPanel read-write-rollback integration
+        env:
+          STAGING_URL: ${{ steps.staging-health.outputs.staging_url }}
+          FIREBASE_WEB_API_KEY: ${{ secrets.STAGING_FIREBASE_WEB_API_KEY }}
+          TEST_EMAIL: ${{ secrets.STAGING_TEST_EMAIL }}
+          TEST_PASSWORD: ${{ secrets.STAGING_TEST_PASSWORD }}
+          CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
+          CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
+          CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
+          CP_ROOT: ${{ secrets.STAGING_CPANEL_DOCUMENT_ROOT }}
+          CP_TEST_FILE: ${{ secrets.STAGING_CPANEL_TEST_FILE }}
+        run: |
+          set -euo pipefail
+          export ID_TOKEN="$(node <<'NODE'
+          const https=require("https");
+          const body=JSON.stringify({email:process.env.TEST_EMAIL,password:process.env.TEST_PASSWORD,returnSecureToken:true});
+          const req=https.request("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key="+encodeURIComponent(process.env.FIREBASE_WEB_API_KEY),{method:"POST",headers:{"Content-Type":"application/json","Content-Length":Buffer.byteLength(body)}},res=>{
+            let raw="";res.setEncoding("utf8");res.on("data",c=>raw+=c);res.on("end",()=>{let data;try{data=JSON.parse(raw)}catch{console.error("Staging Firebase sign-in returned invalid JSON.");process.exit(1)}if(res.statusCode!==200||!data.idToken){console.error("Staging Firebase sign-in failed with HTTP "+res.statusCode);process.exit(1)}process.stdout.write(data.idToken)});
+          });req.on("error",e=>{console.error("Staging Firebase sign-in request failed:",e.message);process.exit(1)});req.end(body);
+          NODE
+          )"
+          node <<'NODE'
+          const base=process.env.STAGING_URL;
+          const token=process.env.ID_TOKEN;
+          const marker="IRPA_STAGING_WEBSITE_CHECK_"+Date.now();
+          async function call(path,options={}){
+            const response=await fetch(base+path,{...options,headers:{Authorization:"Bearer "+token,Accept:"application/json",...(options.body?{"Content-Type":"application/json"}:{}),...(options.headers||{})}});
+            const body=await response.json().catch(()=>({}));
+            if(!response.ok) throw new Error(path+" returned HTTP "+response.status+": "+String(body.error||"request failed").slice(0,180));
+            return body;
+          }
+          async function waitForPublicMarker(url){
+            for(let i=0;i<6;i++){
+              const response=await fetch(url+(url.includes("?")?"&":"?")+"irpa_staging_check="+Date.now(),{cache:"no-store"});
+              if(response.ok && (await response.text()).includes(marker)) return true;
+              await new Promise(r=>setTimeout(r,1500));
+            }
+            return false;
+          }
+          (async()=>{
+            const status=await call("/api/communications/site/status");
+            if(status.connections?.website!=="connected"||status.connections?.cpanel!=="connected") throw new Error("WordPress or cPanel connection did not authenticate successfully.");
+            let selectedType="pages",items=await call("/api/communications/website/content?type=pages");
+            let page=(items.items||[]).find(x=>x.status==="publish"&&x.link);
+            if(!page){selectedType="posts";items=await call("/api/communications/website/content?type=posts");page=(items.items||[]).find(x=>x.status==="publish"&&x.link)}
+            if(!page) throw new Error("No published staging page or post is available for a reversible integration test.");
+            const original={id:page.id,type:selectedType,title:page.title,content:page.content||""};
+            let modified=false;
+            try{
+              const updated=await call("/api/communications/website/content",{method:"PUT",body:JSON.stringify({...original,title:original.title+" [staging check]",content:original.content+"\n<p>"+marker+"</p>"})});
+              modified=true;
+              if(!updated.success||!await waitForPublicMarker(updated.publicUrl||page.link)) throw new Error("The staged website edit did not render publicly.");
+            }finally{
+              if(modified) await call("/api/communications/website/content",{method:"PUT",body:JSON.stringify(original)});
+            }
+            const cpanelPath=process.env.CP_TEST_FILE;
+            const before=await call("/api/communications/cpanel/files?path="+encodeURIComponent(cpanelPath));
+            if(typeof before.content!=="string") throw new Error("The designated staging cPanel test file could not be read.");
+            const write=await call("/api/communications/cpanel/files",{method:"PUT",body:JSON.stringify({path:cpanelPath,content:marker})});
+            if(!write.backupId) throw new Error("The cPanel write did not return a rollback snapshot.");
+            const after=await call("/api/communications/cpanel/files?path="+encodeURIComponent(cpanelPath));
+            if(after.content!==marker) throw new Error("The cPanel file content did not match the staged write.");
+            await call("/api/communications/cpanel/rollback",{method:"POST",body:JSON.stringify({path:cpanelPath,backupId:write.backupId})});
+            const restored=await call("/api/communications/cpanel/files?path="+encodeURIComponent(cpanelPath));
+            if(restored.content!==before.content) throw new Error("The cPanel rollback did not restore the original content.");
+            const denied=await fetch(base+"/api/communications/cpanel/files?path="+encodeURIComponent("../index.php"),{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
+            if(denied.ok) throw new Error("cPanel traversal/executable path rejection failed.");
+            console.log("STAGING_WORDPRESS_READ_WRITE_PUBLIC_RENDER_RESTORE_PASS");
+            console.log("STAGING_CPANEL_READ_WRITE_ROLLBACK_PATH_REJECTION_PASS");
+          })().catch(e=>{console.error("Staging website integration acceptance failed:",e.message);process.exit(1)});
+          NODE
 
 # Staging proof execution trigger — 2026-10-04
