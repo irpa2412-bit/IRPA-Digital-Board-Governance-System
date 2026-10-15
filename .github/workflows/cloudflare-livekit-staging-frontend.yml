@@ -63,19 +63,20 @@ jobs:
           VITE_LIVEKIT_TOKEN_WORKER_URL: "https://irpa-dgb-livekit-token-staging.irpa-governance.workers.dev"
           VITE_GATEWAY_ORIGIN: "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
           VITE_GOOGLE_DRIVE_GATEWAY_URL: "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
-          # Enable only after the staging Gateway runtime acceptance workflow passes.
+          # Keep disabled until the isolated staging Gateway runtime acceptance workflow passes.
           VITE_IRPA_CRYPTOGRAPHIC_SIGNING_ENABLED: "false"
           VITE_GRANT_CRAWLER_WORKER_URL: "https://staging-disabled.invalid"
           VITE_GRANT_ASSISTANT_WORKER_URL: "https://staging-disabled.invalid"
         run: |
           set -euo pipefail
+          test "$VITE_IRPA_CRYPTOGRAPHIC_SIGNING_ENABLED" = "false"
           npm run build
           test -s dist/index.html
           grep -R -q 'irpa-dbg-staging-a73ec' dist
           grep -R -q 'irpa-dgb-livekit-token-staging.irpa-governance.workers.dev' dist
           grep -R -q 'irpa-google-drive-gateway-staging.irpa-governance.workers.dev' dist
           grep -R -q 'Cryptographic Signing' dist/assets
-          echo "Staging build uses isolated Firebase, the staging Gateway, and the enabled cryptographic signing bridge."
+          echo "Staging build uses isolated Firebase and the staging Gateway; cryptographic signing remains disabled pending runtime acceptance."
 
       - name: Verify Cloudflare deployment credentials
         env:
