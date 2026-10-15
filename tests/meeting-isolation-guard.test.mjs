@@ -35,5 +35,6 @@ test("administrator-recovery paired repairs allow only the reviewed PR file set"
   assert.match(workflow, /changed\.includes\("\.github\/workflows\/meeting-portal-fixture-browser\.yml"\)/);
   assert.match(workflow, /changed\.includes\("tests\/meeting-isolation-guard\.test\.mjs"\)/);
   assert.match(workflow, /changed\.every\(path => adminRecoveryPairedRepairFiles\.has\(path\)\)/);
+  assert.match(workflow, /"\.github\/workflows\/staging-gateway-e2e\.yml"/);
   assert.match(workflow, /!adminResetOnly/);
 });
