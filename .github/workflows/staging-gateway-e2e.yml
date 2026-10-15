@@ -336,6 +336,10 @@ jobs:
               FIRESTORE_COLLECTION_PREFIX:"staging_",DRIVE_MOCK:"false",LOCAL_TEST_MODE:"false"
             },
             kv_namespaces:[{binding:"DRIVE_KV",id:process.env.STAGING_KV_ID}],
+            // The generated config is standalone (not an env.staging overlay), so it must
+            // explicitly carry the isolated signer's Durable Object binding and migration.
+            durable_objects:{bindings:[{name:"ESIGN_DO",class_name:"EsignRecordDurableObject"}]},
+            migrations:[{tag:"esign-do-staging-v1",new_sqlite_classes:["EsignRecordDurableObject"]}],
             triggers:{crons:["0 * * * *"]}
           };
           if(c.vars.FIREBASE_PROJECT_ID==="irpa-digital-board-governance") throw new Error("Production Firebase project forbidden.");
@@ -352,6 +356,8 @@ jobs:
           if(c.vars.IRPA_ENVIRONMENT!=="staging"||c.vars.IRPA_STAGING_CRYPTO_TEST_MODE!=="true"||c.vars.ESIGN_MODULE_ENABLED!=="true") throw new Error("Explicit staging-only e-sign crypto acceptance mode is missing");
           if(c.vars.FIREBASE_PROJECT_ID==="irpa-digital-board-governance") throw new Error("Production Firebase project");
           if(c.kv_namespaces?.[0]?.binding!=="DRIVE_KV") throw new Error("Missing staging KV");
+          if(c.durable_objects?.bindings?.some(b=>b.name==="ESIGN_DO"&&b.class_name==="EsignRecordDurableObject")!==true) throw new Error("Isolated staging signer Durable Object binding missing");
+          if(c.migrations?.some(m=>m.tag==="esign-do-staging-v1"&&m.new_sqlite_classes?.includes("EsignRecordDurableObject"))!==true) throw new Error("Isolated staging signer Durable Object migration missing");
           if(c.triggers?.crons?.[0]!=="0 * * * *") throw new Error("Cleanup cron missing");
           console.log("STAGING_CONFIGURATION_VALID");
           NODE
