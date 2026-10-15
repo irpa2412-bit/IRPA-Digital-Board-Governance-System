@@ -67,7 +67,7 @@ exports.publishCommunicationMediaItem=onCall({
   if(!username||!password)throw new HttpsError("failed-precondition","WordPress publishing secrets are incomplete.");
   const auth="Basic "+Buffer.from(username+":"+password,"utf8").toString("base64");
   const escapeHtml=value=>String(value).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\"/g,"&quot;").replace(/\'/g,"&#39;");
-  const safeContent=body.split(/\\n{2,}/).map(paragraph=>"<p>"+escapeHtml(paragraph).replace(/\\n/g,"<br>")+"</p>").join("\\n");
+  const safeContent=body.split(/\n{2,}/).map(paragraph=>"<p>"+escapeHtml(paragraph).replace(/\n/g,"<br>")+"</p>").join("\n");
   let response;
   try{
     response=await fetch(endpoint,{method:"POST",headers:{"Authorization":auth,"Content-Type":"application/json","Accept":"application/json"},body:JSON.stringify({title,content:safeContent,excerpt:escapeHtml(String(item.summary||"").slice(0,600)),slug:"irpa-"+itemId,status:"publish",comment_status:"closed",ping_status:"closed"}),signal:AbortSignal.timeout(45000)});
