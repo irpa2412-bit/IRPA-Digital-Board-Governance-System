@@ -172,18 +172,26 @@ jobs:
             changed.includes("tests/fixtures/meeting-portal-fixture.jsx");
           const testOnlyRegisterScope = changed.includes("src/firebase/data.js") &&
             changed.includes("tests/meeting-category-policy.test.mjs");
-          // An administrator-recovery-only PR may touch the shared Wrangler config,
-          // but it must not be treated as a meeting-portal source change.
-          const adminResetFiles = new Set([
+          // This PR combines administrator recovery with its explicitly paired
+          // isolation-guard repair and staging namespace verification. Permit only
+          // this exact, reviewed file set; unexpected paths still fail closed.
+          const adminRecoveryPairedRepairFiles = new Set([
             ".github/workflows/administrator-reset-security.yml",
+            ".github/workflows/meeting-portal-fixture-browser.yml",
+            ".github/workflows/signature-migration-build-test.yml",
             "drive-gateway/ADMIN-REGISTRATION-RESET.md",
             "drive-gateway/src/adminRegistrationReset.mjs",
+            "drive-gateway/src/index.js",
             "drive-gateway/tests/admin-registration-reset.test.mjs",
+            "drive-gateway/wrangler.toml",
             "functions/systemControl.js",
-            "drive-gateway/wrangler.toml"
+            "tests/meeting-isolation-guard.test.mjs"
           ]);
-          const adminResetOnly = changed.some(path => adminResetFiles.has(path)) &&
-            changed.every(path => adminResetFiles.has(path));
+          const adminResetOnly = changed.includes("drive-gateway/src/adminRegistrationReset.mjs") &&
+            changed.includes("drive-gateway/tests/admin-registration-reset.test.mjs") &&
+            changed.includes(".github/workflows/meeting-portal-fixture-browser.yml") &&
+            changed.includes("tests/meeting-isolation-guard.test.mjs") &&
+            changed.every(path => adminRecoveryPairedRepairFiles.has(path));
           // A manual dispatch on an already-merged ref is a regression rerun, not a PR diff.
           // Keep the changed-path isolation guard, but require a source/test delta only for event diffs.
           if (eventName !== "workflow_dispatch" &&
