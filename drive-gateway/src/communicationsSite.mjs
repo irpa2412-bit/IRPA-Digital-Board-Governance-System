@@ -46,12 +46,12 @@ function plainContent(body) {
 }
 function sanitizeWordPressContent(value) {
   return String(value || "")
-    .replace(/<\\s*(script|style|iframe|object|embed|form|input|button|textarea|link|meta|svg|math)\\b[^>]*>[\\s\\S]*?<\\/\\s*\\1\\s*>/gi, "")
-    .replace(/<\\s*(script|style|iframe|object|embed|form|input|button|textarea|link|meta|svg|math)\\b[^>]*\\/?\\s*>/gi, "")
-    .replace(/\\s+on[a-z]+\\s*=\\s*(?:"[^"]*"|'[^']*'|[^\\s>]+)/gi, "")
-    .replace(/\\s+(style|srcdoc|formaction|xlink:href|srcset)\\s*=\\s*(?:"[^"]*"|'[^']*'|[^\\s>]+)/gi, "")
-    .replace(/\\s+(href|src)\\s*=\\s*(["'])\\s*(?:javascript|vbscript|data):[\\s\\S]*?\\2/gi, "")
-    .replace(/<\\/?\\s*(?!(?:p|br|h[1-6]|strong|b|em|i|u|ul|ol|li|blockquote|a|img|figure|figcaption|div|span|table|thead|tbody|tr|th|td|hr|pre|code|sup|sub)\\b)[a-z][^>]*>/gi, "")
+    .replace(/<\s*(script|style|iframe|object|embed|form|input|button|textarea|link|meta|svg|math)\b[^>]*>[\s\S]*?<\/\s*\1\s*>/gi, "")
+    .replace(/<\s*(script|style|iframe|object|embed|form|input|button|textarea|link|meta|svg|math)\b[^>]*\/?\s*>/gi, "")
+    .replace(/\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/\s+(style|srcdoc|formaction|xlink:href|srcset)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/\s+(href|src)\s*=\s*(["'])\s*(?:javascript|vbscript|data):[\s\S]*?\2/gi, "")
+    .replace(/<\/?\s*(?!(?:p|br|h[1-6]|strong|b|em|i|u|ul|ol|li|blockquote|a|img|figure|figcaption|div|span|table|thead|tbody|tr|th|td|hr|pre|code|sup|sub)\b)[a-z][^>]*>/gi, "")
     .slice(0, MAX_EDIT_BYTES);
 }
 function safeCpanelPath(input, root) {
