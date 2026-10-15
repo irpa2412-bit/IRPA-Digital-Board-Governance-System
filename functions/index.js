@@ -1717,7 +1717,7 @@ exports.resetTrialData = onCall({region:"us-central1"}, async request => {
 // attests that final system testing has passed. The setting is server-controlled.
 function actualDataAdministrator(request, profile) {
   const email=String(request.auth?.token?.email||profile?.email||"").trim().toLowerCase();
-  return email==="irpa2412@gmail.com" || profile?.active===true || request.auth?.token?.admin===true;
+  return email==="irpa2412@gmail.com" || request.auth?.token?.admin===true || (profile?.active===true && profile?.role==="Administrator" && profile?.uid===request.auth?.uid);
 }
 exports.getActualDataAccessStatus = onCall({region:"us-central1"}, async request => {
   if(!request.auth?.uid) throw new HttpsError("unauthenticated","Authentication is required.");
