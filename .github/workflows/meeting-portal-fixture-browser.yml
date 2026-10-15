@@ -129,7 +129,21 @@ jobs:
             "tests/fixtures/mocks.js",
             "tests/meeting-portal-browser.test.mjs",
             "tests/meeting-room-authorization-boundary.test.mjs",
-            "vite.meeting-fixture.config.js"
+            "vite.meeting-fixture.config.js",
+            ".github/workflows/authenticated-governance-browser-fixture.yml",
+            ".github/workflows/cloudflare-esignature-tests.yml",
+            ".github/workflows/document-lifecycle-module-test.yml",
+            ".github/workflows/document-translation-workspace-test.yml",
+            ".github/workflows/fundraising-responsive-smoke.yml",
+            ".github/workflows/meeting-media-governance.yml",
+            ".github/workflows/meeting-room-ai-assistant-verification.yml",
+            ".github/workflows/pdf-esignature-tests.yml",
+            ".github/workflows/portal-navigation-regression.yml",
+            ".github/workflows/readability-release-gate.yml",
+            "src/main.jsx",
+            "src/styles/portal-readability-standard.css",
+            "tests/browser/authenticated-governance-regression.spec.mjs",
+            "tests/portal-readability-standard.test.mjs"
           ]);
           const unexpected = changed.filter(path => !allowed.has(path));
           if (unexpected.length) {
@@ -169,12 +183,32 @@ jobs:
             changed.includes("tests/fixtures/meeting-portal-fixture.jsx");
           const testOnlyRegisterScope = changed.includes("src/firebase/data.js") &&
             changed.includes("tests/meeting-category-policy.test.mjs");
+          // Readability-only PRs may update the shared theme, its dedicated tests, and explicitly listed CI path filters.
+          // Keep this exception narrow: no meeting or unrelated portal implementation files may be included.
+          const readabilityOnlyFiles = new Set([
+            ".github/workflows/authenticated-governance-browser-fixture.yml",
+            ".github/workflows/cloudflare-esignature-tests.yml",
+            ".github/workflows/document-lifecycle-module-test.yml",
+            ".github/workflows/document-translation-workspace-test.yml",
+            ".github/workflows/fundraising-responsive-smoke.yml",
+            ".github/workflows/meeting-media-governance.yml",
+            ".github/workflows/meeting-room-ai-assistant-verification.yml",
+            ".github/workflows/pdf-esignature-tests.yml",
+            ".github/workflows/portal-navigation-regression.yml",
+            ".github/workflows/readability-release-gate.yml",
+            "src/main.jsx",
+            "src/styles/portal-readability-standard.css",
+            "tests/browser/authenticated-governance-regression.spec.mjs",
+            "tests/portal-readability-standard.test.mjs"
+          ]);
+          const readabilityOnlyChange = changed.includes("src/styles/portal-readability-standard.css") &&
+            changed.every(path => readabilityOnlyFiles.has(path));
           // A manual dispatch on an already-merged ref is a regression rerun, not a PR diff.
           // Keep the changed-path isolation guard, but require a source/test delta only for event diffs.
           if (eventName !== "workflow_dispatch" &&
               !changed.includes("src/pages/Meetings.jsx") &&
               !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
-              !testOnlySignatureNavigation && !testOnlyRegisterScope && !guardOnlyWorkflowRepair) {
+              !testOnlySignatureNavigation && !testOnlyRegisterScope && !guardOnlyWorkflowRepair && !readabilityOnlyChange) {
             throw new Error("Meeting/participant source change or an explicitly paired isolated regression/guard test is missing.");
           }
           console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));
