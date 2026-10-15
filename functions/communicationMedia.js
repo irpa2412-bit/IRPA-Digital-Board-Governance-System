@@ -16,7 +16,7 @@ function roleValues(record){
     .filter(Boolean).flatMap(v=>String(v).split(",").map(s=>s.trim()).filter(Boolean));
 }
 function isActive(record){
-  return !!record && (["Active","Activated"].includes(String(record.status||""))||record.registrationStatus==="Activated"||record.employmentStatus==="Active");
+  return !!record&&(["Active","Activated"].includes(String(record.status||""))||record.registrationStatus==="Activated"||record.employmentStatus==="Active");
 }
 async function accessFor(uid,email,tokenRoles=[]){
   if(email==="irpa2412@gmail.com"||tokenRoles.includes("Administrator"))return {admin:true,author:true,reviewer:true,roles:["Administrator"]};
@@ -31,6 +31,14 @@ async function accessFor(uid,email,tokenRoles=[]){
   const roles=[...new Set([...tokenRoles,...roleValues(member),...roleValues(employee)])];
   const active=admin||isActive(member)||isActive(employee);
   return {admin,author:admin||(active&&roles.some(r=>AUTHOR_ROLES.includes(r))),reviewer:admin||(active&&roles.some(r=>REVIEW_ROLES.includes(r))),roles};
+}
+async function restoreApproved(ref,uid,email,reason){
+  try{await ref.update({status:"Approved",lastPublishError:String(reason||"Publishing failed").slice(0,300),updatedAt:FieldValue.serverTimestamp(),updatedByUid:uid,updatedByEmail:email});}catch(error){console.error("IRPA publishing state recovery failed",error?.name||"Error");}
+}
+async function markPublished(ref,itemId,item,post,uid,email){
+  await ref.update({status:"Published",wpPostId:post.id,publicUrl:String(post.link),publishedAt:FieldValue.serverTimestamp(),publishedByUid:uid,publishedByEmail:email,updatedAt:FieldValue.serverTimestamp(),updatedByUid:uid,updatedByEmail:email,lastPublishError:null});
+  await db.collection("audit").add({action:"COMMUNICATION_MEDIA_PUBLISHED",category:"COMMUNICATIONS",collection:"communicationMediaItems",recordId:itemId,actorUid:uid,actorEmail:email,details:{type:item.type,channel:item.channel,wpPostId:post.id,publicUrl:String(post.link),approvedBeforePublishing:true,reconciledFromExistingPost:post.reconciled===true},createdAt:FieldValue.serverTimestamp()});
+  return {success:true,publicUrl:String(post.link),wpPostId:post.id,message:post.reconciled?"An existing WordPress post was reconciled with the IRPA record; no duplicate was created.":"Approved content was published to the IRPA website."};
 }
 
 exports.publishCommunicationMediaItem=onCall({
@@ -48,17 +56,17 @@ exports.publishCommunicationMediaItem=onCall({
   const itemId=String(request.data?.itemId||"").trim();
   if(!/^[A-Za-z0-9_-]{1,150}$/.test(itemId))throw new HttpsError("invalid-argument","A valid communications item ID is required.");
   const ref=db.collection("communicationMediaItems").doc(itemId);
-  const snap=await ref.get();
-  if(!snap.exists)throw new HttpsError("not-found","The communications item was not found.");
-  const item=snap.data()||{};
+  const initial=await ref.get();
+  if(!initial.exists)throw new HttpsError("not-found","The communications item was not found.");
+  const item=initial.data()||{};
   if(item.status==="Published"&&item.wpPostId&&item.publicUrl)return {success:true,alreadyPublished:true,publicUrl:item.publicUrl,message:"This item is already published; no duplicate post was created."};
   if(item.status!=="Approved")throw new HttpsError("failed-precondition","Only content with recorded Approved status can be published.");
-  if(!["Website Article","Press Release"].includes(item.type))throw new HttpsError("failed-precondition","Only website articles and press releases can be published through WordPress.");
+  if(!["Website Article","Press Release"].includes(item.type)||!["IRPA Website","Press / Media"].includes(item.channel))throw new HttpsError("failed-precondition","Only approved website articles and press releases can be published through WordPress.");
   const title=String(item.title||"").trim();
   const body=String(item.body||"").trim();
   if(!title||!body||title.length>180||body.length>30000)throw new HttpsError("failed-precondition","The approved item is missing required content or exceeds the permitted length.");
   let base;
-  try{base=new URL(WORDPRESS_BASE_URL.value())}catch{throw new HttpsError("failed-precondition","WORDPRESS_BASE_URL is not a valid URL.");}
+  try{base=new URL(WORDPRESS_BASE_URL.value());}catch{throw new HttpsError("failed-precondition","WORDPRESS_BASE_URL is not a valid URL.");}
   if(base.protocol!=="https:"||base.username||base.password||base.search||base.hash)throw new HttpsError("failed-precondition","The WordPress base URL must be a clean HTTPS URL without embedded credentials, query strings or fragments.");
   const root=base.toString().replace(/\/$/,"");
   const endpoint=root+"/wp-json/wp/v2/posts";
@@ -66,22 +74,55 @@ exports.publishCommunicationMediaItem=onCall({
   const password=WORDPRESS_APPLICATION_PASSWORD.value().replace(/\s/g,"");
   if(!username||!password)throw new HttpsError("failed-precondition","WordPress publishing secrets are incomplete.");
   const auth="Basic "+Buffer.from(username+":"+password,"utf8").toString("base64");
-  const escapeHtml=value=>String(value).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\"/g,"&quot;").replace(/\'/g,"&#39;");
+  const escapeHtml=value=>String(value).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
   const safeContent=body.split(/\n{2,}/).map(paragraph=>"<p>"+escapeHtml(paragraph).replace(/\n/g,"<br>")+"</p>").join("\n");
-  let response;
+
+  // Acquire a short Firestore publishing lock before contacting WordPress.
+  // A retry can reclaim a stale lock, then reconcile by deterministic post slug.
+  let lock;
+  try{
+    lock=await db.runTransaction(async tx=>{
+      const latest=await tx.get(ref);
+      if(!latest.exists)throw new HttpsError("not-found","The communications item was not found.");
+      const current=latest.data()||{};
+      if(current.status==="Published"&&current.wpPostId&&current.publicUrl)return {alreadyPublished:true,current};
+      if(current.status==="Publishing"){
+        const started=current.publishStartedAt?.toDate?.()?.getTime?.()||0;
+        if(started&&Date.now()-started<5*60*1000)throw new HttpsError("aborted","A publishing attempt is already in progress. Wait before retrying.");
+      }else if(current.status!=="Approved"){
+        throw new HttpsError("failed-precondition","The item must remain Approved before publishing.");
+      }
+      tx.update(ref,{status:"Publishing",publishStartedAt:FieldValue.serverTimestamp(),publishStartedByUid:uid,updatedAt:FieldValue.serverTimestamp(),updatedByUid:uid,updatedByEmail:email});
+      return {alreadyPublished:false,current};
+    });
+  }catch(error){throw error instanceof HttpsError?error:new HttpsError("aborted","Could not safely reserve this item for publishing.");}
+  if(lock.alreadyPublished)return {success:true,alreadyPublished:true,publicUrl:lock.current.publicUrl,message:"This item is already published; no duplicate post was created."};
+  let existingResponse,existingPosts;
+  try{
+    existingResponse=await fetch(endpoint+"?slug="+encodeURIComponent("irpa-"+itemId)+"&status=publish,draft,pending,private&per_page=1",{headers:{"Authorization":auth,"Accept":"application/json"},signal:AbortSignal.timeout(20000)});
+    existingPosts=await existingResponse.json().catch(()=>null);
+    if(!existingResponse.ok||!Array.isArray(existingPosts))throw new Error("WordPress idempotency lookup failed");
+  }catch(error){
+    await restoreApproved(ref,uid,email,"WordPress post lookup failed; no new post was attempted.");
+    console.error("IRPA WordPress idempotency lookup failed",error?.name||"Error");
+    throw new HttpsError("unavailable","Could not safely check whether WordPress already contains this item. The item remains approved for a safe retry.");
+  }
+  if(existingPosts.length&&Number.isInteger(existingPosts[0]?.id)&&existingPosts[0]?.link){
+    return await markPublished(ref,itemId,item,{id:existingPosts[0].id,link:existingPosts[0].link,reconciled:true},uid,email);
+  }
+  let response,payload;
   try{
     response=await fetch(endpoint,{method:"POST",headers:{"Authorization":auth,"Content-Type":"application/json","Accept":"application/json"},body:JSON.stringify({title,content:safeContent,excerpt:escapeHtml(String(item.summary||"").slice(0,600)),slug:"irpa-"+itemId,status:"publish",comment_status:"closed",ping_status:"closed"}),signal:AbortSignal.timeout(45000)});
+    payload=await response.json().catch(()=>({}));
   }catch(error){
+    await restoreApproved(ref,uid,email,"WordPress publish request did not return a confirmed response.");
     console.error("IRPA WordPress publishing network failure",error?.name||"Error");
-    throw new HttpsError("unavailable","The IRPA website could not be reached. The approved item remains approved and can be retried.");
+    throw new HttpsError("unavailable","The IRPA website did not return a confirmed publishing response. The approved item can be retried safely.");
   }
-  const payload=await response.json().catch(()=>({}));
   if(!response.ok||!Number.isInteger(payload.id)||!payload.link){
+    await restoreApproved(ref,uid,email,"WordPress rejected the publishing request.");
     console.error("IRPA WordPress publishing rejected",JSON.stringify({status:response.status,code:payload.code||null}));
-    throw new HttpsError("failed-precondition","WordPress rejected the publishing request. The item remains approved; verify the dedicated account's post-publishing permissions.");
+    throw new HttpsError("failed-precondition","WordPress rejected the publishing request. The item remains approved; verify the dedicated account's publishing permissions.");
   }
-  const publishedAt=FieldValue.serverTimestamp();
-  await ref.update({status:"Published",wpPostId:payload.id,publicUrl:String(payload.link),publishedAt,publishedByUid:uid,publishedByEmail:email,updatedAt:publishedAt,updatedByUid:uid,updatedByEmail:email});
-  await db.collection("audit").add({action:"COMMUNICATION_MEDIA_PUBLISHED",category:"COMMUNICATIONS",collection:"communicationMediaItems",recordId:itemId,actorUid:uid,actorEmail:email,details:{type:item.type,channel:item.channel,wpPostId:payload.id,publicUrl:String(payload.link),approvedBeforePublishing:true},createdAt:FieldValue.serverTimestamp()});
-  return {success:true,publicUrl:String(payload.link),wpPostId:payload.id,message:"Approved content was published to the IRPA website."};
+  return await markPublished(ref,itemId,item,payload,uid,email);
 });
