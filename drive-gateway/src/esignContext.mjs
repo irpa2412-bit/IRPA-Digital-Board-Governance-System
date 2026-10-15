@@ -145,8 +145,8 @@ function driveStorage(env, helpers) {
       const token=await helpers.getDriveAccessToken(env);
       const meta={name,parents:[folder],mimeType:contentType,description:JSON.stringify(metadata||{})};
       const boundary="esign-"+crypto.randomUUID(), enc=new TextEncoder();
-      const head=enc.encode(`--${boundary}\\r\\nContent-Type: application/json; charset=UTF-8\\r\\n\\r\\n${JSON.stringify(meta)}\\r\\n--${boundary}\\r\\nContent-Type: ${contentType}\\r\\n\\r\\n`);
-      const tail=enc.encode(`\\r\\n--${boundary}--`), body=new Uint8Array(head.length+bytes.length+tail.length);
+      const head=enc.encode(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${boundary}\r\nContent-Type: ${contentType}\r\n\r\n`);
+      const tail=enc.encode(`\r\n--${boundary}--`), body=new Uint8Array(head.length+bytes.length+tail.length);
       body.set(head); body.set(bytes,head.length); body.set(tail,head.length+bytes.length);
       const r=await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink",{method:"POST",headers:{Authorization:`Bearer ${token}`,"Content-Type":`multipart/related; boundary=${boundary}`},body});
       const x=await r.json(); if(!r.ok) throw new Error(x.error?.message||"Google Drive upload failed.");
