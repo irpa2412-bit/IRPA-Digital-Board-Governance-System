@@ -132,19 +132,15 @@
 
 /* Keep labels and structural headings legible even when a legacy portal supplies
    a pale inline text color. This is presentation-only and does not touch access. */
-#root .app-shell .content-area .page :where(h1, h2, h3, h4, h5, h6, label, table th) {
+#root .app-shell .content-area:not(.dashboard-content-area) .page :where(h1, h2, h3, h4, h5, h6, label, table th) {
   color: var(--irpa-readable-text) !important;
   -webkit-text-fill-color: var(--irpa-readable-text) !important;
   opacity: 1 !important;
 }
 
 
-/* Keep Dashboard headings dark on light cards; hero text is white on its deep-green gradient. */
-#root .app-shell .content-area.dashboard-content-area .page :where(h1, h2, h3, h4, h5, h6) {
-  color: var(--irpa-readable-text) !important;
-  -webkit-text-fill-color: var(--irpa-readable-text) !important;
-}
-#root .app-shell .content-area.dashboard-content-area .page :where(.dashboard-hero, .mobile-dashboard-hero) :where(h1, h2, h3, h4, h5, h6, p, span, small, .muted) {
+/* Preserve the Dashboard's own light-card/dark-gradient text pairing; force readable white copy only on dark hero surfaces. */
+#root .app-shell .content-area.dashboard-content-area .page :where(.dashboard-hero, .mobile-dashboard-hero) :where(p, span, small, .muted) {
   color: #ffffff !important;
   -webkit-text-fill-color: #ffffff !important;
 }
