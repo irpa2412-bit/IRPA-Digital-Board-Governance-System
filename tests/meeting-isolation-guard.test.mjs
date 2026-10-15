@@ -35,3 +35,8 @@ test("Signature Gateway integration must include its portal bridge and authentic
   assert.match(workflow, /changed\.includes\("drive-gateway\/tests\/controlled-authenticated-signing-flow\.test\.mjs"\)/);
   assert.match(workflow, /!signatureGatewayIntegration/);
 });
+
+test("Signature Gateway isolation does not exempt unrelated staging admin reset workflows", () => {
+  assert.match(workflow, /!allowed\\.has\\(path\\).*signatureGatewayIntegration/);
+  assert.doesNotMatch(workflow, /staging-admin-reset-fixture\\.yml/);
+});
