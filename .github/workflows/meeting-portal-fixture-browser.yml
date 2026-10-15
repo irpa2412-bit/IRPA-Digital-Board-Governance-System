@@ -80,6 +80,8 @@ jobs:
           const allowed = new Set([
             ".github/workflows/meeting-portal-fixture-browser.yml",
             "tests/meeting-isolation-guard.test.mjs",
+            "docs/ACTUAL_DATA_ACCESS_GATE.md",
+            "src/components/ActualDataAccessControl.jsx",
             ".github/workflows/meeting-invitation-flow-ci.yml",
             ".github/workflows/mail-invitation-tests.yml",
             "drive-gateway/src/index.js",
