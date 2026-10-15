@@ -69,12 +69,12 @@ function safeCpanelPath(input, root) {
   return { dir: base + (raw.includes("/") ? "/" + raw.split("/").slice(0, -1).join("/") : ""), file: filename, relative: raw };
 }
 function safeCpanelDirectory(input, root) {
-  const raw = String(input || "").replace(/\\\\/g, "/").trim();
-  if (!raw) return String(root || "public_html").replace(/^\\/+|\\/+$/g, "");
-  if (raw.startsWith("/") || raw.includes("\\0") || raw.split("/").some(p => !p || p === "." || p === ".." || p.startsWith("."))) {
+  const raw = String(input || "").replace(/\\/g, "/").trim();
+  if (!raw) return String(root || "public_html").replace(/^\/+|\/+$/g, "");
+  if (raw.startsWith("/") || raw.includes("\0") || raw.split("/").some(p => !p || p === "." || p === ".." || p.startsWith("."))) {
     throw new Error("Invalid website directory path.");
   }
-  return String(root || "public_html").replace(/^\\/+|\\/+$/g, "") + "/" + raw;
+  return String(root || "public_html").replace(/^\/+|\/+$/g, "") + "/" + raw;
 }
 
 function authHeader(username, token) {
