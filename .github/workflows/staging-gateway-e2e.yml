@@ -163,7 +163,8 @@ jobs:
               DRIVE_ROOT_FOLDER_NAME:"IRPA Governance System - STAGING",
               FIRESTORE_COLLECTION_PREFIX:"staging_",DRIVE_MOCK:"false",LOCAL_TEST_MODE:"false",
               IRPA_ENVIRONMENT:"staging",ESIGN_MODULE_ENABLED:"false",CLOUDFLARE_AUTH_FUNCTIONS_ENABLED:"false",
-              ADMIN_REGISTRATION_RESET_ENABLED:"true"
+              ADMIN_REGISTRATION_RESET_ENABLED:"true",
+              STAGING_ADMIN_RESET_TEST_UID:"qv5soS4LGra78iNqJpAVq0RpMUv1"
             },
             kv_namespaces:[{binding:"DRIVE_KV",id:process.env.STAGING_KV_ID}],
             triggers:{crons:["0 * * * *"]}
@@ -180,6 +181,7 @@ jobs:
           const c=require("./wrangler.staging.generated.json");
           if(c.name!=="irpa-google-drive-gateway-staging") throw new Error("Worker boundary mismatch");
           if(c.vars.FIREBASE_PROJECT_ID==="irpa-digital-board-governance") throw new Error("Production Firebase project");
+          if(c.vars.IRPA_ENVIRONMENT!=="staging" || c.vars.ADMIN_REGISTRATION_RESET_ENABLED!=="true" || c.vars.STAGING_ADMIN_RESET_TEST_UID!=="qv5soS4LGra78iNqJpAVq0RpMUv1") throw new Error("Staging recovery test configuration mismatch");
           if(c.kv_namespaces?.[0]?.binding!=="DRIVE_KV") throw new Error("Missing staging KV");
           if(c.triggers?.crons?.[0]!=="0 * * * *") throw new Error("Cleanup cron missing");
           console.log("STAGING_CONFIGURATION_VALID");
