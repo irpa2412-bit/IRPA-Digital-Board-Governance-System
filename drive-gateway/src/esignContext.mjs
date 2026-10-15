@@ -126,23 +126,22 @@ function doMeta(env) {
     async list(c){ const keys=(await doCall(env.ESIGN_DO,"__index__",{op:"list",key:"__index__"})).keys.filter(k=>k.startsWith(c+"/")); const out=[]; for(const k of keys){const r=await doCall(env.ESIGN_DO,k,{op:"get",key:k}); if(r.value) out.push({id:k.slice(c.length+1),...r.value});} return out; }
   };
 }
-async function driveFolder(env, accessToken, path) {
-  let parent=await findFolder(env,accessToken,"IRPA Governance System",null);
-  for(const part of path.split("/").filter(Boolean)) parent=await findFolder(env,accessToken,part,parent);
+async function driveFolder(env, accessToken, path, driveFetchImpl) {
+  let parent=await findFolder(env,accessToken,"IRPA Governance System",null,driveFetchImpl);
+  for(const part of path.split("/").filter(Boolean)) parent=await findFolder(env,accessToken,part,parent,driveFetchImpl);
   return parent;
 }
-async function findFolder(env,token,name,parent) {
+async function findFolder(env,token,name,parent,driveFetchImpl) {
   const q=[`name='${name.replaceAll("'","\\'")}'`,"mimeType='application/vnd.google-apps.folder'","trashed=false",parent?`'${parent}' in parents`:null].filter(Boolean).join(" and ");
-  const x=await driveFetch(env,token,"/drive/v3/files?q="+encodeURIComponent(q)+"&spaces=drive&pageSize=10&fields=files(id)");
+  const x=await driveFetchImpl(env,token,"/drive/v3/files?q="+encodeURIComponent(q)+"&spaces=drive&pageSize=10&fields=files(id)");
   if(x.files?.[0]?.id) return x.files[0].id;
-  return (await driveFetch(env,token,"/drive/v3/files",{method:"POST",body:JSON.stringify({name,mimeType:"application/vnd.google-apps.folder",...(parent?{parents:[parent]}:{})})})).id;
+  return (await driveFetchImpl(env,token,"/drive/v3/files",{method:"POST",body:JSON.stringify({name,mimeType:"application/vnd.google-apps.folder",...(parent?{parents:[parent]}:{})})})).id;
 }
 function driveStorage(env, helpers) {
   if(env.DRIVE_MOCK==="true") return mockStorage();
   return {
     async put({path,bytes,contentType,metadata}) {
-      const parts=path.split("/"); const name=parts.pop(); const folder=await driveFolder(env,await helpers.getDriveAccessToken(env),parts.join("/"));
-      const token=await helpers.getDriveAccessToken(env);
+      const parts=path.split("/"); const name=parts.pop(); const token=await helpers.getDriveAccessToken(env); const folder=await driveFolder(env,token,parts.join("/"),helpers.driveFetch);
       const meta={name,parents:[folder],mimeType:contentType,description:JSON.stringify(metadata||{})};
       const boundary="esign-"+crypto.randomUUID(), enc=new TextEncoder();
       const head=enc.encode(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${boundary}\r\nContent-Type: ${contentType}\r\n\r\n`);
