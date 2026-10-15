@@ -200,6 +200,10 @@ jobs:
           npm install
           npm run build
 
+      - name: Install gateway dependencies for production secret configuration
+        working-directory: drive-gateway
+        run: npm ci --no-audit --no-fund
+
       - name: Configure production website-management secrets
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
