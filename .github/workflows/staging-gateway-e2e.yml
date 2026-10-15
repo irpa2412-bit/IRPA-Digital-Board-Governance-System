@@ -32,7 +32,7 @@ jobs:
         working-directory: drive-gateway
       - name: Validate runtime acceptance script syntax
         working-directory: drive-gateway
-        run: node --check tests/staging-runtime-acceptance.mjs
+        run: node --check drive-gateway/tests/staging-runtime-acceptance.mjs
       - name: Firestore emulator E2E
         run: |
           set -o pipefail
@@ -291,6 +291,6 @@ jobs:
           STAGING_CRYPTO_TEST_SIGNER_UID: ${{ steps.staging_crypto_key.outputs.signer_uid }}
           STAGING_CRYPTO_TEST_KEY_ID: ${{ steps.staging_crypto_key.outputs.key_id }}
         working-directory: drive-gateway
-        run: node tests/staging-runtime-acceptance.mjs
+        run: node drive-gateway/tests/staging-runtime-acceptance.mjs
 
 # Staging proof execution trigger — 2026-10-04
