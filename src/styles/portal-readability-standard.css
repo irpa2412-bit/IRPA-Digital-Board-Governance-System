@@ -157,14 +157,26 @@
   opacity: 1 !important;
 }
 
-/* Desktop Quick Access is a light panel; mobile Quick Access is a blue panel. */
-#root .app-shell .content-area.dashboard-content-area .page .dashboard-quote4-quick .quote4-heading h2 {
-  color: #17372b !important;
-  -webkit-text-fill-color: #17372b !important;
-}
+/* Both desktop and mobile Quick Access panels use blue surfaces; retain white heading text. */
+#root .app-shell .content-area.dashboard-content-area .page .dashboard-quote4-quick .quote4-heading h2,
 #root .app-shell .content-area.dashboard-content-area .page .mobile-quote1-quick .mobile-quote1-heading h2 {
   color: #ffffff !important;
   -webkit-text-fill-color: #ffffff !important;
+}
+
+/* Text-button actions inside colored workflow panels use a light button surface so the blue action text stays legible. */
+#root .app-shell .content-area:not(.dashboard-content-area) .page button.text-button {
+  color: #18364f !important;
+  -webkit-text-fill-color: #18364f !important;
+  background-color: #ffffff !important;
+  border: 1px solid #718a80 !important;
+  text-decoration: none;
+}
+#root .app-shell .content-area:not(.dashboard-content-area) .page button.text-button:hover {
+  color: #102a3d !important;
+  -webkit-text-fill-color: #102a3d !important;
+  background-color: #f4f8f5 !important;
+  text-decoration: underline;
 }
 
 /* Text buttons are link-like controls; avoid blue-on-blue by keeping their surface transparent. */
