@@ -431,7 +431,15 @@ jobs:
               const after=await call("/api/communications/cpanel/files?path="+encodeURIComponent(cpanelPath));
               if(after.content!==marker) throw new Error("The cPanel file content did not match the staged write.");
             }finally{
-              if(backupId) await call("/api/communications/cpanel/rollback",{method:"POST",body:JSON.stringify({path:cpanelPath,backupId})});
+              if(backupId){
+                await call("/api/communications/cpanel/rollback",{method:"POST",body:JSON.stringify({path:cpanelPath,backupId})});
+              }else{
+                const root=process.env.CP_ROOT.replace(/^\/+|\/+$/g,"");
+                const cpFile=cpanelPath.split("/").pop();
+                const response=await fetch(new URL("/execute/Fileman/save_file_content",process.env.CP_BASE),{method:"POST",headers:{Authorization:"cpanel "+process.env.CP_USER+":"+process.env.CP_TOKEN,Accept:"application/json","Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({dir:root,file:cpFile,content:before.content,charset:"utf-8"})});
+                const result=await response.json().catch(()=>null);
+                if(!response.ok||result?.status!==1) throw new Error("Emergency restoration of the staging cPanel test file failed.");
+              }
             }
             const restored=await call("/api/communications/cpanel/files?path="+encodeURIComponent(cpanelPath));
             if(restored.content!==before.content) throw new Error("The cPanel rollback did not restore the original content.");
