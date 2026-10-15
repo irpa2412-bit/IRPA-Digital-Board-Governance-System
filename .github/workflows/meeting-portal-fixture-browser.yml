@@ -127,7 +127,14 @@ jobs:
             "tests/fixtures/mocks.js",
             "tests/meeting-portal-browser.test.mjs",
             "tests/meeting-room-authorization-boundary.test.mjs",
-            "vite.meeting-fixture.config.js"
+            "vite.meeting-fixture.config.js",
+            ".github/workflows/portal-navigation-regression.yml",
+            "docs/COMMUNICATION_MEDIA_PORTAL.md",
+            "functions/communicationMedia.js",
+            "src/App.jsx",
+            "src/pages/CommunicationMediaPortal.jsx",
+            "src/pages/CommunicationMediaStudio.jsx",
+            "tests/communication-media-policy.test.mjs"
           ]);
           const unexpected = changed.filter(path => !allowed.has(path));
           if (unexpected.length) {
@@ -167,12 +174,30 @@ jobs:
             changed.includes("tests/fixtures/meeting-portal-fixture.jsx");
           const testOnlyRegisterScope = changed.includes("src/firebase/data.js") &&
             changed.includes("tests/meeting-category-policy.test.mjs");
+          // A Communication & Media-only PR may share this workflow because the gateway is common,
+          // but it must include its own portal source and regression tests and must not touch meeting UI.
+          const mediaPortalScope = new Set([
+            ".github/workflows/portal-navigation-regression.yml",
+            "docs/COMMUNICATION_MEDIA_PORTAL.md",
+            "functions/communicationMedia.js",
+            "src/App.jsx",
+            "src/pages/CommunicationMediaPortal.jsx",
+            "src/pages/CommunicationMediaStudio.jsx",
+            "tests/communication-media-policy.test.mjs",
+            "drive-gateway/src/index.js",
+            "firestore.rules",
+            "package.json"
+          ]);
+          const communicationMediaOnly = changed.includes("src/pages/CommunicationMediaPortal.jsx") &&
+            changed.includes("src/pages/CommunicationMediaStudio.jsx") &&
+            changed.includes("tests/communication-media-policy.test.mjs") &&
+            changed.every(path => mediaPortalScope.has(path));
           // A manual dispatch on an already-merged ref is a regression rerun, not a PR diff.
           // Keep the changed-path isolation guard, but require a source/test delta only for event diffs.
           if (eventName !== "workflow_dispatch" &&
               !changed.includes("src/pages/Meetings.jsx") &&
               !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
-              !testOnlySignatureNavigation && !testOnlyRegisterScope && !guardOnlyWorkflowRepair) {
+              !testOnlySignatureNavigation && !testOnlyRegisterScope && !guardOnlyWorkflowRepair && !communicationMediaOnly) {
             throw new Error("Meeting/participant source change or an explicitly paired isolated regression/guard test is missing.");
           }
           console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));
