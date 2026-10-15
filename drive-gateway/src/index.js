@@ -7,7 +7,7 @@ const ALLOWED_CONTENT_TYPES = new Set([
   "application/vnd.oasis.opendocument.text","application/vnd.oasis.opendocument.spreadsheet","application/vnd.oasis.opendocument.presentation",
   "application/rtf","text/plain","text/csv","text/tab-separated-values","text/markdown","text/html","application/xhtml+xml",
   "application/epub+zip","application/json","application/xml","text/xml","image/png","image/jpeg","image/webp","image/svg+xml",
-  "video/mp4","video/webm","audio/mpeg","audio/wav","audio/x-wav","audio/webm","audio/mp4"
+  "image/gif","image/bmp","image/tiff","image/avif","application/zip","video/mp4","video/webm","video/quicktime","video/x-msvideo","video/x-matroska","audio/mpeg","audio/wav","audio/x-wav","audio/webm","audio/mp4","audio/x-m4a","audio/aac","audio/ogg","audio/flac"
 ]);
 const OAUTH_STATE_TTL = 600;
 const SMTP_HOST = "mail.irpa.or.tz";
@@ -356,6 +356,9 @@ async function upload(request, env) {
   const fileSize = Number(data.fileSize || 0);
   const base64 = String(data.base64 || "");
   const purpose = cleanName(data.purpose || "Controlled Documents");
+  if (purpose === "Communication Media" && !(await authorizeCommunicationMediaDownload(env, claims))) {
+    return json({ ok:false, error:"Your registered IRPA role does not permit communications media uploads." },403,corsHeaders(request));
+  }
   const requestedFolderId = String(data.folderId || "").trim();
   const ownerUid = String(data.ownerUid || claims.user_id).trim();
   const signatureDocumentId = cleanId(data.documentId || "");
@@ -410,7 +413,7 @@ async function upload(request, env) {
   if (!ALLOWED_CONTENT_TYPES.has(contentType)) {
     return json({ ok: false, error: "This document format is not supported. Use PDF, Word, Excel, PowerPoint, OpenDocument, text/CSV, or supported image formats." }, 400, corsHeaders(request));
   }
-  const maxUploadBytes = purpose === "Meeting Products" ? 60 * 1024 * 1024 : MAX_BYTES;
+  const maxUploadBytes = purpose === "Meeting Products" ? 60 * 1024 * 1024 : purpose === "Communication Media" ? 25 * 1024 * 1024 : MAX_BYTES;
   if (!Number.isFinite(fileSize) || fileSize <= 0 || fileSize > maxUploadBytes) {
     return json({ ok: false, error: purpose === "Meeting Products" ? "Meeting products must not exceed 60 MB per file in this upload workflow." : "Uploaded files must not exceed 10 MB." }, 400, corsHeaders(request));
   }
@@ -654,6 +657,28 @@ async function uploadControlledDocument(request, env) {
   },200,corsHeaders(request));
 }
 
+function communicationMediaRoleValues(record){
+  if(!record)return [];
+  return [record.role,record.title,record.position,record.departmentalRole,record.boardPosition,record.unit,record.unitName,...(Array.isArray(record.roles)?record.roles:[]),...(Array.isArray(record.assignedRoles)?record.assignedRoles:[]),...(Array.isArray(record.selectedRoles)?record.selectedRoles:[]),...(Array.isArray(record.roleAssignments)?record.roleAssignments:[])]
+    .filter(Boolean).flatMap(value=>String(value).split(",").map(value=>value.trim()).filter(Boolean));
+}
+async function authorizeCommunicationMediaDownload(env,claims){
+  const email=String(claims.email||"").trim().toLowerCase();
+  const [adminRaw,memberRaw,employeeRaw]=await Promise.all([
+    getFirestoreDocument(env,"adminProfiles/"+claims.user_id,claims.token).catch(()=>null),
+    getFirestoreDocument(env,"members/"+claims.user_id,claims.token).catch(()=>null),
+    getFirestoreDocument(env,"employees/"+claims.user_id,claims.token).catch(()=>null)
+  ]);
+  const admin=firestoreDocumentToPlain(adminRaw);
+  const member=firestoreDocumentToPlain(memberRaw);
+  const employee=firestoreDocumentToPlain(employeeRaw);
+  if(email==="irpa2412@gmail.com"||admin?.active===true)return true;
+  const allowed=["Communications Officer","Communications Manager","Media Officer","Public Relations Officer","Executive Director","Director Outreach","Outreach Director","Director Community Development","Community Development Director","Administrator"];
+  const roles=[...new Set([...communicationMediaRoleValues(member),...communicationMediaRoleValues(employee)])];
+  const active=Boolean((member && (["Active","Activated"].includes(String(member.status||"")) || member?.registrationStatus==="Activated")) || (employee && (["Active","Activated"].includes(String(employee.status||"")) || employee?.employmentStatus==="Active")));
+  return Boolean(active&&roles.some(role=>allowed.includes(role)));
+}
+
 async function download(request, env) {
   const claims = await authenticateFirebaseRequest(request, env);
   const data = await request.json();
@@ -678,6 +703,9 @@ async function download(request, env) {
     return json({ ok: false, error: "The requested file is not an IRPA governance document." }, 403, corsHeaders(request));
   }
   const purpose = String(description.purpose || "");
+  if (purpose === "Communication Media" && !(await authorizeCommunicationMediaDownload(env, claims))) {
+    return json({ ok:false, error:"Your registered IRPA role does not permit access to the communications media archive." },403,corsHeaders(request));
+  }
   if (purpose === "Signed Documents Archive") {
     return json({ ok:false, error:"Signed workflow PDFs must be retrieved through the Signature Portal envelope-authorized route." },403,corsHeaders(request));
   }
@@ -691,7 +719,7 @@ async function download(request, env) {
   }
 
   const size = Number(metadata.size || 0);
-  if (size > MAX_BYTES) return json({ ok: false, error: "The requested file exceeds the 10 MB limit." }, 400, corsHeaders(request));
+  if (size > (purpose === "Communication Media" ? 25 * 1024 * 1024 : MAX_BYTES)) return json({ ok: false, error: purpose === "Communication Media" ? "The requested media file exceeds the 25 MB limit." : "The requested file exceeds the 10 MB limit." }, 400, corsHeaders(request));
 
   const media = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`, {
     headers: { Authorization: `Bearer ${accessToken}` }

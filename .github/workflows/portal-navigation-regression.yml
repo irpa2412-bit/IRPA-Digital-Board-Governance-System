@@ -6,6 +6,10 @@ on:
     paths:
       - "src/App.jsx"
       - "tests/portal-workspace-navigation.test.mjs"
+      - "tests/communication-media-policy.test.mjs"
+      - "src/pages/CommunicationMediaPortal.jsx"
+      - "functions/communicationMedia.js"
+      - "firestore.rules"
       - "package.json"
       - ".github/workflows/portal-navigation-regression.yml"
   push:
@@ -37,4 +41,4 @@ jobs:
         with:
           node-version: 22
       - name: Run isolated navigation regression tests
-        run: npm run test:portal-navigation
+        run: npm run test:portal-navigation && npm run test:communication-media
