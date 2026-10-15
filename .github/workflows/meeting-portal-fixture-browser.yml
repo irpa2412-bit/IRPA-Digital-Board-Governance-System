@@ -129,6 +129,7 @@ jobs:
             "tests/meeting-room-authorization-boundary.test.mjs",
             "vite.meeting-fixture.config.js",
             ".github/workflows/administrator-reset-security.yml",
+            ".github/workflows/staging-gateway-e2e.yml",
             "drive-gateway/ADMIN-REGISTRATION-RESET.md",
             "drive-gateway/src/adminRegistrationReset.mjs",
             "drive-gateway/tests/admin-registration-reset.test.mjs",
