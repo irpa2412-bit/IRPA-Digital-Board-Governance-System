@@ -1,0 +1,119 @@
+/* IRPA-DBGS shared portal readability standard.
+   Reference: Procurement Portal's clear light workspace, dark text, high-contrast
+   controls, readable registers and explicit focus states.
+   Presentation only: no routing, permissions, data, workflow or auth selectors. */
+:root {
+  --irpa-readable-workspace: #f8faf9;
+  --irpa-readable-surface: #ffffff;
+  --irpa-readable-text: #26352f;
+  --irpa-readable-muted: #526b60;
+  --irpa-readable-border: #cbd9d2;
+  --irpa-readable-control-text: #18364f;
+  --irpa-readable-placeholder: #526579;
+  --irpa-readable-action: #0b5fa8;
+  --irpa-readable-action-hover: #084d89;
+  --irpa-readable-focus: #075f3d;
+}
+
+/* Authenticated portal workspace only; the dashboard and authentication chrome
+   retain their existing independently designed presentation. */
+#root .app-shell .content-area:not(.dashboard-content-area) {
+  background-color: var(--irpa-readable-workspace);
+  color: var(--irpa-readable-text);
+}
+#root .app-shell .content-area:not(.dashboard-content-area) .page {
+  color: var(--irpa-readable-text);
+}
+
+/* Standard operational surfaces. */
+#root .app-shell .content-area:not(.dashboard-content-area) .page :where(.panel, .module-panel, .stat-card, .workflow-stage, .identity-card, .record-details, .detail-grid > div) {
+  background-color: var(--irpa-readable-surface);
+  color: var(--irpa-readable-text);
+  border-color: var(--irpa-readable-border);
+}
+#root .app-shell .content-area:not(.dashboard-content-area) .page :where(h1, h2, h3, h4, h5, h6, p, li, legend, label, .eyebrow, .panel-description, .module-panel > p, .page-header p, .module-header p, .muted, .table-subtext, .field-help, .help-text, .hint, .form-field > span) {
+  color: var(--irpa-readable-text);
+  opacity: 1;
+}
+#root .app-shell .content-area:not(.dashboard-content-area) .page :where(.panel-description, .module-panel > p, .page-header p, .module-header p, .muted, .table-subtext, .field-help, .help-text, .hint) {
+  color: var(--irpa-readable-muted);
+}
+#root .app-shell .content-area:not(.dashboard-content-area) .page :where(.stat-card span, .stat-card small, .workflow-stage span, .workflow-stage small, .identity-card small) {
+  color: var(--irpa-readable-muted);
+}
+
+/* Inputs, dropdowns and placeholders remain legible in all portals. */
+#root .app-shell .content-area:not(.dashboard-content-area) .page :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea, .table-search) {
+  color: var(--irpa-readable-control-text);
+  -webkit-text-fill-color: var(--irpa-readable-control-text);
+  background-color: var(--irpa-readable-surface);
+  border: 1px solid #718a80;
+  opacity: 1;
+}
+#root .app-shell .content-area:not(.dashboard-content-area) .page :where(input, textarea, .table-search)::placeholder {
+  color: var(--irpa-readable-placeholder);
+  -webkit-text-fill-color: var(--irpa-readable-placeholder);
+  opacity: 1;
+}
+#root .app-shell .content-area:not(.dashboard-content-area) .page select option {
+  color: var(--irpa-readable-control-text);
+  background-color: var(--irpa-readable-surface);
+}
+#root .app-shell .content-area:not(.dashboard-content-area) .page :where(input, select, textarea, button, a, [tabindex]):focus-visible {
+  outline: 3px solid var(--irpa-readable-focus);
+  outline-offset: 2px;
+}
+
+/* Consistent readable table headers, body text and separators without changing
+   register columns, content, horizontal scrolling or workflow controls. */
+#root .app-shell .content-area:not(.dashboard-content-area) .page :where(table, .table-wrapper) {
+  border-color: var(--irpa-readable-border);
+}
+#root .app-shell .content-area:not(.dashboard-content-area) .page table th {
+  color: #40584d;
+  background-color: #edf4f0;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+#root .app-shell .content-area:not(.dashboard-content-area) .page table td {
+  color: var(--irpa-readable-text);
+  font-size: 14px;
+  line-height: 1.5;
+}
+#root .app-shell .content-area:not(.dashboard-content-area) .page table :where(th, td) {
+  border-color: var(--irpa-readable-border);
+}
+#root .app-shell .content-area:not(.dashboard-content-area) .page table tr:hover td {
+  background-color: #f1f7f3;
+}
+
+/* Blue actions use white text (contrast >= 4.5:1); semantic danger and
+   secondary controls keep their existing intent and distinct treatment. */
+#root .app-shell .content-area:not(.dashboard-content-area) .page button:not(.danger-button):not(.delete-button):not(.secondary-button):not(.text-button):not(.password-visibility-toggle) {
+  color: #ffffff;
+}
+#root .app-shell .content-area:not(.dashboard-content-area) .page .secondary-button {
+  color: #18364f;
+  background-color: #f4f8f5;
+  border-color: #718a80;
+}
+#root .app-shell .content-area:not(.dashboard-content-area) .page :where(.form-field > label, .form-field label, label) {
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.45;
+}
+#root .app-shell .content-area:not(.dashboard-content-area) .page :where(button, input, select, textarea) {
+  line-height: 1.45;
+}
+@media (max-width: 760px) {
+  #root .app-shell .content-area:not(.dashboard-content-area) .page :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea, button) {
+    font-size: 15px;
+  }
+  #root .app-shell .content-area:not(.dashboard-content-area) .page :where(input:not([type="checkbox"]):not([type="radio"]), select, button) {
+    min-height: 44px;
+  }
+  #root .app-shell .content-area:not(.dashboard-content-area) .page :where(table, .table-wrapper) {
+    max-width: 100%;
+  }
+}
