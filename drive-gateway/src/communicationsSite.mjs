@@ -111,14 +111,12 @@ export function createCommunicationsSiteRouter(deps) {
 
   async function authorised(request, env, reviewer = false) {
     const claims = await authenticateFirebaseRequest(request, env);
-    const [identity, adminDocument] = await Promise.all([
-      getInstitutionalProfileForUser(env, claims),
-      getFirestoreDocument(env, "adminProfiles/" + claims.user_id, claims.token)
-    ]);
-    const member = firestoreDocumentToPlain(identity?.memberRecord);
-    const employee = firestoreDocumentToPlain(identity?.employeeRecord);
+    const adminDocument = await getFirestoreDocument(env, "adminProfiles/" + claims.user_id, claims.token);
     const adminProfile = firestoreDocumentToPlain(adminDocument);
     const activeAdmin = adminProfile?.active === true;
+    const identity = activeAdmin ? null : await getInstitutionalProfileForUser(env, claims);
+    const member = firestoreDocumentToPlain(identity?.memberRecord);
+    const employee = firestoreDocumentToPlain(identity?.employeeRecord);
     const tokenRoles = [
       ...(Array.isArray(claims.irpaRoles) ? claims.irpaRoles : []),
       claims.role, claims.title, claims.position
