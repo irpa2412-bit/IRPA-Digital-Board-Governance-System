@@ -87,10 +87,10 @@ jobs:
           if(wp.protocol!=="https:" || ["irpa.or.tz","www.irpa.or.tz"].includes(wp.hostname.toLowerCase())) throw new Error("Staging WordPress must use HTTPS on an isolated non-production hostname.");
           const cp=new URL(process.env.CP_BASE);
           if(cp.protocol!=="https:" || cp.port!=="2083" || cp.pathname!=="/") throw new Error("Staging cPanel endpoint must use HTTPS port 2083.");
-          const root=process.env.CP_ROOT.replace(/^\\/+|\\/+$/g,"");
+          const root=process.env.CP_ROOT.replace(/^\/+|\/+$/g,"");
           if(!root || root.split("/").some(p=>!p || p==="." || p===".." || p.startsWith("."))) throw new Error("Staging cPanel document root is invalid.");
           const file=process.env.CP_TEST_FILE;
-          if(!file || file.startsWith("/") || file.split("/").some(p=>!p || p==="." || p===".." || p.startsWith(".")) || !/\\.txt$/i.test(file)) throw new Error("Staging cPanel test file must be a safe relative .txt path.");
+          if(!file || file.startsWith("/") || file.split("/").some(p=>!p || p==="." || p===".." || p.startsWith(".")) || !/\.txt$/i.test(file)) throw new Error("Staging cPanel test file must be a safe relative .txt path.");
           console.log("ISOLATED_STAGING_CREDENTIALS_VALID");
           NODE
 
@@ -290,6 +290,44 @@ jobs:
           grep -q '"ok":true' staging-health.json
           grep -q '"environment":"staging"' staging-health.json
 
+      - name: Prepare isolated cPanel rollback test file
+        env:
+          CP_BASE: \${{ secrets.STAGING_CPANEL_BASE_URL }}
+          CP_USER: \${{ secrets.STAGING_CPANEL_USERNAME }}
+          CP_TOKEN: \${{ secrets.STAGING_CPANEL_API_TOKEN }}
+          CP_ROOT: \${{ secrets.STAGING_CPANEL_DOCUMENT_ROOT }}
+          CP_TEST_FILE: \${{ secrets.STAGING_CPANEL_TEST_FILE }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          async function main(){
+            const root=process.env.CP_ROOT.replace(/^\/+|\/+$/g,"");
+            const parts=process.env.CP_TEST_FILE.split("/");
+            const file=parts.pop();
+            const dir=root+(parts.length?"/"+parts.join("/"):"");
+            const base=new URL(process.env.CP_BASE);
+            const auth="cpanel "+process.env.CP_USER+":"+process.env.CP_TOKEN;
+            async function request(operation,values){
+              const url=new URL("/execute/Fileman/"+operation,base);
+              const response=await fetch(url,{method:"POST",headers:{Authorization:auth,Accept:"application/json","Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams(values)});
+              const body=await response.json().catch(()=>null);
+              if(!response.ok||!body) throw new Error("Staging cPanel test-file preparation failed with HTTP "+response.status+".");
+              return body;
+            }
+            const existing=await request("get_file_content",{dir,file});
+            if(existing.status===1){
+              const content=existing.data?.content??existing.data?.[0]?.content;
+              if(typeof content!=="string") throw new Error("Staging cPanel test file exists but is not readable.");
+              console.log("STAGING_CPANEL_TEST_FILE_READY");
+              return;
+            }
+            const created=await request("save_file_content",{dir,file,content:"IRPA staging cPanel rollback baseline\\n",charset:"utf-8"});
+            if(created.status!==1) throw new Error("Unable to create the isolated staging cPanel test file.");
+            console.log("STAGING_CPANEL_TEST_FILE_CREATED");
+          }
+          main().catch(e=>{console.error(e.message);process.exit(1)});
+          NODE
+
       - name: Verify WordPress and cPanel read-write-rollback integration
         env:
           STAGING_URL: ${{ steps.staging-health.outputs.staging_url }}
@@ -339,8 +377,8 @@ jobs:
             const original={id:page.id,type:selectedType,title:page.title,content:page.content||""};
             let modified=false;
             try{
-              const updated=await call("/api/communications/website/content",{method:"PUT",body:JSON.stringify({...original,title:original.title+" [staging check]",content:original.content+"\n<p>"+marker+"</p>"})});
               modified=true;
+              const updated=await call("/api/communications/website/content",{method:"PUT",body:JSON.stringify({...original,title:original.title+" [staging check]",content:original.content+"\n<p>"+marker+"</p>"})});
               if(!updated.success||!await waitForPublicMarker(updated.publicUrl||page.link)) throw new Error("The staged website edit did not render publicly.");
             }finally{
               if(modified) await call("/api/communications/website/content",{method:"PUT",body:JSON.stringify(original)});
