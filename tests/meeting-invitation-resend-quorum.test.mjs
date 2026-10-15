@@ -20,7 +20,8 @@ test("resend persists successful dispatch to invitation and participant records"
 
 test("failed invitations are excluded from Meeting Room attendance and quorum populations",()=>{
   assert.match(room,/const attending=useMemo\(\(\)=>participants\.filter\(p=>/);
-  assert.match(room,/\["failed","invitation dispatch failed","cancelled","cancelled invitation"\]/);
+  assert.match(room,/"failed","invitation dispatch failed"/);
+  assert.match(room,/"cancelled","canceled","cancelled invitation","canceled invitation"/);
   assert.match(room,/\["failed","revoked"\]/);
   assert.match(room,/p\.meetingAccessDispatched!==false/);
   assert.match(room,/const eligible=useMemo\(\(\)=>attending\.filter\(votingRole\)/);
