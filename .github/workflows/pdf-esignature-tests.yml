@@ -3,10 +3,12 @@ on:
   push:
     branches: ["fix/member-signature-invitation-email-20261004", "repair/esign-production-entrypoint-20261004"]
     paths:
+      - "src/styles/portal-readability-standard.css"
       - "drive-gateway/**"
       - ".github/workflows/pdf-esignature-tests.yml"
   pull_request:
     paths:
+      - "src/styles/portal-readability-standard.css"
       - "drive-gateway/**"
   workflow_dispatch:
 jobs:
