@@ -46,6 +46,8 @@ npx wrangler secret put CPANEL_API_TOKEN
 ```
 For staging, explicitly target the staging Worker environment using the supported Wrangler `--env staging` option. Do not copy production credentials into staging. Do not log or print secret values.
 
+Production deployment is gated on six GitHub Actions secrets being configured for the production workflow: `PRODUCTION_WORDPRESS_BASE_URL`, `PRODUCTION_WORDPRESS_USERNAME`, `PRODUCTION_WORDPRESS_APPLICATION_PASSWORD`, `PRODUCTION_CPANEL_BASE_URL`, `PRODUCTION_CPANEL_USERNAME`, and `PRODUCTION_CPANEL_API_TOKEN`. The production workflow validates their presence and endpoint formats before changing the Worker, then transfers the values into Cloudflare Worker secrets without printing them. Do not put these values in source control or paste them into chat.
+
 ## Automated staging acceptance prerequisites
 
 The staging workflow runs on the Communication & Media integration pull request and deploys only the dedicated `irpa-google-drive-gateway-staging` Worker. It requires the following repository Actions secrets; values are never printed by the workflow:
