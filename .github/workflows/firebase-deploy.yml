@@ -321,6 +321,26 @@ jobs:
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
       
+      - name: Deploy actual-data access control callables
+        id: actual_data_gate
+        continue-on-error: true
+        uses: w9jds/firebase-action@v14.17.0
+        with:
+          args: deploy --project irpa-digital-board-governance --only functions:getActualDataAccessStatus,functions:setActualDataAccess
+        env:
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+
+      - name: Report actual-data gate callable deployment status
+        if: always()
+        env:
+          ACTUAL_DATA_GATE_OUTCOME: ${{ steps.actual_data_gate.outcome }}
+        run: |
+          if [ "$ACTUAL_DATA_GATE_OUTCOME" = "success" ]; then
+            echo "ACTUAL_DATA_GATE_CALLABLES_DEPLOYED=true"
+          else
+            echo "::warning::Firestore rules keep actual operational writes closed, but administrator-controlled reopening remains unavailable until both actual-data gate callables deploy successfully. Check Cloud Functions billing, API enablement and service-account permissions."
+          fi
+
       - name: Deploy signed meeting attendance register callables
         id: attendance_register
         continue-on-error: true
