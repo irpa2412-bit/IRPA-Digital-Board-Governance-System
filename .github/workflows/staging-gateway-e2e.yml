@@ -188,6 +188,26 @@ jobs:
           console.log("STAGING_PREFLIGHT=PASS; isolated test fixture only; worker deployed=false; production touched=false");
           NODE
 
+  dispatch-staging-acceptance:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015' && startsWith(github.event.head_commit.message, 'test(staging): dispatch isolated runtime acceptance')
+    needs: [local-e2e, preflight-staging]
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Dispatch the existing manually gated isolated staging acceptance workflow
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: "staging-gateway-e2e.yml",
+              ref: "fix/signature-gateway-cryptographic-bridge-20261015",
+              inputs: { deploy_staging: "true" }
+            });
+
   deploy-staging:
     needs: [local-e2e, preflight-staging]
     if: github.event_name == 'workflow_dispatch' && inputs.deploy_staging == true && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004' || github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015')
