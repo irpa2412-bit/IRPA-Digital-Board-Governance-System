@@ -230,7 +230,9 @@ async function assertSharedReadability(page, module, width) {
   }
 
   const samples = await workspace.evaluate(root => {
-    const candidates = [...root.querySelectorAll(".page h1, .page h2, .page h3, .page label, .page table th")];
+    const candidates = [...root.querySelectorAll(
+      '.page h1, .page h2, .page h3, .page label, .page table th, .page p, .page li, .page legend, .page button, .page table td, .page [role="heading"]'
+    )];
     const visible = candidates.filter(el => {
       const rect = el.getBoundingClientRect();
       const style = getComputedStyle(el);
@@ -255,7 +257,7 @@ async function assertSharedReadability(page, module, width) {
       return { tag: el.tagName, text: (el.textContent || "").trim().slice(0, 50), fg, bg, ratio };
     });
   });
-  expect(samples.length, "portal should render readable headings, labels or table headers").toBeGreaterThan(0);
+  expect(samples.length, `portal should render visible text for readability checks in ${module}`).toBeGreaterThan(0);
   for (const sample of samples) {
     if (sample.ratio !== null) {
       expect(sample.ratio, `low text contrast in ${module}: ${sample.tag} "${sample.text}" (${sample.fg} on ${sample.bg})`)
