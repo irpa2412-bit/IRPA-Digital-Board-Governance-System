@@ -8,6 +8,8 @@ on:
       - "src/firebase/documentLifecycle.js"
       - "firebase.json"
       - ".github/workflows/staging-gateway-e2e.yml"
+      - ".github/workflows/meeting-portal-fixture-browser.yml"
+      - "tests/meeting-isolation-guard.test.mjs"
   workflow_dispatch:
     inputs:
       deploy_staging:
