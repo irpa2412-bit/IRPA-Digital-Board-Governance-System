@@ -46,6 +46,8 @@ test("website publishing enforces Firebase authentication, registered reviewer r
  assert.ok(site.includes("COMMUNICATION_MEDIA_PUBLISHED"));
  assert.ok(site.includes("WORDPRESS_APPLICATION_PASSWORD"));
  assert.ok(!portal.includes("WORDPRESS_APPLICATION_PASSWORD"));
+ assert.ok(!portal.includes("CPANEL_API_TOKEN"));
+ assert.ok(portal.includes("configured securely by an authorised administrator"));
 });
 
 test("cPanel access is secret-backed and static-file editor denies executable or traversal paths",()=>{
