@@ -17,7 +17,8 @@
     "test:security-rules": "node --test tests/meeting-category-firestore-rules.test.cjs tests/finance-portal-policy.test.cjs",
     "test:fundraising-registry": "node --test tests/fundraising-source-registry.test.mjs",
     "test:portal-navigation": "node --test tests/portal-workspace-navigation.test.mjs",
-    "test:meeting-entry-policy": "node --test functions/meetingEntryPolicy.test.cjs"
+    "test:meeting-entry-policy": "node --test functions/meetingEntryPolicy.test.cjs",
+    "test:communication-media": "node --test tests/communication-media-policy.test.mjs"
   },
   "dependencies": {
     "firebase": "^11.10.0",
