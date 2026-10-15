@@ -5,6 +5,7 @@ on:
   push:
     branches: [feat/secure-meeting-invitation-flow-20261013, test/meeting-signature-portal-browser-regression-20261014]
     paths:
+      - "src/styles/portal-readability-standard.css"
       - "src/pages/Meetings.jsx"
       - "drive-gateway/src/invitationRedemption.mjs"
       - "drive-gateway/tests/invitation-redemption.test.mjs"
@@ -13,6 +14,7 @@ on:
   pull_request:
     branches: [main]
     paths:
+      - "src/styles/portal-readability-standard.css"
       - "src/pages/Meetings.jsx"
       - "src/firebase/data.js"
       - "functions/meetingGateway.js"
