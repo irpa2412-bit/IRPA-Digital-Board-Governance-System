@@ -1,71 +1,65 @@
 # IRPA Communication & Media Portal
 
 ## Purpose
-Integrated communications workspace inside the existing IRPA Digital Board Governance System. This is an extension of the existing app, not a separate application.
+An integrated communications workspace inside the existing IRPA Digital Board Governance System. It reuses the existing authenticated Cloudflare Drive Gateway, Firebase identity and Firestore audit pathways. It does not add a separate app or new storage provider.
 
 ## Included capabilities
-- Website article and press-release drafting.
-- Social-media copy drafting for export and manual posting.
-- Multi-format media upload and archive through the existing authenticated Google Drive gateway, with Firestore metadata and role-based access.
-- Asset types include supported PDF, Word, Excel, PowerPoint, OpenDocument, RTF, TXT, CSV/TSV, Markdown, HTML, EPUB, JSON/XML, image, audio and video formats; gateway-supported formats only, with a 25 MB per-file limit in the communications media upload route.
-- Media library with searchable type filters, title/tags, original-file download and Google Drive link-out.
-- Editorial planning calendar.
-- Searchable content library and workflow status counts.
-- Draft exports to TXT, Markdown, HTML and PDF without changing approval status or publishing.
-- Browser-native image editing (brightness, contrast, saturation, rotation) with PNG/JPEG/WebP export; source assets are not overwritten.
-- Audio/video preview, basic trim range selection and WebM export where the browser supports MediaRecorder and media capture.
-- Author submission, designated review/approval, return-for-revision, archival and audit-triggered record changes.
-- Server-side WordPress post publishing for approved website articles and press releases.
+- Website article, press-release and social-media draft creation.
+- Content library, editorial planning calendar, review, approval, return-for-revision and archival workflow.
+- Approved website publishing through the existing Cloudflare Worker.
+- Read and update WordPress pages/posts through the WordPress REST API.
+- cPanel connection verification and restricted static-file editing through cPanel UAPI.
+- Media uploads and archive through the existing authenticated Google Drive gateway. Firebase Storage remains deny-by-default.
+- Media library, authenticated download, image editing/export, audio/video preview and browser-native trim/export, within the existing gateway's file-size and format limits.
 
-## Workflow
-1. An authorised communications author creates a Draft.
-2. The author submits it for approval.
-3. The Executive Director, Director Outreach, Director Community Development or authorised Administrator approves or returns it with a recorded note.
-4. A designated reviewer explicitly confirms a live publishing action. The callable re-checks the authenticated role and Approved status on the server.
-5. WordPress publication metadata and public URL are saved to the record. Firestore server-audit triggers and an explicit publishing audit event record the action.
+## Website and cPanel access
+The portal calls the existing Cloudflare Worker routes:
+- `GET /api/communications/site/status` — verifies WordPress and cPanel credentials without returning secrets.
+- `GET /api/communications/website/content?type=posts|pages` — reads up to 50 latest editable records.
+- `PUT /api/communications/website/content` — updates the title and plain-text body of an existing WordPress page or post.
+- `POST /api/communications/website/publish` — publishes an approved article or press release and reconciles by deterministic slug before creating a post.
+- `GET /api/communications/cpanel/files` — lists permitted static files from the configured document root.
+- `GET /api/communications/cpanel/files?path=<relative-path>` — reads a permitted static file.
+- `PUT /api/communications/cpanel/files` — saves a permitted static file through cPanel UAPI.
 
-Saving, scheduling and approving do not themselves publish. The calendar is a planning aid; it does not run a background scheduler. Social channels are draft/export only in this release.
+The cPanel editor intentionally accepts only HTML, HTM, CSS, TXT and JSON files, with a 512 KiB limit. It rejects path traversal, hidden paths, PHP and other executable/script extensions; it does not provide arbitrary shell access, delete-file operations, or unrestricted hosting administration. WordPress page/post content should be edited through the WordPress API. The portal does not embed a cPanel password login session in the browser; it authenticates server-to-server through a restricted cPanel API token.
 
-## Website integration prerequisites
-WordPress uses a dedicated account with only the required publishing capability and an application password. Never use a personal/main administrator password.
+## Required Cloudflare Worker secrets
+Set these as Worker secrets in the correct environment; never commit them or paste them into the portal:
+- `WORDPRESS_BASE_URL`: HTTPS WordPress base URL, normally `https://www.irpa.or.tz`.
+- `WORDPRESS_USERNAME`: dedicated WordPress integration account.
+- `WORDPRESS_APPLICATION_PASSWORD`: application password for that dedicated account.
+- `CPANEL_BASE_URL`: HTTPS cPanel hostname with port 2083, for example the actual hosting provider hostname; do not guess the host.
+- `CPANEL_USERNAME`: the cPanel account username.
+- `CPANEL_API_TOKEN`: a cPanel API token with only the required account-level permissions.
+- `CPANEL_DOCUMENT_ROOT` (optional non-secret Worker variable): document-root-relative directory, default `public_html`.
 
-Set these Firebase Secret Manager values in the intended Firebase project:
-- `WORDPRESS_BASE_URL`: HTTPS origin or WordPress installation base URL, without credentials, query or fragment.
-- `WORDPRESS_USERNAME`: dedicated WordPress integration username.
-- `WORDPRESS_APPLICATION_PASSWORD`: WordPress application password.
-
-Use an isolated staging WordPress site first. Set secrets using the Firebase CLI prompts (do not pass values in shell history or commit them):
+Use the Cloudflare dashboard or Wrangler's interactive secret prompt for the intended environment. Example commands (run only in the repository's authorised Cloudflare environment):
 ```sh
-firebase functions:secrets:set WORDPRESS_BASE_URL
-firebase functions:secrets:set WORDPRESS_USERNAME
-firebase functions:secrets:set WORDPRESS_APPLICATION_PASSWORD
+npx wrangler secret put WORDPRESS_BASE_URL
+npx wrangler secret put WORDPRESS_USERNAME
+npx wrangler secret put WORDPRESS_APPLICATION_PASSWORD
+npx wrangler secret put CPANEL_BASE_URL
+npx wrangler secret put CPANEL_USERNAME
+npx wrangler secret put CPANEL_API_TOKEN
 ```
+For staging, explicitly target the staging Worker environment using the supported Wrangler `--env staging` option. Do not copy production credentials into staging. Do not log or print secret values.
 
-Then deploy only the callable to the authorised staging project after the branch checks and security review:
-```sh
-firebase deploy --only functions:publishCommunicationMediaItem --project <isolated-staging-project-id>
-```
+## Authorization and audit
+- Every website and cPanel route verifies the Firebase ID token at the Cloudflare Worker.
+- Write operations require a registered reviewer role; credentials stay server-side.
+- Website publishing is limited to approved website articles and press releases.
+- Website publishing and edits record audit events. A successful HTTP response is not by itself proof of public rendering; verify the resulting public URL.
+- cPanel writes are restricted to static content file types and record an audit event.
+- No Firebase Functions callable is required for website publishing, avoiding a new Cloud Functions billing dependency.
 
-Do not deploy to production until authenticated staging tests verify role denial, approval enforcement, HTTPS-only endpoint validation, successful publish, failure recovery, duplicate prevention and audit evidence. This code does not configure secrets, create WordPress users, or deploy infrastructure.
+## Acceptance and release gates
+1. Run `npm run test:communication-media`, the full required test suite, production build, gateway syntax/security tests and browser regression checks.
+2. Verify role-denial behavior for unauthenticated and non-reviewer users.
+3. Verify WordPress connection, content list/read/update, approved publishing, failure handling and duplicate reconciliation against isolated staging WordPress.
+4. Verify cPanel token authentication, permitted file listing/read/write, path traversal rejection, executable-file rejection and audit evidence against isolated staging hosting.
+5. Confirm the public page after a staged edit and verify the previous content is preserved for rollback.
+6. Verify desktop and mobile portal usability and ensure unrelated governance portals retain existing behavior.
+7. Merge only after all required checks pass; deploy and live-verify only after staging acceptance. Do not claim live integration until the secret-backed connection checks and actual test writes succeed.
 
-## Data protection
-- Firestore documents are private to designated communications roles and reviewers.
-- Delete is denied for communications records; use Archived to retain history.
-- WordPress credentials are server-side Firebase secrets, never browser data or Firestore fields.
-- Text entered in the portal is escaped to plain-text paragraphs before WordPress publication.
-- Media binaries use the existing Google Drive gateway and the Firestore media register stores metadata only; Firebase Storage remains deny-by-default.
-- Media upload and download use the authenticated gateway; Communication Media downloads are checked against registered communications roles server-side.
-- Image exports and text/PDF exports are created locally in the browser. Audio/video trim exports are real-time browser captures to WebM and depend on MediaRecorder support; the source file is never overwritten.
-- This is a self-contained communications production workspace for common editorial tasks, not a professional multi-track nonlinear editor: multi-track audio mixing, noise reduction, frame-accurate timeline editing, advanced colour grading and arbitrary codec transcoding are not provided in this browser-native release.
-- External social-network posting is not enabled; each platform requires its own approved API application and secret-backed server integration.
-
-## Known acceptance gates
-- Verify multi-format upload and authenticated download in isolated staging for each allowed file type and enforce the dedicated 25 MB media limit.
-- Verify communications-role denial for media downloads, file-size/MIME rejection, and no direct Firebase Storage access.
-- Test image edit/export and text TXT/Markdown/HTML/PDF exports on desktop and mobile; verify original assets remain unchanged.
-- Test audio/video trim and WebM export on supported browsers, and verify graceful fallback when MediaRecorder or captureStream is unavailable.
-- Verify the portal appears only for communications roles, designated reviewers and administrators.
-- Run `npm run test:communication-media` and `npm run build`.
-- Run Firestore rules tests in the authorised emulator environment.
-- Verify WordPress staging publication and failure behaviour with no secret values in logs.
-- Confirm the hosting deployment and production secrets are untouched until acceptance is recorded.
+Production secrets and deployments must not be changed merely by merging this code.
