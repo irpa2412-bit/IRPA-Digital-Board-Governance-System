@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { browserSupportsPush, listenForForegroundMessages, notificationPermissionState, requestPushPermission } from "../firebase/messaging";
 import SystemResetControl from "../components/SystemResetControl";
+import ActualDataAccessControl from "../components/ActualDataAccessControl";
 import { startGoogleDriveAuthorization } from "../firebase/signatureStorage";
 import { resetDocumentTrialData, resetEmployeeTrialData, resetMemberTrialData, resetSignatureEnvelopeTrialData, createExternalAuditorProfile, getRecords, COLLECTIONS, linkAdministratorToEmployee } from "../firebase/data";
 import { createAdministrator, reconcileRegisteredIdentityUids } from "../firebase/functions";
@@ -361,6 +362,7 @@ export default function Settings({ admin = false, section = "settings" }) {
       </section>
       )}
 
+      {admin && section === "settings" && <ActualDataAccessControl/>}
       {admin && section === "settings" && <SystemResetControl/>}
 
       {admin && section === "settings" && (
