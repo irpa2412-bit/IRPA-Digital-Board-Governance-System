@@ -148,3 +148,17 @@
 /* Cross-portal contrast regression also measures opaque gradient colour stops. */
 
 /* Revalidate the final responsive contrast changes on this PR head. */
+
+
+/* Introductory copy on light portal page headers must not inherit pale dark-surface text. */
+#root .app-shell .content-area:not(.dashboard-content-area) .page .page-header p {
+  color: #526b60 !important;
+  -webkit-text-fill-color: #526b60 !important;
+  opacity: 1 !important;
+}
+
+/* Quick Access is a blue Dashboard panel; keep its heading white against that surface. */
+#root .app-shell .content-area.dashboard-content-area .page .dashboard-quote4-quick .quote4-heading h2 {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
