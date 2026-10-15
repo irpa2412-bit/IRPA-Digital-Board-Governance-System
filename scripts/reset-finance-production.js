@@ -6,8 +6,11 @@ const PRODUCTION_RESET_DOC = "wholeWebAppZeroReset20261011";
 const RESET_CONTROL_DOC = "resetControl20261015";
 const TRIAL_RESET_AUDIT_COLLECTION = "trialResetAudit";
 const PROTECTED_TOP_LEVEL = new Set([
-  "adminProfiles", "members", "employees", "systemSettings",
-  "auditorProfiles", "signerIdentities", "signatureProfiles"
+  "audit", "adminProfiles", "adminInvitations", "members", "employees",
+  "systemSettings", "systemResetPlans", "invitations", "registrationRequests",
+  "inductionRecords", "memberCounters", "employeeCounters", "auditorProfiles",
+  "signerIdentities", "signatureProfiles", "signatureEnvelopes", "signatureEvents",
+  "notifications", "mail", "financialReferenceCounters"
 ]);
 const ACTUAL_ONLY_COLLECTIONS = [
   "adminProfiles", "members", "employees", "auditorProfiles",
@@ -98,6 +101,20 @@ async function main() {
       productionResetConsumedBy: actor,
       productionResetState: "CONSUMED_IN_PROGRESS",
       productionResetVersion: 1
+    }, { merge: true });
+    // Close actual operational data entry before the first deletion. systemSettings
+    // is protected from the reset, so this closed state survives the cleanup.
+    const actualGateRef = db.collection("systemSettings").doc("actualDataAccess");
+    const actualGateSnap = await actualGateRef.get();
+    const actualGate = actualGateSnap.exists ? (actualGateSnap.data() || {}) : {};
+    await actualGateRef.set({
+      enabled: false,
+      status: "CLOSED",
+      changedAt: FieldValue.serverTimestamp(),
+      changedBy: actor,
+      closeReason: "One-time pre-production reset; remain closed until final system tests pass.",
+      finalTestsAttested: false,
+      version: Number(actualGate.version || 0) + 1
     }, { merge: true });
   } else {
     // Trial reset follows the application's established record markers across the
