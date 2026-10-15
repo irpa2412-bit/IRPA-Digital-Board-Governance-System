@@ -104,7 +104,7 @@ runButton.addEventListener("click", async () => {
   setBusy(true);
   try {
     const result = await invoke(lastPayload);
-    showStatus(JSON.stringify(result, null, 2) + "\nSave this operation ID for audit verification: " + lastPayload.operationId);
+    showStatus(JSON.stringify(result, null, 2) + " | Operation ID for audit verification: " + lastPayload.operationId);
     operationCompleted = true;
     replayButton.classList.remove("hidden");
     runButton.disabled = true;
@@ -117,7 +117,7 @@ replayButton.addEventListener("click", async () => {
   setBusy(true);
   try {
     const result = await invoke(lastPayload);
-    showStatus("Idempotency replay result (same operation ID and payload):\n" + JSON.stringify(result, null, 2));
+    showStatus("Idempotency replay result (same operation ID and payload): " + JSON.stringify(result, null, 2));
   } catch (error) {
     showStatus(String(error && error.message || "Replay verification failed."));
   } finally { setBusy(false); }
