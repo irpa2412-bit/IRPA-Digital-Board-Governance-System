@@ -13,8 +13,8 @@ const DATA_TYPES=[
   ["other","Other / not listed"]
 ];
 const ENVIRONMENTS=[["TRIAL","Trial data — testing and demonstrations"],["ACTUAL","Actual data — official institutional records"]];
-const ACTUAL_ONLY_TYPES=new Set(["signatures","system"]);
-const ACTUAL_ONLY_PORTAL_HINT=/signature|signer|auditor|security|system settings|administrator/i;
+const ACTUAL_ONLY_TYPES=new Set(["personnel","system"]);
+const ACTUAL_ONLY_PORTAL_HINT=/auditor|security|system settings|administrator/i;
 const portalRequiresActual=portal=>ACTUAL_ONLY_PORTAL_HINT.test(String(portal||""));
 const verificationMapKey="irpaPortalDataEntryVerifications";
 
@@ -274,10 +274,10 @@ export default function FieldEntryDataGate({portal}){
         <legend style={{fontWeight:750,marginBottom:10}}>2. Select the data environment (Required)</legend>
         {ENVIRONMENTS.map(([value,label])=><label key={value} style={{display:"flex",alignItems:"flex-start",gap:9,padding:"10px 0",cursor:actualOnly&&value==="TRIAL"?"not-allowed":"pointer",opacity:actualOnly&&value==="TRIAL"?.5:1}}>
           <input type="radio" name="irpa-data-environment" value={value} disabled={(actualOnly&&value==="TRIAL")||(value==="ACTUAL"&&!actualOnly&&(!actualDataAccessOpen||actualDataAccessLoading))} checked={environment===value} onChange={()=>{setEnvironment(value);setConfirmed(false)}} style={{marginTop:3}}/>
-          <span>{label}{actualOnly&&value==="TRIAL"?" — unavailable for protected identity/security records":""}</span>
+          <span>{label}{actualOnly&&value==="TRIAL"?" — unavailable for protected personnel/system-security records":""}</span>
         </label>)}
       </fieldset>
-      {actualOnly&&<p style={{padding:12,borderRadius:9,background:"var(--surface-muted, #f1f5f3)",lineHeight:1.45}}>This portal or data category is reserved for protected identity, personnel, signer/signature, auditor, authorization or system-security records. It must remain in ACTUAL DATA.</p>}
+      {actualOnly&&<p style={{padding:12,borderRadius:9,background:"var(--surface-muted, #f1f5f3)",lineHeight:1.45}}>Identity, personnel, auditor and system-security records remain protected by their specific authorization rules. The Signature Portal can use TRIAL mode for test envelopes and workflow checks; protected signer identity records are still governed separately.</p>}
       {!actualOnly&&!actualDataAccessOpen&&<p role="status" style={{padding:12,borderRadius:9,background:"var(--surface-muted, #f1f5f3)",lineHeight:1.45}}><strong>ACTUAL-DATA ENTRY IS CLOSED.</strong> Trial entry remains available. The IRPA Administrator may open actual-data entry only after final system tests have passed.</p>}
       {!actualOnly&&actualDataAccessLoading&&<p role="status">Checking administrator-controlled actual-data access…</p>}
       {environment==="ACTUAL"&&<label style={{display:"flex",alignItems:"flex-start",gap:10,padding:12,border:"1px solid #b7791f",borderRadius:9,marginBottom:16}}>
