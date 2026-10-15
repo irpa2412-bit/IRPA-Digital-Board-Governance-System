@@ -110,7 +110,6 @@ async function main() {
     if (PROTECTED_TOP_LEVEL.has("trialData")) throw new Error("Safety stop: trialData unexpectedly classified as protected.");
   }
 
-  const targetName = mode === "PRODUCTION_ONCE" ? null : "trialData";
   const report = {
     status: "STARTED", mode, projectId: EXPECTED_PROJECT_ID, actor,
     startedAt: new Date().toISOString(), before: {}, deleted: {}, after: {}
@@ -146,8 +145,10 @@ async function main() {
     console.log("WHOLE_WEB_APP_PRODUCTION_RESET_COMPLETED_AND_LATCHED");
     console.log(JSON.stringify({ ...report, completedAt: "serverTimestamp", actor }, null, 2));
   } else {
-    const trial = db.collection(targetName);
+    // Trial reset is intentionally scoped to the isolated trialData root.
+    const trial = db.collection("trialData");
     const children = await trial.get();
+    report.before.trialData = children.size;
     for (const doc of children.docs) {
       for (const child of await doc.ref.listCollections()) totalDeleted += await deleteCollectionTree(child, report);
       await doc.ref.delete();
