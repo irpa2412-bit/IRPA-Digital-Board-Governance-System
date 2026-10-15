@@ -327,6 +327,7 @@ jobs:
             vars:{
               IRPA_ENVIRONMENT:"staging",
               IRPA_STAGING_CRYPTO_TEST_MODE:"true",
+              ESIGN_MODULE_ENABLED:"true",
               FIREBASE_PROJECT_ID:process.env.PROJECT,
               AUTHORIZED_DRIVE_EMAIL:"irpa2412@gmail.com",
               IRPA_APP_URL:process.env.APP_URL,
@@ -348,7 +349,7 @@ jobs:
           node <<'NODE'
           const c=require("./wrangler.staging.generated.json");
           if(c.name!=="irpa-google-drive-gateway-staging") throw new Error("Worker boundary mismatch");
-          if(c.vars.IRPA_ENVIRONMENT!=="staging"||c.vars.IRPA_STAGING_CRYPTO_TEST_MODE!=="true") throw new Error("Explicit staging-only crypto acceptance mode is missing");
+          if(c.vars.IRPA_ENVIRONMENT!=="staging"||c.vars.IRPA_STAGING_CRYPTO_TEST_MODE!=="true"||c.vars.ESIGN_MODULE_ENABLED!=="true") throw new Error("Explicit staging-only e-sign crypto acceptance mode is missing");
           if(c.vars.FIREBASE_PROJECT_ID==="irpa-digital-board-governance") throw new Error("Production Firebase project");
           if(c.kv_namespaces?.[0]?.binding!=="DRIVE_KV") throw new Error("Missing staging KV");
           if(c.triggers?.crons?.[0]!=="0 * * * *") throw new Error("Cleanup cron missing");
