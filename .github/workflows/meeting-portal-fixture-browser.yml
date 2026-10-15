@@ -179,12 +179,17 @@ jobs:
             changed.includes("tests/fixtures/meeting-portal-fixture.jsx");
           const testOnlyRegisterScope = changed.includes("src/firebase/data.js") &&
             changed.includes("tests/meeting-category-policy.test.mjs");
+          // Cross-portal actual-data gating is covered by Firestore rules regression tests,
+          // so it is a valid shared-control change even without a Meetings.jsx edit.
+          const testOnlyActualDataGate = changed.includes("src/FieldEntryDataGate.jsx") &&
+            changed.includes("firestore.rules") &&
+            changed.includes("tests/firestore.rules.test.cjs");
           // A manual dispatch on an already-merged ref is a regression rerun, not a PR diff.
           // Keep the changed-path isolation guard, but require a source/test delta only for event diffs.
           if (eventName !== "workflow_dispatch" &&
               !changed.includes("src/pages/Meetings.jsx") &&
               !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
-              !testOnlySignatureNavigation && !testOnlyRegisterScope && !guardOnlyWorkflowRepair) {
+              !testOnlySignatureNavigation && !testOnlyRegisterScope && !testOnlyActualDataGate && !guardOnlyWorkflowRepair) {
             throw new Error("Meeting/participant source change or an explicitly paired isolated regression/guard test is missing.");
           }
           console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));
