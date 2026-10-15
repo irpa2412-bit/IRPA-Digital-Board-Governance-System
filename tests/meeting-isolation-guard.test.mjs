@@ -37,6 +37,6 @@ test("Signature Gateway integration must include its portal bridge and authentic
 });
 
 test("Signature Gateway isolation does not exempt unrelated staging admin reset workflows", () => {
-  assert.match(workflow, /!allowed\\.has\\(path\\).*signatureGatewayIntegration/);
-  assert.doesNotMatch(workflow, /staging-admin-reset-fixture\\.yml/);
+  assert.match(workflow, /!allowed\.has\(path\).*signatureGatewayIntegration/);
+  assert.doesNotMatch(workflow, /staging-admin-reset-fixture\.yml/);
 });
