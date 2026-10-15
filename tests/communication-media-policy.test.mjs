@@ -18,7 +18,7 @@ test("communications portal is integrated into the existing shell and role-based
 });
 
 test("communications workspace supports drafts, approval, library, calendar and website publishing",()=>{
- for(const term of ["Create communications item","Content library","Editorial Calendar","Publishing Setup","Pending Approval","Approved","Returned","Media Asset","Submit for approval","Publish to website"]) assert.ok(portal.includes(term),term);
+ for(const term of ["Create communications item","Content library","Editorial Calendar","Publishing Setup","Pending Approval","Approved","Returned","Media Asset","Submit for approval","Publish to website","exportDraft(\"txt\")","exportDraft(\"md\")","exportDraft(\"html\")","exportDraft(\"pdf\")"]) assert.ok(portal.includes(term),term);
  assert.ok(portal.includes('collection(db,"communicationMediaItems")'));
  assert.ok(portal.includes('window.confirm("Publish this approved item to the IRPA WordPress website now?'));
 });
