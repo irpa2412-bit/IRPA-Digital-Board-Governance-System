@@ -61,7 +61,6 @@ jobs:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
           RESET_MODE: ${{ inputs.reset_mode }}
           RESET_ACTOR: ${{ inputs.administrator_identity }}
-          TRIAL_COLLECTION: trialData
           TRIAL_RESET_AUTHORIZED: ${{ inputs.reset_mode == 'TRIAL_ADMIN' && inputs.authorize == 'RESET-TRIAL' && 'YES_I_AUTHORIZE_TRIAL_DATA_RESET' || '' }}
           PRODUCTION_RESET_AUTHORIZED: ${{ inputs.reset_mode == 'PRODUCTION_ONCE' && inputs.authorize == 'RESET-PRODUCTION-ONCE' && 'YES_I_AUTHORIZE_ONE_TIME_PRODUCTION_RESET' || '' }}
         run: node scripts/reset-finance-production.js
