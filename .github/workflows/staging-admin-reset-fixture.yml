@@ -7,7 +7,6 @@ on:
         description: "UID of the dedicated staging-only test account (not a production account)"
         required: true
         type: string
-        default: "mVlfzJdyneafO6S89kLJPhqCdRh2"
 
 permissions:
   contents: read
