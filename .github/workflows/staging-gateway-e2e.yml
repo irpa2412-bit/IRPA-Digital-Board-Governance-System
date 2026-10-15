@@ -226,6 +226,7 @@ jobs:
           test -n "$subdomain"
           url="https://irpa-google-drive-gateway-staging.$subdomain.workers.dev/health"
           echo "STAGING_HEALTH_URL=$url"
+          echo "STAGING_GATEWAY_BASE_URL=https://irpa-google-drive-gateway-staging.$subdomain.workers.dev" >> "$GITHUB_ENV"
           curl --fail --silent --show-error --retry 5 --retry-delay 2 "$url" | tee staging-health.json
           grep -q '"ok":true' staging-health.json
           grep -q '"environment":"staging"' staging-health.json
@@ -234,12 +235,14 @@ jobs:
           test "$(node -e 'const x=require("./staging-health.json"); process.stdout.write(String(x.environment||""))')" = "staging"
 
       - name: Verify live recovery endpoint rejects unauthenticated requests
+        env:
+          STAGING_GATEWAY_BASE_URL: \${{ env.STAGING_GATEWAY_BASE_URL }}
         run: |
           set -euo pipefail
           code="$(curl --silent --show-error --output "$RUNNER_TEMP/reset-unauthenticated.json" --write-out '%{http_code}' \
             -X POST -H "Content-Type: application/json" \
             --data '{}' \
-            "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev/api/admin-registration/reset")"
+            "$STAGING_GATEWAY_BASE_URL/api/admin-registration/reset")"
           if [ "$code" != "401" ]; then
             echo "Expected unauthenticated staging recovery request to return HTTP 401; received $code."
             cat "$RUNNER_TEMP/reset-unauthenticated.json"
