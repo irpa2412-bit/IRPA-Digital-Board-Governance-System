@@ -251,7 +251,7 @@ async function assertSharedReadability(page, module, width) {
         const style = getComputedStyle(node);
         const image = style.backgroundImage || "none";
         if (image !== "none" && image.includes("gradient")) {
-          const stops = [...image.matchAll(/rgba?\\(\\s*\\d+,\\s*\\d+,\\s*\\d+(?:\\s*,\\s*[\\d.]+)?\\s*\\)/g)].map(match => match[0]);
+          const stops = [...image.matchAll(/rgba?\(\s*\d+,\s*\d+,\s*\d+(?:\s*,\s*[\d.]+)?\s*\)/g)].map(match => match[0]);
           if (stops.length) { backgrounds = stops; break; }
         }
         const candidate = style.backgroundColor;
