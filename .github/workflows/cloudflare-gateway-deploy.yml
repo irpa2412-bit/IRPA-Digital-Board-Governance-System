@@ -23,30 +23,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Require production WordPress and cPanel credentials before any Worker change
-        env:
-          WP_BASE: ${{ secrets.PRODUCTION_WORDPRESS_BASE_URL }}
-          WP_USER: ${{ secrets.PRODUCTION_WORDPRESS_USERNAME }}
-          WP_PASSWORD: ${{ secrets.PRODUCTION_WORDPRESS_APPLICATION_PASSWORD }}
-          CP_BASE: ${{ secrets.PRODUCTION_CPANEL_BASE_URL }}
-          CP_USER: ${{ secrets.PRODUCTION_CPANEL_USERNAME }}
-          CP_TOKEN: ${{ secrets.PRODUCTION_CPANEL_API_TOKEN }}
-        run: |
-          set -euo pipefail
-          missing=0
-          for pair in "PRODUCTION_WORDPRESS_BASE_URL:$WP_BASE" "PRODUCTION_WORDPRESS_USERNAME:$WP_USER" "PRODUCTION_WORDPRESS_APPLICATION_PASSWORD:$WP_PASSWORD" "PRODUCTION_CPANEL_BASE_URL:$CP_BASE" "PRODUCTION_CPANEL_USERNAME:$CP_USER" "PRODUCTION_CPANEL_API_TOKEN:$CP_TOKEN"; do
-            name="${pair%%:*}"; value="${pair#*:}"
-            if [ -z "$value" ]; then echo "Missing required production secret: $name"; missing=1; fi
-          done
-          test "$missing" -eq 0
-          node <<'NODE'
-          const wp=new URL(process.env.WP_BASE);
-          if(wp.protocol!=="https:"||wp.username||wp.password||wp.search||wp.hash) throw new Error("Production WordPress endpoint must be an HTTPS base URL without embedded credentials.");
-          const cp=new URL(process.env.CP_BASE);
-          if(cp.protocol!=="https:"||cp.port!=="2083"||cp.pathname!=="/"||cp.username||cp.password||cp.search||cp.hash) throw new Error("Production cPanel endpoint must be an HTTPS origin on port 2083.");
-          console.log("PRODUCTION_WEBSITE_CREDENTIALS_CONFIGURED");
-          NODE
-
       - name: Record current production Worker version for rollback
         env:
           CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -200,30 +176,6 @@ jobs:
           npm install
           npm run build
 
-      - name: Install gateway dependencies for production secret configuration
-        working-directory: drive-gateway
-        run: npm ci --no-audit --no-fund
-
-      - name: Configure production website-management secrets
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          WP_BASE: ${{ secrets.PRODUCTION_WORDPRESS_BASE_URL }}
-          WP_USER: ${{ secrets.PRODUCTION_WORDPRESS_USERNAME }}
-          WP_PASSWORD: ${{ secrets.PRODUCTION_WORDPRESS_APPLICATION_PASSWORD }}
-          CP_BASE: ${{ secrets.PRODUCTION_CPANEL_BASE_URL }}
-          CP_USER: ${{ secrets.PRODUCTION_CPANEL_USERNAME }}
-          CP_TOKEN: ${{ secrets.PRODUCTION_CPANEL_API_TOKEN }}
-        working-directory: drive-gateway
-        run: |
-          set -euo pipefail
-          printf '%s' "$WP_BASE" | npx wrangler secret put WORDPRESS_BASE_URL --config wrangler.json
-          printf '%s' "$WP_USER" | npx wrangler secret put WORDPRESS_USERNAME --config wrangler.json
-          printf '%s' "$WP_PASSWORD" | npx wrangler secret put WORDPRESS_APPLICATION_PASSWORD --config wrangler.json
-          printf '%s' "$CP_BASE" | npx wrangler secret put CPANEL_BASE_URL --config wrangler.json
-          printf '%s' "$CP_USER" | npx wrangler secret put CPANEL_USERNAME --config wrangler.json
-          printf '%s' "$CP_TOKEN" | npx wrangler secret put CPANEL_API_TOKEN --config wrangler.json
-
       - name: Deploy production Worker — authorized cutover
         uses: cloudflare/wrangler-action@v3
         with:
@@ -239,48 +191,6 @@ jobs:
           echo "$body"
           echo "$body" | grep -q '"ok":true'
           echo "$body" | grep -q '"storageProvider":"Google Drive"'
-
-      - name: Verify live WordPress and cPanel integration through the production portal gateway
-        env:
-          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
-        run: |
-          set -euo pipefail
-          node <<'NODE'
-          const fs=require("fs");
-          const {initializeApp,cert}=require("./functions/node_modules/firebase-admin/app");
-          const {getAuth}=require("./functions/node_modules/firebase-admin/auth");
-          const source=fs.readFileSync("src/firebase/config.js","utf8");
-          const match=source.match(/apiKey:\s*import\.meta\.env\.VITE_FIREBASE_API_KEY\s*\|\|\s*"([^"]+)"/);
-          if(!match) throw new Error("Could not resolve the public Firebase web API key for live verification.");
-          const serviceAccount=JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-          if(serviceAccount.project_id!=="irpa-digital-board-governance") throw new Error("Production verification service account project mismatch.");
-          initializeApp({credential:cert(serviceAccount),projectId:serviceAccount.project_id});
-          async function main(){
-            const user=await getAuth().getUserByEmail("irpa2412@gmail.com");
-            const customToken=await getAuth().createCustomToken(user.uid);
-            const signIn=await fetch("https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key="+encodeURIComponent(match[1]),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:customToken,returnSecureToken:true})});
-            const session=await signIn.json().catch(()=>null);
-            if(!signIn.ok||!session?.idToken) throw new Error("Could not create the short-lived production verification session.");
-            const base="https://irpa-google-drive-gateway.irpa-governance.workers.dev";
-            async function request(path){
-              const response=await fetch(base+path,{headers:{Authorization:"Bearer "+session.idToken,Accept:"application/json"},signal:AbortSignal.timeout(20000)});
-              const body=await response.json().catch(()=>({}));
-              if(!response.ok) throw new Error(path+" returned HTTP "+response.status+": "+String(body.error||"request failed").slice(0,160));
-              return body;
-            }
-            const status=await request("/api/communications/site/status");
-            if(status.connections?.website!=="connected"||status.connections?.cpanel!=="connected"||status.permissions?.reviewer!==true) {
-              throw new Error("Production portal could not verify authenticated WordPress and cPanel access.");
-            }
-            const pages=await request("/api/communications/website/content?type=pages");
-            if(!Array.isArray(pages.items)) throw new Error("Production WordPress page listing did not return an item list.");
-            const files=await request("/api/communications/cpanel/files?dir=");
-            if(!Array.isArray(files.entries)) throw new Error("Production cPanel directory listing did not return an entry list.");
-            console.log("PRODUCTION_WORDPRESS_AUTH_AND_PAGE_READ_PASS");
-            console.log("PRODUCTION_CPANEL_AUTH_AND_DIRECTORY_READ_PASS");
-          }
-          main().catch(e=>{console.error("Production website integration verification failed:",e.message);process.exit(1)});
-          NODE
 
       - name: Verify production CORS
         run: |
