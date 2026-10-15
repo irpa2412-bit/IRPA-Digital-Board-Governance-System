@@ -6,9 +6,14 @@ Integrated communications workspace inside the existing IRPA Digital Board Gover
 ## Included capabilities
 - Website article and press-release drafting.
 - Social-media copy drafting for export and manual posting.
-- Media asset/link register for HTTPS URLs and approved Google Drive links.
+- Multi-format media upload and archive through the existing authenticated Google Drive gateway, with Firestore metadata and role-based access.
+- Asset types include supported PDF, Word, Excel, PowerPoint, OpenDocument, RTF, TXT, CSV/TSV, Markdown, HTML, EPUB, JSON/XML, image, audio and video formats; gateway-supported formats only, with a 10 MB per-file limit in the current upload route.
+- Media library with searchable type filters, title/tags, original-file download and Google Drive link-out.
 - Editorial planning calendar.
 - Searchable content library and workflow status counts.
+- Draft exports to TXT, Markdown, HTML and PDF without changing approval status or publishing.
+- Browser-native image editing (brightness, contrast, saturation, rotation) with PNG/JPEG/WebP export; source assets are not overwritten.
+- Audio/video preview, basic trim range selection and WebM export where the browser supports MediaRecorder and media capture.
 - Author submission, designated review/approval, return-for-revision, archival and audit-triggered record changes.
 - Server-side WordPress post publishing for approved website articles and press releases.
 
@@ -48,10 +53,17 @@ Do not deploy to production until authenticated staging tests verify role denial
 - Delete is denied for communications records; use Archived to retain history.
 - WordPress credentials are server-side Firebase secrets, never browser data or Firestore fields.
 - Text entered in the portal is escaped to plain-text paragraphs before WordPress publication.
-- Media files remain in the approved Google Drive storage pathway; the media register stores links/metadata rather than opening Firebase Storage access.
+- Media binaries use the existing Google Drive gateway and the Firestore media register stores metadata only; Firebase Storage remains deny-by-default.
+- Media upload and download use the authenticated gateway; Communication Media downloads are checked against registered communications roles server-side.
+- Image exports and text/PDF exports are created locally in the browser. Audio/video trim exports are real-time browser captures to WebM and depend on MediaRecorder support; the source file is never overwritten.
+- This is a self-contained communications production workspace for common editorial tasks, not a professional multi-track nonlinear editor: multi-track audio mixing, noise reduction, frame-accurate timeline editing, advanced colour grading and arbitrary codec transcoding are not provided in this browser-native release.
 - External social-network posting is not enabled; each platform requires its own approved API application and secret-backed server integration.
 
 ## Known acceptance gates
+- Verify multi-format upload and authenticated download in isolated staging for each allowed file type and enforce the 10 MB limit.
+- Verify communications-role denial for media downloads, file-size/MIME rejection, and no direct Firebase Storage access.
+- Test image edit/export and text TXT/Markdown/HTML/PDF exports on desktop and mobile; verify original assets remain unchanged.
+- Test audio/video trim and WebM export on supported browsers, and verify graceful fallback when MediaRecorder or captureStream is unavailable.
 - Verify the portal appears only for communications roles, designated reviewers and administrators.
 - Run `npm run test:communication-media` and `npm run build`.
 - Run Firestore rules tests in the authorised emulator environment.
