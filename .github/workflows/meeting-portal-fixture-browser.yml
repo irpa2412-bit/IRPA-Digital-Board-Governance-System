@@ -159,9 +159,7 @@ jobs:
             changed.includes("drive-gateway/src/signing.mjs") &&
             changed.includes("drive-gateway/tests/controlled-authenticated-signing-flow.test.mjs");
           const unexpected = changed.filter(path =>
-            !allowed.has(path) &&
-            !(path === ".github/workflows/firebase-deploy.yml" && signatureGatewayIntegration) &&
-            !(path === "drive-gateway/tests/esign-storage-multipart.test.mjs" && signatureGatewayIntegration)
+            !allowed.has(path) && !(path === ".github/workflows/firebase-deploy.yml" && signatureGatewayIntegration) && !(path === "drive-gateway/tests/esign-storage-multipart.test.mjs" && signatureGatewayIntegration)
           );
           if (unexpected.length) {
             console.error("Unexpected files changed outside the isolated meeting repair:", unexpected);
