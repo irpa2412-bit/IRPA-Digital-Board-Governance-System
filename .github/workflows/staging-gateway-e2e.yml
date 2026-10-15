@@ -59,7 +59,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Verify staging secrets, authenticated signer, and authority register (read-only)
+      - name: Verify staging signer and provision missing synthetic fixture (isolated staging only)
         env:
           PROJECT: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
           TEST_EMAIL: ${{ secrets.STAGING_CRYPTO_TEST_EMAIL }}
@@ -101,7 +101,7 @@ jobs:
             // written through that identity's own Firebase token and only to isolated staging.
             const svg='<svg xmlns="http://www.w3.org/2000/svg" width="360" height="90" viewBox="0 0 360 90"><rect width="360" height="90" fill="white"/><path d="M18 54 C32 16 38 77 58 45 S84 24 88 52 S110 69 130 38 S153 18 160 53 S184 68 200 41 S224 22 231 53 S252 67 271 39 S293 24 303 52" fill="none" stroke="#1f2937" stroke-width="3" stroke-linecap="round"/><text x="180" y="82" text-anchor="middle" font-size="10" fill="#6b7280">STAGING TEST FIXTURE - NOT A REAL SIGNATURE</text></svg>';
             const specimen='data:image/svg+xml;base64,'+Buffer.from(svg).toString("base64");
-            const fields={uid:{stringValue:auth.localId},email:{stringValue:email},displayName:{stringValue:"IRPA Staging Crypto Test Signer"},method:{stringValue:"Automated Staging Test Fixture"},status:{stringValue:"Active"},signatureUrl:{stringValue:specimen},signaturePath:{stringValue:"staging-test-fixture/synthetic.svg"},signatureSha256:{stringValue:crypto.createHash("sha256").update(svg).digest("hex")},recordOrigin:{stringValue:"TRIAL"},pathwayVersion:{stringValue:"STAGING-ONLY-TEST-FIXTURE"}};
+            const fields={uid:{stringValue:auth.localId},email:{stringValue:auth.email||email},displayName:{stringValue:"IRPA Staging Crypto Test Signer"},method:{stringValue:"Automated Staging Test Fixture"},status:{stringValue:"Active"},signatureUrl:{stringValue:specimen},signaturePath:{stringValue:"staging-test-fixture/synthetic.svg"},signatureSha256:{stringValue:crypto.createHash("sha256").update(svg).digest("hex")},recordOrigin:{stringValue:"TRIAL"},pathwayVersion:{stringValue:"STAGING-ONLY-TEST-FIXTURE"}};
             const created=await fetch("https://firestore.googleapis.com/v1/projects/"+project+"/databases/(default)/documents/signatureProfiles?documentId="+encodeURIComponent(auth.localId),{method:"POST",headers:{Authorization:"Bearer "+auth.idToken,"content-type":"application/json"},body:JSON.stringify({fields})});
             if(!created.ok && created.status!==409) throw new Error("Could not provision the authenticated staging-only Signature Profile fixture (HTTP "+created.status+").");
             sig=await readOwn("signatureProfiles");
@@ -142,7 +142,7 @@ jobs:
           console.log("STAGING_SIGNATURE_PROFILE=PASS");
           console.log("STAGING_SIGNER_IDENTITY_AUTHORITY=PASS");
           console.log("STAGING_MEMBER_EMPLOYEE_AUTHORITY_REGISTER=PASS");
-          console.log("STAGING_PREFLIGHT_ONLY=PASS; worker deployed=false; production touched=false");
+          console.log("STAGING_PREFLIGHT=PASS; isolated test fixture only; worker deployed=false; production touched=false");
           NODE
 
   deploy-staging:
