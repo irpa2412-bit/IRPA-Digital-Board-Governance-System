@@ -195,7 +195,7 @@ jobs:
               SMTP_HOST:"mail.irpa.or.tz",SMTP_PORT:"465",SMTP_FROM:"info@irpa.or.tz",
               DRIVE_ROOT_FOLDER_NAME:"IRPA Governance System - STAGING",
               FIRESTORE_COLLECTION_PREFIX:"staging_",DRIVE_MOCK:"false",LOCAL_TEST_MODE:"false",
-              CPANEL_DOCUMENT_ROOT:process.env.CP_ROOT
+              IRPA_ENVIRONMENT:"staging",CPANEL_DOCUMENT_ROOT:process.env.CP_ROOT
             },
             kv_namespaces:[{binding:"DRIVE_KV",id:process.env.STAGING_KV_ID}],
             triggers:{crons:["0 * * * *"]}
@@ -212,6 +212,7 @@ jobs:
           const c=require("./wrangler.staging.generated.json");
           if(c.name!=="irpa-google-drive-gateway-staging") throw new Error("Worker boundary mismatch");
           if(c.vars.FIREBASE_PROJECT_ID==="irpa-digital-board-governance") throw new Error("Production Firebase project");
+          if(c.vars.IRPA_ENVIRONMENT!=="staging") throw new Error("Explicit staging environment marker missing");
           if(c.kv_namespaces?.[0]?.binding!=="DRIVE_KV") throw new Error("Missing staging KV");
           if(c.triggers?.crons?.[0]!=="0 * * * *") throw new Error("Cleanup cron missing");
           console.log("STAGING_CONFIGURATION_VALID");
@@ -351,7 +352,7 @@ jobs:
           CP_TEST_FILE: ${{ secrets.STAGING_CPANEL_TEST_FILE }}
         run: |
           set -euo pipefail
-          export ID_TOKEN="$(node <<'NODE'
+          ID_TOKEN="$(node <<'NODE'
           const https=require("https");
           const body=JSON.stringify({email:process.env.TEST_EMAIL,password:process.env.TEST_PASSWORD,returnSecureToken:true});
           const req=https.request("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key="+encodeURIComponent(process.env.FIREBASE_WEB_API_KEY),{method:"POST",headers:{"Content-Type":"application/json","Content-Length":Buffer.byteLength(body)}},res=>{
@@ -359,6 +360,7 @@ jobs:
           });req.on("error",e=>{console.error("Staging Firebase sign-in request failed:",e.message);process.exit(1)});req.end(body);
           NODE
           )"
+          export ID_TOKEN
           node <<'NODE'
           const base=process.env.STAGING_URL;
           const token=process.env.ID_TOKEN;
