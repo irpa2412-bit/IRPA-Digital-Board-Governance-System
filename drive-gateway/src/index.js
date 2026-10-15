@@ -665,9 +665,9 @@ function communicationMediaRoleValues(record){
 async function authorizeCommunicationMediaDownload(env,claims){
   const email=String(claims.email||"").trim().toLowerCase();
   const [adminRaw,memberRaw,employeeRaw]=await Promise.all([
-    getFirestoreDocument(env,"adminProfiles/"+claims.user_id,claims.token),
-    getFirestoreDocument(env,"members/"+claims.user_id,claims.token),
-    getFirestoreDocument(env,"employees/"+claims.user_id,claims.token)
+    getFirestoreDocument(env,"adminProfiles/"+claims.user_id,claims.token).catch(()=>null),
+    getFirestoreDocument(env,"members/"+claims.user_id,claims.token).catch(()=>null),
+    getFirestoreDocument(env,"employees/"+claims.user_id,claims.token).catch(()=>null)
   ]);
   const admin=firestoreDocumentToPlain(adminRaw);
   const member=firestoreDocumentToPlain(memberRaw);
