@@ -3,7 +3,7 @@ import {addDoc,collection,deleteDoc,doc,onSnapshot,orderBy,query,serverTimestamp
 import {auth,db} from "../firebase/config";
 import CommunicationMediaStudio from "./CommunicationMediaStudio";
 
-const GATEWAY=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").replace(/\\/$/,"");
+const GATEWAY=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").replace(/\/$/,"");
 const TYPES=["Website Article","Press Release","Social Media","Media Asset"];
 const CHANNELS=["IRPA Website","Facebook","Instagram","LinkedIn","X","WhatsApp","Press / Media"];
 const STATUSES=["Draft","Pending Approval","Approved","Returned","Published","Archived"];
