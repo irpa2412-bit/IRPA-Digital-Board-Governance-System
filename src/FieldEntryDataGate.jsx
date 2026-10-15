@@ -39,6 +39,7 @@ const applyRecord=record=>{
     window.sessionStorage.setItem("irpaDataEnvironmentTarget",record.portal);
     window.sessionStorage.setItem("irpaDataEnvironmentSelectedAt",record.verifiedAt);
     window.sessionStorage.setItem("irpaIdentityDataEnvironment","ACTUAL");
+    window.sessionStorage.setItem("irpaActualDataAccessVerified",record.environment==="ACTUAL"&&window.sessionStorage.getItem("irpaActualDataAccessOpen")==="true"?"true":"false");
     return true;
   }catch{return false}
 };
@@ -141,10 +142,10 @@ export default function FieldEntryDataGate({portal}){
     let current=true;
     setActualDataAccessLoading(true);
     getActualDataAccessStatus().then(status=>{
-      if(current)setActualDataAccessOpen(status?.enabled===true);
+      if(current){setActualDataAccessOpen(status?.enabled===true);try{window.sessionStorage.setItem("irpaActualDataAccessOpen",status?.enabled===true?"true":"false")}catch{}}
     }).catch(()=>{
       // Fail closed: a missing/unavailable gate status never enables actual-data entry.
-      if(current)setActualDataAccessOpen(false);
+      if(current){setActualDataAccessOpen(false);try{window.sessionStorage.setItem("irpaActualDataAccessOpen","false");window.sessionStorage.setItem("irpaActualDataAccessVerified","false")}catch{}}
     }).finally(()=>{if(current)setActualDataAccessLoading(false)});
     return()=>{current=false};
   },[field?.portal]);
