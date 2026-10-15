@@ -29,7 +29,7 @@ service cloud.firestore {
   function adminProfileExists(){return signedIn()&&exists(/databases/$(database)/documents/adminProfiles/$(request.auth.uid));}
   function admin(){return primaryAdmin()||(adminProfileExists()&&get(/databases/$(database)/documents/adminProfiles/$(request.auth.uid)).data.active==true);}
   // Operational actual-data writes are closed by default. Trial-marked records remain usable for controlled testing.
-  function actualDataAccessOpen(){return exists(/databases/$(database)/documents/systemSettings/actualDataAccess)&&get(/databases/$(database)/documents/systemSettings/actualDataAccess).data.get("enabled",false)==true;}
+  function actualDataAccessOpen(){return exists(/databases/$(database)/documents/systemSettings/actualDataAccess)&&get(/databases/$(database)/documents/systemSettings/actualDataAccess).data.get("enabled",false)==true&&get(/databases/$(database)/documents/systemSettings/actualDataAccess).data.get("status","")=="OPEN"&&get(/databases/$(database)/documents/systemSettings/actualDataAccess).data.get("finalTestsAttested",false)==true;}
   function trialDataRecord(data){return data.get("recordOrigin","") in ["TRIAL","trial","Trial"]||data.get("trialData",false)==true||data.get("isTrial",false)==true;}
   function actualCreateAllowed(){return actualDataAccessOpen()||trialDataRecord(request.resource.data);}
   function actualUpdateAllowed(){return actualDataAccessOpen()||(trialDataRecord(resource.data)&&trialDataRecord(request.resource.data));}
