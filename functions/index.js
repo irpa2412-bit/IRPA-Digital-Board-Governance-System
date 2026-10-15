@@ -1722,3 +1722,7 @@ exports.submitMeetingDocumentReview = meetingWorkingDocuments.submitMeetingDocum
 // Explicitly expose the authorised server-side meeting invitee directory callable.
 const meetingGateway = require("./meetingGateway");
 exports.listMeetingInviteeDirectory = meetingGateway.listMeetingInviteeDirectory;
+
+// Communications and media publishing. WordPress credentials remain in Firebase Secret Manager.
+const communicationMedia = require("./communicationMedia");
+exports.publishCommunicationMediaItem = communicationMedia.publishCommunicationMediaItem;
