@@ -233,4 +233,25 @@ jobs:
           grep -q '"authFunctionsEnabled":false' staging-health.json
           test "$(node -e 'const x=require("./staging-health.json"); process.stdout.write(String(x.environment||""))')" = "staging"
 
+      - name: Verify live recovery endpoint rejects unauthenticated requests
+        run: |
+          set -euo pipefail
+          code="$(curl --silent --show-error --output "$RUNNER_TEMP/reset-unauthenticated.json" --write-out '%{http_code}' \
+            -X POST -H "Content-Type: application/json" \
+            --data '{}' \
+            "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev/api/admin-registration/reset")"
+          if [ "$code" != "401" ]; then
+            echo "Expected unauthenticated staging recovery request to return HTTP 401; received $code."
+            cat "$RUNNER_TEMP/reset-unauthenticated.json"
+            exit 1
+          fi
+          node - "$RUNNER_TEMP/reset-unauthenticated.json" <<'NODE'
+          const fs=require("fs");
+          const body=JSON.parse(fs.readFileSync(process.argv[2],"utf8"));
+          if(body?.ok!==false || !/authentication is required/i.test(String(body?.error||""))) {
+            throw new Error("Unauthenticated recovery response did not match the expected fail-closed contract.");
+          }
+          console.log("LIVE_RECOVERY_UNAUTHENTICATED_REJECTION=PASS");
+          NODE
+
 # Staging proof execution trigger — 2026-10-04
