@@ -24,6 +24,7 @@ import { canReadSignatureAsset, canUploadSignedDocument } from "./signatureAsset
 import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPasswordSetup, getInvitationSessionState } from "./invitationRedemption.mjs";
 import { buildGoogleDriveAuthorizationParams } from "./googleDriveOAuth.mjs";
 import { handleAdminRegistrationReset } from "./adminRegistrationReset.mjs";
+import { renderStagingAdminResetPage, STAGING_ADMIN_RESET_TEST_UID } from "./adminRegistrationResetStagingPage.mjs";
 
 function getFirebaseProjectId(env) {
   const projectId = String(env?.FIREBASE_PROJECT_ID || "").trim();
@@ -90,6 +91,65 @@ export default {
 
       // Normalize trailing slashes so portal upload/archive actions cannot be blocked by URL formatting.
       const pathname = url.pathname.replace(/\/+$/, "") || "/";
+
+      const stagingResetTestEnabled =
+        env.IRPA_ENVIRONMENT === "staging" &&
+        env.FIREBASE_PROJECT_ID === "irpa-dbg-staging-a73ec" &&
+        env.ADMIN_REGISTRATION_RESET_ENABLED === "true" &&
+        env.STAGING_ADMIN_RESET_TEST_UID === STAGING_ADMIN_RESET_TEST_UID;
+
+      if (pathname === "/admin-registration-reset-staging-test") {
+        if (request.method !== "GET" || !stagingResetTestEnabled) {
+          return json({ ok: false, error: "Not found." }, 404, corsHeaders(request));
+        }
+        const html = renderStagingAdminResetPage(env.STAGING_ADMIN_RESET_TEST_UID);
+        return new Response(html, {
+          status: 200,
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Referrer-Policy": "no-referrer",
+            "X-Content-Type-Options": "nosniff",
+            "X-Frame-Options": "DENY",
+            "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+            "Content-Security-Policy": "default-src 'none'; script-src 'unsafe-inline' https://www.gstatic.com; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+          }
+        });
+      }
+
+      if (pathname === "/api/admin-registration/reset-staging-test") {
+        if (!stagingResetTestEnabled) {
+          return json({ ok: false, error: "Not found." }, 404, corsHeaders(request));
+        }
+        if (request.method !== "POST") {
+          return json({ ok: false, error: "Method not allowed." }, 405, corsHeaders(request));
+        }
+        if (request.headers.has("x-irpa-reset-secret")) {
+          return json({ ok: false, error: "Client-supplied reset secret headers are not accepted." }, 400, corsHeaders(request));
+        }
+        let payload;
+        try { payload = await request.clone().json(); } catch {
+          return json({ ok: false, error: "A valid JSON request is required." }, 400, corsHeaders(request));
+        }
+        if (String(payload?.targetUid || "") !== env.STAGING_ADMIN_RESET_TEST_UID) {
+          return json({ ok: false, error: "Only the dedicated staging test profile is permitted." }, 403, corsHeaders(request));
+        }
+        const internalHeaders = new Headers(request.headers);
+        internalHeaders.set("x-irpa-reset-secret", String(env.IRPA_RESET_DEVELOPER_SECRET || ""));
+        const internalRequest = new Request(request.url, {
+          method: "POST",
+          headers: internalHeaders,
+          body: JSON.stringify(payload)
+        });
+        return await handleAdminRegistrationReset(internalRequest, env, {
+          authenticate: authenticateFirebaseRequest,
+          getFirestoreDocument,
+          getFirebaseProjectId,
+          json,
+          corsHeaders
+        });
+      }
 
       if (pathname === "/api/admin-registration/reset") {
         return await handleAdminRegistrationReset(request, env, {
