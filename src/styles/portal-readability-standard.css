@@ -148,3 +148,5 @@
   color: #ffffff !important;
   -webkit-text-fill-color: #ffffff !important;
 }
+
+/* Cross-portal contrast regression also measures opaque gradient colour stops. */
