@@ -8,6 +8,7 @@ const studio=readFileSync(new URL("../src/pages/CommunicationMediaStudio.jsx",im
 const rules=readFileSync(new URL("../firestore.rules",import.meta.url),"utf8");
 const fn=readFileSync(new URL("../functions/communicationMedia.js",import.meta.url),"utf8");
 const index=readFileSync(new URL("../functions/index.js",import.meta.url),"utf8");
+const gateway=readFileSync(new URL("../drive-gateway/src/index.js",import.meta.url),"utf8");
 
 test("communications portal is integrated into the existing shell and role-based navigation",()=>{
  assert.ok(app.includes('import CommunicationMediaPortal from "./pages/CommunicationMediaPortal"'));
@@ -59,4 +60,12 @@ test("media asset register is authenticated, size-limited, immutable and deny-by
  assert.ok(rules.includes('request.resource.data.get("fileSize",0)<=10485760'));
  assert.ok(rules.includes('request.resource.data.get("storageProvider","")=="Google Drive"'));
  assert.ok(rules.includes('allow update,delete:if false;'));
+});
+
+test("media upload and download both enforce registered communications roles at the gateway",()=>{
+ assert.ok(gateway.includes("async function authorizeCommunicationMediaDownload(env,claims)"));
+ assert.ok(gateway.includes('purpose === "Communication Media" && !(await authorizeCommunicationMediaDownload(env, claims))'));
+ assert.ok(gateway.includes('if (purpose === "Communication Media" && !(await authorizeCommunicationMediaDownload(env, claims)))'));
+ assert.ok(gateway.includes("Your registered IRPA role does not permit communications media uploads."));
+ assert.ok(gateway.includes("Your registered IRPA role does not permit access to the communications media archive."));
 });
