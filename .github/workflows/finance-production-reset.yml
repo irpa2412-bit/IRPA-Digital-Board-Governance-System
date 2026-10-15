@@ -38,7 +38,7 @@ jobs:
         with:
           node-version: 22
       - name: Install Firebase Admin SDK
-        run: npm --prefix functions install --omit=dev
+        run: npm install --no-save firebase-admin@^13
       - name: Validate reset authorization without logging secret values
         env:
           MODE: ${{ inputs.reset_mode }}
@@ -59,7 +59,6 @@ jobs:
       - name: Execute selected, guarded reset
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
-          NODE_PATH: ${{ github.workspace }}/functions/node_modules
           RESET_MODE: ${{ inputs.reset_mode }}
           RESET_ACTOR: ${{ inputs.administrator_identity }}
           TRIAL_COLLECTION: trialData
