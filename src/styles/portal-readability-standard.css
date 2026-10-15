@@ -137,3 +137,10 @@
   -webkit-text-fill-color: var(--irpa-readable-text) !important;
   opacity: 1 !important;
 }
+
+
+/* The Dashboard keeps its deep-green hero surface; use white text there for WCAG contrast. */
+#root .app-shell .content-area.dashboard-content-area .page :where(h1, h2, h3, h4, h5, h6) {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
