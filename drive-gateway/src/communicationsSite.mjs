@@ -28,6 +28,8 @@ function field(value) {
   if (value === null || value === undefined) return { nullValue: null };
   if (typeof value === "boolean") return { booleanValue: value };
   if (typeof value === "number") return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
+  if (Array.isArray(value)) return { arrayValue: { values: value.map(field) } };
+  if (typeof value === "object") return { mapValue: { fields: fields(value) } };
   return { stringValue: String(value) };
 }
 function fields(record) {
@@ -151,6 +153,43 @@ export function createCommunicationsSiteRouter(deps) {
         result.cpanel = "connected";
       } catch (error) { result.cpanel = error.message.includes("not configured") ? "not_configured" : "unavailable_or_denied"; }
       return json({ ok: true, connections: result, permissions: { reviewer: roles.some(r => REVIEW_ROLES.has(r)), staticFileEditing: true } }, 200, corsHeaders(request));
+    }
+
+    if (path === "/api/communications/website/content" && request.method === "GET") {
+      await authorised(request, env, true);
+      const wp = wordpressConfig(env);
+      const type = url.searchParams.get("type") === "pages" ? "pages" : "posts";
+      const response = await fetch(wp.root + "/wp-json/wp/v2/" + type + "?context=edit&per_page=50&orderby=modified&order=desc", {
+        headers: { Authorization: wp.auth, Accept: "application/json" }, signal: AbortSignal.timeout(15000)
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !Array.isArray(data)) throw new Error("Could not read website content. Verify the WordPress account's edit permissions.");
+      return json({ items: data.map(item => ({
+        id: item.id, type, title: String(item.title?.rendered || ""), status: item.status,
+        link: item.link, modified: item.modified, content: String(item.content?.raw || "")
+      })) }, 200, corsHeaders(request));
+    }
+
+    if (path === "/api/communications/website/content" && request.method === "PUT") {
+      const { claims } = await authorised(request, env, true);
+      const input = await request.json().catch(() => ({}));
+      const type = input.type === "pages" ? "pages" : input.type === "posts" ? "posts" : "";
+      const id = Number(input.id);
+      const title = cleanText(input.title, 181);
+      const body = cleanText(input.content, 30001);
+      if (!type || !Number.isSafeInteger(id) || id < 1 || !title || title.length > 180 || !body || body.length > 30000) {
+        return json({ error: "A valid page/post ID, title and content (up to 30,000 characters) are required." }, 400, corsHeaders(request));
+      }
+      const wp = wordpressConfig(env);
+      const response = await fetch(wp.root + "/wp-json/wp/v2/" + type + "/" + id, {
+        method: "POST", headers: { Authorization: wp.auth, "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ title, content: plainContent(body) }), signal: AbortSignal.timeout(20000)
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !Number.isSafeInteger(data?.id) || typeof data?.link !== "string") throw new Error("WordPress rejected the content update. Confirm that the integration account can edit this item.");
+      const auditFields = fields({ action: "COMMUNICATION_WEBSITE_CONTENT_UPDATED", category: "COMMUNICATIONS", collection: type, recordId: id, actorUid: claims.user_id, actorEmail: claims.email || "", details: { title, publicUrl: data.link }, createdAt: new Date().toISOString() });
+      await commitDocumentAndAudit(env, "communicationWebsiteEdits/" + crypto.randomUUID(), claims.token, fields({ itemId: id, type, title, publicUrl: data.link, updatedByUid: claims.user_id, updatedAt: new Date().toISOString() }), ["itemId", "type", "title", "publicUrl", "updatedByUid", "updatedAt"], auditFields, { createOnly: true });
+      return json({ success: true, id: data.id, title: String(data.title?.rendered || title), publicUrl: data.link, message: "Website content updated." }, 200, corsHeaders(request));
     }
 
     if (path === "/api/communications/website/publish" && request.method === "POST") {
