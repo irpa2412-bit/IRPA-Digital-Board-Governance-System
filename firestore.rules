@@ -444,7 +444,7 @@ service cloud.firestore {
       &&request.resource.data.get("fileId","").size()>0
       &&request.resource.data.get("fileSize",0) is int
       &&request.resource.data.get("fileSize",0)>0
-      &&request.resource.data.get("fileSize",0)<=10485760
+      &&request.resource.data.get("fileSize",0)<=26214400
       &&request.resource.data.get("storageProvider","")=="Google Drive"
       &&request.resource.data.keys().hasOnly(["title","originalFileName","contentType","fileSize","fileId","webViewLink","storageProvider","purpose","tags","mediaKind","status","recordOrigin","uploadedByUid","uploadedByEmail","createdAt","updatedAt"]);
     // Asset binaries and immutable upload identity are not editable or deletable through client-side Firestore writes.
