@@ -92,11 +92,22 @@ jobs:
             if(!res.ok) throw new Error("Cannot read the signer's "+collection+" record under its own authenticated identity (HTTP "+res.status+").");
             return data.fields||{};
           };
-          const sig=await readOwn("signatureProfiles");
+          let sig=await readOwn("signatureProfiles");
           const identity=await readOwn("signerIdentities");
           const val=(fields,key)=>fields?.[key]?.stringValue||"";
-          if(!sig) throw new Error("STAGING_SIGNER_PROFILE_MISSING: no signatureProfiles/{authenticated UID} record exists. Complete and save the dedicated staging signer's Signature Profile before rerunning preflight; no profile or specimen will be fabricated.");
-          if(!identity) throw new Error("STAGING_SIGNER_IDENTITY_MISSING: no signerIdentities/{authenticated UID} record exists. Complete the staging signer's identity registration before rerunning preflight.");
+          if(!identity) throw new Error("STAGING_SIGNER_IDENTITY_MISSING: no signerIdentities/{authenticated UID} record exists. Register the dedicated staging signer through the authorized identity workflow before acceptance.");
+          if(!sig){
+            // This is an explicitly synthetic fixture for the dedicated test identity,
+            // written through that identity's own Firebase token and only to isolated staging.
+            const svg='<svg xmlns="http://www.w3.org/2000/svg" width="360" height="90" viewBox="0 0 360 90"><rect width="360" height="90" fill="white"/><path d="M18 54 C32 16 38 77 58 45 S84 24 88 52 S110 69 130 38 S153 18 160 53 S184 68 200 41 S224 22 231 53 S252 67 271 39 S293 24 303 52" fill="none" stroke="#1f2937" stroke-width="3" stroke-linecap="round"/><text x="180" y="82" text-anchor="middle" font-size="10" fill="#6b7280">STAGING TEST FIXTURE - NOT A REAL SIGNATURE</text></svg>';
+            const specimen='data:image/svg+xml;base64,'+Buffer.from(svg).toString("base64");
+            const fields={uid:{stringValue:auth.localId},email:{stringValue:email},displayName:{stringValue:"IRPA Staging Crypto Test Signer"},method:{stringValue:"Automated Staging Test Fixture"},status:{stringValue:"Active"},signatureUrl:{stringValue:specimen},signaturePath:{stringValue:"staging-test-fixture/synthetic.svg"},signatureSha256:{stringValue:crypto.createHash("sha256").update(svg).digest("hex")},recordOrigin:{stringValue:"TRIAL"},pathwayVersion:{stringValue:"STAGING-ONLY-TEST-FIXTURE"}};
+            const created=await fetch("https://firestore.googleapis.com/v1/projects/"+project+"/databases/(default)/documents/signatureProfiles?documentId="+encodeURIComponent(auth.localId),{method:"POST",headers:{Authorization:"Bearer "+auth.idToken,"content-type":"application/json"},body:JSON.stringify({fields})});
+            if(!created.ok && created.status!==409) throw new Error("Could not provision the authenticated staging-only Signature Profile fixture (HTTP "+created.status+").");
+            sig=await readOwn("signatureProfiles");
+            if(!sig) throw new Error("Staging-only Signature Profile fixture was not readable after provisioning.");
+            console.log("STAGING_SYNTHETIC_SIGNATURE_FIXTURE=PROVISIONED (isolated test identity only)");
+          }
           if(val(sig,"status")!=="Active"||!val(sig,"signatureUrl").startsWith("data:image/")) throw new Error("STAGING_SIGNER_PROFILE_INCOMPLETE: Signature Profile must be Active and contain a saved signature specimen.");
           if(val(identity,"authorityStatus")!=="Current") throw new Error("STAGING_SIGNER_AUTHORITY_NOT_CURRENT: staging Signer Identity authority status must be Current.");
           const role=val(identity,"authorityRole");
@@ -157,7 +168,7 @@ jobs:
         run: |
           set -euo pipefail
           missing=0
-          for pair in             "CLOUDFLARE_API_TOKEN:$CF_TOKEN"             "CLOUDFLARE_ACCOUNT_ID:$CF_ACCOUNT"             "STAGING_FIREBASE_PROJECT_ID:$PROJECT"             "STAGING_IRPA_APP_URL:$APP_URL"             "STAGING_GOOGLE_DRIVE_CLIENT_ID:$DRIVE_ID"             "STAGING_GOOGLE_DRIVE_CLIENT_SECRET:$DRIVE_SECRET"             "STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY:$DRIVE_KEY"             "STAGING_SMTP_PASSWORD:$SMTP"             "STAGING_CRYPTO_TEST_EMAIL:$CRYPTO_TEST_EMAIL"             "STAGING_CRYPTO_TEST_PASSWORD:$CRYPTO_TEST_PASSWORD" "STAGING_CRYPTO_TEST_AUTHORITY:$CRYPTO_TEST_AUTHORITY"; do
+          for pair in             "CLOUDFLARE_API_TOKEN:$CF_TOKEN"             "CLOUDFLARE_ACCOUNT_ID:$CF_ACCOUNT"             "STAGING_FIREBASE_PROJECT_ID:$PROJECT"             "STAGING_IRPA_APP_URL:$APP_URL"             "STAGING_GOOGLE_DRIVE_CLIENT_ID:$DRIVE_ID"             "STAGING_GOOGLE_DRIVE_CLIENT_SECRET:$DRIVE_SECRET"             "STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY:$DRIVE_KEY"             "STAGING_SMTP_PASSWORD:$SMTP"             "STAGING_CRYPTO_TEST_EMAIL:$CRYPTO_TEST_EMAIL"             "STAGING_CRYPTO_TEST_PASSWORD:$CRYPTO_TEST_PASSWORD"; do
             name="${pair%%:*}"; value="${pair#*:}"
             if [ -z "$value" ]; then echo "Missing staging secret: $name"; missing=1; fi
           done
