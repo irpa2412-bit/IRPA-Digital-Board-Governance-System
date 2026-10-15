@@ -271,6 +271,29 @@ export function createCommunicationsSiteRouter(deps) {
       return json({ directory: relativeDir, entries }, 200, corsHeaders(request));
     }
 
+    if (path === "/api/communications/cpanel/rollback" && request.method === "POST") {
+      const { claims } = await authorised(request, env, true);
+      const input = await request.json().catch(() => ({}));
+      const backupId = String(input.backupId || "");
+      const relative = String(input.path || "");
+      if (!/^cpanel-backup:[0-9a-f-]{36}$/i.test(backupId) || !relative) return json({ error: "A valid rollback snapshot and file path are required." }, 400, corsHeaders(request));
+      if (!env.DRIVE_KV) throw new Error("The existing Cloudflare rollback store is unavailable.");
+      const backup = await env.DRIVE_KV.get(backupId, "json");
+      if (!backup || backup.path !== relative || typeof backup.content !== "string") return json({ error: "The rollback snapshot is missing, expired or does not match this file." }, 404, corsHeaders(request));
+      const cp = cpanelConfig(env);
+      const safe = safeCpanelPath(relative, cp.documentRoot);
+      const current = await cpanelCall(cp, "Fileman/get_file_content", { dir: safe.dir, file: safe.file });
+      const currentContent = current.data?.content ?? current.data?.[0]?.content;
+      if (typeof currentContent !== "string") throw new Error("The current file could not be read; rollback was not applied.");
+      const safetyBackupId = "cpanel-backup:" + crypto.randomUUID();
+      await env.DRIVE_KV.put(safetyBackupId, JSON.stringify({ path: safe.relative, content: currentContent }), { expirationTtl: 604800 });
+      await cpanelCall(cp, "Fileman/save_file_content", { dir: safe.dir, file: safe.file, content: backup.content, charset: "utf-8" }, "POST");
+      const now = new Date().toISOString();
+      const auditFields = fields({ action: "CPANEL_STATIC_FILE_ROLLED_BACK", category: "COMMUNICATIONS", collection: "cpanelFiles", recordId: safe.relative, actorUid: claims.user_id, actorEmail: claims.email || "", details: { path: safe.relative, rollbackBackupId: backupId, safetyBackupId }, createdAt: now });
+      await commitDocumentAndAudit(env, "cpanelFileEdits/" + crypto.randomUUID(), claims.token, fields({ path: safe.relative, updatedByUid: claims.user_id, updatedAt: now, rollbackBackupId: backupId, safetyBackupId }), ["path", "updatedByUid", "updatedAt", "rollbackBackupId", "safetyBackupId"], auditFields, { createOnly: true });
+      return json({ success: true, path: safe.relative, safetyBackupId, message: "The selected rollback snapshot was restored; the pre-rollback version is also retained for seven days." }, 200, corsHeaders(request));
+    }
+
     if (path === "/api/communications/cpanel/files" && request.method === "PUT") {
       const { claims } = await authorised(request, env, true);
       const input = await request.json().catch(() => ({}));
@@ -283,7 +306,7 @@ export function createCommunicationsSiteRouter(deps) {
       const priorContent = prior.data?.content ?? prior.data?.[0]?.content;
       if (typeof priorContent !== "string") throw new Error("The current file could not be read; the file was not changed.");
       const backupId = "cpanel-backup:" + crypto.randomUUID();
-      await env.DRIVE_KV.put(backupId, priorContent, { expirationTtl: 604800 });
+      await env.DRIVE_KV.put(backupId, JSON.stringify({ path: safe.relative, content: priorContent }), { expirationTtl: 604800 });
       await cpanelCall(cp, "Fileman/save_file_content", { dir: safe.dir, file: safe.file, content, charset: "utf-8" }, "POST");
       const now = new Date().toISOString();
       const auditFields = fields({ action: "CPANEL_STATIC_FILE_EDITED", category: "COMMUNICATIONS", collection: "cpanelFiles", recordId: safe.relative, actorUid: claims.user_id, actorEmail: claims.email || "", details: { path: safe.relative, bytes: new TextEncoder().encode(content).byteLength, rollbackBackupId: backupId, backupRetentionDays: 7 }, createdAt: now });
