@@ -116,6 +116,50 @@ test("actual operational writes fail closed when the access setting is absent", 
   }));
 });
 
+test("signature portal trial envelopes and events remain writable while actual data access is closed", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("systemSettings/actualDataAccess").set({
+      enabled: false,
+      status: "CLOSED",
+      finalTestsAttested: false
+    });
+  });
+  const db = testEnv.authenticatedContext("member-user", {
+    email: "member@example.test"
+  }).firestore();
+  const trialEnvelope = {
+    envelopeReference: "IRPA-ENV-TRIAL-001",
+    title: "Trial signature envelope",
+    documentId: "LIFE-trial-signature",
+    senderUid: "member-user",
+    ownerUid: "member-user",
+    recordOrigin: "TRIAL",
+    trialData: true,
+    isTrial: true,
+    status: "Draft",
+    signingMode: "Sequential",
+    participantUids: ["member-user"],
+    actionUids: [],
+    recipients: []
+  };
+  await assertSucceeds(db.doc("signatureEnvelopes/TRIAL-ENV-001").set(trialEnvelope));
+  await assertSucceeds(db.doc("signatureEvents/TRIAL-EVENT-001").set({
+    envelopeId: "TRIAL-ENV-001",
+    event: "Trial envelope created",
+    actorUid: "member-user",
+    recordOrigin: "TRIAL",
+    trialData: true,
+    isTrial: true
+  }));
+  await assertFails(db.doc("signatureEnvelopes/ACTUAL-ENV-001").set({
+    ...trialEnvelope,
+    envelopeReference: "IRPA-ENV-ACTUAL-001",
+    recordOrigin: "PRODUCTION",
+    trialData: false,
+    isTrial: false
+  }));
+});
+
 test("actual operational writes stay closed without the final-test attestation", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     await context.firestore().doc("systemSettings/actualDataAccess").set({
