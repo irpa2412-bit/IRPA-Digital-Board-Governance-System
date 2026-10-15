@@ -144,13 +144,13 @@ jobs:
             "package.json",
             "src/styles/portal-readability-standard.css",
             "tests/browser/authenticated-governance-regression.spec.mjs",
-            "tests/portal-readability-standa,
+            "tests/portal-readability-standard.test.mjs",
             "docs/COMMUNICATION_MEDIA_PORTAL.md",
             "functions/communicationMedia.js",
             "src/App.jsx",
             "src/pages/CommunicationMediaPortal.jsx",
             "src/pages/CommunicationMediaStudio.jsx",
-            "tests/communication-media-policy.test.mjs"rd.test.mjs"
+            "tests/communication-media-policy.test.mjs"
           ]);
           const unexpected = changed.filter(path => !allowed.has(path));
           if (unexpected.length) {
