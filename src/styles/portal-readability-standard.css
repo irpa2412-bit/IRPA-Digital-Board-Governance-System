@@ -186,3 +186,10 @@
   -webkit-text-fill-color: var(--irpa-readable-action) !important;
   border-color: transparent !important;
 }
+
+
+/* Finance's TRIAL notice is intentionally a dark control banner; keep its copy light. */
+#root .app-shell .content-area:not(.dashboard-content-area) .page.finance-portal .welcome-panel .auth-message :where(p, span, small, strong) {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
