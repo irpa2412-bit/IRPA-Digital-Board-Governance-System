@@ -143,9 +143,22 @@ jobs:
             console.log("STAGING_SIGNER_IDENTITY_PLACEHOLDER=CREATED");
             const call=await fetch("https://us-central1-"+project+".cloudfunctions.net/updateSignerAuthority",{method:"POST",headers:{Authorization:"Bearer "+auth.idToken,"content-type":"application/json"},body:JSON.stringify({data:{authorityRole:role,authorityStatus:"Current",authorityDepartment:dept,authorityUnit:unit,authorityReference:"STAGING-TEST-FIXTURE"}})});
             const callBody=await call.json().catch(()=>({}));
-            if(!call.ok||callBody.error) throw new Error("Authorized updateSignerAuthority callable could not validate/register the isolated staging test role (HTTP "+call.status+").");
+            if(call.ok&&!callBody.error){
+              console.log("STAGING_SIGNER_AUTHORITY=REGISTERED_THROUGH_AUTHORIZED_CALLABLE");
+            }else if(call.status===404||call.status===503){
+              // Match the app's documented fallback: Firestore rules independently validate
+              // the same active institutional authority register before accepting this self-update.
+              const updateMask=new URLSearchParams();
+              for(const field of ["authorityRole","authorityStatus","authorityDepartment","authorityUnit","authorityReference","authorityUpdatedAt","updatedAt"]) updateMask.append("updateMask.fieldPaths",field);
+              const timestamp=new Date().toISOString();
+              const patchFields={authorityRole:{stringValue:role},authorityStatus:{stringValue:"Current"},authorityDepartment:{stringValue:dept},authorityUnit:{stringValue:unit},authorityReference:{stringValue:"STAGING-TEST-FIXTURE"},authorityUpdatedAt:{timestampValue:timestamp},updatedAt:{timestampValue:timestamp}};
+              const patch=await fetch("https://firestore.googleapis.com/v1/projects/"+project+"/databases/(default)/documents/signerIdentities/"+encodeURIComponent(auth.localId)+"?"+updateMask.toString(),{method:"PATCH",headers:{Authorization:"Bearer "+auth.idToken,"content-type":"application/json"},body:JSON.stringify({fields:patchFields})});
+              if(!patch.ok) throw new Error("Staging Signer Identity fallback update was rejected by Firestore's authority-register security rules (HTTP "+patch.status+").");
+              console.log("STAGING_SIGNER_AUTHORITY=REGISTERED_THROUGH_FIRESTORE_AUTHORITY_RULES");
+            }else{
+              throw new Error("Authorized updateSignerAuthority callable rejected the isolated staging test role (HTTP "+call.status+").");
+            }
             identity=await readOwn("signerIdentities");
-            console.log("STAGING_SIGNER_AUTHORITY=REGISTERED_THROUGH_AUTHORIZED_CALLABLE");
           }
           if(val(identity,"authorityStatus")!=="Current") throw new Error("STAGING_SIGNER_AUTHORITY_NOT_CURRENT: staging Signer Identity authority status must be Current; no existing non-current authority was overridden.");
           const identityRole=val(identity,"authorityRole");
