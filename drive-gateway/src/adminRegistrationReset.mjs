@@ -70,31 +70,6 @@ function firestoreFields(event, eventHash) {
   return fields;
 }
 
-function validPriorAudit(document, expected) {
-  if (!document?.fields) return false;
-  const prior = documentFields(document);
-  const event = makeEvent({
-    operationId: expected.operationId,
-    targetUid: expected.targetUid,
-    actor: expected.actor,
-    reason: expected.reason,
-    profileExisted: prior.profileExisted === true,
-    profileChanged: prior.profileChanged === true
-  });
-  return prior.operation === event.operation &&
-    prior.operationId === event.operationId &&
-    prior.targetUid === event.targetUid &&
-    prior.actorUid === event.actorUid &&
-    prior.actorEmail === event.actorEmail &&
-    prior.reason === event.reason &&
-    prior.scope === event.scope &&
-    prior.action === "ADMIN_REGISTRATION_RESET" &&
-    prior.collection === "adminProfiles" &&
-    prior.recordId === event.targetUid &&
-    prior.eventHash === expected.eventHashIfPrior ||
-    false;
-}
-
 async function priorAuditMatches(document, expected) {
   if (!document?.fields) return false;
   const prior = documentFields(document);
