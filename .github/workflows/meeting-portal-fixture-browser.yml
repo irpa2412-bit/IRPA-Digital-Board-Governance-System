@@ -127,6 +127,7 @@ jobs:
             "tests/fixtures/mocks.js",
             "tests/meeting-portal-browser.test.mjs",
             "tests/meeting-room-authorization-boundary.test.mjs",
+            "tests/meeting-invitation-resend-quorum.test.mjs",
             "vite.meeting-fixture.config.js",
             ".github/workflows/portal-navigation-regression.yml",
             "docs/COMMUNICATION_MEDIA_PORTAL.md",
