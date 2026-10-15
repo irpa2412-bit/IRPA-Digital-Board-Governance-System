@@ -60,7 +60,7 @@ async function navigateModule(page, viewportName, module) {
 
 async function assertPortalAndNoOverflow(page, expectedText, width) {
   await expect(page.locator(".topbar h2")).toContainText(expectedText, { timeout: 30000 });
-  const workspace = page.locator("[data-active-portal-content]");
+  const workspace = page.locator("[data-active-portal-content]:visible").first();
   await expect(workspace).toBeVisible();
   await expect(workspace, "navigation must focus the destination portal body, not the shared header").toBeFocused();
   await expect.poll(
@@ -214,7 +214,7 @@ async function assertSharedReadability(page, module, width) {
   const title = page.locator(".topbar h2");
   await expect(title, `portal heading should render for ${module}`).toBeVisible({ timeout: 30000 });
   await expect(title).not.toHaveText("");
-  const workspace = page.locator("[data-active-portal-content]");
+  const workspace = page.locator("[data-active-portal-content]:visible").first();
   await expect(workspace, `active portal content should render for ${module}`).toBeVisible({ timeout: 30000 });
   const dimensions = await page.evaluate(() => ({
     viewport: document.documentElement.clientWidth,
@@ -296,7 +296,7 @@ for (const viewport of [
     for (const module of APP_PORTALS) {
       await page.goto("/?adminModule=" + encodeURIComponent(module));
       await expect(page.locator(".topbar h2")).toBeVisible({ timeout: 30000 });
-      await expect(page.locator("[data-active-portal-content]")).toBeVisible({ timeout: 30000 });
+      await expect(page.locator("[data-active-portal-content]:visible").first()).toBeVisible({ timeout: 30000 });
       await assertSharedReadability(page, module, viewport.width);
     }
 
