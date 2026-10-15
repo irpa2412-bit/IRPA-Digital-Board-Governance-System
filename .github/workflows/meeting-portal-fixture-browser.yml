@@ -83,6 +83,7 @@ jobs:
             "docs/ACTUAL_DATA_ACCESS_GATE.md",
             "src/components/ActualDataAccessControl.jsx",
             ".github/workflows/finance-production-reset.yml",
+            ".github/workflows/firebase-deploy.yml",
             "scripts/reset-finance-production.js",
             "src/FieldEntryDataGate.jsx",
             "src/firebase/systemControl.js",
