@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   seed-staging-admin-profile:
-    if: github.ref == 'refs/heads/security/admin-registration-reset-20261015'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/security/admin-registration-reset-20261015'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
