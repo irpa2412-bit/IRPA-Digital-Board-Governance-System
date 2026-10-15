@@ -178,6 +178,7 @@ jobs:
           const adminRecoveryPairedRepairFiles = new Set([
             ".github/workflows/administrator-reset-security.yml",
             ".github/workflows/meeting-portal-fixture-browser.yml",
+            ".github/workflows/staging-gateway-e2e.yml",
             ".github/workflows/signature-migration-build-test.yml",
             "drive-gateway/ADMIN-REGISTRATION-RESET.md",
             "drive-gateway/src/adminRegistrationReset.mjs",
