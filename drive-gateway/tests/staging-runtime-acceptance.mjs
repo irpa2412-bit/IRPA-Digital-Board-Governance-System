@@ -46,7 +46,8 @@ if(authority)assert.equal(normalizeAuthority(authority),normalizeAuthority(fires
 
 async function readJson(response,label){
   const body=await response.json().catch(()=>({}));
-  assert.equal(response.ok,true,label+" failed with HTTP "+response.status+": "+(body.error||"no error detail"));
+  const detail=body.diagnosticMessage?` [${body.diagnosticCode||"Error"}] ${body.diagnosticMessage}`:(body.error||"no error detail");
+  assert.equal(response.ok,true,label+" failed with HTTP "+response.status+": "+detail);
   assert.notEqual(body.ok,false,label+" returned ok=false");
   return body;
 }
