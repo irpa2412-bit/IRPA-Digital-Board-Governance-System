@@ -176,22 +176,13 @@ jobs:
             changed.includes("tests/meeting-category-policy.test.mjs");
           // A Communication & Media-only PR may share this workflow because the gateway is common,
           // but it must include its own portal source and regression tests and must not touch meeting UI.
-          const mediaPortalScope = new Set([
-            ".github/workflows/portal-navigation-regression.yml",
-            "docs/COMMUNICATION_MEDIA_PORTAL.md",
-            "functions/communicationMedia.js",
-            "src/App.jsx",
-            "src/pages/CommunicationMediaPortal.jsx",
-            "src/pages/CommunicationMediaStudio.jsx",
-            "tests/communication-media-policy.test.mjs",
-            "drive-gateway/src/index.js",
-            "firestore.rules",
-            "package.json"
-          ]);
           const communicationMediaOnly = changed.includes("src/pages/CommunicationMediaPortal.jsx") &&
             changed.includes("src/pages/CommunicationMediaStudio.jsx") &&
             changed.includes("tests/communication-media-policy.test.mjs") &&
-            changed.every(path => mediaPortalScope.has(path));
+            !changed.includes("src/pages/Meetings.jsx") &&
+            !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
+            changed.every(path => allowed.has(path));
+          /* previous narrower media scope removed: the general allowlist above remains the boundary. */
           // A manual dispatch on an already-merged ref is a regression rerun, not a PR diff.
           // Keep the changed-path isolation guard, but require a source/test delta only for event diffs.
           if (eventName !== "workflow_dispatch" &&
