@@ -20,9 +20,10 @@ The portal calls the existing Cloudflare Worker routes:
 - `POST /api/communications/website/publish` — publishes an approved article or press release and reconciles by deterministic slug before creating a post.
 - `GET /api/communications/cpanel/files` — lists permitted static files from the configured document root.
 - `GET /api/communications/cpanel/files?path=<relative-path>` — reads a permitted static file.
-- `PUT /api/communications/cpanel/files` — saves a permitted static file through cPanel UAPI.
+- `PUT /api/communications/cpanel/files` — saves a permitted static file through cPanel UAPI after saving a seven-day snapshot in the existing Cloudflare KV namespace.
+- `POST /api/communications/cpanel/rollback` — restores a matching snapshot and keeps the pre-rollback version for seven days.
 
-The cPanel editor intentionally accepts only HTML, HTM, CSS, TXT and JSON files, with a 512 KiB limit. It rejects path traversal, hidden paths, PHP and other executable/script extensions; it does not provide arbitrary shell access, delete-file operations, or unrestricted hosting administration. WordPress page/post content should be edited through the WordPress API. The portal does not embed a cPanel password login session in the browser; it authenticates server-to-server through a restricted cPanel API token.
+The cPanel editor intentionally accepts only HTML, HTM, CSS, TXT and JSON files, with a 512 KiB limit. Before each write it reads the existing file and stores a seven-day rollback snapshot in the existing Cloudflare KV namespace; the editor exposes a rollback action and records audit events. It rejects path traversal, hidden paths, PHP and other executable/script extensions; it does not provide arbitrary shell access, delete-file operations, or unrestricted hosting administration. WordPress page/post content should be edited through the WordPress API. The portal does not embed a cPanel password login session in the browser; it authenticates server-to-server through a restricted cPanel API token.
 
 ## Required Cloudflare Worker secrets
 Set these as Worker secrets in the correct environment; never commit them or paste them into the portal:
