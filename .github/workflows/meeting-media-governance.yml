@@ -4,6 +4,7 @@ on:
   pull_request:
     branches: [main, integration/collective-portals-20261009]
     paths:
+      - "src/styles/portal-readability-standard.css"
       - "src/components/IRPADGBSMeetingRoomMedia.jsx"
       - "src/components/MeetingAccessControl.jsx"
       - "src/pages/MeetingEntryGateway.jsx"
