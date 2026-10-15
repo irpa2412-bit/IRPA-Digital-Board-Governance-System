@@ -27,3 +27,12 @@ test("workflow-only guard maintenance requires its paired regression test", () =
   assert.match(workflow, /changed\.includes\("tests\/meeting-isolation-guard\.test\.mjs"\)/);
   assert.match(workflow, /!guardOnlyWorkflowRepair/);
 });
+
+test("readability-only PRs are narrowly allowlisted without permitting unrelated portal source changes", () => {
+  assert.match(workflow, /const readabilityOnlyFiles = new Set\(\[/);
+  assert.match(workflow, /changed\.includes\("src\/styles\/portal-readability-standard\.css"\)/);
+  assert.match(workflow, /changed\.every\(path => readabilityOnlyFiles\.has\(path\)\)/);
+  assert.match(workflow, /!readabilityOnlyChange/);
+  assert.match(workflow, /"src\/main\.jsx"/);
+  assert.match(workflow, /"tests\/browser\/authenticated-governance-regression\.spec\.mjs"/);
+});
