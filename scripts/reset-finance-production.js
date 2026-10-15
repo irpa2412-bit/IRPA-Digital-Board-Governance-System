@@ -156,7 +156,7 @@ async function main() {
     }
     const verify = await trial.get();
     if (!verify.empty) throw new Error(`Trial reset verification failed: ${verify.size} root documents remain.`);
-    report.after[targetName] = verify.size;
+    report.after.trialData = verify.size;
     report.totalDeletedDocuments = totalDeleted;
     report.status = "COMPLETED";
     report.completedAt = FieldValue.serverTimestamp();
