@@ -38,7 +38,7 @@ export default function CommunicationMediaStudio(){
    const chosen=candidates.find(t=>MediaRecorder.isTypeSupported(t))||"";
    const recorder=new MediaRecorder(stream,chosen?{mimeType:chosen}:undefined);
    const chunks=[];
-   const stopped=new Promise((resolve,reject)=>{recorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};recorder.onerror=()=>reject(new Error("Browser media export failed."));recorder.onstop=()=>{try{const type=recorder.mimeType|| (isVideo?"video/webm":"audio/webm");downloadBlob(new Blob(chunks,{type}),safeName((title||file?.name||"irpa-media").replace(/\\.[^.]+$/,""))+"-trimmed.webm");setNotice("Trimmed media exported as WebM. The original asset remains unchanged.");resolve()}catch(e){reject(e)}finally{stream.getTracks().forEach(t=>t.stop());setExportingClip(false)}}});
+   const stopped=new Promise((resolve,reject)=>{recorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};recorder.onerror=()=>reject(new Error("Browser media export failed."));recorder.onstop=()=>{try{const type=recorder.mimeType|| (isVideo?"video/webm":"audio/webm");downloadBlob(new Blob(chunks,{type}),safeName((title||file?.name||"irpa-media").replace(/\.[^.]+$/,""))+"-trimmed.webm");setNotice("Trimmed media exported as WebM. The original asset remains unchanged.");resolve()}catch(e){reject(e)}finally{stream.getTracks().forEach(t=>t.stop());setExportingClip(false)}}});
    recorder.start();await media.play();
    window.setTimeout(()=>{media.pause();if(recorder.state!=="inactive")recorder.stop()},Math.max(100,Math.min(end-start,600)*1000));
    media.onended=()=>{if(recorder.state!=="inactive")recorder.stop()};
