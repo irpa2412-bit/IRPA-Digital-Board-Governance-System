@@ -4,9 +4,9 @@ import { readFileSync } from "node:fs";
 
 const workflow = readFileSync(new URL("../.github/workflows/meeting-portal-fixture-browser.yml", import.meta.url), "utf8");
 
-test("pull-request isolation baseline uses the captured PR base SHA", () => {
+test("isolation baseline uses captured PR base SHA or current main for push runs", () => {
   assert.match(workflow, /const eventBase = process\.env\.PR_BASE_SHA\?\.trim\(\)/);
-  assert.match(workflow, /const base = eventBase \|\| execFileSync\("git", \["merge-base", "origin\/main", "HEAD"\]/);
+  assert.match(workflow, /const base = eventBase \|\| "origin\/main"/);
 });
 
 test("Wrangler changes cannot alter production configuration", () => {
