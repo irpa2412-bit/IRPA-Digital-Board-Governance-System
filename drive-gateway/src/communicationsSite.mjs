@@ -278,10 +278,17 @@ export function createCommunicationsSiteRouter(deps) {
       const content = String(input.content ?? "");
       if (new TextEncoder().encode(content).byteLength > MAX_EDIT_BYTES) return json({ error: "Website file exceeds the 512 KB edit limit." }, 413, corsHeaders(request));
       const cp = cpanelConfig(env);
+      if (!env.DRIVE_KV) throw new Error("The existing Cloudflare rollback store is unavailable; the file was not changed.");
+      const prior = await cpanelCall(cp, "Fileman/get_file_content", { dir: safe.dir, file: safe.file });
+      const priorContent = prior.data?.content ?? prior.data?.[0]?.content;
+      if (typeof priorContent !== "string") throw new Error("The current file could not be read; the file was not changed.");
+      const backupId = "cpanel-backup:" + crypto.randomUUID();
+      await env.DRIVE_KV.put(backupId, priorContent, { expirationTtl: 604800 });
       await cpanelCall(cp, "Fileman/save_file_content", { dir: safe.dir, file: safe.file, content, charset: "utf-8" }, "POST");
-      const auditFields = fields({ action: "CPANEL_STATIC_FILE_EDITED", category: "COMMUNICATIONS", collection: "cpanelFiles", recordId: safe.relative, actorUid: claims.user_id, actorEmail: claims.email || "", details: { path: safe.relative, bytes: new TextEncoder().encode(content).byteLength }, createdAt: new Date().toISOString() });
-      await commitDocumentAndAudit(env, "cpanelFileEdits/" + crypto.randomUUID(), claims.token, fields({ path: safe.relative, updatedByUid: claims.user_id, updatedAt: new Date().toISOString() }), ["path", "updatedByUid", "updatedAt"], auditFields, { createOnly: true });
-      return json({ success: true, path: safe.relative, message: "Website file saved through cPanel. Verify the public page before considering the edit complete." }, 200, corsHeaders(request));
+      const now = new Date().toISOString();
+      const auditFields = fields({ action: "CPANEL_STATIC_FILE_EDITED", category: "COMMUNICATIONS", collection: "cpanelFiles", recordId: safe.relative, actorUid: claims.user_id, actorEmail: claims.email || "", details: { path: safe.relative, bytes: new TextEncoder().encode(content).byteLength, rollbackBackupId: backupId, backupRetentionDays: 7 }, createdAt: now });
+      await commitDocumentAndAudit(env, "cpanelFileEdits/" + crypto.randomUUID(), claims.token, fields({ path: safe.relative, updatedByUid: claims.user_id, updatedAt: now, rollbackBackupId: backupId }), ["path", "updatedByUid", "updatedAt", "rollbackBackupId"], auditFields, { createOnly: true });
+      return json({ success: true, path: safe.relative, backupId, message: "Website file saved through cPanel. A rollback snapshot is retained for seven days; verify the public page before considering the edit complete." }, 200, corsHeaders(request));
     }
     return null;
   }
