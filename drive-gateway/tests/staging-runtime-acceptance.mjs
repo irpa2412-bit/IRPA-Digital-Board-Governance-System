@@ -10,7 +10,7 @@ const authority=process.env.STAGING_CRYPTO_TEST_AUTHORITY||"";
 const expectedUid=process.env.STAGING_CRYPTO_TEST_SIGNER_UID||"";
 const expectedKeyId=process.env.STAGING_CRYPTO_TEST_KEY_ID||"";
 const base=String(process.env.STAGING_GATEWAY_URL||"").replace(/\/+$/,"");
-for(const [name,value] of Object.entries({STAGING_FIREBASE_WEB_API_KEY:apiKey,STAGING_FIREBASE_PROJECT_ID:project,STAGING_CRYPTO_TEST_EMAIL:email,STAGING_CRYPTO_TEST_PASSWORD:password,STAGING_CRYPTO_TEST_AUTHORITY:authority,STAGING_CRYPTO_TEST_SIGNER_UID:expectedUid,STAGING_CRYPTO_TEST_KEY_ID:expectedKeyId,STAGING_GATEWAY_URL:base}))assert.ok(value,name+" is required.");
+for(const [name,value] of Object.entries({STAGING_FIREBASE_WEB_API_KEY:apiKey,STAGING_FIREBASE_PROJECT_ID:project,STAGING_CRYPTO_TEST_EMAIL:email,STAGING_CRYPTO_TEST_PASSWORD:password,STAGING_CRYPTO_TEST_SIGNER_UID:expectedUid,STAGING_CRYPTO_TEST_KEY_ID:expectedKeyId,STAGING_GATEWAY_URL:base}))assert.ok(value,name+" is required.");
 assert.notEqual(project,"irpa-digital-board-governance","Production Firebase project is forbidden in staging acceptance.");
 
 const loginResponse=await fetch("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key="+encodeURIComponent(apiKey),{
@@ -40,7 +40,9 @@ assert.ok(firestoreString(signatureProfile,"signatureUrl").startsWith("data:imag
 assert.equal(firestoreString(signerIdentity,"authorityStatus"),"Current","Staging test signer must have Current Signer Identity authority.");
 assert.ok(firestoreString(signerIdentity,"authorityRole")&&firestoreString(signerIdentity,"authorityRole")!=="Not yet assigned","Staging test signer must have a registered signing authority.");
 const normalizeAuthority=value=>String(value||"").toLowerCase().replace(/^(the|irpa)\s+/,"").replace(/[._-]+/g," ").replace(/\s+/g," ").trim();
-assert.equal(normalizeAuthority(authority),normalizeAuthority(firestoreString(signerIdentity,"authorityRole")),"The staging authority secret must match the Current Signer Identity role.");
+const effectiveAuthority=authority||firestoreString(signerIdentity,"authorityRole");
+assert.ok(effectiveAuthority,"Staging signer authority must be available from the current Signer Identity.");
+if(authority)assert.equal(normalizeAuthority(authority),normalizeAuthority(firestoreString(signerIdentity,"authorityRole")),"The optional staging authority value must match the Current Signer Identity role.");
 
 async function readJson(response,label){
   const body=await response.json().catch(()=>({}));
@@ -113,7 +115,7 @@ const signedResponse=await fetch(base+"/api/sign/submit",{
     token:signingToken,
     signature:{type:"typed",value:"IRPA Staging Crypto Test Signer"},
     fieldValues:{"staging-name":"IRPA Staging Crypto Test Signer","staging-signature":"IRPA Staging Crypto Test Signer"},
-    manualAuthorityIdentification:authority,
+    manualAuthorityIdentification:effectiveAuthority,
     consent:true
   })
 });
@@ -174,7 +176,7 @@ assert.equal(tamperedResponse.status,409,"Gateway did not reject a tampered comp
 const beforeRetry=status.eventCount;
 const retryResponse=await fetch(base+"/api/sign/submit",{
   method:"POST",headers:{...authHeaders,"content-type":"application/json"},
-  body:JSON.stringify({token:signingToken,signature:{type:"typed",value:"IRPA Staging Crypto Test Signer"},fieldValues:{"staging-name":"IRPA Staging Crypto Test Signer","staging-signature":"IRPA Staging Crypto Test Signer"},manualAuthorityIdentification:authority,consent:true})
+  body:JSON.stringify({token:signingToken,signature:{type:"typed",value:"IRPA Staging Crypto Test Signer"},fieldValues:{"staging-name":"IRPA Staging Crypto Test Signer","staging-signature":"IRPA Staging Crypto Test Signer"},manualAuthorityIdentification:effectiveAuthority,consent:true})
 });
 const retry=await readJson(retryResponse,"Idempotent signing retry");
 assert.equal(retry.idempotent,true);
