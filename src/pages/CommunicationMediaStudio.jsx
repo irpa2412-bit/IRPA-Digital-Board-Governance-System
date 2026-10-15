@@ -9,7 +9,7 @@ const MIME_BY_EXT={pdf:"application/pdf",doc:"application/msword",docx:"applicat
 const styles={panel:{border:"1px solid var(--border-color,#d6dee8)",borderRadius:12,padding:15,background:"var(--surface,#fff)",minWidth:0},input:{width:"100%",boxSizing:"border-box",padding:"10px 12px",borderRadius:8,border:"1px solid var(--border-color,#cbd5e1)",background:"var(--input-bg,#fff)",color:"var(--text-primary,#172033)",font:"inherit"},button:{padding:"9px 12px",borderRadius:8,border:"1px solid var(--border-color,#cbd5e1)",background:"var(--surface-elevated,#f8fafc)",color:"var(--text-primary,#172033)",font:"inherit",fontWeight:650,cursor:"pointer"},primary:{padding:"9px 12px",borderRadius:8,border:"1px solid #1d4ed8",background:"#1d4ed8",color:"#fff",font:"inherit",fontWeight:700,cursor:"pointer"}};
 const safeName=name=>String(name||"asset").replace(/[^a-zA-Z0-9._-]/g,"_").slice(-140);
 function downloadBlob(blob,name){const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
-function mime(file){return String(file?.type||"").toLowerCase()||MIME_BY_EXT[String(file?.name||"").split(".").pop().toLowerCase()]||"application/octet-stream"}
+function mime(file){const reported=String(file?.type||"").toLowerCase();const extension=String(file?.name||"").split(".").pop().toLowerCase();return Object.values(MIME_BY_EXT).includes(reported)?reported:(MIME_BY_EXT[extension]||reported||"application/octet-stream")}
 export default function CommunicationMediaStudio(){
  const [assets,setAssets]=useState([]),[file,setFile]=useState(null),[title,setTitle]=useState(""),[tags,setTags]=useState(""),[busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState(""),[previewUrl,setPreviewUrl]=useState(""),[filter,setFilter]=useState("All");
  const [brightness,setBrightness]=useState(100),[contrast,setContrast]=useState(100),[saturation,setSaturation]=useState(100),[rotation,setRotation]=useState(0),[exportType,setExportType]=useState("image/png");
@@ -24,7 +24,7 @@ export default function CommunicationMediaStudio(){
   if(!media||!Number.isFinite(duration)||duration<=0){setError("Wait for the media duration to load before trimming.");return}
   const start=Math.max(0,Math.min(Number(trimStart)||0,duration-0.1));
   const end=Math.max(start+0.1,Math.min(Number(trimEnd)||duration,duration));
-  if(end<=start||end-start<0.1){setError("Choose a valid trim range.");return}
+  if(end<=start||end-start<0.1){setError("Choose a valid trim range.");return}if(end-start>600){setError("Browser-native trim export is limited to 10 minutes per output. Select a shorter segment.");return}
   if(typeof MediaRecorder==="undefined"){setError("This browser does not support MediaRecorder export. Use a supported desktop Chrome or Edge browser, or export the original file.");return}
   const capture=media.captureStream||media.mozCaptureStream;
   if(!capture){setError("This browser does not expose media capture for export. Download the original file instead.");return}
@@ -40,7 +40,7 @@ export default function CommunicationMediaStudio(){
    const chunks=[];
    const stopped=new Promise((resolve,reject)=>{recorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};recorder.onerror=()=>reject(new Error("Browser media export failed."));recorder.onstop=()=>{try{const type=recorder.mimeType|| (isVideo?"video/webm":"audio/webm");downloadBlob(new Blob(chunks,{type}),safeName((title||file?.name||"irpa-media").replace(/\.[^.]+$/,""))+"-trimmed.webm");setNotice("Trimmed media exported as WebM. The original asset remains unchanged.");resolve()}catch(e){reject(e)}finally{stream.getTracks().forEach(t=>t.stop());setExportingClip(false)}}});
    recorder.start();await media.play();
-   window.setTimeout(()=>{media.pause();if(recorder.state!=="inactive")recorder.stop()},Math.max(100,Math.min(end-start,600)*1000));
+   window.setTimeout(()=>{media.pause();if(recorder.state!=="inactive")recorder.stop()},Math.max(100,(end-start)*1000));
    media.onended=()=>{if(recorder.state!=="inactive")recorder.stop()};
    await stopped;
   }catch(e){setExportingClip(false);setError(e?.message||"Trimmed media export failed.")}
