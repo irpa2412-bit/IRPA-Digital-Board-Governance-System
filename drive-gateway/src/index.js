@@ -55,6 +55,47 @@ const documentLifecycleRouter = createDocumentLifecycleRouter({
   corsHeaders
 });
 
+
+function normalizeGatewayAuthority(value) {
+  return String(value||"").toLowerCase().replace(/^(the|irpa)\s+/,"").replace(/[._-]+/g," ").replace(/\s+/g," ").trim();
+}
+async function verifyGatewaySigningAuthority(env,user,manualAuthorityIdentification) {
+  const input=normalizeGatewayAuthority(manualAuthorityIdentification);
+  if(!input||!user?.uid||!user?.token)throw Object.assign(new Error("Authenticated signing authority is required."),{status:403});
+  const records=[];
+  const add=(document,sourceCollection,fallbackId)=>{
+    if(!document?.fields)return;
+    const record=firestoreDocumentToPlain(document)||{};
+    const id=String(document.name||"").split("/").pop()||fallbackId||user.uid;
+    records.push({id,...record,sourceCollection});
+  };
+  add(await getFirestoreDocument(env,"members/"+user.uid,user.token),"members",user.uid);
+  add(await getFirestoreDocument(env,"employees/"+user.uid,user.token),"employees",user.uid);
+  const matchesAuthority=record=>{
+    const active=String(record.status||record.employmentStatus||"Active").trim().toLowerCase()!=="inactive";
+    const candidates=[record.role,record.boardPosition,record.designation,record.jobTitle,record.position,record.title,record.authorityRole,record.unit,record.unitName].map(normalizeGatewayAuthority).filter(Boolean);
+    return active&&candidates.includes(input);
+  };
+  let match=records.find(matchesAuthority);
+  if(!match&&user.email){
+    let memberRows=[],employeeRows=[];
+    try{memberRows=await getFirestoreDocumentsByEmail(env,"members",user.email,user.token)}catch{}
+    try{employeeRows=await getFirestoreDocumentsByEmail(env,"employees",user.email,user.token)}catch{}
+    for(const row of [...memberRows,...employeeRows])add(row,String(row.name||"").split("/").at(-2)||"members",user.uid);
+    match=records.find(matchesAuthority);
+  }
+  if(!match)throw Object.assign(new Error("SYSTEM VERIFICATION FAILED: the declared signing authority does not match an active IRPA Member or Employee Register record for this authenticated account."),{status:403});
+  return{
+    verified:true,
+    authorityRole:String(match.role||match.boardPosition||match.designation||match.jobTitle||match.position||match.title||manualAuthorityIdentification).trim(),
+    authorityDepartment:String(match.department||"").trim(),
+    authorityUnit:String(match.unit||match.unitName||"").trim(),
+    authoritySourceCollection:match.sourceCollection,
+    authoritySourceRecordId:match.id,
+    verificationMethod:"Authenticated Gateway Member/Employee Register Match"
+  };
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -213,6 +254,9 @@ export default {
           pathname === "/api/envelopes" ||
           /^\/api\/envelopes\/[A-Za-z0-9_-]{3,64}(?:\/void|\/retry-completion)?$/.test(pathname) ||
           pathname === "/api/sign/open" ||
+          pathname === "/api/sign/status" ||
+          pathname === "/api/sign/evidence" ||
+          pathname === "/api/sign/verify" ||
           pathname === "/api/sign/pdf" ||
           pathname === "/api/sign/submit" ||
           pathname === "/api/sign/decline" ||
@@ -226,10 +270,11 @@ export default {
             verifyUser: async req => {
               const claims = await authenticateFirebaseRequest(req, env);
               const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
-              return {uid:claims.user_id,isAdmin:Boolean(admin?.fields?.active?.booleanValue)};
+              return {uid:claims.user_id,email:claims.email||"",token:claims.token,isAdmin:Boolean(admin?.fields?.active?.booleanValue)};
             },
             sendInvitation: async ({to,name,link}) => sendInvitationEmail({email:to,name,link,smtpSend:async ({to:recipient,subject,text,html})=>smtpSend(env,{to:recipient,subject,text,html}),logger:console}),
             logger: console,
+            verifySigningAuthority: (user,manualAuthorityIdentification)=>verifyGatewaySigningAuthority(env,user,manualAuthorityIdentification),
             driveHelpers: {getDriveAccessToken,driveFetch}
           });
           const response = await esignRoute(request,ctx);

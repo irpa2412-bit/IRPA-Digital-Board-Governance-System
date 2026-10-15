@@ -58,6 +58,38 @@ async function navigateModule(page, viewportName, module) {
   }
 }
 
+async function evaluateVisibleWorkflowControls(page, expectedText) {
+  const selector = ".module-interlink-bar button:visible";
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await page.locator(selector).evaluateAll(nodes => nodes.map(node => {
+        const rect = node.getBoundingClientRect();
+        return {
+          label: (node.innerText || node.getAttribute("aria-label") || "").trim(),
+          left: rect.left,
+          right: rect.right,
+          top: rect.top,
+          bottom: rect.bottom,
+          width: rect.width,
+          height: rect.height,
+          clientWidth: node.clientWidth,
+          scrollWidth: node.scrollWidth,
+          clientHeight: node.clientHeight,
+          scrollHeight: node.scrollHeight
+        };
+      }));
+    } catch (error) {
+      const navigationRace = /Execution context was destroyed|Cannot find context with specified id/i.test(String(error));
+      if (!navigationRace || attempt === 2) throw error;
+      // A portal transition can replace the document between layout assertions and inspection.
+      // Wait for that navigation to settle, then reassert the intended destination before retrying.
+      await page.waitForLoadState("domcontentloaded", { timeout: 5000 }).catch(() => {});
+      await expect(page.locator(".topbar h2")).toContainText(expectedText, { timeout: 30000 });
+    }
+  }
+  throw new Error("Unable to inspect workflow controls after navigation retries.");
+}
+
 async function assertPortalAndNoOverflow(page, expectedText, width) {
   await expect(page.locator(".topbar h2")).toContainText(expectedText, { timeout: 30000 });
   const workspace = page.locator("[data-active-portal-content]");
@@ -82,22 +114,7 @@ async function assertPortalAndNoOverflow(page, expectedText, width) {
     document: document.documentElement.scrollWidth
   }));
   expect(dimensions.document, "unexpected horizontal page overflow").toBeLessThanOrEqual(dimensions.viewport + 1);
-  const controls = await page.locator(".module-interlink-bar button:visible").evaluateAll(nodes => nodes.map(node => {
-    const rect = node.getBoundingClientRect();
-    return {
-      label: (node.innerText || node.getAttribute("aria-label") || "").trim(),
-      left: rect.left,
-      right: rect.right,
-      top: rect.top,
-      bottom: rect.bottom,
-      width: rect.width,
-      height: rect.height,
-      clientWidth: node.clientWidth,
-      scrollWidth: node.scrollWidth,
-      clientHeight: node.clientHeight,
-      scrollHeight: node.scrollHeight
-    };
-  }));
+  const controls = await evaluateVisibleWorkflowControls(page, expectedText);
   for (const control of controls) {
     expect(control.width, `zero-width workflow control: ${control.label}`).toBeGreaterThan(0);
     expect(control.left, `workflow control left edge outside viewport: ${control.label}`).toBeGreaterThanOrEqual(-1);

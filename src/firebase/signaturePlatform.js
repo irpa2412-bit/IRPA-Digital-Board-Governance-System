@@ -1,6 +1,6 @@
 import { arrayUnion, collection, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, setDoc, updateDoc, where, writeBatch } from "firebase/firestore";
 import { requireSupportedSignatureRoutingMode } from "./signatureWorkflowPolicy.js";
-import { downloadSignatureBytes, ensureSignatureWorkflowFolder, ensureSignedDocumentArchive, ensureSignatureProfileFolder, finalizeSignatureProfileArchives, getDownloadURL, ref, uploadBytes } from "./signatureStorage";
+import { createGatewaySignatureEnvelope, voidGatewaySignatureEnvelope, downloadSignatureBytes, ensureSignatureWorkflowFolder, ensureSignedDocumentArchive, ensureSignatureProfileFolder, finalizeSignatureProfileArchives, getDownloadURL, ref, uploadBytes, fetchGatewaySigningStatus, fetchGatewaySigningResource, submitGatewaySignature, verifyGatewaySignedPdf } from "./signatureStorage";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { auth, db } from "./config";
 import { ensureMySignerIdentity, getMySignerIdentity, recordSignerAuthenticationEvidence, IRPA_ORGANISATION } from "./signerIdentity";
@@ -8,6 +8,7 @@ import { getCurrentSigningAuthorityRegisterEntries } from "./data";
 import { readWorkflowContext } from "./workflowLinks";
 const PROFILE_COLLECTION="signatureProfiles";const ENVELOPE_COLLECTION="signatureEnvelopes";const EVENT_COLLECTION="signatureEvents";
 const GATEWAY_URL=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").replace(/\/$/,"");
+const CRYPTOGRAPHIC_GATEWAY_BRIDGE_ENABLED=import.meta.env.VITE_IRPA_CRYPTOGRAPHIC_SIGNING_ENABLED==="true";
 async function sendSignatureMail(envelope,recipient){
   if(!auth.currentUser) throw new Error("Authentication is required. Sign in again before sending the signing invitation.");
   try{
@@ -289,9 +290,101 @@ export async function finalizeSignatureWorkflowDraft(args){
   return saveSignatureWorkflowDraft(args);
 }
 
-export async function startSignatureWorkflow(envelope){requireSupportedSignatureRoutingMode(envelope?.signingMode);const u=user();if(!envelope?.id)throw new Error("A valid workflow envelope is required.");if(envelope.senderUid!==u.uid&&envelope.ownerUid!==u.uid)throw new Error("Only the document owner can start this workflow.");if(envelope.status!=="Draft")return envelope;const current=(envelope.recipients||[]).find(r=>r.uid===envelope.currentSignerUid);const actionRecipients=(envelope.recipients||[]).filter(isActionRecipient);const update={status:envelope.currentSignerUid?"In Progress":"Shared",workflowStartedAt:serverTimestamp(),workflowStartedByUid:u.uid,updatedAt:serverTimestamp()};await updateDoc(doc(db,ENVELOPE_COLLECTION,envelope.id),update);if(current&&current.uid!==u.uid&&current.email)await releaseNextSigner({...envelope,...update},current);await recordEnvelopeEvent(envelope.id,"Workflow Started",{ownerUid:u.uid,currentSignerUid:envelope.currentSignerUid||null,currentSignerName:current?.name||"",requiredActionCount:actionRecipients.length});return{...envelope,...update};}
+export async function startSignatureWorkflow(envelope){
+  requireSupportedSignatureRoutingMode(envelope?.signingMode);
+  const u=user();
+  if(!envelope?.id)throw new Error("A valid workflow envelope is required.");
+  if(envelope.senderUid!==u.uid&&envelope.ownerUid!==u.uid)throw new Error("Only the document owner can start this workflow.");
+  if(envelope.status!=="Draft")return envelope;
+  const current=(envelope.recipients||[]).find(r=>r.uid===envelope.currentSignerUid);
+  const actionRecipients=(envelope.recipients||[]).filter(isActionRecipient);
+  let gateway=null;
+  if(CRYPTOGRAPHIC_GATEWAY_BRIDGE_ENABLED){
+    if(envelope.gatewayEnvelopeId){
+      gateway={gatewayEnvelopeId:envelope.gatewayEnvelopeId,gatewayDocumentId:envelope.gatewayDocumentId||null,gatewayOriginalHash:envelope.gatewayOriginalHash||null,gatewaySigningStatus:envelope.gatewaySigningStatus||"Sent",existing:true};
+    }else{
+      const sourceBytes=await fetchBytes(envelope.documentUrl,envelope.documentId,envelope.id);
+      gateway=await createGatewaySignatureEnvelope({envelope,sourceBytes});
+    }
+  }
+  const update={
+    status:envelope.currentSignerUid?"In Progress":"Shared",
+    workflowStartedAt:serverTimestamp(),
+    workflowStartedByUid:u.uid,
+    updatedAt:serverTimestamp(),
+    ...(gateway?{
+      gatewayEnvelopeId:gateway.gatewayEnvelopeId,
+      gatewayDocumentId:gateway.gatewayDocumentId,
+      gatewayOriginalHash:gateway.gatewayOriginalHash,
+      gatewaySigningStatus:gateway.gatewaySigningStatus||"Sent",
+      gatewayBridgeStatus:"Connected",
+      gatewayEvidenceSchema:"IRPA-CRYPTOGRAPHIC-EVIDENCE-1"
+    }:{})
+  };
+  try{
+    await updateDoc(doc(db,ENVELOPE_COLLECTION,envelope.id),update);
+  }catch(error){
+    if(gateway?.gatewayEnvelopeId&&!gateway.existing){
+      try{await voidGatewaySignatureEnvelope(gateway.gatewayEnvelopeId,"Firebase Signature Portal link could not be committed");}
+      catch(rollbackError){console.error("Gateway envelope rollback failed; preserve the Gateway reference for reconciliation.",{gatewayEnvelopeId:gateway.gatewayEnvelopeId,message:rollbackError?.message||"rollback failed"});}
+    }
+    throw error;
+  }
+  if(!gateway&&current&&current.uid!==u.uid&&current.email)await releaseNextSigner({...envelope,...update},current);
+  await recordEnvelopeEvent(envelope.id,"Workflow Started",{
+    ownerUid:u.uid,
+    currentSignerUid:envelope.currentSignerUid||null,
+    currentSignerName:current?.name||"",
+    requiredActionCount:actionRecipients.length,
+    gatewayEnvelopeId:gateway?.gatewayEnvelopeId||null,
+    gatewayBridgeStatus:gateway?"Connected":"Not Enabled"
+  });
+  return{...envelope,...update,...(gateway||{})};
+}
 
 export async function createSignatureEnvelope({title,documentId,documentReference,documentUrl,documentClassification="Public",documentArchiveCategory="Administrative Documents",documentType="Governance Document",documentUploadedAt=null,authorizationRequestId=null,authorizationReference="",signingMode,recipients,fields=[]}){signingMode=requireSupportedSignatureRoutingMode(signingMode);const u=user();const workflowContext=readWorkflowContext();authorizationRequestId=authorizationRequestId||workflowContext?.authorizationRequestId||null;authorizationReference=authorizationReference||workflowContext?.authorizationReference||"";if(!title?.trim())throw new Error("Envelope title is required.");if(!documentId)throw new Error("An authorized document must be selected.");if(!documentUrl)throw new Error("The selected document has no PDF file URL. Upload/link the controlled PDF before sending for signature.");if(!recipients?.length)throw new Error("At least the document owner is required.");const envelopeId=`IRPA-ENV-${new Date().getFullYear()}-${Date.now().toString().slice(-8)}`;const owner={...(recipients.find(r=>r?.uid===u.uid)||{}),uid:u.uid,name:u.displayName||u.email||"Document Owner",email:u.email||"",role:"Document Owner",routingOrder:1,status:"Pending"};const supplied=recipients.filter(r=>r?.uid&&r.uid!==u.uid);const orderedRecipients=[owner,...supplied.map((r,i)=>({...r,accessOnly:isViewOnlyRecipient(r),routingOrder:signingMode==="Sequential"?i+2:r.routingOrder||1}))];const participantUids=orderedRecipients.map(r=>r.uid).filter(Boolean);const viewOnlyUids=new Set(orderedRecipients.filter(isViewOnlyRecipient).map(r=>r.uid));if((fields||[]).some(f=>f?.signerUid&&viewOnlyUids.has(f.signerUid)))throw new Error("View-only recipients cannot be assigned action fields. Assign fields only to the document owner or an action officer.");const actionUids=[...new Set((fields||[]).map(f=>f?.signerUid).filter(Boolean))];const firstActionRecipient=orderedRecipients.find(isActionRecipient);const payload={envelopeReference:envelopeId,title:title.trim(),documentId,documentReference:documentReference||"",documentUrl,senderUid:u.uid,senderEmail:u.email||"",ownerUid:u.uid,ownerName:owner.name,ownerEmail:owner.email,documentClassification:documentClassification||"Public",documentArchiveCategory:documentArchiveCategory||"Administrative Documents",documentType:documentType||"Governance Document",documentUploadedAt:documentUploadedAt||null,authorizationRequestId:authorizationRequestId||null,authorizationReference:authorizationReference||null,status:"Draft",signingMode:signingMode||"Sequential",recipients:orderedRecipients,fields,participantUids,actionUids,currentSignerUid:signingMode==="Sequential"?(firstActionRecipient?.uid||null):null,createdAt:serverTimestamp(),updatedAt:serverTimestamp()};const batch=writeBatch(db);batch.set(doc(db,ENVELOPE_COLLECTION,envelopeId),payload);batch.update(doc(db,"documents",documentId),{signatureEnvelopeId:envelopeId,signatureReference:envelopeId,signatureStatus:"Draft",signatureOwnerUid:u.uid,workflowOwnerSectionSaved:true,authorizationRequestId:authorizationRequestId||null,authorizationReference:authorizationReference||null,updatedAt:serverTimestamp()});await batch.commit();await recordEnvelopeEvent(envelopeId,"Envelope Created",{status:"Draft",ownerUid:u.uid,signingOrder:orderedRecipients.map(r=>({uid:r.uid,name:r.name,email:r.email,routingOrder:r.routingOrder,role:r.role,accessOnly:isViewOnlyRecipient(r),actionRequired:isActionRecipient(r)}))});const viewOnlyRecipients=orderedRecipients.filter(isViewOnlyRecipient);if(viewOnlyRecipients.length)await Promise.all(viewOnlyRecipients.map(r=>releaseViewOnlyRecipient({...payload,id:envelopeId},r).catch(async error=>{await recordEnvelopeEvent(envelopeId,"View-Only Invitation Failed",{signerUid:r.uid,signerEmail:r.email,error:error?.message||"Unable to send view-only invitation"});return null;})));return{id:envelopeId,...payload};}
+export async function syncGatewaySigningMirror(envelopeId,gatewayStatus){
+  const u=user();
+  if(!envelopeId||gatewayStatus?.externalReference!==envelopeId)throw new Error("Gateway status does not match the Signature Portal envelope.");
+  if(gatewayStatus.auditChainValid!==true)throw new Error("The Gateway audit chain did not verify. The Signature Portal status will not be synchronized.");
+  const ref=doc(db,ENVELOPE_COLLECTION,envelopeId),snap=await getDoc(ref);
+  if(!snap.exists())throw new Error("The Signature Portal envelope no longer exists.");
+  const envelope={id:snap.id,...snap.data()};
+  if(!Array.isArray(envelope.participantUids)||!envelope.participantUids.includes(u.uid))throw new Error("You are not assigned to this Signature Portal envelope.");
+  if(!envelope.gatewayEnvelopeId||envelope.gatewayEnvelopeId!==gatewayStatus.envelopeId)throw new Error("The Gateway envelope ID does not match the linked Signature Portal record.");
+  if(envelope.gatewayOriginalHash&&gatewayStatus.documentHash!==envelope.gatewayOriginalHash)throw new Error("The Gateway source PDF hash does not match the linked Signature Portal document.");
+  if(gatewayStatus.status==="Completed"&&(!gatewayStatus.completion?.finalHash||!Array.isArray(gatewayStatus.completion?.cryptographicEvidenceIds)||gatewayStatus.completion.cryptographicEvidenceIds.length===0))throw new Error("The Gateway completion record has no verified PDF hash or cryptographic evidence reference.");
+  const gatewaySigners=Array.isArray(gatewayStatus.signers)?gatewayStatus.signers:[];
+  const recipients=(envelope.recipients||[]).map(recipient=>{
+    const signer=gatewaySigners.find(item=>item.uid&&item.uid===recipient.uid);
+    if(!signer)return recipient;
+    const status=signer.status==="Signed"?"Signed":signer.status==="Declined"?"Declined":signer.status==="Pending"?(gatewayStatus.signingMode==="Parallel"?"Pending":recipient.uid===gatewaySigners.filter(x=>x.status==="Pending").sort((a,b)=>a.order-b.order)[0]?.uid?"Current":"Pending"):recipient.status;
+    return {...recipient,status,completedAt:signer.signedAt||recipient.completedAt||null};
+  });
+  const pending=gatewaySigners.filter(x=>x.status==="Pending").sort((a,b)=>a.order-b.order);
+  const overall=gatewayStatus.status==="Completed"?"Completed":gatewayStatus.status==="Declined"?"Declined":gatewayStatus.status==="Voided"?"Cancelled":"In Progress";
+  const patch={
+    recipients,
+    status:overall,
+    currentSignerUid:gatewayStatus.signingMode==="Parallel"?null:(pending[0]?.uid||null),
+    gatewaySigningStatus:gatewayStatus.status,
+    gatewayFinalHash:gatewayStatus.completion?.finalHash||null,
+    gatewayCryptographicEvidenceIds:gatewayStatus.completion?.cryptographicEvidenceIds||[],
+    gatewayAuditChainValid:true,
+    gatewayStatusUpdatedAt:serverTimestamp(),
+    updatedAt:serverTimestamp()
+  };
+  await updateDoc(ref,patch);
+  await recordEnvelopeEvent(envelopeId,"Gateway Signing Status Verified",{
+    gatewayEnvelopeId:gatewayStatus.envelopeId,
+    gatewayStatus:gatewayStatus.status,
+    gatewayFinalHash:gatewayStatus.completion?.finalHash||null,
+    cryptographicEvidenceCount:(gatewayStatus.completion?.cryptographicEvidenceIds||[]).length,
+    auditChainValid:true
+  });
+  return {...envelope,...patch};
+}
+
 export async function recordEnvelopeEvent(envelopeId,event,details={}){const u=user();await setDoc(doc(collection(db,EVENT_COLLECTION)),{envelopeId,event,details,actorUid:u.uid,actorEmail:u.email||"",createdAt:serverTimestamp()});}
 async function fetchBytes(url,documentId=null,envelopeId=null){const value=String(url||"");if(value.startsWith("drive://"))return downloadSignatureBytes(value.slice("drive://".length),documentId,envelopeId);const r=await fetch(value);if(!r.ok)throw new Error(`Unable to retrieve the controlled PDF (${r.status}).`);return new Uint8Array(await r.arrayBuffer());}
 async function embedImage(pdfDoc,url){const bytes=await fetchBytes(url);const lower=url.toLowerCase();if(lower.includes(".jpg")||lower.includes(".jpeg"))return pdfDoc.embedJpg(bytes);return pdfDoc.embedPng(bytes);}
@@ -315,7 +408,76 @@ export async function previewEnvelopeSigning(envelope,profile,fieldValues={}){co
   drawField(page,font,field,value);
 }}return await pdf.save();}
 
-export async function signEnvelope(envelope,profile,fieldValues={},manualAuthorityIdentification=""){const u=user();if(profile?.status!=="Active")throw new Error("Your Signature Application is not active. Activate your Signature Profile before signing.");if(!u?.uid||!u?.email)throw new Error("Your secure signing session has expired. Sign in again before signing this document.");if(!envelope?.documentUrl)throw new Error("This envelope has no controlled PDF URL.");if(!envelope.participantUids?.includes(u.uid))throw new Error("You are not a participant in this signing envelope.");const recipient=(envelope.recipients||[]).find(r=>r?.uid===u.uid);if(!recipient)throw new Error("You are not assigned to this workflow.");const signerAuthority=await getMySignerIdentity();if(!signerAuthority?.authorityRole||signerAuthority.authorityRole==="Not yet assigned")throw new Error("Your current signing authority has not been registered. Update your Signer Identity capacity before signing.");if(signerAuthority.authorityStatus!=="Current")throw new Error(`Your signing authority is ${signerAuthority.authorityStatus||"not verified"}. A Current authority is required to sign.`);const authorityVerification=await verifyManualSigningAuthority(manualAuthorityIdentification);if(isViewOnlyRecipient(recipient))throw new Error("This role has view-only access. No action or signature is required.");if(envelope.signingMode==="Sequential"&&envelope.currentSignerUid&&envelope.currentSignerUid!==u.uid)throw new Error("This envelope is waiting for another officer.");const source=await fetchBytes(envelope.signedDocumentUrl||envelope.documentUrl,envelope.documentId,envelope.id);const originalHash=await hashBytes(source);const pdf=await PDFDocument.load(source);const font=await pdf.embedFont(StandardFonts.Helvetica);const signature=profile?.signatureUrl?await embedImage(pdf,profile.signatureUrl):null;const initials=profile?.initialsUrl?await embedImage(pdf,profile.initialsUrl):null;const signerFields=(envelope.fields||[]).filter(f=>f?.signerUid===u.uid);if(!signerFields.length)throw new Error("This signing task is assigned to another officer. Your profile is not authorized to execute it.");const requiresSignature=signerFields.some(f=>f.type==="Signature"||f.type==="Initials");if(requiresSignature&&!profile?.signatureUrl)throw new Error("Your Signature Profile is not configured for the signature fields assigned to you.");for(const field of signerFields){const page=pdf.getPages()[Math.max(0,Number(field.page||1)-1)];if(!page)continue;const{width,height}=page.getSize();const x=(Number(field.x||10)/100)*width;const y=height-((Number(field.y||80)/100)*height)-(Number(field.height||8)/100)*height;const w=(Number(field.width||24)/100)*width;const h=(Number(field.height||9)/100)*height;if(field.type==="Signature"&&signature){page.drawImage(signature,{x,y,width:w,height:h});}else if(field.type==="Initials"&&initials){page.drawImage(initials,{x,y,width:w,height:h});}else{const value=fieldValues[field.fieldId]??(field.type==="Name"?(profile?.displayName||u.displayName||u.email||""):field.type==="Date"?new Date().toLocaleDateString():fieldValues[field.fieldId]||"");drawField(page,font,field,value);}}const signaturePaneRecords=signerFields.filter(f=>f?.type==="Signature"||f?.type==="Initials").map(f=>({fieldId:f.fieldId||null,type:f.type,page:Number(f.page||1),x:Number(f.x||10),y:Number(f.y||80),width:Number(f.width||24),height:Number(f.height||9),signatureAssetHash:profile?.signatureHash||profile?.signatureSha256||null}));
+
+function readGatewaySigningToken(){
+  try{return typeof window!=="undefined"?new URLSearchParams(window.location.search).get("gatewayToken")||"":"";}
+  catch{return "";}
+}
+async function signatureProfilePngDataUrl(url){
+  if(!url)return "";
+  const bytes=await fetchBytes(url);
+  if(bytes.length<8||bytes[0]!==137||bytes[1]!==80||bytes[2]!==78||bytes[3]!==71)throw new Error("The Gateway requires the authorized signer specimen as a PNG image. Re-save the Signature Profile specimen as PNG before signing.");
+  let binary="";
+  for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,Math.min(i+0x8000,bytes.length)));
+  return "data:image/png;base64,"+btoa(binary);
+}
+async function signEnvelopeThroughGateway({envelope,profile,fieldValues,manualAuthorityIdentification,recipient,signerFields,signerAuthority,authorityVerification,u}){
+  const token=readGatewaySigningToken();
+  if(!token)throw new Error("Cryptographic Gateway signing is enabled, but this session has no Gateway invitation token. Open the authenticated Gateway signing invitation; legacy Firebase signing is disabled for this workflow.");
+  const status=await fetchGatewaySigningStatus(token);
+  const expectedDocumentId=("DOC-"+String(envelope.id)).replace(/[^A-Za-z0-9_-]/g,"-").slice(0,64);
+  if(status.externalReference!==envelope.id||status.documentId!==expectedDocumentId||status.signer?.uid!==u.uid||status.envelopeId!==envelope.gatewayEnvelopeId){
+    throw new Error("The Gateway signing token does not match this Firebase envelope, controlled document, and authenticated signer.");
+  }
+  if(status.signingMode!==envelope.signingMode)throw new Error("The Gateway signing route differs from the authorized Signature Portal route. Signing has been blocked.");
+  const specimen=profile?.signatureUrl?await signatureProfilePngDataUrl(profile.signatureUrl):"";
+  const signature=specimen?{type:"drawn",value:specimen}:{type:"typed",value:String(profile?.displayName||u.displayName||u.email||"").trim()};
+  const gatewayFields={};
+  for(const field of signerFields){
+    const supplied=fieldValues?.[field.fieldId];
+    if(field.type==="Signature"||field.type==="Initials"){
+      if(specimen)gatewayFields[field.fieldId]=specimen;
+      else if(supplied)gatewayFields[field.fieldId]=String(supplied);
+    }else if(supplied!==undefined&&supplied!==null)gatewayFields[field.fieldId]=supplied;
+    else if(field.type==="Name")gatewayFields[field.fieldId]=profile?.displayName||u.displayName||u.email||"";
+    else if(field.type==="Date")gatewayFields[field.fieldId]=new Date().toISOString().slice(0,10);
+  }
+  const submission=await submitGatewaySignature({token,signature,fieldValues:gatewayFields,consent:true,manualAuthorityIdentification:authorityVerification.manualAuthorityIdentification||manualAuthorityIdentification||""});
+  const after=await fetchGatewaySigningStatus(token);
+  if(after.envelopeId!==status.envelopeId||after.signer?.uid!==u.uid||after.signer?.status!=="Signed")throw new Error("Gateway did not persist the authenticated signer action. No Firebase completion was recorded.");
+  const gatewaySigners=Array.isArray(after.signers)?after.signers:[];
+  const nextGatewaySigner=gatewaySigners.find(s=>s.status!=="Signed");
+  const completed=after.status==="Completed";
+  let signedUrl=envelope.signedDocumentUrl||envelope.documentUrl;
+  let finalHash=null;
+  let evidence=null;
+  if(completed){
+    const signedBytes=await fetchGatewaySigningResource("/api/sign/pdf",token,{pdf:true});
+    const pdfCheck=await verifyGatewaySignedPdf({token,bytes:signedBytes});
+    if(pdfCheck.envelopeId!==after.envelopeId||pdfCheck.documentHash!==after.completion?.finalHash||!pdfCheck.verified)throw new Error("The completed PDF hash does not match the Gateway envelope completion record.");
+    evidence=await fetchGatewaySigningResource("/api/sign/evidence",token);
+    if(evidence.envelopeId!==after.envelopeId||evidence.documentHash!==pdfCheck.documentHash||evidence.auditChainValid!==true||!Array.isArray(evidence.evidence)||!evidence.evidence.length||evidence.evidence.some(e=>e.signerUid!==u.uid))throw new Error("Persisted cryptographic evidence does not verify for this envelope, final PDF, authenticated signer, and audit chain.");
+    finalHash=pdfCheck.documentHash;
+    const archive=await ensureSignedDocumentArchive({documentId:envelope.documentId,title:envelope.title||envelope.documentReference,reference:envelope.documentReference||envelope.documentId,archiveCategory:envelope.documentArchiveCategory||"Administrative Documents",classification:envelope.documentClassification||"Restricted",documentType:envelope.documentType||"Governance Document",uploadedAt:envelope.documentUploadedAt||null});
+    const target=ref(null,`signatureEnvelopes/${envelope.id}/gateway-final-${finalHash}.pdf`);
+    await uploadBytes(target,new Blob([signedBytes],{type:"application/pdf"}),{contentType:"application/pdf",purpose:"Signed Documents Archive",folderId:archive.folderId,customMetadata:{envelopeId:envelope.id,gatewayEnvelopeId:after.envelopeId,signerUid:u.uid,finalHash,documentId:envelope.documentId,archiveProtocol:"IRPA-GATEWAY-CRYPTOGRAPHIC-EVIDENCE-1"}});
+    signedUrl=await getDownloadURL(target);
+  }
+  const updatedRecipients=(envelope.recipients||[]).map(r=>{
+    const gs=gatewaySigners.find(s=>s.uid===r.uid);
+    if(!gs)return r;
+    return {...r,status:gs.status==="Signed"?"Signed":(!completed&&envelope.signingMode!=="Parallel"&&nextGatewaySigner?.uid===r.uid?"Current":(r.status||"Pending")),completedAt:gs.signedAt||r.completedAt||null};
+  });
+  const actionRecord={uid:u.uid,name:profile?.displayName||u.displayName||u.email||"Signer",email:u.email||"",role:recipient.role||"Action",completedAt:new Date().toISOString(),fields:signerFields.map(f=>({fieldId:f.fieldId,type:f.type,value:fieldValues?.[f.fieldId]??""})),signatureAuthority:authorityVerification.authorityRole||signerAuthority.authorityRole,authorityVerificationStatus:"Verified",gatewayEnvelopeId:after.envelopeId,gatewaySignerId:after.signer?.id,cryptographicEvidenceStatus:completed?"Verified":"Pending completion"};
+  const update={status:completed?"Completed":"In Progress",recipients:updatedRecipients,lastSignedByUid:u.uid,lastSignedAt:serverTimestamp(),workflowHistory:arrayUnion(actionRecord),gatewaySigningStatus:after.status,gatewayBridgeStatus:"Connected",gatewayLastSignerUid:u.uid,gatewayEvidenceStatus:completed?"Verified":"Awaiting all required signatures",gatewayAuditChainValid:completed?evidence.auditChainValid:null,updatedAt:serverTimestamp(),...(completed?{signedDocumentUrl:signedUrl,ownerCompletedDocumentUrl:signedUrl,latestDocumentHash:finalHash,originalDocumentHash:status.documentHash,completedAt:serverTimestamp(),signerArchiveStatus:"Gateway PDF and evidence verified"}:{currentSignerUid:envelope.signingMode==="Sequential"?(nextGatewaySigner?.uid||null):null})};
+  await updateDoc(doc(db,ENVELOPE_COLLECTION,envelope.id),update);
+  if(completed)await updateDoc(doc(db,"documents",envelope.documentId),{workflowActionStatus:"Signed",lastWorkflowAction:recipient.role||"Action",lastWorkflowActionUid:u.uid,lastWorkflowActionAt:serverTimestamp(),completedDocumentUrl:signedUrl,ownerCompletedDocumentUrl:signedUrl,ownerRecordStatus:"Completed",lastCompletedDocumentHash:finalHash,updatedAt:serverTimestamp()});
+  await setDoc(doc(db,"signatures",`gateway-${envelope.id}-${u.uid}`),{envelopeId:envelope.id,documentId:envelope.documentId,signerUid:u.uid,signerEmail:u.email||"",signerName:profile?.displayName||u.displayName||u.email||"Signer",workflowRole:recipient.role||"Action",signatureAuthority:authorityVerification.authorityRole||signerAuthority.authorityRole,signatureAuthorityVerificationStatus:"Verified",signatureStatus:"Signed",status:"Signed",signedAt:serverTimestamp(),gatewayEnvelopeId:after.envelopeId,gatewaySignerId:after.signer?.id,gatewayDocumentHash:completed?finalHash:null,cryptographicEvidenceStatus:completed?"Verified":"Pending completion",immutable:true},{merge:true});
+  await recordEnvelopeEvent(envelope.id,"Gateway Signature Submitted",{signerUid:u.uid,gatewayEnvelopeId:after.envelopeId,gatewayStatus:after.status,completed,finalDocumentHash:finalHash,evidenceVerified:completed,auditChainValid:completed?evidence.auditChainValid:null,idempotent:submission.idempotent===true});
+  return {...envelope,...update,id:envelope.id,gatewayEnvelopeId:after.envelopeId,gatewayCompletion:after.completion||null,gatewayEvidence:evidence||null};
+}
+
+export async function signEnvelope(envelope,profile,fieldValues={},manualAuthorityIdentification=""){const u=user();if(profile?.status!=="Active")throw new Error("Your Signature Application is not active. Activate your Signature Profile before signing.");if(!u?.uid||!u?.email)throw new Error("Your secure signing session has expired. Sign in again before signing this document.");if(!envelope?.documentUrl)throw new Error("This envelope has no controlled PDF URL.");if(!envelope.participantUids?.includes(u.uid))throw new Error("You are not a participant in this signing envelope.");const recipient=(envelope.recipients||[]).find(r=>r?.uid===u.uid);if(!recipient)throw new Error("You are not assigned to this workflow.");const signerAuthority=await getMySignerIdentity();if(!signerAuthority?.authorityRole||signerAuthority.authorityRole==="Not yet assigned")throw new Error("Your current signing authority has not been registered. Update your Signer Identity capacity before signing.");if(signerAuthority.authorityStatus!=="Current")throw new Error(`Your signing authority is ${signerAuthority.authorityStatus||"not verified"}. A Current authority is required to sign.`);const authorityVerification=await verifyManualSigningAuthority(manualAuthorityIdentification);if(isViewOnlyRecipient(recipient))throw new Error("This role has view-only access. No action or signature is required.");if(envelope.signingMode==="Sequential"&&envelope.currentSignerUid&&envelope.currentSignerUid!==u.uid)throw new Error("This envelope is waiting for another officer.");const signerFields=(envelope.fields||[]).filter(f=>f?.signerUid===u.uid);if(!signerFields.length)throw new Error("This signing task is assigned to another officer. Your profile is not authorized to execute it.");const requiresSignature=signerFields.some(f=>f.type==="Signature"||f.type==="Initials");if(requiresSignature&&!profile?.signatureUrl)throw new Error("Your Signature Profile is not configured for the signature fields assigned to you.");if(CRYPTOGRAPHIC_GATEWAY_BRIDGE_ENABLED)return await signEnvelopeThroughGateway({envelope,profile,fieldValues,manualAuthorityIdentification,recipient,signerFields,signerAuthority,authorityVerification,u});const source=await fetchBytes(envelope.signedDocumentUrl||envelope.documentUrl,envelope.documentId,envelope.id);const originalHash=await hashBytes(source);const pdf=await PDFDocument.load(source);const font=await pdf.embedFont(StandardFonts.Helvetica);const signature=profile?.signatureUrl?await embedImage(pdf,profile.signatureUrl):null;const initials=profile?.initialsUrl?await embedImage(pdf,profile.initialsUrl):null;for(const field of signerFields){const page=pdf.getPages()[Math.max(0,Number(field.page||1)-1)];if(!page)continue;const{width,height}=page.getSize();const x=(Number(field.x||10)/100)*width;const y=height-((Number(field.y||80)/100)*height)-(Number(field.height||8)/100)*height;const w=(Number(field.width||24)/100)*width;const h=(Number(field.height||9)/100)*height;if(field.type==="Signature"&&signature){page.drawImage(signature,{x,y,width:w,height:h});}else if(field.type==="Initials"&&initials){page.drawImage(initials,{x,y,width:w,height:h});}else{const value=fieldValues[field.fieldId]??(field.type==="Name"?(profile?.displayName||u.displayName||u.email||""):field.type==="Date"?new Date().toLocaleDateString():fieldValues[field.fieldId]||"");drawField(page,font,field,value);}}const signaturePaneRecords=signerFields.filter(f=>f?.type==="Signature"||f?.type==="Initials").map(f=>({fieldId:f.fieldId||null,type:f.type,page:Number(f.page||1),x:Number(f.x||10),y:Number(f.y||80),width:Number(f.width||24),height:Number(f.height||9),signatureAssetHash:profile?.signatureHash||profile?.signatureSha256||null}));
 const signaturePaneId=`IRPA-SP-${envelope.id}-${u.uid}-${Date.now()}`;
 const signedAt=new Date().toISOString();
 pageSignatureManifest(pdf,signaturePaneRecords,signaturePaneId,profile,u,signedAt);

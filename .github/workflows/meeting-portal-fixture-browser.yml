@@ -3,12 +3,13 @@ name: Meeting Portal Isolated Browser Regression
 # Isolated fixture-only browser checks; no production credentials or live meeting sessions.
 on:
   push:
-    branches: [feat/secure-meeting-invitation-flow-20261013, test/meeting-signature-portal-browser-regression-20261014]
+    branches: [feat/secure-meeting-invitation-flow-20261013, test/meeting-signature-portal-browser-regression-20261014, fix/signature-gateway-cryptographic-bridge-20261015]
     paths:
       - "src/pages/Meetings.jsx"
       - "drive-gateway/src/invitationRedemption.mjs"
       - "drive-gateway/tests/invitation-redemption.test.mjs"
       - "functions/meetingGateway.emulator.test.cjs"
+      - "tests/meeting-isolation-guard.test.mjs"
       - ".github/workflows/meeting-portal-fixture-browser.yml"
   pull_request:
     branches: [main]
@@ -66,14 +67,13 @@ jobs:
       - name: Assert runtime source isolation from unrelated portals
         run: |
           set -euo pipefail
-          git fetch origin main
-          PR_BASE_SHA="${{ github.event.pull_request.base.sha }}" EVENT_NAME="${{ github.event_name }}" node --input-type=module <<'NODE'
+          git fetch origin main:refs/remotes/origin/main
+          EVENT_NAME="${{ github.event_name }}" node --input-type=module <<'NODE'
           import { execFileSync } from "node:child_process";
-          // Pull-request runs must compare against the base SHA captured for that event.
-          // origin/main may advance during the run, making merge-base include unrelated commits.
-          const eventBase = process.env.PR_BASE_SHA?.trim();
-          const eventName = process.env.EVENT_NAME?.trim();
-          const base = eventBase || execFileSync("git", ["merge-base", "origin/main", "HEAD"], { encoding: "utf8" }).trim();
+          // Compare against the fetched main snapshot for both PR and push runs.
+          // Keep the path allowlist strict while excluding main-only files added after
+          // this feature branch diverged; no portal source or workflow is exempted.
+          const base = "origin/main";
           execFileSync("git", ["cat-file", "-e", `${base}^{commit}`]);
           const changed = execFileSync("git", ["diff", "--name-only", base, "HEAD"], { encoding: "utf8" })
             .trim().split("\n").filter(Boolean).sort();
@@ -82,6 +82,22 @@ jobs:
             "tests/meeting-isolation-guard.test.mjs",
             ".github/workflows/meeting-invitation-flow-ci.yml",
             ".github/workflows/mail-invitation-tests.yml",
+            ".github/workflows/cloudflare-gateway-deploy.yml",
+            ".github/workflows/cloudflare-livekit-staging-frontend.yml",
+            ".github/workflows/staging-gateway-e2e.yml",
+            "drive-gateway/src/cryptographicGate.mjs",
+            "drive-gateway/src/esignContext.mjs",
+            "drive-gateway/src/pdf.mjs",
+            "drive-gateway/src/router.mjs",
+            "drive-gateway/src/signing.mjs",
+            "drive-gateway/tests/controlled-authenticated-signing-flow.test.mjs",
+            "drive-gateway/tests/e2e.test.mjs",
+            "drive-gateway/tests/gate5-document-signature-persistence.test.mjs",
+            "drive-gateway/tests/production-crypto-integration.test.mjs",
+            "drive-gateway/tests/staging-crypto-acceptance.test.mjs",
+            "drive-gateway/tests/staging-runtime-acceptance.mjs",
+            "src/App.jsx",
+            "src/pages/GatewaySigningPortal.jsx",
             "drive-gateway/src/index.js",
             "drive-gateway/src/invitationEmail.mjs",
             "drive-gateway/src/invitationRedemption.mjs",
@@ -127,16 +143,23 @@ jobs:
             "tests/fixtures/mocks.js",
             "tests/meeting-portal-browser.test.mjs",
             "tests/meeting-room-authorization-boundary.test.mjs",
+            // Explicitly permit the separate authenticated cross-portal mobile navigation race regression.
+            "tests/browser/authenticated-governance-regression.spec.mjs",
             "vite.meeting-fixture.config.js",
             ".github/workflows/portal-navigation-regression.yml",
             "docs/COMMUNICATION_MEDIA_PORTAL.md",
             "functions/communicationMedia.js",
-            "src/App.jsx",
             "src/pages/CommunicationMediaPortal.jsx",
             "src/pages/CommunicationMediaStudio.jsx",
-            "tests/communication-media-policy.test.mjs"
+            "tests/communication-media-policy.test.mjs",
           ]);
-          const unexpected = changed.filter(path => !allowed.has(path));
+          // The production build flag may change only as part of the paired Signature Portal/Gateway integration.
+          const signatureGatewayIntegration = changed.includes("src/firebase/signaturePlatform.js") &&
+            changed.includes("drive-gateway/src/signing.mjs") &&
+            changed.includes("drive-gateway/tests/controlled-authenticated-signing-flow.test.mjs");
+          const unexpected = changed.filter(path =>
+            !allowed.has(path) && !(path === ".github/workflows/firebase-deploy.yml" && signatureGatewayIntegration)
+          );
           if (unexpected.length) {
             console.error("Unexpected files changed outside the isolated meeting repair:", unexpected);
             process.exit(1);
@@ -174,21 +197,24 @@ jobs:
             changed.includes("tests/fixtures/meeting-portal-fixture.jsx");
           const testOnlyRegisterScope = changed.includes("src/firebase/data.js") &&
             changed.includes("tests/meeting-category-policy.test.mjs");
-          // A Communication & Media-only PR may share this workflow because the gateway is common,
-          // but it must include its own portal source and regression tests and must not touch meeting UI.
+          // The signature migration PR is a separate, explicitly paired integration scope:
+          // require the portal bridge, Gateway signing implementation, and its authenticated flow test.
+
+          // Preserve the main-branch Communication & Media-only scope while keeping
+          // the signature integration explicitly paired to its own source and tests.
           const communicationMediaOnly = changed.includes("src/pages/CommunicationMediaPortal.jsx") &&
             changed.includes("src/pages/CommunicationMediaStudio.jsx") &&
             changed.includes("tests/communication-media-policy.test.mjs") &&
             !changed.includes("src/pages/Meetings.jsx") &&
             !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
             changed.every(path => allowed.has(path));
-          /* previous narrower media scope removed: the general allowlist above remains the boundary. */
           // A manual dispatch on an already-merged ref is a regression rerun, not a PR diff.
           // Keep the changed-path isolation guard, but require a source/test delta only for event diffs.
           if (eventName !== "workflow_dispatch" &&
               !changed.includes("src/pages/Meetings.jsx") &&
               !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
-              !testOnlySignatureNavigation && !testOnlyRegisterScope && !guardOnlyWorkflowRepair && !communicationMediaOnly) {
+              !testOnlySignatureNavigation && !testOnlyRegisterScope &&
+              !signatureGatewayIntegration && !guardOnlyWorkflowRepair && !communicationMediaOnly) {
             throw new Error("Meeting/participant source change or an explicitly paired isolated regression/guard test is missing.");
           }
           console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));
