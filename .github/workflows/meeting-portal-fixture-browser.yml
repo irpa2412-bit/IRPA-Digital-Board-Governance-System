@@ -204,6 +204,7 @@ jobs:
             ".github/workflows/portal-navigation-regression.yml",
             ".github/workflows/readability-release-gate.yml",
             "src/main.jsx",
+            "package.json",
             "src/styles/portal-readability-standard.css",
             "tests/browser/authenticated-governance-regression.spec.mjs",
             "tests/portal-readability-standard.test.mjs"
