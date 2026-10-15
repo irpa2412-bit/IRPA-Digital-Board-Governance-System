@@ -280,6 +280,15 @@ export function createCommunicationsSiteRouter(deps) {
     if (path === "/api/communications/cpanel/files" && request.method === "GET") {
       await authorised(request, env, true);
       const cp = cpanelConfig(env);
+      const requestedPath = url.searchParams.get("path");
+      if (requestedPath !== null) {
+        const safe = safeCpanelPath(requestedPath, cp.documentRoot);
+        const file = await cpanelCall(cp, "Fileman/get_file_content", { dir: safe.dir, file: safe.file });
+        const content = file.data?.content ?? file.data?.[0]?.content;
+        if (typeof content !== "string") throw new Error("The selected website file could not be read.");
+        const truncated = new TextEncoder().encode(content).byteLength > MAX_EDIT_BYTES;
+        return json({ path: safe.relative, content: truncated ? "" : content, truncated }, 200, corsHeaders(request));
+      }
       const relativeDir = String(url.searchParams.get("dir") || "");
       const dir = safeCpanelDirectory(relativeDir, cp.documentRoot);
       const listing = await cpanelCall(cp, "Fileman/list_files", { dir });
