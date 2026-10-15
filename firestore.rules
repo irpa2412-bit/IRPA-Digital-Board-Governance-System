@@ -409,7 +409,7 @@ service cloud.firestore {
   match /grantCrawlerStatus/{id}{allow read:if signedIn();allow write:if false;}
   match /grantCrawlerSources/{id}{allow read:if signedIn();allow write:if false;}
   match /grantCrawlerRuns/{id}{allow read:if signedIn()&&(admin()||anyInstitutionalRole(["Executive Director","Director Outreach","Director Finance & Administration","Director Research","Research Director","Research Manager","Research Officer","Fundraising Officer"]));allow write:if false;}
-  match /systemSettings/{id}{allow read,create,update,delete:if admin();}
+  match /systemSettings/{id}{allow read,create,update,delete:if admin()&&id!="actualDataAccess";}
   // Procurement document numbers are issued by the client transaction, but only through monotonic single-counter increments.
   // This narrow exception avoids granting members access to other system settings.
   match /systemSettings/procurementCounters{
