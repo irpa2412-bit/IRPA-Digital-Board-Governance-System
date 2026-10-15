@@ -67,5 +67,7 @@ jobs:
         run: npm ci
       - name: Test meeting entry policy
         run: npm run test:meeting-entry-policy
+      - name: Test failed invitation resend and quorum exclusion
+        run: npm run test:meeting-invitation-resend
       - name: Build web application
         run: npm run build
