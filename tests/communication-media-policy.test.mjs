@@ -39,6 +39,8 @@ test("publishing, website content edits and cPanel file edits route through Clou
 
 test("website publishing enforces Firebase authentication, registered reviewer role, approval and HTTPS",()=>{
  assert.ok(site.includes("authenticateFirebaseRequest"));
+ assert.ok(site.includes('getFirestoreDocument(env, "adminProfiles/" + claims.user_id, claims.token)'));
+ assert.ok(site.includes("const activeAdmin = adminProfile?.active === true"));
  assert.ok(site.includes("await authorised(request, env, true)"));
  assert.ok(site.includes('item.status !== "Approved"'));
  assert.ok(site.includes('base.protocol !== "https:"'));
