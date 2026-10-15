@@ -40,9 +40,18 @@ jobs:
         working-directory: drive-gateway
       - name: Install meeting Gateway emulator test dependencies
         run: npm --prefix functions install --omit=dev --no-audit --no-fund
-      - name: Validate runtime acceptance script syntax
+      - name: Validate runtime acceptance script and Drive multipart framing
         working-directory: drive-gateway
-        run: node --check tests/staging-runtime-acceptance.mjs
+        run: |
+          set -euo pipefail
+          node --check tests/staging-runtime-acceptance.mjs
+          # RFC 7578 multipart upload framing must use actual CRLF escape sequences,
+          # not literal backslash characters that Google Drive rejects.
+          grep -Fq '\r\nContent-Type: application/json' src/esignContext.mjs
+          if grep -Fq '\\r\\nContent-Type: application/json' src/esignContext.mjs; then
+            echo "Drive multipart framing contains double-escaped CRLF." >&2
+            exit 1
+          fi
       - name: Firestore emulator E2E
         run: |
           set -o pipefail
