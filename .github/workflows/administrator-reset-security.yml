@@ -3,20 +3,22 @@ name: Administrator Registration Reset Security
 on:
   pull_request:
     paths:
+      - "drive-gateway/src/adminRegistrationReset.mjs"
+      - "drive-gateway/src/index.js"
+      - "drive-gateway/tests/admin-registration-reset.test.mjs"
+      - "drive-gateway/wrangler.toml"
+      - "drive-gateway/ADMIN-REGISTRATION-RESET.md"
       - "functions/systemControl.js"
-      - "functions/adminRegistrationResetPolicy.cjs"
-      - "functions/adminRegistrationResetService.js"
-      - "functions/adminRegistrationReset.policy.test.cjs"
-      - "functions/adminRegistrationReset.emulator.test.cjs"
       - ".github/workflows/administrator-reset-security.yml"
   push:
     branches: [main]
     paths:
+      - "drive-gateway/src/adminRegistrationReset.mjs"
+      - "drive-gateway/src/index.js"
+      - "drive-gateway/tests/admin-registration-reset.test.mjs"
+      - "drive-gateway/wrangler.toml"
+      - "drive-gateway/ADMIN-REGISTRATION-RESET.md"
       - "functions/systemControl.js"
-      - "functions/adminRegistrationResetPolicy.cjs"
-      - "functions/adminRegistrationResetService.js"
-      - "functions/adminRegistrationReset.policy.test.cjs"
-      - "functions/adminRegistrationReset.emulator.test.cjs"
       - ".github/workflows/administrator-reset-security.yml"
   workflow_dispatch:
 
@@ -24,22 +26,22 @@ permissions:
   contents: read
 
 jobs:
-  isolated-reset-verification:
+  cloudflare-admin-reset-security:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "21"
-      - run: npm ci --no-audit --no-fund
-      - run: npm install --prefix functions --no-audit --no-fund
-      - name: Verify authorization policy
-        run: node --test functions/adminRegistrationReset.policy.test.cjs
-      - name: Verify isolated Firestore reset, preservation, idempotency, and audit integrity
-        run: npx firebase emulators:exec --project demo-irpa-admin-reset-isolated --only firestore "node --test functions/adminRegistrationReset.emulator.test.cjs"
+          cache-dependency-path: drive-gateway/package-lock.json
+      - name: Install Cloudflare Worker dependencies
+        run: npm ci --prefix drive-gateway --no-audit --no-fund
+      - name: Test administrator recovery authorization, scope, idempotency and audit integrity
+        run: node --test drive-gateway/tests/admin-registration-reset.test.mjs
+      - name: Ensure retired Firebase reset module has no defineSecret binding
+        shell: bash
+        run: |
+          ! grep -q 'defineSecret' functions/systemControl.js
+          ! grep -q 'exports.resetAdministratorRegistration' functions/systemControl.js
