@@ -68,6 +68,15 @@ function safeCpanelPath(input, root) {
   const base = String(root || "public_html").replace(/^\/+|\/+$/g, "");
   return { dir: base + (raw.includes("/") ? "/" + raw.split("/").slice(0, -1).join("/") : ""), file: filename, relative: raw };
 }
+function safeCpanelDirectory(input, root) {
+  const raw = String(input || "").replace(/\\\\/g, "/").trim();
+  if (!raw) return String(root || "public_html").replace(/^\\/+|\\/+$/g, "");
+  if (raw.startsWith("/") || raw.includes("\\0") || raw.split("/").some(p => !p || p === "." || p === ".." || p.startsWith("."))) {
+    throw new Error("Invalid website directory path.");
+  }
+  return String(root || "public_html").replace(/^\\/+|\\/+$/g, "") + "/" + raw;
+}
+
 function authHeader(username, token) {
   return "cpanel " + username + ":" + token;
 }
@@ -246,22 +255,20 @@ export function createCommunicationsSiteRouter(deps) {
     if (path === "/api/communications/cpanel/files" && request.method === "GET") {
       await authorised(request, env, true);
       const cp = cpanelConfig(env);
-      const relative = String(url.searchParams.get("path") || "");
-      if (!relative) {
-        const listing = await cpanelCall(cp, "Fileman/list_files", { dir: cp.documentRoot });
-        const rows = listing.data?.[0]?.data || listing.data || [];
-        const files = Array.isArray(rows) ? rows.filter(row => {
-          const name = String(row.file || row.name || "");
-          const ext = name.includes(".") ? name.slice(name.lastIndexOf(".")).toLowerCase() : "";
-          return EDITABLE_EXTENSIONS.has(ext) && !name.startsWith(".");
-        }).map(row => ({ name: String(row.file || row.name || ""), type: row.type || "file", size: Number(row.file_size || row.size || 0) })) : [];
-        return json({ files }, 200, corsHeaders(request));
-      }
-      const safe = safeCpanelPath(relative, cp.documentRoot);
-      const data = await cpanelCall(cp, "Fileman/get_file_content", { dir: safe.dir, file: safe.file });
-      const content = data.data?.content ?? data.data?.[0]?.content;
-      if (typeof content !== "string") throw new Error("cPanel did not return file content.");
-      return json({ path: safe.relative, content: content.slice(0, MAX_EDIT_BYTES), truncated: content.length > MAX_EDIT_BYTES }, 200, corsHeaders(request));
+      const relativeDir = String(url.searchParams.get("dir") || "");
+      const dir = safeCpanelDirectory(relativeDir, cp.documentRoot);
+      const listing = await cpanelCall(cp, "Fileman/list_files", { dir });
+      const rows = listing.data?.[0]?.data || listing.data || [];
+      const entries = Array.isArray(rows) ? rows.map(row => {
+        const name = String(row.file || row.name || "");
+        const type = String(row.type || (row.is_dir ? "dir" : "file")).toLowerCase();
+        const isDirectory = ["dir", "directory", "folder"].includes(type) || row.is_dir === true;
+        const ext = name.includes(".") ? name.slice(name.lastIndexOf(".")).toLowerCase() : "";
+        if (!name || name.startsWith(".")) return null;
+        if (isDirectory) return /^[A-Za-z0-9 _.-]{1,120}$/.test(name) && name !== "." && name !== ".." ? { name, type: "dir" } : null;
+        return EDITABLE_EXTENSIONS.has(ext) ? { name, type: "file", size: Number(row.file_size || row.size || 0) } : null;
+      }).filter(Boolean) : [];
+      return json({ directory: relativeDir, entries }, 200, corsHeaders(request));
     }
 
     if (path === "/api/communications/cpanel/files" && request.method === "PUT") {
