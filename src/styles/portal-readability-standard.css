@@ -157,8 +157,14 @@
   opacity: 1 !important;
 }
 
-/* Quick Access is a blue Dashboard panel; keep its heading white against that surface. */
+/* Quick Access changes surfaces by breakpoint: dark text on light/tablet/desktop surfaces, white on the blue mobile surface. */
 #root .app-shell .content-area.dashboard-content-area .page .dashboard-quote4-quick .quote4-heading h2 {
-  color: #ffffff !important;
-  -webkit-text-fill-color: #ffffff !important;
+  color: #17372b !important;
+  -webkit-text-fill-color: #17372b !important;
+}
+@media (max-width: 767px) {
+  #root .app-shell .content-area.dashboard-content-area .page .dashboard-quote4-quick .quote4-heading h2 {
+    color: #ffffff !important;
+    -webkit-text-fill-color: #ffffff !important;
+  }
 }
