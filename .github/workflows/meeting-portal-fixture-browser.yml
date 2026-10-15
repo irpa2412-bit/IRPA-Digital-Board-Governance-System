@@ -73,6 +73,7 @@ jobs:
           // Compare against the fetched main snapshot for both PR and push runs.
           // Keep the path allowlist strict while excluding main-only files added after
           // this feature branch diverged; no portal source or workflow is exempted.
+          const eventName = process.env.EVENT_NAME?.trim();
           const base = "origin/main";
           execFileSync("git", ["cat-file", "-e", `${base}^{commit}`]);
           const changed = execFileSync("git", ["diff", "--name-only", base, "HEAD"], { encoding: "utf8" })
