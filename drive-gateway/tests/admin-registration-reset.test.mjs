@@ -51,7 +51,11 @@ test("updates only the target active flag and appends a hashed audit record", as
   assert.equal(state.writes[0].length,2);
   assert.deepEqual(state.writes[0][0].updateMask.fieldPaths,["active"]);
   assert.match(state.writes[0][1].update.name,/\/audit\/admin-registration-reset-/);
-  assert.equal(state.writes[0].some(w=>/meetings|finance|signature|documents/.test(w.update.name)),false);
+  const writtenDocumentPaths = state.writes[0].map(w => w.update.name.split("/documents/")[1] || "");
+  assert.deepEqual(writtenDocumentPaths, [
+    "adminProfiles/target-uid",
+    `audit/admin-registration-reset-${operationId}`
+  ]);
   assert.equal(state.audit.fields.eventHash.stringValue,body.eventHash);
 });
 
