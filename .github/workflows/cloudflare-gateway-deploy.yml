@@ -23,6 +23,30 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Require production WordPress and cPanel credentials before any Worker change
+        env:
+          WP_BASE: ${{ secrets.PRODUCTION_WORDPRESS_BASE_URL }}
+          WP_USER: ${{ secrets.PRODUCTION_WORDPRESS_USERNAME }}
+          WP_PASSWORD: ${{ secrets.PRODUCTION_WORDPRESS_APPLICATION_PASSWORD }}
+          CP_BASE: ${{ secrets.PRODUCTION_CPANEL_BASE_URL }}
+          CP_USER: ${{ secrets.PRODUCTION_CPANEL_USERNAME }}
+          CP_TOKEN: ${{ secrets.PRODUCTION_CPANEL_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for pair in "PRODUCTION_WORDPRESS_BASE_URL:$WP_BASE" "PRODUCTION_WORDPRESS_USERNAME:$WP_USER" "PRODUCTION_WORDPRESS_APPLICATION_PASSWORD:$WP_PASSWORD" "PRODUCTION_CPANEL_BASE_URL:$CP_BASE" "PRODUCTION_CPANEL_USERNAME:$CP_USER" "PRODUCTION_CPANEL_API_TOKEN:$CP_TOKEN"; do
+            name="${pair%%:*}"; value="${pair#*:}"
+            if [ -z "$value" ]; then echo "Missing required production secret: $name"; missing=1; fi
+          done
+          test "$missing" -eq 0
+          node <<'NODE'
+          const wp=new URL(process.env.WP_BASE);
+          if(wp.protocol!=="https:"||wp.username||wp.password||wp.search||wp.hash) throw new Error("Production WordPress endpoint must be an HTTPS base URL without embedded credentials.");
+          const cp=new URL(process.env.CP_BASE);
+          if(cp.protocol!=="https:"||cp.port!=="2083"||cp.pathname!=="/"||cp.username||cp.password||cp.search||cp.hash) throw new Error("Production cPanel endpoint must be an HTTPS origin on port 2083.");
+          console.log("PRODUCTION_WEBSITE_CREDENTIALS_CONFIGURED");
+          NODE
+
       - name: Record current production Worker version for rollback
         env:
           CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -175,6 +199,26 @@ jobs:
           set -euo pipefail
           npm install
           npm run build
+
+      - name: Configure production website-management secrets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WP_BASE: ${{ secrets.PRODUCTION_WORDPRESS_BASE_URL }}
+          WP_USER: ${{ secrets.PRODUCTION_WORDPRESS_USERNAME }}
+          WP_PASSWORD: ${{ secrets.PRODUCTION_WORDPRESS_APPLICATION_PASSWORD }}
+          CP_BASE: ${{ secrets.PRODUCTION_CPANEL_BASE_URL }}
+          CP_USER: ${{ secrets.PRODUCTION_CPANEL_USERNAME }}
+          CP_TOKEN: ${{ secrets.PRODUCTION_CPANEL_API_TOKEN }}
+        working-directory: drive-gateway
+        run: |
+          set -euo pipefail
+          printf '%s' "$WP_BASE" | npx wrangler secret put WORDPRESS_BASE_URL --config wrangler.json
+          printf '%s' "$WP_USER" | npx wrangler secret put WORDPRESS_USERNAME --config wrangler.json
+          printf '%s' "$WP_PASSWORD" | npx wrangler secret put WORDPRESS_APPLICATION_PASSWORD --config wrangler.json
+          printf '%s' "$CP_BASE" | npx wrangler secret put CPANEL_BASE_URL --config wrangler.json
+          printf '%s' "$CP_USER" | npx wrangler secret put CPANEL_USERNAME --config wrangler.json
+          printf '%s' "$CP_TOKEN" | npx wrangler secret put CPANEL_API_TOKEN --config wrangler.json
 
       - name: Deploy production Worker — authorized cutover
         uses: cloudflare/wrangler-action@v3
