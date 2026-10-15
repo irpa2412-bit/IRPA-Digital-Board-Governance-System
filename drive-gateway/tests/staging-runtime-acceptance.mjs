@@ -23,7 +23,7 @@ assert.equal(login.localId,expectedUid,"Staging test account UID does not match 
 const tokenClaims=JSON.parse(Buffer.from(String(login.idToken||"").split(".")[1]||"","base64url").toString("utf8"));
 assert.equal(tokenClaims.aud,project,"Firebase ID token audience is not the staging project.");
 assert.equal(tokenClaims.iss,"https://securetoken.google.com/"+project,"Firebase ID token issuer is not the staging project.");
-const authHeaders={Authorization:"Bearer "+login.idToken};
+const authHeaders={Authorization:"Bearer "+login.idToken,"x-irpa-staging-diagnostics":"1"};
 async function ownFirestoreDocument(collection){
   const response=await fetch("https://firestore.googleapis.com/v1/projects/"+encodeURIComponent(project)+"/databases/(default)/documents/"+collection+"/"+encodeURIComponent(expectedUid),{headers:authHeaders});
   const data=await response.json().catch(()=>({}));
