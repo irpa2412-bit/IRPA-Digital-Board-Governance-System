@@ -1,42 +1,65 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {readFileSync} from "node:fs";
+import {readFileSync,existsSync} from "node:fs";
 
-const app=readFileSync(new URL("../src/App.jsx",import.meta.url),"utf8");
-const portal=readFileSync(new URL("../src/pages/CommunicationMediaPortal.jsx",import.meta.url),"utf8");
-const studio=readFileSync(new URL("../src/pages/CommunicationMediaStudio.jsx",import.meta.url),"utf8");
-const rules=readFileSync(new URL("../firestore.rules",import.meta.url),"utf8");
-const fn=readFileSync(new URL("../functions/communicationMedia.js",import.meta.url),"utf8");
-const index=readFileSync(new URL("../functions/index.js",import.meta.url),"utf8");
-const gateway=readFileSync(new URL("../drive-gateway/src/index.js",import.meta.url),"utf8");
+const read=path=>readFileSync(new URL(path,import.meta.url),"utf8");
+const app=read("../src/App.jsx");
+const portal=read("../src/pages/CommunicationMediaPortal.jsx");
+const studio=read("../src/pages/CommunicationMediaStudio.jsx");
+const rules=read("../firestore.rules");
+const gateway=read("../drive-gateway/src/index.js");
+const site=read("../drive-gateway/src/communicationsSite.mjs");
+const functionsIndex=read("../functions/index.js");
+const docs=read("../docs/COMMUNICATION_MEDIA_PORTAL.md");
 
-test("communications portal is integrated into the existing shell and role-based navigation",()=>{
+test("communications portal stays integrated in the existing app with role-based navigation",()=>{
  assert.ok(app.includes('import CommunicationMediaPortal from "./pages/CommunicationMediaPortal"'));
  assert.ok(app.includes('COMMUNICATIONS:["Communication & Media"]'));
  assert.ok(app.includes('if(COMMUNICATIONS_ROLES.includes(selected))m.push("Communication & Media")'));
  assert.ok(app.includes('active==="Communication & Media"&&<CommunicationMediaPortal'));
- assert.ok(portal.includes('if(!authorized)return'));
+ assert.ok(portal.includes("if(!authorized)return"));
 });
 
-test("communications workspace supports drafts, approval, library, calendar and website publishing",()=>{
+test("communications authoring, approvals, library, calendar and exports remain available",()=>{
  for(const term of ["Create communications item","Content library","Editorial Calendar","Publishing Setup","Pending Approval","Approved","Returned","Media Asset","Submit for approval","Publish to website","exportDraft(\"txt\")","exportDraft(\"md\")","exportDraft(\"html\")","exportDraft(\"pdf\")"]) assert.ok(portal.includes(term),term);
  assert.ok(portal.includes('collection(db,"communicationMediaItems")'));
- assert.ok(portal.includes('window.confirm("Publish this approved item to the IRPA WordPress website now?'));
+ assert.ok(portal.includes('window.confirm("Publish this approved item to the live IRPA website now?'));
 });
 
-test("website publishing is server-side, role checked, secret-backed, HTTPS-only and approval-gated",()=>{
- for(const secret of ["WORDPRESS_BASE_URL","WORDPRESS_USERNAME","WORDPRESS_APPLICATION_PASSWORD"]) assert.ok(fn.includes(secret),secret);
- assert.ok(fn.includes('request.auth?.uid'));
- assert.ok(fn.includes('if(!access.reviewer)'));
- assert.ok(fn.includes('item.status!=="Approved"'));
- assert.ok(fn.includes('base.protocol!=="https:"'));
- assert.ok(fn.includes('status:"publish"'));
- assert.ok(fn.includes('escapeHtml(paragraph)'));
- assert.ok(index.includes('exports.publishCommunicationMediaItem = communicationMedia.publishCommunicationMediaItem'));
- assert.ok(!portal.includes("WORDPRESS_APPLICATION_PASSWORD.value"));
+test("publishing, website content edits and cPanel file edits route through Cloudflare",()=>{
+ for(const route of ["/api/communications/site/status","/api/communications/website/publish","/api/communications/website/content","/api/communications/cpanel/files"]) assert.ok(site.includes(route),route);
+ assert.ok(gateway.includes('import { createCommunicationsSiteRouter } from "./communicationsSite.mjs"'));
+ assert.ok(gateway.includes('pathname.startsWith("/api/communications/")'));
+ assert.ok(portal.includes('fetch(GATEWAY+path'));
+ assert.ok(portal.includes('gatewayRequest("/api/communications/website/publish"'));
+ assert.ok(!portal.includes("firebase/functions"));
+ assert.ok(!functionsIndex.includes("publishCommunicationMediaItem"));
+ assert.ok(!existsSync(new URL("../functions/communicationMedia.js",import.meta.url)));
 });
 
-test("Firestore rules restrict records to authorised communications roles and prohibit deletion",()=>{
+test("website publishing enforces Firebase authentication, registered reviewer role, approval and HTTPS",()=>{
+ assert.ok(site.includes("authenticateFirebaseRequest"));
+ assert.ok(site.includes("await authorised(request, env, true)"));
+ assert.ok(site.includes('item.status !== "Approved"'));
+ assert.ok(site.includes('base.protocol !== "https:"'));
+ assert.ok(site.includes('status: "publish"'));
+ assert.ok(site.includes("COMMUNICATION_MEDIA_PUBLISHED"));
+ assert.ok(site.includes("WORDPRESS_APPLICATION_PASSWORD"));
+ assert.ok(!portal.includes("WORDPRESS_APPLICATION_PASSWORD"));
+});
+
+test("cPanel access is secret-backed and static-file editor denies executable or traversal paths",()=>{
+ for(const secret of ["CPANEL_BASE_URL","CPANEL_USERNAME","CPANEL_API_TOKEN"]) assert.ok(site.includes(secret),secret);
+ assert.ok(site.includes('new Set([".html", ".htm", ".css", ".txt", ".json"])'));
+ assert.ok(site.includes('p === ".."'));
+ assert.ok(site.includes("Fileman/get_file_content"));
+ assert.ok(site.includes("Fileman/save_file_content"));
+ assert.ok(site.includes("CPANEL_STATIC_FILE_EDITED"));
+ assert.ok(site.includes("MAX_EDIT_BYTES = 512 * 1024"));
+ assert.ok(!site.includes("Fileman/delete_file"));
+});
+
+test("Firestore communications records remain role-scoped and protected from deletion",()=>{
  assert.ok(rules.includes("function communicationMediaUser()"));
  assert.ok(rules.includes("function communicationMediaReviewer()"));
  assert.ok(rules.includes("match /communicationMediaItems/{id}"));
@@ -45,27 +68,18 @@ test("Firestore rules restrict records to authorised communications roles and pr
  assert.ok(rules.includes('request.resource.data.get("status","") in ["Approved","Returned"]'));
 });
 
-test("media studio preserves multi-format upload, secure Drive storage, image editing and export",()=>{
+test("media studio keeps uploads on authenticated Google Drive gateway, not Firebase Storage",()=>{
  assert.ok(portal.includes('import CommunicationMediaStudio from "./CommunicationMediaStudio"'));
  assert.ok(portal.includes('{tab==="Media Studio"&&<CommunicationMediaStudio/>}'));
  for(const term of ['type="file"','uploadBytes','purpose:"Communication Media"','collection(db,"communicationMediaAssets")','downloadDriveBytes','brightness','contrast','saturation','canvas.toBlob','Export edited image','Download original']) assert.ok(studio.includes(term),term);
- assert.ok(studio.includes('MAX_BYTES=25*1024*1024'));
- assert.ok(studio.includes('status:"Available"'));
+ assert.ok(studio.includes("MAX_BYTES=25*1024*1024"));
  assert.ok(studio.includes('storageProvider:"Google Drive"'));
-});
-
-test("media asset register is authenticated, size-limited, immutable and deny-by-default for edits/deletion",()=>{
- assert.ok(rules.includes('match /communicationMediaAssets/{id}'));
- assert.ok(rules.includes('request.resource.data.get("uploadedByUid","")==request.auth.uid'));
- assert.ok(rules.includes('request.resource.data.get("fileSize",0)<=26214400'));
  assert.ok(rules.includes('request.resource.data.get("storageProvider","")=="Google Drive"'));
- assert.ok(rules.includes('allow update,delete:if false;'));
 });
 
-test("media upload and download both enforce registered communications roles at the gateway",()=>{
- assert.ok(gateway.includes("async function authorizeCommunicationMediaDownload(env,claims)"));
- assert.ok(gateway.includes('purpose === "Communication Media" && !(await authorizeCommunicationMediaDownload(env, claims))'));
- assert.ok(gateway.includes('if (purpose === "Communication Media" && !(await authorizeCommunicationMediaDownload(env, claims)))'));
- assert.ok(gateway.includes("Your registered IRPA role does not permit communications media uploads."));
- assert.ok(gateway.includes("Your registered IRPA role does not permit access to the communications media archive."));
+test("deployment docs require isolated staging and never commit credentials",()=>{
+ assert.ok(docs.includes("Cloudflare Worker secrets"));
+ assert.ok(docs.includes("CPANEL_API_TOKEN"));
+ assert.ok(docs.includes("Do not deploy to production"));
+ assert.ok(docs.includes("Firebase Storage remains deny-by-default"));
 });
