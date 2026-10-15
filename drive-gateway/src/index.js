@@ -356,6 +356,9 @@ async function upload(request, env) {
   const fileSize = Number(data.fileSize || 0);
   const base64 = String(data.base64 || "");
   const purpose = cleanName(data.purpose || "Controlled Documents");
+  if (purpose === "Communication Media" && !(await authorizeCommunicationMediaDownload(env, claims))) {
+    return json({ ok:false, error:"Your registered IRPA role does not permit communications media uploads." },403,corsHeaders(request));
+  }
   const requestedFolderId = String(data.folderId || "").trim();
   const ownerUid = String(data.ownerUid || claims.user_id).trim();
   const signatureDocumentId = cleanId(data.documentId || "");
