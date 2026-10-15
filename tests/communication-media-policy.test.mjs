@@ -56,6 +56,9 @@ test("cPanel access is secret-backed and static-file editor denies executable or
  assert.ok(site.includes("Fileman/list_files"));
  assert.ok(site.includes("Fileman/get_file_content"));
  assert.ok(site.includes("Fileman/save_file_content"));
+ assert.ok(site.includes("/api/communications/cpanel/rollback"));
+ assert.ok(site.includes("rollbackBackupId"));
+ assert.ok(site.includes("expirationTtl: 604800"));
  assert.ok(site.includes("CPANEL_STATIC_FILE_EDITED"));
  assert.ok(site.includes("MAX_EDIT_BYTES = 512 * 1024"));
  assert.ok(site.includes("function sanitizeWordPressContent(value)"));
