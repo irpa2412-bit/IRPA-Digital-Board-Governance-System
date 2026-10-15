@@ -4,6 +4,7 @@ import {readFileSync} from "node:fs";
 
 const app=readFileSync(new URL("../src/App.jsx",import.meta.url),"utf8");
 const portal=readFileSync(new URL("../src/pages/CommunicationMediaPortal.jsx",import.meta.url),"utf8");
+const studio=readFileSync(new URL("../src/pages/CommunicationMediaStudio.jsx",import.meta.url),"utf8");
 const rules=readFileSync(new URL("../firestore.rules",import.meta.url),"utf8");
 const fn=readFileSync(new URL("../functions/communicationMedia.js",import.meta.url),"utf8");
 const index=readFileSync(new URL("../functions/index.js",import.meta.url),"utf8");
@@ -41,4 +42,21 @@ test("Firestore rules restrict records to authorised communications roles and pr
  assert.ok(rules.includes("allow delete:if false;"));
  assert.ok(rules.includes('request.resource.data.get("status","")=="Draft"'));
  assert.ok(rules.includes('request.resource.data.get("status","") in ["Approved","Returned"]'));
+});
+
+test("media studio preserves multi-format upload, secure Drive storage, image editing and export",()=>{
+ assert.ok(portal.includes('import CommunicationMediaStudio from "./CommunicationMediaStudio"'));
+ assert.ok(portal.includes('{tab==="Media Studio"&&<CommunicationMediaStudio/>}'));
+ for(const term of ['type="file"','uploadBytes','purpose:"Communication Media"','collection(db,"communicationMediaAssets")','downloadDriveBytes','brightness','contrast','saturation','canvas.toBlob','Export edited image','Download original']) assert.ok(studio.includes(term),term);
+ assert.ok(studio.includes('MAX_BYTES=10*1024*1024'));
+ assert.ok(studio.includes('status:"Available"'));
+ assert.ok(studio.includes('storageProvider:"Google Drive"'));
+});
+
+test("media asset register is authenticated, size-limited, immutable and deny-by-default for edits/deletion",()=>{
+ assert.ok(rules.includes('match /communicationMediaAssets/{id}'));
+ assert.ok(rules.includes('request.resource.data.get("uploadedByUid","")==request.auth.uid'));
+ assert.ok(rules.includes('request.resource.data.get("fileSize",0)<=10485760'));
+ assert.ok(rules.includes('request.resource.data.get("storageProvider","")=="Google Drive"'));
+ assert.ok(rules.includes('allow update,delete:if false;'));
 });
