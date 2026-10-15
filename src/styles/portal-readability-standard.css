@@ -179,12 +179,19 @@
   text-decoration: underline;
 }
 
-/* Text buttons are link-like controls; avoid blue-on-blue by keeping their surface transparent. */
+/* Text-button actions inside colored workflow panels use a light button surface so their text remains legible. */
 #root .app-shell .content-area:not(.dashboard-content-area) .page button.text-button {
-  background-color: transparent !important;
-  color: var(--irpa-readable-action) !important;
-  -webkit-text-fill-color: var(--irpa-readable-action) !important;
-  border-color: transparent !important;
+  background-color: #ffffff !important;
+  color: #18364f !important;
+  -webkit-text-fill-color: #18364f !important;
+  border: 1px solid #718a80 !important;
+  text-decoration: none;
+}
+#root .app-shell .content-area:not(.dashboard-content-area) .page button.text-button:hover {
+  background-color: #f4f8f5 !important;
+  color: #102a3d !important;
+  -webkit-text-fill-color: #102a3d !important;
+  text-decoration: underline;
 }
 
 
