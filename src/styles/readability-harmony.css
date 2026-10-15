@@ -3336,3 +3336,50 @@ textarea:focus-visible{
  .signature-field-palette img{max-height:64px!important;}
  .signature-workflow-grid .panel{min-width:0;max-width:100%;}
 }
+
+
+/* Communication & Media Portal — prevent global app-shell white text from
+   overriding the portal's light inline-styled cards and inactive controls.
+   The portal intentionally uses a dark workspace shell with light summary
+   cards/controls; descendants need explicit foreground colours, not inheritance. */
+.communication-media-portal > section:first-child > div:nth-child(2) > button,
+.communication-media-portal > section:first-child > div:nth-child(2) > button span,
+.communication-media-portal > section:first-child > div:nth-child(2) > button strong {
+  color:#17372b!important;
+  -webkit-text-fill-color:#17372b!important;
+  opacity:1!important;
+}
+.communication-media-portal > div > button:not([style*="#1d4ed8"]),
+.communication-media-portal > div > button:not([style*="#1d4ed8"]) * {
+  color:#17372b!important;
+  -webkit-text-fill-color:#17372b!important;
+  opacity:1!important;
+}
+.communication-media-portal > div > button:not([style*="#1d4ed8"]) {
+  background:#f4f8f5!important;
+  border-color:#718a80!important;
+}
+.communication-media-portal > div > button:not([style*="#1d4ed8"]):hover,
+.communication-media-portal > div > button:not([style*="#1d4ed8"]):focus-visible {
+  background:#e2eee7!important;
+  border-color:#3f6556!important;
+}
+.communication-media-portal > div > button[style*="#1d4ed8"],
+.communication-media-portal > div > button[style*="#1d4ed8"] * {
+  color:#ffffff!important;
+  -webkit-text-fill-color:#ffffff!important;
+  opacity:1!important;
+}
+.communication-media-portal input,
+.communication-media-portal select,
+.communication-media-portal textarea {
+  color:#172033!important;
+  -webkit-text-fill-color:#172033!important;
+  background:#ffffff!important;
+}
+.communication-media-portal input::placeholder,
+.communication-media-portal textarea::placeholder {
+  color:#526176!important;
+  -webkit-text-fill-color:#526176!important;
+  opacity:1!important;
+}
