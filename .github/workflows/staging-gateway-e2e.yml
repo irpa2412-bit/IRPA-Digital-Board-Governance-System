@@ -235,8 +235,6 @@ jobs:
           test "$(node -e 'const x=require("./staging-health.json"); process.stdout.write(String(x.environment||""))')" = "staging"
 
       - name: Verify live recovery endpoint rejects unauthenticated requests
-        env:
-          STAGING_GATEWAY_BASE_URL: ${{ env.STAGING_GATEWAY_BASE_URL }}
         run: |
           set -euo pipefail
           code="$(curl --silent --show-error --output "$RUNNER_TEMP/reset-unauthenticated.json" --write-out '%{http_code}' \
