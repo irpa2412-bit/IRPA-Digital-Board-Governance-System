@@ -2,6 +2,8 @@ const assert = require("node:assert/strict");
 const { before, after, beforeEach, test } = require("node:test");
 const { initializeTestEnvironment, assertFails, assertSucceeds } = require("@firebase/rules-unit-testing");
 const fs = require("node:fs");
+const firebase = require("firebase/compat/app");
+require("firebase/compat/firestore");
 
 let testEnv;
 const projectId = process.env.GCLOUD_PROJECT || "irpa-digital-board-governance";
@@ -210,6 +212,61 @@ test("invitee can check in only their own participant record", async () => {
   await assertFails(db.doc("participants/invitee-record").update({participantRole:"Board Member"}));
 });
 
+
+test("meeting participant can create and retrieve an immutable signed attendance record", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    const db = context.firestore();
+    await db.doc("meetings/attendance-signing-meeting").set(meeting({
+      meetingCategory:"GOVERNANCE",
+      meetingPolicyId:"GOVERNANCE",
+      meetingType:"Board Meeting",
+      registerStatus:"Registered",
+      status:"In Progress",
+      participantEmails:["invitee@example.test"],
+      invitedEmails:["invitee@example.test"]
+    }));
+    await db.doc("participants/attendance-signing-invitee").set({
+      meetingId:"attendance-signing-meeting",
+      participantUid:"attendance-invitee",
+      participantEmail:"invitee@example.test",
+      participantName:"Attendance Invitee",
+      participantRole:"Board Member",
+      attendanceStatus:"Invited"
+    });
+    await db.doc("participants/attendance-signing-other").set({
+      meetingId:"attendance-signing-meeting",
+      participantUid:"other-user",
+      participantEmail:"other@example.test",
+      participantName:"Other Participant",
+      attendanceStatus:"Invited"
+    });
+  });
+  const db=testEnv.authenticatedContext("attendance-invitee",{email:"invitee@example.test"}).firestore();
+  const stamp=()=>firebase.firestore.FieldValue.serverTimestamp();
+  const batch=db.batch();
+  batch.update(db.doc("participants/attendance-signing-invitee"),{
+    attendanceStatus:"Present",attendanceRecordedAt:stamp(),attendanceRecordedByUid:"attendance-invitee",updatedAt:stamp()
+  });
+  batch.set(db.doc("meetingAttendanceSignatures/attendance-signing-meeting__attendance-signing-invitee"),{
+    meetingId:"attendance-signing-meeting",participantId:"attendance-signing-invitee",
+    meetingReference:"IRPA-MTG-TEST",participantName:"Attendance Invitee",participantRole:"Board Member",
+    signerUid:"attendance-invitee",signerEmail:"invitee@example.test",typedName:"Attendance Invitee",
+    signatureMethod:"AUTHENTICATED_TYPED_NAME_ATTESTATION",
+    declaration:"I confirm that I am the registered participant and that this signature records my attendance at this meeting.",
+    signatureVersion:"1.0",signedAt:stamp(),createdAt:stamp(),updatedByUid:"attendance-invitee",updatedByEmail:"invitee@example.test"
+  });
+  await assertSucceeds(batch.commit());
+  await assertSucceeds(db.collection("meetingAttendanceSignatures").where("meetingId","==","attendance-signing-meeting").get());
+  await assertFails(db.doc("meetingAttendanceSignatures/attendance-signing-meeting__attendance-signing-invitee").update({typedName:"Altered Signature"}));
+  await assertFails(db.doc("meetingAttendanceSignatures/attendance-signing-meeting__attendance-signing-invitee").delete());
+  await assertFails(db.doc("meetingAttendanceSignatures/attendance-signing-meeting__attendance-signing-other").set({
+    meetingId:"attendance-signing-meeting",participantId:"attendance-signing-other",
+    participantName:"Other Participant",participantRole:"",signerUid:"attendance-invitee",signerEmail:"invitee@example.test",
+    typedName:"Other Participant",signatureMethod:"AUTHENTICATED_TYPED_NAME_ATTESTATION",
+    declaration:"I confirm that I am the registered participant and that this signature records my attendance at this meeting.",
+    signatureVersion:"1.0",signedAt:stamp(),createdAt:stamp(),updatedByUid:"attendance-invitee",updatedByEmail:"invitee@example.test"
+  }));
+});
 
 test("meeting initiator can register an invitee and create the linked invitation", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {const db=context.firestore();await db.doc("meetings/organizer-meeting").set(meeting({initiatorUid:"departmental-director",initiatorEmail:"director@example.test",registerStatus:"Registered"}));});
