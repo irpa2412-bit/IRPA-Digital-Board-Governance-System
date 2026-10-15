@@ -44,7 +44,7 @@ jobs:
       - name: Verify readability policy
         run: npm run check:production-readability
 
-      - name: Build with isolated staging Firebase and LiveKit configuration
+      - name: Build with isolated staging Firebase, LiveKit, and guarded gateway routing
         env:
           VITE_FIREBASE_API_KEY: "AIzaSyA6UmHtP-mRr99rBw57_-qrD4_mFSBnZ38"
           VITE_FIREBASE_AUTH_DOMAIN: "irpa-dbg-staging-a73ec.firebaseapp.com"
@@ -54,6 +54,9 @@ jobs:
           VITE_FIREBASE_APP_ID: "1:1018976634858:web:e73e9e09f55a76ade25493"
           VITE_FIREBASE_MEASUREMENT_ID: ""
           VITE_LIVEKIT_TOKEN_WORKER_URL: "https://irpa-dgb-livekit-token-staging.irpa-governance.workers.dev"
+          # Enable only the explicit TRIAL document lifecycle route to the isolated staging gateway.
+          # Keep generic and production-default gateway integrations disabled until live gateway acceptance passes.
+          VITE_GOOGLE_DRIVE_GATEWAY_STAGING_URL: "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
           VITE_GATEWAY_ORIGIN: "https://staging-disabled.invalid"
           VITE_GOOGLE_DRIVE_GATEWAY_URL: "https://staging-disabled.invalid"
           VITE_GRANT_CRAWLER_WORKER_URL: "https://staging-disabled.invalid"
@@ -64,7 +67,9 @@ jobs:
           test -s dist/index.html
           grep -R -q 'irpa-dbg-staging-a73ec' dist
           grep -R -q 'irpa-dgb-livekit-token-staging.irpa-governance.workers.dev' dist
-          echo "Staging build uses the isolated Firebase project and Cloudflare LiveKit token Worker."
+          grep -R -q 'irpa-google-drive-gateway-staging.irpa-governance.workers.dev' dist
+          grep -R -q 'staging-disabled.invalid' dist
+          echo "Staging build uses isolated Firebase and LiveKit; TRIAL document lifecycle routes to the staging gateway; generic gateway and grant integrations remain disabled."
 
       - name: Verify Cloudflare deployment credentials
         env:
