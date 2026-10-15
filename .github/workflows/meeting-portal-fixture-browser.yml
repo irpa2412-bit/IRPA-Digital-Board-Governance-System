@@ -147,7 +147,13 @@ jobs:
             "tests/browser/authenticated-governance-regression.spec.mjs",
             "vite.meeting-fixture.config.js"
           ]);
-          const unexpected = changed.filter(path => !allowed.has(path));
+          // The production build flag may change only as part of the paired Signature Portal/Gateway integration.
+          const signatureGatewayIntegration = changed.includes("src/firebase/signaturePlatform.js") &&
+            changed.includes("drive-gateway/src/signing.mjs") &&
+            changed.includes("drive-gateway/tests/controlled-authenticated-signing-flow.test.mjs");
+          const unexpected = changed.filter(path =>
+            !allowed.has(path) && !(path === ".github/workflows/firebase-deploy.yml" && signatureGatewayIntegration)
+          );
           if (unexpected.length) {
             console.error("Unexpected files changed outside the isolated meeting repair:", unexpected);
             process.exit(1);
@@ -187,9 +193,7 @@ jobs:
             changed.includes("tests/meeting-category-policy.test.mjs");
           // The signature migration PR is a separate, explicitly paired integration scope:
           // require the portal bridge, Gateway signing implementation, and its authenticated flow test.
-          const signatureGatewayIntegration = changed.includes("src/firebase/signaturePlatform.js") &&
-            changed.includes("drive-gateway/src/signing.mjs") &&
-            changed.includes("drive-gateway/tests/controlled-authenticated-signing-flow.test.mjs");
+
           // A manual dispatch on an already-merged ref is a regression rerun, not a PR diff.
           // Keep the changed-path isolation guard, but require a source/test delta only for event diffs.
           if (eventName !== "workflow_dispatch" &&
