@@ -55,6 +55,11 @@ beforeEach(async () => {
       action: "TEST",
       actorUid: "admin-user"
     });
+    await db.doc("systemSettings/actualDataAccess").set({
+      enabled: true,
+      status: "OPEN",
+      finalTestsAttested: true
+    });
   });
 });
 
@@ -95,6 +100,49 @@ function lifecycleDocument(overrides = {}) {
     ...overrides
   };
 }
+
+test("actual operational writes are denied while the administrator gate is closed", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("systemSettings/actualDataAccess").set({enabled:false,status:"CLOSED"});
+  });
+  const db = testEnv.authenticatedContext("finance-user", {
+    email: "finance@example.test",
+    irpaRoles: ["Finance Manager"]
+  }).firestore();
+  await assertFails(db.doc("donorFunders/actual-denied").set({
+    name: "Actual Funder",
+    recordType: "DONOR_FUNDER_REGISTRY",
+    status: "Prospect"
+  }));
+});
+
+test("trial-marked operational writes remain available while actual access is closed", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("systemSettings/actualDataAccess").set({enabled:false,status:"CLOSED"});
+  });
+  const db = testEnv.authenticatedContext("finance-user", {
+    email: "finance@example.test",
+    irpaRoles: ["Finance Manager"]
+  }).firestore();
+  await assertSucceeds(db.doc("donorFunders/trial-funder").set({
+    name: "Trial Funder",
+    recordType: "DONOR_FUNDER_REGISTRY",
+    status: "Prospect",
+    recordOrigin: "TRIAL",
+    trialData: true,
+    isTrial: true
+  }));
+});
+
+test("administrator cannot bypass the attested gate by directly editing its system setting", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("systemSettings/actualDataAccess").set({enabled:false,status:"CLOSED"});
+  });
+  const db = testEnv.authenticatedContext("admin-user", {
+    email: "admin@example.test"
+  }).firestore();
+  await assertFails(db.doc("systemSettings/actualDataAccess").update({enabled:true,status:"OPEN"}));
+});
 
 test("active document owner can create a valid internal lifecycle record", async () => {
   const db = testEnv.authenticatedContext("member-user", {
