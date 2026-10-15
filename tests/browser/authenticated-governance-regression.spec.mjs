@@ -255,6 +255,7 @@ async function assertSharedReadability(page, module, width) {
       return { tag: el.tagName, text: (el.textContent || "").trim().slice(0, 50), fg, bg, ratio };
     });
   });
+  expect(samples.length, "portal should render readable headings, labels or table headers").toBeGreaterThan(0);
   for (const sample of samples) {
     if (sample.ratio !== null) {
       expect(sample.ratio, `low text contrast in ${module}: ${sample.tag} "${sample.text}" (${sample.fg} on ${sample.bg})`)
