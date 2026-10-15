@@ -71,8 +71,8 @@ jobs:
           EVENT_NAME="${{ github.event_name }}" node --input-type=module <<'NODE'
           import { execFileSync } from "node:child_process";
           // Compare against the fetched main snapshot for both PR and push runs.
-          // A captured PR event base can be stale after main advances, incorrectly
-          // treating files already on main as unrelated changes in this branch.
+          // Keep the path allowlist strict while excluding main-only files added after
+          // this feature branch diverged; no portal source or workflow is exempted.
           const base = "origin/main";
           execFileSync("git", ["cat-file", "-e", `${base}^{commit}`]);
           const changed = execFileSync("git", ["diff", "--name-only", base, "HEAD"], { encoding: "utf8" })
