@@ -246,14 +246,26 @@ async function assertSharedReadability(page, module, width) {
     };
     return visible.map(el => {
       const fg = getComputedStyle(el).color;
-      let node = el, bg = "rgba(0, 0, 0, 0)";
+      let node = el, backgrounds = [];
       while (node && node !== document.documentElement) {
-        const candidate = getComputedStyle(node).backgroundColor;
-        if (candidate && !candidate.includes("rgba(0, 0, 0, 0)") && candidate !== "transparent") { bg = candidate; break; }
+        const style = getComputedStyle(node);
+        const image = style.backgroundImage || "none";
+        if (image !== "none" && image.includes("gradient")) {
+          const stops = [...image.matchAll(/rgba?\\(\\s*\\d+,\\s*\\d+,\\s*\\d+(?:\\s*,\\s*[\\d.]+)?\\s*\\)/g)].map(match => match[0]);
+          if (stops.length) { backgrounds = stops; break; }
+        }
+        const candidate = style.backgroundColor;
+        if (candidate && !candidate.includes("rgba(0, 0, 0, 0)") && candidate !== "transparent") {
+          backgrounds = [candidate];
+          break;
+        }
         node = node.parentElement;
       }
-      const a = luminance(fg), b = luminance(bg);
-      const ratio = a === null || b === null ? null : (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+      const a = luminance(fg);
+      const backgroundLuminances = backgrounds.map(luminance).filter(value => value !== null);
+      const ratios = a === null ? [] : backgroundLuminances.map(b => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05));
+      const ratio = ratios.length ? Math.min(...ratios) : null;
+      const bg = backgrounds.join(" / ") || "unknown background";
       return { tag: el.tagName, text: (el.textContent || "").trim().slice(0, 50), fg, bg, ratio };
     });
   });
