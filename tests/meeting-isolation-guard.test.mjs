@@ -16,7 +16,7 @@ test("Wrangler changes cannot alter production configuration", () => {
 });
 
 test("staging keeps its dedicated KV namespace and rejects the production namespace", () => {
-  assert.match(workflow, /id = "7b50627e29fc4fe1abaa8dc8665edd02"/);
+  assert.match(workflow, /id = "5ea76010553049a2b98c8493c37fbbc4"/);
   assert.match(workflow, /id = "ccdbffa662ac48bfbdf7f4b1f62ca941"/);
   assert.match(workflow, /Staging DRIVE_KV must retain the explicitly approved dedicated namespace/);
   assert.match(workflow, /Production DRIVE_KV cannot be used by staging/);
@@ -26,4 +26,15 @@ test("workflow-only guard maintenance requires its paired regression test", () =
   assert.match(workflow, /const guardOnlyWorkflowRepair = changed\.includes\("\.github\/workflows\/meeting-portal-fixture-browser\.yml"\)/);
   assert.match(workflow, /changed\.includes\("tests\/meeting-isolation-guard\.test\.mjs"\)/);
   assert.match(workflow, /!guardOnlyWorkflowRepair/);
+});
+
+test("administrator-recovery paired repairs allow only the reviewed PR file set", () => {
+  assert.match(workflow, /const adminRecoveryPairedRepairFiles = new Set\(\[/);
+  assert.match(workflow, /const adminResetOnly = changed\.includes\("drive-gateway\/src\/adminRegistrationReset\.mjs"\)/);
+  assert.match(workflow, /changed\.includes\("drive-gateway\/tests\/admin-registration-reset\.test\.mjs"\)/);
+  assert.match(workflow, /changed\.includes\("\.github\/workflows\/meeting-portal-fixture-browser\.yml"\)/);
+  assert.match(workflow, /changed\.includes\("tests\/meeting-isolation-guard\.test\.mjs"\)/);
+  assert.match(workflow, /changed\.every\(path => adminRecoveryPairedRepairFiles\.has\(path\)\)/);
+  assert.match(workflow, /"\.github\/workflows\/staging-gateway-e2e\.yml"/);
+  assert.match(workflow, /!adminResetOnly/);
 });

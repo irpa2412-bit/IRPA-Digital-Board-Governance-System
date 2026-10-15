@@ -39,23 +39,23 @@ workers_dev = true
 
 [env.staging.vars]
 IRPA_ENVIRONMENT = "staging"
-FIREBASE_PROJECT_ID = "irpa-digital-board-governance"
+FIREBASE_PROJECT_ID = "irpa-dbg-staging-a73ec"
 AUTHORIZED_DRIVE_EMAIL = "irpa2412@gmail.com"
 IRPA_APP_URL = "https://irpa-digital-board-governance.web.app"
 SMTP_HOST = "mail.irpa.or.tz"
 SMTP_PORT = "465"
 SMTP_FROM = "info@irpa.or.tz"
-DRIVE_ROOT_FOLDER_NAME = "IRPA Governance System"
-FIRESTORE_COLLECTION_PREFIX = ""
+DRIVE_ROOT_FOLDER_NAME = "IRPA Governance System - STAGING"
+FIRESTORE_COLLECTION_PREFIX = "staging_"
 DRIVE_MOCK = "false"
 LOCAL_TEST_MODE = "false"
-ESIGN_MODULE_ENABLED = "true"
-CLOUDFLARE_AUTH_FUNCTIONS_ENABLED = "true"
+ESIGN_MODULE_ENABLED = "false"
+CLOUDFLARE_AUTH_FUNCTIONS_ENABLED = "false"
 IRPA_PRODUCTION_CUTOVER = "false"
 
 [[env.staging.kv_namespaces]]
 binding = "DRIVE_KV"
-id = "7b50627e29fc4fe1abaa8dc8665edd02"
+id = "5ea76010553049a2b98c8493c37fbbc4"
 
 [[env.staging.durable_objects.bindings]]
 name = "ESIGN_DO"
