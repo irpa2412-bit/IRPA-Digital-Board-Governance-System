@@ -22,3 +22,24 @@ test("destination navigation keeps existing access-gate routing and entry-intent
   assert.ok(source.includes("const handlePortalDataEntryIntent="));
   assert.ok(!source.includes("window.scrollTo(0,0)"));
 });
+
+
+test("sidebar portal entries are alphabetically re-sorted at render time within each existing group", () => {
+  assert.ok(source.includes("sortNavigationItems(items.filter(x=>!PORTAL_CHILDREN_SET.has(x))).map(x=>"));
+  assert.ok(source.includes("function sortNavigationItems(items)"));
+  assert.ok(source.includes("labelA.localeCompare(labelB,\"en\",{sensitivity:\"base\",numeric:true})"));
+});
+
+test("mobile portal navigation derives from the current authorized module registry and registered parent portals", () => {
+  assert.ok(source.includes("[...modules,...PORTAL_ROLLER_GROUPS.map(([parent])=>parent)]"));
+  assert.ok(source.includes("filter(target=>!PORTAL_CHILDREN_SET.has(target))"));
+  assert.ok(source.includes("const portalItems=sortNavigationItems("));
+  assert.ok(source.includes("const children=sortNavigationItems((PORTAL_CHILDREN[target]||[]).filter(child=>modules.includes(child)))"));
+});
+
+test("alphabetical navigation changes do not alter the registered sub-portal boundary or access-gate handlers", () => {
+  assert.ok(source.includes("const PORTAL_CHILDREN_SET=new Set(Object.values(PORTAL_CHILDREN).flat())"));
+  assert.ok(source.includes("onClick={()=>requestDataGate(x)}"));
+  assert.ok(source.includes("onClick={()=>go(child)}"));
+  assert.ok(source.includes("const navigateWithoutDataGate=target=>{if(!target)return;setGateBypassPortal(target);setActive(target)}"));
+});
