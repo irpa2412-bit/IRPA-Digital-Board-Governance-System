@@ -7,7 +7,7 @@ Integrated communications workspace inside the existing IRPA Digital Board Gover
 - Website article and press-release drafting.
 - Social-media copy drafting for export and manual posting.
 - Multi-format media upload and archive through the existing authenticated Google Drive gateway, with Firestore metadata and role-based access.
-- Asset types include supported PDF, Word, Excel, PowerPoint, OpenDocument, RTF, TXT, CSV/TSV, Markdown, HTML, EPUB, JSON/XML, image, audio and video formats; gateway-supported formats only, with a 10 MB per-file limit in the current upload route.
+- Asset types include supported PDF, Word, Excel, PowerPoint, OpenDocument, RTF, TXT, CSV/TSV, Markdown, HTML, EPUB, JSON/XML, image, audio and video formats; gateway-supported formats only, with a 25 MB per-file limit in the communications media upload route.
 - Media library with searchable type filters, title/tags, original-file download and Google Drive link-out.
 - Editorial planning calendar.
 - Searchable content library and workflow status counts.
