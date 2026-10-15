@@ -90,7 +90,7 @@ jobs:
           const root=process.env.CP_ROOT.replace(/^\/+|\/+$/g,"");
           if(!root || root.split("/").some(p=>!p || p==="." || p===".." || p.startsWith("."))) throw new Error("Staging cPanel document root is invalid.");
           const file=process.env.CP_TEST_FILE;
-          if(!file || file.startsWith("/") || file.split("/").some(p=>!p || p==="." || p===".." || p.startsWith(".")) || !/\.txt$/i.test(file)) throw new Error("Staging cPanel test file must be a safe relative .txt path.");
+          if(!file || file.includes("/") || file.startsWith("/") || file.split("/").some(p=>!p || p==="." || p===".." || p.startsWith(".")) || !/\.txt$/i.test(file)) throw new Error("Staging cPanel test file must be a safe relative .txt path.");
           console.log("ISOLATED_STAGING_CREDENTIALS_VALID");
           NODE
 
@@ -334,6 +334,9 @@ jobs:
           FIREBASE_WEB_API_KEY: ${{ secrets.STAGING_FIREBASE_WEB_API_KEY }}
           TEST_EMAIL: ${{ secrets.STAGING_TEST_EMAIL }}
           TEST_PASSWORD: ${{ secrets.STAGING_TEST_PASSWORD }}
+          WP_BASE: ${{ secrets.STAGING_WORDPRESS_BASE_URL }}
+          WP_USER: ${{ secrets.STAGING_WORDPRESS_USERNAME }}
+          WP_PASSWORD: ${{ secrets.STAGING_WORDPRESS_APPLICATION_PASSWORD }}
           CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
           CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
           CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
@@ -353,11 +356,19 @@ jobs:
           const base=process.env.STAGING_URL;
           const token=process.env.ID_TOKEN;
           const marker="IRPA_STAGING_WEBSITE_CHECK_"+Date.now();
+          const wpBase=process.env.WP_BASE.replace(/\/+$/,"");
+          const wpAuth="Basic "+Buffer.from(process.env.WP_USER+":"+process.env.WP_PASSWORD).toString("base64");
           async function call(path,options={}){
             const response=await fetch(base+path,{...options,headers:{Authorization:"Bearer "+token,Accept:"application/json",...(options.body?{"Content-Type":"application/json"}:{}),...(options.headers||{})}});
             const body=await response.json().catch(()=>({}));
             if(!response.ok) throw new Error(path+" returned HTTP "+response.status+": "+String(body.error||"request failed").slice(0,180));
             return body;
+          }
+          async function wpRequest(path,body){
+            const response=await fetch(wpBase+"/wp-json/wp/v2/"+path,{method:body?"POST":"GET",headers:{Authorization:wpAuth,Accept:"application/json",...(body?{"Content-Type":"application/json"}:{})},...(body?{body:JSON.stringify(body)}:{})});
+            const data=await response.json().catch(()=>null);
+            if(!response.ok||!data) throw new Error("Staging WordPress test-page preparation/restore failed with HTTP "+response.status+".");
+            return data;
           }
           async function waitForPublicMarker(url){
             for(let i=0;i<6;i++){
@@ -370,18 +381,35 @@ jobs:
           (async()=>{
             const status=await call("/api/communications/site/status");
             if(status.connections?.website!=="connected"||status.connections?.cpanel!=="connected") throw new Error("WordPress or cPanel connection did not authenticate successfully.");
-            let selectedType="pages",items=await call("/api/communications/website/content?type=pages");
-            let page=(items.items||[]).find(x=>x.status==="publish"&&x.link);
-            if(!page){selectedType="posts";items=await call("/api/communications/website/content?type=posts");page=(items.items||[]).find(x=>x.status==="publish"&&x.link)}
-            if(!page) throw new Error("No published staging page or post is available for a reversible integration test.");
-            const original={id:page.id,type:selectedType,title:page.title,content:page.content||""};
-            let modified=false;
+            const baselineTitle="IRPA Staging Integration Check";
+            const baselineContent="<p>IRPA staging integration baseline.</p>";
+            const found=await wpRequest("pages?slug=irpa-staging-integration-check&context=edit&per_page=1");
+            let page=(Array.isArray(found)?found:[]).find(x=>Number.isInteger(x.id));
+            let created=false;
+            let original=null;
+            if(page){
+              original={title:page.title?.raw||page.title?.rendered||baselineTitle,content:page.content?.raw??baselineContent,status:page.status||"draft"};
+            }else{
+              page=await wpRequest("pages",{title:baselineTitle,slug:"irpa-staging-integration-check",content:baselineContent,status:"draft"});
+              created=true;
+              original={title:baselineTitle,content:baselineContent,status:"draft"};
+            }
+            let prepared=false;
             try{
-              modified=true;
-              const updated=await call("/api/communications/website/content",{method:"PUT",body:JSON.stringify({...original,title:original.title+" [staging check]",content:original.content+"\n<p>"+marker+"</p>"})});
-              if(!updated.success||!await waitForPublicMarker(updated.publicUrl||page.link)) throw new Error("The staged website edit did not render publicly.");
+              const ready=await wpRequest("pages/"+page.id,{title:baselineTitle,slug:"irpa-staging-integration-check",content:baselineContent,status:"publish"});
+              prepared=true;
+              const listed=await call("/api/communications/website/content?type=pages");
+              const portalPage=(listed.items||[]).find(x=>Number(x.id)===Number(page.id));
+              if(!portalPage) throw new Error("The dedicated staging page was not visible through the Communication & Media Portal.");
+              const updated=await call("/api/communications/website/content",{method:"PUT",body:JSON.stringify({id:page.id,type:"pages",title:baselineTitle+" "+marker,content:baselineContent+"<p>"+marker+"</p>"})});
+              if(!updated.success||!await waitForPublicMarker(updated.publicUrl||ready.link||page.link)) throw new Error("The staged website edit did not render publicly.");
+              await call("/api/communications/website/content",{method:"PUT",body:JSON.stringify({id:page.id,type:"pages",title:baselineTitle,content:baselineContent})});
             }finally{
-              if(modified) await call("/api/communications/website/content",{method:"PUT",body:JSON.stringify(original)});
+              if(prepared){
+                await wpRequest("pages/"+page.id,{title:original.title,content:original.content,status:created?"draft":original.status});
+              }else if(created){
+                await wpRequest("pages/"+page.id,{status:"draft"});
+              }
             }
             const cpanelPath=process.env.CP_TEST_FILE;
             const before=await call("/api/communications/cpanel/files?path="+encodeURIComponent(cpanelPath));
