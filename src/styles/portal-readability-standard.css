@@ -128,3 +128,12 @@
     max-width: 100%;
   }
 }
+
+
+/* Keep labels and structural headings legible even when a legacy portal supplies
+   a pale inline text color. This is presentation-only and does not touch access. */
+#root .app-shell .content-area .page :where(h1, h2, h3, h4, h5, h6, label, table th) {
+  color: var(--irpa-readable-text) !important;
+  -webkit-text-fill-color: var(--irpa-readable-text) !important;
+  opacity: 1 !important;
+}
