@@ -60,7 +60,7 @@ Do not deploy to production until authenticated staging tests verify role denial
 - External social-network posting is not enabled; each platform requires its own approved API application and secret-backed server integration.
 
 ## Known acceptance gates
-- Verify multi-format upload and authenticated download in isolated staging for each allowed file type and enforce the 10 MB limit.
+- Verify multi-format upload and authenticated download in isolated staging for each allowed file type and enforce the dedicated 25 MB media limit.
 - Verify communications-role denial for media downloads, file-size/MIME rejection, and no direct Firebase Storage access.
 - Test image edit/export and text TXT/Markdown/HTML/PDF exports on desktop and mobile; verify original assets remain unchanged.
 - Test audio/video trim and WebM export on supported browsers, and verify graceful fallback when MediaRecorder or captureStream is unavailable.
