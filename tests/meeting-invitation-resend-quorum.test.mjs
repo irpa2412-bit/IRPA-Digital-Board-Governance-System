@@ -25,5 +25,5 @@ test("failed invitations are excluded from Meeting Room attendance and quorum po
   assert.match(room,/\["failed","revoked"\]/);
   assert.match(room,/p\.meetingAccessDispatched!==false/);
   assert.match(room,/const eligible=useMemo\(\(\)=>attending\.filter\(votingRole\)/);
-  assert.match(room,/eligiblePresent\s*=\s*useMemo\(\(\)\s*=>\s*present\.filter\(votingRole\)/);
+  assert.match(room,/eligiblePresent=useMemo\(\(\)=>present\.filter\(votingRole\)/);
 });
