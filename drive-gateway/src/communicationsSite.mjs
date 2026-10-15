@@ -44,6 +44,15 @@ function htmlEscape(value) {
 function plainContent(body) {
   return body.split(/\n{2,}/).map(p => "<p>" + htmlEscape(p).replace(/\n/g, "<br>") + "</p>").join("\n");
 }
+function sanitizeWordPressContent(value) {
+  return String(value || "")
+    .replace(/<\\s*(script|style|iframe|object|embed|form|input|button|textarea|link|meta)\\b[^>]*>[\\s\\S]*?<\\/\\s*\\1\\s*>/gi, "")
+    .replace(/<\\s*(script|style|iframe|object|embed|form|input|button|textarea|link|meta)\\b[^>]*\\/?\\s*>/gi, "")
+    .replace(/\\s+on[a-z]+\\s*=\\s*(?:"[^"]*"|'[^']*'|[^\\s>]+)/gi, "")
+    .replace(/\\s+(href|src)\\s*=\\s*(["'])\\s*javascript:[\\s\\S]*?\\2/gi, "")
+    .replace(/\\s+srcdoc\\s*=\\s*(?:"[^"]*"|'[^']*'|[^\\s>]+)/gi, "")
+    .slice(0, MAX_EDIT_BYTES);
+}
 function safeCpanelPath(input, root) {
   const raw = String(input || "").replace(/\\/g, "/").trim();
   if (!raw || raw.startsWith("/") || raw.includes("\0") || raw.split("/").some(p => !p || p === "." || p === ".." || p.startsWith("."))) {
@@ -183,7 +192,7 @@ export function createCommunicationsSiteRouter(deps) {
       const wp = wordpressConfig(env);
       const response = await fetch(wp.root + "/wp-json/wp/v2/" + type + "/" + id, {
         method: "POST", headers: { Authorization: wp.auth, "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ title, content: plainContent(body) }), signal: AbortSignal.timeout(20000)
+        body: JSON.stringify({ title, content: sanitizeWordPressContent(body) }), signal: AbortSignal.timeout(20000)
       });
       const data = await response.json().catch(() => null);
       if (!response.ok || !Number.isSafeInteger(data?.id) || typeof data?.link !== "string") throw new Error("WordPress rejected the content update. Confirm that the integration account can edit this item.");
