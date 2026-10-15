@@ -125,7 +125,7 @@ jobs:
           const active=(r,collection)=>!!r&&(collection==="members"?val(r,"status")==="Active":(val(r,"status")==="Active"||val(r,"employmentStatus")==="Active"));
           const roleValues=r=>[val(r,"role"),val(r,"boardPosition"),...(r?.roles?.arrayValue?.values||[]).map(x=>x.stringValue||""),...(r?.assignedRoles?.arrayValue?.values||[]).map(x=>x.stringValue||""),...(r?.selectedRoles?.arrayValue?.values||[]).map(x=>x.stringValue||""),...(r?.roleAssignments?.arrayValue?.values||[]).map(x=>x.stringValue||"")].filter(Boolean);
           const candidates=[{record:member,collection:"members"},{record:employee,collection:"employees"}].filter(x=>active(x.record,x.collection));
-          const norm=s=>String(s||"").toLowerCase().replace(/^(the|irpa)\\s+/,"").replace(/[._-]+/g," ").replace(/\\s+/g," ").trim();
+          const norm=s=>String(s||"").toLowerCase().replace(/^(the|irpa)\s+/,"").replace(/[._-]+/g," ").replace(/\s+/g," ").trim();
           const selected=candidates.find(x=>desired&&roleValues(x.record).some(role=>norm(role)===norm(desired)))||candidates.find(x=>roleValues(x.record).length);
           if(!selected) throw new Error("No active staging Member/Employee authority record exists for the authenticated test UID.");
           const record=selected.record;
