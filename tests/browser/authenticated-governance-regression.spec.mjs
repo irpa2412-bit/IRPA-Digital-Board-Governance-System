@@ -225,7 +225,7 @@ async function assertSharedReadability(page, module, width) {
   if (module !== "Dashboard") {
     const workspaceBackground = await page.locator(".content-area:not(.dashboard-content-area)")
       .evaluate(el => getComputedStyle(el).backgroundColor);
-    expect(workspaceBackground, `shared Procurement-inspired workspace should be applied to ${module}")
+    expect(workspaceBackground, `shared Procurement-inspired workspace should be applied to ${module}`)
       .toBe("rgb(248, 250, 249)");
   }
 
@@ -237,7 +237,7 @@ async function assertSharedReadability(page, module, width) {
       return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden" && (el.textContent || "").trim();
     }).slice(0, 12);
     const luminance = color => {
-      const m = color.match(/rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)/i);
+      const m = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
       if (!m) return null;
       const channels = m.slice(1, 4).map(v => Number(v) / 255).map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
       return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
@@ -273,7 +273,8 @@ for (const viewport of [
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     const externalRequests = [];
     const completedExternalRequests = [];
-    page.on("pageerror", error => { throw error; });
+    const pageErrors = [];
+    page.on("pageerror", error => pageErrors.push(error.message));
     page.on("requestfinished", request => {
       const url = new URL(request.url());
       if (!["localhost", "127.0.0.1"].includes(url.hostname)) completedExternalRequests.push(url.href);
@@ -299,6 +300,7 @@ for (const viewport of [
     }
 
     expect(completedExternalRequests, "isolated browser test must not complete external/production requests").toEqual([]);
+    expect(pageErrors, "no uncaught runtime errors across the portal sweep").toEqual([]);
     test.info().annotations.push({
       type: "coverage",
       description: `Inspected ${APP_PORTALS.length} portal routes at ${viewport.width}px; blocked ${externalRequests.length} external requests.`
