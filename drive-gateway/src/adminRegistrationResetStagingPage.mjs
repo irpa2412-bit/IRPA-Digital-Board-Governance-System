@@ -57,6 +57,7 @@ const runButton = document.getElementById("runReset");
 const replayButton = document.getElementById("replay");
 let operator = null;
 let lastPayload = null;
+let operationCompleted = false;
 function showStatus(value) { statusNode.textContent = value; }
 function setBusy(value) { signInButton.disabled = value; runButton.disabled = value; replayButton.disabled = value; }
 async function invoke(payload) {
@@ -104,11 +105,12 @@ runButton.addEventListener("click", async () => {
   try {
     const result = await invoke(lastPayload);
     showStatus(JSON.stringify(result, null, 2) + "\nSave this operation ID for audit verification: " + lastPayload.operationId);
+    operationCompleted = true;
     replayButton.classList.remove("hidden");
     runButton.disabled = true;
   } catch (error) {
     showStatus(String(error && error.message || "Recovery request failed."));
-  } finally { setBusy(false); }
+  } finally { setBusy(false); if (operationCompleted) runButton.disabled = true; }
 });
 replayButton.addEventListener("click", async () => {
   if (!lastPayload) { showStatus("No completed operation is available to replay."); return; }
