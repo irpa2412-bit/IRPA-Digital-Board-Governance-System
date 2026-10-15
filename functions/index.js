@@ -1712,6 +1712,65 @@ exports.resetTrialData = onCall({region:"us-central1"}, async request => {
 });
 
 
+
+// Actual-data entry remains CLOSED until an authenticated administrator explicitly
+// attests that final system testing has passed. The setting is server-controlled.
+function actualDataAdministrator(request, profile) {
+  const email=String(request.auth?.token?.email||profile?.email||"").trim().toLowerCase();
+  return email==="irpa2412@gmail.com" || profile?.active===true || request.auth?.token?.admin===true;
+}
+exports.getActualDataAccessStatus = onCall({region:"us-central1"}, async request => {
+  if(!request.auth?.uid) throw new HttpsError("unauthenticated","Authentication is required.");
+  const ref=db.collection("systemSettings").doc("actualDataAccess");
+  const snap=await ref.get();
+  const data=snap.exists?(snap.data()||{}):{};
+  return {
+    enabled:data.enabled===true,
+    status:data.enabled===true?"OPEN":"CLOSED",
+    changedAt:data.changedAt?.toDate?.()?.toISOString?.()||null,
+    changedByEmail:data.changedByEmail||null,
+    finalTestsAttested:data.finalTestsAttested===true
+  };
+});
+exports.setActualDataAccess = onCall({region:"us-central1"}, async request => {
+  const uid=request.auth?.uid;
+  if(!uid) throw new HttpsError("unauthenticated","Administrator authentication is required.");
+  const profileSnap=await db.collection("adminProfiles").doc(uid).get();
+  const profile=profileSnap.exists?profileSnap.data():null;
+  if(!actualDataAdministrator(request,profile)) throw new HttpsError("permission-denied","Only an active IRPA Administrator may change actual-data access.");
+  if(typeof request.data?.enabled!=="boolean") throw new HttpsError("invalid-argument","An enabled boolean is required.");
+  const enabled=request.data.enabled;
+  if(enabled && request.data?.confirmation!=="I CONFIRM FINAL SYSTEM TESTS PASSED") {
+    throw new HttpsError("failed-precondition","Opening actual-data access requires the exact final-test attestation.");
+  }
+  const email=String(request.auth.token?.email||profile?.email||"").trim().toLowerCase()||null;
+  const ref=db.collection("systemSettings").doc("actualDataAccess");
+  const previous=await ref.get();
+  const previousData=previous.exists?(previous.data()||{}):{};
+  const next={
+    enabled,
+    status:enabled?"OPEN":"CLOSED",
+    changedByUid:uid,
+    changedByEmail:email,
+    changedAt:FieldValue.serverTimestamp(),
+    version:Number(previousData.version||0)+1,
+    finalTestsAttested:enabled?true:false,
+    finalTestsAttestedByUid:enabled?uid:null,
+    finalTestsAttestedByEmail:enabled?email:null,
+    finalTestsAttestedAt:enabled?FieldValue.serverTimestamp():null
+  };
+  await ref.set(next,{merge:false});
+  await db.collection("audit").add({
+    action:enabled?"ACTUAL_DATA_ACCESS_OPENED":"ACTUAL_DATA_ACCESS_CLOSED",
+    category:"SYSTEM_SECURITY",
+    description:enabled?"Administrator opened actual-data entry after attesting final system tests passed.":"Administrator closed actual-data entry.",
+    actorUid:uid,actorEmail:email,previousStatus:previousData.enabled===true?"OPEN":"CLOSED",
+    newStatus:enabled?"OPEN":"CLOSED",finalTestsAttested:enabled,
+    createdAt:FieldValue.serverTimestamp()
+  });
+  return {success:true,enabled,status:enabled?"OPEN":"CLOSED",version:next.version};
+});
+
 // Meeting Room working-document review endpoints. The underlying handlers enforce
 // meeting-scoped host/participant permissions and write audit events.
 const meetingWorkingDocuments = require("./meetingRecords");
