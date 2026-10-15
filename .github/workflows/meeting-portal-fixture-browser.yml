@@ -66,7 +66,7 @@ jobs:
       - name: Assert runtime source isolation from unrelated portals
         run: |
           set -euo pipefail
-          git fetch origin main
+          git fetch origin main:refs/remotes/origin/main
           PR_BASE_SHA="${{ github.event.pull_request.base.sha }}" EVENT_NAME="${{ github.event_name }}" node --input-type=module <<'NODE'
           import { execFileSync } from "node:child_process";
           // Pull-request runs compare against the base SHA captured for that event.
