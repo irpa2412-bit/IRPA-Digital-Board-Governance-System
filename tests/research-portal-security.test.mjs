@@ -7,6 +7,7 @@ let env;
 before(async()=>{env=await initializeTestEnvironment({projectId:"demo-irpa-research-security",firestore:{rules:fs.readFileSync("firestore.rules","utf8")}})});
 beforeEach(async()=>{await env.clearFirestore();await env.withSecurityRulesDisabled(async ctx=>{
  const db=ctx.firestore();
+ await setDoc(doc(db,"systemSettings","actualDataAccess"),{enabled:true,status:"OPEN",finalTestsAttested:true});
  await setDoc(doc(db,"members","regular-user"),{status:"Active",role:"Livestock Officer"});
  await setDoc(doc(db,"members","research-user"),{status:"Active",role:"Research Officer"});
  await setDoc(doc(db,"members","research-user-2"),{status:"Active",role:"Research Officer"});
