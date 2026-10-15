@@ -7,7 +7,7 @@ const ALLOWED_CONTENT_TYPES = new Set([
   "application/vnd.oasis.opendocument.text","application/vnd.oasis.opendocument.spreadsheet","application/vnd.oasis.opendocument.presentation",
   "application/rtf","text/plain","text/csv","text/tab-separated-values","text/markdown","text/html","application/xhtml+xml",
   "application/epub+zip","application/json","application/xml","text/xml","image/png","image/jpeg","image/webp","image/svg+xml",
-  "video/mp4","video/webm","audio/mpeg","audio/wav","audio/x-wav","audio/webm","audio/mp4"
+  "image/gif","image/bmp","image/tiff","image/avif","application/zip","video/mp4","video/webm","video/quicktime","video/x-msvideo","video/x-matroska","audio/mpeg","audio/wav","audio/x-wav","audio/webm","audio/mp4","audio/x-m4a","audio/aac","audio/ogg","audio/flac"
 ]);
 const OAUTH_STATE_TTL = 600;
 const SMTP_HOST = "mail.irpa.or.tz";
@@ -413,7 +413,7 @@ async function upload(request, env) {
   if (!ALLOWED_CONTENT_TYPES.has(contentType)) {
     return json({ ok: false, error: "This document format is not supported. Use PDF, Word, Excel, PowerPoint, OpenDocument, text/CSV, or supported image formats." }, 400, corsHeaders(request));
   }
-  const maxUploadBytes = purpose === "Meeting Products" ? 60 * 1024 * 1024 : MAX_BYTES;
+  const maxUploadBytes = purpose === "Meeting Products" ? 60 * 1024 * 1024 : purpose === "Communication Media" ? 25 * 1024 * 1024 : MAX_BYTES;
   if (!Number.isFinite(fileSize) || fileSize <= 0 || fileSize > maxUploadBytes) {
     return json({ ok: false, error: purpose === "Meeting Products" ? "Meeting products must not exceed 60 MB per file in this upload workflow." : "Uploaded files must not exceed 10 MB." }, 400, corsHeaders(request));
   }
@@ -719,7 +719,7 @@ async function download(request, env) {
   }
 
   const size = Number(metadata.size || 0);
-  if (size > MAX_BYTES) return json({ ok: false, error: "The requested file exceeds the 10 MB limit." }, 400, corsHeaders(request));
+  if (size > (purpose === "Communication Media" ? 25 * 1024 * 1024 : MAX_BYTES)) return json({ ok: false, error: purpose === "Communication Media" ? "The requested media file exceeds the 25 MB limit." : "The requested file exceeds the 10 MB limit." }, 400, corsHeaders(request));
 
   const media = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`, {
     headers: { Authorization: `Bearer ${accessToken}` }
