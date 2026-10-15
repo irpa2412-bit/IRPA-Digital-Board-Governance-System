@@ -25,6 +25,17 @@ Before any operational reset, isolated tests and staging checks must verify wron
 
 The secret configuration does not itself prove that the Worker version is deployed or that Firestore writes succeed. Verify the active staging version and Firebase/Firestore availability separately. If billing restrictions disable Firestore API access, this endpoint cannot bypass that restriction.
 
+## Secure staging-only operator test interface
+
+- Page: `/admin-registration-reset-staging-test` on the dedicated staging Worker only.
+- Invocation endpoint: `POST /api/admin-registration/reset-staging-test`.
+- The page signs the designated operator in directly with Firebase Authentication using in-memory persistence, obtains a fresh Firebase ID token, and never stores or logs the password or ID token.
+- The browser never receives or sends `IRPA_RESET_DEVELOPER_SECRET`. The staging Worker adds that secret to an internal request only after validating the exact staging environment, exact staging Firebase project, feature flag, and fixed staging test UID.
+- The proxy rejects client-supplied `X-IRPA-Reset-Secret` headers and refuses any target UID other than the fixed dedicated staging test account. The shared recovery handler still enforces operator email, fresh `auth_time`, explicit confirmation, operation UUID, reason, and Firestore authorization.
+- The staging page requires an explicit checkbox and exact confirmation phrase before the first destructive test request. It keeps the operation ID and payload in memory so the same operation can be replayed to verify idempotency. The page is no-store, no-referrer, frame-denied, and served with a restrictive Content Security Policy.
+- The page and proxy return 404 unless `IRPA_ENVIRONMENT=staging`, `FIREBASE_PROJECT_ID=irpa-dbg-staging-a73ec`, `ADMIN_REGISTRATION_RESET_ENABLED=true`, and the staging test UID matches the compiled test fixture UID. The production Worker configuration must not set these staging values.
+- This interface is for the dedicated staging test account only. Do not use it for operational administrator recovery or a production account.
+
 ## Request contract
 
 Headers:
