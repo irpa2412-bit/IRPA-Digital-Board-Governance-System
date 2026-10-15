@@ -101,6 +101,21 @@ function lifecycleDocument(overrides = {}) {
   };
 }
 
+test("actual operational writes fail closed when the access setting is absent", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("systemSettings/actualDataAccess").delete();
+  });
+  const db = testEnv.authenticatedContext("finance-user", {
+    email: "finance@example.test",
+    irpaRoles: ["Finance Manager"]
+  }).firestore();
+  await assertFails(db.doc("donorFunders/no-gate-setting").set({
+    name: "Funder",
+    recordType: "DONOR_FUNDER_REGISTRY",
+    status: "Prospect"
+  }));
+});
+
 test("actual operational writes are denied while the administrator gate is closed", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     await context.firestore().doc("systemSettings/actualDataAccess").set({enabled:false,status:"CLOSED"});
