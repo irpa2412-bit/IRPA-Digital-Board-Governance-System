@@ -137,12 +137,22 @@ jobs:
           const roleValues=r=>[val(r,"role"),val(r,"boardPosition"),...(r?.roles?.arrayValue?.values||[]).map(x=>x.stringValue||""),...(r?.assignedRoles?.arrayValue?.values||[]).map(x=>x.stringValue||""),...(r?.selectedRoles?.arrayValue?.values||[]).map(x=>x.stringValue||""),...(r?.roleAssignments?.arrayValue?.values||[]).map(x=>x.stringValue||"")].filter(Boolean);
           if(!member&&!employee){
             if(desired) throw new Error("Configured STAGING_CRYPTO_TEST_AUTHORITY cannot be provisioned because no existing staging Member/Employee register record exists.");
-            const fixtureFields={uid:{stringValue:auth.localId},email:{stringValue:auth.email||email},name:{stringValue:"IRPA Staging Crypto Test Signer"},fullName:{stringValue:"IRPA Staging Crypto Test Signer"},status:{stringValue:"Active"},department:{stringValue:"Staging Test Department"},unit:{stringValue:"Staging Test Unit"},role:{stringValue:"Staging Test Signer"},recordOrigin:{stringValue:"TRIAL"},isStagingTestFixture:{booleanValue:true},testFixtureType:{stringValue:"STAGING_CRYPTO_ACCEPTANCE"},createdAt:{timestampValue:new Date().toISOString()}};
+            const fixtureFields={uid:{stringValue:auth.localId},email:{stringValue:auth.email||email},name:{stringValue:"IRPA Staging Crypto Test Signer"},fullName:{stringValue:"IRPA Staging Crypto Test Signer"},status:{stringValue:"Active"},registrationStatus:{stringValue:"Activated"},accountActivated:{booleanValue:true},department:{stringValue:"Staging Test Department"},unit:{stringValue:"Staging Test Unit"},role:{stringValue:"Staging Test Signer"},recordOrigin:{stringValue:"TRIAL"},isStagingTestFixture:{booleanValue:true},testFixtureType:{stringValue:"STAGING_CRYPTO_ACCEPTANCE"},createdAt:{timestampValue:new Date().toISOString()}};
             const created=await fetch("https://firestore.googleapis.com/v1/projects/"+project+"/databases/(default)/documents/members?documentId="+encodeURIComponent(auth.localId),{method:"POST",headers:{Authorization:"Bearer "+tokenData.access_token,"content-type":"application/json"},body:JSON.stringify({fields:fixtureFields})});
             if(!created.ok&&created.status!==409) throw new Error("Could not provision the isolated staging-only test member fixture (HTTP "+created.status+").");
             member=await readRegister("members");
             if(!member) throw new Error("Staging test member fixture was not readable after provisioning.");
             console.log("STAGING_TEST_MEMBER_FIXTURE=PROVISIONED (isolated test identity only)");
+          }
+          if(member?.isStagingTestFixture?.booleanValue===true&&val(member,"testFixtureType")==="STAGING_CRYPTO_ACCEPTANCE"&&(member?.accountActivated?.booleanValue!==true||val(member,"registrationStatus")!=="Activated")){
+            const activationMask=new URLSearchParams();
+            for(const field of ["registrationStatus","accountActivated","updatedAt"]) activationMask.append("updateMask.fieldPaths",field);
+            const activationFields={registrationStatus:{stringValue:"Activated"},accountActivated:{booleanValue:true},updatedAt:{timestampValue:new Date().toISOString()}};
+            const activationResponse=await fetch("https://firestore.googleapis.com/v1/projects/"+project+"/databases/(default)/documents/members/"+encodeURIComponent(auth.localId)+"?"+activationMask.toString(),{method:"PATCH",headers:{Authorization:"Bearer "+tokenData.access_token,"content-type":"application/json"},body:JSON.stringify({fields:activationFields})});
+            if(!activationResponse.ok) throw new Error("Could not activate the isolated synthetic staging test member fixture (HTTP "+activationResponse.status+").");
+            member=await readRegister("members");
+            if(member?.accountActivated?.booleanValue!==true||val(member,"registrationStatus")!=="Activated") throw new Error("Isolated staging test member activation did not persist.");
+            console.log("STAGING_TEST_MEMBER_ACTIVATION=PASS (synthetic fixture only)");
           }
           const candidates=[{record:member,collection:"members"},{record:employee,collection:"employees"}].filter(x=>active(x.record,x.collection));
           const norm=s=>String(s||"").toLowerCase().replace(/^(the|irpa)\s+/,"").replace(/[._-]+/g," ").replace(/\s+/g," ").trim();
