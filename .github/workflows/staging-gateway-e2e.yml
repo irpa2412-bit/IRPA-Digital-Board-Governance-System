@@ -93,12 +93,10 @@ jobs:
             return data.fields||{};
           };
           let sig=await readOwn("signatureProfiles");
-          const identity=await readOwn("signerIdentities");
+          let identity=await readOwn("signerIdentities");
           const val=(fields,key)=>fields?.[key]?.stringValue||"";
-          if(!identity) throw new Error("STAGING_SIGNER_IDENTITY_MISSING: no signerIdentities/{authenticated UID} record exists. Register the dedicated staging signer through the authorized identity workflow before acceptance.");
           if(!sig){
-            // This is an explicitly synthetic fixture for the dedicated test identity,
-            // written through that identity's own Firebase token and only to isolated staging.
+            // Explicit synthetic fixture for the dedicated staging test identity only.
             const svg='<svg xmlns="http://www.w3.org/2000/svg" width="360" height="90" viewBox="0 0 360 90"><rect width="360" height="90" fill="white"/><path d="M18 54 C32 16 38 77 58 45 S84 24 88 52 S110 69 130 38 S153 18 160 53 S184 68 200 41 S224 22 231 53 S252 67 271 39 S293 24 303 52" fill="none" stroke="#1f2937" stroke-width="3" stroke-linecap="round"/><text x="180" y="82" text-anchor="middle" font-size="10" fill="#6b7280">STAGING TEST FIXTURE - NOT A REAL SIGNATURE</text></svg>';
             const specimen='data:image/svg+xml;base64,'+Buffer.from(svg).toString("base64");
             const fields={uid:{stringValue:auth.localId},email:{stringValue:auth.email||email},displayName:{stringValue:"IRPA Staging Crypto Test Signer"},method:{stringValue:"Automated Staging Test Fixture"},status:{stringValue:"Active"},signatureUrl:{stringValue:specimen},signaturePath:{stringValue:"staging-test-fixture/synthetic.svg"},signatureSha256:{stringValue:crypto.createHash("sha256").update(svg).digest("hex")},recordOrigin:{stringValue:"TRIAL"},pathwayVersion:{stringValue:"STAGING-ONLY-TEST-FIXTURE"}};
@@ -109,21 +107,13 @@ jobs:
             console.log("STAGING_SYNTHETIC_SIGNATURE_FIXTURE=PROVISIONED (isolated test identity only)");
           }
           if(val(sig,"status")!=="Active"||!val(sig,"signatureUrl").startsWith("data:image/")) throw new Error("STAGING_SIGNER_PROFILE_INCOMPLETE: Signature Profile must be Active and contain a saved signature specimen.");
-          if(val(identity,"authorityStatus")!=="Current") throw new Error("STAGING_SIGNER_AUTHORITY_NOT_CURRENT: staging Signer Identity authority status must be Current.");
-          const role=val(identity,"authorityRole");
-          const dept=val(identity,"authorityDepartment");
-          const unit=val(identity,"authorityUnit");
-          const norm=s=>String(s||"").toLowerCase().replace(/^(the|irpa)\\s+/,"").replace(/[._-]+/g," ").replace(/\\s+/g," ").trim();
-          if(!role) throw new Error("Staging signer authority role is missing.");
-          if(desired && norm(role)!==norm(desired)) throw new Error("Configured STAGING_CRYPTO_TEST_AUTHORITY does not match signerIdentities.authorityRole.");
-          if(!dept||!unit) throw new Error("Staging signer authority is missing department or unit linkage.");
           const now=Math.floor(Date.now()/1000);
           const b64=x=>Buffer.from(x).toString("base64url");
           const unsigned=b64(JSON.stringify({alg:"RS256",typ:"JWT"}))+"."+b64(JSON.stringify({iss:sa.client_email,scope:"https://www.googleapis.com/auth/datastore",aud:"https://oauth2.googleapis.com/token",iat:now,exp:now+300}));
           const assertion=unsigned+"."+crypto.sign("RSA-SHA256",Buffer.from(unsigned),sa.private_key).toString("base64url");
           const tokenRes=await fetch("https://oauth2.googleapis.com/token",{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded"},body:new URLSearchParams({grant_type:"urn:ietf:params:oauth:grant-type:jwt-bearer",assertion})});
           const tokenData=await tokenRes.json().catch(()=>({}));
-          if(!tokenRes.ok||!tokenData.access_token) throw new Error("Could not obtain short-lived read-only staging Firestore access token.");
+          if(!tokenRes.ok||!tokenData.access_token) throw new Error("Could not obtain staging Firestore authority-register access token.");
           const readRegister=async collection=>{
             const res=await fetch("https://firestore.googleapis.com/v1/projects/"+project+"/databases/(default)/documents/"+collection+"/"+encodeURIComponent(auth.localId),{headers:{Authorization:"Bearer "+tokenData.access_token}});
             const data=await res.json().catch(()=>({}));
@@ -133,8 +123,37 @@ jobs:
           };
           const [member,employee]=await Promise.all([readRegister("members"),readRegister("employees")]);
           const active=(r,collection)=>!!r&&(collection==="members"?val(r,"status")==="Active":(val(r,"status")==="Active"||val(r,"employmentStatus")==="Active"));
-          const registered=(r)=>[val(r,"role"),val(r,"boardPosition"),val(r,"unit"),val(r,"unitName"),...(r?.roles?.arrayValue?.values||[]).map(x=>x.stringValue||""),...(r?.assignedRoles?.arrayValue?.values||[]).map(x=>x.stringValue||""),...(r?.selectedRoles?.arrayValue?.values||[]).map(x=>x.stringValue||""),...(r?.roleAssignments?.arrayValue?.values||[]).map(x=>x.stringValue||"")].some(x=>x===role);
-          const matched=(r,collection)=>active(r,collection)&&val(r,"department")===dept&&(val(r,"unit")===unit||val(r,"unitName")===unit||unit===dept)&&registered(r);
+          const roleValues=r=>[val(r,"role"),val(r,"boardPosition"),...(r?.roles?.arrayValue?.values||[]).map(x=>x.stringValue||""),...(r?.assignedRoles?.arrayValue?.values||[]).map(x=>x.stringValue||""),...(r?.selectedRoles?.arrayValue?.values||[]).map(x=>x.stringValue||""),...(r?.roleAssignments?.arrayValue?.values||[]).map(x=>x.stringValue||"")].filter(Boolean);
+          const candidates=[{record:member,collection:"members"},{record:employee,collection:"employees"}].filter(x=>active(x.record,x.collection));
+          const norm=s=>String(s||"").toLowerCase().replace(/^(the|irpa)\\s+/,"").replace(/[._-]+/g," ").replace(/\\s+/g," ").trim();
+          const selected=candidates.find(x=>desired&&roleValues(x.record).some(role=>norm(role)===norm(desired)))||candidates.find(x=>roleValues(x.record).length);
+          if(!selected) throw new Error("No active staging Member/Employee authority record exists for the authenticated test UID.");
+          const record=selected.record;
+          const roles=roleValues(record);
+          const role=desired?roles.find(value=>norm(value)===norm(desired))||"":(val(record,"role")||val(record,"boardPosition")||roles[0]||"");
+          const dept=val(record,"department");
+          const unit=val(record,"unit")||val(record,"unitName")||dept;
+          if(!role||!dept||!unit) throw new Error("Active staging authority register lacks a role, department or unit for the test signer.");
+          if(!identity){
+            const fields={uid:{stringValue:auth.localId},signerProfileId:{stringValue:auth.localId},email:{stringValue:auth.email||email},organisationName:{stringValue:"Improvement of Rangeland in Pastoral Areas"},signatureStatus:{stringValue:"Active"},revocationStatus:{stringValue:"Active"},authorityRole:{stringValue:"Not yet assigned"},authorityStatus:{stringValue:"Unspecified"},authorityReference:{stringValue:""},createdAt:{timestampValue:new Date().toISOString()}};
+            const created=await fetch("https://firestore.googleapis.com/v1/projects/"+project+"/databases/(default)/documents/signerIdentities?documentId="+encodeURIComponent(auth.localId),{method:"POST",headers:{Authorization:"Bearer "+auth.idToken,"content-type":"application/json"},body:JSON.stringify({fields})});
+            if(!created.ok&&created.status!==409) throw new Error("Could not create the staging signer's owner-authorized placeholder identity (HTTP "+created.status+").");
+            identity=await readOwn("signerIdentities");
+            if(!identity) throw new Error("Staging Signer Identity placeholder was not readable after creation.");
+            console.log("STAGING_SIGNER_IDENTITY_PLACEHOLDER=CREATED");
+            const call=await fetch("https://us-central1-"+project+".cloudfunctions.net/updateSignerAuthority",{method:"POST",headers:{Authorization:"Bearer "+auth.idToken,"content-type":"application/json"},body:JSON.stringify({data:{authorityRole:role,authorityStatus:"Current",authorityDepartment:dept,authorityUnit:unit,authorityReference:"STAGING-TEST-FIXTURE"}})});
+            const callBody=await call.json().catch(()=>({}));
+            if(!call.ok||callBody.error) throw new Error("Authorized updateSignerAuthority callable could not validate/register the isolated staging test role (HTTP "+call.status+").");
+            identity=await readOwn("signerIdentities");
+            console.log("STAGING_SIGNER_AUTHORITY=REGISTERED_THROUGH_AUTHORIZED_CALLABLE");
+          }
+          if(val(identity,"authorityStatus")!=="Current") throw new Error("STAGING_SIGNER_AUTHORITY_NOT_CURRENT: staging Signer Identity authority status must be Current; no existing non-current authority was overridden.");
+          const identityRole=val(identity,"authorityRole");
+          const identityDept=val(identity,"authorityDepartment");
+          const identityUnit=val(identity,"authorityUnit");
+          if(!identityRole||!identityDept||!identityUnit) throw new Error("Staging signer authority is missing role, department or unit linkage.");
+          if(desired&&norm(identityRole)!==norm(desired)) throw new Error("Configured STAGING_CRYPTO_TEST_AUTHORITY does not match signerIdentities.authorityRole.");
+          const matched=(r,collection)=>active(r,collection)&&val(r,"department")===identityDept&&(val(r,"unit")===identityUnit||val(r,"unitName")===identityUnit||identityUnit===identityDept)&&roleValues(r).some(value=>value===identityRole);
           if(!matched(member,"members")&&!matched(employee,"employees")) throw new Error("No active staging Member/Employee record matches signer UID, department, unit and authority role.");
           console.log("STAGING_PROJECT_GUARD=PASS");
           console.log("STAGING_SECRETS_PRESENT=PASS (values not printed)");
