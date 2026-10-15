@@ -356,8 +356,9 @@ jobs:
           if(c.vars.IRPA_ENVIRONMENT!=="staging"||c.vars.IRPA_STAGING_CRYPTO_TEST_MODE!=="true"||c.vars.ESIGN_MODULE_ENABLED!=="true") throw new Error("Explicit staging-only e-sign crypto acceptance mode is missing");
           if(c.vars.FIREBASE_PROJECT_ID==="irpa-digital-board-governance") throw new Error("Production Firebase project");
           if(c.kv_namespaces?.[0]?.binding!=="DRIVE_KV") throw new Error("Missing staging KV");
-          if(c.durable_objects?.bindings?.some(b=>b.name==="ESIGN_DO"&&b.class_name==="EsignRecordDurableObject")!==true) throw new Error("Isolated staging signer Durable Object binding missing");
-          if(c.migrations?.some(m=>m.tag==="esign-do-staging-v1"&&m.new_sqlite_classes?.includes("EsignRecordDurableObject"))!==true) throw new Error("Isolated staging signer Durable Object migration missing");
+          if(c.durable_objects?.bindings?.length!==1||c.durable_objects.bindings[0]?.name!=="ESIGN_DO"||c.durable_objects.bindings[0]?.class_name!=="EsignRecordDurableObject") throw new Error("Unexpected isolated staging Durable Object binding set");
+          if(c.migrations?.length!==1||c.migrations[0]?.tag!=="esign-do-staging-v1"||!c.migrations[0]?.new_sqlite_classes?.includes("EsignRecordDurableObject")) throw new Error("Unexpected isolated staging signer Durable Object migration set");
+          if(c.vars.FIREBASE_PROJECT_ID==="irpa-digital-board-governance"||c.vars.IRPA_ENVIRONMENT!=="staging") throw new Error("Staging cryptographic runtime must remain isolated from production.");
           if(c.triggers?.crons?.[0]!=="0 * * * *") throw new Error("Cleanup cron missing");
           console.log("STAGING_CONFIGURATION_VALID");
           NODE
