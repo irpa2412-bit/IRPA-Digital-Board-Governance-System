@@ -9,6 +9,7 @@ on:
       - "drive-gateway/src/invitationRedemption.mjs"
       - "drive-gateway/tests/invitation-redemption.test.mjs"
       - "functions/meetingGateway.emulator.test.cjs"
+      - "tests/meeting-isolation-guard.test.mjs"
       - ".github/workflows/meeting-portal-fixture-browser.yml"
   pull_request:
     branches: [main]
