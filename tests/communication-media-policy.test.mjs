@@ -58,6 +58,8 @@ test("cPanel access is secret-backed and static-file editor denies executable or
  assert.ok(site.includes('p === ".."'));
  assert.ok(site.includes("safeCpanelDirectory"));
  assert.ok(site.includes("Fileman/list_files"));
+ assert.ok(site.includes('url.searchParams.get("path")'));
+ assert.ok(site.includes("The selected website file could not be read."));
  assert.ok(site.includes("Fileman/get_file_content"));
  assert.ok(site.includes("Fileman/save_file_content"));
  assert.ok(site.includes("/api/communications/cpanel/rollback"));
