@@ -111,17 +111,22 @@ export function createCommunicationsSiteRouter(deps) {
 
   async function authorised(request, env, reviewer = false) {
     const claims = await authenticateFirebaseRequest(request, env);
-    const identity = await getInstitutionalProfileForUser(env, claims);
+    const [identity, adminDocument] = await Promise.all([
+      getInstitutionalProfileForUser(env, claims),
+      getFirestoreDocument(env, "adminProfiles/" + claims.user_id, claims.token)
+    ]);
     const member = firestoreDocumentToPlain(identity?.memberRecord);
     const employee = firestoreDocumentToPlain(identity?.employeeRecord);
+    const adminProfile = firestoreDocumentToPlain(adminDocument);
+    const activeAdmin = adminProfile?.active === true;
     const tokenRoles = [
       ...(Array.isArray(claims.irpaRoles) ? claims.irpaRoles : []),
       claims.role, claims.title, claims.position
     ].filter(Boolean).flatMap(v => String(v).split(",").map(s => s.trim()));
-    const roles = [...new Set([...tokenRoles, ...values(member), ...values(employee)])];
-    const isActive = active(member) || active(employee);
+    const roles = [...new Set([...tokenRoles, ...values(member), ...values(employee), ...(activeAdmin ? ["Administrator"] : [])])];
+    const isActive = activeAdmin || active(member) || active(employee);
     const hasRole = [...(reviewer ? REVIEW_ROLES : AUTHOR_ROLES)].some(r => roles.includes(r));
-    if (!hasRole || (!isActive && !roles.includes("Administrator"))) {
+    if (!hasRole || !isActive) {
       throw new Error("Your registered IRPA role does not permit this website-management action.");
     }
     return { claims, roles };
