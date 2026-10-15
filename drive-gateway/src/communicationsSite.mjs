@@ -45,14 +45,36 @@ function plainContent(body) {
   return body.split(/\n{2,}/).map(p => "<p>" + htmlEscape(p).replace(/\n/g, "<br>") + "</p>").join("\n");
 }
 function sanitizeWordPressContent(value) {
-  return String(value || "")
-    .replace(/<\s*(script|style|iframe|object|embed|form|input|button|textarea|link|meta|svg|math)\b[^>]*>[\s\S]*?<\/\s*\1\s*>/gi, "")
-    .replace(/<\s*(script|style|iframe|object|embed|form|input|button|textarea|link|meta|svg|math)\b[^>]*\/?\s*>/gi, "")
-    .replace(/\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
-    .replace(/\s+(style|srcdoc|formaction|xlink:href|srcset)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
-    .replace(/\s+(href|src)\s*=\s*(["'])\s*(?:javascript|vbscript|data):[\s\S]*?\2/gi, "")
-    .replace(/<\/?\s*(?!(?:p|br|h[1-6]|strong|b|em|i|u|ul|ol|li|blockquote|a|img|figure|figcaption|div|span|table|thead|tbody|tr|th|td|hr|pre|code|sup|sub)\b)[a-z][^>]*>/gi, "")
-    .slice(0, MAX_EDIT_BYTES);
+  const allowedTags = new Set(["p","br","h1","h2","h3","h4","h5","h6","strong","b","em","i","u","ul","ol","li","blockquote","a","img","figure","figcaption","div","span","table","thead","tbody","tr","th","td","hr","pre","code","sup","sub"]);
+  const allowedAttributes = new Set(["href","src","alt","title","width","height","target","rel","class","id","colspan","rowspan"]);
+  const voidTags = new Set(["br","img","hr"]);
+  const input = String(value || "").slice(0, MAX_EDIT_BYTES);
+  return input.replace(/<!--[\s\S]*?-->/g, "").replace(/<\/?\s*([a-z0-9-]+)\b([^>]*)>/gi, (whole, rawTag, rawAttrs) => {
+    const tag = rawTag.toLowerCase();
+    if (!allowedTags.has(tag)) return "";
+    if (/^<\s*\//.test(whole)) return voidTags.has(tag) ? "" : "</" + tag + ">";
+    const attrs = [];
+    rawAttrs.replace(/([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>]+))/g, (_match, rawName, doubleValue, singleValue, bareValue) => {
+      const name = rawName.toLowerCase();
+      if (!allowedAttributes.has(name)) return "";
+      let value = String(doubleValue ?? singleValue ?? bareValue ?? "").trim();
+      if (["href","src"].includes(name)) {
+        const decoded = value.replace(/&#x([0-9a-f]+);?/gi, (_m, n) => String.fromCodePoint(parseInt(n, 16)))
+          .replace(/&#([0-9]+);?/g, (_m, n) => String.fromCodePoint(parseInt(n, 10)))
+          .replace(/&colon;/gi, ":").replace(/[\u0000-\u0020]+/g, "").toLowerCase();
+        const allowedUrl = /^https:\/\//.test(decoded) || /^\/(?!\/)/.test(decoded) || (name === "href" && (/^#/.test(decoded) || /^mailto:/.test(decoded) || /^tel:/.test(decoded)));
+        if (!allowedUrl) return "";
+      }
+      if (name === "target" && !["_blank","_self"].includes(value)) return "";
+      if (name === "class" || name === "id") value = value.replace(/[^a-zA-Z0-9 _-]/g, "").slice(0, 150);
+      if (["width","height","colspan","rowspan"].includes(name) && !/^\d{1,4}$/.test(value)) return "";
+      value = value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      attrs.push(" " + name + '="' + value + '"');
+      return "";
+    });
+    if (tag === "a" && attrs.some(attr => attr.startsWith(' target="_blank"')) && !attrs.some(attr => attr.startsWith(" rel="))) attrs.push(' rel="noopener noreferrer"');
+    return "<" + tag + attrs.join("") + ">";
+  });
 }
 function safeCpanelPath(input, root) {
   const raw = String(input || "").replace(/\\/g, "/").trim();
