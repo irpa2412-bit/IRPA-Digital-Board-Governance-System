@@ -65,6 +65,8 @@ service cloud.firestore {
       (portal=="Documents" && anyInstitutionalRole(["Executive Director","Director Internal Oversight","Director Finance & Administration"])) ||
       (portal=="Reports" && anyInstitutionalRole(["Executive Director","Director Internal Oversight","Director Finance & Administration","Director Human Resources"]));
   }
+  function communicationMediaUser(){return admin()||anyInstitutionalRole(["Communications Officer","Communications Manager","Media Officer","Public Relations Officer","Executive Director","Director Outreach","Outreach Director","Director Community Development","Community Development Director"]);}
+  function communicationMediaReviewer(){return admin()||anyInstitutionalRole(["Executive Director","Director Outreach","Outreach Director","Director Community Development","Community Development Director"]);}
   function authorityRoleRegistered(record,authorityRole){return record.get("role","")==authorityRole||record.get("boardPosition","")==authorityRole||record.get("unit","")==authorityRole||record.get("unitName","")==authorityRole||(record.get("roles",[]) is list&&record.get("roles",[]).hasAny([authorityRole]))||(record.get("assignedRoles",[]) is list&&record.get("assignedRoles",[]).hasAny([authorityRole]))||(record.get("selectedRoles",[]) is list&&record.get("selectedRoles",[]) .hasAny([authorityRole]))||(record.get("roleAssignments",[]) is list&&record.get("roleAssignments",[]).hasAny([authorityRole]));}
   function signerIdentityAuthorityUnchanged(){return request.resource.data.get("authorityRole",null)==resource.data.get("authorityRole",null)&&request.resource.data.get("authorityStatus",null)==resource.data.get("authorityStatus",null)&&request.resource.data.get("authorityReference",null)==resource.data.get("authorityReference",null)&&request.resource.data.get("authorityEffectiveAt",null)==resource.data.get("authorityEffectiveAt",null)&&request.resource.data.get("authorityExpiresAt",null)==resource.data.get("authorityExpiresAt",null)&&request.resource.data.get("authorityDepartment",null)==resource.data.get("authorityDepartment",null)&&request.resource.data.get("authorityUnit",null)==resource.data.get("authorityUnit",null)&&request.resource.data.get("authoritySourceCollection",null)==resource.data.get("authoritySourceCollection",null)&&request.resource.data.get("authoritySourceRecordId",null)==resource.data.get("authoritySourceRecordId",null);}
   function signerAuthorityUpdateAllowed(uid){return self(uid)&&request.resource.data.uid==resource.data.uid&&request.resource.data.signerProfileId==resource.data.signerProfileId&&request.resource.data.get("authorityRole","") is string&&request.resource.data.get("authorityRole","")!=""&&request.resource.data.get("authorityStatus","") in ["Current","Pending Verification","Expired","Not yet assigned"]&&request.resource.data.get("authorityDepartment","") is string&&request.resource.data.get("authorityUnit","") is string&&authorityRegisterMatch(request.resource.data.get("authorityDepartment",""),request.resource.data.get("authorityUnit",""),request.resource.data.get("authorityRole",""));}
@@ -426,6 +428,46 @@ service cloud.firestore {
     allow update,delete:if admin();
   }
   match /inductionRecords/{uid}{allow read:if self(uid)||admin();allow create,update:if self(uid)&&request.resource.data.uid==request.auth.uid&&(activeMember()||request.auth.token.firebase.sign_in_provider=="anonymous");allow delete:if admin();}
+  match /communicationMediaItems/{id}{
+    allow read:if communicationMediaUser();
+    allow create:if communicationMediaUser()
+      &&request.resource.data.get("createdByUid","")==request.auth.uid
+      &&request.resource.data.get("status","")=="Draft"
+      &&request.resource.data.get("recordOrigin","")=="PRODUCTION"
+      &&request.resource.data.get("title","") is string
+      &&request.resource.data.get("title","").size()>0
+      &&request.resource.data.get("title","").size()<=180
+      &&request.resource.data.get("body","") is string
+      &&request.resource.data.get("body","").size()>0
+      &&request.resource.data.get("body","").size()<=30000
+      &&request.resource.data.get("type","") in ["Website Article","Press Release","Social Media","Media Asset"]
+      &&request.resource.data.keys().hasOnly(["title","type","channel","summary","body","scheduledAt","tags","assetUrl","status","recordOrigin","createdByUid","createdByEmail","createdAt","updatedAt","updatedByUid","updatedByEmail"]);
+    allow update:if communicationMediaUser()&&(
+      (resource.data.get("createdByUid","")==request.auth.uid
+        &&resource.data.get("status","") in ["Draft","Returned"]
+        &&request.resource.data.get("status","") in ["Draft","Pending Approval"]
+        &&request.resource.data.get("createdByUid","")==resource.data.get("createdByUid","")
+        &&request.resource.data.get("recordOrigin","")==resource.data.get("recordOrigin","")
+        &&request.resource.data.get("title","") is string
+        &&request.resource.data.get("title","").size()>0
+        &&request.resource.data.get("title","").size()<=180
+        &&request.resource.data.get("body","") is string
+        &&request.resource.data.get("body","").size()>0
+        &&request.resource.data.get("body","").size()<=30000
+        &&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["title","type","channel","summary","body","scheduledAt","tags","assetUrl","status","submittedAt","updatedAt","updatedByUid","updatedByEmail"]))
+      ||(communicationMediaReviewer()
+        &&resource.data.get("status","")=="Pending Approval"
+        &&request.resource.data.get("status","") in ["Approved","Returned"]
+        &&request.resource.data.get("createdByUid","")==resource.data.get("createdByUid","")
+        &&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","decisionNote","reviewedAt","reviewedByUid","reviewedByEmail","updatedAt","updatedByUid","updatedByEmail"]))
+      ||(communicationMediaReviewer()
+        &&resource.data.get("status","") in ["Draft","Returned","Pending Approval","Approved"]
+        &&request.resource.data.get("status","")=="Archived"
+        &&request.resource.data.get("createdByUid","")==resource.data.get("createdByUid","")
+        &&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","updatedAt","updatedByUid","updatedByEmail"]))
+    );
+    allow delete:if false;
+  }
   match /{document=**}{allow read,write:if false;}
  }
 }
