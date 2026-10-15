@@ -66,9 +66,11 @@ exports.publishCommunicationMediaItem=onCall({
   const password=WORDPRESS_APPLICATION_PASSWORD.value().replace(/\s/g,"");
   if(!username||!password)throw new HttpsError("failed-precondition","WordPress publishing secrets are incomplete.");
   const auth="Basic "+Buffer.from(username+":"+password,"utf8").toString("base64");
+  const escapeHtml=value=>String(value).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\"/g,"&quot;").replace(/\'/g,"&#39;");
+  const safeContent=body.split(/\\n{2,}/).map(paragraph=>"<p>"+escapeHtml(paragraph).replace(/\\n/g,"<br>")+"</p>").join("\\n");
   let response;
   try{
-    response=await fetch(endpoint,{method:"POST",headers:{"Authorization":auth,"Content-Type":"application/json","Accept":"application/json"},body:JSON.stringify({title,content:body,excerpt:String(item.summary||"").slice(0,600),status:"publish",comment_status:"closed",ping_status:"closed",meta:{irpa_communication_item_id:itemId}}),signal:AbortSignal.timeout(45000)});
+    response=await fetch(endpoint,{method:"POST",headers:{"Authorization":auth,"Content-Type":"application/json","Accept":"application/json"},body:JSON.stringify({title,content:safeContent,excerpt:escapeHtml(String(item.summary||"").slice(0,600)),slug:"irpa-"+itemId,status:"publish",comment_status:"closed",ping_status:"closed"}),signal:AbortSignal.timeout(45000)});
   }catch(error){
     console.error("IRPA WordPress publishing network failure",error?.name||"Error");
     throw new HttpsError("unavailable","The IRPA website could not be reached. The approved item remains approved and can be retried.");
