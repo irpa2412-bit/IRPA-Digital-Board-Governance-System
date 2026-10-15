@@ -675,7 +675,7 @@ async function authorizeCommunicationMediaDownload(env,claims){
   if(email==="irpa2412@gmail.com"||admin?.active===true)return true;
   const allowed=["Communications Officer","Communications Manager","Media Officer","Public Relations Officer","Executive Director","Director Outreach","Outreach Director","Director Community Development","Community Development Director","Administrator"];
   const roles=[...new Set([...communicationMediaRoleValues(member),...communicationMediaRoleValues(employee)])];
-  const active=member&&(["Active","Activated"].includes(String(member.status||""))||member?.registrationStatus==="Activated"||employee&&(["Active","Activated"].includes(String(employee.status||""))||employee?.employmentStatus==="Active");
+  const active=Boolean((member&&(["Active","Activated"].includes(String(member.status||""))||member?.registrationStatus==="Activated")||(employee&&(["Active","Activated"].includes(String(employee.status||""))||employee?.employmentStatus==="Active")));
   return Boolean(active&&roles.some(role=>allowed.includes(role)));
 }
 
