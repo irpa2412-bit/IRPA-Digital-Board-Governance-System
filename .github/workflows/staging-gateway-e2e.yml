@@ -236,6 +236,24 @@ jobs:
           grep -q '"authFunctionsEnabled":false' staging-health.json
           test "$(node -e 'const x=require("./staging-health.json"); process.stdout.write(String(x.environment||""))')" = "staging"
 
+      - name: Verify staging-only operator recovery page
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 5 --retry-delay 2 \
+            "$STAGING_GATEWAY_BASE_URL/admin-registration-reset-staging-test" \
+            -D "$RUNNER_TEMP/staging-reset-page.headers" \
+            -o "$RUNNER_TEMP/staging-reset-page.html"
+          grep -qi 'content-type: text/html' "$RUNNER_TEMP/staging-reset-page.headers"
+          grep -qi 'irpa-dbg-staging-a73ec' "$RUNNER_TEMP/staging-reset-page.html"
+          grep -q 'qv5soS4LGra78iNqJpAVq0RpMUv1' "$RUNNER_TEMP/staging-reset-page.html"
+          grep -q 'signInWithEmailAndPassword' "$RUNNER_TEMP/staging-reset-page.html"
+          if grep -qi 'x-irpa-reset-secret' "$RUNNER_TEMP/staging-reset-page.html"; then
+            echo "The browser page must never contain the recovery-secret header."
+            exit 1
+          fi
+          grep -qi "content-security-policy" "$RUNNER_TEMP/staging-reset-page.headers"
+          echo "STAGING_OPERATOR_RECOVERY_PAGE=PASS"
+
       - name: Verify live recovery endpoint rejects unauthenticated requests
         run: |
           set -euo pipefail
