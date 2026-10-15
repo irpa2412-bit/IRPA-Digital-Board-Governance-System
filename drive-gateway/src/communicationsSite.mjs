@@ -122,7 +122,7 @@ export function createCommunicationsSiteRouter(deps) {
     let base;
     try { base = new URL(String(env.CPANEL_BASE_URL || "")); }
     catch { throw new Error("cPanel integration is not configured."); }
-    if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash || base.port !== "2083") {
+    if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash || base.pathname !== "/" || base.port !== "2083") {
       throw new Error("cPanel endpoint configuration is invalid.");
     }
     const username = String(env.CPANEL_USERNAME || "").trim();
