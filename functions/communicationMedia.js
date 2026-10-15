@@ -53,7 +53,7 @@ exports.publishCommunicationMediaItem=onCall({
   const item=snap.data()||{};
   if(item.status==="Published"&&item.wpPostId&&item.publicUrl)return {success:true,alreadyPublished:true,publicUrl:item.publicUrl,message:"This item is already published; no duplicate post was created."};
   if(item.status!=="Approved")throw new HttpsError("failed-precondition","Only content with recorded Approved status can be published.");
-  if(!["Website Article","Press Release","Social Media"].includes(item.type))throw new HttpsError("failed-precondition","Only website articles and press releases can be published through WordPress.");
+  if(!["Website Article","Press Release"].includes(item.type))throw new HttpsError("failed-precondition","Only website articles and press releases can be published through WordPress.");
   const title=String(item.title||"").trim();
   const body=String(item.body||"").trim();
   if(!title||!body||title.length>180||body.length>30000)throw new HttpsError("failed-precondition","The approved item is missing required content or exceeds the permitted length.");
