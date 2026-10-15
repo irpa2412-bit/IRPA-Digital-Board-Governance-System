@@ -28,8 +28,12 @@ test("workflow-only guard maintenance requires its paired regression test", () =
   assert.match(workflow, /!guardOnlyWorkflowRepair/);
 });
 
-test("administrator-recovery-only changes do not masquerade as meeting-portal source changes", () => {
-  assert.match(workflow, /const adminResetOnly = changed\.some\(path => adminResetFiles\.has\(path\)\)/);
+test("administrator-recovery paired repairs allow only the reviewed PR file set", () => {
+  assert.match(workflow, /const adminRecoveryPairedRepairFiles = new Set\(\[/);
+  assert.match(workflow, /const adminResetOnly = changed\.includes\("drive-gateway\/src\/adminRegistrationReset\.mjs"\)/);
+  assert.match(workflow, /changed\.includes\("drive-gateway\/tests\/admin-registration-reset\.test\.mjs"\)/);
+  assert.match(workflow, /changed\.includes\("\.github\/workflows\/meeting-portal-fixture-browser\.yml"\)/);
+  assert.match(workflow, /changed\.includes\("tests\/meeting-isolation-guard\.test\.mjs"\)/);
+  assert.match(workflow, /changed\.every\(path => adminRecoveryPairedRepairFiles\.has\(path\)\)/);
   assert.match(workflow, /!adminResetOnly/);
-  assert.match(workflow, /drive-gateway\/src\/adminRegistrationReset\.mjs/);
 });
