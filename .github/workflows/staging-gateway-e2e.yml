@@ -189,7 +189,7 @@ jobs:
           NODE
 
   dispatch-staging-acceptance:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015' && startsWith(github.event.head_commit.message, 'test(staging): dispatch isolated runtime acceptance')
+    if: github.event_name == 'push' && github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015' && contains(github.event.head_commit.message, 'dispatch isolated runtime acceptance')
     needs: [local-e2e, preflight-staging]
     runs-on: ubuntu-latest
     permissions:
