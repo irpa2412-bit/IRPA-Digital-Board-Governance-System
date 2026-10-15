@@ -153,6 +153,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           PROJECT: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
           APP_URL: ${{ secrets.STAGING_IRPA_APP_URL }}
+          CP_ROOT: ${{ secrets.STAGING_CPANEL_DOCUMENT_ROOT }}
         working-directory: drive-gateway
         run: |
           set -euo pipefail
@@ -347,11 +348,16 @@ jobs:
             const cpanelPath=process.env.CP_TEST_FILE;
             const before=await call("/api/communications/cpanel/files?path="+encodeURIComponent(cpanelPath));
             if(typeof before.content!=="string") throw new Error("The designated staging cPanel test file could not be read.");
-            const write=await call("/api/communications/cpanel/files",{method:"PUT",body:JSON.stringify({path:cpanelPath,content:marker})});
-            if(!write.backupId) throw new Error("The cPanel write did not return a rollback snapshot.");
-            const after=await call("/api/communications/cpanel/files?path="+encodeURIComponent(cpanelPath));
-            if(after.content!==marker) throw new Error("The cPanel file content did not match the staged write.");
-            await call("/api/communications/cpanel/rollback",{method:"POST",body:JSON.stringify({path:cpanelPath,backupId:write.backupId})});
+            let backupId="";
+            try{
+              const write=await call("/api/communications/cpanel/files",{method:"PUT",body:JSON.stringify({path:cpanelPath,content:marker})});
+              backupId=write.backupId||"";
+              if(!backupId) throw new Error("The cPanel write did not return a rollback snapshot.");
+              const after=await call("/api/communications/cpanel/files?path="+encodeURIComponent(cpanelPath));
+              if(after.content!==marker) throw new Error("The cPanel file content did not match the staged write.");
+            }finally{
+              if(backupId) await call("/api/communications/cpanel/rollback",{method:"POST",body:JSON.stringify({path:cpanelPath,backupId})});
+            }
             const restored=await call("/api/communications/cpanel/files?path="+encodeURIComponent(cpanelPath));
             if(restored.content!==before.content) throw new Error("The cPanel rollback did not restore the original content.");
             const denied=await fetch(base+"/api/communications/cpanel/files?path="+encodeURIComponent("../index.php"),{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
