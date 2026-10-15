@@ -68,16 +68,14 @@ jobs:
         run: |
           set -euo pipefail
           git fetch origin main:refs/remotes/origin/main
-          PR_BASE_SHA="${{ github.event.pull_request.base.sha }}" EVENT_NAME="${{ github.event_name }}" node --input-type=module <<'NODE'
+          EVENT_NAME="${{ github.event_name }}" node --input-type=module <<'NODE'
           import { execFileSync } from "node:child_process";
-          // Pull-request runs compare against the base SHA captured for that event.
-          // Use the captured PR base when available. On push runs, compare only commits
-          // introduced on this branch since its merge-base with current main; main-only
-          // files added after divergence are not changes introduced by this branch.
-          const eventBase = process.env.PR_BASE_SHA?.trim();
-          const base = eventBase || execFileSync("git", ["merge-base", "origin/main", "HEAD"], { encoding: "utf8" }).trim();
+          // Compare against the fetched main snapshot for both PR and push runs.
+          // A captured PR event base can be stale after main advances, incorrectly
+          // treating files already on main as unrelated changes in this branch.
+          const base = "origin/main";
           execFileSync("git", ["cat-file", "-e", `${base}^{commit}`]);
-          const changed = execFileSync("git", ["diff", "--name-only", `${base}...HEAD`], { encoding: "utf8" })
+          const changed = execFileSync("git", ["diff", "--name-only", base, "HEAD"], { encoding: "utf8" })
             .trim().split("\n").filter(Boolean).sort();
           const allowed = new Set([
             ".github/workflows/meeting-portal-fixture-browser.yml",
