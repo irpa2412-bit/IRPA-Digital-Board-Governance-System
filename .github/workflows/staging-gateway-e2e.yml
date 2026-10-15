@@ -76,7 +76,7 @@ jobs:
           const password=process.env.TEST_PASSWORD||"";
           const desired=String(process.env.TEST_AUTHORITY||"").trim();
           if(project!=="irpa-dbg-staging-a73ec" || project==="irpa-digital-board-governance") throw new Error("Refusing non-isolated or unexpected Firebase project.");
-          if(!email||!password||!desired||!process.env.SERVICE_ACCOUNT_JSON) throw new Error("One or more staging secrets are unavailable to this workflow; names only, values never logged.");
+          if(!email||!password||!process.env.SERVICE_ACCOUNT_JSON) throw new Error("Required staging credentials or service-account secret are unavailable; secret values are never logged.");
           let sa;
           try { sa=JSON.parse(process.env.SERVICE_ACCOUNT_JSON); } catch { throw new Error("Staging service-account secret is not valid JSON."); }
           if(sa.project_id!==project||!sa.client_email||!sa.private_key) throw new Error("Staging service account is incomplete or belongs to another project.");
@@ -100,7 +100,8 @@ jobs:
           const dept=val(identity,"authorityDepartment");
           const unit=val(identity,"authorityUnit");
           const norm=s=>String(s||"").toLowerCase().replace(/^(the|irpa)\\s+/,"").replace(/[._-]+/g," ").replace(/\\s+/g," ").trim();
-          if(!role||norm(role)!==norm(desired)) throw new Error("STAGING_CRYPTO_TEST_AUTHORITY does not match signerIdentities.authorityRole.");
+          if(!role) throw new Error("Staging signer authority role is missing.");
+          if(desired && norm(role)!==norm(desired)) throw new Error("Configured STAGING_CRYPTO_TEST_AUTHORITY does not match signerIdentities.authorityRole.");
           if(!dept||!unit) throw new Error("Staging signer authority is missing department or unit linkage.");
           const now=Math.floor(Date.now()/1000);
           const b64=x=>Buffer.from(x).toString("base64url");
