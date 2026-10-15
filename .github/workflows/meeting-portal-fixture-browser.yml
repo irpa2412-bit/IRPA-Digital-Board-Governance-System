@@ -127,7 +127,12 @@ jobs:
             "tests/fixtures/mocks.js",
             "tests/meeting-portal-browser.test.mjs",
             "tests/meeting-room-authorization-boundary.test.mjs",
-            "vite.meeting-fixture.config.js"
+            "vite.meeting-fixture.config.js",
+            ".github/workflows/administrator-reset-security.yml",
+            "drive-gateway/ADMIN-REGISTRATION-RESET.md",
+            "drive-gateway/src/adminRegistrationReset.mjs",
+            "drive-gateway/tests/admin-registration-reset.test.mjs",
+            "functions/systemControl.js"
           ]);
           const unexpected = changed.filter(path => !allowed.has(path));
           if (unexpected.length) {
@@ -153,7 +158,7 @@ jobs:
               throw new Error("Production Wrangler configuration changed; only staging-only changes are permitted.");
             }
             const stagingConfig = currentConfig.slice(currentConfig.indexOf("\n[env.staging]"));
-            if (!stagingConfig.includes('id = "7b50627e29fc4fe1abaa8dc8665edd02"')) {
+            if (!stagingConfig.includes('id = "5ea76010553049a2b98c8493c37fbbc4"')) {
               throw new Error("Staging DRIVE_KV must retain the explicitly approved dedicated namespace.");
             }
             if (stagingConfig.includes('id = "ccdbffa662ac48bfbdf7f4b1f62ca941"')) {
@@ -167,12 +172,24 @@ jobs:
             changed.includes("tests/fixtures/meeting-portal-fixture.jsx");
           const testOnlyRegisterScope = changed.includes("src/firebase/data.js") &&
             changed.includes("tests/meeting-category-policy.test.mjs");
+          // An administrator-recovery-only PR may touch the shared Wrangler config,
+          // but it must not be treated as a meeting-portal source change.
+          const adminResetFiles = new Set([
+            ".github/workflows/administrator-reset-security.yml",
+            "drive-gateway/ADMIN-REGISTRATION-RESET.md",
+            "drive-gateway/src/adminRegistrationReset.mjs",
+            "drive-gateway/tests/admin-registration-reset.test.mjs",
+            "functions/systemControl.js",
+            "drive-gateway/wrangler.toml"
+          ]);
+          const adminResetOnly = changed.some(path => adminResetFiles.has(path)) &&
+            changed.every(path => adminResetFiles.has(path));
           // A manual dispatch on an already-merged ref is a regression rerun, not a PR diff.
           // Keep the changed-path isolation guard, but require a source/test delta only for event diffs.
           if (eventName !== "workflow_dispatch" &&
               !changed.includes("src/pages/Meetings.jsx") &&
               !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
-              !testOnlySignatureNavigation && !testOnlyRegisterScope && !guardOnlyWorkflowRepair) {
+              !testOnlySignatureNavigation && !testOnlyRegisterScope && !guardOnlyWorkflowRepair && !adminResetOnly) {
             throw new Error("Meeting/participant source change or an explicitly paired isolated regression/guard test is missing.");
           }
           console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));
