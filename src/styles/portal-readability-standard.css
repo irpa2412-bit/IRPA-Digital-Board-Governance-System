@@ -139,8 +139,12 @@
 }
 
 
-/* The Dashboard keeps its deep-green hero surface; use white text there for WCAG contrast. */
+/* Keep Dashboard headings dark on light cards; hero text is white on its deep-green gradient. */
 #root .app-shell .content-area.dashboard-content-area .page :where(h1, h2, h3, h4, h5, h6) {
+  color: var(--irpa-readable-text) !important;
+  -webkit-text-fill-color: var(--irpa-readable-text) !important;
+}
+#root .app-shell .content-area.dashboard-content-area .page :where(.dashboard-hero, .mobile-dashboard-hero) :where(h1, h2, h3, h4, h5, h6, p, span, small, .muted) {
   color: #ffffff !important;
   -webkit-text-fill-color: #ffffff !important;
 }
