@@ -1,4 +1,5 @@
 name: Staging Gateway E2E and Deploy
+# Authorized verification branch runs isolated staging checks and deployment only; never production.
 
 on:
   push:
