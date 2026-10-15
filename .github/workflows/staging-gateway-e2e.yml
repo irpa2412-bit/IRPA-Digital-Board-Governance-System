@@ -75,7 +75,8 @@ jobs:
               STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY) value="$DRIVE_KEY" ;;
               STAGING_SMTP_PASSWORD) value="$SMTP" ;;
               STAGING_CRYPTO_TEST_EMAIL) value="$TEST_EMAIL" ;;
-              STAGING_CRYPTO_TEST_PASSWORD) value="$TEST_PASSWORD" ;;\n              STAGING_LIFECYCLE_FORBIDDEN_DOCUMENT_ID) value="$FORBIDDEN_DOCUMENT_ID" ;;
+              STAGING_CRYPTO_TEST_PASSWORD) value="$TEST_PASSWORD" ;;
+              STAGING_LIFECYCLE_FORBIDDEN_DOCUMENT_ID) value="$FORBIDDEN_DOCUMENT_ID" ;;
             esac
             if [ -z "$value" ]; then echo "Missing staging secret: $name"; missing=1; fi
           done
@@ -284,11 +285,11 @@ jobs:
             const endpoint = process.env.STAGING_GATEWAY_URL + "/api/document-lifecycle/list";
             const unauth = await fetch(endpoint,{method:"POST",headers:{"content-type":"application/json"},body:"{}"});
             if (unauth.status !== 401) fail(`Unauthenticated document-list request was not rejected with HTTP 401 (received ${unauth.status}).`);
-            const listed = await fetch(endpoint,{method:"POST",headers:{authorization:`Bearer ${auth.idToken}","content-type":"application/json"},body:"{}"});
+            const listed = await fetch(endpoint,{method:"POST",headers:{authorization:`Bearer ${auth.idToken}`,"content-type":"application/json"},body:"{}"});
             const listBody = await listed.json().catch(() => ({}));
             if (!listed.ok || listBody.ok !== true || !Array.isArray(listBody.documents)) fail(`Authenticated document-list operation failed (HTTP ${listed.status}).`);
             const forbidden = await fetch(process.env.STAGING_GATEWAY_URL + "/api/document-lifecycle/get",{
-              method:"POST",headers:{authorization:`Bearer ${auth.idToken}","content-type":"application/json"},
+              method:"POST",headers:{authorization:`Bearer ${auth.idToken}`,"content-type":"application/json"},
               body:JSON.stringify({documentId:process.env.FORBIDDEN_DOCUMENT_ID})
             });
             if (forbidden.status !== 403) fail(`Authorization fixture was not rejected with HTTP 403 (received ${forbidden.status}); ensure the fixture exists and is inaccessible to the test identity.`);
