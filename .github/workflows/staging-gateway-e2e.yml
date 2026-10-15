@@ -88,14 +88,17 @@ jobs:
           const readOwn=async collection=>{
             const res=await fetch("https://firestore.googleapis.com/v1/projects/"+project+"/databases/(default)/documents/"+collection+"/"+encodeURIComponent(auth.localId),{headers:{Authorization:"Bearer "+auth.idToken}});
             const data=await res.json().catch(()=>({}));
+            if(res.status===404) return null;
             if(!res.ok) throw new Error("Cannot read the signer's "+collection+" record under its own authenticated identity (HTTP "+res.status+").");
             return data.fields||{};
           };
           const sig=await readOwn("signatureProfiles");
           const identity=await readOwn("signerIdentities");
           const val=(fields,key)=>fields?.[key]?.stringValue||"";
-          if(val(sig,"status")!=="Active"||!val(sig,"signatureUrl").startsWith("data:image/")) throw new Error("Staging Signature Profile is not Active or has no saved signature specimen.");
-          if(val(identity,"authorityStatus")!=="Current") throw new Error("Staging Signer Identity authority status is not Current.");
+          if(!sig) throw new Error("STAGING_SIGNER_PROFILE_MISSING: no signatureProfiles/{authenticated UID} record exists. Complete and save the dedicated staging signer's Signature Profile before rerunning preflight; no profile or specimen will be fabricated.");
+          if(!identity) throw new Error("STAGING_SIGNER_IDENTITY_MISSING: no signerIdentities/{authenticated UID} record exists. Complete the staging signer's identity registration before rerunning preflight.");
+          if(val(sig,"status")!=="Active"||!val(sig,"signatureUrl").startsWith("data:image/")) throw new Error("STAGING_SIGNER_PROFILE_INCOMPLETE: Signature Profile must be Active and contain a saved signature specimen.");
+          if(val(identity,"authorityStatus")!=="Current") throw new Error("STAGING_SIGNER_AUTHORITY_NOT_CURRENT: staging Signer Identity authority status must be Current.");
           const role=val(identity,"authorityRole");
           const dept=val(identity,"authorityDepartment");
           const unit=val(identity,"authorityUnit");
