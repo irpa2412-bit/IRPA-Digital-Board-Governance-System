@@ -6,6 +6,7 @@ const workflow = readFileSync(new URL("../.github/workflows/meeting-portal-fixtu
 
 test("isolation baseline uses captured PR base SHA or current main for push runs", () => {
   assert.match(workflow, /const eventBase = process\.env\.PR_BASE_SHA\?\.trim\(\)/);
+  assert.match(workflow, /git fetch origin main:refs\/remotes\/origin\/main/);
   assert.match(workflow, /const base = eventBase \|\| "origin\/main"/);
 });
 
