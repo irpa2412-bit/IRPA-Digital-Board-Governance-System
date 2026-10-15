@@ -229,7 +229,6 @@ async function assertSharedReadability(page, module, width) {
       .toBe("rgb(248, 250, 249)");
   }
 
-  const readableCandidateSelector = '.page h1, .page h2, .page h3, .page label, .page table th, .page p, .page li, .page legend, .page button, .page table td, .page [role="heading"]';
   // Lazy-loaded portals may first render a visible shell while their actual workspace mounts.
   // Wait for real, visible portal copy rather than treating that transient shell as a readability failure.
   await expect.poll(async () => workspace.evaluate(root => {
