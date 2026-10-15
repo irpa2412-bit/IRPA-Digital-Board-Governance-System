@@ -6,7 +6,7 @@ const PRODUCTION_RESET_DOC = "wholeWebAppZeroReset20261011";
 const RESET_CONTROL_DOC = "resetControl20261015";
 const TRIAL_RESET_AUDIT_COLLECTION = "trialResetAudit";
 const PROTECTED_TOP_LEVEL = new Set([
-  "audit", "adminProfiles", "adminInvitations", "members", "employees",
+  "audit", "trialResetAudit", "adminProfiles", "adminInvitations", "members", "employees",
   "systemSettings", "systemResetPlans", "invitations", "registrationRequests",
   "inductionRecords", "memberCounters", "employeeCounters", "auditorProfiles",
   "signerIdentities", "signatureProfiles", "signatureEnvelopes", "signatureEvents",
