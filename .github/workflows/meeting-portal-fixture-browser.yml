@@ -186,6 +186,12 @@ jobs:
           // Readability-only PRs may update the shared theme, its dedicated tests, and explicitly listed CI path filters.
           // Keep this exception narrow: no meeting or unrelated portal implementation files may be included.
           const readabilityOnlyFiles = new Set([
+            ".github/workflows/mail-invitation-tests.yml",
+            ".github/workflows/meeting-invitation-flow-ci.yml",
+            ".github/workflows/meeting-invitation-nonprod-e2e.yml",
+            ".github/workflows/meeting-portal-fixture-browser.yml",
+            ".github/workflows/meeting-room-authorization-boundary.yml",
+            "tests/meeting-isolation-guard.test.mjs",
             ".github/workflows/authenticated-governance-browser-fixture.yml",
             ".github/workflows/cloudflare-esignature-tests.yml",
             ".github/workflows/document-lifecycle-module-test.yml",
