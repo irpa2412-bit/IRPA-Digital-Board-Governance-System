@@ -1,0 +1,48 @@
+name: Communication Website Integration Verification
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/pages/CommunicationMediaPortal.jsx"
+      - "drive-gateway/src/communicationsSite.mjs"
+      - "drive-gateway/src/index.js"
+      - "tests/communication-media-policy.test.mjs"
+      - "docs/COMMUNICATION_MEDIA_PORTAL.md"
+      - "package.json"
+      - "package-lock.json"
+      - "drive-gateway/**"
+      - ".github/workflows/communications-website-integration.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  communications-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install web dependencies
+        run: npm ci
+      - name: Run communications portal security and integration regression tests
+        run: npm run test:communication-media
+      - name: Verify Cloudflare communications router syntax
+        run: node --check drive-gateway/src/communicationsSite.mjs
+      - name: Verify Cloudflare gateway entrypoint syntax
+        run: node --check drive-gateway/src/index.js
+      - name: Build web application
+        run: npm run build
+      - name: Install gateway dependencies
+        working-directory: drive-gateway
+        run: npm ci
+      - name: Run complete gateway regression suite
+        working-directory: drive-gateway
+        run: npm test
+      - name: Verify Worker bundle without deployment
+        working-directory: drive-gateway
+        run: npx wrangler deploy --dry-run --keep-vars
