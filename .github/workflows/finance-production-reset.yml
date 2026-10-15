@@ -1,30 +1,68 @@
-name: Approved Finance Production Data Reset
+name: IRPA Data Reset Controls
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "scripts/reset-finance-production.js"
-      - ".github/workflows/finance-production-reset.yml"
   workflow_dispatch:
+    inputs:
+      reset_mode:
+        description: "Choose the reset scope. Production is single-use; trial reset can be repeated."
+        type: choice
+        required: true
+        options:
+          - TRIAL_ADMIN
+          - PRODUCTION_ONCE
+      authorize:
+        description: "For trial: RESET-TRIAL. For production: RESET-PRODUCTION-ONCE. Exact phrase required."
+        type: string
+        required: true
+      administrator_identity:
+        description: "Auditable administrator/operator identity (email or approved GitHub identity)."
+        type: string
+        required: true
 
 permissions:
   contents: read
 
+concurrency:
+  group: irpa-data-reset-controls
+  cancel-in-progress: false
+
 jobs:
-  reset-and-verify:
-    runs-on: ubuntu-latest
+  reset:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - name: Install Firebase Admin SDK
         run: npm --prefix functions install --omit=dev
-      - name: Execute approved reset and verify zero operational entries
+      - name: Validate reset authorization without logging secret values
+        env:
+          MODE: ${{ inputs.reset_mode }}
+          AUTH: ${{ inputs.authorize }}
+          ACTOR: ${{ inputs.administrator_identity }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$ACTOR"
+          if [ "$MODE" = "TRIAL_ADMIN" ]; then
+            test "$AUTH" = "RESET-TRIAL"
+          elif [ "$MODE" = "PRODUCTION_ONCE" ]; then
+            test "$AUTH" = "RESET-PRODUCTION-ONCE"
+          else
+            echo "Unknown reset mode." >&2
+            exit 1
+          fi
+      - name: Execute selected, guarded reset
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
           NODE_PATH: ${{ github.workspace }}/functions/node_modules
+          RESET_MODE: ${{ inputs.reset_mode }}
+          RESET_ACTOR: ${{ inputs.administrator_identity }}
+          TRIAL_COLLECTION: trialData
+          TRIAL_RESET_AUTHORIZED: ${{ inputs.reset_mode == 'TRIAL_ADMIN' && inputs.authorize == 'RESET-TRIAL' && 'YES_I_AUTHORIZE_TRIAL_DATA_RESET' || '' }}
+          PRODUCTION_RESET_AUTHORIZED: ${{ inputs.reset_mode == 'PRODUCTION_ONCE' && inputs.authorize == 'RESET-PRODUCTION-ONCE' && 'YES_I_AUTHORIZE_ONE_TIME_PRODUCTION_RESET' || '' }}
         run: node scripts/reset-finance-production.js
