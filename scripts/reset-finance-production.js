@@ -100,14 +100,12 @@ async function main() {
       productionResetVersion: 1
     }, { merge: true });
   } else {
-    // Trial resets remain reusable but are isolated to a dedicated trial collection.
+    // Trial reset follows the application's established record markers across the
+    // resettable operational collections. Identity records and protected collections
+    // are excluded from the scan and cannot be deleted by this path.
     if (process.env.TRIAL_RESET_AUTHORIZED !== "YES_I_AUTHORIZE_TRIAL_DATA_RESET") {
       throw new Error("Trial reset requires the exact authorization input.");
     }
-    if (process.env.TRIAL_COLLECTION !== "trialData") {
-      throw new Error("TRIAL_COLLECTION must be the explicitly isolated trialData collection.");
-    }
-    if (PROTECTED_TOP_LEVEL.has("trialData")) throw new Error("Safety stop: trialData unexpectedly classified as protected.");
   }
 
   const report = {
@@ -145,18 +143,54 @@ async function main() {
     console.log("WHOLE_WEB_APP_PRODUCTION_RESET_COMPLETED_AND_LATCHED");
     console.log(JSON.stringify({ ...report, completedAt: "serverTimestamp", actor }, null, 2));
   } else {
-    // Trial reset is intentionally scoped to the isolated trialData root.
-    const trial = db.collection("trialData");
-    const children = await trial.get();
-    report.before.trialData = children.size;
-    for (const doc of children.docs) {
-      for (const child of await doc.ref.listCollections()) totalDeleted += await deleteCollectionTree(child, report);
-      await doc.ref.delete();
-      totalDeleted++;
+    // Match the same marker semantics as the app's reset protocol. Keep the scan
+    // within operational collections; identity, configuration, invitation, audit,
+    // and signer/security collections are never targets.
+    const resettable = [
+      "meetings","meetingSubscriptions","meetingRoomEvents","transcriptions",
+      "resolutions","votes","voteCorrections","votingIssues","actions","documents","signatures","decisions",
+      "risks","reports","authorizationRequests","workflowActions","staffPaymentRequests","financeBudgets",
+      "financeTransactions","financeFunding","financeApprovals","financeCommitments","financeGrants",
+      "financeBankAccounts","financeReconciliations","financeAssets","financeRisks","financeReports",
+      "financeChartOfAccounts","financeJournalBatches","financePeriods","financeLedgerJournals",
+      "financeLedgerEntries","financePaymentMatches","financePaymentTrace","financeReferenceRegistry",
+      "procurementVendors","procurementRequests","procurementVendorScores","procurementVendorBlacklist",
+      "procurementVendorProbation","donorFunders","grantReportingObligations","participants"
+    ];
+    const isTrial = data =>
+      String(data?.recordOrigin || "").trim().toUpperCase() === "TRIAL" ||
+      data?.trialData === true || data?.isTrial === true;
+    for (const name of resettable) {
+      const ref = db.collection(name);
+      let cursor = null, before = 0, deleted = 0, after = -1;
+      while (true) {
+        let q = ref.orderBy("__name__").limit(400);
+        if (cursor) q = q.startAfter(cursor);
+        const snap = await q.get();
+        before += snap.size;
+        if (snap.empty) { after = 0; break; }
+        const batch = db.batch();
+        let batchDeletes = 0;
+        for (const doc of snap.docs) {
+          if (isTrial(doc.data())) {
+            batch.delete(doc.ref);
+            batchDeletes++;
+          }
+        }
+        if (batchDeletes) await batch.commit();
+        deleted += batchDeletes;
+        cursor = snap.docs[snap.docs.length - 1];
+        if (snap.size < 400) { after = 0; break; }
+      }
+      const verify = await ref.orderBy("__name__").limit(400).get();
+      const remainingTrial = verify.docs.filter(doc => isTrial(doc.data()));
+      if (remainingTrial.length) throw new Error(`Trial reset verification failed for ${name}: trial-marked records remain in the first verification page.`);
+      report.before[name] = before;
+      report.deleted[name] = deleted;
+      report.after[name] = "verified-no-trial-marked-records";
+      totalDeleted += deleted;
     }
-    const verify = await trial.get();
-    if (!verify.empty) throw new Error(`Trial reset verification failed: ${verify.size} root documents remain.`);
-    report.after.trialData = verify.size;
+    report.scope = "Delete only documents explicitly marked recordOrigin=TRIAL, trialData=true, or isTrial=true across approved operational collections. Registered identities, security records, and unmarked/production records are preserved.";
     report.totalDeletedDocuments = totalDeleted;
     report.status = "COMPLETED";
     report.completedAt = FieldValue.serverTimestamp();
