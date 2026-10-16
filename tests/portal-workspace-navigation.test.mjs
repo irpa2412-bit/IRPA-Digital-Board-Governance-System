@@ -60,7 +60,7 @@ test("Back/Next sticky offset follows the measured portal-label panel height", (
   assert.ok(source.includes("new ResizeObserver(update)"));
   assert.ok(source.includes('main.style.setProperty("--irpa-portal-navigation-height"'));
   assert.ok(source.includes("<PortalNavigationFreeze/>"));
-  assert.match(navigationCss, /\.page-back-next-navigation\s*\{[\s\S]*?top:\s*var\(--irpa-portal-navigation-height,\s*0px\)\s*!important/);
+  assert.match(navigationCss, /@media\s*\(max-width:\s*760px\)[\s\S]*?\.page-back-next-navigation\s*\{[\s\S]*?grid-template-columns:\s*minmax/);
 });
 
 test("mobile portal label is visible and Back/Next uses the same measured sticky stack", () => {
