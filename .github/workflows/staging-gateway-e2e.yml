@@ -86,13 +86,14 @@ jobs:
             name="${pair%%:*}"; value="${pair#*:}"
             if [ -z "$value" ]; then echo "Missing staging secret: $name"; missing=1; fi
           done
-          test "$PROJECT" != "irpa-digital-board-governance"
+          test "$PROJECT" = "irpa-dbg-staging-a73ec"
           test "$APP_URL" != "https://irpa-digital-board-governance.web.app"
           test "$missing" -eq 0
           node <<'NODE'
           const fs=require("fs");
           const project=process.env.PROJECT;
           const sa=JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT||"{}");
+          if(project!=="irpa-dbg-staging-a73ec") throw new Error("Firebase project must match the approved isolated staging project.");
           if(sa.project_id!==project) throw new Error("Staging service account must belong to the isolated staging Firebase project.");
           const app=new URL(process.env.APP_URL);
           if(app.protocol!=="https:" || ["irpa.or.tz","www.irpa.or.tz","irpa-digital-board-governance.web.app"].includes(app.hostname.toLowerCase())) throw new Error("Staging application must use HTTPS on an isolated non-production hostname.");
@@ -211,7 +212,7 @@ jobs:
             kv_namespaces:[{binding:"DRIVE_KV",id:process.env.STAGING_KV_ID}],
             triggers:{crons:["0 * * * *"]}
           };
-          if(c.vars.FIREBASE_PROJECT_ID==="irpa-digital-board-governance") throw new Error("Production Firebase project forbidden.");
+          if(c.vars.FIREBASE_PROJECT_ID!=="irpa-dbg-staging-a73ec") throw new Error("Worker must use the approved isolated staging Firebase project.");
           fs.writeFileSync("wrangler.staging.generated.json",JSON.stringify(c,null,2)+"\n");
           NODE
 
@@ -222,7 +223,7 @@ jobs:
           node <<'NODE'
           const c=require("./wrangler.staging.generated.json");
           if(c.name!=="irpa-google-drive-gateway-staging") throw new Error("Worker boundary mismatch");
-          if(c.vars.FIREBASE_PROJECT_ID==="irpa-digital-board-governance") throw new Error("Production Firebase project");
+          if(c.vars.FIREBASE_PROJECT_ID!=="irpa-dbg-staging-a73ec") throw new Error("Unexpected Firebase project for staging Worker");
           if(c.vars.IRPA_ENVIRONMENT!=="staging") throw new Error("Explicit staging environment marker missing");
           if(c.kv_namespaces?.[0]?.binding!=="DRIVE_KV") throw new Error("Missing staging KV");
           if(c.triggers?.crons?.[0]!=="0 * * * *") throw new Error("Cleanup cron missing");
