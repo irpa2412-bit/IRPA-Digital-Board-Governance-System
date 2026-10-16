@@ -80,6 +80,17 @@ jobs:
             .trim().split("\n").filter(Boolean).sort();
           const allowed = new Set([
             ".github/workflows/meeting-portal-fixture-browser.yml",
+            ".github/workflows/finance-production-reset.yml",
+            "docs/ACTUAL_DATA_ACCESS_GATE.md",
+            "scripts/reset-finance-production.js",
+            "src/FieldEntryDataGate.jsx",
+            "src/components/ActualDataAccessControl.jsx",
+            "src/firebase/systemControl.js",
+            "src/pages/Settings.jsx",
+            "src/pages/FinancePortfolio.jsx",
+            "tests/finance-portal-policy.test.cjs",
+            "tests/firestore.rules.test.cjs",
+            "tests/research-portal-security.test.mjs",
             "tests/meeting-isolation-guard.test.mjs",
             ".github/workflows/meeting-invitation-flow-ci.yml",
             ".github/workflows/mail-invitation-tests.yml",
@@ -159,8 +170,13 @@ jobs:
           const signatureGatewayIntegration = changed.includes("src/firebase/signaturePlatform.js") &&
             changed.includes("drive-gateway/src/signing.mjs") &&
             changed.includes("drive-gateway/tests/controlled-authenticated-signing-flow.test.mjs");
+          const actualDataGateIntegration = changed.includes("src/FieldEntryDataGate.jsx") &&
+            changed.includes("src/firebase/systemControl.js") &&
+            changed.includes("src/components/ActualDataAccessControl.jsx") &&
+            changed.includes("functions/index.js") && changed.includes("firestore.rules") &&
+            changed.includes("tests/firestore.rules.test.cjs") && changed.every(path => allowed.has(path) || path === ".github/workflows/firebase-deploy.yml");
           const unexpected = changed.filter(path =>
-            !allowed.has(path) && !(path === ".github/workflows/firebase-deploy.yml" && signatureGatewayIntegration) && !(path === "drive-gateway/tests/esign-storage-multipart.test.mjs" && signatureGatewayIntegration)
+            !allowed.has(path) && !(path === ".github/workflows/firebase-deploy.yml" && (signatureGatewayIntegration || actualDataGateIntegration)) && !(path === "drive-gateway/tests/esign-storage-multipart.test.mjs" && signatureGatewayIntegration)
           );
           if (unexpected.length) {
             console.error("Unexpected files changed outside the isolated meeting repair:", unexpected);
@@ -216,7 +232,7 @@ jobs:
               !changed.includes("src/pages/Meetings.jsx") &&
               !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
               !testOnlySignatureNavigation && !testOnlyRegisterScope &&
-              !signatureGatewayIntegration && !guardOnlyWorkflowRepair && !communicationMediaOnly) {
+              !signatureGatewayIntegration && !actualDataGateIntegration && !guardOnlyWorkflowRepair && !communicationMediaOnly) {
             throw new Error("Meeting/participant source change or an explicitly paired isolated regression/guard test is missing.");
           }
           console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));
