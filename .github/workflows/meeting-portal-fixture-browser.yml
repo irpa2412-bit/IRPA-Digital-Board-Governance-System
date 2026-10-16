@@ -100,6 +100,7 @@ jobs:
             "tests/research-portal-security.test.mjs",
             "tests/meeting-isolation-guard.test.mjs",
             "tests/invitation-removal-policy.test.mjs",
+            "tests/meeting-invitation-resend-quorum.test.mjs",
           "tests/signature-signer-picker-regression.test.mjs",
             ".github/workflows/meeting-invitation-flow-ci.yml",
             ".github/workflows/mail-invitation-tests.yml",
