@@ -25,6 +25,7 @@ on:
       - "drive-gateway/tests/mail-invitation.unit.mjs"
       - "drive-gateway/tests/invitation-redemption.test.mjs"
       - "functions/meetingGateway.emulator.test.cjs"
+      - "tests/meeting-invitation-resend-quorum.test.mjs"
   pull_request:
     branches:
       - main
@@ -69,5 +70,7 @@ jobs:
         run: npm ci
       - name: Test meeting entry policy
         run: npm run test:meeting-entry-policy
+      - name: Test failed invitation resend and quorum exclusion
+        run: npm run test:meeting-invitation-resend
       - name: Build web application
         run: npm run build
