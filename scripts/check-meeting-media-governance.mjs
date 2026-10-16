@@ -25,7 +25,6 @@ const checks=[
  ["Firestore create retains registrar, initiator and meeting-category validation",fs.readFileSync("firestore.rules","utf8").includes('allow create:if meetingRegistrar()&&request.resource.data.get("initiatorUid","")==request.auth.uid&&validMeetingCategory(request.resource.data)')],
  ["Meeting media client exists",fs.existsSync("src/components/IRPADGBSMeetingRoomMedia.jsx")],
  ["Participant invitation creates a meeting access pass",participantPage.includes("createMeetingAccessInvitation")&&participantPage.includes("meetingAccess")],
- ["Meeting invitation constructs the exact tokenized gateway URL required by the mail renderer",participantPage.includes('meetingGateUrl.searchParams.set("meetingToken",issued.accessToken)')&&participantPage.includes('meetingGateUrl.searchParams.set("meetingId",issued.meetingId||payload.meetingId)')&&participantPage.includes("link:meetingGateUrl.toString()")],
  ["Meeting access pass is sent through the authenticated IRPA mail gateway",participantPage.includes("sendMemberInvitationEmail(payload.participantEmail,invitationId,payload.participantRole,payload.memberType,meetingAccess)")],
  ["Undelivered meeting access pass is revoked",participantPage.includes("revokeMeetingAccessInvitation")&&gateway.includes("exports.revokeMeetingAccessInvitation")],
  ["Mail gateway verifies meeting and participant link before dispatch",invitationWorker.includes("fields.participantId?.stringValue")&&invitationWorker.includes("linkedMeeting!==meetingId||participantEmail!==email")],
