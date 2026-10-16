@@ -78,7 +78,7 @@ jobs:
           const eventName = process.env.EVENT_NAME?.trim();
           const base = "origin/main";
           execFileSync("git", ["cat-file", "-e", `${base}^{commit}`]);
-          const changed = execFileSync("git", ["diff", "--name-only", base, "HEAD"], { encoding: "utf8" })
+          const changed = execFileSync("git", ["diff", "--name-only", `${base}...HEAD`], { encoding: "utf8" })
             .trim().split("\n").filter(Boolean).sort();
           const allowed = new Set([
             ".github/workflows/meeting-portal-fixture-browser.yml",
