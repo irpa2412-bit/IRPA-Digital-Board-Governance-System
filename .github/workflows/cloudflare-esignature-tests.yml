@@ -4,8 +4,16 @@ on:
   push:
     branches: ["repair/esign-production-entrypoint-20261004", "repair/cloudflare-auth-functions-20261004"]
     paths:
+      - "src/styles/portal-readability-standard.css"
       - "drive-gateway/**"
       - "firebase.json"
+      - ".github/workflows/cloudflare-esignature-tests.yml"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "src/styles/portal-readability-standard.css"
+      - "src/pages/SignaturePlatform.jsx"
+      - "drive-gateway/**"
       - ".github/workflows/cloudflare-esignature-tests.yml"
   workflow_dispatch:
 
