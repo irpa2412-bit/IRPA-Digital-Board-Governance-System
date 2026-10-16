@@ -164,9 +164,20 @@ async function assertStickyPortalNavigation(page) {
       rollerTop: roller.getBoundingClientRect().top,
       rollerBottom: roller.getBoundingClientRect().bottom,
       rollerMarginBottom: parseFloat(rollerStyle.marginBottom || "0"),
-      navTop: nav.getBoundingClientRect().top
+      navTop: nav.getBoundingClientRect().top,
+      rollerPosition: rollerStyle.position,
+      mainTop: roller.closest(".main-area").getBoundingClientRect().top,
+      windowScrollY: window.scrollY,
+      viewportWidth: window.innerWidth,
+      sidebarDisplay: document.querySelector(".sidebar") ? getComputedStyle(document.querySelector(".sidebar")).display : "missing",
+      sidebarTop: document.querySelector(".sidebar")?.getBoundingClientRect().top ?? null,
+      sidebarHeight: document.querySelector(".sidebar")?.getBoundingClientRect().height ?? null,
+      htmlOverflowX: getComputedStyle(document.documentElement).overflowX,
+      bodyOverflowX: getComputedStyle(document.body).overflowX,
+      rootOverflowX: getComputedStyle(document.querySelector("#root")).overflowX
     };
   });
+  console.log("STICKY_NAV_DIAGNOSTIC", JSON.stringify(scrolled));
   expect(Math.abs(scrolled.rollerTop), "portal label panel must stay at the viewport top while scrolling").toBeLessThanOrEqual(3);
   expect(Math.abs(scrolled.navTop - (scrolled.rollerBottom + scrolled.rollerMarginBottom)),
     "Back/Next must remain directly below the portal label panel while scrolling").toBeLessThanOrEqual(3);
