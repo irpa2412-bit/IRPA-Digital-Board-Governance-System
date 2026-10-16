@@ -230,3 +230,16 @@
   background-color: #f4f8f5 !important;
   text-decoration: underline !important;
 }
+
+
+/* Document archive routing is a light instructional surface; force its list copy
+   to retain dark contrast even when legacy theme variables supply light text. */
+#root .app-shell .content-area:not(.dashboard-content-area) .page .archive-routing-panel,
+#root .app-shell .content-area:not(.dashboard-content-area) .page .archive-routing-panel :where(li, div) {
+  color: #26352f !important;
+  -webkit-text-fill-color: #26352f !important;
+}
+#root .app-shell .content-area:not(.dashboard-content-area) .page .archive-routing-panel strong {
+  color: #214f38 !important;
+  -webkit-text-fill-color: #214f38 !important;
+}
