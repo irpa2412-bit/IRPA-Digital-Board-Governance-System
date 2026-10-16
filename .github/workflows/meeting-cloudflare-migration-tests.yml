@@ -41,6 +41,7 @@ jobs:
         working-directory: drive-gateway
         run: |
           node --check src/index.js
+          node --check src/meetingPortal.mjs
           node --check src/meetingServices.mjs
 
       - name: Run Worker and meeting migration tests
