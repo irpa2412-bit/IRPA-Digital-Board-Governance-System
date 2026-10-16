@@ -19,6 +19,7 @@ In **Repository → Settings → Secrets and variables → Actions → Secrets**
 
 - [ ] `STAGING_CLOUDFLARE_API_TOKEN` — dedicated, active API token scoped to the staging account/resources needed to verify the token, manage the staging KV namespace and deploy the staging Worker; must not have production deployment permissions.
 - [ ] `STAGING_CLOUDFLARE_ACCOUNT_ID` — Cloudflare account ID containing the dedicated staging Worker and staging KV namespace.
+- [ ] `STAGING_IRPA_APP_URL` — HTTPS URL of the isolated staging application; must not be the production Firebase Hosting URL or live website.
 
 ### Firebase and staging test identity
 
@@ -53,7 +54,6 @@ In **Repository → Settings → Secrets and variables → Actions → Secrets**
 
 In **Repository → Settings → Secrets and variables → Actions → Variables**:
 
-- [ ] `STAGING_IRPA_APP_URL` (currently wired as an Actions secret by the workflow) — HTTPS URL of the isolated staging application; not the production Firebase Hosting URL or live website. Keep the current workflow's expected secret name unless the workflow is deliberately changed in the same reviewed PR.
 - [ ] `STAGING_SMTP_HOST` — dedicated test SMTP hostname; must not be `mail.irpa.or.tz`.
 - [ ] `STAGING_SMTP_PORT` — `465` or `587`, matching the staging SMTP service.
 - [ ] `STAGING_SMTP_FROM` — approved staging/test sender; must not be `info@irpa.or.tz`.
