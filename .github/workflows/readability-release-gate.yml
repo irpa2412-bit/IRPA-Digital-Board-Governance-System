@@ -33,6 +33,8 @@ jobs:
         run: npm ci
       - name: Syntax-check checker and verifier
         run: node --check scripts/check-production-readability.mjs && node --check scripts/verify-production-readability.mjs
+      - name: Test shared portal readability standard
+        run: node --test tests/portal-readability-standard.test.mjs
       - name: Run mandatory full-source readability and contrast audit
         run: npm run check:production-readability
       - name: Build production artifact
