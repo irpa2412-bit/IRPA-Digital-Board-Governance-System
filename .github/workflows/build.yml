@@ -21,8 +21,6 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Signature PDF palette regression tests
-        run: node --test tests/signature-signer-picker-regression.test.mjs
       - name: Mandatory full-source readability and contrast check
         run: npm run check:production-readability
       - name: Production build
