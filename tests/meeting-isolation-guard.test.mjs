@@ -48,6 +48,6 @@ test("readability-only PRs are narrowly allowlisted without permitting unrelated
   assert.match(workflow, /changed\.includes\("src\/styles\/portal-readability-standard\.css"\)/);
   assert.match(workflow, /changed\.every\(path => readabilityOnlyFiles\.has\(path\)\)/);
   assert.match(workflow, /!readabilityOnlyChange/);
-  assert.match(workflow, /"src\/main\.jsx"/);
+  assert.match(workflow, /"src\\/App\\.jsx"/);
   assert.match(workflow, /"tests\/browser\/authenticated-governance-regression\.spec\.mjs"/);
 });
