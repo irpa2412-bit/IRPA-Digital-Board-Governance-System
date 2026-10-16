@@ -46,6 +46,7 @@ test("alphabetical navigation changes do not alter the registered sub-portal bou
 
 const entry = readFileSync(new URL("../src/main.jsx", import.meta.url), "utf8");
 const navigationCss = readFileSync(new URL("../src/styles/page-back-next-navigation.css", import.meta.url), "utf8");
+const mobileEnhancementCss = readFileSync(new URL("../src/styles/mobile-app-enhancement.css", import.meta.url), "utf8");
 
 test("Back/Next freeze rules are in the stylesheet imported by the production entry point", () => {
   assert.ok(entry.includes('import "./styles/page-back-next-navigation.css";'));
@@ -67,4 +68,10 @@ test("Back/Next sticky offset follows the measured portal-label panel height", (
 test("mobile portal label is visible and Back/Next uses the same measured sticky stack", () => {
   assert.match(navigationCss, /@media\s*\(max-width:\s*760px\)[\s\S]*?\.desktop-webapp-navigation-roller\s*\{[\s\S]*?display:\s*grid\s*!important/);
   assert.match(navigationCss, /@media\s*\(max-width:\s*760px\)[\s\S]*?\.page-back-next-navigation\s*\{[\s\S]*?grid-template-columns:\s*minmax/);
+});
+
+
+test("mobile horizontal containment does not create a competing scroll container for sticky navigation", () => {
+  assert.match(mobileEnhancementCss, /html,\s*body,\s*#root\s*\{[^}]*overflow-x:\s*clip\s*;/);
+  assert.doesNotMatch(mobileEnhancementCss, /html,\s*body,\s*#root\s*\{[^}]*overflow-x:\s*hidden\s*;/);
 });
