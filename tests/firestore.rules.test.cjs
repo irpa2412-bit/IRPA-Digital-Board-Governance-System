@@ -700,3 +700,20 @@ test("controlled-document register accepts explicitly trial-marked uploads witho
   assert.ok(rules.includes('match /documents/{id}{allow read:if admin()||controlledDocumentReadAllowed();allow create:if (admin()||controlledDocumentCreateAllowed()||documentLifecycleCreateAllowed(id)||documentLifecycleDerivativeCreateAllowed(id))&&actualCreateAllowed();'));
   assert.ok(rules.includes("function actualCreateAllowed(){return actualDataAccessOpen()||trialDataRecord(request.resource.data); }") || rules.includes("function actualCreateAllowed(){return actualDataAccessOpen()||trialDataRecord(request.resource.data);}"));
 });
+
+
+test("initial Signature Portal envelope association is owner-bound, draft-only, and preserves the actual-data gate", () => {
+  const rules = require("node:fs").readFileSync("firestore.rules", "utf8");
+  const start = rules.indexOf("function signatureDocumentInitialEnvelopeLink(documentId)");
+  const end = rules.indexOf("function signatureDocumentWorkflowUpdate()", start);
+  const helper = rules.slice(start, end);
+  assert.ok(start >= 0, "initial envelope-link helper must exist");
+  assert.ok(helper.includes('get("ownerUid","")==request.auth.uid'));
+  assert.ok(helper.includes('get("senderUid","")==request.auth.uid'));
+  assert.ok(helper.includes('get("documentId","")==documentId'));
+  assert.ok(helper.includes('get("status","")=="Draft"'));
+  assert.ok(helper.includes('request.resource.data.signatureOwnerUid==request.auth.uid'));
+  assert.ok(helper.includes('affectedKeys().hasOnly(["signatureEnvelopeId","signatureReference","signatureStatus","signatureOwnerUid","workflowOwnerSectionSaved","authorizationRequestId","authorizationReference","updatedAt"])'));
+  assert.ok(rules.includes("signatureDocumentInitialEnvelopeLink(id)||signatureDocumentWorkflowUpdate()"));
+  assert.ok(rules.includes("&&actualUpdateAllowed()"), "actual-data access gate must remain mandatory");
+});
