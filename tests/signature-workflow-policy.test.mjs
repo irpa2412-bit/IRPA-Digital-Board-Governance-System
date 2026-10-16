@@ -3,6 +3,8 @@ import test from "node:test";
 import fs from "node:fs";
 import { requireSupportedSignatureRoutingMode } from "../src/firebase/signatureWorkflowPolicy.js";
 
+const portal = fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx", import.meta.url), "utf8");
+
 test("Sequential and Parallel are the only supported Signature Portal routing modes", () => {
   assert.equal(requireSupportedSignatureRoutingMode("Sequential"), "Sequential");
   assert.equal(requireSupportedSignatureRoutingMode("Parallel"), "Parallel");
