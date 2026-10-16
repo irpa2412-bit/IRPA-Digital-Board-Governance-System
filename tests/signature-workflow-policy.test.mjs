@@ -30,3 +30,14 @@ test("Signature Portal signing reads use the scoped download route and preserve 
   assert.match(gateway, /url\.pathname === "\/api\/signature-file\/download"/);
   assert.match(gateway, /canReadSignatureAsset/);
 });
+
+test("uploaded controlled PDF enters the pre-signing palette with scoped document access", () => {
+  const page = fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx", import.meta.url), "utf8");
+  const storage = fs.readFileSync(new URL("../src/firebase/signatureStorage.js", import.meta.url), "utf8");
+  assert.match(page, /setDocumentId\(initialDocument\.id\);setDocumentUrl\(url\)/);
+  assert.match(page, /setSigningCircle\("Document Selected"\);setTab\("Prepare Envelope"\)/);
+  assert.match(page, /import\{downloadControlledDocumentBytes,downloadSignatureBytes\}from"\.\.\/firebase\/signatureStorage"/);
+  assert.match(page, /envelopeId\?await downloadSignatureBytes\([^;]+:await downloadControlledDocumentBytes\(url\.slice\("drive:\/\/"\.length\),documentId\)/);
+  assert.match(storage, /export async function downloadControlledDocumentBytes\(fileId, documentId\)/);
+  assert.match(storage, /if \(!fileId \|\| !documentId\) throw new Error/);
+});

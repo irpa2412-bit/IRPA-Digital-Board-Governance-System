@@ -77,3 +77,11 @@ test("controlled-document trial upload permission fix must remain paired with Fi
   assert.match(workflow, /changed\.includes\("tests\/firestore\.rules\.test\.cjs"\)/);
   assert.match(workflow, /!controlledDocumentTrialUploadFix/);
 });
+
+test("PDF palette repair is isolated to the signature page, scoped storage helper and paired policy test", () => {
+  assert.match(workflow, /const signaturePdfPaletteRepair = changed\.includes\("src\/pages\/SignaturePlatform\.jsx"\)/);
+  assert.match(workflow, /changed\.includes\("src\/firebase\/signatureStorage\.js"\)/);
+  assert.match(workflow, /changed\.includes\("tests\/signature-workflow-policy\.test\.mjs"\)/);
+  assert.match(workflow, /!signaturePdfPaletteRepair/);
+  assert.match(workflow, /changed\.every\(path => \["\.github\/workflows\/meeting-portal-fixture-browser\.yml", "tests\/meeting-isolation-guard\.test\.mjs", "src\/pages\/SignaturePlatform\.jsx", "src\/firebase\/signatureStorage\.js", "tests\/signature-workflow-policy\.test\.mjs"\]\.includes\(path\)\)/);
+});

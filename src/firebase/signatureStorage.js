@@ -194,6 +194,17 @@ export async function downloadDriveBytes(fileId, documentId = null) {
   return bytes;
 }
 
+export async function downloadControlledDocumentBytes(fileId, documentId) {
+  if (!fileId || !documentId) throw new Error("A controlled document ID and Google Drive file ID are required.");
+  const result = await gatewayPost("/api/download", { fileId, documentId });
+  const base64 = result.base64;
+  if (!base64) throw new Error("Google Drive returned no controlled document content.");
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
 export async function downloadSignatureBytes(fileId, documentId = null, envelopeId = null) {
   if (!fileId) throw new Error("Google Drive file ID is required.");
   const result = await gatewayPost("/api/signature-file/download", { fileId, documentId, envelopeId });

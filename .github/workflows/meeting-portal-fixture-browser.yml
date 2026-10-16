@@ -201,6 +201,10 @@ jobs:
           const signatureSignerPickerRepair = changed.includes("src/pages/SignaturePlatform.jsx") &&
             changed.includes("src/firebase/signaturePlatform.js") &&
             changed.includes("tests/signature-signer-picker-regression.test.mjs");
+          const signaturePdfPaletteRepair = changed.includes("src/pages/SignaturePlatform.jsx") &&
+            changed.includes("src/firebase/signatureStorage.js") &&
+            changed.includes("tests/signature-workflow-policy.test.mjs") &&
+            changed.every(path => [".github/workflows/meeting-portal-fixture-browser.yml", "tests/meeting-isolation-guard.test.mjs", "src/pages/SignaturePlatform.jsx", "src/firebase/signatureStorage.js", "tests/signature-workflow-policy.test.mjs"].includes(path));
           const controlledDocumentTrialUploadFix = changed.includes("firestore.rules") &&
             changed.includes("tests/firestore.rules.test.cjs") &&
             changed.every(path => allowed.has(path) || path === ".github/workflows/firebase-deploy.yml");
@@ -319,7 +323,7 @@ jobs:
               !changed.includes("src/pages/Meetings.jsx") &&
               !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
               !testOnlySignatureNavigation && !testOnlyRegisterScope && !invitationRemovalIntegration && !invitationMailResendIntegration &&
-              !signatureGatewayIntegration && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange) {
+              !signatureGatewayIntegration && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signaturePdfPaletteRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange) {
             throw new Error("Meeting/participant source change or an explicitly paired isolated regression/guard test is missing.");
           }
           console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));
