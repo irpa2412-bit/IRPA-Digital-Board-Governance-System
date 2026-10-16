@@ -10,6 +10,8 @@ test("failed meeting invitations expose a resend action",()=>{
   assert.match(participants,/isInvitationError\(i\)/);
   assert.match(participants,/Resend Invitation/);
   assert.match(participants,/createMeetingAccessInvitation/);
+  assert.match(participants,/link:meetingGateUrl\.toString\(\)/);
+  assert.match(participants,/searchParams\.set\("meetingToken",issued\.accessToken\)/);
   assert.match(participants,/sendMemberInvitationEmail\(i\.email\|\|participant\.participantEmail/);
 });
 
