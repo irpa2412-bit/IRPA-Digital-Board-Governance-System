@@ -94,6 +94,7 @@ jobs:
             "tests/firestore.rules.test.cjs",
             "tests/research-portal-security.test.mjs",
             "tests/meeting-isolation-guard.test.mjs",
+          "tests/signature-signer-picker-regression.test.mjs",
             ".github/workflows/meeting-invitation-flow-ci.yml",
             ".github/workflows/mail-invitation-tests.yml",
             ".github/workflows/cloudflare-gateway-deploy.yml",
@@ -185,6 +186,9 @@ jobs:
           const signatureGatewayIntegration = changed.includes("src/firebase/signaturePlatform.js") &&
             changed.includes("drive-gateway/src/signing.mjs") &&
             changed.includes("drive-gateway/tests/controlled-authenticated-signing-flow.test.mjs");
+          const signatureSignerPickerRepair = changed.includes("src/pages/SignaturePlatform.jsx") &&
+            changed.includes("src/firebase/signaturePlatform.js") &&
+            changed.includes("tests/signature-signer-picker-regression.test.mjs");
           const controlledDocumentTrialUploadFix = changed.includes("firestore.rules") &&
             changed.includes("tests/firestore.rules.test.cjs") &&
             changed.every(path => allowed.has(path) || path === ".github/workflows/firebase-deploy.yml");
@@ -292,7 +296,7 @@ jobs:
               !changed.includes("src/pages/Meetings.jsx") &&
               !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
               !testOnlySignatureNavigation && !testOnlyRegisterScope &&
-              !signatureGatewayIntegration && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange) {
+              !signatureGatewayIntegration && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange) {
             throw new Error("Meeting/participant source change or an explicitly paired isolated regression/guard test is missing.");
           }
           console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));
