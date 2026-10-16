@@ -19,18 +19,39 @@ export function validateName(name) {
 export function escapeHtml(s) {
   return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 }
+export const MAX_INVITATION_MAIL_ATTEMPTS = 3;
+export const MAX_INVITATION_RETRY_DELAY_MS = 2000;
+
+export function isRetryableMailError(error) {
+  const message = String(error?.message || error || "");
+  const smtp = message.match(/IRPA SMTP error (\d{3})/i);
+  if (smtp) {
+    const code = Number(smtp[1]);
+    return Number(smtp[1]) >= 400 && Number(smtp[1]) < 500;
+  }
+  if (error?.deliveryOutcome === "unknown" || error?.retryable === false) return false;
+  return true;
+}
+
 export async function sendWithRetry(fn, opts = {}) {
-  const { attempts=3, delayMs=300, logger=console, shouldRetry=()=>true, sleep=(ms)=>new Promise(r=>setTimeout(r,ms)) }=opts;
+  const { attempts=MAX_INVITATION_MAIL_ATTEMPTS, delayMs=300,
+    maxDelayMs=MAX_INVITATION_RETRY_DELAY_MS, logger=console,
+    shouldRetry=isRetryableMailError, sleep=(ms)=>new Promise(r=>setTimeout(r,ms)) }=opts;
+  const boundedAttempts=Math.max(1,Math.min(MAX_INVITATION_MAIL_ATTEMPTS,Number(attempts)||MAX_INVITATION_MAIL_ATTEMPTS));
   let lastErr;
-  for(let i=1;i<=attempts;i++){
+  for(let i=1;i<=boundedAttempts;i++){
     try{return await fn(i);}
     catch(e){
       lastErr=e;
-      if(i===attempts||!shouldRetry(e)) break;
-      await sleep(delayMs*2**(i-1));
+      try { logger?.error?.("IRPA invitation mail attempt failed", {attempt:i, retryable:shouldRetry(e), stage:e?.stage||"provider"}); } catch {}
+      if(i===boundedAttempts||!shouldRetry(e)) break;
+      const cap=Math.max(0,Number(maxDelayMs)||MAX_INVITATION_RETRY_DELAY_MS);
+      const exponential=Math.min(cap,Math.max(0,Number(delayMs)||300)*2**(i-1));
+      const jitter=Math.floor(Math.random()*Math.max(1,Math.floor(exponential*0.2)));
+      await sleep(Math.min(cap,exponential+jitter));
     }
   }
-  throw lastErr;
+  throw lastErr || new Error("Invitation mail delivery failed.");
 }
 export function buildInvitationMessage({name,link,meetingAccess=null,username=""}) {
   const safeName=validateName(name);

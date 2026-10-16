@@ -139,6 +139,7 @@ jobs:
             "package.json",
             "src/components/MeetingAccessControl.jsx",
             "src/pages/Invitations.jsx",
+            "src/firebase/auth.js",
             "src/pages/MeetingEntryGateway.jsx",
             "src/components/ControlledDocumentUpload.jsx",
             "src/firebase/meetingRecords.js",
@@ -247,6 +248,12 @@ jobs:
             changed.includes("tests/fixtures/meeting-portal-fixture.jsx");
           const testOnlyRegisterScope = changed.includes("src/firebase/data.js") &&
             changed.includes("tests/meeting-category-policy.test.mjs");
+          const invitationMailResendIntegration = changed.includes("src/firebase/auth.js") &&
+            changed.includes("src/pages/Invitations.jsx") &&
+            changed.includes("drive-gateway/src/index.js") &&
+            changed.includes("drive-gateway/src/invitationEmail.mjs") &&
+            changed.includes("drive-gateway/tests/mail-invitation.unit.mjs") &&
+            changed.every(path => allowed.has(path));
           const invitationRemovalIntegration = changed.includes("src/pages/Invitations.jsx") &&
             changed.includes("src/firebase/data.js") && changed.includes("functions/index.js") &&
             changed.includes("tests/invitation-removal-policy.test.mjs") &&
@@ -309,7 +316,7 @@ jobs:
           if (eventName !== "workflow_dispatch" &&
               !changed.includes("src/pages/Meetings.jsx") &&
               !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
-              !testOnlySignatureNavigation && !testOnlyRegisterScope && !invitationRemovalIntegration &&
+              !testOnlySignatureNavigation && !testOnlyRegisterScope && !invitationRemovalIntegration && !invitationMailResendIntegration &&
               !signatureGatewayIntegration && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange) {
             throw new Error("Meeting/participant source change or an explicitly paired isolated regression/guard test is missing.");
           }

@@ -1555,6 +1555,17 @@ async function sendMemberInvitation(request, env) {
   const invitation = await getFirestoreDocument(env, `invitations/${invitationId}`, claims.token);
   if (!invitation) return json({ok:false,error:"Invitation record was not found."},404,corsHeaders(request));
   const fields=invitation.fields||{};
+  const forceResend=data.forceResend===true;
+  const priorDeliveryStatus=String(fields.deliveryStatus?.stringValue||"").trim().toLowerCase();
+  const priorTokenHash=String(fields.invitationTokenHash?.stringValue||"").trim();
+  // Duplicate initial requests must reuse the existing activation state. Only the
+  // explicit Resend action may rotate the invitation secret.
+  if(priorTokenHash&&!forceResend&&priorDeliveryStatus==="sent"){
+    return json({ok:true,email:fields.email?.stringValue||"",deliveryStatus:"Sent",alreadySent:true},200,corsHeaders(request));
+  }
+  if(priorTokenHash&&!forceResend&&priorDeliveryStatus==="queued"){
+    return json({ok:true,email:fields.email?.stringValue||"",deliveryStatus:"Queued",alreadyProcessing:true},200,corsHeaders(request));
+  }
   const email=validateRecipient(fields.email?.stringValue||"");
   if(!email) return json({ok:false,error:"Invalid recipient"},400,corsHeaders(request));
   const name=String(fields.name?.stringValue||"").trim();
@@ -1767,7 +1778,19 @@ async function smtpSend(env,{to,subject,text,html}) {
       "--"+boundary+"--",""
     ].join("\r\n");
     await writer.write(new TextEncoder().encode(mime+"\r\n.\r\n"));
-    const accepted=await readResponse();
+    let accepted;
+    try {
+      accepted=await readResponse();
+    } catch (error) {
+      // Once DATA has been written, a transport failure before the final SMTP
+      // response is ambiguous: the provider may already have accepted the mail.
+      // Do not retry this case automatically and risk duplicate invitations.
+      if (!/^IRPA SMTP error \d{3}/i.test(String(error?.message||""))) {
+        error.deliveryOutcome="unknown";
+        error.retryable=false;
+      }
+      throw error;
+    }
     if (!accepted.startsWith("2")) throw new Error("SMTP message was not accepted.");
     await command("QUIT","2");
     return accepted;
