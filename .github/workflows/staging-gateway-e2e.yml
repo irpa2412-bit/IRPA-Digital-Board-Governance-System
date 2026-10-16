@@ -315,11 +315,11 @@ jobs:
 
       - name: Prepare isolated cPanel rollback test file
         env:
-          CP_BASE: \${{ secrets.STAGING_CPANEL_BASE_URL }}
-          CP_USER: \${{ secrets.STAGING_CPANEL_USERNAME }}
-          CP_TOKEN: \${{ secrets.STAGING_CPANEL_API_TOKEN }}
-          CP_ROOT: \${{ secrets.STAGING_CPANEL_DOCUMENT_ROOT }}
-          CP_TEST_FILE: \${{ secrets.STAGING_CPANEL_TEST_FILE }}
+          CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
+          CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
+          CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
+          CP_ROOT: ${{ secrets.STAGING_CPANEL_DOCUMENT_ROOT }}
+          CP_TEST_FILE: ${{ secrets.STAGING_CPANEL_TEST_FILE }}
         run: |
           set -euo pipefail
           node <<'NODE'
