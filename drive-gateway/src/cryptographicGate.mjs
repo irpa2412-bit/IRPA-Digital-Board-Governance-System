@@ -85,6 +85,9 @@ export function buildCanonicalSigningPayload({
   signedAt,
   chainHead,
   keyId,
+  authorityRole,
+  authoritySourceCollection,
+  authoritySourceRecordId,
 } = {}) {
   const payload = {
     schema: CRYPTO_EVIDENCE_SCHEMA,
@@ -100,6 +103,9 @@ export function buildCanonicalSigningPayload({
     chainHead: requireHexHash(chainHead, "chainHead"),
     keyId: String(keyId || ""),
   };
+  if (String(authorityRole||"").trim()) payload.authorityRole=String(authorityRole).trim();
+  if (String(authoritySourceCollection||"").trim()) payload.authoritySourceCollection=String(authoritySourceCollection).trim();
+  if (String(authoritySourceRecordId||"").trim()) payload.authoritySourceRecordId=String(authoritySourceRecordId).trim();
   if (!payload.envelopeId || !payload.signerId || !payload.signatureType || !payload.keyId) {
     throw new Error("Cryptographic signing payload is incomplete.");
   }
@@ -167,6 +173,9 @@ export async function createCryptographicEvidence({
     signedAt,
     chainHead,
     keyId,
+    authorityRole:signer.authorityVerification?.authorityRole,
+    authoritySourceCollection:signer.authorityVerification?.authoritySourceCollection,
+    authoritySourceRecordId:signer.authorityVerification?.authoritySourceRecordId,
   });
   const payloadHash = await sha256Hex(canonicalPayload);
   const signature = await signCanonicalPayload(privateKey, canonicalPayload);
@@ -186,6 +195,9 @@ export async function createCryptographicEvidence({
     documentHash,
     signatureHash,
     signatureType: signer.signatureType,
+    authorityRole:signer.authorityVerification?.authorityRole||null,
+    authoritySourceCollection:signer.authorityVerification?.authoritySourceCollection||null,
+    authoritySourceRecordId:signer.authorityVerification?.authoritySourceRecordId||null,
     signedAt: new Date(signedAt).toISOString(),
     chainHead,
     payloadHash,
@@ -346,6 +358,7 @@ export async function sealAndPersist({
           envelopeId: envelope.id,
           signatureHash: await sha256Hex(String(signer.signatureValue || "")),
           signatureType: signer.signatureType,
+          authorityVerification:signer.authorityVerification||null,
           privateKey: keyRecord.privateKey,
           publicKey: keyRecord.publicKey,
         },

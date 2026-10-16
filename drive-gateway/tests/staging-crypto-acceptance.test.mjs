@@ -9,7 +9,7 @@ import {
   importPublicKeyJwk,
   verifyCryptographicEvidence,
 } from "../src/cryptographicGate.mjs";
-import { chainEvents, finalizeEnvelope, verifyChain } from "../src/signing.mjs";
+import { chainEvents, finalizeEnvelope, getSigningEvidence, getSigningStatus, verifyChain } from "../src/signing.mjs";
 import { sha256Hex } from "../src/util.mjs";
 
 async function makeStagingSecret(signerUid) {
@@ -63,6 +63,8 @@ async function fixture() {
   });
 
   const signerUid = "uid-staging-crypto-001";
+  const signingSecret = "a".repeat(64);
+  const tokenHash = await sha256Hex(signingSecret);
   const envelope = {
     id: "ENV-STAGING-CRYPTO-001",
     documentId: "DOC-STAGING-CRYPTO-001",
@@ -75,6 +77,7 @@ async function fixture() {
     signers: [{
       id: "S1",
       uid: signerUid,
+      tokenHash,
       email: "staging-signer@example.org",
       name: "Staging Signer",
       order: 1,
@@ -92,7 +95,7 @@ async function fixture() {
   };
   await meta.create("envelopes", envelope.id, envelope);
   const stagingSecret = await makeStagingSecret(signerUid);
-  return { meta, storage, envelope, stagingSecret };
+  return { meta, storage, envelope, stagingSecret, token: envelope.id + ".S1." + signingSecret };
 }
 
 test("C-G13 staging custody resolves the signer key through the Cloudflare-style environment binding", async () => {
@@ -240,4 +243,57 @@ test("C-G19 staging transaction rejects tampered persisted cryptographic payload
     signerUid: evidence.signerUid,
     publicKey,
   }), false);
+});
+
+
+test("C-G21 authenticated Gateway status and evidence retrieval bind the completed envelope, signer, PDF hash, and audit chain", async () => {
+  const f = await fixture();
+  const provider = createCloudflareSignerKeyProvider(f.stagingSecret.env);
+  const ctx = {
+    meta:f.meta,
+    storage:f.storage,
+    now:()=>new Date("2026-10-07T20:00:00.000Z"),
+    config:{ttlDays:14},
+    crypto:{keyProvider:provider}
+  };
+  const result=await finalizeEnvelope(ctx,f.envelope.id);
+  assert.equal(result.completed,true);
+  const status=await getSigningStatus(ctx,f.token,{uid:f.envelope.signers[0].uid});
+  assert.equal(status.status,"Completed");
+  assert.equal(status.auditChainValid,true);
+  assert.equal(status.completion.finalHash,result.completion.finalHash);
+  assert.equal(status.completion.cryptographicEvidenceIds.length,1);
+  assert.equal(status.signers[0].uid,f.envelope.signers[0].uid);
+  const evidence=await getSigningEvidence(ctx,f.token,{uid:f.envelope.signers[0].uid});
+  assert.equal(evidence.ok,true);
+  assert.equal(evidence.documentHash,result.completion.finalHash);
+  assert.equal(evidence.auditChainValid,true);
+  assert.equal(evidence.evidence.length,1);
+  assert.equal(evidence.evidence[0].envelopeId,f.envelope.id);
+  assert.equal(evidence.evidence[0].signerUid,f.envelope.signers[0].uid);
+  assert.equal(evidence.evidence[0].documentHash,result.completion.finalHash);
+});
+
+test("C-G22 evidence retrieval fails closed when persisted cryptographic evidence is tampered", async () => {
+  const f = await fixture();
+  const provider = createCloudflareSignerKeyProvider(f.stagingSecret.env);
+  const ctx = {
+    meta:f.meta,
+    storage:f.storage,
+    now:()=>new Date("2026-10-07T20:00:00.000Z"),
+    config:{ttlDays:14},
+    crypto:{keyProvider:provider}
+  };
+  const result=await finalizeEnvelope(ctx,f.envelope.id);
+  assert.equal(result.completed,true);
+  const evidenceId=result.completion.cryptographicEvidenceIds[0];
+  const evidence=await f.meta.get("cryptographicEvidence",evidenceId);
+  await f.meta.update("cryptographicEvidence",evidenceId,{
+    ...evidence,
+    canonicalPayload:evidence.canonicalPayload.replace(f.envelope.signers[0].uid,"uid-tampered")
+  });
+  await assert.rejects(
+    ()=>getSigningEvidence(ctx,f.token,{uid:f.envelope.signers[0].uid}),
+    error=>error.status===409&&error.message.includes("failed verification")
+  );
 });

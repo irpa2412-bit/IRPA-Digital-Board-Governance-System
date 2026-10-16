@@ -149,6 +149,7 @@ jobs:
           if (c.vars?.ESIGN_MODULE_ENABLED !== "true") throw new Error("Production e-signature flag is not exactly true. Deployment blocked.");
           if (c.vars?.CLOUDFLARE_AUTH_FUNCTIONS_ENABLED !== "true") throw new Error("Production Cloudflare authentication cutover flag is not exactly true. Deployment blocked.");
           if (c.vars?.IRPA_PRODUCTION_CUTOVER !== "true") throw new Error("Explicit production cutover marker is missing. Deployment blocked.");
+          if (c.vars?.IRPA_STAGING_CRYPTO_TEST_MODE === "true") throw new Error("Staging-only signing-token return mode is forbidden in production. Deployment blocked.");
           const kv = Array.isArray(c.kv_namespaces) ? c.kv_namespaces : [];
           if (kv.length !== 1 || kv[0]?.binding !== "DRIVE_KV" || !/^[a-f0-9]{32}$/.test(String(kv[0]?.id || ""))) {
             throw new Error("Production DRIVE_KV binding is invalid. Deployment blocked.");

@@ -45,7 +45,12 @@ jobs:
           VITE_GRANT_CRAWLER_WORKER_URL: https://irpa-grant-crawler-production.irpa-governance.workers.dev
           VITE_GRANT_ASSISTANT_WORKER_URL: https://irpa-dbgs-grant-crawler.irpa-governance.workers.dev
           VITE_GOOGLE_WEATHER_API_KEY: ${{ secrets.VITE_GOOGLE_WEATHER_API_KEY }}
-        run: npm run build
+          # Keep Gateway cryptographic signing disabled until isolated staging acceptance passes.
+          VITE_IRPA_CRYPTOGRAPHIC_SIGNING_ENABLED: "false"
+        run: |
+          set -euo pipefail
+          test "$VITE_IRPA_CRYPTOGRAPHIC_SIGNING_ENABLED" = "false"
+          npm run build
 
       - name: Verify grant crawler endpoint in the production bundle
         shell: bash
