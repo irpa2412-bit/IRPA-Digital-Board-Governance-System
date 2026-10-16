@@ -3,6 +3,7 @@ import { auth, db, applicantAuth, applicantDb, applicantApp } from "./config";
 import { sendEmployeeRegistrationEmail } from "./auth";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { canAccessMeetingCategory, MEETING_CATEGORIES } from "./meetingPolicy.js";
+import { listLifecycleDocuments } from "./documentLifecycle.js";
 
 const uniqueInductionValues=(values)=>[...new Set(values.flatMap(v=>Array.isArray(v)?v:String(v||"").split(",")).map(v=>String(v||"").trim()).filter(Boolean))];
 
@@ -130,15 +131,30 @@ export async function getControlledDocumentsForSigning({portal="Signature Portal
       ];
   const results=[];const errors=[];
   for(const q of querySpecs){try{const snap=await getDocs(q);results.push(...snap.docs.map(x=>({id:x.id,...x.data()})));}catch(error){errors.push(error);}}
-  if(!results.length&&errors.length===querySpecs.length)throw errors[0]||new Error("Controlled document list could not be loaded.");
-  const byId=new Map(results.map(d=>[d.id,d]));
+  // The Documents Portal writes through the authenticated Document Lifecycle gateway.
+  // Those records are access-filtered server-side and are not guaranteed to be in the
+  // same query result shape as legacy direct Firestore document uploads.
+  let lifecycleLoaded=false;
+  try{
+    const lifecycle=await listLifecycleDocuments();
+    const lifecycleRows=Array.isArray(lifecycle?.documents)?lifecycle.documents:[];
+    for(const item of lifecycleRows){
+      const id=String(item?.documentId||item?.id||"").trim();
+      if(!id)continue;
+      const fileId=String(item?.fileId||item?.driveFileId||"").trim();
+      results.push({...item,id,documentId:id,fileUrl:item?.fileUrl||(fileId?("drive://"+fileId):""),contentType:item?.contentType||item?.mimeType||"application/pdf",recordOrigin:item?.recordOrigin||"PRODUCTION"});
+    }
+    lifecycleLoaded=true;
+  }catch(error){errors.push(error);}
+  if(!results.length&&errors.length===querySpecs.length+1)throw errors[0]||new Error("Controlled document list could not be loaded.");
+  const byId=new Map(results.map(item=>[String(item.id||item.documentId),item]));
   const trialMode=isTrialDataMode();
   const usable=[...byId.values()].filter(d=>{
     const isTrialRecord=String(d?.recordOrigin||"PRODUCTION").toUpperCase()==="TRIAL"||d?.trialData===true||d?.isTrial===true;
     if(isTrialRecord!==trialMode)return false;
-    const contentType=String(d?.contentType||"application/pdf").toLowerCase();if(contentType!=="application/pdf")return false;
-    const link=String(d?.webViewLink||"");const driveId=d?.fileId||d?.driveFileId||((link.match(/\/d\/([a-zA-Z0-9_-]+)/)||[])[1])||((link.match(/[?&]id=([a-zA-Z0-9_-]+)/)||[])[1])||"";
-    if(!(d?.fileUrl||d?.documentUrl||d?.storageUrl||d?.pdfUrl||driveId))return false;
+    const contentType=String(d?.contentType||d?.mimeType||d?.documentContentType||"application/pdf").toLowerCase();if(contentType!=="application/pdf")return false;
+    const link=String(d?.webViewLink||d?.archiveFileWebViewLink||"");const driveId=d?.fileId||d?.driveFileId||d?.sourceFileId||((link.match(/\/d\/([a-zA-Z0-9_-]+)/)||[])[1])||((link.match(/[?&]id=([a-zA-Z0-9_-]+)/)||[])[1])||"";
+    if(!(d?.fileUrl||d?.documentUrl||d?.storageUrl||d?.pdfUrl||d?.downloadUrl||d?.downloadURL||driveId))return false;
     const classification=String(d?.classification||"Public").trim().toLowerCase();
     // Governance and Meeting portals can access every classification. Every other portal can access all categories, but not Confidential or Restricted.
     if(!isUnrestrictedPortal&&["confidential","restricted"].includes(classification))return false;
