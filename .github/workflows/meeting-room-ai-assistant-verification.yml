@@ -4,12 +4,14 @@ on:
   pull_request:
     branches: [main]
     paths:
+      - "src/styles/portal-readability-standard.css"
       - "src/pages/MeetingRoom.jsx"
       - "tests/meeting-room-ai-assistant.test.mjs"
       - ".github/workflows/meeting-room-ai-assistant-verification.yml"
   push:
     branches: [main]
     paths:
+      - "src/styles/portal-readability-standard.css"
       - "src/pages/MeetingRoom.jsx"
       - "tests/meeting-room-ai-assistant.test.mjs"
       - ".github/workflows/meeting-room-ai-assistant-verification.yml"
