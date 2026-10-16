@@ -49,6 +49,7 @@ const navigationCss = readFileSync(new URL("../src/styles/page-back-next-navigat
 
 test("Back/Next freeze rules are in the stylesheet imported by the production entry point", () => {
   assert.ok(entry.includes('import "./styles/page-back-next-navigation.css";'));
+  assert.ok(entry.indexOf('import "./styles/page-back-next-navigation.css";') > entry.indexOf('import "./styles/grant-intelligence-layout.css";'), "sticky navigation overrides must load after grant layout positioning rules");
   assert.match(navigationCss, /\.main-area\s*>\s*\.desktop-webapp-navigation-roller\s*\{[\s\S]*?position:\s*sticky\s*!important/);
   assert.match(navigationCss, /\.main-area\s*>\s*\.page-back-next-navigation\s*\{[\s\S]*?position:\s*sticky\s*!important/);
   assert.match(navigationCss, /\.page-back-next-navigation\s*\{[\s\S]*?top:\s*var\(--irpa-portal-navigation-height,\s*0px\)\s*!important/);
