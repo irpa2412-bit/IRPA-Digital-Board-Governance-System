@@ -169,6 +169,9 @@ jobs:
           PROJECT: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
           APP_URL: ${{ secrets.STAGING_IRPA_APP_URL }}
           CP_ROOT: ${{ secrets.STAGING_CPANEL_DOCUMENT_ROOT }}
+          SMTP_HOST: ${{ vars.STAGING_SMTP_HOST }}
+          SMTP_PORT: ${{ vars.STAGING_SMTP_PORT }}
+          SMTP_FROM: ${{ vars.STAGING_SMTP_FROM }}
         working-directory: drive-gateway
         run: |
           set -euo pipefail
