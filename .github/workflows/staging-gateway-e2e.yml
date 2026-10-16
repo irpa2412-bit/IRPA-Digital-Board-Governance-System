@@ -355,8 +355,17 @@ jobs:
                 const code=error.cause?.code||error.cause?.name||error.name||"unknown";
                 throw new Error("Staging cPanel API connection failed ("+code+") at "+base.hostname+":"+base.port+".");
               }
-              const body=await response.json().catch(()=>null);
-              if(!response.ok||!body) throw new Error("Staging cPanel test-file preparation failed with HTTP "+response.status+".");
+              const raw=await response.text();
+              let body=null;
+              try { body=JSON.parse(raw); } catch {}
+              if(!response.ok||!body) {
+                const detail=String(body?.errors?.map?.(x=>x?.message).filter(Boolean).join("; ")||body?.error||body?.message||"").replace(/[\\r\\n\\t]+/g," ").slice(0,220);
+                throw new Error("Staging cPanel test-file preparation failed with HTTP "+response.status+(detail?": "+detail:"; response body was not valid cPanel JSON")+". Check cPanel API token validity, user association, token privileges, and hosting security rules.");
+              }
+              if(body.status!==1 && body.errors?.length) {
+                const detail=String(body.errors.map(x=>x?.message||"").filter(Boolean).join("; ")).replace(/[\\r\\n\\t]+/g," ").slice(0,220);
+                throw new Error("cPanel Fileman API rejected the request"+(detail?": "+detail:"")+".");
+              }
               return body;
             }
             const existing=await request("get_file_content",{dir,file});
