@@ -80,7 +80,7 @@ test("Signature Portal palette includes authenticated Documents Portal lifecycle
   assert.match(data, /lifecycle\?\.documents/);
   assert.match(data, /documentId\|\|item\?\.id/);
   assert.match(data, /item\?\.fileUrl\|\|\(fileId\?/);
-  assert.match(data, /item\?\.contentType\|\|item\?\.mimeType\|\|item\?\.documentContentType/);
+  assert.match(data, /item\\?\\.contentType\\|\\|item\\?\\.mimeType\\|\\|"application\\.pdf"/);
   assert.match(data, /d\?\.downloadUrl\|\|d\?\.downloadURL/);
   assert.match(data, /const byId=new Map\(results\.map\(item=>\[String\(item\.id\|\|item\.documentId\),item\]\)\)/);
 });
