@@ -109,7 +109,7 @@ test("Signature document palette and assignment repair is narrowly paired with a
   assert.match(workflow, /changed\.includes\("firestore\.rules"\)/);
   assert.match(workflow, /changed\.includes\("tests\/firestore\.rules\.test\.cjs"\)/);
   assert.match(workflow, /!signatureDocumentPaletteAssignmentRepair/);
-  assert.match(workflow, /!signatureDocumentPaletteAssignmentRepair && !guardOnlyWorkflowRepair/);
+  assert.match(workflow, /!signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !guardOnlyWorkflowRepair/);
 });
 
 
