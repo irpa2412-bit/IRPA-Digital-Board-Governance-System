@@ -100,3 +100,44 @@ const fenv={GATEWAY_URL:"https://gw.test",INVITE_SERVICE_KEY:"k"};
 test("queueInductionEmail marks Sent on success",async()=>{const db=fakeDb();const fetchFn=async()=>({ok:true,status:200,json:async()=>({ok:true,messageId:"m-9"})});const out=await queueInductionEmail(base(db),{fetchFn,env:fenv,logger:quiet,sleep});assert.equal(out.status,"Sent");assert.equal(db.docs.get("emailQueue/INV-1").status,"Sent")});
 test("queueInductionEmail retries 5xx then marks Failed",async()=>{const db=fakeDb();let n=0;const fetchFn=async()=>{n++;return{ok:false,status:502,json:async()=>({})}};const out=await queueInductionEmail(base(db),{fetchFn,env:fenv,logger:quiet,sleep});assert.equal(out.status,"Failed");assert.equal(n,3);assert.equal(db.docs.get("emailQueue/INV-1").status,"Failed")});
 test("queueInductionEmail does not retry 4xx",async()=>{const db=fakeDb();let n=0;const fetchFn=async()=>{n++;return{ok:false,status:400,json:async()=>({})}};const out=await queueInductionEmail(base(db),{fetchFn,env:fenv,logger:quiet,sleep});assert.equal(out.status,"Failed");assert.equal(n,1)});
+
+
+import { authenticateSmtpPlain } from "../src/smtpAuth.mjs";
+
+test("SMTP AUTH PLAIN accepts servers that immediately return success", async () => {
+  const writes=[];
+  const response=await authenticateSmtpPlain({
+    username:"info@irpa.or.tz",password:"test-password",
+    writeLine:async line=>writes.push(line),
+    readResponse:async()=>"235 2.7.0 Authentication successful",
+    command:async()=>{throw new Error("Challenge command must not be used");}
+  });
+  assert.match(response,/^235 /);
+  assert.match(writes[0],/^AUTH PLAIN /);
+});
+
+test("SMTP AUTH PLAIN completes servers that first issue a 334 challenge", async () => {
+  const writes=[],commands=[];
+  const response=await authenticateSmtpPlain({
+    username:"smtp-user",password:"test-password",
+    writeLine:async line=>writes.push(line),
+    readResponse:async()=>"334 ",
+    command:async(payload,expected)=>{commands.push({payload,expected});return "235 2.7.0 Authentication successful";}
+  });
+  assert.match(response,/^235 /);
+  assert.equal(writes.length,1);
+  assert.equal(commands.length,1);
+  assert.equal(commands[0].expected,"2");
+  assert.equal(commands[0].payload,writes[0].slice("AUTH PLAIN ".length));
+});
+
+test("SMTP AUTH PLAIN fails closed on rejected credentials and unsafe usernames", async () => {
+  const options={
+    username:"smtp-user",password:"test-password",
+    writeLine:async()=>{},
+    readResponse:async()=>"535 5.7.8 Authentication credentials invalid",
+    command:async()=>{throw new Error("Unexpected challenge");}
+  };
+  await assert.rejects(authenticateSmtpPlain(options),/authentication was rejected/i);
+  await assert.rejects(authenticateSmtpPlain({...options,username:"smtp-user\\r\\nAUTH LOGIN"}),/username is invalid/i);
+});
