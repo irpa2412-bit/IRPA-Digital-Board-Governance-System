@@ -91,6 +91,7 @@ jobs:
             "drive-gateway/src/pdf.mjs",
             "drive-gateway/src/router.mjs",
             "drive-gateway/src/signing.mjs",
+            "drive-gateway/src/upload.mjs",
             "drive-gateway/tests/controlled-authenticated-signing-flow.test.mjs",
             "drive-gateway/tests/e2e.test.mjs",
             "drive-gateway/tests/gate5-document-signature-persistence.test.mjs",
