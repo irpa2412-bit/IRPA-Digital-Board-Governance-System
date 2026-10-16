@@ -8,7 +8,7 @@ test("isolation baseline compares against the fetched current main snapshot", ()
   assert.match(workflow, /git fetch origin main:refs\/remotes\/origin\/main/);
   assert.match(workflow, /const eventName = process\.env\.EVENT_NAME\?\.trim\(\)/);
   assert.match(workflow, /const base = "origin\/main"/);
-  assert.match(workflow, /git", \["diff", "--name-only", base, "HEAD"\]/);
+  assert.ok(workflow.includes('git", ["diff", "--name-only", `${base}...HEAD`]'));
 });
 
 test("Wrangler changes cannot alter production configuration", () => {
