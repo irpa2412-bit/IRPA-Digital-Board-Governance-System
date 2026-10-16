@@ -195,3 +195,15 @@ html body #root .app-shell .main-area > .page-back-next-navigation.page-back-nex
     border-radius: 0 0 10px 10px !important;
   }
 }
+
+
+/* Sticky positioning was being neutralized by the viewport-containment rule:
+   overflow-x:hidden on html/body/#root computes the other axis to auto and
+   creates a nearer scroll container that does not scroll with the document.
+   clip preserves horizontal containment without creating that scrollport. */
+html,
+body,
+#root {
+  overflow-x: clip !important;
+  overflow-y: visible !important;
+}
