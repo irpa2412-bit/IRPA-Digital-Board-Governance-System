@@ -74,6 +74,7 @@ uploadForm.append("title","IRPA Staging Cryptographic Acceptance");
 uploadForm.append("classification","Restricted");
 uploadForm.append("archives","board-governance");
 uploadForm.append("file",new Blob([originalBytes],{type:"application/pdf"}),"staging-crypto-acceptance.pdf");
+console.log("STAGING_CONTROLLED_PDF_UPLOAD_DIAGNOSTICS=ENABLED (staging-only; redacted)");
 const uploadResponse=await fetch(base+"/api/documents",{method:"POST",headers:authHeaders,body:uploadForm});
 const uploaded=await readJson(uploadResponse,"Staging controlled-PDF upload");
 assert.equal(uploaded.documentId,documentId);
