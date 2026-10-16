@@ -41,3 +41,13 @@ test("uploaded controlled PDF enters the pre-signing palette with scoped documen
   assert.match(storage, /export async function downloadControlledDocumentBytes\(fileId, documentId\)/);
   assert.match(storage, /if \(!fileId \|\| !documentId\) throw new Error/);
 });
+
+test("PDF palette resolves controlled Drive PDFs in archive, initial selection and upload paths", () => {
+  const page = fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx", import.meta.url), "utf8");
+  assert.match(page, /function controlledPdfUrl\(document=\{\}\)/);
+  assert.match(page, /if\(driveId\)return `drive:\/\/\$\{driveId\}`/);
+  assert.match(page, /setDocumentUrl\(controlledPdfUrl\(d\)\)/);
+  assert.match(page, /setDocumentUrl\(controlledPdfUrl\(doc\)\)/);
+  assert.match(page, /setDocumentUrl\(controlledPdfUrl\(selectedDoc\)\)/);
+  assert.match(page, /const url=controlledPdfUrl\(initialDocument\)/);
+});
