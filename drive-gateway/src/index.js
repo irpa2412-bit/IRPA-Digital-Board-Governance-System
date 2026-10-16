@@ -1730,7 +1730,15 @@ async function smtpSend(env,{to,subject,text,html}) {
   try {
     await readResponse();
     await command("EHLO irpa-digital-board-governance","2");
-    await command("AUTH PLAIN "+btoa("\0"+SMTP_FROM+"\0"+env.SMTP_PASSWORD),"2");
+    // Support both valid SMTP AUTH PLAIN exchanges: immediate success or a 334 challenge.
+    // Keep the existing TLS transport and fail closed on rejected credentials.
+    const smtpUsername=String(env.SMTP_USERNAME||SMTP_FROM).trim();
+    if(!smtpUsername||/[\r\n<>]/.test(smtpUsername)) throw new Error("IRPA SMTP username is invalid.");
+    const authPayload=btoa("\0"+smtpUsername+"\0"+env.SMTP_PASSWORD);
+    await writer.write(new TextEncoder().encode("AUTH PLAIN "+authPayload+"\r\n"));
+    let authResponse=await readResponse();
+    if(authResponse.startsWith("334")) authResponse=await command(authPayload,"2");
+    else if(!authResponse.startsWith("2")) throw new Error("IRPA SMTP authentication was rejected.");
     await command("MAIL FROM:<"+SMTP_FROM+">","2");
     await command("RCPT TO:<"+toEmail+">","2");
     await command("DATA","3");
