@@ -3383,3 +3383,57 @@ textarea:focus-visible{
   -webkit-text-fill-color:#526176!important;
   opacity:1!important;
 }
+
+
+/* IRPA navigation freeze correction — 2026-10-16.
+   Presentation-only: keep the in-portal label/selector and Back/Next controls
+   together at the viewport top while scrolling. No route, identity, role,
+   authorization, signing, or data-access behavior is modified. */
+.main-area>.desktop-webapp-navigation-roller{
+  position:sticky;
+  top:0;
+  z-index:1300;
+  isolation:isolate;
+  background:#f4f8fc;
+  border-bottom:1px solid #b8cfe5;
+}
+.main-area>.page-back-next-navigation{
+  position:sticky;
+  top:var(--irpa-portal-navigation-height,64px);
+  z-index:1290;
+  isolation:isolate;
+  background:#f4f8fc;
+  box-shadow:0 2px 5px rgb(16 55 92 / 12%);
+}
+@media(max-width:1100px){
+  .main-area>.desktop-webapp-navigation-roller{
+    --irpa-portal-navigation-height:88px;
+  }
+  .main-area>.page-back-next-navigation{
+    top:var(--irpa-portal-navigation-height,88px);
+  }
+}
+@media(max-width:760px){
+  .main-area>.desktop-webapp-navigation-roller{
+    position:sticky;
+    top:0;
+    display:grid;
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+    min-height:0;
+    gap:6px;
+    padding:8px 9px;
+    background:#f4f8fc;
+  }
+  .main-area>.page-back-next-navigation{
+    top:var(--irpa-portal-navigation-height,112px);
+    grid-template-columns:minmax(0,1fr) minmax(64px,auto) minmax(0,1fr);
+  }
+}
+@media(max-width:390px){
+  .main-area>.desktop-webapp-navigation-roller{
+    grid-template-columns:minmax(0,1fr);
+  }
+  .main-area>.page-back-next-navigation{
+    top:var(--irpa-portal-navigation-height,150px);
+  }
+}
