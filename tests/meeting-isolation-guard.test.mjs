@@ -52,3 +52,10 @@ test("readability-only PRs are narrowly allowlisted without permitting unrelated
   assert.match(workflow, /"src\/App\.jsx"/);
   assert.match(workflow, /"tests\/browser\/authenticated-governance-regression\.spec\.mjs"/);
 });
+
+
+test("controlled-document trial upload permission fix must remain paired with Firestore rule regression tests", () => {
+  assert.match(workflow, /const controlledDocumentTrialUploadFix = changed\.includes\("firestore\.rules"\)/);
+  assert.match(workflow, /changed\.includes\("tests\/firestore\.rules\.test\.cjs"\)/);
+  assert.match(workflow, /!controlledDocumentTrialUploadFix/);
+});
