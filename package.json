@@ -18,7 +18,6 @@
     "test:fundraising-registry": "node --test tests/fundraising-source-registry.test.mjs",
     "test:portal-navigation": "node --test tests/portal-workspace-navigation.test.mjs",
     "test:meeting-entry-policy": "node --test functions/meetingEntryPolicy.test.cjs",
-    "test:portal-readability-standard": "node --test tests/portal-readability-standard.test.mjs",
     "test:communication-media": "node --test tests/communication-media-policy.test.mjs"
   },
   "dependencies": {
