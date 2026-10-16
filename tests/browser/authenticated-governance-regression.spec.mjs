@@ -249,7 +249,7 @@ async function assertSharedReadability(page, module, width) {
   // Wait for real, visible portal copy rather than treating that transient shell as a readability failure.
   await expect.poll(async () => workspace.evaluate(root => {
     const candidates = [...root.querySelectorAll(
-      '.page h1, .page h2, .page h3, .page label, .page table th, .page p, .page li, .page legend, .page button, .page table td, .page [role="heading"]'
+      :is(.page, .grant-intelligence-portal) :is(h1, h2, h3, label, table th, p, li, legend, button, table td, [role="heading"])'
     )];
     return candidates.filter(el => {
       const rect = el.getBoundingClientRect();
@@ -260,7 +260,7 @@ async function assertSharedReadability(page, module, width) {
 
   const samples = await workspace.evaluate(root => {
     const candidates = [...root.querySelectorAll(
-      '.page h1, .page h2, .page h3, .page label, .page table th, .page p, .page li, .page legend, .page button, .page table td, .page [role="heading"]'
+      :is(.page, .grant-intelligence-portal) :is(h1, h2, h3, label, table th, p, li, legend, button, table td, [role="heading"])'
     )];
     const visible = candidates.filter(el => {
       const rect = el.getBoundingClientRect();
