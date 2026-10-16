@@ -418,7 +418,12 @@ export async function readGdeltSearch() {
   const batchCount = Math.ceil(GDELT_QUERIES.length / SEARCH_BATCH_SIZE);
   const batch = Math.floor(Date.now() / (6 * 60 * 60 * 1000)) % batchCount;
   const queries = GDELT_QUERIES.slice(batch * SEARCH_BATCH_SIZE, Math.min((batch + 1) * SEARCH_BATCH_SIZE, GDELT_QUERIES.length));
-  const settled = await Promise.all(queries.map(async query => {
+  // GDELT is a shared public endpoint and can throttle parallel bursts. Run its
+  // small rotating batch serially, stopping after HTTP 429 instead of continuing
+  // to send requests while rate-limited.
+  const settled = [];
+  for (const query of queries) {
+    const result = await (async () => {
     try {
       const url = new URL("https://api.gdeltproject.org/api/v2/doc/doc");
       url.searchParams.set("query", query);
@@ -443,12 +448,23 @@ export async function readGdeltSearch() {
       }).filter(Boolean);
       return { items, error: null };
     } catch (error) {
-      return { items: [], error: { query, error: String(error.message || error).slice(0, 180) } };
+      const message = String(error.message || error).slice(0, 180);
+      return { items: [], error: { query, error: message }, rateLimited: /HTTP 429|rate.?limit|too many requests/i.test(message) };
     }
-  }));
+    })();
+    settled.push(result);
+    if (result.rateLimited) break;
+  }
   const items = [...new Map(settled.flatMap(result => result.items).map(item => [item.url, item])).values()];
   const errors = settled.filter(result => result.error).map(result => result.error);
-  return { items, stats: { configured: true, provider: "GDELT DOC API", queries: queries.length, queryCatalogSize: GDELT_QUERIES.length, found: items.length, errors } };
+  if (settled.some(result => result.rateLimited)) {
+    // Preserve partial GDELT findings and transparently fall back to the existing
+    // RSS search provider. A GDELT 429 is a source warning, not a whole-search failure.
+    const fallback = await readBingSearch();
+    const combined = [...new Map([...items, ...fallback.items].map(item => [item.url, item])).values()];
+    return { items: combined, stats: { configured: true, provider: "GDELT DOC API with Bing RSS fallback", queries: settled.length, queryCatalogSize: GDELT_QUERIES.length, found: combined.length, fallbackProvider: "Bing RSS", errors: [...errors, ...fallback.stats.errors] } };
+  }
+  return { items, stats: { configured: true, provider: "GDELT DOC API", queries: settled.length, queryCatalogSize: GDELT_QUERIES.length, found: items.length, errors } };
 }
 
 export async function readWebSearch(env) {
