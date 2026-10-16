@@ -15,6 +15,7 @@ const SMTP_PORT = 465;
 const SMTP_FROM = "info@irpa.or.tz";
 import { escapeHtml as escapeMailHtml, normalizeRecipientEmail, recipientDomain, safeMailError, sendWithRetry, validateMailHeader } from "./mailDelivery.js";
 import { sendInvitationEmail, buildInvitationMessage, validateRecipient } from "./invitationEmail.mjs";
+import { authenticateSmtpPlain } from "./smtpAuth.mjs";
 import { route as esignRoute } from "./router.mjs";
 import { buildEsignContext, EsignRecordDurableObject } from "./esignContext.mjs";
 import { runCleanup } from "./upload.mjs";
@@ -1730,7 +1731,13 @@ async function smtpSend(env,{to,subject,text,html}) {
   try {
     await readResponse();
     await command("EHLO irpa-digital-board-governance","2");
-    await command("AUTH PLAIN "+btoa("\0"+SMTP_FROM+"\0"+env.SMTP_PASSWORD),"2");
+    await authenticateSmtpPlain({
+      username:env.SMTP_USERNAME||SMTP_FROM,
+      password:env.SMTP_PASSWORD,
+      writeLine:async line=>writer.write(new TextEncoder().encode(line+"\r\n")),
+      readResponse,
+      command
+    });
     await command("MAIL FROM:<"+SMTP_FROM+">","2");
     await command("RCPT TO:<"+toEmail+">","2");
     await command("DATA","3");
