@@ -301,7 +301,7 @@ jobs:
           if (eventName !== "workflow_dispatch" &&
               !changed.includes("src/pages/Meetings.jsx") &&
               !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
-              !testOnlySignatureNavigation && !testOnlyRegisterScope &&
+              !testOnlySignatureNavigation && !testOnlyRegisterScope && !invitationRemovalIntegration &&
               !signatureGatewayIntegration && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange) {
             throw new Error("Meeting/participant source change or an explicitly paired isolated regression/guard test is missing.");
           }
