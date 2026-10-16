@@ -11,6 +11,9 @@ function getPageNavigationItems(active,modules){
   return sortNavigationItems(modules.filter(module=>!PORTAL_CHILDREN_SET.has(module)));
 }
 function PageBackNextNavigation({active,modules,onNavigate}){
+  const [timePadOpen,setTimePadOpen]=useState(false);
+  const [clockNow,setClockNow]=useState(()=>Date.now());
+  useEffect(()=>{if(!timePadOpen)return;const timer=window.setInterval(()=>setClockNow(Date.now()),1000);return()=>window.clearInterval(timer);},[timePadOpen]);
   const items=getPageNavigationItems(active,modules);
   if(!items.length)return null;
   const activeGroup=getPortalGroupForModule(active);
@@ -25,10 +28,12 @@ function PageBackNextNavigation({active,modules,onNavigate}){
     </button>
     <div className="page-back-next-status" aria-live="polite">
       <span>PAGE NAVIGATION</span><strong>{label}</strong><small>{index+1} of {items.length}</small>
+      <button type="button" className="page-back-next-time-toggle" onClick={()=>setTimePadOpen(value=>!value)} aria-expanded={timePadOpen} aria-controls="irpa-international-time-pad">{timePadOpen?"Hide world time":"World time"}</button>
     </div>
     <button type="button" className="page-back-next-button" disabled={!next} onClick={()=>next&&onNavigate(next)} aria-label={next?"Next to "+(PORTAL_LABELS[next]||displayModuleName(next)):"Next unavailable"}>
       <span>Next</span><span aria-hidden="true">→</span>
     </button>
+    {timePadOpen&&<section className="page-back-next-time-pad" id="irpa-international-time-pad" role="region" aria-label="International time pad"><div className="live-weather-time-pad-heading"><div><strong>INTERNATIONAL TIME</strong><small>Live local times · updates every second</small></div><button type="button" onClick={()=>setTimePadOpen(false)} aria-label="Close international time pad">Close</button></div><div className="live-weather-time-grid">{[{city:"Dar es Salaam",zone:"Africa/Dar_es_Salaam"},{city:"Nairobi",zone:"Africa/Nairobi"},{city:"Dubai",zone:"Asia/Dubai"},{city:"London",zone:"Europe/London"},{city:"Geneva",zone:"Europe/Zurich"},{city:"New York",zone:"America/New_York"},{city:"Singapore",zone:"Asia/Singapore"},{city:"Tokyo",zone:"Asia/Tokyo"},{city:"Sydney",zone:"Australia/Sydney"}].map(place=><div className="live-weather-time-city" key={place.zone}><strong>{place.city}</strong><span>{new Intl.DateTimeFormat("en-GB",{hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23",timeZone:place.zone}).format(new Date(clockNow))}</span><small>{new Intl.DateTimeFormat("en-GB",{weekday:"short",day:"2-digit",month:"short",year:"numeric",timeZone:place.zone}).format(new Date(clockNow))}</small></div>)}</div></section>}
   </nav>
 }
 
@@ -377,8 +382,7 @@ function LiveWeatherPanel(){
   {name:"Singida",region:"Singida Region",latitude:-4.817,longitude:34.743}
  ];
  const apiKey=String(import.meta.env.VITE_GOOGLE_WEATHER_API_KEY||"").trim();
- const[weatherByPlace,setWeatherByPlace]=useState({});const[forecastExpanded,setForecastExpanded]=useState(false);const[timePadOpen,setTimePadOpen]=useState(false);const[clockNow,setClockNow]=useState(()=>Date.now());
- useEffect(()=>{if(!timePadOpen)return;const timer=window.setInterval(()=>setClockNow(Date.now()),1000);return()=>window.clearInterval(timer);},[timePadOpen]);
+ const[weatherByPlace,setWeatherByPlace]=useState({});const[forecastExpanded,setForecastExpanded]=useState(false);
  const[activePlaceIndex,setActivePlaceIndex]=useState(0);
  const[error,setError]=useState("");
  const[loading,setLoading]=useState(true);
@@ -444,9 +448,8 @@ function LiveWeatherPanel(){
  return <div className={"live-weather-content"+(forecastExpanded?" forecast-expanded":"")} aria-live="polite">
   <div className="live-weather-location-bar">
    <div className="live-weather-location-name"><strong>{activePlace.name}</strong><span>{icon(current?.weatherCondition?.type)} {Number.isFinite(temp)?fmt(temp,"°C"):(loading?"Loading…":"—")} · {placeWeather?condition:(error||"Live conditions loading")}</span></div>
-   <div className="live-weather-location-controls"><button type="button" onClick={()=>changePlace(-1)} aria-label="Previous weather location" title="Previous location">‹</button><button type="button" onClick={()=>changePlace(1)} aria-label="Next weather location" title="Next location">›</button><button type="button" className="live-weather-expand" onClick={()=>setForecastExpanded(value=>!value)} aria-expanded={forecastExpanded}>{forecastExpanded?"Less":"Forecast"}</button><button type="button" className="live-weather-time-toggle" onClick={()=>setTimePadOpen(value=>!value)} aria-expanded={timePadOpen} aria-controls="irpa-international-time-pad">{timePadOpen?"Hide time":"World time"}</button></div>
+   <div className="live-weather-location-controls"><button type="button" onClick={()=>changePlace(-1)} aria-label="Previous weather location" title="Previous location">‹</button><button type="button" onClick={()=>changePlace(1)} aria-label="Next weather location" title="Next location">›</button><button type="button" className="live-weather-expand" onClick={()=>setForecastExpanded(value=>!value)} aria-expanded={forecastExpanded}>{forecastExpanded?"Less":"Forecast"}</button></div>
   </div>
-  {timePadOpen&&<section className="live-weather-time-pad" id="irpa-international-time-pad" role="region" aria-label="International time pad"><div className="live-weather-time-pad-heading"><div><strong>INTERNATIONAL TIME</strong><small>Live local times · updates every second</small></div><button type="button" onClick={()=>setTimePadOpen(false)} aria-label="Close international time pad">Close</button></div><div className="live-weather-time-grid">{[{city:"Dar es Salaam",zone:"Africa/Dar_es_Salaam"},{city:"Nairobi",zone:"Africa/Nairobi"},{city:"Dubai",zone:"Asia/Dubai"},{city:"London",zone:"Europe/London"},{city:"Geneva",zone:"Europe/Zurich"},{city:"New York",zone:"America/New_York"},{city:"Singapore",zone:"Asia/Singapore"},{city:"Tokyo",zone:"Asia/Tokyo"},{city:"Sydney",zone:"Australia/Sydney"}].map(place=><div className="live-weather-time-city" key={place.zone}><strong>{place.city}</strong><span>{new Intl.DateTimeFormat("en-GB",{hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23",timeZone:place.zone}).format(new Date(clockNow))}</span><small>{new Intl.DateTimeFormat("en-GB",{weekday:"short",day:"2-digit",month:"short",year:"numeric",timeZone:place.zone}).format(new Date(clockNow))}</small></div>)}</div></section>}
   <div className="live-weather-current">
     <div className="live-weather-current-main"><span className="live-weather-icon" aria-hidden="true">{icon(current?.weatherCondition?.type)}</span><div><strong>{Number.isFinite(temp)?fmt(temp,"°C"):(loading?"Loading…":"—")}</strong><small>{placeWeather?condition:(error||"Connecting to live weather…")} · feels like {fmt(feels,"°C")}</small></div></div>
     <div className="live-weather-metrics"><span>💧 Humidity <b>{fmt(current?.relativeHumidity,"%")}</b></span><span>💨 Wind <b>{fmt(current?.wind?.speed?.value," km/h")}</b></span><span>🌧️ Rain chance <b>{fmt(rain,"%")}</b></span></div>
