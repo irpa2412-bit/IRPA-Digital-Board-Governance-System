@@ -300,6 +300,35 @@ jobs:
           grep -q '"ok":true' staging-health.json
           grep -q '"environment":"staging"' staging-health.json
 
+      - name: Diagnose cPanel endpoint reachability
+        env:
+          CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const dns=require("dns").promises;
+          const net=require("net");
+          (async()=>{
+            const u=new URL(process.env.CP_BASE);
+            let addresses=[];
+            try { addresses=(await dns.lookup(u.hostname,{all:true})).map(x=>x.address); }
+            catch(e) { throw new Error("cPanel DNS lookup failed ("+(e.code||e.name)+") for "+u.hostname+"."); }
+            console.log("CPANEL_DNS_RESOLVED="+addresses.length+" address(es)");
+            const result=await Promise.all(addresses.map(address=>new Promise(resolve=>{
+              const socket=net.connect({host:address,port:Number(u.port||443)});
+              let settled=false;
+              const done=v=>{if(!settled){settled=true;socket.destroy();resolve(v)}};
+              socket.setTimeout(8000,()=>done({address,result:"timeout"}));
+              socket.once("connect",()=>done({address,result:"connected"}));
+              socket.once("error",e=>done({address,result:e.code||e.name||"error"}));
+            })));
+            console.log("CPANEL_TCP_REACHABILITY="+JSON.stringify(result));
+            if(!result.some(x=>x.result==="connected")) {
+              throw new Error("Runner cannot establish TCP connectivity to the configured cPanel endpoint on port "+(u.port||443)+". Check hosting-provider IP allowlisting, firewall rules, routing, and endpoint availability.");
+            }
+          })().catch(e=>{console.error(e.message);process.exit(1)});
+          NODE
+
       - name: Prepare isolated cPanel rollback test file
         env:
           CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
