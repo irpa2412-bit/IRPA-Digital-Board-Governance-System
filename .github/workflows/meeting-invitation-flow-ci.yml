@@ -48,6 +48,7 @@ on:
       - "drive-gateway/tests/mail-invitation.unit.mjs"
       - "drive-gateway/tests/invitation-redemption.test.mjs"
       - "functions/meetingGateway.emulator.test.cjs"
+      - "tests/meeting-invitation-resend-quorum.test.mjs"
 
   workflow_dispatch:
 
