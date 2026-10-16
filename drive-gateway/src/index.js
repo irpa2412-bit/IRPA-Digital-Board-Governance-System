@@ -1543,6 +1543,17 @@ async function sendMemberInvitation(request, env) {
   const invitation = await getFirestoreDocument(env, `invitations/${invitationId}`, claims.token);
   if (!invitation) return json({ok:false,error:"Invitation record was not found."},404,corsHeaders(request));
   const fields=invitation.fields||{};
+  const forceResend=data.forceResend===true;
+  const priorDeliveryStatus=String(fields.deliveryStatus?.stringValue||"").trim().toLowerCase();
+  const priorTokenHash=String(fields.invitationTokenHash?.stringValue||"").trim();
+  // Duplicate initial requests must reuse the existing activation state. Only the
+  // explicit Resend action may rotate the invitation secret.
+  if(priorTokenHash&&!forceResend&&priorDeliveryStatus==="sent"){
+    return json({ok:true,email:fields.email?.stringValue||"",deliveryStatus:"Sent",alreadySent:true},200,corsHeaders(request));
+  }
+  if(priorTokenHash&&!forceResend&&priorDeliveryStatus==="queued"){
+    return json({ok:true,email:fields.email?.stringValue||"",deliveryStatus:"Queued",alreadyProcessing:true},200,corsHeaders(request));
+  }
   const email=validateRecipient(fields.email?.stringValue||"");
   if(!email) return json({ok:false,error:"Invalid recipient"},400,corsHeaders(request));
   const name=String(fields.name?.stringValue||"").trim();
