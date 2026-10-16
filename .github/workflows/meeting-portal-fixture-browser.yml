@@ -139,6 +139,7 @@ jobs:
             "package.json",
             "src/components/MeetingAccessControl.jsx",
             "src/pages/Invitations.jsx",
+            "public/administrator.html",
             "src/firebase/auth.js",
             "src/pages/MeetingEntryGateway.jsx",
             "src/components/ControlledDocumentUpload.jsx",
@@ -248,7 +249,8 @@ jobs:
             changed.includes("tests/fixtures/meeting-portal-fixture.jsx");
           const testOnlyRegisterScope = changed.includes("src/firebase/data.js") &&
             changed.includes("tests/meeting-category-policy.test.mjs");
-          const invitationMailResendIntegration = changed.includes("src/firebase/auth.js") &&
+          const invitationMailResendIntegration = changed.includes("public/administrator.html") &&
+            changed.includes("src/firebase/auth.js") &&
             changed.includes("src/pages/Invitations.jsx") &&
             changed.includes("drive-gateway/src/index.js") &&
             changed.includes("drive-gateway/src/invitationEmail.mjs") &&

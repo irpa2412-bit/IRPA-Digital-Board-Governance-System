@@ -30,9 +30,24 @@ test("workflow-only guard maintenance requires its paired regression test", () =
   assert.match(workflow, /!guardOnlyWorkflowRepair/);
 });
 
-
 test("invitation resend regression is explicitly allowlisted by the isolation guard", () => {
   assert.ok(workflow.includes('"tests/meeting-invitation-resend-quorum.test.mjs"'));
+});
+
+test("invitation/reset integration exception requires all paired implementation and test files", () => {
+  assert.match(workflow, /const invitationMailResendIntegration = changed\.includes\("public\/administrator\.html"\)/);
+  for (const path of [
+    "public/administrator.html",
+    "src/firebase/auth.js",
+    "src/pages/Invitations.jsx",
+    "drive-gateway/src/index.js",
+    "drive-gateway/src/invitationEmail.mjs",
+    "drive-gateway/tests/mail-invitation.unit.mjs",
+  ]) {
+    assert.ok(workflow.includes(`"${path}"`), `missing required paired path: ${path}`);
+  }
+  assert.match(workflow, /changed\.every\(path => allowed\.has\(path\)\)/);
+  assert.match(workflow, /!invitationMailResendIntegration/);
 });
 
 test("Signature Gateway integration must include its portal bridge and authenticated flow test", () => {
@@ -56,7 +71,6 @@ test("readability-only PRs are narrowly allowlisted without permitting unrelated
   assert.match(workflow, /"src\/App\.jsx"/);
   assert.match(workflow, /"tests\/browser\/authenticated-governance-regression\.spec\.mjs"/);
 });
-
 
 test("controlled-document trial upload permission fix must remain paired with Firestore rule regression tests", () => {
   assert.match(workflow, /const controlledDocumentTrialUploadFix = changed\.includes\("firestore\.rules"\)/);
