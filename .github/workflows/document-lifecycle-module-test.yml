@@ -6,6 +6,7 @@ on:
       - integration/collective-portals-20261009
       - main
     paths:
+      - "src/styles/portal-readability-standard.css"
       - "src/pages/DocumentLifecycleModule.jsx"
       - "src/firebase/documentLifecycle.js"
       - "drive-gateway/src/documentLifecycle.mjs"
@@ -19,6 +20,7 @@ on:
       - integration/document-lifecycle-acceptance-20261009
       - integration/collective-portals-20261009
     paths:
+      - "src/styles/portal-readability-standard.css"
       - "src/pages/DocumentLifecycleModule.jsx"
       - "src/firebase/documentLifecycle.js"
       - "drive-gateway/src/documentLifecycle.mjs"

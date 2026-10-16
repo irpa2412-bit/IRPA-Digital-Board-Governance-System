@@ -5,6 +5,7 @@ on:
   pull_request:
     branches: ["main", "integration/collective-portals-20261009"]
     paths:
+      - "src/styles/portal-readability-standard.css"
       - "drive-gateway/**"
       - "src/firebase/signaturePlatform.js"
       - "src/firebase/auth.js"

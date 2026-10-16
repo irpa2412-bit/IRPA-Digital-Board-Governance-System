@@ -4,6 +4,7 @@ on:
   push:
     branches: [feat/secure-meeting-invitation-flow-20261013]
     paths:
+      - "src/styles/portal-readability-standard.css"
       - "src/pages/MeetingRoom.jsx"
       - "src/components/ControlledDocumentUpload.jsx"
       - "src/firebase/meetingRecords.js"
@@ -15,6 +16,7 @@ on:
   pull_request:
     branches: [main]
     paths:
+      - "src/styles/portal-readability-standard.css"
       - "src/pages/MeetingRoom.jsx"
       - "src/components/ControlledDocumentUpload.jsx"
       - "src/firebase/meetingRecords.js"

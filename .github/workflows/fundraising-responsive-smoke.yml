@@ -3,6 +3,7 @@ name: Fundraising Responsive Browser Smoke
 on:
   pull_request:
     paths:
+      - "src/styles/portal-readability-standard.css"
       - "src/pages/GrantIntelligencePortal.jsx"
       - "src/pages/grant-fundraising/**"
       - "tests/browser/**"
@@ -14,6 +15,7 @@ on:
     branches:
       - "plan/fundraising-csr-esg-safe-expansion"
     paths:
+      - "src/styles/portal-readability-standard.css"
       - "src/pages/GrantIntelligencePortal.jsx"
       - "src/pages/grant-fundraising/**"
       - "tests/browser/**"
