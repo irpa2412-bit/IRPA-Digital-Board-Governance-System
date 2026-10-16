@@ -5,6 +5,7 @@ on:
   push:
     branches: [feat/secure-meeting-invitation-flow-20261013, test/meeting-signature-portal-browser-regression-20261014, fix/signature-gateway-cryptographic-bridge-20261015]
     paths:
+      - "src/styles/portal-readability-standard.css"
       - "src/pages/Meetings.jsx"
       - "drive-gateway/src/invitationRedemption.mjs"
       - "drive-gateway/tests/invitation-redemption.test.mjs"
@@ -14,6 +15,7 @@ on:
   pull_request:
     branches: [main]
     paths:
+      - "src/styles/portal-readability-standard.css"
       - "src/pages/Meetings.jsx"
       - "src/firebase/data.js"
       - "functions/meetingGateway.js"
@@ -158,6 +160,19 @@ jobs:
             "tests/meeting-room-authorization-boundary.test.mjs",
             // Explicitly permit the separate authenticated cross-portal mobile navigation race regression.
             "tests/browser/authenticated-governance-regression.spec.mjs",
+            ".github/workflows/authenticated-governance-browser-fixture.yml",
+            ".github/workflows/cloudflare-esignature-tests.yml",
+            ".github/workflows/document-lifecycle-module-test.yml",
+            ".github/workflows/document-translation-workspace-test.yml",
+            ".github/workflows/fundraising-responsive-smoke.yml",
+            ".github/workflows/meeting-media-governance.yml",
+            ".github/workflows/meeting-room-ai-assistant-verification.yml",
+            ".github/workflows/pdf-esignature-tests.yml",
+            ".github/workflows/readability-release-gate.yml",
+            "src/main.jsx",
+            "package.json",
+            "src/styles/portal-readability-standard.css",
+            "tests/portal-readability-standard.test.mjs",
             "vite.meeting-fixture.config.js",
             ".github/workflows/portal-navigation-regression.yml",
             "docs/COMMUNICATION_MEDIA_PORTAL.md",
@@ -226,13 +241,55 @@ jobs:
             !changed.includes("src/pages/Meetings.jsx") &&
             !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
             changed.every(path => allowed.has(path));
+          // Readability-only PRs may change the shared stylesheet, its dedicated tests, and explicit CI path filters.
+          // The exception excludes portal business logic, meeting UI, auth logic and deployment configuration.
+          const readabilityOnlyFiles = new Set([
+            ".github/workflows/authenticated-governance-browser-fixture.yml",
+            ".github/workflows/cloudflare-esignature-tests.yml",
+            ".github/workflows/document-lifecycle-module-test.yml",
+            ".github/workflows/document-translation-workspace-test.yml",
+            ".github/workflows/fundraising-responsive-smoke.yml",
+            ".github/workflows/mail-invitation-tests.yml",
+            ".github/workflows/meeting-invitation-flow-ci.yml",
+            ".github/workflows/meeting-invitation-nonprod-e2e.yml",
+            ".github/workflows/meeting-media-governance.yml",
+            ".github/workflows/meeting-portal-fixture-browser.yml",
+            ".github/workflows/meeting-room-ai-assistant-verification.yml",
+            ".github/workflows/meeting-room-authorization-boundary.yml",
+            ".github/workflows/pdf-esignature-tests.yml",
+            ".github/workflows/portal-navigation-regression.yml",
+            ".github/workflows/readability-release-gate.yml",
+            "package.json",
+            "src/main.jsx",
+            "src/styles/portal-readability-standard.css",
+            "tests/browser/authenticated-governance-regression.spec.mjs",
+            "tests/meeting-isolation-guard.test.mjs",
+            "tests/portal-readability-standard.test.mjs"
+          ]);
+          // package.json may change only to register the dedicated readability test script.
+          let packageJsonReadabilityOnly = !changed.includes("package.json");
+          if (changed.includes("package.json")) {
+            const baselinePackage = JSON.parse(execFileSync("git", ["show", `${base}:package.json`], { encoding: "utf8" }));
+            const currentPackage = JSON.parse(execFileSync("git", ["show", "HEAD:package.json"], { encoding: "utf8" }));
+            const removeReadabilityScript = value => {
+              const copy = structuredClone(value);
+              delete copy.scripts?.["test:portal-readability-standard"];
+              return copy;
+            };
+            packageJsonReadabilityOnly =
+              currentPackage.scripts?.["test:portal-readability-standard"] === "node --test tests/portal-readability-standard.test.mjs" &&
+              baselinePackage.scripts?.["test:portal-readability-standard"] === undefined &&
+              JSON.stringify(removeReadabilityScript(baselinePackage)) === JSON.stringify(removeReadabilityScript(currentPackage));
+          }
+          const readabilityOnlyChange = changed.includes("src/styles/portal-readability-standard.css") &&
+            changed.every(path => readabilityOnlyFiles.has(path)) && packageJsonReadabilityOnly;
           // A manual dispatch on an already-merged ref is a regression rerun, not a PR diff.
           // Keep the changed-path isolation guard, but require a source/test delta only for event diffs.
           if (eventName !== "workflow_dispatch" &&
               !changed.includes("src/pages/Meetings.jsx") &&
               !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
               !testOnlySignatureNavigation && !testOnlyRegisterScope &&
-              !signatureGatewayIntegration && !actualDataGateIntegration && !guardOnlyWorkflowRepair && !communicationMediaOnly) {
+              !signatureGatewayIntegration && !actualDataGateIntegration && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange) {
             throw new Error("Meeting/participant source change or an explicitly paired isolated regression/guard test is missing.");
           }
           console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));
