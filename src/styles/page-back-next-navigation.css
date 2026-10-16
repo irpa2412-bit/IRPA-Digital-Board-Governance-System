@@ -102,7 +102,7 @@
   isolation: isolate;
   background: #062b4c;
 }
-#root .app-shell .main-area > .page-back-next-navigation {
+html body #root .app-shell .main-area > .page-back-next-navigation.page-back-next-navigation {
   position: sticky !important;
   top: 88px !important;
   z-index: 12990 !important;
@@ -111,7 +111,7 @@
   box-shadow: 0 4px 12px rgba(7,43,76,.14);
 }
 @media (min-width: 761px) and (max-width: 1100px) {
-  #root .app-shell .main-area > .page-back-next-navigation {
+  html body #root .app-shell .main-area > .page-back-next-navigation.page-back-next-navigation {
     top: 104px !important;
   }
 }
@@ -133,7 +133,7 @@
   transform: none !important;
   background: #062b4c;
 }
-#root .app-shell .main-area > .page-back-next-navigation {
+html body #root .app-shell .main-area > .page-back-next-navigation.page-back-next-navigation {
   position: sticky !important;
   top: var(--irpa-portal-navigation-height, 0px) !important;
   left: auto !important;
@@ -187,7 +187,7 @@
     height: auto !important;
     margin: 0 !important;
   }
-  #root .app-shell .main-area > .page-back-next-navigation {
+  html body #root .app-shell .main-area > .page-back-next-navigation.page-back-next-navigation {
     display: grid !important;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) minmax(0, 1fr) !important;
     gap: 6px !important;
