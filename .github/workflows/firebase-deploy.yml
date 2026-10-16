@@ -365,6 +365,15 @@ jobs:
           else
             echo "::warning::Meeting attendance UI is published, but its server-side signing/retrieval callables were not deployed. Check Firebase Cloud Functions billing, API enablement and service-account permissions before treating the register as live."
           fi
+      # Deploy the secure Invitation Register removal endpoint explicitly.
+      # Do not silently publish the UI without its required server authorization path.
+      - name: Deploy secure invitation removal callable
+        uses: w9jds/firebase-action@v14.17.0
+        with:
+          args: deploy --project irpa-digital-board-governance --only functions:removeInvitationRecord
+        env:
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+
       - name: Verify live Firebase application
         run: |
           set -e
