@@ -45,6 +45,7 @@ test("Signature Gateway isolation does not exempt unrelated staging admin reset 
 
 test("readability-only PRs are narrowly allowlisted without permitting unrelated portal source changes", () => {
   assert.match(workflow, /const readabilityOnlyFiles = new Set\(\[/);
+  assert.ok(workflow.includes('"--name-only", `${base}...HEAD`'));
   assert.match(workflow, /changed\.includes\("src\/styles\/portal-readability-standard\.css"\)/);
   assert.match(workflow, /changed\.every\(path => readabilityOnlyFiles\.has\(path\)\)/);
   assert.match(workflow, /!readabilityOnlyChange/);
