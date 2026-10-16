@@ -23,7 +23,7 @@ In **Repository → Settings → Secrets and variables → Actions → Secrets**
 
 ### Firebase and staging test identity
 
-- [ ] `STAGING_FIREBASE_PROJECT_ID` — isolated staging project ID; must not equal `irpa-digital-board-governance`.
+- [ ] `STAGING_FIREBASE_PROJECT_ID` — approved isolated staging project ID exactly `irpa-dbg-staging-a73ec`; any other project ID is rejected.
 - [ ] `STAGING_FIREBASE_SERVICE_ACCOUNT_JSON` — service-account JSON for that exact staging project; its `project_id` must exactly match `STAGING_FIREBASE_PROJECT_ID`; grant only required staging permissions.
 - [ ] `STAGING_FIREBASE_WEB_API_KEY` — Web API key belonging to the isolated staging Firebase project.
 - [ ] `STAGING_TEST_EMAIL` — dedicated staging reviewer/test account, not a real user's production account.
@@ -64,7 +64,7 @@ The staging workflow checks these mail settings before deployment and uses them 
 
 - [ ] Staging Worker name is exactly `irpa-google-drive-gateway-staging`.
 - [ ] Generated Worker configuration sets `IRPA_ENVIRONMENT=staging`.
-- [ ] Firebase project ID and service-account `project_id` match and are not production.
+- [ ] Firebase project ID is exactly `irpa-dbg-staging-a73ec` and service-account `project_id` matches it.
 - [ ] Staging Firestore collection prefix is `staging_`; staging KV binding is `DRIVE_KV` and points to the dedicated staging namespace.
 - [ ] Staging app URL and WordPress URL use HTTPS and are not production endpoints.
 - [ ] Staging SMTP host and sender are not production values.
