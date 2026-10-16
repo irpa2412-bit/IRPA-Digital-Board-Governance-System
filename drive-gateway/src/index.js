@@ -24,6 +24,7 @@ import { canProvisionSignatureProfileFolder } from "./signatureProfileAuthorizat
 import { canReadSignatureAsset, canUploadSignedDocument } from "./signatureAssetAuthorization.mjs";
 import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPasswordSetup, getInvitationSessionState } from "./invitationRedemption.mjs";
 import { buildGoogleDriveAuthorizationParams } from "./googleDriveOAuth.mjs";
+import { createMeetingPortalRouter } from "./meetingPortal.mjs";
 
 function getFirebaseProjectId(env) {
   const projectId = String(env?.FIREBASE_PROJECT_ID || "").trim();
@@ -52,6 +53,14 @@ const documentLifecycleRouter = createDocumentLifecycleRouter({
   firestoreDocumentToPlain,
   commitDocumentAndAudit: commitFirestoreDocumentAndAudit,
   recordLifecycleFailure: recordDocumentLifecycleFailure,
+  json,
+  corsHeaders
+});
+
+const meetingPortalRouter = createMeetingPortalRouter({
+  getFirebaseProjectId: env => getFirebaseProjectId(env),
+  getFirestoreAdminAccessToken: env => getFirestoreAdminAccessToken(env),
+  authenticateFirebaseRequest,
   json,
   corsHeaders
 });
@@ -131,6 +140,9 @@ export default {
 
       // Normalize trailing slashes so portal upload/archive actions cannot be blocked by URL formatting.
       const pathname = url.pathname.replace(/\/+$/, "") || "/";
+
+      const meetingPortalResponse = await meetingPortalRouter(request, env, pathname);
+      if (meetingPortalResponse) return meetingPortalResponse;
 
       if (pathname.startsWith("/api/document-lifecycle/")) {
         const lifecycleResponse = await documentLifecycleRouter(request, env);

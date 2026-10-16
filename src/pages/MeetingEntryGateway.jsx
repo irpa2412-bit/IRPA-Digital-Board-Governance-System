@@ -1,5 +1,5 @@
 import React,{useEffect,useState}from"react";
-import{httpsCallable,getFunctions}from"firebase/functions";
+import{authorizeMeetingEntry}from"../firebase/meetingGatewayApi";
 import{auth}from"../firebase/config";
 import{onAuthStateChanged}from"firebase/auth";
 
@@ -18,8 +18,7 @@ export default function MeetingEntryGateway({onEnter}){
   if(!meetingPassword){setState("password");setMessage("Enter the meeting gate password from the invitation email.");return}
   setState("checking");
   try{
-   const call=httpsCallable(getFunctions(undefined,"us-central1"),"authorizeMeetingEntry");
-   const result=await call({accessToken:token,meetingId,meetingPassword});const data=result.data||{};
+   const data=await authorizeMeetingEntry({accessToken:token,meetingId,meetingPassword});
    if(!live)return;
    setMeeting(data);
    if(data.entryState==="WAITING_FOR_HOST"){setState("waiting");setMessage("Your invitation and identity are valid. The meeting host must admit you before the room opens.");return;}

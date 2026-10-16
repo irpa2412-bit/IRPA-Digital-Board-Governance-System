@@ -20,6 +20,9 @@ on:
       - "package.json"
       - "package-lock.json"
       - "drive-gateway/src/index.js"
+      - "drive-gateway/src/meetingPortal.mjs"
+      - "drive-gateway/tests/meeting-portal.test.mjs"
+      - "src/firebase/meetingGatewayApi.js"
       - "drive-gateway/src/invitationEmail.mjs"
       - "drive-gateway/src/invitationRedemption.mjs"
       - "drive-gateway/tests/mail-invitation.unit.mjs"
@@ -43,6 +46,9 @@ on:
       - "package.json"
       - "package-lock.json"
       - "drive-gateway/src/index.js"
+      - "drive-gateway/src/meetingPortal.mjs"
+      - "drive-gateway/tests/meeting-portal.test.mjs"
+      - "src/firebase/meetingGatewayApi.js"
       - "drive-gateway/src/invitationEmail.mjs"
       - "drive-gateway/src/invitationRedemption.mjs"
       - "drive-gateway/tests/mail-invitation.unit.mjs"
@@ -69,6 +75,10 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Install Cloudflare gateway dependencies
+        run: npm --prefix drive-gateway ci
+      - name: Test Cloudflare gateway and meeting access routes
+        run: npm --prefix drive-gateway test
       - name: Test meeting entry policy
         run: npm run test:meeting-entry-policy
       - name: Test failed invitation resend and quorum exclusion
