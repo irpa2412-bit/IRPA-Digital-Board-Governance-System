@@ -11131,4 +11131,4 @@ html, body, #root { min-width:0; max-width:100%; }
 .main-area>.page-back-next-navigation .page-back-next-status>span{flex:0 0 auto;order:1}
 .main-area>.page-back-next-navigation .page-back-next-status>strong{flex:0 1 auto;order:2;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .main-area>.page-back-next-navigation .page-back-next-status>small{flex:0 0 auto;order:3}
-@media(max-width:600px){.main-area>.page-back-next-navigation .page-back-next-status{gap:5px;font-size:11px}.main-area>.page-back-next-navigation .page-back-next-status .page-back-next-time-toggle{padding:5px 7px;font-size:11px}}
+@media(max-width:600px){.main-area>.page-back-next-navigation .page-back-next-status{gap:5px;font-size:12px}.main-area>.page-back-next-navigation .page-back-next-status .page-back-next-time-toggle{padding:5px 7px;font-size:12px}}
