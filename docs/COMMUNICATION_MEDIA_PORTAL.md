@@ -77,3 +77,23 @@ The workflow verifies the explicit staging health marker, authenticates a stagin
 7. Merge only after all required checks pass; deploy and live-verify only after staging acceptance. Do not claim live integration until the secret-backed connection checks and actual test writes succeed.
 
 Production secrets and deployments must not be changed merely by merging this code.
+
+## Supported document and media upload formats
+
+The Media Asset Studio uploads through the authenticated Google Drive gateway; it does not write to Firebase Storage. Each upload is limited to 25 MiB by the current browser route. The selector advertises these formats:
+
+- **Office documents:** PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, RTF, ODT, ODS, ODP.
+- **Structured and text content:** TXT, CSV, TSV, Markdown (MD), HTML, JSON, XML, EPUB, ZIP.
+- **Images:** JPG/JPEG, PNG, WEBP, SVG, GIF, BMP, TIF/TIFF, AVIF.
+- **Audio:** MP3, WAV, M4A, AAC, OGG, FLAC.
+- **Video:** MP4, WEBM, MOV, AVI, MKV.
+
+This is the supported list, not a claim that every proprietary, encrypted, damaged, or future file format is supported. MIME type is checked against the allowlist; unknown types are rejected. Files are stored as originals in the existing Drive pathway and registered as metadata in Firestore. Authenticated download is by Drive file ID. Image adjustments and browser-native audio/video trimming export a new local derivative and never overwrite the original. The current upload route accepts one file per submission; upload additional files as separate submissions.
+
+## Live website editor and preview
+
+The Publishing Setup workspace loads existing WordPress pages or posts, lets an authorised reviewer edit the title and content, and saves through the authenticated Cloudflare Worker. The editor provides an **unsaved, sandboxed live preview** that updates from the current form contents when preview is open. The preview iframe has an empty sandbox (no script execution), sends no referrer, and is explicitly a visual approximation rather than the live theme. It does not publish or save content by opening preview.
+
+The server-side editor enforces Firebase authentication, active registered reviewer roles, HTTPS WordPress configuration, a 30,000-character content limit, allowlisted HTML tags/attributes and URL schemes, and audit recording. Saving is an immediate live WordPress write; the interface requires an explicit confirmation before the write. Review the preview, confirm the target page/post and keep a copy of the prior content before saving. Confirm the returned public URL after the write. If the WordPress or cPanel connection is not configured and verified, the portal must show the connection failure rather than simulate a successful edit.
+
+The cPanel file editor is deliberately separate and restricted to existing static HTML/HTM, CSS, TXT and JSON files (512 KiB maximum). It does not edit PHP, run commands, create arbitrary files, or provide hosting administration. WordPress page/post editing should be preferred for content managed by WordPress. Secrets remain in the server-side Worker environment, never in the browser bundle or Firestore.
