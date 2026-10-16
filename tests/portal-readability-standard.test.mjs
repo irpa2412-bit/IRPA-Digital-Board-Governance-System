@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const css = fs.readFileSync(new URL("../src/styles/portal-readability-standard.css", import.meta.url), "utf8");
-const entry = fs.readFileSync(new URL("../src/main.jsx", import.meta.url), "utf8");
+const entry = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
 
 function luminance(hex) {
   const rgb = hex.slice(1).match(/../g).map(v => parseInt(v, 16) / 255).map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
