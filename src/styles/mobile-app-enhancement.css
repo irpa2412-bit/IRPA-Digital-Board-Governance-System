@@ -3,7 +3,7 @@
    Desktop rules are intentionally untouched.
 */
 @media (max-width: 760px) {
-  html, body, #root { width:100%; min-width:0; overflow-x:hidden; }
+  html, body, #root { width:100%; min-width:0; overflow-x:clip; }
   html body #root .app-shell {
     width:100%!important; min-width:0!important; max-width:100%!important;
     height:auto!important; min-height:100dvh!important; overflow-x:clip!important;
