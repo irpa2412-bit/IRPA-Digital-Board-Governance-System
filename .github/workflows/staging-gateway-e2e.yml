@@ -270,10 +270,10 @@ jobs:
         run: |
           set -euo pipefail
           npm --prefix functions install --omit=dev --no-audit --no-fund
-          node <<'NODE'
-          const {initializeApp,cert}=require("./functions/node_modules/firebase-admin/app");
-          const {getAuth}=require("./functions/node_modules/firebase-admin/auth");
-          const {getFirestore}=require("./functions/node_modules/firebase-admin/firestore");
+          NODE_PATH="$GITHUB_WORKSPACE/functions/node_modules" node <<'NODE'
+          const {initializeApp,cert}=require("firebase-admin/app");
+          const {getAuth}=require("firebase-admin/auth");
+          const {getFirestore}=require("firebase-admin/firestore");
           const sa=JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
           if(sa.project_id!==process.env.PROJECT) throw new Error("Staging service account project mismatch.");
           initializeApp({credential:cert(sa),projectId:process.env.PROJECT});
