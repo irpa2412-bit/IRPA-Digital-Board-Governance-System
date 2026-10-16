@@ -115,16 +115,6 @@
     top: 104px !important;
   }
 }
-@media (max-width: 760px) {
-  /* Mobile's in-portal label is fixed at 150px and 46px tall. Dock the
-     Back/Next strip immediately beneath it; retain safe-area spacing. */
-  #root .app-shell .main-area > .page-back-next-navigation {
-    position: sticky !important;
-    top: calc(150px + 46px + 8px + env(safe-area-inset-top, 0px)) !important;
-    z-index: 12990 !important;
-    margin-top: 0;
-  }
-}
 
 
 /* ACTUAL STICKY STACK — override legacy fixed/hidden rules at their source.
