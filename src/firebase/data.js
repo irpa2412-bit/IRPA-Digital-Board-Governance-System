@@ -462,3 +462,16 @@ export async function listMeetingInviteeDirectory(){
  const call=httpsCallable(getFunctions(undefined,"us-central1"),"listMeetingInviteeDirectory");const result=await call({});
  return {boardMembers:Array.isArray(result.data?.boardMembers)?result.data.boardMembers:[],members:Array.isArray(result.data?.members)?result.data.members:[],employees:Array.isArray(result.data?.employees)?result.data.employees:[]};
 }
+
+/**
+ * Permanently remove a pending invitation through the server-authorized path.
+ * The callable verifies the active administrator identity before using Admin SDK.
+ */
+export async function removeInvitationRecord(invitationId){
+ const id=String(invitationId||"").trim();
+ if(!id)throw new Error("An invitation record is required.");
+ if(!auth.currentUser?.uid)throw new Error("Administrator authentication is required.");
+ const call=httpsCallable(getFunctions(undefined,"us-central1"),"removeInvitationRecord");
+ const result=await call({invitationId:id});
+ return result.data||{ok:true};
+}
