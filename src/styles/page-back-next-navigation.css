@@ -207,3 +207,120 @@ body,
   overflow-x: clip !important;
   overflow-y: visible !important;
 }
+
+
+/* WORLD TIME + PAGE NAVIGATION — compact, high-contrast shared header.
+   Keep the clock action beside the heading/counter instead of leaving it below
+   them; preserve the existing Back/Next controls, sticky placement and popup. */
+#root .app-shell .main-area > .page-back-next-navigation {
+  grid-template-columns: minmax(64px, .7fr) minmax(0, 2fr) minmax(64px, .7fr);
+  column-gap: 8px;
+  padding-inline: 8px;
+}
+#root .app-shell .main-area > .page-back-next-navigation .page-back-next-status {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "eyebrow eyebrow"
+    "title time"
+    "count time";
+  align-items: center;
+  justify-items: center;
+  column-gap: 10px;
+  row-gap: 3px;
+}
+#root .app-shell .main-area > .page-back-next-navigation .page-back-next-status > span {
+  grid-area: eyebrow;
+  font-size: 12px;
+  line-height: 1.2;
+  letter-spacing: .035em;
+  white-space: nowrap;
+}
+#root .app-shell .main-area > .page-back-next-navigation .page-back-next-status > strong {
+  grid-area: title;
+  justify-self: end;
+  font-size: clamp(14px, 1.25vw, 17px);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+#root .app-shell .main-area > .page-back-next-navigation .page-back-next-status > small {
+  grid-area: count;
+  justify-self: end;
+  font-size: 13px;
+  line-height: 1.2;
+}
+#root .app-shell .main-area > .page-back-next-navigation .page-back-next-time-toggle {
+  grid-area: time;
+  justify-self: start;
+  align-self: center;
+  min-width: 112px;
+  min-height: 44px;
+  padding: 9px 14px;
+  border: 2px solid #075f3d;
+  border-radius: 10px;
+  background: #075f3d !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  font-size: 15px !important;
+  font-weight: 800;
+  line-height: 1.25;
+  text-align: center;
+  white-space: normal;
+  opacity: 1 !important;
+  box-shadow: 0 2px 5px rgba(7,43,76,.18);
+}
+#root .app-shell .main-area > .page-back-next-navigation .page-back-next-time-toggle:hover {
+  background: #064b31 !important;
+}
+#root .app-shell .main-area > .page-back-next-navigation .page-back-next-time-toggle:focus-visible {
+  outline: 3px solid #075f3d;
+  outline-offset: 3px;
+}
+#root .app-shell .main-area > .page-back-next-navigation .page-back-next-time-pad {
+  grid-column: 1 / -1;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+@media (max-width: 760px) {
+  #root .app-shell .main-area > .page-back-next-navigation {
+    grid-template-columns: minmax(48px, .65fr) minmax(0, 2fr) minmax(48px, .65fr) !important;
+    column-gap: 5px !important;
+    padding: 8px 6px !important;
+  }
+  #root .app-shell .main-area > .page-back-next-navigation .page-back-next-status {
+    column-gap: 5px;
+    row-gap: 4px;
+  }
+  #root .app-shell .main-area > .page-back-next-navigation .page-back-next-status > span {
+    font-size: 12px !important;
+    letter-spacing: .015em !important;
+  }
+  #root .app-shell .main-area > .page-back-next-navigation .page-back-next-status > strong {
+    font-size: 14px !important;
+  }
+  #root .app-shell .main-area > .page-back-next-navigation .page-back-next-status > small {
+    font-size: 13px !important;
+  }
+  #root .app-shell .main-area > .page-back-next-navigation .page-back-next-time-toggle {
+    min-width: 0;
+    min-height: 44px;
+    padding: 8px 9px;
+    font-size: 14px !important;
+  }
+}
+@media (max-width: 380px) {
+  #root .app-shell .main-area > .page-back-next-navigation .page-back-next-status {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "eyebrow" "title" "count" "time";
+    justify-items: center;
+  }
+  #root .app-shell .main-area > .page-back-next-navigation .page-back-next-status > strong,
+  #root .app-shell .main-area > .page-back-next-navigation .page-back-next-status > small {
+    justify-self: center;
+  }
+  #root .app-shell .main-area > .page-back-next-navigation .page-back-next-time-toggle {
+    justify-self: center;
+    width: 100%;
+  }
+}
