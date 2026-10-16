@@ -27,8 +27,8 @@ function PageBackNextNavigation({active,modules,onNavigate}){
       <span aria-hidden="true">←</span><span>Back</span>
     </button>
     <div className="page-back-next-status" aria-live="polite">
-      <span>PAGE NAVIGATION</span><strong>{label}</strong><small>{index+1} of {items.length}</small>
       <button type="button" className="page-back-next-time-toggle" onClick={()=>setTimePadOpen(value=>!value)} aria-expanded={timePadOpen} aria-controls="irpa-international-time-pad">{timePadOpen?"Hide world time":"World time"}</button>
+      <span>PAGE NAVIGATION</span><strong>{label}</strong><small>{index+1} of {items.length}</small>
     </div>
     <button type="button" className="page-back-next-button" disabled={!next} onClick={()=>next&&onNavigate(next)} aria-label={next?"Next to "+(PORTAL_LABELS[next]||displayModuleName(next)):"Next unavailable"}>
       <span>Next</span><span aria-hidden="true">→</span>
