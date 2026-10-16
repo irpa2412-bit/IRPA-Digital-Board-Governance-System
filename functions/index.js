@@ -1806,6 +1806,9 @@ exports.removeInvitationRecord = onCall({region:"us-central1",timeoutSeconds:30}
   const snap=await ref.get();
   if(!snap.exists) throw new HttpsError("not-found","This invitation record no longer exists. Refresh the Invitation Register.");
   const invitation=snap.data()||{};
+  if(String(invitation.meetingId||"").trim() || String(invitation.source||"").toLowerCase().includes("meeting participant")){
+    throw new HttpsError("failed-precondition","This invitee is linked to a meeting. Remove the participant through the Meeting Participants portal so meeting access passes and attendance/quorum counts are revoked together.");
+  }
   const status=String(invitation.status||"").trim().toLowerCase();
   if(invitation.accountActivated===true || ["activated","accepted"].includes(status) || invitation.activationCompleted===true){
     throw new HttpsError("failed-precondition","This invitation is linked to an activated account and cannot be removed from the register. Retain the identity record and use the authorised account-deactivation process.");
