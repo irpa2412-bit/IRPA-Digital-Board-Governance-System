@@ -126,7 +126,13 @@ export default function OperationalGatewaysParticipants(){
     const issued=(await issueAccess({meetingId:payload.meetingId,participantId})).data||{};
     issuedAccess=issued;
     if(!issued.accessToken||!issued.meetingPassword||!issued.accessId)throw new Error("The meeting gateway did not return a complete access pass.");
-    const meetingAccess={accessId:issued.accessId,accessToken:issued.accessToken,meetingId:issued.meetingId,participantId:issued.participantId,meetingIdentity:payload.meetingIdentity,meetingReference:payload.meetingReference,meetingTitle:m.title,meetingDate:m.date||"",meetingStartTime:m.startTime||"",meetingEndTime:m.endTime||"",meetingPlatform:m.meetingPlatform||"Platform not recorded",platformAccessUrl:m.platformAccessUrl||"",platformMeetingId:m.platformMeetingId||"",platformPasscode:m.platformPasscode||"",meetingVenue:m.venue||"",meetingChairperson:m.chairperson||"",meetingAgenda:m.agenda||"",password:issued.meetingPassword,expiresAt:issued.expiresAt};
+    // Match the established Meeting Access Control URL parser exactly: the gateway reads
+    // meetingToken + meetingId from the deployed app URL. The mail renderer requires
+    // meetingAccess.link; passing only accessToken causes URL("") and aborts dispatch.
+    const meetingGateUrl=new URL(window.location.origin+window.location.pathname);
+    meetingGateUrl.searchParams.set("meetingToken",issued.accessToken);
+    meetingGateUrl.searchParams.set("meetingId",issued.meetingId||payload.meetingId);
+    const meetingAccess={accessId:issued.accessId,accessToken:issued.accessToken,link:meetingGateUrl.toString(),meetingId:issued.meetingId||payload.meetingId,participantId:issued.participantId||participantId,meetingIdentity:payload.meetingIdentity,meetingReference:payload.meetingReference,meetingTitle:m.title,meetingDate:m.date||"",meetingStartTime:m.startTime||"",meetingEndTime:m.endTime||"",meetingPlatform:m.meetingPlatform||"Platform not recorded",platformAccessUrl:m.platformAccessUrl||"",platformMeetingId:m.platformMeetingId||"",platformPasscode:m.platformPasscode||"",meetingVenue:m.venue||"",meetingChairperson:m.chairperson||"",meetingAgenda:m.agenda||"",password:issued.meetingPassword,expiresAt:issued.expiresAt};
     dispatchStage="send-email";
     const result=await sendMemberInvitationEmail(payload.participantEmail,invitationId,payload.participantRole,payload.memberType,meetingAccess);
     if(result.meetingAccessSent!==true)throw new Error("The IRPA Mail Server did not confirm dispatch of the meeting access link and gate token. The access pass will be revoked rather than counted as released.");
