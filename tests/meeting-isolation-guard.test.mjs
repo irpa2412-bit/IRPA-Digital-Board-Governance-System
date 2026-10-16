@@ -93,3 +93,11 @@ test("PDF URL handoff repair is narrowly paired with its policy regression test"
   assert.match(workflow, /!signaturePdfUrlHandoffRepair/);
   assert.match(workflow, /changed\.every\(path => \["\.github\/workflows\/meeting-portal-fixture-browser\.yml", "tests\/meeting-isolation-guard\.test\.mjs", "src\/pages\/SignaturePlatform\.jsx", "tests\/signature-workflow-policy\.test\.mjs"\]\.includes\(path\)\)/);
 });
+
+
+test("selected signer list visibility fix is narrowly paired with its regression test", () => {
+  assert.match(workflow, /const signatureSignerListVisibilityRepair = changed\.includes\("src\/pages\/SignaturePlatform\.jsx"\)/);
+  assert.match(workflow, /changed\.includes\("tests\/signature-signer-picker-regression\.test\.mjs"\)/);
+  assert.match(workflow, /!signatureSignerListVisibilityRepair/);
+  assert.match(workflow, /changed\.every\(path => \["\.github\/workflows\/meeting-portal-fixture-browser\.yml", "tests\/meeting-isolation-guard\.test\.mjs", "src\/pages\/SignaturePlatform\.jsx", "tests\/signature-signer-picker-regression\.test\.mjs"\]\.includes\(path\)\)/);
+});
