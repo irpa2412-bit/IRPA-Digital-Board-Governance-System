@@ -42,3 +42,10 @@ test("Signature Gateway isolation does not exempt unrelated staging admin reset 
   assert.match(workflow, /!allowed\.has\(path\).*signatureGatewayIntegration/);
   assert.doesNotMatch(workflow, /staging-admin-reset-fixture\.yml/);
 });
+
+
+test("controlled-document trial upload permission fix must remain paired with Firestore rule regression tests", () => {
+  assert.match(workflow, /const controlledDocumentTrialUploadFix = changed\.includes\("firestore\.rules"\)/);
+  assert.match(workflow, /changed\.includes\("tests\/firestore\.rules\.test\.cjs"\)/);
+  assert.match(workflow, /!controlledDocumentTrialUploadFix/);
+});
