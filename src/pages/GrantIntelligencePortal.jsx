@@ -159,6 +159,9 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  const [status,setStatus]=useState("all");
  const [showForm,setShowForm]=useState(false);
  const [saving,setSaving]=useState(false);
+ const [pipelineFormOpen,setPipelineFormOpen]=useState(false);
+ const [pipelineSaving,setPipelineSaving]=useState(false);
+ const [pipelineEntry,setPipelineEntry]=useState({title:"",funder:"",status:"Submitted",submissionDate:"",awardDate:"",amount:"",url:"",project:"",notes:""});
  const [draft,setDraft]=useState({title:"",funder:"",url:"",deadline:"",country:"Tanzania",amount:"",summary:"",status:"Open",pillars:["rangeland"],themes:[]});
  const uid=auth.currentUser?.uid||"";
  const roleList=[profile?.role,profile?.roles,employee?.role,employee?.roles].flatMap(v=>Array.isArray(v)?v:String(v||"").split(",")).map(v=>String(v||"").trim().toLowerCase());
@@ -494,7 +497,32 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    try{await updateDoc(doc(db,"grantOpportunities",record.id),{status:nextStatus,updatedAt:serverTimestamp(),lastUpdatedByUid:uid});setNotice("Opportunity status updated.");setTimeout(()=>setNotice(""),4000);}
    catch(err){setError(err?.message||"Status update failed.");}
  }
- function toggleDraftArray(key,value){setDraft(d=>({...d,[key]:d[key].includes(value)?d[key].filter(x=>x!==value):[...d[key],value]}));}
+ async function savePipelineEntry(e){
+    e.preventDefault();
+    if(!canManage){setError("Only designated grant-management and executive roles may record submitted or awarded grants.");return;}
+    if(!text(pipelineEntry.title)||!text(pipelineEntry.funder)){setError("Enter the grant or project title and funder.");return;}
+    if(pipelineEntry.status==="Submitted"&&!pipelineEntry.submissionDate){setError("Enter the submission date for a submitted grant.");return;}
+    if(pipelineEntry.status==="Awarded"&&!pipelineEntry.awardDate){setError("Enter the award date for an awarded grant.");return;}
+    if(pipelineEntry.url&&!/^https:\/\//i.test(pipelineEntry.url)){setError("The source or application URL must start with https://.");return;}
+    try{
+      setPipelineSaving(true);setError("");
+      await addDoc(collection(db,"grantOpportunities"),{
+        title:text(pipelineEntry.title),funder:text(pipelineEntry.funder),status:pipelineEntry.status,
+        url:text(pipelineEntry.url),deadline:null,country:"Tanzania",amount:text(pipelineEntry.amount)||"Not specified",
+        summary:text(pipelineEntry.project)+(text(pipelineEntry.notes)?" — "+text(pipelineEntry.notes):""),
+        pillars:[],themes:[],submissionDate:pipelineEntry.status==="Submitted"?pipelineEntry.submissionDate:null,
+        awardDate:pipelineEntry.status==="Awarded"?pipelineEntry.awardDate:null,
+        project:text(pipelineEntry.project),pipelineNotes:text(pipelineEntry.notes),
+        createdAt:serverTimestamp(),updatedAt:serverTimestamp(),createdByUid:uid,
+        createdByEmail:auth.currentUser?.email||"",lastUpdatedByUid:uid,
+        verificationStatus:"Manually recorded by IRPA",sourceType:"Grant pipeline entry",recordOrigin:"PRODUCTION"
+      });
+      setPipelineEntry({title:"",funder:"",status:"Submitted",submissionDate:"",awardDate:"",amount:"",url:"",project:"",notes:""});
+      setPipelineFormOpen(false);setNotice("Grant pipeline entry saved. The submitted/awarded dashboard total has been updated.");setTimeout(()=>setNotice(""),7000);
+    }catch(err){setError(err?.message||"Could not save the grant pipeline entry. Check your designated grant-management access.");}
+    finally{setPipelineSaving(false);}
+  }
+  function toggleDraftArray(key,value){setDraft(d=>({...d,[key]:d[key].includes(value)?d[key].filter(x=>x!==value):[...d[key],value]}));}
  return <div className="grant-intelligence-portal" style={{...styles.page,width:"100%",minWidth:0,maxWidth:"100%",boxSizing:"border-box"}}>
   <section style={styles.hero}>
    <div style={{maxWidth:760}}>
@@ -539,6 +567,37 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
   <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12}}>
    {[["Discovered opportunities",combinedRecords.length,"All geographic eligibility categories included"],["Open calls",counts.open,"Status: Open"],["In preparation",counts.review,"Review / drafting"],["Submitted or awarded",counts.submitted,"Pipeline progress"],["Expired / closed / unverified calls suppressed",expiredExclusionCount,"Past deadlines, explicit closure, or no verified current deadline/status"]].map(([label,value,sub])=><div key={label} style={styles.card}><div style={styles.muted}>{label}</div><div style={{fontSize:28,fontWeight:800,margin:"7px 0"}}>{value}</div><div style={{fontSize:11,color:"#8ba2b8"}}>{sub}</div></div>)}
   </div>
+  <section style={{...styles.card,display:"grid",gap:12,borderColor:"#4e8b91"}} aria-labelledby="grant-pipeline-entry-heading">
+   <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",gap:12,flexWrap:"wrap"}}>
+    <div><div style={styles.eyebrow}>GRANT APPLICATION PIPELINE</div><h2 id="grant-pipeline-entry-heading" style={{fontSize:19,margin:"5px 0"}}>Record submitted and awarded grants</h2><p style={{...styles.muted,margin:0}}>Enter grants that IRPA has actually submitted or been formally awarded. Entries are saved in the existing grant register and counted in the dashboard. Saving a record does not submit an application or certify an award.</p></div>
+    {canManage&&<button type="button" style={styles.button} onClick={()=>setPipelineFormOpen(v=>!v)}>{pipelineFormOpen?"Close entry form":"＋ Add grant entry"}</button>}
+   </div>
+   {!canManage&&<p style={styles.muted}>Entry is restricted to designated grant-management and executive roles.</p>}
+   {pipelineFormOpen&&canManage&&<form onSubmit={savePipelineEntry} style={{display:"grid",gap:11}}>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:10}}>
+     <label style={{display:"grid",gap:5,fontSize:13,fontWeight:700}}>Grant / project title *<input required maxLength={180} style={styles.input} value={pipelineEntry.title} onChange={e=>setPipelineEntry(v=>({...v,title:e.target.value}))} placeholder="Grant or project title"/></label>
+     <label style={{display:"grid",gap:5,fontSize:13,fontWeight:700}}>Funder *<input required maxLength={180} style={styles.input} value={pipelineEntry.funder} onChange={e=>setPipelineEntry(v=>({...v,funder:e.target.value}))} placeholder="Funding organisation"/></label>
+     <label style={{display:"grid",gap:5,fontSize:13,fontWeight:700}}>Pipeline status *<select style={styles.input} value={pipelineEntry.status} onChange={e=>setPipelineEntry(v=>({...v,status:e.target.value}))}><option>Submitted</option><option>Awarded</option></select></label>
+     {pipelineEntry.status==="Submitted"&&<label style={{display:"grid",gap:5,fontSize:13,fontWeight:700}}>Submission date *<input required type="date" style={styles.input} value={pipelineEntry.submissionDate} onChange={e=>setPipelineEntry(v=>({...v,submissionDate:e.target.value}))}/></label>}
+     {pipelineEntry.status==="Awarded"&&<label style={{display:"grid",gap:5,fontSize:13,fontWeight:700}}>Award date *<input required type="date" style={styles.input} value={pipelineEntry.awardDate} onChange={e=>setPipelineEntry(v=>({...v,awardDate:e.target.value}))}/></label>}
+     <label style={{display:"grid",gap:5,fontSize:13,fontWeight:700}}>Amount / grant value (optional)<input maxLength={100} style={styles.input} value={pipelineEntry.amount} onChange={e=>setPipelineEntry(v=>({...v,amount:e.target.value}))} placeholder="Amount and currency, if confirmed"/></label>
+     <label style={{display:"grid",gap:5,fontSize:13,fontWeight:700}}>Official call / award URL (optional)<input type="url" maxLength={1000} style={styles.input} value={pipelineEntry.url} onChange={e=>setPipelineEntry(v=>({...v,url:e.target.value}))} placeholder="https://…"/></label>
+     <label style={{display:"grid",gap:5,fontSize:13,fontWeight:700}}>IRPA project / programme (optional)<input maxLength={180} style={styles.input} value={pipelineEntry.project} onChange={e=>setPipelineEntry(v=>({...v,project:e.target.value}))} placeholder="Project linked to this grant"/></label>
+    </div>
+    <label style={{display:"grid",gap:5,fontSize:13,fontWeight:700}}>Notes / reference number (optional)<textarea rows={3} maxLength={3000} style={styles.input} value={pipelineEntry.notes} onChange={e=>setPipelineEntry(v=>({...v,notes:e.target.value}))} placeholder="Submission reference, award conditions, next action, or notes"/></label>
+    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button type="submit" disabled={pipelineSaving} style={{...styles.button,opacity:pipelineSaving?0.65:1}}>{pipelineSaving?"Saving entry…":"Save grant entry"}</button><span style={styles.muted}>Only record a grant as Awarded after formal award confirmation.</span></div>
+   </form>}
+   <div style={{display:"grid",gap:8}}>
+    <h3 style={{fontSize:15,margin:0}}>Submitted / awarded register ({records.filter(r=>["Submitted","Awarded"].includes(r.status)).length})</h3>
+    {records.filter(r=>["Submitted","Awarded"].includes(r.status)).length===0?<p style={styles.muted}>No submitted or awarded grants have been entered yet.</p>:records.filter(r=>["Submitted","Awarded"].includes(r.status)).map(r=><article key={r.id} style={{border:"1px solid #344255",borderRadius:10,padding:12,display:"grid",gap:5}}>
+     <div style={{display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}><strong>{r.title}</strong><span style={styles.tag}>{r.status}</span></div>
+     <div style={styles.muted}>{r.funder||"Funder not specified"} · {r.status==="Submitted"?"Submitted: "+dateLabel(r.submissionDate||r.updatedAt):"Awarded: "+dateLabel(r.awardDate||r.updatedAt)} · Amount: {r.amount||"Not specified"}</div>
+     {r.project&&<div style={styles.muted}>Project: {r.project}</div>}
+     {r.pipelineNotes&&<div style={styles.muted}>Notes: {r.pipelineNotes}</div>}
+     {r.url&&<a href={r.url} target="_blank" rel="noreferrer" style={{color:"#8fd3df",fontSize:13}}>Open official record ↗</a>}
+    </article>)}
+   </div>
+  </section>
   <section style={{...styles.card,display:"grid",gap:12}} aria-labelledby="crawler-status-heading">
    <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"start",flexWrap:"wrap"}}>
     <div><div style={styles.eyebrow}>AUTOMATED SOURCE MONITOR</div><h2 id="crawler-status-heading" style={{fontSize:18,margin:"5px 0"}}>Multi-donor web crawler</h2><p style={{...styles.muted,margin:0}}>Checks public RSS/Atom feeds, public APIs and selected donor opportunity hubs every six hours. New records are unverified leads, not confirmed eligible grants.</p></div>
