@@ -88,3 +88,40 @@
     line-height: 1.25;
   }
 }
+
+
+/* PRODUCTION FIX — navigation freeze must live in an imported stylesheet.
+   The earlier rule was added to readability-harmony.css, which is not imported
+   by src/main.jsx. This stylesheet is imported by main.jsx after the legacy
+   layout rules, so these selectors are authoritative. Keep the in-portal
+   selector at the top and Back/Next below it while the document scrolls. */
+#root .app-shell .main-area > .desktop-webapp-navigation-roller {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 13000 !important;
+  isolation: isolate;
+  background: #062b4c;
+}
+#root .app-shell .main-area > .page-back-next-navigation {
+  position: sticky !important;
+  top: 88px !important;
+  z-index: 12990 !important;
+  isolation: isolate;
+  background: #f7fafc;
+  box-shadow: 0 4px 12px rgba(7,43,76,.14);
+}
+@media (min-width: 761px) and (max-width: 1100px) {
+  #root .app-shell .main-area > .page-back-next-navigation {
+    top: 104px !important;
+  }
+}
+@media (max-width: 760px) {
+  /* Mobile's in-portal label is fixed at 150px and 46px tall. Dock the
+     Back/Next strip immediately beneath it; retain safe-area spacing. */
+  #root .app-shell .main-area > .page-back-next-navigation {
+    position: sticky !important;
+    top: calc(150px + 46px + 8px + env(safe-area-inset-top, 0px)) !important;
+    z-index: 12990 !important;
+    margin-top: 0;
+  }
+}
