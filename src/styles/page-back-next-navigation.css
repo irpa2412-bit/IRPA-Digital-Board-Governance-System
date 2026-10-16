@@ -102,7 +102,7 @@
   isolation: isolate;
   background: #062b4c;
 }
-#root .app-shell .main-area > .page-back-next-navigation {
+html body #root .app-shell .main-area > .page-back-next-navigation.page-back-next-navigation {
   position: sticky !important;
   top: 88px !important;
   z-index: 12990 !important;
@@ -111,17 +111,99 @@
   box-shadow: 0 4px 12px rgba(7,43,76,.14);
 }
 @media (min-width: 761px) and (max-width: 1100px) {
-  #root .app-shell .main-area > .page-back-next-navigation {
+  html body #root .app-shell .main-area > .page-back-next-navigation.page-back-next-navigation {
     top: 104px !important;
   }
 }
+
+
+/* ACTUAL STICKY STACK — override legacy fixed/hidden rules at their source.
+   The roller's measured height is published by PortalNavigationFreeze so the
+   Back/Next strip always sits directly beneath it at every viewport width. */
+#root .app-shell .main-area > .desktop-webapp-navigation-roller {
+  position: sticky !important;
+  top: 0 !important;
+  left: auto !important;
+  right: auto !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  z-index: 13000 !important;
+  margin: 0 0 14px !important;
+  isolation: isolate;
+  transform: none !important;
+  background: #062b4c;
+}
+html body #root .app-shell .main-area > .page-back-next-navigation.page-back-next-navigation {
+  position: sticky !important;
+  top: var(--irpa-portal-navigation-height, 0px) !important;
+  left: auto !important;
+  right: auto !important;
+  width: 100% !important;
+  z-index: 12990 !important;
+  margin: 0 0 14px !important;
+  isolation: isolate;
+  background: #f7fafc;
+  box-shadow: 0 4px 12px rgba(7,43,76,.14);
+}
 @media (max-width: 760px) {
-  /* Mobile's in-portal label is fixed at 150px and 46px tall. Dock the
-     Back/Next strip immediately beneath it; retain safe-area spacing. */
-  #root .app-shell .main-area > .page-back-next-navigation {
-    position: sticky !important;
-    top: calc(150px + 46px + 8px + env(safe-area-inset-top, 0px)) !important;
-    z-index: 12990 !important;
-    margin-top: 0;
+  #root .app-shell .main-area > .desktop-webapp-navigation-roller {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    align-items: stretch !important;
+    gap: 7px !important;
+    min-height: 0 !important;
+    height: auto !important;
+    padding: 9px 12px 10px !important;
+    margin-bottom: 6px !important;
+    border-radius: 0 0 12px 12px !important;
+    overflow: visible !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,.22) !important;
   }
+  #root .app-shell .main-area > .desktop-webapp-navigation-roller .webapp-navigation-live-clock,
+  #root .app-shell .main-area > .desktop-webapp-navigation-roller .webapp-navigation-roller-chevron {
+    display: none !important;
+  }
+  #root .app-shell .main-area > .desktop-webapp-navigation-roller .webapp-navigation-roller-kicker {
+    display: block !important;
+    white-space: normal !important;
+    font-size: 12px !important;
+    line-height: 1.2 !important;
+  }
+  #root .app-shell .main-area > .desktop-webapp-navigation-roller > strong {
+    display: block !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    overflow-wrap: anywhere !important;
+    text-overflow: clip !important;
+    font-size: 14px !important;
+    line-height: 1.3 !important;
+  }
+  #root .app-shell .main-area > .desktop-webapp-navigation-roller > select {
+    display: block !important;
+    width: 100% !important;
+    min-height: 40px !important;
+    height: auto !important;
+    margin: 0 !important;
+  }
+  html body #root .app-shell .main-area > .page-back-next-navigation.page-back-next-navigation {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) minmax(0, 1fr) !important;
+    gap: 6px !important;
+    padding: 8px 10px !important;
+    border-radius: 0 0 10px 10px !important;
+  }
+}
+
+
+/* Sticky positioning was being neutralized by the viewport-containment rule:
+   overflow-x:hidden on html/body/#root computes the other axis to auto and
+   creates a nearer scroll container that does not scroll with the document.
+   clip preserves horizontal containment without creating that scrollport. */
+html,
+body,
+#root {
+  overflow-x: clip !important;
+  overflow-y: visible !important;
 }

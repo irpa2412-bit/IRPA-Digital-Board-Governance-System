@@ -124,6 +124,66 @@ async function assertPortalAndNoOverflow(page, expectedText, width) {
   }
 }
 
+async function assertStickyPortalNavigation(page) {
+  const initial = await page.evaluate(() => {
+    const roller = document.querySelector(".main-area > .desktop-webapp-navigation-roller");
+    const nav = document.querySelector(".main-area > .page-back-next-navigation");
+    if (!roller || !nav) return { missing: true };
+    const rollerStyle = getComputedStyle(roller);
+    const navStyle = getComputedStyle(nav);
+    return {
+      missing: false,
+      rollerDisplay: rollerStyle.display,
+      rollerPosition: rollerStyle.position,
+      navPosition: navStyle.position,
+      rollerTop: roller.getBoundingClientRect().top,
+      rollerBottom: roller.getBoundingClientRect().bottom,
+      rollerMarginBottom: parseFloat(rollerStyle.marginBottom || "0"),
+      navTop: nav.getBoundingClientRect().top
+    };
+  });
+  expect(initial.missing, "authenticated portal must render both label panel and Back/Next").toBe(false);
+  expect(initial.rollerDisplay, "portal label panel must be visible on mobile and desktop").not.toBe("none");
+  expect(initial.rollerPosition, "portal label panel must remain sticky").toBe("sticky");
+  expect(initial.navPosition, "Back/Next must use sticky positioning, not a guessed fixed offset").toBe("sticky");
+  expect(Math.abs(initial.navTop - (initial.rollerBottom + initial.rollerMarginBottom)),
+    "Back/Next must sit immediately beneath the actual portal label panel").toBeLessThanOrEqual(3);
+
+  await page.evaluate(() => {
+    const main = document.querySelector(".app-shell .main-area");
+    window.scrollTo(0, window.scrollY + (main?.getBoundingClientRect().top || 0));
+  });
+  await page.waitForTimeout(60);
+  await page.evaluate(() => window.scrollBy(0, 260));
+  await page.waitForTimeout(100);
+  const scrolled = await page.evaluate(() => {
+    const roller = document.querySelector(".main-area > .desktop-webapp-navigation-roller");
+    const nav = document.querySelector(".main-area > .page-back-next-navigation");
+    const rollerStyle = getComputedStyle(roller);
+    return {
+      rollerTop: roller.getBoundingClientRect().top,
+      rollerBottom: roller.getBoundingClientRect().bottom,
+      rollerMarginBottom: parseFloat(rollerStyle.marginBottom || "0"),
+      navTop: nav.getBoundingClientRect().top,
+      rollerPosition: rollerStyle.position,
+      mainTop: roller.closest(".main-area").getBoundingClientRect().top,
+      windowScrollY: window.scrollY,
+      viewportWidth: window.innerWidth,
+      sidebarDisplay: document.querySelector(".sidebar") ? getComputedStyle(document.querySelector(".sidebar")).display : "missing",
+      sidebarTop: document.querySelector(".sidebar")?.getBoundingClientRect().top ?? null,
+      sidebarHeight: document.querySelector(".sidebar")?.getBoundingClientRect().height ?? null,
+      htmlOverflowX: getComputedStyle(document.documentElement).overflowX,
+      bodyOverflowX: getComputedStyle(document.body).overflowX,
+      rootOverflowX: getComputedStyle(document.querySelector("#root")).overflowX
+    };
+  });
+  console.log("STICKY_NAV_DIAGNOSTIC", JSON.stringify(scrolled));
+  expect(Math.abs(scrolled.rollerTop), "portal label panel must stay at the viewport top while scrolling").toBeLessThanOrEqual(3);
+  expect(Math.abs(scrolled.navTop - (scrolled.rollerBottom + scrolled.rollerMarginBottom)),
+    "Back/Next must remain directly below the portal label panel while scrolling").toBeLessThanOrEqual(3);
+  await page.evaluate(() => window.scrollTo(0, 0));
+}
+
 for (const viewport of [
   { name: "mobile", width: 390, height: 844 },
   { name: "tablet", width: 768, height: 1024 },
@@ -157,6 +217,7 @@ for (const viewport of [
     await expect(page.locator(".topbar h2")).toContainText(/Grant Intelligence.*Funding Opportunities/, { timeout: 45000 });
 
     await assertPortalAndNoOverflow(page, /Grant Intelligence.*Funding Opportunities/, viewport.width);
+    await assertStickyPortalNavigation(page);
     await expect(page.getByRole("heading", { name: "Corporate, climate and partnership sources" })).toBeVisible();
     const registryToggle = page.getByRole("button", { name: /Browse source registry/ });
     await expect(registryToggle).toHaveAttribute("aria-expanded", "false");
