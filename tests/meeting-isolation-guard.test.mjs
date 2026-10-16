@@ -31,6 +31,10 @@ test("workflow-only guard maintenance requires its paired regression test", () =
 });
 
 
+test("invitation resend regression is explicitly allowlisted by the isolation guard", () => {
+  assert.ok(workflow.includes('"tests/meeting-invitation-resend-quorum.test.mjs"'));
+});
+
 test("Signature Gateway integration must include its portal bridge and authenticated flow test", () => {
   assert.match(workflow, /const signatureGatewayIntegration = changed\.includes\("src\/firebase\/signaturePlatform\.js"\)/);
   assert.match(workflow, /changed\.includes\("drive-gateway\/src\/signing\.mjs"\)/);
