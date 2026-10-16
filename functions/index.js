@@ -1785,3 +1785,40 @@ exports.listMeetingInviteeDirectory = meetingGateway.listMeetingInviteeDirectory
 // Communications and media publishing. WordPress credentials remain in Firebase Secret Manager.
 const communicationMedia = require("./communicationMedia");
 exports.publishCommunicationMediaItem = communicationMedia.publishCommunicationMediaItem;
+
+
+// Secure invitation-register removal. This is intentionally administrator-only,
+// and activated invitations are retained so an active identity is never orphaned.
+exports.removeInvitationRecord = onCall({region:"us-central1",timeoutSeconds:30}, async request => {
+  const actor=request.auth;
+  if(!actor?.uid) throw new HttpsError("unauthenticated","Sign in as an IRPA Administrator to remove an invitee.");
+  const actorEmail=String(actor.token?.email||"").trim().toLowerCase();
+  let activeAdmin=false;
+  if(actor.token?.admin===true || actorEmail==="irpa2412@gmail.com") activeAdmin=true;
+  if(!activeAdmin){
+    const adminSnap=await db.collection("adminProfiles").doc(actor.uid).get();
+    activeAdmin=adminSnap.exists && adminSnap.data()?.active===true;
+  }
+  if(!activeAdmin) throw new HttpsError("permission-denied","Only an active IRPA Administrator can remove invitation records.");
+  const invitationId=String(request.data?.invitationId||"").trim();
+  if(!invitationId || invitationId.includes("/")) throw new HttpsError("invalid-argument","A valid invitation record is required.");
+  const ref=db.collection("invitations").doc(invitationId);
+  const snap=await ref.get();
+  if(!snap.exists) throw new HttpsError("not-found","This invitation record no longer exists. Refresh the Invitation Register.");
+  const invitation=snap.data()||{};
+  const status=String(invitation.status||"").trim().toLowerCase();
+  if(invitation.accountActivated===true || ["activated","accepted"].includes(status) || invitation.activationCompleted===true){
+    throw new HttpsError("failed-precondition","This invitation is linked to an activated account and cannot be removed from the register. Retain the identity record and use the authorised account-deactivation process.");
+  }
+  await ref.delete();
+  await db.collection("audit").add({
+    action:"INVITATION_REGISTER_REMOVE",
+    collection:"invitations",
+    recordId:invitationId,
+    details:{email:String(invitation.email||"").trim().toLowerCase(),statusBeforeRemoval:invitation.status||"Pending",source:"ADMINISTRATOR_INVITATION_REGISTER"},
+    actorUid:actor.uid,
+    actorEmail:actorEmail||null,
+    createdAt:FieldValue.serverTimestamp()
+  });
+  return {ok:true,invitationId};
+});
