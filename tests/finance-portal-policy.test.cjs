@@ -21,6 +21,7 @@ beforeEach(async () => {
     await db.doc("members/outsider").set({status:"Active", department:"Environment & Sustainable Rangeland Management", unit:"Rangeland Management Unit", role:"Rangeland Officer"});
     await db.doc("financeTransactions/live-record").set({recordOrigin:"PRODUCTION",status:"Draft",workflowStage:"Draft",amount:500});
     await db.doc("financeTransactions/trial-record").set({recordOrigin:"TRIAL",status:"Draft",workflowStage:"Draft",postingStatus:"Unposted",amount:5});
+    await db.doc("systemSettings/actualDataAccess").set({enabled:true,status:"OPEN",finalTestsAttested:true});
   });
 });
 const finance = () => env.authenticatedContext("finance-staff").firestore();
