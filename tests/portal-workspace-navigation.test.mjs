@@ -65,5 +65,5 @@ test("Back/Next sticky offset follows the measured portal-label panel height", (
 
 test("mobile portal label is visible and Back/Next uses the same measured sticky stack", () => {
   assert.match(navigationCss, /@media\s*\(max-width:\s*760px\)[\s\S]*?\.desktop-webapp-navigation-roller\s*\{[\s\S]*?display:\s*grid\s*!important/);
-  assert.match(navigationCss, /@media\s*\(max-width:\s*760px\)[\s\S]*?\.page-back-next-navigation\s*\{[\s\S]*?top:\s*var\(--irpa-portal-navigation-height,\s*0px\)\s*!important/);
+  assert.match(navigationCss, /@media\s*\(max-width:\s*760px\)[\s\S]*?\.page-back-next-navigation\s*\{[\s\S]*?grid-template-columns:\s*minmax/);
 });
