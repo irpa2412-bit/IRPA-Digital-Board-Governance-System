@@ -55,6 +55,11 @@ beforeEach(async () => {
       action: "TEST",
       actorUid: "admin-user"
     });
+    await db.doc("systemSettings/actualDataAccess").set({
+      enabled: true,
+      status: "OPEN",
+      finalTestsAttested: true
+    });
   });
 });
 
@@ -95,6 +100,127 @@ function lifecycleDocument(overrides = {}) {
     ...overrides
   };
 }
+
+test("actual operational writes fail closed when the access setting is absent", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("systemSettings/actualDataAccess").delete();
+  });
+  const db = testEnv.authenticatedContext("finance-user", {
+    email: "finance@example.test",
+    irpaRoles: ["Finance Manager"]
+  }).firestore();
+  await assertFails(db.doc("donorFunders/no-gate-setting").set({
+    name: "Funder",
+    recordType: "DONOR_FUNDER_REGISTRY",
+    status: "Prospect"
+  }));
+});
+
+test("signature portal trial envelopes and events remain writable while actual data access is closed", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("systemSettings/actualDataAccess").set({
+      enabled: false,
+      status: "CLOSED",
+      finalTestsAttested: false
+    });
+  });
+  const db = testEnv.authenticatedContext("member-user", {
+    email: "member@example.test"
+  }).firestore();
+  const trialEnvelope = {
+    envelopeReference: "IRPA-ENV-TRIAL-001",
+    title: "Trial signature envelope",
+    documentId: "LIFE-trial-signature",
+    senderUid: "member-user",
+    ownerUid: "member-user",
+    recordOrigin: "TRIAL",
+    trialData: true,
+    isTrial: true,
+    status: "Draft",
+    signingMode: "Sequential",
+    participantUids: ["member-user"],
+    actionUids: [],
+    recipients: []
+  };
+  await assertSucceeds(db.doc("signatureEnvelopes/TRIAL-ENV-001").set(trialEnvelope));
+  await assertSucceeds(db.doc("signatureEvents/TRIAL-EVENT-001").set({
+    envelopeId: "TRIAL-ENV-001",
+    event: "Trial envelope created",
+    actorUid: "member-user",
+    recordOrigin: "TRIAL",
+    trialData: true,
+    isTrial: true
+  }));
+  await assertFails(db.doc("signatureEnvelopes/ACTUAL-ENV-001").set({
+    ...trialEnvelope,
+    envelopeReference: "IRPA-ENV-ACTUAL-001",
+    recordOrigin: "PRODUCTION",
+    trialData: false,
+    isTrial: false
+  }));
+});
+
+test("actual operational writes stay closed without the final-test attestation", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("systemSettings/actualDataAccess").set({
+      enabled: true,
+      status: "OPEN",
+      finalTestsAttested: false
+    });
+  });
+  const db = testEnv.authenticatedContext("finance-user", {
+    email: "finance@example.test",
+    irpaRoles: ["Finance Manager"]
+  }).firestore();
+  await assertFails(db.doc("donorFunders/unattested-actual").set({
+    name: "Funder",
+    recordType: "DONOR_FUNDER_REGISTRY",
+    status: "Prospect"
+  }));
+});
+
+test("actual operational writes are denied while the administrator gate is closed", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("systemSettings/actualDataAccess").set({enabled:false,status:"CLOSED"});
+  });
+  const db = testEnv.authenticatedContext("finance-user", {
+    email: "finance@example.test",
+    irpaRoles: ["Finance Manager"]
+  }).firestore();
+  await assertFails(db.doc("donorFunders/actual-denied").set({
+    name: "Actual Funder",
+    recordType: "DONOR_FUNDER_REGISTRY",
+    status: "Prospect"
+  }));
+});
+
+test("trial-marked operational writes remain available while actual access is closed", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("systemSettings/actualDataAccess").set({enabled:false,status:"CLOSED"});
+  });
+  const db = testEnv.authenticatedContext("finance-user", {
+    email: "finance@example.test",
+    irpaRoles: ["Finance Manager"]
+  }).firestore();
+  await assertSucceeds(db.doc("donorFunders/trial-funder").set({
+    name: "Trial Funder",
+    recordType: "DONOR_FUNDER_REGISTRY",
+    status: "Prospect",
+    recordOrigin: "TRIAL",
+    trialData: true,
+    isTrial: true
+  }));
+});
+
+test("administrator cannot bypass the attested gate by directly editing its system setting", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("systemSettings/actualDataAccess").set({enabled:false,status:"CLOSED"});
+  });
+  const db = testEnv.authenticatedContext("admin-user", {
+    email: "admin@example.test"
+  }).firestore();
+  await assertFails(db.doc("systemSettings/actualDataAccess").update({enabled:true,status:"OPEN"}));
+});
 
 test("active document owner can create a valid internal lifecycle record", async () => {
   const db = testEnv.authenticatedContext("member-user", {
