@@ -39,5 +39,6 @@ test("bulk resend targets only explicit failed or error-reported invitation reco
   assert.match(participants,/meetingInvitationRows\.filter\(isInvitationError\)/);
   assert.match(participants,/deliveryError/);
   assert.match(participants,/v\.includes\("error"\)/);
+  assert.match(participants,/if\(status\.some\(v=>\["cancelled","canceled","cancelled invitation","canceled invitation"\]\.includes\(v\)\)\)return false/);
   assert.match(participants,/resendInFlight\.current\.has\("__bulk__"\)/);
 });
