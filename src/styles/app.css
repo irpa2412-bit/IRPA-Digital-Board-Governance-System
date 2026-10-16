@@ -11104,3 +11104,19 @@ html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar
   .module-interlink-bar .workflow-portal-children { border-left:0; flex-wrap:wrap; }
 }
 html, body, #root { min-width:0; max-width:100%; }
+
+
+/* IRPA international time pad inside the live weather card */
+.live-weather-time-toggle{background:#174c39;border:1px solid #54846d;color:#f2f8f4;font-size:12px;min-height:36px;padding:7px 10px;white-space:nowrap}
+.live-weather-time-pad{position:relative;z-index:2;margin:10px 0 12px;padding:12px;background:#071b14;border:1px solid #456b57;border-radius:10px;color:#edf5f1;box-shadow:0 8px 22px rgba(0,0,0,.22)}
+.live-weather-time-pad-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.live-weather-time-pad-heading>div{display:flex;flex-direction:column;gap:4px;min-width:0}
+.live-weather-time-pad-heading strong{font-size:12px;letter-spacing:.08em;color:#e7c65e}
+.live-weather-time-pad-heading small{font-size:12px;line-height:1.4;color:#b7c9c0}
+.live-weather-time-pad-heading button{background:#163c2d;border:1px solid #456b57;color:#f2f8f4;font-size:12px;padding:7px 10px;min-height:34px}
+.live-weather-time-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.live-weather-time-city{display:flex;flex-direction:column;gap:4px;min-width:0;padding:9px;background:#10291f;border:1px solid #2d5140;border-radius:8px}
+.live-weather-time-city strong{font-size:12px;color:#c7dbd1}
+.live-weather-time-city span{font-size:18px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:.02em;color:#fff;white-space:nowrap}
+.live-weather-time-city small{font-size:12px;line-height:1.35;color:#9eb6aa}
+@media(max-width:600px){.live-weather-time-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.live-weather-time-city{padding:8px}.live-weather-time-city span{font-size:17px}.live-weather-time-toggle{padding:7px 8px}}
