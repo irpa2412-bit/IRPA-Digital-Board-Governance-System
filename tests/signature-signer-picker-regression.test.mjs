@@ -24,3 +24,12 @@ test("draft envelope preserves controlled-document origin without bypassing actu
   assert.match(rules, /function actualCreateAllowed\(\)\{return actualDataAccessOpen\(\)\|\|trialDataRecord\(request\.resource\.data\);\}/);
   assert.match(rules, /match \/signatureEnvelopes\/\{id\}.*actualCreateAllowed\(\)/);
 });
+
+test("selected signer is visible before saving and the add action is disabled during saves", () => {
+  assert.match(portal, /const selectedSignerMember=useMemo\(\(\)=>members\.find\(x=>x\.uid===selectedSigner\)/);
+  assert.match(portal, /selectedSignerMember&&!recipients\.some\(r=>r\.uid===selectedSignerMember\.uid\)/);
+  assert.match(portal, /Not yet saved to workflow/);
+  assert.match(portal, /Click “Add signer \/ next level” to save this officer into the workflow ladder and field-assignment list/);
+  assert.match(portal, /disabled=\{busy\|\|\(!selectedSigner&&!signerEmail\)\}/);
+  assert.match(portal, /busy\?"Saving signer…":"Add signer \/ next level"/);
+});
