@@ -79,6 +79,70 @@ jobs:
                     console.error(JSON.stringify({ url, missingOrInvalidViewportMeta: true, ...viewportResults.at(-1) }));
                   }
                 }
+                const navigationAudits = [];
+                for (const width of [360, 390, 768, 1366]) {
+                  await page.setViewportSize({ width, height: 900 });
+                  const audit = await page.evaluate(async () => {
+                    const root = document.querySelector("#root");
+                    const fixture = document.createElement("div");
+                    fixture.className = "app-shell";
+                    fixture.style.cssText = "display:block;position:relative;width:100%;min-height:1500px;margin:24px 0 0;overflow:visible";
+                    const main = document.createElement("section");
+                    main.className = "main-area";
+                    main.style.cssText = "display:block;position:relative;width:100%;min-height:1500px;margin:0;padding:0;overflow:visible";
+                    const roller = document.createElement("div");
+                    roller.className = "desktop-webapp-navigation-roller";
+                    roller.innerHTML = '<div class="webapp-navigation-live-clock"><strong>Friday</strong><span>16 Oct 2026</span><b>04:00</b><button type="button">24H</button></div><span class="webapp-navigation-roller-kicker">IN-PORTAL NAVIGATION</span><strong>Parent Portal · Finance</strong><select aria-label="Portal test selector"><option>Finance</option></select><span class="webapp-navigation-roller-chevron">⌄</span>';
+                    const nav = document.createElement("nav");
+                    nav.className = "page-back-next-navigation";
+                    nav.setAttribute("aria-label", "Page Back and Next navigation");
+                    nav.innerHTML = '<button type="button">Back</button><div class="page-back-next-status"><span>PAGE NAVIGATION</span><strong>Finance</strong><small>2 of 10</small></div><button type="button">Next</button>';
+                    const spacer = document.createElement("div");
+                    spacer.style.height = "1200px";
+                    main.append(roller, nav, spacer);
+                    fixture.append(main);
+                    root.append(fixture);
+                    const frame = () => new Promise(resolve => requestAnimationFrame(() => resolve()));
+                    await frame();
+                    const styles = getComputedStyle(roller);
+                    main.style.setProperty("--irpa-portal-navigation-height", `${Math.ceil(roller.getBoundingClientRect().height + parseFloat(styles.marginBottom || "0"))}px`);
+                    fixture.scrollIntoView({ block: "start", behavior: "auto" });
+                    await frame(); await frame();
+                    const first = {
+                      rollerDisplay: getComputedStyle(roller).display,
+                      rollerPosition: getComputedStyle(roller).position,
+                      navPosition: getComputedStyle(nav).position,
+                      rollerTop: roller.getBoundingClientRect().top,
+                      navTop: nav.getBoundingClientRect().top,
+                      rollerBottom: roller.getBoundingClientRect().bottom,
+                      rollerMarginBottom: parseFloat(getComputedStyle(roller).marginBottom || "0")
+                    };
+                    window.scrollBy(0, 260);
+                    await frame(); await frame();
+                    const second = {
+                      rollerTop: roller.getBoundingClientRect().top,
+                      navTop: nav.getBoundingClientRect().top,
+                      rollerBottom: roller.getBoundingClientRect().bottom,
+                      rollerMarginBottom: parseFloat(getComputedStyle(roller).marginBottom || "0")
+                    };
+                    fixture.remove();
+                    return { first, second };
+                  });
+                  const close = (a, b) => Math.abs(a - b) <= 3;
+                  const ok = audit.first.rollerDisplay !== "none" &&
+                    audit.first.rollerPosition === "sticky" &&
+                    audit.first.navPosition === "sticky" &&
+                    close(audit.first.rollerTop, 0) &&
+                    close(audit.first.navTop, audit.first.rollerBottom + audit.first.rollerMarginBottom) &&
+                    close(audit.second.rollerTop, 0) &&
+                    close(audit.second.navTop, audit.second.rollerBottom + audit.second.rollerMarginBottom);
+                  navigationAudits.push({ width, ...audit, passed: ok });
+                  if (!ok) {
+                    failed = true;
+                    console.error(JSON.stringify({ url, stickyNavigationFailure: true, width, audit }));
+                  }
+                }
+                await page.evaluate(() => window.scrollTo(0, 0));
                 await page.setViewportSize({ width: 1366, height: 900 });
                 const result = await page.evaluate(() => ({
                   title: document.title,
