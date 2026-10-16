@@ -218,6 +218,49 @@ for (const viewport of [
 
     await assertPortalAndNoOverflow(page, /Grant Intelligence.*Funding Opportunities/, viewport.width);
     await assertStickyPortalNavigation(page);
+
+    // Exercise the real international time pad in the authenticated application shell.
+    // It must live in shared Back/Next navigation, never inside the weather forecast panel.
+    const pageNavigation = page.locator(".main-area > .page-back-next-navigation");
+    const worldTimeToggle = pageNavigation.getByRole("button", { name: "World time" });
+    await expect(worldTimeToggle, "World time toggle belongs in the shared Back/Next navigator").toBeVisible();
+    await expect(page.locator(".live-weather-content .page-back-next-time-pad"),
+      "weather forecast must not own the international time popup").toHaveCount(0);
+    await expect(page.locator("#irpa-international-time-pad")).toHaveCount(0);
+    await worldTimeToggle.click();
+    const timePad = page.getByRole("region", { name: "International time pad" });
+    await expect(timePad).toBeVisible();
+    await expect(pageNavigation.getByRole("button", { name: "Hide world time" })).toHaveAttribute("aria-expanded", "true");
+    const expectedWorldCities = [
+      "Dar es Salaam", "Nairobi", "Dubai", "London", "Geneva",
+      "New York", "Singapore", "Tokyo", "Sydney"
+    ];
+    await expect(timePad.locator(".live-weather-time-city")).toHaveCount(expectedWorldCities.length);
+    for (const city of expectedWorldCities) {
+      await expect(timePad.locator(".live-weather-time-city").filter({ has: page.getByText(city, { exact: true }) }),
+        `world clock for ${city} should render`).toHaveCount(1);
+    }
+    const initialDarTime = await timePad.locator(".live-weather-time-city").filter({
+      has: page.getByText("Dar es Salaam", { exact: true })
+    }).locator("span").textContent();
+    await expect.poll(async () => timePad.locator(".live-weather-time-city").filter({
+      has: page.getByText("Dar es Salaam", { exact: true })
+    }).locator("span").textContent(), {
+      timeout: 4000,
+      message: "world clocks should refresh while the popup remains open"
+    }).not.toBe(initialDarTime);
+    const padBounds = await timePad.evaluate(element => {
+      const rect = element.getBoundingClientRect();
+      return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width };
+    });
+    expect(padBounds.width, "world time pad must have visible width").toBeGreaterThan(0);
+    expect(padBounds.left, "world time pad must not overflow the left viewport edge").toBeGreaterThanOrEqual(-1);
+    expect(padBounds.right, "world time pad must not overflow the right viewport edge").toBeLessThanOrEqual(viewport.width + 1);
+    await expect(page.locator(".live-weather-content .page-back-next-time-pad"),
+      "opening world time must not insert popup content into weather forecast").toHaveCount(0);
+    await timePad.getByRole("button", { name: "Close international time pad" }).click();
+    await expect(timePad).toHaveCount(0);
+    await expect(pageNavigation.getByRole("button", { name: "World time" })).toHaveAttribute("aria-expanded", "false");
     await expect(page.getByRole("heading", { name: "Corporate, climate and partnership sources" })).toBeVisible();
     const registryToggle = page.getByRole("button", { name: /Browse source registry/ });
     await expect(registryToggle).toHaveAttribute("aria-expanded", "false");
