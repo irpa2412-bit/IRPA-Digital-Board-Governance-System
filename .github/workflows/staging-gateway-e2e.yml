@@ -63,10 +63,6 @@ jobs:
           DRIVE_ID: ${{ secrets.STAGING_GOOGLE_DRIVE_CLIENT_ID }}
           DRIVE_SECRET: ${{ secrets.STAGING_GOOGLE_DRIVE_CLIENT_SECRET }}
           DRIVE_KEY: ${{ secrets.STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY }}
-          SMTP: ${{ secrets.STAGING_SMTP_PASSWORD }}
-          SMTP_HOST: ${{ vars.STAGING_SMTP_HOST }}
-          SMTP_PORT: ${{ vars.STAGING_SMTP_PORT }}
-          SMTP_FROM: ${{ vars.STAGING_SMTP_FROM }}
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT_JSON }}
           FIREBASE_WEB_API_KEY: ${{ secrets.STAGING_FIREBASE_WEB_API_KEY }}
           TEST_EMAIL: ${{ secrets.STAGING_TEST_EMAIL }}
@@ -82,7 +78,7 @@ jobs:
         run: |
           set -euo pipefail
           missing=0
-          for pair in             "CLOUDFLARE_API_TOKEN:$CF_TOKEN"             "CLOUDFLARE_ACCOUNT_ID:$CF_ACCOUNT"             "STAGING_FIREBASE_PROJECT_ID:$PROJECT"             "STAGING_IRPA_APP_URL:$APP_URL"             "STAGING_GOOGLE_DRIVE_CLIENT_ID:$DRIVE_ID"             "STAGING_GOOGLE_DRIVE_CLIENT_SECRET:$DRIVE_SECRET"             "STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY:$DRIVE_KEY"             "STAGING_SMTP_PASSWORD:$SMTP"             "STAGING_SMTP_HOST:$SMTP_HOST"             "STAGING_SMTP_PORT:$SMTP_PORT"             "STAGING_SMTP_FROM:$SMTP_FROM"             "STAGING_FIREBASE_SERVICE_ACCOUNT_JSON:$FIREBASE_SERVICE_ACCOUNT"             "STAGING_FIREBASE_WEB_API_KEY:$FIREBASE_WEB_API_KEY"             "STAGING_TEST_EMAIL:$TEST_EMAIL"             "STAGING_TEST_PASSWORD:$TEST_PASSWORD"             "STAGING_WORDPRESS_BASE_URL:$WP_BASE"             "STAGING_WORDPRESS_USERNAME:$WP_USER"             "STAGING_WORDPRESS_APPLICATION_PASSWORD:$WP_PASSWORD"             "STAGING_CPANEL_BASE_URL:$CP_BASE"             "STAGING_CPANEL_USERNAME:$CP_USER"             "STAGING_CPANEL_API_TOKEN:$CP_TOKEN"             "STAGING_CPANEL_DOCUMENT_ROOT:$CP_ROOT"             "STAGING_CPANEL_TEST_FILE:$CP_TEST_FILE"; do
+          for pair in             "CLOUDFLARE_API_TOKEN:$CF_TOKEN"             "CLOUDFLARE_ACCOUNT_ID:$CF_ACCOUNT"             "STAGING_FIREBASE_PROJECT_ID:$PROJECT"             "STAGING_IRPA_APP_URL:$APP_URL"             "STAGING_GOOGLE_DRIVE_CLIENT_ID:$DRIVE_ID"             "STAGING_GOOGLE_DRIVE_CLIENT_SECRET:$DRIVE_SECRET"             "STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY:$DRIVE_KEY"             "STAGING_FIREBASE_SERVICE_ACCOUNT_JSON:$FIREBASE_SERVICE_ACCOUNT"             "STAGING_FIREBASE_WEB_API_KEY:$FIREBASE_WEB_API_KEY"             "STAGING_TEST_EMAIL:$TEST_EMAIL"             "STAGING_TEST_PASSWORD:$TEST_PASSWORD"             "STAGING_WORDPRESS_BASE_URL:$WP_BASE"             "STAGING_WORDPRESS_USERNAME:$WP_USER"             "STAGING_WORDPRESS_APPLICATION_PASSWORD:$WP_PASSWORD"             "STAGING_CPANEL_BASE_URL:$CP_BASE"             "STAGING_CPANEL_USERNAME:$CP_USER"             "STAGING_CPANEL_API_TOKEN:$CP_TOKEN"             "STAGING_CPANEL_DOCUMENT_ROOT:$CP_ROOT"             "STAGING_CPANEL_TEST_FILE:$CP_TEST_FILE"; do
             name="${pair%%:*}"; value="${pair#*:}"
             if [ -z "$value" ]; then echo "Missing staging secret: $name"; missing=1; fi
           done
@@ -99,8 +95,7 @@ jobs:
           if(app.protocol!=="https:" || ["irpa.or.tz","www.irpa.or.tz","irpa-digital-board-governance.web.app"].includes(app.hostname.toLowerCase())) throw new Error("Staging application must use HTTPS on an isolated non-production hostname.");
           const wp=new URL(process.env.WP_BASE);
           if(wp.protocol!=="https:" || ["irpa.or.tz","www.irpa.or.tz"].includes(wp.hostname.toLowerCase())) throw new Error("Staging WordPress must use HTTPS on an isolated non-production hostname.");
-          if(process.env.SMTP_HOST.toLowerCase()==="mail.irpa.or.tz" || process.env.SMTP_FROM.toLowerCase()==="info@irpa.or.tz") throw new Error("Staging mail must use an isolated test SMTP host and sender, not production mail configuration.");
-          if(!/^(465|587)$/.test(process.env.SMTP_PORT)) throw new Error("Staging SMTP port must be 465 or 587.");
+          console.log("STAGING_MAIL_DELIVERY_MOCKED");
           const cp=new URL(process.env.CP_BASE);
           if(cp.protocol!=="https:" || cp.port!=="2083" || cp.pathname!=="/") throw new Error("Staging cPanel endpoint must use HTTPS port 2083.");
           const root=process.env.CP_ROOT.replace(/^\/+|\/+$/g,"");
@@ -170,9 +165,6 @@ jobs:
           PROJECT: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
           APP_URL: ${{ secrets.STAGING_IRPA_APP_URL }}
           CP_ROOT: ${{ secrets.STAGING_CPANEL_DOCUMENT_ROOT }}
-          SMTP_HOST: ${{ vars.STAGING_SMTP_HOST }}
-          SMTP_PORT: ${{ vars.STAGING_SMTP_PORT }}
-          SMTP_FROM: ${{ vars.STAGING_SMTP_FROM }}
         working-directory: drive-gateway
         run: |
           set -euo pipefail
@@ -202,9 +194,9 @@ jobs:
             compatibility_date:"2026-09-29",workers_dev:true,
             vars:{
               FIREBASE_PROJECT_ID:process.env.PROJECT,
+              SMTP_MOCK:"success",
               AUTHORIZED_DRIVE_EMAIL:"irpa2412@gmail.com",
               IRPA_APP_URL:process.env.APP_URL,
-              SMTP_HOST:process.env.SMTP_HOST,SMTP_PORT:process.env.SMTP_PORT,SMTP_FROM:process.env.SMTP_FROM,
               DRIVE_ROOT_FOLDER_NAME:"IRPA Governance System - STAGING",
               FIRESTORE_COLLECTION_PREFIX:"staging_",DRIVE_MOCK:"false",LOCAL_TEST_MODE:"false",
               IRPA_ENVIRONMENT:"staging",CPANEL_DOCUMENT_ROOT:process.env.CP_ROOT
@@ -237,10 +229,6 @@ jobs:
           GOOGLE_DRIVE_CLIENT_ID: ${{ secrets.STAGING_GOOGLE_DRIVE_CLIENT_ID }}
           GOOGLE_DRIVE_CLIENT_SECRET: ${{ secrets.STAGING_GOOGLE_DRIVE_CLIENT_SECRET }}
           GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY: ${{ secrets.STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY }}
-          SMTP_PASSWORD: ${{ secrets.STAGING_SMTP_PASSWORD }}
-          SMTP_HOST: ${{ vars.STAGING_SMTP_HOST }}
-          SMTP_PORT: ${{ vars.STAGING_SMTP_PORT }}
-          SMTP_FROM: ${{ vars.STAGING_SMTP_FROM }}
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT_JSON }}
           WP_BASE: ${{ secrets.STAGING_WORDPRESS_BASE_URL }}
           WP_USER: ${{ secrets.STAGING_WORDPRESS_USERNAME }}
@@ -254,7 +242,6 @@ jobs:
           printf '%s' "$GOOGLE_DRIVE_CLIENT_ID" | npx wrangler secret put GOOGLE_DRIVE_CLIENT_ID --config wrangler.staging.generated.json
           printf '%s' "$GOOGLE_DRIVE_CLIENT_SECRET" | npx wrangler secret put GOOGLE_DRIVE_CLIENT_SECRET --config wrangler.staging.generated.json
           printf '%s' "$GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY" | npx wrangler secret put GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY --config wrangler.staging.generated.json
-          printf '%s' "$SMTP_PASSWORD" | npx wrangler secret put SMTP_PASSWORD --config wrangler.staging.generated.json
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT" | npx wrangler secret put FIREBASE_SERVICE_ACCOUNT_JSON --config wrangler.staging.generated.json
           printf '%s' "$WP_BASE" | npx wrangler secret put WORDPRESS_BASE_URL --config wrangler.staging.generated.json
           printf '%s' "$WP_USER" | npx wrangler secret put WORDPRESS_USERNAME --config wrangler.staging.generated.json
