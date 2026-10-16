@@ -408,6 +408,29 @@ service cloud.firestore {
     allow create, update: if admin() || anyInstitutionalRole(["Executive Director","Director Outreach","Director Finance & Administration","Director Research","Research Director","Research Manager","Research Officer","Fundraising Officer"]);
     allow delete: if admin();
   }
+  // Private AI-generated funding documents persist across sessions and devices. Users can access only records they own.
+  match /grantAssistantDocuments/{id}{
+    function validAssistantDocument(data){
+      return data.keys().hasOnly(["title","format","tone","length","instructions","context","draft","createdByUid","createdByEmail","createdAt","updatedAt","recordOrigin"])
+        &&data.get("title","") is string&&data.get("title","").size()>0&&data.get("title","").size()<=180
+        &&data.get("format","") is string&&data.get("format","").size()<=100
+        &&data.get("tone","") is string&&data.get("tone","").size()<=100
+        &&data.get("length","") is string&&data.get("length","").size()<=100
+        &&data.get("instructions","") is string&&data.get("instructions","").size()<=8000
+        &&data.get("context","") is string&&data.get("context","").size()<=8000
+        &&data.get("draft","") is string&&data.get("draft","").size()>0&&data.get("draft","").size()<=30000
+        &&data.get("createdByUid","")==request.auth.uid
+        &&data.get("createdByEmail","") is string&&data.get("createdByEmail","").size()<=320
+        &&data.get("recordOrigin","")=="PRODUCTION";
+    }
+    allow read:if signedIn()&&resource.data.get("createdByUid","")==request.auth.uid;
+    allow create:if signedIn()&&validAssistantDocument(request.resource.data);
+    allow update:if signedIn()&&resource.data.get("createdByUid","")==request.auth.uid
+      &&request.resource.data.get("createdByUid","")==resource.data.get("createdByUid","")
+      &&request.resource.data.get("createdAt",null)==resource.data.get("createdAt",null)
+      &&validAssistantDocument(request.resource.data);
+    allow delete:if false;
+  }
   // Grant crawler telemetry is visible to authenticated IRPA profiles; only trusted server functions write crawler status.
   match /grantCrawlerStatus/{id}{allow read:if signedIn();allow write:if false;}
   match /grantCrawlerSources/{id}{allow read:if signedIn();allow write:if false;}
