@@ -31,6 +31,6 @@ test("uploaded controlled PDF is handed directly into the field palette before s
 });
 
 test("pre-envelope Drive PDF uses the document-scoped download route", () => {
-  assert.match(portal, /import\{downloadDriveBytes,downloadSignatureBytes\}from"\.\.\/firebase\/signatureStorage"/);
+  assert.match(portal, /import\{downloadControlledDocumentBytes,downloadSignatureBytes\}from"\.\.\/firebase\/signatureStorage"/);
   assert.match(portal, /envelopeId\?await downloadSignatureBytes\([^;]+:await downloadDriveBytes\(url\.slice\("drive:\/\/".length\),documentId\)/);
 });
