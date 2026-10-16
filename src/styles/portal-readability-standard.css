@@ -209,25 +209,24 @@
   -webkit-text-fill-color: #ffffff !important;
 }
 
-
-/* Signature Platform identity-recovery action: never inherit the legacy blue-on-blue text-button skin. */
-#root button.text-button.signature-identity-restore-button,
-#root button.signature-identity-restore-button {
+/* Signature Portal recovery and other compact text actions: use a light, bordered button surface,
+   not the legacy blue text on a blue inherited surface. */
+#root button.text-button {
   color: #18364f !important;
   -webkit-text-fill-color: #18364f !important;
   background: #ffffff !important;
   background-color: #ffffff !important;
-  border: 2px solid #526b60 !important;
+  border: 1px solid #718a80 !important;
   opacity: 1 !important;
   text-decoration: none !important;
-  min-height: 44px;
-  padding: 10px 14px;
+  min-height: 40px;
+  padding: 8px 12px;
   line-height: 1.45;
 }
-#root button.text-button.signature-identity-restore-button:hover,
-#root button.signature-identity-restore-button:hover {
+#root button.text-button:hover {
   color: #102a3d !important;
   -webkit-text-fill-color: #102a3d !important;
   background: #f4f8f5 !important;
   background-color: #f4f8f5 !important;
+  text-decoration: underline !important;
 }
