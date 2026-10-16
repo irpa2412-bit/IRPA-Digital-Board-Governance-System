@@ -184,7 +184,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  }
 
  async function loadCrawlerResults(showNotice=false){
-   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-production.irpa-governance.workers.dev").replace(/\/+$/,"");
+   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-dbgs-grant-crawler.irpa-governance.workers.dev").replace(/\/+$/,"");
    const token=await auth.currentUser?.getIdToken();
    if(!token){if(showNotice)setError("Your session has expired. Sign in again to load crawler results.");return;}
    setCrawlerResultsBusy(true);
@@ -289,7 +289,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  async function runFundraisingSearch(searchQuery=fundraisingQuery, searchMode=fundraisingMode){
    const query=text(searchQuery);
    if(query.length<2){setFundraisingSearchError("Enter at least two characters, such as rangeland restoration, livestock markets, women-led enterprises, CSR or digital governance.");return;}
-   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-production.irpa-governance.workers.dev").replace(/\/+$/,"");
+   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-dbgs-grant-crawler.irpa-governance.workers.dev").replace(/\/+$/,"");
    const token=await auth.currentUser?.getIdToken(true);
    if(!token){setFundraisingSearchError("Sign in to search fundraising sources.");return;}
    setFundraisingSearchBusy(true);setFundraisingSearchError("");setFundraisingSearchMeta(null);
@@ -319,7 +319,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    if(!auth.currentUser){setError("Sign in to IRPA to start a grant scan.");return;}
    try{
      setCrawlerRunning(true);setError("");setNotice("Manual donor-source scan requested. This can take several minutes.");
-     const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-production.irpa-governance.workers.dev").replace(/\/+$/, "");
+     const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-dbgs-grant-crawler.irpa-governance.workers.dev").replace(/\/+$/, "");
      const idToken=await auth.currentUser?.getIdToken();
      if(!idToken) throw new Error("Your session has expired. Sign in again.");
      const response=await fetch(workerUrl+"/run",{method:"POST",headers:{"Authorization":"Bearer "+idToken,"Content-Type":"application/json"},body:"{}",signal:AbortSignal.timeout(90000)});
@@ -331,7 +331,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    finally{setCrawlerRunning(false);}
  }
  async function loadSavedDrafts(){
-   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-production.irpa-governance.workers.dev").replace(/\/+$/,"");
+   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-dbgs-grant-crawler.irpa-governance.workers.dev").replace(/\/+$/,"");
    const idToken=await auth.currentUser?.getIdToken();
    if(!idToken)return;
    setDraftsBusy(true);
@@ -354,7 +354,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    setWorkspaceOpen(true);
  }
  async function loadDraftAuditEvents(id){
-   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-production.irpa-governance.workers.dev").replace(/\/+$/,"");
+   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-dbgs-grant-crawler.irpa-governance.workers.dev").replace(/\/+$/,"");
    const idToken=await auth.currentUser?.getIdToken();
    if(!idToken||!id)return;
    setAuditBusy(true);
@@ -412,7 +412,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    const statusUnverified=currentStatusIssue==="unverified";
    // Geographic eligibility no longer blocks opportunity analysis; show and assess all calls.
    if(!text(opportunityDescription)&&!text(donorRequirements)){setError("Provide the opportunity description or paste the official donor eligibility and application criteria.");return;}
-   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-production.irpa-governance.workers.dev").replace(/\/+$/,"");
+   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-dbgs-grant-crawler.irpa-governance.workers.dev").replace(/\/+$/,"");
    const idToken=await auth.currentUser?.getIdToken();
    if(!idToken){setError("Your session has expired. Sign in again.");return;}
    setAnalysisBusy(true);setError("");setWorkspaceNotice(task==="concept_note"?(statusUnverified?"Preparing a review-only draft; current call status still needs verification…":"Checking eligibility and preparing the concept-note draft…"):"Checking geographic, organizational and donor eligibility criteria…");
@@ -444,7 +444,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    }
    const statusUnverified=currentStatusIssue==="unverified";
    // Geographic eligibility no longer blocks saving a reviewed draft.
-   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-production.irpa-governance.workers.dev").replace(/\/+$/,"");
+   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-dbgs-grant-crawler.irpa-governance.workers.dev").replace(/\/+$/,"");
    const idToken=await auth.currentUser?.getIdToken();
    if(!idToken){setError("Your session has expired. Sign in again.");return;}
    const id=draftId||crypto.randomUUID();
