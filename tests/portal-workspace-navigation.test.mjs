@@ -51,7 +51,7 @@ test("Back/Next freeze rules are in the stylesheet imported by the production en
   assert.ok(entry.includes('import "./styles/page-back-next-navigation.css";'));
   assert.match(navigationCss, /\.main-area\s*>\s*\.desktop-webapp-navigation-roller\s*\{[\s\S]*?position:\s*sticky\s*!important/);
   assert.match(navigationCss, /\.main-area\s*>\s*\.page-back-next-navigation\s*\{[\s\S]*?position:\s*sticky\s*!important/);
-  assert.match(navigationCss, /@media\s*\(max-width:\s*760px\)[\s\S]*?top:\s*calc\(150px\s*\+\s*46px\s*\+\s*8px\s*\+\s*env\(safe-area-inset-top,\s*0px\)\)\s*!important/);
+  assert.match(navigationCss, /\.page-back-next-navigation\s*\{[\s\S]*?top:\s*var\(--irpa-portal-navigation-height,\s*0px\)\s*!important/);
 });
 
 
