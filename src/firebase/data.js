@@ -130,8 +130,10 @@ export async function getControlledDocumentsForSigning({portal="Signature Portal
   for(const q of querySpecs){try{const snap=await getDocs(q);results.push(...snap.docs.map(x=>({id:x.id,...x.data()})));}catch(error){errors.push(error);}}
   if(!results.length&&errors.length===querySpecs.length)throw errors[0]||new Error("Controlled document list could not be loaded.");
   const byId=new Map(results.map(d=>[d.id,d]));
+  const trialMode=isTrialDataMode();
   const usable=[...byId.values()].filter(d=>{
-    if(String(d?.recordOrigin||"PRODUCTION").toUpperCase()==="TRIAL"||d?.trialData===true||d?.isTrial===true)return false;
+    const isTrialRecord=String(d?.recordOrigin||"PRODUCTION").toUpperCase()==="TRIAL"||d?.trialData===true||d?.isTrial===true;
+    if(isTrialRecord!==trialMode)return false;
     const contentType=String(d?.contentType||"application/pdf").toLowerCase();if(contentType!=="application/pdf")return false;
     const link=String(d?.webViewLink||"");const driveId=d?.fileId||((link.match(/\/d\/([a-zA-Z0-9_-]+)/)||[])[1])||((link.match(/[?&]id=([a-zA-Z0-9_-]+)/)||[])[1])||"";
     if(!(d?.fileUrl||d?.documentUrl||d?.storageUrl||d?.pdfUrl||driveId))return false;
