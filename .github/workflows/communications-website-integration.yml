@@ -9,6 +9,7 @@ on:
       - "drive-gateway/src/index.js"
       - "tests/communication-media-policy.test.mjs"
       - "docs/COMMUNICATION_MEDIA_PORTAL.md"
+      - "docs/COMMUNICATION_MEDIA_READINESS_CHECKLIST.md"
       - "package.json"
       - "package-lock.json"
       - "drive-gateway/**"
