@@ -24,3 +24,13 @@ test("draft envelope preserves controlled-document origin without bypassing actu
   assert.match(rules, /function actualCreateAllowed\(\)\{return actualDataAccessOpen\(\)\|\|trialDataRecord\(request\.resource\.data\);\}/);
   assert.match(rules, /match \/signatureEnvelopes\/\{id\}.*actualCreateAllowed\(\)/);
 });
+test("uploaded controlled PDF is handed directly into the field palette before signing", () => {
+  assert.match(portal, /setDocumentId\(initialDocument\.id\);setDocumentUrl\(url\);setTitle\(initialDocument\.title/);
+  assert.match(portal, /setSigningCircle\("Document Selected"\);setTab\("Prepare Envelope"\)/);
+  assert.match(portal, /initialDocument\.fileUrl\|\|initialDocument\.documentUrl\|\|initialDocument\.storageUrl\|\|initialDocument\.pdfUrl/);
+});
+
+test("pre-envelope Drive PDF uses the document-scoped download route", () => {
+  assert.match(portal, /import\{downloadDriveBytes,downloadSignatureBytes\}from"\.\.\/firebase\/signatureStorage"/);
+  assert.match(portal, /envelopeId\?await downloadSignatureBytes\([^;]+:await downloadDriveBytes\(url\.slice\("drive:\/\/".length\),documentId\)/);
+});
