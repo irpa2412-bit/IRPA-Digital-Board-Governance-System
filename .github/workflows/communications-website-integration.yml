@@ -32,6 +32,8 @@ jobs:
         run: npm ci
       - name: Run communications portal security and integration regression tests
         run: npm run test:communication-media
+      - name: Run existing portal navigation regression tests
+        run: npm run test:portal-navigation
       - name: Verify Cloudflare communications router syntax
         run: node --check drive-gateway/src/communicationsSite.mjs
       - name: Verify Cloudflare gateway entrypoint syntax
