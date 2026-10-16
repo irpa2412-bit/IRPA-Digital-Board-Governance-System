@@ -717,3 +717,17 @@ test("initial Signature Portal envelope association is owner-bound, draft-only, 
   assert.ok(rules.includes("signatureDocumentInitialEnvelopeLink(id)||signatureDocumentWorkflowUpdate()"));
   assert.ok(rules.includes("&&actualUpdateAllowed()"), "actual-data access gate must remain mandatory");
 });
+
+
+test("controlled document reads remain limited to authorized users and named owners", () => {
+  const rules = require("node:fs").readFileSync("firestore.rules", "utf8");
+  const start = rules.indexOf("function controlledDocumentReadAllowed()");
+  const end = rules.indexOf("function documentLifecycleIdentity()", start);
+  const helper = rules.slice(start, end);
+  assert.ok(helper.includes("authorizationUser()"));
+  assert.ok(helper.includes('resource.data.get("authorizedUids",[])'));
+  assert.ok(helper.includes('resource.data.get("uploadedByUid","")==request.auth.uid'));
+  assert.ok(helper.includes('resource.data.get("ownerUid","")==request.auth.uid'));
+  assert.ok(helper.includes('resource.data.get("signatureOwnerUid","")==request.auth.uid'));
+  assert.ok(helper.includes("signedIn()"));
+});
