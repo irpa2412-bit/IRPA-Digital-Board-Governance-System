@@ -99,3 +99,14 @@ test("deployment docs require isolated staging and never commit credentials",()=
  assert.ok(docs.includes("deploy and live-verify only after staging acceptance"));
  assert.ok(docs.includes("Firebase Storage remains deny-by-default"));
 });
+
+test("website editor provides a sandboxed live preview without bypassing live-write controls",()=>{
+ assert.ok(portal.includes("websitePreview"));
+ assert.ok(portal.includes('title="IRPA website content preview"'));
+ assert.ok(portal.includes('sandbox=""'));
+ assert.ok(portal.includes('referrerPolicy="no-referrer"'));
+ assert.ok(portal.includes("Save to live website"));
+ assert.ok(docs.includes("Supported document and media upload formats"));
+ assert.ok(docs.includes("current browser route"));
+ assert.ok(docs.includes("does not edit PHP"));
+});
