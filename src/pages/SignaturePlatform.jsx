@@ -19,7 +19,7 @@ const DEFAULTS={Signature:{width:28,height:10},Initials:{width:16,height:8},Date
 function makeField(type,i,uid,page=1){const d=DEFAULTS[type]||DEFAULTS.Text;return{fieldId:`FIELD-${Date.now()}-${i}`,type,page,x:8,y:12,width:d.width,height:d.height,required:type!=="Checkbox",signerUid:uid,responsibility:type==="Signature"?"Signature":type==="Initials"?"Initial":type==="Date"?"Date":type==="Comment"?"Comment":type==="Remarks"?"Remarks":type==="Number"?"Number Entry":type==="Checkbox"?"Approval":"Review",placeholder:type==="Comment"?"Enter comment":type==="Remarks"?"Enter remarks":type==="Number"?"Enter number":""};}
 
 function clamp(v,min,max){return Math.max(min,Math.min(max,v));}
-function controlledPdfUrl(document={}){const link=String(document.webViewLink||"");const driveId=document.fileId||document.driveFileId||((link.match(/\\/d\\/([a-zA-Z0-9_-]+)/)||[])[1])||((link.match(/[?&]id=([a-zA-Z0-9_-]+)/)||[])[1])||"";if(driveId)return `drive://${driveId}`;return document.fileUrl||document.documentUrl||document.storageUrl||document.pdfUrl||"";}
+function controlledPdfUrl(document={}){const link=String(document.webViewLink||"");const driveId=document.fileId||document.driveFileId||(link.includes("/d/")?(link.split("/d/")[1]||"").split(/[/?#]/)[0]:"")||((link.match(/[?&]id=([a-zA-Z0-9_-]+)/)||[])[1])||"";if(driveId)return `drive://${driveId}`;return document.fileUrl||document.documentUrl||document.storageUrl||document.pdfUrl||"";}
 function InkCapture({label="Sign directly on this device",onUse,onSave,replacementMode=false}){
   const canvasRef=useRef(null);
   const drawing=useRef(false);
