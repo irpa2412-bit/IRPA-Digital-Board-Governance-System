@@ -101,3 +101,13 @@ test("selected signer list visibility fix is narrowly paired with its regression
   assert.match(workflow, /!signatureSignerListVisibilityRepair/);
   assert.match(workflow, /changed\.every\(path => \["\.github\/workflows\/meeting-portal-fixture-browser\.yml", "tests\/meeting-isolation-guard\.test\.mjs", "src\/pages\/SignaturePlatform\.jsx", "tests\/signature-signer-picker-regression\.test\.mjs"\]\.includes\(path\)\)/);
 });
+
+
+test("Signature document palette and assignment repair is narrowly paired with access-rule tests", () => {
+  assert.match(workflow, /const signatureDocumentPaletteAssignmentRepair = changed\.includes\("src\/pages\/SignaturePlatform\.jsx"\)/);
+  assert.match(workflow, /changed\.includes\("src\/firebase\/data\.js"\)/);
+  assert.match(workflow, /changed\.includes\("firestore\.rules"\)/);
+  assert.match(workflow, /changed\.includes\("tests\/firestore\.rules\.test\.cjs"\)/);
+  assert.match(workflow, /!signatureDocumentPaletteAssignmentRepair/);
+  assert.match(workflow, /signatureDocumentPaletteAssignmentRepair\)\)/);
+});
