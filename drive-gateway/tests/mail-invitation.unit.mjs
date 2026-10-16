@@ -139,5 +139,5 @@ test("SMTP AUTH PLAIN fails closed on rejected credentials and unsafe usernames"
     command:async()=>{throw new Error("Unexpected challenge");}
   };
   await assert.rejects(authenticateSmtpPlain(options),/authentication was rejected/i);
-  await assert.rejects(authenticateSmtpPlain({...options,username:"smtp-user\\r\\nAUTH LOGIN"}),/username is invalid/i);
+  await assert.rejects(authenticateSmtpPlain({...options,username:"smtp-user\r\nAUTH LOGIN"}),/username is invalid/i);
 });
