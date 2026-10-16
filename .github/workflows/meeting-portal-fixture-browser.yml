@@ -18,6 +18,9 @@ on:
       - "src/styles/portal-readability-standard.css"
       - "src/pages/Meetings.jsx"
       - "src/firebase/data.js"
+      - "src/pages/Invitations.jsx"
+      - "functions/index.js"
+      - "tests/invitation-removal-policy.test.mjs"
       - "functions/meetingGateway.js"
       - "src/pages/OperationalGatewaysParticipants.jsx"
       - "firestore.rules"
@@ -62,6 +65,8 @@ jobs:
         run: npm ci
       - name: Test source-isolation guard policy
         run: node --test tests/meeting-isolation-guard.test.mjs
+      - name: Test administrator-only invitation removal policy
+        run: node --test tests/invitation-removal-policy.test.mjs
       - name: Install isolated browser runner
         run: |
           npm install --no-save --package-lock=false playwright
@@ -94,6 +99,7 @@ jobs:
             "tests/firestore.rules.test.cjs",
             "tests/research-portal-security.test.mjs",
             "tests/meeting-isolation-guard.test.mjs",
+            "tests/invitation-removal-policy.test.mjs",
             ".github/workflows/meeting-invitation-flow-ci.yml",
             ".github/workflows/mail-invitation-tests.yml",
             ".github/workflows/cloudflare-gateway-deploy.yml",
@@ -233,6 +239,10 @@ jobs:
             changed.includes("tests/fixtures/meeting-portal-fixture.jsx");
           const testOnlyRegisterScope = changed.includes("src/firebase/data.js") &&
             changed.includes("tests/meeting-category-policy.test.mjs");
+          const invitationRemovalIntegration = changed.includes("src/pages/Invitations.jsx") &&
+            changed.includes("src/firebase/data.js") && changed.includes("functions/index.js") &&
+            changed.includes("tests/invitation-removal-policy.test.mjs") &&
+            changed.every(path => allowed.has(path));
           // The signature migration PR is a separate, explicitly paired integration scope:
           // require the portal bridge, Gateway signing implementation, and its authenticated flow test.
 
