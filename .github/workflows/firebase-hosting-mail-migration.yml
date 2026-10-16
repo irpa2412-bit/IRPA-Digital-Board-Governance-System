@@ -25,9 +25,9 @@ jobs:
         run: npm run build
       - name: Independent production readability verification
         run: npm run verify:production-readability
-      - name: Deploy Hosting and Firestore
+      - name: Deploy Hosting only (Firestore releases are independently controlled)
         uses: w9jds/firebase-action@v14.17.0
         with:
-          args: deploy --project irpa-digital-board-governance --only hosting,firestore
+          args: deploy --project irpa-digital-board-governance --only hosting
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
