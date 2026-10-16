@@ -196,7 +196,7 @@ export default function OperationalGatewaysParticipants(){
  // Only metadata/reference IDs are retained here; the bearer token itself is delivered by email
  // and is deliberately not persisted in the broadly readable invitation register.
  const meetingInvitationRows=useMemo(()=>invitations.filter(x=>Boolean(String(x.meetingId||"").trim())).sort((a,b)=>String(b.sentAt||b.createdAt||"").localeCompare(String(a.sentAt||a.createdAt||""))),[invitations]);
- const isInvitationError=(x)=>{const status=[x?.meetingAccessDispatchStatus,x?.deliveryStatus,x?.status].map(v=>String(v||"").trim().toLowerCase());return x?.meetingAccessDispatched===false||Boolean(String(x?.deliveryError||x?.meetingAccessDispatchError||"").trim())||status.some(v=>["failed","error","dispatch error","delivery error","undelivered","invitation dispatch failed","smtp error"].includes(v)||v.includes("error")||v.includes("undelivered"));};
+ const isInvitationError=(x)=>{const status=[x?.meetingAccessDispatchStatus,x?.deliveryStatus,x?.status].map(v=>String(v||"").trim().toLowerCase());if(status.some(v=>["cancelled","canceled","cancelled invitation","canceled invitation"].includes(v)))return false;return x?.meetingAccessDispatched===false||Boolean(String(x?.deliveryError||x?.meetingAccessDispatchError||"").trim())||status.some(v=>["failed","error","dispatch error","delivery error","undelivered","invitation dispatch failed","smtp error"].includes(v)||v.includes("error")||v.includes("undelivered"));};
  const invitationMetrics=useMemo(()=>({
   total:meetingInvitationRows.length,
   released:meetingInvitationRows.filter(x=>x.meetingAccessDispatched===true&&!isInvitationError(x)).length,
