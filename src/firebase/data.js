@@ -134,7 +134,6 @@ export async function getControlledDocumentsForSigning({portal="Signature Portal
   // The Documents Portal writes through the authenticated Document Lifecycle gateway.
   // Those records are access-filtered server-side and are not guaranteed to be in the
   // same query result shape as legacy direct Firestore document uploads.
-  let lifecycleLoaded=false;
   try{
     const lifecycle=await listLifecycleDocuments();
     const lifecycleRows=Array.isArray(lifecycle?.documents)?lifecycle.documents:[];
@@ -144,7 +143,6 @@ export async function getControlledDocumentsForSigning({portal="Signature Portal
       const fileId=String(item?.fileId||item?.driveFileId||"").trim();
       results.push({...item,id,documentId:id,fileUrl:item?.fileUrl||(fileId?("drive://"+fileId):""),contentType:item?.contentType||item?.mimeType||"application/pdf",recordOrigin:item?.recordOrigin||"PRODUCTION"});
     }
-    lifecycleLoaded=true;
   }catch(error){errors.push(error);}
   if(!results.length&&errors.length===querySpecs.length+1)throw errors[0]||new Error("Controlled document list could not be loaded.");
   const byId=new Map(results.map(item=>[String(item.id||item.documentId),item]));
