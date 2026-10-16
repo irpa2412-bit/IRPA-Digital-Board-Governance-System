@@ -42,3 +42,10 @@ test("bulk resend targets only explicit failed or error-reported invitation reco
   assert.match(participants,/if\(status\.some\(v=>\["cancelled","canceled","cancelled invitation","canceled invitation"\]\.includes\(v\)\)\)return false/);
   assert.match(participants,/resendInFlight\.current\.has\("__bulk__"\)/);
 });
+
+test("resend action gives immediate per-invitation feedback and is not blocked by unrelated busy state",()=>{
+  assert.match(participants,/\[resendingInvitationIds,setResendingInvitationIds\]=useState\(\[\]\)/);
+  assert.match(participants,/setMsg\("Resending the meeting invitation to "/);
+  assert.match(participants,/disabled=\{resendingInvitationIds\.includes\(i\.id\)\|\|\(busy&&resendInFlight\.current\.has\("__bulk__"\)\)\}/);
+  assert.match(participants,/setResendingInvitationIds\(current=>current\.filter\(id=>id!==i\.id\)\)/);
+});
