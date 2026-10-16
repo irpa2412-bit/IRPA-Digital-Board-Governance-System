@@ -94,6 +94,7 @@ jobs:
             "tests/firestore.rules.test.cjs",
             "tests/research-portal-security.test.mjs",
             "tests/meeting-isolation-guard.test.mjs",
+          "tests/signature-signer-picker-regression.test.mjs",
             ".github/workflows/meeting-invitation-flow-ci.yml",
             ".github/workflows/mail-invitation-tests.yml",
             ".github/workflows/cloudflare-gateway-deploy.yml",
