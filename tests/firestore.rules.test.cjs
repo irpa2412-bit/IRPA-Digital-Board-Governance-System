@@ -731,3 +731,63 @@ test("controlled document reads remain limited to authorized users and named own
   assert.ok(helper.includes('resource.data.get("signatureOwnerUid","")==request.auth.uid'));
   assert.ok(helper.includes("signedIn()"));
 });
+
+function grantAssistantDocument(overrides = {}) {
+  return {
+    title: "IRPA funding concept note",
+    format: "Concept note",
+    tone: "Professional and persuasive",
+    length: "Detailed",
+    instructions: "Prepare a concept note for rangeland restoration.",
+    context: "Longido District, Tanzania.",
+    draft: "Draft document content.",
+    createdByUid: "member-user",
+    createdByEmail: "member@example.test",
+    createdAt: new Date("2026-10-16T10:00:00.000Z"),
+    updatedAt: new Date("2026-10-16T10:00:00.000Z"),
+    recordOrigin: "PRODUCTION",
+    ...overrides
+  };
+}
+
+test("Grant AI document history is private to the authenticated owner", async () => {
+  const ownerDb = testEnv.authenticatedContext("member-user", {
+    email: "member@example.test"
+  }).firestore();
+  const otherDb = testEnv.authenticatedContext("reviewer-user", {
+    email: "reviewer@example.test"
+  }).firestore();
+
+  await assertSucceeds(ownerDb.doc("grantAssistantDocuments/owned-draft").set(grantAssistantDocument()));
+  await assertSucceeds(ownerDb.doc("grantAssistantDocuments/owned-draft").get());
+  await assertFails(otherDb.doc("grantAssistantDocuments/owned-draft").get());
+  await assertFails(otherDb.doc("grantAssistantDocuments/owned-draft").update({ draft: "Unauthorized edit" }));
+});
+
+test("Grant AI document owner can save edits but cannot transfer ownership or rewrite creation time", async () => {
+  const ownerDb = testEnv.authenticatedContext("member-user", {
+    email: "member@example.test"
+  }).firestore();
+
+  await assertSucceeds(ownerDb.doc("grantAssistantDocuments/editable-draft").set(grantAssistantDocument()));
+  await assertSucceeds(ownerDb.doc("grantAssistantDocuments/editable-draft").update({
+    draft: "Revised draft content.",
+    updatedAt: new Date("2026-10-16T11:00:00.000Z")
+  }));
+  await assertFails(ownerDb.doc("grantAssistantDocuments/editable-draft").update({
+    createdByUid: "reviewer-user"
+  }));
+  await assertFails(ownerDb.doc("grantAssistantDocuments/editable-draft").update({
+    createdAt: new Date("2026-10-16T12:00:00.000Z")
+  }));
+});
+
+test("Grant AI document deletion is denied even to the record owner", async () => {
+  const ownerDb = testEnv.authenticatedContext("member-user", {
+    email: "member@example.test"
+  }).firestore();
+
+  await assertSucceeds(ownerDb.doc("grantAssistantDocuments/nondeletable-draft").set(grantAssistantDocument()));
+  await assertFails(ownerDb.doc("grantAssistantDocuments/nondeletable-draft").delete());
+});
+

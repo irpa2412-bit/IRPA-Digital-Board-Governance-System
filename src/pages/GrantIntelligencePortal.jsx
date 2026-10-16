@@ -1,5 +1,5 @@
 import React,{useEffect,useMemo,useState} from "react";
-import {addDoc,collection,onSnapshot,serverTimestamp,updateDoc,doc} from "firebase/firestore";
+import {addDoc,collection,onSnapshot,serverTimestamp,updateDoc,doc,query,where} from "firebase/firestore";
 import app,{auth,db} from "../firebase/config";
 import FundraisingSourceRegistry from "./grant-fundraising/FundraisingSourceRegistry.jsx";
 
@@ -147,6 +147,10 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  const [assistantInstructions,setAssistantInstructions]=useState("");
  const [assistantContext,setAssistantContext]=useState("");
  const [assistantDraft,setAssistantDraft]=useState("");
+ const [assistantDocumentId,setAssistantDocumentId]=useState("");
+ const [assistantDocuments,setAssistantDocuments]=useState([]);
+ const [assistantDocumentsBusy,setAssistantDocumentsBusy]=useState(true);
+ const [assistantSaving,setAssistantSaving]=useState(false);
  const [assistantBusy,setAssistantBusy]=useState(false);
  const [assistantError,setAssistantError]=useState("");
  const [assistantNotice,setAssistantNotice]=useState("");
@@ -173,7 +177,10 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
      if(!response.ok)throw new Error(data.error||"The AI Assistant request failed ("+response.status+").");
      const generated=text(data.draft||data.message||data.assessment?.draft||data.assessment?.concept_note?.draft);
      if(!generated)throw new Error("The AI service returned no draft. Please retry.");
-     setAssistantDraft(generated);setAssistantNotice("Draft generated. Review and edit it before use.");
+     const documentPayload={title:request.slice(0,180),format:assistantFormat,tone:assistantTone,length:assistantLength,instructions:request,context:text(assistantContext),draft:generated,createdByUid:uid,createdByEmail:auth.currentUser?.email||"",createdAt:serverTimestamp(),updatedAt:serverTimestamp(),recordOrigin:"PRODUCTION"};
+     const saved=await addDoc(collection(db,"grantAssistantDocuments"),documentPayload);
+     setAssistantDocumentId(saved.id);setAssistantDraft(generated);
+     setAssistantNotice("Draft generated and saved to your private AI document history. It remains available after you sign out or turn off your computer.");
    }catch(err){setAssistantError(err?.name==="TimeoutError"?"The AI Assistant took longer than 90 seconds. Please retry.":err?.message||"The AI Assistant could not generate a draft.");setAssistantNotice("");}
    finally{setAssistantBusy(false);}
  }
@@ -219,6 +226,16 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    finally{setCrawlerResultsBusy(false);}
  }
  useEffect(()=>{loadCrawlerResults(false)},[]);
+ useEffect(()=>{
+   if(!uid){setAssistantDocuments([]);setAssistantDocumentsBusy(false);return;}
+   setAssistantDocumentsBusy(true);
+   const ownedDocuments=query(collection(db,"grantAssistantDocuments"),where("createdByUid","==",uid));
+   return onSnapshot(ownedDocuments,snap=>{
+     const items=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>dateMillis(b.updatedAt||b.createdAt)-dateMillis(a.updatedAt||a.createdAt));
+     setAssistantDocuments(items);setAssistantDocumentsBusy(false);
+     if(assistantDocumentId&&!items.some(item=>item.id===assistantDocumentId))setAssistantDocumentId("");
+   },err=>{console.error("Grant AI document history subscription failed",err);setAssistantDocumentsBusy(false);setAssistantError("Saved AI documents could not be loaded. Check your authenticated Firestore access.");});
+ },[uid]);
  useEffect(()=>onSnapshot(collection(db,"grantOpportunities"),snap=>{
    const next=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>dateMillis(b.createdAt)-dateMillis(a.createdAt));
    setRecords(next);setLoading(false);setError("");
@@ -510,10 +527,14 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    </div>
    <label style={{fontSize:12}}>What should the assistant prepare? <span style={styles.muted}>Required</span><textarea aria-label="AI Assistant request" rows="4" style={{...styles.input,marginTop:5,resize:"vertical"}} value={assistantInstructions} onChange={e=>setAssistantInstructions(e.target.value)} placeholder="Example: Draft a first-contact message to the Climate Justice Resilience Fund asking about suitable funding pathways for IRPA's community-led climate resilience work in Longido. Do not assume a call is open or claim we have implemented projects." /></label>
    <label style={{fontSize:12}}>Additional context, source text or required points <span style={styles.muted}>(optional)</span><textarea aria-label="AI Assistant additional context" rows="3" style={{...styles.input,marginTop:5,resize:"vertical"}} value={assistantContext} onChange={e=>setAssistantContext(e.target.value)} placeholder="Paste donor guidelines, recipient details, required facts, word limits, language or formatting instructions." /></label>
-   <div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button type="button" disabled={assistantBusy} style={{...styles.button,opacity:assistantBusy?0.6:1}} onClick={generateAssistantDraft}>{assistantBusy?"Generating draft…":"Generate requested output"}</button><button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>{setAssistantInstructions("");setAssistantContext("");setAssistantDraft("");setAssistantError("");setAssistantNotice("");}}>Clear workspace</button></div>
+   <div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button type="button" disabled={assistantBusy} style={{...styles.button,opacity:assistantBusy?0.6:1}} onClick={generateAssistantDraft}>{assistantBusy?"Generating draft…":"Generate requested output"}</button><button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>{setAssistantInstructions("");setAssistantContext("");setAssistantDraft("");setAssistantDocumentId("");setAssistantError("");setAssistantNotice("");}}>Clear workspace</button></div>
+   <section aria-labelledby="grant-ai-saved-documents-heading" style={{border:"1px solid #344255",borderRadius:10,padding:12,display:"grid",gap:8}}>
+    <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"center",flexWrap:"wrap"}}><strong id="grant-ai-saved-documents-heading">Saved AI documents</strong><span style={styles.muted}>Private to your signed-in account · cloud-saved</span></div>
+    {assistantDocumentsBusy?<div style={styles.muted}>Loading saved documents…</div>:assistantDocuments.length===0?<div style={styles.muted}>No saved AI documents yet. Newly generated outputs will be saved here automatically.</div>:<div style={{display:"grid",gap:7}}>{assistantDocuments.map(item=><div key={item.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap",borderTop:"1px solid #344255",paddingTop:8}}><div style={{minWidth:0,flex:"1 1 240px"}}><strong style={{fontSize:13,overflowWrap:"anywhere"}}>{item.title||item.format||"Saved AI document"}</strong><div style={styles.muted}>{item.format||"AI output"} · Updated {dateLabel(item.updatedAt||item.createdAt)}</div></div><button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>{setAssistantDocumentId(item.id);setAssistantDraft(text(item.draft));setAssistantInstructions(text(item.instructions));setAssistantContext(text(item.context));if(item.format)setAssistantFormat(item.format);if(item.tone)setAssistantTone(item.tone);if(item.length)setAssistantLength(item.length);setAssistantError("");setAssistantNotice("Saved document opened. Changes can be saved back to this record.");}}>Open</button></div>)}</div>}
+   </section>
    {assistantNotice&&<div role="status" style={{...styles.card,borderColor:"#32846d",color:"#8de0b7"}}>{assistantNotice}</div>}
    {assistantError&&<div role="alert" style={{...styles.card,borderColor:"#b65c5c",color:"#ffb8b8"}}>{assistantError}</div>}
-   {assistantDraft&&<div style={{display:"grid",gap:8}}><label style={{fontSize:13,fontWeight:800}} htmlFor="grant-ai-draft-output">Editable AI output</label><textarea id="grant-ai-draft-output" aria-label="Editable AI output" rows="14" style={{...styles.input,resize:"vertical",fontFamily:"inherit",lineHeight:1.65}} value={assistantDraft} onChange={e=>setAssistantDraft(e.target.value)}/><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button type="button" style={styles.button} onClick={()=>{if(!navigator.clipboard?.writeText){setAssistantError("Clipboard access is unavailable in this browser.");return;}navigator.clipboard.writeText(assistantDraft).then(()=>setAssistantNotice("Draft copied to clipboard.")).catch(()=>setAssistantError("Clipboard access was blocked by the browser."));}}>Copy draft</button><button type="button" style={{...styles.button,background:"transparent"}} onClick={downloadAssistantDraft}>Download .txt</button></div><p style={{...styles.muted,margin:0}}>Check facts, eligibility, dates, budgets and donor instructions before sending or submitting.</p></div>}
+   {assistantDraft&&<div style={{display:"grid",gap:8}}><label style={{fontSize:13,fontWeight:800}} htmlFor="grant-ai-draft-output">Editable AI output</label><textarea id="grant-ai-draft-output" aria-label="Editable AI output" rows="14" style={{...styles.input,resize:"vertical",fontFamily:"inherit",lineHeight:1.65}} value={assistantDraft} onChange={e=>setAssistantDraft(e.target.value)}/><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button type="button" style={styles.button} onClick={()=>{if(!navigator.clipboard?.writeText){setAssistantError("Clipboard access is unavailable in this browser.");return;}navigator.clipboard.writeText(assistantDraft).then(()=>setAssistantNotice("Draft copied to clipboard.")).catch(()=>setAssistantError("Clipboard access was blocked by the browser."));}}>Copy draft</button><button type="button" disabled={assistantSaving} style={{...styles.button,opacity:assistantSaving?0.6:1}} onClick={async()=>{if(!uid||!assistantDocumentId){setAssistantError("Generate a document or open a saved record before saving edits.");return;}setAssistantSaving(true);setAssistantError("");try{await updateDoc(doc(db,"grantAssistantDocuments",assistantDocumentId),{draft:assistantDraft,updatedAt:serverTimestamp(),title:text(assistantInstructions).slice(0,180)||"Saved AI document",format:assistantFormat,tone:assistantTone,length:assistantLength,instructions:assistantInstructions,context:assistantContext});setAssistantNotice("Edits saved to your private AI document history.");}catch(err){setAssistantError(err?.message||"Could not save edits to the cloud.");}finally{setAssistantSaving(false);}}}>{assistantSaving?"Saving…":"Save edits"}</button><button type="button" style={{...styles.button,background:"transparent"}} onClick={downloadAssistantDraft}>Download .txt</button></div><p style={{...styles.muted,margin:0}}>Check facts, eligibility, dates, budgets and donor instructions before sending or submitting.</p></div>}
   </section>
   <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12}}>
    {[["Discovered opportunities",combinedRecords.length,"All geographic eligibility categories included"],["Open calls",counts.open,"Status: Open"],["In preparation",counts.review,"Review / drafting"],["Submitted or awarded",counts.submitted,"Pipeline progress"],["Expired / closed / unverified calls suppressed",expiredExclusionCount,"Past deadlines, explicit closure, or no verified current deadline/status"]].map(([label,value,sub])=><div key={label} style={styles.card}><div style={styles.muted}>{label}</div><div style={{fontSize:28,fontWeight:800,margin:"7px 0"}}>{value}</div><div style={{fontSize:11,color:"#8ba2b8"}}>{sub}</div></div>)}
