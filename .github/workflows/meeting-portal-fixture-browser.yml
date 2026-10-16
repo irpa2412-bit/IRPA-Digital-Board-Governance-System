@@ -228,8 +228,22 @@ jobs:
             changed.includes("src/components/ActualDataAccessControl.jsx") &&
             changed.includes("functions/index.js") && changed.includes("firestore.rules") &&
             changed.includes("tests/firestore.rules.test.cjs") && changed.every(path => allowed.has(path) || path === ".github/workflows/firebase-deploy.yml");
+          // Grant AI document persistence is a separate, explicitly paired portal/rules change.
+          // Permit only its exact source, Firestore rules, and status-only readability adjustment;
+          // this does not exempt any meeting or invitation source from the isolation guard.
+          const grantAssistantPersistence = changed.includes("src/pages/GrantIntelligencePortal.jsx") &&
+            changed.includes("firestore.rules") &&
+            changed.every(path => [
+              ".github/workflows/meeting-portal-fixture-browser.yml",
+              "src/pages/GrantIntelligencePortal.jsx",
+              "firestore.rules",
+              "src/styles/app.css"
+            ].includes(path));
           const unexpected = changed.filter(path =>
-            !allowed.has(path) && !(path === ".github/workflows/firebase-deploy.yml" && (signatureGatewayIntegration || actualDataGateIntegration || controlledDocumentTrialUploadFix)) && !(path === "drive-gateway/tests/esign-storage-multipart.test.mjs" && signatureGatewayIntegration)
+            !allowed.has(path) &&
+            !(path === ".github/workflows/firebase-deploy.yml" && (signatureGatewayIntegration || actualDataGateIntegration || controlledDocumentTrialUploadFix)) &&
+            !(path === "drive-gateway/tests/esign-storage-multipart.test.mjs" && signatureGatewayIntegration) &&
+            !(grantAssistantPersistence && ["src/pages/GrantIntelligencePortal.jsx", "src/styles/app.css"].includes(path))
           );
           if (unexpected.length) {
             console.error("Unexpected files changed outside the isolated meeting repair:", unexpected);
@@ -338,7 +352,7 @@ jobs:
               !changed.includes("src/pages/Meetings.jsx") &&
               !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
               !testOnlySignatureNavigation && !testOnlyRegisterScope && !invitationRemovalIntegration && !invitationMailResendIntegration &&
-              !signatureGatewayIntegration && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signatureSignerListVisibilityRepair && !signaturePdfPaletteRepair && !signaturePdfUrlHandoffRepair && !signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange) {
+              !signatureGatewayIntegration && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signatureSignerListVisibilityRepair && !signaturePdfPaletteRepair && !signaturePdfUrlHandoffRepair && !signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange && !grantAssistantPersistence) {
             throw new Error("Meeting/participant source change or an explicitly paired isolated regression/guard test is missing.");
           }
           console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));
