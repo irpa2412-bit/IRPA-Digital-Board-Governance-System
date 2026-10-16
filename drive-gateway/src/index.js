@@ -1669,9 +1669,9 @@ async function enforceMailRateLimit(env, uid) {
 async function smtpSend(env,{to,subject,text,html}) {
   const toEmail = normalizeRecipientEmail(to);
   const cleanSubject = validateMailHeader(subject, "Subject");
-  if (!env.SMTP_PASSWORD) throw new Error("IRPA SMTP password is not configured in the deployment environment.");
   if (env.SMTP_MOCK === "success") return "250 MOCK ACCEPTED";
   if (env.SMTP_MOCK === "fail") throw new Error("Mock SMTP provider failure.");
+  if (!env.SMTP_PASSWORD) throw new Error("IRPA SMTP password is not configured in the deployment environment.");
   const { connect } = await import("cloudflare:sockets");
   const socket = connect({hostname:SMTP_HOST,port:SMTP_PORT},{secureTransport:"on"});
   const reader = socket.readable.getReader();
