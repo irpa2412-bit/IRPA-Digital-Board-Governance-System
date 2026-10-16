@@ -85,3 +85,11 @@ test("PDF palette repair is isolated to the signature page, scoped storage helpe
   assert.match(workflow, /!signaturePdfPaletteRepair/);
   assert.match(workflow, /changed\.every\(path => \["\.github\/workflows\/meeting-portal-fixture-browser\.yml", "tests\/meeting-isolation-guard\.test\.mjs", "src\/pages\/SignaturePlatform\.jsx", "src\/firebase\/signatureStorage\.js", "tests\/signature-workflow-policy\.test\.mjs"\]\.includes\(path\)\)/);
 });
+
+
+test("PDF URL handoff repair is narrowly paired with its policy regression test", () => {
+  assert.match(workflow, /const signaturePdfUrlHandoffRepair = changed\.includes\("src\/pages\/SignaturePlatform\.jsx"\)/);
+  assert.match(workflow, /changed\.includes\("tests\/signature-workflow-policy\.test\.mjs"\)/);
+  assert.match(workflow, /!signaturePdfUrlHandoffRepair/);
+  assert.match(workflow, /changed\.every\(path => \["\.github\/workflows\/meeting-portal-fixture-browser\.yml", "tests\/meeting-isolation-guard\.test\.mjs", "src\/pages\/SignaturePlatform\.jsx", "tests\/signature-workflow-policy\.test\.mjs"\]\.includes\(path\)\)/);
+});
