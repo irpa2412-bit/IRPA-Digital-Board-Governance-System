@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { handleSendInvitationEmail, buildInvitationMessage } from "../src/invitationEmail.mjs";
+import { handleSendInvitationEmail, buildInvitationMessage, sendWithRetry, isRetryableMailError } from "../src/invitationEmail.mjs";
 import { queueInductionEmail } from "../../functions/queueInductionEmail.mjs";
 
 const quiet = { error() {}, log() {} };
@@ -88,6 +88,24 @@ test("retries after a provider failure then succeeds", async () => {
 test("returns 502 after final provider failure", async () => {
   let n=0; const smtpSend=async()=>{n++;throw new Error("down")};
   assert.equal((await handleSendInvitationEmail(req(good),makeEnv(),{smtpSend,logger:quiet,sleep})).status,502); assert.equal(n,3);
+});
+
+test("bounded exponential retry delays never exceed the configured cap", async () => {
+  const delays=[]; let n=0;
+  await assert.rejects(sendWithRetry(async()=>{n++;throw new Error("temporary network failure")},{
+    attempts:99,delayMs:300,maxDelayMs:500,logger:quiet,sleep:async ms=>delays.push(ms)
+  }));
+  assert.equal(n,3,"attempt count is capped");
+  assert.equal(delays.length,2);
+  assert.ok(delays.every(ms=>ms>=0&&ms<=500));
+});
+
+test("permanent SMTP rejection is not retried", async () => {
+  let n=0;
+  await assert.rejects(sendWithRetry(async()=>{n++;throw new Error("IRPA SMTP error 550: sender rejected")},{logger:quiet,sleep}));
+  assert.equal(n,1);
+  assert.equal(isRetryableMailError(new Error("IRPA SMTP error 450: temporary failure")),true);
+  assert.equal(isRetryableMailError(Object.assign(new Error("connection dropped after DATA"),{deliveryOutcome:"unknown",retryable:false})),false);
 });
 test("rate limits repeated sends to one address", async () => {
   const env=makeEnv(), d={smtpSend:async()=>({messageId:"x"}),logger:quiet,sleep};
