@@ -1766,7 +1766,19 @@ async function smtpSend(env,{to,subject,text,html}) {
       "--"+boundary+"--",""
     ].join("\r\n");
     await writer.write(new TextEncoder().encode(mime+"\r\n.\r\n"));
-    const accepted=await readResponse();
+    let accepted;
+    try {
+      accepted=await readResponse();
+    } catch (error) {
+      // Once DATA has been written, a transport failure before the final SMTP
+      // response is ambiguous: the provider may already have accepted the mail.
+      // Do not retry this case automatically and risk duplicate invitations.
+      if (!/^IRPA SMTP error \d{3}/i.test(String(error?.message||""))) {
+        error.deliveryOutcome="unknown";
+        error.retryable=false;
+      }
+      throw error;
+    }
     if (!accepted.startsWith("2")) throw new Error("SMTP message was not accepted.");
     await command("QUIT","2");
     return accepted;
