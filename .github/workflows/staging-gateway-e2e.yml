@@ -319,7 +319,13 @@ jobs:
             const auth="cpanel "+process.env.CP_USER+":"+process.env.CP_TOKEN;
             async function request(operation,values){
               const url=new URL("/execute/Fileman/"+operation,base);
-              const response=await fetch(url,{method:"POST",headers:{Authorization:auth,Accept:"application/json","Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams(values)});
+              let response;
+              try {
+                response=await fetch(url,{method:"POST",headers:{Authorization:auth,Accept:"application/json","Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams(values)});
+              } catch(error) {
+                const code=error.cause?.code||error.cause?.name||error.name||"unknown";
+                throw new Error("Staging cPanel API connection failed ("+code+") at "+base.hostname+":"+base.port+".");
+              }
               const body=await response.json().catch(()=>null);
               if(!response.ok||!body) throw new Error("Staging cPanel test-file preparation failed with HTTP "+response.status+".");
               return body;
