@@ -687,3 +687,14 @@ test("translation derivative creation is denied if access is broader than the so
   });
   await assertFails(ownerDb.doc("documents/LIFE-translated-broader").set(derivative));
 });
+
+
+test("controlled-document register accepts explicitly trial-marked uploads without bypassing actual-data gate", () => {
+  const rules = require("node:fs").readFileSync("firestore.rules", "utf8");
+  const helper = rules.match(/function controlledDocumentCreateAllowed\\(\\)\\{([^}]*)\\}/)?.[1] || "";
+  assert.match(helper, /trialDataRecord\\(request\\.resource\\.data\\)/);
+  assert.match(rules, /match \\/documents\\/\\{id\\}.*controlledDocumentCreateAllowed\\(\\).*actualCreateAllowed\\(\\)/);
+  assert.match(rules, /function actualCreateAllowed\\(\\)\\{return actualDataAccessOpen\\(\\)\\|\\|trialDataRecord\\(request\\.resource\\.data\\);\\}/);
+  assert.match(helper, /uploadedByUid/);
+  assert.match(helper, /authorizedUids/);
+});
