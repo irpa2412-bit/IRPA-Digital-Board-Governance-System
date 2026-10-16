@@ -149,7 +149,10 @@ async function assertStickyPortalNavigation(page) {
   expect(Math.abs(initial.navTop - (initial.rollerBottom + initial.rollerMarginBottom)),
     "Back/Next must sit immediately beneath the actual portal label panel").toBeLessThanOrEqual(3);
 
-  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.evaluate(() => {
+    const main = document.querySelector(".app-shell .main-area");
+    window.scrollTo(0, window.scrollY + (main?.getBoundingClientRect().top || 0));
+  });
   await page.waitForTimeout(60);
   await page.evaluate(() => window.scrollBy(0, 260));
   await page.waitForTimeout(100);
