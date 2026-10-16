@@ -11104,31 +11104,3 @@ html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar
   .module-interlink-bar .workflow-portal-children { border-left:0; flex-wrap:wrap; }
 }
 html, body, #root { min-width:0; max-width:100%; }
-
-
-/* Meeting Centre action controls must remain clickable inside the viewport on phones.
-   The hero switches to a column layout below 1100px; make its action row full-width
-   and wrap controls rather than allowing the intrinsic button widths off-screen. */
-.meeting-centre-page .meeting-centre-actions {
-  min-width: 0;
-  max-width: 100%;
-}
-@media (max-width: 1100px) {
-  .meeting-centre-page .meeting-centre-actions {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: stretch;
-    justify-content: flex-start;
-    gap: 8px;
-    width: 100%;
-    min-width: 0;
-    max-width: 100%;
-  }
-  .meeting-centre-page .meeting-centre-actions > button {
-    flex: 1 1 180px;
-    min-width: 0;
-    max-width: 100%;
-    white-space: normal;
-    overflow-wrap: anywhere;
-  }
-}
