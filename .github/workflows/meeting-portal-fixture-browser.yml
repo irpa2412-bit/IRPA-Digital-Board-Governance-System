@@ -208,6 +208,9 @@ jobs:
           const signatureSignerListVisibilityRepair = changed.includes("src/pages/SignaturePlatform.jsx") &&
             changed.includes("tests/signature-signer-picker-regression.test.mjs") &&
             changed.every(path => [".github/workflows/meeting-portal-fixture-browser.yml", "tests/meeting-isolation-guard.test.mjs", "src/pages/SignaturePlatform.jsx", "tests/signature-signer-picker-regression.test.mjs"].includes(path));
+          const signaturePaletteLifecycleSourceRepair = changed.includes("src/firebase/data.js") &&
+            changed.includes("tests/signature-workflow-policy.test.mjs") &&
+            changed.every(path => [".github/workflows/meeting-portal-fixture-browser.yml", "tests/meeting-isolation-guard.test.mjs", "src/firebase/data.js", "tests/signature-workflow-policy.test.mjs"].includes(path));
           const signatureDocumentPaletteAssignmentRepair = changed.includes("src/pages/SignaturePlatform.jsx") &&
             changed.includes("src/firebase/data.js") &&
             changed.includes("firestore.rules") &&
@@ -335,7 +338,7 @@ jobs:
               !changed.includes("src/pages/Meetings.jsx") &&
               !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
               !testOnlySignatureNavigation && !testOnlyRegisterScope && !invitationRemovalIntegration && !invitationMailResendIntegration &&
-              !signatureGatewayIntegration && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signatureSignerListVisibilityRepair && !signaturePdfPaletteRepair && !signaturePdfUrlHandoffRepair && !signatureDocumentPaletteAssignmentRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange) {
+              !signatureGatewayIntegration && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signatureSignerListVisibilityRepair && !signaturePdfPaletteRepair && !signaturePdfUrlHandoffRepair && !signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange) {
             throw new Error("Meeting/participant source change or an explicitly paired isolated regression/guard test is missing.");
           }
           console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));

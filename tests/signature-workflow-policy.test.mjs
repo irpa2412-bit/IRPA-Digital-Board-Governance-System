@@ -71,3 +71,16 @@ test("adding the first signing officer creates a signature field assigned to tha
   assert.match(portal, /fields:nextFields/);
   assert.match(portal, /setFields\(nextFields\)/);
 });
+
+
+test("Signature Portal palette includes authenticated Documents Portal lifecycle PDFs", () => {
+  const data = fs.readFileSync("src/firebase/data.js", "utf8");
+  assert.match(data, /import \{ listLifecycleDocuments \} from "\.\/documentLifecycle\.js"/);
+  assert.match(data, /const lifecycle=await listLifecycleDocuments\(\)/);
+  assert.match(data, /lifecycle\?\.documents/);
+  assert.match(data, /documentId\|\|item\?\.id/);
+  assert.match(data, /item\?\.fileUrl\|\|\(fileId\?/);
+  assert.ok(data.includes('item?.contentType||item?.mimeType||"application/pdf"'));
+  assert.match(data, /d\?\.downloadUrl\|\|d\?\.downloadURL/);
+  assert.match(data, /const byId=new Map\(results\.map\(item=>\[String\(item\.id\|\|item\.documentId\),item\]\)\)/);
+});
