@@ -1803,25 +1803,28 @@ exports.removeInvitationRecord = onCall({region:"us-central1",timeoutSeconds:30}
   const invitationId=String(request.data?.invitationId||"").trim();
   if(!invitationId || invitationId.includes("/")) throw new HttpsError("invalid-argument","A valid invitation record is required.");
   const ref=db.collection("invitations").doc(invitationId);
-  const snap=await ref.get();
-  if(!snap.exists) throw new HttpsError("not-found","This invitation record no longer exists. Refresh the Invitation Register.");
-  const invitation=snap.data()||{};
-  if(String(invitation.meetingId||"").trim() || String(invitation.source||"").toLowerCase().includes("meeting participant")){
-    throw new HttpsError("failed-precondition","This invitee is linked to a meeting. Remove the participant through the Meeting Participants portal so meeting access passes and attendance/quorum counts are revoked together.");
-  }
-  const status=String(invitation.status||"").trim().toLowerCase();
-  if(invitation.accountActivated===true || ["activated","accepted"].includes(status) || invitation.activationCompleted===true){
-    throw new HttpsError("failed-precondition","This invitation is linked to an activated account and cannot be removed from the register. Retain the identity record and use the authorised account-deactivation process.");
-  }
-  await ref.delete();
-  await db.collection("audit").add({
-    action:"INVITATION_REGISTER_REMOVE",
-    collection:"invitations",
-    recordId:invitationId,
-    details:{email:String(invitation.email||"").trim().toLowerCase(),statusBeforeRemoval:invitation.status||"Pending",source:"ADMINISTRATOR_INVITATION_REGISTER"},
-    actorUid:actor.uid,
-    actorEmail:actorEmail||null,
-    createdAt:FieldValue.serverTimestamp()
+  await db.runTransaction(async tx=>{
+    const snap=await tx.get(ref);
+    if(!snap.exists) throw new HttpsError("not-found","This invitation record no longer exists. Refresh the Invitation Register.");
+    const invitation=snap.data()||{};
+    if(String(invitation.meetingId||"").trim() || String(invitation.source||"").toLowerCase().includes("meeting participant")){
+      throw new HttpsError("failed-precondition","This invitee is linked to a meeting. Remove the participant through the Meeting Participants portal so meeting access passes and attendance/quorum counts are revoked together.");
+    }
+    const status=String(invitation.status||"").trim().toLowerCase();
+    if(invitation.accountActivated===true || ["activated","accepted"].includes(status) || invitation.activationCompleted===true){
+      throw new HttpsError("failed-precondition","This invitation is linked to an activated account and cannot be removed from the register. Retain the identity record and use the authorised account-deactivation process.");
+    }
+    const auditRef=db.collection("audit").doc();
+    tx.delete(ref);
+    tx.set(auditRef,{
+      action:"INVITATION_REGISTER_REMOVE",
+      collection:"invitations",
+      recordId:invitationId,
+      details:{email:String(invitation.email||"").trim().toLowerCase(),statusBeforeRemoval:invitation.status||"Pending",source:"ADMINISTRATOR_INVITATION_REGISTER"},
+      actorUid:actor.uid,
+      actorEmail:actorEmail||null,
+      createdAt:FieldValue.serverTimestamp()
+    });
   });
   return {ok:true,invitationId};
 });
