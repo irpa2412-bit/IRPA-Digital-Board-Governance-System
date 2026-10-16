@@ -124,7 +124,9 @@ export async function getControlledDocumentsForSigning({portal="Signature Portal
     ? [query(collection(db,COLLECTIONS.documents),orderBy("uploadedAt","desc"))]
     : [
         query(collection(db,COLLECTIONS.documents),where("uploadedByUid","==",uid)),
-        query(collection(db,COLLECTIONS.documents),where("authorizedUids","array-contains",uid))
+        query(collection(db,COLLECTIONS.documents),where("authorizedUids","array-contains",uid)),
+        query(collection(db,COLLECTIONS.documents),where("ownerUid","==",uid)),
+        query(collection(db,COLLECTIONS.documents),where("signatureOwnerUid","==",uid))
       ];
   const results=[];const errors=[];
   for(const q of querySpecs){try{const snap=await getDocs(q);results.push(...snap.docs.map(x=>({id:x.id,...x.data()})));}catch(error){errors.push(error);}}
@@ -135,7 +137,7 @@ export async function getControlledDocumentsForSigning({portal="Signature Portal
     const isTrialRecord=String(d?.recordOrigin||"PRODUCTION").toUpperCase()==="TRIAL"||d?.trialData===true||d?.isTrial===true;
     if(isTrialRecord!==trialMode)return false;
     const contentType=String(d?.contentType||"application/pdf").toLowerCase();if(contentType!=="application/pdf")return false;
-    const link=String(d?.webViewLink||"");const driveId=d?.fileId||((link.match(/\/d\/([a-zA-Z0-9_-]+)/)||[])[1])||((link.match(/[?&]id=([a-zA-Z0-9_-]+)/)||[])[1])||"";
+    const link=String(d?.webViewLink||"");const driveId=d?.fileId||d?.driveFileId||((link.match(/\/d\/([a-zA-Z0-9_-]+)/)||[])[1])||((link.match(/[?&]id=([a-zA-Z0-9_-]+)/)||[])[1])||"";
     if(!(d?.fileUrl||d?.documentUrl||d?.storageUrl||d?.pdfUrl||driveId))return false;
     const classification=String(d?.classification||"Public").trim().toLowerCase();
     // Governance and Meeting portals can access every classification. Every other portal can access all categories, but not Confidential or Restricted.

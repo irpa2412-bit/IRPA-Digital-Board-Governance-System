@@ -3,6 +3,8 @@ import test from "node:test";
 import fs from "node:fs";
 import { requireSupportedSignatureRoutingMode } from "../src/firebase/signatureWorkflowPolicy.js";
 
+const portal = fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx", import.meta.url), "utf8");
+
 test("Sequential and Parallel are the only supported Signature Portal routing modes", () => {
   assert.equal(requireSupportedSignatureRoutingMode("Sequential"), "Sequential");
   assert.equal(requireSupportedSignatureRoutingMode("Parallel"), "Parallel");
@@ -50,4 +52,22 @@ test("PDF palette resolves controlled Drive PDFs in archive, initial selection a
   assert.match(page, /setDocumentUrl\(controlledPdfUrl\(doc\)\)/);
   assert.match(page, /setDocumentUrl\(controlledPdfUrl\(selectedDoc\)\)/);
   assert.match(page, /const url=controlledPdfUrl\(initialDocument\)/);
+});
+
+
+test("Signature Portal palette queries include document owner and signature owner access", () => {
+  const data = fs.readFileSync("src/firebase/data.js", "utf8");
+  const rules = fs.readFileSync("firestore.rules", "utf8");
+  assert.match(data, /where\("ownerUid","==",uid\)/);
+  assert.match(data, /where\("signatureOwnerUid","==",uid\)/);
+  assert.match(data, /d\?\.driveFileId/);
+  assert.match(rules, /resource\.data\.get\("ownerUid",""\)==request\.auth\.uid/);
+  assert.match(rules, /resource\.data\.get\("signatureOwnerUid",""\)==request\.auth\.uid/);
+});
+
+test("adding the first signing officer creates a signature field assigned to that officer", () => {
+  assert.match(portal, /const nextFields=fields\.map\(f=>\(\["Signature","Initials"\]\.includes\(f\.type\)&&!f\.signerUid\)/);
+  assert.match(portal, /if\(!nextFields\.some\(f=>\["Signature","Initials"\]\.includes\(f\.type\)\)\)nextFields\.push\(makeField\("Signature",nextFields\.length,m\.uid,1\)\)/);
+  assert.match(portal, /fields:nextFields/);
+  assert.match(portal, /setFields\(nextFields\)/);
 });
