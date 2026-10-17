@@ -751,19 +751,23 @@ jobs:
             const usernameHash=backup.content.match(/hash_equals\s*\(\s*base64_decode\s*\(\s*(['"])(.*?)\1\s*\)\s*,\s*\$username\s*\)/s);
             const passwordHash=backup.content.match(/hash_equals\s*\(\s*(['"])([a-f0-9]{32,128})\1\s*,\s*hash\s*\(\s*(['"])(sha256|sha512)\3\s*,\s*\$password\s*\)\s*\)/is);
             const loginLiteral=backup.content.match(/get_user_by\s*\(\s*(['"])login\1\s*,\s*(['"])(.*?)\2\s*\)/is);
-            let credentialsMatch=false;
-            if(username&&password&&usernameHash&&passwordHash&&loginLiteral){
-              const decodedUsername=Buffer.from(usernameHash[2],"base64").toString("utf8");
-              const actualHash=require("node:crypto").createHash(passwordHash[4]).update(password).digest("hex");
-              credentialsMatch=decodedUsername===username&&loginLiteral[3]===username&&actualHash.toLowerCase()===passwordHash[2].toLowerCase();
+            let decodedUsernameMatches=false,pluginLoginMatches=false,passwordDigestMatches=false;
+            if(usernameHash&&username){
+              decodedUsernameMatches=Buffer.from(usernameHash[2],"base64").toString("utf8")===username;
             }
+            if(loginLiteral&&username)pluginLoginMatches=loginLiteral[3]===username;
+            if(passwordHash&&password){
+              const actualHash=require("node:crypto").createHash(passwordHash[4]).update(password).digest("hex");
+              passwordDigestMatches=actualHash.toLowerCase()===passwordHash[2].toLowerCase();
+            }
+            const credentialsMatch=Boolean(username&&password&&usernameHash&&passwordHash&&loginLiteral&&decodedUsernameMatches&&pluginLoginMatches&&passwordDigestMatches);
             const secureHooks=/add_filter\s*\(\s*['"]determine_current_user['"]/.test(backup.content)&&
               /add_filter\s*\(\s*['"]rest_authentication_errors['"]/.test(backup.content)&&
               /wp_set_current_user\s*\(/.test(backup.content)&&/get_user_meta\s*\(/.test(backup.content)&&
               /user_can\s*\(/.test(backup.content)&&/HTTP_HOST|SERVER_NAME/.test(backup.content)&&
               /HTTP_X_IRPA_STAGING_AUTHORIZATION|X-IRPA-Staging-Authorization/i.test(backup.content)&&
               /staging\.irpa\.or\.tz/.test(backup.content)&&!/eval\s*\(|shell_exec\s*\(|system\s*\(|passthru\s*\(/i.test(backup.content);
-            console.log("STAGING_AUTH_BACKUP_CHECK="+JSON.stringify({found:true,length:backup.content.length,secureHooks,credentialsMatch}));
+            console.log("STAGING_AUTH_BACKUP_CHECK="+JSON.stringify({found:true,length:backup.content.length,secureHooks,hasUsernameHash:Boolean(usernameHash),hasPasswordHash:Boolean(passwordHash),hasLoginLiteral:Boolean(loginLiteral),decodedUsernameMatches,pluginLoginMatches,passwordDigestMatches,credentialsMatch}));
             if(!secureHooks||!credentialsMatch)throw new Error("ABORT: original staging auth backup does not safely match the configured dedicated editor credentials; no plugin change made.");
             const sourceLines=backup.content.replace(/\r\n/g,"\n").split("\n");
             const hostLine=sourceLines.findIndex(line=>/\$host\s*=.*preg_replace.*\$_SERVER/.test(line));
