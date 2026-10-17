@@ -193,6 +193,7 @@ jobs:
           PROJECT: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
           APP_URL: ${{ secrets.STAGING_IRPA_APP_URL }}
           CP_ROOT: ${{ secrets.STAGING_CPANEL_DOCUMENT_ROOT }}
+          META_APP_ID: ${{ secrets.STAGING_META_APP_ID }}
         working-directory: drive-gateway
         run: |
           set -euo pipefail
@@ -227,7 +228,10 @@ jobs:
               IRPA_APP_URL:process.env.APP_URL,
               DRIVE_ROOT_FOLDER_NAME:"IRPA Governance System - STAGING",
               FIRESTORE_COLLECTION_PREFIX:"staging_",DRIVE_MOCK:"false",LOCAL_TEST_MODE:"false",
-              IRPA_ENVIRONMENT:"staging",CPANEL_DOCUMENT_ROOT:process.env.CP_ROOT
+              IRPA_ENVIRONMENT:"staging",CPANEL_DOCUMENT_ROOT:process.env.CP_ROOT,
+              META_APP_ID:process.env.META_APP_ID||"",
+              META_REDIRECT_URI:"https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev/api/communications/meta/callback",
+              META_GRAPH_API_VERSION:"v26.0"
             },
             kv_namespaces:[{binding:"DRIVE_KV",id:process.env.STAGING_KV_ID}],
             triggers:{crons:["0 * * * *"]}
@@ -922,6 +926,41 @@ jobs:
           accountId: ${{ secrets.STAGING_CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: drive-gateway
           command: deploy --config wrangler.staging.generated.json
+
+      - name: Configure optional Meta OAuth secrets for staging
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.STAGING_CLOUDFLARE_ACCOUNT_ID }}
+          META_APP_ID: ${{ secrets.STAGING_META_APP_ID }}
+          META_APP_SECRET: ${{ secrets.STAGING_META_APP_SECRET }}
+          META_TOKEN_ENCRYPTION_KEY: ${{ secrets.STAGING_META_TOKEN_ENCRYPTION_KEY }}
+        working-directory: drive-gateway
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const values = [process.env.META_APP_ID||"", process.env.META_APP_SECRET||"", process.env.META_TOKEN_ENCRYPTION_KEY||""];
+          const count = values.filter(Boolean).length;
+          if (count === 0) {
+            console.log("META_OAUTH_CONFIGURED=false; Meta endpoints remain disabled until staging-only configuration is supplied.");
+            process.exit(0);
+          }
+          if (count !== 3) throw new Error("Partial Meta staging configuration. Configure all three STAGING_META_* repository secrets; values are never printed.");
+          if (!/^\\d+$/.test(values[0])) throw new Error("STAGING_META_APP_ID must be a numeric Meta App ID.");
+          const decoded = Buffer.from(values[2], "base64");
+          if (decoded.length !== 32) throw new Error("STAGING_META_TOKEN_ENCRYPTION_KEY must decode to 32 bytes.");
+          console.log("META_OAUTH_CONFIGURATION_SHAPE=VALID");
+          NODE
+          if [ -z "$META_APP_ID" ] && [ -z "$META_APP_SECRET" ] && [ -z "$META_TOKEN_ENCRYPTION_KEY" ]; then exit 0; fi
+          node <<'NODE'
+          const {spawnSync}=require("node:child_process");
+          for (const [name,value] of [["META_APP_SECRET",process.env.META_APP_SECRET],["META_TOKEN_ENCRYPTION_KEY",process.env.META_TOKEN_ENCRYPTION_KEY]]) {
+            const result=spawnSync("npx",["wrangler","secret","put",name,"--config","wrangler.staging.generated.json"],{
+              input:value,encoding:"utf8",stdio:["pipe","ignore","pipe"],env:process.env
+            });
+            if(result.status!==0) throw new Error("Could not configure a staging Meta Worker secret: "+name+"; secret value suppressed.");
+          }
+          console.log("META_OAUTH_SECRETS_CONFIGURED=true");
+          NODE
 
       - name: Provision least-privilege staging WordPress application password
         working-directory: drive-gateway
