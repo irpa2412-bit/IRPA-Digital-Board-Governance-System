@@ -590,7 +590,7 @@ jobs:
                     setsCurrentUser:/wp_set_current_user/.test(authContent),
                     checksApplicationPasswords:/application_password/i.test(authContent),
                     checksHost:/HTTP_HOST|SERVER_NAME/.test(authContent),
-                    containsFatalFunctions:/wp_die\\s*\\(|\\b(?:exit|die)\\s*\\(/i.test(authContent)
+                    hasFatalFunctionCall:authContent.includes("wp_die(")||authContent.includes("exit(")||authContent.includes("die(")
                   }));
                 }
               }
