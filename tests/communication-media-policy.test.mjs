@@ -6,6 +6,7 @@ const read=path=>readFileSync(new URL(path,import.meta.url),"utf8");
 const app=read("../src/App.jsx");
 const portal=read("../src/pages/CommunicationMediaPortal.jsx");
 const studio=read("../src/pages/CommunicationMediaStudio.jsx");
+const operations=read("../src/pages/CommunicationMediaOperations.jsx");
 const rules=read("../firestore.rules");
 const gateway=read("../drive-gateway/src/index.js");
 const site=read("../drive-gateway/src/communicationsSite.mjs");
@@ -131,4 +132,20 @@ test("website page editing is staging-host-only, Communication & Media scoped, r
  assert.ok(!site.includes("console.log(WORDPRESS_APPLICATION_PASSWORD"));
  assert.ok(!portal.includes("WORDPRESS_APPLICATION_PASSWORD"));
  assert.ok(!portal.includes("CPANEL_API_TOKEN"));
+});
+
+
+test("communications operations registers provide campaigns, media contacts, brand resources, crisis plans and coverage logs",()=>{
+ for(const term of ['Campaign','Media Contact','Brand Asset','Crisis Plan','Coverage Log','startDate','contactName','rights','holdingStatement','sourceUrl','observedDate']) assert.ok(operations.includes(term),term);
+ assert.ok(portal.includes('import CommunicationMediaOperations from "./CommunicationMediaOperations"'));
+ assert.ok(portal.includes('tab==="Communications Operations"&&<CommunicationMediaOperations'));
+ assert.ok(operations.includes('writeBatch(db)'));
+ assert.ok(operations.includes('collection(db,"communicationOperationsAudit")'));
+ assert.ok(operations.includes('No records are deleted'));
+ assert.ok(rules.includes('match /communicationOperations/{id}'));
+ assert.ok(rules.includes('match /communicationOperationsAudit/{id}'));
+ assert.ok(rules.includes('allow delete:if false;'));
+ assert.ok(rules.includes('allow update,delete:if false;'));
+ assert.ok(rules.includes('"Crisis Plan"'));
+ assert.ok(rules.includes('request.resource.data.get("actorUid","")==request.auth.uid'));
 });
