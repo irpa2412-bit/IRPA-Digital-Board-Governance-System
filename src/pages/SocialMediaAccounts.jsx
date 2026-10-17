@@ -1,5 +1,5 @@
 import React,{useEffect,useMemo,useState} from "react";
-import {collection,doc,onSnapshot,orderBy,query,serverTimestamp,writeBatch} from "firebase/firestore";
+import {collection,doc,limit,onSnapshot,orderBy,query,serverTimestamp,writeBatch} from "firebase/firestore";
 import {auth,db} from "../firebase/config";
 
 const PLATFORMS=["Facebook","Instagram","LinkedIn","X","YouTube","TikTok","WhatsApp","Telegram","Other"];
@@ -19,7 +19,7 @@ export default function SocialMediaAccounts({profile,employee,selectedAuthority,
  const reviewer=isAdmin||roles.some(r=>REVIEW_ROLES.includes(r));
  const [items,setItems]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState(""),[notice,setNotice]=useState(""),[busy,setBusy]=useState(false),[editing,setEditing]=useState(null),[filter,setFilter]=useState("All"),[search,setSearch]=useState(""),[audit,setAudit]=useState([]),[form,setForm]=useState(blank);
  useEffect(()=>{if(!user?.uid||!allowed){setItems([]);setLoading(false);return}const q=query(collection(db,"socialMediaAccounts"),orderBy("updatedAt","desc"));return onSnapshot(q,s=>{setItems(s.docs.map(d=>({id:d.id,...d.data()})));setLoading(false);setError("")},e=>{setLoading(false);setError(e?.code==="permission-denied"?"Access denied by social-account policy. Verify your assigned communications role and deployed rules.":e.message||"Unable to load social accounts.")})},[user?.uid,allowed]);
- useEffect(()=>{if(!user?.uid||!reviewer){setAudit([]);return}const q=query(collection(db,"socialMediaAccountsAudit"),orderBy("createdAt","desc"));return onSnapshot(q,s=>setAudit(s.docs.slice(0,50).map(d=>({id:d.id,...d.data()}))),e=>setError(e?.message||"Unable to load account audit history."))},[user?.uid,reviewer]);
+ useEffect(()=>{if(!user?.uid||!reviewer){setAudit([]);return}const q=query(collection(db,"socialMediaAccountsAudit"),orderBy("createdAt","desc"),limit(50));return onSnapshot(q,s=>setAudit(s.docs.map(d=>({id:d.id,...d.data()}))),e=>setError(e?.message||"Unable to load account audit history."))},[user?.uid,reviewer]);
  const reset=()=>{setEditing(null);setForm(blank())};
  const visible=items.filter(x=>(filter==="All"||x.connectionStatus===filter)&&(!search||[x.platform,x.accountName,x.handle,x.owner,x.custodian,x.purpose].join(" ").toLowerCase().includes(search.toLowerCase())));
  function edit(item){setEditing(item);setForm({...blank(),...item})}
