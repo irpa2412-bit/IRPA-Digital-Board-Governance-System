@@ -189,7 +189,7 @@ export function createCommunicationsSiteRouter(deps) {
           const user = await response.json();
           result.website = "connected";
           result.websiteAccount = { name: cleanText(user.name, 100), canEditPosts: Array.isArray(user.capabilities) ? !!user.capabilities.edit_posts : undefined };
-        } else result.website = "authentication_failed";
+        } else { const detail = await response.json().catch(() => ({})); result.website = "authentication_failed"; result.websiteHttpStatus = response.status; result.websiteErrorCode = typeof detail.code === "string" ? detail.code.slice(0, 100) : undefined; }
       } catch (error) { result.website = error.message.includes("not configured") ? "not_configured" : "unavailable"; }
       try {
         const cp = cpanelConfig(env);
