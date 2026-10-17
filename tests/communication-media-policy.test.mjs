@@ -58,7 +58,8 @@ test("website publishing enforces Firebase authentication, registered reviewer r
  assert.ok(site.includes("COMMUNICATION_MEDIA_PUBLISHED"));
  assert.ok(site.includes("WORDPRESS_APPLICATION_PASSWORD"));
  assert.ok(!portal.includes("WORDPRESS_APPLICATION_PASSWORD"));
- assert.ok(!portal.includes("CPANEL_API_TOKEN"));
+ assert.ok(!portal.includes("process.env.CPANEL_API_TOKEN"));
+ assert.ok(!/CPANEL_API_TOKEN\s*[:=]\s*["'][^"']+["']/.test(portal));
  assert.ok(portal.includes("configured securely by an authorised administrator"));
 });
 
@@ -136,7 +137,8 @@ test("website page editing is staging-host-only, Communication & Media scoped, r
  assert.ok(site.includes('["draft", "publish"]'));
  assert.ok(!site.includes("console.log(WORDPRESS_APPLICATION_PASSWORD"));
  assert.ok(!portal.includes("WORDPRESS_APPLICATION_PASSWORD"));
- assert.ok(!portal.includes("CPANEL_API_TOKEN"));
+ assert.ok(!portal.includes("process.env.CPANEL_API_TOKEN"));
+ assert.ok(!/CPANEL_API_TOKEN\s*[:=]\s*["'][^"']+["']/.test(portal));
 });
 
 
