@@ -1181,15 +1181,16 @@ jobs:
             // The current staging index.php is a custom 404 JSON handler and does not bootstrap WordPress. Preserve it outside the web root, then restore the standard WordPress front controller.
             const originalIndex=await readFile(stage,"index.php");
             if(!originalIndex.ok||!originalIndex.content.startsWith("<?php"))throw new Error("Could not read staging index.php before front-controller repair.");
-            const standardIndex=String.raw`<?php
-/**
- * Front to the WordPress application.
- *
- * @package WordPress
- */
-define( 'WP_USE_THEMES', true );
-require __DIR__ . '/wp-blog-header.php';
-`;
+            const standardIndex=[
+              "<?php",
+              "/**",
+              " * Front to the WordPress application.",
+              " *",
+              " * @package WordPress",
+              " */",
+              "define( 'WP_USE_THEMES', true );",
+              "require __DIR__ . '/wp-blog-header.php';"
+            ].join("\n")+"\n";
             const needsFrontController=!/require[^;]*wp-blog-header\.php/i.test(originalIndex.content)||/["']ok["']\s*:\s*false/.test(originalIndex.content);
             if(needsFrontController){
               const homeDir=root.replace(/\/public_html$/,"");
