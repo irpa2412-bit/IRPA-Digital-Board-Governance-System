@@ -497,7 +497,7 @@ export default {
     if (url.pathname === "/run") {
       try {
         const token = String(request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
-        await verifyFirebaseIdToken(token, env, false);
+        await verifyFirebaseIdToken(token, env, true);
       } catch (error) {
         return json({ error: String(error.message || "Unauthorized").slice(0, 300) }, 401);
       }
