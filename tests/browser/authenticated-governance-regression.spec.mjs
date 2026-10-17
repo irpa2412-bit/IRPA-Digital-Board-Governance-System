@@ -125,6 +125,16 @@ async function assertPortalAndNoOverflow(page, expectedText, width) {
 }
 
 async function assertStickyPortalNavigation(page) {
+  if (page.viewportSize().width <= 760) {
+    const mobilePositions = await page.evaluate(() => ({
+      roller: getComputedStyle(document.querySelector(".main-area > .desktop-webapp-navigation-roller")).position,
+      nav: getComputedStyle(document.querySelector(".main-area > .page-back-next-navigation")).position
+    }));
+    expect(mobilePositions.roller, "mobile portal header must not cover content while scrolling").toBe("static");
+    expect(mobilePositions.nav, "mobile World Time row must not cover other panels while scrolling").toBe("static");
+    await page.evaluate(() => window.scrollTo(0, 0));
+    return;
+  }
   const initial = await page.evaluate(() => {
     const roller = document.querySelector(".main-area > .desktop-webapp-navigation-roller");
     const nav = document.querySelector(".main-area > .page-back-next-navigation");
