@@ -1141,12 +1141,10 @@ jobs:
             }
             const iniLines=userIni.split(/\\r?\\n/).filter(line=>!/^\\s*memory_limit\\s*=/i.test(line));
             const updatedIni=iniLines.filter((line,index)=>line.length||index<iniLines.length-1).concat("memory_limit=256M").join("\\n")+"\\n";
-            const memoryConfigChanged=userIni!==updatedIni;
-            if(memoryConfigChanged){
+            const memoryLimitConfigured=/^\\s*memory_limit\\s*=\\s*256M\\s*$/im.test(userIni);
+            if(!memoryLimitConfigured){
               if(!await writeFile(stage,".user.ini",updatedIni))throw new Error("Could not raise the staging-only PHP memory limit to 256M.");
               console.log("STAGING_PHP_MEMORY_LIMIT=256M");
-              // PHP-FPM caches .user.ini for up to 300 seconds by default. Wait only
-              // after changing the file; otherwise avoid needlessly resetting its cache.
               console.log("STAGING_PHP_INI_CACHE_WAIT=STARTED");
               await new Promise(resolve=>setTimeout(resolve,310000));
               console.log("STAGING_PHP_INI_CACHE_WAIT=COMPLETED");
@@ -1239,9 +1237,11 @@ jobs:
             const usernameB64=Buffer.from(process.env.WP_USER,"utf8").toString("base64");
             const integrationUser="irpa-staging-gateway-"+crypto.createHash("sha256").update(String(process.env.WP_USER||"")).digest("hex").slice(0,12);
             const passwordHash=crypto.createHash("sha256").update(wpPassword).digest("hex");
-            async function verifyAuth(){
+            async function verifyAuth(fatalToken=""){
               try{
-                const r=await request(new URL("/wp-json/wp/v2/users/me?context=edit",wpBase).href,"GET",{Authorization:basic,"X-IRPA-Staging-Authorization":basic,Accept:"application/json","Cache-Control":"no-cache"});
+                const headers={Authorization:basic,"X-IRPA-Staging-Authorization":basic,Accept:"application/json","Cache-Control":"no-cache"};
+                if(fatalToken)headers["X-IRPA-Staging-Fatal-Token"]=fatalToken;
+                const r=await request(new URL("/wp-json/wp/v2/users/me?context=edit",wpBase).href,"GET",headers);
                 return {ok:r.http===200&&Number.isInteger(r.data?.id),http:r.http,errorCode:String(r.data?.code||"").slice(0,80),message:String(r.data?.message||"").replace(/\/home\/[^/\s]+/g,"/home/[account]").replace(/(?:password|secret|token|authorization)\s*[:=]\s*[^,\s;]+/ig,"credential=[redacted]").slice(0,180)};
               }catch(e){return {ok:false,http:0,error:String(e.code||e.name)}}
             }
@@ -1362,7 +1362,25 @@ jobs:
               }finally{
                 if(!await writeFile(muDir,cachePlugin,inert))throw new Error("Could not neutralize the temporary staging OPcache plugin.");
               }
-              verified=await verifyAuth();
+              const fatalToken=crypto.randomBytes(32).toString("hex");
+              const fatalHash=crypto.createHash("sha256").update(fatalToken).digest("hex");
+              const fatalPlugin="irpa-staging-fatal-"+crypto.randomBytes(6).toString("hex")+".php";
+              const fatalPhp=[
+                "<?php",
+                "$host=strtolower(preg_replace('/:\\\\d+$/','',(string)(\$_SERVER['HTTP_HOST']??'')));",
+                "if($host!=='staging.irpa.or.tz') return;",
+                "$path=(string)(parse_url((string)(\$_SERVER['REQUEST_URI']??''),PHP_URL_PATH)?:'');",
+                "if(strpos($path,'/wp-json/wp/v2/')!==0) return;",
+                "$provided=(string)(\$_SERVER['HTTP_X_IRPA_STAGING_FATAL_TOKEN']??'');",
+                "if(!hash_equals('"+fatalHash+"',hash('sha256',$provided))) return;",
+                "register_shutdown_function(function(){ $e=error_get_last(); if(!$e||!in_array((int)$e['type'],[E_ERROR,E_PARSE,E_CORE_ERROR,E_COMPILE_ERROR,E_USER_ERROR],true)) return; $msg=(string)($e['message']??''); $msg=preg_replace('/(?:password|secret|token|authorization)\\\\s*[:=]\\\\s*[^,\\\\s;]+/i','credential=[redacted]',$msg); $msg=preg_replace('/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\\\.[A-Z]{2,}/i','[email]',$msg); error_log('[IRPA_STAGING_FATAL_DIAG] '.json_encode(['type'=>(int)$e['type'],'file'=>basename((string)($e['file']??'')),'line'=>(int)($e['line']??0),'message'=>substr($msg,0,240)])); });"
+              ].join("\\n")+"\\n";
+              if(!await writeFile(muDir,fatalPlugin,fatalPhp))throw new Error("Could not install the temporary staging fatal diagnostic.");
+              try{
+                verified=await verifyAuth(fatalToken);
+              }finally{
+                if(!await writeFile(muDir,fatalPlugin,inert))throw new Error("Could not neutralize the temporary staging fatal diagnostic.");
+              }
               if(!verified.ok&&verified.http===500){
                 const logDirs=[{label:"staging",dir:stage},{label:"webroot",dir:root},{label:"home-logs",dir:root.replace(/\/public_html$/,"")+"/logs"},{label:"wp-content",dir:stage+"/wp-content"}];
                 for(const entry of logDirs){
@@ -1371,7 +1389,7 @@ jobs:
                     if(!listing.ok)continue;
                     for(const name of listing.files.filter(n=>n==="error_log"||n==="debug.log"||/staging.*error.*log/i.test(n)).slice(0,3)){
                       const log=await readFile(entry.dir,name);
-                      const lines=log.content.split(/\r?\n/).filter(line=>/fatal error|uncaught|parse error|irpa-staging-rest-auth|undefined function|critical error/i.test(line)).slice(-8).map(line=>line.replace(/\/home\/[^/\s]+/g,"/home/[account]").replace(/(?:password|secret|token|authorization)\s*[:=]\s*[^,\s;]+/ig,"credential=[redacted]").replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/ig,"[email]").slice(0,200));
+                      const lines=log.content.split(/\r?\n/).filter(line=>/fatal error|uncaught|parse error|irpa-staging-rest-auth|irpa_staging_fatal_diag|undefined function|critical error/i.test(line)).slice(-8).map(line=>line.replace(/\/home\/[^/\s]+/g,"/home/[account]").replace(/(?:password|secret|token|authorization)\s*[:=]\s*[^,\s;]+/ig,"credential=[redacted]").replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/ig,"[email]").slice(0,200));
                       console.log("STAGING_WORDPRESS_FATAL_LOG="+JSON.stringify({location:entry.label,file:name,count:lines.length,lines}));
                     }
                   }catch{}
