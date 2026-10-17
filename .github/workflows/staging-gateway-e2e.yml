@@ -482,6 +482,15 @@ jobs:
           CF_STAGING_ZONE_ID_SECRET: ${{ secrets.STAGING_CLOUDFLARE_ZONE_ID }}
           CF_ZONE_ID_VAR: ${{ vars.CLOUDFLARE_ZONE_ID }}
           CF_STAGING_ZONE_ID_VAR: ${{ vars.STAGING_CLOUDFLARE_ZONE_ID }}
+          CF_ZONE_ID_ALT1: ${{ secrets.CF_ZONE_ID }}
+          CF_ZONE_ID_ALT2: ${{ secrets.IRPA_ZONE_ID }}
+          CF_ZONE_ID_ALT3: ${{ secrets.IRPA_CLOUDFLARE_ZONE_ID }}
+          CF_ZONE_ID_ALT4: ${{ secrets.CLOUDFLARE_IRPA_ZONE_ID }}
+          CF_ZONE_ID_ALT5: ${{ secrets.CLOUDFLARE_DNS_ZONE_ID }}
+          CF_ZONE_ID_ALT6: ${{ secrets.IRPA_OR_TZ_ZONE_ID }}
+          CF_ZONE_ID_ALT7: ${{ secrets.DNS_ZONE_ID }}
+          CF_ZONE_ID_ALT8: ${{ secrets.STAGING_ZONE_ID }}
+          CF_ZONE_ID_ALT9: ${{ secrets.CLOUDFLARE_PRODUCTION_ZONE_ID }}
           CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
           CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
           CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
