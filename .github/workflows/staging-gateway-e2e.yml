@@ -43,23 +43,39 @@ jobs:
       - run: npm ci --no-audit --no-fund
         working-directory: drive-gateway
       - name: Firestore emulator E2E
+        id: firestore-e2e
         run: |
           set -o pipefail
           npx firebase emulators:exec --project demo-irpa-staging --only firestore "npm --prefix drive-gateway test" | tee e2e-output.ndjson
-      - if: always()
+      - name: Write redacted local E2E summary
+        if: always()
+        env:
+          E2E: ${{ steps.firestore-e2e.outcome }}
+        run: |
+          set -euo pipefail
+          { echo "# IRPA-DBGS local regression checks"; echo ""; echo "- Firestore emulator E2E: ${E2E:-not-run}"; echo "- Environment: demo-irpa-staging"; } | tee local-e2e-summary.md >> "$GITHUB_STEP_SUMMARY"
+          if [ -f e2e-output.ndjson ]; then sed -E 's/(Authorization:)[^, ]+/\1[REDACTED]/Ig; s/(password|token|secret)(["=: ]+)[^", ]+/\1\2[REDACTED]/Ig' e2e-output.ndjson > local-e2e-diagnostics.txt; else echo "No E2E output file was produced." > local-e2e-diagnostics.txt; fi
+      - name: Upload redacted local E2E diagnostics
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: staging-gateway-e2e-raw-output
-          path: e2e-output.ndjson
+          name: staging-local-e2e-redacted-diagnostics
+          path: |
+            local-e2e-summary.md
+            local-e2e-diagnostics.txt
+          if-no-files-found: error
 
-  deploy-staging:
+  repair-staging:
     needs: local-e2e
+    outputs:
+      staging_url: ${{ steps.staging-health.outputs.staging_url }}
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004' || github.ref == 'refs/heads/fix/communications-cloudflare-website-integration' || (github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'fix/communications-cloudflare-website-integration')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - name: Require isolated staging secrets
+        id: staging-preflight
         env:
           CF_TOKEN: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
           CF_ACCOUNT: ${{ secrets.STAGING_CLOUDFLARE_ACCOUNT_ID }}
@@ -90,6 +106,11 @@ jobs:
           test "$PROJECT" = "irpa-dbg-staging-a73ec"
           test "$APP_URL" != "https://irpa-digital-board-governance.web.app"
           test "$missing" -eq 0
+          node <<'NODE'
+          const wp=new URL(process.env.WP_BASE);
+          if(wp.hostname.toLowerCase()!=="staging.irpa.or.tz"||wp.protocol!=="https:") throw new Error("ABORT: WordPress target must be the HTTPS staging.irpa.or.tz host.");
+          console.log("STAGING_HOST_ASSERTION=PASS host="+wp.hostname);
+          NODE
           node <<'NODE'
           const fs=require("fs");
           const project=process.env.PROJECT;
@@ -321,66 +342,6 @@ jobs:
           NODE
 
 
-      - name: Check all configured Cloudflare tokens for IRPA DNS zone access (read-only)
-        env:
-          CF_PRODUCTION: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CF_STAGING: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
-          CF_GRANT: ${{ secrets.CLOUDFLARE_GRANT_CRAWLER_API_TOKEN }}
-        run: |
-          set -euo pipefail
-          node <<'NODE'
-          const https=require("node:https");
-          function get(token){
-            return new Promise((resolve,reject)=>{
-              const req=https.request("https://api.cloudflare.com/client/v4/zones?name=irpa.or.tz&per_page=10",{headers:{Authorization:"Bearer "+token,Accept:"application/json"},timeout:10000},res=>{
-                let raw="";res.setEncoding("utf8");res.on("data",c=>raw+=c);res.on("end",()=>{let data;try{data=JSON.parse(raw)}catch{}resolve({http:res.statusCode,data})});
-              });
-              req.on("timeout",()=>req.destroy(new Error("Cloudflare zone access check timed out.")));
-              req.on("error",reject);req.end();
-            });
-          }
-          (async()=>{
-            for(const [name,token] of [["production",process.env.CF_PRODUCTION],["staging",process.env.CF_STAGING],["grant-crawler",process.env.CF_GRANT]]){
-              if(!token){console.log("IRPA_DNS_TOKEN_"+name.toUpperCase()+"=missing");continue}
-              try{
-                const r=await get(token);
-                const zones=Array.isArray(r.data?.result)?r.data.result:[];
-                console.log("IRPA_DNS_TOKEN_"+name.toUpperCase()+"_HTTP="+r.http);
-                console.log("IRPA_DNS_TOKEN_"+name.toUpperCase()+"_SUCCESS="+String(r.data?.success));
-                console.log("IRPA_DNS_TOKEN_"+name.toUpperCase()+"_ZONE_VISIBLE="+String(zones.some(z=>z.name==="irpa.or.tz")));
-                console.log("IRPA_DNS_TOKEN_"+name.toUpperCase()+"_ZONE_COUNT="+zones.length);
-                console.log("IRPA_DNS_TOKEN_"+name.toUpperCase()+"_ERROR_CODES="+JSON.stringify((r.data?.errors||[]).map(e=>e.code)));
-              }catch(e){console.log("IRPA_DNS_TOKEN_"+name.toUpperCase()+"_ERROR="+String(e.code||e.name))}
-            }
-          })().catch(e=>{console.error(e.message);process.exit(1)});
-          NODE
-
-      - name: Verify production Cloudflare token can inspect the IRPA DNS zone (read-only)
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: |
-          set -euo pipefail
-          node <<'NODE'
-          const https=require("node:https");
-          function get(url){
-            return new Promise((resolve,reject)=>{
-              const req=https.request(url,{headers:{Authorization:"Bearer "+process.env.CLOUDFLARE_API_TOKEN,Accept:"application/json"},timeout:10000},res=>{
-                let raw="";res.setEncoding("utf8");res.on("data",c=>raw+=c);res.on("end",()=>{let data;try{data=JSON.parse(raw)}catch{}resolve({http:res.statusCode,data})});
-              });
-              req.on("timeout",()=>req.destroy(new Error("Cloudflare DNS scope check timed out.")));
-              req.on("error",reject);req.end();
-            });
-          }
-          (async()=>{
-            const r=await get("https://api.cloudflare.com/client/v4/zones?name=irpa.or.tz&per_page=10");
-            console.log("IRPA_DNS_ZONE_QUERY_HTTP="+r.http);
-            console.log("IRPA_DNS_ZONE_QUERY_SUCCESS="+String(r.data?.success));
-            console.log("IRPA_DNS_ZONE_VISIBLE="+String((r.data?.result||[]).some(z=>z.name==="irpa.or.tz")));
-            console.log("IRPA_DNS_ZONE_ERRORS="+JSON.stringify((r.data?.errors||[]).map(e=>({code:e.code,message:String(e.message||"").slice(0,120)}))));
-            if(r.http!==200||r.data?.success!==true) throw new Error("Production Cloudflare token cannot inspect DNS zone metadata.");
-          })().catch(e=>{console.error("IRPA DNS zone read-only verification failed: "+(e.code||e.message||e.name));process.exit(1)});
-          NODE
-
       - name: Inspect cPanel staging installation and reachable WordPress paths (read-only)
         continue-on-error: true
         env:
@@ -476,415 +437,6 @@ jobs:
               console.log("CPANEL_DIR_CHECK="+JSON.stringify({dir:dir.replace(/\/home\/[^/]+/,"/home/[account]"),http:q.http,status:q.data?.status,errors:(q.data?.errors||[]).map(x=>String(x).slice(0,120))}));
             }
           })().catch(e=>{console.error(e.message);process.exit(1)});
-          NODE
-
-      - name: Remediate staging DNS and cPanel document root (independent attempts)
-        if: always()
-        env:
-          CF_PRODUCTION: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CF_STAGING: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
-          CF_GRANT: ${{ secrets.CLOUDFLARE_GRANT_CRAWLER_API_TOKEN }}
-          CF_ZONE_ID_SECRET: ${{ secrets.CLOUDFLARE_ZONE_ID }}
-          CF_STAGING_ZONE_ID_SECRET: ${{ secrets.STAGING_CLOUDFLARE_ZONE_ID }}
-          CF_ZONE_ID_VAR: ${{ vars.CLOUDFLARE_ZONE_ID }}
-          CF_STAGING_ZONE_ID_VAR: ${{ vars.STAGING_CLOUDFLARE_ZONE_ID }}
-          CF_ZONE_ID_ALT1: ${{ secrets.CF_ZONE_ID }}
-          CF_ZONE_ID_ALT2: ${{ secrets.IRPA_ZONE_ID }}
-          CF_ZONE_ID_ALT3: ${{ secrets.IRPA_CLOUDFLARE_ZONE_ID }}
-          CF_ZONE_ID_ALT4: ${{ secrets.CLOUDFLARE_IRPA_ZONE_ID }}
-          CF_ZONE_ID_ALT5: ${{ secrets.CLOUDFLARE_DNS_ZONE_ID }}
-          CF_ZONE_ID_ALT6: ${{ secrets.IRPA_OR_TZ_ZONE_ID }}
-          CF_ZONE_ID_ALT7: ${{ secrets.DNS_ZONE_ID }}
-          CF_ZONE_ID_ALT8: ${{ secrets.STAGING_ZONE_ID }}
-          CF_ZONE_ID_ALT9: ${{ secrets.CLOUDFLARE_PRODUCTION_ZONE_ID }}
-          CF_ZONE_ID_ALT10: ${{ secrets.IRPA_DNS_ZONE_ID }}
-          CF_ZONE_ID_VAR_ALT1: ${{ vars.CF_ZONE_ID }}
-          CF_ZONE_ID_VAR_ALT2: ${{ vars.IRPA_ZONE_ID }}
-          CF_ZONE_ID_VAR_ALT3: ${{ vars.IRPA_CLOUDFLARE_ZONE_ID }}
-          CF_ZONE_ID_VAR_ALT4: ${{ vars.CLOUDFLARE_IRPA_ZONE_ID }}
-          CF_ZONE_ID_VAR_ALT5: ${{ vars.CLOUDFLARE_DNS_ZONE_ID }}
-          CF_ZONE_ID_VAR_ALT6: ${{ vars.IRPA_OR_TZ_ZONE_ID }}
-          CF_ZONE_ID_VAR_ALT7: ${{ vars.DNS_ZONE_ID }}
-          CF_ZONE_ID_VAR_ALT8: ${{ vars.STAGING_ZONE_ID }}
-          CF_ZONE_ID_VAR_ALT9: ${{ vars.CLOUDFLARE_PRODUCTION_ZONE_ID }}
-          CF_ZONE_ID_VAR_ALT10: ${{ vars.IRPA_DNS_ZONE_ID }}
-          CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
-          CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
-          CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
-          CP_TEST_FILE: ${{ secrets.STAGING_CPANEL_TEST_FILE }}
-          GH_TOKEN: ${{ github.token }}
-        continue-on-error: true
-        run: |
-          set -euo pipefail
-          node <<'NODE'
-          const https=require("node:https");
-          require("node:dns").setDefaultResultOrder("ipv4first");
-          const {URL,URLSearchParams}=require("node:url");
-          function requestOnce(url,method="GET",headers={},body){
-            return new Promise((resolve,reject)=>{
-              const u=new URL(url);
-              const req=https.request({protocol:u.protocol,hostname:u.hostname,port:u.port||443,family:4,path:u.pathname+u.search,method,headers,timeout:15000},res=>{
-                let raw="";res.setEncoding("utf8");res.on("data",c=>raw+=c);res.on("end",()=>{let data;try{data=JSON.parse(raw)}catch{}resolve({http:res.statusCode,data,raw})});
-              });
-              req.on("timeout",()=>req.destroy(Object.assign(new Error("request timeout"),{code:"ETIMEDOUT"})));
-              req.on("error",reject);
-              if(body)req.write(body);
-              req.end();
-            });
-          }
-          async function request(url,method="GET",headers={},body){
-            const u=new URL(url);
-            const cpApi2=u.pathname==="/json-api/cpanel";
-            const cpFunc=u.searchParams.get("cpanel_jsonapi_func")||"";
-            const safeCpanelRead=cpApi2&&["fetchzone_records","fetchzones","fetchzone","list_domains","domains_data","list_files","get_file_content"].includes(cpFunc);
-            const safeUapiRead=u.pathname.startsWith("/execute/")&&/\/(DomainInfo\/(domains_data|list_domains)|Fileman\/(list_files|get_file_content))$/.test(u.pathname);
-            const retryable=method==="GET"&&(!cpApi2&&!u.pathname.startsWith("/execute/")||safeCpanelRead||safeUapiRead);
-            const attempts=retryable?3:1;
-            for(let attempt=1;;attempt++){
-              try{
-                const response=await requestOnce(url,method,headers,body);
-                const transientHttp=[500,502,503,504].includes(response.http);
-                if(retryable&&transientHttp&&attempt<attempts){
-                  console.log("TRANSIENT_HTTP_READ_RETRY="+u.hostname+"_"+response.http+"_"+attempt);
-                  await new Promise(resolve=>setTimeout(resolve,attempt*1500));
-                  continue;
-                }
-                return response;
-              }catch(error){
-                const code=String(error.code||error.name||"");
-                const transient=["ETIMEDOUT","ECONNRESET","EHOSTUNREACH","ENETUNREACH","ECONNREFUSED","EAI_AGAIN","TimeoutError"].includes(code)||/timeout/i.test(String(error.message||""));
-                if(!retryable||!transient||attempt>=attempts)throw error;
-                console.log("TRANSIENT_READ_RETRY="+u.hostname+"_"+attempt);
-                await new Promise(resolve=>setTimeout(resolve,attempt*1500));
-              }
-            }
-          }
-          const cfHeaders=token=>({Authorization:"Bearer "+token,Accept:"application/json","Content-Type":"application/json"});
-          async function remediateDns(){
-            const tokens=[["production",process.env.CF_PRODUCTION],["staging",process.env.CF_STAGING],["grant-crawler",process.env.CF_GRANT]].filter(x=>x[1]);
-            const configuredIds=[process.env.CF_ZONE_ID_SECRET,process.env.CF_STAGING_ZONE_ID_SECRET,process.env.CF_ZONE_ID_VAR,process.env.CF_STAGING_ZONE_ID_VAR,process.env.CF_ZONE_ID_ALT1,process.env.CF_ZONE_ID_ALT2,process.env.CF_ZONE_ID_ALT3,process.env.CF_ZONE_ID_ALT4,process.env.CF_ZONE_ID_ALT5,process.env.CF_ZONE_ID_ALT6,process.env.CF_ZONE_ID_ALT7,process.env.CF_ZONE_ID_ALT8,process.env.CF_ZONE_ID_ALT9,process.env.CF_ZONE_ID_ALT10,process.env.CF_ZONE_ID_VAR_ALT1,process.env.CF_ZONE_ID_VAR_ALT2,process.env.CF_ZONE_ID_VAR_ALT3,process.env.CF_ZONE_ID_VAR_ALT4,process.env.CF_ZONE_ID_VAR_ALT5,process.env.CF_ZONE_ID_VAR_ALT6,process.env.CF_ZONE_ID_VAR_ALT7,process.env.CF_ZONE_ID_VAR_ALT8,process.env.CF_ZONE_ID_VAR_ALT9,process.env.CF_ZONE_ID_VAR_ALT10].map(x=>(x||"").trim()).filter(Boolean);
-            const variableNames=[];
-            try{
-              const gh=await request("https://api.github.com/repos/"+encodeURIComponent(process.env.GITHUB_REPOSITORY)+"/actions/variables?per_page=100","GET",{Authorization:"Bearer "+process.env.GH_TOKEN,Accept:"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"});
-              if(gh.http===200&&Array.isArray(gh.data?.variables)){
-                for(const variable of gh.data.variables){
-                  if(/cloudflare|dns|zone/i.test(variable.name||"")){
-                    variableNames.push(variable.name);
-                    if(/zone.*id|id.*zone|dns.*zone/i.test(variable.name||"")&&typeof variable.value==="string"&&variable.value.trim())configuredIds.push(variable.value.trim());
-                  }
-                }
-                console.log("GITHUB_DNS_RELATED_VARIABLE_NAMES="+JSON.stringify(variableNames));
-              }else console.log("GITHUB_REPOSITORY_VARIABLE_LOOKUP=UNAVAILABLE_HTTP_"+gh.http);
-            }catch(e){console.log("GITHUB_REPOSITORY_VARIABLE_LOOKUP=ERROR_"+String(e.code||e.name))}
-            let zone=null,token=null;
-            for(const [label,t] of tokens){
-              try{
-                const r=await request("https://api.cloudflare.com/client/v4/zones?name=irpa.or.tz&per_page=10","GET",cfHeaders(t));
-                const found=(r.data?.result||[]).find(z=>z.name==="irpa.or.tz");
-                console.log("DNS_ZONE_DISCOVERY_"+label.toUpperCase()+"="+(found?"visible":r.http===200&&r.data?.success===true?"no-zone-visible":"api-error"));
-                if(found){zone=found;token=t;break;}
-              }catch(e){console.log("DNS_ZONE_DISCOVERY_"+label.toUpperCase()+"_ERROR="+String(e.code||e.name))}
-            }
-            if(!zone){
-              for(const id of [...new Set(configuredIds)]){
-                for(const [label,t] of tokens){
-                  try{
-                    const r=await request("https://api.cloudflare.com/client/v4/zones/"+encodeURIComponent(id),"GET",cfHeaders(t));
-                    if(r.http===200&&r.data?.success===true&&r.data?.result?.name==="irpa.or.tz"){
-                      zone=r.data.result;token=t;console.log("DNS_ZONE_ID_VALIDATED="+label);break;
-                    }
-                    const records=await request("https://api.cloudflare.com/client/v4/zones/"+encodeURIComponent(id)+"/dns_records?name=staging.irpa.or.tz","GET",cfHeaders(t));
-                    if(records.http===200&&records.data?.success===true&&Array.isArray(records.data?.result)){
-                      zone={id,name:"irpa.or.tz"};token=t;console.log("DNS_ZONE_ID_VALIDATED_BY_RECORD_SCOPE="+label);break;
-                    }
-                  }catch(e){console.log("DNS_ZONE_ID_CANDIDATE_ERROR="+String(e.code||e.name))}
-                }
-                if(zone)break;
-              }
-            }
-            if(!zone||!token){
-              console.log("CLOUDFLARE_DNS_WRITE=UNAVAILABLE_NO_ZONE_ACCESS");
-              // irpa.or.tz is authoritative on the hosting provider's nameservers, not Cloudflare.
-              // Fall back only when public NS records confirm the provider zone and cPanel can
-              // read the zone. Never alter nameservers or touch production/mail records.
-              async function remediateAuthoritativeCpanelZone(){
-                const dns=require("node:dns").promises;
-                let nameservers=[];
-                try{nameservers=(await dns.resolveNs("irpa.or.tz")).map(x=>x.toLowerCase().replace(/\.$/,""))}
-                catch(e){console.log("AUTHORITATIVE_DNS_NS_LOOKUP=FAILED_"+String(e.code||e.name));return false}
-                console.log("AUTHORITATIVE_DNS_PROVIDER="+(nameservers.length&&nameservers.every(n=>n.endsWith(".habari.co.tz"))?"habari":"unverified"));
-                if(!nameservers.length||!nameservers.every(n=>n.endsWith(".habari.co.tz"))){console.log("CPANEL_DNS_REMEDIATION=BLOCKED_NON_HABARI_OR_UNVERIFIED_AUTHORITY");return false}
-                const base=new URL(process.env.CP_BASE);
-                const auth={Authorization:"cpanel "+process.env.CP_USER+":"+process.env.CP_TOKEN,Accept:"application/json"};
-                async function api2(module,func,params={}){
-                  const u=new URL("/json-api/cpanel",base);
-                  u.search=new URLSearchParams({cpanel_jsonapi_user:process.env.CP_USER,cpanel_jsonapi_apiversion:"2",cpanel_jsonapi_module:module,cpanel_jsonapi_func:func,...params}).toString();
-                  const response=await request(u.href,"GET",auth);
-                  const root=response.data?.cpanelresult;
-                  const rows=Array.isArray(root?.data)?root.data:[];
-                  const success=response.http===200&&root?.event?.result===1&&!root?.error&&rows.every(row=>row?.status!==0&&row?.result?.status!==0);
-                  return {http:response.http,ok:success,rows,root};
-                }
-                const fetched=await api2("ZoneEdit","fetchzone_records",{domain:"irpa.or.tz"});
-                const records=fetched.rows;
-                if(!fetched.ok||!records.length){
-                  console.log("CPANEL_DNS_REMEDIATION=BLOCKED_ZONE_READ_HTTP_"+fetched.http+"_API2_OK_"+String(fetched.ok)+"_RECORDS_"+records.length);
-                  return false;
-                }
-                const normalizedName=v=>String(v||"").trim().toLowerCase().replace(/\.$/,"");
-                const staging=records.filter(r=>normalizedName(r.name)==="staging.irpa.or.tz"||normalizedName(r.name)==="staging");
-                const conflicting=staging.filter(r=>String(r.type||"").toUpperCase()==="CNAME");
-                if(conflicting.length){console.log("CPANEL_DNS_REMEDIATION=BLOCKED_CNAME_CONFLICT");return false}
-                const aRecords=staging.filter(r=>String(r.type||"").toUpperCase()==="A");
-                const correct=aRecords.some(r=>String(r.address||r.ip||"").trim()==="41.220.128.10");
-                if(!correct){
-                  if(aRecords.length){
-                    for(const record of aRecords){
-                      if(record.line===undefined||record.line===null){console.log("CPANEL_DNS_REMEDIATION=BLOCKED_A_RECORD_WITHOUT_LINE_ID");return false}
-                      const edited=await api2("ZoneEdit","edit_zone_record",{Line:String(record.line),domain:"irpa.or.tz",name:record.name,type:"A",address:"41.220.128.10",ttl:String(record.ttl||300),class:"IN"});
-                      if(!edited.ok){console.log("CPANEL_DNS_REMEDIATION=FAILED_EDIT_A_RECORD_HTTP_"+edited.http);return false}
-                    }
-                  }else{
-                    const added=await api2("ZoneEdit","add_zone_record",{domain:"irpa.or.tz",name:"staging",type:"A",address:"41.220.128.10",ttl:"300",class:"IN"});
-                    if(!added.ok){console.log("CPANEL_DNS_REMEDIATION=FAILED_ADD_A_RECORD_HTTP_"+added.http);return false}
-                  }
-                }
-                const verified=await api2("ZoneEdit","fetchzone_records",{domain:"irpa.or.tz"});
-                const pass=verified.ok&&verified.rows.some(r=>(normalizedName(r.name)==="staging.irpa.or.tz"||normalizedName(r.name)==="staging")&&String(r.type||"").toUpperCase()==="A"&&String(r.address||r.ip||"").trim()==="41.220.128.10");
-                console.log("CPANEL_DNS_REMEDIATION="+(pass?(correct?"ALREADY_CORRECT":"A_RECORD_VERIFIED"):"POST_WRITE_VERIFICATION_FAILED"));
-                if(pass){
-                  try{
-                    const publicA=await dns.resolve4("staging.irpa.or.tz");
-                    console.log("STAGING_PUBLIC_A_VERIFIED="+String(publicA.includes("41.220.128.10")));
-                  }catch(e){console.log("STAGING_PUBLIC_A_PENDING="+String(e.code||e.name))}
-                }
-                return pass;
-              }
-              return await remediateAuthoritativeCpanelZone();
-            }
-            const endpoint="https://api.cloudflare.com/client/v4/zones/"+encodeURIComponent(zone.id)+"/dns_records";
-            const list=await request(endpoint+"?type=A&name=staging.irpa.or.tz","GET",cfHeaders(token));
-            if(list.http!==200||list.data?.success!==true||!Array.isArray(list.data?.result)){console.log("DNS_REMEDIATION=BLOCKED_DNS_RECORD_READ");return false}
-            const aRecords=list.data.result;
-            const all=await request(endpoint+"?name=staging.irpa.or.tz","GET",cfHeaders(token));
-            if(all.http!==200||all.data?.success!==true||!Array.isArray(all.data?.result)){console.log("DNS_REMEDIATION=BLOCKED_DNS_RECORD_INSPECTION");return false}
-            const conflicts=all.data.result.filter(r=>r.type!=="A");
-            if(conflicts.length){console.log("DNS_REMEDIATION=BLOCKED_CONFLICTING_RECORD_TYPE_"+conflicts.map(r=>r.type).join("_"));return false}
-            const desired={type:"A",name:"staging.irpa.or.tz",content:"41.220.128.10",ttl:1,proxied:true};
-            if(aRecords.length){
-              let success=true;
-              for(const record of aRecords){
-                if(record.content==="41.220.128.10"&&record.proxied===true)continue;
-                const updated=await request(endpoint+"/"+encodeURIComponent(record.id),"PATCH",cfHeaders(token),JSON.stringify(desired));
-                if(updated.http<200||updated.http>=300||updated.data?.success!==true)success=false;
-              }
-              console.log("DNS_REMEDIATION="+(success?"UPDATED_OR_ALREADY_CORRECT":"FAILED_UPDATE"));return success;
-            }
-            const created=await request(endpoint,"POST",cfHeaders(token),JSON.stringify(desired));
-            const success=created.http>=200&&created.http<300&&created.data?.success===true;
-            console.log("DNS_REMEDIATION="+(success?"CREATED_A_RECORD":"FAILED_CREATE"));return success;
-          }
-          async function remediateCpanel(){
-            const base=new URL(process.env.CP_BASE);
-            const auth={Authorization:"cpanel "+process.env.CP_USER+":"+process.env.CP_TOKEN,Accept:"application/json"};
-            async function uapi(path,params={}){
-              const url=new URL("/execute/"+path,base);url.search=new URLSearchParams(params).toString();
-              return request(url.href,"GET",auth);
-            }
-            async function api2(module,func,params={}){
-              const url=new URL("/json-api/cpanel",base);
-              url.search=new URLSearchParams({cpanel_jsonapi_user:process.env.CP_USER,cpanel_jsonapi_apiversion:"2",cpanel_jsonapi_module:module,cpanel_jsonapi_func:func,...params}).toString();
-              const r=await request(url.href,"GET",auth);
-              const root=r.data?.cpanelresult||r.data;
-              const rows=Array.isArray(root?.data)?root.data:[];
-              const detail=String(root?.error||root?.event?.reason||rows.map(x=>x?.err||x?.reason||"").filter(Boolean).join("; ")||"").replace(/[\\r\\n\\t]+/g," ").slice(0,180); return {http:r.http,ok:r.http===200&&(root?.event?.result===1||rows.some(x=>x?.result===1))&&!root?.error,rows,detail,raw:r.raw};
-            }
-            const info=await uapi("DomainInfo/domains_data");
-            const main=info.data?.data?.main_domain||{};
-            const root=String(main.documentroot||main.document_root||"");
-            if(info.http!==200||info.data?.status!==1||!root.endsWith("/public_html")){console.log("CPANEL_REMEDIATION=BLOCKED_UNEXPECTED_MAIN_DOCUMENT_ROOT");return false}
-            async function renameDirectory(srcRel,dstRel,srcAbs,dstAbs){
-              const verify=async()=>{
-                const src=await uapi("Fileman/list_files",{dir:srcAbs,showdotfiles:1});
-                const dst=await uapi("Fileman/list_files",{dir:dstAbs,showdotfiles:1});
-                return {srcExists:src.http===200&&src.data?.status===1,dstExists:dst.http===200&&dst.data?.status===1};
-              };
-              let r=await api2("Fileman","fileop",{op:"rename",sourcefiles:srcAbs,destfiles:dstAbs,doubledecode:"1"});
-              let state=await verify();
-              if(r.ok||(!state.srcExists&&state.dstExists))return true;
-              r=await api2("Fileman","fileop",{op:"rename",sourcefiles:srcRel,destfiles:dstRel,doubledecode:"1"});
-              state=await verify();
-              if(r.ok||(!state.srcExists&&state.dstExists))return true;
-              console.log("CPANEL_RENAME_ATTEMPT_HTTP="+r.http);
-              console.log("CPANEL_RENAME_ATTEMPT_DETAIL="+r.detail);
-              return false;
-            }
-            const list=async dir=>{
-              const r=await uapi("Fileman/list_files",{dir,showdotfiles:1});
-              if(r.http!==200||r.data?.status!==1||!Array.isArray(r.data?.data))throw new Error("Could not inspect cPanel directory safely");
-              return r.data.data;
-            };
-            const entries=await list(root);
-            const names=entries.map(x=>String(x.file||x.name||""));
-            const hasSource=names.includes("staging "),hasTarget=names.includes("staging");
-            if(hasSource){
-              const sourceFiles=await list(root+"/staging ");
-              const sourceNames=sourceFiles.map(x=>String(x.file||x.name||""));
-              const required=["wp-admin","wp-content","wp-includes","wp-config.php","index.php"];
-              if(!required.every(x=>sourceNames.includes(x))){console.log("CPANEL_REMEDIATION=BLOCKED_SOURCE_NOT_COMPLETE_WORDPRESS");return false}
-              if(hasTarget){
-                const targetFiles=await list(root+"/staging");
-                const targetNames=targetFiles.map(x=>String(x.file||x.name||""));
-                if(targetFiles.length!==0){
-                  if(required.every(x=>targetNames.includes(x)))console.log("CPANEL_WORDPRESS_DIRECTORY=ALREADY_NORMALIZED");
-                  else {
-                    const unexpected=targetNames.filter(x=>x!==process.env.CP_TEST_FILE);
-                    if(unexpected.length){console.log("CPANEL_REMEDIATION=BLOCKED_TARGET_HAS_UNEXPECTED_FILES");return false}
-                    const backup="public_html/staging-empty-backup-"+String(process.env.GITHUB_RUN_ID||"run");
-                    const backupCheck=await uapi("Fileman/list_files",{dir:root+"/staging-empty-backup-"+String(process.env.GITHUB_RUN_ID||"run"),showdotfiles:1});
-                    if(backupCheck.http===200&&backupCheck.data?.status===1){console.log("CPANEL_REMEDIATION=BLOCKED_BACKUP_PATH_ALREADY_EXISTS");return false}
-                    const movedTarget=await renameDirectory("public_html/staging",backup,root+"/staging",root+"/"+backup.split("/").pop());
-                    if(!movedTarget){console.log("CPANEL_REMEDIATION=FAILED_TO_PRESERVE_TARGET_TEST_FILE");return false}
-                    const movedWp=await renameDirectory("public_html/staging ", "public_html/staging",root+"/staging ",root+"/staging");
-                    if(!movedWp){
-                      await renameDirectory(backup,"public_html/staging",root+"/"+backup.split("/").pop(),root+"/staging");
-                      console.log("CPANEL_WORDPRESS_DIRECTORY_RENAME=FAILED_ROLLBACK_ATTEMPTED");return false
-                    }
-                    console.log("CPANEL_WORDPRESS_DIRECTORY_RENAME=PASS_TEST_FILE_PRESERVED_IN_BACKUP");
-                  }
-                }else{
-                  const backup="public_html/staging-empty-backup-20261017";
-                  const backupCheck=await uapi("Fileman/list_files",{dir:root+"/staging-empty-backup-20261017",showdotfiles:1});
-                  if(backupCheck.http===200&&backupCheck.data?.status===1){console.log("CPANEL_REMEDIATION=BLOCKED_BACKUP_PATH_ALREADY_EXISTS");return false}
-                  const movedEmpty=await renameDirectory("public_html/staging",backup,root+"/staging",root+"/"+backup.split("/").pop());
-                  if(!movedEmpty){console.log("CPANEL_EMPTY_DIRECTORY_BACKUP=FAILED");return false}
-                  const movedWp=await renameDirectory("public_html/staging ", "public_html/staging",root+"/staging ",root+"/staging");
-                  if(!movedWp){
-                    await renameDirectory(backup,"public_html/staging",root+"/"+backup.split("/").pop(),root+"/staging");
-                    console.log("CPANEL_FILEOP_RENAME_WORDPRESS_HTTP="+movedWp.http);console.log("CPANEL_FILEOP_RENAME_WORDPRESS_DETAIL="+movedWp.detail);
-                    console.log("CPANEL_WORDPRESS_DIRECTORY_RENAME=FAILED_ROLLBACK_ATTEMPTED");return false
-                  }
-                  console.log("CPANEL_WORDPRESS_DIRECTORY_RENAME=PASS");
-                }
-              }else{
-                const movedWp=await renameDirectory("public_html/staging ", "public_html/staging",root+"/staging ",root+"/staging");
-                if(!movedWp){console.log("CPANEL_WORDPRESS_DIRECTORY_RENAME=FAILED");return false}
-                console.log("CPANEL_WORDPRESS_DIRECTORY_RENAME=PASS");
-              }
-            }else if(hasTarget){
-              const targetFiles=await list(root+"/staging");
-              const targetNames=targetFiles.map(x=>String(x.file||x.name||""));
-              if(!["wp-admin","wp-content","wp-includes","wp-config.php","index.php"].every(x=>targetNames.includes(x))){console.log("CPANEL_REMEDIATION=BLOCKED_WORDPRESS_NOT_FOUND_IN_NORMAL_TARGET");return false}
-              console.log("CPANEL_WORDPRESS_DIRECTORY=ALREADY_NORMALIZED");
-            }else{console.log("CPANEL_REMEDIATION=BLOCKED_EXPECTED_DIRECTORIES_NOT_FOUND");return false}
-            const subdomains=await api2("SubDomain","listsubdomains",{regex:"staging"});
-            const found=subdomains.rows.find(x=>x.domain==="staging.irpa.or.tz"||x.fullsubdomain==="staging.irpa.or.tz");
-            if(found){
-              const existingRoot=String(found.dir||found.reldir||found.basedir||"");
-              if(existingRoot.endsWith("/public_html/staging")||existingRoot.endsWith("public_html/staging")||existingRoot==="home:public_html/staging"){
-                console.log("CPANEL_SUBDOMAIN_MAPPING=ALREADY_CORRECT");
-              }else{
-                let changed=await uapi("SubDomain/changedocroot",{subdomain:"staging",rootdomain:"irpa.or.tz",dir:"/public_html/staging"});
-                let changedOk=changed.http===200&&(changed.data?.status===1||changed.data?.result?.status===1)&&changed.data?.result?.result!==0;
-                if(!changedOk){
-                  const api2Changed=await api2("SubDomain","changedocroot",{subdomain:"staging",rootdomain:"irpa.or.tz",dir:"/public_html/staging"});
-                  changedOk=api2Changed.ok;
-                  console.log("CPANEL_SUBDOMAIN_MAPPING_CHANGE_HTTP="+changed.http);
-                  console.log("CPANEL_SUBDOMAIN_MAPPING_CHANGE_STATUS="+String(changed.data?.status??changed.data?.result?.status));
-                  console.log("CPANEL_SUBDOMAIN_MAPPING_CHANGE_ERRORS="+JSON.stringify((changed.data?.errors||changed.data?.result?.errors||[]).map(x=>String(x).slice(0,120))));
-                }
-                if(!changedOk){console.log("CPANEL_SUBDOMAIN_MAPPING=FAILED_CHANGE_DOCROOT");return false}
-              }
-            }else{
-              const added=await uapi("SubDomain/addsubdomain",{domain:"staging",rootdomain:"irpa.or.tz",dir:"/public_html/staging"});
-              if(added.http!==200||added.data?.status!==1||added.data?.result?.result===0){console.log("CPANEL_SUBDOMAIN_MAPPING=FAILED_ADD");return false}
-            }
-            const verify=await uapi("DomainInfo/domains_data");
-            const data=verify.data?.data||{};
-            const all=[...(Array.isArray(data.sub_domains)?data.sub_domains:[]),...(Array.isArray(data.subdomains)?data.subdomains:[])];
-            const mapped=all.some(x=>(x.domain||x.name)==="staging.irpa.or.tz"&&String(x.documentroot||x.document_root||x.dir||"").endsWith("/public_html/staging"));
-            console.log("CPANEL_SUBDOMAIN_MAPPING="+(mapped?"PASS":"CHANGED_RECHECK_REQUIRED"));
-            if(mapped){
-              const stageDir=root+"/staging";
-              const ht=await uapi("Fileman/get_file_content",{dir:stageDir,file:".htaccess"});
-              const original=String(ht.data?.data?.content??ht.data?.content??"");
-              if(ht.http===200&&ht.data?.status===1&&original){
-                const malformed=/\bphp_value\b|\bphp_flag\b|RewriteBase\s+\/staging\s|RewriteRule\s+\.\s+\/staging\s+\/index\.php/i.test(original)||!/E=HTTP_AUTHORIZATION\s*:/i.test(original)||!/SetEnvIf\s+Authorization/i.test(original);
-                if(malformed){
-                  const homeDir=root.replace(/\/public_html\/?$/,"");
-                  const backupFile="staging-htaccess-backup-"+String(process.env.GITHUB_RUN_ID||"run")+".txt";
-                  const boundary="----IRPAStagingBackup"+String(process.env.GITHUB_RUN_ID||"run");
-                  const backupBody=Buffer.concat([
-                    Buffer.from("--"+boundary+"\r\nContent-Disposition: form-data; name=\"dir\"\r\n\r\n"+homeDir+"\r\n"),
-                    Buffer.from("--"+boundary+"\r\nContent-Disposition: form-data; name=\"file-1\"; filename=\""+backupFile+"\"\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n"),
-                    Buffer.from(original,"utf8"),
-                    Buffer.from("\r\n--"+boundary+"--\r\n")
-                  ]);
-                  const uploadUrl=new URL("/execute/Fileman/upload_files",base);
-                  const backup=await request(uploadUrl.href,"POST",{...auth,"Content-Type":"multipart/form-data; boundary="+boundary,"Content-Length":String(backupBody.length)},backupBody);
-                  if(backup.http<200||backup.http>=300||backup.data?.status!==1){
-                    console.log("CPANEL_STAGING_HTACCESS=BLOCKED_BACKUP_FAILED");
-                    return false;
-                  }
-                  const handlerLine=original.split(/\r?\n/).map(x=>x.trim()).find(x=>/^AddHandler\s+application\/x-httpd-ea-php\d+\s+\.php\b/i.test(x))||"";
-                  let standard="# IRPA staging WordPress rewrite rules\n<IfModule mod_rewrite.c>\nRewriteEngine On\nSetEnvIf Authorization \"(.*)\" HTTP_AUTHORIZATION=$1\nRewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]\nRewriteRule ^index\\.php$ - [L]\nRewriteCond %{REQUEST_FILENAME} !-f\nRewriteCond %{REQUEST_FILENAME} !-d\nRewriteCond %{HTTP_HOST} ^staging\\.irpa\\.or\\.tz$ [NC]\nRewriteRule . /index.php [L]\nRewriteCond %{REQUEST_FILENAME} !-f\nRewriteCond %{REQUEST_FILENAME} !-d\nRewriteCond %{HTTP_HOST} ^(?:www\\.)?irpa\\.or\\.tz$ [NC]\nRewriteRule . /staging/index.php [L]\n</IfModule>\n";
-                  if(handlerLine)standard+=handlerLine+"\n";
-                  async function saveHt(content){
-                    const body=new URLSearchParams({dir:stageDir,file:".htaccess",content,charset:"utf-8"}).toString();
-                    return request(new URL("/execute/Fileman/save_file_content",base).href,"POST",{...auth,"Content-Type":"application/x-www-form-urlencoded","Content-Length":String(Buffer.byteLength(body))},body);
-                  }
-                  const saved=await saveHt(standard);
-                  const check=await uapi("Fileman/get_file_content",{dir:stageDir,file:".htaccess"});
-                  const written=String(check.data?.data?.content??check.data?.content??"");
-                  if(saved.http<200||saved.http>=300||saved.data?.status!==1||written!==standard){
-                    await saveHt(original);
-                    console.log("CPANEL_STAGING_HTACCESS=FAILED_RESTORED_ORIGINAL");
-                    return false;
-                  }
-                  console.log("CPANEL_STAGING_HTACCESS=FIXED_WITH_PRIVATE_BACKUP");
-                  console.log("CPANEL_STAGING_HTACCESS_BACKUP="+backupFile);
-                }else{
-                  console.log("CPANEL_STAGING_HTACCESS=ALREADY_VALID");
-                }
-              }else{
-                console.log("CPANEL_STAGING_HTACCESS=NOT_READABLE_NO_CHANGE");
-              }
-            }
-            if(mapped){
-              async function setRoot(dir){
-                await uapi("SubDomain/changedocroot",{subdomain:"staging",rootdomain:"irpa.or.tz",dir});
-                let check=await api2("SubDomain","listsubdomains",{regex:"staging"});
-                let row=check.rows.find(x=>x.domain==="staging.irpa.or.tz"||x.fullsubdomain==="staging.irpa.or.tz");
-                let actual=String(row?.dir||row?.reldir||row?.basedir||"");
-                if(actual.endsWith(dir)||actual.endsWith(dir.replace(/^\//,"")))return true;
-                await api2("SubDomain","changedocroot",{subdomain:"staging",rootdomain:"irpa.or.tz",dir});
-                check=await api2("SubDomain","listsubdomains",{regex:"staging"});
-                row=check.rows.find(x=>x.domain==="staging.irpa.or.tz"||x.fullsubdomain==="staging.irpa.or.tz");
-                actual=String(row?.dir||row?.reldir||row?.basedir||"");
-                return actual.endsWith(dir)||actual.endsWith(dir.replace(/^\//,""));
-              }
-              let movedTemp=false;
-              try{movedTemp=await setRoot("/public_html/wp")}catch(e){console.log("CPANEL_VHOST_REBIND_TEMP_ERROR="+String(e.code||e.name))}
-              if(movedTemp){
-                let restored=false;
-                for(let attempt=1;attempt<=3&&!restored;attempt++){
-                  try{restored=await setRoot("/public_html/staging")}catch(e){console.log("CPANEL_VHOST_REBIND_RESTORE_ATTEMPT_ERROR="+String(e.code||e.name))}
-                }
-                console.log("CPANEL_VHOST_REBIND="+(restored?"PASS":"RESTORE_FAILED"));
-                if(!restored)return false;
-              }else{
-                console.log("CPANEL_VHOST_REBIND=SKIPPED_TEMP_ROOT_CHANGE_REJECTED");
-              }
-            }
-            return true;
-          }
-          (async()=>{
-            let dnsOk=false,cpanelOk=false;
-            try{dnsOk=await remediateDns()}catch(e){console.log("DNS_REMEDIATION_ERROR="+String(e.code||e.message||e.name))}
-            try{cpanelOk=await remediateCpanel()}catch(e){console.log("CPANEL_REMEDIATION_ERROR="+String(e.code||e.message||e.name))}
-            console.log("DNS_REMEDIATION_FINAL="+(dnsOk?"PASS":"BLOCKED_OR_FAILED"));
-            console.log("CPANEL_REMEDIATION_FINAL="+(cpanelOk?"PASS":"BLOCKED_OR_FAILED"));
-          })().catch(e=>{console.error("Staging remediation step failed unexpectedly: "+String(e.message||e));process.exit(1)});
           NODE
 
       - name: Diagnose post-remediation staging WordPress HTTP 500 (redacted)
@@ -1085,7 +637,7 @@ jobs:
           NODE
 
       - name: Repair staging WordPress bootstrap and register application password safely
-        continue-on-error: true
+        id: wp-bootstrap-repair
         env:
           CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
           CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
@@ -1492,6 +1044,7 @@ jobs:
         run: npm ci --no-audit --no-fund
 
       - name: Deploy staging Worker only
+        id: deploy-staging-worker
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
@@ -1692,7 +1245,6 @@ jobs:
           NODE
 
       - name: Diagnose staging WordPress application-password authentication (no secrets logged)
-        continue-on-error: true
         env:
           WP_BASE: ${{ secrets.STAGING_WORDPRESS_BASE_URL }}
           WP_USER: ${{ secrets.STAGING_WORDPRESS_USERNAME }}
@@ -1717,9 +1269,52 @@ jobs:
           main().catch(e=>{console.log("STAGING_WP_APPLICATION_PASSWORD_PREFLIGHT=ERROR_"+String(e.name||"error"));process.exit(1)});
           NODE
 
-      - name: Verify WordPress and cPanel read-write-rollback integration
+
+      - name: Write redacted repair summary
+        if: always()
         env:
-          STAGING_URL: ${{ steps.staging-health.outputs.staging_url }}
+          PREFLIGHT: ${{ steps.staging-preflight.outcome }}
+          REPAIR: ${{ steps.wp-bootstrap-repair.outcome }}
+          DEPLOY: ${{ steps.deploy-staging-worker.outcome }}
+          HEALTH: ${{ steps.staging-health.outcome }}
+        run: |
+          set -euo pipefail
+          { echo "# IRPA-DBGS staging repair"; echo ""; echo "- Target: staging.irpa.or.tz"; echo "- Preflight: ${PREFLIGHT:-not-run}"; echo "- WordPress bootstrap/auth repair: ${REPAIR:-not-run}"; echo "- Staging Worker deployment: ${DEPLOY:-not-run}"; echo "- Staging health: ${HEALTH:-not-run}"; echo "- Production credentials/site/DNS: not accessed in this run"; echo "- Merge gate: CLOSED"; } | tee staging-repair-summary.md >> "$GITHUB_STEP_SUMMARY"
+          cp staging-repair-summary.md staging-repair-diagnostics.txt
+      - name: Upload redacted repair diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-repair-redacted-diagnostics
+          path: staging-repair-diagnostics.txt
+          if-no-files-found: error
+
+  acceptance-staging:
+    needs: repair-staging
+    if: needs.repair-staging.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert staging-only target before acceptance
+        id: acceptance-preflight
+        env:
+          WP_BASE: ${{ secrets.STAGING_WORDPRESS_BASE_URL }}
+          CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
+          STAGING_URL: ${{ needs.repair-staging.outputs.staging_url }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const wp=new URL(process.env.WP_BASE||""),cp=new URL(process.env.CP_BASE||""),worker=new URL(process.env.STAGING_URL||"");
+          if(wp.protocol!=="https:"||wp.hostname.toLowerCase()!=="staging.irpa.or.tz") throw new Error("ABORT: WordPress target is not the approved staging host.");
+          if(cp.protocol!=="https:"||cp.port!=="2083") throw new Error("ABORT: cPanel target is not HTTPS port 2083.");
+          if(worker.protocol!=="https:"||!worker.hostname.startsWith("irpa-google-drive-gateway-staging.")||!worker.hostname.endsWith(".workers.dev")) throw new Error("ABORT: Worker target is not the isolated staging Worker.");
+          console.log("STAGING_ACCEPTANCE_TARGETS=PASS");
+          NODE
+      - name: Verify WordPress and cPanel read-write-rollback integration
+        id: acceptance
+        env:
+          STAGING_URL: ${{ needs.repair-staging.outputs.staging_url }}
           FIREBASE_WEB_API_KEY: ${{ secrets.STAGING_FIREBASE_WEB_API_KEY }}
           TEST_EMAIL: ${{ secrets.STAGING_TEST_EMAIL }}
           TEST_PASSWORD: ${{ secrets.STAGING_TEST_PASSWORD }}
@@ -1830,5 +1425,22 @@ jobs:
             console.log("STAGING_CPANEL_READ_WRITE_ROLLBACK_PATH_REJECTION_PASS");
           })().catch(e=>{console.error("Staging website integration acceptance failed:",e.message);process.exit(1)});
           NODE
+
+      - name: Write redacted acceptance summary
+        if: always()
+        env:
+          PREFLIGHT: ${{ steps.acceptance-preflight.outcome }}
+          ACCEPTANCE: ${{ steps.acceptance.outcome }}
+        run: |
+          set -euo pipefail
+          { echo "# IRPA-DBGS staging acceptance"; echo ""; echo "- Target: staging only"; echo "- Target preflight: ${PREFLIGHT:-not-run}"; echo "- Read/write/restore acceptance: ${ACCEPTANCE:-not-run}"; echo "- Production site/DNS/credentials: not accessed in this run"; echo "- Merge gate: CLOSED"; } | tee staging-acceptance-summary.md >> "$GITHUB_STEP_SUMMARY"
+          cp staging-acceptance-summary.md staging-acceptance-diagnostics.txt
+      - name: Upload redacted acceptance diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-acceptance-redacted-diagnostics
+          path: staging-acceptance-diagnostics.txt
+          if-no-files-found: error
 
 # Staging proof execution trigger — 2026-10-04
