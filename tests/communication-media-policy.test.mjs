@@ -218,8 +218,8 @@ test("communication portal light cards and secondary controls retain readable fo
 });
 
 test("media studio upload size matches the gateway enforced maximum and labels staging records correctly",()=>{
- assert.ok(studio.includes("MAX_BYTES=10*1024*1024"));
- assert.ok(gateway.includes("const MAX_BYTES = 10 * 1024 * 1024"));
+ assert.ok(studio.includes("MAX_BYTES=25*1024*1024"));
+ assert.ok(gateway.includes('purpose === "Communication Media" ? 25 * 1024 * 1024'));
  assert.ok(studio.includes('recordOrigin:auth.app?.options?.projectId === "irpa-dbg-staging-a73ec" ? "STAGING" : "PRODUCTION"'));
 });
 
