@@ -7,6 +7,7 @@ const app=read("../src/App.jsx");
 const portal=read("../src/pages/CommunicationMediaPortal.jsx");
 const studio=read("../src/pages/CommunicationMediaStudio.jsx");
 const operations=read("../src/pages/CommunicationMediaOperations.jsx");
+const social=read("../src/pages/SocialMediaAccounts.jsx");
 const rules=read("../firestore.rules");
 const gateway=read("../drive-gateway/src/index.js");
 const site=read("../drive-gateway/src/communicationsSite.mjs");
@@ -155,4 +156,21 @@ test("communications operations registers provide campaigns, media contacts, bra
  assert.ok(rules.includes('function communicationMediaUser(){return admin()||anyInstitutionalRole(["Communication & Media"'));
  assert.ok(rules.includes('resource.data.get("status","")=="Draft"&&request.resource.data.get("status","") in ["Under Review","Approved","Archived"]'));
  assert.ok(rules.includes('resource.data.get("status","")=="Completed"&&request.resource.data.get("status","")=="Archived"'));
+});
+
+
+test("social account enrolment is integrated, metadata-only, role-scoped and audited",()=>{
+ assert.ok(portal.includes('import SocialMediaAccounts from "./SocialMediaAccounts"'));
+ assert.ok(portal.includes('"Social Accounts"'));
+ assert.ok(portal.includes('tab==="Social Accounts"&&<SocialMediaAccounts'));
+ for(const term of ['Facebook','Instagram','LinkedIn','YouTube','TikTok','Pending Verification','authorizationReference','custodian','reviewDate','writeBatch(db)','socialMediaAccountsAudit','noopener noreferrer','does not publish posts']) assert.ok(social.includes(term),term);
+ assert.ok(!social.includes('accessToken'));
+ assert.ok(!social.includes('clientSecret'));
+ assert.ok(!social.includes('password'));
+ assert.ok(rules.includes('match /socialMediaAccounts/{id}'));
+ assert.ok(rules.includes('match /socialMediaAccountsAudit/{id}'));
+ assert.ok(rules.includes('data.keys().hasOnly(["platform","accountName","handle","profileUrl"'));
+ assert.ok(rules.includes('allow update,delete:if false;'));
+ assert.ok(rules.includes('getAfter(/databases/$(database)/documents/socialMediaAccounts/$(request.resource.data.recordId))'));
+ assert.ok(rules.includes('"Pending Verification","Active","Suspended","Disconnected","Archived"'));
 });
