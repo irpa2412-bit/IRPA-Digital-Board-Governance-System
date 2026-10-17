@@ -89,6 +89,8 @@ jobs:
           TEST_EMAIL: ${{ secrets.STAGING_TEST_EMAIL }}
           TEST_PASSWORD: ${{ secrets.STAGING_TEST_PASSWORD }}
           WP_BASE: ${{ secrets.STAGING_WORDPRESS_BASE_URL }}
+          WP_USER: ${{ secrets.STAGING_WORDPRESS_USERNAME }}
+          WP_APP_PASSWORD: ${{ secrets.STAGING_WORDPRESS_APPLICATION_PASSWORD }}
           CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
           CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
           CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
@@ -99,7 +101,7 @@ jobs:
         run: |
           set -euo pipefail
           missing=0
-          for pair in             "CLOUDFLARE_API_TOKEN:$CF_TOKEN"             "CLOUDFLARE_ACCOUNT_ID:$CF_ACCOUNT"             "STAGING_FIREBASE_PROJECT_ID:$PROJECT"             "STAGING_IRPA_APP_URL:$APP_URL"             "STAGING_GOOGLE_DRIVE_CLIENT_ID:$DRIVE_ID"             "STAGING_GOOGLE_DRIVE_CLIENT_SECRET:$DRIVE_SECRET"             "STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY:$DRIVE_KEY"             "STAGING_FIREBASE_SERVICE_ACCOUNT_JSON:$FIREBASE_SERVICE_ACCOUNT"             "STAGING_FIREBASE_WEB_API_KEY:$FIREBASE_WEB_API_KEY"             "STAGING_TEST_EMAIL:$TEST_EMAIL"             "STAGING_TEST_PASSWORD:$TEST_PASSWORD"             "STAGING_WORDPRESS_BASE_URL:$WP_BASE"             "STAGING_WORDPRESS_DB_NAME:$STAGING_DB_NAME"             "PRODUCTION_WORDPRESS_DB_NAME:$PRODUCTION_DB_NAME"             "STAGING_CPANEL_BASE_URL:$CP_BASE"             "STAGING_CPANEL_USERNAME:$CP_USER"             "STAGING_CPANEL_API_TOKEN:$CP_TOKEN"             "STAGING_CPANEL_DOCUMENT_ROOT:$CP_ROOT"             "STAGING_CPANEL_TEST_FILE:$CP_TEST_FILE"; do
+          for pair in             "CLOUDFLARE_API_TOKEN:$CF_TOKEN"             "CLOUDFLARE_ACCOUNT_ID:$CF_ACCOUNT"             "STAGING_FIREBASE_PROJECT_ID:$PROJECT"             "STAGING_IRPA_APP_URL:$APP_URL"             "STAGING_GOOGLE_DRIVE_CLIENT_ID:$DRIVE_ID"             "STAGING_GOOGLE_DRIVE_CLIENT_SECRET:$DRIVE_SECRET"             "STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY:$DRIVE_KEY"             "STAGING_FIREBASE_SERVICE_ACCOUNT_JSON:$FIREBASE_SERVICE_ACCOUNT"             "STAGING_FIREBASE_WEB_API_KEY:$FIREBASE_WEB_API_KEY"             "STAGING_TEST_EMAIL:$TEST_EMAIL"             "STAGING_TEST_PASSWORD:$TEST_PASSWORD"             "STAGING_WORDPRESS_BASE_URL:$WP_BASE"             "STAGING_WORDPRESS_USERNAME:$WP_USER"             "STAGING_WORDPRESS_APPLICATION_PASSWORD:$WP_APP_PASSWORD"             "STAGING_WORDPRESS_DB_NAME:$STAGING_DB_NAME"             "PRODUCTION_WORDPRESS_DB_NAME:$PRODUCTION_DB_NAME"             "STAGING_CPANEL_BASE_URL:$CP_BASE"             "STAGING_CPANEL_USERNAME:$CP_USER"             "STAGING_CPANEL_API_TOKEN:$CP_TOKEN"             "STAGING_CPANEL_DOCUMENT_ROOT:$CP_ROOT"             "STAGING_CPANEL_TEST_FILE:$CP_TEST_FILE"; do
             name="${pair%%:*}"; value="${pair#*:}"
             if [ -z "$value" ]; then echo "Missing staging secret: $name"; missing=1; fi
           done
@@ -602,6 +604,8 @@ jobs:
       - name: Inspect staging PHP logs and authenticated REST path (read-only)
         env:
           WP_BASE: ${{ secrets.STAGING_WORDPRESS_BASE_URL }}
+          WP_USER: ${{ secrets.STAGING_WORDPRESS_USERNAME }}
+          WP_APP_PASSWORD: ${{ secrets.STAGING_WORDPRESS_APPLICATION_PASSWORD }}
           CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
           CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
           CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
@@ -661,7 +665,12 @@ jobs:
               }catch(e){console.log("STAGING_REST_AUTH_PROBE="+JSON.stringify({label,error:String(e.code||e.name||"request_error")}))}
             }
             await probe("anonymous",{});
-            console.log("STAGING_REST_AUTH_DIRECT_PROBE=SKIPPED; WordPress credentials remain exclusively in Cloudflare Worker secrets");
+            const username=process.env.WP_USER||"",password=(process.env.WP_APP_PASSWORD||"").replace(/\\s/g,"");
+            if(!username||!password)throw new Error("Dedicated staging WordPress editor credentials are missing; auth probe aborted.");
+            const basic="Basic "+Buffer.from(username+":"+password).toString("base64");
+            await probe("basic_only",{Authorization:basic});
+            await probe("basic_plus_staging_header",{Authorization:basic,"X-IRPA-Staging-Authorization":basic});
+            console.log("STAGING_REST_AUTH_PROBES_COMPLETED");
           }
           main().catch(e=>{console.error("Staging PHP/auth diagnostics failed safely: "+safeError(e));process.exit(1)});
           function safeError(e){return String(e?.message||e?.code||e?.name||"unknown").replace(/[\r\n\t]+/g," ").replace(/\s+/g," ").slice(0,180)}
@@ -794,6 +803,8 @@ jobs:
           GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY: ${{ secrets.STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY }}
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT_JSON }}
           WP_BASE: ${{ secrets.STAGING_WORDPRESS_BASE_URL }}
+          WP_USER: ${{ secrets.STAGING_WORDPRESS_USERNAME }}
+          WP_APP_PASSWORD: ${{ secrets.STAGING_WORDPRESS_APPLICATION_PASSWORD }}
           CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
           CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
           CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
@@ -805,6 +816,8 @@ jobs:
           printf '%s' "$GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY" | npx wrangler secret put GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY --config wrangler.staging.generated.json
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT" | npx wrangler secret put FIREBASE_SERVICE_ACCOUNT_JSON --config wrangler.staging.generated.json
           printf '%s' "$WP_BASE" | npx wrangler secret put WORDPRESS_BASE_URL --config wrangler.staging.generated.json
+          printf '%s' "$WP_USER" | npx wrangler secret put WORDPRESS_USERNAME --config wrangler.staging.generated.json
+          printf '%s' "$WP_APP_PASSWORD" | npx wrangler secret put WORDPRESS_APPLICATION_PASSWORD --config wrangler.staging.generated.json
           printf '%s' "$CP_BASE" | npx wrangler secret put CPANEL_BASE_URL --config wrangler.staging.generated.json
           printf '%s' "$CP_USER" | npx wrangler secret put CPANEL_USERNAME --config wrangler.staging.generated.json
           printf '%s' "$CP_TOKEN" | npx wrangler secret put CPANEL_API_TOKEN --config wrangler.staging.generated.json
