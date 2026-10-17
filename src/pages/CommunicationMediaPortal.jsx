@@ -66,7 +66,7 @@ export default function CommunicationMediaPortal({profile,employee,selectedAutho
   if(status==="publish"&&!window.confirm("Publish this page/post to the isolated staging website now?"))return;
   setSiteBusy(true);setError("");setNotice("");
   try{
-   const payload={...websiteEdit,status};
+   const payload={type:websiteEdit.type,id:websiteEdit.id,title:websiteEdit.title,content:websiteEdit.content,excerpt:websiteEdit.excerpt||"",featuredMedia:Number(websiteEdit.featuredMedia||0),status};
    const data=await gatewayRequest("/api/communications/website/content",{method:"PUT",body:JSON.stringify(payload)});
    setWebsiteEdit(data.item||null);
    await loadWebsiteContent(websiteType);
