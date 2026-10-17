@@ -189,7 +189,7 @@ export function createCommunicationsSiteRouter(deps) {
           const user = await response.json();
           result.website = "connected";
           result.websiteAccount = { name: cleanText(user.name, 100), canEditPosts: Array.isArray(user.capabilities) ? !!user.capabilities.edit_posts : undefined };
-        } else { const detail = await response.json().catch(() => ({})); result.website = "authentication_failed"; result.websiteHttpStatus = response.status; result.websiteErrorCode = typeof detail.code === "string" ? detail.code.slice(0, 100) : undefined; }
+        } else { const contentType = response.headers.get("content-type") || ""; const server = response.headers.get("server") || ""; const cfRay = response.headers.get("cf-ray") || ""; const detail = contentType.includes("json") ? await response.json().catch(() => ({})) : {}; result.website = response.status === 401 || response.status === 403 ? "authentication_failed" : "unavailable"; result.websiteHttpStatus = response.status; result.websiteErrorCode = typeof detail.code === "string" ? detail.code.slice(0, 100) : undefined; result.websiteResponseType = contentType.slice(0, 100); result.websiteResponseServer = server.slice(0, 80); result.websiteCloudflareRay = cfRay.slice(0, 100); }
       } catch (error) { result.website = error.message.includes("not configured") ? "not_configured" : "unavailable"; }
       try {
         const cp = cpanelConfig(env);
