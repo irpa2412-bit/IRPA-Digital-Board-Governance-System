@@ -759,7 +759,7 @@ jobs:
             try{base=new URL(process.env.WP_BASE)}catch{console.log("POST_REMEDIATION_WP_BASE=INVALID");return}
             console.log("POST_REMEDIATION_STAGING_HOST="+base.hostname);
             try{console.log("POST_REMEDIATION_DNS="+JSON.stringify(await dns.lookup(base.hostname,{all:true})));}catch(e){console.log("POST_REMEDIATION_DNS_ERROR="+String(e.code||e.name))}
-            for(const path of ["/wp-json/","/wp-login.php","/"]){
+            for(const path of ["/wp-json/","/wp-login.php","/","/readme.html","/wp-includes/css/dashicons.min.css","/wp-includes/version.php"]){
               try{
                 const r=await request(new URL(path,base).href,{Accept:"application/json,text/html,*/*","Cache-Control":"no-cache"});
                 const snippet=redact(r.raw.replace(/<script[\s\S]*?<\/script>/ig," ").replace(/<style[\s\S]*?<\/style>/ig," ").replace(/<[^>]+>/g," "));
@@ -785,8 +785,9 @@ jobs:
                 const obj=JSON.parse(listing.raw||"{}");
                 const files=Array.isArray(obj.data)?obj.data:Array.isArray(obj.result?.data)?obj.result.data:[];
                 const names=files.map(x=>String(x.file||x.name||""));
-                const relevant=names.filter(x=>["error_log",".htaccess","wp-config.php","index.php","wp-admin","wp-content","wp-includes"].includes(x)||/staging.*log|error.*log/i.test(x)).slice(0,30);
-                console.log("POST_REMEDIATION_DIR="+JSON.stringify({dir:dir.replace(/\/home\/[^/]+/,"/home/[account]"),status:obj.status??obj.result?.status,wordpress:["wp-admin","wp-content","wp-includes","wp-config.php","index.php"].every(x=>names.includes(x)),names:relevant}));
+                const relevant=names.filter(x=>["error_log",".htaccess","wp-config.php","index.php","wp-admin","wp-content","wp-includes","readme.html"].includes(x)||/staging.*log|error.*log/i.test(x)).slice(0,30);
+                const metadata=files.filter(x=>[".htaccess","wp-config.php","index.php","wp-admin","wp-content","wp-includes","readme.html"].includes(String(x.file||x.name||""))).map(x=>({name:String(x.file||x.name||""),type:String(x.type||x.filetype||""),permissions:String(x.permissions||x.mode||""),size:String(x.size||"")}));
+                console.log("POST_REMEDIATION_DIR="+JSON.stringify({dir:dir.replace(/\/home\/[^/]+/,"/home/[account]"),status:obj.status??obj.result?.status,wordpress:["wp-admin","wp-content","wp-includes","wp-config.php","index.php"].every(x=>names.includes(x)),names:relevant,metadata}));
                 for(const file of names.filter(x=>x==="error_log"||(/staging.*log|error.*log/i.test(x)&&x.length<180)).slice(0,4)){
                   const log=await cp("Fileman/get_file_content",{dir,file});
                   const l=JSON.parse(log.raw||"{}");
@@ -794,6 +795,13 @@ jobs:
                   const lines=content.split(/\r?\n/).filter(x=>/error|warning|fatal|critical|denied|permission|failed|exception|PHP|staging/i.test(x)).slice(-10).map(redact);
                   console.log("POST_REMEDIATION_LOG_READ="+JSON.stringify({dir:dir.replace(/\/home\/[^/]+/,"/home/[account]"),file,http:log.http,status:l.status??l.result?.status,contentLength:content.length,relevantLines:lines.length}));
                   if(lines.length)console.log("POST_REMEDIATION_PHP_ERRORS="+JSON.stringify({dir:dir.replace(/\/home\/[^/]+/,"/home/[account]"),file,lines}));
+                }
+                if(dir===root+"/staging"&&names.includes(".htaccess")){
+                  const ht=await cp("Fileman/get_file_content",{dir,file:".htaccess"});
+                  const h=JSON.parse(ht.raw||"{}");
+                  const content=String(h.data?.content??h.data?.data?.content??h.result?.data?.content??"");
+                  const directives=content.split(/\r?\n/).filter(x=>/^\s*(RewriteEngine|RewriteBase|RewriteRule|RewriteCond|php_value|php_flag|Options|DirectoryIndex|SetHandler|AddHandler|RemoveHandler)/i.test(x)).slice(0,25).map(redact);
+                  console.log("POST_REMEDIATION_HTACCESS="+JSON.stringify({length:content.length,directives}));
                 }
                 if(dir===root+"/staging"&&names.includes("wp-config.php")){
                   const cfg=await cp("Fileman/get_file_content",{dir,file:"wp-config.php"});
