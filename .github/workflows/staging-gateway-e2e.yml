@@ -957,15 +957,15 @@ jobs:
         working-directory: drive-gateway
         run: |
           set -euo pipefail
+          if [ -z "$META_APP_ID" ] && [ -z "$META_APP_SECRET" ] && [ -z "$META_TOKEN_ENCRYPTION_KEY" ]; then
+            echo "META_OAUTH_CONFIGURED=false; no staging Meta values are configured; Meta endpoints remain disabled."
+            exit 0
+          fi
           node <<'NODE'
           const values = [process.env.META_APP_ID||"", process.env.META_APP_SECRET||"", process.env.META_TOKEN_ENCRYPTION_KEY||""];
-          const count = values.filter(Boolean).length;
           const decoded = Buffer.from(values[2], "base64");
-          const valid = count === 3 && /^\d+$/.test(values[0]) && Boolean(values[1].trim()) && decoded.length === 32;
-          if (!valid) {
-            console.log("META_OAUTH_CONFIGURED=false; optional staging Meta configuration is absent, incomplete, or invalid; Worker App ID remains blank and Meta endpoints stay disabled.");
-            process.exit(0);
-          }
+          const valid = /^\d+$/.test(values[0]) && Boolean(values[1].trim()) && decoded.length === 32;
+          if (!valid) throw new Error("Staging Meta configuration is partial or invalid; refusing to configure Worker secrets.");
           console.log("META_OAUTH_CONFIGURATION_SHAPE=VALID");
           NODE
           node <<'NODE'
