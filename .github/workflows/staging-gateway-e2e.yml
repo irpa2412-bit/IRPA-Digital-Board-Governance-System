@@ -239,8 +239,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Require isolated staging secrets
         env:
-          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_TOKEN: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.STAGING_CLOUDFLARE_ACCOUNT_ID }}
           PROJECT: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
           APP_URL: ${{ secrets.STAGING_IRPA_APP_URL }}
           DRIVE_ID: ${{ secrets.STAGING_GOOGLE_DRIVE_CLIENT_ID }}
@@ -263,7 +263,7 @@ jobs:
 
       - name: Diagnostic - verify Cloudflare staging token
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
         run: |
           set -euo pipefail
           node <<'NODE'
@@ -316,8 +316,8 @@ jobs:
 
       - name: Provision or reuse dedicated staging KV
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.STAGING_CLOUDFLARE_ACCOUNT_ID }}
           PROJECT: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
           APP_URL: ${{ secrets.STAGING_IRPA_APP_URL }}
         working-directory: drive-gateway
@@ -381,8 +381,8 @@ jobs:
 
       - name: Inject staging-only Worker secrets
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.STAGING_CLOUDFLARE_ACCOUNT_ID }}
           GOOGLE_DRIVE_CLIENT_ID: ${{ secrets.STAGING_GOOGLE_DRIVE_CLIENT_ID }}
           GOOGLE_DRIVE_CLIENT_SECRET: ${{ secrets.STAGING_GOOGLE_DRIVE_CLIENT_SECRET }}
           GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY: ${{ secrets.STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY }}
@@ -406,8 +406,8 @@ jobs:
           FIREBASE_PROJECT_ID: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
           TEST_EMAIL: ${{ secrets.STAGING_CRYPTO_TEST_EMAIL }}
           TEST_PASSWORD: ${{ secrets.STAGING_CRYPTO_TEST_PASSWORD }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.STAGING_CLOUDFLARE_ACCOUNT_ID }}
         working-directory: drive-gateway
         run: |
           set -euo pipefail
@@ -447,16 +447,16 @@ jobs:
       - name: Deploy staging Worker only
         uses: cloudflare/wrangler-action@v3
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          apiToken: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.STAGING_CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: drive-gateway
           command: deploy --config wrangler.staging.generated.json
 
       - name: Verify staging health
         id: staging_health
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.STAGING_CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
           subdomain_json="$(curl --fail --silent --show-error -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Accept: application/json" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain")"
