@@ -945,7 +945,7 @@ jobs:
             process.exit(0);
           }
           if (count !== 3) throw new Error("Partial Meta staging configuration. Configure all three STAGING_META_* repository secrets; values are never printed.");
-          if (!/^\\d+$/.test(values[0])) throw new Error("STAGING_META_APP_ID must be a numeric Meta App ID.");
+          if (!/^\d+$/.test(values[0])) throw new Error("STAGING_META_APP_ID must be a numeric Meta App ID.");
           const decoded = Buffer.from(values[2], "base64");
           if (decoded.length !== 32) throw new Error("STAGING_META_TOKEN_ENCRYPTION_KEY must decode to 32 bytes.");
           console.log("META_OAUTH_CONFIGURATION_SHAPE=VALID");
