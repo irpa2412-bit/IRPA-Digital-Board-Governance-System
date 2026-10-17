@@ -95,7 +95,7 @@ async function graphJson(url, init = {}, appSecret = "") {
       target.searchParams.set("appsecret_proof", Array.from(signature, byte => byte.toString(16).padStart(2, "0")).join(""));
     }
   }
-  const response = await fetch(target.toString(), { ...init, headers });
+  const response = await fetch(target.toString(), { redirect: "error", signal: AbortSignal.timeout(12000), ...init, headers });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data.error) {
     const code = Number(data?.error?.code || 0);
@@ -217,7 +217,7 @@ export function createMetaOAuthRouter(deps) {
         };
         const encrypted = await encryptJson(env, connection);
         await env.DRIVE_KV.put(TOKEN_KEY_PREFIX + stateRecord.uid, encrypted);
-        return json({ ok: true, status: "verified", message: "Meta read-only API access verified. No posting permissions were requested.",
+        return json({ ok: true, status: "verified", postingEnabled: false, message: "Meta read-only API access verified. No posting permissions were requested.",
           facebookPages: connection.accounts.map(({ facebookPageId, facebookPageName }) => ({ id: facebookPageId, name: facebookPageName })),
           instagramAccounts: connection.accounts.flatMap(a => a.instagram.map(i => ({ id: i.instagramAccountId, username: i.username, accountType: i.accountType }))),
           connectedAt: connection.connectedAt, expiresAt: connection.expiresAt, requestedScopes: REQUIRED_SCOPES
@@ -235,8 +235,8 @@ export function createMetaOAuthRouter(deps) {
       let claims, cfg;
       try {
         if (url.origin !== STAGING_GATEWAY) throw new Error("Meta connection is available only on the approved staging gateway.");
-        cfg = safeConfig(env);
         claims = await authorizeUser(request, env, deps, false);
+        cfg = safeConfig(env);
       } catch (error) {
         return jsonError(json, corsHeaders, request, error.status || 403, error.message || "Meta connection is not authorized.");
       }
