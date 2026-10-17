@@ -42,7 +42,7 @@ test("Meta integration refuses production environment and production callback ho
  assert.equal(response.status,403);
  const bad=harness({envOverrides:{META_REDIRECT_URI:"https://irpa.or.tz/api/communications/meta/callback"}});
  const badResponse=await bad.router(new Request("https://gateway.example/api/communications/meta/connect",{method:"POST"}),bad.env);
- assert.equal(badResponse.status,503);
+ assert.equal(badResponse.status,403);
 });
 test("Meta connection status does not disclose token material",async()=>{
  const {router,env}=harness();
@@ -56,10 +56,10 @@ test("Meta connection status does not disclose token material",async()=>{
 test("Meta integration refuses wrong Firebase project and production cutover",async()=>{
  const wrongProject=harness({envOverrides:{FIREBASE_PROJECT_ID:"irpa-digital-board-governance"}});
  const projectResponse=await wrongProject.router(new Request("https://gateway.example/api/communications/meta/connect",{method:"POST"}),wrongProject.env);
- assert.equal(projectResponse.status,503);
+ assert.equal(projectResponse.status,403);
  const cutover=harness({envOverrides:{IRPA_PRODUCTION_CUTOVER:"true"}});
  const cutoverResponse=await cutover.router(new Request("https://gateway.example/api/communications/meta/connect",{method:"POST"}),cutover.env);
- assert.equal(cutoverResponse.status,503);
+ assert.equal(cutoverResponse.status,403);
 });
 test("unauthorized roles cannot initiate Meta authorization",async()=>{
  const {router,env}=harness({role:"Finance Officer"});
