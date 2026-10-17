@@ -206,6 +206,9 @@ test("Meta API uses the existing staging-only OAuth router, minimal read permiss
  assert.ok(stagingWorkflow.includes("STAGING_META_TOKEN_ENCRYPTION_KEY"));
  assert.ok(stagingWorkflow.includes("META_OAUTH_CONFIGURATION_SHAPE=VALID"));
  assert.ok(stagingWorkflow.includes('IRPA_PRODUCTION_CUTOVER:"false"'));
+ assert.ok(stagingWorkflow.includes("STAGING_COMMUNICATION_MEDIA_ARCHIVE_PROVISION=PASS"));
+ assert.ok(stagingWorkflow.includes("STAGING_CONTROLLED_PDF_UPLOAD=PASS"));
+ assert.ok(stagingWorkflow.includes("firestore-rules-approved"));
  assert.ok(stagingWorkflow.includes("refusing to configure Worker secrets"));
 });
 
@@ -229,6 +232,12 @@ test("media asset register is authenticated, size-limited, immutable and deny-by
  assert.ok(rules.includes('request.resource.data.get("fileSize",0)<=26214400'));
  assert.ok(rules.includes('request.resource.data.get("storageProvider","")=="Google Drive"'));
  assert.ok(rules.includes('allow update,delete:if false;'));
+});
+
+test("media asset and item record origins are restricted to the authenticated Firebase project",()=>{
+ assert.ok(rules.includes('function communicationMediaRecordOriginMatches(data)'));
+ assert.ok(rules.includes('request.auth.token.get("aud","")=="irpa-dbg-staging-a73ec"'));
+ assert.equal((rules.match(/communicationMediaRecordOriginMatches\\(request\\.resource\\.data\\)/g)||[]).length,2);
 });
 
 test("staging gateway is isolated from production Firebase, app URL and Drive archive root",()=>{
