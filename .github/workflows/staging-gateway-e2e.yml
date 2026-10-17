@@ -498,7 +498,7 @@ jobs:
           }
           (async()=>{
             const status=await call("/api/communications/site/status");
-            if(status.connections?.website!=="connected"||status.connections?.cpanel!=="connected") throw new Error("WordPress or cPanel connection did not authenticate successfully.");
+            if(status.connections?.website!=="connected"||status.connections?.cpanel!=="connected") throw new Error("WordPress/cPanel connection status: "+JSON.stringify(status.connections||{}));
             const baselineTitle="IRPA Staging Integration Check";
             const baselineContent="<p>IRPA staging integration baseline.</p>";
             const found=await wpRequest("pages?slug=irpa-staging-integration-check&context=edit&per_page=1");
