@@ -255,8 +255,8 @@ export function createMetaOAuthRouter(deps) {
       let claims, cfg;
       try {
         if (url.origin !== STAGING_GATEWAY) throw new Error("Meta status checks are available only on the approved staging gateway.");
-        cfg = safeConfig(env);
         claims = await authorizeUser(request, env, deps, false);
+        cfg = safeConfig(env);
       } catch (error) {
         return jsonError(json, corsHeaders, request, error.status || 403, error.message || "Meta status check is not authorized.");
       }
