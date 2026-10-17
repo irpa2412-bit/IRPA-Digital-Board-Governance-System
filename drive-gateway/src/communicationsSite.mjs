@@ -200,6 +200,22 @@ export function createCommunicationsSiteRouter(deps) {
     return fetch(target.toString(), { ...init, redirect: "manual" });
   }
 
+  async function verifyDedicatedWordPressEditor(wp) {
+    const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/users/me?context=edit", {
+      headers: wordpressHeaders(wp, { Accept: "application/json", "Cache-Control": "no-cache" }),
+      signal: AbortSignal.timeout(12000)
+    });
+    const user = await response.json().catch(() => null);
+    if (!response.ok || !Number.isSafeInteger(user?.id)) {
+      throw new Error("Staging WordPress authentication failed; the integration account was not verified.");
+    }
+    const roles = Array.isArray(user.roles) ? user.roles.map(role => String(role).toLowerCase()) : [];
+    if (!roles.includes("editor") || roles.includes("administrator")) {
+      throw new Error("The staging WordPress integration account must have the Editor role and must not be an Administrator.");
+    }
+    return user;
+  }
+
   function cpanelConfig(env) {
     let base;
     try { base = new URL(String(env.CPANEL_BASE_URL || "")); }
@@ -357,8 +373,10 @@ export function createCommunicationsSiteRouter(deps) {
         });
         if (response.ok) {
           const user = await response.json();
-          result.website = "connected";
-          result.websiteAccount = { name: cleanText(user.name, 100), canEditPosts: user.capabilities && typeof user.capabilities === "object" ? !!user.capabilities.edit_posts : undefined, canEditPages: user.capabilities && typeof user.capabilities === "object" ? !!user.capabilities.edit_pages : undefined };
+          const roles = Array.isArray(user.roles) ? user.roles.map(role => String(role).toLowerCase()) : [];
+          const isDedicatedEditor = roles.includes("editor") && !roles.includes("administrator");
+          result.website = isDedicatedEditor ? "connected" : "wrong_account_role";
+          result.websiteAccount = { name: cleanText(user.name, 100), role: isDedicatedEditor ? "editor" : "unverified", canEditPosts: user.capabilities && typeof user.capabilities === "object" ? !!user.capabilities.edit_posts : undefined, canEditPages: user.capabilities && typeof user.capabilities === "object" ? !!user.capabilities.edit_pages : undefined };
         } else { const contentType = response.headers.get("content-type") || ""; const server = response.headers.get("server") || ""; const cfRay = response.headers.get("cf-ray") || ""; const raw = await response.text().catch(() => ""); let detail = {}; if (contentType.includes("json")) { try { detail = JSON.parse(raw); } catch {} } result.website = response.status === 401 || response.status === 403 ? "authentication_failed" : "unavailable"; result.websiteHttpStatus = response.status; result.websiteErrorCode = typeof detail.code === "string" ? detail.code.slice(0, 100) : undefined; result.websiteResponseType = contentType.slice(0, 100); result.websiteResponseServer = server.slice(0, 80); result.websiteCloudflareRay = cfRay.slice(0, 100); const hint = raw.replace(/<[^>]*>/g, " ").replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").trim(); result.websiteResponseHint = hint ? hint.slice(0, 180) : undefined; }
       } catch (error) { result.website = error.message.includes("not configured") ? "not_configured" : "unavailable"; }
       try {
@@ -372,6 +390,7 @@ export function createCommunicationsSiteRouter(deps) {
     if (path === "/api/communications/website/content" && request.method === "GET") {
       await websiteEditorAuthorised(request, env);
       const wp = stagingWordPressConfig(env);
+      await verifyDedicatedWordPressEditor(wp);
       const type = url.searchParams.get("type") === "pages" ? "pages" : url.searchParams.get("type") === "posts" ? "posts" : "";
       if (!type) return json({ error: "Content type must be pages or posts." }, 400, corsHeaders(request));
       const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/" + type + "?context=edit&status=any&per_page=50&orderby=modified&order=desc", {
@@ -390,6 +409,7 @@ export function createCommunicationsSiteRouter(deps) {
     if (singleContentMatch && request.method === "GET") {
       await websiteEditorAuthorised(request, env);
       const wp = stagingWordPressConfig(env);
+      await verifyDedicatedWordPressEditor(wp);
       const type = singleContentMatch[1];
       const id = Number(singleContentMatch[2]);
       const item = await readWebsiteItem(wp, type, id);
@@ -399,6 +419,7 @@ export function createCommunicationsSiteRouter(deps) {
     if (path === "/api/communications/website/revisions" && request.method === "GET") {
       await websiteEditorAuthorised(request, env);
       const wp = stagingWordPressConfig(env);
+      await verifyDedicatedWordPressEditor(wp);
       const type = url.searchParams.get("type");
       const id = Number(url.searchParams.get("id"));
       if (!["pages", "posts"].includes(type) || !Number.isSafeInteger(id) || id < 1) {
@@ -457,6 +478,7 @@ export function createCommunicationsSiteRouter(deps) {
         return json({ error: "Provide a valid page/post ID, title, content, excerpt, featured image ID and draft/publish status." }, 400, corsHeaders(request));
       }
       const wp = stagingWordPressConfig(env);
+      await verifyDedicatedWordPressEditor(wp);
       const current = await readWebsiteItem(wp, type, id);
       const changedFields = ["title", "content", "excerpt", "featuredMedia", "status"].filter(key => {
         const currentValue = key === "featuredMedia" ? Number(current.featured_media || 0) :
@@ -511,6 +533,7 @@ export function createCommunicationsSiteRouter(deps) {
         return json({ error: "A valid page/post and saved snapshot or WordPress revision are required." }, 400, corsHeaders(request));
       }
       const wp = stagingWordPressConfig(env);
+      await verifyDedicatedWordPressEditor(wp);
       const current = await readWebsiteItem(wp, type, id);
       const safetySnapshot = await saveWebsiteSnapshot(env, claims, wp, type, id, current, ["restore"]);
       let target;
