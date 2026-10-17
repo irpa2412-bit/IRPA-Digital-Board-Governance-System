@@ -322,35 +322,51 @@ export function createCommunicationsSiteRouter(deps) {
   }
 
   async function saveWebsiteSnapshot(env, claims, wp, type, id, current, changedFields = []) {
-    if (!env.DRIVE_KV || typeof env.DRIVE_KV.put !== "function") {
-      throw new Error("Staging revision storage is unavailable; no edit was made.");
+    let stage = "check_storage";
+    try {
+      if (!env.DRIVE_KV || typeof env.DRIVE_KV.put !== "function") {
+        throw new Error("Staging revision storage is unavailable; no edit was made.");
+      }
+      stage = "read_revisions";
+      const revisions = await readWebsiteRevisions(wp, type, id);
+      stage = "validate_revision";
+      const currentRevisionId = revisions.length && Number.isSafeInteger(Number(revisions[0]?.id)) ? Number(revisions[0].id) : null;
+      if (!currentRevisionId) throw new Error("No current WordPress revision ID is available; no edit was made.");
+      stage = "build_snapshot";
+      const snapshotId = crypto.randomUUID();
+      const snapshot = {
+        snapshotId, type, itemId: id, currentRevisionId,
+        title: editorRaw(current, "title"),
+        content: editorRaw(current, "content"),
+        excerpt: editorRaw(current, "excerpt"),
+        featuredMedia: Number(current.featured_media || 0),
+        status: String(current.status || "draft"),
+        link: String(current.link || ""),
+        modified: String(current.modified || ""),
+        actorUid: claims.user_id,
+        actorEmail: String(claims.email || ""),
+        createdAt: new Date().toISOString()
+      };
+      const serialized = JSON.stringify(snapshot);
+      if (new TextEncoder().encode(serialized).byteLength > MAX_WEBSITE_SNAPSHOT_BYTES) {
+        throw new Error("The current page/post exceeds the safe revision snapshot limit; no edit was made.");
+      }
+      stage = "write_snapshot";
+      await env.DRIVE_KV.put(websiteSnapshotKey(type, id, snapshotId), serialized);
+      stage = "write_audit";
+      await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_EDIT_SNAPSHOT_SAVED", type, id, {
+        snapshotId, previousRevisionId: currentRevisionId, changedFields
+      });
+      return snapshot;
+    } catch (error) {
+      const message = String(error?.message || "");
+      if (message === "No current WordPress revision ID is available; no edit was made." ||
+          message === "Staging revision storage is unavailable; no edit was made." ||
+          message === "The current page/post exceeds the safe revision snapshot limit; no edit was made.") {
+        throw error;
+      }
+      throw new Error("Staging website snapshot failed at stage " + stage + "; no page edit was made.");
     }
-    const revisions = await readWebsiteRevisions(wp, type, id);
-    const currentRevisionId = revisions.length && Number.isSafeInteger(Number(revisions[0]?.id)) ? Number(revisions[0].id) : null;
-    if (!currentRevisionId) throw new Error("No current WordPress revision ID is available; no edit was made.");
-    const snapshotId = crypto.randomUUID();
-    const snapshot = {
-      snapshotId, type, itemId: id, currentRevisionId,
-      title: editorRaw(current, "title"),
-      content: editorRaw(current, "content"),
-      excerpt: editorRaw(current, "excerpt"),
-      featuredMedia: Number(current.featured_media || 0),
-      status: String(current.status || "draft"),
-      link: String(current.link || ""),
-      modified: String(current.modified || ""),
-      actorUid: claims.user_id,
-      actorEmail: String(claims.email || ""),
-      createdAt: new Date().toISOString()
-    };
-    const serialized = JSON.stringify(snapshot);
-    if (new TextEncoder().encode(serialized).byteLength > MAX_WEBSITE_SNAPSHOT_BYTES) {
-      throw new Error("The current page/post exceeds the safe revision snapshot limit; no edit was made.");
-    }
-    await env.DRIVE_KV.put(websiteSnapshotKey(type, id, snapshotId), serialized);
-    await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_EDIT_SNAPSHOT_SAVED", type, id, {
-      snapshotId, previousRevisionId: currentRevisionId, changedFields
-    });
-    return snapshot;
   }
 
   function snapshotPayload(snapshot) {
