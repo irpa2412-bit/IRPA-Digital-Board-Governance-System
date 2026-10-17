@@ -1,5 +1,6 @@
 const STAGING_PROJECT = "irpa-dbg-staging-a73ec";
 const STAGING_GATEWAY = "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev";
+// Read-only connection verification only; this router intentionally exposes no social publishing or messaging operations.
 const REQUIRED_SCOPES = ["pages_show_list", "pages_read_engagement", "instagram_basic"];
 const TOKEN_KEY_PREFIX = "meta:readonly:connection:";
 const STATE_KEY_PREFIX = "meta:readonly:oauth-state:";
