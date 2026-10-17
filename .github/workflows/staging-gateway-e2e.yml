@@ -667,6 +667,103 @@ jobs:
           function safeError(e){return String(e?.message||e?.code||e?.name||"unknown").replace(/[\r\n\t]+/g," ").replace(/\s+/g," ").slice(0,180)}
           NODE
 
+      - name: Repair staging-only WordPress Basic Auth forwarding bridge
+        env:
+          WP_BASE: ${{ secrets.STAGING_WORDPRESS_BASE_URL }}
+          CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
+          CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
+          CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
+          CP_ROOT: ${{ secrets.STAGING_CPANEL_DOCUMENT_ROOT }}
+          STAGING_DB_NAME: ${{ secrets.STAGING_WORDPRESS_DB_NAME }}
+          PRODUCTION_DB_NAME: ${{ secrets.PRODUCTION_WORDPRESS_DB_NAME }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const https=require("node:https");
+          const {URL,URLSearchParams}=require("node:url");
+          function request(url,method="GET",headers={},body){
+            return new Promise((resolve,reject)=>{
+              const u=new URL(url);
+              const req=https.request({protocol:u.protocol,hostname:u.hostname,port:u.port||443,path:u.pathname+u.search,method,headers,timeout:15000},res=>{
+                let raw="";res.setEncoding("utf8");res.on("data",c=>raw+=c);res.on("end",()=>resolve({http:res.statusCode,raw}));
+              });
+              req.on("timeout",()=>req.destroy(new Error("Staging cPanel request timed out.")));
+              req.on("error",reject);if(body)req.write(body);req.end();
+            });
+          }
+          async function main(){
+            const wp=new URL(process.env.WP_BASE||""),cp=new URL(process.env.CP_BASE||"");
+            if(wp.protocol!=="https:"||wp.hostname.toLowerCase()!=="staging.irpa.or.tz"||wp.pathname!=="/")throw new Error("ABORT: WordPress target must be HTTPS staging.irpa.or.tz.");
+            if(cp.protocol!=="https:"||cp.port!=="2083"||cp.pathname!=="/")throw new Error("ABORT: cPanel target must be HTTPS port 2083.");
+            const auth={Authorization:"cpanel "+process.env.CP_USER+":"+process.env.CP_TOKEN,Accept:"application/json"};
+            async function uapi(fn,params={},method="GET"){
+              const url=new URL("/execute/"+fn,cp),form=new URLSearchParams(params);
+              if(method==="GET")url.search=form.toString();
+              const r=await request(url.href,method,{...auth,...(method==="POST"?{"Content-Type":"application/x-www-form-urlencoded"}:{})},method==="POST"?form.toString():undefined);
+              let data;try{data=JSON.parse(r.raw)}catch{}
+              return {http:r.http,data};
+            }
+            async function read(dir,file){
+              const r=await uapi("Fileman/get_file_content",{dir,file});
+              return {ok:r.http===200&&r.data?.status===1,content:String(r.data?.data?.content??r.data?.data?.[0]?.content??r.data?.result?.data?.content??"")};
+            }
+            async function write(dir,file,content){
+              const r=await uapi("Fileman/save_file_content",{dir,file,content,charset:"utf-8"},"POST");
+              if(r.http!==200||r.data?.status!==1)throw new Error("cPanel rejected the staging MU-plugin update.");
+              const check=await read(dir,file);
+              if(!check.ok||check.content!==content)throw new Error("Staging MU-plugin update did not pass exact read-back verification.");
+            }
+            const info=await uapi("DomainInfo/domains_data");
+            const home=String(info.data?.data?.main_domain?.documentroot||info.data?.data?.main_domain?.document_root||"").replace(/\/+$/,"");
+            if(info.http!==200||info.data?.status!==1||!home.endsWith("/public_html"))throw new Error("ABORT: could not verify cPanel document root.");
+            const stage=home+"/staging";
+            if(String(process.env.CP_ROOT||"").replace(/\/+$/,"")!==stage)throw new Error("ABORT: cPanel document root is not the isolated staging directory.");
+            const config=await read(stage,"wp-config.php");
+            const db=/define\s*\(\s*['"]DB_NAME['"]\s*,\s*(['"])(.*?)\1\s*\)/s.exec(config.content);
+            if(!config.ok||!db||db[2]!==String(process.env.STAGING_DB_NAME||"").trim()||
+               !process.env.PRODUCTION_DB_NAME||process.env.STAGING_DB_NAME===process.env.PRODUCTION_DB_NAME)
+              throw new Error("ABORT: staging database isolation could not be verified.");
+            const pluginDir=stage+"/wp-content/mu-plugins";
+            const pluginName="irpa-staging-rest-auth.php";
+            const backup=await read(home,"irpa-staging-rest-auth.php.backup");
+            if(!backup.ok||backup.content.length>10000||!backup.content.includes("irpa_staging_rest_auth_user")||!backup.content.includes("hash_equals"))
+              throw new Error("ABORT: verified original staging authentication bridge backup is required; no plugin was changed.");
+            const plugin=`<?php
+          /**
+           * IRPA staging-only WordPress REST Basic Authentication forwarding.
+           * Accepts the custom header used by the isolated staging Worker only.
+           */
+          if (!defined('ABSPATH')) { return; }
+          if (strtolower((string) ($_SERVER['HTTP_HOST'] ?? '')) !== 'staging.irpa.or.tz') { return; }
+          if (empty($_SERVER['HTTPS']) || strtolower((string) $_SERVER['HTTPS']) === 'off') { return; }
+          $header = trim((string) ($_SERVER['HTTP_X_IRPA_STAGING_AUTHORIZATION'] ?? ''));
+          if (!preg_match('/^Basic\\s+[A-Za-z0-9+\\/]+={0,2}$/i', $header)) { return; }
+          $decoded = base64_decode(substr($header, 6), true);
+          if (!is_string($decoded) || strpos($decoded, ':') === false) { return; }
+          [$username, $password] = explode(':', $decoded, 2);
+          if ($username === '' || $password === '') { return; }
+          // Populate the variables WordPress Application Password authentication consumes.
+          $_SERVER['HTTP_AUTHORIZATION'] = $header;
+          $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] = $header;
+          $_SERVER['PHP_AUTH_USER'] = $username;
+          $_SERVER['PHP_AUTH_PW'] = $password;
+          `;
+            const existing=await read(pluginDir,pluginName);
+            if(!existing.ok||existing.content!==plugin){
+              await write(pluginDir,pluginName,plugin);
+            }
+            const verify=await read(pluginDir,pluginName);
+            if(!verify.ok||verify.content!==plugin||!verify.content.includes("HTTP_X_IRPA_STAGING_AUTHORIZATION")||
+               !verify.content.includes("PHP_AUTH_USER")||!verify.content.includes("PHP_AUTH_PW")||
+               !verify.content.includes("staging.irpa.or.tz"))throw new Error("Staging authentication bridge failed post-write verification.");
+            console.log("STAGING_REST_AUTH_BRIDGE_REPAIR=PASS");
+            console.log("STAGING_AUTH_BACKUP=VERIFIED_OUTSIDE_WEB_ROOT");
+            console.log("STAGING_DATABASE_ISOLATION=PASS");
+            console.log("STAGING_CREDENTIALS=NOT_LOGGED");
+          }
+          main().catch(e=>{console.error("Staging-only auth bridge repair failed: "+String(e.message||e).replace(/[\\r\\n\\t]+/g," ").slice(0,220));process.exit(1)});
+          NODE
+
       - name: Verify staging-only WordPress REST authorization bridge
         env:
           WP_BASE: ${{ secrets.STAGING_WORDPRESS_BASE_URL }}
