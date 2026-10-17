@@ -1080,7 +1080,7 @@ jobs:
             if(response.http===406){
               const muDir=stage+"/wp-content/mu-plugins";
               const muFilename="irpa-stage-setup-"+crypto.randomBytes(10).toString("hex")+".php";
-              const muPhp=String.raw`<?php
+              let muPhp=String.raw`<?php
           if (!defined('ABSPATH')) { return; }
           if (strtolower((string)($_SERVER['HTTP_HOST'] ?? '')) !== 'staging.irpa.or.tz') { return; }
           add_action('rest_api_init', function () {
