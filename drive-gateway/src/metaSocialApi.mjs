@@ -99,8 +99,11 @@ async function graphGet(version, path, token) {
 }
 function publicConnection(value) {
   return {
+    status: "verified",
     connected: true,
     verifiedAt: value.verifiedAt,
+    expiresAt: value.expiresAt || null,
+    user: value.metaUser,
     metaUser: value.metaUser,
     facebookPages: value.facebookPages || [],
     instagramAccounts: value.instagramAccounts || [],
@@ -137,7 +140,7 @@ export function createMetaSocialApiRouter(deps) {
     const cfg = config(env);
     if (!env.META_TOKEN_ENCRYPTION_KEY) throw new Error("Staging Meta token-encryption secret is not configured.");
     const saved = await env.DRIVE_KV.get("meta:connection:" + claims.user_id, "json");
-    if (!saved?.encryptedToken) return json({ connected: false, postingEnabled: false, requiredPermissions: REQUIRED_PERMISSIONS }, 200, corsHeaders(request));
+    if (!saved?.encryptedToken) return json({ status: "not_connected", connected: false, postingEnabled: false, requiredPermissions: REQUIRED_PERMISSIONS }, 200, corsHeaders(request));
     const token = await decryptToken(saved.encryptedToken, env.META_TOKEN_ENCRYPTION_KEY);
     const [me, permissions, pages] = await Promise.all([
       graphGet(cfg.version, "me?fields=id,name", token),
@@ -153,7 +156,7 @@ export function createMetaSocialApiRouter(deps) {
     })).filter(p => p.id && p.name);
     const instagramAccounts = (Array.isArray(pages.data) ? pages.data : [])
       .filter(p => p.instagram_business_account?.id)
-      .map(p => ({ id: String(p.instagram_business_account.id), username: String(p.instagram_business_account.username || "").slice(0, 120), linkedFacebookPage: String(p.name || "").slice(0, 180) }));
+      .map(p => ({ id: String(p.instagram_business_account.id), username: String(p.instagram_business_account.username || "").slice(0, 120), accountType: "Professional", linkedFacebookPage: String(p.name || "").slice(0, 180) }));
     const result = publicConnection({
       verifiedAt: new Date().toISOString(),
       metaUser: { id: String(me.id || ""), name: String(me.name || "").slice(0, 180) },
@@ -220,11 +223,11 @@ export function createMetaSocialApiRouter(deps) {
         })).filter(p => p.id && p.name);
         const instagramAccounts = (Array.isArray(pages.data) ? pages.data : [])
           .filter(p => p.instagram_business_account?.id)
-          .map(p => ({ id: String(p.instagram_business_account.id), username: String(p.instagram_business_account.username || "").slice(0, 120), linkedFacebookPage: String(p.name || "").slice(0, 180) }));
+.map(p => ({ id: String(p.instagram_business_account.id), username: String(p.instagram_business_account.username || "").slice(0, 120), accountType: "Professional", linkedFacebookPage: String(p.name || "").slice(0, 180) }));
         const connection = {
           encryptedToken, metaUser: { id: String(me.id || ""), name: String(me.name || "").slice(0, 180) },
           facebookPages, instagramAccounts, grantedPermissions, verifiedAt,
-          connectedAt: verifiedAt, environment: "staging"
+          connectedAt: verifiedAt, expiresAt: Number.isFinite(Number(longToken.expires_in)) ? new Date(Date.now() + Number(longToken.expires_in) * 1000).toISOString() : null, environment: "staging"
         };
         await env.DRIVE_KV.put("meta:connection:" + pending.uid, JSON.stringify(connection));
         const missing = REQUIRED_PERMISSIONS.filter(p => !grantedPermissions.includes(p));
@@ -254,6 +257,15 @@ export function createMetaSocialApiRouter(deps) {
       authorizeUrl.searchParams.set("response_type", "code");
       authorizeUrl.searchParams.set("scope", REQUIRED_PERMISSIONS.join(","));
       return json({ authorizationUrl: authorizeUrl.toString(), expiresInSeconds: 600, requestedPermissions: REQUIRED_PERMISSIONS, postingEnabled: false }, 200, corsHeaders(request));
+    }
+
+    if (path === "/api/communications/meta/disconnect" && request.method === "POST") {
+      const claims = await authorize(request, env);
+      if (String(env.IRPA_ENVIRONMENT || "").toLowerCase() !== "staging" || !env.DRIVE_KV) {
+        throw new Error("Local Meta disconnection is available only in the staging gateway.");
+      }
+      await env.DRIVE_KV.delete("meta:connection:" + claims.user_id);
+      return json({ status: "not_connected", connected: false, postingEnabled: false, message: "The local staging token was removed. Revoke app authorization separately in Meta settings if required." }, 200, corsHeaders(request));
     }
 
     if (path === "/api/communications/meta/status" && request.method === "GET") {
