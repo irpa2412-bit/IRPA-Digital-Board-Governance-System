@@ -1136,14 +1136,14 @@ jobs:
               const saved=await uapi("Fileman/save_file_content",{dir,file:name,content,charset:"utf-8"},"POST");
               let read=await readFile(dir,name);
               if(saved.http===200&&saved.data?.status===1&&read.ok&&read.content===content)return true;
-              // The hosting account's save_file_content endpoint may return success without updating MU-plugin files. Fall back to the same multipart upload API already verified by the staging rollback test, explicitly allowing overwrite, then verify exact content.
+              // Fall back to the multipart cPanel upload API; verify exact bytes before proceeding.
               const boundary="----IRPAStagingFileRewrite"+crypto.randomBytes(8).toString("hex");
               const payload=Buffer.concat([
-                Buffer.from("--"+boundary+"\\r\\nContent-Disposition: form-data; name=\\"dir\\"\\r\\n\\r\\n"+dir+"\\r\\n"),
-                Buffer.from("--"+boundary+"\\r\\nContent-Disposition: form-data; name=\\"overwrite\\"\\r\\n\\r\\n1\\r\\n"),
-                Buffer.from("--"+boundary+"\\r\\nContent-Disposition: form-data; name=\\"file-1\\"; filename=\\""+name+"\\"\\r\\nContent-Type: application/octet-stream\\r\\n\\r\\n"),
+                Buffer.from("--"+boundary+"\r\nContent-Disposition: form-data; name=\"dir\"\r\n\r\n"+dir+"\r\n"),
+                Buffer.from("--"+boundary+"\r\nContent-Disposition: form-data; name=\"overwrite\"\r\n\r\n1\r\n"),
+                Buffer.from("--"+boundary+"\r\nContent-Disposition: form-data; name=\"file-1\"; filename=\""+name+"\"\r\nContent-Type: application/octet-stream\r\n\r\n"),
                 Buffer.from(content),
-                Buffer.from("\\r\\n--"+boundary+"--\\r\\n")
+                Buffer.from("\r\n--"+boundary+"--\r\n")
               ]);
               const uploaded=await request(new URL("/execute/Fileman/upload_files",cpBase).href,"POST",{...auth,"Content-Type":"multipart/form-data; boundary="+boundary,"Content-Length":String(payload.length)},payload);
               read=await readFile(dir,name);
