@@ -10,6 +10,7 @@ let kvStore;
 let auditEvents;
 let requestCount;
 let wpRoles;
+let wpItemLink;
 let consoleMessages;
 let originalFetch;
 let originalConsole;
@@ -22,7 +23,7 @@ function currentItem() {
     excerpt: { raw: state.excerpt, rendered: state.excerpt },
     featured_media: state.featured_media,
     status: state.status,
-    link: "https://staging.irpa.or.tz/test-page/",
+    link: wpItemLink,
     modified: state.modified
   };
 }
@@ -114,6 +115,7 @@ test.beforeEach(() => {
   auditEvents = [];
   requestCount = 0;
   wpRoles = ["editor"];
+  wpItemLink = "https://staging.irpa.or.tz/test-page/";
   consoleMessages = [];
   originalFetch = globalThis.fetch;
   originalConsole = { log: console.log, info: console.info, warn: console.warn, error: console.error };
@@ -287,6 +289,19 @@ test("the page editor rejects plugins, themes, users, settings and other non-con
   assert.equal(result.status, 400);
   assert.equal(state.title, "Original test page");
   assert.equal(auditEvents.length, 0);
+});
+
+test("WordPress items that advertise a production-host link are refused", async () => {
+  wpItemLink = "https://irpa.or.tz/staging/test-page/";
+  const router = makeRouter();
+  const env = makeEnv();
+  const result = await call(router, env, "/api/communications/website/content", {
+    method: "PUT",
+    body: { type: "pages", id: 123, title: "Blocked", content: "<p>Blocked</p>", excerpt: "", featuredMedia: 0, status: "draft" }
+  });
+  assert.equal(result.status, 502);
+  assert.equal(state.title, "Original test page");
+  assert.equal(kvStore.size, 0);
 });
 
 test("WordPress Administrator credentials are rejected even when authentication returns HTTP 200", async () => {
