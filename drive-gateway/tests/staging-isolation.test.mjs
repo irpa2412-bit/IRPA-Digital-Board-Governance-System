@@ -34,9 +34,9 @@ test("Wrangler staging project and application URLs are isolated from production
 test("staging workflow validates the approved frontend origin and fails closed on invalid optional Meta configuration", () => {
   const workflow = readFileSync(new URL("../../.github/workflows/staging-gateway-e2e.yml", import.meta.url), "utf8");
   assert.ok(workflow.includes('appUrl.hostname!=="irpa-dgb-meeting-room-staging.irpa-governance.workers.dev"'));
-  assert.ok(workflow.includes('const valid = count === 3 && /^\\d+$/.test(values[0]) && Boolean(values[1].trim()) && decoded.length === 32;'));
+  assert.ok(workflow.includes('const valid = /^\\d+$/.test(values[0]) && Boolean(values[1].trim()) && decoded.length === 32;'));
   assert.ok(workflow.includes('const metaReady=/^\\d+$/.test(metaAppIdRaw)&&Boolean(String(process.env.META_APP_SECRET||"").trim())&&metaKey.length===32;'));
   assert.ok(workflow.includes('const metaAppId=metaReady?metaAppIdRaw:"";'));
-  assert.ok(workflow.includes('Worker App ID remains blank and Meta endpoints stay disabled.'));
+  assert.ok(workflow.includes('META_OAUTH_CONFIGURED=false; no staging Meta values are configured; Meta endpoints remain disabled.'));
   assert.ok(!workflow.includes('if (!/^\\\\d+$/.test(values[0]))'));
 });

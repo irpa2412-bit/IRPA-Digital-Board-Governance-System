@@ -299,14 +299,14 @@ jobs:
           });
           NODE
 
-      - name: Deploy Hosting and Firestore
+      - name: Deploy Firestore Rules and Indexes (frontend hosted on Cloudflare)
         uses: w9jds/firebase-action@v14.17.0
         with:
-          args: deploy --project irpa-digital-board-governance --only hosting,firestore
+          args: deploy --project irpa-digital-board-governance --only firestore
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
 
-      # Keep Firebase function deployments independent from Hosting/Firestore.
+      # Keep Firebase function deployments independent from Firestore. The frontend is deployed by cloudflare-pages-deploy.yml.
       # Google Cloud billing is currently closed for this project, so new Cloud Functions
       # deployments cannot activate Cloud Build/Artifact Registry. Existing deployed
       # functions remain untouched; deployment can be re-enabled when billing is restored.
@@ -378,7 +378,7 @@ jobs:
         run: |
           set -e
           curl --fail --silent --show-error --retry 5 --retry-delay 3 \
-            https://irpa-digital-board-governance.web.app/
+            https://irpa-digital-board-governance-frontend.irpa-governance.workers.dev/
 
   live-hosting-verification:
     name: Live Hosting Verification and Commit Status
@@ -386,7 +386,7 @@ jobs:
     needs: build-and-deploy
     if: always()
     steps:
-      - name: Verify production hosting independently
+      - name: Verify Cloudflare production frontend independently
         id: live
         shell: bash
         run: |
@@ -397,10 +397,10 @@ jobs:
           echo "CURL_EXIT=$CURL_EXIT"
           if [ "$CURL_EXIT" -eq 0 ] && [ "$HTTP_STATUS" = "200" ]; then
             echo "live_ok=true" >> "$GITHUB_OUTPUT"
-            echo "Production hosting is reachable and returned HTTP 200."
+            echo "Cloudflare production frontend is reachable and returned HTTP 200."
           else
             echo "live_ok=false" >> "$GITHUB_OUTPUT"
-            echo "Production hosting verification failed."
+            echo "Cloudflare production frontend verification failed."
             exit 1
           fi
 
@@ -417,10 +417,10 @@ jobs:
               repo: context.repo.repo,
               sha: context.sha,
               state: liveOk ? "success" : "failure",
-              context: "firebase/hosting-live",
+              context: "cloudflare/frontend-live",
               description: liveOk
-                ? "Production Firebase Hosting returned HTTP 200."
-                : "Production Firebase Hosting did not return HTTP 200.",
+                ? "Production Cloudflare frontend returned HTTP 200."
+                : "Production Cloudflare frontend did not return HTTP 200.",
               target_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
             });
 
