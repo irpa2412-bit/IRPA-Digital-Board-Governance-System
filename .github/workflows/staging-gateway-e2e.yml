@@ -1001,7 +1001,7 @@ jobs:
             const db=/define\s*\(\s*['"]DB_NAME['"]\s*,\s*(['"])(.*?)\1\s*\)/s.exec(cfg.content);
             if(!cfg.ok||!db||db[2]!==process.env.STAGING_DB_NAME)throw new Error("ABORT: staging wp-config.php database name does not match the isolated staging secret.");
             const setupToken=crypto.randomBytes(32).toString("hex");
-            const filename="irpa-staging-app-password-"+crypto.randomBytes(10).toString("hex")+".php";
+            const filename="irpa-stage-setup-"+crypto.randomBytes(10).toString("hex")+".php";
             const php=String.raw`<?php
           ini_set('display_errors', '0');
           error_reporting(0);
@@ -1076,7 +1076,7 @@ jobs:
             }
             let data;try{data=JSON.parse(response.raw)}catch{}
             if(response.http!==200||data?.ok!==true||data.username!=="irpa_staging_gateway"||!/^[a-z0-9]{24}$/i.test(String(data.password||"")))
-              throw new Error("WordPress did not provision a valid staging-only Editor application password (HTTP "+response.http+", code "+String(data?.code||"invalid_response").slice(0,80)+").");
+              throw new Error("WordPress did not provision a valid staging-only Editor application password (HTTP "+response.http+", server "+String(response.headers?.server||"unknown").slice(0,60)+", content-type "+String(response.headers?.["content-type"]||"unknown").slice(0,60)+", Cloudflare Ray "+String(response.headers?.["cf-ray"]||"none").slice(0,60)+", code "+String(data?.code||"invalid_response").slice(0,80)+").");
             const usernameResult=spawnSync("npx",["wrangler","secret","put","WORDPRESS_USERNAME","--config","wrangler.staging.generated.json"],{input:data.username,encoding:"utf8",stdio:["pipe","ignore","pipe"],env:process.env});
             if(usernameResult.status!==0)throw new Error("Could not update the staging Worker username secret.");
             const passwordResult=spawnSync("npx",["wrangler","secret","put","WORDPRESS_APPLICATION_PASSWORD","--config","wrangler.staging.generated.json"],{input:data.password,encoding:"utf8",stdio:["pipe","ignore","pipe"],env:process.env});
