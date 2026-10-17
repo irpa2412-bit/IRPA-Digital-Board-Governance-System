@@ -236,6 +236,7 @@ jobs:
             try { u = new URL(process.env.WP_BASE || ""); } catch { throw new Error("Staging WordPress base URL is invalid or missing."); }
             if (u.protocol !== "https:" || u.username || u.password || u.search || u.hash) throw new Error("Staging WordPress base URL must be a clean HTTPS origin/path.");
             console.log("STAGING_WORDPRESS_HOST=" + u.hostname);
+            console.log("STAGING_WORDPRESS_BASE_PATH=" + (u.pathname || "/"));
             try {
               const addresses = await dns.lookup(u.hostname, { all: true });
               console.log("STAGING_WORDPRESS_DNS=" + JSON.stringify(addresses.map(a => ({address:a.address,family:a.family}))));
@@ -249,6 +250,7 @@ jobs:
                 res.on("data", chunk => raw += chunk);
                 res.on("end", () => {
                   console.log("STAGING_WORDPRESS_HTTP=" + res.statusCode);
+                  console.log("STAGING_WORDPRESS_LOCATION=" + String(res.headers.location || "").slice(0,180));
                   console.log("STAGING_WORDPRESS_SERVER=" + String(res.headers.server || "").slice(0,80));
                   console.log("STAGING_WORDPRESS_CF_RAY=" + String(res.headers["cf-ray"] || "").slice(0,100));
                   const hint = raw.replace(/<[^>]*>/g," ").replace(/[\\r\\n\\t]+/g," ").replace(/\\s+/g," ").trim();
