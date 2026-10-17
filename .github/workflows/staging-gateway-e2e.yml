@@ -957,8 +957,8 @@ jobs:
         working-directory: drive-gateway
         run: |
           set -euo pipefail
-          if [ -z "$META_APP_ID" ] && [ -z "$META_APP_SECRET" ] && [ -z "$META_TOKEN_ENCRYPTION_KEY" ]; then
-            echo "META_OAUTH_CONFIGURED=false; no staging Meta values are configured; Meta endpoints remain disabled."
+          if [ -z "$META_APP_ID" ] || [ -z "$META_APP_SECRET" ] || [ -z "$META_TOKEN_ENCRYPTION_KEY" ]; then
+            echo "::warning::META_OAUTH_CONFIGURED=false; staging Meta configuration is incomplete. No Meta secrets were changed, Meta OAuth remains unavailable, and independent WordPress/cPanel acceptance will continue."
             exit 0
           fi
           node <<'NODE'
