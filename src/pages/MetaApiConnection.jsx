@@ -1,5 +1,5 @@
 import React,{useCallback,useEffect,useState} from "react";
-import {auth} from "../firebase/config";
+import {auth,firebaseConfig} from "../firebase/config";
 
 const GATEWAY_URL=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_STAGING_URL||"https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev").replace(/\/+$/,"");
 const panel={background:"var(--surface, #fff)",color:"var(--text-primary, #172033)",border:"1px solid var(--border-color, #d6dee8)",borderRadius:12,padding:14,minWidth:0};
@@ -10,6 +10,7 @@ function stagingGateway(){
  return url.toString().replace(/\/$/,"");
 }
 export default function MetaApiConnection(){
+ if(firebaseConfig.projectId!=="irpa-dbg-staging-a73ec")return null;
  const [status,setStatus]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const request=useCallback(async(path,method="GET")=>{
   const user=auth.currentUser;
@@ -53,7 +54,7 @@ export default function MetaApiConnection(){
   {error&&<p role="alert" style={{margin:0,color:"var(--danger, #b91c1c)"}}>{error}</p>}
   {notice&&<p role="status" style={{margin:0}}>{notice}</p>}
   <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-   <button type="button" disabled={busy} style={{...button,opacity:busy?.65:1}} onClick={connect}>{busy?"Connecting…":status?.connected?"Reconnect Meta account":"Connect Meta account"}</button>
+   <button type="button" disabled={busy} style={{...button,opacity:busy ? 0.65 : 1}} onClick={connect}>{busy?"Connecting…":status?.connected?"Reconnect Meta account":"Connect Meta account"}</button>
    <button type="button" disabled={busy} style={button} onClick={refresh}>Verify API access</button>
   </div>
   <small style={{opacity:.8}}>Tokens remain encrypted in the staging Worker KV store and are never returned to this page. This control is not a publishing approval.</small>
