@@ -1393,9 +1393,22 @@ jobs:
             const candidates=(listed.items||[]).filter(item=>String(item.title||"").startsWith("IRPA Staging Integration Check"));
             if(candidates.length!==1) throw new Error("A single pre-provisioned staging page titled IRPA Staging Integration Check is required.");
             const testPageId=Number(candidates[0].id);
-            const before=await call("/api/communications/website/content/pages/"+testPageId);
-            const original=before.item;
+            let before=await call("/api/communications/website/content/pages/"+testPageId);
+            let original=before.item;
             if(!original||original.type!=="pages"||!original.title||typeof original.content!=="string") throw new Error("The pre-provisioned staging test page could not be read.");
+            // Recover a leftover acceptance marker from an earlier timed-out run before treating this page as the baseline.
+            if(original.title.includes("IRPA_STAGING_WEBSITE_CHECK_")||original.content.includes("IRPA_STAGING_WEBSITE_CHECK_")){
+              const history=await call("/api/communications/website/revisions?type=pages&id="+testPageId);
+              const recent=(history.revisions||[]).filter(r=>r.source==="IRPA saved snapshot"&&r.snapshotId&&
+                !String(r.title||"").includes("IRPA_STAGING_WEBSITE_CHECK_")&&Date.now()-Date.parse(r.date||"")<10*60*1000)
+                .sort((a,b)=>Date.parse(b.date||"")-Date.parse(a.date||""));
+              if(recent.length) await call("/api/communications/website/restore",{method:"POST",body:JSON.stringify({type:"pages",id:testPageId,snapshotId:recent[0].snapshotId})});
+              else throw new Error("A prior timed-out acceptance left a marker, but no recent safe snapshot was available; refusing to overwrite the page.");
+              before=await call("/api/communications/website/content/pages/"+testPageId);
+              original=before.item;
+              if(!original||original.title.includes("IRPA_STAGING_WEBSITE_CHECK_")||original.content.includes("IRPA_STAGING_WEBSITE_CHECK_"))
+                throw new Error("Staging acceptance marker recovery did not restore a clean baseline.");
+            }
             console.log("STAGING_WORDPRESS_PAGE_READ_HTTP=200");
             let snapshotId="";
             try{
@@ -1419,6 +1432,29 @@ jobs:
             }finally{
               if(snapshotId){
                 await call("/api/communications/website/restore",{method:"POST",body:JSON.stringify({type:"pages",id:testPageId,snapshotId})});
+              }else{
+                // A request timeout can occur after WordPress has applied the edit but before the snapshot ID reaches this runner.
+                await new Promise(resolve=>setTimeout(resolve,1000));
+                let current=(await call("/api/communications/website/content/pages/"+testPageId)).item;
+                const matchesOriginal=()=>current&&current.title===original.title&&current.content===original.content&&
+                  current.excerpt===original.excerpt&&Number(current.featuredMedia||0)===Number(original.featuredMedia||0)&&current.status===original.status;
+                if(!matchesOriginal()){
+                  const history=await call("/api/communications/website/revisions?type=pages&id="+testPageId);
+                  const candidates=(history.revisions||[]).filter(r=>r.source==="IRPA saved snapshot"&&r.snapshotId&&
+                    r.title===original.title&&r.modified===original.modified)
+                    .sort((a,b)=>Date.parse(b.date||"")-Date.parse(a.date||""));
+                  if(candidates.length){
+                    await call("/api/communications/website/restore",{method:"POST",body:JSON.stringify({type:"pages",id:testPageId,snapshotId:candidates[0].snapshotId})});
+                  }else{
+                    const recovery=await call("/api/communications/website/content",{method:"PUT",body:JSON.stringify({
+                      type:"pages",id:testPageId,title:original.title,content:original.content,excerpt:original.excerpt||"",
+                      featuredMedia:Number(original.featuredMedia||0),status:original.status
+                    })});
+                    if(!recovery.success) throw new Error("Timed-out page edit could not be safely restored from its saved snapshot or original fields.");
+                  }
+                  current=(await call("/api/communications/website/content/pages/"+testPageId)).item;
+                  if(!matchesOriginal()) throw new Error("Timed-out page edit recovery failed exact field verification.");
+                }
               }
             }
             const cpanelPath=process.env.CP_TEST_FILE;
