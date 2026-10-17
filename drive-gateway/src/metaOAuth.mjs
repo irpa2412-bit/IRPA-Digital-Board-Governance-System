@@ -21,7 +21,7 @@ function isActive(record) {
 function safeConfig(env) {
   if (env?.IRPA_ENVIRONMENT !== "staging" ||
       env?.FIREBASE_PROJECT_ID !== STAGING_PROJECT ||
-      env?.IRPA_PRODUCTION_CUTOVER === "true") {
+      env?.IRPA_PRODUCTION_CUTOVER !== "false") {
     throw new Error("Meta integration is disabled unless the gateway is verified as isolated staging.");
   }
   const redirect = String(env.META_REDIRECT_URI || "");
