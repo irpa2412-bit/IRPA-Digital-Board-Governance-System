@@ -1141,7 +1141,7 @@ jobs:
             }
             const iniLines=userIni.split(/\\r?\\n/).filter(line=>!/^\\s*memory_limit\\s*=/i.test(line));
             const updatedIni=iniLines.filter((line,index)=>line.length||index<iniLines.length-1).concat("memory_limit=256M").join("\\n")+"\\n";
-            const memoryLimitConfigured=/^\\s*memory_limit\\s*=\\s*256M\\s*$/im.test(userIni);
+            const memoryLimitConfigured=/^\s*memory_limit\s*=\s*256M\s*$/im.test(userIni);
             if(!memoryLimitConfigured){
               if(!await writeFile(stage,".user.ini",updatedIni))throw new Error("Could not raise the staging-only PHP memory limit to 256M.");
               console.log("STAGING_PHP_MEMORY_LIMIT=256M");
@@ -1365,6 +1365,8 @@ jobs:
               const fatalToken=crypto.randomBytes(32).toString("hex");
               const fatalHash=crypto.createHash("sha256").update(fatalToken).digest("hex");
               const fatalPlugin="irpa-staging-fatal-"+crypto.randomBytes(6).toString("hex")+".php";
+              const fatalLogName="irpa-staging-fatal-"+crypto.randomBytes(6).toString("hex")+".log";
+              const fatalLogPath=stage+"/wp-content/"+fatalLogName;
               const fatalPhp=[
                 "<?php",
                 "$host=strtolower(preg_replace('/:\\\\d+$/','',(string)(\$_SERVER['HTTP_HOST']??'')));",
@@ -1373,7 +1375,8 @@ jobs:
                 "if(strpos($path,'/wp-json/wp/v2/')!==0) return;",
                 "$provided=(string)(\$_SERVER['HTTP_X_IRPA_STAGING_FATAL_TOKEN']??'');",
                 "if(!hash_equals('"+fatalHash+"',hash('sha256',$provided))) return;",
-                "register_shutdown_function(function(){ $e=error_get_last(); if(!$e||!in_array((int)$e['type'],[E_ERROR,E_PARSE,E_CORE_ERROR,E_COMPILE_ERROR,E_USER_ERROR],true)) return; $msg=(string)($e['message']??''); $msg=preg_replace('/(?:password|secret|token|authorization)\\\\s*[:=]\\\\s*[^,\\\\s;]+/i','credential=[redacted]',$msg); $msg=preg_replace('/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\\\.[A-Z]{2,}/i','[email]',$msg); error_log('[IRPA_STAGING_FATAL_DIAG] '.json_encode(['type'=>(int)$e['type'],'file'=>basename((string)($e['file']??'')),'line'=>(int)($e['line']??0),'message'=>substr($msg,0,240)])); });"
+                "$logPath='"+fatalLogPath+"';",
+                "register_shutdown_function(function() use ($logPath){ $e=error_get_last(); $msg=(string)($e['message']??'no-last-error'); $msg=preg_replace('/(?:password|secret|token|authorization)\\\\s*[:=]\\\\s*[^,\\\\s;]+/i','credential=[redacted]',$msg); $msg=preg_replace('/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\\\.[A-Z]{2,}/i','[email]',$msg); $payload=['type'=>(int)($e['type']??0),'file'=>basename((string)($e['file']??'')),'line'=>(int)($e['line']??0),'message'=>substr($msg,0,240)]; @file_put_contents($logPath,json_encode($payload).PHP_EOL,FILE_APPEND|LOCK_EX); });"
               ].join("\\n")+"\\n";
               if(!await writeFile(muDir,fatalPlugin,fatalPhp))throw new Error("Could not install the temporary staging fatal diagnostic.");
               try{
@@ -1381,6 +1384,14 @@ jobs:
               }finally{
                 if(!await writeFile(muDir,fatalPlugin,inert))throw new Error("Could not neutralize the temporary staging fatal diagnostic.");
               }
+              const fatalLog=await readFile(stage+"/wp-content",fatalLogName);
+              if(fatalLog.ok&&fatalLog.content){
+                const fatalLines=fatalLog.content.split(/\r?\n/).filter(Boolean).slice(-3).map(line=>{try{const d=JSON.parse(line);return {type:d.type,file:d.file,line:d.line,message:String(d.message||"").replace(/\/home\/[^/\s]+/g,"/home/[account]").replace(/(?:password|secret|token|authorization)\s*[:=]\s*[^,\s;]+/ig,"credential=[redacted]").replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/ig,"[email]").slice(0,240)}}catch{return {invalidDiagnosticLine:true}}});
+                console.log("STAGING_REST_FATAL_DIAGNOSTIC="+JSON.stringify(fatalLines));
+              }else{
+                console.log("STAGING_REST_FATAL_DIAGNOSTIC="+JSON.stringify({logCreated:false,logReadOk:fatalLog.ok}));
+              }
+              if(!await writeFile(stage+"/wp-content",fatalLogName,inert))throw new Error("Could not neutralize the temporary staging fatal diagnostic log.");
               if(!verified.ok&&verified.http===500){
                 const logDirs=[{label:"staging",dir:stage},{label:"webroot",dir:root},{label:"home-logs",dir:root.replace(/\/public_html$/,"")+"/logs"},{label:"wp-content",dir:stage+"/wp-content"}];
                 for(const entry of logDirs){
