@@ -39,7 +39,10 @@ workers_dev = true
 
 [env.staging.vars]
 IRPA_ENVIRONMENT = "staging"
-FIREBASE_PROJECT_ID = "irpa-digital-board-governance"
+FIREBASE_PROJECT_ID = "irpa-dbg-staging-a73ec"
+META_APP_ID = ""
+META_GRAPH_API_VERSION = "v26.0"
+META_REDIRECT_URI = "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev/api/communications/meta/callback"
 AUTHORIZED_DRIVE_EMAIL = "irpa2412@gmail.com"
 IRPA_APP_URL = "https://irpa-digital-board-governance.web.app"
 SMTP_HOST = "mail.irpa.or.tz"
