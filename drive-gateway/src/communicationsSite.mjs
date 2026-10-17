@@ -441,7 +441,20 @@ export function createCommunicationsSiteRouter(deps) {
         const cp = cpanelConfig(env);
         await cpanelCall(cp, "DomainInfo/list_domains");
         result.cpanel = "connected";
-      } catch (error) { result.cpanel = error.message.includes("not configured") ? "not_configured" : "unavailable_or_denied"; }
+      } catch (error) {
+        const message = String(error?.message || "");
+        result.cpanel = message.includes("not configured") ? "not_configured" : "unavailable_or_denied";
+        // Safe diagnostics only: never return hostnames, usernames, tokens, or raw UAPI errors.
+        result.cpanelDiagnostic = message.includes("endpoint configuration is invalid") ? "endpoint_invalid" :
+          message.includes("credentials are not configured") ? "credentials_missing" :
+          /category authentication_rejected/.test(message) ? "authentication_rejected" :
+          /category permission_denied/.test(message) ? "permission_denied" :
+          /category invalid_operation/.test(message) ? "invalid_operation" :
+          /category not_found/.test(message) ? "resource_not_found" :
+          /category uapi_error/.test(message) ? "uapi_error" :
+          /category/.test(message) ? "request_failed" :
+          message.includes("not configured") ? "configuration_missing" : "connection_failed";
+      }
       return json({ ok: true, connections: result, permissions: { websiteEditor: true, staticFileEditing: roles.some(r => REVIEW_ROLES.has(r)) } }, 200, corsHeaders(request));
     }
 
