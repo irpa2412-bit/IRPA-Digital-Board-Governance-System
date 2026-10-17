@@ -514,17 +514,36 @@ jobs:
           const https=require("node:https");
           require("node:dns").setDefaultResultOrder("ipv4first");
           const {URL,URLSearchParams}=require("node:url");
-          function request(url,method="GET",headers={},body){
+          function requestOnce(url,method="GET",headers={},body){
             return new Promise((resolve,reject)=>{
               const u=new URL(url);
               const req=https.request({protocol:u.protocol,hostname:u.hostname,port:u.port||443,family:4,path:u.pathname+u.search,method,headers,timeout:15000},res=>{
                 let raw="";res.setEncoding("utf8");res.on("data",c=>raw+=c);res.on("end",()=>{let data;try{data=JSON.parse(raw)}catch{}resolve({http:res.statusCode,data,raw})});
               });
-              req.on("timeout",()=>req.destroy(new Error("request timeout")));
+              req.on("timeout",()=>req.destroy(Object.assign(new Error("request timeout"),{code:"ETIMEDOUT"})));
               req.on("error",reject);
               if(body)req.write(body);
               req.end();
             });
+          }
+          async function request(url,method="GET",headers={},body){
+            const u=new URL(url);
+            const cpApi2=u.pathname==="/json-api/cpanel";
+            const cpFunc=u.searchParams.get("cpanel_jsonapi_func")||"";
+            const safeCpanelRead=cpApi2&&["fetchzone_records","fetchzones","fetchzone","list_domains","domains_data","list_files","get_file_content"].includes(cpFunc);
+            const safeUapiRead=u.pathname.startsWith("/execute/")&&/\/(DomainInfo\/(domains_data|list_domains)|Fileman\/(list_files|get_file_content))$/.test(u.pathname);
+            const retryable=method==="GET"&&(!cpApi2&&!u.pathname.startsWith("/execute/")||safeCpanelRead||safeUapiRead);
+            const attempts=retryable?3:1;
+            for(let attempt=1;;attempt++){
+              try{return await requestOnce(url,method,headers,body)}
+              catch(error){
+                const code=String(error.code||error.name||"");
+                const transient=["ETIMEDOUT","ECONNRESET","EHOSTUNREACH","ENETUNREACH","ECONNREFUSED","EAI_AGAIN","TimeoutError"].includes(code)||/timeout/i.test(String(error.message||""));
+                if(!retryable||!transient||attempt>=attempts)throw error;
+                console.log("TRANSIENT_READ_RETRY="+u.hostname+"_"+attempt);
+                await new Promise(resolve=>setTimeout(resolve,attempt*1500));
+              }
+            }
           }
           const cfHeaders=token=>({Authorization:"Bearer "+token,Accept:"application/json","Content-Type":"application/json"});
           async function remediateDns(){
@@ -1066,14 +1085,23 @@ jobs:
             try { addresses=(await dns.lookup(u.hostname,{all:true})).map(x=>x.address); }
             catch(e) { throw new Error("cPanel DNS lookup failed ("+(e.code||e.name)+") for "+u.hostname+"."); }
             console.log("CPANEL_DNS_RESOLVED="+addresses.length+" address(es)");
-            const result=await Promise.all(addresses.map(address=>new Promise(resolve=>{
-              const socket=net.connect({host:address,port:Number(u.port||443)});
-              let settled=false;
-              const done=v=>{if(!settled){settled=true;socket.destroy();resolve(v)}};
-              socket.setTimeout(8000,()=>done({address,result:"timeout"}));
-              socket.once("connect",()=>done({address,result:"connected"}));
-              socket.once("error",e=>done({address,result:e.code||e.name||"error"}));
-            })));
+            async function probe(address){
+              let last={address,result:"not-tested"};
+              for(let attempt=1;attempt<=3;attempt++){
+                last=await new Promise(resolve=>{
+                  const socket=net.connect({host:address,port:Number(u.port||443)});
+                  let settled=false;
+                  const done=v=>{if(!settled){settled=true;socket.destroy();resolve(v)}};
+                  socket.setTimeout(8000,()=>done({address,result:"timeout"}));
+                  socket.once("connect",()=>done({address,result:"connected"}));
+                  socket.once("error",e=>done({address,result:e.code||e.name||"error"}));
+                });
+                if(last.result==="connected"||last.result==="ENETUNREACH"||attempt===3)return last;
+                await new Promise(resolve=>setTimeout(resolve,attempt*1500));
+              }
+              return last;
+            }
+            const result=await Promise.all(addresses.map(probe));
             console.log("CPANEL_TCP_REACHABILITY="+JSON.stringify(result));
             if(!result.some(x=>x.result==="connected")) {
               throw new Error("Runner cannot establish TCP connectivity to the configured cPanel endpoint on port "+(u.port||443)+". Check hosting-provider IP allowlisting, firewall rules, routing, and endpoint availability.");
