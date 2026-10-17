@@ -288,6 +288,7 @@ jobs:
             "drive-gateway/wrangler.toml",
             "src/firebase/signatureStorage.js",
             "src/pages/CommunicationMediaStudio.jsx",
+            "drive-gateway/tests/staging-isolation.test.mjs",
             "tests/communication-media-policy.test.mjs"
           ]);
           const communicationMediaArchiveIntegration =
