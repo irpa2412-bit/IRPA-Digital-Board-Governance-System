@@ -1141,13 +1141,18 @@ jobs:
             }
             const iniLines=userIni.split(/\\r?\\n/).filter(line=>!/^\\s*memory_limit\\s*=/i.test(line));
             const updatedIni=iniLines.filter((line,index)=>line.length||index<iniLines.length-1).concat("memory_limit=256M").join("\\n")+"\\n";
-            if(!await writeFile(stage,".user.ini",updatedIni))throw new Error("Could not raise the staging-only PHP memory limit to 256M.");
-            console.log("STAGING_PHP_MEMORY_LIMIT=256M");
-            // PHP-FPM caches .user.ini for up to 300 seconds by default. Do not
-            // test the REST endpoint against a stale 128 MiB worker configuration.
-            console.log("STAGING_PHP_INI_CACHE_WAIT=STARTED");
-            await new Promise(resolve=>setTimeout(resolve,310000));
-            console.log("STAGING_PHP_INI_CACHE_WAIT=COMPLETED");
+            const memoryConfigChanged=userIni!==updatedIni;
+            if(memoryConfigChanged){
+              if(!await writeFile(stage,".user.ini",updatedIni))throw new Error("Could not raise the staging-only PHP memory limit to 256M.");
+              console.log("STAGING_PHP_MEMORY_LIMIT=256M");
+              // PHP-FPM caches .user.ini for up to 300 seconds by default. Wait only
+              // after changing the file; otherwise avoid needlessly resetting its cache.
+              console.log("STAGING_PHP_INI_CACHE_WAIT=STARTED");
+              await new Promise(resolve=>setTimeout(resolve,310000));
+              console.log("STAGING_PHP_INI_CACHE_WAIT=COMPLETED");
+            }else{
+              console.log("STAGING_PHP_MEMORY_LIMIT=ALREADY_CONFIGURED");
+            }
             async function list(dir){
               const r=await uapi("Fileman/list_files",{dir,showdotfiles:1});
               return {ok:r.http===200&&r.data?.status===1,files:Array.isArray(r.data?.data)?r.data.data.map(x=>String(x.file||x.name||"")).filter(Boolean):[]};
@@ -1237,7 +1242,7 @@ jobs:
             async function verifyAuth(){
               try{
                 const r=await request(new URL("/wp-json/wp/v2/users/me?context=edit",wpBase).href,"GET",{Authorization:basic,"X-IRPA-Staging-Authorization":basic,Accept:"application/json","Cache-Control":"no-cache"});
-                return {ok:r.http===200&&Number.isInteger(r.data?.id),http:r.http,errorCode:String(r.data?.code||"").slice(0,80)};
+                return {ok:r.http===200&&Number.isInteger(r.data?.id),http:r.http,errorCode:String(r.data?.code||"").slice(0,80),message:String(r.data?.message||"").replace(/\\/home\\/[^/\\s]+/g,"/home/[account]").replace(/(?:password|secret|token|authorization)\\s*[:=]\\s*[^,\\s;]+/ig,"credential=[redacted]").slice(0,180)};
               }catch(e){return {ok:false,http:0,error:String(e.code||e.name)}}
             }
             let verified=await verifyAuth();
@@ -1408,6 +1413,16 @@ jobs:
                 }
                 if(diagnosticError)console.log("STAGING_REST_AUTH_DIAGNOSTIC_ERROR="+String(diagnosticError.code||diagnosticError.name||"error"));
               }
+            }
+            if(!verified.ok){
+              const probes=[];
+              for(const path of ["/wp-json/","/wp-json/wp/v2/types","/wp-json/wp/v2/posts?per_page=1","/wp-json/wp/v2/users/me?context=edit"]){
+                try{
+                  const r=await request(new URL(path,wpBase).href,"GET",{Authorization:basic,"X-IRPA-Staging-Authorization":basic,Accept:"application/json","Cache-Control":"no-cache"});
+                  probes.push({path,http:r.http,code:String(r.data?.code||"").slice(0,80),message:String(r.data?.message||"").replace(/\\/home\\/[^/\\s]+/g,"/home/[account]").replace(/(?:password|secret|token|authorization)\\s*[:=]\\s*[^,\\s;]+/ig,"credential=[redacted]").slice(0,140)});
+                }catch(e){probes.push({path,error:String(e.code||e.name||"error")});}
+              }
+              console.log("STAGING_REST_ENDPOINT_DIAGNOSTICS="+JSON.stringify(probes));
             }
             console.log("STAGING_WORDPRESS_AUTH_AFTER_REPAIR="+JSON.stringify(verified));
             if(!verified.ok)throw new Error("WordPress REST authentication remains unavailable after the staging bootstrap repair.");
