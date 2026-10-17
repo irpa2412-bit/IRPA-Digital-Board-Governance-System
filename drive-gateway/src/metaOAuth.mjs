@@ -124,7 +124,7 @@ async function authorizeUser(request, env, deps, reviewer = false) {
   return claims;
 }
 async function requireReadOnlyScopes(version, token) {
-  const response = await graphJson(graphUrl(version, "me/permissions", { access_token: token }).toString());
+  const response = await graphJson(graphUrl(version, "me/permissions").toString(), { headers: { Authorization: "Bearer " + token } });
   const granted = new Set((Array.isArray(response.data) ? response.data : [])
     .filter(item => item?.status === "granted").map(item => String(item.permission || "")));
   const missing = REQUIRED_SCOPES.filter(scope => !granted.has(scope));
@@ -190,10 +190,10 @@ export function createMetaOAuthRouter(deps) {
         });
         const token = longToken.access_token || shortToken.access_token;
         await requireReadOnlyScopes(cfg.version, token);
-        const me = await graphJson(graphUrl(cfg.version, "me", { fields: "id,name", access_token: token }).toString());
+        const me = await graphJson(graphUrl(cfg.version, "me", { fields: "id,name" }).toString(), { headers: { Authorization: "Bearer " + token } });
         const pages = await graphJson(graphUrl(cfg.version, "me/accounts", {
-          fields: "id,name,instagram_business_account{id,username,account_type}", limit: 100, access_token: token
-        }).toString());
+          fields: "id,name,instagram_business_account{id,username,account_type}", limit: 100
+        }).toString(), { headers: { Authorization: "Bearer " + token } });
         const connection = {
           userId: String(me.id || ""), userName: String(me.name || "").slice(0, 180),
           accounts: publicAccounts(pages), connectedAt: new Date().toISOString(),
@@ -251,10 +251,10 @@ export function createMetaOAuthRouter(deps) {
       try {
         const connection = await decryptJson(env, encrypted);
         await requireReadOnlyScopes(cfg.version, connection.accessToken);
-        const me = await graphJson(graphUrl(cfg.version, "me", { fields: "id,name", access_token: connection.accessToken }).toString());
+        const me = await graphJson(graphUrl(cfg.version, "me", { fields: "id,name" }).toString(), { headers: { Authorization: "Bearer " + connection.accessToken } });
         const pages = await graphJson(graphUrl(cfg.version, "me/accounts", {
-          fields: "id,name,instagram_business_account{id,username,account_type}", limit: 100, access_token: connection.accessToken
-        }).toString());
+          fields: "id,name,instagram_business_account{id,username,account_type}", limit: 100
+        }).toString(), { headers: { Authorization: "Bearer " + connection.accessToken } });
         const accounts = publicAccounts(pages);
         return json({ ok: true, status: "verified", user: { id: String(me.id || ""), name: String(me.name || "").slice(0, 180) },
           facebookPages: accounts.map(({ facebookPageId, facebookPageName }) => ({ id: facebookPageId, name: facebookPageName })),
