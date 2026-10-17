@@ -501,14 +501,14 @@ service cloud.firestore {
         &&data.get("recordOrigin","")=="PRODUCTION"
         &&data.keys().hasOnly(["kind","title","summary","status","owner","startDate","dueDate","channels","audience","objective","budgetNote","contactName","organization","email","phone","beat","consent","assetType","assetUrl","rights","version","expiryDate","severity","lead","approver","trigger","holdingStatement","nextReview","channel","sourceUrl","observedDate","reach","engagement","sentiment","evidence","tags","createdByUid","createdByEmail","createdAt","updatedByUid","updatedAt","recordOrigin"]);
     }
-    allow read:if communicationMediaUser();
-    allow create:if communicationMediaUser()&&validOperationsRecord(request.resource.data)
+    allow read:if communicationMediaUser()&&(resource.data.get("kind","")!="Crisis Plan"||communicationMediaReviewer());
+    allow create:if communicationMediaUser()&&(request.resource.data.get("kind","")!="Crisis Plan"||communicationMediaReviewer())&&validOperationsRecord(request.resource.data)
       &&request.resource.data.get("createdByUid","")==request.auth.uid
       &&request.resource.data.get("updatedByUid","")==request.auth.uid
       &&request.resource.data.get("status","")=="Draft"
       &&request.resource.data.get("createdAt",null)==request.time
       &&request.resource.data.get("updatedAt",null)==request.time;
-    allow update:if communicationMediaUser()&&validOperationsRecord(request.resource.data)
+    allow update:if communicationMediaUser()&&(resource.data.get("kind","")!="Crisis Plan"||communicationMediaReviewer())&&validOperationsRecord(request.resource.data)
       &&request.resource.data.get("createdByUid","")==resource.data.get("createdByUid","")
       &&request.resource.data.get("createdAt",null)==resource.data.get("createdAt",null)
       &&request.resource.data.get("recordOrigin","")==resource.data.get("recordOrigin","")
@@ -525,8 +525,7 @@ service cloud.firestore {
           &&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["title","summary","owner","startDate","dueDate","channels","audience","objective","budgetNote","contactName","organization","email","phone","beat","consent","assetType","assetUrl","rights","version","expiryDate","severity","lead","approver","trigger","holdingStatement","nextReview","channel","sourceUrl","observedDate","reach","engagement","sentiment","evidence","tags","updatedByUid","updatedAt"]))
         ||(communicationMediaReviewer()
           &&resource.data.get("status","")!="Archived"
-          &&request.resource.data.get("status","") in ["Approved","Archived","Active","Under Review","Completed","Draft"]
-          &&request.resource.data.get("status","")!=resource.data.get("status","")
+          &&((resource.data.get("status","")=="Draft"&&request.resource.data.get("status","") in ["Under Review","Approved","Archived"])||(resource.data.get("status","")=="Under Review"&&request.resource.data.get("status","") in ["Draft","Approved","Archived"])||(resource.data.get("status","")=="Approved"&&request.resource.data.get("status","") in ["Active","Completed","Archived"])||(resource.data.get("status","")=="Active"&&request.resource.data.get("status","") in ["Completed","Archived"])||(resource.data.get("status","")=="Completed"&&request.resource.data.get("status","")=="Archived"))
           &&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","updatedByUid","updatedAt"]))
       );
     allow delete:if false;
