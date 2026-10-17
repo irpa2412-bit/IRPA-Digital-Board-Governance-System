@@ -1212,7 +1212,7 @@ jobs:
             const wpPassword=String(process.env.WP_PASSWORD||"").replace(/\s/g,"");
             const basic="Basic "+Buffer.from(process.env.WP_USER+":"+wpPassword).toString("base64");
             const usernameB64=Buffer.from(process.env.WP_USER,"utf8").toString("base64");
-            const integrationUser="irpa-staging-gateway-"+crypto.randomBytes(6).toString("hex");
+            const integrationUser="irpa-staging-gateway-"+crypto.createHash("sha256").update(String(process.env.WP_USER||"")).digest("hex").slice(0,12);
             const passwordHash=crypto.createHash("sha256").update(wpPassword).digest("hex");
             async function verifyAuth(){
               try{
@@ -1241,7 +1241,8 @@ jobs:
                 "  $integrationUser=trim((string)(\$_SERVER['HTTP_X_IRPA_STAGING_INTEGRATION_USER']??''));",
                 "  if(!preg_match('/^irpa-staging-gateway-[a-f0-9]{12}$/',$integrationUser)){http_response_code(400);echo json_encode(['ok'=>false,'reason'=>'invalid_integration_user']);exit;}",
                 "  $gateway=get_user_by('login',$integrationUser);",
-                "  if(!$gateway){$uid=wp_insert_user(['user_login'=>$integrationUser,'user_pass'=>wp_generate_password(48,true,true),'user_email'=>$integrationUser.'@staging.irpa.or.tz','display_name'=>'IRPA Staging Gateway','role'=>'editor']);if(is_wp_error($uid)){http_response_code(409);echo json_encode(['ok'=>false,'reason'=>'staging_integration_user_creation_failed']);exit;}$gateway=get_user_by('id',$uid);}",
+                "  if($gateway&&get_user_meta($gateway->ID,'_irpa_staging_gateway_managed',true)!=='v1'){http_response_code(409);echo json_encode(['ok'=>false,'reason'=>'staging_integration_user_conflict']);exit;}",
+                "  if(!$gateway){$uid=wp_insert_user(['user_login'=>$integrationUser,'user_pass'=>wp_generate_password(48,true,true),'user_email'=>$integrationUser.'@staging.irpa.or.tz','display_name'=>'IRPA Staging Gateway','role'=>'editor']);if(is_wp_error($uid)){http_response_code(409);echo json_encode(['ok'=>false,'reason'=>'staging_integration_user_creation_failed']);exit;}update_user_meta($uid,'_irpa_staging_gateway_managed','v1');$gateway=get_user_by('id',$uid);}",
                 "  if(!$gateway||!user_can($gateway,'edit_pages')||user_can($gateway,'manage_options')){http_response_code(409);echo json_encode(['ok'=>false,'reason'=>'staging_integration_user_permissions_invalid']);exit;}",
                 "  http_response_code(409);echo json_encode(['ok'=>false,'reason'=>'application_passwords_unavailable']);exit;",
                 "}",
@@ -1295,7 +1296,7 @@ jobs:
                   "$password=preg_replace('/\\\\s+/','',$password);",
                   "if(!hash_equals(base64_decode('"+usernameB64+"'),$username)||!hash_equals('"+passwordHash+"',hash('sha256',$password))) return 0;",
                   "$user=get_user_by('login','"+integrationUser+"');",
-                  "if(!$user||!user_can($user,'edit_pages')) return 0;",
+                  "if(!$user||get_user_meta($user->ID,'_irpa_staging_gateway_managed',true)!=='v1'||!user_can($user,'edit_pages')) return 0;",
                   "return (int)$user->ID;",
                   "}",
                   "}",
@@ -1334,6 +1335,20 @@ jobs:
                 if(!await writeFile(muDir,cachePlugin,inert))throw new Error("Could not neutralize the temporary staging OPcache plugin.");
               }
               verified=await verifyAuth();
+              if(!verified.ok&&verified.http===500){
+                const logDirs=[{label:"staging",dir:stage},{label:"webroot",dir:root},{label:"home-logs",dir:root.replace(/\/public_html$/,"")+"/logs"},{label:"wp-content",dir:stage+"/wp-content"}];
+                for(const entry of logDirs){
+                  try{
+                    const listing=await list(entry.dir);
+                    if(!listing.ok)continue;
+                    for(const name of listing.files.filter(n=>n==="error_log"||n==="debug.log"||/staging.*error.*log/i.test(n)).slice(0,3)){
+                      const log=await readFile(entry.dir,name);
+                      const lines=log.content.split(/\r?\n/).filter(line=>/fatal error|uncaught|parse error|irpa-staging-rest-auth|undefined function|critical error/i.test(line)).slice(-8).map(line=>line.replace(/\/home\/[^/\s]+/g,"/home/[account]").replace(/(?:password|secret|token|authorization)\s*[:=]\s*[^,\s;]+/ig,"credential=[redacted]").replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/ig,"[email]").slice(0,200));
+                      console.log("STAGING_WORDPRESS_FATAL_LOG="+JSON.stringify({location:entry.label,file:name,count:lines.length,lines}));
+                    }
+                  }catch{}
+                }
+              }
               if(!verified.ok&&appPasswordsUnavailable){
                 // Read-only diagnostic through a token-guarded temporary index.php, reporting booleans only; always restore the exact original bytes.
                 const diagOriginal=await readFile(stage,"index.php");
