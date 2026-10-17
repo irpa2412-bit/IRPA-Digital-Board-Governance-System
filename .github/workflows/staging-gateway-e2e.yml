@@ -339,6 +339,7 @@ jobs:
         run: |
           set -euo pipefail
           node <<'NODE'
+          require("node:dns").setDefaultResultOrder("ipv4first");
           async function main(){
             let root=process.env.CP_ROOT.trim().replace(/^\/+|\/+$/g,"");
             const homePrefix="home/"+process.env.CP_USER+"/";
