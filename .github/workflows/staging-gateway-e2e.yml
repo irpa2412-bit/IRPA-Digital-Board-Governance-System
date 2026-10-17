@@ -325,50 +325,41 @@ jobs:
           set -euo pipefail
           node <<'NODE'
           const https=require("node:https");
+          const dns=require("node:dns").promises;
           const {URL,URLSearchParams}=require("node:url");
           function request(url,headers={}) {
             return new Promise((resolve,reject)=>{
               const req=https.request(url,{headers,timeout:10000},res=>{
-                let raw="";res.setEncoding("utf8");res.on("data",c=>raw+=c);res.on("end",()=>{
-                  let data;try{data=JSON.parse(raw)}catch{}
-                  resolve({http:res.statusCode,data,raw});
-                });
+                let raw="";res.setEncoding("utf8");res.on("data",c=>raw+=c);res.on("end",()=>{let data;try{data=JSON.parse(raw)}catch{}resolve({http:res.statusCode,data,raw})});
               });
               req.on("timeout",()=>req.destroy(new Error("Read-only DNS/cPanel inspection timed out.")));
               req.on("error",reject);req.end();
             });
           }
           function cp(path,params={}) {
-            const u=new URL(process.env.CP_BASE);
-            u.pathname="/execute/"+path;u.search=new URLSearchParams(params).toString();
+            const u=new URL(process.env.CP_BASE);u.pathname="/execute/"+path;u.search=new URLSearchParams(params).toString();
             return request(u,{Authorization:"cpanel "+process.env.CP_USER+":"+process.env.CP_TOKEN,Accept:"application/json"});
           }
           (async()=>{
-            const z=await request("https://api.cloudflare.com/client/v4/zones?name=irpa.or.tz&per_page=20",{Authorization:"Bearer "+process.env.CLOUDFLARE_API_TOKEN,Accept:"application/json"});
-            console.log("CF_ZONE_LOOKUP_HTTP="+z.http);
-            console.log("CF_ZONE_LOOKUP_SUCCESS="+String(z.data?.success));
-            const zone=(z.data?.result||[]).find(x=>x.name==="irpa.or.tz");
-            if(zone){
-              console.log("CF_IRPA_ZONE="+JSON.stringify({id:zone.id,name:zone.name,status:zone.status}));
-              const d=await request("https://api.cloudflare.com/client/v4/zones/"+encodeURIComponent(zone.id)+"/dns_records?name=staging.irpa.or.tz&per_page=100",{Authorization:"Bearer "+process.env.CLOUDFLARE_API_TOKEN,Accept:"application/json"});
-              console.log("CF_STAGING_DNS_HTTP="+d.http);
-              console.log("CF_STAGING_DNS_SUCCESS="+String(d.data?.success));
-              console.log("CF_STAGING_DNS_RECORDS="+JSON.stringify((d.data?.result||[]).map(x=>({type:x.type,name:x.name,content:x.type==="A"||x.type==="AAAA"?x.content:"(target hidden)",proxied:x.proxied,ttl:x.ttl}))));
-              if(!d.data?.success)console.log("CF_STAGING_DNS_ERRORS="+JSON.stringify((d.data?.errors||[]).map(x=>({code:x.code,message:String(x.message||"").slice(0,160)}))));
-            } else {
-              console.log("CF_IRPA_ZONE_NOT_FOUND_OR_NOT_AUTHORIZED");
-              console.log("CF_ZONE_ERRORS="+JSON.stringify((z.data?.errors||[]).map(x=>({code:x.code,message:String(x.message||"").slice(0,160)}))));
-            }
+            const cpHost=new URL(process.env.CP_BASE).hostname;
+            try{console.log("CPANEL_HOST_DNS="+JSON.stringify((await dns.lookup(cpHost,{all:true})).map(x=>({address:x.address,family:x.family}))));}
+            catch(e){console.log("CPANEL_HOST_DNS_ERROR="+String(e.code||e.name))}
+            const z=await request("https://api.cloudflare.com/client/v4/zones?per_page=100",{Authorization:"Bearer "+process.env.CLOUDFLARE_API_TOKEN,Accept:"application/json"});
+            console.log("CF_ZONES_HTTP="+z.http);
+            console.log("CF_ZONES_SUCCESS="+String(z.data?.success));
+            console.log("CF_ZONE_NAMES="+JSON.stringify((z.data?.result||[]).map(x=>({name:x.name,status:x.status,id:x.id}))));
+            console.log("CF_ZONE_ERRORS="+JSON.stringify((z.data?.errors||[]).map(x=>({code:x.code,message:String(x.message||"").slice(0,160)}))));
             const dom=await cp("DomainInfo/domains_data");
             const main=dom.data?.data?.main_domain||{};
             const docroot=String(main.documentroot||main.document_root||"");
             console.log("CPANEL_MAIN_DOMAIN="+String(main.domain||main.domain_name||""));
             console.log("CPANEL_MAIN_DOCROOT="+docroot.slice(0,240));
-            const candidates=[docroot,docroot.replace(/\/+$/,"")+"/wp268",docroot.replace(/\/+$/,"")+"/stage268"].filter(Boolean);
-            for(const dir of candidates){
-              const r=await cp("Fileman/list_files",{dir,showdotfiles:0});
-              const entries=Array.isArray(r.data?.data)?r.data.data:[];
-              console.log("CPANEL_DIR_CHECK="+JSON.stringify({dir:dir.replace(/\/home\/[^/]+/,"/home/[account]"),http:r.http,status:r.data?.status,entries:entries.filter(x=>/wp268|stage268|wp-config\.php|index\.php/i.test(String(x.file||x.name||""))).map(x=>({name:x.file||x.name,type:x.type||x.filetype})).slice(0,20),errors:(r.data?.errors||[]).map(x=>String(x).slice(0,120))}));
+            const r=await cp("Fileman/list_files",{dir:docroot,showdotfiles:0});
+            const entries=Array.isArray(r.data?.data)?r.data.data:[];
+            console.log("CPANEL_PUBLIC_HTML_ENTRIES="+JSON.stringify(entries.map(x=>({name:x.file||x.name,type:x.type||x.filetype})).filter(x=>x.name).slice(0,120)));
+            for(const dir of [docroot+"/wp268",docroot+"/stage268"]){
+              const q=await cp("Fileman/list_files",{dir,showdotfiles:0});
+              console.log("CPANEL_DIR_CHECK="+JSON.stringify({dir:dir.replace(/\/home\/[^/]+/,"/home/[account]"),http:q.http,status:q.data?.status,errors:(q.data?.errors||[]).map(x=>String(x).slice(0,120))}));
             }
           })().catch(e=>{console.error(e.message);process.exit(1)});
           NODE
