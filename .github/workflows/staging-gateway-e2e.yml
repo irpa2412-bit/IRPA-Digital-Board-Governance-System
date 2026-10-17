@@ -445,7 +445,9 @@ jobs:
             const listing=await uapi("Fileman/list_files",{dir:stage,showdotfiles:1});
             const rows=Array.isArray(listing.data?.data)?listing.data.data:[];
             const cfg=rows.find(x=>String(x.file||x.name||"")==="wp-config.php");
-            if(listing.http!==200||listing.data?.status!==1||!cfg||String(cfg.type||"")!=="file"||(Number(cfg.permissions)&61440)!==32768)throw new Error("ABORT: staging wp-config.php is missing or is not a regular isolated file.");
+            const permissionText=String(cfg?.permissions||"");
+  const safePermissionMode=/^(?:0?[0-7]{3})$/.test(permissionText)||(Number.isFinite(Number(cfg?.permissions))&&(Number(cfg.permissions)&61440)===32768);
+  if(listing.http!==200||listing.data?.status!==1||!cfg||String(cfg.type||"")!=="file"||!safePermissionMode)throw new Error("ABORT: staging wp-config.php is missing or is not a regular isolated file.");
             const original=await readFile(stage,"wp-config.php");
             if(!original.ok||!original.content.includes("<?php"))throw new Error("Could not safely read staging wp-config.php.");
             const target="https://staging.irpa.or.tz";
