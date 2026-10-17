@@ -38,6 +38,9 @@ function safeConfig(env) {
   if (!String(env.META_TOKEN_ENCRYPTION_KEY || "").trim()) {
     throw new Error("Meta token encryption is not configured.");
   }
+  if (base64Bytes(env.META_TOKEN_ENCRYPTION_KEY).byteLength !== 32) {
+    throw new Error("Meta token encryption key must decode to 32 bytes.");
+  }
   return { redirect, version, appId: String(env.META_APP_ID).trim(), appSecret: String(env.META_APP_SECRET) };
 }
 function base64Bytes(value) {
@@ -173,19 +176,18 @@ export function createMetaOAuthRouter(deps) {
         return jsonError(json, corsHeaders, request, 400, "Meta authorization state expired.");
       }
       try {
-        const tokenUrl = new URL("https://graph.facebook.com/" + cfg.version + "/oauth/access_token");
-        tokenUrl.search = new URLSearchParams({
-          client_id: cfg.appId, client_secret: cfg.appSecret, redirect_uri: cfg.redirect,
-          code
-        }).toString();
-        const shortToken = await graphJson(tokenUrl.toString());
+        const tokenUrl = "https://graph.facebook.com/" + cfg.version + "/oauth/access_token";
+        const shortToken = await graphJson(tokenUrl, {
+          method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({ client_id: cfg.appId, client_secret: cfg.appSecret, redirect_uri: cfg.redirect, code }).toString()
+        });
         if (!shortToken.access_token) throw new Error("Meta did not return an access token.");
-        const longUrl = new URL("https://graph.facebook.com/" + cfg.version + "/oauth/access_token");
-        longUrl.search = new URLSearchParams({
-          grant_type: "fb_exchange_token", client_id: cfg.appId, client_secret: cfg.appSecret,
-          fb_exchange_token: shortToken.access_token
-        }).toString();
-        const longToken = await graphJson(longUrl.toString());
+        const longUrl = "https://graph.facebook.com/" + cfg.version + "/oauth/access_token";
+        const longToken = await graphJson(longUrl, {
+          method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({ grant_type: "fb_exchange_token", client_id: cfg.appId,
+            client_secret: cfg.appSecret, fb_exchange_token: shortToken.access_token }).toString()
+        });
         const token = longToken.access_token || shortToken.access_token;
         await requireReadOnlyScopes(cfg.version, token);
         const me = await graphJson(graphUrl(cfg.version, "me", { fields: "id,name", access_token: token }).toString());
