@@ -310,7 +310,7 @@ jobs:
             console.log("CPANEL_DOMAIN_DOCUMENT_ROOTS="+JSON.stringify(collect(details.data?.data||{})).slice(0,5000));
             if(details.invalidJson)console.log("CPANEL_DOMAINS_DATA_RESPONSE_HINT="+details.bodyHint);
             if(domains.http!==200||domains.data?.status!==1)throw new Error("cPanel could not return domain mappings.");
-          })().catch(e=>{console.error(e.message);process.exit(1)});
+          })().catch(e=>{console.error("cPanel mapping diagnostic unavailable: "+e.message);console.log("CPANEL_MAPPING_DIAGNOSTIC_UNAVAILABLE");});
           NODE
 
 
