@@ -148,4 +148,7 @@ test("communications operations registers provide campaigns, media contacts, bra
  assert.ok(rules.includes('allow update,delete:if false;'));
  assert.ok(rules.includes('"Crisis Plan"'));
  assert.ok(rules.includes('request.resource.data.get("actorUid","")==request.auth.uid'));
+ assert.ok(rules.includes('function communicationMediaUser(){return admin()||anyInstitutionalRole(["Communication & Media"'));
+ assert.ok(rules.includes('resource.data.get("status","")=="Draft"&&request.resource.data.get("status","") in ["Under Review","Approved","Archived"]'));
+ assert.ok(rules.includes('resource.data.get("status","")=="Completed"&&request.resource.data.get("status","")=="Archived"'));
 });
