@@ -39,7 +39,7 @@ test("Meta connect route is staging-only and requests read-only permissions",asy
 test("Meta integration refuses production environment and production callback host",async()=>{
  const {router,env}=harness({envOverrides:{IRPA_ENVIRONMENT:"production"}});
  const response=await router(new Request("https://gateway.example/api/communications/meta/connect",{method:"POST"}),env);
- assert.equal(response.status,503);
+ assert.equal(response.status,403);
  const bad=harness({envOverrides:{META_REDIRECT_URI:"https://irpa.or.tz/api/communications/meta/callback"}});
  const badResponse=await bad.router(new Request("https://gateway.example/api/communications/meta/connect",{method:"POST"}),bad.env);
  assert.equal(badResponse.status,503);
