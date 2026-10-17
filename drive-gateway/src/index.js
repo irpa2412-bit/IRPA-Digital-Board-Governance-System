@@ -86,6 +86,7 @@ async function verifyGatewaySigningAuthority(env,user,manualAuthorityIdentificat
     const active=String(record.status||record.employmentStatus||"Active").trim().toLowerCase()!=="inactive";
     const candidates=[record.role,record.boardPosition,record.designation,record.jobTitle,record.position,record.title,record.authorityRole,record.unit,record.unitName].map(normalizeGatewayAuthority).filter(Boolean);
     return active&&candidates.includes(input);
+  };
   let match=records.find(matchesAuthority);
   if(!match&&user.email){
     let memberRows=[],employeeRows=[];
@@ -103,6 +104,9 @@ async function verifyGatewaySigningAuthority(env,user,manualAuthorityIdentificat
     authoritySourceCollection:match.sourceCollection,
     authoritySourceRecordId:match.id,
     verificationMethod:"Authenticated Gateway Member/Employee Register Match"
+  };
+}
+
 const communicationsSiteRouter = createCommunicationsSiteRouter({
   getFirestoreDocument,
   getInstitutionalProfileForUser,
