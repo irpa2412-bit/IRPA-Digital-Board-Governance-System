@@ -12,6 +12,20 @@ An integrated communications workspace inside the existing IRPA Digital Board Go
 - Media uploads and archive through the existing authenticated Google Drive gateway. Firebase Storage remains deny-by-default.
 - Media library, authenticated download, image editing/export, audio/video preview and browser-native trim/export, within the existing gateway's file-size and format limits.
 
+## Communications operations registers
+
+The Communications Operations workspace is available alongside the editorial workspace. It provides structured registers for:
+
+- **Campaigns:** owner, dates, channels, target audience, objective and optional budget reference.
+- **Media contacts:** journalist/contact details, organization, coverage beat and contact permission/basis. Store only professional contact details needed for legitimate communications.
+- **Brand register:** approved asset links, custodian, version, attribution/usage rights and review date. Asset binaries remain on the existing authenticated Google Drive pathway; no new storage provider is introduced.
+- **Crisis response:** severity, response lead, approving authority, activation trigger, draft holding statement and next review date. Do not store credentials, security secrets or unnecessary sensitive personal data.
+- **Media coverage and metrics:** source URL, observation date, sourced reach/engagement, assessment and supporting evidence. These are manual records, not claims of automatic social-platform analytics.
+
+Records are retained and archived rather than hard-deleted. Operations changes are committed together with an audit event using a Firestore batch. The dedicated `communicationOperations` collection has an explicit field allowlist and role-scoped create/read/update rules; `communicationOperationsAudit` is reviewer-readable and immutable after creation. A browser success message is shown only after the batch commits. If the batch fails, the interface reports failure and does not claim that the record or audit entry was saved.
+
+The workspace intentionally does not auto-publish social posts, send messages to media contacts, infer analytics, or trigger crisis communications. Those integrations require separate authorized design and acceptance. It is intended to be usable for planning and record keeping while website integration is pending.
+
 ## Website and cPanel access
 
 WordPress page/post editing uses a dedicated WordPress account whose role is exactly `Editor`, with an application password and only the permissions needed to edit pages/posts. The Worker checks `/users/me` and refuses an account carrying the `administrator` role. Never use a personal or main administrator account/password. Editing is enabled only in the staging Worker against `https://staging.irpa.or.tz`; the production hostname, including a `/staging` path on that hostname, is rejected.
