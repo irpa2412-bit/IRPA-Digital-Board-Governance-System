@@ -2204,7 +2204,7 @@ async function getFirestoreAdminAccessToken(env) {
 async function commitFirestoreDocumentAndAudit(env, documentId, _firebaseToken, documentFields, documentMask, auditFields, {createOnly=false}={}) {
   const firebaseToken = await getFirestoreAdminAccessToken(env);
   const base=`projects/${getFirebaseProjectId(env)}/databases/(default)/documents`;
-  const auditId=`${documentId}-${Date.now()}-${crypto.randomUUID().slice(0,8)}`;
+  const auditId=`${Date.now()}-${crypto.randomUUID()}`;
   const documentWrite={
     update:{name:`${base}/${documentId}`,fields:documentFields},
     updateMask:{fieldPaths:documentMask}
