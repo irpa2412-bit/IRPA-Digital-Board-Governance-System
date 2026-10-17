@@ -688,8 +688,21 @@ jobs:
             const subdomains=await api2("SubDomain","listsubdomains",{regex:"staging"});
             const found=subdomains.rows.find(x=>x.domain==="staging.irpa.or.tz"||x.fullsubdomain==="staging.irpa.or.tz");
             if(found){
-              const changed=await uapi("SubDomain/changedocroot",{subdomain:"staging",rootdomain:"irpa.or.tz",dir:"/public_html/staging"});
-              if(changed.http!==200||changed.data?.status!==1||changed.data?.result?.result===0){console.log("CPANEL_SUBDOMAIN_MAPPING=FAILED_CHANGE_DOCROOT");return false}
+              const existingRoot=String(found.dir||found.reldir||found.basedir||"");
+              if(existingRoot.endsWith("/public_html/staging")||existingRoot.endsWith("public_html/staging")||existingRoot==="home:public_html/staging"){
+                console.log("CPANEL_SUBDOMAIN_MAPPING=ALREADY_CORRECT");
+              }else{
+                let changed=await uapi("SubDomain/changedocroot",{subdomain:"staging",rootdomain:"irpa.or.tz",dir:"/public_html/staging"});
+                let changedOk=changed.http===200&&(changed.data?.status===1||changed.data?.result?.status===1)&&changed.data?.result?.result!==0;
+                if(!changedOk){
+                  const api2Changed=await api2("SubDomain","changedocroot",{subdomain:"staging",rootdomain:"irpa.or.tz",dir:"/public_html/staging"});
+                  changedOk=api2Changed.ok;
+                  console.log("CPANEL_SUBDOMAIN_MAPPING_CHANGE_HTTP="+changed.http);
+                  console.log("CPANEL_SUBDOMAIN_MAPPING_CHANGE_STATUS="+String(changed.data?.status??changed.data?.result?.status));
+                  console.log("CPANEL_SUBDOMAIN_MAPPING_CHANGE_ERRORS="+JSON.stringify((changed.data?.errors||changed.data?.result?.errors||[]).map(x=>String(x).slice(0,120))));
+                }
+                if(!changedOk){console.log("CPANEL_SUBDOMAIN_MAPPING=FAILED_CHANGE_DOCROOT");return false}
+              }
             }else{
               const added=await uapi("SubDomain/addsubdomain",{domain:"staging",rootdomain:"irpa.or.tz",dir:"/public_html/staging"});
               if(added.http!==200||added.data?.status!==1||added.data?.result?.result===0){console.log("CPANEL_SUBDOMAIN_MAPPING=FAILED_ADD");return false}
@@ -758,7 +771,7 @@ jobs:
             }
             const info=await cp("DomainInfo/domains_data");
             const parsed=JSON.parse(info.raw||"{}");
-            const data=parsed.data?.data||parsed.result?.data||{};
+            const data=parsed.data||parsed.result?.data||{};
             const main=data.main_domain||{};
             const root=String(main.documentroot||main.document_root||"");
             console.log("POST_REMEDIATION_CPANEL_ROOT="+(root?root.replace(/\/home\/[^/]+/,"/home/[account]"):"unresolved"));
@@ -767,7 +780,7 @@ jobs:
               try{
                 const listing=await cp("Fileman/list_files",{dir,showdotfiles:1});
                 const obj=JSON.parse(listing.raw||"{}");
-                const files=Array.isArray(obj.data?.data)?obj.data.data:Array.isArray(obj.result?.data)?obj.result.data:[];
+                const files=Array.isArray(obj.data)?obj.data:Array.isArray(obj.result?.data)?obj.result.data:[];
                 const names=files.map(x=>String(x.file||x.name||""));
                 console.log("POST_REMEDIATION_DIR="+JSON.stringify({dir:dir.replace(/\/home\/[^/]+/,"/home/[account]"),status:obj.data?.status??obj.result?.status,wordpress:["wp-admin","wp-content","wp-includes","wp-config.php","index.php"].every(x=>names.includes(x)),names:names.filter(x=>["error_log",".htaccess","wp-config.php","index.php","wp-admin","wp-content","wp-includes"].includes(x)).slice(0,20)}));
                 if(names.includes("error_log")){
