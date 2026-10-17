@@ -253,7 +253,6 @@ export function createMetaSocialApiRouter(deps) {
       authorizeUrl.searchParams.set("state", state);
       authorizeUrl.searchParams.set("response_type", "code");
       authorizeUrl.searchParams.set("scope", REQUIRED_PERMISSIONS.join(","));
-      authorizeUrl.searchParams.set("auth_type", "rerequest");
       return json({ authorizationUrl: authorizeUrl.toString(), expiresInSeconds: 600, requestedPermissions: REQUIRED_PERMISSIONS, postingEnabled: false }, 200, corsHeaders(request));
     }
 
@@ -261,7 +260,7 @@ export function createMetaSocialApiRouter(deps) {
       try { return await status(request, env); }
       catch (error) {
         const message = String(error?.message || "");
-        const code = /authentication|token/i.test(message) ? 401 : /role does not permit|authorised|authorized|active IRPA role/i.test(message) ? 403 : /not configured|configuration|unavailable/i.test(message) ? 503 : 502;
+        const code = /authentication|token/i.test(message) ? 401 : /role does not permit|authorised|authorized|active IRPA role|outside the staging gateway/i.test(message) ? 403 : /not configured|configuration|unavailable/i.test(message) ? 503 : 502;
         return json({ error: message || "Meta connection verification failed.", postingEnabled: false }, code, corsHeaders(request));
       }
     }
@@ -273,7 +272,7 @@ export function createMetaSocialApiRouter(deps) {
     catch (error) {
       const message = String(error?.message || "");
       const status = /authentication|token/i.test(message) ? 401 :
-        /role does not permit|authorised|authorized|active IRPA role/i.test(message) ? 403 :
+        /role does not permit|authorised|authorized|active IRPA role|outside the staging gateway/i.test(message) ? 403 :
         /not configured|configuration|unavailable/i.test(message) ? 503 : 502;
       return json({ error: message || "Meta API request failed.", postingEnabled: false }, status, corsHeaders(request));
     }
