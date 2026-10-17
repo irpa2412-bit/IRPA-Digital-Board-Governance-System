@@ -9,6 +9,7 @@ const rules=readFileSync(new URL("../firestore.rules",import.meta.url),"utf8");
 const fn=readFileSync(new URL("../functions/communicationMedia.js",import.meta.url),"utf8");
 const index=readFileSync(new URL("../functions/index.js",import.meta.url),"utf8");
 const gateway=readFileSync(new URL("../drive-gateway/src/index.js",import.meta.url),"utf8");
+const wrangler=readFileSync(new URL("../drive-gateway/wrangler.toml",import.meta.url),"utf8");
 
 test("communications portal is integrated into the existing shell and role-based navigation",()=>{
  assert.ok(app.includes('import CommunicationMediaPortal from "./pages/CommunicationMediaPortal"'));
@@ -60,6 +61,15 @@ test("media asset register is authenticated, size-limited, immutable and deny-by
  assert.ok(rules.includes('request.resource.data.get("fileSize",0)<=26214400'));
  assert.ok(rules.includes('request.resource.data.get("storageProvider","")=="Google Drive"'));
  assert.ok(rules.includes('allow update,delete:if false;'));
+});
+
+test("staging gateway is isolated from production Firebase, app URL and Drive archive root",()=>{
+ const staging=wrangler.slice(wrangler.indexOf("[env.staging.vars]"));
+ assert.ok(staging.includes('FIREBASE_PROJECT_ID = "irpa-dbg-staging-a73ec"'));
+ assert.ok(staging.includes('IRPA_APP_URL = "https://irpa-dbg-staging-a73ec.web.app"'));
+ assert.ok(staging.includes('DRIVE_ROOT_FOLDER_NAME = "IRPA Governance System - STAGING"'));
+ assert.ok(gateway.includes("function getDriveRootFolderName(env)"));
+ assert.ok(gateway.includes('env?.IRPA_ENVIRONMENT === "staging" ? "IRPA Governance System - STAGING"'));
 });
 
 test("Communication and Media Archive is provisioned and verified before media upload",()=>{
