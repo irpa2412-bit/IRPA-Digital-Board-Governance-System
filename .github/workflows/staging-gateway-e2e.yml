@@ -1178,6 +1178,36 @@ jobs:
               if(!await writeFile(stage,name,inert))throw new Error("Could not neutralize a leftover one-time staging provisioning script.");
             }
             console.log("STAGING_LEFTOVER_SCRIPT_NEUTRALIZATION=PASS count="+oldScripts.length);
+            // The current staging index.php is a custom 404 JSON handler and does not bootstrap WordPress. Preserve it outside the web root, then restore the standard WordPress front controller.
+            const originalIndex=await readFile(stage,"index.php");
+            if(!originalIndex.ok||!originalIndex.content.startsWith("<?php"))throw new Error("Could not read staging index.php before front-controller repair.");
+            const standardIndex=String.raw`<?php
+/**
+ * Front to the WordPress application.
+ *
+ * @package WordPress
+ */
+define( 'WP_USE_THEMES', true );
+require __DIR__ . '/wp-blog-header.php';
+`;
+            const needsFrontController=!/require[^;]*wp-blog-header\.php/i.test(originalIndex.content)||/["']ok["']\s*:\s*false/.test(originalIndex.content);
+            if(needsFrontController){
+              const homeDir=root.replace(/\/public_html$/,"");
+              if(!homeDir||homeDir===root)throw new Error("Could not derive a safe backup directory outside the staging web root.");
+              const backupName="irpa-staging-index-backup-"+crypto.randomBytes(10).toString("hex")+".txt";
+              if(!await writeFile(homeDir,backupName,originalIndex.content))throw new Error("Could not verify the original staging index.php backup outside the web root.");
+              if(!await writeFile(stage,"index.php",standardIndex)){
+                const restored=await writeFile(stage,"index.php",originalIndex.content);
+                throw new Error(restored?"Standard WordPress front-controller write failed; original index.php was restored.":"CRITICAL: WordPress front-controller write failed and original index.php could not be restored.");
+              }
+              const savedIndex=await readFile(stage,"index.php");
+              if(!savedIndex.ok||savedIndex.content!==standardIndex)throw new Error("Staging WordPress front-controller did not verify byte-for-byte.");
+              console.log("STAGING_WORDPRESS_FRONT_CONTROLLER_REPAIR=VERIFIED backup=outside-webroot");
+            }
+            const routeCheck=await request(new URL("/wp-json/",wpBase).href,"GET",{Accept:"application/json","Cache-Control":"no-cache"});
+            let routeData=routeCheck.data;
+            if(routeCheck.http!==200||!routeData||!Array.isArray(routeData.namespaces))throw new Error("WordPress REST routing is still unavailable after front-controller repair; HTTP="+routeCheck.http);
+            console.log("STAGING_WORDPRESS_REST_ROUTE=PASS namespaces="+routeData.namespaces.length);
             const wpPassword=String(process.env.WP_PASSWORD||"").replace(/\s/g,"");
             const basic="Basic "+Buffer.from(process.env.WP_USER+":"+wpPassword).toString("base64");
             const usernameB64=Buffer.from(process.env.WP_USER,"utf8").toString("base64");
