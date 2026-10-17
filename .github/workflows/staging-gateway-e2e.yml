@@ -1305,6 +1305,34 @@ jobs:
                 if(!await writeFile(muDir,"irpa-staging-rest-auth.php",shim))throw new Error("Could not install and verify the staging-only WordPress REST authentication adapter.");
                 console.log("STAGING_REST_AUTH_SHIM_INSTALL=VERIFIED");
               }
+              // A prior guarded index.php bootstrap may remain in PHP OPcache even after its original bytes are restored.
+              // Invalidate only the staging WordPress front controller via a temporary MU-plugin; never rewrite index.php.
+              const cacheToken=crypto.randomBytes(32).toString("hex");
+              const cacheHash=crypto.createHash("sha256").update(cacheToken).digest("hex");
+              const cachePlugin="irpa-staging-opcache-"+crypto.randomBytes(6).toString("hex")+".php";
+              const cachePhp=[
+                "<?php",
+                "$path=(string)(parse_url((string)(\$_SERVER['REQUEST_URI']??''),PHP_URL_PATH)?:'');",
+                "if($path!=='/wp-admin/'&&$path!=='/wp-admin/index.php') return;",
+                "$host=strtolower(preg_replace('/:\\d+$/','',(string)(\$_SERVER['HTTP_HOST']??'')));",
+                "if($host!=='staging.irpa.or.tz') return;",
+                "$provided=(string)(\$_SERVER['HTTP_X_IRPA_STAGING_OPCACHE_TOKEN']??'');",
+                "if(!hash_equals('"+cacheHash+"',hash('sha256',$provided))) return;",
+                "$target=ABSPATH.'index.php';",
+                "$cached=function_exists('opcache_is_script_cached')&&opcache_is_script_cached($target);",
+                "$invalidated=!$cached||(function_exists('opcache_invalidate')&&@opcache_invalidate($target,true));",
+                "header('Content-Type: application/json; charset=utf-8');",
+                "echo json_encode(['ok'=>!$cached||$invalidated,'cached'=>$cached,'invalidated'=>$invalidated]);exit;"
+              ].join("\\n")+"\\n";
+              if(!await writeFile(muDir,cachePlugin,cachePhp))throw new Error("Could not install the temporary staging OPcache invalidation plugin.");
+              let cacheResult=null;
+              try{
+                cacheResult=await request(new URL("/wp-admin/",wpBase).href,"GET",{"X-IRPA-Staging-OPCACHE-Token":cacheToken,Accept:"application/json","Cache-Control":"no-cache"});
+                console.log("STAGING_INDEX_OPCACHE_INVALIDATION="+JSON.stringify({http:cacheResult.http,ok:cacheResult.data?.ok===true,cached:cacheResult.data?.cached===true,invalidated:cacheResult.data?.invalidated===true}));
+                if(cacheResult.data?.ok!==true)throw new Error("Could not safely invalidate a stale staging WordPress front-controller cache.");
+              }finally{
+                if(!await writeFile(muDir,cachePlugin,inert))throw new Error("Could not neutralize the temporary staging OPcache plugin.");
+              }
               verified=await verifyAuth();
               if(!verified.ok&&appPasswordsUnavailable){
                 // Read-only diagnostic through a token-guarded temporary index.php, reporting booleans only; always restore the exact original bytes.
