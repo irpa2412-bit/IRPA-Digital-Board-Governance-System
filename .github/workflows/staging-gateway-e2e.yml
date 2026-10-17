@@ -839,6 +839,50 @@ jobs:
           main().catch(e=>{console.error("Staging REST auth bridge verification failed: "+String(e.message||e).replace(/\s+/g," ").slice(0,220));process.exit(1)});
           NODE
 
+      - name: Verify staging WordPress credentials directly without logging secrets
+        env:
+          WP_BASE: ${{ secrets.STAGING_WORDPRESS_BASE_URL }}
+          WP_USER: ${{ secrets.STAGING_WORDPRESS_USERNAME }}
+          WP_APP_PASSWORD: ${{ secrets.STAGING_WORDPRESS_APPLICATION_PASSWORD }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const https=require("node:https");
+          const {URL}=require("node:url");
+          async function main(){
+            const base=new URL(process.env.WP_BASE||"");
+            if(base.protocol!=="https:"||base.hostname.toLowerCase()!=="staging.irpa.or.tz"||base.pathname!=="/"||base.username||base.password||base.search||base.hash)
+              throw new Error("ABORT: direct credential verification is restricted to the staging WordPress origin.");
+            const username=String(process.env.WP_USER||"").trim();
+            const password=String(process.env.WP_APP_PASSWORD||"").replace(/\s/g,"");
+            if(!username||!password)throw new Error("Staging WordPress username/application-password secret is missing.");
+            const authorization="Basic "+Buffer.from(username+":"+password,"utf8").toString("base64");
+            const endpoint=new URL("/wp-json/wp/v2/users/me?context=edit",base);
+            const result=await new Promise((resolve,reject)=>{
+              const req=https.request({protocol:"https:",hostname:endpoint.hostname,port:443,path:endpoint.pathname+endpoint.search,method:"GET",headers:{
+                Accept:"application/json","Cache-Control":"no-cache",Authorization:authorization,"X-IRPA-Staging-Authorization":authorization
+              },timeout:15000},res=>{
+                let raw="";res.setEncoding("utf8");res.on("data",c=>raw+=c);res.on("end",()=>resolve({http:res.statusCode,ray:String(res.headers["cf-ray"]||"").slice(0,80),type:String(res.headers["content-type"]||"").slice(0,80),raw}));
+              });
+              req.on("timeout",()=>req.destroy(new Error("Staging WordPress direct authentication probe timed out.")));
+              req.on("error",reject);req.end();
+            });
+            let body;try{body=JSON.parse(result.raw)}catch{}
+            const roles=Array.isArray(body?.roles)?body.roles.filter(x=>typeof x==="string").map(x=>x.toLowerCase()):[];
+            console.log("STAGING_DIRECT_WORDPRESS_AUTH="+JSON.stringify({
+              http:result.http,contentType:result.type,cloudflareRay:result.ray,
+              errorCode:typeof body?.code==="string"?body.code.slice(0,100):null,
+              userId:Number.isSafeInteger(body?.id)?body.id:null,
+              accountSlug:typeof body?.slug==="string"?body.slug.slice(0,80):null,
+              roles,canEditPages:body?.capabilities?.edit_pages===true
+            }));
+            if(result.http!==200||!Number.isSafeInteger(body?.id)||!roles.includes("editor")||roles.includes("administrator")||body?.capabilities?.edit_pages!==true)
+              throw new Error("Direct staging WordPress credential verification failed; inspect the redacted HTTP status, error code, Cloudflare Ray ID and account-role fields above.");
+            console.log("STAGING_DIRECT_WORDPRESS_AUTH=PASS");
+          }
+          main().catch(e=>{console.error("Staging direct credential verification failed: "+String(e.message||e).replace(/[\r\n\t]+/g," ").slice(0,220));process.exit(1)});
+          NODE
+
       - name: Inject staging-only Worker secrets
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
