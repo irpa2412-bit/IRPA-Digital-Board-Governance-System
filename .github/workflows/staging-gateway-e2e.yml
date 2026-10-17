@@ -485,6 +485,7 @@ jobs:
           CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
           CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
           CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
+          CP_TEST_FILE: ${{ secrets.STAGING_CPANEL_TEST_FILE }}
           GH_TOKEN: ${{ github.token }}
         continue-on-error: true
         run: |
@@ -608,7 +609,21 @@ jobs:
                 const targetNames=targetFiles.map(x=>String(x.file||x.name||""));
                 if(targetFiles.length!==0){
                   if(required.every(x=>targetNames.includes(x)))console.log("CPANEL_WORDPRESS_DIRECTORY=ALREADY_NORMALIZED");
-                  else {console.log("CPANEL_REMEDIATION=BLOCKED_TARGET_NOT_EMPTY");return false}
+                  else {
+                    const unexpected=targetNames.filter(x=>x!==process.env.CP_TEST_FILE);
+                    if(unexpected.length){console.log("CPANEL_REMEDIATION=BLOCKED_TARGET_HAS_UNEXPECTED_FILES");return false}
+                    const backup="public_html/staging-empty-backup-"+String(process.env.GITHUB_RUN_ID||"run");
+                    const backupCheck=await uapi("Fileman/list_files",{dir:root+"/staging-empty-backup-"+String(process.env.GITHUB_RUN_ID||"run"),showdotfiles:1});
+                    if(backupCheck.http===200&&backupCheck.data?.status===1){console.log("CPANEL_REMEDIATION=BLOCKED_BACKUP_PATH_ALREADY_EXISTS");return false}
+                    const movedTarget=await api2("Fileman","fileop",{op:"rename",sourcefiles:"public_html/staging",destfiles:backup,doubledecode:"1"});
+                    if(!movedTarget.ok){console.log("CPANEL_REMEDIATION=FAILED_TO_PRESERVE_TARGET_TEST_FILE");return false}
+                    const movedWp=await api2("Fileman","fileop",{op:"rename",sourcefiles:"public_html/staging ",destfiles:"public_html/staging",doubledecode:"1"});
+                    if(!movedWp.ok){
+                      await api2("Fileman","fileop",{op:"rename",sourcefiles:backup,destfiles:"public_html/staging",doubledecode:"1"});
+                      console.log("CPANEL_WORDPRESS_DIRECTORY_RENAME=FAILED_ROLLBACK_ATTEMPTED");return false
+                    }
+                    console.log("CPANEL_WORDPRESS_DIRECTORY_RENAME=PASS_TEST_FILE_PRESERVED_IN_BACKUP");
+                  }
                 }else{
                   const backup="public_html/staging-empty-backup-20261017";
                   const backupCheck=await uapi("Fileman/list_files",{dir:root+"/staging-empty-backup-20261017",showdotfiles:1});
