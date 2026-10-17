@@ -382,7 +382,7 @@ jobs:
               try { body=JSON.parse(raw); } catch {}
               if(!response.ok||!body) {
                 const detail=String(body?.errors?.map?.(x=>x?.message).filter(Boolean).join("; ")||body?.error||body?.message||"").replace(/[\r\n\t]+/g," ").slice(0,220);
-                const contentType=response.headers.get("content-type")||"unknown";
+                const contentType=response.headers["content-type"]||"unknown";
                 const lower=raw.toLowerCase();
                 const titleStart=lower.indexOf("<title");
                 const titleOpen=titleStart>=0?raw.indexOf(">",titleStart):-1;
