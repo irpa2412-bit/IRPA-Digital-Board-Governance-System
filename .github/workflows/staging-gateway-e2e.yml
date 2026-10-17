@@ -569,7 +569,63 @@ jobs:
                 if(zone)break;
               }
             }
-            if(!zone||!token){console.log("DNS_REMEDIATION=BLOCKED_NO_ZONE_SCOPED_TOKEN_AND_ZONE_ID");return false}
+            if(!zone||!token){
+              console.log("CLOUDFLARE_DNS_WRITE=UNAVAILABLE_NO_ZONE_ACCESS");
+              // irpa.or.tz is authoritative on the hosting provider's nameservers, not Cloudflare.
+              // Fall back only when public NS records confirm the provider zone and cPanel can
+              // read the zone. Never alter nameservers or touch production/mail records.
+              async function remediateAuthoritativeCpanelZone(){
+                const dns=require("node:dns").promises;
+                let nameservers=[];
+                try{nameservers=(await dns.resolveNs("irpa.or.tz")).map(x=>x.toLowerCase().replace(/\.$/,""))}
+                catch(e){console.log("AUTHORITATIVE_DNS_NS_LOOKUP=FAILED_"+String(e.code||e.name));return false}
+                console.log("AUTHORITATIVE_DNS_PROVIDER="+(nameservers.length&&nameservers.every(n=>n.endsWith(".habari.co.tz"))?"habari":"unverified"));
+                if(!nameservers.length||!nameservers.every(n=>n.endsWith(".habari.co.tz"))){console.log("CPANEL_DNS_REMEDIATION=BLOCKED_NON_HABARI_OR_UNVERIFIED_AUTHORITY");return false}
+                const base=new URL(process.env.CP_BASE);
+                const auth={Authorization:"cpanel "+process.env.CP_USER+":"+process.env.CP_TOKEN,Accept:"application/json"};
+                async function uapi(path,params={}){
+                  const u=new URL("/execute/"+path,base);u.search=new URLSearchParams(params).toString();
+                  return request(u.href,"GET",auth);
+                }
+                const fetched=await uapi("ZoneEdit/fetchzone_records",{domain:"irpa.or.tz"});
+                const records=Array.isArray(fetched.data?.data)?fetched.data.data:Array.isArray(fetched.data?.result?.data)?fetched.data.result.data:[];
+                if(fetched.http!==200||fetched.data?.status!==1||!records.length){
+                  console.log("CPANEL_DNS_REMEDIATION=BLOCKED_ZONE_READ_HTTP_"+fetched.http+"_STATUS_"+String(fetched.data?.status));
+                  return false;
+                }
+                const normalizedName=v=>String(v||"").trim().toLowerCase().replace(/\.$/,"");
+                const staging=records.filter(r=>normalizedName(r.name||r.dname||r.host)==="staging.irpa.or.tz" || normalizedName(r.name||r.dname||r.host)==="staging");
+                const conflicting=staging.filter(r=>String(r.type||"").toUpperCase()==="CNAME");
+                if(conflicting.length){console.log("CPANEL_DNS_REMEDIATION=BLOCKED_CNAME_CONFLICT");return false}
+                const aRecords=staging.filter(r=>String(r.type||"").toUpperCase()==="A");
+                const correct=aRecords.some(r=>String(r.address||r.ip||r.data||r.record||"").includes("41.220.128.10"));
+                if(!correct){
+                  if(aRecords.length){
+                    for(const record of aRecords){
+                      const line=record.line??record.line_number??record.lineNumber;
+                      if(line===undefined||line===null){console.log("CPANEL_DNS_REMEDIATION=BLOCKED_A_RECORD_WITHOUT_LINE_ID");return false}
+                      const edited=await uapi("ZoneEdit/edit_zone_record",{domain:"irpa.or.tz",line:String(line),name:"staging",type:"A",address:"41.220.128.10",ttl:"300"});
+                      if(edited.http!==200||edited.data?.status!==1||edited.data?.result?.status===0){console.log("CPANEL_DNS_REMEDIATION=FAILED_EDIT_A_RECORD_HTTP_"+edited.http);return false}
+                    }
+                  }else{
+                    const added=await uapi("ZoneEdit/add_zone_record",{domain:"irpa.or.tz",name:"staging",type:"A",address:"41.220.128.10",ttl:"300"});
+                    if(added.http!==200||added.data?.status!==1||added.data?.result?.status===0){console.log("CPANEL_DNS_REMEDIATION=FAILED_ADD_A_RECORD_HTTP_"+added.http+"_STATUS_"+String(added.data?.status));return false}
+                  }
+                }
+                const verified=await uapi("ZoneEdit/fetchzone_records",{domain:"irpa.or.tz"});
+                const after=Array.isArray(verified.data?.data)?verified.data.data:Array.isArray(verified.data?.result?.data)?verified.data.result.data:[];
+                const pass=verified.http===200&&verified.data?.status===1&&after.some(r=>(normalizedName(r.name||r.dname||r.host)==="staging.irpa.or.tz"||normalizedName(r.name||r.dname||r.host)==="staging")&&String(r.type||"").toUpperCase()==="A"&&String(r.address||r.ip||r.data||r.record||"").includes("41.220.128.10"));
+                console.log("CPANEL_DNS_REMEDIATION="+(pass?(correct?"ALREADY_CORRECT":"A_RECORD_VERIFIED"):"POST_WRITE_VERIFICATION_FAILED"));
+                if(pass){
+                  try{
+                    const publicA=await dns.resolve4("staging.irpa.or.tz");
+                    console.log("STAGING_PUBLIC_A_VERIFIED="+String(publicA.includes("41.220.128.10")));
+                  }catch(e){console.log("STAGING_PUBLIC_A_PENDING="+String(e.code||e.name))}
+                }
+                return pass;
+              }
+              return await remediateAuthoritativeCpanelZone();
+            }
             const endpoint="https://api.cloudflare.com/client/v4/zones/"+encodeURIComponent(zone.id)+"/dns_records";
             const list=await request(endpoint+"?type=A&name=staging.irpa.or.tz","GET",cfHeaders(token));
             if(list.http!==200||list.data?.success!==true||!Array.isArray(list.data?.result)){console.log("DNS_REMEDIATION=BLOCKED_DNS_RECORD_READ");return false}
