@@ -9,6 +9,7 @@ const studio=read("../src/pages/CommunicationMediaStudio.jsx");
 const operations=read("../src/pages/CommunicationMediaOperations.jsx");
 const social=read("../src/pages/SocialMediaAccounts.jsx");
 const metaOAuth=read("../drive-gateway/src/metaOAuth.mjs");
+const stagingWorkflow=read("../.github/workflows/staging-gateway-e2e.yml");
 const rules=read("../firestore.rules");
 const gateway=read("../drive-gateway/src/index.js");
 const site=read("../drive-gateway/src/communicationsSite.mjs");
@@ -198,6 +199,11 @@ test("Meta API uses the existing staging-only OAuth router, minimal read permiss
  assert.ok(gateway.includes('const metaOAuthRouter = createMetaOAuthRouter'));
  assert.ok(gateway.includes('const metaResponse = await metaOAuthRouter(request, env)'));
  assert.ok(docs.includes("Meta (Facebook and Instagram) API — staging-only connection and access verification"));
+ assert.ok(stagingWorkflow.includes("STAGING_META_APP_ID"));
+ assert.ok(stagingWorkflow.includes("STAGING_META_APP_SECRET"));
+ assert.ok(stagingWorkflow.includes("STAGING_META_TOKEN_ENCRYPTION_KEY"));
+ assert.ok(stagingWorkflow.includes("META_OAUTH_CONFIGURATION_SHAPE=VALID"));
+ assert.ok(stagingWorkflow.includes("refusing to configure Worker secrets"));
 });
 
 test("communication portal light cards and secondary controls retain readable foreground contrast",()=>{
