@@ -24,6 +24,7 @@ import { canReadSignatureAsset, canUploadSignedDocument } from "./signatureAsset
 import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPasswordSetup, getInvitationSessionState } from "./invitationRedemption.mjs";
 import { buildGoogleDriveAuthorizationParams } from "./googleDriveOAuth.mjs";
 import { createCommunicationsSiteRouter } from "./communicationsSite.mjs";
+import { createMetaOAuthRouter } from "./metaOAuth.mjs";
 
 function getFirebaseProjectId(env) {
   const projectId = String(env?.FIREBASE_PROJECT_ID || "").trim();
@@ -66,6 +67,15 @@ const communicationsSiteRouter = createCommunicationsSiteRouter({
   corsHeaders
 });
 
+const metaOAuthRouter = createMetaOAuthRouter({
+  authenticateFirebaseRequest,
+  getFirestoreDocument,
+  getInstitutionalProfileForUser,
+  firestoreDocumentToPlain,
+  json,
+  corsHeaders
+});
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -104,6 +114,11 @@ export default {
       if (pathname.startsWith("/api/document-lifecycle/")) {
         const lifecycleResponse = await documentLifecycleRouter(request, env);
         if (lifecycleResponse) return lifecycleResponse;
+      }
+
+      if (pathname.startsWith("/api/communications/meta/")) {
+        const metaResponse = await metaOAuthRouter(request, env);
+        if (metaResponse) return metaResponse;
       }
 
       if (pathname.startsWith("/api/communications/")) {
