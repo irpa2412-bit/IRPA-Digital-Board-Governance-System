@@ -37,6 +37,6 @@ test("staging workflow validates the approved frontend origin and fails closed o
   assert.ok(workflow.includes('const valid = /^\\d+$/.test(values[0]) && Boolean(values[1].trim()) && decoded.length === 32;'));
   assert.ok(workflow.includes('const metaReady=/^\\d+$/.test(metaAppIdRaw)&&Boolean(String(process.env.META_APP_SECRET||"").trim())&&metaKey.length===32;'));
   assert.ok(workflow.includes('const metaAppId=metaReady?metaAppIdRaw:"";'));
-  assert.ok(workflow.includes('META_OAUTH_CONFIGURED=false; no staging Meta values are configured; Meta endpoints remain disabled.'));
+  assert.ok(workflow.includes('META_OAUTH_CONFIGURED=false; staging Meta configuration is incomplete. No Meta secrets were changed, Meta OAuth remains unavailable, and independent WordPress/cPanel acceptance will continue.'));
   assert.ok(!workflow.includes('if (!/^\\\\d+$/.test(values[0]))'));
 });
