@@ -27,7 +27,11 @@ test("communications authoring, approvals, library, calendar and exports remain 
 });
 
 test("publishing, website content edits and cPanel file edits route through Cloudflare",()=>{
- for(const route of ["/api/communications/site/status","/api/communications/website/publish","/api/communications/website/content","/api/communications/cpanel/files"]) assert.ok(site.includes(route),route);
+ for(const route of ["/api/communications/site/status","/api/communications/website/publish","/api/communications/website/content","/api/communications/website/revisions","/api/communications/website/restore","/api/communications/cpanel/files"]) assert.ok(site.includes(route),route);
+ assert.ok(site.includes("singleContentMatch"));
+ assert.ok(site.includes("saveWebsiteSnapshot"));
+ assert.ok(site.includes("currentRevisionId"));
+ assert.ok(site.includes("COMMUNICATION_WEBSITE_REVISION_RESTORED"));
  assert.ok(gateway.includes('import { createCommunicationsSiteRouter } from "./communicationsSite.mjs"'));
  assert.ok(gateway.includes('pathname.startsWith("/api/communications/")'));
  assert.ok(portal.includes('fetch(GATEWAY+path'));
@@ -105,8 +109,26 @@ test("website editor provides a sandboxed live preview without bypassing live-wr
  assert.ok(portal.includes('title="IRPA website content preview"'));
  assert.ok(portal.includes('sandbox=""'));
  assert.ok(portal.includes('referrerPolicy="no-referrer"'));
- assert.ok(portal.includes("Save to live website"));
+ assert.ok(portal.includes("Save draft"));
+ assert.ok(portal.includes("Publish"));
+ assert.ok(portal.includes("websiteRevisions"));
+ assert.ok(portal.includes("Restore"));
  assert.ok(docs.includes("Supported document and media upload formats"));
  assert.ok(docs.includes("current browser route"));
  assert.ok(docs.includes("does not edit PHP"));
+});
+
+test("website page editing is staging-host-only, Communication & Media scoped, revision-backed and secret-safe",()=>{
+ assert.ok(site.includes('String(env.IRPA_ENVIRONMENT || "").toLowerCase() !== "staging"'));
+ assert.ok(site.includes('base.hostname.toLowerCase() !== "staging.irpa.or.tz"'));
+ assert.ok(site.includes('redirect: "manual"'));
+ assert.ok(site.includes("WEBSITE_EDITOR_ROLES"));
+ assert.ok(site.includes("COMMUNICATION_WEBSITE_EDIT_SNAPSHOT_SAVED"));
+ assert.ok(site.includes("COMMUNICATION_WEBSITE_CONTENT_UPDATED"));
+ assert.ok(site.includes("snapshotId"));
+ assert.ok(site.includes("featured_media"));
+ assert.ok(site.includes('["draft", "publish"]'));
+ assert.ok(!site.includes("console.log(WORDPRESS_APPLICATION_PASSWORD"));
+ assert.ok(!portal.includes("WORDPRESS_APPLICATION_PASSWORD"));
+ assert.ok(!portal.includes("CPANEL_API_TOKEN"));
 });
