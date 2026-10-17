@@ -72,6 +72,8 @@ test("Communication and Media Archive is provisioned and verified before media u
  assert.ok(gateway.includes('folderDescription.irpaCommunicationMediaArchive !== true'));
  assert.ok(gateway.includes('purpose === "Communication Media" && !requestedFolderId'));
  assert.ok(gateway.includes('code:"GOOGLE_DRIVE_NOT_AUTHORIZED"'));
+ assert.ok(gateway.includes('https://irpa-dbg-staging-a73ec.web.app'));
+ assert.ok(gateway.includes('https://irpa-dbg-staging-a73ec.firebaseapp.com'));
  assert.ok(gateway.includes('},503,corsHeaders(request))'));
 });
 
