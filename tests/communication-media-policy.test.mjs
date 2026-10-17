@@ -141,6 +141,8 @@ test("communications operations registers provide campaigns, media contacts, bra
  assert.ok(portal.includes('tab==="Communications Operations"&&<CommunicationMediaOperations'));
  assert.ok(operations.includes('writeBatch(db)'));
  assert.ok(operations.includes('collection(db,"communicationOperationsAudit")'));
+ assert.ok(operations.includes('limit(50)'));
+ assert.ok(operations.includes("Communications audit history"));
  assert.ok(operations.includes('No records are deleted'));
  assert.ok(rules.includes('match /communicationOperations/{id}'));
  assert.ok(rules.includes('match /communicationOperationsAudit/{id}'));
