@@ -2122,7 +2122,7 @@ async function getInstitutionalProfileForUser(env, claims) {
 function base64UrlEncodeBytes(bytes) {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/=/g, "").replace(/\\+/g, "-").replace(/\\//g, "_");
+  return btoa(binary).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
 }
 
 function base64UrlEncodeText(value) {
@@ -2130,7 +2130,7 @@ function base64UrlEncodeText(value) {
 }
 
 function pemPrivateKeyBytes(pem) {
-  const body = String(pem || "").replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\\s/g, "");
+  const body = String(pem || "").replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g, "");
   if (!body) throw new Error("Privileged Firestore identity is not configured.");
   const binary = atob(body);
   return Uint8Array.from(binary, char => char.charCodeAt(0));
