@@ -10,7 +10,7 @@ const KINDS=[
  {id:"Coverage Log",label:"Media coverage & metrics",description:"Record observed coverage and campaign outcomes; this is a manual register, not automatic social analytics.",fields:[["channel","Channel"],["sourceUrl","Coverage URL"],["observedDate","Date observed","date"],["reach","Reach / audience (if sourced)"],["engagement","Engagement (if sourced)"],["sentiment","Assessment"],["evidence","Evidence / notes"]]}
 ];
 const STATUSES=["Draft","Active","Under Review","Approved","Completed","Archived"];
-const REVIEW_ROLES=["Executive Director","Director Outreach","Outreach Director","Director Community Development","Community Development Director","Administrator"];
+const REVIEW_ROLES=["Executive Director","Director Outreach","Outreach Director","Director Community Development","Community Development Director"];
 const EDITOR_ROLES=["Communications Officer","Communication Officer","Communications Manager","Communication Manager","Media Officer","Media Manager","Public Relations Officer","Communications & Media Officer","Communications and Media Officer","Media and Communications Officer","Media & Communications Officer","Communication & Media","Communications & Media","Communication and Media","Communications and Media",...REVIEW_ROLES];
 const clean=v=>String(v??"").trim();
 const panel={background:"var(--surface, #fff)",color:"var(--text-primary, #172033)",border:"1px solid var(--border-color, #d6dee8)",borderRadius:12,padding:14,minWidth:0};
