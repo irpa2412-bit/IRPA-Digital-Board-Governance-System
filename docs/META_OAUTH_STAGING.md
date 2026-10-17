@@ -17,7 +17,7 @@ Cloudflare Worker secrets (staging environment only):
 - `META_APP_SECRET`
 - `META_TOKEN_ENCRYPTION_KEY`: random 32-byte key encoded as Base64; keep it separate from the Meta app secret.
 
-Configure values in the Cloudflare dashboard or through interactive Wrangler prompts. Do not place them in source control, chat, browser storage, Firestore or logs. Do not copy production values into staging.
+For the repository's staging deployment workflow, configure the GitHub Actions repository secrets `STAGING_META_APP_ID`, `STAGING_META_APP_SECRET`, and `STAGING_META_TOKEN_ENCRYPTION_KEY`. The workflow injects the App ID as a staging Worker variable and provisions the latter two as Worker secrets without printing them. If all three are absent, the Worker deploys with Meta integration disabled; a partial set fails the Meta-secret step. Alternatively, configure the equivalent variables/secrets directly in the staging Worker environment. Do not place values in source control, chat, browser storage, Firestore or logs. Do not copy production values into staging.
 
 The gateway uses the existing `DRIVE_KV` binding for a one-use OAuth state with a 10-minute TTL and an AES-256-GCM-encrypted connection record. Tokens are never returned to the browser or saved in Firestore. The status endpoint re-checks granted scopes and API access. Local disconnect removes the encrypted staging record but does not revoke the app inside Meta.
 
