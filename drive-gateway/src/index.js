@@ -25,6 +25,7 @@ import { canReadSignatureAsset, canUploadSignedDocument } from "./signatureAsset
 import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPasswordSetup, getInvitationSessionState } from "./invitationRedemption.mjs";
 import { buildGoogleDriveAuthorizationParams } from "./googleDriveOAuth.mjs";
 import { createCommunicationsSiteRouter } from "./communicationsSite.mjs";
+import { createMetaSocialApiRouter } from "./metaSocialApi.mjs";
 import { createMetaOAuthRouter } from "./metaOAuth.mjs";
 import { createMeetingPortalRouter } from "./meetingPortal.mjs";
 
@@ -107,6 +108,15 @@ async function verifyGatewaySigningAuthority(env,user,manualAuthorityIdentificat
     verificationMethod:"Authenticated Gateway Member/Employee Register Match"
   };
 }
+
+const metaSocialApiRouter = createMetaSocialApiRouter({
+  authenticateFirebaseRequest,
+  getFirestoreDocument,
+  getInstitutionalProfileForUser,
+  firestoreDocumentToPlain,
+  json,
+  corsHeaders
+});
 
 const communicationsSiteRouter = createCommunicationsSiteRouter({
   authenticateFirebaseRequest,
