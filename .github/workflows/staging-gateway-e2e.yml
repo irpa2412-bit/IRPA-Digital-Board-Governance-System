@@ -383,6 +383,110 @@ jobs:
           main().catch(e=>{console.error(e.message);process.exit(1)});
           NODE
 
+      - name: Correct staging-only WordPress home and site URL configuration
+        env:
+          WP_BASE: ${{ secrets.STAGING_WORDPRESS_BASE_URL }}
+          CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
+          CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
+          CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
+          CP_ROOT: ${{ secrets.STAGING_CPANEL_DOCUMENT_ROOT }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const https=require("node:https");
+          const crypto=require("node:crypto");
+          const {URL,URLSearchParams}=require("node:url");
+          require("node:dns").setDefaultResultOrder("ipv4first");
+          function request(url,method="GET",headers={},body){
+            return new Promise((resolve,reject)=>{
+              const u=new URL(url);
+              const req=https.request({protocol:u.protocol,hostname:u.hostname,port:u.port||443,family:4,path:u.pathname+u.search,method,headers,timeout:12000},res=>{
+                let raw="";res.setEncoding("utf8");res.on("data",x=>raw+=x);res.on("end",()=>resolve({http:res.statusCode,headers:res.headers,raw}));
+              });
+              req.on("timeout",()=>req.destroy(Object.assign(new Error("request timeout"),{code:"ETIMEDOUT"})));
+              req.on("error",reject);if(body)req.write(body);req.end();
+            });
+          }
+          async function main(){
+            const wp=new URL(process.env.WP_BASE||""),cp=new URL(process.env.CP_BASE||"");
+            if(wp.protocol!=="https:"||wp.hostname.toLowerCase()!=="staging.irpa.or.tz")throw new Error("ABORT: URL correction is restricted to staging.irpa.or.tz.");
+            if(cp.protocol!=="https:"||cp.port!=="2083")throw new Error("ABORT: cPanel endpoint must be HTTPS port 2083.");
+            const auth={Authorization:"cpanel "+process.env.CP_USER+":"+process.env.CP_TOKEN,Accept:"application/json"};
+            async function uapi(fn,params={},method="GET",body){
+              const u=new URL("/execute/"+fn,cp);if(method==="GET")u.search=new URLSearchParams(params).toString();
+              const r=await request(u.href,method,{...auth,...(method==="POST"?{"Content-Type":"application/x-www-form-urlencoded"}:{})},body??(method==="POST"?new URLSearchParams(params).toString():undefined));
+              let data;try{data=JSON.parse(r.raw)}catch{}
+              return {http:r.http,data};
+            }
+            async function readFile(dir,name){
+              const r=await uapi("Fileman/get_file_content",{dir,file:name});
+              return {ok:r.http===200&&r.data?.status===1,content:String(r.data?.data?.content??r.data?.data?.[0]?.content??r.data?.result?.data?.content??"")};
+            }
+            async function writeFile(dir,name,content){
+              const saved=await uapi("Fileman/save_file_content",{dir,file:name,content,charset:"utf-8"},"POST");
+              let read=await readFile(dir,name);
+              if(saved.http===200&&saved.data?.status===1&&read.ok&&read.content===content)return true;
+              const boundary="----IRPAStagingConfig"+crypto.randomBytes(8).toString("hex");
+              const payload=Buffer.concat([
+                Buffer.from("--"+boundary+"\r\nContent-Disposition: form-data; name=\"dir\"\r\n\r\n"+dir+"\r\n"),
+                Buffer.from("--"+boundary+"\r\nContent-Disposition: form-data; name=\"overwrite\"\r\n\r\n1\r\n"),
+                Buffer.from("--"+boundary+"\r\nContent-Disposition: form-data; name=\"file-1\"; filename=\""+name+"\"\r\nContent-Type: application/octet-stream\r\n\r\n"),
+                Buffer.from(content),
+                Buffer.from("\r\n--"+boundary+"--\r\n")
+              ]);
+              const up=await request(new URL("/execute/Fileman/upload_files",cp).href,"POST",{...auth,"Content-Type":"multipart/form-data; boundary="+boundary,"Content-Length":String(payload.length)},payload);
+              let data;try{data=JSON.parse(up.raw)}catch{}
+              read=await readFile(dir,name);
+              return up.http===200&&data?.status===1&&read.ok&&read.content===content;
+            }
+            const info=await uapi("DomainInfo/domains_data");
+            const root=String(info.data?.data?.main_domain?.documentroot||info.data?.data?.main_domain?.document_root||"").replace(/\/+$/,"");
+            if(info.http!==200||info.data?.status!==1||!root.endsWith("/public_html"))throw new Error("Could not verify cPanel document root.");
+            const stage=root+"/staging",configuredRoot=String(process.env.CP_ROOT||"").replace(/\/+$/,"");
+            if(configuredRoot!==stage)throw new Error("ABORT: cPanel document root does not exactly match the isolated staging installation.");
+            const listing=await uapi("Fileman/list_files",{dir:stage,showdotfiles:1});
+            const rows=Array.isArray(listing.data?.data)?listing.data.data:[];
+            const cfg=rows.find(x=>String(x.file||x.name||"")==="wp-config.php");
+            if(listing.http!==200||listing.data?.status!==1||!cfg||String(cfg.type||"")!=="file"||(Number(cfg.permissions)&61440)!==32768)throw new Error("ABORT: staging wp-config.php is missing or is not a regular isolated file.");
+            const original=await readFile(stage,"wp-config.php");
+            if(!original.ok||!original.content.includes("<?php"))throw new Error("Could not safely read staging wp-config.php.");
+            const target="https://staging.irpa.or.tz";
+            const home=/define\s*\(\s*['"]WP_HOME['"]\s*,\s*(['"])(.*?)\1\s*\)/s.exec(original.content);
+            const site=/define\s*\(\s*['"]WP_SITEURL['"]\s*,\s*(['"])(.*?)\1\s*\)/s.exec(original.content);
+            let changed=false;
+            let updated=original.content;
+            if(home||site){
+              if(!home||!site||home[2]!==target||site[2]!==target)throw new Error("ABORT: staging wp-config.php contains unexpected home/site URL constants; refusing blind replacement.");
+            }else{
+              const marker=/^\s*require_once\s+ABSPATH\s*\.\s*['"]wp-settings\.php['"]\s*;\s*$/m;
+              const match=marker.exec(original.content);
+              if(!match||original.content.match(marker)?.length!==1)throw new Error("Could not find a unique WordPress bootstrap insertion point.");
+              updated=original.content.replace(marker,"define('WP_HOME', '"+target+"');\ndefine('WP_SITEURL', '"+target+"');\n"+match[0]);
+              if(updated===original.content)throw new Error("Staging URL configuration did not change.");
+              if(!await writeFile(stage,"wp-config.php",updated))throw new Error("Could not verify the staging-only wp-config.php update.");
+              changed=true;
+            }
+            try{
+              const r=await request(new URL("/wp-json/",wp).href,"GET",{Accept:"application/json","Cache-Control":"no-cache"});
+              let data;try{data=JSON.parse(r.raw)}catch{}
+              const canonical=v=>{try{const u=new URL(v);return u.protocol==="https:"&&u.hostname.toLowerCase()==="staging.irpa.or.tz"&&(u.pathname==="/"||u.pathname==="")}catch{return false}};
+              const pass=r.http===200&&canonical(data?.url)&&canonical(data?.home);
+              console.log("STAGING_HOME_SITEURL_CHECK="+JSON.stringify({http:r.http,finalUrl:new URL("/wp-json/",wp).href,homeIsStaging:canonical(data?.home),siteurlIsStaging:canonical(data?.url),changed}));
+              if(!pass)throw new Error("Staging WordPress REST root does not report staging-only home and siteurl.");
+            }catch(e){
+              if(changed){
+                const restored=await writeFile(stage,"wp-config.php",original.content);
+                const verify=await readFile(stage,"wp-config.php");
+                if(!restored||!verify.ok||verify.content!==original.content)throw new Error("Staging URL check failed and exact wp-config.php rollback could not be verified.");
+                console.log("STAGING_WP_CONFIG_ROLLBACK=VERIFIED");
+              }
+              throw e;
+            }
+            console.log("STAGING_HOME_SITEURL_REPAIR=PASS");
+          }
+          main().catch(e=>{console.error("Staging URL correction failed: "+String(e.message||e).replace(/\s+/g," ").slice(0,220));process.exit(1)});
+          NODE
+
       - name: Diagnose staging WordPress bootstrap and route handling (read-only)
         env:
           WP_BASE: ${{ secrets.STAGING_WORDPRESS_BASE_URL }}
