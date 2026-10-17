@@ -5,6 +5,8 @@ on:
     branches: [fix/communications-cloudflare-website-integration]
     paths:
       - "src/pages/CommunicationMediaPortal.jsx"
+      - "src/pages/CommunicationMediaOperations.jsx"
+      - "firestore.rules"
       - "drive-gateway/src/communicationsSite.mjs"
       - "drive-gateway/src/index.js"
       - "tests/communication-media-policy.test.mjs"
@@ -19,6 +21,8 @@ on:
     branches: [main]
     paths:
       - "src/pages/CommunicationMediaPortal.jsx"
+      - "src/pages/CommunicationMediaOperations.jsx"
+      - "firestore.rules"
       - "drive-gateway/src/communicationsSite.mjs"
       - "drive-gateway/src/index.js"
       - "tests/communication-media-policy.test.mjs"
