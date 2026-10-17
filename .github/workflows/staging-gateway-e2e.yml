@@ -518,7 +518,7 @@ jobs:
           const cfHeaders=token=>({Authorization:"Bearer "+token,Accept:"application/json","Content-Type":"application/json"});
           async function remediateDns(){
             const tokens=[["production",process.env.CF_PRODUCTION],["staging",process.env.CF_STAGING],["grant-crawler",process.env.CF_GRANT]].filter(x=>x[1]);
-            const configuredIds=[process.env.CF_ZONE_ID_SECRET,process.env.CF_STAGING_ZONE_ID_SECRET,process.env.CF_ZONE_ID_VAR,process.env.CF_STAGING_ZONE_ID_VAR].map(x=>(x||"").trim()).filter(Boolean);
+            const configuredIds=[process.env.CF_ZONE_ID_SECRET,process.env.CF_STAGING_ZONE_ID_SECRET,process.env.CF_ZONE_ID_VAR,process.env.CF_STAGING_ZONE_ID_VAR,process.env.CF_ZONE_ID_ALT1,process.env.CF_ZONE_ID_ALT2,process.env.CF_ZONE_ID_ALT3,process.env.CF_ZONE_ID_ALT4,process.env.CF_ZONE_ID_ALT5,process.env.CF_ZONE_ID_ALT6,process.env.CF_ZONE_ID_ALT7,process.env.CF_ZONE_ID_ALT8,process.env.CF_ZONE_ID_ALT9].map(x=>(x||"").trim()).filter(Boolean);
             const variableNames=[];
             try{
               const gh=await request("https://api.github.com/repos/"+encodeURIComponent(process.env.GITHUB_REPOSITORY)+"/actions/variables?per_page=100","GET",{Authorization:"Bearer "+process.env.GH_TOKEN,Accept:"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"});
