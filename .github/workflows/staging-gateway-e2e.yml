@@ -2,7 +2,7 @@ name: Staging Gateway E2E and Deploy
 
 on:
   push:
-    branches: [main, fix/member-signature-invitation-email-20261004, fix/signature-gateway-cryptographic-bridge-20261015, fix/communications-cloudflare-website-integration]
+    branches: [main, fix/member-signature-invitation-email-20261004, fix/signature-gateway-cryptographic-bridge-20261015, fix/communications-cloudflare-website-integration, fix/communications-acceptance-gates-20261017]
     paths:
       - "drive-gateway/**"
       - "src/firebase/documentLifecycle.js"
@@ -36,7 +36,7 @@ permissions:
 
 jobs:
   local-e2e:
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004' || github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015' || github.ref == 'refs/heads/fix/communications-cloudflare-website-integration' || (github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'fix/communications-cloudflare-website-integration')
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004' || github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015' || github.ref == 'refs/heads/fix/communications-cloudflare-website-integration' || github.ref == 'refs/heads/fix/communications-acceptance-gates-20261017' || (github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'fix/communications-cloudflare-website-integration' || github.event.pull_request.head.ref == 'fix/communications-acceptance-gates-20261017'))
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
