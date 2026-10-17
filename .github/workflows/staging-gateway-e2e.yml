@@ -2,7 +2,7 @@ name: Staging Gateway E2E and Deploy
 
 on:
   push:
-    branches: [main, fix/member-signature-invitation-email-20261004, fix/signature-gateway-cryptographic-bridge-20261015]
+    branches: [main, fix/member-signature-invitation-email-20261004, fix/signature-gateway-cryptographic-bridge-20261015, fix/communication-media-archive-drive-oauth]
     paths:
       - "drive-gateway/**"
       - "src/firebase/documentLifecycle.js"
@@ -23,7 +23,7 @@ permissions:
 
 jobs:
   local-e2e:
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004' || github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004' || github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015' || github.ref == 'refs/heads/fix/communication-media-archive-drive-oauth'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -208,7 +208,7 @@ jobs:
           NODE
 
   dispatch-staging-acceptance:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015' && contains(github.event.head_commit.message, 'dispatch isolated runtime acceptance')
+    if: github.event_name == 'push' && github.ref == 'refs/heads/fix/communication-media-archive-drive-oauth' && contains(github.event.head_commit.message, 'dispatch isolated runtime acceptance')
     needs: [local-e2e, preflight-staging]
     runs-on: ubuntu-latest
     permissions:
@@ -223,13 +223,13 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               workflow_id: "staging-gateway-e2e.yml",
-              ref: "fix/signature-gateway-cryptographic-bridge-20261015",
+              ref: "fix/communication-media-archive-drive-oauth",
               inputs: { deploy_staging: "true" }
             });
 
   deploy-staging:
     needs: [local-e2e, preflight-staging]
-    if: github.event_name == 'workflow_dispatch' && (inputs.deploy_staging == true || inputs.deploy_staging == 'true') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004' || github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015')
+    if: github.event_name == 'workflow_dispatch' && (inputs.deploy_staging == true || inputs.deploy_staging == 'true') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004' || github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015' || github.ref == 'refs/heads/fix/communication-media-archive-drive-oauth')
     concurrency:
       group: irpa-staging-gateway-deploy
       cancel-in-progress: false
@@ -257,7 +257,8 @@ jobs:
             name="${pair%%:*}"; value="${pair#*:}"
             if [ -z "$value" ]; then echo "Missing staging secret: $name"; missing=1; fi
           done
-          test "$PROJECT" != "irpa-digital-board-governance"
+          test "$PROJECT" = "irpa-dbg-staging-a73ec"
+          test "$APP_URL" = "https://irpa-dbg-staging-a73ec.web.app"
           test "$missing" -eq 0
 
       - name: Diagnostic - verify Cloudflare staging token
@@ -330,15 +331,8 @@ jobs:
           if(x?.id) process.stdout.write(x.id);
           NODE
           )"
-          if [ -z "$id" ]; then
-            created="$(curl --fail --silent --show-error -X POST -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" --data '{"title":"irpa-google-drive-gateway-staging"}' "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces")"
-            id="$(node - "$created" <<'NODE'
-          const a=JSON.parse(process.argv[2]);
-          if(!a.success) throw new Error("Cloudflare KV namespace creation failed");
-          process.stdout.write(a?.result?.id||"");
-          NODE
-            )"
-          fi
+          test -n "$id" || { echo "Required dedicated staging KV namespace was not found; refusing to create or substitute a namespace."; exit 1; }
+          test "$id" = "7b50627e29fc4fe1abaa8dc8665edd02" || { echo "Staging KV namespace ID does not match the approved isolated namespace; refusing deployment."; exit 1; }
           case "$id" in ''|*[!a-f0-9]*) exit 1;; esac
           export STAGING_KV_ID="$id"
           node <<'NODE'
