@@ -89,7 +89,8 @@ jobs:
           CF_TOKEN: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
           CF_ACCOUNT: ${{ secrets.STAGING_CLOUDFLARE_ACCOUNT_ID }}
           PROJECT: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
-          APP_URL: ${{ secrets.STAGING_IRPA_APP_URL }}
+          # Public, non-secret staging frontend origin; keep aligned with wrangler.toml [env.staging.vars].
+          APP_URL: https://irpa-dgb-meeting-room-staging.irpa-governance.workers.dev
           DRIVE_ID: ${{ secrets.STAGING_GOOGLE_DRIVE_CLIENT_ID }}
           DRIVE_SECRET: ${{ secrets.STAGING_GOOGLE_DRIVE_CLIENT_SECRET }}
           DRIVE_KEY: ${{ secrets.STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY }}
@@ -108,7 +109,7 @@ jobs:
         run: |
           set -euo pipefail
           missing=0
-          for pair in             "CLOUDFLARE_API_TOKEN:$CF_TOKEN"             "CLOUDFLARE_ACCOUNT_ID:$CF_ACCOUNT"             "STAGING_FIREBASE_PROJECT_ID:$PROJECT"             "STAGING_IRPA_APP_URL:$APP_URL"             "STAGING_GOOGLE_DRIVE_CLIENT_ID:$DRIVE_ID"             "STAGING_GOOGLE_DRIVE_CLIENT_SECRET:$DRIVE_SECRET"             "STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY:$DRIVE_KEY"             "FIREBASE_SERVICE_ACCOUNT_JSON:$FIREBASE_SERVICE_ACCOUNT"             "STAGING_FIREBASE_WEB_API_KEY:$FIREBASE_WEB_API_KEY"             "STAGING_TEST_EMAIL:$TEST_EMAIL"             "STAGING_TEST_PASSWORD:$TEST_PASSWORD"             "STAGING_WORDPRESS_BASE_URL:$WP_BASE"             "STAGING_WORDPRESS_DB_NAME:$STAGING_DB_NAME"             "PRODUCTION_WORDPRESS_DB_NAME:$PRODUCTION_DB_NAME"             "STAGING_CPANEL_BASE_URL:$CP_BASE"             "STAGING_CPANEL_USERNAME:$CP_USER"             "STAGING_CPANEL_API_TOKEN:$CP_TOKEN"             "STAGING_CPANEL_DOCUMENT_ROOT:$CP_ROOT"             "STAGING_CPANEL_TEST_FILE:$CP_TEST_FILE"; do
+          for pair in             "CLOUDFLARE_API_TOKEN:$CF_TOKEN"             "CLOUDFLARE_ACCOUNT_ID:$CF_ACCOUNT"             "STAGING_FIREBASE_PROJECT_ID:$PROJECT"              "STAGING_GOOGLE_DRIVE_CLIENT_ID:$DRIVE_ID"             "STAGING_GOOGLE_DRIVE_CLIENT_SECRET:$DRIVE_SECRET"             "STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY:$DRIVE_KEY"             "FIREBASE_SERVICE_ACCOUNT_JSON:$FIREBASE_SERVICE_ACCOUNT"             "STAGING_FIREBASE_WEB_API_KEY:$FIREBASE_WEB_API_KEY"             "STAGING_TEST_EMAIL:$TEST_EMAIL"             "STAGING_TEST_PASSWORD:$TEST_PASSWORD"             "STAGING_WORDPRESS_BASE_URL:$WP_BASE"             "STAGING_WORDPRESS_DB_NAME:$STAGING_DB_NAME"             "PRODUCTION_WORDPRESS_DB_NAME:$PRODUCTION_DB_NAME"             "STAGING_CPANEL_BASE_URL:$CP_BASE"             "STAGING_CPANEL_USERNAME:$CP_USER"             "STAGING_CPANEL_API_TOKEN:$CP_TOKEN"             "STAGING_CPANEL_DOCUMENT_ROOT:$CP_ROOT"             "STAGING_CPANEL_TEST_FILE:$CP_TEST_FILE"; do
             name="${pair%%:*}"; value="${pair#*:}"
             if [ -z "$value" ]; then echo "Missing staging secret: $name"; missing=1; fi
           done
