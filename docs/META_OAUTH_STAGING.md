@@ -6,6 +6,8 @@ The integration is available only through the existing staging Cloudflare gatewa
 
 Requested permissions are limited to `pages_show_list`, `pages_read_engagement`, and `instagram_basic`. The callback checks that all required read-only permissions were granted, then verifies the Meta user, Page list and eligible linked Instagram professional accounts.
 
+The Social Accounts UI is enabled only in the staging frontend build when `VITE_META_STAGING_GATEWAY_URL` is the exact staging gateway and `VITE_META_OAUTH_ENABLED` is true. The existing general Google Drive gateway remains disabled in the staging frontend; this flag exposes only the dedicated Meta read-only endpoints. The deployment workflow derives the flag from the presence of all three `STAGING_META_*` repository secrets.
+
 ## Configure staging only
 
 Worker variables:
