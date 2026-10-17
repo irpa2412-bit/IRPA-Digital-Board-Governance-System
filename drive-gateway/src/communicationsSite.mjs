@@ -243,7 +243,18 @@ export function createCommunicationsSiteRouter(deps) {
       signal: AbortSignal.timeout(15000)
     });
     const data = await response.json().catch(() => null);
-    if (!response.ok || !data || data.status !== 1) throw new Error("cPanel rejected the requested operation.");
+    if (!response.ok || !data || data.status !== 1) {
+      const status = Number.isInteger(response.status) ? response.status : 0;
+      const uapiStatus = data && Number.isInteger(data.status) ? data.status : "unknown";
+      const errorCount = Array.isArray(data?.errors) ? data.errors.length : 0;
+      const errorText = Array.isArray(data?.errors) ? data.errors.join(" ").toLowerCase() : "";
+      const category = /permission|access denied|not authorized|not allowed/.test(errorText) ? "permission_denied" :
+        /not found|does not exist|no such file|cannot find/.test(errorText) ? "not_found" :
+        /invalid|unsupported|unknown function|unknown api/.test(errorText) ? "invalid_operation" :
+        /auth|token|login/.test(errorText) ? "authentication_rejected" : "uapi_error";
+      throw new Error("cPanel operation failed (" + operation.replace(/[^A-Za-z0-9_/-]/g, "").slice(0, 80) +
+        "; HTTP " + status + "; UAPI status " + uapiStatus + "; error_count " + errorCount + "; category " + category + ").");
+    }
     return data;
   }
 
@@ -687,7 +698,7 @@ export function createCommunicationsSiteRouter(deps) {
       if (requestedPath !== null) {
         const safe = safeCpanelPath(requestedPath, cp.documentRoot);
         const file = await cpanelCall(cp, "Fileman/get_file_content", { dir: safe.dir, file: safe.file });
-        const content = file.data?.content ?? file.data?.[0]?.content;
+        const content = file.data?.content ?? file.data?.[0]?.content ?? file.data?.data?.content ?? file.data?.data?.[0]?.content ?? file.data?.result?.data?.content;
         if (typeof content !== "string") throw new Error("The selected website file could not be read.");
         const truncated = new TextEncoder().encode(content).byteLength > MAX_EDIT_BYTES;
         return json({ path: safe.relative, content: truncated ? "" : content, truncated }, 200, corsHeaders(request));
@@ -720,7 +731,7 @@ export function createCommunicationsSiteRouter(deps) {
       const cp = cpanelConfig(env);
       const safe = safeCpanelPath(relative, cp.documentRoot);
       const current = await cpanelCall(cp, "Fileman/get_file_content", { dir: safe.dir, file: safe.file });
-      const currentContent = current.data?.content ?? current.data?.[0]?.content;
+      const currentContent = current.data?.content ?? current.data?.[0]?.content ?? current.data?.data?.content ?? current.data?.data?.[0]?.content ?? current.data?.result?.data?.content;
       if (typeof currentContent !== "string") throw new Error("The current file could not be read; rollback was not applied.");
       const safetyBackupId = "cpanel-backup:" + crypto.randomUUID();
       await env.DRIVE_KV.put(safetyBackupId, JSON.stringify({ path: safe.relative, content: currentContent }), { expirationTtl: 604800 });
@@ -740,7 +751,7 @@ export function createCommunicationsSiteRouter(deps) {
       const cp = cpanelConfig(env);
       if (!env.DRIVE_KV) throw new Error("The existing Cloudflare rollback store is unavailable; the file was not changed.");
       const prior = await cpanelCall(cp, "Fileman/get_file_content", { dir: safe.dir, file: safe.file });
-      const priorContent = prior.data?.content ?? prior.data?.[0]?.content;
+      const priorContent = prior.data?.content ?? prior.data?.[0]?.content ?? prior.data?.data?.content ?? prior.data?.data?.[0]?.content ?? prior.data?.result?.data?.content;
       if (typeof priorContent !== "string") throw new Error("The current file could not be read; the file was not changed.");
       const backupId = "cpanel-backup:" + crypto.randomUUID();
       await env.DRIVE_KV.put(backupId, JSON.stringify({ path: safe.relative, content: priorContent }), { expirationTtl: 604800 });
