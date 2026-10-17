@@ -371,8 +371,9 @@ jobs:
                 throw new Error("Staging cPanel test-file preparation failed with HTTP "+response.status+" (content-type: "+contentType+")"+(diagnostic?"; "+diagnostic:"; response body was not valid cPanel JSON")+". Check cPanel API token validity, user association, token privileges, and hosting security rules.");
               }
               if(body.status!==1 && body.errors?.length) {
-                const detail=String(body.errors.map(x=>x?.message||"").filter(Boolean).join("; ")).replace(/[\\r\\n\\t]+/g," ").slice(0,220);
-                throw new Error("cPanel Fileman API rejected the request"+(detail?": "+detail:"")+".");
+                const detail=String(body.errors.map(x=>typeof x==="string"?x:(x?.message||x?.error||JSON.stringify(x))).filter(Boolean).join("; ")).replace(/[\\r\\n\\t]+/g," ").slice(0,220);
+                const meta="status="+String(body.status)+", error_keys="+Object.keys(body).filter(k=>/error|reason|status|message/i.test(k)).join(",");
+                throw new Error("cPanel Fileman API rejected the request ("+meta+")"+(detail?": "+detail:"; no readable error detail returned")+".");
               }
               return body;
             }
