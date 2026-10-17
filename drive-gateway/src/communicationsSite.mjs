@@ -365,7 +365,16 @@ export function createCommunicationsSiteRouter(deps) {
           message === "The current page/post exceeds the safe revision snapshot limit; no edit was made.") {
         throw error;
       }
-      throw new Error("Staging website snapshot failed at stage " + stage + "; no page edit was made.");
+      let category = "runtime_error";
+      if (/Privileged Firestore identity is not configured correctly/i.test(message)) category = "service_account_json_invalid";
+      else if (/Privileged Firestore identity is not configured/i.test(message)) category = "service_account_missing";
+      else if (/invalid for this Firebase project/i.test(message)) category = "service_account_project_mismatch";
+      else if (/could not obtain an access token/i.test(message)) category = "oauth_token_exchange_failed";
+      else if (/atomically commit.*HTTP ([0-9]{3})/i.test(message)) category = "firestore_commit_http_" + message.match(/HTTP ([0-9]{3})/i)[1];
+      else if (/is not defined/i.test(message)) category = "reference_error";
+      else if (/DataError|InvalidAccessError|OperationError/i.test(message)) category = "crypto_key_import_or_sign_error";
+      else if (error?.name === "ReferenceError") category = "reference_error";
+      throw new Error("Staging website snapshot failed at stage " + stage + " (" + category + "); no page edit was made.");
     }
   }
 
