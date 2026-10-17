@@ -263,6 +263,20 @@ test("audit records and application logs never contain the Worker credential", a
   assert.equal(JSON.stringify(consoleMessages).includes(TEST_PASSWORD), false);
 });
 
+test("editing is refused when WordPress has no current revision ID", async () => {
+  nativeRevisions = [];
+  const router = makeRouter();
+  const env = makeEnv();
+  const result = await call(router, env, "/api/communications/website/content", {
+    method: "PUT",
+    body: { type: "pages", id: 123, title: "Should not save", content: "<p>Should not save</p>", excerpt: "", featuredMedia: 0, status: "draft" }
+  });
+  assert.equal(result.status, 502);
+  assert.equal(state.title, "Original test page");
+  assert.equal(auditEvents.length, 0);
+  assert.equal(kvStore.size, 0);
+});
+
 test("the page editor rejects plugins, themes, users, settings and other non-content fields", async () => {
   const router = makeRouter();
   const env = makeEnv();
