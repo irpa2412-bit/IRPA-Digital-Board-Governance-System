@@ -592,6 +592,9 @@ jobs:
                     checksHost:/HTTP_HOST|SERVER_NAME/.test(authContent),
                     hasFatalFunctionCall:authContent.includes("wp_die(")||authContent.includes("exit(")||authContent.includes("die(")
                   }));
+                  const sanitizedAuth=authContent.replace(/'[^']*'/g,"'[STRING]'").replace(/"[^"]*"/g,'"[STRING]"').replace(/[A-Za-z0-9+/_=-]{32,}/g,"[REDACTED]").replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}/g,"[EMAIL]").replace(/\\/home\\/[^/]+\\//g,"/home/[account]/");
+                  const authStructure=sanitizedAuth.split(String.fromCharCode(10)).map((line,index)=>({line:index+1,text:line.trim()})).filter(x=>/function|add_filter|add_action|wp_|HTTP_|SERVER|return|auth|user|filter|error|if\\s*\\(/i.test(x.text)).slice(0,45);
+                  console.log("STAGING_REST_AUTH_PLUGIN_SANITIZED="+JSON.stringify(authStructure));
                 }
               }
             }
