@@ -360,7 +360,11 @@ jobs:
               try { body=JSON.parse(raw); } catch {}
               if(!response.ok||!body) {
                 const detail=String(body?.errors?.map?.(x=>x?.message).filter(Boolean).join("; ")||body?.error||body?.message||"").replace(/[\\r\\n\\t]+/g," ").slice(0,220);
-                throw new Error("Staging cPanel test-file preparation failed with HTTP "+response.status+(detail?": "+detail:"; response body was not valid cPanel JSON")+". Check cPanel API token validity, user association, token privileges, and hosting security rules.");
+                const contentType=response.headers.get("content-type")||"unknown";
+                const title=(raw.match(/<title[^>]*>([\\s\\S]*?)<\\/title>/i)?.[1]||"").replace(/<[^>]*>/g," ").replace(/[\\r\\n\\t]+/g," ").trim().slice(0,120);
+                const textHint=raw.replace(/<script[\\s\\S]*?<\\/script>/gi," ").replace(/<style[\\s\\S]*?<\\/style>/gi," ").replace(/<[^>]*>/g," ").replace(/&nbsp;/gi," ").replace(/&amp;/gi,"&").replace(/[\\r\\n\\t]+/g," ").replace(/\\s+/g," ").trim().slice(0,180);
+                const diagnostic=[detail,title?"page title: "+title:"",textHint?"response excerpt: "+textHint:""].filter(Boolean).join("; ");
+                throw new Error("Staging cPanel test-file preparation failed with HTTP "+response.status+" (content-type: "+contentType+")"+(diagnostic?"; "+diagnostic:"; response body was not valid cPanel JSON")+". Check cPanel API token validity, user association, token privileges, and hosting security rules.");
               }
               if(body.status!==1 && body.errors?.length) {
                 const detail=String(body.errors.map(x=>x?.message||"").filter(Boolean).join("; ")).replace(/[\\r\\n\\t]+/g," ").slice(0,220);
