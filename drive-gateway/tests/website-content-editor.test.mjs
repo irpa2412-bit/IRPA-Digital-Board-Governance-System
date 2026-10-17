@@ -252,6 +252,46 @@ test("production hostname with a staging path is rejected before any WordPress r
   assert.equal(requestCount, before);
 });
 
+test("cPanel Fileman reads use the relative path for the exact staging document root", async () => {
+  const router = makeRouter();
+  const env = makeEnv({
+    CPANEL_BASE_URL: "https://cpanel.example.test:2083/",
+    CPANEL_USERNAME: "irpaortz",
+    CPANEL_API_TOKEN: "test-only-cpanel-token",
+    CPANEL_DOCUMENT_ROOT: "/home/irpaortz/public_html/staging"
+  });
+  let requestedUrl;
+  globalThis.fetch = async input => {
+    requestedUrl = new URL(typeof input === "string" ? input : input.url);
+    assert.equal(requestedUrl.hostname, "cpanel.example.test");
+    return response({ status: 1, data: { data: { content: "staging-only content" } } });
+  };
+  const result = await call(router, env, "/api/communications/cpanel/files?path=probe.txt");
+  assert.equal(result.status, 200);
+  assert.equal((await result.json()).content, "staging-only content");
+  assert.equal(requestedUrl.pathname, "/execute/Fileman/get_file_content");
+  assert.equal(requestedUrl.searchParams.get("dir"), "public_html/staging");
+  assert.equal(requestedUrl.searchParams.get("file"), "probe.txt");
+});
+
+test("cPanel file access refuses any document root other than the exact staging directory", async () => {
+  const router = makeRouter();
+  const env = makeEnv({
+    CPANEL_BASE_URL: "https://cpanel.example.test:2083/",
+    CPANEL_USERNAME: "irpaortz",
+    CPANEL_API_TOKEN: "test-only-cpanel-token",
+    CPANEL_DOCUMENT_ROOT: "/home/irpaortz/public_html"
+  });
+  let cpanelRequests = 0;
+  globalThis.fetch = async () => {
+    cpanelRequests++;
+    return response({ status: 1, data: { data: { content: "must not be read" } } });
+  };
+  const result = await call(router, env, "/api/communications/cpanel/files?path=probe.txt");
+  assert.equal(result.status, 502);
+  assert.equal(cpanelRequests, 0);
+});
+
 test("audit records and application logs never contain the Worker credential", async () => {
   const router = makeRouter();
   const env = makeEnv();
