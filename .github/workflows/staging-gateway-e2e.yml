@@ -783,6 +783,30 @@ jobs:
             $safeCodes = preg_replace('/[^a-z0-9_,.-]/i', '', $codes);
             header('X-IRPA-Staging-Auth-Diagnostic: bridge=active;https=1;authorization=1;php_user=1;php_password=1;app_password=rejected;reason=' . $safeCodes);
           }, 10, 1);
+          // Fallback only if core has not authenticated this request. Delegate to WordPress core's
+          // Application Password validator; do not compare passwords or bypass core capabilities.
+          add_filter('determine_current_user', function ($userId) {
+            if (!empty($userId)) { return $userId; }
+            if (!function_exists('wp_authenticate_application_password')) {
+              header('X-IRPA-Staging-Auth-Diagnostic: bridge=active;https=1;authorization=1;php_user=1;php_password=1;app_password=unsupported');
+              return $userId;
+            }
+            $authUser = (string) ($_SERVER['PHP_AUTH_USER'] ?? '');
+            $authPassword = (string) ($_SERVER['PHP_AUTH_PW'] ?? '');
+            if ($authUser === '' || $authPassword === '') { return $userId; }
+            $validated = wp_authenticate_application_password(false, $authUser, $authPassword);
+            if ($validated instanceof WP_User) {
+              header('X-IRPA-Staging-Auth-Diagnostic: bridge=active;https=1;authorization=1;php_user=1;php_password=1;app_password=valid;fallback=1');
+              return (int) $validated->ID;
+            }
+            if (is_wp_error($validated)) {
+              $codes = preg_replace('/[^a-z0-9_,.-]/i', '', implode(',', $validated->get_error_codes()));
+              header('X-IRPA-Staging-Auth-Diagnostic: bridge=active;https=1;authorization=1;php_user=1;php_password=1;app_password=rejected;fallback=1;reason=' . $codes);
+            } else {
+              header('X-IRPA-Staging-Auth-Diagnostic: bridge=active;https=1;authorization=1;php_user=1;php_password=1;app_password=no_result;fallback=1');
+            }
+            return $userId;
+          }, 999);
           `;
             const existing=await read(pluginDir,pluginName);
             if(!existing.ok||existing.content!==plugin){
