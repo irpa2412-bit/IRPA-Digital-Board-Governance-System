@@ -1233,6 +1233,32 @@ jobs:
           main().catch(e=>{console.error(e.message);process.exit(1)});
           NODE
 
+      - name: Diagnose staging WordPress application-password authentication (no secrets logged)
+        continue-on-error: true
+        env:
+          WP_BASE: ${{ secrets.STAGING_WORDPRESS_BASE_URL }}
+          WP_USER: ${{ secrets.STAGING_WORDPRESS_USERNAME }}
+          WP_PASSWORD: ${{ secrets.STAGING_WORDPRESS_APPLICATION_PASSWORD }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const {URL}=require("node:url");
+          async function main(){
+            const base=new URL(process.env.WP_BASE);
+            const auth="Basic "+Buffer.from(process.env.WP_USER+":"+String(process.env.WP_PASSWORD||"").replace(/\s/g,"")).toString("base64");
+            let response;
+            try{
+              response=await fetch(new URL("/wp-json/wp/v2/users/me?context=edit",base),{headers:{Authorization:auth,Accept:"application/json","Cache-Control":"no-cache"},signal:AbortSignal.timeout(12000)});
+            }catch(e){
+              console.log("STAGING_WP_APPLICATION_PASSWORD_PREFLIGHT="+JSON.stringify({result:"network_error",error:String(e.cause?.code||e.name||"error")}));
+              return;
+            }
+            const data=await response.json().catch(()=>({}));
+            console.log("STAGING_WP_APPLICATION_PASSWORD_PREFLIGHT="+JSON.stringify({http:response.status,contentType:response.headers.get("content-type")||"",server:response.headers.get("server")||"",errorCode:String(data.code||"").slice(0,80),authenticated:response.status===200&&Number.isInteger(data.id)}));
+          }
+          main().catch(e=>{console.log("STAGING_WP_APPLICATION_PASSWORD_PREFLIGHT=ERROR_"+String(e.name||"error"));process.exit(1)});
+          NODE
+
       - name: Verify WordPress and cPanel read-write-rollback integration
         env:
           STAGING_URL: ${{ steps.staging-health.outputs.staging_url }}
