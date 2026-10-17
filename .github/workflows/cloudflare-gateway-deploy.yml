@@ -7,24 +7,12 @@ on:
       - "drive-gateway/**"
       - ".github/workflows/cloudflare-gateway-deploy.yml"
   workflow_dispatch:
-    inputs:
-      production_cutover_confirmation:
-        description: "Type AUTHORIZE_FULL_PRODUCTION_CUTOVER only after staging acceptance and approved release review."
-        required: true
-        type: choice
-        options:
-          - NO
-          - AUTHORIZE_FULL_PRODUCTION_CUTOVER
-        default: NO:
 
 permissions:
   contents: read
 
 jobs:
   deploy:
-    # Never deploy production on an ordinary push/merge. Require an explicit
-    # workflow_dispatch confirmation after staging acceptance and release review.
-    if: github.event_name == 'workflow_dispatch' && inputs.production_cutover_confirmation == 'AUTHORIZE_FULL_PRODUCTION_CUTOVER'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:

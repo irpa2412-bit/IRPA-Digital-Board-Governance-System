@@ -126,8 +126,16 @@ function doMeta(env) {
     async list(c){ const keys=(await doCall(env.ESIGN_DO,"__index__",{op:"list",key:"__index__"})).keys.filter(k=>k.startsWith(c+"/")); const out=[]; for(const k of keys){const r=await doCall(env.ESIGN_DO,k,{op:"get",key:k}); if(r.value) out.push({id:k.slice(c.length+1),...r.value});} return out; }
   };
 }
+export function getDriveRootFolderName(env) {
+  const name=String(env?.DRIVE_ROOT_FOLDER_NAME||"IRPA Governance System").trim();
+  if(!name) throw new Error("DRIVE_ROOT_FOLDER_NAME must be configured.");
+  if(env?.IRPA_ENVIRONMENT==="staging" && name==="IRPA Governance System") {
+    throw new Error("Staging Drive storage must use a dedicated staging root folder.");
+  }
+  return name;
+}
 async function driveFolder(env, accessToken, path, driveFetchImpl) {
-  let parent=await findFolder(env,accessToken,"IRPA Governance System",null,driveFetchImpl);
+  let parent=await findFolder(env,accessToken,getDriveRootFolderName(env),null,driveFetchImpl);
   for(const part of path.split("/").filter(Boolean)) parent=await findFolder(env,accessToken,part,parent,driveFetchImpl);
   return parent;
 }

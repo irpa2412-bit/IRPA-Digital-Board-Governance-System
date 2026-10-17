@@ -72,7 +72,7 @@ service cloud.firestore {
       (portal=="Documents" && anyInstitutionalRole(["Executive Director","Director Internal Oversight","Director Finance & Administration"])) ||
       (portal=="Reports" && anyInstitutionalRole(["Executive Director","Director Internal Oversight","Director Finance & Administration","Director Human Resources"]));
   }
-  function communicationMediaUser(){return admin()||anyInstitutionalRole(["Communications Officer","Communications Manager","Media Officer","Public Relations Officer","Executive Director","Director Outreach","Outreach Director","Director Community Development","Community Development Director"]);}
+  function communicationMediaUser(){return admin()||anyInstitutionalRole(["Communication & Media","Communications & Media","Communication and Media","Communications and Media","Communications Officer","Communication Officer","Communications Manager","Communication Manager","Media Officer","Media Manager","Public Relations Officer","Communications & Media Officer","Communications and Media Officer","Media and Communications Officer","Media & Communications Officer","Executive Director","Director Outreach","Outreach Director","Director Community Development","Community Development Director"]);}
   function communicationMediaReviewer(){return admin()||anyInstitutionalRole(["Executive Director","Director Outreach","Outreach Director","Director Community Development","Community Development Director"]);}
   function authorityRoleRegistered(record,authorityRole){return record.get("role","")==authorityRole||record.get("boardPosition","")==authorityRole||record.get("unit","")==authorityRole||record.get("unitName","")==authorityRole||(record.get("roles",[]) is list&&record.get("roles",[]).hasAny([authorityRole]))||(record.get("assignedRoles",[]) is list&&record.get("assignedRoles",[]).hasAny([authorityRole]))||(record.get("selectedRoles",[]) is list&&record.get("selectedRoles",[]) .hasAny([authorityRole]))||(record.get("roleAssignments",[]) is list&&record.get("roleAssignments",[]).hasAny([authorityRole]));}
   function signerIdentityAuthorityUnchanged(){return request.resource.data.get("authorityRole",null)==resource.data.get("authorityRole",null)&&request.resource.data.get("authorityStatus",null)==resource.data.get("authorityStatus",null)&&request.resource.data.get("authorityReference",null)==resource.data.get("authorityReference",null)&&request.resource.data.get("authorityEffectiveAt",null)==resource.data.get("authorityEffectiveAt",null)&&request.resource.data.get("authorityExpiresAt",null)==resource.data.get("authorityExpiresAt",null)&&request.resource.data.get("authorityDepartment",null)==resource.data.get("authorityDepartment",null)&&request.resource.data.get("authorityUnit",null)==resource.data.get("authorityUnit",null)&&request.resource.data.get("authoritySourceCollection",null)==resource.data.get("authoritySourceCollection",null)&&request.resource.data.get("authoritySourceRecordId",null)==resource.data.get("authoritySourceRecordId",null);}
@@ -521,6 +521,134 @@ service cloud.firestore {
     );
     allow delete:if false;
   }
+// Communications operations registers: explicit schemas, no hard deletes, and immutable audit entries.
+  match /communicationOperations/{id}{
+    function validOperationsKind(data){return data.get("kind","") in ["Campaign","Media Contact","Brand Asset","Crisis Plan","Coverage Log"];}
+    function validOperationsRecord(data){
+      return validOperationsKind(data)
+        &&data.get("title","") is string&&data.get("title","").size()>0&&data.get("title","").size()<=180
+        &&data.get("summary","") is string&&data.get("summary","").size()<=2000
+        &&data.get("status","") in ["Draft","Active","Under Review","Approved","Completed","Archived"]
+        &&data.get("recordOrigin","")=="PRODUCTION"
+        &&data.keys().hasOnly(["kind","title","summary","status","owner","startDate","dueDate","channels","audience","objective","budgetNote","contactName","organization","email","phone","beat","consent","assetType","assetUrl","rights","version","expiryDate","severity","lead","approver","trigger","holdingStatement","nextReview","channel","sourceUrl","observedDate","reach","engagement","sentiment","evidence","tags","createdByUid","createdByEmail","createdAt","updatedByUid","updatedAt","recordOrigin"]);
+    }
+    allow read:if communicationMediaUser();
+    allow create:if communicationMediaUser()&&validOperationsRecord(request.resource.data)
+      &&request.resource.data.get("createdByUid","")==request.auth.uid
+      &&request.resource.data.get("updatedByUid","")==request.auth.uid
+      &&request.resource.data.get("status","")=="Draft"
+      &&request.resource.data.get("createdAt",null)==request.time
+      &&request.resource.data.get("updatedAt",null)==request.time;
+    allow update:if communicationMediaUser()&&validOperationsRecord(request.resource.data)
+      &&request.resource.data.get("createdByUid","")==resource.data.get("createdByUid","")
+      &&request.resource.data.get("createdAt",null)==resource.data.get("createdAt",null)
+      &&request.resource.data.get("recordOrigin","")==resource.data.get("recordOrigin","")
+      &&request.resource.data.get("updatedByUid","")==request.auth.uid
+      &&request.resource.data.get("updatedAt",null)==request.time
+      &&(
+        (resource.data.get("status","") in ["Draft","Under Review"]
+          &&request.resource.data.get("status","")==resource.data.get("status","")
+          &&resource.data.get("createdByUid","")==request.auth.uid
+          &&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["title","summary","owner","startDate","dueDate","channels","audience","objective","budgetNote","contactName","organization","email","phone","beat","consent","assetType","assetUrl","rights","version","expiryDate","severity","lead","approver","trigger","holdingStatement","nextReview","channel","sourceUrl","observedDate","reach","engagement","sentiment","evidence","tags","updatedByUid","updatedAt"]))
+        ||(communicationMediaReviewer()
+          &&resource.data.get("status","")!="Archived"
+          &&request.resource.data.get("status","")==resource.data.get("status","")
+          &&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["title","summary","owner","startDate","dueDate","channels","audience","objective","budgetNote","contactName","organization","email","phone","beat","consent","assetType","assetUrl","rights","version","expiryDate","severity","lead","approver","trigger","holdingStatement","nextReview","channel","sourceUrl","observedDate","reach","engagement","sentiment","evidence","tags","updatedByUid","updatedAt"]))
+        ||(communicationMediaReviewer()
+          &&resource.data.get("status","")!="Archived"
+          &&((resource.data.get("status","")=="Draft"&&request.resource.data.get("status","") in ["Under Review","Approved","Archived"])||(resource.data.get("status","")=="Under Review"&&request.resource.data.get("status","") in ["Draft","Approved","Archived"])||(resource.data.get("status","")=="Approved"&&request.resource.data.get("status","") in ["Active","Completed","Archived"])||(resource.data.get("status","")=="Active"&&request.resource.data.get("status","") in ["Completed","Archived"])||(resource.data.get("status","")=="Completed"&&request.resource.data.get("status","")=="Archived"))
+          &&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","updatedByUid","updatedAt"]))
+      );
+    allow delete:if false;
+  }
+  match /communicationOperationsAudit/{id}{
+    allow read:if communicationMediaReviewer();
+    allow create:if communicationMediaUser()
+      &&request.resource.data.get("actorUid","")==request.auth.uid
+      &&request.resource.data.get("recordId","") is string
+      &&request.resource.data.get("kind","") in ["Campaign","Media Contact","Brand Asset","Crisis Plan","Coverage Log"]
+      &&request.resource.data.get("action","") in ["CREATED","UPDATED","STATUS_APPROVED","STATUS_ARCHIVED","STATUS_ACTIVE","STATUS_UNDER_REVIEW","STATUS_COMPLETED","STATUS_DRAFT"]
+      &&request.resource.data.get("title","") is string
+      &&request.resource.data.get("title","").size()<=180
+      &&request.resource.data.get("actorEmail","")==request.auth.token.get("email","")
+      &&existsAfter(/databases/$(database)/documents/communicationOperations/$(request.resource.data.recordId))
+      &&getAfter(/databases/$(database)/documents/communicationOperations/$(request.resource.data.recordId)).data.get("kind","")==request.resource.data.get("kind","")
+      &&getAfter(/databases/$(database)/documents/communicationOperations/$(request.resource.data.recordId)).data.get("title","")==request.resource.data.get("title","")
+      &&request.resource.data.get("recordOrigin","")=="PRODUCTION"
+      &&request.resource.data.get("createdAt",null)==request.time
+      &&request.resource.data.keys().hasOnly(["recordId","kind","action","title","actorUid","actorEmail","createdAt","recordOrigin"]);
+    allow update,delete:if false;
+  }
+  // Social-media account register: metadata only; no platform credentials or tokens are accepted.
+  match /socialMediaAccounts/{id}{
+    function validSocialAccount(data){
+      return data.get("platform","") in ["Facebook","Instagram","LinkedIn","X","YouTube","TikTok","WhatsApp","Telegram","Other"]
+        &&data.get("accountName","") is string&&data.get("accountName","").size()>0&&data.get("accountName","").size()<=180
+        &&data.get("handle","") is string&&data.get("handle","").size()<=120
+        &&data.get("profileUrl","") is string&&data.get("profileUrl","").size()<=1000
+        &&(data.get("profileUrl","")==""||data.get("profileUrl","").matches("^https://.*"))
+        &&data.get("accountType","") in ["Organization page","Public profile","Channel","Group","Messaging channel","Other"]
+        &&data.get("owner","") is string&&data.get("owner","").size()>0&&data.get("owner","").size()<=180
+        &&data.get("custodian","") is string&&data.get("custodian","").size()<=180
+        &&data.get("purpose","") is string&&data.get("purpose","").size()<=1000
+        &&data.get("audience","") is string&&data.get("audience","").size()<=500
+        &&data.get("authorizationReference","") is string&&data.get("authorizationReference","").size()<=180
+        &&data.get("reviewDate","") is string&&data.get("reviewDate","").size()<=20
+        &&data.get("notes","") is string&&data.get("notes","").size()<=1500
+        &&data.get("connectionStatus","") in ["Pending Verification","Active","Suspended","Disconnected","Archived"]
+        &&data.get("recordOrigin","")=="PRODUCTION"
+        &&data.keys().hasOnly(["platform","accountName","handle","profileUrl","accountType","owner","custodian","purpose","audience","authorizationReference","reviewDate","notes","connectionStatus","createdByUid","createdByEmail","createdAt","updatedByUid","updatedAt","recordOrigin"]);
+    }
+    allow read:if communicationMediaUser();
+    allow create:if communicationMediaUser()&&validSocialAccount(request.resource.data)
+      &&request.resource.data.get("createdByUid","")==request.auth.uid
+      &&request.resource.data.get("updatedByUid","")==request.auth.uid
+      &&request.resource.data.get("connectionStatus","")=="Pending Verification"
+      &&request.resource.data.get("createdAt",null)==request.time
+      &&request.resource.data.get("updatedAt",null)==request.time;
+    allow update:if communicationMediaUser()&&validSocialAccount(request.resource.data)
+      &&request.resource.data.get("createdByUid","")==resource.data.get("createdByUid","")
+      &&request.resource.data.get("createdAt",null)==resource.data.get("createdAt",null)
+      &&request.resource.data.get("recordOrigin","")==resource.data.get("recordOrigin","")
+      &&request.resource.data.get("updatedByUid","")==request.auth.uid
+      &&request.resource.data.get("updatedAt",null)==request.time
+      &&(
+        (resource.data.get("connectionStatus","")=="Pending Verification"
+          &&resource.data.get("createdByUid","")==request.auth.uid
+          &&request.resource.data.get("connectionStatus","")==resource.data.get("connectionStatus","")
+          &&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["platform","accountName","handle","profileUrl","accountType","owner","custodian","purpose","audience","authorizationReference","reviewDate","notes","updatedByUid","updatedAt"]))
+        ||(communicationMediaReviewer()
+          &&resource.data.get("connectionStatus","")!="Archived"
+          &&request.resource.data.get("connectionStatus","")==resource.data.get("connectionStatus","")
+          &&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["platform","accountName","handle","profileUrl","accountType","owner","custodian","purpose","audience","authorizationReference","reviewDate","notes","updatedByUid","updatedAt"]))
+        ||(communicationMediaReviewer()
+          &&((resource.data.get("connectionStatus","")=="Pending Verification"&&request.resource.data.get("connectionStatus","") in ["Active","Suspended","Disconnected","Archived"])
+            ||(resource.data.get("connectionStatus","")=="Active"&&request.resource.data.get("connectionStatus","") in ["Suspended","Disconnected","Archived"])
+            ||(resource.data.get("connectionStatus","")=="Suspended"&&request.resource.data.get("connectionStatus","") in ["Active","Disconnected","Archived"])
+            ||(resource.data.get("connectionStatus","")=="Disconnected"&&request.resource.data.get("connectionStatus","")=="Archived"))
+          &&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["connectionStatus","updatedByUid","updatedAt"]))
+      );
+    allow delete:if false;
+  }
+  match /socialMediaAccountsAudit/{id}{
+    allow read:if communicationMediaReviewer();
+    allow create:if communicationMediaUser()
+      &&request.resource.data.get("actorUid","")==request.auth.uid
+      &&request.resource.data.get("recordId","") is string
+      &&request.resource.data.get("platform","") in ["Facebook","Instagram","LinkedIn","X","YouTube","TikTok","WhatsApp","Telegram","Other"]
+      &&request.resource.data.get("accountName","") is string
+      &&request.resource.data.get("accountName","").size()<=180
+      &&request.resource.data.get("action","") in ["ENROLLED","UPDATED","STATUS_ACTIVE","STATUS_SUSPENDED","STATUS_DISCONNECTED","STATUS_ARCHIVED"]
+      &&request.resource.data.get("actorEmail","")==request.auth.token.get("email","")
+      &&existsAfter(/databases/$(database)/documents/socialMediaAccounts/$(request.resource.data.recordId))
+      &&getAfter(/databases/$(database)/documents/socialMediaAccounts/$(request.resource.data.recordId)).data.get("platform","")==request.resource.data.get("platform","")
+      &&getAfter(/databases/$(database)/documents/socialMediaAccounts/$(request.resource.data.recordId)).data.get("accountName","")==request.resource.data.get("accountName","")
+      &&request.resource.data.get("recordOrigin","")=="PRODUCTION"
+      &&request.resource.data.get("createdAt",null)==request.time
+      &&request.resource.data.keys().hasOnly(["recordId","platform","accountName","action","actorUid","actorEmail","createdAt","recordOrigin"]);
+    allow update,delete:if false;
+  }
+
   match /{document=**}{allow read,write:if false;}
  }
 }
