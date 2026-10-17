@@ -1,4 +1,5 @@
 name: Staging Gateway E2E and Deploy
+# Archive repair deployment is isolated to the approved staging Firebase app and dedicated KV namespace.
 
 on:
   push:
