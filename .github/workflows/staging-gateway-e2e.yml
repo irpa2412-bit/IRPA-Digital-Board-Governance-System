@@ -905,6 +905,15 @@ jobs:
           }
           (async()=>{
             const status=await call("/api/communications/site/status");
+            console.log("STAGING_CONNECTION_DIAGNOSTIC="+JSON.stringify({
+              website:status.connections?.website||"unknown",
+              websiteHttpStatus:status.connections?.websiteHttpStatus??null,
+              websiteErrorCode:status.connections?.websiteErrorCode||null,
+              websiteResponseType:status.connections?.websiteResponseType||null,
+              websiteResponseServer:status.connections?.websiteResponseServer||null,
+              websiteCloudflareRay:status.connections?.websiteCloudflareRay||null,
+              cpanel:status.connections?.cpanel||"unknown"
+            }));
             if(status.connections?.website!=="connected"||status.connections?.websiteHttpStatus!==200||status.connections?.cpanel!=="connected") throw new Error("Staging connection acceptance failed with HTTP "+(status.connections?.websiteHttpStatus??"unknown")+".");
             console.log("STAGING_WORDPRESS_USERS_ME_HTTP="+status.connections.websiteHttpStatus);
             const listed=await call("/api/communications/website/content?type=pages&search="+encodeURIComponent("IRPA Staging Integration Check"));
