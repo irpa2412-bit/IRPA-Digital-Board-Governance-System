@@ -1847,6 +1847,10 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.STAGING_CLOUDFLARE_ACCOUNT_ID }}
           PROJECT: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
           APP_URL: "https://irpa-dbg-staging-a73ec.web.app"
+          CP_ROOT: ${{ secrets.STAGING_CPANEL_DOCUMENT_ROOT }}
+          META_APP_ID: ${{ vars.STAGING_META_APP_ID }}
+          META_APP_SECRET: ${{ secrets.STAGING_META_APP_SECRET }}
+          META_TOKEN_ENCRYPTION_KEY: ${{ secrets.STAGING_META_TOKEN_ENCRYPTION_KEY }}
         working-directory: drive-gateway
         run: |
           set -euo pipefail
@@ -1876,7 +1880,11 @@ jobs:
               IRPA_APP_URL:process.env.APP_URL,
               SMTP_HOST:"mail.irpa.or.tz",SMTP_PORT:"465",SMTP_FROM:"info@irpa.or.tz",
               DRIVE_ROOT_FOLDER_NAME:"IRPA Governance System - STAGING",
-              FIRESTORE_COLLECTION_PREFIX:"staging_",DRIVE_MOCK:"false",LOCAL_TEST_MODE:"false"
+              FIRESTORE_COLLECTION_PREFIX:"staging_",DRIVE_MOCK:"false",LOCAL_TEST_MODE:"false",
+              IRPA_PRODUCTION_CUTOVER:"false",CPANEL_DOCUMENT_ROOT:process.env.CP_ROOT,
+              META_APP_ID:process.env.META_APP_ID||"",
+              META_REDIRECT_URI:"https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev/api/communications/meta/callback",
+              META_GRAPH_API_VERSION:"v26.0"
             },
             kv_namespaces:[{binding:"DRIVE_KV",id:process.env.STAGING_KV_ID}],
             // The generated config is standalone (not an env.staging overlay), so it must
@@ -1885,7 +1893,7 @@ jobs:
             migrations:[{tag:"esign-do-staging-v1",new_sqlite_classes:["EsignRecordDurableObject"]}],
             triggers:{crons:["0 * * * *"]}
           };
-          if(c.vars.FIREBASE_PROJECT_ID==="irpa-digital-board-governance") throw new Error("Production Firebase project forbidden.");
+          if(c.vars.FIREBASE_PROJECT_ID!=="irpa-dbg-staging-a73ec"||c.vars.IRPA_PRODUCTION_CUTOVER!=="false"||c.vars.IRPA_ENVIRONMENT!=="staging") throw new Error("Staging deployment refused unsafe Firebase project or production cutover configuration.");
           fs.writeFileSync("wrangler.staging.generated.json",JSON.stringify(c,null,2)+"\n");
           NODE
 
@@ -1906,6 +1914,23 @@ jobs:
           console.log("STAGING_CONFIGURATION_VALID");
           NODE
 
+      - name: Validate optional staging Meta OAuth configuration
+        env:
+          META_APP_ID: ${{ vars.STAGING_META_APP_ID }}
+          META_APP_SECRET: ${{ secrets.STAGING_META_APP_SECRET }}
+          META_TOKEN_ENCRYPTION_KEY: ${{ secrets.STAGING_META_TOKEN_ENCRYPTION_KEY }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const id=String(process.env.META_APP_ID||"").trim();
+          const secret=String(process.env.META_APP_SECRET||"");
+          const key=String(process.env.META_TOKEN_ENCRYPTION_KEY||"");
+          const any=Boolean(id||secret||key);
+          const valid=!any || (/^\d+$/.test(id)&&Boolean(secret.trim())&&/^[A-Za-z0-9+/]+={0,2}$/.test(key)&&Buffer.from(key,"base64").length===32&&key.trim()===key);
+          if(!valid) throw new Error("Staging Meta configuration is partial or invalid; refusing to configure Worker secrets.");
+          console.log(any?"META_OAUTH_CONFIGURATION_SHAPE=VALID":"META_OAUTH_CONFIGURED=false");
+          NODE
+
       - name: Inject staging-only Worker secrets
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
@@ -1914,6 +1939,9 @@ jobs:
           GOOGLE_DRIVE_CLIENT_SECRET: ${{ secrets.STAGING_GOOGLE_DRIVE_CLIENT_SECRET }}
           GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY: ${{ secrets.STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY }}
           SMTP_PASSWORD: ${{ secrets.STAGING_SMTP_PASSWORD }}
+          META_APP_ID: ${{ vars.STAGING_META_APP_ID }}
+          META_APP_SECRET: ${{ secrets.STAGING_META_APP_SECRET }}
+          META_TOKEN_ENCRYPTION_KEY: ${{ secrets.STAGING_META_TOKEN_ENCRYPTION_KEY }}
         working-directory: drive-gateway
         run: |
           set -euo pipefail
@@ -1921,6 +1949,10 @@ jobs:
           printf '%s' "$GOOGLE_DRIVE_CLIENT_SECRET" | npx wrangler secret put GOOGLE_DRIVE_CLIENT_SECRET --config wrangler.staging.generated.json
           printf '%s' "$GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY" | npx wrangler secret put GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY --config wrangler.staging.generated.json
           printf '%s' "$SMTP_PASSWORD" | npx wrangler secret put SMTP_PASSWORD --config wrangler.staging.generated.json
+          if [ -n "$META_APP_ID" ] && [ -n "$META_APP_SECRET" ] && [ -n "$META_TOKEN_ENCRYPTION_KEY" ]; then
+            printf '%s' "$META_APP_SECRET" | npx wrangler secret put META_APP_SECRET --config wrangler.staging.generated.json
+            printf '%s' "$META_TOKEN_ENCRYPTION_KEY" | npx wrangler secret put META_TOKEN_ENCRYPTION_KEY --config wrangler.staging.generated.json
+          fi
 
       - name: Install gateway dependencies for bundling
         working-directory: drive-gateway
