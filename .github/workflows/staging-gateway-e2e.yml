@@ -126,6 +126,7 @@ jobs:
           if(cp.protocol!=="https:" || cp.port!=="2083" || cp.pathname!=="/") throw new Error("Staging cPanel endpoint must use HTTPS port 2083.");
           const root=process.env.CP_ROOT.replace(/^\/+|\/+$/g,"");
           if(!root || root.split("/").some(p=>!p || p==="." || p===".." || p.startsWith("."))) throw new Error("Staging cPanel document root is invalid.");
+          if(!/(^|\/)staging$/i.test(root)) throw new Error("ABORT: cPanel document root must be the isolated staging directory, never the production document root.");
           const file=process.env.CP_TEST_FILE;
           if(!file || file.includes("/") || file.startsWith("/") || file.split("/").some(p=>!p || p==="." || p===".." || p.startsWith(".")) || !/\.txt$/i.test(file)) throw new Error("Staging cPanel test file must be a safe relative .txt path.");
           console.log("ISOLATED_STAGING_CREDENTIALS_VALID");
@@ -445,8 +446,10 @@ jobs:
               console.log("WP_BOOT_FILE_CHECK="+JSON.stringify(report));
               if(name==="wp-config.php"){
                 const match=content.match(/define\s*\(\s*['"]DB_NAME['"]\s*,\s*(['"])(.*?)\1\s*\)/s);
+                const dbNameLiteral=Boolean(match);
                 const isolated=Boolean(match&&/stage|staging|test/i.test(match[2]));
                 console.log("STAGING_DATABASE_ISOLATION="+(isolated?"PASS":"FAIL"));
+                console.log("STAGING_DATABASE_GUARD_DETAIL="+JSON.stringify({dbNameLiteral,stagingMarker:isolated}));
                 if(!isolated)throw new Error("ABORT: staging database name is not explicitly staging-scoped; refusing all WordPress database changes.");
               }
             }
@@ -461,7 +464,7 @@ jobs:
               }
             }
           }
-          main().catch(e=>{console.log("WP_BOOT_DIAGNOSTIC_ERROR="+String(e.code||e.name||"unknown"));process.exit(1);});
+          main().catch(e=>{console.log("WP_BOOT_DIAGNOSTIC_ERROR="+String(e.message||e.code||e.name||"unknown").replace(/\s+/g," ").slice(0,220));process.exit(1);});
           NODE
 
       - name: Repair staging WordPress bootstrap and register application password safely
@@ -852,11 +855,13 @@ jobs:
           set -euo pipefail
           node <<'NODE'
           const https=require("node:https");
+          const dns=require("node:dns");
+          dns.setDefaultResultOrder("ipv4first");
           const {URL,URLSearchParams}=require("node:url");
           function request(url,headers={},method="GET",body){
             return new Promise((resolve,reject)=>{
               const u=new URL(url);
-              const req=https.request({protocol:u.protocol,hostname:u.hostname,port:u.port||443,path:u.pathname+u.search,method,headers,timeout:12000},res=>{
+              const req=https.request({protocol:u.protocol,hostname:u.hostname,port:u.port||443,family:4,path:u.pathname+u.search,method,headers,timeout:12000},res=>{
                 let raw="";res.setEncoding("utf8");res.on("data",c=>raw+=c);res.on("end",()=>resolve({http:res.statusCode,headers:res.headers,raw}));
               });
               req.on("timeout",()=>req.destroy(new Error("request timeout")));
@@ -905,7 +910,13 @@ jobs:
             fs.writeFileSync("staging-wordpress-fatal-diagnostics.txt",JSON.stringify(output,null,2)+"\n");
             console.log("STAGING_FATAL_DIAGNOSTICS="+JSON.stringify({targetHost:wp.hostname,probes:probes.map(p=>({url:p.url,http:p.http,errorCode:p.errorCode,error:p.error})),logs:reports.map(x=>({file:x.file,http:x.http,status:x.status,contentLength:x.contentLength,relevantLineCount:x.relevantLineCount,lines:x.lines}))}));
           }
-          main().catch(e=>{console.error("Staging fatal diagnostics failed: "+String(e.message||e));process.exit(1)});
+          main().catch(e=>{
+            const fs=require("node:fs");
+            const report={diagnosticError:String(e.code||e.name||"diagnostic_error"),message:String(e.message||"").replace(/\s+/g," ").slice(0,180),targetHost:"staging.irpa.or.tz"};
+            fs.writeFileSync("staging-wordpress-fatal-diagnostics.txt",JSON.stringify(report,null,2)+"\n");
+            console.error("Staging fatal diagnostics failed: "+report.diagnosticError);
+            process.exit(1)
+          });
           NODE
 
       - name: Inject staging-only Worker secrets
