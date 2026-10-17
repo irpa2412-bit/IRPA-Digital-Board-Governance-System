@@ -1151,7 +1151,7 @@ jobs:
             const basic="Basic "+Buffer.from(process.env.WP_USER+":"+wpPassword).toString("base64");
             async function verifyAuth(){
               let r;
-              try{r=await request(new URL("/wp-json/wp/v2/users/me?context=edit",wpBase).href,{Authorization:basic,Accept:"application/json","Cache-Control":"no-cache"});}
+              try{r=await request(new URL("/wp-json/wp/v2/users/me?context=edit",wpBase).href,"GET",{Authorization:basic,Accept:"application/json","Cache-Control":"no-cache"});}
               catch(e){return {ok:false,http:0,error:String(e.code||e.name)}}
               return {ok:r.http===200&&Number.isInteger(r.data?.id),http:r.http,errorCode:String(r.data?.code||"").slice(0,80)};
             }
