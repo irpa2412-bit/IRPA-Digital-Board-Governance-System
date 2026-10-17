@@ -36,9 +36,8 @@ function config(env) {
   if (!/^\d{4,30}$/.test(appId) || !appSecret) throw new Error("Staging Meta application configuration is incomplete.");
   let redirect;
   try { redirect = new URL(redirectUri); } catch { throw new Error("Staging Meta callback configuration is invalid."); }
-  if (redirect.protocol !== "https:" || !redirect.hostname.includes("staging") ||
-      !redirect.hostname.endsWith(".workers.dev") || redirect.hostname === "workers.dev" ||
-      redirect.hostname.endsWith(".irpa.or.tz") || redirect.username || redirect.password ||
+  if (redirect.protocol !== "https:" || redirect.hostname !== "irpa-google-drive-gateway-staging.irpa-governance.workers.dev" ||
+      redirect.username || redirect.password ||
       redirect.search || redirect.hash || redirect.pathname !== "/api/communications/meta/callback") {
     throw new Error("Meta callback configuration must use the dedicated HTTPS staging Cloudflare Worker URL.");
   }
