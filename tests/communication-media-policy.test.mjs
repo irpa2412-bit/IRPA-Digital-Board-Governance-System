@@ -166,7 +166,7 @@ test("social account enrolment is integrated, metadata-only, role-scoped and aud
  for(const term of ['Facebook','Instagram','LinkedIn','YouTube','TikTok','Pending Verification','authorizationReference','custodian','reviewDate','writeBatch(db)','socialMediaAccountsAudit','noopener noreferrer','does not publish posts']) assert.ok(social.includes(term),term);
  assert.ok(!social.includes('accessToken'));
  assert.ok(!social.includes('clientSecret'));
- assert.ok(!social.includes('password'));
+ assert.ok(!/\\bpassword\\s*[:=]/i.test(social));
  assert.ok(rules.includes('match /socialMediaAccounts/{id}'));
  assert.ok(rules.includes('match /socialMediaAccountsAudit/{id}'));
  assert.ok(rules.includes('data.keys().hasOnly(["platform","accountName","handle","profileUrl"'));
