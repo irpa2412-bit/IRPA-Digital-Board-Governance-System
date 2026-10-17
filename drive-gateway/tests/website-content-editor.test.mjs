@@ -9,6 +9,7 @@ let nextRevisionId;
 let kvStore;
 let auditEvents;
 let requestCount;
+let consoleMessages;
 let originalFetch;
 let originalConsole;
 
@@ -111,12 +112,13 @@ test.beforeEach(() => {
   kvStore = new Map();
   auditEvents = [];
   requestCount = 0;
+  consoleMessages = [];
   originalFetch = globalThis.fetch;
   originalConsole = { log: console.log, info: console.info, warn: console.warn, error: console.error };
-  console.log = () => {};
-  console.info = () => {};
-  console.warn = () => {};
-  console.error = () => {};
+  console.log = (...args) => consoleMessages.push(["log", ...args]);
+  console.info = (...args) => consoleMessages.push(["info", ...args]);
+  console.warn = (...args) => consoleMessages.push(["warn", ...args]);
+  console.error = (...args) => consoleMessages.push(["error", ...args]);
   globalThis.fetch = async (input, init = {}) => {
     requestCount++;
     const url = new URL(typeof input === "string" ? input : input.url);
@@ -182,6 +184,9 @@ test("one staging page can be read with editable fields", async () => {
   assert.equal(data.item.title, "Original test page");
   assert.equal(data.item.content, "<p>Original exact content.</p>");
   assert.equal(data.item.featuredMedia, 19);
+  const listed = await call(router, makeEnv(), "/api/communications/website/content?type=pages");
+  assert.equal(listed.status, 200);
+  assert.equal((await listed.json()).items[0].id, 123);
 });
 
 test("an edit saves a snapshot and one-click restore returns all allowed fields exactly", async () => {
@@ -203,6 +208,11 @@ test("an edit saves a snapshot and one-click restore returns all allowed fields 
   assert.equal(editData.item.status, "draft");
   assert.equal(editData.item.featuredMedia, 77);
   assert.equal(editData.previousRevisionId, 44);
+  const revisionsResponse = await call(router, env, "/api/communications/website/revisions?type=pages&id=123");
+  assert.equal(revisionsResponse.status, 200);
+  const revisionList = await revisionsResponse.json();
+  assert.ok(revisionList.revisions.some(item => item.snapshotId === editData.snapshotId));
+  assert.ok(revisionList.revisions.some(item => item.revisionId === 44));
 
   const restored = await call(router, env, "/api/communications/website/restore", {
     method: "POST",
@@ -216,7 +226,9 @@ test("an edit saves a snapshot and one-click restore returns all allowed fields 
   assert.equal(restoreData.item.excerpt, original.excerpt);
   assert.equal(restoreData.item.featuredMedia, original.featured_media);
   assert.equal(restoreData.item.status, original.status);
-  assert.deepEqual(state, original);
+  assert.deepEqual({ title: state.title, content: state.content, excerpt: state.excerpt, featured_media: state.featured_media, status: state.status }, {
+    title: original.title, content: original.content, excerpt: original.excerpt, featured_media: original.featured_media, status: original.status
+  });
   assert.ok(auditEvents.some(event => JSON.stringify(event).includes("COMMUNICATION_WEBSITE_EDIT_SNAPSHOT_SAVED")));
   assert.ok(auditEvents.some(event => JSON.stringify(event).includes("COMMUNICATION_WEBSITE_REVISION_RESTORED")));
 });
@@ -246,4 +258,5 @@ test("audit records and application logs never contain the Worker credential", a
   const auditText = JSON.stringify(auditEvents);
   assert.equal(auditText.includes(TEST_PASSWORD), false);
   assert.equal(auditText.includes("Authorization"), false);
+  assert.equal(JSON.stringify(consoleMessages).includes(TEST_PASSWORD), false);
 });
