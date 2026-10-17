@@ -314,6 +314,77 @@ jobs:
           NODE
 
 
+      - name: Verify production Cloudflare token can inspect the IRPA DNS zone (read-only)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const https=require("node:https");
+          function get(url){
+            return new Promise((resolve,reject)=>{
+              const req=https.request(url,{headers:{Authorization:"Bearer "+process.env.CLOUDFLARE_API_TOKEN,Accept:"application/json"},timeout:10000},res=>{
+                let raw="";res.setEncoding("utf8");res.on("data",c=>raw+=c);res.on("end",()=>{let data;try{data=JSON.parse(raw)}catch{}resolve({http:res.statusCode,data})});
+              });
+              req.on("timeout",()=>req.destroy(new Error("Cloudflare DNS scope check timed out.")));
+              req.on("error",reject);req.end();
+            });
+          }
+          (async()=>{
+            const r=await get("https://api.cloudflare.com/client/v4/zones?name=irpa.or.tz&per_page=10");
+            console.log("IRPA_DNS_ZONE_QUERY_HTTP="+r.http);
+            console.log("IRPA_DNS_ZONE_QUERY_SUCCESS="+String(r.data?.success));
+            console.log("IRPA_DNS_ZONE_VISIBLE="+String((r.data?.result||[]).some(z=>z.name==="irpa.or.tz")));
+            console.log("IRPA_DNS_ZONE_ERRORS="+JSON.stringify((r.data?.errors||[]).map(e=>({code:e.code,message:String(e.message||"").slice(0,120)}))));
+            if(r.http!==200||r.data?.success!==true) throw new Error("Production Cloudflare token cannot inspect DNS zone metadata.");
+          })().catch(e=>{console.error("IRPA DNS zone read-only verification failed: "+(e.code||e.message||e.name));process.exit(1)});
+          NODE
+
+      - name: Inspect cPanel staging installation and reachable WordPress paths (read-only)
+        env:
+          CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
+          CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
+          CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const https=require("node:https");
+          const dns=require("node:dns").promises;
+          const {URL,URLSearchParams}=require("node:url");
+          function get(url,headers={}) {
+            return new Promise((resolve,reject)=>{
+              const req=https.request(url,{headers,timeout:10000},res=>{
+                let raw="";res.setEncoding("utf8");res.on("data",c=>raw+=c);res.on("end",()=>{let data;try{data=JSON.parse(raw)}catch{}resolve({http:res.statusCode,data,raw})});
+              });
+              req.on("timeout",()=>req.destroy(new Error("Inspection request timed out.")));
+              req.on("error",reject);req.end();
+            });
+          }
+          async function main(){
+            const base=new URL(process.env.CP_BASE);
+            const auth={Authorization:"cpanel "+process.env.CP_USER+":"+process.env.CP_TOKEN,Accept:"application/json"};
+            const call=async(path,params={})=>{const u=new URL("/execute/"+path,base);u.search=new URLSearchParams(params).toString();return get(u,auth)};
+            const info=await call("DomainInfo/domains_data");
+            const root=String(info.data?.data?.main_domain?.documentroot||info.data?.data?.main_domain?.document_root||"");
+            if(info.http!==200||info.data?.status!==1||!root) throw new Error("Could not resolve the cPanel main document root.");
+            console.log("CPANEL_ROOT_CONFIRMED="+root.replace(/\/home\/[^/]+/,"/home/[account]"));
+            for(const rel of ["staging","staging ","wp","wp-content","wp-admin","wp-includes"]){
+              const dir=root+"/"+rel;
+              const listing=await call("Fileman/list_files",{dir,showdotfiles:1});
+              const rows=Array.isArray(listing.data?.data)?listing.data.data:[];
+              console.log("CPANEL_INSTALL_DIR="+JSON.stringify({dir:dir.replace(/\/home\/[^/]+/,"/home/[account]"),status:listing.data?.status,files:rows.map(v=>String(v.file||v.name||"")).filter(Boolean).slice(0,80)}));
+            }
+            for(const path of ["/wp-json/","/staging/wp-json/","/staging /wp-json/","/staging/"]){
+              try{
+                const u=new URL("https://irpa.or.tz"+path);
+                const result=await get(u,{Accept:"application/json"});
+                console.log("PUBLIC_WORDPRESS_PATH="+JSON.stringify({path,http:result.http,server:result.data?undefined:undefined,contentType:result.raw.slice(0,120).replace(/[\r\n]+/g," ")}));
+              }catch(e){console.log("PUBLIC_WORDPRESS_PATH_ERROR="+JSON.stringify({path,code:e.code||e.name}))}
+            }
+          }
+          main().catch(e=>{console.error(e.message);process.exit(1)});
+          NODE
+
       - name: Inspect staging DNS and wp268 installation mapping (read-only)
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
@@ -362,51 +433,6 @@ jobs:
               console.log("CPANEL_DIR_CHECK="+JSON.stringify({dir:dir.replace(/\/home\/[^/]+/,"/home/[account]"),http:q.http,status:q.data?.status,errors:(q.data?.errors||[]).map(x=>String(x).slice(0,120))}));
             }
           })().catch(e=>{console.error(e.message);process.exit(1)});
-          NODE
-
-      - name: Inspect cPanel staging installation and reachable WordPress paths (read-only)
-        env:
-          CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
-          CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
-          CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
-        run: |
-          set -euo pipefail
-          node <<'NODE'
-          const https=require("node:https");
-          const dns=require("node:dns").promises;
-          const {URL,URLSearchParams}=require("node:url");
-          function get(url,headers={}) {
-            return new Promise((resolve,reject)=>{
-              const req=https.request(url,{headers,timeout:10000},res=>{
-                let raw="";res.setEncoding("utf8");res.on("data",c=>raw+=c);res.on("end",()=>{let data;try{data=JSON.parse(raw)}catch{}resolve({http:res.statusCode,data,raw})});
-              });
-              req.on("timeout",()=>req.destroy(new Error("Inspection request timed out.")));
-              req.on("error",reject);req.end();
-            });
-          }
-          async function main(){
-            const base=new URL(process.env.CP_BASE);
-            const auth={Authorization:"cpanel "+process.env.CP_USER+":"+process.env.CP_TOKEN,Accept:"application/json"};
-            const call=async(path,params={})=>{const u=new URL("/execute/"+path,base);u.search=new URLSearchParams(params).toString();return get(u,auth)};
-            const info=await call("DomainInfo/domains_data");
-            const root=String(info.data?.data?.main_domain?.documentroot||info.data?.data?.main_domain?.document_root||"");
-            if(info.http!==200||info.data?.status!==1||!root) throw new Error("Could not resolve the cPanel main document root.");
-            console.log("CPANEL_ROOT_CONFIRMED="+root.replace(/\/home\/[^/]+/,"/home/[account]"));
-            for(const rel of ["staging","staging ","wp","wp-content","wp-admin","wp-includes"]){
-              const dir=root+"/"+rel;
-              const listing=await call("Fileman/list_files",{dir,showdotfiles:1});
-              const rows=Array.isArray(listing.data?.data)?listing.data.data:[];
-              console.log("CPANEL_INSTALL_DIR="+JSON.stringify({dir:dir.replace(/\/home\/[^/]+/,"/home/[account]"),status:listing.data?.status,files:rows.map(v=>String(v.file||v.name||"")).filter(Boolean).slice(0,80)}));
-            }
-            for(const path of ["/wp-json/","/staging/wp-json/","/staging /wp-json/","/staging/"]){
-              try{
-                const u=new URL("https://irpa.or.tz"+path);
-                const result=await get(u,{Accept:"application/json"});
-                console.log("PUBLIC_WORDPRESS_PATH="+JSON.stringify({path,http:result.http,server:result.data?undefined:undefined,contentType:result.raw.slice(0,120).replace(/[\r\n]+/g," ")}));
-              }catch(e){console.log("PUBLIC_WORDPRESS_PATH_ERROR="+JSON.stringify({path,code:e.code||e.name}))}
-            }
-          }
-          main().catch(e=>{console.error(e.message);process.exit(1)});
           NODE
 
       - name: Inject staging-only Worker secrets
