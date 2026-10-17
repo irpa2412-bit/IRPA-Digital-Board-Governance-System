@@ -791,7 +791,8 @@ jobs:
                   const log=await cp("Fileman/get_file_content",{dir,file});
                   const l=JSON.parse(log.raw||"{}");
                   const content=String(l.data?.content??l.data?.data?.content??l.result?.data?.content??"");
-                  const lines=content.split(/\r?\n/).filter(x=>/PHP Fatal error|PHP Parse error|Uncaught Error|Permission denied|failed to open stream|Error establishing a database connection|Allowed memory size|Call to undefined function|staging\.irpa\.or\.tz|\/staging(?:\/|\s)/i.test(x)).slice(-10).map(redact);
+                  const lines=content.split(/\r?\n/).filter(x=>/error|warning|fatal|critical|denied|permission|failed|exception|PHP|staging/i.test(x)).slice(-10).map(redact);
+                  console.log("POST_REMEDIATION_LOG_READ="+JSON.stringify({dir:dir.replace(/\/home\/[^/]+/,"/home/[account]"),file,http:log.http,status:l.status??l.result?.status,contentLength:content.length,relevantLines:lines.length}));
                   if(lines.length)console.log("POST_REMEDIATION_PHP_ERRORS="+JSON.stringify({dir:dir.replace(/\/home\/[^/]+/,"/home/[account]"),file,lines}));
                 }
                 if(dir===root+"/staging"&&names.includes("wp-config.php")){
