@@ -80,7 +80,8 @@ jobs:
     needs: local-e2e
     outputs:
       staging_url: ${{ steps.staging-health.outputs.staging_url }}
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004' || github.ref == 'refs/heads/fix/communications-cloudflare-website-integration' || github.ref == 'refs/heads/fix/communication-media-archive-drive-oauth' || (github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'fix/communications-cloudflare-website-integration' || github.event.pull_request.head.ref == 'fix/communication-media-archive-drive-oauth'))
+    # Archive acceptance uses the full deploy-staging runtime job, avoiding a competing partial Worker deployment.
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004' || github.ref == 'refs/heads/fix/communications-cloudflare-website-integration' || (github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'fix/communications-cloudflare-website-integration')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
