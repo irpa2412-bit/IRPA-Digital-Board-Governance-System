@@ -159,6 +159,7 @@ export function createMetaSocialApiRouter(deps) {
       .map(p => ({ id: String(p.instagram_business_account.id), username: String(p.instagram_business_account.username || "").slice(0, 120), accountType: "Professional", linkedFacebookPage: String(p.name || "").slice(0, 180) }));
     const result = publicConnection({
       verifiedAt: new Date().toISOString(),
+      expiresAt: saved.expiresAt || null,
       metaUser: { id: String(me.id || ""), name: String(me.name || "").slice(0, 180) },
       facebookPages, instagramAccounts, grantedPermissions: granted
     });
@@ -262,7 +263,7 @@ export function createMetaSocialApiRouter(deps) {
     if (path === "/api/communications/meta/disconnect" && request.method === "POST") {
       const claims = await authorize(request, env);
       if (String(env.IRPA_ENVIRONMENT || "").toLowerCase() !== "staging" || !env.DRIVE_KV) {
-        throw new Error("Local Meta disconnection is available only in the staging gateway.");
+        throw new Error("Meta local disconnection is disabled outside staging.");
       }
       await env.DRIVE_KV.delete("meta:connection:" + claims.user_id);
       return json({ status: "not_connected", connected: false, postingEnabled: false, message: "The local staging token was removed. Revoke app authorization separately in Meta settings if required." }, 200, corsHeaders(request));
