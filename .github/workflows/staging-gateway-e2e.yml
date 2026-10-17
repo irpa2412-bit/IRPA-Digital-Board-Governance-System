@@ -1040,7 +1040,7 @@ jobs:
             const routeAnchor="$header = trim((string) ($_SERVER['HTTP_X_IRPA_STAGING_AUTHORIZATION'] ?? ''));";
             const routeAnchorIndex=basePlugin.indexOf(routeAnchor);
             if(routeAnchorIndex<0)throw new Error("ABORT: staging bridge insertion point was not found.");
-            const temporaryPlugin=basePlugin.slice(0,routeAnchorIndex)+route+"\\n"+basePlugin.slice(routeAnchorIndex);
+            const temporaryPlugin=basePlugin.slice(0,routeAnchorIndex)+route+"\n"+basePlugin.slice(routeAnchorIndex);
             let provisioned=null,routeResponse=null,restoreError=null;
             try {
               await writeFile(stage+"/wp-content/mu-plugins","irpa-staging-rest-auth.php",temporaryPlugin);
