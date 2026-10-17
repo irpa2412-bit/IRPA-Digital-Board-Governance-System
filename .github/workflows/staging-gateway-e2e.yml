@@ -1389,9 +1389,9 @@ jobs:
                status.connections?.cpanel!=="connected") throw new Error("Staging connection acceptance failed: authenticated Editor identity and cPanel connection must both be verified.");
             console.log("STAGING_WORDPRESS_USERS_ME_HTTP="+status.connections.websiteHttpStatus);
             console.log("STAGING_WORDPRESS_ACCOUNT_ROLE="+status.connections.websiteAccount.role);
-            const listed=await call("/api/communications/website/content?type=pages&search="+encodeURIComponent("IRPA Staging Integration Check"));
+            const listed=await call("/api/communications/website/content?type=pages&search="+encodeURIComponent("IRPA"));
             const candidates=(listed.items||[]).filter(item=>String(item.title||"").startsWith("IRPA Staging Integration Check"));
-            if(candidates.length!==1) throw new Error("A single pre-provisioned staging page titled IRPA Staging Integration Check is required.");
+            if(candidates.length!==1) throw new Error("A single pre-provisioned staging page titled IRPA Staging Integration Check is required (listed "+(listed.items||[]).length+" page(s), matching "+candidates.length+").");
             const testPageId=Number(candidates[0].id);
             let before=await call("/api/communications/website/content/pages/"+testPageId);
             let original=before.item;
