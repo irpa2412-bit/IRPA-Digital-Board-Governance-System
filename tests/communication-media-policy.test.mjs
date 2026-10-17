@@ -237,7 +237,7 @@ test("media asset register is authenticated, size-limited, immutable and deny-by
 test("media asset and item record origins are restricted to the authenticated Firebase project",()=>{
  assert.ok(rules.includes('function communicationMediaRecordOriginMatches(data)'));
  assert.ok(rules.includes('request.auth.token.get("aud","")=="irpa-dbg-staging-a73ec"'));
- assert.equal((rules.match(/communicationMediaRecordOriginMatches\\(request\\.resource\\.data\\)/g)||[]).length,2);
+ assert.equal(rules.split("communicationMediaRecordOriginMatches(request.resource.data)").length-1,2);
 });
 
 test("staging gateway is isolated from production Firebase, app URL and Drive archive root",()=>{
