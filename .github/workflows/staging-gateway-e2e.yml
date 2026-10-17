@@ -391,8 +391,8 @@ jobs:
           CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
           CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
           CP_ROOT: ${{ secrets.STAGING_CPANEL_DOCUMENT_ROOT }}
-          STAGING_DB_NAME: ${{ vars.STAGING_WORDPRESS_DB_NAME }}
-          PRODUCTION_DB_NAME: ${{ vars.PRODUCTION_WORDPRESS_DB_NAME }}
+          STAGING_DB_NAME: ${{ secrets.STAGING_WORDPRESS_DB_NAME }}
+          PRODUCTION_DB_NAME: ${{ secrets.PRODUCTION_WORDPRESS_DB_NAME }}
         run: |
           set -euo pipefail
           node <<'NODE'
@@ -451,8 +451,8 @@ jobs:
             const rows=Array.isArray(listing.data?.data)?listing.data.data:[];
             const cfg=rows.find(x=>String(x.file||x.name||"")==="wp-config.php");
             const permissionText=String(cfg?.permissions||"");
-  const safePermissionMode=/^(?:0?[0-7]{3})$/.test(permissionText)||(Number.isFinite(Number(cfg?.permissions))&&(Number(cfg.permissions)&61440)===32768);
-  if(listing.http!==200||listing.data?.status!==1||!cfg||String(cfg.type||"")!=="file"||!safePermissionMode)throw new Error("ABORT: staging wp-config.php is missing or is not a regular isolated file.");
+            const safePermissionMode=/^(?:0?[0-7]{3})$/.test(permissionText)||(Number.isFinite(Number(cfg?.permissions))&&(Number(cfg.permissions)&61440)===32768);
+            if(listing.http!==200||listing.data?.status!==1||!cfg||String(cfg.type||"")!=="file"||!safePermissionMode)throw new Error("ABORT: staging wp-config.php is missing or is not a regular isolated file.");
             const original=await readFile(stage,"wp-config.php");
             if(!original.ok||!original.content.includes("<?php"))throw new Error("Could not safely read staging wp-config.php.");
             const dbNameMatch=/define\s*\(\s*['"]DB_NAME['"]\s*,\s*(['"])(.*?)\1\s*\)/s.exec(original.content);
