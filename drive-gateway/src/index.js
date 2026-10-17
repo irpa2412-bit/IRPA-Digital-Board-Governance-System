@@ -24,6 +24,7 @@ import { canReadSignatureAsset, canUploadSignedDocument } from "./signatureAsset
 import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPasswordSetup, getInvitationSessionState } from "./invitationRedemption.mjs";
 import { buildGoogleDriveAuthorizationParams } from "./googleDriveOAuth.mjs";
 import { createCommunicationsSiteRouter } from "./communicationsSite.mjs";
+import { createMetaSocialApiRouter } from "./metaSocialApi.mjs";
 import { createMetaOAuthRouter } from "./metaOAuth.mjs";
 
 function getFirebaseProjectId(env) {
@@ -53,6 +54,15 @@ const documentLifecycleRouter = createDocumentLifecycleRouter({
   firestoreDocumentToPlain,
   commitDocumentAndAudit: commitFirestoreDocumentAndAudit,
   recordLifecycleFailure: recordDocumentLifecycleFailure,
+  json,
+  corsHeaders
+});
+
+const metaSocialApiRouter = createMetaSocialApiRouter({
+  authenticateFirebaseRequest,
+  getFirestoreDocument,
+  getInstitutionalProfileForUser,
+  firestoreDocumentToPlain,
   json,
   corsHeaders
 });
@@ -118,6 +128,11 @@ export default {
 
       if (pathname.startsWith("/api/communications/meta/")) {
         const metaResponse = await metaOAuthRouter(request, env);
+        if (metaResponse) return metaResponse;
+      }
+
+      if (pathname.startsWith("/api/communications/meta/")) {
+        const metaResponse = await metaSocialApiRouter(request, env);
         if (metaResponse) return metaResponse;
       }
 
@@ -2403,7 +2418,7 @@ function escapeHtml(value) {
 
 function corsHeaders(request) {
   const origin = request.headers.get("Origin") || "";
-  const allowed = origin === "https://irpa.or.tz" || origin === "https://www.irpa.or.tz" || origin === "https://irpa-digital-board-governance.web.app" || origin === "https://irpa-digital-board-governance.firebaseapp.com" || origin === "http://localhost:5173";
+  const allowed = origin === "https://irpa.or.tz" || origin === "https://www.irpa.or.tz" || origin === "https://irpa-digital-board-governance.web.app" || origin === "https://irpa-digital-board-governance.firebaseapp.com" || origin === "https://staging.irpa.or.tz" || origin === "https://irpa-dbg-staging-a73ec.web.app" || origin === "https://irpa-dbg-staging-a73ec.firebaseapp.com" || origin === "http://localhost:5173";
   return {
     "Access-Control-Allow-Origin": allowed ? origin : "https://irpa.or.tz",
     "Access-Control-Allow-Headers": "Authorization, Content-Type, X-IRPA-Invitation-Version, x-signing-token",
