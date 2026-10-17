@@ -1251,7 +1251,7 @@ jobs:
                   "if(!$user||!user_can($user,'edit_pages')) return $userId;",
                   "return (int)$user->ID;",
                   "},20);"
-                ].join('\\n')+'\\n';
+                ].join("\\n")+"\\n";
                 if(!await writeFile(muDir,"irpa-staging-rest-auth.php",shim))throw new Error("Could not install and verify the staging-only WordPress REST authentication adapter.");
                 console.log("STAGING_REST_AUTH_SHIM_INSTALL=VERIFIED");
               }
