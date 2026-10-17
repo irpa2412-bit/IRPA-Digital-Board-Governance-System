@@ -602,8 +602,6 @@ jobs:
       - name: Inspect staging PHP logs and authenticated REST path (read-only)
         env:
           WP_BASE: ${{ secrets.STAGING_WORDPRESS_BASE_URL }}
-          WP_USER: ${{ secrets.STAGING_WORDPRESS_USERNAME }}
-          WP_APP_PASSWORD: ${{ secrets.STAGING_WORDPRESS_APPLICATION_PASSWORD }}
           CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
           CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
           CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
@@ -796,8 +794,6 @@ jobs:
           GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY: ${{ secrets.STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY }}
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT_JSON }}
           WP_BASE: ${{ secrets.STAGING_WORDPRESS_BASE_URL }}
-          WP_USER: ${{ secrets.STAGING_WORDPRESS_USERNAME }}
-          WP_APP_PASSWORD: ${{ secrets.STAGING_WORDPRESS_APPLICATION_PASSWORD }}
           CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
           CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
           CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
