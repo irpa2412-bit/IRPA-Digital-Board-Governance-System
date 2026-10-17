@@ -14,10 +14,13 @@ An integrated communications workspace inside the existing IRPA Digital Board Go
 
 ## Website and cPanel access
 The portal calls the existing Cloudflare Worker routes:
-- `GET /api/communications/site/status` — verifies WordPress and cPanel credentials without returning secrets.
-- `GET /api/communications/website/content?type=posts|pages` — reads up to 50 latest editable records.
-- `PUT /api/communications/website/content` — updates the title and plain-text body of an existing WordPress page or post.
-- `POST /api/communications/website/publish` — publishes an approved article or press release and reconciles by deterministic slug before creating a post.
+- `GET /api/communications/site/status` — verifies the isolated staging WordPress connection without returning credentials.
+- `GET /api/communications/website/content?type=posts|pages` — lists up to 50 staging pages or posts.
+- `GET /api/communications/website/content/pages/{id}` or `/posts/{id}` — reads one staging item with edit-context fields.
+- `PUT /api/communications/website/content` — updates only title, content, excerpt, featured image ID and status (`draft` or `publish`).
+- `GET /api/communications/website/revisions?type=pages|posts&id={id}` — lists native WordPress revisions and complete pre-edit snapshots.
+- `POST /api/communications/website/restore` — restores a saved snapshot or WordPress revision; a pre-restore snapshot is saved first.
+- `POST /api/communications/website/publish` — retains the existing approved article/press-release workflow and deterministic-slug reconciliation.
 - `GET /api/communications/cpanel/files` — lists permitted static files from the configured document root.
 - `GET /api/communications/cpanel/files?path=<relative-path>` — reads a permitted static file.
 - `PUT /api/communications/cpanel/files` — saves a permitted static file through cPanel UAPI after saving a seven-day snapshot in the existing Cloudflare KV namespace.
@@ -27,7 +30,7 @@ The cPanel editor intentionally accepts only HTML, HTM, CSS, TXT and JSON files,
 
 ## Required Cloudflare Worker secrets
 Set these as Worker secrets in the correct environment; never commit them or paste them into the portal:
-- `WORDPRESS_BASE_URL`: HTTPS WordPress base URL, normally `https://www.irpa.or.tz`.
+- `WORDPRESS_BASE_URL`: the dedicated staging WordPress origin `https://staging.irpa.or.tz` with no path, credentials, query or fragment. The editor rejects `irpa.or.tz`, `www.irpa.or.tz`, and `https://irpa.or.tz/staging` because those use the production hostname; do not bypass this guard.
 - `WORDPRESS_USERNAME`: dedicated WordPress integration account.
 - `WORDPRESS_APPLICATION_PASSWORD`: application password for that dedicated account.
 - `CPANEL_BASE_URL`: HTTPS cPanel hostname with port 2083, for example the actual hosting provider hostname; do not guess the host.
@@ -61,16 +64,16 @@ The workflow also requires Actions variables `STAGING_SMTP_HOST`, `STAGING_SMTP_
 
 ## Authorization and audit
 - Every website and cPanel route verifies the Firebase ID token at the Cloudflare Worker.
-- Write operations require a registered reviewer role; credentials stay server-side.
+- WordPress page/post edits and restores require an active registered Communication & Media role or an active administrator profile; broader reviewer roles alone are insufficient. The cPanel static-file editor retains its separate reviewer gate. Credentials stay server-side.
 - Website publishing is limited to approved website articles and press releases.
-- Website publishing and edits record audit events. A successful HTTP response is not by itself proof of public rendering; verify the resulting public URL.
+- Before every page/post edit or restore, the Worker saves a complete pre-edit snapshot in the staging Worker KV namespace, records the current WordPress revision ID, and writes an audit event with actor, action, timestamp and page/post ID. The update is then verified by re-reading the item; the saved snapshot appears in revision history and can be restored with one click. Audit entries contain no WordPress credentials or content secrets.
 - cPanel writes are restricted to static content file types and record an audit event.
 - No Firebase Functions callable is required for website publishing, avoiding a new Cloud Functions billing dependency.
 
 ## Acceptance and release gates
 1. Run `npm run test:communication-media`, the full required test suite, production build, gateway syntax/security tests and browser regression checks.
 2. Verify role-denial behavior for unauthenticated and non-reviewer users.
-3. Verify WordPress connection, content list/read/update, approved publishing, failure handling and duplicate reconciliation against isolated staging WordPress.
+3. Verify the staging WordPress `users/me` status code is 200, list and read a test page/post, edit only allowlisted fields, verify the edit, and restore the saved snapshot exactly. Verify a non-Communication & Media user is refused. Check logs and audit events for secrets. Also verify approved publishing, failure handling and duplicate reconciliation against isolated staging WordPress.
 4. Verify cPanel token authentication, permitted file listing/read/write, path traversal rejection, executable-file rejection and audit evidence against isolated staging hosting.
 5. Confirm the public page after a staged edit and verify the previous content is preserved for rollback.
 6. Verify desktop and mobile portal usability and ensure unrelated governance portals retain existing behavior.
