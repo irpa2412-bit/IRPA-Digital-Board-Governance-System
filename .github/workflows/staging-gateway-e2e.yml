@@ -1003,6 +1003,83 @@ jobs:
           main().catch(e=>{console.log("POST_REMEDIATION_DIAGNOSTIC_ERROR="+String(e.code||e.name||"unknown"));});
           NODE
 
+      - name: Diagnose staging WordPress bootstrap and route handling (read-only)
+        continue-on-error: true
+        env:
+          WP_BASE: ${{ secrets.STAGING_WORDPRESS_BASE_URL }}
+          CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
+          CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
+          CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const https=require("node:https");
+          const {URL,URLSearchParams}=require("node:url");
+          require("node:dns").setDefaultResultOrder("ipv4first");
+          function request(url,headers={},timeout=12000){
+            return new Promise((resolve,reject)=>{
+              const u=new URL(url);
+              const req=https.request({protocol:u.protocol,hostname:u.hostname,port:u.port||443,family:4,path:u.pathname+u.search,headers,timeout},res=>{
+                let raw="";res.setEncoding("utf8");res.on("data",c=>raw+=c);res.on("end",()=>resolve({http:res.statusCode,headers:res.headers,raw}));
+              });
+              req.on("timeout",()=>req.destroy(new Error("request timeout")));
+              req.on("error",reject);req.end();
+            });
+          }
+          async function main(){
+            const base=new URL(process.env.WP_BASE);
+            for(const path of ["/","/index.php","/wp-blog-header.php","/wp-load.php","/wp-json/","/wp-json/wp/v2/types","/wp-admin/"]){
+              try{
+                const r=await request(new URL(path,base).href,{Accept:"application/json,text/html,*/*","Cache-Control":"no-cache"});
+                let body=r.raw.replace(/<script[\s\S]*?<\/script>/ig," ").replace(/<style[\s\S]*?<\/style>/ig," ").replace(/<[^>]+>/g," ").replace(/[\r\n\t]+/g," ").replace(/\s+/g," ").trim();
+                console.log("WP_BOOT_HTTP="+JSON.stringify({path,status:r.http,server:String(r.headers.server||"").slice(0,60),contentType:String(r.headers["content-type"]||"").slice(0,80),bodyHint:body.slice(0,100)}));
+              }catch(e){console.log("WP_BOOT_HTTP_ERROR="+JSON.stringify({path,error:String(e.code||e.name)}))}
+            }
+            const cpBase=new URL(process.env.CP_BASE);
+            async function cp(path,params={}){
+              const u=new URL("/execute/"+path,cpBase);u.search=new URLSearchParams(params).toString();
+              const r=await request(u.href,{Authorization:"cpanel "+process.env.CP_USER+":"+process.env.CP_TOKEN,Accept:"application/json"});
+              let data;try{data=JSON.parse(r.raw)}catch{}
+              return {http:r.http,data};
+            }
+            const info=await cp("DomainInfo/domains_data");
+            const root=String(info.data?.data?.main_domain?.documentroot||info.data?.data?.main_domain?.document_root||"");
+            if(info.http!==200||info.data?.status!==1||!root.endsWith("/public_html"))throw new Error("Read-only bootstrap diagnostics could not verify the hosting document root.");
+            const stage=root+"/staging";
+            async function file(dir,name){
+              const r=await cp("Fileman/get_file_content",{dir,file:name});
+              return String(r.data?.data?.content??r.data?.data?.[0]?.content??r.data?.result?.data?.content??"");
+            }
+            async function list(dir){
+              const r=await cp("Fileman/list_files",{dir,showdotfiles:1});
+              return Array.isArray(r.data?.data)?r.data.data.map(x=>String(x.file||x.name||"")).filter(Boolean):[];
+            }
+            const stageFiles=await list(stage);
+            console.log("WP_BOOT_FILES="+JSON.stringify({hasIndex:stageFiles.includes("index.php"),hasWpBlogHeader:stageFiles.includes("wp-blog-header.php"),hasWpLoad:stageFiles.includes("wp-load.php"),hasWpConfig:stageFiles.includes("wp-config.php"),hasWpAdmin:stageFiles.includes("wp-admin"),hasWpIncludes:stageFiles.includes("wp-includes")}));
+            for(const name of ["index.php","wp-blog-header.php","wp-load.php","wp-config.php"]){
+              if(!stageFiles.includes(name))continue;
+              const content=await file(stage,name);
+              const report={file:name,length:content.length,phpOpen:content.includes("<?php")};
+              if(name==="index.php")Object.assign(report,{loadsWpBlogHeader:/require[^;]*wp-blog-header\.php/i.test(content),loadsWpLoad:/require[^;]*wp-load\.php/i.test(content),hasCustomJsonFalse:/["']ok["']\s*=>\s*false|["']ok["']\s*:\s*false/.test(content)});
+              if(name==="wp-blog-header.php")Object.assign(report,{loadsWpLoad:/require_once[^;]*wp-load\.php/i.test(content),hasEarlyExit:/\b(exit|die)\s*\(/i.test(content)});
+              if(name==="wp-load.php")Object.assign(report,{loadsWpConfig:/wp-config\.php/i.test(content),loadsSettings:/wp-settings\.php/i.test(content)});
+              if(name==="wp-config.php")Object.assign(report,{hasDbName:/define\s*\(\s*['"]DB_NAME['"]/.test(content),hasDbUser:/define\s*\(\s*['"]DB_USER['"]/.test(content),hasWpHome:/define\s*\(\s*['"]WP_HOME['"]/.test(content),hasWpSiteurl:/define\s*\(\s*['"]WP_SITEURL['"]/.test(content),hasCustomJsonFalse:/["']ok["']\s*=>\s*false|["']ok["']\s*:\s*false/.test(content),hasHostGate:/HTTP_HOST|SERVER_NAME|REQUEST_URI/.test(content),hasEarlyExit:/\b(exit|die)\s*\(/i.test(content)});
+              console.log("WP_BOOT_FILE_CHECK="+JSON.stringify(report));
+            }
+            for(const dir of [stage+"/wp-content/mu-plugins",stage+"/wp-content/plugins"]){
+              const names=await list(dir);
+              console.log("WP_BOOT_PLUGIN_DIR="+JSON.stringify({dir:dir.endsWith("/mu-plugins")?"mu-plugins":"plugins",count:names.length,names:names.slice(0,50)}));
+              if(dir.endsWith("/mu-plugins")){
+                for(const name of names.filter(n=>/\.php$/i.test(n)).slice(0,30)){
+                  const content=await file(dir,name);
+                  console.log("WP_BOOT_MU_PLUGIN_CHECK="+JSON.stringify({file:name,length:content.length,hasCustomJsonFalse:/["']ok["']\s*=>\s*false|["']ok["']\s*:\s*false/.test(content),hasHostGate:/HTTP_HOST|SERVER_NAME|REQUEST_URI/.test(content),hasWpDie:/wp_die\s*\(/i.test(content),hasEarlyExit:/\b(exit|die)\s*\(/i.test(content),hasHttpStatus:/http_response_code\s*\(/i.test(content)}));
+                }
+              }
+            }
+          }
+          main().catch(e=>{console.log("WP_BOOT_DIAGNOSTIC_ERROR="+String(e.code||e.name||"unknown"));});
+          NODE
+
       - name: Register configured staging application password in staging WordPress
         continue-on-error: true
         env:
