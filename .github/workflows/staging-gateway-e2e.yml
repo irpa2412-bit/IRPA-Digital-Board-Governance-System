@@ -94,16 +94,19 @@ jobs:
           CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
           CP_ROOT: ${{ secrets.STAGING_CPANEL_DOCUMENT_ROOT }}
           CP_TEST_FILE: ${{ secrets.STAGING_CPANEL_TEST_FILE }}
+          STAGING_DB_NAME: ${{ vars.STAGING_WORDPRESS_DB_NAME }}
+          PRODUCTION_DB_NAME: ${{ vars.PRODUCTION_WORDPRESS_DB_NAME }}
         run: |
           set -euo pipefail
           missing=0
-          for pair in             "CLOUDFLARE_API_TOKEN:$CF_TOKEN"             "CLOUDFLARE_ACCOUNT_ID:$CF_ACCOUNT"             "STAGING_FIREBASE_PROJECT_ID:$PROJECT"             "STAGING_IRPA_APP_URL:$APP_URL"             "STAGING_GOOGLE_DRIVE_CLIENT_ID:$DRIVE_ID"             "STAGING_GOOGLE_DRIVE_CLIENT_SECRET:$DRIVE_SECRET"             "STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY:$DRIVE_KEY"             "STAGING_FIREBASE_SERVICE_ACCOUNT_JSON:$FIREBASE_SERVICE_ACCOUNT"             "STAGING_FIREBASE_WEB_API_KEY:$FIREBASE_WEB_API_KEY"             "STAGING_TEST_EMAIL:$TEST_EMAIL"             "STAGING_TEST_PASSWORD:$TEST_PASSWORD"             "STAGING_WORDPRESS_BASE_URL:$WP_BASE"             "STAGING_CPANEL_BASE_URL:$CP_BASE"             "STAGING_CPANEL_USERNAME:$CP_USER"             "STAGING_CPANEL_API_TOKEN:$CP_TOKEN"             "STAGING_CPANEL_DOCUMENT_ROOT:$CP_ROOT"             "STAGING_CPANEL_TEST_FILE:$CP_TEST_FILE"; do
+          for pair in             "CLOUDFLARE_API_TOKEN:$CF_TOKEN"             "CLOUDFLARE_ACCOUNT_ID:$CF_ACCOUNT"             "STAGING_FIREBASE_PROJECT_ID:$PROJECT"             "STAGING_IRPA_APP_URL:$APP_URL"             "STAGING_GOOGLE_DRIVE_CLIENT_ID:$DRIVE_ID"             "STAGING_GOOGLE_DRIVE_CLIENT_SECRET:$DRIVE_SECRET"             "STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY:$DRIVE_KEY"             "STAGING_FIREBASE_SERVICE_ACCOUNT_JSON:$FIREBASE_SERVICE_ACCOUNT"             "STAGING_FIREBASE_WEB_API_KEY:$FIREBASE_WEB_API_KEY"             "STAGING_TEST_EMAIL:$TEST_EMAIL"             "STAGING_TEST_PASSWORD:$TEST_PASSWORD"             "STAGING_WORDPRESS_BASE_URL:$WP_BASE"             "STAGING_WORDPRESS_DB_NAME:$STAGING_DB_NAME"             "PRODUCTION_WORDPRESS_DB_NAME:$PRODUCTION_DB_NAME"             "STAGING_CPANEL_BASE_URL:$CP_BASE"             "STAGING_CPANEL_USERNAME:$CP_USER"             "STAGING_CPANEL_API_TOKEN:$CP_TOKEN"             "STAGING_CPANEL_DOCUMENT_ROOT:$CP_ROOT"             "STAGING_CPANEL_TEST_FILE:$CP_TEST_FILE"; do
             name="${pair%%:*}"; value="${pair#*:}"
             if [ -z "$value" ]; then echo "Missing staging secret: $name"; missing=1; fi
           done
           test "$PROJECT" = "irpa-dbg-staging-a73ec"
           test "$APP_URL" != "https://irpa-digital-board-governance.web.app"
           test "$missing" -eq 0
+          if [[ "$STAGING_DB_NAME" == "$PRODUCTION_DB_NAME" ]]; then echo "ABORT: staging and production database names must differ."; exit 1; fi
           node <<'NODE'
           const wp=new URL(process.env.WP_BASE);
           if(wp.hostname.toLowerCase()!=="staging.irpa.or.tz"||wp.protocol!=="https:") throw new Error("ABORT: WordPress target must be the HTTPS staging.irpa.or.tz host.");
@@ -388,6 +391,8 @@ jobs:
           CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
           CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
           CP_ROOT: ${{ secrets.STAGING_CPANEL_DOCUMENT_ROOT }}
+          STAGING_DB_NAME: ${{ vars.STAGING_WORDPRESS_DB_NAME }}
+          PRODUCTION_DB_NAME: ${{ vars.PRODUCTION_WORDPRESS_DB_NAME }}
         run: |
           set -euo pipefail
           node <<'NODE'
@@ -450,6 +455,11 @@ jobs:
   if(listing.http!==200||listing.data?.status!==1||!cfg||String(cfg.type||"")!=="file"||!safePermissionMode)throw new Error("ABORT: staging wp-config.php is missing or is not a regular isolated file.");
             const original=await readFile(stage,"wp-config.php");
             if(!original.ok||!original.content.includes("<?php"))throw new Error("Could not safely read staging wp-config.php.");
+            const dbNameMatch=/define\s*\(\s*['"]DB_NAME['"]\s*,\s*(['"])(.*?)\1\s*\)/s.exec(original.content);
+            const stagingDbName=String(process.env.STAGING_DB_NAME||"").trim();
+            const productionDbName=String(process.env.PRODUCTION_DB_NAME||"").trim();
+            if(!dbNameMatch||!stagingDbName||!productionDbName||dbNameMatch[2]!==stagingDbName||stagingDbName===productionDbName)throw new Error("ABORT: staging database mapping is not verified as isolated from production.");
+            console.log("STAGING_DB_ISOLATION=PASS");
             const target="https://staging.irpa.or.tz";
             const home=/define\s*\(\s*['"]WP_HOME['"]\s*,\s*(['"])(.*?)\1\s*\)/s.exec(original.content);
             const site=/define\s*\(\s*['"]WP_SITEURL['"]\s*,\s*(['"])(.*?)\1\s*\)/s.exec(original.content);
