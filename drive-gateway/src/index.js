@@ -24,6 +24,7 @@ import { canReadSignatureAsset, canUploadSignedDocument } from "./signatureAsset
 import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPasswordSetup, getInvitationSessionState } from "./invitationRedemption.mjs";
 import { buildGoogleDriveAuthorizationParams } from "./googleDriveOAuth.mjs";
 import { createCommunicationsSiteRouter } from "./communicationsSite.mjs";
+import { createMetaSocialApiRouter } from "./metaSocialApi.mjs";
 
 function getFirebaseProjectId(env) {
   const projectId = String(env?.FIREBASE_PROJECT_ID || "").trim();
@@ -52,6 +53,15 @@ const documentLifecycleRouter = createDocumentLifecycleRouter({
   firestoreDocumentToPlain,
   commitDocumentAndAudit: commitFirestoreDocumentAndAudit,
   recordLifecycleFailure: recordDocumentLifecycleFailure,
+  json,
+  corsHeaders
+});
+
+const metaSocialApiRouter = createMetaSocialApiRouter({
+  authenticateFirebaseRequest,
+  getFirestoreDocument,
+  getInstitutionalProfileForUser,
+  firestoreDocumentToPlain,
   json,
   corsHeaders
 });
@@ -104,6 +114,11 @@ export default {
       if (pathname.startsWith("/api/document-lifecycle/")) {
         const lifecycleResponse = await documentLifecycleRouter(request, env);
         if (lifecycleResponse) return lifecycleResponse;
+      }
+
+      if (pathname.startsWith("/api/communications/meta/")) {
+        const metaResponse = await metaSocialApiRouter(request, env);
+        if (metaResponse) return metaResponse;
       }
 
       if (pathname.startsWith("/api/communications/")) {
