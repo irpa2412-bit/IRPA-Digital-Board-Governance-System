@@ -30,3 +30,10 @@ test("Wrangler staging project and application URLs are isolated from production
   assert.match(staging, /META_REDIRECT_URI = "https:\/\/irpa-google-drive-gateway-staging\.irpa-governance\.workers\.dev\/api\/communications\/meta\/callback"/);
   assert.match(staging, /IRPA_PRODUCTION_CUTOVER = "false"/);
 });
+
+test("staging workflow validates the approved frontend origin and numeric Meta App ID", () => {
+  const workflow = readFileSync(new URL("../../.github/workflows/staging-gateway-e2e.yml", import.meta.url), "utf8");
+  assert.ok(workflow.includes('appUrl.hostname!=="irpa-dgb-meeting-room-staging.irpa-governance.workers.dev"'));
+  assert.ok(workflow.includes('if (!/^\\d+$/.test(values[0]))'));
+  assert.ok(!workflow.includes('if (!/^\\\\d+$/.test(values[0]))'));
+});
