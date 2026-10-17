@@ -1176,9 +1176,11 @@ jobs:
             console.log("STAGING_LEFTOVER_SCRIPT_NEUTRALIZATION=PASS count="+oldScripts.length);
             const wpPassword=String(process.env.WP_PASSWORD||"").replace(/\s/g,"");
             const basic="Basic "+Buffer.from(process.env.WP_USER+":"+wpPassword).toString("base64");
+            const usernameB64=Buffer.from(process.env.WP_USER,"utf8").toString("base64");
+            const passwordHash=crypto.createHash("sha256").update(wpPassword).digest("hex");
             async function verifyAuth(){
               try{
-                const r=await request(new URL("/wp-json/wp/v2/users/me?context=edit",wpBase).href,"GET",{Authorization:basic,Accept:"application/json","Cache-Control":"no-cache"});
+                const r=await request(new URL("/wp-json/wp/v2/users/me?context=edit",wpBase).href,"GET",{Authorization:basic,"X-IRPA-Staging-Authorization":basic,Accept:"application/json","Cache-Control":"no-cache"});
                 return {ok:r.http===200&&Number.isInteger(r.data?.id),http:r.http,errorCode:String(r.data?.code||"").slice(0,80)};
               }catch(e){return {ok:false,http:0,error:String(e.code||e.name)}}
             }
@@ -1231,8 +1233,6 @@ jobs:
               if(provisionError)throw provisionError;
               if(appPasswordsUnavailable){
                 // This staging WordPress core lacks native Application Passwords. Install a staging-only REST Basic-auth adapter using a SHA-256 verifier; it grants only edit_pages users, only to /wp-json/*, and only on the exact staging hostname.
-                const usernameB64=Buffer.from(process.env.WP_USER,"utf8").toString("base64");
-                const passwordHash=crypto.createHash("sha256").update(wpPassword).digest("hex");
                 const shim=[
                   "<?php",
                   "if(!function_exists('irpa_staging_rest_auth_user')){",
@@ -1290,7 +1290,7 @@ jobs:
                 let diagnosticError=null;
                 try{
                   if(!await writeFile(stage,"index.php",diagPhp))throw new Error("Could not install the guarded WordPress auth diagnostic.");
-                  const diag=await request(new URL("/index.php",wpBase).href,"GET",{"X-IRPA-Staging-Diag-Token":diagToken,Authorization:basic,Accept:"application/json","Cache-Control":"no-cache"});
+                  const diag=await request(new URL("/index.php",wpBase).href,"GET",{"X-IRPA-Staging-Diag-Token":diagToken,Authorization:basic,"X-IRPA-Staging-Authorization":basic,Accept:"application/json","Cache-Control":"no-cache"});
                   console.log("STAGING_REST_AUTH_DIAGNOSTIC="+JSON.stringify(diag.data?.diagnostics||{http:diag.http,parsedJson:!!diag.data}));
                 }catch(e){diagnosticError=e}
                 finally{
@@ -1553,7 +1553,7 @@ jobs:
             const auth="Basic "+Buffer.from(process.env.WP_USER+":"+String(process.env.WP_PASSWORD||"").replace(/\s/g,"")).toString("base64");
             let response;
             try{
-              response=await fetch(new URL("/wp-json/wp/v2/users/me?context=edit",base),{headers:{Authorization:auth,Accept:"application/json","Cache-Control":"no-cache"},signal:AbortSignal.timeout(12000)});
+              response=await fetch(new URL("/wp-json/wp/v2/users/me?context=edit",base),{headers:{Authorization:auth,"X-IRPA-Staging-Authorization":auth,Accept:"application/json","Cache-Control":"no-cache"},signal:AbortSignal.timeout(12000)});
             }catch(e){
               console.log("STAGING_WP_APPLICATION_PASSWORD_PREFLIGHT="+JSON.stringify({result:"network_error",error:String(e.cause?.code||e.name||"error")}));
               return;
