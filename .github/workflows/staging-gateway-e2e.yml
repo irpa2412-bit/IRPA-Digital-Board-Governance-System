@@ -795,7 +795,8 @@ jobs:
             }
             try{
               const parent=await request("https://irpa.or.tz/staging/readme.html",{Accept:"text/html","Cache-Control":"no-cache"});
-              console.log("POST_REMEDIATION_PARENT_PATH="+JSON.stringify({status:parent.http,server:String(parent.headers.server||"").slice(0,80),contentType:String(parent.headers["content-type"]||"").slice(0,80)}));
+              const parentControl=await request("https://irpa.or.tz/wp-includes/css/dashicons.min.css",{Accept:"text/css","Cache-Control":"no-cache"});
+              console.log("POST_REMEDIATION_PARENT_PATH="+JSON.stringify({stagingStaticStatus:parent.http,stagingStaticServer:String(parent.headers.server||"").slice(0,80),productionStaticStatus:parentControl.http,productionStaticServer:String(parentControl.headers.server||"").slice(0,80)}));
             }catch(e){console.log("POST_REMEDIATION_PARENT_PATH_ERROR="+String(e.code||e.name))}
             const cpBase=new URL(process.env.CP_BASE);
             async function cp(path,params={}){
@@ -810,7 +811,7 @@ jobs:
             console.log("POST_REMEDIATION_CPANEL_ROOT="+(root?root.replace(/\/home\/[^/]+/,"/home/[account]"):"unresolved"));
             if(!root)return;
             const home=root.replace(/\/public_html\/?$/,"");
-            for(const dir of [root+"/staging",root+"/staging ",home+"/logs"]){
+            for(const dir of [root,root+"/staging",root+"/staging ",home+"/logs"]){
               try{
                 const listing=await cp("Fileman/list_files",{dir,showdotfiles:1});
                 const obj=JSON.parse(listing.raw||"{}");
@@ -826,6 +827,19 @@ jobs:
                   const lines=content.split(/\r?\n/).filter(x=>/error|warning|fatal|critical|denied|permission|failed|exception|PHP|staging/i.test(x)).slice(-10).map(redact);
                   console.log("POST_REMEDIATION_LOG_READ="+JSON.stringify({dir:dir.replace(/\/home\/[^/]+/,"/home/[account]"),file,http:log.http,status:l.status??l.result?.status,contentLength:content.length,relevantLines:lines.length}));
                   if(lines.length)console.log("POST_REMEDIATION_PHP_ERRORS="+JSON.stringify({dir:dir.replace(/\/home\/[^/]+/,"/home/[account]"),file,lines}));
+                }
+                if(dir===root&&names.includes(".htaccess")){
+                  const ht=await cp("Fileman/get_file_content",{dir,file:".htaccess"});
+                  const h=JSON.parse(ht.raw||"{}");
+                  const content=String(h.data?.content??h.data?.data?.content??h.result?.data?.content??"");
+                  const directives=content.split(/\r?\n/).filter(x=>/^\s*(RewriteEngine|RewriteBase|RewriteRule|RewriteCond|php_value|php_flag|Options|DirectoryIndex|SetHandler|AddHandler|ErrorDocument|Require|Deny|Allow)/i.test(x)||/staging/i.test(x)).slice(0,35).map(redact);
+                  console.log("POST_REMEDIATION_PARENT_HTACCESS="+JSON.stringify({length:content.length,directives}));
+                }
+                if(dir===root&&names.includes(".user.ini")){
+                  const ini=await cp("Fileman/get_file_content",{dir,file:".user.ini"});
+                  const z=JSON.parse(ini.raw||"{}");
+                  const content=String(z.data?.content??z.data?.data?.content??z.result?.data?.content??"");
+                  console.log("POST_REMEDIATION_PARENT_USER_INI="+JSON.stringify(content.split(/\r?\n/).filter(x=>/open_basedir|auto_prepend_file|auto_append_file|error_log|include_path|disable_functions/i.test(x)).slice(0,20).map(redact)));
                 }
                 if(dir===root+"/staging"&&names.includes(".htaccess")){
                   const ht=await cp("Fileman/get_file_content",{dir,file:".htaccess"});
