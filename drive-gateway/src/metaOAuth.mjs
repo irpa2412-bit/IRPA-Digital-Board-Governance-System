@@ -120,6 +120,13 @@ async function authorizeUser(request, env, deps, reviewer = false) {
   }
   return claims;
 }
+async function requireReadOnlyScopes(version, token) {
+  const response = await graphJson(graphUrl(version, "me/permissions", { access_token: token }).toString());
+  const granted = new Set((Array.isArray(response.data) ? response.data : [])
+    .filter(item => item?.status === "granted").map(item => String(item.permission || "")));
+  const missing = REQUIRED_SCOPES.filter(scope => !granted.has(scope));
+  if (missing.length) throw new Error("Required Meta read-only permissions were not granted.");
+}
 function publicAccounts(pages) {
   return (Array.isArray(pages?.data) ? pages.data : []).map(page => ({
     facebookPageId: String(page.id || ""),
@@ -180,6 +187,7 @@ export function createMetaOAuthRouter(deps) {
         }).toString();
         const longToken = await graphJson(longUrl.toString());
         const token = longToken.access_token || shortToken.access_token;
+        await requireReadOnlyScopes(cfg.version, token);
         const me = await graphJson(graphUrl(cfg.version, "me", { fields: "id,name", access_token: token }).toString());
         const pages = await graphJson(graphUrl(cfg.version, "me/accounts", {
           fields: "id,name,instagram_business_account{id,username,account_type}", limit: 100, access_token: token
@@ -240,6 +248,7 @@ export function createMetaOAuthRouter(deps) {
       if (!encrypted) return json({ ok: true, status: "not_connected", postingEnabled: false }, 200, corsHeaders(request));
       try {
         const connection = await decryptJson(env, encrypted);
+        await requireReadOnlyScopes(cfg.version, connection.accessToken);
         const me = await graphJson(graphUrl(cfg.version, "me", { fields: "id,name", access_token: connection.accessToken }).toString());
         const pages = await graphJson(graphUrl(cfg.version, "me/accounts", {
           fields: "id,name,instagram_business_account{id,username,account_type}", limit: 100, access_token: connection.accessToken
