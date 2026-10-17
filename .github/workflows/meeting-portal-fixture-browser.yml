@@ -296,12 +296,16 @@ jobs:
 
           // Preserve the main-branch Communication & Media-only scope while keeping
           // the signature integration explicitly paired to its own source and tests.
-          const communicationMediaOnly = changed.includes("src/pages/CommunicationMediaPortal.jsx") &&
-            changed.includes("src/pages/CommunicationMediaStudio.jsx") &&
+          const communicationMediaOnly = changed.includes("src/pages/CommunicationMediaStudio.jsx") &&
             changed.includes("tests/communication-media-policy.test.mjs") &&
             !changed.includes("src/pages/Meetings.jsx") &&
             !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
-            changed.every(path => allowed.has(path));
+            changed.every(path => allowed.has(path)) &&
+            (changed.includes("src/pages/CommunicationMediaPortal.jsx") ||
+              (changed.includes("drive-gateway/src/index.js") &&
+               changed.includes("drive-gateway/wrangler.toml") &&
+               changed.includes("src/firebase/signatureStorage.js") &&
+               changed.includes("docs/COMMUNICATION_MEDIA_PORTAL.md")));
           // Readability-only PRs may change the shared stylesheet, its dedicated tests, and explicit CI path filters.
           // The exception excludes portal business logic, meeting UI, auth logic and deployment configuration.
           const readabilityOnlyFiles = new Set([
