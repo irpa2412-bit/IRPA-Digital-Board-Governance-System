@@ -1390,9 +1390,35 @@ jobs:
             console.log("STAGING_WORDPRESS_USERS_ME_HTTP="+status.connections.websiteHttpStatus);
             console.log("STAGING_WORDPRESS_ACCOUNT_ROLE="+status.connections.websiteAccount.role);
             const listed=await call("/api/communications/website/content?type=pages&search="+encodeURIComponent("IRPA"));
-            const candidates=(listed.items||[]).filter(item=>String(item.title||"").startsWith("IRPA Staging Integration Check"));
-            if(candidates.length!==1) throw new Error("A single pre-provisioned staging page titled IRPA Staging Integration Check is required (listed "+(listed.items||[]).length+" page(s), matching "+candidates.length+").");
-            const testPageId=Number(candidates[0].id);
+            const fixtureTitle="IRPA Staging Integration Check";
+            const candidates=(listed.items||[]).filter(item=>String(item.title||"").startsWith(fixtureTitle));
+            const slugOf=item=>{try{return new URL(item.link).pathname.replace(/\/+$/,"").split("/").pop()}catch{return ""}};
+            const canonicalCandidates=candidates.filter(item=>slugOf(item)==="irpa-staging-integration-check");
+            if(canonicalCandidates.length!==1) throw new Error("A single canonical staging test page is required (listed "+(listed.items||[]).length+" page(s), matching "+candidates.length+", canonical "+canonicalCandidates.length+").");
+            const canonical=canonicalCandidates[0];
+            // Clean only extra pages carrying this workflow's unmistakable marker. Restore their pre-test snapshot, then unpublish the duplicate.
+            for(const duplicate of candidates.filter(item=>Number(item.id)!==Number(canonical.id))){
+              const duplicateRead=await call("/api/communications/website/content/pages/"+Number(duplicate.id));
+              const duplicateItem=duplicateRead.item;
+              const hasMarker=String(duplicateItem?.title||"").includes("IRPA_STAGING_WEBSITE_CHECK_")||
+                String(duplicateItem?.content||"").includes("IRPA_STAGING_WEBSITE_CHECK_");
+              if(!hasMarker) throw new Error("An additional staging test-page candidate has no acceptance marker; refusing to alter it.");
+              const duplicateHistory=await call("/api/communications/website/revisions?type=pages&id="+Number(duplicate.id));
+              const duplicateSnapshots=(duplicateHistory.revisions||[]).filter(r=>r.source==="IRPA saved snapshot"&&r.snapshotId&&
+                r.title===fixtureTitle&&Date.now()-Date.parse(r.date||"")<10*60*1000)
+                .sort((a,b)=>Date.parse(b.date||"")-Date.parse(a.date||""));
+              if(!duplicateSnapshots.length) throw new Error("A marked duplicate staging test page has no recent verified pre-test snapshot; refusing to alter it.");
+              await call("/api/communications/website/restore",{method:"POST",body:JSON.stringify({type:"pages",id:Number(duplicate.id),snapshotId:duplicateSnapshots[0].snapshotId})});
+              const cleanDuplicate=(await call("/api/communications/website/content/pages/"+Number(duplicate.id))).item;
+              const draft=await call("/api/communications/website/content",{method:"PUT",body:JSON.stringify({
+                type:"pages",id:Number(duplicate.id),title:cleanDuplicate.title,content:cleanDuplicate.content,
+                excerpt:cleanDuplicate.excerpt||"",featuredMedia:Number(cleanDuplicate.featuredMedia||0),status:"draft"
+              })});
+              if(!draft.success) throw new Error("A marked duplicate staging test page could not be safely unpublished.");
+              const draftCheck=(await call("/api/communications/website/content/pages/"+Number(duplicate.id))).item;
+              if(draftCheck.status!=="draft") throw new Error("A marked duplicate staging test page remains published after cleanup.");
+            }
+            const testPageId=Number(canonical.id);
             let before=await call("/api/communications/website/content/pages/"+testPageId);
             let original=before.item;
             if(!original||original.type!=="pages"||!original.title||typeof original.content!=="string") throw new Error("The pre-provisioned staging test page could not be read.");
