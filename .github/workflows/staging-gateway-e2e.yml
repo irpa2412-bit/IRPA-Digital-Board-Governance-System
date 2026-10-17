@@ -63,7 +63,7 @@ jobs:
           path: e2e-output.ndjson
 
   preflight-staging:
-    if: (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015'))
+    if: (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015' || github.ref == 'refs/heads/fix/communication-media-archive-drive-oauth')))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
