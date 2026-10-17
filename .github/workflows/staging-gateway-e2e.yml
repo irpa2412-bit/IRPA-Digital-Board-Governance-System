@@ -218,6 +218,8 @@ jobs:
           export STAGING_KV_ID="$id"
           node <<'NODE'
           const fs=require("fs");
+          const appUrl=new URL(String(process.env.APP_URL||""));
+          if(appUrl.protocol!=="https:"||appUrl.hostname!=="irpa-dgb-meeting-room-staging.irpa-governance.workers.dev"||appUrl.username||appUrl.password||appUrl.search||appUrl.hash||appUrl.pathname!=="/") throw new Error("Staging application URL must be the approved HTTPS staging frontend origin.");
           const c={
             name:"irpa-google-drive-gateway-staging",main:"src/index.js",
             compatibility_date:"2026-09-29",workers_dev:true,
