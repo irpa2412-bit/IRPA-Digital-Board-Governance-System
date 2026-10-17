@@ -1341,7 +1341,11 @@ jobs:
             const response=await fetch(base+path,{...options,headers:{Authorization:"Bearer "+token,Accept:"application/json",...(options.body?{"Content-Type":"application/json"}:{}),...(options.headers||{})},redirect:"manual"});
             const body=await response.json().catch(()=>({}));
             if(response.status>=300&&response.status<400) throw new Error(path+" returned a redirect; no redirect target was requested.");
-            if(!response.ok) throw new Error(path+" returned HTTP "+response.status);
+            if(!response.ok) {
+              const detail=String(body?.error||body?.message||"").replace(/(password|token|secret|authorization)(\\s*[:=]\\s*)[^\\s,;]+/ig,"$1$2[REDACTED]").replace(/[\\r\\n\\t]+/g," ").slice(0,180);
+              const ray=String(response.headers.get("cf-ray")||"none").slice(0,60);
+              throw new Error(path+" returned HTTP "+response.status+" (cf-ray "+ray+")"+(detail?"; error="+detail:""));
+            }
             return body;
           }
           async function waitForPublicMarker(url){
