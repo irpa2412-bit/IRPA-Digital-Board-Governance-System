@@ -1402,14 +1402,21 @@ jobs:
               const duplicateItem=duplicateRead.item;
               const hasMarker=String(duplicateItem?.title||"").includes("IRPA_STAGING_WEBSITE_CHECK_")||
                 String(duplicateItem?.content||"").includes("IRPA_STAGING_WEBSITE_CHECK_");
-              if(!hasMarker) throw new Error("An additional staging test-page candidate has no acceptance marker; refusing to alter it.");
-              const duplicateHistory=await call("/api/communications/website/revisions?type=pages&id="+Number(duplicate.id));
-              const duplicateSnapshots=(duplicateHistory.revisions||[]).filter(r=>r.source==="IRPA saved snapshot"&&r.snapshotId&&
-                r.title===fixtureTitle&&Date.now()-Date.parse(r.date||"")<10*60*1000)
-                .sort((a,b)=>Date.parse(b.date||"")-Date.parse(a.date||""));
-              if(!duplicateSnapshots.length) throw new Error("A marked duplicate staging test page has no recent verified pre-test snapshot; refusing to alter it.");
-              await call("/api/communications/website/restore",{method:"POST",body:JSON.stringify({type:"pages",id:Number(duplicate.id),snapshotId:duplicateSnapshots[0].snapshotId})});
-              const cleanDuplicate=(await call("/api/communications/website/content/pages/"+Number(duplicate.id))).item;
+              let cleanDuplicate=duplicateItem;
+              if(hasMarker){
+                const duplicateHistory=await call("/api/communications/website/revisions?type=pages&id="+Number(duplicate.id));
+                const duplicateSnapshots=(duplicateHistory.revisions||[]).filter(r=>r.source==="IRPA saved snapshot"&&r.snapshotId&&
+                  r.title===fixtureTitle&&Date.now()-Date.parse(r.date||"")<10*60*1000)
+                  .sort((a,b)=>Date.parse(b.date||"")-Date.parse(a.date||""));
+                if(!duplicateSnapshots.length) throw new Error("A marked duplicate staging test page has no recent verified pre-test snapshot; refusing to alter it.");
+                await call("/api/communications/website/restore",{method:"POST",body:JSON.stringify({type:"pages",id:Number(duplicate.id),snapshotId:duplicateSnapshots[0].snapshotId})});
+                cleanDuplicate=(await call("/api/communications/website/content/pages/"+Number(duplicate.id))).item;
+              }else{
+                const duplicateSlug=slugOf(duplicate);
+                const recentDuplicate=Date.now()-Date.parse(String(duplicate.modified||""))<24*60*60*1000;
+                if(duplicateItem?.title!==fixtureTitle||!/^irpa-staging-integration-check-\\d+$/.test(duplicateSlug)||!recentDuplicate)
+                  throw new Error("An additional staging test-page candidate is not a verifiable recent workflow duplicate; refusing to alter it.");
+              }
               const draft=await call("/api/communications/website/content",{method:"PUT",body:JSON.stringify({
                 type:"pages",id:Number(duplicate.id),title:cleanDuplicate.title,content:cleanDuplicate.content,
                 excerpt:cleanDuplicate.excerpt||"",featuredMedia:Number(cleanDuplicate.featuredMedia||0),status:"draft"
