@@ -140,7 +140,15 @@ export function createCommunicationsSiteRouter(deps) {
     const username = String(env.WORDPRESS_USERNAME || "").trim();
     const password = String(env.WORDPRESS_APPLICATION_PASSWORD || "").replace(/\s/g, "");
     if (!username || !password) throw new Error("Website publishing credentials are not configured.");
-    return { root: base.toString().replace(/\/$/, ""), auth: "Basic " + btoa(unescape(encodeURIComponent(username + ":" + password))) };
+    return { root: base.toString().replace(/\/$/, ""), auth: "Basic " + btoa(unescape(encodeURIComponent(username + ":" + password))), stagingAuthHeader: base.hostname.toLowerCase() === "staging.irpa.or.tz" };
+  }
+
+  function wordpressHeaders(wp, extra = {}) {
+    const headers = { Authorization: wp.auth, ...extra };
+    // Staging nginx/FastCGI strips Authorization before PHP; forward it under a
+    // staging-only header validated by the isolated staging MU-plugin.
+    if (wp.stagingAuthHeader) headers["X-IRPA-Staging-Authorization"] = wp.auth;
+    return headers;
   }
 
   function cpanelConfig(env) {
@@ -183,7 +191,7 @@ export function createCommunicationsSiteRouter(deps) {
       try {
         const wp = wordpressConfig(env);
         const response = await fetch(wp.root + "/wp-json/wp/v2/users/me?context=edit", {
-          headers: { Authorization: wp.auth, Accept: "application/json" }, signal: AbortSignal.timeout(12000)
+          headers: wordpressHeaders(wp, { Accept: "application/json" }), signal: AbortSignal.timeout(12000)
         });
         if (response.ok) {
           const user = await response.json();
@@ -204,7 +212,7 @@ export function createCommunicationsSiteRouter(deps) {
       const wp = wordpressConfig(env);
       const type = url.searchParams.get("type") === "pages" ? "pages" : "posts";
       const response = await fetch(wp.root + "/wp-json/wp/v2/" + type + "?context=edit&per_page=50&orderby=modified&order=desc", {
-        headers: { Authorization: wp.auth, Accept: "application/json" }, signal: AbortSignal.timeout(15000)
+        headers: wordpressHeaders(wp, { Accept: "application/json" }), signal: AbortSignal.timeout(15000)
       });
       const data = await response.json().catch(() => null);
       if (!response.ok || !Array.isArray(data)) throw new Error("Could not read website content. Verify the WordPress account's edit permissions.");
@@ -226,7 +234,7 @@ export function createCommunicationsSiteRouter(deps) {
       }
       const wp = wordpressConfig(env);
       const response = await fetch(wp.root + "/wp-json/wp/v2/" + type + "/" + id, {
-        method: "POST", headers: { Authorization: wp.auth, "Content-Type": "application/json", Accept: "application/json" },
+        method: "POST", headers: wordpressHeaders(wp, { "Content-Type": "application/json", Accept: "application/json" }),
         body: JSON.stringify({ title, content: sanitizeWordPressContent(body) }), signal: AbortSignal.timeout(20000)
       });
       const data = await response.json().catch(() => null);
@@ -255,7 +263,7 @@ export function createCommunicationsSiteRouter(deps) {
       const endpoint = wp.root + "/wp-json/wp/v2/posts";
       const slug = "irpa-" + itemId;
       const lookup = await fetch(endpoint + "?slug=" + encodeURIComponent(slug) + "&status=publish,draft,pending,private&per_page=1", {
-        headers: { Authorization: wp.auth, Accept: "application/json" }, signal: AbortSignal.timeout(15000)
+        headers: wordpressHeaders(wp, { Accept: "application/json" }), signal: AbortSignal.timeout(15000)
       });
       const found = await lookup.json().catch(() => null);
       if (!lookup.ok || !Array.isArray(found)) throw new Error("Could not safely check existing website content before publishing.");
@@ -263,7 +271,7 @@ export function createCommunicationsSiteRouter(deps) {
       if (!post) {
         const response = await fetch(endpoint, {
           method: "POST",
-          headers: { Authorization: wp.auth, "Content-Type": "application/json", Accept: "application/json" },
+          headers: wordpressHeaders(wp, { "Content-Type": "application/json", Accept: "application/json" }),
           body: JSON.stringify({ title, content: plainContent(body), excerpt: htmlEscape(cleanText(item.summary, 600)), slug, status: "publish", comment_status: "closed", ping_status: "closed" }),
           signal: AbortSignal.timeout(30000)
         });
