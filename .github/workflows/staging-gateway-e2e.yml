@@ -785,6 +785,7 @@ jobs:
             try{base=new URL(process.env.WP_BASE)}catch{console.log("POST_REMEDIATION_WP_BASE=INVALID");return}
             console.log("POST_REMEDIATION_STAGING_HOST="+base.hostname);
             try{console.log("POST_REMEDIATION_DNS="+JSON.stringify(await dns.lookup(base.hostname,{all:true})));}catch(e){console.log("POST_REMEDIATION_DNS_ERROR="+String(e.code||e.name))}
+            try{console.log("POST_REMEDIATION_AUTHORITATIVE_NS="+JSON.stringify(await dns.resolveNs("irpa.or.tz")));}catch(e){console.log("POST_REMEDIATION_NS_ERROR="+String(e.code||e.name))}
             for(const path of ["/wp-json/","/wp-login.php","/","/readme.html","/wp-includes/css/dashicons.min.css","/wp-includes/version.php"]){
               try{
                 const r=await request(new URL(path,base).href,{Accept:"application/json,text/html,*/*","Cache-Control":"no-cache"});
@@ -792,6 +793,10 @@ jobs:
                 console.log("POST_REMEDIATION_HTTP="+JSON.stringify({path,status:r.http,server:String(r.headers.server||"").slice(0,80),contentType:String(r.headers["content-type"]||"").slice(0,100),hint:snippet}));
               }catch(e){console.log("POST_REMEDIATION_HTTP_ERROR="+JSON.stringify({path,error:String(e.code||e.name)}))}
             }
+            try{
+              const parent=await request("https://irpa.or.tz/staging/readme.html",{Accept:"text/html","Cache-Control":"no-cache"});
+              console.log("POST_REMEDIATION_PARENT_PATH="+JSON.stringify({status:parent.http,server:String(parent.headers.server||"").slice(0,80),contentType:String(parent.headers["content-type"]||"").slice(0,80)}));
+            }catch(e){console.log("POST_REMEDIATION_PARENT_PATH_ERROR="+String(e.code||e.name))}
             const cpBase=new URL(process.env.CP_BASE);
             async function cp(path,params={}){
               const u=new URL("/execute/"+path,cpBase);u.search=new URLSearchParams(params).toString();
