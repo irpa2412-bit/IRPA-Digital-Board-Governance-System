@@ -88,3 +88,239 @@
     line-height: 1.25;
   }
 }
+
+
+/* PRODUCTION FIX — navigation freeze must live in an imported stylesheet.
+   The earlier rule was added to readability-harmony.css, which is not imported
+   by src/main.jsx. This stylesheet is imported by main.jsx after the legacy
+   layout rules, so these selectors are authoritative. Keep the in-portal
+   selector at the top and Back/Next below it while the document scrolls. */
+#root .app-shell .main-area > .desktop-webapp-navigation-roller {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 13000 !important;
+  isolation: isolate;
+  background: #062b4c;
+}
+html body #root .app-shell .main-area > .page-back-next-navigation.page-back-next-navigation {
+  position: sticky !important;
+  top: 88px !important;
+  z-index: 12990 !important;
+  isolation: isolate;
+  background: #f7fafc;
+  box-shadow: 0 4px 12px rgba(7,43,76,.14);
+}
+@media (min-width: 761px) and (max-width: 1100px) {
+  html body #root .app-shell .main-area > .page-back-next-navigation.page-back-next-navigation {
+    top: 104px !important;
+  }
+}
+
+
+/* ACTUAL STICKY STACK — override legacy fixed/hidden rules at their source.
+   The roller's measured height is published by PortalNavigationFreeze so the
+   Back/Next strip always sits directly beneath it at every viewport width. */
+#root .app-shell .main-area > .desktop-webapp-navigation-roller {
+  position: sticky !important;
+  top: 0 !important;
+  left: auto !important;
+  right: auto !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  z-index: 13000 !important;
+  margin: 0 0 14px !important;
+  isolation: isolate;
+  transform: none !important;
+  background: #062b4c;
+}
+html body #root .app-shell .main-area > .page-back-next-navigation.page-back-next-navigation {
+  position: sticky !important;
+  top: var(--irpa-portal-navigation-height, 0px) !important;
+  left: auto !important;
+  right: auto !important;
+  width: 100% !important;
+  z-index: 12990 !important;
+  margin: 0 0 14px !important;
+  isolation: isolate;
+  background: #f7fafc;
+  box-shadow: 0 4px 12px rgba(7,43,76,.14);
+}
+@media (max-width: 760px) {
+  #root .app-shell .main-area > .desktop-webapp-navigation-roller {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    align-items: stretch !important;
+    gap: 7px !important;
+    min-height: 0 !important;
+    height: auto !important;
+    padding: 9px 12px 10px !important;
+    margin-bottom: 6px !important;
+    border-radius: 0 0 12px 12px !important;
+    overflow: visible !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,.22) !important;
+  }
+  #root .app-shell .main-area > .desktop-webapp-navigation-roller .webapp-navigation-live-clock,
+  #root .app-shell .main-area > .desktop-webapp-navigation-roller .webapp-navigation-roller-chevron {
+    display: none !important;
+  }
+  #root .app-shell .main-area > .desktop-webapp-navigation-roller .webapp-navigation-roller-kicker {
+    display: block !important;
+    white-space: normal !important;
+    font-size: 12px !important;
+    line-height: 1.2 !important;
+  }
+  #root .app-shell .main-area > .desktop-webapp-navigation-roller > strong {
+    display: block !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    overflow-wrap: anywhere !important;
+    text-overflow: clip !important;
+    font-size: 14px !important;
+    line-height: 1.3 !important;
+  }
+  #root .app-shell .main-area > .desktop-webapp-navigation-roller > select {
+    display: block !important;
+    width: 100% !important;
+    min-height: 40px !important;
+    height: auto !important;
+    margin: 0 !important;
+  }
+  html body #root .app-shell .main-area > .page-back-next-navigation.page-back-next-navigation {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) minmax(0, 1fr) !important;
+    gap: 6px !important;
+    padding: 8px 10px !important;
+    border-radius: 0 0 10px 10px !important;
+  }
+}
+
+
+/* Sticky positioning was being neutralized by the viewport-containment rule:
+   overflow-x:hidden on html/body/#root computes the other axis to auto and
+   creates a nearer scroll container that does not scroll with the document.
+   clip preserves horizontal containment without creating that scrollport. */
+html,
+body,
+#root {
+  overflow-x: clip !important;
+  overflow-y: visible !important;
+}
+
+
+/* WORLD TIME + PAGE NAVIGATION — compact, high-contrast shared header.
+   Keep the clock action beside the heading/counter instead of leaving it below
+   them; preserve the existing Back/Next controls, sticky placement and popup. */
+#root .app-shell .main-area > .page-back-next-navigation {
+  grid-template-columns: minmax(64px, .7fr) minmax(0, 2fr) minmax(64px, .7fr);
+  column-gap: 8px;
+  padding-inline: 8px;
+}
+#root .app-shell .main-area > .page-back-next-navigation .page-back-next-status {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "eyebrow eyebrow"
+    "title time"
+    "count time";
+  align-items: center;
+  justify-items: center;
+  column-gap: 10px;
+  row-gap: 3px;
+}
+#root .app-shell .main-area > .page-back-next-navigation .page-back-next-status > span {
+  grid-area: eyebrow;
+  font-size: 12px;
+  line-height: 1.2;
+  letter-spacing: .035em;
+  white-space: nowrap;
+}
+#root .app-shell .main-area > .page-back-next-navigation .page-back-next-status > strong {
+  grid-area: title;
+  justify-self: end;
+  font-size: clamp(14px, 1.25vw, 17px);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+#root .app-shell .main-area > .page-back-next-navigation .page-back-next-status > small {
+  grid-area: count;
+  justify-self: end;
+  font-size: 13px;
+  line-height: 1.2;
+}
+#root .app-shell .main-area > .page-back-next-navigation .page-back-next-time-toggle {
+  grid-area: time;
+  justify-self: start;
+  align-self: center;
+  min-width: 112px;
+  min-height: 44px;
+  padding: 9px 14px;
+  border: 2px solid #075f3d;
+  border-radius: 10px;
+  background: #075f3d !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  font-size: 15px !important;
+  font-weight: 800;
+  line-height: 1.25;
+  text-align: center;
+  white-space: normal;
+  opacity: 1 !important;
+  box-shadow: 0 2px 5px rgba(7,43,76,.18);
+}
+#root .app-shell .main-area > .page-back-next-navigation .page-back-next-time-toggle:hover {
+  background: #064b31 !important;
+}
+#root .app-shell .main-area > .page-back-next-navigation .page-back-next-time-toggle:focus-visible {
+  outline: 3px solid #075f3d;
+  outline-offset: 3px;
+}
+#root .app-shell .main-area > .page-back-next-navigation .page-back-next-time-pad {
+  grid-column: 1 / -1;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+@media (max-width: 760px) {
+  #root .app-shell .main-area > .page-back-next-navigation {
+    grid-template-columns: minmax(48px, .65fr) minmax(0, 2fr) minmax(48px, .65fr) !important;
+    column-gap: 5px !important;
+    padding: 8px 6px !important;
+  }
+  #root .app-shell .main-area > .page-back-next-navigation .page-back-next-status {
+    column-gap: 5px;
+    row-gap: 4px;
+  }
+  #root .app-shell .main-area > .page-back-next-navigation .page-back-next-status > span {
+    font-size: 12px !important;
+    letter-spacing: .015em !important;
+  }
+  #root .app-shell .main-area > .page-back-next-navigation .page-back-next-status > strong {
+    font-size: 14px !important;
+  }
+  #root .app-shell .main-area > .page-back-next-navigation .page-back-next-status > small {
+    font-size: 13px !important;
+  }
+  #root .app-shell .main-area > .page-back-next-navigation .page-back-next-time-toggle {
+    min-width: 0;
+    min-height: 44px;
+    padding: 8px 9px;
+    font-size: 14px !important;
+  }
+}
+@media (max-width: 380px) {
+  #root .app-shell .main-area > .page-back-next-navigation .page-back-next-status {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "eyebrow" "title" "count" "time";
+    justify-items: center;
+  }
+  #root .app-shell .main-area > .page-back-next-navigation .page-back-next-status > strong,
+  #root .app-shell .main-area > .page-back-next-navigation .page-back-next-status > small {
+    justify-self: center;
+  }
+  #root .app-shell .main-area > .page-back-next-navigation .page-back-next-time-toggle {
+    justify-self: center;
+    width: 100%;
+  }
+}

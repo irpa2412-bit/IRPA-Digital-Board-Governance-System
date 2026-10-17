@@ -134,27 +134,26 @@ export function getDriveRootFolderName(env) {
   }
   return name;
 }
-async function driveFolder(env, accessToken, path) {
-  let parent=await findFolder(env,accessToken,getDriveRootFolderName(env),null);
-  for(const part of path.split("/").filter(Boolean)) parent=await findFolder(env,accessToken,part,parent);
+async function driveFolder(env, accessToken, path, driveFetchImpl) {
+  let parent=await findFolder(env,accessToken,getDriveRootFolderName(env),null,driveFetchImpl);
+  for(const part of path.split("/").filter(Boolean)) parent=await findFolder(env,accessToken,part,parent,driveFetchImpl);
   return parent;
 }
-async function findFolder(env,token,name,parent) {
+async function findFolder(env,token,name,parent,driveFetchImpl) {
   const q=[`name='${name.replaceAll("'","\\'")}'`,"mimeType='application/vnd.google-apps.folder'","trashed=false",parent?`'${parent}' in parents`:null].filter(Boolean).join(" and ");
-  const x=await driveFetch(env,token,"/drive/v3/files?q="+encodeURIComponent(q)+"&spaces=drive&pageSize=10&fields=files(id)");
+  const x=await driveFetchImpl(env,token,"/drive/v3/files?q="+encodeURIComponent(q)+"&spaces=drive&pageSize=10&fields=files(id)");
   if(x.files?.[0]?.id) return x.files[0].id;
-  return (await driveFetch(env,token,"/drive/v3/files",{method:"POST",body:JSON.stringify({name,mimeType:"application/vnd.google-apps.folder",...(parent?{parents:[parent]}:{})})})).id;
+  return (await driveFetchImpl(env,token,"/drive/v3/files",{method:"POST",body:JSON.stringify({name,mimeType:"application/vnd.google-apps.folder",...(parent?{parents:[parent]}:{})})})).id;
 }
 function driveStorage(env, helpers) {
   if(env.DRIVE_MOCK==="true") return mockStorage();
   return {
     async put({path,bytes,contentType,metadata}) {
-      const parts=path.split("/"); const name=parts.pop(); const folder=await driveFolder(env,await helpers.getDriveAccessToken(env),parts.join("/"));
-      const token=await helpers.getDriveAccessToken(env);
+      const parts=path.split("/"); const name=parts.pop(); const token=await helpers.getDriveAccessToken(env); const folder=await driveFolder(env,token,parts.join("/"),helpers.driveFetch);
       const meta={name,parents:[folder],mimeType:contentType,description:JSON.stringify(metadata||{})};
       const boundary="esign-"+crypto.randomUUID(), enc=new TextEncoder();
-      const head=enc.encode(`--${boundary}\\r\\nContent-Type: application/json; charset=UTF-8\\r\\n\\r\\n${JSON.stringify(meta)}\\r\\n--${boundary}\\r\\nContent-Type: ${contentType}\\r\\n\\r\\n`);
-      const tail=enc.encode(`\\r\\n--${boundary}--`), body=new Uint8Array(head.length+bytes.length+tail.length);
+      const head=enc.encode(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${boundary}\r\nContent-Type: ${contentType}\r\n\r\n`);
+      const tail=enc.encode(`\r\n--${boundary}--`), body=new Uint8Array(head.length+bytes.length+tail.length);
       body.set(head); body.set(bytes,head.length); body.set(tail,head.length+bytes.length);
       const r=await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink",{method:"POST",headers:{Authorization:`Bearer ${token}`,"Content-Type":`multipart/related; boundary=${boundary}`},body});
       const x=await r.json(); if(!r.ok) throw new Error(x.error?.message||"Google Drive upload failed.");
@@ -175,6 +174,6 @@ export function buildEsignContext({env,verifyUser,sendInvitation,logger,now,driv
     now:now||(()=>new Date()),
     config:{appUrl:String(env.IRPA_APP_URL||"https://irpa-digital-board-governance.web.app").replace(/\/$/,""),ttlDays:14},
     crypto:env.DRIVE_MOCK==="true"?null:{keyProvider:createCloudflareSignerKeyProvider(env)},
-    allowReturnTokens:env.DRIVE_MOCK==="true"
+    allowReturnTokens:env.DRIVE_MOCK==="true"||(env.IRPA_ENVIRONMENT==="staging"&&env.IRPA_STAGING_CRYPTO_TEST_MODE==="true")
   };
 }

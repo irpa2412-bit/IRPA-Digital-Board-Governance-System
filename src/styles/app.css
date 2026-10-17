@@ -11104,3 +11104,31 @@ html body #root .app-shell .main-area > header.topbar.dashboard-topbar > .topbar
   .module-interlink-bar .workflow-portal-children { border-left:0; flex-wrap:wrap; }
 }
 html, body, #root { min-width:0; max-width:100%; }
+
+
+/* IRPA international time pad — anchored to the shared Back/Next navigator */
+.page-back-next-navigation{position:relative}
+.page-back-next-time-toggle{justify-self:center;align-self:center;min-height:30px;padding:5px 10px;border:1px solid #456b57;border-radius:7px;background:#174c39;color:#f2f8f4;font-size:12px;line-height:1.2;font-weight:800;white-space:nowrap}
+.page-back-next-time-toggle:hover{filter:brightness(1.08)}
+.page-back-next-time-toggle:focus-visible{outline:3px solid rgba(47,134,207,.35);outline-offset:2px}
+.page-back-next-time-pad{position:absolute;top:calc(100% + 6px);right:0;z-index:10001;width:min(680px,calc(100vw - 24px));max-height:70vh;overflow:auto;margin:0;padding:12px;background:#071b14;border:1px solid #456b57;border-radius:10px;color:#edf5f1;box-shadow:0 8px 22px rgba(0,0,0,.32)}
+.live-weather-time-pad-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.live-weather-time-pad-heading>div{display:flex;flex-direction:column;gap:4px;min-width:0}
+.live-weather-time-pad-heading strong{font-size:12px;letter-spacing:.08em;color:#e7c65e}
+.live-weather-time-pad-heading small{font-size:12px;line-height:1.4;color:#b7c9c0}
+.live-weather-time-pad-heading button{background:#163c2d;border:1px solid #456b57;border-radius:7px;color:#f2f8f4;font-size:12px;padding:7px 10px;min-height:34px}
+.live-weather-time-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.live-weather-time-city{display:flex;flex-direction:column;gap:4px;min-width:0;padding:9px;background:#10291f;border:1px solid #2d5140;border-radius:8px}
+.live-weather-time-city strong{font-size:12px;color:#c7dbd1}
+.live-weather-time-city span{font-size:18px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:.02em;color:#fff;white-space:nowrap}
+.live-weather-time-city small{font-size:12px;line-height:1.35;color:#9eb6aa}
+@media(max-width:600px){.page-back-next-time-pad{right:0;width:calc(100vw - 24px);max-height:65vh}.live-weather-time-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.live-weather-time-city{padding:8px}.live-weather-time-city span{font-size:17px}.page-back-next-time-toggle{padding:5px 8px}}
+
+
+/* Reorder navigation status content only; Back/Next controls are unchanged. */
+.main-area>.page-back-next-navigation .page-back-next-status{display:flex;flex-direction:row;align-items:center;justify-content:center;flex-wrap:nowrap;gap:8px;min-width:0;white-space:nowrap}
+.main-area>.page-back-next-navigation .page-back-next-status .page-back-next-time-toggle{flex:0 0 auto;order:0}
+.main-area>.page-back-next-navigation .page-back-next-status>span{flex:0 0 auto;order:1}
+.main-area>.page-back-next-navigation .page-back-next-status>strong{flex:0 1 auto;order:2;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.main-area>.page-back-next-navigation .page-back-next-status>small{flex:0 0 auto;order:3}
+@media(max-width:600px){.main-area>.page-back-next-navigation .page-back-next-status{gap:5px;font-size:12px}.main-area>.page-back-next-navigation .page-back-next-status .page-back-next-time-toggle{padding:5px 7px;font-size:12px}}

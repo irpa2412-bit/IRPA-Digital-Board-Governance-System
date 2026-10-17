@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { PDFDocument } from "pdf-lib";
-import { declineSigning, getSigningPdf, openSigning, sign } from "../src/signing.mjs";
+import { chainEvents, declineSigning, getSigningPdf, openSigning, sign, verifySigningPdf } from "../src/signing.mjs";
 import { route } from "../src/router.mjs";
 import { sha256Hex } from "../src/util.mjs";
 
@@ -55,7 +55,7 @@ async function makeFixture({ signerUid, signerEmail, secondSigner = true } = {})
     archiveTargets: [],
     createdAt: NOW.toISOString(),
     expiresAt: new Date(NOW.getTime() + 86400000).toISOString(),
-    events: [{ type: "envelope.created", hash: "GENESIS", prevHash: "GENESIS" }],
+    events: await chainEvents([], { type: "envelope.created", at: NOW.toISOString(), actor: "owner-user" }),
     completion: null,
     _v: 1
   };
@@ -215,4 +215,142 @@ test("External token signer remains usable without Firebase authentication", asy
   assert.equal(opened.canSign, true);
   const pdf = await getSigningPdf(fixture.ctx, fixture.token, null);
   assert.deepEqual(pdf.bytes, ORIGINAL);
+});
+
+
+test("Gateway open returns only fields assigned to the authenticated signer", async () => {
+  const fixture = await makeFixture({ signerUid:"member-uid", signerEmail:"member@example.org" });
+  fixture.envelope.fields = [
+    {fieldId:"member-name",type:"Name",page:1,x:10,y:20,width:30,height:8,signerUid:"member-uid",required:true},
+    {fieldId:"second-signature",type:"Signature",page:1,x:50,y:20,width:30,height:8,signerUid:"second-user",required:true}
+  ];
+  const opened = await openSigning(fixture.ctx,fixture.token,{uid:"member-uid",email:"member@example.org"});
+  assert.equal(opened.fields.length,1);
+  assert.equal(opened.fields[0].fieldId,"member-name");
+  assert.equal(opened.fields.some(field=>field.signerUid==="second-user"),false);
+});
+
+test("Gateway signing refuses missing required assigned fields before mutating the signer", async () => {
+  const fixture = await makeFixture({ signerUid:"member-uid", signerEmail:"member@example.org" });
+  fixture.envelope.fields = [
+    {fieldId:"approval-reason",type:"Text",page:1,x:10,y:20,width:30,height:8,signerUid:"member-uid",required:true}
+  ];
+  await assert.rejects(
+    () => sign(fixture.ctx,{
+      token:fixture.token,
+      signature:{type:"typed",value:"Member Signer"},
+      fieldValues:{},
+      consent:true,
+      user:{uid:"member-uid",email:"member@example.org"}
+    }),
+    error=>error.status===400&&error.message.includes("required text field")
+  );
+  const current=await fixture.ctx.meta.get("envelopes",fixture.envelope.id);
+  assert.equal(current.signers[0].status,"Pending");
+});
+
+test("Gateway signing stores only the authenticated signer's assigned field values", async () => {
+  const fixture = await makeFixture({ signerUid:"member-uid", signerEmail:"member@example.org" });
+  fixture.envelope.fields = [
+    {fieldId:"member-name",type:"Name",page:1,x:10,y:20,width:30,height:8,signerUid:"member-uid",required:true},
+    {fieldId:"second-name",type:"Name",page:1,x:50,y:20,width:30,height:8,signerUid:"second-user",required:true}
+  ];
+  const result=await sign(fixture.ctx,{
+    token:fixture.token,
+    signature:{type:"typed",value:"Member Signer"},
+    fieldValues:{"member-name":"Member Name","second-name":"Injected Other Signer"},
+    consent:true,
+    user:{uid:"member-uid",email:"member@example.org"}
+  });
+  assert.equal(result.status,"InProgress");
+  const current=await fixture.ctx.meta.get("envelopes",fixture.envelope.id);
+  assert.deepEqual(current.signers[0].fieldValues,{"member-name":"Member Name"});
+  assert.equal(current.signers[0].fieldValues["second-name"],undefined);
+});
+
+
+test("Gateway idempotent signing retry still requires the invited authenticated UID", async () => {
+  const fixture = await makeFixture({ signerUid:"member-uid", signerEmail:"member@example.org" });
+  await sign(fixture.ctx,{
+    token:fixture.token,
+    signature:{type:"typed",value:"Member Signer"},
+    consent:true,
+    user:{uid:"member-uid",email:"member@example.org"}
+  });
+  await assert.rejects(
+    () => sign(fixture.ctx,{
+      token:fixture.token,
+      signature:{type:"typed",value:"Member Signer"},
+      consent:true,
+      user:{uid:"wrong-user",email:"member@example.org"}
+    }),
+    error=>error.status===403
+  );
+});
+
+
+test("Gateway completed-PDF verification accepts the exact hash and rejects tampered bytes", async () => {
+  const fixture=await makeFixture({signerUid:"member-uid",signerEmail:"member@example.org"});
+  const finalHash=await sha256Hex(ORIGINAL);
+  fixture.envelope.status="Completed";
+  fixture.envelope.completion={finalHash,cryptographicEvidenceIds:["CRYPTO-TEST"]};
+  const user={uid:"member-uid",email:"member@example.org"};
+  const accepted=await verifySigningPdf(fixture.ctx,fixture.token,user,new Uint8Array(ORIGINAL));
+  assert.equal(accepted.verified,true);
+  assert.equal(accepted.documentHash,finalHash);
+  const tampered=new Uint8Array(ORIGINAL);
+  tampered[tampered.length-1]^=1;
+  await assert.rejects(
+    ()=>verifySigningPdf(fixture.ctx,fixture.token,user,tampered),
+    error=>error.status===409&&error.message.includes("does not match")
+  );
+});
+
+test("Gateway completed-PDF verification requires the invited UID even for a valid hash", async () => {
+  const fixture=await makeFixture({signerUid:"member-uid",signerEmail:"member@example.org"});
+  fixture.envelope.status="Completed";
+  fixture.envelope.completion={finalHash:await sha256Hex(ORIGINAL),cryptographicEvidenceIds:[]};
+  await assert.rejects(
+    ()=>verifySigningPdf(fixture.ctx,fixture.token,{uid:"wrong-user",email:"member@example.org"},new Uint8Array(ORIGINAL)),
+    error=>error.status===403
+  );
+});
+
+
+test("Production-mode Gateway signing fails closed without server-side Member/Employee authority verification", async () => {
+  const fixture=await makeFixture({signerUid:"member-uid",signerEmail:"member@example.org"});
+  fixture.ctx.env={DRIVE_MOCK:"false",IRPA_ENVIRONMENT:"staging"};
+  await assert.rejects(
+    ()=>sign(fixture.ctx,{
+      token:fixture.token,
+      signature:{type:"typed",value:"Member Signer"},
+      consent:true,
+      manualAuthorityIdentification:"Board Member",
+      user:{uid:"member-uid",email:"member@example.org"}
+    }),
+    error=>error.status===403&&error.message.includes("authority could not be verified")
+  );
+  const current=await fixture.ctx.meta.get("envelopes",fixture.envelope.id);
+  assert.equal(current.signers[0].status,"Pending");
+});
+
+test("Production-mode Gateway signing records the server-verified authority in the audit chain", async () => {
+  const fixture=await makeFixture({signerUid:"member-uid",signerEmail:"member@example.org"});
+  fixture.ctx.env={DRIVE_MOCK:"false",IRPA_ENVIRONMENT:"staging"};
+  fixture.ctx.verifySigningAuthority=async(user,manualAuthorityIdentification)=>{
+    assert.equal(user.uid,"member-uid");
+    assert.equal(manualAuthorityIdentification,"Board Member");
+    return {verified:true,authorityRole:"Board Member",authoritySourceCollection:"members",authoritySourceRecordId:"member-uid",verificationMethod:"Authenticated Gateway Member/Employee Register Match"};
+  };
+  const result=await sign(fixture.ctx,{
+    token:fixture.token,
+    signature:{type:"typed",value:"Member Signer"},
+    consent:true,
+    manualAuthorityIdentification:"Board Member",
+    user:{uid:"member-uid",email:"member@example.org"}
+  });
+  assert.equal(result.status,"InProgress");
+  const current=await fixture.ctx.meta.get("envelopes",fixture.envelope.id);
+  assert.equal(current.signers[0].authorityVerification.authorityRole,"Board Member");
+  assert.equal(current.events.at(-1).authoritySourceCollection,"members");
 });

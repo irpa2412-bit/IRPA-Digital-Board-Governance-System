@@ -198,3 +198,13 @@ test("Meta API uses the existing staging-only OAuth router, minimal read permiss
  assert.ok(gateway.includes('const metaResponse = await metaOAuthRouter(request, env)'));
  assert.ok(docs.includes("Meta (Facebook and Instagram) API — staging-only connection and access verification"));
 });
+
+const readability=readFileSync(new URL("../src/styles/readability-harmony.css",import.meta.url),"utf8");
+
+test("communication portal light cards and secondary controls retain readable foreground contrast",()=>{
+ assert.match(readability,/\.communication-media-portal > section:first-child > div:nth-child\(2\) > button span[\s\S]*?color:#17372b!important/);
+ assert.match(readability,/\.communication-media-portal button:not\(\[style\*="#1d4ed8"\]\)[\s\S]*?color:#17372b!important/);
+ assert.match(readability,/\.communication-media-portal button\[style\*="#1d4ed8"\][\s\S]*?color:#ffffff!important/);
+ assert.match(readability,/\.communication-media-portal input,[\s\S]*?color:#172033!important/);
+ assert.match(readability,/\.communication-media-portal input::placeholder,[\s\S]*?color:#526176!important/);
+});

@@ -1,4 +1,5 @@
 import React,{useCallback,useEffect,useRef,useState}from"react";
+import{getActualDataAccessStatus}from"./firebase/systemControl";
 
 const DATA_TYPES=[
   ["governance","Governance, meetings and resolutions"],
@@ -12,8 +13,8 @@ const DATA_TYPES=[
   ["other","Other / not listed"]
 ];
 const ENVIRONMENTS=[["TRIAL","Trial data — testing and demonstrations"],["ACTUAL","Actual data — official institutional records"]];
-const ACTUAL_ONLY_TYPES=new Set(["personnel","signatures","system"]);
-const ACTUAL_ONLY_PORTAL_HINT=/member|personnel|employee|signature|signer|auditor|security|system settings|administrator|authorization|approval/i;
+const ACTUAL_ONLY_TYPES=new Set(["system"]);
+const ACTUAL_ONLY_PORTAL_HINT=/auditor|security|system settings|administrator/i;
 const portalRequiresActual=portal=>ACTUAL_ONLY_PORTAL_HINT.test(String(portal||""));
 const verificationMapKey="irpaPortalDataEntryVerifications";
 
@@ -38,6 +39,7 @@ const applyRecord=record=>{
     window.sessionStorage.setItem("irpaDataEnvironmentTarget",record.portal);
     window.sessionStorage.setItem("irpaDataEnvironmentSelectedAt",record.verifiedAt);
     window.sessionStorage.setItem("irpaIdentityDataEnvironment","ACTUAL");
+    window.sessionStorage.setItem("irpaActualDataAccessVerified",record.environment==="ACTUAL"&&window.sessionStorage.getItem("irpaActualDataAccessOpen")==="true"?"true":"false");
     return true;
   }catch{return false}
 };
@@ -110,6 +112,8 @@ export default function FieldEntryDataGate({portal}){
   const[environment,setEnvironment]=useState("");
   const[confirmed,setConfirmed]=useState(false);
   const[storageError,setStorageError]=useState("");
+  const[actualDataAccessOpen,setActualDataAccessOpen]=useState(false);
+  const[actualDataAccessLoading,setActualDataAccessLoading]=useState(true);
   const pending=useRef(null);
   const openRef=useRef(false);
   const replaying=useRef(false);
@@ -132,6 +136,19 @@ export default function FieldEntryDataGate({portal}){
     openRef.current=true;
     setField({portal:name});
   },[]);
+
+  useEffect(()=>{
+    if(!field){setActualDataAccessLoading(false);return;}
+    let current=true;
+    setActualDataAccessLoading(true);
+    getActualDataAccessStatus().then(status=>{
+      if(current){setActualDataAccessOpen(status?.enabled===true);try{window.sessionStorage.setItem("irpaActualDataAccessOpen",status?.enabled===true?"true":"false")}catch{}}
+    }).catch(()=>{
+      // Fail closed: a missing/unavailable gate status never enables actual-data entry.
+      if(current){setActualDataAccessOpen(false);try{window.sessionStorage.setItem("irpaActualDataAccessOpen","false");window.sessionStorage.setItem("irpaActualDataAccessVerified","false")}catch{}}
+    }).finally(()=>{if(current)setActualDataAccessLoading(false)});
+    return()=>{current=false};
+  },[field?.portal]);
 
   const previousPortalRef=useRef(currentPortal);
 
@@ -206,6 +223,7 @@ export default function FieldEntryDataGate({portal}){
   const close=()=>{setField(null);openRef.current=false;pending.current=null};
   const proceed=()=>{
     if(!field||!dataType||!environment||(environment==="ACTUAL"&&!confirmed))return;
+    if(environment==="ACTUAL"&&!actualOnly&&!actualDataAccessOpen)return;
     if(actualOnly&&environment!=="ACTUAL")return;
     const selectedEnvironment=actualOnly?"ACTUAL":environment;
     const record={dataType,environment:selectedEnvironment,portal:field.portal,verifiedAt:new Date().toISOString()};
@@ -234,7 +252,7 @@ export default function FieldEntryDataGate({portal}){
   };
 
   if(!field)return null;
-  const disabled=!dataType||!environment||(environment==="ACTUAL"&&!confirmed)||(actualOnly&&environment!=="ACTUAL");
+  const disabled=actualDataAccessLoading||!dataType||!environment||(environment==="ACTUAL"&&!confirmed)||(environment==="ACTUAL"&&!actualOnly&&!actualDataAccessOpen)||(actualOnly&&environment!=="ACTUAL");
   return <div data-irpa-field-gate role="dialog" aria-modal="true" aria-labelledby="irpa-field-gate-title" onKeyDown={e=>{if(e.key==="Escape"){e.preventDefault();close()}}} style={{position:"fixed",inset:0,zIndex:30000,display:"flex",alignItems:"center",justifyContent:"center",padding:20,background:"rgba(3,12,10,.78)",backdropFilter:"blur(5px)",overflowY:"auto"}}>
     <section style={{width:"min(100%,680px)",maxHeight:"92vh",overflowY:"auto",background:"var(--surface, #fff)",color:"var(--text, #14231f)",border:"1px solid var(--border, #cbd5d1)",borderRadius:18,padding:24,boxShadow:"0 24px 80px rgba(0,0,0,.35)"}}>
       <div style={{fontSize:12,fontWeight:800,letterSpacing:1.4,textTransform:"uppercase",opacity:.75}}>IRPA · Data Control</div>
@@ -255,11 +273,13 @@ export default function FieldEntryDataGate({portal}){
       <fieldset style={{border:0,padding:0,margin:"0 0 16px"}}>
         <legend style={{fontWeight:750,marginBottom:10}}>2. Select the data environment (Required)</legend>
         {ENVIRONMENTS.map(([value,label])=><label key={value} style={{display:"flex",alignItems:"flex-start",gap:9,padding:"10px 0",cursor:actualOnly&&value==="TRIAL"?"not-allowed":"pointer",opacity:actualOnly&&value==="TRIAL"?.5:1}}>
-          <input type="radio" name="irpa-data-environment" value={value} disabled={actualOnly&&value==="TRIAL"} checked={environment===value} onChange={()=>{setEnvironment(value);setConfirmed(false)}} style={{marginTop:3}}/>
-          <span>{label}{actualOnly&&value==="TRIAL"?" — unavailable for protected identity/security records":""}</span>
+          <input type="radio" name="irpa-data-environment" value={value} disabled={(actualOnly&&value==="TRIAL")||(value==="ACTUAL"&&!actualOnly&&(!actualDataAccessOpen||actualDataAccessLoading))} checked={environment===value} onChange={()=>{setEnvironment(value);setConfirmed(false)}} style={{marginTop:3}}/>
+          <span>{label}{actualOnly&&value==="TRIAL"?" — unavailable for protected system-security records":""}</span>
         </label>)}
       </fieldset>
-      {actualOnly&&<p style={{padding:12,borderRadius:9,background:"var(--surface-muted, #f1f5f3)",lineHeight:1.45}}>This portal or data category is reserved for protected identity, personnel, signer/signature, auditor, authorization or system-security records. It must remain in ACTUAL DATA.</p>}
+      {actualOnly&&<p style={{padding:12,borderRadius:9,background:"var(--surface-muted, #f1f5f3)",lineHeight:1.45}}>The Signature Portal and other operational portals can use TRIAL mode for testing. Identity, signer identity, auditor and system-security records remain protected by their specific authorization rules.</p>}
+      {!actualOnly&&!actualDataAccessOpen&&<p role="status" style={{padding:12,borderRadius:9,background:"var(--surface-muted, #f1f5f3)",lineHeight:1.45}}><strong>ACTUAL-DATA ENTRY IS CLOSED.</strong> Trial entry remains available. The IRPA Administrator may open actual-data entry only after final system tests have passed.</p>}
+      {!actualOnly&&actualDataAccessLoading&&<p role="status">Checking administrator-controlled actual-data access…</p>}
       {environment==="ACTUAL"&&<label style={{display:"flex",alignItems:"flex-start",gap:10,padding:12,border:"1px solid #b7791f",borderRadius:9,marginBottom:16}}>
         <input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)} style={{marginTop:3}}/>
         <span>I confirm this portal’s data-entry environment for this session. This selection authorises data entry throughout this portal/sub-portal. If ACTUAL DATA is selected, I understand changes may affect live institutional records.</span>

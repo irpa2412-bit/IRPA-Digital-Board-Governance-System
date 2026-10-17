@@ -3,12 +3,13 @@ import { auth, db, applicantAuth, applicantDb, applicantApp } from "./config";
 import { sendEmployeeRegistrationEmail } from "./auth";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { canAccessMeetingCategory, MEETING_CATEGORIES } from "./meetingPolicy.js";
+import { listLifecycleDocuments } from "./documentLifecycle.js";
 
 const uniqueInductionValues=(values)=>[...new Set(values.flatMap(v=>Array.isArray(v)?v:String(v||"").split(",")).map(v=>String(v||"").trim()).filter(Boolean))];
 
 export const COLLECTIONS={members:"members",employees:"employees",employeeCounters:"employeeCounters",memberCounters:"memberCounters",participants:"participants",meetings:"meetings",meetingSubscriptions:"meetingSubscriptions",meetingRoomEvents:"meetingRoomEvents",transcriptions:"transcriptions",resolutions:"resolutions",votes:"votes",voteLocks:"voteLocks",voteCorrections:"voteCorrections",votingIssues:"votingIssues",actions:"actions",documents:"documents",documentTranslationRequests:"documentTranslationRequests",signatures:"signatures",decisions:"decisions",risks:"risks",audit:"audit",reports:"reports",authorizationRequests:"authorizationRequests",workflowActions:"workflowActions",staffPaymentRequests:"staffPaymentRequests",financeBudgets:"financeBudgets",financeTransactions:"financeTransactions",financeFunding:"financeFunding",financeApprovals:"financeApprovals",financeCommitments:"financeCommitments",financeGrants:"financeGrants",financeBankAccounts:"financeBankAccounts",financeReconciliations:"financeReconciliations",financeAssets:"financeAssets",financeRisks:"financeRisks",financeReports:"financeReports",financeChartOfAccounts:"financeChartOfAccounts",financeJournalBatches:"financeJournalBatches",financePeriods:"financePeriods",financeLedgerJournals:"financeLedgerJournals",financeLedgerEntries:"financeLedgerEntries",financePaymentMatches:"financePaymentMatches",financePaymentTrace:"financePaymentTrace",financeReferenceRegistry:"financeReferenceRegistry",procurementVendors:"procurementVendors",procurementRequests:"procurementRequests",procurementVendorScores:"procurementVendorScores",procurementVendorBlacklist:"procurementVendorBlacklist",procurementVendorProbation:"procurementVendorProbation",invitations:"invitations",registrationRequests:"registrationRequests",inductionRecords:"inductionRecords",adminProfiles:"adminProfiles",auditorProfiles:"auditorProfiles",systemSettings:"systemSettings",mail:"mail",donorFunders:"donorFunders",grantReportingObligations:"grantReportingObligations",researchStudies:"researchStudies",researchDatasets:"researchDatasets",researchObservations:"researchObservations",researchAnalyses:"researchAnalyses",researchKnowledge:"researchKnowledge",researchOutputs:"researchOutputs",researchInstruments:"researchInstruments",researchSubmissions:"researchSubmissions",researchInformationRequests:"researchInformationRequests",researchInformationGrants:"researchInformationGrants",researchSharedInformation:"researchSharedInformation",researchUpdates:"researchUpdates",researchToolPermissions:"researchToolPermissions",researchPortalAlerts:"researchPortalAlerts"};
 const ACTUAL_ONLY_COLLECTIONS=new Set([COLLECTIONS.members,COLLECTIONS.employees,COLLECTIONS.employeeCounters,COLLECTIONS.memberCounters,COLLECTIONS.invitations,COLLECTIONS.registrationRequests,COLLECTIONS.inductionRecords,COLLECTIONS.adminProfiles,COLLECTIONS.auditorProfiles,COLLECTIONS.systemSettings,COLLECTIONS.audit,COLLECTIONS.signatures,"signatureEnvelopes","signatureEvents","voteLocks"]);
-function isTrialDataMode(){try{return String(window.sessionStorage.getItem("irpaDataEnvironment")||"").toUpperCase()==="TRIAL"||String(window.sessionStorage.getItem("irpaActiveAccessAuthority")||"").toUpperCase()==="ADMINISTRATOR"}catch{return false}}
+function isTrialDataMode(){try{const environment=String(window.sessionStorage.getItem("irpaDataEnvironment")||"TRIAL").toUpperCase();const authority=String(window.sessionStorage.getItem("irpaActiveAccessAuthority")||"").toUpperCase();const actualAccessVerified=window.sessionStorage.getItem("irpaActualDataAccessVerified")==="true";return environment!=="ACTUAL"||(authority==="ADMINISTRATOR"&&!actualAccessVerified)}catch{return true}}
 function isActualOnlyCollection(collectionName){return ACTUAL_ONLY_COLLECTIONS.has(collectionName)}
 function hasTrialMarker(data={}){return String(data.recordOrigin||"").toUpperCase()==="TRIAL"||data.trialData===true||data.isTrial===true}
 function currentActor(){return{uid:auth.currentUser?.uid||null,email:auth.currentUser?.email||null};}
@@ -124,17 +125,34 @@ export async function getControlledDocumentsForSigning({portal="Signature Portal
     ? [query(collection(db,COLLECTIONS.documents),orderBy("uploadedAt","desc"))]
     : [
         query(collection(db,COLLECTIONS.documents),where("uploadedByUid","==",uid)),
-        query(collection(db,COLLECTIONS.documents),where("authorizedUids","array-contains",uid))
+        query(collection(db,COLLECTIONS.documents),where("authorizedUids","array-contains",uid)),
+        query(collection(db,COLLECTIONS.documents),where("ownerUid","==",uid)),
+        query(collection(db,COLLECTIONS.documents),where("signatureOwnerUid","==",uid))
       ];
   const results=[];const errors=[];
   for(const q of querySpecs){try{const snap=await getDocs(q);results.push(...snap.docs.map(x=>({id:x.id,...x.data()})));}catch(error){errors.push(error);}}
-  if(!results.length&&errors.length===querySpecs.length)throw errors[0]||new Error("Controlled document list could not be loaded.");
-  const byId=new Map(results.map(d=>[d.id,d]));
+  // The Documents Portal writes through the authenticated Document Lifecycle gateway.
+  // Those records are access-filtered server-side and are not guaranteed to be in the
+  // same query result shape as legacy direct Firestore document uploads.
+  try{
+    const lifecycle=await listLifecycleDocuments();
+    const lifecycleRows=Array.isArray(lifecycle?.documents)?lifecycle.documents:[];
+    for(const item of lifecycleRows){
+      const id=String(item?.documentId||item?.id||"").trim();
+      if(!id)continue;
+      const fileId=String(item?.fileId||item?.driveFileId||"").trim();
+      results.push({...item,id,documentId:id,fileUrl:item?.fileUrl||(fileId?("drive://"+fileId):""),contentType:item?.contentType||item?.mimeType||"application/pdf",recordOrigin:item?.recordOrigin||"PRODUCTION"});
+    }
+  }catch(error){errors.push(error);}
+  if(!results.length&&errors.length===querySpecs.length+1)throw errors[0]||new Error("Controlled document list could not be loaded.");
+  const byId=new Map(results.map(item=>[String(item.id||item.documentId),item]));
+  const trialMode=isTrialDataMode();
   const usable=[...byId.values()].filter(d=>{
-    if(String(d?.recordOrigin||"PRODUCTION").toUpperCase()==="TRIAL"||d?.trialData===true||d?.isTrial===true)return false;
-    const contentType=String(d?.contentType||"application/pdf").toLowerCase();if(contentType!=="application/pdf")return false;
-    const link=String(d?.webViewLink||"");const driveId=d?.fileId||((link.match(/\/d\/([a-zA-Z0-9_-]+)/)||[])[1])||((link.match(/[?&]id=([a-zA-Z0-9_-]+)/)||[])[1])||"";
-    if(!(d?.fileUrl||d?.documentUrl||d?.storageUrl||d?.pdfUrl||driveId))return false;
+    const isTrialRecord=String(d?.recordOrigin||"PRODUCTION").toUpperCase()==="TRIAL"||d?.trialData===true||d?.isTrial===true;
+    if(isTrialRecord!==trialMode)return false;
+    const contentType=String(d?.contentType||d?.mimeType||d?.documentContentType||"application/pdf").toLowerCase();if(contentType!=="application/pdf")return false;
+    const link=String(d?.webViewLink||d?.archiveFileWebViewLink||"");const driveId=d?.fileId||d?.driveFileId||d?.sourceFileId||((link.match(/\/d\/([a-zA-Z0-9_-]+)/)||[])[1])||((link.match(/[?&]id=([a-zA-Z0-9_-]+)/)||[])[1])||"";
+    if(!(d?.fileUrl||d?.documentUrl||d?.storageUrl||d?.pdfUrl||d?.downloadUrl||d?.downloadURL||driveId))return false;
     const classification=String(d?.classification||"Public").trim().toLowerCase();
     // Governance and Meeting portals can access every classification. Every other portal can access all categories, but not Confidential or Restricted.
     if(!isUnrestrictedPortal&&["confidential","restricted"].includes(classification))return false;
@@ -459,4 +477,14 @@ export async function listMeetingInviteeDirectory(){
  if(!auth.currentUser?.uid)throw new Error("Authentication is required to load meeting participants.");
  const call=httpsCallable(getFunctions(undefined,"us-central1"),"listMeetingInviteeDirectory");const result=await call({});
  return {boardMembers:Array.isArray(result.data?.boardMembers)?result.data.boardMembers:[],members:Array.isArray(result.data?.members)?result.data.members:[],employees:Array.isArray(result.data?.employees)?result.data.employees:[]};
+}
+
+/** Secure administrator-only removal for pending invitation records. */
+export async function removeInvitationRecord(invitationId){
+ const id=String(invitationId||"").trim();
+ if(!id)throw new Error("An invitation record is required.");
+ if(!auth.currentUser?.uid)throw new Error("Administrator authentication is required.");
+ const call=httpsCallable(getFunctions(undefined,"us-central1"),"removeInvitationRecord");
+ const result=await call({invitationId:id});
+ return result.data||{ok:true};
 }

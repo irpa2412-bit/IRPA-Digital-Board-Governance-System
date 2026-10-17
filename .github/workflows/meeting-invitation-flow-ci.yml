@@ -7,6 +7,7 @@ on:
     branches:
       - feat/secure-meeting-invitation-flow-20261013
     paths:
+      - "src/styles/portal-readability-standard.css"
       - ".github/workflows/meeting-invitation-flow-ci.yml"
       - "functions/meetingEntryPolicy.js"
       - "functions/meetingEntryPolicy.test.cjs"
@@ -19,15 +20,20 @@ on:
       - "package.json"
       - "package-lock.json"
       - "drive-gateway/src/index.js"
+      - "drive-gateway/src/meetingPortal.mjs"
+      - "drive-gateway/tests/meeting-portal.test.mjs"
+      - "src/firebase/meetingGatewayApi.js"
       - "drive-gateway/src/invitationEmail.mjs"
       - "drive-gateway/src/invitationRedemption.mjs"
       - "drive-gateway/tests/mail-invitation.unit.mjs"
       - "drive-gateway/tests/invitation-redemption.test.mjs"
       - "functions/meetingGateway.emulator.test.cjs"
+      - "tests/meeting-invitation-resend-quorum.test.mjs"
   pull_request:
     branches:
       - main
     paths:
+      - "src/styles/portal-readability-standard.css"
       - ".github/workflows/meeting-invitation-flow-ci.yml"
       - "functions/meetingEntryPolicy.js"
       - "functions/meetingEntryPolicy.test.cjs"
@@ -40,11 +46,15 @@ on:
       - "package.json"
       - "package-lock.json"
       - "drive-gateway/src/index.js"
+      - "drive-gateway/src/meetingPortal.mjs"
+      - "drive-gateway/tests/meeting-portal.test.mjs"
+      - "src/firebase/meetingGatewayApi.js"
       - "drive-gateway/src/invitationEmail.mjs"
       - "drive-gateway/src/invitationRedemption.mjs"
       - "drive-gateway/tests/mail-invitation.unit.mjs"
       - "drive-gateway/tests/invitation-redemption.test.mjs"
       - "functions/meetingGateway.emulator.test.cjs"
+      - "tests/meeting-invitation-resend-quorum.test.mjs"
 
   workflow_dispatch:
 
@@ -65,7 +75,13 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Install Cloudflare gateway dependencies
+        run: npm --prefix drive-gateway ci
+      - name: Test Cloudflare gateway and meeting access routes
+        run: npm --prefix drive-gateway test
       - name: Test meeting entry policy
         run: npm run test:meeting-entry-policy
+      - name: Test failed invitation resend and quorum exclusion
+        run: npm run test:meeting-invitation-resend
       - name: Build web application
         run: npm run build

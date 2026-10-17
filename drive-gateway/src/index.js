@@ -15,6 +15,7 @@ const SMTP_PORT = 465;
 const SMTP_FROM = "info@irpa.or.tz";
 import { escapeHtml as escapeMailHtml, normalizeRecipientEmail, recipientDomain, safeMailError, sendWithRetry, validateMailHeader } from "./mailDelivery.js";
 import { sendInvitationEmail, buildInvitationMessage, validateRecipient } from "./invitationEmail.mjs";
+import { authenticateSmtpPlain } from "./smtpAuth.mjs";
 import { route as esignRoute } from "./router.mjs";
 import { buildEsignContext, EsignRecordDurableObject } from "./esignContext.mjs";
 import { runCleanup } from "./upload.mjs";
@@ -23,6 +24,7 @@ import { canProvisionSignatureProfileFolder } from "./signatureProfileAuthorizat
 import { canReadSignatureAsset, canUploadSignedDocument } from "./signatureAssetAuthorization.mjs";
 import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPasswordSetup, getInvitationSessionState } from "./invitationRedemption.mjs";
 import { buildGoogleDriveAuthorizationParams } from "./googleDriveOAuth.mjs";
+import { createMeetingPortalRouter } from "./meetingPortal.mjs";
 import { createCommunicationsSiteRouter } from "./communicationsSite.mjs";
 import { createMetaOAuthRouter } from "./metaOAuth.mjs";
 
@@ -57,25 +59,56 @@ const documentLifecycleRouter = createDocumentLifecycleRouter({
   corsHeaders
 });
 
-const communicationsSiteRouter = createCommunicationsSiteRouter({
+const meetingPortalRouter = createMeetingPortalRouter({
+  getFirebaseProjectId: env => getFirebaseProjectId(env),
+  getFirestoreAdminAccessToken: env => getFirestoreAdminAccessToken(env),
   authenticateFirebaseRequest,
+  json,
+  corsHeaders
+});
+
+function normalizeGatewayAuthority(value) {
+  return String(value||"").toLowerCase().replace(/^(the|irpa)\s+/,"").replace(/[._-]+/g," ").replace(/\s+/g," ").trim();
+}
+async function verifyGatewaySigningAuthority(env,user,manualAuthorityIdentification) {
+  const input=normalizeGatewayAuthority(manualAuthorityIdentification);
+  if(!input||!user?.uid||!user?.token)throw Object.assign(new Error("Authenticated signing authority is required."),{status:403});
+  const records=[];
+  const add=(document,sourceCollection,fallbackId)=>{
+    if(!document?.fields)return;
+    const record=firestoreDocumentToPlain(document)||{};
+    const id=String(document.name||"").split("/").pop()||fallbackId||user.uid;
+    records.push({id,...record,sourceCollection});
+  };
+  add(await getFirestoreDocument(env,"members/"+user.uid,user.token),"members",user.uid);
+  add(await getFirestoreDocument(env,"employees/"+user.uid,user.token),"employees",user.uid);
+  const matchesAuthority=record=>{
+    const active=String(record.status||record.employmentStatus||"Active").trim().toLowerCase()!=="inactive";
+    const candidates=[record.role,record.boardPosition,record.designation,record.jobTitle,record.position,record.title,record.authorityRole,record.unit,record.unitName].map(normalizeGatewayAuthority).filter(Boolean);
+    return active&&candidates.includes(input);
+  let match=records.find(matchesAuthority);
+  if(!match&&user.email){
+    let memberRows=[],employeeRows=[];
+    try{memberRows=await getFirestoreDocumentsByEmail(env,"members",user.email,user.token)}catch{}
+    try{employeeRows=await getFirestoreDocumentsByEmail(env,"employees",user.email,user.token)}catch{}
+    for(const row of [...memberRows,...employeeRows])add(row,String(row.name||"").split("/").at(-2)||"members",user.uid);
+    match=records.find(matchesAuthority);
+  }
+  if(!match)throw Object.assign(new Error("SYSTEM VERIFICATION FAILED: the declared signing authority does not match an active IRPA Member or Employee Register record for this authenticated account."),{status:403});
+  return{
+    verified:true,
+    authorityRole:String(match.role||match.boardPosition||match.designation||match.jobTitle||match.position||match.title||manualAuthorityIdentification).trim(),
+    authorityDepartment:String(match.department||"").trim(),
+    authorityUnit:String(match.unit||match.unitName||"").trim(),
+    authoritySourceCollection:match.sourceCollection,
+    authoritySourceRecordId:match.id,
+    verificationMethod:"Authenticated Gateway Member/Employee Register Match"
+const communicationsSiteRouter = createCommunicationsSiteRouter({
   getFirestoreDocument,
   getInstitutionalProfileForUser,
   firestoreDocumentToPlain,
   commitDocumentAndAudit: commitFirestoreDocumentAndAudit,
-  json,
-  corsHeaders
-});
-
 const metaOAuthRouter = createMetaOAuthRouter({
-  authenticateFirebaseRequest,
-  getFirestoreDocument,
-  getInstitutionalProfileForUser,
-  firestoreDocumentToPlain,
-  json,
-  corsHeaders
-});
-
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -110,6 +143,9 @@ export default {
 
       // Normalize trailing slashes so portal upload/archive actions cannot be blocked by URL formatting.
       const pathname = url.pathname.replace(/\/+$/, "") || "/";
+
+      const meetingPortalResponse = await meetingPortalRouter(request, env, pathname);
+      if (meetingPortalResponse) return meetingPortalResponse;
 
       if (pathname.startsWith("/api/document-lifecycle/")) {
         const lifecycleResponse = await documentLifecycleRouter(request, env);
@@ -244,6 +280,9 @@ export default {
           pathname === "/api/envelopes" ||
           /^\/api\/envelopes\/[A-Za-z0-9_-]{3,64}(?:\/void|\/retry-completion)?$/.test(pathname) ||
           pathname === "/api/sign/open" ||
+          pathname === "/api/sign/status" ||
+          pathname === "/api/sign/evidence" ||
+          pathname === "/api/sign/verify" ||
           pathname === "/api/sign/pdf" ||
           pathname === "/api/sign/submit" ||
           pathname === "/api/sign/decline" ||
@@ -257,10 +296,11 @@ export default {
             verifyUser: async req => {
               const claims = await authenticateFirebaseRequest(req, env);
               const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
-              return {uid:claims.user_id,isAdmin:Boolean(admin?.fields?.active?.booleanValue)};
+              return {uid:claims.user_id,email:claims.email||"",token:claims.token,isAdmin:Boolean(admin?.fields?.active?.booleanValue)};
             },
             sendInvitation: async ({to,name,link}) => sendInvitationEmail({email:to,name,link,smtpSend:async ({to:recipient,subject,text,html})=>smtpSend(env,{to:recipient,subject,text,html}),logger:console}),
             logger: console,
+            verifySigningAuthority: (user,manualAuthorityIdentification)=>verifyGatewaySigningAuthority(env,user,manualAuthorityIdentification),
             driveHelpers: {getDriveAccessToken,driveFetch}
           });
           const response = await esignRoute(request,ctx);
@@ -1528,6 +1568,17 @@ async function sendMemberInvitation(request, env) {
   const invitation = await getFirestoreDocument(env, `invitations/${invitationId}`, claims.token);
   if (!invitation) return json({ok:false,error:"Invitation record was not found."},404,corsHeaders(request));
   const fields=invitation.fields||{};
+  const forceResend=data.forceResend===true;
+  const priorDeliveryStatus=String(fields.deliveryStatus?.stringValue||"").trim().toLowerCase();
+  const priorTokenHash=String(fields.invitationTokenHash?.stringValue||"").trim();
+  // Duplicate initial requests must reuse the existing activation state. Only the
+  // explicit Resend action may rotate the invitation secret.
+  if(priorTokenHash&&!forceResend&&priorDeliveryStatus==="sent"){
+    return json({ok:true,email:fields.email?.stringValue||"",deliveryStatus:"Sent",alreadySent:true},200,corsHeaders(request));
+  }
+  if(priorTokenHash&&!forceResend&&priorDeliveryStatus==="queued"){
+    return json({ok:true,email:fields.email?.stringValue||"",deliveryStatus:"Queued",alreadyProcessing:true},200,corsHeaders(request));
+  }
   const email=validateRecipient(fields.email?.stringValue||"");
   if(!email) return json({ok:false,error:"Invalid recipient"},400,corsHeaders(request));
   const name=String(fields.name?.stringValue||"").trim();
@@ -1716,7 +1767,13 @@ async function smtpSend(env,{to,subject,text,html}) {
   try {
     await readResponse();
     await command("EHLO irpa-digital-board-governance","2");
-    await command("AUTH PLAIN "+btoa("\0"+SMTP_FROM+"\0"+env.SMTP_PASSWORD),"2");
+    await authenticateSmtpPlain({
+      username:env.SMTP_USERNAME||SMTP_FROM,
+      password:env.SMTP_PASSWORD,
+      writeLine:async line=>writer.write(new TextEncoder().encode(line+"\r\n")),
+      readResponse,
+      command
+    });
     await command("MAIL FROM:<"+SMTP_FROM+">","2");
     await command("RCPT TO:<"+toEmail+">","2");
     await command("DATA","3");
@@ -1734,7 +1791,19 @@ async function smtpSend(env,{to,subject,text,html}) {
       "--"+boundary+"--",""
     ].join("\r\n");
     await writer.write(new TextEncoder().encode(mime+"\r\n.\r\n"));
-    const accepted=await readResponse();
+    let accepted;
+    try {
+      accepted=await readResponse();
+    } catch (error) {
+      // Once DATA has been written, a transport failure before the final SMTP
+      // response is ambiguous: the provider may already have accepted the mail.
+      // Do not retry this case automatically and risk duplicate invitations.
+      if (!/^IRPA SMTP error \d{3}/i.test(String(error?.message||""))) {
+        error.deliveryOutcome="unknown";
+        error.retryable=false;
+      }
+      throw error;
+    }
     if (!accepted.startsWith("2")) throw new Error("SMTP message was not accepted.");
     await command("QUIT","2");
     return accepted;

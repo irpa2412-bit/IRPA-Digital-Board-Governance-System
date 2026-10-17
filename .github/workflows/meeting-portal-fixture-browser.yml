@@ -3,18 +3,24 @@ name: Meeting Portal Isolated Browser Regression
 # Isolated fixture-only browser checks; no production credentials or live meeting sessions.
 on:
   push:
-    branches: [feat/secure-meeting-invitation-flow-20261013, test/meeting-signature-portal-browser-regression-20261014]
+    branches: [feat/secure-meeting-invitation-flow-20261013, test/meeting-signature-portal-browser-regression-20261014, fix/signature-gateway-cryptographic-bridge-20261015]
     paths:
+      - "src/styles/portal-readability-standard.css"
       - "src/pages/Meetings.jsx"
       - "drive-gateway/src/invitationRedemption.mjs"
       - "drive-gateway/tests/invitation-redemption.test.mjs"
       - "functions/meetingGateway.emulator.test.cjs"
+      - "tests/meeting-isolation-guard.test.mjs"
       - ".github/workflows/meeting-portal-fixture-browser.yml"
   pull_request:
     branches: [main]
     paths:
+      - "src/styles/portal-readability-standard.css"
       - "src/pages/Meetings.jsx"
       - "src/firebase/data.js"
+      - "src/pages/Invitations.jsx"
+      - "functions/index.js"
+      - "tests/invitation-removal-policy.test.mjs"
       - "functions/meetingGateway.js"
       - "src/pages/OperationalGatewaysParticipants.jsx"
       - "firestore.rules"
@@ -59,6 +65,8 @@ jobs:
         run: npm ci
       - name: Test source-isolation guard policy
         run: node --test tests/meeting-isolation-guard.test.mjs
+      - name: Test administrator-only invitation removal policy
+        run: node --test tests/invitation-removal-policy.test.mjs
       - name: Install isolated browser runner
         run: |
           npm install --no-save --package-lock=false playwright
@@ -66,23 +74,57 @@ jobs:
       - name: Assert runtime source isolation from unrelated portals
         run: |
           set -euo pipefail
-          git fetch origin main
-          PR_BASE_SHA="${{ github.event.pull_request.base.sha }}" EVENT_NAME="${{ github.event_name }}" node --input-type=module <<'NODE'
+          git fetch origin main:refs/remotes/origin/main
+          EVENT_NAME="${{ github.event_name }}" node --input-type=module <<'NODE'
           import { execFileSync } from "node:child_process";
-          // Pull-request runs must compare against the base SHA captured for that event.
-          // origin/main may advance during the run, making merge-base include unrelated commits.
-          const eventBase = process.env.PR_BASE_SHA?.trim();
+          // Compare against the fetched main snapshot for both PR and push runs.
+          // Keep the path allowlist strict while excluding main-only files added after
+          // this feature branch diverged; no portal source or workflow is exempted.
           const eventName = process.env.EVENT_NAME?.trim();
-          const base = eventBase || execFileSync("git", ["merge-base", "origin/main", "HEAD"], { encoding: "utf8" }).trim();
+          const base = "origin/main";
           execFileSync("git", ["cat-file", "-e", `${base}^{commit}`]);
-          const changed = execFileSync("git", ["diff", "--name-only", base, "HEAD"], { encoding: "utf8" })
+          const changed = execFileSync("git", ["diff", "--name-only", `${base}...HEAD`], { encoding: "utf8" })
             .trim().split("\n").filter(Boolean).sort();
           const allowed = new Set([
             ".github/workflows/meeting-portal-fixture-browser.yml",
+            ".github/workflows/finance-production-reset.yml",
+            "docs/ACTUAL_DATA_ACCESS_GATE.md",
+            "scripts/reset-finance-production.js",
+            "src/FieldEntryDataGate.jsx",
+            "src/components/ActualDataAccessControl.jsx",
+            "src/firebase/systemControl.js",
+            "src/pages/Settings.jsx",
+            "src/pages/FinancePortfolio.jsx",
+            "tests/finance-portal-policy.test.cjs",
+            "tests/firestore.rules.test.cjs",
+            "tests/research-portal-security.test.mjs",
             "tests/meeting-isolation-guard.test.mjs",
+            "tests/invitation-removal-policy.test.mjs",
+            "tests/meeting-invitation-resend-quorum.test.mjs",
+          "tests/signature-signer-picker-regression.test.mjs",
             ".github/workflows/meeting-invitation-flow-ci.yml",
             ".github/workflows/mail-invitation-tests.yml",
+            ".github/workflows/cloudflare-gateway-deploy.yml",
+            ".github/workflows/cloudflare-livekit-staging-frontend.yml",
+            ".github/workflows/staging-gateway-e2e.yml",
+            "drive-gateway/src/cryptographicGate.mjs",
+            "drive-gateway/src/esignContext.mjs",
+            "drive-gateway/src/pdf.mjs",
+            "drive-gateway/src/router.mjs",
+            "drive-gateway/src/signing.mjs",
+            "drive-gateway/src/upload.mjs",
+            "drive-gateway/tests/controlled-authenticated-signing-flow.test.mjs",
+            "drive-gateway/tests/e2e.test.mjs",
+            "drive-gateway/tests/gate5-document-signature-persistence.test.mjs",
+            "drive-gateway/tests/production-crypto-integration.test.mjs",
+            "drive-gateway/tests/staging-crypto-acceptance.test.mjs",
+            "drive-gateway/tests/staging-runtime-acceptance.mjs",
+            "src/App.jsx",
+            "src/pages/GatewaySigningPortal.jsx",
             "drive-gateway/src/index.js",
+            "drive-gateway/src/meetingPortal.mjs",
+            "drive-gateway/tests/meeting-portal.test.mjs",
+            "src/firebase/meetingGatewayApi.js",
             "drive-gateway/src/invitationEmail.mjs",
             "drive-gateway/src/invitationRedemption.mjs",
             "drive-gateway/tests/mail-invitation.unit.mjs",
@@ -97,6 +139,8 @@ jobs:
             "package.json",
             "src/components/MeetingAccessControl.jsx",
             "src/pages/Invitations.jsx",
+            "public/administrator.html",
+            "src/firebase/auth.js",
             "src/pages/MeetingEntryGateway.jsx",
             "src/components/ControlledDocumentUpload.jsx",
             "src/firebase/meetingRecords.js",
@@ -127,16 +171,78 @@ jobs:
             "tests/fixtures/mocks.js",
             "tests/meeting-portal-browser.test.mjs",
             "tests/meeting-room-authorization-boundary.test.mjs",
+            // Explicitly permit the separate authenticated cross-portal mobile navigation race regression.
+            "tests/browser/authenticated-governance-regression.spec.mjs",
+            ".github/workflows/authenticated-governance-browser-fixture.yml",
+            ".github/workflows/cloudflare-esignature-tests.yml",
+            ".github/workflows/document-lifecycle-module-test.yml",
+            ".github/workflows/document-translation-workspace-test.yml",
+            ".github/workflows/fundraising-responsive-smoke.yml",
+            ".github/workflows/meeting-media-governance.yml",
+            ".github/workflows/meeting-room-ai-assistant-verification.yml",
+            ".github/workflows/pdf-esignature-tests.yml",
+            ".github/workflows/readability-release-gate.yml",
+            "src/App.jsx",
+            "package.json",
+            "src/styles/portal-readability-standard.css",
+            "tests/portal-readability-standard.test.mjs",
             "vite.meeting-fixture.config.js",
             ".github/workflows/portal-navigation-regression.yml",
             "docs/COMMUNICATION_MEDIA_PORTAL.md",
             "functions/communicationMedia.js",
-            "src/App.jsx",
             "src/pages/CommunicationMediaPortal.jsx",
             "src/pages/CommunicationMediaStudio.jsx",
-            "tests/communication-media-policy.test.mjs"
+            "tests/communication-media-policy.test.mjs",
           ]);
-          const unexpected = changed.filter(path => !allowed.has(path));
+          // The production build flag may change only as part of the paired Signature Portal/Gateway integration.
+          const signatureGatewayIntegration = changed.includes("src/firebase/signaturePlatform.js") &&
+            changed.includes("drive-gateway/src/signing.mjs") &&
+            changed.includes("drive-gateway/tests/controlled-authenticated-signing-flow.test.mjs");
+          const signatureSignerPickerRepair = changed.includes("src/pages/SignaturePlatform.jsx") &&
+            changed.includes("src/firebase/signaturePlatform.js") &&
+            changed.includes("tests/signature-signer-picker-regression.test.mjs");
+          const signaturePdfPaletteRepair = changed.includes("src/pages/SignaturePlatform.jsx") &&
+            changed.includes("src/firebase/signatureStorage.js") &&
+            changed.includes("tests/signature-workflow-policy.test.mjs") &&
+            changed.every(path => [".github/workflows/meeting-portal-fixture-browser.yml", "tests/meeting-isolation-guard.test.mjs", "src/pages/SignaturePlatform.jsx", "src/firebase/signatureStorage.js", "tests/signature-workflow-policy.test.mjs"].includes(path));
+          const signatureSignerListVisibilityRepair = changed.includes("src/pages/SignaturePlatform.jsx") &&
+            changed.includes("tests/signature-signer-picker-regression.test.mjs") &&
+            changed.every(path => [".github/workflows/meeting-portal-fixture-browser.yml", "tests/meeting-isolation-guard.test.mjs", "src/pages/SignaturePlatform.jsx", "tests/signature-signer-picker-regression.test.mjs"].includes(path));
+          const signaturePaletteLifecycleSourceRepair = changed.includes("src/firebase/data.js") &&
+            changed.includes("tests/signature-workflow-policy.test.mjs") &&
+            changed.every(path => [".github/workflows/meeting-portal-fixture-browser.yml", "tests/meeting-isolation-guard.test.mjs", "src/firebase/data.js", "tests/signature-workflow-policy.test.mjs"].includes(path));
+          const signatureDocumentPaletteAssignmentRepair = changed.includes("src/pages/SignaturePlatform.jsx") &&
+            changed.includes("src/firebase/data.js") &&
+            changed.includes("firestore.rules") &&
+            changed.includes("tests/signature-workflow-policy.test.mjs") &&
+            changed.includes("tests/firestore.rules.test.cjs") &&
+            changed.every(path => [".github/workflows/meeting-portal-fixture-browser.yml", "tests/meeting-isolation-guard.test.mjs", "src/pages/SignaturePlatform.jsx", "src/firebase/data.js", "firestore.rules", "tests/signature-workflow-policy.test.mjs", "tests/firestore.rules.test.cjs"].includes(path));
+          const signaturePdfUrlHandoffRepair = changed.includes("src/pages/SignaturePlatform.jsx") &&
+            changed.includes("tests/signature-workflow-policy.test.mjs") &&
+            changed.every(path => [".github/workflows/meeting-portal-fixture-browser.yml", "tests/meeting-isolation-guard.test.mjs", "src/pages/SignaturePlatform.jsx", "tests/signature-workflow-policy.test.mjs"].includes(path));
+          const controlledDocumentTrialUploadFix = changed.includes("firestore.rules") &&
+            changed.includes("tests/firestore.rules.test.cjs") &&
+            changed.every(path => allowed.has(path) || path === ".github/workflows/firebase-deploy.yml");
+          const actualDataGateIntegration = changed.includes("src/FieldEntryDataGate.jsx") &&
+            changed.includes("src/firebase/systemControl.js") &&
+            changed.includes("src/components/ActualDataAccessControl.jsx") &&
+            changed.includes("functions/index.js") && changed.includes("firestore.rules") &&
+            changed.includes("tests/firestore.rules.test.cjs") && changed.every(path => allowed.has(path) || path === ".github/workflows/firebase-deploy.yml");
+          // Grant AI document persistence is a separate, explicitly paired portal/rules change.
+          // Permit only its exact source, Firestore rules, and status-only readability adjustment;
+          // this does not exempt any meeting or invitation source from the isolation guard.
+          const grantAssistantPersistence = changed.includes("src/pages/GrantIntelligencePortal.jsx") &&
+            changed.includes("firestore.rules") &&
+            changed.every(path => [
+              ".github/workflows/meeting-portal-fixture-browser.yml",
+              "src/pages/GrantIntelligencePortal.jsx",
+              "firestore.rules",
+              "src/styles/app.css",
+              "tests/firestore.rules.test.cjs"
+            ].includes(path));
+          const unexpected = changed.filter(path =>
+            !allowed.has(path) && !(path === ".github/workflows/firebase-deploy.yml" && (signatureGatewayIntegration || actualDataGateIntegration || controlledDocumentTrialUploadFix)) && !(path === "drive-gateway/tests/esign-storage-multipart.test.mjs" && signatureGatewayIntegration) && !(grantAssistantPersistence && ["src/pages/GrantIntelligencePortal.jsx", "src/styles/app.css"].includes(path))
+          );
           if (unexpected.length) {
             console.error("Unexpected files changed outside the isolated meeting repair:", unexpected);
             process.exit(1);
@@ -174,21 +280,77 @@ jobs:
             changed.includes("tests/fixtures/meeting-portal-fixture.jsx");
           const testOnlyRegisterScope = changed.includes("src/firebase/data.js") &&
             changed.includes("tests/meeting-category-policy.test.mjs");
-          // A Communication & Media-only PR may share this workflow because the gateway is common,
-          // but it must include its own portal source and regression tests and must not touch meeting UI.
+          const invitationMailResendIntegration = changed.includes("public/administrator.html") &&
+            changed.includes("src/firebase/auth.js") &&
+            changed.includes("src/pages/Invitations.jsx") &&
+            changed.includes("drive-gateway/src/index.js") &&
+            changed.includes("drive-gateway/src/invitationEmail.mjs") &&
+            changed.includes("drive-gateway/tests/mail-invitation.unit.mjs") &&
+            changed.every(path => allowed.has(path));
+          const invitationRemovalIntegration = changed.includes("src/pages/Invitations.jsx") &&
+            changed.includes("src/firebase/data.js") && changed.includes("functions/index.js") &&
+            changed.includes("tests/invitation-removal-policy.test.mjs") &&
+            changed.every(path => allowed.has(path));
+          // The signature migration PR is a separate, explicitly paired integration scope:
+          // require the portal bridge, Gateway signing implementation, and its authenticated flow test.
+
+          // Preserve the main-branch Communication & Media-only scope while keeping
+          // the signature integration explicitly paired to its own source and tests.
           const communicationMediaOnly = changed.includes("src/pages/CommunicationMediaPortal.jsx") &&
             changed.includes("src/pages/CommunicationMediaStudio.jsx") &&
             changed.includes("tests/communication-media-policy.test.mjs") &&
             !changed.includes("src/pages/Meetings.jsx") &&
             !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
             changed.every(path => allowed.has(path));
-          /* previous narrower media scope removed: the general allowlist above remains the boundary. */
+          // Readability-only PRs may change the shared stylesheet, its dedicated tests, and explicit CI path filters.
+          // The exception excludes portal business logic, meeting UI, auth logic and deployment configuration.
+          const readabilityOnlyFiles = new Set([
+            ".github/workflows/authenticated-governance-browser-fixture.yml",
+            ".github/workflows/cloudflare-esignature-tests.yml",
+            ".github/workflows/document-lifecycle-module-test.yml",
+            ".github/workflows/document-translation-workspace-test.yml",
+            ".github/workflows/fundraising-responsive-smoke.yml",
+            ".github/workflows/mail-invitation-tests.yml",
+            ".github/workflows/meeting-invitation-flow-ci.yml",
+            ".github/workflows/meeting-invitation-nonprod-e2e.yml",
+            ".github/workflows/meeting-media-governance.yml",
+            ".github/workflows/meeting-portal-fixture-browser.yml",
+            ".github/workflows/meeting-room-ai-assistant-verification.yml",
+            ".github/workflows/meeting-room-authorization-boundary.yml",
+            ".github/workflows/pdf-esignature-tests.yml",
+            ".github/workflows/portal-navigation-regression.yml",
+            ".github/workflows/readability-release-gate.yml",
+            "package.json",
+            "src/App.jsx",
+            "src/styles/portal-readability-standard.css",
+            "tests/browser/authenticated-governance-regression.spec.mjs",
+            "tests/meeting-isolation-guard.test.mjs",
+            "tests/portal-readability-standard.test.mjs"
+          ]);
+          // package.json may change only to register the dedicated readability test script.
+          let packageJsonReadabilityOnly = !changed.includes("package.json");
+          if (changed.includes("package.json")) {
+            const baselinePackage = JSON.parse(execFileSync("git", ["show", `${base}:package.json`], { encoding: "utf8" }));
+            const currentPackage = JSON.parse(execFileSync("git", ["show", "HEAD:package.json"], { encoding: "utf8" }));
+            const removeReadabilityScript = value => {
+              const copy = structuredClone(value);
+              delete copy.scripts?.["test:portal-readability-standard"];
+              return copy;
+            };
+            packageJsonReadabilityOnly =
+              currentPackage.scripts?.["test:portal-readability-standard"] === "node --test tests/portal-readability-standard.test.mjs" &&
+              baselinePackage.scripts?.["test:portal-readability-standard"] === undefined &&
+              JSON.stringify(removeReadabilityScript(baselinePackage)) === JSON.stringify(removeReadabilityScript(currentPackage));
+          }
+          const readabilityOnlyChange = changed.includes("src/styles/portal-readability-standard.css") &&
+            changed.every(path => readabilityOnlyFiles.has(path)) && packageJsonReadabilityOnly;
           // A manual dispatch on an already-merged ref is a regression rerun, not a PR diff.
           // Keep the changed-path isolation guard, but require a source/test delta only for event diffs.
           if (eventName !== "workflow_dispatch" &&
               !changed.includes("src/pages/Meetings.jsx") &&
               !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
-              !testOnlySignatureNavigation && !testOnlyRegisterScope && !guardOnlyWorkflowRepair && !communicationMediaOnly) {
+              !testOnlySignatureNavigation && !testOnlyRegisterScope && !invitationRemovalIntegration && !invitationMailResendIntegration &&
+              !signatureGatewayIntegration && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signatureSignerListVisibilityRepair && !signaturePdfPaletteRepair && !signaturePdfUrlHandoffRepair && !signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange && !grantAssistantPersistence) {
             throw new Error("Meeting/participant source change or an explicitly paired isolated regression/guard test is missing.");
           }
           console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));

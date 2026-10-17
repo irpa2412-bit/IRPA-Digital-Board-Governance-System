@@ -1712,6 +1712,65 @@ exports.resetTrialData = onCall({region:"us-central1"}, async request => {
 });
 
 
+
+// Actual-data entry remains CLOSED until an authenticated administrator explicitly
+// attests that final system testing has passed. The setting is server-controlled.
+function actualDataAdministrator(request, profile) {
+  const email=String(request.auth?.token?.email||profile?.email||"").trim().toLowerCase();
+  return email==="irpa2412@gmail.com" || request.auth?.token?.admin===true || (profile?.active===true && profile?.role==="Administrator" && profile?.uid===request.auth?.uid);
+}
+exports.getActualDataAccessStatus = onCall({region:"us-central1"}, async request => {
+  if(!request.auth?.uid) throw new HttpsError("unauthenticated","Authentication is required.");
+  const ref=db.collection("systemSettings").doc("actualDataAccess");
+  const snap=await ref.get();
+  const data=snap.exists?(snap.data()||{}):{};
+  return {
+    enabled:data.enabled===true,
+    status:data.enabled===true?"OPEN":"CLOSED",
+    changedAt:data.changedAt?.toDate?.()?.toISOString?.()||null,
+    changedByEmail:data.changedByEmail||null,
+    finalTestsAttested:data.finalTestsAttested===true
+  };
+});
+exports.setActualDataAccess = onCall({region:"us-central1"}, async request => {
+  const uid=request.auth?.uid;
+  if(!uid) throw new HttpsError("unauthenticated","Administrator authentication is required.");
+  const profileSnap=await db.collection("adminProfiles").doc(uid).get();
+  const profile=profileSnap.exists?profileSnap.data():null;
+  if(!actualDataAdministrator(request,profile)) throw new HttpsError("permission-denied","Only an active IRPA Administrator may change actual-data access.");
+  if(typeof request.data?.enabled!=="boolean") throw new HttpsError("invalid-argument","An enabled boolean is required.");
+  const enabled=request.data.enabled;
+  if(enabled && request.data?.confirmation!=="I CONFIRM FINAL SYSTEM TESTS PASSED") {
+    throw new HttpsError("failed-precondition","Opening actual-data access requires the exact final-test attestation.");
+  }
+  const email=String(request.auth.token?.email||profile?.email||"").trim().toLowerCase()||null;
+  const ref=db.collection("systemSettings").doc("actualDataAccess");
+  const previous=await ref.get();
+  const previousData=previous.exists?(previous.data()||{}):{};
+  const next={
+    enabled,
+    status:enabled?"OPEN":"CLOSED",
+    changedByUid:uid,
+    changedByEmail:email,
+    changedAt:FieldValue.serverTimestamp(),
+    version:Number(previousData.version||0)+1,
+    finalTestsAttested:enabled?true:false,
+    finalTestsAttestedByUid:enabled?uid:null,
+    finalTestsAttestedByEmail:enabled?email:null,
+    finalTestsAttestedAt:enabled?FieldValue.serverTimestamp():null
+  };
+  await ref.set(next,{merge:false});
+  await db.collection("audit").add({
+    action:enabled?"ACTUAL_DATA_ACCESS_OPENED":"ACTUAL_DATA_ACCESS_CLOSED",
+    category:"SYSTEM_SECURITY",
+    description:enabled?"Administrator opened actual-data entry after attesting final system tests passed.":"Administrator closed actual-data entry.",
+    actorUid:uid,actorEmail:email,previousStatus:previousData.enabled===true?"OPEN":"CLOSED",
+    newStatus:enabled?"OPEN":"CLOSED",finalTestsAttested:enabled,
+    createdAt:FieldValue.serverTimestamp()
+  });
+  return {success:true,enabled,status:enabled?"OPEN":"CLOSED",version:next.version};
+});
+
 // Meeting Room working-document review endpoints. The underlying handlers enforce
 // meeting-scoped host/participant permissions and write audit events.
 const meetingWorkingDocuments = require("./meetingRecords");
@@ -1724,3 +1783,36 @@ const meetingGateway = require("./meetingGateway");
 exports.listMeetingInviteeDirectory = meetingGateway.listMeetingInviteeDirectory;
 
 // Website publishing and cPanel edits are handled by the existing Cloudflare Drive Gateway.
+
+ 
+// Secure invitation-register removal. Administrator-only; preserve active identities.
+exports.removeInvitationRecord = onCall({region:"us-central1",timeoutSeconds:30}, async request => {
+  const actor=request.auth;
+  if(!actor?.uid) throw new HttpsError("unauthenticated","Sign in as an IRPA Administrator to remove an invitee.");
+  const actorEmail=String(actor.token?.email||"").trim().toLowerCase();
+  let activeAdmin=actor.token?.admin===true || actorEmail==="irpa2412@gmail.com";
+  if(!activeAdmin){
+    const adminSnap=await db.collection("adminProfiles").doc(actor.uid).get();
+    activeAdmin=adminSnap.exists && adminSnap.data()?.active===true;
+  }
+  if(!activeAdmin) throw new HttpsError("permission-denied","Only an active IRPA Administrator can remove invitation records.");
+  const invitationId=String(request.data?.invitationId||"").trim();
+  if(!invitationId || invitationId.includes("/")) throw new HttpsError("invalid-argument","A valid invitation record is required.");
+  const ref=db.collection("invitations").doc(invitationId);
+  await db.runTransaction(async tx=>{
+    const snap=await tx.get(ref);
+    if(!snap.exists) throw new HttpsError("not-found","This invitation record no longer exists. Refresh the Invitation Register.");
+    const invitation=snap.data()||{};
+    if(String(invitation.meetingId||"").trim() || String(invitation.source||"").toLowerCase().includes("meeting participant")){
+      throw new HttpsError("failed-precondition","This invitee is linked to a meeting. Remove the participant through the Meeting Participants portal so meeting access passes and attendance/quorum counts are revoked together.");
+    }
+    const status=String(invitation.status||"").trim().toLowerCase();
+    if(invitation.accountActivated===true || ["activated","accepted"].includes(status) || invitation.activationCompleted===true){
+      throw new HttpsError("failed-precondition","This invitation is linked to an activated account and cannot be removed from the register. Retain the identity record and use the authorised account-deactivation process.");
+    }
+    const auditRef=db.collection("audit").doc();
+    tx.delete(ref);
+    tx.set(auditRef,{action:"INVITATION_REGISTER_REMOVE",collection:"invitations",recordId:invitationId,details:{email:String(invitation.email||"").trim().toLowerCase(),statusBeforeRemoval:invitation.status||"Pending",source:"ADMINISTRATOR_INVITATION_REGISTER"},actorUid:actor.uid,actorEmail:actorEmail||null,createdAt:FieldValue.serverTimestamp()});
+  });
+  return {ok:true,invitationId};
+});

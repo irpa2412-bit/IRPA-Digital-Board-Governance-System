@@ -35,6 +35,7 @@ beforeEach(async () => {
       role: "Staff"
     });
     await db.doc("adminProfiles/admin-user").set({ active: true, email: "admin@example.test" });
+    await db.doc("systemSettings/actualDataAccess").set({enabled:true,status:"OPEN",finalTestsAttested:true});
   });
 });
 function meeting(overrides = {}) {

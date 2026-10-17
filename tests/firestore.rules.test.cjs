@@ -55,6 +55,11 @@ beforeEach(async () => {
       action: "TEST",
       actorUid: "admin-user"
     });
+    await db.doc("systemSettings/actualDataAccess").set({
+      enabled: true,
+      status: "OPEN",
+      finalTestsAttested: true
+    });
   });
 });
 
@@ -95,6 +100,127 @@ function lifecycleDocument(overrides = {}) {
     ...overrides
   };
 }
+
+test("actual operational writes fail closed when the access setting is absent", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("systemSettings/actualDataAccess").delete();
+  });
+  const db = testEnv.authenticatedContext("finance-user", {
+    email: "finance@example.test",
+    irpaRoles: ["Finance Manager"]
+  }).firestore();
+  await assertFails(db.doc("donorFunders/no-gate-setting").set({
+    name: "Funder",
+    recordType: "DONOR_FUNDER_REGISTRY",
+    status: "Prospect"
+  }));
+});
+
+test("signature portal trial envelopes and events remain writable while actual data access is closed", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("systemSettings/actualDataAccess").set({
+      enabled: false,
+      status: "CLOSED",
+      finalTestsAttested: false
+    });
+  });
+  const db = testEnv.authenticatedContext("member-user", {
+    email: "member@example.test"
+  }).firestore();
+  const trialEnvelope = {
+    envelopeReference: "IRPA-ENV-TRIAL-001",
+    title: "Trial signature envelope",
+    documentId: "LIFE-trial-signature",
+    senderUid: "member-user",
+    ownerUid: "member-user",
+    recordOrigin: "TRIAL",
+    trialData: true,
+    isTrial: true,
+    status: "Draft",
+    signingMode: "Sequential",
+    participantUids: ["member-user"],
+    actionUids: [],
+    recipients: []
+  };
+  await assertSucceeds(db.doc("signatureEnvelopes/TRIAL-ENV-001").set(trialEnvelope));
+  await assertSucceeds(db.doc("signatureEvents/TRIAL-EVENT-001").set({
+    envelopeId: "TRIAL-ENV-001",
+    event: "Trial envelope created",
+    actorUid: "member-user",
+    recordOrigin: "TRIAL",
+    trialData: true,
+    isTrial: true
+  }));
+  await assertFails(db.doc("signatureEnvelopes/ACTUAL-ENV-001").set({
+    ...trialEnvelope,
+    envelopeReference: "IRPA-ENV-ACTUAL-001",
+    recordOrigin: "PRODUCTION",
+    trialData: false,
+    isTrial: false
+  }));
+});
+
+test("actual operational writes stay closed without the final-test attestation", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("systemSettings/actualDataAccess").set({
+      enabled: true,
+      status: "OPEN",
+      finalTestsAttested: false
+    });
+  });
+  const db = testEnv.authenticatedContext("finance-user", {
+    email: "finance@example.test",
+    irpaRoles: ["Finance Manager"]
+  }).firestore();
+  await assertFails(db.doc("donorFunders/unattested-actual").set({
+    name: "Funder",
+    recordType: "DONOR_FUNDER_REGISTRY",
+    status: "Prospect"
+  }));
+});
+
+test("actual operational writes are denied while the administrator gate is closed", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("systemSettings/actualDataAccess").set({enabled:false,status:"CLOSED"});
+  });
+  const db = testEnv.authenticatedContext("finance-user", {
+    email: "finance@example.test",
+    irpaRoles: ["Finance Manager"]
+  }).firestore();
+  await assertFails(db.doc("donorFunders/actual-denied").set({
+    name: "Actual Funder",
+    recordType: "DONOR_FUNDER_REGISTRY",
+    status: "Prospect"
+  }));
+});
+
+test("trial-marked operational writes remain available while actual access is closed", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("systemSettings/actualDataAccess").set({enabled:false,status:"CLOSED"});
+  });
+  const db = testEnv.authenticatedContext("finance-user", {
+    email: "finance@example.test",
+    irpaRoles: ["Finance Manager"]
+  }).firestore();
+  await assertSucceeds(db.doc("donorFunders/trial-funder").set({
+    name: "Trial Funder",
+    recordType: "DONOR_FUNDER_REGISTRY",
+    status: "Prospect",
+    recordOrigin: "TRIAL",
+    trialData: true,
+    isTrial: true
+  }));
+});
+
+test("administrator cannot bypass the attested gate by directly editing its system setting", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("systemSettings/actualDataAccess").set({enabled:false,status:"CLOSED"});
+  });
+  const db = testEnv.authenticatedContext("admin-user", {
+    email: "admin@example.test"
+  }).firestore();
+  await assertFails(db.doc("systemSettings/actualDataAccess").update({enabled:true,status:"OPEN"}));
+});
 
 test("active document owner can create a valid internal lifecycle record", async () => {
   const db = testEnv.authenticatedContext("member-user", {
@@ -561,3 +687,107 @@ test("translation derivative creation is denied if access is broader than the so
   });
   await assertFails(ownerDb.doc("documents/LIFE-translated-broader").set(derivative));
 });
+
+
+test("controlled-document register accepts explicitly trial-marked uploads without bypassing actual-data gate", () => {
+  const rules = require("node:fs").readFileSync("firestore.rules", "utf8");
+  const helperStart = rules.indexOf("function controlledDocumentCreateAllowed()");
+  const helperEnd = rules.indexOf("function controlledDocumentReadAllowed()", helperStart);
+  const helper = rules.slice(helperStart, helperEnd);
+  assert.ok(helper.includes("trialDataRecord(request.resource.data)"));
+  assert.ok(helper.includes("uploadedByUid"));
+  assert.ok(helper.includes("authorizedUids"));
+  assert.ok(rules.includes('match /documents/{id}{allow read:if admin()||controlledDocumentReadAllowed();allow create:if (admin()||controlledDocumentCreateAllowed()||documentLifecycleCreateAllowed(id)||documentLifecycleDerivativeCreateAllowed(id))&&actualCreateAllowed();'));
+  assert.ok(rules.includes("function actualCreateAllowed(){return actualDataAccessOpen()||trialDataRecord(request.resource.data); }") || rules.includes("function actualCreateAllowed(){return actualDataAccessOpen()||trialDataRecord(request.resource.data);}"));
+});
+
+
+test("initial Signature Portal envelope association is owner-bound, draft-only, and preserves the actual-data gate", () => {
+  const rules = require("node:fs").readFileSync("firestore.rules", "utf8");
+  const start = rules.indexOf("function signatureDocumentInitialEnvelopeLink(documentId)");
+  const end = rules.indexOf("function signatureDocumentWorkflowUpdate()", start);
+  const helper = rules.slice(start, end);
+  assert.ok(start >= 0, "initial envelope-link helper must exist");
+  assert.ok(helper.includes('get("ownerUid","")==request.auth.uid'));
+  assert.ok(helper.includes('get("senderUid","")==request.auth.uid'));
+  assert.ok(helper.includes('get("documentId","")==documentId'));
+  assert.ok(helper.includes('get("status","")=="Draft"'));
+  assert.ok(helper.includes('request.resource.data.signatureOwnerUid==request.auth.uid'));
+  assert.ok(helper.includes('affectedKeys().hasOnly(["signatureEnvelopeId","signatureReference","signatureStatus","signatureOwnerUid","workflowOwnerSectionSaved","authorizationRequestId","authorizationReference","updatedAt"])'));
+  assert.ok(rules.includes("signatureDocumentInitialEnvelopeLink(id)||signatureDocumentWorkflowUpdate()"));
+  assert.ok(rules.includes("&&actualUpdateAllowed()"), "actual-data access gate must remain mandatory");
+});
+
+
+test("controlled document reads remain limited to authorized users and named owners", () => {
+  const rules = require("node:fs").readFileSync("firestore.rules", "utf8");
+  const start = rules.indexOf("function controlledDocumentReadAllowed()");
+  const end = rules.indexOf("function documentLifecycleIdentity()", start);
+  const helper = rules.slice(start, end);
+  assert.ok(helper.includes("authorizationUser()"));
+  assert.ok(helper.includes('resource.data.get("authorizedUids",[])'));
+  assert.ok(helper.includes('resource.data.get("uploadedByUid","")==request.auth.uid'));
+  assert.ok(helper.includes('resource.data.get("ownerUid","")==request.auth.uid'));
+  assert.ok(helper.includes('resource.data.get("signatureOwnerUid","")==request.auth.uid'));
+  assert.ok(helper.includes("signedIn()"));
+});
+
+function grantAssistantDocument(overrides = {}) {
+  return {
+    title: "IRPA funding concept note",
+    format: "Concept note",
+    tone: "Professional and persuasive",
+    length: "Detailed",
+    instructions: "Prepare a concept note for rangeland restoration.",
+    context: "Longido District, Tanzania.",
+    draft: "Draft document content.",
+    createdByUid: "member-user",
+    createdByEmail: "member@example.test",
+    createdAt: new Date("2026-10-16T10:00:00.000Z"),
+    updatedAt: new Date("2026-10-16T10:00:00.000Z"),
+    recordOrigin: "PRODUCTION",
+    ...overrides
+  };
+}
+
+test("Grant AI document history is private to the authenticated owner", async () => {
+  const ownerDb = testEnv.authenticatedContext("member-user", {
+    email: "member@example.test"
+  }).firestore();
+  const otherDb = testEnv.authenticatedContext("reviewer-user", {
+    email: "reviewer@example.test"
+  }).firestore();
+
+  await assertSucceeds(ownerDb.doc("grantAssistantDocuments/owned-draft").set(grantAssistantDocument()));
+  await assertSucceeds(ownerDb.doc("grantAssistantDocuments/owned-draft").get());
+  await assertFails(otherDb.doc("grantAssistantDocuments/owned-draft").get());
+  await assertFails(otherDb.doc("grantAssistantDocuments/owned-draft").update({ draft: "Unauthorized edit" }));
+});
+
+test("Grant AI document owner can save edits but cannot transfer ownership or rewrite creation time", async () => {
+  const ownerDb = testEnv.authenticatedContext("member-user", {
+    email: "member@example.test"
+  }).firestore();
+
+  await assertSucceeds(ownerDb.doc("grantAssistantDocuments/editable-draft").set(grantAssistantDocument()));
+  await assertSucceeds(ownerDb.doc("grantAssistantDocuments/editable-draft").update({
+    draft: "Revised draft content.",
+    updatedAt: new Date("2026-10-16T11:00:00.000Z")
+  }));
+  await assertFails(ownerDb.doc("grantAssistantDocuments/editable-draft").update({
+    createdByUid: "reviewer-user"
+  }));
+  await assertFails(ownerDb.doc("grantAssistantDocuments/editable-draft").update({
+    createdAt: new Date("2026-10-16T12:00:00.000Z")
+  }));
+});
+
+test("Grant AI document deletion is denied even to the record owner", async () => {
+  const ownerDb = testEnv.authenticatedContext("member-user", {
+    email: "member@example.test"
+  }).firestore();
+
+  await assertSucceeds(ownerDb.doc("grantAssistantDocuments/nondeletable-draft").set(grantAssistantDocument()));
+  await assertFails(ownerDb.doc("grantAssistantDocuments/nondeletable-draft").delete());
+});
+
