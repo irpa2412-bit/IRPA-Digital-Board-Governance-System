@@ -1235,23 +1235,29 @@ jobs:
                 const passwordHash=crypto.createHash("sha256").update(wpPassword).digest("hex");
                 const shim=[
                   "<?php",
-                  "add_filter('determine_current_user', function($userId) {",
-                  "if($userId) return $userId;",
+                  "if(!function_exists('irpa_staging_rest_auth_user')){",
+                  "function irpa_staging_rest_auth_user(){",
                   "$host=strtolower(preg_replace('/:\\\\d+$/','',(string)($_SERVER['HTTP_HOST']??'')));",
-                  "if($host!=='staging.irpa.or.tz') return $userId;",
+                  "if($host!=='staging.irpa.or.tz') return 0;",
                   "$path=(string)(parse_url((string)($_SERVER['REQUEST_URI']??''),PHP_URL_PATH)?:'');",
-                  "if($path!=='/wp-json'&&strpos($path,'/wp-json/')!==0) return $userId;",
+                  "if($path!=='/wp-json'&&strpos($path,'/wp-json/')!==0) return 0;",
                   "$header=(string)($_SERVER['HTTP_AUTHORIZATION']??$_SERVER['REDIRECT_HTTP_AUTHORIZATION']??'');",
-                  "if(!preg_match('/^Basic\\\\s+([A-Za-z0-9+\\\\/=]+)$/i',$header,$matches)) return $userId;",
+                  "if($header===''&&function_exists('getallheaders')){foreach((array)getallheaders() as $k=>$v){if(strcasecmp((string)$k,'Authorization')===0){$header=(string)$v;break;}}}",
+                  "if($header===''&&function_exists('apache_request_headers')){foreach((array)apache_request_headers() as $k=>$v){if(strcasecmp((string)$k,'Authorization')===0){$header=(string)$v;break;}}}",
+                  "if(!preg_match('/^Basic\\\\s+([A-Za-z0-9+\\\\/=]+)$/i',$header,$matches)) return 0;",
                   "$decoded=base64_decode($matches[1],true);",
-                  "if($decoded===false||strpos($decoded,':')===false) return $userId;",
+                  "if($decoded===false||strpos($decoded,':')===false) return 0;",
                   "list($username,$password)=explode(':',$decoded,2);",
-                  "$password=preg_replace('/\\s+/','',$password);",
-                  "if(!hash_equals(base64_decode('"+usernameB64+"'),$username)||!hash_equals('"+passwordHash+"',hash('sha256',$password))) return $userId;",
+                  "$password=preg_replace('/\\\\s+/','',$password);",
+                  "if(!hash_equals(base64_decode('"+usernameB64+"'),$username)||!hash_equals('"+passwordHash+"',hash('sha256',$password))) return 0;",
                   "$user=get_user_by('login',$username);",
-                  "if(!$user||!user_can($user,'edit_pages')) return $userId;",
+                  "if(!$user&&is_email($username)) $user=get_user_by('email',$username);",
+                  "if(!$user||!user_can($user,'edit_pages')) return 0;",
                   "return (int)$user->ID;",
-                  "},20);"
+                  "}",
+                  "}",
+                  "add_filter('determine_current_user',function($userId){if($userId)return $userId;$candidate=irpa_staging_rest_auth_user();return $candidate?:$userId;},20);",
+                  "add_filter('rest_authentication_errors',function($result){if(is_wp_error($result)&&$result->get_error_code()==='rest_not_logged_in'){$candidate=irpa_staging_rest_auth_user();if($candidate){wp_set_current_user($candidate);return null;}}return $result;},200);"
                 ].join("\n")+"\n";
                 if(!await writeFile(muDir,"irpa-staging-rest-auth.php",shim))throw new Error("Could not install and verify the staging-only WordPress REST authentication adapter.");
                 console.log("STAGING_REST_AUTH_SHIM_INSTALL=VERIFIED");
