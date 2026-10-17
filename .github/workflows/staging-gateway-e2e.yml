@@ -1249,7 +1249,7 @@ jobs:
                   "if($decoded===false||strpos($decoded,':')===false) return 0;",
                   "list($username,$password)=explode(':',$decoded,2);",
                   "$password=preg_replace('/\\\\s+/','',$password);",
-                  "if(!hash_equals(base64_decode('"+usernameB64+"'),$username)||!hash_equals('"+diagPasswordHash+"',hash('sha256',$password))) return 0;",
+                  "if(!hash_equals(base64_decode('"+usernameB64+"'),$username)||!hash_equals('"+passwordHash+"',hash('sha256',$password))) return 0;",
                   "$user=get_user_by('login',$username);",
                   "if(!$user&&is_email($username)) $user=get_user_by('email',$username);",
                   "if(!$user||!user_can($user,'edit_pages')) return 0;",
