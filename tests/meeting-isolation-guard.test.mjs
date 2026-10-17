@@ -63,7 +63,8 @@ test("Signature Gateway isolation does not exempt unrelated staging admin reset 
 });
 
 test("Communication and Media archive gateway integration is explicitly isolated and allowlisted", () => {
-  assert.match(workflow, /const communicationMediaOnly = changed\.includes\("src\/pages\/CommunicationMediaStudio\.jsx"\)/);
+  assert.match(workflow, /const communicationMediaArchiveIntegration =/);
+  assert.match(workflow, /changed\.includes\("src\/pages\/CommunicationMediaStudio\.jsx"\)/);
   assert.match(workflow, /changed\.includes\("tests\/communication-media-policy\.test\.mjs"\)/);
   assert.match(workflow, /changed\.includes\("drive-gateway\/src\/index\.js"\)/);
   assert.match(workflow, /changed\.includes\("drive-gateway\/wrangler\.toml"\)/);
@@ -71,6 +72,7 @@ test("Communication and Media archive gateway integration is explicitly isolated
   assert.match(workflow, /changed\.includes\("docs\/COMMUNICATION_MEDIA_PORTAL\.md"\)/);
   assert.match(workflow, /!changed\.includes\("src\/pages\/Meetings\.jsx"\)/);
   assert.match(workflow, /!changed\.includes\("src\/pages\/OperationalGatewaysParticipants\.jsx"\)/);
+  assert.match(workflow, /communicationMediaArchiveIntegration && communicationMediaArchivePaths\.has\(path\)/);
 });
 
 test("readability-only PRs are narrowly allowlisted without permitting unrelated portal source changes", () => {
