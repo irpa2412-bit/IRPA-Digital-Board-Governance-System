@@ -262,7 +262,7 @@ test("cPanel Fileman reads use the relative path for the exact staging document 
   });
   let requestedUrl;
   globalThis.fetch = async input => {
-    requestedUrl = new URL(typeof input === "string" ? input : input.url);
+    requestedUrl = new URL(input instanceof URL ? input.href : typeof input === "string" ? input : input.url);
     assert.equal(requestedUrl.hostname, "cpanel.example.test");
     return response({ status: 1, data: { data: { content: "staging-only content" } } });
   };
