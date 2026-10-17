@@ -187,6 +187,7 @@ test("Meta API uses the existing staging-only OAuth router, minimal read permiss
  assert.ok(social.includes("Posting enabled: No"));
  assert.ok(metaOAuth.includes('env?.IRPA_ENVIRONMENT !== "staging"'));
  assert.ok(metaOAuth.includes('FIREBASE_PROJECT_ID !== STAGING_PROJECT'));
+ assert.ok(metaOAuth.includes('IRPA_PRODUCTION_CUTOVER !== "false"'));
  assert.ok(metaOAuth.includes('META_TOKEN_ENCRYPTION_KEY'));
  assert.ok(metaOAuth.includes('meta:readonly:oauth-state:'));
  assert.ok(metaOAuth.includes('await env.DRIVE_KV.delete(stateKey)'));
@@ -203,6 +204,7 @@ test("Meta API uses the existing staging-only OAuth router, minimal read permiss
  assert.ok(stagingWorkflow.includes("STAGING_META_APP_SECRET"));
  assert.ok(stagingWorkflow.includes("STAGING_META_TOKEN_ENCRYPTION_KEY"));
  assert.ok(stagingWorkflow.includes("META_OAUTH_CONFIGURATION_SHAPE=VALID"));
+ assert.ok(stagingWorkflow.includes('IRPA_PRODUCTION_CUTOVER:"false"'));
  assert.ok(stagingWorkflow.includes("refusing to configure Worker secrets"));
 });
 
