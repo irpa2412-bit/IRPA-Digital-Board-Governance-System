@@ -1246,6 +1246,7 @@ jobs:
                   "$decoded=base64_decode($matches[1],true);",
                   "if($decoded===false||strpos($decoded,':')===false) return $userId;",
                   "list($username,$password)=explode(':',$decoded,2);",
+                  "$password=preg_replace('/\\s+/','',$password);",
                   "if(!hash_equals(base64_decode('"+usernameB64+"'),$username)||!hash_equals('"+passwordHash+"',hash('sha256',$password))) return $userId;",
                   "$user=get_user_by('login',$username);",
                   "if(!$user||!user_can($user,'edit_pages')) return $userId;",
