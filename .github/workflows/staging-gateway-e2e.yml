@@ -1369,8 +1369,13 @@ jobs:
             return data;
           }
           async function waitForPublicMarker(url){
+            const target=new URL(url);
+            if(target.protocol!=="https:"||target.hostname.toLowerCase()!=="staging.irpa.or.tz") throw new Error("ABORT: public-render verification must target staging.irpa.or.tz.");
             for(let i=0;i<6;i++){
-              const response=await fetch(url+(url.includes("?")?"&":"?")+"irpa_staging_check="+Date.now(),{cache:"no-store"});
+              const check=new URL(target.href);
+              check.searchParams.set("irpa_staging_check",String(Date.now()));
+              const response=await fetch(check.href,{cache:"no-store",redirect:"manual"});
+              if(response.status>=300&&response.status<400) throw new Error("ABORT: staging public-render verification encountered a redirect; no redirect target was requested.");
               if(response.ok && (await response.text()).includes(marker)) return true;
               await new Promise(r=>setTimeout(r,1500));
             }
