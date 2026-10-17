@@ -772,6 +772,52 @@ jobs:
             const mapped=all.some(x=>(x.domain||x.name)==="staging.irpa.or.tz"&&String(x.documentroot||x.document_root||x.dir||"").endsWith("/public_html/staging"));
             console.log("CPANEL_SUBDOMAIN_MAPPING="+(mapped?"PASS":"CHANGED_RECHECK_REQUIRED"));
             if(mapped){
+              const stageDir=root+"/staging";
+              const ht=await uapi("Fileman/get_file_content",{dir:stageDir,file:".htaccess"});
+              const original=String(ht.data?.data?.content??ht.data?.content??"");
+              if(ht.http===200&&ht.data?.status===1&&original){
+                const malformed=/\bphp_value\b|\bphp_flag\b|RewriteBase\s+\/staging\s|RewriteRule\s+\.\s+\/staging\s+\/index\.php/i.test(original);
+                if(malformed){
+                  const homeDir=root.replace(/\/public_html\/?$/,"");
+                  const backupFile="staging-htaccess-backup-"+String(process.env.GITHUB_RUN_ID||"run")+".txt";
+                  const boundary="----IRPAStagingBackup"+String(process.env.GITHUB_RUN_ID||"run");
+                  const backupBody=Buffer.concat([
+                    Buffer.from("--"+boundary+"\r\nContent-Disposition: form-data; name=\"dir\"\r\n\r\n"+homeDir+"\r\n"),
+                    Buffer.from("--"+boundary+"\r\nContent-Disposition: form-data; name=\"file-1\"; filename=\""+backupFile+"\"\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n"),
+                    Buffer.from(original,"utf8"),
+                    Buffer.from("\r\n--"+boundary+"--\r\n")
+                  ]);
+                  const uploadUrl=new URL("/execute/Fileman/upload_files",base);
+                  const backup=await request(uploadUrl.href,"POST",{...auth,"Content-Type":"multipart/form-data; boundary="+boundary,"Content-Length":String(backupBody.length)},backupBody);
+                  if(backup.http<200||backup.http>=300||backup.data?.status!==1){
+                    console.log("CPANEL_STAGING_HTACCESS=BLOCKED_BACKUP_FAILED");
+                    return false;
+                  }
+                  const handlerLine=original.split(/\r?\n/).map(x=>x.trim()).find(x=>/^AddHandler\s+application\/x-httpd-ea-php\d+\s+\.php\b/i.test(x))||"";
+                  let standard="# IRPA staging WordPress rewrite rules\n<IfModule mod_rewrite.c>\nRewriteEngine On\nRewriteBase /\nRewriteRule ^index\\.php$ - [L]\nRewriteCond %{REQUEST_FILENAME} !-f\nRewriteCond %{REQUEST_FILENAME} !-d\nRewriteRule . /index.php [L]\n</IfModule>\n";
+                  if(handlerLine)standard+=handlerLine+"\n";
+                  async function saveHt(content){
+                    const body=new URLSearchParams({dir:stageDir,file:".htaccess",content,charset:"utf-8"}).toString();
+                    return request(new URL("/execute/Fileman/save_file_content",base).href,"POST",{...auth,"Content-Type":"application/x-www-form-urlencoded","Content-Length":String(Buffer.byteLength(body))},body);
+                  }
+                  const saved=await saveHt(standard);
+                  const check=await uapi("Fileman/get_file_content",{dir:stageDir,file:".htaccess"});
+                  const written=String(check.data?.data?.content??check.data?.content??"");
+                  if(saved.http<200||saved.http>=300||saved.data?.status!==1||written!==standard){
+                    await saveHt(original);
+                    console.log("CPANEL_STAGING_HTACCESS=FAILED_RESTORED_ORIGINAL");
+                    return false;
+                  }
+                  console.log("CPANEL_STAGING_HTACCESS=FIXED_WITH_PRIVATE_BACKUP");
+                  console.log("CPANEL_STAGING_HTACCESS_BACKUP="+backupFile);
+                }else{
+                  console.log("CPANEL_STAGING_HTACCESS=ALREADY_VALID");
+                }
+              }else{
+                console.log("CPANEL_STAGING_HTACCESS=NOT_READABLE_NO_CHANGE");
+              }
+            }
+            if(mapped){
               async function setRoot(dir){
                 await uapi("SubDomain/changedocroot",{subdomain:"staging",rootdomain:"irpa.or.tz",dir});
                 let check=await api2("SubDomain","listsubdomains",{regex:"staging"});
