@@ -109,14 +109,14 @@ test("Signature document palette and assignment repair is narrowly paired with a
   assert.match(workflow, /changed\.includes\("firestore\.rules"\)/);
   assert.match(workflow, /changed\.includes\("tests\/firestore\.rules\.test\.cjs"\)/);
   assert.match(workflow, /!signatureDocumentPaletteAssignmentRepair/);
-  assert.match(workflow, /!signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !guardOnlyWorkflowRepair/);
+  assert.match(workflow, /!signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !guardOnlyWorkflowRepair/);
 });
 
 
 test("Signature palette lifecycle source repair is paired with regression coverage", () => {
   assert.match(workflow, /const signaturePaletteLifecycleSourceRepair = changed\.includes\("src\/firebase\/data\.js"\)/);
   assert.match(workflow, /changed\.includes\("tests\/signature-workflow-policy\.test\.mjs"\)/);
-  assert.match(workflow, /!signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !guardOnlyWorkflowRepair/);
+  assert.match(workflow, /!signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !guardOnlyWorkflowRepair/);
 });
 
 
