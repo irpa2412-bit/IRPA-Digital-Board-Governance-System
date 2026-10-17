@@ -2206,7 +2206,7 @@ async function commitFirestoreDocumentAndAudit(env, documentId, _firebaseToken, 
   const base=`projects/${getFirebaseProjectId(env)}/databases/(default)/documents`;
   const auditId=`${documentId}-${Date.now()}-${crypto.randomUUID().slice(0,8)}`;
   const documentWrite={
-    update:{name:`${base}/documents/${documentId}`,fields:documentFields},
+    update:{name:`${base}/${documentId}`,fields:documentFields},
     updateMask:{fieldPaths:documentMask}
   };
   if(createOnly)documentWrite.currentDocument={exists:false};
