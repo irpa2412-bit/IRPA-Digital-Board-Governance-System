@@ -501,6 +501,8 @@ jobs:
           CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
           CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
           CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
+          STAGING_DB_NAME: ${{ secrets.STAGING_WORDPRESS_DB_NAME }}
+          PRODUCTION_DB_NAME: ${{ secrets.PRODUCTION_WORDPRESS_DB_NAME }}
         run: |
           set -euo pipefail
           node <<'NODE'
@@ -559,10 +561,14 @@ jobs:
               if(name==="wp-config.php"){
                 const match=content.match(/define\s*\(\s*['"]DB_NAME['"]\s*,\s*(['"])(.*?)\1\s*\)/s);
                 const dbNameLiteral=Boolean(match);
-                const isolated=Boolean(match&&/stage|staging|test/i.test(match[2]));
+                const stagingDbName=String(process.env.STAGING_DB_NAME||"").trim();
+                const productionDbName=String(process.env.PRODUCTION_DB_NAME||"").trim();
+                const stagingMatches=Boolean(match&&stagingDbName&&match[2]===stagingDbName);
+                const distinctFromProduction=Boolean(stagingDbName&&productionDbName&&stagingDbName!==productionDbName);
+                const isolated=stagingMatches&&distinctFromProduction;
                 console.log("STAGING_DATABASE_ISOLATION="+(isolated?"PASS":"FAIL"));
-                console.log("STAGING_DATABASE_GUARD_DETAIL="+JSON.stringify({dbNameLiteral,stagingMarker:isolated}));
-                if(!isolated)throw new Error("ABORT: staging database name is not explicitly staging-scoped; refusing all WordPress database changes.");
+                console.log("STAGING_DATABASE_GUARD_DETAIL="+JSON.stringify({dbNameLiteral,stagingMappingMatches:stagingMatches,distinctFromProduction}));
+                if(!isolated)throw new Error("ABORT: staging wp-config.php database mapping does not match the protected staging database secret or is not distinct from production.");
               }
             }
             for(const dir of [stage+"/wp-content/mu-plugins",stage+"/wp-content/plugins"]){
