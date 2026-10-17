@@ -10,7 +10,7 @@ Requested permissions are limited to `pages_show_list`, `pages_read_engagement`,
 
 Worker variables:
 - `META_APP_ID`: IRPA-approved Meta developer app ID.
-- `META_GRAPH_API_VERSION`: currently supported Graph API version enabled for the app.
+- `META_GRAPH_API_VERSION`: pinned in staging Wrangler configuration to `v26.0` (released July 29, 2026); verify the version remains supported before future upgrades.
 - `META_REDIRECT_URI`: `https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev/api/communications/meta/callback` (also pinned in staging Wrangler configuration).
 
 Cloudflare Worker secrets (staging environment only):
