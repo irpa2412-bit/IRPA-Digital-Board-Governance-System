@@ -1769,7 +1769,7 @@ jobs:
           CF_TOKEN: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
           CF_ACCOUNT: ${{ secrets.STAGING_CLOUDFLARE_ACCOUNT_ID }}
           PROJECT: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
-          APP_URL: ${{ secrets.STAGING_IRPA_APP_URL }}
+          APP_URL: "https://irpa-dbg-staging-a73ec.web.app"
           DRIVE_ID: ${{ secrets.STAGING_GOOGLE_DRIVE_CLIENT_ID }}
           DRIVE_SECRET: ${{ secrets.STAGING_GOOGLE_DRIVE_CLIENT_SECRET }}
           DRIVE_KEY: ${{ secrets.STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY }}
@@ -1780,7 +1780,7 @@ jobs:
         run: |
           set -euo pipefail
           missing=0
-          for pair in             "CLOUDFLARE_API_TOKEN:$CF_TOKEN"             "CLOUDFLARE_ACCOUNT_ID:$CF_ACCOUNT"             "STAGING_FIREBASE_PROJECT_ID:$PROJECT"             "STAGING_IRPA_APP_URL:$APP_URL"             "STAGING_GOOGLE_DRIVE_CLIENT_ID:$DRIVE_ID"             "STAGING_GOOGLE_DRIVE_CLIENT_SECRET:$DRIVE_SECRET"             "STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY:$DRIVE_KEY"             "STAGING_SMTP_PASSWORD:$SMTP"             "STAGING_CRYPTO_TEST_EMAIL:$CRYPTO_TEST_EMAIL"             "STAGING_CRYPTO_TEST_PASSWORD:$CRYPTO_TEST_PASSWORD"; do
+          for pair in             "CLOUDFLARE_API_TOKEN:$CF_TOKEN"             "CLOUDFLARE_ACCOUNT_ID:$CF_ACCOUNT"             "STAGING_FIREBASE_PROJECT_ID:$PROJECT"                         "STAGING_GOOGLE_DRIVE_CLIENT_ID:$DRIVE_ID"             "STAGING_GOOGLE_DRIVE_CLIENT_SECRET:$DRIVE_SECRET"             "STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY:$DRIVE_KEY"             "STAGING_SMTP_PASSWORD:$SMTP"             "STAGING_CRYPTO_TEST_EMAIL:$CRYPTO_TEST_EMAIL"             "STAGING_CRYPTO_TEST_PASSWORD:$CRYPTO_TEST_PASSWORD"; do
             name="${pair%%:*}"; value="${pair#*:}"
             if [ -z "$value" ]; then echo "Missing staging secret: $name"; missing=1; fi
           done
@@ -1846,7 +1846,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.STAGING_CLOUDFLARE_ACCOUNT_ID }}
           PROJECT: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
-          APP_URL: ${{ secrets.STAGING_IRPA_APP_URL }}
+          APP_URL: "https://irpa-dbg-staging-a73ec.web.app"
         working-directory: drive-gateway
         run: |
           set -euo pipefail
@@ -2010,3 +2010,58 @@ jobs:
         run: node tests/staging-runtime-acceptance.mjs
 
 # Staging proof execution trigger — 2026-10-04
+
+
+  deploy-staging-frontend:
+    needs: [local-e2e, preflight-staging]
+    if: github.event_name == 'workflow_dispatch' && (inputs.deploy_staging == true || inputs.deploy_staging == 'true') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004' || github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015' || github.ref == 'refs/heads/fix/communication-media-archive-drive-oauth')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Require isolated staging Firebase identity
+        env:
+          PROJECT: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
+          SERVICE_ACCOUNT_JSON: ${{ secrets.LIVEKIT_STAGING_FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          set -euo pipefail
+          test "$PROJECT" = "irpa-dbg-staging-a73ec"
+          node <<'NODE'
+          const sa=JSON.parse(process.env.SERVICE_ACCOUNT_JSON||"{}");
+          if(sa.project_id!=="irpa-dbg-staging-a73ec"||!sa.client_email||!sa.private_key) {
+            throw new Error("Refusing staging Hosting deploy: service account must belong to the isolated staging Firebase project.");
+          }
+          console.log("STAGING_FIREBASE_IDENTITY_VALID=true");
+          NODE
+      - name: Build frontend against isolated staging Firebase and Drive gateway
+        env:
+          VITE_FIREBASE_API_KEY: "AIzaSyA6UmHtP-mRr99rBw57_-qrD4_mFSBnZ38"
+          VITE_FIREBASE_AUTH_DOMAIN: "irpa-dbg-staging-a73ec.firebaseapp.com"
+          VITE_FIREBASE_PROJECT_ID: "irpa-dbg-staging-a73ec"
+          VITE_FIREBASE_STORAGE_BUCKET: "irpa-dbg-staging-a73ec.firebasestorage.app"
+          VITE_FIREBASE_MESSAGING_SENDER_ID: "1018976634858"
+          VITE_FIREBASE_APP_ID: "1:1018976634858:web:e73e9e09f55a76ade25493"
+          VITE_FIREBASE_MEASUREMENT_ID: ""
+          VITE_FIREBASE_VAPID_KEY: ""
+          VITE_GOOGLE_DRIVE_GATEWAY_URL: "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
+          VITE_GATEWAY_ORIGIN: "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
+          VITE_GOOGLE_WEATHER_API_KEY: ""
+        run: |
+          set -euo pipefail
+          test "$VITE_FIREBASE_PROJECT_ID" = "irpa-dbg-staging-a73ec"
+          test "$VITE_GOOGLE_DRIVE_GATEWAY_URL" = "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
+          npm ci --no-audit --no-fund
+          npm run build
+          grep -R -q "irpa-dbg-staging-a73ec" dist
+          grep -R -q "irpa-google-drive-gateway-staging.irpa-governance.workers.dev" dist
+          echo "STAGING_FRONTEND_BUILD_VALID=true"
+      - name: Deploy Hosting only to the isolated staging Firebase project
+        uses: w9jds/firebase-action@v14.17.0
+        with:
+          args: deploy --project irpa-dbg-staging-a73ec --only hosting --non-interactive
+        env:
+          GCP_SA_KEY: ${{ secrets.LIVEKIT_STAGING_FIREBASE_SERVICE_ACCOUNT }}
