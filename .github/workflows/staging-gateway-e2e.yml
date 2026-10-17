@@ -760,7 +760,8 @@ jobs:
             $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] = $header;
           }
           `;
-            if(!original.ok||!original.content.includes("irpa_staging_rest_auth_user")||!original.content.includes("hash_equals")||original.content.length>10000)throw new Error("ABORT: staging REST auth plugin does not match the expected repair target.");
+            const alreadyBridge=original.ok&&original.content===replacement;
+            if(!original.ok||original.content.length>10000||(!alreadyBridge&&(!original.content.includes("irpa_staging_rest_auth_user")||!original.content.includes("hash_equals"))))throw new Error("ABORT: staging REST auth plugin does not match the expected repair target.");
             if(original.content!==replacement){
               const backupName="irpa-staging-rest-auth.php.backup";
               const homeListing=await uapi("Fileman/list_files",{dir:home,showdotfiles:1});
