@@ -14,6 +14,7 @@ const gateway=read("../drive-gateway/src/index.js");
 const site=read("../drive-gateway/src/communicationsSite.mjs");
 const functionsIndex=read("../functions/index.js");
 const docs=read("../docs/COMMUNICATION_MEDIA_PORTAL.md");
+const readability=read("../src/styles/readability-harmony.css");
 
 test("communications portal stays integrated in the existing app with role-based navigation",()=>{
  assert.ok(app.includes('import CommunicationMediaPortal from "./pages/CommunicationMediaPortal"'));
