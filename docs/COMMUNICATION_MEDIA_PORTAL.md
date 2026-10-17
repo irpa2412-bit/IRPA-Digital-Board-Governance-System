@@ -26,6 +26,18 @@ Records are retained and archived rather than hard-deleted. Operations changes a
 
 The workspace intentionally does not auto-publish social posts, send messages to media contacts, infer analytics, or trigger crisis communications. Those integrations require separate authorized design and acceptance. It is intended to be usable for planning and record keeping while website integration is pending.
 
+## Social-media account enrolment and management
+
+The **Social Accounts** workspace registers IRPA-owned or IRPA-authorized social accounts in the existing portal. Supported platforms include Facebook, Instagram, LinkedIn, X, YouTube, TikTok, WhatsApp, Telegram and Other. Each entry can capture the public account/page name and handle, HTTPS public profile URL, account type, responsible officer, access custodian, purpose, target audience, internal authorization reference and next access-review date.
+
+- New records start at **Pending Verification**; an authorized reviewer can mark them active, suspend them, mark them disconnected or archive them.
+- Account details are editable by the enrolling officer while pending verification and by authorized reviewers under the Firestore policy. Status transitions are reviewer-controlled.
+- Every enrolment, edit and status change is committed with an audit entry in the same Firestore batch. Audit entries are immutable; records are archived rather than hard-deleted.
+- Firestore rules enforce field allowlists, HTTPS profile links, role checks, permitted status transitions and matching audit records. No credentials or API tokens are accepted in the schema.
+- Use only accounts IRPA owns or has documented authorization to manage. Keep the custodian and authorization reference current, review access periodically, and use the platform's own security controls to remove former staff.
+
+**Important boundary:** this is secure account inventory and governance, not a live platform connection. It does not perform OAuth authorization, store passwords/recovery codes/access tokens, publish or schedule posts, read private messages, retrieve live analytics, or revoke access on a social network. Status is a manually reviewed register state, not a claim that an API connection is working. Direct publishing or analytics would require a separate platform-by-platform integration with approved OAuth scopes, server-side token custody, revocation/expiry handling, consent, and independent security and staging acceptance. Do not put credentials in the account notes or profile URL.
+
 ## Website and cPanel access
 
 WordPress page/post editing uses a dedicated WordPress account whose role is exactly `Editor`, with an application password and only the permissions needed to edit pages/posts. The Worker checks `/users/me` and refuses an account carrying the `administrator` role. Never use a personal or main administrator account/password. Editing is enabled only in the staging Worker against `https://staging.irpa.or.tz`; the production hostname, including a `/staging` path on that hostname, is rejected.
