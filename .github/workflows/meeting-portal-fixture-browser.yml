@@ -243,14 +243,26 @@ jobs:
           // Permit the dedicated Communications & Media integration only when its portal,
           // Worker bridge, policy/browser tests, workflow, and docs are all paired. The two
           // new page files remain disallowed for every other change set.
-          const communicationMediaIntegration = changed.includes("src/pages/CommunicationMediaPortal.jsx") &&
-            changed.includes("src/pages/CommunicationMediaOperations.jsx") &&
+          const existsAtHead = path => {
+            try {
+              execFileSync("git", ["cat-file", "-e", `HEAD:${path}`], { stdio: "ignore" });
+              return true;
+            } catch {
+              return false;
+            }
+          };
+          const communicationMediaIntegration = changed.includes("src/pages/CommunicationMediaOperations.jsx") &&
             changed.includes("src/pages/SocialMediaAccounts.jsx") &&
-            changed.includes("drive-gateway/src/communicationsSite.mjs") &&
-            changed.includes("tests/website-content-editor.test.mjs") &&
-            changed.includes("tests/communication-media-policy.test.mjs") &&
-            changed.includes(".github/workflows/communications-website-integration.yml") &&
-            changed.includes("docs/COMMUNICATION_MEDIA_PORTAL.md") &&
+            [
+              "src/pages/CommunicationMediaPortal.jsx",
+              "drive-gateway/src/communicationsSite.mjs",
+              "drive-gateway/src/metaOAuth.mjs",
+              "tests/website-content-editor.test.mjs",
+              "tests/communication-media-policy.test.mjs",
+              "tests/meta-oauth-staging.test.mjs",
+              ".github/workflows/communications-website-integration.yml",
+              "docs/COMMUNICATION_MEDIA_PORTAL.md"
+            ].every(existsAtHead) &&
             !changed.includes("src/pages/Meetings.jsx") &&
             !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
             changed.every(path => allowed.has(path) || [
