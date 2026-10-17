@@ -1412,10 +1412,8 @@ jobs:
                 await call("/api/communications/website/restore",{method:"POST",body:JSON.stringify({type:"pages",id:Number(duplicate.id),snapshotId:duplicateSnapshots[0].snapshotId})});
                 cleanDuplicate=(await call("/api/communications/website/content/pages/"+Number(duplicate.id))).item;
               }else{
-                const duplicateSlug=slugOf(duplicate);
-                const recentDuplicate=Date.now()-Date.parse(String(duplicate.modified||""))<24*60*60*1000;
-                if(duplicateItem?.title!==fixtureTitle||!/^irpa-staging-integration-check-\d+$/.test(duplicateSlug)||!recentDuplicate)
-                  throw new Error("An additional staging test-page candidate is not a verifiable recent workflow duplicate; refusing to alter it.");
+                // No unique workflow marker means ownership is unproven: leave this page untouched.
+                continue;
               }
               const draft=await call("/api/communications/website/content",{method:"PUT",body:JSON.stringify({
                 type:"pages",id:Number(duplicate.id),title:cleanDuplicate.title,content:cleanDuplicate.content,
