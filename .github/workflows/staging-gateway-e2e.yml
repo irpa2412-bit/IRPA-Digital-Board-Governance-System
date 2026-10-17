@@ -535,8 +535,16 @@ jobs:
             const retryable=method==="GET"&&(!cpApi2&&!u.pathname.startsWith("/execute/")||safeCpanelRead||safeUapiRead);
             const attempts=retryable?3:1;
             for(let attempt=1;;attempt++){
-              try{return await requestOnce(url,method,headers,body)}
-              catch(error){
+              try{
+                const response=await requestOnce(url,method,headers,body);
+                const transientHttp=[500,502,503,504].includes(response.http);
+                if(retryable&&transientHttp&&attempt<attempts){
+                  console.log("TRANSIENT_HTTP_READ_RETRY="+u.hostname+"_"+response.http+"_"+attempt);
+                  await new Promise(resolve=>setTimeout(resolve,attempt*1500));
+                  continue;
+                }
+                return response;
+              }catch(error){
                 const code=String(error.code||error.name||"");
                 const transient=["ETIMEDOUT","ECONNRESET","EHOSTUNREACH","ENETUNREACH","ECONNREFUSED","EAI_AGAIN","TimeoutError"].includes(code)||/timeout/i.test(String(error.message||""));
                 if(!retryable||!transient||attempt>=attempts)throw error;
