@@ -3,8 +3,8 @@ name: Deploy IRPA Meeting Room Staging Frontend
 on:
   push:
     branches:
-      - staging/cloudflare-livekit-token-integration
-      - fix/communications-cloudflare-website-integration-20261014
+      - staging/cloudflare-livekit-token-integration-20261014
+      - fix/communications-cloudflare-website-integration
     paths:
       - "src/**"
       - "public/**"
