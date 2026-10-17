@@ -351,12 +351,21 @@ jobs:
             async function request(operation,values){
               const url=new URL("/execute/Fileman/"+operation,base);
               let response;
-              try {
-                response=await fetch(url,{method:"POST",headers:{Authorization:auth,Accept:"application/json","Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams(values)});
-              } catch(error) {
-                const code=error.cause?.code||error.cause?.name||error.name||"unknown";
-                throw new Error("Staging cPanel API connection failed ("+code+") at "+base.hostname+":"+base.port+".");
+              let lastError;
+              for(let attempt=1;attempt<=3;attempt++){
+                try {
+                  response=await fetch(url,{method:"POST",headers:{Authorization:auth,Accept:"application/json","Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams(values),signal:AbortSignal.timeout(20000)});
+                  lastError=null;
+                  break;
+                } catch(error) {
+                  lastError=error;
+                  const code=error.cause?.code||error.cause?.name||error.name||"unknown";
+                  const transient=["ETIMEDOUT","ECONNRESET","EHOSTUNREACH","UND_ERR_CONNECT_TIMEOUT","TimeoutError"].includes(code);
+                  if(!transient||attempt===3) throw new Error("Staging cPanel API connection failed ("+code+") at "+base.hostname+":"+base.port+" after "+attempt+" attempt(s).");
+                  await new Promise(resolve=>setTimeout(resolve,attempt*2000));
+                }
               }
+              if(lastError||!response) throw new Error("Staging cPanel API request did not return a response.");
               const raw=await response.text();
               let body=null;
               try { body=JSON.parse(raw); } catch {}
