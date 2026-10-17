@@ -222,6 +222,46 @@ jobs:
           console.log("STAGING_CONFIGURATION_VALID");
           NODE
 
+      - name: Diagnose configured staging WordPress origin (no credentials)
+        env:
+          WP_BASE: ${{ secrets.STAGING_WORDPRESS_BASE_URL }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const dns = require("node:dns").promises;
+          const https = require("node:https");
+          (async () => {
+            let u;
+            try { u = new URL(process.env.WP_BASE || ""); } catch { throw new Error("Staging WordPress base URL is invalid or missing."); }
+            if (u.protocol !== "https:" || u.username || u.password || u.search || u.hash) throw new Error("Staging WordPress base URL must be a clean HTTPS origin/path.");
+            console.log("STAGING_WORDPRESS_HOST=" + u.hostname);
+            try {
+              const addresses = await dns.lookup(u.hostname, { all: true });
+              console.log("STAGING_WORDPRESS_DNS=" + JSON.stringify(addresses.map(a => ({address:a.address,family:a.family}))));
+            } catch (e) {
+              console.log("STAGING_WORDPRESS_DNS_ERROR=" + String(e.code || e.name));
+            }
+            await new Promise(resolve => {
+              const req = https.request(new URL("/wp-json/", u), { method: "GET", timeout: 10000, headers: { Accept: "application/json" } }, res => {
+                let raw = "";
+                res.setEncoding("utf8");
+                res.on("data", chunk => raw += chunk);
+                res.on("end", () => {
+                  console.log("STAGING_WORDPRESS_HTTP=" + res.statusCode);
+                  console.log("STAGING_WORDPRESS_SERVER=" + String(res.headers.server || "").slice(0,80));
+                  console.log("STAGING_WORDPRESS_CF_RAY=" + String(res.headers["cf-ray"] || "").slice(0,100));
+                  const hint = raw.replace(/<[^>]*>/g," ").replace(/[\\r\\n\\t]+/g," ").replace(/\\s+/g," ").trim();
+                  if (hint) console.log("STAGING_WORDPRESS_RESPONSE_HINT=" + hint.slice(0,180));
+                  resolve();
+                });
+              });
+              req.on("timeout", () => { console.log("STAGING_WORDPRESS_HTTP_ERROR=timeout"); req.destroy(); resolve(); });
+              req.on("error", e => { console.log("STAGING_WORDPRESS_HTTP_ERROR=" + String(e.code || e.name)); resolve(); });
+              req.end();
+            });
+          })().catch(e => { console.error(e.message); process.exit(1); });
+          NODE
+
       - name: Inject staging-only Worker secrets
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
