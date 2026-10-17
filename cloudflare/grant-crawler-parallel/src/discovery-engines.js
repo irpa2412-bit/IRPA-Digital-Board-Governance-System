@@ -349,7 +349,8 @@ export const SEARCH_QUERIES = [
   '"call for proposals" OR "application deadline" OR "closing date" grant climate livestock rangeland Tanzania Africa'
 ];
 const SEARCH_BATCH_SIZE = 4;
-function activeSearchQueries() {
+function activeSearchQueries(fullCatalog = false) {
+  if (fullCatalog) return [...SEARCH_QUERIES];
   const batchCount = Math.ceil(SEARCH_QUERIES.length / SEARCH_BATCH_SIZE);
   const batch = Math.floor(Date.now() / (6 * 60 * 60 * 1000)) % batchCount;
   const start = batch * SEARCH_BATCH_SIZE;
@@ -384,8 +385,9 @@ export function parseSearchRss(xml, query, provider = "Google News RSS") {
     return { title, description, url, publishedAt: xmlField(block, "pubDate") || null, sourceUrl: verifiedSourceUrl, discoveryEngine: "web_search" };
   }).filter(Boolean);
 }
-async function readGoogleNewsSearch() {
-  const results = await Promise.all(activeSearchQueries().map(async query => {
+async function readGoogleNewsSearch(fullCatalog = false) {
+  const queries = activeSearchQueries(fullCatalog);
+  const results = await Promise.all(queries.map(async query => {
     try {
       const url = new URL("https://news.google.com/rss/search");
       url.searchParams.set("q", query); url.searchParams.set("hl", "en-TZ"); url.searchParams.set("gl", "TZ"); url.searchParams.set("ceid", "TZ:en");
@@ -397,10 +399,11 @@ async function readGoogleNewsSearch() {
     } catch (error) { return { items: [], error: { query, error: String(error.message || error).slice(0, 180) } }; }
   }));
   const items = results.flatMap(result => result.items), errors = results.filter(result => result.error).map(result => result.error);
-  return { items, stats: { configured: true, provider: "Google News RSS", queries: activeSearchQueries().length, queryCatalogSize: SEARCH_QUERIES.length, found: items.length, errors } };
+  return { items, stats: { configured: true, provider: "Google News RSS", queries: queries.length, queryCatalogSize: SEARCH_QUERIES.length, fullCatalog, found: items.length, errors } };
 }
-async function readBingSearch() {
-  const results = await Promise.all(activeSearchQueries().map(async query => {
+async function readBingSearch(fullCatalog = false) {
+  const queries = activeSearchQueries(fullCatalog);
+  const results = await Promise.all(queries.map(async query => {
     try {
       const url = new URL("https://www.bing.com/search");
       url.searchParams.set("format", "rss"); url.searchParams.set("q", query);
@@ -412,12 +415,12 @@ async function readBingSearch() {
     } catch (error) { return { items: [], error: { query, error: String(error.message || error).slice(0, 180) } }; }
   }));
   const items = results.flatMap(result => result.items), errors = results.filter(result => result.error).map(result => result.error);
-  return { items, stats: { configured: true, provider: "Bing RSS", queries: activeSearchQueries().length, queryCatalogSize: SEARCH_QUERIES.length, found: items.length, errors } };
+  return { items, stats: { configured: true, provider: "Bing RSS", queries: queries.length, queryCatalogSize: SEARCH_QUERIES.length, fullCatalog, found: items.length, errors } };
 }
-export async function readGdeltSearch() {
+export async function readGdeltSearch({ fullCatalog = false } = {}) {
   const batchCount = Math.ceil(GDELT_QUERIES.length / SEARCH_BATCH_SIZE);
   const batch = Math.floor(Date.now() / (6 * 60 * 60 * 1000)) % batchCount;
-  const queries = GDELT_QUERIES.slice(batch * SEARCH_BATCH_SIZE, Math.min((batch + 1) * SEARCH_BATCH_SIZE, GDELT_QUERIES.length));
+  const queries = fullCatalog ? [...GDELT_QUERIES] : GDELT_QUERIES.slice(batch * SEARCH_BATCH_SIZE, Math.min((batch + 1) * SEARCH_BATCH_SIZE, GDELT_QUERIES.length));
   const settled = await Promise.all(queries.map(async query => {
     try {
       const url = new URL("https://api.gdeltproject.org/api/v2/doc/doc");
@@ -448,19 +451,20 @@ export async function readGdeltSearch() {
   }));
   const items = [...new Map(settled.flatMap(result => result.items).map(item => [item.url, item])).values()];
   const errors = settled.filter(result => result.error).map(result => result.error);
-  return { items, stats: { configured: true, provider: "GDELT DOC API", queries: queries.length, queryCatalogSize: GDELT_QUERIES.length, found: items.length, errors } };
+  return { items, stats: { configured: true, provider: "GDELT DOC API", queries: queries.length, queryCatalogSize: GDELT_QUERIES.length, fullCatalog, found: items.length, errors } };
 }
 
-export async function readWebSearch(env) {
+export async function readWebSearch(env, { fullCatalog = false } = {}) {
+  const queries = activeSearchQueries(fullCatalog);
   const apiKey = String(env.BRAVE_SEARCH_API_KEY || "").trim();
   if (!apiKey) {
-    const google = await readGoogleNewsSearch();
+    const google = await readGoogleNewsSearch(fullCatalog);
     if (google.items.length > 0 || google.stats.errors.length === 0 && google.stats.found > 0) return google;
-    const bing = await readBingSearch();
+    const bing = await readBingSearch(fullCatalog);
     if (bing.items.length || bing.stats.errors.length === 0) return bing;
-    return { items: [], stats: { configured: true, provider: "Google News RSS / Bing RSS", queries: activeSearchQueries().length, queryCatalogSize: SEARCH_QUERIES.length, found: 0, errors: [...google.stats.errors, ...bing.stats.errors] } };
+    return { items: [], stats: { configured: true, provider: "Google News RSS / Bing RSS", queries: queries.length, queryCatalogSize: SEARCH_QUERIES.length, fullCatalog, found: 0, errors: [...google.stats.errors, ...bing.stats.errors] } };
   }
-  const results = await Promise.all(activeSearchQueries().map(async query => {
+  const results = await Promise.all(queries.map(async query => {
     const items = [];
     try {
       const url = new URL("https://api.search.brave.com/res/v1/web/search");
@@ -478,7 +482,7 @@ export async function readWebSearch(env) {
     } catch (error) { return { items: [], error: { query, error: String(error.message || error).slice(0, 180) } }; }
   }));
   const errors = results.filter(result => result.error).map(result => result.error), items = results.flatMap(result => result.items);
-  return { items, stats: { configured: true, provider: "Brave Search API", queries: activeSearchQueries().length, queryCatalogSize: SEARCH_QUERIES.length, found: items.length, errors } };
+  return { items, stats: { configured: true, provider: "Brave Search API", queries: queries.length, queryCatalogSize: SEARCH_QUERIES.length, fullCatalog, found: items.length, errors } };
 }
 
 
