@@ -94,8 +94,8 @@ jobs:
           CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
           CP_ROOT: ${{ secrets.STAGING_CPANEL_DOCUMENT_ROOT }}
           CP_TEST_FILE: ${{ secrets.STAGING_CPANEL_TEST_FILE }}
-          STAGING_DB_NAME: ${{ vars.STAGING_WORDPRESS_DB_NAME }}
-          PRODUCTION_DB_NAME: ${{ vars.PRODUCTION_WORDPRESS_DB_NAME }}
+          STAGING_DB_NAME: ${{ secrets.STAGING_WORDPRESS_DB_NAME }}
+          PRODUCTION_DB_NAME: ${{ secrets.PRODUCTION_WORDPRESS_DB_NAME }}
         run: |
           set -euo pipefail
           missing=0
