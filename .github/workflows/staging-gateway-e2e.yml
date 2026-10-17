@@ -377,13 +377,7 @@ jobs:
               const rows=Array.isArray(listing.data?.data)?listing.data.data:[];
               console.log("CPANEL_INSTALL_DIR="+JSON.stringify({dir:dir.replace(/\/home\/[^/]+/,"/home/[account]"),status:listing.data?.status,files:rows.map(v=>String(v.file||v.name||"")).filter(Boolean).slice(0,80)}));
             }
-            for(const path of ["/wp-json/","/staging/wp-json/","/staging /wp-json/","/staging/"]){
-              try{
-                const u=new URL("https://irpa.or.tz"+path);
-                const result=await get(u,{Accept:"application/json"});
-                console.log("PUBLIC_WORDPRESS_PATH="+JSON.stringify({path,http:result.http,server:result.data?undefined:undefined,contentType:result.raw.slice(0,120).replace(/[\r\n]+/g," ")}));
-              }catch(e){console.log("PUBLIC_WORDPRESS_PATH_ERROR="+JSON.stringify({path,code:e.code||e.name}))}
-            }
+            console.log("PRODUCTION_SITE_PROBES=SKIPPED_BY_STAGING_SCOPE");
           }
           main().catch(e=>{console.error(e.message);process.exit(1)});
           NODE
