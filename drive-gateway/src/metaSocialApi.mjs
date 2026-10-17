@@ -281,7 +281,7 @@ export function createMetaSocialApiRouter(deps) {
       try { return await status(request, env); }
       catch (error) {
         const message = String(error?.message || "");
-        const code = /authentication|token/i.test(message) ? 401 : /role does not permit|authorised|authorized|active IRPA role|outside the staging gateway|requires the isolated staging Firebase project|production cutover|exact approved staging Cloudflare gateway URL/i.test(message) ? 403 : /not configured|configuration|unavailable/i.test(message) ? 503 : 502;
+        const code = /authentication|missing.*token|access token is expired or invalid/i.test(message) ? 401 : /role does not permit|authorised|authorized|active IRPA role|outside the staging gateway|requires the isolated staging Firebase project|production cutover|exact approved staging Cloudflare gateway URL/i.test(message) ? 403 : /not configured|configuration|unavailable|token-encryption/i.test(message) ? 503 : 502;
         return json({ error: message || "Meta connection verification failed.", postingEnabled: false }, code, corsHeaders(request));
       }
     }
@@ -292,9 +292,9 @@ export function createMetaSocialApiRouter(deps) {
     try { return await handle(request, env); }
     catch (error) {
       const message = String(error?.message || "");
-      const status = /authentication|token/i.test(message) ? 401 :
+      const status = /authentication|missing.*token|access token is expired or invalid/i.test(message) ? 401 :
         /role does not permit|authorised|authorized|active IRPA role|outside the staging gateway|requires the isolated staging Firebase project|production cutover|exact approved staging Cloudflare gateway URL/i.test(message) ? 403 :
-        /not configured|configuration|unavailable/i.test(message) ? 503 : 502;
+        /not configured|configuration|unavailable|token-encryption/i.test(message) ? 503 : 502;
       return json({ error: message || "Meta API request failed.", postingEnabled: false }, status, corsHeaders(request));
     }
   };
