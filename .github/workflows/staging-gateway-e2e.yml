@@ -1001,6 +1001,148 @@ jobs:
           main().catch(e=>{console.log("POST_REMEDIATION_DIAGNOSTIC_ERROR="+String(e.code||e.name||"unknown"));});
           NODE
 
+      - name: Register configured staging application password in staging WordPress
+        continue-on-error: true
+        env:
+          CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
+          CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
+          CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
+          WP_BASE: ${{ secrets.STAGING_WORDPRESS_BASE_URL }}
+          WP_USER: ${{ secrets.STAGING_WORDPRESS_USERNAME }}
+          WP_PASSWORD: ${{ secrets.STAGING_WORDPRESS_APPLICATION_PASSWORD }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const https=require("node:https");
+          const crypto=require("node:crypto");
+          const {URL,URLSearchParams}=require("node:url");
+          require("node:dns").setDefaultResultOrder("ipv4first");
+          function requestOnce(url,method="GET",headers={},body){
+            return new Promise((resolve,reject)=>{
+              const u=new URL(url);
+              const req=https.request({protocol:u.protocol,hostname:u.hostname,port:u.port||443,family:4,path:u.pathname+u.search,method,headers,timeout:15000},res=>{
+                let raw="";res.setEncoding("utf8");res.on("data",c=>raw+=c);res.on("end",()=>{let data;try{data=JSON.parse(raw)}catch{}resolve({http:res.statusCode,data,raw,headers:res.headers})});
+              });
+              req.on("timeout",()=>req.destroy(Object.assign(new Error("request timeout"),{code:"ETIMEDOUT"})));
+              req.on("error",reject);if(body)req.write(body);req.end();
+            });
+          }
+          async function request(url,method="GET",headers={},body){
+            const u=new URL(url),fn=u.searchParams.get("cpanel_jsonapi_func")||"";
+            const safeRead=method==="GET"&&(
+              (u.pathname==="/json-api/cpanel"&&["list_files","get_file_content","list_domains","domains_data"].includes(fn))||
+              /\/execute\/(DomainInfo\/(domains_data|list_domains)|Fileman\/(list_files|get_file_content))$/.test(u.pathname)
+            );
+            const tries=safeRead?3:1;
+            for(let n=1;;n++){
+              try{
+                const r=await requestOnce(url,method,headers,body);
+                if(safeRead&&[500,502,503,504].includes(r.http)&&n<tries){await new Promise(resolve=>setTimeout(resolve,n*1500));continue}
+                return r;
+              }catch(e){
+                const code=String(e.code||e.name||"");
+                const transient=["ETIMEDOUT","ECONNRESET","EHOSTUNREACH","ENETUNREACH","ECONNREFUSED","EAI_AGAIN","TimeoutError"].includes(code)||/timeout/i.test(String(e.message||""));
+                if(!safeRead||!transient||n>=tries)throw e;
+                await new Promise(resolve=>setTimeout(resolve,n*1500));
+              }
+            }
+          }
+          async function main(){
+            const cpBase=new URL(process.env.CP_BASE),wpBase=new URL(process.env.WP_BASE);
+            if(wpBase.protocol!=="https:"||wpBase.hostname.toLowerCase()!=="staging.irpa.or.tz")throw new Error("Refusing to register credentials outside staging.irpa.or.tz.");
+            const auth={Authorization:"cpanel "+process.env.CP_USER+":"+process.env.CP_TOKEN,Accept:"application/json"};
+            async function uapi(fn,params={},method="GET",body){
+              const u=new URL("/execute/"+fn,cpBase);
+              if(method==="GET")u.search=new URLSearchParams(params).toString();
+              return request(u.href,method,{...auth,...(method==="POST"?{"Content-Type":"application/x-www-form-urlencoded"}:{})},body??(method==="POST"?new URLSearchParams(params).toString():undefined));
+            }
+            async function api2(module,func,params={}){
+              const u=new URL("/json-api/cpanel",cpBase);
+              u.search=new URLSearchParams({cpanel_jsonapi_user:process.env.CP_USER,cpanel_jsonapi_apiversion:"2",cpanel_jsonapi_module:module,cpanel_jsonapi_func:func,...params}).toString();
+              const r=await request(u.href,"GET",auth),root=r.data?.cpanelresult,rows=Array.isArray(root?.data)?root.data:[];
+              return {http:r.http,ok:r.http===200&&root?.event?.result===1&&!root?.error&&rows.every(x=>x?.status!==0&&x?.result?.status!==0),rows};
+            }
+            const info=await uapi("DomainInfo/domains_data");
+            const root=String(info.data?.data?.main_domain?.documentroot||info.data?.data?.main_domain?.document_root||"");
+            if(info.http!==200||info.data?.status!==1||!root.endsWith("/public_html"))throw new Error("Could not verify the cPanel staging document root.");
+            const stage=root+"/staging",muDir=stage+"/wp-content/mu-plugins";
+            let list=await uapi("Fileman/list_files",{dir:muDir,showdotfiles:1});
+            if(!(list.http===200&&list.data?.status===1)){
+              await uapi("Fileman/mkdir",{path:stage+"/wp-content",name:"mu-plugins",permissions:"0755"});
+              list=await uapi("Fileman/list_files",{dir:muDir,showdotfiles:1});
+              if(!(list.http===200&&list.data?.status===1)){
+                await api2("Fileman","fileop",{op:"mkdir",sourcefiles:muDir,doubledecode:"1"});
+                list=await uapi("Fileman/list_files",{dir:muDir,showdotfiles:1});
+              }
+              if(!(list.http===200&&list.data?.status===1))throw new Error("Could not safely create the staging mu-plugins directory.");
+            }
+            const token=crypto.randomBytes(32).toString("hex");
+            const tokenHash=crypto.createHash("sha256").update(token).digest("hex");
+            const filename="irpa-staging-app-password-"+crypto.randomBytes(10).toString("hex")+".php";
+            const php=[
+              "<?php",
+              "header('Content-Type: application/json; charset=utf-8');",
+              "$provided=(string)($_SERVER['HTTP_X_IRPA_STAGING_PROVISION_TOKEN']??'');",
+              "if(!hash_equals('"+tokenHash+"',hash('sha256',$provided))){http_response_code(404);echo '{\"ok\":false}';exit;}",
+              "try{",
+              "$username=trim((string)($_SERVER['HTTP_X_IRPA_STAGING_USERNAME']??''));",
+              "$password=preg_replace('/\\\\s+/','',(string)($_SERVER['HTTP_X_IRPA_STAGING_APP_PASSWORD']??''));",
+              "if($username===''||$password===''){http_response_code(400);echo json_encode(['ok'=>false,'reason'=>'missing_input']);exit;}",
+              "if(!function_exists('wp_insert_application_password')||!class_exists('WP_Application_Passwords')){http_response_code(409);echo json_encode(['ok'=>false,'reason'=>'application_passwords_unavailable']);exit;}",
+              "if(function_exists('wp_is_application_passwords_available')&&!wp_is_application_passwords_available()){http_response_code(409);echo json_encode(['ok'=>false,'reason'=>'application_passwords_disabled']);exit;}",
+              "$user=get_user_by('login',$username);",
+              "if(!$user||!user_can($user,'edit_posts')){http_response_code(409);echo json_encode(['ok'=>false,'reason'=>'staging_user_unavailable']);exit;}",
+              "$apps=WP_Application_Passwords::get_user_application_passwords($user->ID);",
+              "foreach($apps as $app){if(($app['name']??'')==='IRPA Staging Gateway'&&!empty($app['uuid']))wp_delete_application_password($app['uuid'],$user->ID);}",
+              "$result=wp_insert_application_password($user->ID,['name'=>'IRPA Staging Gateway','password'=>$password,'created'=>time(),'app_id'=>wp_generate_uuid4()]);",
+              "if(is_wp_error($result)){http_response_code(500);echo json_encode(['ok'=>false,'reason'=>'application_password_registration_failed']);exit;}",
+              "echo json_encode(['ok'=>true]);exit;",
+              "}catch(Throwable $e){http_response_code(500);echo json_encode(['ok'=>false,'reason'=>'bootstrap_exception']);exit;}"
+            ].join("\n");
+            const boundary="----IRPAStagingProvision"+crypto.randomBytes(8).toString("hex");
+            const payload=Buffer.concat([
+              Buffer.from("--"+boundary+"\r\nContent-Disposition: form-data; name=\"dir\"\r\n\r\n"+muDir+"\r\n"),
+              Buffer.from("--"+boundary+"\r\nContent-Disposition: form-data; name=\"file-1\"; filename=\""+filename+"\"\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n"),
+              Buffer.from(php),
+              Buffer.from("\r\n--"+boundary+"--\r\n")
+            ]);
+            const upload=await request(new URL("/execute/Fileman/upload_files",cpBase).href,"POST",{...auth,"Content-Type":"multipart/form-data; boundary="+boundary,"Content-Length":String(payload.length)},payload);
+            list=await uapi("Fileman/list_files",{dir:muDir,showdotfiles:1});
+            const hasScript=list.http===200&&list.data?.status===1&&(list.data?.data||[]).some(x=>x.file===filename||x.name===filename);
+            if(!hasScript)throw new Error("Could not verify upload of the one-time staging credential bootstrap.");
+            let provision;
+            try{
+              const url=new URL("/wp-json/wp/v2/users/me?context=edit",wpBase);
+              provision=await fetch(url,{method:"GET",headers:{
+                "X-IRPA-Staging-Provision-Token":token,
+                "X-IRPA-Staging-Username":process.env.WP_USER,
+                "X-IRPA-Staging-App-Password":String(process.env.WP_PASSWORD||"").replace(/\s/g,""),
+                Accept:"application/json","Cache-Control":"no-cache"
+              },signal:AbortSignal.timeout(15000)});
+              const data=await provision.json().catch(()=>({}));
+              console.log("STAGING_APPLICATION_PASSWORD_REGISTRATION="+JSON.stringify({http:provision.status,ok:data.ok===true,reason:String(data.reason||"").slice(0,80)}));
+              if(provision.status!==200||data.ok!==true)throw new Error("Staging WordPress did not register the configured application password.");
+            }finally{
+              await api2("Fileman","fileop",{op:"delete",sourcefiles:muDir+"/"+filename,doubledecode:"1"});
+              list=await uapi("Fileman/list_files",{dir:muDir,showdotfiles:1});
+              let remains=list.http===200&&list.data?.status===1&&(list.data?.data||[]).some(x=>x.file===filename||x.name===filename);
+              if(remains){
+                await uapi("Fileman/delete_files",{dir:muDir,files:filename});
+                list=await uapi("Fileman/list_files",{dir:muDir,showdotfiles:1});
+                remains=list.http===200&&list.data?.status===1&&(list.data?.data||[]).some(x=>x.file===filename||x.name===filename);
+              }
+              if(remains)throw new Error("The one-time staging credential bootstrap file could not be removed.");
+              console.log("STAGING_APPLICATION_PASSWORD_BOOTSTRAP_CLEANUP=VERIFIED");
+            }
+            const authHeader="Basic "+Buffer.from(process.env.WP_USER+":"+String(process.env.WP_PASSWORD||"").replace(/\s/g,"")).toString("base64");
+            const check=await fetch(new URL("/wp-json/wp/v2/users/me?context=edit",wpBase),{headers:{Authorization:authHeader,Accept:"application/json","Cache-Control":"no-cache"},signal:AbortSignal.timeout(12000)});
+            const me=await check.json().catch(()=>({}));
+            console.log("STAGING_WORDPRESS_AUTH_AFTER_REGISTRATION="+JSON.stringify({http:check.status,authenticated:check.status===200&&Number.isInteger(me.id),errorCode:String(me.code||"").slice(0,80)}));
+            if(check.status!==200||!Number.isInteger(me.id))throw new Error("The configured staging WordPress application password still does not authenticate.");
+          }
+          main().catch(e=>{console.error("Staging WordPress credential registration:",String(e.message||e));process.exit(1)});
+          NODE
+
       - name: Inject staging-only Worker secrets
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
