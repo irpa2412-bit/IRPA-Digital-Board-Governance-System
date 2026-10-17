@@ -69,6 +69,7 @@ test("Communication and Media archive gateway integration is explicitly isolated
   assert.match(workflow, /changed\.includes\("drive-gateway\/src\/index\.js"\)/);
   assert.match(workflow, /changed\.includes\("drive-gateway\/wrangler\.toml"\)/);
   assert.match(workflow, /"drive-gateway\/tests\/staging-isolation\.test\.mjs"/);
+  assert.match(workflow, /"firestore\.rules"/);
   assert.match(workflow, /changed\.includes\("src\/firebase\/signatureStorage\.js"\)/);
   assert.match(workflow, /changed\.includes\("docs\/COMMUNICATION_MEDIA_PORTAL\.md"\)/);
   assert.match(workflow, /!changed\.includes\("src\/pages\/Meetings\.jsx"\)/);

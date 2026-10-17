@@ -876,7 +876,7 @@ jobs:
             console.log("STAGING_DATABASE_ISOLATION=PASS");
             console.log("STAGING_CREDENTIALS=NOT_LOGGED");
           }
-          main().catch(e=>{console.error("Staging-only auth bridge repair failed: "+String(e.message||e).replace(/[\\r\\n\\t]+/g," ").slice(0,220));process.exit(1)});
+          main().catch(e=>{console.error("Staging-only auth bridge repair failed: "+String(e.message||e).replace(/[\r\n\t]+/g," ").slice(0,220));process.exit(1)});
           NODE
 
       - name: Verify staging-only WordPress REST authorization bridge
