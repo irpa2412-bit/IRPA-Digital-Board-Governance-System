@@ -1177,6 +1177,7 @@ jobs:
             const wpPassword=String(process.env.WP_PASSWORD||"").replace(/\s/g,"");
             const basic="Basic "+Buffer.from(process.env.WP_USER+":"+wpPassword).toString("base64");
             const usernameB64=Buffer.from(process.env.WP_USER,"utf8").toString("base64");
+            const integrationUser="irpa-staging-gateway-"+crypto.randomBytes(6).toString("hex");
             const passwordHash=crypto.createHash("sha256").update(wpPassword).digest("hex");
             async function verifyAuth(){
               try{
@@ -1201,7 +1202,14 @@ jobs:
                 "$username=trim((string)($_SERVER['HTTP_X_IRPA_STAGING_USERNAME']??''));",
                 "$password=preg_replace('/\\s+/','',(string)($_SERVER['HTTP_X_IRPA_STAGING_APP_PASSWORD']??''));",
                 "if($username===''||$password===''){http_response_code(400);echo json_encode(['ok'=>false,'reason'=>'missing_input']);exit;}",
-                "if(!function_exists('wp_insert_application_password')||!class_exists('WP_Application_Passwords')){http_response_code(409);echo json_encode(['ok'=>false,'reason'=>'application_passwords_unavailable']);exit;}",
+                "if(!function_exists('wp_insert_application_password')||!class_exists('WP_Application_Passwords')){",
+"  $integrationUser=trim((string)(\$_SERVER['HTTP_X_IRPA_STAGING_INTEGRATION_USER']??''));",
+"  if(!preg_match('/^irpa-staging-gateway-[a-f0-9]{12}$/',$integrationUser)){http_response_code(400);echo json_encode(['ok'=>false,'reason'=>'invalid_integration_user']);exit;}",
+"  $gateway=get_user_by('login',$integrationUser);",
+"  if(!$gateway){$uid=wp_insert_user(['user_login'=>$integrationUser,'user_pass'=>wp_generate_password(48,true,true),'user_email'=>$integrationUser.'@staging.irpa.or.tz','display_name'=>'IRPA Staging Gateway','role'=>'editor']);if(is_wp_error($uid)){http_response_code(409);echo json_encode(['ok'=>false,'reason'=>'staging_integration_user_creation_failed']);exit;}$gateway=get_user_by('id',$uid);}",
+"  if(!$gateway||!user_can($gateway,'edit_pages')||user_can($gateway,'manage_options')){http_response_code(409);echo json_encode(['ok'=>false,'reason'=>'staging_integration_user_permissions_invalid']);exit;}",
+"  http_response_code(409);echo json_encode(['ok'=>false,'reason'=>'application_passwords_unavailable']);exit;",
+"}",
                 "if(function_exists('wp_is_application_passwords_available')&&!wp_is_application_passwords_available()){http_response_code(409);echo json_encode(['ok'=>false,'reason'=>'application_passwords_disabled']);exit;}",
                 "$user=get_user_by('login',$username);",
                 "if(!$user||!user_can($user,'edit_pages')){http_response_code(409);echo json_encode(['ok'=>false,'reason'=>'staging_user_unavailable']);exit;}",
@@ -1220,6 +1228,7 @@ jobs:
                   "X-IRPA-Staging-Provision-Token":token,
                   "X-IRPA-Staging-Username":process.env.WP_USER,
                   "X-IRPA-Staging-App-Password":wpPassword,
+                  "X-IRPA-Staging-Integration-User":integrationUser,
                   Accept:"application/json","Cache-Control":"no-cache"
                 });
                 console.log("STAGING_APPLICATION_PASSWORD_REGISTRATION="+JSON.stringify({http:provision.http,ok:provision.data?.ok===true,reason:String(provision.data?.reason||"").slice(0,80)}));
@@ -1250,8 +1259,7 @@ jobs:
                   "list($username,$password)=explode(':',$decoded,2);",
                   "$password=preg_replace('/\\\\s+/','',$password);",
                   "if(!hash_equals(base64_decode('"+usernameB64+"'),$username)||!hash_equals('"+passwordHash+"',hash('sha256',$password))) return 0;",
-                  "$user=get_user_by('login',$username);",
-                  "if(!$user&&is_email($username)) $user=get_user_by('email',$username);",
+                  "$user=get_user_by('login','"+integrationUser+"');",
                   "if(!$user||!user_can($user,'edit_pages')) return 0;",
                   "return (int)$user->ID;",
                   "}",
@@ -1283,7 +1291,7 @@ jobs:
                   "$parts=($decoded!==false&&strpos($decoded,':')!==false)?explode(':',$decoded,2):['',''];",
                   "$username=$parts[0];$password=preg_replace('/\\\\s+/','',$parts[1]);",
                   "$expectedUser=base64_decode('"+diagExpectedUserB64+"');",
-                  "$user=get_user_by('login',$username);if(!$user&&is_email($username))$user=get_user_by('email',$username);",
+                  "$user=get_user_by('login','"+integrationUser+"');",
                   "$diagnostics=['auth_header_present'=>$header!=='','basic_parsed'=>$parsed,'username_matches'=>hash_equals($expectedUser,$username),'password_hash_matches'=>hash_equals('"+diagPasswordHash+"',hash('sha256',$password)),'user_found'=>(bool)$user,'user_can_edit_pages'=>($user&&user_can($user,'edit_pages'))];",
                   "header('Content-Type: application/json; charset=utf-8');echo json_encode(['diagnostics'=>$diagnostics]);exit;"
                 ].join("\n");
