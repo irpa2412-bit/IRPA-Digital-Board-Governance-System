@@ -1128,25 +1128,31 @@ jobs:
               const r=await uapi("Fileman/list_files",{dir,showdotfiles:1});
               return {ok:r.http===200&&r.data?.status===1,files:Array.isArray(r.data?.data)?r.data.data.map(x=>String(x.file||x.name||"")).filter(Boolean):[]};
             }
-            async function remove(dir,name){
-              let r=await api2("Fileman","fileop",{op:"delete",sourcefiles:dir+"/"+name,doubledecode:"1"});
-              let current=await list(dir);
-              if(current.files.includes(name)){
-                await uapi("Fileman/delete_files",{dir,files:name});
-                current=await list(dir);
-              }
-              return !current.files.includes(name);
+            async function readFile(dir,name){
+              const r=await uapi("Fileman/get_file_content",{dir,file:name});
+              return {ok:r.http===200&&r.data?.status===1,content:String(r.data?.data?.content??r.data?.data?.[0]?.content??r.data?.result?.data?.content??"")};
             }
-            // Previous attempts incorrectly uploaded an endpoint as an MU-plugin. MU-plugins execute on every WordPress request; their token guard returned 404/{"ok":false} before WordPress could bootstrap. Remove only the uniquely named artifacts created by this workflow.
+            async function disableStaleBootstrap(dir,name){
+              // cPanel delete_fileop is inconsistent on this host. Replace only workflow-generated artifacts with inert PHP, then read back the exact bytes.
+              const inert="<?php\\n// Disabled stale IRPA staging credential bootstrap artifact.\\n";
+              const saved=await uapi("Fileman/save_file_content",{dir,file:name,content:inert,charset:"utf-8"},"POST");
+              const read=await readFile(dir,name);
+              return saved.http===200&&saved.data?.status===1&&read.ok&&read.content===inert;
+            }
+            // MU-plugins execute on every WordPress request. These old token-guard files emitted 404/{"ok":false} and exited before WordPress could bootstrap. Disable only uniquely named artifacts created by this workflow.
             let mu=await list(muDir);
             if(!mu.ok)throw new Error("Could not safely inspect the staging MU-plugin directory.");
-            const stale=mu.files.filter(name=>/^irpa-staging-app-password-[a-f0-9]{20}\.php$/i.test(name));
+            const stale=mu.files.filter(name=>/^irpa-staging-app-password-[a-f0-9]{20}\\.php$/i.test(name));
             for(const name of stale){
-              if(!await remove(muDir,name))throw new Error("Could not remove a stale staging-only credential bootstrap MU-plugin.");
+              if(!await disableStaleBootstrap(muDir,name))throw new Error("Could not safely neutralize a stale staging-only credential bootstrap MU-plugin.");
             }
             mu=await list(muDir);
-            if(!mu.ok||mu.files.some(name=>/^irpa-staging-app-password-[a-f0-9]{20}\.php$/i.test(name)))throw new Error("Stale staging credential bootstrap MU-plugins remain; refusing to continue.");
-            console.log("STAGING_STALE_MU_PLUGIN_CLEANUP=PASS count="+stale.length);
+            if(!mu.ok)throw new Error("Could not verify the staging MU-plugin directory after cleanup.");
+            for(const name of mu.files.filter(name=>/^irpa-staging-app-password-[a-f0-9]{20}\\.php$/i.test(name))){
+              const read=await readFile(muDir,name);
+              if(!read.ok||read.content!="<?php\\n// Disabled stale IRPA staging credential bootstrap artifact.\\n")throw new Error("A staging credential bootstrap MU-plugin is not inert; refusing to continue.");
+            }
+            console.log("STAGING_STALE_MU_PLUGIN_DISABLE=PASS count="+stale.length);
             const wpPassword=String(process.env.WP_PASSWORD||"").replace(/\s/g,"");
             const basic="Basic "+Buffer.from(process.env.WP_USER+":"+wpPassword).toString("base64");
             async function verifyAuth(){
