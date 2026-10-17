@@ -709,9 +709,23 @@ jobs:
               return {ok:r.http===200&&r.data?.status===1,content:String(r.data?.data?.content??r.data?.data?.[0]?.content??r.data?.result?.data?.content??"")};
             }
             async function write(dir,file,content){
-              const r=await uapi("Fileman/save_file_content",{dir,file,content,charset:"utf-8"},"POST");
-              if(r.http!==200||r.data?.status!==1)throw new Error("cPanel rejected the staging MU-plugin update.");
-              const check=await read(dir,file);
+              const saved=await uapi("Fileman/save_file_content",{dir,file,content,charset:"utf-8"},"POST");
+              let check=await read(dir,file);
+              if(saved.http===200&&saved.data?.status===1&&check.ok&&check.content===content)return;
+              const boundary="----IRPAStagingAuthBridge"+Date.now().toString(16);
+              const payload=Buffer.concat([
+                Buffer.from("--"+boundary+"\\r\\nContent-Disposition: form-data; name=\\"dir\\"\\r\\n\\r\\n"+dir+"\\r\\n"),
+                Buffer.from("--"+boundary+"\\r\\nContent-Disposition: form-data; name=\\"overwrite\\"\\r\\n\\r\\n1\\r\\n"),
+                Buffer.from("--"+boundary+"\\r\\nContent-Disposition: form-data; name=\\"file-1\\"; filename=\\""+file+"\\"\\r\\nContent-Type: application/octet-stream\\r\\n\\r\\n"),
+                Buffer.from(content),
+                Buffer.from("\\r\\n--"+boundary+"--\\r\\n")
+              ]);
+              const uploaded=await request(new URL("/execute/Fileman/upload_files",cp).href,"POST",{
+                ...auth,"Content-Type":"multipart/form-data; boundary="+boundary,"Content-Length":String(payload.length)
+              },payload);
+              let uploadData;try{uploadData=JSON.parse(uploaded.raw)}catch{}
+              if(uploaded.http!==200||uploadData?.status!==1)throw new Error("cPanel save and multipart upload both failed for the staging MU-plugin.");
+              check=await read(dir,file);
               if(!check.ok||check.content!==content)throw new Error("Staging MU-plugin update did not pass exact read-back verification.");
             }
             const info=await uapi("DomainInfo/domains_data");
