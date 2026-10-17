@@ -62,6 +62,19 @@ test("media asset register is authenticated, size-limited, immutable and deny-by
  assert.ok(rules.includes('allow update,delete:if false;'));
 });
 
+test("Communication and Media Archive is provisioned and verified before media upload",()=>{
+ assert.ok(studio.includes("provisionCommunicationMediaArchive"));
+ assert.ok(studio.includes("folderId:archive.folderId"));
+ assert.ok(studio.includes("archive.archivePath"));
+ assert.ok(gateway.includes('pathname === "/api/communication-media-archive/provision"'));
+ assert.ok(gateway.includes('"Communication and Media Archive"'));
+ assert.ok(gateway.includes('irpaCommunicationMediaArchive:true'));
+ assert.ok(gateway.includes('folderDescription.irpaCommunicationMediaArchive !== true'));
+ assert.ok(gateway.includes('purpose === "Communication Media" && !requestedFolderId'));
+ assert.ok(gateway.includes('code:"GOOGLE_DRIVE_NOT_AUTHORIZED"'));
+ assert.ok(gateway.includes('},503,corsHeaders(request))'));
+});
+
 test("media upload and download both enforce registered communications roles at the gateway",()=>{
  assert.ok(gateway.includes("async function authorizeCommunicationMediaDownload(env,claims)"));
  assert.ok(gateway.includes('purpose === "Communication Media" && !(await authorizeCommunicationMediaDownload(env, claims))'));
