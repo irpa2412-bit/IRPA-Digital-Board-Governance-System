@@ -1143,6 +1143,11 @@ jobs:
             const updatedIni=iniLines.filter((line,index)=>line.length||index<iniLines.length-1).concat("memory_limit=256M").join("\\n")+"\\n";
             if(!await writeFile(stage,".user.ini",updatedIni))throw new Error("Could not raise the staging-only PHP memory limit to 256M.");
             console.log("STAGING_PHP_MEMORY_LIMIT=256M");
+            // PHP-FPM caches .user.ini for up to 300 seconds by default. Do not
+            // test the REST endpoint against a stale 128 MiB worker configuration.
+            console.log("STAGING_PHP_INI_CACHE_WAIT=STARTED");
+            await new Promise(resolve=>setTimeout(resolve,310000));
+            console.log("STAGING_PHP_INI_CACHE_WAIT=COMPLETED");
             async function list(dir){
               const r=await uapi("Fileman/list_files",{dir,showdotfiles:1});
               return {ok:r.http===200&&r.data?.status===1,files:Array.isArray(r.data?.data)?r.data.data.map(x=>String(x.file||x.name||"")).filter(Boolean):[]};
