@@ -6,7 +6,7 @@ Integrated communications workspace inside the existing IRPA Digital Board Gover
 ## Included capabilities
 - Website article and press-release drafting.
 - Social-media copy drafting for export and manual posting.
-- Multi-format media upload and archive through the existing authenticated Google Drive gateway, with Firestore metadata and role-based access.
+- Multi-format media upload into the verified Google Drive folder `IRPA Governance System/Communication and Media Archive` through the existing authenticated gateway, with Firestore metadata and role-based access. The archive is provisioned idempotently and the server verifies its folder marker before accepting media.
 - Asset types include supported PDF, Word, Excel, PowerPoint, OpenDocument, RTF, TXT, CSV/TSV, Markdown, HTML, EPUB, JSON/XML, image, audio and video formats; gateway-supported formats only, with a 25 MB per-file limit in the communications media upload route.
 - Media library with searchable type filters, title/tags, original-file download and Google Drive link-out.
 - Editorial planning calendar.
@@ -16,6 +16,13 @@ Integrated communications workspace inside the existing IRPA Digital Board Gover
 - Audio/video preview, basic trim range selection and WebM export where the browser supports MediaRecorder and media capture.
 - Author submission, designated review/approval, return-for-revision, archival and audit-triggered record changes.
 - Server-side WordPress post publishing for approved website articles and press releases.
+
+
+## Communication and Media Archive provisioning and recovery
+- The first authorised media upload provisions (or reuses and verifies) the dedicated `Communication and Media Archive` folder under `IRPA Governance System` and routes the media binary into that folder. The Firestore collection `communicationMediaAssets` remains a metadata-only register.
+- Provisioning and upload require the existing server-side communications role check. The gateway rejects arbitrary folder IDs and only accepts a folder marked as the IRPA Communication and Media Archive.
+- If the gateway returns `GOOGLE_DRIVE_NOT_AUTHORIZED` (HTTP 503), the refresh-token record is absent from the configured Worker KV namespace. An active IRPA administrator must open the application's Settings and complete Google OAuth using the specifically authorised Google account. The callback verifies the account and encrypts the refresh token before saving it. Retry only after the callback confirms success; never paste tokens or encryption keys into logs or source control.
+- Deploy and validate this change in the isolated staging environment only. Configure the staging app to use the staging gateway and its staging Firebase project/KV namespace; do not copy production OAuth state, secrets or token records into staging. Verify the archive folder, upload response/file ID, Firestore register entry, role-denied behavior and audit coverage before considering acceptance.
 
 ## Workflow
 1. An authorised communications author creates a Draft.
