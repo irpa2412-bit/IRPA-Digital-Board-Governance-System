@@ -30,17 +30,21 @@ function config(env) {
   if (String(env.IRPA_ENVIRONMENT || "").toLowerCase() !== "staging") {
     throw new Error("Meta API integration is disabled outside the staging gateway.");
   }
+  if (String(env.FIREBASE_PROJECT_ID || "") !== "irpa-dbg-staging-a73ec" ||
+      String(env.IRPA_PRODUCTION_CUTOVER || "").toLowerCase() !== "false") {
+    throw new Error("Meta API integration requires the isolated staging Firebase project and a disabled production cutover.");
+  }
   const appId = String(env.META_APP_ID || "").trim();
   const appSecret = String(env.META_APP_SECRET || "").trim();
   const redirectUri = String(env.META_REDIRECT_URI || "").trim();
   if (!/^\d{4,30}$/.test(appId) || !appSecret) throw new Error("Staging Meta application configuration is incomplete.");
   let redirect;
   try { redirect = new URL(redirectUri); } catch { throw new Error("Staging Meta callback configuration is invalid."); }
-  if (redirect.protocol !== "https:" || !redirect.hostname.includes("staging") ||
-      !redirect.hostname.endsWith(".workers.dev") || redirect.hostname === "workers.dev" ||
-      redirect.hostname.endsWith(".irpa.or.tz") || redirect.username || redirect.password ||
-      redirect.search || redirect.hash || redirect.pathname !== "/api/communications/meta/callback") {
-    throw new Error("Meta callback must use the dedicated HTTPS staging Cloudflare Worker URL.");
+  const expectedRedirect = "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev/api/communications/meta/callback";
+  if (redirect.toString() !== expectedRedirect || redirect.protocol !== "https:" ||
+      redirect.hostname !== "irpa-google-drive-gateway-staging.irpa-governance.workers.dev" ||
+      redirect.username || redirect.password || redirect.search || redirect.hash) {
+    throw new Error("Meta callback must use the exact approved staging Cloudflare gateway URL.");
   }
   if (!env.DRIVE_KV) throw new Error("The existing staging Cloudflare KV binding is unavailable.");
   return { appId, appSecret, redirectUri: redirect.toString(), version: graphVersion(env) };
@@ -219,6 +223,10 @@ export function createMetaSocialApiRouter(deps) {
         const grantedPermissions = (Array.isArray(permissions.data) ? permissions.data : [])
           .filter(p => p.status === "granted" && REQUIRED_PERMISSIONS.includes(p.permission))
           .map(p => p.permission);
+        const missing = REQUIRED_PERMISSIONS.filter(p => !grantedPermissions.includes(p));
+        if (missing.length) {
+          return htmlPage("Meta permissions incomplete", "Required read permissions were not granted: " + missing.join(", ") + ". No connection token was stored. Review the Meta app and retry authorization.", 400);
+        }
         const encryptedToken = await encryptToken(token, env.META_TOKEN_ENCRYPTION_KEY);
         const verifiedAt = new Date().toISOString();
         const facebookPages = (Array.isArray(pages.data) ? pages.data : []).map(p => ({
@@ -233,12 +241,10 @@ export function createMetaSocialApiRouter(deps) {
           connectedAt: verifiedAt, expiresAt: Number.isFinite(Number(longToken.expires_in)) ? new Date(Date.now() + Number(longToken.expires_in) * 1000).toISOString() : null, environment: "staging"
         };
         await env.DRIVE_KV.put("meta:connection:" + pending.uid, JSON.stringify(connection));
-        const missing = REQUIRED_PERMISSIONS.filter(p => !grantedPermissions.includes(p));
-        return htmlPage(missing.length ? "Meta connected with limited permissions" : "Meta account connection verified",
+        return htmlPage("Meta account connection verified",
           "Staging authorization completed. Facebook Pages found: " + facebookPages.length +
           ". Linked Instagram professional accounts found: " + instagramAccounts.length +
-          ". Missing read permissions: " + (missing.length ? missing.join(", ") : "none") +
-          ". Social posting remains disabled.");
+          ". All required read permissions are present. Social posting remains disabled.");
       } catch {
         return htmlPage("Meta API verification failed", "The staging connection could not be verified. No access token was displayed. Check the staging Worker configuration and Meta app permissions, then retry.", 502);
       }
