@@ -263,6 +263,18 @@ test("audit records and application logs never contain the Worker credential", a
   assert.equal(JSON.stringify(consoleMessages).includes(TEST_PASSWORD), false);
 });
 
+test("the page editor rejects plugins, themes, users, settings and other non-content fields", async () => {
+  const router = makeRouter();
+  const env = makeEnv();
+  const result = await call(router, env, "/api/communications/website/content", {
+    method: "PUT",
+    body: { type: "pages", id: 123, title: "Blocked", content: "<p>Blocked</p>", excerpt: "", featuredMedia: 0, status: "draft", plugins: ["example"] }
+  });
+  assert.equal(result.status, 400);
+  assert.equal(state.title, "Original test page");
+  assert.equal(auditEvents.length, 0);
+});
+
 test("WordPress Administrator credentials are rejected even when authentication returns HTTP 200", async () => {
   wpRoles = ["administrator"];
   const router = makeRouter();
