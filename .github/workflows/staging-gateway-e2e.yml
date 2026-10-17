@@ -387,6 +387,8 @@ jobs:
       - name: Correct staging-only WordPress home and site URL configuration
         env:
           WP_BASE: ${{ secrets.STAGING_WORDPRESS_BASE_URL }}
+          WP_USER: ${{ secrets.STAGING_WORDPRESS_USERNAME }}
+          WP_APP_PASSWORD: ${{ secrets.STAGING_WORDPRESS_APPLICATION_PASSWORD }}
           CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
           CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
           CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
@@ -735,52 +737,53 @@ jobs:
             const stagingDb=String(process.env.STAGING_DB_NAME||"").trim(),productionDb=String(process.env.PRODUCTION_DB_NAME||"").trim();
             if(!dbMatch||!stagingDb||!productionDb||dbMatch[2]!==stagingDb||stagingDb===productionDb)throw new Error("ABORT: staging database isolation is not verified.");
             const pluginDir=stage+"/wp-content/mu-plugins",pluginName="irpa-staging-rest-auth.php";
-            const original=await readFile(pluginDir,pluginName);
-            const replacement = `<?php
-          /**
-           * IRPA staging-only REST authorization header bridge.
-           * WordPress core validates the dedicated Editor's Application Password.
-           */
-          if (!defined('ABSPATH')) { return; }
-          $host = strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
-          $host = preg_replace('/:[0-9]+$/', '', $host);
-          if ($host !== 'staging.irpa.or.tz') { return; }
-          $path = (string) (parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH) ?: '');
-          if ($path !== '/wp-json' && strpos($path, '/wp-json/') !== 0) { return; }
-          $header = (string) ($_SERVER['HTTP_X_IRPA_STAGING_AUTHORIZATION'] ?? '');
-          if ($header === '' && function_exists('getallheaders')) {
-            foreach ((array) getallheaders() as $key => $value) {
-              if (strcasecmp((string) $key, 'X-IRPA-Staging-Authorization') === 0) {
-                $header = (string) $value;
-                break;
-              }
+            const current=await readFile(pluginDir,pluginName);
+            const backupName="irpa-staging-rest-auth.php.backup";
+            const homeListing=await uapi("Fileman/list_files",{dir:home,showdotfiles:1});
+            const homeRows=Array.isArray(homeListing.data?.data)?homeListing.data.data:[];
+            if(homeListing.http!==200||homeListing.data?.status!==1)throw new Error("ABORT: could not inspect the account-home backup directory.");
+            const hasBackup=homeRows.some(x=>String(x.file||x.name||"")===backupName);
+            if(!current.ok||current.content.length>10000||!hasBackup)throw new Error("ABORT: staging auth bridge or external original-plugin backup is unavailable.");
+            const backup=await readFile(home,backupName);
+            if(!backup.ok||backup.content.length>10000||!backup.content.includes("irpa_staging_rest_auth_user")||!backup.content.includes("hash_equals"))throw new Error("ABORT: external original auth-plugin backup failed structural validation.");
+            const username=String(process.env.WP_USER||"").trim();
+            const password=String(process.env.WP_APP_PASSWORD||"").replace(/\s/g,"");
+            const usernameHash=backup.content.match(/hash_equals\s*\(\s*base64_decode\s*\(\s*(['"])(.*?)\1\s*\)\s*,\s*\$username\s*\)/s);
+            const passwordHash=backup.content.match(/hash_equals\s*\(\s*(['"])([a-f0-9]{32,128})\1\s*,\s*hash\s*\(\s*(['"])(sha256|sha512)\3\s*,\s*\$password\s*\)\s*\)/is);
+            const loginLiteral=backup.content.match(/get_user_by\s*\(\s*(['"])login\1\s*,\s*(['"])(.*?)\2\s*\)/is);
+            let credentialsMatch=false;
+            if(username&&password&&usernameHash&&passwordHash&&loginLiteral){
+              const decodedUsername=Buffer.from(usernameHash[2],"base64").toString("utf8");
+              const actualHash=require("node:crypto").createHash(passwordHash[4]).update(password).digest("hex");
+              credentialsMatch=decodedUsername===username&&loginLiteral[3]===username&&actualHash.toLowerCase()===passwordHash[2].toLowerCase();
             }
-          }
-          if ($header !== '' && preg_match('/^Basic\\s+[A-Za-z0-9+\\/=]+$/i', $header)) {
-            $_SERVER['HTTP_AUTHORIZATION'] = $header;
-            $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] = $header;
-          }
-          `;
-            const alreadyBridge=original.ok&&original.content===replacement;
-            if(!original.ok||original.content.length>10000||(!alreadyBridge&&(!original.content.includes("irpa_staging_rest_auth_user")||!original.content.includes("hash_equals"))))throw new Error("ABORT: staging REST auth plugin does not match the expected repair target.");
-            if(original.content!==replacement){
-              const backupName="irpa-staging-rest-auth.php.backup";
-              const homeListing=await uapi("Fileman/list_files",{dir:home,showdotfiles:1});
-              const homeRows=Array.isArray(homeListing.data?.data)?homeListing.data.data:[];
-              if(homeListing.http!==200||homeListing.data?.status!==1)throw new Error("ABORT: could not inspect the account-home backup directory.");
-              const existing=homeRows.some(x=>String(x.file||x.name||"")===backupName);
-              if(existing){
-                const backup=await readFile(home,backupName);
-                if(!backup.ok||backup.content!==original.content)throw new Error("ABORT: existing staging auth backup differs; refusing to overwrite it.");
-              }else if(!await writeFile(home,backupName,original.content)){
-                throw new Error("ABORT: could not create and verify the original auth-plugin backup outside the web root.");
-              }
-              if(!await writeFile(pluginDir,pluginName,replacement))throw new Error("Could not verify the staging REST auth bridge update.");
+            const secureHooks=/add_filter\s*\(\s*['"]determine_current_user['"]/.test(backup.content)&&
+              /add_filter\s*\(\s*['"]rest_authentication_errors['"]/.test(backup.content)&&
+              /wp_set_current_user\s*\(/.test(backup.content)&&/get_user_meta\s*\(/.test(backup.content)&&
+              /user_can\s*\(/.test(backup.content)&&/HTTP_HOST|SERVER_NAME/.test(backup.content)&&
+              /HTTP_X_IRPA_STAGING_AUTHORIZATION|X-IRPA-Staging-Authorization/i.test(backup.content)&&
+              /staging\.irpa\.or\.tz/.test(backup.content)&&!/eval\s*\(|shell_exec\s*\(|system\s*\(|passthru\s*\(/i.test(backup.content);
+            console.log("STAGING_AUTH_BACKUP_CHECK="+JSON.stringify({found:true,length:backup.content.length,secureHooks,credentialsMatch}));
+            if(!secureHooks||!credentialsMatch)throw new Error("ABORT: original staging auth backup does not safely match the configured dedicated editor credentials; no plugin change made.");
+            const sourceLines=backup.content.replace(/\r\n/g,"\n").split("\n");
+            const hostLine=sourceLines.findIndex(line=>/\$host\s*=.*preg_replace.*\$_SERVER/.test(line));
+            if(hostLine>=0){
+              sourceLines.splice(hostLine,1,"$host = strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));","$host = preg_replace('/:[0-9]+$/', '', $host);");
             }
+            const restoredContent=sourceLines.join("\n");
+            const bridgeBackupName="irpa-staging-rest-auth.php.bridge-backup";
+            const existingBridgeBackup=homeRows.some(x=>String(x.file||x.name||"")===bridgeBackupName);
+            if(existingBridgeBackup){
+              const savedBridge=await readFile(home,bridgeBackupName);
+              if(!savedBridge.ok||savedBridge.content!==current.content)throw new Error("ABORT: existing bridge backup differs; refusing to overwrite it.");
+            }else if(!await writeFile(home,bridgeBackupName,current.content)){
+              throw new Error("ABORT: could not save and verify the current staging bridge backup outside the web root.");
+            }
+            if(current.content!==restoredContent&&!await writeFile(pluginDir,pluginName,restoredContent))throw new Error("Could not verify restoration of the credential-matched staging auth plugin.");
             const verify=await readFile(pluginDir,pluginName);
-            if(!verify.ok||verify.content!==replacement)throw new Error("Staging REST auth bridge verification failed.");
-            console.log("STAGING_REST_AUTH_BRIDGE_REPAIR=PASS");
-            console.log("STAGING_AUTH_BACKUP=VERIFIED_OUTSIDE_WEB_ROOT");
+            if(!verify.ok||verify.content!==restoredContent)throw new Error("Staging auth plugin restoration verification failed.");
+            console.log("STAGING_REST_AUTH_PLUGIN_RESTORED=PASS");
+            console.log("STAGING_BRIDGE_BACKUP=VERIFIED_OUTSIDE_WEB_ROOT");
           }
           main().catch(e=>{console.error("Staging REST auth bridge repair failed: "+String(e.message||e).replace(/\s+/g," ").slice(0,220));process.exit(1)});
           NODE
