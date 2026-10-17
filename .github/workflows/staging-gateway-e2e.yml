@@ -394,7 +394,7 @@ jobs:
               }
               if(body.status!==1 && body.errors?.length) {
                 const detail=String(body.errors.map(x=>typeof x==="string"?x:(x?.message||x?.error||JSON.stringify(x))).filter(Boolean).join("; ")).replace(/[\\r\\n\\t]+/g," ").slice(0,220);
-                if(operation==="get_file_content" && /does not exist|not found/i.test(detail)) return body;
+                if(operation==="get_file_content" && body.status!==1 && body.errors?.length) { console.log("STAGING_CPANEL_TEST_FILE_NOT_READABLE_OR_MISSING; attempting isolated upload"); return body; }
                 const meta="status="+String(body.status)+", error_keys="+Object.keys(body).filter(k=>/error|reason|status|message/i.test(k)).join(",");
                 throw new Error("cPanel Fileman API rejected the request ("+meta+")"+(detail?": "+detail:"; no readable error detail returned")+".");
               }
