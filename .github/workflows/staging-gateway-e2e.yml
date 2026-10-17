@@ -1332,16 +1332,16 @@ jobs:
           CP_TEST_FILE: ${{ secrets.STAGING_CPANEL_TEST_FILE }}
         run: |
           set -euo pipefail
-          ID_TOKEN="$(node <<'NODE'
+          ID_TOKEN="$(node <<'IRPA_STAGING_FIREBASE_SIGNIN_NODE_EOF'
           const https=require("https");
           const body=JSON.stringify({email:process.env.TEST_EMAIL,password:process.env.TEST_PASSWORD,returnSecureToken:true});
           const req=https.request("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key="+encodeURIComponent(process.env.FIREBASE_WEB_API_KEY),{method:"POST",headers:{"Content-Type":"application/json","Content-Length":Buffer.byteLength(body)}},res=>{
             let raw="";res.setEncoding("utf8");res.on("data",c=>raw+=c);res.on("end",()=>{let data;try{data=JSON.parse(raw)}catch{console.error("Staging Firebase sign-in returned invalid JSON.");process.exit(1)}if(res.statusCode!==200||!data.idToken){console.error("Staging Firebase sign-in failed with HTTP "+res.statusCode);process.exit(1)}process.stdout.write(data.idToken)});
           });req.on("error",e=>{console.error("Staging Firebase sign-in request failed:",e.message);process.exit(1)});req.end(body);
-          NODE
+          IRPA_STAGING_FIREBASE_SIGNIN_NODE_EOF
           )"
           export ID_TOKEN
-          node <<'NODE'
+          node <<'IRPA_STAGING_WEBSITE_ACCEPTANCE_NODE_EOF'
           const base=process.env.STAGING_URL;
           const token=process.env.ID_TOKEN;
           const marker="IRPA_STAGING_WEBSITE_CHECK_"+Date.now();
@@ -1450,7 +1450,7 @@ jobs:
             console.log("STAGING_CPANEL_READ_WRITE_ROLLBACK_PATH_REJECTION_PASS");
 
           })().catch(e=>{console.error("Staging website integration acceptance failed:",e.message);process.exit(1)});
-          NODE
+          IRPA_STAGING_WEBSITE_ACCEPTANCE_NODE_EOF
 
       - name: Write redacted acceptance summary
         if: always()
