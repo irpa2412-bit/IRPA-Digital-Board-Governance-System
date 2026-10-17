@@ -405,7 +405,12 @@ export function createCommunicationsSiteRouter(deps) {
       await verifyDedicatedWordPressEditor(wp);
       const type = url.searchParams.get("type") === "pages" ? "pages" : url.searchParams.get("type") === "posts" ? "posts" : "";
       if (!type) return json({ error: "Content type must be pages or posts." }, 400, corsHeaders(request));
-      const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/" + type + "?context=edit&status=any&per_page=50&orderby=modified&order=desc", {
+      const listParams = new URLSearchParams({
+        context: "edit", status: "any", per_page: "50", orderby: "modified", order: "desc"
+      });
+      const search = cleanText(url.searchParams.get("search"), 101);
+      if (search) listParams.set("search", search);
+      const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/" + type + "?" + listParams.toString(), {
         headers: wordpressHeaders(wp, { Accept: "application/json" }), signal: AbortSignal.timeout(15000)
       });
       const data = await response.json().catch(() => null);
