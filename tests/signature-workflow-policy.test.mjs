@@ -84,3 +84,15 @@ test("Signature Portal palette includes authenticated Documents Portal lifecycle
   assert.match(data, /d\?\.downloadUrl\|\|d\?\.downloadURL/);
   assert.match(data, /const byId=new Map\(results\.map\(item=>\[String\(item\.id\|\|item\.documentId\),item\]\)\)/);
 });
+
+
+test("archive-backed controlled PDFs remain discoverable and selectable in the Signature Portal palette", () => {
+  const data = fs.readFileSync("src/firebase/data.js", "utf8");
+  const page = fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx", import.meta.url), "utf8");
+  for (const field of ["archiveFileId", "governanceArchiveFileId", "primaryArchiveFileId", "governanceArchiveFileWebViewLink"]) {
+    assert.ok(data.includes(field), `document discovery must recognize ${field}`);
+    assert.ok(page.includes(field), `palette URL resolution must recognize ${field}`);
+  }
+  assert.match(data, /if\(!\(d\?\.fileUrl\|\|d\?\.documentUrl\|\|d\?\.storageUrl\|\|d\?\.pdfUrl\|\|d\?\.downloadUrl\|\|d\?\.downloadURL\|\|driveId\)\)return false/);
+  assert.match(page, /function controlledPdfUrl\(document=\{\}\)/);
+});
