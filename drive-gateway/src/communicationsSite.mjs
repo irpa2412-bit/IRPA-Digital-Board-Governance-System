@@ -247,6 +247,15 @@ export function createCommunicationsSiteRouter(deps) {
     return data;
   }
 
+  function isStagingPublicLink(value) {
+    try {
+      const link = new URL(String(value || ""));
+      return link.protocol === "https:" && link.hostname.toLowerCase() === "staging.irpa.or.tz";
+    } catch {
+      return false;
+    }
+  }
+
   function editorRaw(item, key) {
     const value = item && item[key];
     return String(value && (value.raw !== undefined ? value.raw : value.rendered) || "");
@@ -278,6 +287,7 @@ export function createCommunicationsSiteRouter(deps) {
     const data = await response.json().catch(() => null);
     if (response.status === 404) throw new Error("WordPress page/post not found.");
     if (!response.ok || !Number.isSafeInteger(data?.id)) throw new Error("WordPress could not read the requested page/post.");
+    if (!isStagingPublicLink(data.link)) throw new Error("WordPress returned a non-staging page URL; the edit was blocked.");
     return data;
   }
 
@@ -399,6 +409,7 @@ export function createCommunicationsSiteRouter(deps) {
       });
       const data = await response.json().catch(() => null);
       if (!response.ok || !Array.isArray(data)) throw new Error("Could not list staging website content.");
+      if (data.some(item => !isStagingPublicLink(item.link))) throw new Error("WordPress returned a non-staging page URL; content listing was blocked.");
       return json({ items: data.map(item => ({
         id: Number(item.id), type, title: editorRaw(item, "title"), excerpt: editorRaw(item, "excerpt"),
         featuredMedia: Number(item.featured_media || 0), status: String(item.status || "draft"),
@@ -495,7 +506,7 @@ export function createCommunicationsSiteRouter(deps) {
         body: JSON.stringify(payload), signal: AbortSignal.timeout(20000)
       });
       const data = await response.json().catch(() => null);
-      if (!response.ok || !Number.isSafeInteger(data?.id) || typeof data?.link !== "string") {
+      if (!response.ok || !Number.isSafeInteger(data?.id) || !isStagingPublicLink(data?.link)) {
         await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_CONTENT_UPDATE_FAILED", type, id, {
           snapshotId: snapshot.snapshotId, previousRevisionId: snapshot.currentRevisionId
         });
@@ -570,7 +581,7 @@ export function createCommunicationsSiteRouter(deps) {
         body: JSON.stringify(target), signal: AbortSignal.timeout(20000)
       });
       const data = await response.json().catch(() => null);
-      if (!response.ok || !Number.isSafeInteger(data?.id) || typeof data?.link !== "string") {
+      if (!response.ok || !Number.isSafeInteger(data?.id) || !isStagingPublicLink(data?.link)) {
         await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_REVISION_RESTORE_FAILED", type, id, {
           requestedSnapshotId: snapshotId || null, requestedRevisionId: snapshotId ? null : revisionId,
           safetySnapshotId: safetySnapshot.snapshotId
