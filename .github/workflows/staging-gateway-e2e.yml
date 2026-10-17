@@ -735,6 +735,7 @@ jobs:
           set -euo pipefail
           node <<'NODE'
           const https=require("node:https");
+          const dns=require("node:dns").promises;
           require("node:dns").setDefaultResultOrder("ipv4first");
           const {URL,URLSearchParams}=require("node:url");
           function request(url,headers={},timeout=12000){
@@ -757,6 +758,7 @@ jobs:
             let base;
             try{base=new URL(process.env.WP_BASE)}catch{console.log("POST_REMEDIATION_WP_BASE=INVALID");return}
             console.log("POST_REMEDIATION_STAGING_HOST="+base.hostname);
+            try{console.log("POST_REMEDIATION_DNS="+JSON.stringify(await dns.lookup(base.hostname,{all:true})));}catch(e){console.log("POST_REMEDIATION_DNS_ERROR="+String(e.code||e.name))}
             for(const path of ["/wp-json/","/wp-login.php","/"]){
               try{
                 const r=await request(new URL(path,base).href,{Accept:"application/json,text/html,*/*","Cache-Control":"no-cache"});
@@ -776,21 +778,23 @@ jobs:
             const root=String(main.documentroot||main.document_root||"");
             console.log("POST_REMEDIATION_CPANEL_ROOT="+(root?root.replace(/\/home\/[^/]+/,"/home/[account]"):"unresolved"));
             if(!root)return;
-            for(const dir of [root+"/staging",root+"/staging "]){
+            const home=root.replace(/\/public_html\/?$/,"");
+            for(const dir of [root+"/staging",root+"/staging ",home+"/logs"]){
               try{
                 const listing=await cp("Fileman/list_files",{dir,showdotfiles:1});
                 const obj=JSON.parse(listing.raw||"{}");
                 const files=Array.isArray(obj.data)?obj.data:Array.isArray(obj.result?.data)?obj.result.data:[];
                 const names=files.map(x=>String(x.file||x.name||""));
-                console.log("POST_REMEDIATION_DIR="+JSON.stringify({dir:dir.replace(/\/home\/[^/]+/,"/home/[account]"),status:obj.data?.status??obj.result?.status,wordpress:["wp-admin","wp-content","wp-includes","wp-config.php","index.php"].every(x=>names.includes(x)),names:names.filter(x=>["error_log",".htaccess","wp-config.php","index.php","wp-admin","wp-content","wp-includes"].includes(x)).slice(0,20)}));
-                if(names.includes("error_log")){
-                  const log=await cp("Fileman/get_file_content",{dir,file:"error_log"});
+                const relevant=names.filter(x=>["error_log",".htaccess","wp-config.php","index.php","wp-admin","wp-content","wp-includes"].includes(x)||/staging.*log|error.*log/i.test(x)).slice(0,30);
+                console.log("POST_REMEDIATION_DIR="+JSON.stringify({dir:dir.replace(/\/home\/[^/]+/,"/home/[account]"),status:obj.status??obj.result?.status,wordpress:["wp-admin","wp-content","wp-includes","wp-config.php","index.php"].every(x=>names.includes(x)),names:relevant}));
+                for(const file of names.filter(x=>x==="error_log"||(/staging.*log|error.*log/i.test(x)&&x.length<180)).slice(0,4)){
+                  const log=await cp("Fileman/get_file_content",{dir,file});
                   const l=JSON.parse(log.raw||"{}");
                   const content=String(l.data?.content??l.data?.data?.content??l.result?.data?.content??"");
-                  const lines=content.split(/\r?\n/).filter(x=>/PHP Fatal error|PHP Parse error|Uncaught Error|Permission denied|failed to open stream|Error establishing a database connection|Allowed memory size|Call to undefined function/i.test(x)).slice(-8).map(redact);
-                  console.log("POST_REMEDIATION_PHP_ERRORS="+JSON.stringify(lines));
+                  const lines=content.split(/\r?\n/).filter(x=>/PHP Fatal error|PHP Parse error|Uncaught Error|Permission denied|failed to open stream|Error establishing a database connection|Allowed memory size|Call to undefined function|staging\.irpa\.or\.tz|\/staging(?:\/|\s)/i.test(x)).slice(-10).map(redact);
+                  if(lines.length)console.log("POST_REMEDIATION_PHP_ERRORS="+JSON.stringify({dir:dir.replace(/\/home\/[^/]+/,"/home/[account]"),file,lines}));
                 }
-                if(names.includes("wp-config.php")){
+                if(dir===root+"/staging"&&names.includes("wp-config.php")){
                   const cfg=await cp("Fileman/get_file_content",{dir,file:"wp-config.php"});
                   const l=JSON.parse(cfg.raw||"{}");
                   const content=String(l.data?.content??l.data?.data?.content??l.result?.data?.content??"");
