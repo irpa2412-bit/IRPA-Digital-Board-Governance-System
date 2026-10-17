@@ -389,7 +389,6 @@ jobs:
           NODE
 
       - name: Diagnose staging WordPress bootstrap and route handling (read-only)
-        continue-on-error: true
         env:
           WP_BASE: ${{ secrets.STAGING_WORDPRESS_BASE_URL }}
           CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
@@ -450,6 +449,12 @@ jobs:
               if(name==="wp-load.php")Object.assign(report,{loadsWpConfig:/wp-config\.php/i.test(content),loadsSettings:/wp-settings\.php/i.test(content)});
               if(name==="wp-config.php")Object.assign(report,{hasDbName:/define\s*\(\s*['"]DB_NAME['"]/.test(content),hasDbUser:/define\s*\(\s*['"]DB_USER['"]/.test(content),hasWpHome:/define\s*\(\s*['"]WP_HOME['"]/.test(content),hasWpSiteurl:/define\s*\(\s*['"]WP_SITEURL['"]/.test(content),hasCustomJsonFalse:/["']ok["']\s*=>\s*false|["']ok["']\s*:\s*false/.test(content),hasHostGate:/HTTP_HOST|SERVER_NAME|REQUEST_URI/.test(content),hasEarlyExit:/\b(exit|die)\s*\(/i.test(content)});
               console.log("WP_BOOT_FILE_CHECK="+JSON.stringify(report));
+              if(name==="wp-config.php"){
+                const match=content.match(/define\s*\(\s*['"]DB_NAME['"]\s*,\s*(['"])(.*?)\1\s*\)/s);
+                const isolated=Boolean(match&&/stage|staging|test/i.test(match[2]));
+                console.log("STAGING_DATABASE_ISOLATION="+(isolated?"PASS":"FAIL"));
+                if(!isolated)throw new Error("ABORT: staging database name is not explicitly staging-scoped; refusing all WordPress database changes.");
+              }
             }
             for(const dir of [stage+"/wp-content/mu-plugins",stage+"/wp-content/plugins"]){
               const names=await list(dir);
@@ -462,7 +467,7 @@ jobs:
               }
             }
           }
-          main().catch(e=>{console.log("WP_BOOT_DIAGNOSTIC_ERROR="+String(e.code||e.name||"unknown"));});
+          main().catch(e=>{console.log("WP_BOOT_DIAGNOSTIC_ERROR="+String(e.code||e.name||"unknown"));process.exit(1);});
           NODE
 
       - name: Repair staging WordPress bootstrap and register application password safely
