@@ -266,7 +266,7 @@ test("cPanel Fileman reads use the relative path for the exact staging document 
     assert.equal(requestedUrl.hostname, "cpanel.example.test");
     return response({ status: 1, data: { data: { content: "staging-only content" } } });
   };
-  const result = await call(router, env, "/api/communications/cpanel/files?path=probe.txt");
+  const result = await call(router, env, "/api/communications/cpanel/files?path=probe.txt", { role: "Executive Director" });
   assert.equal(result.status, 200);
   assert.equal((await result.json()).content, "staging-only content");
   assert.equal(requestedUrl.pathname, "/execute/Fileman/get_file_content");
@@ -287,7 +287,7 @@ test("cPanel file access refuses any document root other than the exact staging 
     cpanelRequests++;
     return response({ status: 1, data: { data: { content: "must not be read" } } });
   };
-  const result = await call(router, env, "/api/communications/cpanel/files?path=probe.txt");
+  const result = await call(router, env, "/api/communications/cpanel/files?path=probe.txt", { role: "Executive Director" });
   assert.equal(result.status, 502);
   assert.equal(cpanelRequests, 0);
 });
