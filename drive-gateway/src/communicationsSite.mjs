@@ -555,7 +555,7 @@ export function createCommunicationsSiteRouter(deps) {
       const payload = { title, content: sanitizeWordPressContent(content), excerpt, featured_media: featuredMedia, status };
       const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/" + type + "/" + id, {
         method: "POST", headers: wordpressHeaders(wp, { "Content-Type": "application/json", Accept: "application/json" }),
-        body: JSON.stringify(payload), signal: AbortSignal.timeout(20000)
+        body: JSON.stringify(payload), signal: AbortSignal.timeout(30000)
       });
       const data = await response.json().catch(() => null);
       if (!response.ok || !Number.isSafeInteger(data?.id) || !isStagingPublicLink(data?.link)) {
