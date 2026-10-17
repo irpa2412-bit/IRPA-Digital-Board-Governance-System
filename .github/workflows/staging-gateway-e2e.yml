@@ -1037,7 +1037,7 @@ jobs:
               "});",
               ""
             ].join("\n");
-            const routeAnchor="$header = trim((string) (\$_SERVER['HTTP_X_IRPA_STAGING_AUTHORIZATION'] ?? ''));";
+            const routeAnchor="$header = trim((string) ($_SERVER['HTTP_X_IRPA_STAGING_AUTHORIZATION'] ?? ''));";
             const routeAnchorIndex=basePlugin.indexOf(routeAnchor);
             if(routeAnchorIndex<0)throw new Error("ABORT: staging bridge insertion point was not found.");
             const temporaryPlugin=basePlugin.slice(0,routeAnchorIndex)+route+"\\n"+basePlugin.slice(routeAnchorIndex);
