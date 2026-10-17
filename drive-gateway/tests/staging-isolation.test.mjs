@@ -25,7 +25,7 @@ test("Wrangler staging project and application URLs are isolated from production
   assert.match(staging, /IRPA_ENVIRONMENT = "staging"/);
   assert.match(staging, /FIREBASE_PROJECT_ID = "irpa-dbg-staging-a73ec"/);
   assert.doesNotMatch(staging, /FIREBASE_PROJECT_ID = "irpa-digital-board-governance"/);
-  assert.match(staging, /IRPA_APP_URL = "https:\/\/irpa-dgb-meeting-room-staging\.irpa-governance\.workers\.dev"/);
+  assert.match(staging, /IRPA_APP_URL = "https:\/\/irpa-dbg-staging-a73ec\.web\.app"/);
   assert.match(staging, /DRIVE_ROOT_FOLDER_NAME = "IRPA Governance System - STAGING"/);
   assert.match(staging, /META_REDIRECT_URI = "https:\/\/irpa-google-drive-gateway-staging\.irpa-governance\.workers\.dev\/api\/communications\/meta\/callback"/);
   assert.match(staging, /IRPA_PRODUCTION_CUTOVER = "false"/);
