@@ -9,6 +9,7 @@ let nextRevisionId;
 let kvStore;
 let auditEvents;
 let requestCount;
+let wpRoles;
 let consoleMessages;
 let originalFetch;
 let originalConsole;
@@ -112,6 +113,7 @@ test.beforeEach(() => {
   kvStore = new Map();
   auditEvents = [];
   requestCount = 0;
+  wpRoles = ["editor"];
   consoleMessages = [];
   originalFetch = globalThis.fetch;
   originalConsole = { log: console.log, info: console.info, warn: console.warn, error: console.error };
@@ -125,7 +127,7 @@ test.beforeEach(() => {
     const method = init.method || "GET";
     if (url.hostname !== "staging.irpa.or.tz") throw new Error("Test blocked non-staging host.");
     if (url.pathname === "/wp-json/wp/v2/users/me") {
-      return response({ id: 7, name: "Staging Editor", capabilities: { edit_posts: true, edit_pages: true } });
+      return response({ id: 7, name: "Staging Editor", roles: wpRoles, capabilities: { edit_posts: true, edit_pages: true } });
     }
     if (url.pathname === "/wp-json/wp/v2/pages") {
       return response([currentItem()]);
@@ -259,4 +261,12 @@ test("audit records and application logs never contain the Worker credential", a
   assert.equal(auditText.includes(TEST_PASSWORD), false);
   assert.equal(auditText.includes("Authorization"), false);
   assert.equal(JSON.stringify(consoleMessages).includes(TEST_PASSWORD), false);
+});
+
+test("WordPress Administrator credentials are rejected even when authentication returns HTTP 200", async () => {
+  wpRoles = ["administrator"];
+  const router = makeRouter();
+  const result = await call(router, makeEnv(), "/api/communications/website/content/pages/123");
+  assert.equal(result.status, 502);
+  assert.equal(requestCount, 1);
 });
