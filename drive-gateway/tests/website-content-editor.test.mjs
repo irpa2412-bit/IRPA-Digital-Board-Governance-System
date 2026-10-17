@@ -175,6 +175,7 @@ test("staging users/me connection check returns HTTP 200 without exposing creden
   assert.equal(result.status, 200);
   const data = await result.json();
   assert.equal(data.connections.website, "connected");
+  assert.equal(data.connections.websiteHttpStatus, 200);
   assert.equal(data.connections.websiteAccount.canEditPosts, true);
   assert.equal(JSON.stringify(data).includes(TEST_PASSWORD), false);
 });
