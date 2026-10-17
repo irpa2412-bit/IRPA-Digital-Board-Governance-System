@@ -9,8 +9,7 @@ function stagingGateway(){
  if(url.protocol!=="https:"||url.hostname!=="irpa-google-drive-gateway-staging.irpa-governance.workers.dev")throw new Error("Meta connection is restricted to the dedicated staging Cloudflare gateway.");
  return url.toString().replace(/\/$/,"");
 }
-export default function MetaApiConnection(){
- if(firebaseConfig.projectId!=="irpa-dbg-staging-a73ec")return null;
+function MetaApiConnectionPanel(){
  const [status,setStatus]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const request=useCallback(async(path,method="GET")=>{
   const user=auth.currentUser;
@@ -59,4 +58,9 @@ export default function MetaApiConnection(){
   </div>
   <small style={{opacity:.8}}>Tokens remain encrypted in the staging Worker KV store and are never returned to this page. This control is not a publishing approval.</small>
  </section>
+}
+
+export default function MetaApiConnection(){
+ if(firebaseConfig.projectId!=="irpa-dbg-staging-a73ec")return null;
+ return <MetaApiConnectionPanel />;
 }
