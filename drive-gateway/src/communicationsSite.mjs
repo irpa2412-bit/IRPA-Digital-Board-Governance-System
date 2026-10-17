@@ -517,7 +517,8 @@ export function createCommunicationsSiteRouter(deps) {
         await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_CONTENT_UPDATE_FAILED", type, id, {
           snapshotId: snapshot.snapshotId, previousRevisionId: snapshot.currentRevisionId
         });
-        throw new Error("WordPress rejected the staging page/post update. The saved pre-edit snapshot remains available.");
+        const wordpressCode = typeof data?.code === "string" ? data.code.replace(/[^a-z0-9_]/gi, "").slice(0, 80) : "invalid_response";
+        throw new Error("WordPress rejected the staging page/post update (HTTP " + response.status + ", code " + wordpressCode + "). The saved pre-edit snapshot remains available.");
       }
       await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_CONTENT_UPDATED", type, id, {
         snapshotId: snapshot.snapshotId, previousRevisionId: snapshot.currentRevisionId,
