@@ -226,7 +226,16 @@ export function createCommunicationsSiteRouter(deps) {
     const username = String(env.CPANEL_USERNAME || "").trim();
     const token = String(env.CPANEL_API_TOKEN || "").trim();
     if (!username || !token) throw new Error("cPanel API credentials are not configured.");
-    return { root: base.origin + "/execute", username, token, documentRoot: String(env.CPANEL_DOCUMENT_ROOT || "public_html").replace(/^\/+|\/+$/g, "") };
+    const configuredRoot = String(env.CPANEL_DOCUMENT_ROOT || "public_html/staging").trim().replace(/\\/g, "/").replace(/\/+$/g, "");
+    const absoluteStagingRoot = "/home/" + username + "/public_html/staging";
+    const homeRelativeStagingRoot = "home/" + username + "/public_html/staging";
+    let documentRoot;
+    if (configuredRoot === absoluteStagingRoot || configuredRoot === homeRelativeStagingRoot || configuredRoot === "public_html/staging") {
+      documentRoot = "public_html/staging";
+    } else {
+      throw new Error("cPanel document root must resolve to the exact staging directory.");
+    }
+    return { root: base.origin + "/execute", username, token, documentRoot };
   }
 
   async function cpanelCall(config, operation, params = {}, method = "GET") {
