@@ -24,7 +24,6 @@ import { canReadSignatureAsset, canUploadSignedDocument } from "./signatureAsset
 import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPasswordSetup, getInvitationSessionState } from "./invitationRedemption.mjs";
 import { buildGoogleDriveAuthorizationParams } from "./googleDriveOAuth.mjs";
 import { createCommunicationsSiteRouter } from "./communicationsSite.mjs";
-import { createMetaSocialApiRouter } from "./metaSocialApi.mjs";
 import { createMetaOAuthRouter } from "./metaOAuth.mjs";
 
 function getFirebaseProjectId(env) {
@@ -54,15 +53,6 @@ const documentLifecycleRouter = createDocumentLifecycleRouter({
   firestoreDocumentToPlain,
   commitDocumentAndAudit: commitFirestoreDocumentAndAudit,
   recordLifecycleFailure: recordDocumentLifecycleFailure,
-  json,
-  corsHeaders
-});
-
-const metaSocialApiRouter = createMetaSocialApiRouter({
-  authenticateFirebaseRequest,
-  getFirestoreDocument,
-  getInstitutionalProfileForUser,
-  firestoreDocumentToPlain,
   json,
   corsHeaders
 });
