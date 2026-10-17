@@ -98,8 +98,10 @@ async function graphGet(version, path, token) {
   return body;
 }
 function publicConnection(value) {
+  const grantedPermissions = value.grantedPermissions || [];
+  const missingPermissions = REQUIRED_PERMISSIONS.filter(p => !grantedPermissions.includes(p));
   return {
-    status: "verified",
+    status: missingPermissions.length ? "needs_permissions" : "verified",
     connected: true,
     verifiedAt: value.verifiedAt,
     expiresAt: value.expiresAt || null,
@@ -107,9 +109,9 @@ function publicConnection(value) {
     metaUser: value.metaUser,
     facebookPages: value.facebookPages || [],
     instagramAccounts: value.instagramAccounts || [],
-    grantedPermissions: value.grantedPermissions || [],
+    grantedPermissions,
     requiredPermissions: REQUIRED_PERMISSIONS,
-    missingPermissions: REQUIRED_PERMISSIONS.filter(p => !(value.grantedPermissions || []).includes(p)),
+    missingPermissions,
     postingEnabled: false
   };
 }
