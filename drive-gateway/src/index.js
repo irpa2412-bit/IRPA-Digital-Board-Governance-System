@@ -32,6 +32,10 @@ function getFirebaseProjectId(env) {
   return projectId;
 }
 
+function getDriveRootFolderName(env) {
+  return String(env?.DRIVE_ROOT_FOLDER_NAME || (env?.IRPA_ENVIRONMENT === "staging" ? "IRPA Governance System - STAGING" : "IRPA Governance System")).trim();
+}
+
 function getAuthorizedDriveEmail(env) {
   const email = String(env?.AUTHORIZED_DRIVE_EMAIL || "").trim().toLowerCase();
   if (!email) throw new Error("AUTHORIZED_DRIVE_EMAIL must be configured for this environment.");
@@ -493,7 +497,7 @@ async function upload(request, env) {
   }
 
   const accessToken = await getDriveAccessToken(env);
-  const rootId = await findOrCreateFolder(env, accessToken, "IRPA Governance System");
+  const rootId = await findOrCreateFolder(env, accessToken, getDriveRootFolderName(env));
   let purposeId;
   if (purpose === "Signature Profile" || purpose === "Signed Documents Archive" || purpose === "Documents Portal" || purpose === "Controlled Documents" || purpose === "Meeting Products" || purpose === "Communication Media") {
     const folderMeta = await driveFetch(env, accessToken, `/drive/v3/files/${encodeURIComponent(requestedFolderId)}?fields=id,name,mimeType,description,trashed`);
@@ -598,7 +602,7 @@ async function uploadControlledDocument(request, env) {
   if (bytes.length !== fileSize) return json({ok:false,error:"Uploaded document size could not be verified."},400,corsHeaders(request));
 
   const accessToken = await getDriveAccessToken(env);
-  const rootId = await findOrCreateFolder(env, accessToken, "IRPA Governance System");
+  const rootId = await findOrCreateFolder(env, accessToken, getDriveRootFolderName(env));
 
   const archiveRootId = await findOrCreateFolder(env, accessToken, "Document Archives", rootId, {
     irpaGovernanceArchive:true,
@@ -757,7 +761,7 @@ async function provisionCommunicationMediaArchive(request, env) {
     return json({ok:false,error:"Your registered IRPA role does not permit communications media archive administration."},403,corsHeaders(request));
   }
   const accessToken = await getDriveAccessToken(env);
-  const rootId = await findOrCreateFolder(env, accessToken, "IRPA Governance System");
+  const rootId = await findOrCreateFolder(env, accessToken, getDriveRootFolderName(env));
   const archiveId = await findOrCreateFolder(env, accessToken, "Communication and Media Archive", rootId, {
     irpaCommunicationMediaArchive:true,
     irpaGovernanceArchive:true,
@@ -769,7 +773,7 @@ async function provisionCommunicationMediaArchive(request, env) {
   if (folder.mimeType !== "application/vnd.google-apps.folder" || folder.trashed || description.irpaCommunicationMediaArchive !== true || description.purpose !== "IRPA Communication and Media Archive") {
     return json({ok:false,error:"The Communication and Media Archive could not be verified. No media was uploaded."},409,corsHeaders(request));
   }
-  return json({ok:true,archiveName:folder.name,folderId:folder.id,archivePath:"IRPA Governance System/Communication and Media Archive",storageProvider:"Google Drive"},200,corsHeaders(request));
+  return json({ok:true,archiveName:folder.name,folderId:folder.id,archivePath:getDriveRootFolderName(env)+"/Communication and Media Archive",storageProvider:"Google Drive"},200,corsHeaders(request));
 }
 
 async function download(request, env) {
@@ -942,7 +946,7 @@ async function finalizeSignatureProfileArchives(request, env) {
   if (bytes.length !== fileSize) return json({ok:false,error:"Completed signed PDF size could not be verified."},400,corsHeaders(request));
 
   const accessToken = await getDriveAccessToken(env);
-  const rootId = await findOrCreateFolder(env, accessToken, "IRPA Governance System");
+  const rootId = await findOrCreateFolder(env, accessToken, getDriveRootFolderName(env));
   const signaturesId = await findOrCreateFolder(env, accessToken, "Signature Profiles", rootId);
   const deliveries = {};
 
@@ -1031,7 +1035,7 @@ async function ensureSignatureProfileFolder(request, env) {
   }
 
   const accessToken = await getDriveAccessToken(env);
-  const rootId = await findOrCreateFolder(env, accessToken, "IRPA Governance System");
+  const rootId = await findOrCreateFolder(env, accessToken, getDriveRootFolderName(env));
   const signaturesId = await findOrCreateFolder(env, accessToken, "Signature Profiles", rootId);
   const folderName = `IRPA-SIGNATURE-${requestedUid}`;
   const folderId = await findOrCreateFolder(env, accessToken, folderName, signaturesId, {
@@ -1092,7 +1096,7 @@ async function meetingArchiveContext(request, env) {
   const policy = MEETING_ARCHIVE_POLICIES[category];
   if (!policy) return { response: json({ok:false,error:"A valid meeting category is required."},400,corsHeaders(request)) };
   const accessToken = await getDriveAccessToken(env);
-  const rootId = await findOrCreateFolder(env, accessToken, "IRPA Governance System");
+  const rootId = await findOrCreateFolder(env, accessToken, getDriveRootFolderName(env));
   const archiveRootId = await findOrCreateFolder(env, accessToken, "Meeting Archives", rootId, {
     irpaGovernanceArchive:true, purpose:"IRPA Meeting Product Archives"
   });
@@ -1207,7 +1211,7 @@ async function ensureDocumentArchiveFolder(request, env) {
   const isPublic = classification === "Public";
   const accessToken = await getDriveAccessToken(env);
 
-  const rootId = await findOrCreateFolder(env, accessToken, "IRPA Governance System");
+  const rootId = await findOrCreateFolder(env, accessToken, getDriveRootFolderName(env));
   const archiveRootId = await findOrCreateFolder(env, accessToken, "Document Archives", rootId, {
     irpaGovernanceArchive:true,
     purpose:"Controlled Document Archives"
@@ -1317,7 +1321,7 @@ async function ensureSignedDocumentArchive(request, env) {
   if (!allowedClassifications.includes(classification)) return json({ok:false,error:"Invalid document access classification."},400,corsHeaders(request));
 
   const accessToken = await getDriveAccessToken(env);
-  const rootId = await findOrCreateFolder(env, accessToken, "IRPA Governance System");
+  const rootId = await findOrCreateFolder(env, accessToken, getDriveRootFolderName(env));
   const signedRootId = await findOrCreateFolder(env, accessToken, "Signed Documents Archive", rootId, {
     irpaGovernanceArchive:true,
     purpose:"Signed Documents Archive"
@@ -1405,7 +1409,7 @@ async function ensureSignatureWorkflowFolder(request, env) {
   const envelopeId = cleanId(data.envelopeId || "");
   if (!envelopeId) return json({ok:false,error:"Signature workflow ID is required."},400,corsHeaders(request));
   const accessToken = await getDriveAccessToken(env);
-  const rootId = await findOrCreateFolder(env, accessToken, "IRPA Governance System");
+  const rootId = await findOrCreateFolder(env, accessToken, getDriveRootFolderName(env));
   const workflowsId = await findOrCreateFolder(env, accessToken, "Signature Workflows", rootId, {
     irpaGovernanceSignatureWorkflow:true,
     purpose:"Signature Workflow Working Files"
