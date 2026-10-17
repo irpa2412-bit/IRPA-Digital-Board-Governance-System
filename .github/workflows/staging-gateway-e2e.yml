@@ -1421,12 +1421,9 @@ jobs:
                 await call("/api/communications/website/restore",{method:"POST",body:JSON.stringify({type:"pages",id:testPageId,snapshotId})});
               }
             }
-          })().catch(e=>{console.error("Staging website integration acceptance failed:",e.message);process.exit(1)});
-          NODE
-
             const cpanelPath=process.env.CP_TEST_FILE;
-            const before=await call("/api/communications/cpanel/files?path="+encodeURIComponent(cpanelPath));
-            if(typeof before.content!=="string") throw new Error("The designated staging cPanel test file could not be read.");
+            const cpBefore=await call("/api/communications/cpanel/files?path="+encodeURIComponent(cpanelPath));
+            if(typeof cpBefore.content!=="string") throw new Error("The designated staging cPanel test file could not be read.");
             let backupId="";
             try{
               const write=await call("/api/communications/cpanel/files",{method:"PUT",body:JSON.stringify({path:cpanelPath,content:marker})});
@@ -1440,17 +1437,18 @@ jobs:
               }else{
                 const root=process.env.CP_ROOT.replace(/^\/+|\/+$/g,"");
                 const cpFile=cpanelPath.split("/").pop();
-                const response=await fetch(new URL("/execute/Fileman/save_file_content",process.env.CP_BASE),{method:"POST",headers:{Authorization:"cpanel "+process.env.CP_USER+":"+process.env.CP_TOKEN,Accept:"application/json","Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({dir:root,file:cpFile,content:before.content,charset:"utf-8"})});
+                const response=await fetch(new URL("/execute/Fileman/save_file_content",process.env.CP_BASE),{method:"POST",headers:{Authorization:"cpanel "+process.env.CP_USER+":"+process.env.CP_TOKEN,Accept:"application/json","Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({dir:root,file:cpFile,content:cpBefore.content,charset:"utf-8"})});
                 const result=await response.json().catch(()=>null);
                 if(!response.ok||result?.status!==1) throw new Error("Emergency restoration of the staging cPanel test file failed.");
               }
             }
             const restored=await call("/api/communications/cpanel/files?path="+encodeURIComponent(cpanelPath));
-            if(restored.content!==before.content) throw new Error("The cPanel rollback did not restore the original content.");
+            if(restored.content!==cpBefore.content) throw new Error("The cPanel rollback did not restore the original content.");
             const denied=await fetch(base+"/api/communications/cpanel/files?path="+encodeURIComponent("../index.php"),{headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
             if(denied.ok) throw new Error("cPanel traversal/executable path rejection failed.");
             console.log("STAGING_WORDPRESS_READ_WRITE_PUBLIC_RENDER_RESTORE_PASS");
             console.log("STAGING_CPANEL_READ_WRITE_ROLLBACK_PATH_REJECTION_PASS");
+
           })().catch(e=>{console.error("Staging website integration acceptance failed:",e.message);process.exit(1)});
           NODE
 
