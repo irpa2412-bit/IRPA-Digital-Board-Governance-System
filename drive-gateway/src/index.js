@@ -24,9 +24,9 @@ import { canProvisionSignatureProfileFolder } from "./signatureProfileAuthorizat
 import { canReadSignatureAsset, canUploadSignedDocument } from "./signatureAssetAuthorization.mjs";
 import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPasswordSetup, getInvitationSessionState } from "./invitationRedemption.mjs";
 import { buildGoogleDriveAuthorizationParams } from "./googleDriveOAuth.mjs";
-import { createMeetingPortalRouter } from "./meetingPortal.mjs";
 import { createCommunicationsSiteRouter } from "./communicationsSite.mjs";
 import { createMetaOAuthRouter } from "./metaOAuth.mjs";
+import { createMeetingPortalRouter } from "./meetingPortal.mjs";
 
 function getFirebaseProjectId(env) {
   const projectId = String(env?.FIREBASE_PROJECT_ID || "").trim();
@@ -66,6 +66,7 @@ const meetingPortalRouter = createMeetingPortalRouter({
   json,
   corsHeaders
 });
+
 
 function normalizeGatewayAuthority(value) {
   return String(value||"").toLowerCase().replace(/^(the|irpa)\s+/,"").replace(/[._-]+/g," ").replace(/\s+/g," ").trim();
@@ -108,11 +109,24 @@ async function verifyGatewaySigningAuthority(env,user,manualAuthorityIdentificat
 }
 
 const communicationsSiteRouter = createCommunicationsSiteRouter({
+  authenticateFirebaseRequest,
   getFirestoreDocument,
   getInstitutionalProfileForUser,
   firestoreDocumentToPlain,
   commitDocumentAndAudit: commitFirestoreDocumentAndAudit,
+  json,
+  corsHeaders
+});
+
 const metaOAuthRouter = createMetaOAuthRouter({
+  authenticateFirebaseRequest,
+  getFirestoreDocument,
+  getInstitutionalProfileForUser,
+  firestoreDocumentToPlain,
+  json,
+  corsHeaders
+});
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -151,11 +165,6 @@ export default {
       const meetingPortalResponse = await meetingPortalRouter(request, env, pathname);
       if (meetingPortalResponse) return meetingPortalResponse;
 
-      if (pathname.startsWith("/api/document-lifecycle/")) {
-        const lifecycleResponse = await documentLifecycleRouter(request, env);
-        if (lifecycleResponse) return lifecycleResponse;
-      }
-
       if (pathname.startsWith("/api/communications/meta/")) {
         const metaResponse = await metaOAuthRouter(request, env);
         if (metaResponse) return metaResponse;
@@ -164,6 +173,11 @@ export default {
       if (pathname.startsWith("/api/communications/")) {
         const communicationsResponse = await communicationsSiteRouter(request, env);
         if (communicationsResponse) return communicationsResponse;
+      }
+
+      if (pathname.startsWith("/api/document-lifecycle/")) {
+        const lifecycleResponse = await documentLifecycleRouter(request, env);
+        if (lifecycleResponse) return lifecycleResponse;
       }
 
       if (pathname === "/api/upload" && request.method === "POST") {
@@ -2476,7 +2490,7 @@ function escapeHtml(value) {
 
 function corsHeaders(request) {
   const origin = request.headers.get("Origin") || "";
-  const allowed = origin === "https://irpa.or.tz" || origin === "https://www.irpa.or.tz" || origin === "https://irpa-digital-board-governance.web.app" || origin === "https://irpa-digital-board-governance.firebaseapp.com" || origin === "https://staging.irpa.or.tz" || origin === "https://irpa-dgb-meeting-room-staging.irpa-governance.workers.dev" || origin === "https://irpa-dbg-staging-a73ec.web.app" || origin === "https://irpa-dbg-staging-a73ec.firebaseapp.com" || origin === "http://localhost:5173";
+  const allowed = origin === "https://irpa.or.tz" || origin === "https://www.irpa.or.tz" || origin === "https://irpa-digital-board-governance.web.app" || origin === "https://irpa-digital-board-governance.firebaseapp.com" || origin === "http://localhost:5173" || origin === "https://staging.irpa.or.tz" || origin === "https://irpa-dgb-meeting-room-staging.irpa-governance.workers.dev" || origin === "https://irpa-dbg-staging-a73ec.web.app" || origin === "https://irpa-dbg-staging-a73ec.firebaseapp.com";
   return {
     "Access-Control-Allow-Origin": allowed ? origin : "https://irpa.or.tz",
     "Access-Control-Allow-Headers": "Authorization, Content-Type, X-IRPA-Invitation-Version, x-signing-token",
