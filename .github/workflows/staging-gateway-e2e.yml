@@ -89,23 +89,23 @@ jobs:
           TEST_EMAIL: ${{ secrets.STAGING_TEST_EMAIL }}
           TEST_PASSWORD: ${{ secrets.STAGING_TEST_PASSWORD }}
           WP_BASE: ${{ secrets.STAGING_WORDPRESS_BASE_URL }}
-          WP_USER: ${{ secrets.STAGING_WORDPRESS_USERNAME }}
-          WP_PASSWORD: ${{ secrets.STAGING_WORDPRESS_APPLICATION_PASSWORD }}
           CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
           CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
           CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
           CP_ROOT: ${{ secrets.STAGING_CPANEL_DOCUMENT_ROOT }}
           CP_TEST_FILE: ${{ secrets.STAGING_CPANEL_TEST_FILE }}
+          TEST_PAGE_ID: ${{ vars.STAGING_WORDPRESS_TEST_PAGE_ID }}
         run: |
           set -euo pipefail
           missing=0
-          for pair in             "CLOUDFLARE_API_TOKEN:$CF_TOKEN"             "CLOUDFLARE_ACCOUNT_ID:$CF_ACCOUNT"             "STAGING_FIREBASE_PROJECT_ID:$PROJECT"             "STAGING_IRPA_APP_URL:$APP_URL"             "STAGING_GOOGLE_DRIVE_CLIENT_ID:$DRIVE_ID"             "STAGING_GOOGLE_DRIVE_CLIENT_SECRET:$DRIVE_SECRET"             "STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY:$DRIVE_KEY"             "STAGING_FIREBASE_SERVICE_ACCOUNT_JSON:$FIREBASE_SERVICE_ACCOUNT"             "STAGING_FIREBASE_WEB_API_KEY:$FIREBASE_WEB_API_KEY"             "STAGING_TEST_EMAIL:$TEST_EMAIL"             "STAGING_TEST_PASSWORD:$TEST_PASSWORD"             "STAGING_WORDPRESS_BASE_URL:$WP_BASE"             "STAGING_WORDPRESS_USERNAME:$WP_USER"             "STAGING_WORDPRESS_APPLICATION_PASSWORD:$WP_PASSWORD"             "STAGING_CPANEL_BASE_URL:$CP_BASE"             "STAGING_CPANEL_USERNAME:$CP_USER"             "STAGING_CPANEL_API_TOKEN:$CP_TOKEN"             "STAGING_CPANEL_DOCUMENT_ROOT:$CP_ROOT"             "STAGING_CPANEL_TEST_FILE:$CP_TEST_FILE"; do
+          for pair in             "CLOUDFLARE_API_TOKEN:$CF_TOKEN"             "CLOUDFLARE_ACCOUNT_ID:$CF_ACCOUNT"             "STAGING_FIREBASE_PROJECT_ID:$PROJECT"             "STAGING_IRPA_APP_URL:$APP_URL"             "STAGING_GOOGLE_DRIVE_CLIENT_ID:$DRIVE_ID"             "STAGING_GOOGLE_DRIVE_CLIENT_SECRET:$DRIVE_SECRET"             "STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY:$DRIVE_KEY"             "STAGING_FIREBASE_SERVICE_ACCOUNT_JSON:$FIREBASE_SERVICE_ACCOUNT"             "STAGING_FIREBASE_WEB_API_KEY:$FIREBASE_WEB_API_KEY"             "STAGING_TEST_EMAIL:$TEST_EMAIL"             "STAGING_TEST_PASSWORD:$TEST_PASSWORD"             "STAGING_WORDPRESS_BASE_URL:$WP_BASE"             "STAGING_WORDPRESS_TEST_PAGE_ID:$TEST_PAGE_ID"             "STAGING_CPANEL_BASE_URL:$CP_BASE"             "STAGING_CPANEL_USERNAME:$CP_USER"             "STAGING_CPANEL_API_TOKEN:$CP_TOKEN"             "STAGING_CPANEL_DOCUMENT_ROOT:$CP_ROOT"             "STAGING_CPANEL_TEST_FILE:$CP_TEST_FILE"; do
             name="${pair%%:*}"; value="${pair#*:}"
             if [ -z "$value" ]; then echo "Missing staging secret: $name"; missing=1; fi
           done
           test "$PROJECT" = "irpa-dbg-staging-a73ec"
           test "$APP_URL" != "https://irpa-digital-board-governance.web.app"
           test "$missing" -eq 0
+          [[ "$TEST_PAGE_ID" =~ ^[1-9][0-9]*$ ]]
           node <<'NODE'
           const wp=new URL(process.env.WP_BASE);
           if(wp.hostname.toLowerCase()!=="staging.irpa.or.tz"||wp.protocol!=="https:") throw new Error("ABORT: WordPress target must be the HTTPS staging.irpa.or.tz host.");
@@ -571,381 +571,6 @@ jobs:
           main().catch(e=>{console.log("WP_BOOT_DIAGNOSTIC_ERROR="+String(e.message||e.code||e.name||"unknown").replace(/\s+/g," ").slice(0,220));process.exit(1);});
           NODE
 
-      - name: Repair staging WordPress bootstrap and register application password safely
-        id: wp-bootstrap-repair
-        env:
-          CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
-          CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
-          CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
-          WP_BASE: ${{ secrets.STAGING_WORDPRESS_BASE_URL }}
-          WP_USER: ${{ secrets.STAGING_WORDPRESS_USERNAME }}
-          WP_PASSWORD: ${{ secrets.STAGING_WORDPRESS_APPLICATION_PASSWORD }}
-        run: |
-          set -euo pipefail
-          node <<'NODE'
-          const https=require("node:https");
-          const crypto=require("node:crypto");
-          const {URL,URLSearchParams}=require("node:url");
-          require("node:dns").setDefaultResultOrder("ipv4first");
-          function request(url,method="GET",headers={},body){
-            return new Promise((resolve,reject)=>{
-              const u=new URL(url);
-              const req=https.request({protocol:u.protocol,hostname:u.hostname,port:u.port||443,family:4,path:u.pathname+u.search,method,headers,timeout:15000},res=>{
-                let raw="";res.setEncoding("utf8");res.on("data",c=>raw+=c);res.on("end",()=>{let data;try{data=JSON.parse(raw)}catch{}resolve({http:res.statusCode,data,raw,headers:res.headers})});
-              });
-              req.on("timeout",()=>req.destroy(Object.assign(new Error("request timeout"),{code:"ETIMEDOUT"})));
-              req.on("error",reject);if(body)req.write(body);req.end();
-            });
-          }
-          async function main(){
-            const cpBase=new URL(process.env.CP_BASE),wpBase=new URL(process.env.WP_BASE);
-            if(wpBase.protocol!=="https:"||wpBase.hostname.toLowerCase()!=="staging.irpa.or.tz")throw new Error("Refusing to modify WordPress outside the isolated staging hostname.");
-            const auth={Authorization:"cpanel "+process.env.CP_USER+":"+process.env.CP_TOKEN,Accept:"application/json"};
-            async function uapi(fn,params={},method="GET",body){
-              const u=new URL("/execute/"+fn,cpBase);if(method==="GET")u.search=new URLSearchParams(params).toString();
-              return request(u.href,method,{...auth,...(method==="POST"?{"Content-Type":"application/x-www-form-urlencoded"}:{})},body??(method==="POST"?new URLSearchParams(params).toString():undefined));
-            }
-            async function api2(module,func,params={}){
-              const u=new URL("/json-api/cpanel",cpBase);
-              u.search=new URLSearchParams({cpanel_jsonapi_user:process.env.CP_USER,cpanel_jsonapi_apiversion:"2",cpanel_jsonapi_module:module,cpanel_jsonapi_func:func,...params}).toString();
-              const r=await request(u.href,"GET",auth),root=r.data?.cpanelresult,rows=Array.isArray(root?.data)?root.data:[];
-              return {http:r.http,ok:r.http===200&&root?.event?.result===1&&!root?.error&&rows.every(x=>x?.status!==0&&x?.result?.status!==0),rows};
-            }
-            const info=await uapi("DomainInfo/domains_data");
-            const root=String(info.data?.data?.main_domain?.documentroot||info.data?.data?.main_domain?.document_root||"");
-            if(info.http!==200||info.data?.status!==1||!root.endsWith("/public_html"))throw new Error("Could not verify the cPanel staging document root.");
-            const stage=root+"/staging",muDir=stage+"/wp-content/mu-plugins";
-            // The staging PHP error log shows the REST request exhausting its 128 MiB limit.
-            // Raise only the isolated staging install's PHP memory ceiling, preserving other .user.ini directives.
-            const stageListing=await uapi("Fileman/list_files",{dir:stage,showdotfiles:1});
-            if(stageListing.http!==200||stageListing.data?.status!==1)throw new Error("Could not safely inspect staging PHP configuration.");
-            const stageNames=(Array.isArray(stageListing.data?.data)?stageListing.data.data:[]).map(x=>String(x.file||x.name||""));
-            let userIni="";
-            if(stageNames.includes(".user.ini")){
-              const existingIni=await uapi("Fileman/get_file_content",{dir:stage,file:".user.ini"});
-              userIni=String(existingIni.data?.data?.content??existingIni.data?.data?.[0]?.content??existingIni.data?.result?.data?.content??"");
-              if(existingIni.http!==200||existingIni.data?.status!==1)throw new Error("Could not read existing staging .user.ini safely.");
-            }
-            const iniLines=userIni.split(/\\r?\\n/).filter(line=>!/^\\s*memory_limit\\s*=/i.test(line));
-            const updatedIni=iniLines.filter((line,index)=>line.length||index<iniLines.length-1).concat("memory_limit=256M").join("\\n")+"\\n";
-            const memoryLimitConfigured=/^\s*memory_limit\s*=\s*256M\s*$/im.test(userIni);
-            if(!memoryLimitConfigured){
-              if(!await writeFile(stage,".user.ini",updatedIni))throw new Error("Could not raise the staging-only PHP memory limit to 256M.");
-              console.log("STAGING_PHP_MEMORY_LIMIT=256M");
-              console.log("STAGING_PHP_INI_CACHE_WAIT=STARTED");
-              await new Promise(resolve=>setTimeout(resolve,310000));
-              console.log("STAGING_PHP_INI_CACHE_WAIT=COMPLETED");
-            }else{
-              console.log("STAGING_PHP_MEMORY_LIMIT=ALREADY_CONFIGURED");
-            }
-            async function list(dir){
-              const r=await uapi("Fileman/list_files",{dir,showdotfiles:1});
-              return {ok:r.http===200&&r.data?.status===1,files:Array.isArray(r.data?.data)?r.data.data.map(x=>String(x.file||x.name||"")).filter(Boolean):[]};
-            }
-            async function readFile(dir,name){
-              const r=await uapi("Fileman/get_file_content",{dir,file:name});
-              return {ok:r.http===200&&r.data?.status===1,content:String(r.data?.data?.content??r.data?.data?.[0]?.content??r.data?.result?.data?.content??"")};
-            }
-            async function writeFile(dir,name,content){
-              const saved=await uapi("Fileman/save_file_content",{dir,file:name,content,charset:"utf-8"},"POST");
-              let read=await readFile(dir,name);
-              if(saved.http===200&&saved.data?.status===1&&read.ok&&read.content===content)return true;
-              // Fall back to the multipart cPanel upload API; verify exact bytes before proceeding.
-              const boundary="----IRPAStagingFileRewrite"+crypto.randomBytes(8).toString("hex");
-              const payload=Buffer.concat([
-                Buffer.from("--"+boundary+"\r\nContent-Disposition: form-data; name=\"dir\"\r\n\r\n"+dir+"\r\n"),
-                Buffer.from("--"+boundary+"\r\nContent-Disposition: form-data; name=\"overwrite\"\r\n\r\n1\r\n"),
-                Buffer.from("--"+boundary+"\r\nContent-Disposition: form-data; name=\"file-1\"; filename=\""+name+"\"\r\nContent-Type: application/octet-stream\r\n\r\n"),
-                Buffer.from(content),
-                Buffer.from("\r\n--"+boundary+"--\r\n")
-              ]);
-              const uploaded=await request(new URL("/execute/Fileman/upload_files",cpBase).href,"POST",{...auth,"Content-Type":"multipart/form-data; boundary="+boundary,"Content-Length":String(payload.length)},payload);
-              read=await readFile(dir,name);
-              const ok=uploaded.http===200&&uploaded.data?.status===1&&read.ok&&read.content===content;
-              if(!ok)console.log("STAGING_FILE_REWRITE_DIAGNOSTIC="+JSON.stringify({saveHttp:saved.http,saveStatus:saved.data?.status,uploadHttp:uploaded.http,uploadStatus:uploaded.data?.status,readOk:read.ok,readLength:read.content.length,expectedLength:content.length}));
-              return ok;
-            }
-            const inert="<?php\n// Disabled stale IRPA staging credential bootstrap artifact.\n";
-            // The old files were installed as MU-plugins, so their token guard intercepted every request before WordPress loaded. Disable only the known workflow-generated filenames and verify each file byte-for-byte.
-            let mu=await list(muDir);
-            if(!mu.ok)throw new Error("Could not safely inspect the staging MU-plugin directory.");
-            const stale=mu.files.filter(name=>/^irpa-staging-app-password-[a-f0-9]{20}\.php$/i.test(name));
-            for(const name of stale){
-              if(!await writeFile(muDir,name,inert))throw new Error("Could not safely neutralize a stale staging-only credential bootstrap MU-plugin.");
-            }
-            mu=await list(muDir);
-            if(!mu.ok)throw new Error("Could not verify the staging MU-plugin directory after cleanup.");
-            for(const name of mu.files.filter(name=>/^irpa-staging-app-password-[a-f0-9]{20}\.php$/i.test(name))){
-              const read=await readFile(muDir,name);
-              if(!read.ok||read.content!==inert)throw new Error("A staging credential bootstrap MU-plugin is not inert; refusing to continue.");
-            }
-            console.log("STAGING_STALE_MU_PLUGIN_DISABLE=PASS count="+stale.length);
-            // Neutralize any leftover one-time scripts from earlier attempts. These names are random workflow artifacts, not WordPress core files.
-            const rootFiles=await list(stage);
-            if(!rootFiles.ok)throw new Error("Could not inspect the staging root for leftover provisioning scripts.");
-            const oldScripts=rootFiles.files.filter(name=>/^irpa-staging-provision-[a-f0-9]{20}\.php$/i.test(name));
-            for(const name of oldScripts){
-              if(!await writeFile(stage,name,inert))throw new Error("Could not neutralize a leftover one-time staging provisioning script.");
-            }
-            console.log("STAGING_LEFTOVER_SCRIPT_NEUTRALIZATION=PASS count="+oldScripts.length);
-            // The current staging index.php is a custom 404 JSON handler and does not bootstrap WordPress. Preserve it outside the web root, then restore the standard WordPress front controller.
-            const originalIndex=await readFile(stage,"index.php");
-            if(!originalIndex.ok||!originalIndex.content.startsWith("<?php"))throw new Error("Could not read staging index.php before front-controller repair.");
-            const standardIndex=[
-              "<?php",
-              "/**",
-              " * Front to the WordPress application.",
-              " *",
-              " * @package WordPress",
-              " */",
-              "define( 'WP_USE_THEMES', true );",
-              "require __DIR__ . '/wp-blog-header.php';"
-            ].join("\n")+"\n";
-            const needsFrontController=!/require[^;]*wp-blog-header\.php/i.test(originalIndex.content)||/["']ok["']\s*:\s*false/.test(originalIndex.content);
-            if(needsFrontController){
-              const homeDir=root.replace(/\/public_html$/,"");
-              if(!homeDir||homeDir===root)throw new Error("Could not derive a safe backup directory outside the staging web root.");
-              const backupName="irpa-staging-index-backup-"+crypto.randomBytes(10).toString("hex")+".txt";
-              if(!await writeFile(homeDir,backupName,originalIndex.content))throw new Error("Could not verify the original staging index.php backup outside the web root.");
-              if(!await writeFile(stage,"index.php",standardIndex)){
-                const restored=await writeFile(stage,"index.php",originalIndex.content);
-                throw new Error(restored?"Standard WordPress front-controller write failed; original index.php was restored.":"CRITICAL: WordPress front-controller write failed and original index.php could not be restored.");
-              }
-              const savedIndex=await readFile(stage,"index.php");
-              if(!savedIndex.ok||savedIndex.content!==standardIndex)throw new Error("Staging WordPress front-controller did not verify byte-for-byte.");
-              console.log("STAGING_WORDPRESS_FRONT_CONTROLLER_REPAIR=VERIFIED backup=outside-webroot");
-            }
-            const routeCheck=await request(new URL("/wp-json/",wpBase).href,"GET",{Accept:"application/json","Cache-Control":"no-cache"});
-            let routeData=routeCheck.data;
-            if(routeCheck.http!==200||!routeData||!Array.isArray(routeData.namespaces))throw new Error("WordPress REST routing is still unavailable after front-controller repair; HTTP="+routeCheck.http);
-            console.log("STAGING_WORDPRESS_REST_ROUTE=PASS namespaces="+routeData.namespaces.length);
-            const wpPassword=String(process.env.WP_PASSWORD||"").replace(/\s/g,"");
-            const basic="Basic "+Buffer.from(process.env.WP_USER+":"+wpPassword).toString("base64");
-            const usernameB64=Buffer.from(process.env.WP_USER,"utf8").toString("base64");
-            const integrationUser="irpa-staging-gateway-"+crypto.createHash("sha256").update(String(process.env.WP_USER||"")).digest("hex").slice(0,12);
-            const passwordHash=crypto.createHash("sha256").update(wpPassword).digest("hex");
-            async function verifyAuth(fatalToken=""){
-              try{
-                const headers={Authorization:basic,"X-IRPA-Staging-Authorization":basic,Accept:"application/json","Cache-Control":"no-cache"};
-                if(fatalToken)headers["X-IRPA-Staging-Fatal-Token"]=fatalToken;
-                const r=await request(new URL("/wp-json/wp/v2/users/me?context=edit",wpBase).href,"GET",headers);
-                return {ok:r.http===200&&Number.isInteger(r.data?.id),http:r.http,errorCode:String(r.data?.code||"").slice(0,80),message:String(r.data?.message||"").replace(/\/home\/[^/\s]+/g,"/home/[account]").replace(/(?:password|secret|token|authorization)\s*[:=]\s*[^,\s;]+/ig,"credential=[redacted]").slice(0,180)};
-              }catch(e){return {ok:false,http:0,error:String(e.code||e.name)}}
-            }
-            let verified=await verifyAuth();
-            if(!verified.ok){
-              // Host security rules reject standalone PHP paths. Use the existing staging index.php only for a single token-guarded request and always restore its exact original bytes in finally.
-              const original=await readFile(stage,"index.php");
-              if(!original.ok||!original.content.startsWith("<?php"))throw new Error("Could not read the original staging index.php before the guarded bootstrap.");
-              const token=crypto.randomBytes(32).toString("hex");
-              const tokenHash=crypto.createHash("sha256").update(token).digest("hex");
-              const php=[
-                "<?php",
-                "$provided=(string)($_SERVER['HTTP_X_IRPA_STAGING_PROVISION_TOKEN']??'');",
-                "if(!hash_equals('"+tokenHash+"',hash('sha256',$provided))){http_response_code(404);header('Content-Type: application/json; charset=utf-8');echo '{\"ok\":false}';exit;}",
-                "require_once __DIR__.'/wp-load.php';",
-                "header('Content-Type: application/json; charset=utf-8');",
-                "try{",
-                "$username=trim((string)($_SERVER['HTTP_X_IRPA_STAGING_USERNAME']??''));",
-                "$password=preg_replace('/\\s+/','',(string)($_SERVER['HTTP_X_IRPA_STAGING_APP_PASSWORD']??''));",
-                "if($username===''||$password===''){http_response_code(400);echo json_encode(['ok'=>false,'reason'=>'missing_input']);exit;}",
-                "if(!function_exists('wp_insert_application_password')||!class_exists('WP_Application_Passwords')){",
-                "  $integrationUser=trim((string)(\$_SERVER['HTTP_X_IRPA_STAGING_INTEGRATION_USER']??''));",
-                "  if(!preg_match('/^irpa-staging-gateway-[a-f0-9]{12}$/',$integrationUser)){http_response_code(400);echo json_encode(['ok'=>false,'reason'=>'invalid_integration_user']);exit;}",
-                "  $gateway=get_user_by('login',$integrationUser);",
-                "  if($gateway&&get_user_meta($gateway->ID,'_irpa_staging_gateway_managed',true)!=='v1'){http_response_code(409);echo json_encode(['ok'=>false,'reason'=>'staging_integration_user_conflict']);exit;}",
-                "  if(!$gateway){$uid=wp_insert_user(['user_login'=>$integrationUser,'user_pass'=>wp_generate_password(48,true,true),'user_email'=>$integrationUser.'@staging.irpa.or.tz','display_name'=>'IRPA Staging Gateway','role'=>'editor']);if(is_wp_error($uid)){http_response_code(409);echo json_encode(['ok'=>false,'reason'=>'staging_integration_user_creation_failed']);exit;}update_user_meta($uid,'_irpa_staging_gateway_managed','v1');$gateway=get_user_by('id',$uid);}",
-                "  if(!$gateway||!user_can($gateway,'edit_pages')||user_can($gateway,'manage_options')){http_response_code(409);echo json_encode(['ok'=>false,'reason'=>'staging_integration_user_permissions_invalid']);exit;}",
-                "  http_response_code(409);echo json_encode(['ok'=>false,'reason'=>'application_passwords_unavailable']);exit;",
-                "}",
-                "if(function_exists('wp_is_application_passwords_available')&&!wp_is_application_passwords_available()){http_response_code(409);echo json_encode(['ok'=>false,'reason'=>'application_passwords_disabled']);exit;}",
-                "$user=get_user_by('login',$username);",
-                "if(!$user||!user_can($user,'edit_pages')){http_response_code(409);echo json_encode(['ok'=>false,'reason'=>'staging_user_unavailable']);exit;}",
-                "$apps=WP_Application_Passwords::get_user_application_passwords($user->ID);",
-                "foreach($apps as $app){if(($app['name']??'')==='IRPA Staging Gateway'&&!empty($app['uuid']))wp_delete_application_password($app['uuid'],$user->ID);}",
-                "$result=wp_insert_application_password($user->ID,['name'=>'IRPA Staging Gateway','password'=>$password,'created'=>time(),'app_id'=>wp_generate_uuid4()]);",
-                "if(is_wp_error($result)){http_response_code(500);echo json_encode(['ok'=>false,'reason'=>'application_password_registration_failed']);exit;}",
-                "echo json_encode(['ok'=>true]);exit;",
-                "}catch(Throwable $e){http_response_code(500);echo json_encode(['ok'=>false,'reason'=>'bootstrap_exception']);exit;}"
-              ].join("\n");
-              if(!await writeFile(stage,"index.php",php))throw new Error("Could not install the guarded temporary staging bootstrap.");
-              let provisionError=null;
-              let appPasswordsUnavailable=false;
-              try{
-                const provision=await request(new URL("/index.php",wpBase).href,"GET",{
-                  "X-IRPA-Staging-Provision-Token":token,
-                  "X-IRPA-Staging-Username":process.env.WP_USER,
-                  "X-IRPA-Staging-App-Password":wpPassword,
-                  "X-IRPA-Staging-Integration-User":integrationUser,
-                  Accept:"application/json","Cache-Control":"no-cache"
-                });
-                console.log("STAGING_APPLICATION_PASSWORD_REGISTRATION="+JSON.stringify({http:provision.http,ok:provision.data?.ok===true,reason:String(provision.data?.reason||"").slice(0,80)}));
-                if(provision.data?.reason==="application_passwords_unavailable")appPasswordsUnavailable=true;
-                else if(provision.http!==200||provision.data?.ok!==true)provisionError=new Error("The guarded staging index bootstrap did not register the application password.");
-              }catch(e){provisionError=e}
-              finally{
-                if(!await writeFile(stage,"index.php",original.content))throw new Error("CRITICAL: original staging index.php could not be restored byte-for-byte.");
-                console.log("STAGING_INDEX_RESTORE=VERIFIED");
-              }
-              if(provisionError)throw provisionError;
-              if(appPasswordsUnavailable){
-                // This staging WordPress core lacks native Application Passwords. Install a staging-only REST Basic-auth adapter using a SHA-256 verifier; it grants only edit_pages users, only to /wp-json/*, and only on the exact staging hostname.
-                const shim=[
-                  "<?php",
-                  "@ini_set('memory_limit','256M');",
-                  "if(!function_exists('irpa_staging_rest_auth_user')){",
-                  "function irpa_staging_rest_auth_user(){",
-                  "$host=strtolower(preg_replace('/:\\\\d+$/','',(string)($_SERVER['HTTP_HOST']??'')));",
-                  "if($host!=='staging.irpa.or.tz') return 0;",
-                  "$path=(string)(parse_url((string)($_SERVER['REQUEST_URI']??''),PHP_URL_PATH)?:'');",
-                  "if($path!=='/wp-json'&&strpos($path,'/wp-json/')!==0) return 0;",
-                  "$header=(string)($_SERVER['HTTP_X_IRPA_STAGING_AUTHORIZATION']??$_SERVER['HTTP_AUTHORIZATION']??$_SERVER['REDIRECT_HTTP_AUTHORIZATION']??'');",
-                  "if($header===''&&function_exists('getallheaders')){foreach((array)getallheaders() as $k=>$v){if(strcasecmp((string)$k,'Authorization')===0){$header=(string)$v;break;}}}",
-                  "if($header===''&&function_exists('apache_request_headers')){foreach((array)apache_request_headers() as $k=>$v){if(strcasecmp((string)$k,'Authorization')===0){$header=(string)$v;break;}}}",
-                  "if(!preg_match('/^Basic\\\\s+([A-Za-z0-9+\\\\/=]+)$/i',$header,$matches)) return 0;",
-                  "$decoded=base64_decode($matches[1],true);",
-                  "if($decoded===false||strpos($decoded,':')===false) return 0;",
-                  "list($username,$password)=explode(':',$decoded,2);",
-                  "$password=preg_replace('/\\\\s+/','',$password);",
-                  "if(!hash_equals(base64_decode('"+usernameB64+"'),$username)||!hash_equals('"+passwordHash+"',hash('sha256',$password))) return 0;",
-                  "$user=get_user_by('login','"+integrationUser+"');",
-                  "if(!$user||get_user_meta($user->ID,'_irpa_staging_gateway_managed',true)!=='v1'||!user_can($user,'edit_pages')) return 0;",
-                  "return (int)$user->ID;",
-                  "}",
-                  "}",
-                  "add_filter('determine_current_user',function($userId){if($userId)return $userId;$candidate=irpa_staging_rest_auth_user();return $candidate?:$userId;},20);",
-                  "add_filter('rest_authentication_errors',function($result){if(is_wp_error($result)&&$result->get_error_code()==='rest_not_logged_in'){$candidate=irpa_staging_rest_auth_user();if($candidate){wp_set_current_user($candidate);return null;}}return $result;},200);"
-                ].join("\n")+"\n";
-                if(!await writeFile(muDir,"irpa-staging-rest-auth.php",shim))throw new Error("Could not install and verify the staging-only WordPress REST authentication adapter.");
-                console.log("STAGING_REST_AUTH_SHIM_INSTALL=VERIFIED");
-              }
-              // A prior guarded index.php bootstrap may remain in PHP OPcache even after its original bytes are restored.
-              // Invalidate only the staging WordPress front controller via a temporary MU-plugin; never rewrite index.php.
-              const cacheToken=crypto.randomBytes(32).toString("hex");
-              const cacheHash=crypto.createHash("sha256").update(cacheToken).digest("hex");
-              const cachePlugin="irpa-staging-opcache-"+crypto.randomBytes(6).toString("hex")+".php";
-              const cachePhp=[
-                "<?php",
-                "$path=(string)(parse_url((string)(\$_SERVER['REQUEST_URI']??''),PHP_URL_PATH)?:'');",
-                "if($path!=='/wp-admin/'&&$path!=='/wp-admin/index.php') return;",
-                "$host=strtolower(preg_replace('/:\\d+$/','',(string)(\$_SERVER['HTTP_HOST']??'')));",
-                "if($host!=='staging.irpa.or.tz') return;",
-                "$provided=(string)(\$_SERVER['HTTP_X_IRPA_STAGING_OPCACHE_TOKEN']??'');",
-                "if(!hash_equals('"+cacheHash+"',hash('sha256',$provided))) return;",
-                "$target=ABSPATH.'index.php';",
-                "$cached=function_exists('opcache_is_script_cached')&&opcache_is_script_cached($target);",
-                "$invalidated=!$cached||(function_exists('opcache_invalidate')&&@opcache_invalidate($target,true));",
-                "header('Content-Type: application/json; charset=utf-8');",
-                "echo json_encode(['ok'=>!$cached||$invalidated,'cached'=>$cached,'invalidated'=>$invalidated]);exit;"
-              ].join("\n")+"\n";
-              if(!await writeFile(muDir,cachePlugin,cachePhp))throw new Error("Could not install the temporary staging OPcache invalidation plugin.");
-              let cacheResult=null,cacheError=null;
-              try{
-                cacheResult=await request(new URL("/wp-admin/",wpBase).href,"GET",{"X-IRPA-Staging-OPCACHE-Token":cacheToken,Accept:"application/json","Cache-Control":"no-cache"});
-                console.log("STAGING_INDEX_OPCACHE_INVALIDATION="+JSON.stringify({http:cacheResult.http,ok:cacheResult.data?.ok===true,cached:cacheResult.data?.cached===true,invalidated:cacheResult.data?.invalidated===true}));
-              }catch(e){
-                cacheError=e;
-                console.log("STAGING_INDEX_OPCACHE_INVALIDATION_ERROR="+String(e.code||e.name||"error"));
-              }finally{
-                if(!await writeFile(muDir,cachePlugin,inert))throw new Error("Could not neutralize the temporary staging OPcache plugin.");
-              }
-              const fatalToken=crypto.randomBytes(32).toString("hex");
-              const fatalHash=crypto.createHash("sha256").update(fatalToken).digest("hex");
-              const fatalPlugin="irpa-staging-fatal-"+crypto.randomBytes(6).toString("hex")+".php";
-              const fatalLogName="irpa-staging-fatal-"+crypto.randomBytes(6).toString("hex")+".log";
-              const fatalLogPath=stage+"/wp-content/"+fatalLogName;
-              const fatalPhp=[
-                "<?php",
-                "$host=strtolower(preg_replace('/:\\\\d+$/','',(string)(\$_SERVER['HTTP_HOST']??'')));",
-                "if($host!=='staging.irpa.or.tz') return;",
-                "$path=(string)(parse_url((string)(\$_SERVER['REQUEST_URI']??''),PHP_URL_PATH)?:'');",
-                "if(strpos($path,'/wp-json/wp/v2/')!==0) return;",
-                "$provided=(string)(\$_SERVER['HTTP_X_IRPA_STAGING_FATAL_TOKEN']??'');",
-                "if(!hash_equals('"+fatalHash+"',hash('sha256',$provided))) return;",
-                "$logPath='"+fatalLogPath+"';",
-                "register_shutdown_function(function() use ($logPath){ $e=error_get_last(); $msg=(string)($e['message']??'no-last-error'); $msg=preg_replace('/(?:password|secret|token|authorization)\\\\s*[:=]\\\\s*[^,\\\\s;]+/i','credential=[redacted]',$msg); $msg=preg_replace('/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\\\.[A-Z]{2,}/i','[email]',$msg); $payload=['type'=>(int)($e['type']??0),'file'=>basename((string)($e['file']??'')),'line'=>(int)($e['line']??0),'message'=>substr($msg,0,240)]; @file_put_contents($logPath,json_encode($payload).PHP_EOL,FILE_APPEND|LOCK_EX); });"
-              ].join("\\n")+"\\n";
-              if(!await writeFile(muDir,fatalPlugin,fatalPhp))throw new Error("Could not install the temporary staging fatal diagnostic.");
-              try{
-                verified=await verifyAuth(fatalToken);
-              }finally{
-                if(!await writeFile(muDir,fatalPlugin,inert))throw new Error("Could not neutralize the temporary staging fatal diagnostic.");
-              }
-              const fatalLog=await readFile(stage+"/wp-content",fatalLogName);
-              if(fatalLog.ok&&fatalLog.content){
-                const fatalLines=fatalLog.content.split(/\r?\n/).filter(Boolean).slice(-3).map(line=>{try{const d=JSON.parse(line);return {type:d.type,file:d.file,line:d.line,message:String(d.message||"").replace(/\/home\/[^/\s]+/g,"/home/[account]").replace(/(?:password|secret|token|authorization)\s*[:=]\s*[^,\s;]+/ig,"credential=[redacted]").replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/ig,"[email]").slice(0,240)}}catch{return {invalidDiagnosticLine:true}}});
-                console.log("STAGING_REST_FATAL_DIAGNOSTIC="+JSON.stringify(fatalLines));
-              }else{
-                console.log("STAGING_REST_FATAL_DIAGNOSTIC="+JSON.stringify({logCreated:false,logReadOk:fatalLog.ok}));
-              }
-              if(!await writeFile(stage+"/wp-content",fatalLogName,inert))throw new Error("Could not neutralize the temporary staging fatal diagnostic log.");
-              if(!verified.ok&&verified.http===500){
-                const logDirs=[{label:"staging",dir:stage},{label:"webroot",dir:root},{label:"home-logs",dir:root.replace(/\/public_html$/,"")+"/logs"},{label:"wp-content",dir:stage+"/wp-content"}];
-                for(const entry of logDirs){
-                  try{
-                    const listing=await list(entry.dir);
-                    if(!listing.ok)continue;
-                    for(const name of listing.files.filter(n=>n==="error_log"||n==="debug.log"||/staging.*error.*log/i.test(n)).slice(0,3)){
-                      const log=await readFile(entry.dir,name);
-                      const lines=log.content.split(/\r?\n/).filter(line=>/fatal error|uncaught|parse error|irpa-staging-rest-auth|irpa_staging_fatal_diag|undefined function|critical error/i.test(line)).slice(-8).map(line=>line.replace(/\/home\/[^/\s]+/g,"/home/[account]").replace(/(?:password|secret|token|authorization)\s*[:=]\s*[^,\s;]+/ig,"credential=[redacted]").replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/ig,"[email]").slice(0,200));
-                      console.log("STAGING_WORDPRESS_FATAL_LOG="+JSON.stringify({location:entry.label,file:name,count:lines.length,lines}));
-                    }
-                  }catch{}
-                }
-              }
-              if(!verified.ok&&appPasswordsUnavailable){
-                // Read-only diagnostic through a token-guarded temporary index.php, reporting booleans only; always restore the exact original bytes.
-                const diagOriginal=await readFile(stage,"index.php");
-                if(!diagOriginal.ok||!diagOriginal.content.startsWith("<?php"))throw new Error("Could not read staging index.php for guarded auth diagnostics.");
-                const diagToken=crypto.randomBytes(32).toString("hex");
-                const diagTokenHash=crypto.createHash("sha256").update(diagToken).digest("hex");
-                const diagExpectedUserB64=Buffer.from(process.env.WP_USER,"utf8").toString("base64");
-                const diagPasswordHash=crypto.createHash("sha256").update(wpPassword).digest("hex");
-                const diagPhp=[
-                  "<?php",
-                  "$provided=(string)($_SERVER['HTTP_X_IRPA_STAGING_DIAG_TOKEN']??'');",
-                  "if(!hash_equals('"+diagTokenHash+"',hash('sha256',$provided))){http_response_code(404);exit;}",
-                  "require_once __DIR__.'/wp-load.php';",
-                  "$header=(string)($_SERVER['HTTP_X_IRPA_STAGING_AUTHORIZATION']??$_SERVER['HTTP_AUTHORIZATION']??$_SERVER['REDIRECT_HTTP_AUTHORIZATION']??'');",
-                  "if($header===''&&function_exists('getallheaders')){foreach((array)getallheaders() as $k=>$v){if(strcasecmp((string)$k,'Authorization')===0){$header=(string)$v;break;}}}",
-                  "$parsed=preg_match('/^Basic\\\\s+([A-Za-z0-9+\\\\/=]+)$/i',$header,$m)===1;",
-                  "$decoded=$parsed?base64_decode($m[1],true):false;",
-                  "$parts=($decoded!==false&&strpos($decoded,':')!==false)?explode(':',$decoded,2):['',''];",
-                  "$username=$parts[0];$password=preg_replace('/\\\\s+/','',$parts[1]);",
-                  "$expectedUser=base64_decode('"+diagExpectedUserB64+"');",
-                  "$user=get_user_by('login','"+integrationUser+"');",
-                  "$diagnostics=['auth_header_present'=>$header!=='','basic_parsed'=>$parsed,'username_matches'=>hash_equals($expectedUser,$username),'password_hash_matches'=>hash_equals('"+diagPasswordHash+"',hash('sha256',$password)),'user_found'=>(bool)$user,'user_can_edit_pages'=>($user&&user_can($user,'edit_pages'))];",
-                  "header('Content-Type: application/json; charset=utf-8');echo json_encode(['diagnostics'=>$diagnostics]);exit;"
-                ].join("\n");
-                let diagnosticError=null;
-                try{
-                  if(!await writeFile(stage,"index.php",diagPhp))throw new Error("Could not install the guarded WordPress auth diagnostic.");
-                  const diag=await request(new URL("/index.php",wpBase).href,"GET",{"X-IRPA-Staging-Diag-Token":diagToken,Authorization:basic,"X-IRPA-Staging-Authorization":basic,Accept:"application/json","Cache-Control":"no-cache"});
-                  console.log("STAGING_REST_AUTH_DIAGNOSTIC="+JSON.stringify(diag.data?.diagnostics||{http:diag.http,parsedJson:!!diag.data}));
-                }catch(e){diagnosticError=e}
-                finally{
-                  if(!await writeFile(stage,"index.php",diagOriginal.content))throw new Error("CRITICAL: original staging index.php could not be restored after auth diagnostics.");
-                  console.log("STAGING_AUTH_DIAGNOSTIC_INDEX_RESTORE=VERIFIED");
-                }
-                if(diagnosticError)console.log("STAGING_REST_AUTH_DIAGNOSTIC_ERROR="+String(diagnosticError.code||diagnosticError.name||"error"));
-              }
-            }
-            if(!verified.ok){
-              const probes=[];
-              for(const path of ["/wp-json/","/wp-json/wp/v2/types","/wp-json/wp/v2/posts?per_page=1","/wp-json/wp/v2/users/me?context=edit"]){
-                try{
-                  const r=await request(new URL(path,wpBase).href,"GET",{Authorization:basic,"X-IRPA-Staging-Authorization":basic,Accept:"application/json","Cache-Control":"no-cache"});
-                  probes.push({path,http:r.http,code:String(r.data?.code||"").slice(0,80),message:String(r.data?.message||"").replace(/\/home\/[^/\s]+/g,"/home/[account]").replace(/(?:password|secret|token|authorization)\s*[:=]\s*[^,\s;]+/ig,"credential=[redacted]").slice(0,140)});
-                }catch(e){probes.push({path,error:String(e.code||e.name||"error")});}
-              }
-              console.log("STAGING_REST_ENDPOINT_DIAGNOSTICS="+JSON.stringify(probes));
-            }
-            console.log("STAGING_WORDPRESS_AUTH_AFTER_REPAIR="+JSON.stringify(verified));
-            if(!verified.ok)throw new Error("WordPress REST authentication remains unavailable after the staging bootstrap repair.");
-          }
-          main().catch(e=>{console.error("Staging WordPress bootstrap repair:",String(e.message||e));process.exit(1)});
-          NODE
-
       - name: Capture staging WordPress fatal diagnostics (redacted)
         if: always()
         env:
@@ -1045,8 +670,6 @@ jobs:
           printf '%s' "$GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY" | npx wrangler secret put GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY --config wrangler.staging.generated.json
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT" | npx wrangler secret put FIREBASE_SERVICE_ACCOUNT_JSON --config wrangler.staging.generated.json
           printf '%s' "$WP_BASE" | npx wrangler secret put WORDPRESS_BASE_URL --config wrangler.staging.generated.json
-          printf '%s' "$WP_USER" | npx wrangler secret put WORDPRESS_USERNAME --config wrangler.staging.generated.json
-          printf '%s' "$WP_PASSWORD" | npx wrangler secret put WORDPRESS_APPLICATION_PASSWORD --config wrangler.staging.generated.json
           printf '%s' "$CP_BASE" | npx wrangler secret put CPANEL_BASE_URL --config wrangler.staging.generated.json
           printf '%s' "$CP_USER" | npx wrangler secret put CPANEL_USERNAME --config wrangler.staging.generated.json
           printf '%s' "$CP_TOKEN" | npx wrangler secret put CPANEL_API_TOKEN --config wrangler.staging.generated.json
@@ -1256,42 +879,15 @@ jobs:
           main().catch(e=>{console.error(e.message);process.exit(1)});
           NODE
 
-      - name: Diagnose staging WordPress application-password authentication (no secrets logged)
-        env:
-          WP_BASE: ${{ secrets.STAGING_WORDPRESS_BASE_URL }}
-          WP_USER: ${{ secrets.STAGING_WORDPRESS_USERNAME }}
-          WP_PASSWORD: ${{ secrets.STAGING_WORDPRESS_APPLICATION_PASSWORD }}
-        run: |
-          set -euo pipefail
-          node <<'NODE'
-          const {URL}=require("node:url");
-          async function main(){
-            const base=new URL(process.env.WP_BASE);
-            const auth="Basic "+Buffer.from(process.env.WP_USER+":"+String(process.env.WP_PASSWORD||"").replace(/\s/g,"")).toString("base64");
-            let response;
-            try{
-              response=await fetch(new URL("/wp-json/wp/v2/users/me?context=edit",base),{headers:{Authorization:auth,"X-IRPA-Staging-Authorization":auth,Accept:"application/json","Cache-Control":"no-cache"},signal:AbortSignal.timeout(12000)});
-            }catch(e){
-              console.log("STAGING_WP_APPLICATION_PASSWORD_PREFLIGHT="+JSON.stringify({result:"network_error",error:String(e.cause?.code||e.name||"error")}));
-              return;
-            }
-            const data=await response.json().catch(()=>({}));
-            console.log("STAGING_WP_APPLICATION_PASSWORD_PREFLIGHT="+JSON.stringify({http:response.status,contentType:response.headers.get("content-type")||"",server:response.headers.get("server")||"",errorCode:String(data.code||"").slice(0,80),authenticated:response.status===200&&Number.isInteger(data.id)}));
-          }
-          main().catch(e=>{console.log("STAGING_WP_APPLICATION_PASSWORD_PREFLIGHT=ERROR_"+String(e.name||"error"));process.exit(1)});
-          NODE
-
-
       - name: Write redacted repair summary
         if: always()
         env:
           PREFLIGHT: ${{ steps.staging-preflight.outcome }}
-          REPAIR: ${{ steps.wp-bootstrap-repair.outcome }}
           DEPLOY: ${{ steps.deploy-staging-worker.outcome }}
           HEALTH: ${{ steps.staging-health.outcome }}
         run: |
           set -euo pipefail
-          { echo "# IRPA-DBGS staging repair"; echo ""; echo "- Target: staging.irpa.or.tz"; echo "- Preflight: ${PREFLIGHT:-not-run}"; echo "- WordPress bootstrap/auth repair: ${REPAIR:-not-run}"; echo "- Staging Worker deployment: ${DEPLOY:-not-run}"; echo "- Staging health: ${HEALTH:-not-run}"; echo "- Production credentials/site/DNS: not accessed in this run"; echo "- Merge gate: CLOSED"; } | tee staging-repair-summary.md >> "$GITHUB_STEP_SUMMARY"
+          { echo "# IRPA-DBGS staging repair"; echo ""; echo "- Target: staging.irpa.or.tz"; echo "- Preflight: ${PREFLIGHT:-not-run}"; echo "- WordPress credential source: preconfigured staging Worker secrets"; echo "- Staging Worker deployment: ${DEPLOY:-not-run}"; echo "- Staging health: ${HEALTH:-not-run}"; echo "- Production credentials/site/DNS: not accessed in this run"; echo "- Merge gate: CLOSED"; } | tee staging-repair-summary.md >> "$GITHUB_STEP_SUMMARY"
           cp staging-repair-summary.md staging-repair-diagnostics.txt
           if [ -f staging-wordpress-fatal-diagnostics.txt ]; then cat staging-wordpress-fatal-diagnostics.txt >> staging-repair-diagnostics.txt; fi
       - name: Upload redacted repair diagnostics
@@ -1354,19 +950,14 @@ jobs:
           const base=process.env.STAGING_URL;
           const token=process.env.ID_TOKEN;
           const marker="IRPA_STAGING_WEBSITE_CHECK_"+Date.now();
-          const wpBase=process.env.WP_BASE.replace(/\/+$/,"");
-          const wpAuth="Basic "+Buffer.from(process.env.WP_USER+":"+process.env.WP_PASSWORD).toString("base64");
+          const testPageId=Number(process.env.TEST_PAGE_ID);
+          if(!Number.isSafeInteger(testPageId)||testPageId<1) throw new Error("ABORT: a pre-provisioned isolated staging test page ID is required.");
           async function call(path,options={}){
-            const response=await fetch(base+path,{...options,headers:{Authorization:"Bearer "+token,Accept:"application/json",...(options.body?{"Content-Type":"application/json"}:{}),...(options.headers||{})}});
+            const response=await fetch(base+path,{...options,headers:{Authorization:"Bearer "+token,Accept:"application/json",...(options.body?{"Content-Type":"application/json"}:{}),...(options.headers||{})},redirect:"manual"});
             const body=await response.json().catch(()=>({}));
-            if(!response.ok) throw new Error(path+" returned HTTP "+response.status+": "+String(body.error||"request failed").slice(0,180));
+            if(response.status>=300&&response.status<400) throw new Error(path+" returned a redirect; no redirect target was requested.");
+            if(!response.ok) throw new Error(path+" returned HTTP "+response.status);
             return body;
-          }
-          async function wpRequest(path,body){
-            const response=await fetch(wpBase+"/wp-json/wp/v2/"+path,{method:body?"POST":"GET",headers:{Authorization:wpAuth,Accept:"application/json",...(body?{"Content-Type":"application/json"}:{})},...(body?{body:JSON.stringify(body)}:{})});
-            const data=await response.json().catch(()=>null);
-            if(!response.ok||!data) throw new Error("Staging WordPress test-page preparation/restore failed with HTTP "+response.status+".");
-            return data;
           }
           async function waitForPublicMarker(url){
             const target=new URL(url);
@@ -1383,47 +974,39 @@ jobs:
           }
           (async()=>{
             const status=await call("/api/communications/site/status");
-            if(status.connections?.website!=="connected"||status.connections?.cpanel!=="connected") throw new Error("WordPress/cPanel connection status: "+JSON.stringify(status.connections||{}));
-            const baselineTitle="IRPA Staging Integration Check";
-            const baselineContent="<p>IRPA staging integration baseline.</p>";
-            const found=await wpRequest("pages?slug=irpa-staging-integration-check&context=edit&per_page=1");
-            let page=(Array.isArray(found)?found:[]).find(x=>Number.isInteger(x.id));
-            let created=false;
-            let original=null;
-            if(page){
-              original={title:page.title?.raw||page.title?.rendered||baselineTitle,content:page.content?.raw??baselineContent,excerpt:page.excerpt?.raw??page.excerpt?.rendered??"",featuredMedia:Number(page.featured_media||0),status:page.status||"draft"};
-            }else{
-              page=await wpRequest("pages",{title:baselineTitle,slug:"irpa-staging-integration-check",content:baselineContent,status:"draft"});
-              created=true;
-              original={title:baselineTitle,content:baselineContent,excerpt:"",featuredMedia:0,status:"draft"};
-            }
-            let prepared=false;
+            if(status.connections?.website!=="connected"||status.connections?.websiteHttpStatus!==200||status.connections?.cpanel!=="connected") throw new Error("Staging connection acceptance failed with HTTP "+(status.connections?.websiteHttpStatus??"unknown")+".");
+            console.log("STAGING_WORDPRESS_USERS_ME_HTTP="+status.connections.websiteHttpStatus);
+            const before=await call("/api/communications/website/content/pages/"+testPageId);
+            const original=before.item;
+            if(!original||original.type!=="pages"||!original.title||typeof original.content!=="string") throw new Error("The pre-provisioned staging test page could not be read.");
+            console.log("STAGING_WORDPRESS_PAGE_READ_HTTP=200");
+            let snapshotId="";
             try{
-              const ready=await wpRequest("pages/"+page.id,{title:baselineTitle,slug:"irpa-staging-integration-check",content:baselineContent,status:"publish"});
-              prepared=true;
-              const listed=await call("/api/communications/website/content?type=pages");
-              const portalPage=(listed.items||[]).find(x=>Number(x.id)===Number(page.id));
-              if(!portalPage) throw new Error("The dedicated staging page was not visible through the Communication & Media Portal.");
               const updated=await call("/api/communications/website/content",{method:"PUT",body:JSON.stringify({
-                id:page.id,type:"pages",title:baselineTitle+" "+marker,content:baselineContent+"<p>"+marker+"</p>",
-                excerpt:String(ready.excerpt?.raw??ready.excerpt?.rendered??""),
-                featuredMedia:Number(ready.featured_media||0),status:"publish"
+                id:testPageId,type:"pages",title:original.title+" "+marker,
+                content:original.content+"<p>"+marker+"</p>",excerpt:original.excerpt||"",
+                featuredMedia:Number(original.featuredMedia||0),status:"publish"
               })});
-              if(!updated.success||!updated.snapshotId||!await waitForPublicMarker(updated.item?.link||ready.link||page.link)) throw new Error("The staged website edit did not render publicly or return a pre-edit snapshot.");
-              const restored=await call("/api/communications/website/restore",{method:"POST",body:JSON.stringify({type:"pages",id:page.id,snapshotId:updated.snapshotId})});
-              if(!restored.success||!restored.safetySnapshotId) throw new Error("The one-click revision restore did not return a verified result.");
-              const restoredRead=await call("/api/communications/website/content/pages/"+page.id);
-              if(restoredRead.item?.title!==baselineTitle||restoredRead.item?.content!==baselineContent||
-                 restoredRead.item?.excerpt!==String(ready.excerpt?.raw??ready.excerpt?.rendered??"")||
-                 Number(restoredRead.item?.featuredMedia||0)!==Number(ready.featured_media||0)||
-                 restoredRead.item?.status!=="publish") throw new Error("The restored staging page did not match the exact pre-edit fields.");
+              snapshotId=String(updated.snapshotId||"");
+              if(!updated.success||!snapshotId||!updated.item?.link||!await waitForPublicMarker(updated.item.link)) throw new Error("The staged edit was not publicly verified or did not return a restorable snapshot.");
+              console.log("STAGING_WORDPRESS_PAGE_EDIT_VERIFY_HTTP=200");
+              const restored=await call("/api/communications/website/restore",{method:"POST",body:JSON.stringify({type:"pages",id:testPageId,snapshotId})});
+              if(!restored.success||!restored.safetySnapshotId) throw new Error("The one-click revision restore failed.");
+              snapshotId="";
+              const restoredRead=await call("/api/communications/website/content/pages/"+testPageId);
+              if(restoredRead.item?.title!==original.title||restoredRead.item?.content!==original.content||
+                 restoredRead.item?.excerpt!==original.excerpt||
+                 Number(restoredRead.item?.featuredMedia||0)!==Number(original.featuredMedia||0)||
+                 restoredRead.item?.status!==original.status) throw new Error("The restored staging page does not exactly match its original allowed fields.");
+              console.log("STAGING_WORDPRESS_RESTORE_HTTP=200");
             }finally{
-              if(prepared){
-                await wpRequest("pages/"+page.id,{title:original.title,content:original.content,excerpt:original.excerpt,featured_media:original.featuredMedia,status:created?"draft":original.status});
-              }else if(created){
-                await wpRequest("pages/"+page.id,{status:"draft"});
+              if(snapshotId){
+                await call("/api/communications/website/restore",{method:"POST",body:JSON.stringify({type:"pages",id:testPageId,snapshotId})});
               }
             }
+          })().catch(e=>{console.error("Staging website integration acceptance failed:",e.message);process.exit(1)});
+          NODE
+
             const cpanelPath=process.env.CP_TEST_FILE;
             const before=await call("/api/communications/cpanel/files?path="+encodeURIComponent(cpanelPath));
             if(typeof before.content!=="string") throw new Error("The designated staging cPanel test file could not be read.");
