@@ -857,9 +857,9 @@ jobs:
       - name: Repair malformed staging WordPress rewrite rules with verified backup
         continue-on-error: true
         env:
-          CP_BASE: \${{ secrets.STAGING_CPANEL_BASE_URL }}
-          CP_USER: \${{ secrets.STAGING_CPANEL_USERNAME }}
-          CP_TOKEN: \${{ secrets.STAGING_CPANEL_API_TOKEN }}
+          CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
+          CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
+          CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
         run: |
           set -euo pipefail
           node <<'NODE'
