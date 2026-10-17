@@ -224,6 +224,13 @@ for (const viewport of [
     const pageNavigation = page.locator(".main-area > .page-back-next-navigation");
     const worldTimeToggle = pageNavigation.getByRole("button", { name: "World time" });
     await expect(worldTimeToggle, "World time toggle belongs in the shared Back/Next navigator").toBeVisible();
+    const inAppBackNext = pageNavigation.locator(".page-back-next-button");
+    if (viewport.width <= 760) {
+      await expect(inAppBackNext, "mobile app hides duplicate in-app Back/Next controls").toHaveCount(0);
+      await expect(worldTimeToggle, "World Time remains visible in the mobile navigation row").toBeVisible();
+    } else {
+      await expect(inAppBackNext, "tablet and desktop retain existing Back/Next controls").toHaveCount(2);
+    }
     await expect(page.locator(".live-weather-content .page-back-next-time-pad"),
       "weather forecast must not own the international time popup").toHaveCount(0);
     await expect(page.locator("#irpa-international-time-pad")).toHaveCount(0);
