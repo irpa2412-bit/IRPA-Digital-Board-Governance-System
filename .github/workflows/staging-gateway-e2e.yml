@@ -907,6 +907,15 @@ jobs:
                   const directives=content.split(/\r?\n/).filter(x=>/^\s*(RewriteEngine|RewriteBase|RewriteRule|RewriteCond|php_value|php_flag|Options|DirectoryIndex|SetHandler|AddHandler|RemoveHandler)/i.test(x)).slice(0,25).map(redact);
                   console.log("POST_REMEDIATION_HTACCESS="+JSON.stringify({length:content.length,directives}));
                 }
+                if(dir===root+"/staging"){
+                  for(const configFile of [".htaccess",".user.ini","php.ini"]){
+                    const config=await cp("Fileman/get_file_content",{dir,file:configFile});
+                    const parsedConfig=JSON.parse(config.raw||"{}");
+                    const content=String(parsedConfig.data?.content??parsedConfig.data?.data?.content??parsedConfig.result?.data?.content??"");
+                    const directives=content.split(/\r?\n/).filter(x=>/^\s*(RewriteEngine|RewriteBase|RewriteRule|RewriteCond|php_value|php_flag|Options|DirectoryIndex|SetHandler|AddHandler|ErrorDocument|Require|Deny|Allow|open_basedir|auto_prepend_file|auto_append_file)/i.test(x)||/staging/i.test(x)).slice(0,30).map(redact);
+                    console.log("POST_REMEDIATION_STAGING_CONFIG="+JSON.stringify({file:configFile,http:config.http,status:parsedConfig.status??parsedConfig.result?.status,contentLength:content.length,directives}));
+                  }
+                }
                 if(dir===root+"/staging"&&names.includes("wp-config.php")){
                   const cfg=await cp("Fileman/get_file_content",{dir,file:"wp-config.php"});
                   const l=JSON.parse(cfg.raw||"{}");
