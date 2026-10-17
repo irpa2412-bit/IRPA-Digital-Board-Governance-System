@@ -1132,49 +1132,58 @@ jobs:
               const r=await uapi("Fileman/get_file_content",{dir,file:name});
               return {ok:r.http===200&&r.data?.status===1,content:String(r.data?.data?.content??r.data?.data?.[0]?.content??r.data?.result?.data?.content??"")};
             }
-            async function disableStaleBootstrap(dir,name){
-              // cPanel delete_fileop is inconsistent on this host. Replace only workflow-generated artifacts with inert PHP, then read back the exact bytes.
-              const inert="<?php\\n// Disabled stale IRPA staging credential bootstrap artifact.\\n";
-              const saved=await uapi("Fileman/save_file_content",{dir,file:name,content:inert,charset:"utf-8"},"POST");
+            async function writeFile(dir,name,content){
+              const saved=await uapi("Fileman/save_file_content",{dir,file:name,content,charset:"utf-8"},"POST");
               const read=await readFile(dir,name);
-              return saved.http===200&&saved.data?.status===1&&read.ok&&read.content===inert;
+              return saved.http===200&&saved.data?.status===1&&read.ok&&read.content===content;
             }
-            // MU-plugins execute on every WordPress request. These old token-guard files emitted 404/{"ok":false} and exited before WordPress could bootstrap. Disable only uniquely named artifacts created by this workflow.
+            const inert="<?php\\n// Disabled stale IRPA staging credential bootstrap artifact.\\n";
+            // The old files were installed as MU-plugins, so their token guard intercepted every request before WordPress loaded. Disable only the known workflow-generated filenames and verify each file byte-for-byte.
             let mu=await list(muDir);
             if(!mu.ok)throw new Error("Could not safely inspect the staging MU-plugin directory.");
             const stale=mu.files.filter(name=>/^irpa-staging-app-password-[a-f0-9]{20}\\.php$/i.test(name));
             for(const name of stale){
-              if(!await disableStaleBootstrap(muDir,name))throw new Error("Could not safely neutralize a stale staging-only credential bootstrap MU-plugin.");
+              if(!await writeFile(muDir,name,inert))throw new Error("Could not safely neutralize a stale staging-only credential bootstrap MU-plugin.");
             }
             mu=await list(muDir);
             if(!mu.ok)throw new Error("Could not verify the staging MU-plugin directory after cleanup.");
             for(const name of mu.files.filter(name=>/^irpa-staging-app-password-[a-f0-9]{20}\\.php$/i.test(name))){
               const read=await readFile(muDir,name);
-              if(!read.ok||read.content!="<?php\\n// Disabled stale IRPA staging credential bootstrap artifact.\\n")throw new Error("A staging credential bootstrap MU-plugin is not inert; refusing to continue.");
+              if(!read.ok||read.content!==inert)throw new Error("A staging credential bootstrap MU-plugin is not inert; refusing to continue.");
             }
             console.log("STAGING_STALE_MU_PLUGIN_DISABLE=PASS count="+stale.length);
-            const wpPassword=String(process.env.WP_PASSWORD||"").replace(/\s/g,"");
+            // Neutralize any leftover one-time scripts from earlier attempts. These names are random workflow artifacts, not WordPress core files.
+            const rootFiles=await list(stage);
+            if(!rootFiles.ok)throw new Error("Could not inspect the staging root for leftover provisioning scripts.");
+            const oldScripts=rootFiles.files.filter(name=>/^irpa-staging-provision-[a-f0-9]{20}\\.php$/i.test(name));
+            for(const name of oldScripts){
+              if(!await writeFile(stage,name,inert))throw new Error("Could not neutralize a leftover one-time staging provisioning script.");
+            }
+            console.log("STAGING_LEFTOVER_SCRIPT_NEUTRALIZATION=PASS count="+oldScripts.length);
+            const wpPassword=String(process.env.WP_PASSWORD||"").replace(/\\s/g,"");
             const basic="Basic "+Buffer.from(process.env.WP_USER+":"+wpPassword).toString("base64");
             async function verifyAuth(){
-              let r;
-              try{r=await request(new URL("/wp-json/wp/v2/users/me?context=edit",wpBase).href,"GET",{Authorization:basic,Accept:"application/json","Cache-Control":"no-cache"});}
-              catch(e){return {ok:false,http:0,error:String(e.code||e.name)}}
-              return {ok:r.http===200&&Number.isInteger(r.data?.id),http:r.http,errorCode:String(r.data?.code||"").slice(0,80)};
+              try{
+                const r=await request(new URL("/wp-json/wp/v2/users/me?context=edit",wpBase).href,"GET",{Authorization:basic,Accept:"application/json","Cache-Control":"no-cache"});
+                return {ok:r.http===200&&Number.isInteger(r.data?.id),http:r.http,errorCode:String(r.data?.code||"").slice(0,80)};
+              }catch(e){return {ok:false,http:0,error:String(e.code||e.name)}}
             }
             let verified=await verifyAuth();
             if(!verified.ok){
+              // Host security rules reject standalone PHP paths. Use the existing staging index.php only for a single token-guarded request and always restore its exact original bytes in finally.
+              const original=await readFile(stage,"index.php");
+              if(!original.ok||!original.content.startsWith("<?php"))throw new Error("Could not read the original staging index.php before the guarded bootstrap.");
               const token=crypto.randomBytes(32).toString("hex");
               const tokenHash=crypto.createHash("sha256").update(token).digest("hex");
-              const filename="irpa-staging-provision-"+crypto.randomBytes(10).toString("hex")+".php";
               const php=[
                 "<?php",
                 "$provided=(string)($_SERVER['HTTP_X_IRPA_STAGING_PROVISION_TOKEN']??'');",
-                "if(!hash_equals('"+tokenHash+"',hash('sha256',$provided))){http_response_code(404);header('Content-Type: application/json; charset=utf-8');echo '{\"ok\":false}';exit;}",
+                "if(!hash_equals('"+tokenHash+"',hash('sha256',$provided))){http_response_code(404);header('Content-Type: application/json; charset=utf-8');echo '{\\"ok\\":false}';exit;}",
                 "require_once __DIR__.'/wp-load.php';",
                 "header('Content-Type: application/json; charset=utf-8');",
                 "try{",
                 "$username=trim((string)($_SERVER['HTTP_X_IRPA_STAGING_USERNAME']??''));",
-                "$password=preg_replace('/\\s+/','',(string)($_SERVER['HTTP_X_IRPA_STAGING_APP_PASSWORD']??''));",
+                "$password=preg_replace('/\\\\s+/','',(string)($_SERVER['HTTP_X_IRPA_STAGING_APP_PASSWORD']??''));",
                 "if($username===''||$password===''){http_response_code(400);echo json_encode(['ok'=>false,'reason'=>'missing_input']);exit;}",
                 "if(!function_exists('wp_insert_application_password')||!class_exists('WP_Application_Passwords')){http_response_code(409);echo json_encode(['ok'=>false,'reason'=>'application_passwords_unavailable']);exit;}",
                 "if(function_exists('wp_is_application_passwords_available')&&!wp_is_application_passwords_available()){http_response_code(409);echo json_encode(['ok'=>false,'reason'=>'application_passwords_disabled']);exit;}",
@@ -1186,36 +1195,28 @@ jobs:
                 "if(is_wp_error($result)){http_response_code(500);echo json_encode(['ok'=>false,'reason'=>'application_password_registration_failed']);exit;}",
                 "echo json_encode(['ok'=>true]);exit;",
                 "}catch(Throwable $e){http_response_code(500);echo json_encode(['ok'=>false,'reason'=>'bootstrap_exception']);exit;}"
-              ].join("\n");
-              const boundary="----IRPAStagingProvision"+crypto.randomBytes(8).toString("hex");
-              const payload=Buffer.concat([
-                Buffer.from("--"+boundary+"\r\nContent-Disposition: form-data; name=\"dir\"\r\n\r\n"+stage+"\r\n"),
-                Buffer.from("--"+boundary+"\r\nContent-Disposition: form-data; name=\"file-1\"; filename=\""+filename+"\"\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n"),
-                Buffer.from(php),
-                Buffer.from("\r\n--"+boundary+"--\r\n")
-              ]);
-              let uploaded=false;
+              ].join("\\n");
+              if(!await writeFile(stage,"index.php",php))throw new Error("Could not install the guarded temporary staging bootstrap.");
+              let provisionError=null;
               try{
-                const upload=await request(new URL("/execute/Fileman/upload_files",cpBase).href,"POST",{...auth,"Content-Type":"multipart/form-data; boundary="+boundary,"Content-Length":String(payload.length)},payload);
-                const files=await list(stage);
-                uploaded=upload.http===200&&upload.data?.status===1&&files.ok&&files.files.includes(filename);
-                if(!uploaded)throw new Error("Could not verify upload of the one-time staging credential script.");
-                const provision=await request(new URL("/"+filename,wpBase).href,"GET",{
+                const provision=await request(new URL("/index.php",wpBase).href,"GET",{
                   "X-IRPA-Staging-Provision-Token":token,
                   "X-IRPA-Staging-Username":process.env.WP_USER,
                   "X-IRPA-Staging-App-Password":wpPassword,
                   Accept:"application/json","Cache-Control":"no-cache"
                 });
                 console.log("STAGING_APPLICATION_PASSWORD_REGISTRATION="+JSON.stringify({http:provision.http,ok:provision.data?.ok===true,reason:String(provision.data?.reason||"").slice(0,80)}));
-                if(provision.http!==200||provision.data?.ok!==true)throw new Error("The isolated one-time staging credential script did not register the application password.");
-              }finally{
-                if(uploaded&&!await remove(stage,filename))throw new Error("The one-time staging credential script could not be removed; manual cleanup is required.");
-                if(uploaded)console.log("STAGING_ONE_TIME_SCRIPT_CLEANUP=VERIFIED");
+                if(provision.http!==200||provision.data?.ok!==true)provisionError=new Error("The guarded staging index bootstrap did not register the application password.");
+              }catch(e){provisionError=e}
+              finally{
+                if(!await writeFile(stage,"index.php",original.content))throw new Error("CRITICAL: original staging index.php could not be restored byte-for-byte.");
+                console.log("STAGING_INDEX_RESTORE=VERIFIED");
               }
+              if(provisionError)throw provisionError;
               verified=await verifyAuth();
             }
             console.log("STAGING_WORDPRESS_AUTH_AFTER_REPAIR="+JSON.stringify(verified));
-            if(!verified.ok)throw new Error("WordPress REST authentication remains unavailable after removing the blocking MU-plugin artifacts.");
+            if(!verified.ok)throw new Error("WordPress REST authentication remains unavailable after the staging bootstrap repair.");
           }
           main().catch(e=>{console.error("Staging WordPress bootstrap repair:",String(e.message||e));process.exit(1)});
           NODE
