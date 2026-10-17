@@ -50,9 +50,15 @@ test("media studio preserves multi-format upload, secure Drive storage, image ed
  assert.ok(portal.includes('import CommunicationMediaStudio from "./CommunicationMediaStudio"'));
  assert.ok(portal.includes('{tab==="Media Studio"&&<CommunicationMediaStudio/>}'));
  for(const term of ['type="file"','uploadBytes','purpose:"Communication Media"','collection(db,"communicationMediaAssets")','downloadDriveBytes','brightness','contrast','saturation','canvas.toBlob','Export edited image','Download original']) assert.ok(studio.includes(term),term);
- assert.ok(studio.includes('MAX_BYTES=25*1024*1024'));
+ assert.ok(studio.includes('MAX_BYTES=10*1024*1024'));
  assert.ok(studio.includes('status:"Available"'));
  assert.ok(studio.includes('storageProvider:"Google Drive"'));
+});
+
+test("media studio upload size matches the gateway enforced maximum and labels staging records correctly",()=>{
+ assert.ok(studio.includes("MAX_BYTES=10*1024*1024"));
+ assert.ok(gateway.includes("const MAX_BYTES = 10 * 1024 * 1024"));
+ assert.ok(studio.includes('recordOrigin:auth.app?.options?.projectId === "irpa-dbg-staging-a73ec" ? "STAGING" : "PRODUCTION"'));
 });
 
 test("media asset register is authenticated, size-limited, immutable and deny-by-default for edits/deletion",()=>{
