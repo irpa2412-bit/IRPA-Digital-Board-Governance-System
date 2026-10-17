@@ -579,6 +579,20 @@ jobs:
                   const content=await file(dir,name);
                   console.log("WP_BOOT_MU_PLUGIN_CHECK="+JSON.stringify({file:name,length:content.length,hasCustomJsonFalse:/["']ok["']\s*=>\s*false|["']ok["']\s*:\s*false/.test(content),hasHostGate:/HTTP_HOST|SERVER_NAME|REQUEST_URI/.test(content),hasWpDie:/wp_die\s*\(/i.test(content),hasEarlyExit:/\b(exit|die)\s*\(/i.test(content),hasHttpStatus:/http_response_code\s*\(/i.test(content)}));
                 }
+                const authFile="irpa-staging-rest-auth.php";
+                if(names.includes(authFile)){
+                  const authContent=await file(dir,authFile);
+                  console.log("STAGING_REST_AUTH_PLUGIN_FLAGS="+JSON.stringify({
+                    length:authContent.length,
+                    readsCustomHeader:/HTTP_X_IRPA_STAGING_AUTHORIZATION|X-IRPA-Staging-Authorization/i.test(authContent),
+                    forwardsAuthorization:/HTTP_AUTHORIZATION|REDIRECT_HTTP_AUTHORIZATION/i.test(authContent),
+                    hooksRestAuthentication:/rest_authentication_errors/.test(authContent),
+                    setsCurrentUser:/wp_set_current_user/.test(authContent),
+                    checksApplicationPasswords:/application_password/i.test(authContent),
+                    checksHost:/HTTP_HOST|SERVER_NAME/.test(authContent),
+                    containsFatalFunctions:/wp_die\\s*\\(|\\b(?:exit|die)\\s*\\(/i.test(authContent)
+                  }));
+                }
               }
             }
           }
