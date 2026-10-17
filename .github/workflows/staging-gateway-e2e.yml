@@ -220,7 +220,12 @@ jobs:
           NODE
           )"
           test -n "$id" || { echo "Required dedicated staging KV namespace was not found; refusing to create or substitute a namespace."; exit 1; }
-          test "$id" = "7b50627e29fc4fe1abaa8dc8665edd02" || { echo "Staging KV namespace ID does not match the approved isolated namespace; refusing deployment."; exit 1; }
+          if [ "$id" != "7b50627e29fc4fe1abaa8dc8665edd02" ]; then
+            echo "STAGING_KV_NAMESPACE_ACTUAL_ID=$id"
+            echo "Staging KV namespace ID does not match the approved isolated namespace; refusing deployment."
+            exit 1
+          fi
+          test "$id" = "7b50627e29fc4fe1abaa8dc8665edd02"
           case "$id" in ''|*[!a-f0-9]*) exit 1;; esac
           export STAGING_KV_ID="$id"
           node <<'NODE'
@@ -1864,7 +1869,12 @@ jobs:
           NODE
           )"
           test -n "$id" || { echo "Required dedicated staging KV namespace was not found; refusing to create or substitute a namespace."; exit 1; }
-          test "$id" = "7b50627e29fc4fe1abaa8dc8665edd02" || { echo "Staging KV namespace ID does not match the approved isolated namespace; refusing deployment."; exit 1; }
+          if [ "$id" != "7b50627e29fc4fe1abaa8dc8665edd02" ]; then
+            echo "STAGING_KV_NAMESPACE_ACTUAL_ID=$id"
+            echo "Staging KV namespace ID does not match the approved isolated namespace; refusing deployment."
+            exit 1
+          fi
+          test "$id" = "7b50627e29fc4fe1abaa8dc8665edd02"
           case "$id" in ''|*[!a-f0-9]*) exit 1;; esac
           export STAGING_KV_ID="$id"
           node <<'NODE'
