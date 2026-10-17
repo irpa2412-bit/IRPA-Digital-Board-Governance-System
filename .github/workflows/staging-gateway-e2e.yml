@@ -1091,7 +1091,7 @@ jobs:
               "if(!function_exists('wp_insert_application_password')||!class_exists('WP_Application_Passwords')){http_response_code(409);echo json_encode(['ok'=>false,'reason'=>'application_passwords_unavailable']);exit;}",
               "if(function_exists('wp_is_application_passwords_available')&&!wp_is_application_passwords_available()){http_response_code(409);echo json_encode(['ok'=>false,'reason'=>'application_passwords_disabled']);exit;}",
               "$user=get_user_by('login',$username);",
-              "if(!$user||!user_can($user,'edit_posts')){http_response_code(409);echo json_encode(['ok'=>false,'reason'=>'staging_user_unavailable']);exit;}",
+              "if(!$user||!user_can($user,'edit_pages')){http_response_code(409);echo json_encode(['ok'=>false,'reason'=>'staging_user_unavailable']);exit;}",
               "$apps=WP_Application_Passwords::get_user_application_passwords($user->ID);",
               "foreach($apps as $app){if(($app['name']??'')==='IRPA Staging Gateway'&&!empty($app['uuid']))wp_delete_application_password($app['uuid'],$user->ID);}",
               "$result=wp_insert_application_password($user->ID,['name'=>'IRPA Staging Gateway','password'=>$password,'created'=>time(),'app_id'=>wp_generate_uuid4()]);",
