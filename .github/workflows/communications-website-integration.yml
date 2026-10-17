@@ -47,8 +47,14 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
       - name: Install web dependencies
         run: npm ci
+      - name: Compile Firestore rules in an isolated local emulator
+        run: npx firebase emulators:exec --project demo-irpa-rules --only firestore "node -e 'process.exit(0)'"
       - name: Run communications portal security and integration regression tests
         run: npm run test:communication-media
       - name: Run existing portal navigation regression tests
