@@ -592,9 +592,6 @@ jobs:
                     checksHost:/HTTP_HOST|SERVER_NAME/.test(authContent),
                     hasFatalFunctionCall:authContent.includes("wp_die(")||authContent.includes("exit(")||authContent.includes("die(")
                   }));
-                  const sanitizedAuth=authContent.replace(/'[^']*'/g,"'[STRING]'").replace(/"[^"]*"/g,'"[STRING]"').replace(/[A-Za-z0-9+/_=-]{32,}/g,"[REDACTED]");
-                  const authStructure=sanitizedAuth.split(String.fromCharCode(10)).map((line,index)=>({line:index+1,text:line.trim()})).filter(x=>/function|add_filter|add_action|wp_|HTTP_|SERVER|return|auth|user|filter|error|if/i.test(x.text)).slice(0,45);
-                  console.log("STAGING_REST_AUTH_PLUGIN_SANITIZED="+JSON.stringify(authStructure));
                 }
               }
             }
@@ -605,8 +602,6 @@ jobs:
       - name: Inspect staging PHP logs and authenticated REST path (read-only)
         env:
           WP_BASE: ${{ secrets.STAGING_WORDPRESS_BASE_URL }}
-          WP_USER: ${{ secrets.STAGING_WORDPRESS_USERNAME }}
-          WP_APP_PASSWORD: ${{ secrets.STAGING_WORDPRESS_APPLICATION_PASSWORD }}
           CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
           CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
           CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
@@ -666,12 +661,7 @@ jobs:
               }catch(e){console.log("STAGING_REST_AUTH_PROBE="+JSON.stringify({label,error:String(e.code||e.name||"request_error")}))}
             }
             await probe("anonymous",{});
-            const username=process.env.WP_USER||"",password=(process.env.WP_APP_PASSWORD||"").replace(/\s/g,"");
-            if(username&&password){
-              const basic="Basic "+Buffer.from(username+":"+password).toString("base64");
-              await probe("basic_only",{Authorization:basic});
-              await probe("basic_plus_staging_header",{Authorization:basic,"X-IRPA-Staging-Authorization":basic});
-            }else console.log("STAGING_REST_AUTH_DIRECT_PROBE=SKIPPED missing dedicated staging WordPress username/application-password GitHub secrets");
+            console.log("STAGING_REST_AUTH_DIRECT_PROBE=SKIPPED; WordPress credentials remain exclusively in Cloudflare Worker secrets");
           }
           main().catch(e=>{console.error("Staging PHP/auth diagnostics failed safely: "+safeError(e));process.exit(1)});
           function safeError(e){return String(e?.message||e?.code||e?.name||"unknown").replace(/[\r\n\t]+/g," ").replace(/\s+/g," ").slice(0,180)}
