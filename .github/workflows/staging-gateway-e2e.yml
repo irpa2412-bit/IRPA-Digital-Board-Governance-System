@@ -611,6 +611,22 @@ jobs:
             const main=info.data?.data?.main_domain||{};
             const root=String(main.documentroot||main.document_root||"");
             if(info.http!==200||info.data?.status!==1||!root.endsWith("/public_html")){console.log("CPANEL_REMEDIATION=BLOCKED_UNEXPECTED_MAIN_DOCUMENT_ROOT");return false}
+            async function renameDirectory(srcRel,dstRel,srcAbs,dstAbs){
+              const verify=async()=>{
+                const src=await uapi("Fileman/list_files",{dir:srcAbs,showdotfiles:1});
+                const dst=await uapi("Fileman/list_files",{dir:dstAbs,showdotfiles:1});
+                return {srcExists:src.http===200&&src.data?.status===1,dstExists:dst.http===200&&dst.data?.status===1};
+              };
+              let r=await api2("Fileman","fileop",{op:"rename",sourcefiles:srcAbs,destfiles:dstAbs,doubledecode:"1"});
+              let state=await verify();
+              if(r.ok||(!state.srcExists&&state.dstExists))return true;
+              r=await api2("Fileman","fileop",{op:"rename",sourcefiles:srcRel,destfiles:dstRel,doubledecode:"1"});
+              state=await verify();
+              if(r.ok||(!state.srcExists&&state.dstExists))return true;
+              console.log("CPANEL_RENAME_ATTEMPT_HTTP="+r.http);
+              console.log("CPANEL_RENAME_ATTEMPT_DETAIL="+r.detail);
+              return false;
+            }
             const list=async dir=>{
               const r=await uapi("Fileman/list_files",{dir,showdotfiles:1});
               if(r.http!==200||r.data?.status!==1||!Array.isArray(r.data?.data))throw new Error("Could not inspect cPanel directory safely");
@@ -635,11 +651,11 @@ jobs:
                     const backup="public_html/staging-empty-backup-"+String(process.env.GITHUB_RUN_ID||"run");
                     const backupCheck=await uapi("Fileman/list_files",{dir:root+"/staging-empty-backup-"+String(process.env.GITHUB_RUN_ID||"run"),showdotfiles:1});
                     if(backupCheck.http===200&&backupCheck.data?.status===1){console.log("CPANEL_REMEDIATION=BLOCKED_BACKUP_PATH_ALREADY_EXISTS");return false}
-                    const movedTarget=await api2("Fileman","fileop",{op:"rename",sourcefiles:"public_html/staging",destfiles:backup,doubledecode:"1"});
-                    if(!movedTarget.ok){console.log("CPANEL_FILEOP_RENAME_TARGET_HTTP="+movedTarget.http);console.log("CPANEL_FILEOP_RENAME_TARGET_DETAIL="+movedTarget.detail);console.log("CPANEL_REMEDIATION=FAILED_TO_PRESERVE_TARGET_TEST_FILE");return false}
-                    const movedWp=await api2("Fileman","fileop",{op:"rename",sourcefiles:"public_html/staging ",destfiles:"public_html/staging",doubledecode:"1"});
-                    if(!movedWp.ok){
-                      await api2("Fileman","fileop",{op:"rename",sourcefiles:backup,destfiles:"public_html/staging",doubledecode:"1"});
+                    const movedTarget=await renameDirectory("public_html/staging",backup,root+"/staging",root+"/"+backup.split("/").pop());
+                    if(!movedTarget){console.log("CPANEL_REMEDIATION=FAILED_TO_PRESERVE_TARGET_TEST_FILE");return false}
+                    const movedWp=await renameDirectory("public_html/staging ", "public_html/staging",root+"/staging ",root+"/staging");
+                    if(!movedWp){
+                      await renameDirectory(backup,"public_html/staging",root+"/"+backup.split("/").pop(),root+"/staging");
                       console.log("CPANEL_WORDPRESS_DIRECTORY_RENAME=FAILED_ROLLBACK_ATTEMPTED");return false
                     }
                     console.log("CPANEL_WORDPRESS_DIRECTORY_RENAME=PASS_TEST_FILE_PRESERVED_IN_BACKUP");
@@ -648,19 +664,19 @@ jobs:
                   const backup="public_html/staging-empty-backup-20261017";
                   const backupCheck=await uapi("Fileman/list_files",{dir:root+"/staging-empty-backup-20261017",showdotfiles:1});
                   if(backupCheck.http===200&&backupCheck.data?.status===1){console.log("CPANEL_REMEDIATION=BLOCKED_BACKUP_PATH_ALREADY_EXISTS");return false}
-                  const movedEmpty=await api2("Fileman","fileop",{op:"rename",sourcefiles:"public_html/staging",destfiles:backup,doubledecode:"1"});
-                  if(!movedEmpty.ok){console.log("CPANEL_EMPTY_DIRECTORY_BACKUP=FAILED");return false}
-                  const movedWp=await api2("Fileman","fileop",{op:"rename",sourcefiles:"public_html/staging ",destfiles:"public_html/staging",doubledecode:"1"});
-                  if(!movedWp.ok){
-                    await api2("Fileman","fileop",{op:"rename",sourcefiles:backup,destfiles:"public_html/staging",doubledecode:"1"});
+                  const movedEmpty=await renameDirectory("public_html/staging",backup,root+"/staging",root+"/"+backup.split("/").pop());
+                  if(!movedEmpty){console.log("CPANEL_EMPTY_DIRECTORY_BACKUP=FAILED");return false}
+                  const movedWp=await renameDirectory("public_html/staging ", "public_html/staging",root+"/staging ",root+"/staging");
+                  if(!movedWp){
+                    await renameDirectory(backup,"public_html/staging",root+"/"+backup.split("/").pop(),root+"/staging");
                     console.log("CPANEL_FILEOP_RENAME_WORDPRESS_HTTP="+movedWp.http);console.log("CPANEL_FILEOP_RENAME_WORDPRESS_DETAIL="+movedWp.detail);
                     console.log("CPANEL_WORDPRESS_DIRECTORY_RENAME=FAILED_ROLLBACK_ATTEMPTED");return false
                   }
                   console.log("CPANEL_WORDPRESS_DIRECTORY_RENAME=PASS");
                 }
               }else{
-                const movedWp=await api2("Fileman","fileop",{op:"rename",sourcefiles:"public_html/staging ",destfiles:"public_html/staging",doubledecode:"1"});
-                if(!movedWp.ok){console.log("CPANEL_WORDPRESS_DIRECTORY_RENAME=FAILED");return false}
+                const movedWp=await renameDirectory("public_html/staging ", "public_html/staging",root+"/staging ",root+"/staging");
+                if(!movedWp){console.log("CPANEL_WORDPRESS_DIRECTORY_RENAME=FAILED");return false}
                 console.log("CPANEL_WORDPRESS_DIRECTORY_RENAME=PASS");
               }
             }else if(hasTarget){
