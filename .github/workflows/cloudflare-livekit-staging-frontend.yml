@@ -3,7 +3,8 @@ name: Deploy IRPA Meeting Room Staging Frontend
 on:
   push:
     branches:
-      - staging/cloudflare-livekit-token-integration-20261014
+      - staging/cloudflare-livekit-token-integration
+      - fix/communications-cloudflare-website-integration-20261014
     paths:
       - "src/**"
       - "public/**"
@@ -56,6 +57,8 @@ jobs:
           VITE_LIVEKIT_TOKEN_WORKER_URL: "https://irpa-dgb-livekit-token-staging.irpa-governance.workers.dev"
           VITE_GATEWAY_ORIGIN: "https://staging-disabled.invalid"
           VITE_GOOGLE_DRIVE_GATEWAY_URL: "https://staging-disabled.invalid"
+          VITE_META_STAGING_GATEWAY_URL: "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
+          VITE_META_OAUTH_ENABLED: "${{ secrets.STAGING_META_APP_ID != '' && secrets.STAGING_META_APP_SECRET != '' && secrets.STAGING_META_TOKEN_ENCRYPTION_KEY != '' }}"
           VITE_GRANT_CRAWLER_WORKER_URL: "https://staging-disabled.invalid"
           VITE_GRANT_ASSISTANT_WORKER_URL: "https://staging-disabled.invalid"
         run: |
