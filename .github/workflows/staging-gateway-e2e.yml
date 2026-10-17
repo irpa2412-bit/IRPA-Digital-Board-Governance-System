@@ -829,6 +829,7 @@ jobs:
             return $userId;
           }, 999);
           `;
+            require("node:fs").writeFileSync(process.env.GITHUB_WORKSPACE+"/staging-auth-bridge-base.php",plugin,{mode:0o600});
             const existing=await read(pluginDir,pluginName);
             if(!existing.ok||existing.content!==plugin){
               await write(pluginDir,pluginName,plugin);
@@ -939,6 +940,7 @@ jobs:
           node <<'NODE'
           const https=require("node:https");
           const crypto=require("node:crypto");
+          const fs=require("node:fs");
           const {URL,URLSearchParams}=require("node:url");
           const {spawnSync}=require("node:child_process");
           require("node:dns").setDefaultResultOrder("ipv4first");
@@ -988,7 +990,7 @@ jobs:
               const up=await request(new URL("/execute/Fileman/upload_files",cp).href,"POST",{...auth,"Content-Type":"multipart/form-data; boundary="+boundary,"Content-Length":String(payload.length)},payload);
               let data;try{data=JSON.parse(up.raw)}catch{}
               check=await readFile(dir,file);
-              if(up.http!==200||data?.status!==1||!check.ok||check.content!==content)throw new Error("Temporary staging setup endpoint could not be written and verified.");
+              if(up.http!==200||data?.status!==1||!check.ok||check.content!==content)throw new Error("Temporary staging REST route could not be written and verified.");
             }
             const info=await uapi("DomainInfo/domains_data");
             const home=String(info.data?.data?.main_domain?.documentroot||info.data?.data?.main_domain?.document_root||"").replace(/\/+$/,"");
@@ -1000,173 +1002,62 @@ jobs:
             const cfg=await readFile(stage,"wp-config.php");
             const db=/define\s*\(\s*['"]DB_NAME['"]\s*,\s*(['"])(.*?)\1\s*\)/s.exec(cfg.content);
             if(!cfg.ok||!db||db[2]!==process.env.STAGING_DB_NAME)throw new Error("ABORT: staging wp-config.php database name does not match the isolated staging secret.");
-            const setupToken=crypto.randomBytes(32).toString("hex");
-            const filename="irpa-stage-setup-"+crypto.randomBytes(10).toString("hex")+".php";
-            const php=String.raw`<?php
-          ini_set('display_errors', '0');
-          error_reporting(0);
-          if (strtolower((string)($_SERVER['HTTP_HOST'] ?? '')) !== 'staging.irpa.or.tz' ||
-              strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? '')) !== 'POST' ||
-              !hash_equals('${setupToken}', (string)($_SERVER['HTTP_X_IRPA_STAGING_SETUP'] ?? ''))) {
-            http_response_code(404); exit;
-          }
-          @unlink(__FILE__);
-          header('Content-Type: application/json; charset=utf-8');
-          header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-          $level = ob_get_level(); ob_start();
-          try {
-            $_SERVER['HTTPS'] = 'on'; $_SERVER['SERVER_PORT'] = '443';
-            require_once __DIR__ . '/wp-load.php';
-            $login = 'irpa_staging_gateway';
-            $email = 'irpa-staging-gateway@irpa.or.tz';
-            $user = get_user_by('login', $login);
-            if (!$user) {
-              if (email_exists($email)) { throw new RuntimeException('integration_email_in_use'); }
-              $created = wp_insert_user([
-                'user_login' => $login, 'user_email' => $email,
-                'user_pass' => wp_generate_password(64, true, true),
-                'display_name' => 'IRPA Staging Gateway', 'role' => 'editor'
-              ]);
-              if (is_wp_error($created)) { throw new RuntimeException('editor_account_creation_failed'); }
-              $user = get_user_by('id', $created);
-            }
-            if (!$user || !in_array('editor', (array)$user->roles, true) || in_array('administrator', (array)$user->roles, true)) {
-              throw new RuntimeException('dedicated_account_role_mismatch');
-            }
-            if (!class_exists('WP_Application_Passwords') ||
-                !function_exists('wp_is_application_passwords_available') ||
-                !wp_is_application_passwords_available() ||
-                !wp_is_application_passwords_available_for_user($user)) {
-              throw new RuntimeException('application_passwords_unavailable');
-            }
-            foreach (WP_Application_Passwords::get_user_application_passwords($user->ID) as $item) {
-              if (($item['name'] ?? '') === 'IRPA Staging Gateway' && !empty($item['uuid'])) {
-                WP_Application_Passwords::delete_application_password($user->ID, $item['uuid']);
-              }
-            }
-            $createdPassword = WP_Application_Passwords::create_new_application_password($user->ID, ['name' => 'IRPA Staging Gateway']);
-            if (is_wp_error($createdPassword) || !is_array($createdPassword) || empty($createdPassword[0])) {
-              throw new RuntimeException('application_password_creation_failed');
-            }
-            $plain = preg_replace('/\\s+/', '', (string)$createdPassword[0]);
-            while (ob_get_level() > $level) { ob_end_clean(); }
-            echo json_encode(['ok' => true, 'username' => $login, 'password' => $plain]);
-          } catch (Throwable $e) {
-            while (ob_get_level() > $level) { ob_end_clean(); }
-            http_response_code(500);
-            echo json_encode(['ok' => false, 'code' => preg_replace('/[^a-z0-9_]/i', '', $e->getMessage()) ?: 'setup_failed']);
-          }
-          `;
-            await writeFile(stage,filename,php);
-            let response;
+            const pluginPath=stage+"/wp-content/mu-plugins/irpa-staging-rest-auth.php";
+            const basePlugin=fs.readFileSync(process.env.GITHUB_WORKSPACE+"/staging-auth-bridge-base.php","utf8");
+            if(!basePlugin.includes("HTTP_X_IRPA_STAGING_AUTHORIZATION")||!basePlugin.includes("PHP_AUTH_USER")||basePlugin.includes("irpa-staging/v1/setup"))
+              throw new Error("ABORT: staging base authentication bridge source is missing or unexpected.");
+            const current=await readFile(stage+"/wp-content/mu-plugins","irpa-staging-rest-auth.php");
+            if(!current.ok||current.content!==basePlugin)throw new Error("ABORT: live staging authentication bridge does not match the verified base source.");
+            const token=crypto.randomBytes(32).toString("hex");
+            const route=[
+              "",
+              "// Temporary one-run staging setup route. CI removes this route immediately after provisioning.",
+              "add_action('rest_api_init', function () {",
+              "  register_rest_route('irpa-staging/v1', '/setup', [",
+              "    'methods' => 'POST',",
+              "    'permission_callback' => function ($request) { return hash_equals('"+token+"', (string) $request->get_header('x-irpa-staging-setup')); },",
+              "    'callback' => function () {",
+              "      if (strtolower((string) ($_SERVER['HTTP_HOST'] ?? '')) !== 'staging.irpa.or.tz') return new WP_Error('wrong_host', 'Not found', ['status' => 404]);",
+              "      $login = 'irpa_staging_gateway'; $email = 'irpa-staging-gateway@irpa.or.tz';",
+              "      $user = get_user_by('login', $login);",
+              "      if (!$user) {",
+              "        if (email_exists($email)) return new WP_Error('integration_email_in_use', 'Staging integration identity conflict', ['status' => 409]);",
+              "        $created = wp_insert_user(['user_login' => $login, 'user_email' => $email, 'user_pass' => wp_generate_password(64, true, true), 'display_name' => 'IRPA Staging Gateway', 'role' => 'editor']);",
+              "        if (is_wp_error($created)) return new WP_Error('editor_account_creation_failed', 'Staging Editor creation failed', ['status' => 500]);",
+              "        $user = get_user_by('id', $created);",
+              "      }",
+              "      if (!$user || !in_array('editor', (array) $user->roles, true) || in_array('administrator', (array) $user->roles, true)) return new WP_Error('dedicated_account_role_mismatch', 'Staging integration account must be Editor only', ['status' => 409]);",
+              "      if (!class_exists('WP_Application_Passwords') || !function_exists('wp_is_application_passwords_available') || !function_exists('wp_is_application_passwords_available_for_user') || !wp_is_application_passwords_available() || !wp_is_application_passwords_available_for_user($user)) return new WP_Error('application_passwords_unavailable', 'Application Passwords unavailable on staging', ['status' => 503]);",
+              "      foreach (WP_Application_Passwords::get_user_application_passwords($user->ID) as $item) { if (($item['name'] ?? '') === 'IRPA Staging Gateway' && !empty($item['uuid'])) WP_Application_Passwords::delete_application_password($user->ID, $item['uuid']); }",
+              "      $createdPassword = WP_Application_Passwords::create_new_application_password($user->ID, ['name' => 'IRPA Staging Gateway']);",
+              "      if (is_wp_error($createdPassword) || !is_array($createdPassword) || empty($createdPassword[0])) return new WP_Error('application_password_creation_failed', 'Staging application password creation failed', ['status' => 500]);",
+              "      return new WP_REST_Response(['ok' => true, 'username' => $login, 'password' => str_replace(' ', '', (string) $createdPassword[0])], 200);",
+              "    }",
+              "  ]);",
+              "});",
+              ""
+            ].join("\n");
+            const temporaryPlugin=basePlugin+route;
+            let provisioned=null,routeResponse=null,restoreError=null;
             try {
-              response=await request(new URL(filename,wp).href,"POST",{
-                "Content-Type":"application/x-www-form-urlencoded",
-                "Content-Length":"0",
-                "X-IRPA-Staging-Setup":setupToken,
-                "Cache-Control":"no-store"
-              },"");
+              await writeFile(stage+"/wp-content/mu-plugins","irpa-staging-rest-auth.php",temporaryPlugin);
+              const endpoint=new URL("/wp-json/irpa-staging/v1/setup",wp);
+              routeResponse=await request(endpoint.href,"POST",{"Content-Length":"0","X-IRPA-Staging-Setup":token,"Cache-Control":"no-store"},"");
+              try{provisioned=JSON.parse(routeResponse.raw)}catch{}
             } finally {
-              const remaining=await readFile(stage,filename);
-              if(remaining.ok){
-                await uapi("Fileman/delete_files",{dir:stage,"files-0":filename},"POST");
-                const after=await readFile(stage,filename);
-                if(after.ok)throw new Error("Temporary staging setup endpoint cleanup could not be verified.");
-              }
-            }
-            let data;try{data=JSON.parse(response.raw)}catch{}
-            // Nginx returns 406 for direct execution of the temporary PHP file. Retry via a
-            // one-time REST route in a staging-only MU-plugin, then verify the file is removed.
-            if(response.http===406){
-              const muDir=stage+"/wp-content/mu-plugins";
-              const muFilename="irpa-stage-setup-"+crypto.randomBytes(10).toString("hex")+".php";
-              let muPhp=String.raw`<?php
-          if (!defined('ABSPATH')) { return; }
-          if (strtolower((string)($_SERVER['HTTP_HOST'] ?? '')) !== 'staging.irpa.or.tz') { return; }
-          add_action('rest_api_init', function () {
-            register_rest_route('irpa-staging/v1', '/provision', [
-              'methods' => 'POST',
-              'permission_callback' => '__return_true',
-              'callback' => function ($request) {
-                if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? '')) !== 'POST' ||
-                    !hash_equals('__SETUP_TOKEN__', (string)$request->get_header('x-irpa-staging-setup'))) {
-                  return new WP_Error('rest_not_found', 'Not found.', ['status' => 404]);
-                }
-                try {
-                  $login = 'irpa_staging_gateway';
-                  $email = 'irpa-staging-gateway@irpa.or.tz';
-                  $user = get_user_by('login', $login);
-                  if (!$user) {
-                    if (email_exists($email)) { throw new RuntimeException('integration_email_in_use'); }
-                    $created = wp_insert_user([
-                      'user_login' => $login,
-                      'user_email' => $email,
-                      'user_pass' => wp_generate_password(64, true, true),
-                      'display_name' => 'IRPA Staging Gateway',
-                      'role' => 'editor'
-                    ]);
-                    if (is_wp_error($created)) { throw new RuntimeException('editor_account_creation_failed'); }
-                    $user = get_user_by('id', $created);
-                  }
-                  if (!$user || !in_array('editor', (array)$user->roles, true) || in_array('administrator', (array)$user->roles, true)) {
-                    throw new RuntimeException('dedicated_account_role_mismatch');
-                  }
-                  if (!class_exists('WP_Application_Passwords') ||
-                      !function_exists('wp_is_application_passwords_available') ||
-                      !wp_is_application_passwords_available() ||
-                      !function_exists('wp_is_application_passwords_available_for_user') ||
-                      !wp_is_application_passwords_available_for_user($user)) {
-                    throw new RuntimeException('application_passwords_unavailable');
-                  }
-                  foreach (WP_Application_Passwords::get_user_application_passwords($user->ID) as $item) {
-                    if (($item['name'] ?? '') === 'IRPA Staging Gateway' && !empty($item['uuid'])) {
-                      WP_Application_Passwords::delete_application_password($user->ID, $item['uuid']);
-                    }
-                  }
-                  $createdPassword = WP_Application_Passwords::create_new_application_password($user->ID, ['name' => 'IRPA Staging Gateway']);
-                  if (is_wp_error($createdPassword) || !is_array($createdPassword) || empty($createdPassword[0])) {
-                    throw new RuntimeException('application_password_creation_failed');
-                  }
-                  return new WP_REST_Response([
-                    'ok' => true,
-                    'username' => $login,
-                    'password' => preg_replace('/\s+/', '', (string)$createdPassword[0])
-                  ], 200);
-                } catch (Throwable $e) {
-                  return new WP_REST_Response([
-                    'ok' => false,
-                    'code' => preg_replace('/[^a-z0-9_]/i', '', $e->getMessage()) ?: 'setup_failed'
-                  ], 500);
-                }
-              }
-            ]);
-          });
-          `;
-              muPhp=muPhp.replace("__SETUP_TOKEN__","${setupToken}");
-              await writeFile(muDir,muFilename,muPhp);
               try {
-                response=await request(new URL("/wp-json/irpa-staging/v1/provision",wp).href,"POST",{
-                  "Content-Type":"application/json",
-                  "Content-Length":"2",
-                  "X-IRPA-Staging-Setup":setupToken,
-                  "Cache-Control":"no-store"
-                },"{}");
-              } finally {
-                const remaining=await readFile(muDir,muFilename);
-                if(remaining.ok){
-                  await uapi("Fileman/delete_files",{dir:muDir,"files-0":muFilename},"POST");
-                  const after=await readFile(muDir,muFilename);
-                  if(after.ok)throw new Error("Temporary staging MU-plugin cleanup could not be verified.");
-                }
-              }
-              data=null;try{data=JSON.parse(response.raw)}catch{}
+                await writeFile(stage+"/wp-content/mu-plugins","irpa-staging-rest-auth.php",basePlugin);
+                const restored=await readFile(stage+"/wp-content/mu-plugins","irpa-staging-rest-auth.php");
+                if(!restored.ok||restored.content!==basePlugin)throw new Error("Staging authentication bridge restoration failed.");
+              } catch(e) { restoreError=e; }
             }
-            if(response.http!==200||data?.ok!==true||data.username!=="irpa_staging_gateway"||!/^[a-z0-9]{24}$/i.test(String(data.password||"")))
-              throw new Error("WordPress did not provision a valid staging-only Editor application password (HTTP "+response.http+", server "+String(response.headers?.server||"unknown").slice(0,60)+", content-type "+String(response.headers?.["content-type"]||"unknown").slice(0,60)+", Cloudflare Ray "+String(response.headers?.["cf-ray"]||"none").slice(0,60)+", code "+String(data?.code||"invalid_response").slice(0,80)+").");
-            const usernameResult=spawnSync("npx",["wrangler","secret","put","WORDPRESS_USERNAME","--config","wrangler.staging.generated.json"],{input:data.username,encoding:"utf8",stdio:["pipe","ignore","pipe"],env:process.env});
+            if(restoreError)throw new Error("ABORT: temporary staging setup route cleanup could not be verified.");
+            if(!routeResponse||routeResponse.http!==200||provisioned?.ok!==true||provisioned.username!=="irpa_staging_gateway"||!/^[a-z0-9]{24}$/i.test(String(provisioned.password||"")))
+              throw new Error("WordPress staging REST setup route failed (HTTP "+String(routeResponse?.http||"unknown")+", code "+String(provisioned?.code||"invalid_response").slice(0,80)+").");
+            const usernameResult=spawnSync("npx",["wrangler","secret","put","WORDPRESS_USERNAME","--config","wrangler.staging.generated.json"],{input:provisioned.username,encoding:"utf8",stdio:["pipe","ignore","pipe"],env:process.env});
             if(usernameResult.status!==0)throw new Error("Could not update the staging Worker username secret.");
-            const passwordResult=spawnSync("npx",["wrangler","secret","put","WORDPRESS_APPLICATION_PASSWORD","--config","wrangler.staging.generated.json"],{input:data.password,encoding:"utf8",stdio:["pipe","ignore","pipe"],env:process.env});
-            data.password="";
+            const passwordResult=spawnSync("npx",["wrangler","secret","put","WORDPRESS_APPLICATION_PASSWORD","--config","wrangler.staging.generated.json"],{input:provisioned.password,encoding:"utf8",stdio:["pipe","ignore","pipe"],env:process.env});
+            provisioned.password="";
             if(passwordResult.status!==0)throw new Error("Could not update the staging Worker application-password secret.");
             console.log("STAGING_WORDPRESS_DEDICATED_EDITOR=PASS");
             console.log("STAGING_WORDPRESS_APPLICATION_PASSWORD_ROTATION=PASS (value redacted)");
