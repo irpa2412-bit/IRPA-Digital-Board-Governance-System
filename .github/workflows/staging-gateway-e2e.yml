@@ -724,9 +724,10 @@ jobs:
             if(!config.ok||!db||db[2]!==String(process.env.STAGING_DB_NAME||"").trim()||
                !process.env.PRODUCTION_DB_NAME||process.env.STAGING_DB_NAME===process.env.PRODUCTION_DB_NAME)
               throw new Error("ABORT: staging database isolation could not be verified.");
+            const accountHome=home.slice(0,-"/public_html".length);
             const pluginDir=stage+"/wp-content/mu-plugins";
             const pluginName="irpa-staging-rest-auth.php";
-            const backup=await read(home,"irpa-staging-rest-auth.php.backup");
+            const backup=await read(accountHome,"irpa-staging-rest-auth.php.backup");
             if(!backup.ok||backup.content.length>10000||!backup.content.includes("irpa_staging_rest_auth_user")||!backup.content.includes("hash_equals"))
               throw new Error("ABORT: verified original staging authentication bridge backup is required; no plugin was changed.");
             const plugin=`<?php
