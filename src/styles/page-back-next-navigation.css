@@ -368,3 +368,18 @@ body,
     margin: 0 !important;
   }
 }
+
+
+/* MOBILE OVERLAP FIX: let page content own the viewport while scrolling.
+   Sticky headers on narrow screens were stacking over and obscuring panels.
+   Keep World Time in normal document flow on phones; desktop/tablet are unchanged. */
+@media (max-width: 760px) {
+  html body #root .app-shell .main-area > .desktop-webapp-navigation-roller,
+  html body #root .app-shell .main-area > .page-back-next-navigation.page-back-next-navigation {
+    position: static !important;
+    top: auto !important;
+    z-index: auto !important;
+    transform: none !important;
+    box-shadow: none !important;
+  }
+}
