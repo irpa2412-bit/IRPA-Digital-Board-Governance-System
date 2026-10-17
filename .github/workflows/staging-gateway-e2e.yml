@@ -771,24 +771,45 @@ jobs:
           $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] = $header;
           $_SERVER['PHP_AUTH_USER'] = $username;
           $_SERVER['PHP_AUTH_PW'] = $password;
-          // Emit presence-only diagnostics; never include credentials or their encodings.
-          header('X-IRPA-Staging-Auth-Diagnostic: bridge=active;https=1;authorization=1;php_user=1;php_password=1;app_password=not_observed');
+          // Presence-only account diagnostics; never return usernames, passwords, hashes or application-password records.
+          $diagnostic_user = function_exists('get_user_by') ? get_user_by('login', $username) : false;
+          $diagnostic_user_found = $diagnostic_user instanceof WP_User;
+          $diagnostic_editor_caps = $diagnostic_user_found && user_can($diagnostic_user, 'edit_pages') && user_can($diagnostic_user, 'edit_posts');
+          $diagnostic_admin = $diagnostic_user_found && user_can($diagnostic_user, 'manage_options');
+          $diagnostic_ap_class = class_exists('WP_Application_Passwords');
+          $diagnostic_ap_available = function_exists('wp_is_application_passwords_available') ? (bool) wp_is_application_passwords_available() : null;
+          $diagnostic_ap_supported = function_exists('wp_is_application_passwords_supported') ? (bool) wp_is_application_passwords_supported() : null;
+          $diagnostic_ap_in_use = $diagnostic_ap_class && method_exists('WP_Application_Passwords', 'is_in_use') ? (bool) WP_Application_Passwords::is_in_use() : null;
+          $diagnostic_ap_count = null;
+          if ($diagnostic_user_found && $diagnostic_ap_class && method_exists('WP_Application_Passwords', 'get_user_application_passwords')) {
+            $diagnostic_ap_list = WP_Application_Passwords::get_user_application_passwords($diagnostic_user->ID);
+            if (is_array($diagnostic_ap_list)) { $diagnostic_ap_count = count($diagnostic_ap_list); }
+          }
+          $diagnostic_suffix = ';username_found=' . ($diagnostic_user_found ? '1' : '0') .
+            ';editor_caps=' . ($diagnostic_editor_caps ? '1' : '0') .
+            ';admin_cap=' . ($diagnostic_admin ? '1' : '0') .
+            ';ap_class=' . ($diagnostic_ap_class ? '1' : '0') .
+            ';ap_available=' . ($diagnostic_ap_available === null ? 'unknown' : ($diagnostic_ap_available ? '1' : '0')) .
+            ';ap_supported=' . ($diagnostic_ap_supported === null ? 'unknown' : ($diagnostic_ap_supported ? '1' : '0')) .
+            ';ap_in_use=' . ($diagnostic_ap_in_use === null ? 'unknown' : ($diagnostic_ap_in_use ? '1' : '0')) .
+            ';ap_count=' . ($diagnostic_ap_count === null ? 'unknown' : (string) $diagnostic_ap_count);
+          header('X-IRPA-Staging-Auth-Diagnostic: bridge=active;https=1;authorization=1;php_user=1;php_password=1;app_password=not_observed' . $diagnostic_suffix);
           add_action('application_password_did_authenticate', function ($user) {
             if ($user instanceof WP_User) {
-              header('X-IRPA-Staging-Auth-Diagnostic: bridge=active;https=1;authorization=1;php_user=1;php_password=1;app_password=valid');
+              header('X-IRPA-Staging-Auth-Diagnostic: bridge=active;https=1;authorization=1;php_user=1;php_password=1;app_password=valid' . $diagnostic_suffix);
             }
           }, 10, 1);
           add_action('application_password_failed_authentication', function ($error) {
             $codes = is_wp_error($error) ? implode(',', $error->get_error_codes()) : 'unknown';
             $safeCodes = preg_replace('/[^a-z0-9_,.-]/i', '', $codes);
-            header('X-IRPA-Staging-Auth-Diagnostic: bridge=active;https=1;authorization=1;php_user=1;php_password=1;app_password=rejected;reason=' . $safeCodes);
+            header('X-IRPA-Staging-Auth-Diagnostic: bridge=active;https=1;authorization=1;php_user=1;php_password=1;app_password=rejected;reason=' . $safeCodes . $diagnostic_suffix);
           }, 10, 1);
           // Fallback only if core has not authenticated this request. Delegate to WordPress core's
           // Application Password validator; do not compare passwords or bypass core capabilities.
           add_filter('determine_current_user', function ($userId) {
             if (!empty($userId)) { return $userId; }
             if (!function_exists('wp_authenticate_application_password')) {
-              header('X-IRPA-Staging-Auth-Diagnostic: bridge=active;https=1;authorization=1;php_user=1;php_password=1;app_password=unsupported');
+              header('X-IRPA-Staging-Auth-Diagnostic: bridge=active;https=1;authorization=1;php_user=1;php_password=1;app_password=unsupported' . $diagnostic_suffix);
               return $userId;
             }
             $authUser = (string) ($_SERVER['PHP_AUTH_USER'] ?? '');
@@ -796,14 +817,14 @@ jobs:
             if ($authUser === '' || $authPassword === '') { return $userId; }
             $validated = wp_authenticate_application_password(false, $authUser, $authPassword);
             if ($validated instanceof WP_User) {
-              header('X-IRPA-Staging-Auth-Diagnostic: bridge=active;https=1;authorization=1;php_user=1;php_password=1;app_password=valid;fallback=1');
+              header('X-IRPA-Staging-Auth-Diagnostic: bridge=active;https=1;authorization=1;php_user=1;php_password=1;app_password=valid;fallback=1' . $diagnostic_suffix);
               return (int) $validated->ID;
             }
             if (is_wp_error($validated)) {
               $codes = preg_replace('/[^a-z0-9_,.-]/i', '', implode(',', $validated->get_error_codes()));
-              header('X-IRPA-Staging-Auth-Diagnostic: bridge=active;https=1;authorization=1;php_user=1;php_password=1;app_password=rejected;fallback=1;reason=' . $codes);
+              header('X-IRPA-Staging-Auth-Diagnostic: bridge=active;https=1;authorization=1;php_user=1;php_password=1;app_password=rejected;fallback=1;reason=' . $codes . $diagnostic_suffix);
             } else {
-              header('X-IRPA-Staging-Auth-Diagnostic: bridge=active;https=1;authorization=1;php_user=1;php_password=1;app_password=no_result;fallback=1');
+              header('X-IRPA-Staging-Auth-Diagnostic: bridge=active;https=1;authorization=1;php_user=1;php_password=1;app_password=no_result;fallback=1' . $diagnostic_suffix);
             }
             return $userId;
           }, 999);
@@ -817,6 +838,9 @@ jobs:
                !verify.content.includes("PHP_AUTH_USER")||!verify.content.includes("PHP_AUTH_PW")||
                !verify.content.includes("application_password_did_authenticate")||
                !verify.content.includes("application_password_failed_authentication")||
+               !verify.content.includes("get_user_by('login'")||
+               !verify.content.includes("get_user_application_passwords")||
+               !verify.content.includes("ap_in_use=")||
                !verify.content.includes("staging.irpa.or.tz"))throw new Error("Staging authentication bridge failed post-write verification.");
             console.log("STAGING_REST_AUTH_BRIDGE_REPAIR=PASS");
             console.log("STAGING_AUTH_BACKUP=VERIFIED_OUTSIDE_WEB_ROOT");
