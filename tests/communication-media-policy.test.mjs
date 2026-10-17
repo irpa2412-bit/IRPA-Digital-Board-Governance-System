@@ -8,6 +8,8 @@ const portal=read("../src/pages/CommunicationMediaPortal.jsx");
 const studio=read("../src/pages/CommunicationMediaStudio.jsx");
 const operations=read("../src/pages/CommunicationMediaOperations.jsx");
 const social=read("../src/pages/SocialMediaAccounts.jsx");
+const metaUi=read("../src/pages/MetaApiConnection.jsx");
+const metaApi=read("../drive-gateway/src/metaSocialApi.mjs");
 const rules=read("../firestore.rules");
 const gateway=read("../drive-gateway/src/index.js");
 const site=read("../drive-gateway/src/communicationsSite.mjs");
@@ -173,4 +175,27 @@ test("social account enrolment is integrated, metadata-only, role-scoped and aud
  assert.ok(rules.includes('allow update,delete:if false;'));
  assert.ok(rules.includes('getAfter(/databases/$(database)/documents/socialMediaAccounts/$(request.resource.data.recordId))'));
  assert.ok(rules.includes('"Pending Verification","Active","Suspended","Disconnected","Archived"'));
+});
+
+
+test("Meta API connection is staging-only, read-only, encrypted server-side and never exposes tokens",()=>{
+ assert.ok(social.includes('import MetaApiConnection from "./MetaApiConnection"'));
+ assert.ok(social.includes("<MetaApiConnection />"));
+ assert.ok(metaUi.includes('firebaseConfig.projectId!=="irpa-dbg-staging-a73ec"'));
+ assert.ok(metaUi.includes('irpa-google-drive-gateway-staging.irpa-governance.workers.dev'));
+ assert.ok(metaUi.includes('"/api/communications/meta/connect"'));
+ assert.ok(metaUi.includes('"/api/communications/meta/status"'));
+ assert.ok(metaUi.includes("postingEnabled"));
+ assert.ok(metaApi.includes('String(env.IRPA_ENVIRONMENT || "").toLowerCase() !== "staging"'));
+ assert.ok(metaApi.includes('META_TOKEN_ENCRYPTION_KEY'));
+ assert.ok(metaApi.includes('meta:oauth-state:'));
+ assert.ok(metaApi.includes('await env.DRIVE_KV.delete(stateKey)'));
+ assert.ok(metaApi.includes('"pages_show_list", "pages_read_engagement", "instagram_basic"'));
+ assert.ok(metaApi.includes('postingEnabled: false'));
+ assert.ok(!metaApi.includes('instagram_content_publish'));
+ assert.ok(!metaApi.includes('pages_manage_posts'));
+ assert.ok(gateway.includes('import { createMetaSocialApiRouter } from "./metaSocialApi.mjs"'));
+ assert.ok(gateway.includes('pathname.startsWith("/api/communications/meta/")'));
+ assert.ok(docs.includes("Meta (Facebook and Instagram) API — staging-only connection and access verification"));
+ assert.ok(docs.includes("Do not reuse the Google Drive encryption key."));
 });
