@@ -10,6 +10,13 @@ const REVIEW_ROLES = new Set([
 ]);
 const EDITABLE_EXTENSIONS = new Set([".html", ".htm", ".css", ".txt", ".json"]);
 const MAX_EDIT_BYTES = 512 * 1024;
+const WEBSITE_EDITOR_ROLES = new Set([
+  "Communication & Media", "Communications & Media", "Communication and Media", "Communications and Media",
+  "Communications Officer", "Communication Officer", "Communications Manager", "Communication Manager",
+  "Media Officer", "Media Manager", "Public Relations Officer", "Communications & Media Officer",
+  "Communications and Media Officer", "Media and Communications Officer", "Media & Communications Officer"
+]);
+const MAX_WEBSITE_SNAPSHOT_BYTES = 2 * 1024 * 1024;
 
 function values(record) {
   if (!record) return [];
@@ -130,6 +137,27 @@ export function createCommunicationsSiteRouter(deps) {
     return { claims, roles };
   }
 
+  async function websiteEditorAuthorised(request, env) {
+    const claims = await authenticateFirebaseRequest(request, env);
+    const adminDocument = await getFirestoreDocument(env, "adminProfiles/" + claims.user_id, claims.token);
+    const adminProfile = firestoreDocumentToPlain(adminDocument);
+    const activeAdmin = adminProfile?.active === true;
+    if (activeAdmin) return { claims, roles: ["Administrator"], admin: true };
+    const identity = await getInstitutionalProfileForUser(env, claims);
+    const member = firestoreDocumentToPlain(identity?.memberRecord);
+    const employee = firestoreDocumentToPlain(identity?.employeeRecord);
+    const tokenRoles = [
+      ...(Array.isArray(claims.irpaRoles) ? claims.irpaRoles : []),
+      claims.role, claims.title, claims.position
+    ].filter(Boolean).flatMap(v => String(v).split(",").map(s => s.trim()).filter(Boolean));
+    const roles = [...new Set([...tokenRoles, ...values(member), ...values(employee)])];
+    const isActive = active(member) || active(employee);
+    if (!isActive || !roles.some(role => WEBSITE_EDITOR_ROLES.has(role))) {
+      throw new Error("Your registered Communication & Media role does not permit this website-editing action.");
+    }
+    return { claims, roles, admin: false };
+  }
+
   function wordpressConfig(env) {
     let base;
     try { base = new URL(String(env.WORDPRESS_BASE_URL || "")); }
@@ -149,6 +177,27 @@ export function createCommunicationsSiteRouter(deps) {
     // staging-only header validated by the isolated staging MU-plugin.
     if (wp.stagingAuthHeader) headers["X-IRPA-Staging-Authorization"] = wp.auth;
     return headers;
+  }
+
+  function stagingWordPressConfig(env) {
+    if (String(env.IRPA_ENVIRONMENT || "").toLowerCase() !== "staging") {
+      throw new Error("WordPress page/post editing is disabled outside the staging Worker.");
+    }
+    const wp = wordpressConfig(env);
+    const base = new URL(wp.root);
+    if (base.protocol !== "https:" || base.hostname.toLowerCase() !== "staging.irpa.or.tz" || base.pathname !== "/" ||
+        base.hostname.toLowerCase() === "irpa.or.tz" || base.hostname.toLowerCase() === "www.irpa.or.tz") {
+      throw new Error("WordPress page/post editing requires the dedicated staging hostname.");
+    }
+    return wp;
+  }
+
+  async function wordpressEditorFetch(wp, endpoint, init = {}) {
+    const target = new URL(endpoint);
+    if (target.protocol !== "https:" || target.hostname.toLowerCase() !== "staging.irpa.or.tz") {
+      throw new Error("WordPress editor requests are restricted to the dedicated staging hostname.");
+    }
+    return fetch(target.toString(), { ...init, redirect: "manual" });
   }
 
   function cpanelConfig(env) {
@@ -182,15 +231,128 @@ export function createCommunicationsSiteRouter(deps) {
     return data;
   }
 
+  function editorRaw(item, key) {
+    const value = item && item[key];
+    return String(value && (value.raw !== undefined ? value.raw : value.rendered) || "");
+  }
+
+  function editorItem(item, type) {
+    return {
+      id: Number(item.id),
+      type,
+      title: editorRaw(item, "title"),
+      content: editorRaw(item, "content"),
+      excerpt: editorRaw(item, "excerpt"),
+      featuredMedia: Number(item.featured_media || 0),
+      status: String(item.status || "draft"),
+      link: String(item.link || ""),
+      modified: String(item.modified || "")
+    };
+  }
+
+  function websiteSnapshotKey(type, id, snapshotId) {
+    return "irpa:website-editor:snapshot:" + type + ":" + id + ":" + snapshotId;
+  }
+
+  async function readWebsiteItem(wp, type, id) {
+    const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/" + type + "/" + id + "?context=edit", {
+      headers: wordpressHeaders(wp, { Accept: "application/json" }),
+      signal: AbortSignal.timeout(15000)
+    });
+    const data = await response.json().catch(() => null);
+    if (response.status === 404) throw new Error("WordPress page/post not found.");
+    if (!response.ok || !Number.isSafeInteger(data?.id)) throw new Error("WordPress could not read the requested page/post.");
+    return data;
+  }
+
+  async function readWebsiteRevisions(wp, type, id) {
+    const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/" + type + "/" + id + "/revisions?context=edit&per_page=50&orderby=date&order=desc", {
+      headers: wordpressHeaders(wp, { Accept: "application/json" }),
+      signal: AbortSignal.timeout(15000)
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !Array.isArray(data)) throw new Error("WordPress revision history could not be read; no edit was made.");
+    return data;
+  }
+
+  async function recordWebsiteAudit(env, claims, action, type, id, details = {}) {
+    const createdAt = new Date().toISOString();
+    const eventId = crypto.randomUUID();
+    const actorEmail = String(claims.email || "");
+    const record = { action, type, pageId: id, actorUid: claims.user_id, actorEmail, details, createdAt };
+    const auditFields = fields({
+      action, category: "COMMUNICATIONS", collection: type, recordId: id,
+      actorUid: claims.user_id, actorEmail, details, createdAt
+    });
+    await commitDocumentAndAudit(
+      env,
+      "communicationWebsiteEdits/" + eventId,
+      claims.token,
+      fields(record),
+      ["action", "type", "pageId", "actorUid", "actorEmail", "details", "createdAt"],
+      auditFields,
+      { createOnly: true }
+    );
+  }
+
+  async function saveWebsiteSnapshot(env, claims, wp, type, id, current, changedFields = []) {
+    if (!env.DRIVE_KV || typeof env.DRIVE_KV.put !== "function") {
+      throw new Error("Staging revision storage is unavailable; no edit was made.");
+    }
+    const revisions = await readWebsiteRevisions(wp, type, id);
+    const currentRevisionId = revisions.length && Number.isSafeInteger(Number(revisions[0]?.id)) ? Number(revisions[0].id) : null;
+    const snapshotId = crypto.randomUUID();
+    const snapshot = {
+      snapshotId, type, itemId: id, currentRevisionId,
+      title: editorRaw(current, "title"),
+      content: editorRaw(current, "content"),
+      excerpt: editorRaw(current, "excerpt"),
+      featuredMedia: Number(current.featured_media || 0),
+      status: String(current.status || "draft"),
+      link: String(current.link || ""),
+      modified: String(current.modified || ""),
+      actorUid: claims.user_id,
+      actorEmail: String(claims.email || ""),
+      createdAt: new Date().toISOString()
+    };
+    const serialized = JSON.stringify(snapshot);
+    if (new TextEncoder().encode(serialized).byteLength > MAX_WEBSITE_SNAPSHOT_BYTES) {
+      throw new Error("The current page/post exceeds the safe revision snapshot limit; no edit was made.");
+    }
+    await env.DRIVE_KV.put(websiteSnapshotKey(type, id, snapshotId), serialized);
+    await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_EDIT_SNAPSHOT_SAVED", type, id, {
+      snapshotId, previousRevisionId: currentRevisionId, changedFields
+    });
+    return snapshot;
+  }
+
+  function snapshotPayload(snapshot) {
+    return {
+      title: String(snapshot.title || ""),
+      content: String(snapshot.content || ""),
+      excerpt: String(snapshot.excerpt || ""),
+      featured_media: Number(snapshot.featuredMedia || 0),
+      status: String(snapshot.status || "draft")
+    };
+  }
+
+  function sameEditorFields(actual, expected) {
+    return editorRaw(actual, "title") === String(expected.title || "") &&
+      editorRaw(actual, "content") === String(expected.content || "") &&
+      editorRaw(actual, "excerpt") === String(expected.excerpt || "") &&
+      Number(actual.featured_media || 0) === Number(expected.featured_media || 0) &&
+      String(actual.status || "draft") === String(expected.status || "draft");
+  }
+
   async function handle(request, env) {
     const url = new URL(request.url);
     const path = url.pathname.replace(/\/+$/, "") || "/";
     if (path === "/api/communications/site/status" && request.method === "GET") {
-      const { roles } = await authorised(request, env, true);
+      const { roles } = await websiteEditorAuthorised(request, env);
       const result = { website: "not_configured", cpanel: "not_configured" };
       try {
-        const wp = wordpressConfig(env);
-        const response = await fetch(wp.root + "/wp-json/wp/v2/users/me?context=edit", {
+        const wp = stagingWordPressConfig(env);
+        const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/users/me?context=edit", {
           headers: wordpressHeaders(wp, { Accept: "application/json" }), signal: AbortSignal.timeout(12000)
         });
         if (response.ok) {
@@ -204,44 +366,209 @@ export function createCommunicationsSiteRouter(deps) {
         await cpanelCall(cp, "DomainInfo/list_domains");
         result.cpanel = "connected";
       } catch (error) { result.cpanel = error.message.includes("not configured") ? "not_configured" : "unavailable_or_denied"; }
-      return json({ ok: true, connections: result, permissions: { reviewer: roles.some(r => REVIEW_ROLES.has(r)), staticFileEditing: true } }, 200, corsHeaders(request));
+      return json({ ok: true, connections: result, permissions: { websiteEditor: true, staticFileEditing: roles.some(r => REVIEW_ROLES.has(r)) } }, 200, corsHeaders(request));
     }
 
     if (path === "/api/communications/website/content" && request.method === "GET") {
-      await authorised(request, env, true);
-      const wp = wordpressConfig(env);
-      const type = url.searchParams.get("type") === "pages" ? "pages" : "posts";
-      const response = await fetch(wp.root + "/wp-json/wp/v2/" + type + "?context=edit&per_page=50&orderby=modified&order=desc", {
+      await websiteEditorAuthorised(request, env);
+      const wp = stagingWordPressConfig(env);
+      const type = url.searchParams.get("type") === "pages" ? "pages" : url.searchParams.get("type") === "posts" ? "posts" : "";
+      if (!type) return json({ error: "Content type must be pages or posts." }, 400, corsHeaders(request));
+      const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/" + type + "?context=edit&status=any&per_page=50&orderby=modified&order=desc", {
         headers: wordpressHeaders(wp, { Accept: "application/json" }), signal: AbortSignal.timeout(15000)
       });
       const data = await response.json().catch(() => null);
-      if (!response.ok || !Array.isArray(data)) throw new Error("Could not read website content. Verify the WordPress account's edit permissions.");
+      if (!response.ok || !Array.isArray(data)) throw new Error("Could not list staging website content.");
       return json({ items: data.map(item => ({
-        id: item.id, type, title: String(item.title?.rendered || ""), status: item.status,
-        link: item.link, modified: item.modified, content: String(item.content?.raw || "")
+        id: Number(item.id), type, title: editorRaw(item, "title"), excerpt: editorRaw(item, "excerpt"),
+        featuredMedia: Number(item.featured_media || 0), status: String(item.status || "draft"),
+        link: String(item.link || ""), modified: String(item.modified || "")
       })) }, 200, corsHeaders(request));
     }
 
-    if (path === "/api/communications/website/content" && request.method === "PUT") {
-      const { claims } = await authorised(request, env, true);
-      const input = await request.json().catch(() => ({}));
-      const type = input.type === "pages" ? "pages" : input.type === "posts" ? "posts" : "";
-      const id = Number(input.id);
-      const title = cleanText(input.title, 181);
-      const body = cleanText(input.content, 30001);
-      if (!type || !Number.isSafeInteger(id) || id < 1 || !title || title.length > 180 || !body || body.length > 30000) {
-        return json({ error: "A valid page/post ID, title and content (up to 30,000 characters) are required." }, 400, corsHeaders(request));
+    const singleContentMatch = /^\/api\/communications\/website\/content\/(pages|posts)\/([1-9]\d*)$/.exec(path);
+    if (singleContentMatch && request.method === "GET") {
+      await websiteEditorAuthorised(request, env);
+      const wp = stagingWordPressConfig(env);
+      const type = singleContentMatch[1];
+      const id = Number(singleContentMatch[2]);
+      const item = await readWebsiteItem(wp, type, id);
+      return json({ item: editorItem(item, type) }, 200, corsHeaders(request));
+    }
+
+    if (path === "/api/communications/website/revisions" && request.method === "GET") {
+      await websiteEditorAuthorised(request, env);
+      const wp = stagingWordPressConfig(env);
+      const type = url.searchParams.get("type");
+      const id = Number(url.searchParams.get("id"));
+      if (!["pages", "posts"].includes(type) || !Number.isSafeInteger(id) || id < 1) {
+        return json({ error: "A valid page/post type and ID are required." }, 400, corsHeaders(request));
       }
-      const wp = wordpressConfig(env);
-      const response = await fetch(wp.root + "/wp-json/wp/v2/" + type + "/" + id, {
+      await readWebsiteItem(wp, type, id);
+      const native = await readWebsiteRevisions(wp, type, id);
+      if (!env.DRIVE_KV || typeof env.DRIVE_KV.list !== "function" || typeof env.DRIVE_KV.get !== "function") {
+        throw new Error("Staging revision storage is unavailable.");
+      }
+      const prefix = "irpa:website-editor:snapshot:" + type + ":" + id + ":";
+      const listing = await env.DRIVE_KV.list({ prefix, limit: 50 });
+      const snapshots = [];
+      for (const key of (listing.keys || [])) {
+        const raw = await env.DRIVE_KV.get(key.name);
+        if (!raw) continue;
+        try {
+          const snapshot = JSON.parse(raw);
+          if (snapshot.type === type && Number(snapshot.itemId) === id && snapshot.snapshotId) {
+            snapshots.push({
+              source: "IRPA saved snapshot", snapshotId: snapshot.snapshotId,
+              revisionId: snapshot.currentRevisionId, date: snapshot.createdAt,
+              title: String(snapshot.title || ""), status: String(snapshot.status || "draft"),
+              modified: String(snapshot.modified || "")
+            });
+          }
+        } catch {}
+      }
+      const revisions = native.map(item => ({
+        source: "WordPress revision", revisionId: Number(item.id),
+        date: String(item.date || item.modified || ""), title: editorRaw(item, "title"),
+        status: String(item.status || ""), modified: String(item.modified || "")
+      }));
+      revisions.push(...snapshots);
+      revisions.sort((a, b) => Date.parse(b.date || "") - Date.parse(a.date || ""));
+      return json({ type, id, revisions: revisions.slice(0, 100) }, 200, corsHeaders(request));
+    }
+
+    if (path === "/api/communications/website/content" && request.method === "PUT") {
+      const { claims } = await websiteEditorAuthorised(request, env);
+      const input = await request.json().catch(() => ({}));
+      const allowedKeys = new Set(["type", "id", "title", "content", "excerpt", "featuredMedia", "status"]);
+      if (Object.keys(input || {}).some(key => !allowedKeys.has(key))) {
+        return json({ error: "Only title, content, excerpt, featured image and status may be changed." }, 400, corsHeaders(request));
+      }
+      const type = input.type;
+      const id = Number(input.id);
+      const title = String(input.title ?? "").trim();
+      const content = String(input.content ?? "");
+      const excerpt = String(input.excerpt ?? "").replace(/<[^>]*>/g, "").trim();
+      const featuredMedia = Number(input.featuredMedia ?? 0);
+      const status = String(input.status || "draft");
+      if (!["pages", "posts"].includes(type) || !Number.isSafeInteger(id) || id < 1 ||
+          !title || title.length > 180 || content.length > 30000 || excerpt.length > 600 ||
+          !Number.isSafeInteger(featuredMedia) || featuredMedia < 0 || !["draft", "publish"].includes(status)) {
+        return json({ error: "Provide a valid page/post ID, title, content, excerpt, featured image ID and draft/publish status." }, 400, corsHeaders(request));
+      }
+      const wp = stagingWordPressConfig(env);
+      const current = await readWebsiteItem(wp, type, id);
+      const changedFields = ["title", "content", "excerpt", "featuredMedia", "status"].filter(key => {
+        const currentValue = key === "featuredMedia" ? Number(current.featured_media || 0) :
+          key === "status" ? String(current.status || "draft") : editorRaw(current, key);
+        const nextValue = key === "title" ? title : key === "content" ? sanitizeWordPressContent(content) :
+          key === "excerpt" ? excerpt : key === "featuredMedia" ? featuredMedia : status;
+        return currentValue !== nextValue;
+      });
+      const snapshot = await saveWebsiteSnapshot(env, claims, wp, type, id, current, changedFields);
+      const payload = { title, content: sanitizeWordPressContent(content), excerpt, featured_media: featuredMedia, status };
+      const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/" + type + "/" + id, {
         method: "POST", headers: wordpressHeaders(wp, { "Content-Type": "application/json", Accept: "application/json" }),
-        body: JSON.stringify({ title, content: sanitizeWordPressContent(body) }), signal: AbortSignal.timeout(20000)
+        body: JSON.stringify(payload), signal: AbortSignal.timeout(20000)
       });
       const data = await response.json().catch(() => null);
-      if (!response.ok || !Number.isSafeInteger(data?.id) || typeof data?.link !== "string") throw new Error("WordPress rejected the content update. Confirm that the integration account can edit this item.");
-      const auditFields = fields({ action: "COMMUNICATION_WEBSITE_CONTENT_UPDATED", category: "COMMUNICATIONS", collection: type, recordId: id, actorUid: claims.user_id, actorEmail: claims.email || "", details: { title, publicUrl: data.link }, createdAt: new Date().toISOString() });
-      await commitDocumentAndAudit(env, "communicationWebsiteEdits/" + crypto.randomUUID(), claims.token, fields({ itemId: id, type, title, publicUrl: data.link, updatedByUid: claims.user_id, updatedAt: new Date().toISOString() }), ["itemId", "type", "title", "publicUrl", "updatedByUid", "updatedAt"], auditFields, { createOnly: true });
-      return json({ success: true, id: data.id, title: String(data.title?.rendered || title), publicUrl: data.link, message: "Website content updated." }, 200, corsHeaders(request));
+      if (!response.ok || !Number.isSafeInteger(data?.id) || typeof data?.link !== "string") {
+        await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_CONTENT_UPDATE_FAILED", type, id, {
+          snapshotId: snapshot.snapshotId, previousRevisionId: snapshot.currentRevisionId
+        });
+        throw new Error("WordPress rejected the staging page/post update. The saved pre-edit snapshot remains available.");
+      }
+      await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_CONTENT_UPDATED", type, id, {
+        snapshotId: snapshot.snapshotId, previousRevisionId: snapshot.currentRevisionId,
+        changedFields, status, publicUrl: String(data.link || "")
+      });
+      const verified = await readWebsiteItem(wp, type, id);
+      if (!sameEditorFields(verified, payload)) {
+        await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_CONTENT_VERIFICATION_FAILED", type, id, {
+          snapshotId: snapshot.snapshotId, previousRevisionId: snapshot.currentRevisionId
+        });
+        throw new Error("WordPress did not verify every requested field. Use the saved revision to restore the previous version.");
+      }
+      const revisions = await readWebsiteRevisions(wp, type, id);
+      const revisionId = revisions.length && Number.isSafeInteger(Number(revisions[0]?.id)) ? Number(revisions[0].id) : null;
+      return json({
+        success: true, item: editorItem(verified, type), snapshotId: snapshot.snapshotId,
+        previousRevisionId: snapshot.currentRevisionId, revisionId,
+        message: status === "publish" ? "Staging page/post published and verified." : "Staging draft saved and verified."
+      }, 200, corsHeaders(request));
+    }
+
+    if (path === "/api/communications/website/restore" && request.method === "POST") {
+      const { claims } = await websiteEditorAuthorised(request, env);
+      const input = await request.json().catch(() => ({}));
+      const type = input.type;
+      const id = Number(input.id);
+      const snapshotId = String(input.snapshotId || "").trim();
+      const revisionId = Number(input.revisionId);
+      if (!["pages", "posts"].includes(type) || !Number.isSafeInteger(id) || id < 1 ||
+          (!snapshotId && (!Number.isSafeInteger(revisionId) || revisionId < 1)) ||
+          (snapshotId && !/^[0-9a-f-]{36}$/i.test(snapshotId))) {
+        return json({ error: "A valid page/post and saved snapshot or WordPress revision are required." }, 400, corsHeaders(request));
+      }
+      const wp = stagingWordPressConfig(env);
+      const current = await readWebsiteItem(wp, type, id);
+      const safetySnapshot = await saveWebsiteSnapshot(env, claims, wp, type, id, current, ["restore"]);
+      let target;
+      if (snapshotId) {
+        if (!env.DRIVE_KV || typeof env.DRIVE_KV.get !== "function") throw new Error("Staging revision storage is unavailable.");
+        const raw = await env.DRIVE_KV.get(websiteSnapshotKey(type, id, snapshotId));
+        if (!raw) throw new Error("Saved revision snapshot not found.");
+        const snapshot = JSON.parse(raw);
+        if (snapshot.snapshotId !== snapshotId || snapshot.type !== type || Number(snapshot.itemId) !== id) {
+          throw new Error("Saved revision snapshot does not match this page/post.");
+        }
+        target = snapshotPayload(snapshot);
+      } else {
+        const revisionResponse = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/" + type + "/" + id + "/revisions/" + revisionId + "?context=edit", {
+          headers: wordpressHeaders(wp, { Accept: "application/json" }), signal: AbortSignal.timeout(15000)
+        });
+        const revision = await revisionResponse.json().catch(() => null);
+        if (!revisionResponse.ok || !Number.isSafeInteger(revision?.id)) throw new Error("WordPress revision not found.");
+        target = {
+          title: editorRaw(revision, "title"),
+          content: editorRaw(revision, "content"),
+          excerpt: editorRaw(revision, "excerpt"),
+          featured_media: Number(revision.featured_media ?? current.featured_media ?? 0),
+          status: String(current.status || "draft")
+        };
+      }
+      if (!target.title || target.title.length > 180 || target.content.length > 30000 || target.excerpt.length > 600 ||
+          !Number.isSafeInteger(Number(target.featured_media)) || Number(target.featured_media) < 0) {
+        throw new Error("The selected revision contains fields outside the permitted restore scope.");
+      }
+      const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/" + type + "/" + id, {
+        method: "POST", headers: wordpressHeaders(wp, { "Content-Type": "application/json", Accept: "application/json" }),
+        body: JSON.stringify(target), signal: AbortSignal.timeout(20000)
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !Number.isSafeInteger(data?.id) || typeof data?.link !== "string") {
+        await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_REVISION_RESTORE_FAILED", type, id, {
+          requestedSnapshotId: snapshotId || null, requestedRevisionId: snapshotId ? null : revisionId,
+          safetySnapshotId: safetySnapshot.snapshotId
+        });
+        throw new Error("WordPress rejected the staging revision restore. The pre-restore snapshot remains available.");
+      }
+      await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_REVISION_RESTORED", type, id, {
+        requestedSnapshotId: snapshotId || null, requestedRevisionId: snapshotId ? null : revisionId,
+        safetySnapshotId: safetySnapshot.snapshotId
+      });
+      const verified = await readWebsiteItem(wp, type, id);
+      if (!sameEditorFields(verified, target)) {
+        await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_RESTORE_VERIFICATION_FAILED", type, id, {
+          requestedSnapshotId: snapshotId || null, requestedRevisionId: snapshotId ? null : revisionId,
+          safetySnapshotId: safetySnapshot.snapshotId
+        });
+        throw new Error("WordPress did not verify the restored revision exactly. The pre-restore snapshot remains available.");
+      }
+      return json({
+        success: true, item: editorItem(verified, type), safetySnapshotId: safetySnapshot.snapshotId,
+        message: "Staging revision restored and verified."
+      }, 200, corsHeaders(request));
     }
 
     if (path === "/api/communications/website/publish" && request.method === "POST") {
