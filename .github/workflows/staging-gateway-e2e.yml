@@ -961,8 +961,8 @@ jobs:
         working-directory: drive-gateway
         run: |
           set -euo pipefail
-          if [ -z "$META_APP_ID" ] && [ -z "$META_APP_SECRET" ] && [ -z "$META_TOKEN_ENCRYPTION_KEY" ]; then
-            echo "META_OAUTH_CONFIGURED=false; no staging Meta values are configured; Meta endpoints remain disabled."
+          if [ -z "$META_APP_ID" ] || [ -z "$META_APP_SECRET" ] || [ -z "$META_TOKEN_ENCRYPTION_KEY" ]; then
+            echo "::warning::META_OAUTH_CONFIGURED=false; staging Meta configuration is incomplete. No Meta secrets were changed, Meta OAuth remains unavailable, and independent WordPress/cPanel acceptance will continue."
             exit 0
           fi
           node <<'NODE'
@@ -1946,10 +1946,10 @@ jobs:
           const id=String(process.env.META_APP_ID||"").trim();
           const secret=String(process.env.META_APP_SECRET||"");
           const key=String(process.env.META_TOKEN_ENCRYPTION_KEY||"");
-          const any=Boolean(id||secret||key);
-          const valid=!any || (/^\d+$/.test(id)&&Boolean(secret.trim())&&/^[A-Za-z0-9+/]+={0,2}$/.test(key)&&Buffer.from(key,"base64").length===32&&key.trim()===key);
-          if(!valid) throw new Error("Staging Meta configuration is partial or invalid; refusing to configure Worker secrets.");
-          console.log(any?"META_OAUTH_CONFIGURATION_SHAPE=VALID":"META_OAUTH_CONFIGURED=false");
+          const complete=Boolean(id&&secret&&key);
+          const valid=!complete || (/^\d+$/.test(id)&&Boolean(secret.trim())&&/^[A-Za-z0-9+/]+={0,2}$/.test(key)&&Buffer.from(key,"base64").length===32&&key.trim()===key);
+          if(!valid) throw new Error("Complete staging Meta configuration is invalid; refusing to configure Worker secrets.");
+          console.log(complete?"META_OAUTH_CONFIGURATION_SHAPE=VALID":"META_OAUTH_CONFIGURED=false; incomplete optional Meta configuration will not be injected.");
           NODE
 
       - name: Inject staging-only Worker secrets
