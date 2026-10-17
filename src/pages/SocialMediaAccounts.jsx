@@ -19,7 +19,7 @@ export default function SocialMediaAccounts({profile,employee,selectedAuthority,
  const reviewer=isAdmin||roles.some(r=>REVIEW_ROLES.includes(r));
  const [items,setItems]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState(""),[notice,setNotice]=useState(""),[busy,setBusy]=useState(false),[editing,setEditing]=useState(null),[filter,setFilter]=useState("All"),[search,setSearch]=useState(""),[audit,setAudit]=useState([]),[form,setForm]=useState(blank);
  const META_GATEWAY="https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev";
- const metaStagingEnabled=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"").replace(/\\/$/,"")===META_GATEWAY;
+ const metaStagingEnabled=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"").replace(/\/+$/,"")===META_GATEWAY;
  const [metaStatus,setMetaStatus]=useState(null),[metaBusy,setMetaBusy]=useState(false);
  useEffect(()=>{if(!user?.uid||!allowed){setItems([]);setLoading(false);return}const q=query(collection(db,"socialMediaAccounts"),orderBy("updatedAt","desc"));return onSnapshot(q,s=>{setItems(s.docs.map(d=>({id:d.id,...d.data()})));setLoading(false);setError("")},e=>{setLoading(false);setError(e?.code==="permission-denied"?"Access denied by social-account policy. Verify your assigned communications role and deployed rules.":e.message||"Unable to load social accounts.")})},[user?.uid,allowed]);
  useEffect(()=>{if(!user?.uid||!reviewer){setAudit([]);return}const q=query(collection(db,"socialMediaAccountsAudit"),orderBy("createdAt","desc"),limit(50));return onSnapshot(q,s=>setAudit(s.docs.map(d=>({id:d.id,...d.data()}))),e=>setError(e?.message||"Unable to load account audit history."))},[user?.uid,reviewer]);
