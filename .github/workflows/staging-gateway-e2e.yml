@@ -1137,17 +1137,17 @@ jobs:
               const read=await readFile(dir,name);
               return saved.http===200&&saved.data?.status===1&&read.ok&&read.content===content;
             }
-            const inert="<?php\\n// Disabled stale IRPA staging credential bootstrap artifact.\\n";
+            const inert="<?php\n// Disabled stale IRPA staging credential bootstrap artifact.\n";
             // The old files were installed as MU-plugins, so their token guard intercepted every request before WordPress loaded. Disable only the known workflow-generated filenames and verify each file byte-for-byte.
             let mu=await list(muDir);
             if(!mu.ok)throw new Error("Could not safely inspect the staging MU-plugin directory.");
-            const stale=mu.files.filter(name=>/^irpa-staging-app-password-[a-f0-9]{20}\\.php$/i.test(name));
+            const stale=mu.files.filter(name=>/^irpa-staging-app-password-[a-f0-9]{20}\.php$/i.test(name));
             for(const name of stale){
               if(!await writeFile(muDir,name,inert))throw new Error("Could not safely neutralize a stale staging-only credential bootstrap MU-plugin.");
             }
             mu=await list(muDir);
             if(!mu.ok)throw new Error("Could not verify the staging MU-plugin directory after cleanup.");
-            for(const name of mu.files.filter(name=>/^irpa-staging-app-password-[a-f0-9]{20}\\.php$/i.test(name))){
+            for(const name of mu.files.filter(name=>/^irpa-staging-app-password-[a-f0-9]{20}\.php$/i.test(name))){
               const read=await readFile(muDir,name);
               if(!read.ok||read.content!==inert)throw new Error("A staging credential bootstrap MU-plugin is not inert; refusing to continue.");
             }
@@ -1155,12 +1155,12 @@ jobs:
             // Neutralize any leftover one-time scripts from earlier attempts. These names are random workflow artifacts, not WordPress core files.
             const rootFiles=await list(stage);
             if(!rootFiles.ok)throw new Error("Could not inspect the staging root for leftover provisioning scripts.");
-            const oldScripts=rootFiles.files.filter(name=>/^irpa-staging-provision-[a-f0-9]{20}\\.php$/i.test(name));
+            const oldScripts=rootFiles.files.filter(name=>/^irpa-staging-provision-[a-f0-9]{20}\.php$/i.test(name));
             for(const name of oldScripts){
               if(!await writeFile(stage,name,inert))throw new Error("Could not neutralize a leftover one-time staging provisioning script.");
             }
             console.log("STAGING_LEFTOVER_SCRIPT_NEUTRALIZATION=PASS count="+oldScripts.length);
-            const wpPassword=String(process.env.WP_PASSWORD||"").replace(/\\s/g,"");
+            const wpPassword=String(process.env.WP_PASSWORD||"").replace(/\s/g,"");
             const basic="Basic "+Buffer.from(process.env.WP_USER+":"+wpPassword).toString("base64");
             async function verifyAuth(){
               try{
@@ -1178,12 +1178,12 @@ jobs:
               const php=[
                 "<?php",
                 "$provided=(string)($_SERVER['HTTP_X_IRPA_STAGING_PROVISION_TOKEN']??'');",
-                "if(!hash_equals('"+tokenHash+"',hash('sha256',$provided))){http_response_code(404);header('Content-Type: application/json; charset=utf-8');echo '{\\"ok\\":false}';exit;}",
+                "if(!hash_equals('"+tokenHash+"',hash('sha256',$provided))){http_response_code(404);header('Content-Type: application/json; charset=utf-8');echo '{\"ok\":false}';exit;}",
                 "require_once __DIR__.'/wp-load.php';",
                 "header('Content-Type: application/json; charset=utf-8');",
                 "try{",
                 "$username=trim((string)($_SERVER['HTTP_X_IRPA_STAGING_USERNAME']??''));",
-                "$password=preg_replace('/\\\\s+/','',(string)($_SERVER['HTTP_X_IRPA_STAGING_APP_PASSWORD']??''));",
+                "$password=preg_replace('/\\s+/','',(string)($_SERVER['HTTP_X_IRPA_STAGING_APP_PASSWORD']??''));",
                 "if($username===''||$password===''){http_response_code(400);echo json_encode(['ok'=>false,'reason'=>'missing_input']);exit;}",
                 "if(!function_exists('wp_insert_application_password')||!class_exists('WP_Application_Passwords')){http_response_code(409);echo json_encode(['ok'=>false,'reason'=>'application_passwords_unavailable']);exit;}",
                 "if(function_exists('wp_is_application_passwords_available')&&!wp_is_application_passwords_available()){http_response_code(409);echo json_encode(['ok'=>false,'reason'=>'application_passwords_disabled']);exit;}",
@@ -1195,7 +1195,7 @@ jobs:
                 "if(is_wp_error($result)){http_response_code(500);echo json_encode(['ok'=>false,'reason'=>'application_password_registration_failed']);exit;}",
                 "echo json_encode(['ok'=>true]);exit;",
                 "}catch(Throwable $e){http_response_code(500);echo json_encode(['ok'=>false,'reason'=>'bootstrap_exception']);exit;}"
-              ].join("\\n");
+              ].join("\n");
               if(!await writeFile(stage,"index.php",php))throw new Error("Could not install the guarded temporary staging bootstrap.");
               let provisionError=null;
               try{
