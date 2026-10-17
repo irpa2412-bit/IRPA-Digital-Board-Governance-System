@@ -501,14 +501,14 @@ service cloud.firestore {
         &&data.get("recordOrigin","")=="PRODUCTION"
         &&data.keys().hasOnly(["kind","title","summary","status","owner","startDate","dueDate","channels","audience","objective","budgetNote","contactName","organization","email","phone","beat","consent","assetType","assetUrl","rights","version","expiryDate","severity","lead","approver","trigger","holdingStatement","nextReview","channel","sourceUrl","observedDate","reach","engagement","sentiment","evidence","tags","createdByUid","createdByEmail","createdAt","updatedByUid","updatedAt","recordOrigin"]);
     }
-    allow read:if communicationMediaUser()&&(resource.data.get("kind","")!="Crisis Plan"||communicationMediaReviewer());
-    allow create:if communicationMediaUser()&&(request.resource.data.get("kind","")!="Crisis Plan"||communicationMediaReviewer())&&validOperationsRecord(request.resource.data)
+    allow read:if communicationMediaUser();
+    allow create:if communicationMediaUser()&&validOperationsRecord(request.resource.data)
       &&request.resource.data.get("createdByUid","")==request.auth.uid
       &&request.resource.data.get("updatedByUid","")==request.auth.uid
       &&request.resource.data.get("status","")=="Draft"
       &&request.resource.data.get("createdAt",null)==request.time
       &&request.resource.data.get("updatedAt",null)==request.time;
-    allow update:if communicationMediaUser()&&(resource.data.get("kind","")!="Crisis Plan"||communicationMediaReviewer())&&validOperationsRecord(request.resource.data)
+    allow update:if communicationMediaUser()&&validOperationsRecord(request.resource.data)
       &&request.resource.data.get("createdByUid","")==resource.data.get("createdByUid","")
       &&request.resource.data.get("createdAt",null)==resource.data.get("createdAt",null)
       &&request.resource.data.get("recordOrigin","")==resource.data.get("recordOrigin","")
