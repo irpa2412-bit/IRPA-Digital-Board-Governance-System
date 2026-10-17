@@ -1782,9 +1782,7 @@ exports.submitMeetingDocumentReview = meetingWorkingDocuments.submitMeetingDocum
 const meetingGateway = require("./meetingGateway");
 exports.listMeetingInviteeDirectory = meetingGateway.listMeetingInviteeDirectory;
 
-// Communications and media publishing. WordPress credentials remain in Firebase Secret Manager.
-const communicationMedia = require("./communicationMedia");
-exports.publishCommunicationMediaItem = communicationMedia.publishCommunicationMediaItem;
+// Website publishing and cPanel edits are handled by the existing Cloudflare Drive Gateway.
 
  
 // Secure invitation-register removal. Administrator-only; preserve active identities.

@@ -1,0 +1,90 @@
+name: Communication Website Integration Verification
+
+on:
+  push:
+    branches: [fix/communications-cloudflare-website-integration]
+    paths:
+      - "src/pages/CommunicationMediaPortal.jsx"
+      - "src/pages/CommunicationMediaOperations.jsx"
+      - "src/pages/SocialMediaAccounts.jsx"
+      - "firestore.rules"
+      - "drive-gateway/src/communicationsSite.mjs"
+      - "drive-gateway/src/index.js"
+      - "tests/communication-media-policy.test.mjs"
+      - "docs/COMMUNICATION_MEDIA_PORTAL.md"
+      - "docs/META_OAUTH_STAGING.md"
+      - "docs/COMMUNICATION_MEDIA_READINESS_CHECKLIST.md"
+      - "package.json"
+      - "package-lock.json"
+      - "drive-gateway/**"
+      - "drive-gateway/wrangler.toml"
+      - "drive-gateway/src/metaOAuth.mjs"
+      - "tests/meta-oauth-staging.test.mjs"
+      - ".github/workflows/communications-website-integration.yml"
+      - ".github/workflows/staging-gateway-e2e.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/pages/CommunicationMediaPortal.jsx"
+      - "src/pages/CommunicationMediaOperations.jsx"
+      - "src/pages/SocialMediaAccounts.jsx"
+      - "firestore.rules"
+      - "drive-gateway/src/communicationsSite.mjs"
+      - "drive-gateway/src/index.js"
+      - "tests/communication-media-policy.test.mjs"
+      - "docs/COMMUNICATION_MEDIA_PORTAL.md"
+      - "docs/META_OAUTH_STAGING.md"
+      - "docs/COMMUNICATION_MEDIA_READINESS_CHECKLIST.md"
+      - "package.json"
+      - "package-lock.json"
+      - "drive-gateway/**"
+      - "drive-gateway/wrangler.toml"
+      - "drive-gateway/src/metaOAuth.mjs"
+      - "tests/meta-oauth-staging.test.mjs"
+      - ".github/workflows/communications-website-integration.yml"
+      - ".github/workflows/staging-gateway-e2e.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  communications-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install web dependencies
+        run: npm ci
+      - name: Compile Firestore rules in an isolated local emulator
+        run: npx firebase emulators:exec --project demo-irpa-rules --only firestore "node -e 'process.exit(0)'"
+      - name: Run communications portal security and integration regression tests
+        run: npm run test:communication-media
+      - name: Run Meta OAuth staging security regression tests
+        run: npm run test:meta-oauth
+      - name: Verify Meta OAuth router syntax
+        run: node --check drive-gateway/src/metaOAuth.mjs
+      - name: Run existing portal navigation regression tests
+        run: npm run test:portal-navigation
+      - name: Verify Cloudflare communications router syntax
+        run: node --check drive-gateway/src/communicationsSite.mjs
+      - name: Verify Cloudflare gateway entrypoint syntax
+        run: node --check drive-gateway/src/index.js
+      - name: Build web application
+        run: npm run build
+      - name: Install gateway dependencies
+        working-directory: drive-gateway
+        run: npm ci
+      - name: Run complete gateway regression suite
+        working-directory: drive-gateway
+        run: npm test
+      - name: Verify Worker bundle without deployment
+        working-directory: drive-gateway
+        run: npx wrangler deploy --dry-run --keep-vars

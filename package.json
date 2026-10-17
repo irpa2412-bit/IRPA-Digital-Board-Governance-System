@@ -19,7 +19,8 @@
     "test:portal-navigation": "node --test tests/portal-workspace-navigation.test.mjs",
     "test:meeting-entry-policy": "node --test functions/meetingEntryPolicy.test.cjs",
     "test:meeting-invitation-resend": "node --test tests/meeting-invitation-resend-quorum.test.mjs",
-    "test:communication-media": "node --test tests/communication-media-policy.test.mjs"
+    "test:communication-media": "node --test tests/communication-media-policy.test.mjs",
+    "test:meta-oauth": "node --test tests/meta-oauth-staging.test.mjs"
   },
   "dependencies": {
     "firebase": "^11.10.0",
