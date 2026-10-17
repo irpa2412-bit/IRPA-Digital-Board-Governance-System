@@ -1,6 +1,7 @@
 import React,{useEffect,useMemo,useState} from "react";
 import {collection,doc,limit,onSnapshot,orderBy,query,serverTimestamp,writeBatch} from "firebase/firestore";
 import {auth,db} from "../firebase/config";
+import MetaApiConnection from "./MetaApiConnection";
 
 const PLATFORMS=["Facebook","Instagram","LinkedIn","X","YouTube","TikTok","WhatsApp","Telegram","Other"];
 const ACCOUNT_TYPES=["Organization page","Public profile","Channel","Group","Messaging channel","Other"];
@@ -43,6 +44,7 @@ export default function SocialMediaAccounts({profile,employee,selectedAuthority,
  if(!allowed)return <section style={panel} role="alert"><h3>Social-media accounts</h3><p>Your assigned role does not permit account management.</p></section>;
  return <section style={{display:"grid",gap:14,color:"var(--text-primary, #172033)"}}>
   <header style={{...panel,display:"grid",gap:8}}><h3 style={{margin:0}}>Social-media account enrolment &amp; management</h3><p style={{margin:0}}>Register IRPA's official accounts, custodians, purpose, authorization and review dates. Account records are audited and archived rather than deleted.</p><p style={{margin:0,fontSize:13}}>This is an account register, not an OAuth connection. It never asks for or stores passwords, recovery codes, access tokens or API secrets; it does not publish posts, read private messages, or revoke platform access.</p></header>
+  <MetaApiConnection />
   <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:14}}>
    <form onSubmit={save} style={{...panel,display:"grid",gap:10,alignContent:"start"}}>
     <h4 style={{margin:0}}>{editing?"Edit account record":"Enrol a social-media account"}</h4>
