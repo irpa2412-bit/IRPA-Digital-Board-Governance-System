@@ -1128,6 +1128,21 @@ jobs:
             const root=String(info.data?.data?.main_domain?.documentroot||info.data?.data?.main_domain?.document_root||"");
             if(info.http!==200||info.data?.status!==1||!root.endsWith("/public_html"))throw new Error("Could not verify the cPanel staging document root.");
             const stage=root+"/staging",muDir=stage+"/wp-content/mu-plugins";
+            // The staging PHP error log shows the REST request exhausting its 128 MiB limit.
+            // Raise only the isolated staging install's PHP memory ceiling, preserving other .user.ini directives.
+            const stageListing=await uapi("Fileman/list_files",{dir:stage,showdotfiles:1});
+            if(stageListing.http!==200||stageListing.data?.status!==1)throw new Error("Could not safely inspect staging PHP configuration.");
+            const stageNames=(Array.isArray(stageListing.data?.data)?stageListing.data.data:[]).map(x=>String(x.file||x.name||""));
+            let userIni="";
+            if(stageNames.includes(".user.ini")){
+              const existingIni=await uapi("Fileman/get_file_content",{dir:stage,file:".user.ini"});
+              userIni=String(existingIni.data?.data?.content??existingIni.data?.data?.[0]?.content??existingIni.data?.result?.data?.content??"");
+              if(existingIni.http!==200||existingIni.data?.status!==1)throw new Error("Could not read existing staging .user.ini safely.");
+            }
+            const iniLines=userIni.split(/\\r?\\n/).filter(line=>!/^\\s*memory_limit\\s*=/i.test(line));
+            const updatedIni=iniLines.filter((line,index)=>line.length||index<iniLines.length-1).concat("memory_limit=256M").join("\\n")+"\\n";
+            if(!await writeFile(stage,".user.ini",updatedIni))throw new Error("Could not raise the staging-only PHP memory limit to 256M.");
+            console.log("STAGING_PHP_MEMORY_LIMIT=256M");
             async function list(dir){
               const r=await uapi("Fileman/list_files",{dir,showdotfiles:1});
               return {ok:r.http===200&&r.data?.status===1,files:Array.isArray(r.data?.data)?r.data.data.map(x=>String(x.file||x.name||"")).filter(Boolean):[]};
@@ -1280,6 +1295,7 @@ jobs:
                 // This staging WordPress core lacks native Application Passwords. Install a staging-only REST Basic-auth adapter using a SHA-256 verifier; it grants only edit_pages users, only to /wp-json/*, and only on the exact staging hostname.
                 const shim=[
                   "<?php",
+                  "@ini_set('memory_limit','256M');",
                   "if(!function_exists('irpa_staging_rest_auth_user')){",
                   "function irpa_staging_rest_auth_user(){",
                   "$host=strtolower(preg_replace('/:\\\\d+$/','',(string)($_SERVER['HTTP_HOST']??'')));",
