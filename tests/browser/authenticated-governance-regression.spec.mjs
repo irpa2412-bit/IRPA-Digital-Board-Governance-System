@@ -226,7 +226,7 @@ for (const viewport of [
     await expect(worldTimeToggle, "World time toggle belongs in the shared Back/Next navigator").toBeVisible();
     const inAppBackNext = pageNavigation.locator(".page-back-next-button");
     if (viewport.width <= 760) {
-      await expect(inAppBackNext, "mobile app hides duplicate in-app Back/Next controls").toHaveCount(0);
+      await expect(inAppBackNext, "mobile app hides duplicate in-app Back/Next controls").toBeHidden();
       await expect(worldTimeToggle, "World Time remains visible in the mobile navigation row").toBeVisible();
     } else {
       await expect(inAppBackNext, "tablet and desktop retain existing Back/Next controls").toHaveCount(2);
