@@ -19,6 +19,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   local-e2e:
@@ -484,6 +485,7 @@ jobs:
           CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
           CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
           CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -507,6 +509,19 @@ jobs:
           async function remediateDns(){
             const tokens=[["production",process.env.CF_PRODUCTION],["staging",process.env.CF_STAGING],["grant-crawler",process.env.CF_GRANT]].filter(x=>x[1]);
             const configuredIds=[process.env.CF_ZONE_ID_SECRET,process.env.CF_STAGING_ZONE_ID_SECRET,process.env.CF_ZONE_ID_VAR,process.env.CF_STAGING_ZONE_ID_VAR].map(x=>(x||"").trim()).filter(Boolean);
+            const variableNames=[];
+            try{
+              const gh=await request("https://api.github.com/repos/"+encodeURIComponent(process.env.GITHUB_REPOSITORY)+"/actions/variables?per_page=100","GET",{Authorization:"Bearer "+process.env.GH_TOKEN,Accept:"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"});
+              if(gh.http===200&&Array.isArray(gh.data?.variables)){
+                for(const variable of gh.data.variables){
+                  if(/cloudflare|dns|zone/i.test(variable.name||"")){
+                    variableNames.push(variable.name);
+                    if(/zone.*id|id.*zone|dns.*zone/i.test(variable.name||"")&&typeof variable.value==="string"&&variable.value.trim())configuredIds.push(variable.value.trim());
+                  }
+                }
+                console.log("GITHUB_DNS_RELATED_VARIABLE_NAMES="+JSON.stringify(variableNames));
+              }else console.log("GITHUB_REPOSITORY_VARIABLE_LOOKUP=UNAVAILABLE_HTTP_"+gh.http);
+            }catch(e){console.log("GITHUB_REPOSITORY_VARIABLE_LOOKUP=ERROR_"+String(e.code||e.name))}
             let zone=null,token=null;
             for(const [label,t] of tokens){
               try{
