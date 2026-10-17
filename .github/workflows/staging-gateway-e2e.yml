@@ -1134,8 +1134,22 @@ jobs:
             }
             async function writeFile(dir,name,content){
               const saved=await uapi("Fileman/save_file_content",{dir,file:name,content,charset:"utf-8"},"POST");
-              const read=await readFile(dir,name);
-              return saved.http===200&&saved.data?.status===1&&read.ok&&read.content===content;
+              let read=await readFile(dir,name);
+              if(saved.http===200&&saved.data?.status===1&&read.ok&&read.content===content)return true;
+              // The hosting account's save_file_content endpoint may return success without updating MU-plugin files. Fall back to the same multipart upload API already verified by the staging rollback test, explicitly allowing overwrite, then verify exact content.
+              const boundary="----IRPAStagingFileRewrite"+crypto.randomBytes(8).toString("hex");
+              const payload=Buffer.concat([
+                Buffer.from("--"+boundary+"\\r\\nContent-Disposition: form-data; name=\\"dir\\"\\r\\n\\r\\n"+dir+"\\r\\n"),
+                Buffer.from("--"+boundary+"\\r\\nContent-Disposition: form-data; name=\\"overwrite\\"\\r\\n\\r\\n1\\r\\n"),
+                Buffer.from("--"+boundary+"\\r\\nContent-Disposition: form-data; name=\\"file-1\\"; filename=\\""+name+"\\"\\r\\nContent-Type: application/octet-stream\\r\\n\\r\\n"),
+                Buffer.from(content),
+                Buffer.from("\\r\\n--"+boundary+"--\\r\\n")
+              ]);
+              const uploaded=await request(new URL("/execute/Fileman/upload_files",cpBase).href,"POST",{...auth,"Content-Type":"multipart/form-data; boundary="+boundary,"Content-Length":String(payload.length)},payload);
+              read=await readFile(dir,name);
+              const ok=uploaded.http===200&&uploaded.data?.status===1&&read.ok&&read.content===content;
+              if(!ok)console.log("STAGING_FILE_REWRITE_DIAGNOSTIC="+JSON.stringify({saveHttp:saved.http,saveStatus:saved.data?.status,uploadHttp:uploaded.http,uploadStatus:uploaded.data?.status,readOk:read.ok,readLength:read.content.length,expectedLength:content.length}));
+              return ok;
             }
             const inert="<?php\n// Disabled stale IRPA staging credential bootstrap artifact.\n";
             // The old files were installed as MU-plugins, so their token guard intercepted every request before WordPress loaded. Disable only the known workflow-generated filenames and verify each file byte-for-byte.
