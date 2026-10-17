@@ -602,6 +602,81 @@ jobs:
           main().catch(e=>{console.log("WP_BOOT_DIAGNOSTIC_ERROR="+String(e.message||e.code||e.name||"unknown").replace(/\s+/g," ").slice(0,220));process.exit(1);});
           NODE
 
+      - name: Inspect staging PHP logs and authenticated REST path (read-only)
+        env:
+          WP_BASE: ${{ secrets.STAGING_WORDPRESS_BASE_URL }}
+          WP_USER: ${{ secrets.STAGING_WORDPRESS_USERNAME }}
+          WP_APP_PASSWORD: ${{ secrets.STAGING_WORDPRESS_APPLICATION_PASSWORD }}
+          CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
+          CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
+          CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const https=require("node:https");
+          const {URL,URLSearchParams}=require("node:url");
+          require("node:dns").setDefaultResultOrder("ipv4first");
+          function request(url,headers={},timeout=12000){
+            return new Promise((resolve,reject)=>{
+              const u=new URL(url);
+              const req=https.request({protocol:u.protocol,hostname:u.hostname,port:u.port||443,family:4,path:u.pathname+u.search,headers,timeout},res=>{
+                let raw="";res.setEncoding("utf8");res.on("data",c=>raw+=c);res.on("end",()=>resolve({status:res.statusCode,headers:res.headers,raw}));
+              });
+              req.on("timeout",()=>req.destroy(new Error("request timeout")));
+              req.on("error",reject);req.end();
+            });
+          }
+          function json(raw){try{return JSON.parse(raw)}catch{return null}}
+          function safeText(s){return String(s||"").replace(/[\r\n\t]+/g," ").replace(/\s+/g," ").replace(/(?:Bearer|Basic)\s+[^\s,]+/ig,"[REDACTED]").replace(/(password|token|secret|authorization|cookie)(\s*[:=]\s*)[^,; ]+/ig,"$1$2[REDACTED]").replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/ig,"[EMAIL]").replace(/\/home\/[^/\s]+/g,"/home/[account]").slice(0,240)}
+          async function cp(path,params={}){
+            const base=new URL(process.env.CP_BASE);
+            if(base.protocol!=="https:"||base.port!=="2083")throw new Error("cPanel target must remain HTTPS port 2083.");
+            const u=new URL("/execute/"+path,base);u.search=new URLSearchParams(params).toString();
+            const r=await request(u.href,{Authorization:"cpanel "+process.env.CP_USER+":"+process.env.CP_TOKEN,Accept:"application/json"});
+            return {http:r.status,data:json(r.raw)};
+          }
+          async function main(){
+            const wp=new URL(process.env.WP_BASE);
+            if(wp.protocol!=="https:"||wp.hostname.toLowerCase()!=="staging.irpa.or.tz")throw new Error("ABORT: diagnostics target must be staging.irpa.or.tz.");
+            const info=await cp("DomainInfo/domains_data");
+            const root=String(info.data?.data?.main_domain?.documentroot||info.data?.data?.main_domain?.document_root||"");
+            if(info.http!==200||info.data?.status!==1||!root.endsWith("/public_html"))throw new Error("Could not verify cPanel staging document-root boundary.");
+            const stage=root+"/staging";
+            async function inspect(dir,file){
+              try{
+                const r=await cp("Fileman/get_file_content",{dir,file});
+                const content=String(r.data?.data?.content??r.data?.data?.[0]?.content??r.data?.result?.data?.content??"");
+                if(r.http!==200||r.data?.status!==1||!content){console.log("STAGING_PHP_LOG="+JSON.stringify({file,found:false,http:r.http,cpanelStatus:r.data?.status??null}));return}
+                const lines=content.split(/\r?\n/);
+                const matches=lines.map((line,i)=>({line:i+1,text:line})).filter(x=>/PHP Fatal error|Uncaught (?:Error|TypeError|Exception)|Parse error|Allowed memory size|WordPress database error|PHP Warning|PHP Notice|Fatal error:/i.test(x.text)).slice(-8).map(x=>({line:x.line,text:safeText(x.text)}));
+                const kinds={fatal:0,uncaught:0,parse:0,memory:0,database:0,warning:0,notice:0};
+                for(const line of lines){if(/PHP Fatal error|Fatal error:/i.test(line))kinds.fatal++;if(/Uncaught (?:Error|TypeError|Exception)/i.test(line))kinds.uncaught++;if(/Parse error/i.test(line))kinds.parse++;if(/Allowed memory size/i.test(line))kinds.memory++;if(/WordPress database error/i.test(line))kinds.database++;if(/PHP Warning/i.test(line))kinds.warning++;if(/PHP Notice/i.test(line))kinds.notice++}
+                console.log("STAGING_PHP_LOG="+JSON.stringify({file,found:true,bytes:Buffer.byteLength(content),lineCount:lines.length,kinds,recentRelevantLines:matches}));
+              }catch(e){console.log("STAGING_PHP_LOG_READ_ERROR="+JSON.stringify({file,error:String(e.code||e.name||"error")}))}
+            }
+            await inspect(stage,"error_log");
+            await inspect(stage+"/wp-content","debug.log");
+            await inspect(stage+"/wp-content","error_log");
+            const endpoint=new URL("/wp-json/wp/v2/users/me?context=edit",wp).href;
+            async function probe(label,headers){
+              try{
+                const r=await request(endpoint,{Accept:"application/json","Cache-Control":"no-cache",...headers});
+                const body=json(r.raw);
+                console.log("STAGING_REST_AUTH_PROBE="+JSON.stringify({label,http:r.status,contentType:String(r.headers["content-type"]||"").slice(0,70),server:String(r.headers.server||"").slice(0,50),cfRay:String(r.headers["cf-ray"]||"").slice(0,80),jsonCode:body&&typeof body.code==="string"?body.code.slice(0,100):null,jsonMessage:body&&typeof body.message==="string"?safeText(body.message):null,userId:Number.isInteger(body?.id)?body.id:null,roles:Array.isArray(body?.roles)?body.roles.filter(x=>typeof x==="string").slice(0,8):null}));
+              }catch(e){console.log("STAGING_REST_AUTH_PROBE="+JSON.stringify({label,error:String(e.code||e.name||"request_error")}))}
+            }
+            await probe("anonymous",{});
+            const username=process.env.WP_USER||"",password=(process.env.WP_APP_PASSWORD||"").replace(/\s/g,"");
+            if(username&&password){
+              const basic="Basic "+Buffer.from(username+":"+password).toString("base64");
+              await probe("basic_only",{Authorization:basic});
+              await probe("basic_plus_staging_header",{Authorization:basic,"X-IRPA-Staging-Authorization":basic});
+            }else console.log("STAGING_REST_AUTH_DIRECT_PROBE=SKIPPED missing dedicated staging WordPress username/application-password GitHub secrets");
+          }
+          main().catch(e=>{console.error("Staging PHP/auth diagnostics failed safely: "+safeError(e));process.exit(1)});
+          function safeError(e){return String(e?.message||e?.code||e?.name||"unknown").replace(/[\r\n\t]+/g," ").replace(/\s+/g," ").slice(0,180)}
+          NODE
+
       - name: Inject staging-only Worker secrets
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
