@@ -128,3 +128,27 @@ The Publishing Setup workspace loads existing WordPress pages or posts, lets an 
 The server-side editor enforces Firebase authentication, active registered reviewer roles, HTTPS WordPress configuration, a 30,000-character content limit, allowlisted HTML tags/attributes and URL schemes, and audit recording. Saving is an immediate live WordPress write; the interface requires an explicit confirmation before the write. Review the preview, confirm the target page/post and keep a copy of the prior content before saving. Confirm the returned public URL after the write. If the WordPress or cPanel connection is not configured and verified, the portal must show the connection failure rather than simulate a successful edit.
 
 The cPanel file editor is deliberately separate and restricted to existing static HTML/HTM, CSS, TXT and JSON files (512 KiB maximum). It does not edit PHP, run commands, create arbitrary files, or provide hosting administration. WordPress page/post editing should be preferred for content managed by WordPress. Secrets remain in the server-side Worker environment, never in the browser bundle or Firestore.
+
+## Meta (Facebook and Instagram) API — staging-only connection and access verification
+
+The initial Meta integration uses the existing Cloudflare gateway and its isolated `staging` environment. It does not add a second gateway, Firebase Functions, a new storage service, or a browser-held Meta token.
+
+- OAuth routes: `POST /api/communications/meta/connect`, `GET /api/communications/meta/callback`, and `GET /api/communications/meta/status`.
+- The callback is fixed to `https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev/api/communications/meta/callback`. Register this exact URI in the Meta developer app. The Worker rejects non-staging environments, non-HTTPS callbacks, non-`workers.dev` callbacks, and production `irpa.or.tz` callback hosts.
+- The gateway authenticates the Firebase user and requires an active IRPA account with a communications/reviewer role or an active administrator profile before starting OAuth or reading connection status.
+- Requested permissions are limited to `pages_show_list`, `pages_read_engagement`, and `instagram_basic`. Publishing, messaging, comments management, ads, and insights permissions are intentionally not requested.
+- The callback consumes a single-use, 10-minute OAuth state from the existing staging `DRIVE_KV`, exchanges the code server-side, attempts a long-lived-token exchange, and checks `/me`, `/me/permissions`, and managed Pages plus linked Instagram professional accounts. It does not request or return Page access tokens.
+- The Meta user token is encrypted server-side with AES-GCM using a dedicated 32-byte `META_TOKEN_ENCRYPTION_KEY` secret and stored only in the existing staging `DRIVE_KV`. It is never returned to the browser, written to Firestore, or committed to source control. Do not reuse the Google Drive encryption key.
+- The status response contains only account metadata, required/granted permission names, a verification timestamp and `postingEnabled: false`. A connected Facebook Page without a linked Instagram professional account is not reported as an Instagram connection.
+- There is no publishing route in this initial integration. Social posting remains disabled regardless of connection status.
+
+### Staging Meta configuration
+
+1. Create or select IRPA's Meta developer app and configure Facebook Login for Web. Use an app with the least privilege needed for managed Facebook Pages and linked Instagram professional accounts. Add the exact callback URI above under valid OAuth redirect URIs.
+2. Set the non-secret staging Worker variables `META_APP_ID`, `META_GRAPH_API_VERSION=v26.0`, and `META_REDIRECT_URI` in the dedicated `irpa-google-drive-gateway-staging` Worker. The checked-in `META_APP_ID` value is intentionally empty until the real app ID is configured.
+3. Add `META_APP_SECRET` and a separately generated, random 32-byte base64 `META_TOKEN_ENCRYPTION_KEY` as **staging Worker secrets only**. Use the Cloudflare dashboard or interactive secret prompt; never put values in chat, source control, command-line arguments, workflow logs, or the portal. Do not use production secrets.
+4. Confirm the staging Worker uses Firebase project `irpa-dbg-staging-a73ec`, not the production Firebase project. Do not deploy while any staging project/credential isolation check is failing.
+5. Add the Meta app's authorized testers/developers and grant access only to IRPA-owned or explicitly authorized accounts. Complete consent while signed into the appropriate Meta account.
+6. Verify the response from the authenticated `/api/communications/meta/status` route. Expected acceptance: the returned Meta identity and managed Page/Instagram metadata are correct; required permissions are visible; no token fields appear; posting remains disabled. Verify invalid/expired state, role denial, production environment rejection and secret redaction as part of the security suite.
+
+The API code and automated tests do not establish that Meta has approved the app, that the actual IRPA account has consented, that the Worker secrets exist, or that the live staging connection succeeds. Those remain external setup and live-acceptance requirements. Do not merge or deploy to production. Keep posting disabled until authorization, security checks and staging acceptance all pass.
