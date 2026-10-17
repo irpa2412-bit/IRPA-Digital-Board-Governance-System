@@ -118,3 +118,12 @@ test("Signature palette lifecycle source repair is paired with regression covera
   assert.match(workflow, /changed\.includes\("tests\/signature-workflow-policy\.test\.mjs"\)/);
   assert.match(workflow, /!signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !guardOnlyWorkflowRepair/);
 });
+
+
+test("archive-backed Signature Portal PDF palette repair is explicitly paired and path-limited", () => {
+  assert.match(workflow, /const signaturePdfArchivePaletteRepair = changed\.includes\("src\/firebase\/data\.js"\)/);
+  assert.match(workflow, /changed\.includes\("src\/pages\/SignaturePlatform\.jsx"\)/);
+  assert.match(workflow, /changed\.includes\("tests\/signature-workflow-policy\.test\.mjs"\)/);
+  assert.match(workflow, /!signaturePdfArchivePaletteRepair/);
+  assert.match(workflow, /changed\.every\(path => \["\.github\/workflows\/meeting-portal-fixture-browser\.yml", "tests\/meeting-isolation-guard\.test\.mjs", "src\/firebase\/data\.js", "src\/pages\/SignaturePlatform\.jsx", "tests\/signature-workflow-policy\.test\.mjs"\]\.includes\(path\)\)/);
+});
