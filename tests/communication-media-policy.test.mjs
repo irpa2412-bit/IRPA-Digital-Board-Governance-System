@@ -8,7 +8,7 @@ const portal=read("../src/pages/CommunicationMediaPortal.jsx");
 const studio=read("../src/pages/CommunicationMediaStudio.jsx");
 const operations=read("../src/pages/CommunicationMediaOperations.jsx");
 const social=read("../src/pages/SocialMediaAccounts.jsx");
-const metaApi=read("../drive-gateway/src/metaSocialApi.mjs");
+const metaOAuth=read("../drive-gateway/src/metaOAuth.mjs");
 const rules=read("../firestore.rules");
 const gateway=read("../drive-gateway/src/index.js");
 const site=read("../drive-gateway/src/communicationsSite.mjs");
@@ -177,22 +177,24 @@ test("social account enrolment is integrated, metadata-only, role-scoped and aud
 });
 
 
-test("Meta API uses staging-only OAuth, minimal read permissions, encrypted tokens and no publishing",()=>{
+test("Meta API uses the existing staging-only OAuth router, minimal read permissions, encrypted tokens and no publishing",()=>{
  assert.ok(social.includes("metaStagingEnabled"));
  assert.ok(social.includes("/api/communications/meta/connect"));
  assert.ok(social.includes("/api/communications/meta/status"));
  assert.ok(social.includes("/api/communications/meta/disconnect"));
  assert.ok(social.includes("Posting enabled: No"));
- assert.ok(metaApi.includes('String(env.IRPA_ENVIRONMENT || "").toLowerCase() !== "staging"'));
- assert.ok(metaApi.includes('META_TOKEN_ENCRYPTION_KEY'));
- assert.ok(metaApi.includes('meta:oauth-state:'));
- assert.ok(metaApi.includes('await env.DRIVE_KV.delete(stateKey)'));
- assert.ok(metaApi.includes('"pages_show_list", "pages_read_engagement", "instagram_basic"'));
- assert.ok(metaApi.includes('postingEnabled: false'));
- assert.ok(!metaApi.includes('instagram_content_publish'));
- assert.ok(!metaApi.includes('pages_manage_posts'));
- assert.ok(metaApi.includes('/api/communications/meta/disconnect'));
- assert.ok(gateway.includes('import { createMetaSocialApiRouter } from "./metaSocialApi.mjs"'));
- assert.ok(gateway.includes('pathname.startsWith("/api/communications/meta/")'));
+ assert.ok(metaOAuth.includes('env?.IRPA_ENVIRONMENT !== "staging"'));
+ assert.ok(metaOAuth.includes('FIREBASE_PROJECT_ID !== STAGING_PROJECT'));
+ assert.ok(metaOAuth.includes('META_TOKEN_ENCRYPTION_KEY'));
+ assert.ok(metaOAuth.includes('meta:readonly:oauth-state:'));
+ assert.ok(metaOAuth.includes('await env.DRIVE_KV.delete(stateKey)'));
+ assert.ok(metaOAuth.includes('"pages_show_list", "pages_read_engagement", "instagram_basic"'));
+ assert.ok(metaOAuth.includes('postingEnabled: false'));
+ assert.ok(!metaOAuth.includes('instagram_content_publish'));
+ assert.ok(!metaOAuth.includes('pages_manage_posts'));
+ assert.ok(metaOAuth.includes('/api/communications/meta/disconnect'));
+ assert.ok(gateway.includes('import { createMetaOAuthRouter } from "./metaOAuth.mjs"'));
+ assert.ok(gateway.includes('const metaOAuthRouter = createMetaOAuthRouter'));
+ assert.ok(gateway.includes('const metaResponse = await metaOAuthRouter(request, env)'));
  assert.ok(docs.includes("Meta (Facebook and Instagram) API — staging-only connection and access verification"));
 });
