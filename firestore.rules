@@ -539,6 +539,10 @@ service cloud.firestore {
       &&request.resource.data.get("action","") in ["CREATED","UPDATED","STATUS_APPROVED","STATUS_ARCHIVED","STATUS_ACTIVE","STATUS_UNDER_REVIEW","STATUS_COMPLETED","STATUS_DRAFT"]
       &&request.resource.data.get("title","") is string
       &&request.resource.data.get("title","").size()<=180
+      &&request.resource.data.get("actorEmail","")==request.auth.token.get("email","")
+      &&existsAfter(/databases/$(database)/documents/communicationOperations/$(request.resource.data.recordId))
+      &&getAfter(/databases/$(database)/documents/communicationOperations/$(request.resource.data.recordId)).data.get("kind","")==request.resource.data.get("kind","")
+      &&getAfter(/databases/$(database)/documents/communicationOperations/$(request.resource.data.recordId)).data.get("title","")==request.resource.data.get("title","")
       &&request.resource.data.get("recordOrigin","")=="PRODUCTION"
       &&request.resource.data.get("createdAt",null)==request.time
       &&request.resource.data.keys().hasOnly(["recordId","kind","action","title","actorUid","actorEmail","createdAt","recordOrigin"]);
