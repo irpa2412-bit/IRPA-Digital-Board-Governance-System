@@ -397,8 +397,36 @@ jobs:
               console.log("STAGING_CPANEL_TEST_FILE_READY");
               return;
             }
-            const created=await request("save_file_content",{dir,file,content:"IRPA staging cPanel rollback baseline\\n",charset:"utf-8"});
-            if(created.status!==1) throw new Error("Unable to create the isolated staging cPanel test file.");
+            // Fileman::save_file_content updates an existing file on some cPanel builds.
+            // Create a missing, dedicated staging test file using the documented multipart upload API.
+            const uploadUrl=new URL("/execute/Fileman/upload_files",base);
+            const form=new FormData();
+            form.append("dir",dir);
+            form.append("file-1",new Blob(["IRPA staging cPanel rollback baseline\\n"],{type:"text/plain"}),file);
+            let uploadResponse;
+            let uploadError;
+            for(let attempt=1;attempt<=3;attempt++){
+              try{
+                uploadResponse=await fetch(uploadUrl,{method:"POST",headers:{Authorization:auth,Accept:"application/json"},body:form,signal:AbortSignal.timeout(20000)});
+                uploadError=null;
+                break;
+              }catch(error){
+                uploadError=error;
+                const code=error.cause?.code||error.cause?.name||error.name||"unknown";
+                if(!["ETIMEDOUT","ECONNRESET","EHOSTUNREACH","UND_ERR_CONNECT_TIMEOUT","TimeoutError"].includes(code)||attempt===3){
+                  throw new Error("Staging cPanel test-file upload failed ("+code+") after "+attempt+" attempt(s).");
+                }
+                await new Promise(resolve=>setTimeout(resolve,attempt*2000));
+              }
+            }
+            if(uploadError||!uploadResponse) throw new Error("Staging cPanel test-file upload returned no response.");
+            const uploadRaw=await uploadResponse.text();
+            let uploaded=null;
+            try{uploaded=JSON.parse(uploadRaw)}catch{}
+            if(!uploadResponse.ok||!uploaded||uploaded.status!==1){
+              const detail=String(uploaded?.errors?.map?.(x=>typeof x==="string"?x:(x?.message||JSON.stringify(x))).filter(Boolean).join("; ")||uploaded?.messages?.join?.("; ")||"").replace(/[\\r\\n\\t]+/g," ").slice(0,220);
+              throw new Error("cPanel Fileman upload_files failed (HTTP "+uploadResponse.status+", status="+String(uploaded?.status)+")"+(detail?": "+detail:"; invalid JSON response")+".");
+            }
             console.log("STAGING_CPANEL_TEST_FILE_CREATED");
           }
           main().catch(e=>{console.error(e.message);process.exit(1)});
