@@ -712,6 +712,32 @@ jobs:
             const all=[...(Array.isArray(data.sub_domains)?data.sub_domains:[]),...(Array.isArray(data.subdomains)?data.subdomains:[])];
             const mapped=all.some(x=>(x.domain||x.name)==="staging.irpa.or.tz"&&String(x.documentroot||x.document_root||x.dir||"").endsWith("/public_html/staging"));
             console.log("CPANEL_SUBDOMAIN_MAPPING="+(mapped?"PASS":"CHANGED_RECHECK_REQUIRED"));
+            if(mapped){
+              async function setRoot(dir){
+                await uapi("SubDomain/changedocroot",{subdomain:"staging",rootdomain:"irpa.or.tz",dir});
+                let check=await api2("SubDomain","listsubdomains",{regex:"staging"});
+                let row=check.rows.find(x=>x.domain==="staging.irpa.or.tz"||x.fullsubdomain==="staging.irpa.or.tz");
+                let actual=String(row?.dir||row?.reldir||row?.basedir||"");
+                if(actual.endsWith(dir)||actual.endsWith(dir.replace(/^\//,"")))return true;
+                await api2("SubDomain","changedocroot",{subdomain:"staging",rootdomain:"irpa.or.tz",dir});
+                check=await api2("SubDomain","listsubdomains",{regex:"staging"});
+                row=check.rows.find(x=>x.domain==="staging.irpa.or.tz"||x.fullsubdomain==="staging.irpa.or.tz");
+                actual=String(row?.dir||row?.reldir||row?.basedir||"");
+                return actual.endsWith(dir)||actual.endsWith(dir.replace(/^\//,""));
+              }
+              let movedTemp=false;
+              try{movedTemp=await setRoot("/public_html/wp")}catch(e){console.log("CPANEL_VHOST_REBIND_TEMP_ERROR="+String(e.code||e.name))}
+              if(movedTemp){
+                let restored=false;
+                for(let attempt=1;attempt<=3&&!restored;attempt++){
+                  try{restored=await setRoot("/public_html/staging")}catch(e){console.log("CPANEL_VHOST_REBIND_RESTORE_ATTEMPT_ERROR="+String(e.code||e.name))}
+                }
+                console.log("CPANEL_VHOST_REBIND="+(restored?"PASS":"RESTORE_FAILED"));
+                if(!restored)return false;
+              }else{
+                console.log("CPANEL_VHOST_REBIND=SKIPPED_TEMP_ROOT_CHANGE_REJECTED");
+              }
+            }
             return true;
           }
           (async()=>{
