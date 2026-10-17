@@ -771,6 +771,18 @@ jobs:
           $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] = $header;
           $_SERVER['PHP_AUTH_USER'] = $username;
           $_SERVER['PHP_AUTH_PW'] = $password;
+          // Emit presence-only diagnostics; never include credentials or their encodings.
+          header('X-IRPA-Staging-Auth-Diagnostic: bridge=active;https=1;authorization=1;php_user=1;php_password=1;app_password=not_observed');
+          add_action('application_password_did_authenticate', function ($user) {
+            if ($user instanceof WP_User) {
+              header('X-IRPA-Staging-Auth-Diagnostic: bridge=active;https=1;authorization=1;php_user=1;php_password=1;app_password=valid');
+            }
+          }, 10, 1);
+          add_action('application_password_failed_authentication', function ($error) {
+            $codes = is_wp_error($error) ? implode(',', $error->get_error_codes()) : 'unknown';
+            $safeCodes = preg_replace('/[^a-z0-9_,.-]/i', '', $codes);
+            header('X-IRPA-Staging-Auth-Diagnostic: bridge=active;https=1;authorization=1;php_user=1;php_password=1;app_password=rejected;reason=' . $safeCodes);
+          }, 10, 1);
           `;
             const existing=await read(pluginDir,pluginName);
             if(!existing.ok||existing.content!==plugin){
@@ -779,6 +791,8 @@ jobs:
             const verify=await read(pluginDir,pluginName);
             if(!verify.ok||verify.content!==plugin||!verify.content.includes("HTTP_X_IRPA_STAGING_AUTHORIZATION")||
                !verify.content.includes("PHP_AUTH_USER")||!verify.content.includes("PHP_AUTH_PW")||
+               !verify.content.includes("application_password_did_authenticate")||
+               !verify.content.includes("application_password_failed_authentication")||
                !verify.content.includes("staging.irpa.or.tz"))throw new Error("Staging authentication bridge failed post-write verification.");
             console.log("STAGING_REST_AUTH_BRIDGE_REPAIR=PASS");
             console.log("STAGING_AUTH_BACKUP=VERIFIED_OUTSIDE_WEB_ROOT");
@@ -1150,6 +1164,7 @@ jobs:
               websiteResponseType:status.connections?.websiteResponseType||null,
               websiteResponseServer:status.connections?.websiteResponseServer||null,
               websiteCloudflareRay:status.connections?.websiteCloudflareRay||null,
+              websiteAuthBridgeDiagnostic:status.connections?.websiteAuthBridgeDiagnostic||null,
               websiteAccountId:Number.isSafeInteger(status.connections?.websiteAccount?.id)?status.connections.websiteAccount.id:null,
               websiteAccountRole:status.connections?.websiteAccount?.role||null,
               websiteCanEditPages:status.connections?.websiteAccount?.canEditPages===true,
