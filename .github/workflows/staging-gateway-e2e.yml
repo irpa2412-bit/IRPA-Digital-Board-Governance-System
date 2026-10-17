@@ -491,6 +491,17 @@ jobs:
           CF_ZONE_ID_ALT7: ${{ secrets.DNS_ZONE_ID }}
           CF_ZONE_ID_ALT8: ${{ secrets.STAGING_ZONE_ID }}
           CF_ZONE_ID_ALT9: ${{ secrets.CLOUDFLARE_PRODUCTION_ZONE_ID }}
+          CF_ZONE_ID_ALT10: ${{ secrets.IRPA_DNS_ZONE_ID }}
+          CF_ZONE_ID_VAR_ALT1: ${{ vars.CF_ZONE_ID }}
+          CF_ZONE_ID_VAR_ALT2: ${{ vars.IRPA_ZONE_ID }}
+          CF_ZONE_ID_VAR_ALT3: ${{ vars.IRPA_CLOUDFLARE_ZONE_ID }}
+          CF_ZONE_ID_VAR_ALT4: ${{ vars.CLOUDFLARE_IRPA_ZONE_ID }}
+          CF_ZONE_ID_VAR_ALT5: ${{ vars.CLOUDFLARE_DNS_ZONE_ID }}
+          CF_ZONE_ID_VAR_ALT6: ${{ vars.IRPA_OR_TZ_ZONE_ID }}
+          CF_ZONE_ID_VAR_ALT7: ${{ vars.DNS_ZONE_ID }}
+          CF_ZONE_ID_VAR_ALT8: ${{ vars.STAGING_ZONE_ID }}
+          CF_ZONE_ID_VAR_ALT9: ${{ vars.CLOUDFLARE_PRODUCTION_ZONE_ID }}
+          CF_ZONE_ID_VAR_ALT10: ${{ vars.IRPA_DNS_ZONE_ID }}
           CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
           CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
           CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
@@ -518,7 +529,7 @@ jobs:
           const cfHeaders=token=>({Authorization:"Bearer "+token,Accept:"application/json","Content-Type":"application/json"});
           async function remediateDns(){
             const tokens=[["production",process.env.CF_PRODUCTION],["staging",process.env.CF_STAGING],["grant-crawler",process.env.CF_GRANT]].filter(x=>x[1]);
-            const configuredIds=[process.env.CF_ZONE_ID_SECRET,process.env.CF_STAGING_ZONE_ID_SECRET,process.env.CF_ZONE_ID_VAR,process.env.CF_STAGING_ZONE_ID_VAR,process.env.CF_ZONE_ID_ALT1,process.env.CF_ZONE_ID_ALT2,process.env.CF_ZONE_ID_ALT3,process.env.CF_ZONE_ID_ALT4,process.env.CF_ZONE_ID_ALT5,process.env.CF_ZONE_ID_ALT6,process.env.CF_ZONE_ID_ALT7,process.env.CF_ZONE_ID_ALT8,process.env.CF_ZONE_ID_ALT9].map(x=>(x||"").trim()).filter(Boolean);
+            const configuredIds=[process.env.CF_ZONE_ID_SECRET,process.env.CF_STAGING_ZONE_ID_SECRET,process.env.CF_ZONE_ID_VAR,process.env.CF_STAGING_ZONE_ID_VAR,process.env.CF_ZONE_ID_ALT1,process.env.CF_ZONE_ID_ALT2,process.env.CF_ZONE_ID_ALT3,process.env.CF_ZONE_ID_ALT4,process.env.CF_ZONE_ID_ALT5,process.env.CF_ZONE_ID_ALT6,process.env.CF_ZONE_ID_ALT7,process.env.CF_ZONE_ID_ALT8,process.env.CF_ZONE_ID_ALT9,process.env.CF_ZONE_ID_ALT10,process.env.CF_ZONE_ID_VAR_ALT1,process.env.CF_ZONE_ID_VAR_ALT2,process.env.CF_ZONE_ID_VAR_ALT3,process.env.CF_ZONE_ID_VAR_ALT4,process.env.CF_ZONE_ID_VAR_ALT5,process.env.CF_ZONE_ID_VAR_ALT6,process.env.CF_ZONE_ID_VAR_ALT7,process.env.CF_ZONE_ID_VAR_ALT8,process.env.CF_ZONE_ID_VAR_ALT9,process.env.CF_ZONE_ID_VAR_ALT10].map(x=>(x||"").trim()).filter(Boolean);
             const variableNames=[];
             try{
               const gh=await request("https://api.github.com/repos/"+encodeURIComponent(process.env.GITHUB_REPOSITORY)+"/actions/variables?per_page=100","GET",{Authorization:"Bearer "+process.env.GH_TOKEN,Accept:"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"});
