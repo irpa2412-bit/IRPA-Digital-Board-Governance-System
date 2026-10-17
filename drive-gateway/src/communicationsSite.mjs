@@ -358,7 +358,7 @@ export function createCommunicationsSiteRouter(deps) {
         if (response.ok) {
           const user = await response.json();
           result.website = "connected";
-          result.websiteAccount = { name: cleanText(user.name, 100), canEditPosts: Array.isArray(user.capabilities) ? !!user.capabilities.edit_posts : undefined };
+          result.websiteAccount = { name: cleanText(user.name, 100), canEditPosts: user.capabilities && typeof user.capabilities === "object" ? !!user.capabilities.edit_posts : undefined, canEditPages: user.capabilities && typeof user.capabilities === "object" ? !!user.capabilities.edit_pages : undefined };
         } else { const contentType = response.headers.get("content-type") || ""; const server = response.headers.get("server") || ""; const cfRay = response.headers.get("cf-ray") || ""; const raw = await response.text().catch(() => ""); let detail = {}; if (contentType.includes("json")) { try { detail = JSON.parse(raw); } catch {} } result.website = response.status === 401 || response.status === 403 ? "authentication_failed" : "unavailable"; result.websiteHttpStatus = response.status; result.websiteErrorCode = typeof detail.code === "string" ? detail.code.slice(0, 100) : undefined; result.websiteResponseType = contentType.slice(0, 100); result.websiteResponseServer = server.slice(0, 80); result.websiteCloudflareRay = cfRay.slice(0, 100); const hint = raw.replace(/<[^>]*>/g, " ").replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").trim(); result.websiteResponseHint = hint ? hint.slice(0, 180) : undefined; }
       } catch (error) { result.website = error.message.includes("not configured") ? "not_configured" : "unavailable"; }
       try {
