@@ -270,7 +270,7 @@ jobs:
           const encoded=process.env.META_KEY||"";
           let decoded;
           try { decoded=Buffer.from(encoded,"base64"); } catch { decoded=Buffer.alloc(0); }
-          const valid=/^\\d+$/.test(appId)&&Boolean(appSecret.trim())&&decoded.length===32&&encoded.trim()===encoded;
+          const valid=/^\d+$/.test(appId)&&Boolean(appSecret.trim())&&/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)&&decoded.length===32&&encoded.trim()===encoded;
           if(!valid) throw new Error("Invalid staging Meta OAuth configuration; refusing to configure Worker secrets.");
           console.log("META_OAUTH_CONFIGURATION_SHAPE=VALID");
           NODE
