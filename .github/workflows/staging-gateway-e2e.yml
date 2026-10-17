@@ -375,6 +375,7 @@ jobs:
           NODE
 
       - name: Inspect cPanel staging installation and reachable WordPress paths (read-only)
+        continue-on-error: true
         env:
           CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
           CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
@@ -420,6 +421,7 @@ jobs:
           NODE
 
       - name: Inspect staging DNS and wp268 installation mapping (read-only)
+        continue-on-error: true
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.STAGING_CLOUDFLARE_ACCOUNT_ID }}
@@ -470,6 +472,7 @@ jobs:
           NODE
 
       - name: Remediate staging DNS and cPanel document root (independent attempts)
+        if: always()
         env:
           CF_PRODUCTION: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CF_STAGING: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
