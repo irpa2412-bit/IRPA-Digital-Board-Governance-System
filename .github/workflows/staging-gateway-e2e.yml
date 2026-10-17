@@ -469,6 +469,176 @@ jobs:
           })().catch(e=>{console.error(e.message);process.exit(1)});
           NODE
 
+      - name: Remediate staging DNS and cPanel document root (independent attempts)
+        env:
+          CF_PRODUCTION: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_STAGING: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
+          CF_GRANT: ${{ secrets.CLOUDFLARE_GRANT_CRAWLER_API_TOKEN }}
+          CF_ZONE_ID_SECRET: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+          CF_STAGING_ZONE_ID_SECRET: ${{ secrets.STAGING_CLOUDFLARE_ZONE_ID }}
+          CF_ZONE_ID_VAR: ${{ vars.CLOUDFLARE_ZONE_ID }}
+          CF_STAGING_ZONE_ID_VAR: ${{ vars.STAGING_CLOUDFLARE_ZONE_ID }}
+          CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
+          CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
+          CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const https=require("node:https");
+          const {URL,URLSearchParams}=require("node:url");
+          function request(url,method="GET",headers={},body){
+            return new Promise((resolve,reject)=>{
+              const u=new URL(url);
+              const req=https.request({protocol:u.protocol,hostname:u.hostname,port:u.port||443,path:u.pathname+u.search,method,headers,timeout:15000},res=>{
+                let raw="";res.setEncoding("utf8");res.on("data",c=>raw+=c);res.on("end",()=>{let data;try{data=JSON.parse(raw)}catch{}resolve({http:res.statusCode,data,raw})});
+              });
+              req.on("timeout",()=>req.destroy(new Error("request timeout")));
+              req.on("error",reject);
+              if(body)req.write(body);
+              req.end();
+            });
+          }
+          const cfHeaders=token=>({Authorization:"Bearer "+token,Accept:"application/json","Content-Type":"application/json"});
+          async function remediateDns(){
+            const tokens=[["production",process.env.CF_PRODUCTION],["staging",process.env.CF_STAGING],["grant-crawler",process.env.CF_GRANT]].filter(x=>x[1]);
+            const configuredIds=[process.env.CF_ZONE_ID_SECRET,process.env.CF_STAGING_ZONE_ID_SECRET,process.env.CF_ZONE_ID_VAR,process.env.CF_STAGING_ZONE_ID_VAR].map(x=>(x||"").trim()).filter(Boolean);
+            let zone=null,token=null;
+            for(const [label,t] of tokens){
+              try{
+                const r=await request("https://api.cloudflare.com/client/v4/zones?name=irpa.or.tz&per_page=10","GET",cfHeaders(t));
+                const found=(r.data?.result||[]).find(z=>z.name==="irpa.or.tz");
+                console.log("DNS_ZONE_DISCOVERY_"+label.toUpperCase()+"="+(found?"visible":r.http===200&&r.data?.success===true?"no-zone-visible":"api-error"));
+                if(found){zone=found;token=t;break;}
+              }catch(e){console.log("DNS_ZONE_DISCOVERY_"+label.toUpperCase()+"_ERROR="+String(e.code||e.name))}
+            }
+            if(!zone){
+              for(const id of [...new Set(configuredIds)]){
+                for(const [label,t] of tokens){
+                  try{
+                    const r=await request("https://api.cloudflare.com/client/v4/zones/"+encodeURIComponent(id),"GET",cfHeaders(t));
+                    if(r.http===200&&r.data?.success===true&&r.data?.result?.name==="irpa.or.tz"){
+                      zone=r.data.result;token=t;console.log("DNS_ZONE_ID_VALIDATED="+label);break;
+                    }
+                    const records=await request("https://api.cloudflare.com/client/v4/zones/"+encodeURIComponent(id)+"/dns_records?name=staging.irpa.or.tz","GET",cfHeaders(t));
+                    if(records.http===200&&records.data?.success===true&&Array.isArray(records.data?.result)){
+                      zone={id,name:"irpa.or.tz"};token=t;console.log("DNS_ZONE_ID_VALIDATED_BY_RECORD_SCOPE="+label);break;
+                    }
+                  }catch(e){console.log("DNS_ZONE_ID_CANDIDATE_ERROR="+String(e.code||e.name))}
+                }
+                if(zone)break;
+              }
+            }
+            if(!zone||!token){console.log("DNS_REMEDIATION=BLOCKED_NO_ZONE_SCOPED_TOKEN_AND_ZONE_ID");return false}
+            const endpoint="https://api.cloudflare.com/client/v4/zones/"+encodeURIComponent(zone.id)+"/dns_records";
+            const list=await request(endpoint+"?type=A&name=staging.irpa.or.tz","GET",cfHeaders(token));
+            if(list.http!==200||list.data?.success!==true||!Array.isArray(list.data?.result)){console.log("DNS_REMEDIATION=BLOCKED_DNS_RECORD_READ");return false}
+            const aRecords=list.data.result;
+            const all=await request(endpoint+"?name=staging.irpa.or.tz","GET",cfHeaders(token));
+            if(all.http!==200||all.data?.success!==true||!Array.isArray(all.data?.result)){console.log("DNS_REMEDIATION=BLOCKED_DNS_RECORD_INSPECTION");return false}
+            const conflicts=all.data.result.filter(r=>r.type!=="A");
+            if(conflicts.length){console.log("DNS_REMEDIATION=BLOCKED_CONFLICTING_RECORD_TYPE_"+conflicts.map(r=>r.type).join("_"));return false}
+            const desired={type:"A",name:"staging.irpa.or.tz",content:"41.220.128.10",ttl:1,proxied:true};
+            if(aRecords.length){
+              let success=true;
+              for(const record of aRecords){
+                if(record.content==="41.220.128.10"&&record.proxied===true)continue;
+                const updated=await request(endpoint+"/"+encodeURIComponent(record.id),"PATCH",cfHeaders(token),JSON.stringify(desired));
+                if(updated.http<200||updated.http>=300||updated.data?.success!==true)success=false;
+              }
+              console.log("DNS_REMEDIATION="+(success?"UPDATED_OR_ALREADY_CORRECT":"FAILED_UPDATE"));return success;
+            }
+            const created=await request(endpoint,"POST",cfHeaders(token),JSON.stringify(desired));
+            const success=created.http>=200&&created.http<300&&created.data?.success===true;
+            console.log("DNS_REMEDIATION="+(success?"CREATED_A_RECORD":"FAILED_CREATE"));return success;
+          }
+          async function remediateCpanel(){
+            const base=new URL(process.env.CP_BASE);
+            const auth={Authorization:"cpanel "+process.env.CP_USER+":"+process.env.CP_TOKEN,Accept:"application/json"};
+            async function uapi(path,params={}){
+              const url=new URL("/execute/"+path,base);url.search=new URLSearchParams(params).toString();
+              return request(url.href,"GET",auth);
+            }
+            async function api2(module,func,params={}){
+              const url=new URL("/json-api/cpanel",base);
+              url.search=new URLSearchParams({cpanel_jsonapi_apiversion:"2",cpanel_jsonapi_module:module,cpanel_jsonapi_func:func,...params}).toString();
+              const r=await request(url.href,"GET",auth);
+              const root=r.data?.cpanelresult||r.data;
+              const rows=Array.isArray(root?.data)?root.data:[];
+              return {http:r.http,ok:r.http===200&&(root?.event?.result===1||rows.some(x=>x?.result===1))&&!root?.error,rows,raw:r.raw};
+            }
+            const info=await uapi("DomainInfo/domains_data");
+            const main=info.data?.data?.main_domain||{};
+            const root=String(main.documentroot||main.document_root||"");
+            if(info.http!==200||info.data?.status!==1||!root.endsWith("/public_html")){console.log("CPANEL_REMEDIATION=BLOCKED_UNEXPECTED_MAIN_DOCUMENT_ROOT");return false}
+            const list=async dir=>{
+              const r=await uapi("Fileman/list_files",{dir,showdotfiles:1});
+              if(r.http!==200||r.data?.status!==1||!Array.isArray(r.data?.data))throw new Error("Could not inspect cPanel directory safely");
+              return r.data.data;
+            };
+            const entries=await list(root);
+            const names=entries.map(x=>String(x.file||x.name||""));
+            const hasSource=names.includes("staging "),hasTarget=names.includes("staging");
+            if(hasSource){
+              const sourceFiles=await list(root+"/staging ");
+              const sourceNames=sourceFiles.map(x=>String(x.file||x.name||""));
+              const required=["wp-admin","wp-content","wp-includes","wp-config.php","index.php"];
+              if(!required.every(x=>sourceNames.includes(x))){console.log("CPANEL_REMEDIATION=BLOCKED_SOURCE_NOT_COMPLETE_WORDPRESS");return false}
+              if(hasTarget){
+                const targetFiles=await list(root+"/staging");
+                const targetNames=targetFiles.map(x=>String(x.file||x.name||""));
+                if(targetFiles.length!==0){
+                  if(required.every(x=>targetNames.includes(x)))console.log("CPANEL_WORDPRESS_DIRECTORY=ALREADY_NORMALIZED");
+                  else {console.log("CPANEL_REMEDIATION=BLOCKED_TARGET_NOT_EMPTY");return false}
+                }else{
+                  const backup="public_html/staging-empty-backup-20261017";
+                  const backupCheck=await uapi("Fileman/list_files",{dir:root+"/staging-empty-backup-20261017",showdotfiles:1});
+                  if(backupCheck.http===200&&backupCheck.data?.status===1){console.log("CPANEL_REMEDIATION=BLOCKED_BACKUP_PATH_ALREADY_EXISTS");return false}
+                  const movedEmpty=await api2("Fileman","fileop",{op:"rename",sourcefiles:"public_html/staging",destfiles:backup,doubledecode:"1"});
+                  if(!movedEmpty.ok){console.log("CPANEL_EMPTY_DIRECTORY_BACKUP=FAILED");return false}
+                  const movedWp=await api2("Fileman","fileop",{op:"rename",sourcefiles:"public_html/staging ",destfiles:"public_html/staging",doubledecode:"1"});
+                  if(!movedWp.ok){
+                    await api2("Fileman","fileop",{op:"rename",sourcefiles:backup,destfiles:"public_html/staging",doubledecode:"1"});
+                    console.log("CPANEL_WORDPRESS_DIRECTORY_RENAME=FAILED_ROLLBACK_ATTEMPTED");return false
+                  }
+                  console.log("CPANEL_WORDPRESS_DIRECTORY_RENAME=PASS");
+                }
+              }else{
+                const movedWp=await api2("Fileman","fileop",{op:"rename",sourcefiles:"public_html/staging ",destfiles:"public_html/staging",doubledecode:"1"});
+                if(!movedWp.ok){console.log("CPANEL_WORDPRESS_DIRECTORY_RENAME=FAILED");return false}
+                console.log("CPANEL_WORDPRESS_DIRECTORY_RENAME=PASS");
+              }
+            }else if(hasTarget){
+              const targetFiles=await list(root+"/staging");
+              const targetNames=targetFiles.map(x=>String(x.file||x.name||""));
+              if(!["wp-admin","wp-content","wp-includes","wp-config.php","index.php"].every(x=>targetNames.includes(x))){console.log("CPANEL_REMEDIATION=BLOCKED_WORDPRESS_NOT_FOUND_IN_NORMAL_TARGET");return false}
+              console.log("CPANEL_WORDPRESS_DIRECTORY=ALREADY_NORMALIZED");
+            }else{console.log("CPANEL_REMEDIATION=BLOCKED_EXPECTED_DIRECTORIES_NOT_FOUND");return false}
+            const subdomains=await api2("SubDomain","listsubdomains",{regex:"staging"});
+            const found=subdomains.rows.find(x=>x.domain==="staging.irpa.or.tz"||x.fullsubdomain==="staging.irpa.or.tz");
+            if(found){
+              const changed=await uapi("SubDomain/changedocroot",{subdomain:"staging",rootdomain:"irpa.or.tz",dir:"public_html/staging"});
+              if(changed.http!==200||changed.data?.status!==1||changed.data?.result?.result===0){console.log("CPANEL_SUBDOMAIN_MAPPING=FAILED_CHANGE_DOCROOT");return false}
+            }else{
+              const added=await uapi("SubDomain/addsubdomain",{domain:"staging",rootdomain:"irpa.or.tz",dir:"/public_html/staging"});
+              if(added.http!==200||added.data?.status!==1||added.data?.result?.result===0){console.log("CPANEL_SUBDOMAIN_MAPPING=FAILED_ADD");return false}
+            }
+            const verify=await uapi("DomainInfo/domains_data");
+            const data=verify.data?.data||{};
+            const all=[...(Array.isArray(data.sub_domains)?data.sub_domains:[]),...(Array.isArray(data.subdomains)?data.subdomains:[])];
+            const mapped=all.some(x=>(x.domain||x.name)==="staging.irpa.or.tz"&&String(x.documentroot||x.document_root||x.dir||"").endsWith("/public_html/staging"));
+            console.log("CPANEL_SUBDOMAIN_MAPPING="+(mapped?"PASS":"CHANGED_RECHECK_REQUIRED"));
+            return true;
+          }
+          (async()=>{
+            let dnsOk=false,cpanelOk=false;
+            try{dnsOk=await remediateDns()}catch(e){console.log("DNS_REMEDIATION_ERROR="+String(e.code||e.message||e.name))}
+            try{cpanelOk=await remediateCpanel()}catch(e){console.log("CPANEL_REMEDIATION_ERROR="+String(e.code||e.message||e.name))}
+            console.log("DNS_REMEDIATION_FINAL="+(dnsOk?"PASS":"BLOCKED_OR_FAILED"));
+            console.log("CPANEL_REMEDIATION_FINAL="+(cpanelOk?"PASS":"BLOCKED_OR_FAILED"));
+          })().catch(e=>{console.error("Staging remediation step failed unexpectedly: "+String(e.message||e));process.exit(1)});
+          NODE
+
       - name: Inject staging-only Worker secrets
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
