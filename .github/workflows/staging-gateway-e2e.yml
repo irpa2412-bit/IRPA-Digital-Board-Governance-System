@@ -314,6 +314,40 @@ jobs:
           NODE
 
 
+      - name: Check all configured Cloudflare tokens for IRPA DNS zone access (read-only)
+        env:
+          CF_PRODUCTION: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_STAGING: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
+          CF_GRANT: ${{ secrets.CLOUDFLARE_GRANT_CRAWLER_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const https=require("node:https");
+          function get(token){
+            return new Promise((resolve,reject)=>{
+              const req=https.request("https://api.cloudflare.com/client/v4/zones?name=irpa.or.tz&per_page=10",{headers:{Authorization:"Bearer "+token,Accept:"application/json"},timeout:10000},res=>{
+                let raw="";res.setEncoding("utf8");res.on("data",c=>raw+=c);res.on("end",()=>{let data;try{data=JSON.parse(raw)}catch{}resolve({http:res.statusCode,data})});
+              });
+              req.on("timeout",()=>req.destroy(new Error("Cloudflare zone access check timed out.")));
+              req.on("error",reject);req.end();
+            });
+          }
+          (async()=>{
+            for(const [name,token] of [["production",process.env.CF_PRODUCTION],["staging",process.env.CF_STAGING],["grant-crawler",process.env.CF_GRANT]]){
+              if(!token){console.log("IRPA_DNS_TOKEN_"+name.toUpperCase()+"=missing");continue}
+              try{
+                const r=await get(token);
+                const zones=Array.isArray(r.data?.result)?r.data.result:[];
+                console.log("IRPA_DNS_TOKEN_"+name.toUpperCase()+"_HTTP="+r.http);
+                console.log("IRPA_DNS_TOKEN_"+name.toUpperCase()+"_SUCCESS="+String(r.data?.success));
+                console.log("IRPA_DNS_TOKEN_"+name.toUpperCase()+"_ZONE_VISIBLE="+String(zones.some(z=>z.name==="irpa.or.tz")));
+                console.log("IRPA_DNS_TOKEN_"+name.toUpperCase()+"_ZONE_COUNT="+zones.length);
+                console.log("IRPA_DNS_TOKEN_"+name.toUpperCase()+"_ERROR_CODES="+JSON.stringify((r.data?.errors||[]).map(e=>e.code)));
+              }catch(e){console.log("IRPA_DNS_TOKEN_"+name.toUpperCase()+"_ERROR="+String(e.code||e.name))}
+            }
+          })().catch(e=>{console.error(e.message);process.exit(1)});
+          NODE
+
       - name: Verify production Cloudflare token can inspect the IRPA DNS zone (read-only)
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
