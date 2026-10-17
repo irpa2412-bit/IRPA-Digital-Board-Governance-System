@@ -13,7 +13,7 @@ function harness(overrides = {}) {
     FIREBASE_PROJECT_ID: "irpa-dbg-staging-a73ec",
     IRPA_PRODUCTION_CUTOVER: "false",
     META_REDIRECT_URI: REDIRECT,
-    META_GRAPH_API_VERSION: "v24.0",
+    META_GRAPH_API_VERSION: "v26.0",
     META_APP_ID: "test-app-id",
     META_APP_SECRET: "test-secret-not-real",
     META_TOKEN_ENCRYPTION_KEY: key,
