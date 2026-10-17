@@ -7,6 +7,7 @@ on:
       - "src/pages/CommunicationMediaPortal.jsx"
       - "src/pages/CommunicationMediaOperations.jsx"
       - "src/pages/SocialMediaAccounts.jsx"
+      - "src/pages/SocialMediaAccounts.jsx"
       - "firestore.rules"
       - "drive-gateway/src/communicationsSite.mjs"
       - "drive-gateway/src/index.js"
@@ -23,6 +24,7 @@ on:
     paths:
       - "src/pages/CommunicationMediaPortal.jsx"
       - "src/pages/CommunicationMediaOperations.jsx"
+      - "src/pages/SocialMediaAccounts.jsx"
       - "firestore.rules"
       - "drive-gateway/src/communicationsSite.mjs"
       - "drive-gateway/src/index.js"
