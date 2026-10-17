@@ -13,7 +13,7 @@ function kvStore() {
 }
 function harness({role="Communications Officer",envOverrides={}}={}) {
   const kv=kvStore();
-  const env={IRPA_ENVIRONMENT:"staging",META_APP_ID:"12345678901234",META_APP_SECRET:"not-a-real-secret",META_REDIRECT_URI:"https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev/api/communications/meta/callback",META_TOKEN_ENCRYPTION_KEY:btoa(String.fromCharCode(...new Uint8Array(32).fill(7))),DRIVE_KV:kv,...envOverrides};
+  const env={IRPA_ENVIRONMENT:"staging",FIREBASE_PROJECT_ID:"irpa-dbg-staging-a73ec",IRPA_PRODUCTION_CUTOVER:"false",META_APP_ID:"12345678901234",META_APP_SECRET:"not-a-real-secret",META_REDIRECT_URI:"https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev/api/communications/meta/callback",META_TOKEN_ENCRYPTION_KEY:btoa(String.fromCharCode(...new Uint8Array(32).fill(7))),DRIVE_KV:kv,...envOverrides};
   const router=createMetaSocialApiRouter({
     authenticateFirebaseRequest:async()=>({user_id:"user-1",email:"test@example.invalid",token:"test-token"}),
     getFirestoreDocument:async()=>null,
@@ -52,6 +52,14 @@ test("Meta connection status does not disclose token material",async()=>{
  assert.equal(body.connected,false);
  assert.equal("access_token" in body,false);
  assert.equal("encryptedToken" in body,false);
+});
+test("Meta integration refuses wrong Firebase project and production cutover",async()=>{
+ const wrongProject=harness({envOverrides:{FIREBASE_PROJECT_ID:"irpa-digital-board-governance"}});
+ const projectResponse=await wrongProject.router(new Request("https://gateway.example/api/communications/meta/connect",{method:"POST"}),wrongProject.env);
+ assert.equal(projectResponse.status,503);
+ const cutover=harness({envOverrides:{IRPA_PRODUCTION_CUTOVER:"true"}});
+ const cutoverResponse=await cutover.router(new Request("https://gateway.example/api/communications/meta/connect",{method:"POST"}),cutover.env);
+ assert.equal(cutoverResponse.status,503);
 });
 test("unauthorized roles cannot initiate Meta authorization",async()=>{
  const {router,env}=harness({role:"Finance Officer"});
