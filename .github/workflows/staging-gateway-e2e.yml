@@ -803,7 +803,7 @@ jobs:
               const ht=await uapi("Fileman/get_file_content",{dir:stageDir,file:".htaccess"});
               const original=String(ht.data?.data?.content??ht.data?.content??"");
               if(ht.http===200&&ht.data?.status===1&&original){
-                const malformed=/\bphp_value\b|\bphp_flag\b|RewriteBase\s+\/staging\s|RewriteRule\s+\.\s+\/staging\s+\/index\.php/i.test(original)||!/E=HTTP_AUTHORIZATION\s*:/i.test(original);
+                const malformed=/\bphp_value\b|\bphp_flag\b|RewriteBase\s+\/staging\s|RewriteRule\s+\.\s+\/staging\s+\/index\.php/i.test(original)||!/E=HTTP_AUTHORIZATION\s*:/i.test(original)||!/SetEnvIf\s+Authorization/i.test(original);
                 if(malformed){
                   const homeDir=root.replace(/\/public_html\/?$/,"");
                   const backupFile="staging-htaccess-backup-"+String(process.env.GITHUB_RUN_ID||"run")+".txt";
@@ -821,7 +821,7 @@ jobs:
                     return false;
                   }
                   const handlerLine=original.split(/\r?\n/).map(x=>x.trim()).find(x=>/^AddHandler\s+application\/x-httpd-ea-php\d+\s+\.php\b/i.test(x))||"";
-                  let standard="# IRPA staging WordPress rewrite rules\n<IfModule mod_rewrite.c>\nRewriteEngine On\nRewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]\nRewriteRule ^index\\.php$ - [L]\nRewriteCond %{REQUEST_FILENAME} !-f\nRewriteCond %{REQUEST_FILENAME} !-d\nRewriteCond %{HTTP_HOST} ^staging\\.irpa\\.or\\.tz$ [NC]\nRewriteRule . /index.php [L]\nRewriteCond %{REQUEST_FILENAME} !-f\nRewriteCond %{REQUEST_FILENAME} !-d\nRewriteCond %{HTTP_HOST} ^(?:www\\.)?irpa\\.or\\.tz$ [NC]\nRewriteRule . /staging/index.php [L]\n</IfModule>\n";
+                  let standard="# IRPA staging WordPress rewrite rules\n<IfModule mod_rewrite.c>\nRewriteEngine On\nSetEnvIf Authorization \"(.*)\" HTTP_AUTHORIZATION=$1\nRewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]\nRewriteRule ^index\\.php$ - [L]\nRewriteCond %{REQUEST_FILENAME} !-f\nRewriteCond %{REQUEST_FILENAME} !-d\nRewriteCond %{HTTP_HOST} ^staging\\.irpa\\.or\\.tz$ [NC]\nRewriteRule . /index.php [L]\nRewriteCond %{REQUEST_FILENAME} !-f\nRewriteCond %{REQUEST_FILENAME} !-d\nRewriteCond %{HTTP_HOST} ^(?:www\\.)?irpa\\.or\\.tz$ [NC]\nRewriteRule . /staging/index.php [L]\n</IfModule>\n";
                   if(handlerLine)standard+=handlerLine+"\n";
                   async function saveHt(content){
                     const body=new URLSearchParams({dir:stageDir,file:".htaccess",content,charset:"utf-8"}).toString();
