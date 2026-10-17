@@ -262,6 +262,49 @@ jobs:
           })().catch(e => { console.error(e.message); process.exit(1); });
           NODE
 
+      - name: Identify cPanel domain mapping for wp268 (read-only)
+        env:
+          CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
+          CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
+          CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
+          CP_ROOT: ${{ secrets.STAGING_CPANEL_DOCUMENT_ROOT }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const https = require("node:https");
+          const { URL, URLSearchParams } = require("node:url");
+          function call(path, values) {
+            return new Promise((resolve, reject) => {
+              const u = new URL(path, process.env.CP_BASE);
+              u.pathname = "/execute/" + path;
+              u.search = new URLSearchParams(values).toString();
+              const req = https.request(u, {headers:{Authorization:"cpanel "+process.env.CP_USER+":"+process.env.CP_TOKEN,Accept:"application/json"},timeout:10000}, res => {
+                let raw=""; res.setEncoding("utf8"); res.on("data",c=>raw+=c); res.on("end",()=>{try{resolve({status:res.statusCode,data:JSON.parse(raw)})}catch{reject(new Error("cPanel returned invalid JSON for read-only domain inspection."))}});
+              });
+              req.on("timeout",()=>{req.destroy(new Error("cPanel read-only domain inspection timed out."))}); req.on("error",reject); req.end();
+            });
+          }
+          (async()=>{
+            const domains=await call("DomainInfo/list_domains",{});
+            if(domains.status!==200||domains.data?.status!==1) throw new Error("Unable to read cPanel domain mappings.");
+            const data=domains.data.data||{};
+            const rows=[];
+            for(const [kind,arr] of Object.entries(data)) if(Array.isArray(arr)) for(const item of arr) {
+              if(typeof item==="string") { if(/irpa\\.or\\.tz|wp268|stage268/i.test(item)) rows.push({kind,domain:item}); }
+              else if(item&&typeof item==="object") {
+                const serialized=JSON.stringify(item);
+                if(/irpa\\.or\\.tz|wp268|stage268/i.test(serialized)) rows.push({kind,...Object.fromEntries(Object.entries(item).filter(([k,v])=>/domain|root|document|path|dir|name/i.test(k)&&typeof v==="string").map(([k,v])=>[k,v.slice(0,240)]))});
+              }
+            }
+            console.log("CPANEL_IRPA_DOMAIN_MAPPINGS="+JSON.stringify(rows).slice(0,5000));
+            const root=String(process.env.CP_ROOT||"public_html").replace(/^\\/+|\\/+$/g,"");
+            const files=await call("Fileman/list_files",{dir:root,showdotfiles:0});
+            if(files.status!==200||files.data?.status!==1) throw new Error("Unable to inspect configured cPanel document root.");
+            const entries=Array.isArray(files.data.data)?files.data.data:[];
+            console.log("CPANEL_ROOT_WP268_ENTRIES="+JSON.stringify(entries.filter(x=>/wp268|stage268|wp-config\\.php/i.test(String(x.file||x.name||""))).map(x=>({name:x.file||x.name,type:x.type||x.filetype}))).slice(0,2000));
+          })().catch(e=>{console.error(e.message);process.exit(1)});
+          NODE
+
       - name: Inject staging-only Worker secrets
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
