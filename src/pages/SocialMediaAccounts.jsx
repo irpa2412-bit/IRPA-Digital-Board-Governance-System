@@ -79,7 +79,7 @@ export default function SocialMediaAccounts({profile,employee,selectedAuthority,
    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
     <button type="button" disabled={metaBusy} style={{...input,width:"auto",cursor:"pointer",fontWeight:700}} onClick={connectMeta}>{metaBusy?"Working…":"Connect Meta (read-only)"}</button>
     <button type="button" disabled={metaBusy} style={{...input,width:"auto",cursor:"pointer"}} onClick={checkMeta}>{metaBusy?"Checking…":"Verify API access"}</button>
-    {metaStatus?.connected&&<button type="button" disabled={metaBusy} style={{...input,width:"auto",cursor:"pointer"}} onClick={disconnectMeta}>Disconnect staging</button>}
+    {metaStatus?.status==="verified"&&<button type="button" disabled={metaBusy} style={{...input,width:"auto",cursor:"pointer"}} onClick={disconnectMeta}>Disconnect staging</button>}
    </div>
    {metaStatus&&<div role="status" style={{border:"1px solid var(--border-color, #d6dee8)",borderRadius:9,padding:10,display:"grid",gap:6}}>
     <strong>Connection status: {metaStatus.status||"unknown"}</strong>
