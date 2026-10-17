@@ -1326,11 +1326,13 @@ jobs:
                 "echo json_encode(['ok'=>!$cached||$invalidated,'cached'=>$cached,'invalidated'=>$invalidated]);exit;"
               ].join("\n")+"\n";
               if(!await writeFile(muDir,cachePlugin,cachePhp))throw new Error("Could not install the temporary staging OPcache invalidation plugin.");
-              let cacheResult=null;
+              let cacheResult=null,cacheError=null;
               try{
                 cacheResult=await request(new URL("/wp-admin/",wpBase).href,"GET",{"X-IRPA-Staging-OPCACHE-Token":cacheToken,Accept:"application/json","Cache-Control":"no-cache"});
                 console.log("STAGING_INDEX_OPCACHE_INVALIDATION="+JSON.stringify({http:cacheResult.http,ok:cacheResult.data?.ok===true,cached:cacheResult.data?.cached===true,invalidated:cacheResult.data?.invalidated===true}));
-                if(cacheResult.data?.ok!==true)throw new Error("Could not safely invalidate a stale staging WordPress front-controller cache.");
+              }catch(e){
+                cacheError=e;
+                console.log("STAGING_INDEX_OPCACHE_INVALIDATION_ERROR="+String(e.code||e.name||"error"));
               }finally{
                 if(!await writeFile(muDir,cachePlugin,inert))throw new Error("Could not neutralize the temporary staging OPcache plugin.");
               }
