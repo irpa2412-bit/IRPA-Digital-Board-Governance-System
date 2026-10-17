@@ -1386,11 +1386,11 @@ jobs:
             let created=false;
             let original=null;
             if(page){
-              original={title:page.title?.raw||page.title?.rendered||baselineTitle,content:page.content?.raw??baselineContent,status:page.status||"draft"};
+              original={title:page.title?.raw||page.title?.rendered||baselineTitle,content:page.content?.raw??baselineContent,excerpt:page.excerpt?.raw??page.excerpt?.rendered??"",featuredMedia:Number(page.featured_media||0),status:page.status||"draft"};
             }else{
               page=await wpRequest("pages",{title:baselineTitle,slug:"irpa-staging-integration-check",content:baselineContent,status:"draft"});
               created=true;
-              original={title:baselineTitle,content:baselineContent,status:"draft"};
+              original={title:baselineTitle,content:baselineContent,excerpt:"",featuredMedia:0,status:"draft"};
             }
             let prepared=false;
             try{
@@ -1399,12 +1399,22 @@ jobs:
               const listed=await call("/api/communications/website/content?type=pages");
               const portalPage=(listed.items||[]).find(x=>Number(x.id)===Number(page.id));
               if(!portalPage) throw new Error("The dedicated staging page was not visible through the Communication & Media Portal.");
-              const updated=await call("/api/communications/website/content",{method:"PUT",body:JSON.stringify({id:page.id,type:"pages",title:baselineTitle+" "+marker,content:baselineContent+"<p>"+marker+"</p>"})});
-              if(!updated.success||!await waitForPublicMarker(updated.publicUrl||ready.link||page.link)) throw new Error("The staged website edit did not render publicly.");
-              await call("/api/communications/website/content",{method:"PUT",body:JSON.stringify({id:page.id,type:"pages",title:baselineTitle,content:baselineContent})});
+              const updated=await call("/api/communications/website/content",{method:"PUT",body:JSON.stringify({
+                id:page.id,type:"pages",title:baselineTitle+" "+marker,content:baselineContent+"<p>"+marker+"</p>",
+                excerpt:String(ready.excerpt?.raw??ready.excerpt?.rendered??""),
+                featuredMedia:Number(ready.featured_media||0),status:"publish"
+              })});
+              if(!updated.success||!updated.snapshotId||!await waitForPublicMarker(updated.item?.link||ready.link||page.link)) throw new Error("The staged website edit did not render publicly or return a pre-edit snapshot.");
+              const restored=await call("/api/communications/website/restore",{method:"POST",body:JSON.stringify({type:"pages",id:page.id,snapshotId:updated.snapshotId})});
+              if(!restored.success||!restored.safetySnapshotId) throw new Error("The one-click revision restore did not return a verified result.");
+              const restoredRead=await call("/api/communications/website/content/pages/"+page.id);
+              if(restoredRead.item?.title!==baselineTitle||restoredRead.item?.content!==baselineContent||
+                 restoredRead.item?.excerpt!==String(ready.excerpt?.raw??ready.excerpt?.rendered??"")||
+                 Number(restoredRead.item?.featuredMedia||0)!==Number(ready.featured_media||0)||
+                 restoredRead.item?.status!=="publish") throw new Error("The restored staging page did not match the exact pre-edit fields.");
             }finally{
               if(prepared){
-                await wpRequest("pages/"+page.id,{title:original.title,content:original.content,status:created?"draft":original.status});
+                await wpRequest("pages/"+page.id,{title:original.title,content:original.content,excerpt:original.excerpt,featured_media:original.featuredMedia,status:created?"draft":original.status});
               }else if(created){
                 await wpRequest("pages/"+page.id,{status:"draft"});
               }
