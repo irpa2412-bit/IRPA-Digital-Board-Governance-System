@@ -571,83 +571,6 @@ jobs:
           main().catch(e=>{console.log("WP_BOOT_DIAGNOSTIC_ERROR="+String(e.message||e.code||e.name||"unknown").replace(/\s+/g," ").slice(0,220));process.exit(1);});
           NODE
 
-      - name: Capture staging WordPress fatal diagnostics (redacted)
-        if: always()
-        env:
-          WP_BASE: ${{ secrets.STAGING_WORDPRESS_BASE_URL }}
-          WP_USER: ${{ secrets.STAGING_WORDPRESS_USERNAME }}
-          WP_PASSWORD: ${{ secrets.STAGING_WORDPRESS_APPLICATION_PASSWORD }}
-          CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
-          CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
-          CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
-        run: |
-          set -euo pipefail
-          node <<'NODE'
-          const https=require("node:https");
-          const dns=require("node:dns");
-          dns.setDefaultResultOrder("ipv4first");
-          const {URL,URLSearchParams}=require("node:url");
-          function request(url,headers={},method="GET",body){
-            return new Promise((resolve,reject)=>{
-              const u=new URL(url);
-              const req=https.request({protocol:u.protocol,hostname:u.hostname,port:u.port||443,family:4,path:u.pathname+u.search,method,headers,timeout:12000},res=>{
-                let raw="";res.setEncoding("utf8");res.on("data",c=>raw+=c);res.on("end",()=>resolve({http:res.statusCode,headers:res.headers,raw}));
-              });
-              req.on("timeout",()=>req.destroy(new Error("request timeout")));
-              req.on("error",reject);if(body)req.write(body);req.end();
-            });
-          }
-          async function main(){
-            const wp=new URL(process.env.WP_BASE||"");
-            if(wp.protocol!=="https:"||wp.hostname.toLowerCase()!=="staging.irpa.or.tz")throw new Error("ABORT: fatal diagnostics are restricted to staging.irpa.or.tz.");
-            const auth="Basic "+Buffer.from(process.env.WP_USER+":"+String(process.env.WP_PASSWORD||"").replace(/\s/g,"")).toString("base64");
-            const probes=[];
-            for(const path of ["/wp-json/wp/v2/users/me?context=edit","/wp-json/wp/v2/posts?per_page=1"]){
-              try{
-                const r=await request(new URL(path,wp).href,{Authorization:auth,"X-IRPA-Staging-Authorization":auth,Accept:"application/json","Cache-Control":"no-cache"});
-                let data;try{data=JSON.parse(r.raw)}catch{}
-                probes.push({url:new URL(path,wp).href,http:r.http,errorCode:String(data?.code||"").slice(0,80)});
-              }catch(e){probes.push({path,error:String(e.code||e.name||"request_error")})}
-            }
-            const cp=new URL(process.env.CP_BASE||"");
-            async function uapi(fn,params={}){
-              const u=new URL("/execute/"+fn,cp);u.search=new URLSearchParams(params).toString();
-              const r=await request(u.href,{Authorization:"cpanel "+process.env.CP_USER+":"+process.env.CP_TOKEN,Accept:"application/json"});
-              let data;try{data=JSON.parse(r.raw)}catch{}
-              return {http:r.http,data};
-            }
-            const info=await uapi("DomainInfo/domains_data");
-            const root=String(info.data?.data?.main_domain?.documentroot||info.data?.data?.main_domain?.document_root||"");
-            if(info.http!==200||info.data?.status!==1||!root.endsWith("/public_html"))throw new Error("Could not verify staging log locations.");
-            const files=[
-              {label:"staging-debug-log",dir:root+"/staging/wp-content",name:"debug.log"},
-              {label:"staging-webroot-error-log",dir:root+"/staging",name:"error_log"},
-              {label:"home-php-error-log",dir:root.replace(/\/public_html$/,"")+"/logs",name:"php.error.log"},
-              {label:"staging-domain-error-log",dir:root.replace(/\/public_html$/,"")+"/logs",name:"staging_irpa_or_tz.php.error.log"}
-            ];
-            const reports=[];
-            for(const f of files){
-              try{
-                const r=await uapi("Fileman/get_file_content",{dir:f.dir,file:f.name});
-                const content=String(r.data?.data?.content??r.data?.data?.[0]?.content??r.data?.result?.data?.content??"");
-                const lines=content.split(/\r?\n/).filter(x=>/fatal error|allowed memory size|uncaught|parse error|undefined function|uncaught throwable|maximum execution time|out of memory|typeerror|error:/i.test(x)).slice(-10).map(x=>x.replace(/\/home\/[^/\s]+/g,"/home/[account]").replace(/(?:password|secret|token|authorization)\s*[:=]\s*[^,\s;]+/ig,"credential=[redacted]").replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/ig,"[email]").replace(/[\r\n\t]+/g," ").slice(0,220));
-                reports.push({file:f.label,http:r.http,status:r.data?.status??null,contentLength:content.length,relevantLineCount:lines.length,lines});
-              }catch(e){reports.push({file:f.label,error:String(e.code||e.name||"read_error")})}
-            }
-            const output={targetHost:wp.hostname,probes,logs:reports};
-            const fs=require("node:fs");
-            fs.writeFileSync("staging-wordpress-fatal-diagnostics.txt",JSON.stringify(output,null,2)+"\n");
-            console.log("STAGING_FATAL_DIAGNOSTICS="+JSON.stringify({targetHost:wp.hostname,probes:probes.map(p=>({url:p.url,http:p.http,errorCode:p.errorCode,error:p.error})),logs:reports.map(x=>({file:x.file,http:x.http,status:x.status,contentLength:x.contentLength,relevantLineCount:x.relevantLineCount,lines:x.lines}))}));
-          }
-          main().catch(e=>{
-            const fs=require("node:fs");
-            const report={diagnosticError:String(e.code||e.name||"diagnostic_error"),message:String(e.message||"").replace(/\s+/g," ").slice(0,180),targetHost:"staging.irpa.or.tz"};
-            fs.writeFileSync("staging-wordpress-fatal-diagnostics.txt",JSON.stringify(report,null,2)+"\n");
-            console.error("Staging fatal diagnostics failed: "+report.diagnosticError);
-            process.exit(1)
-          });
-          NODE
-
       - name: Inject staging-only Worker secrets
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
@@ -657,8 +580,6 @@ jobs:
           GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY: ${{ secrets.STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY }}
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT_JSON }}
           WP_BASE: ${{ secrets.STAGING_WORDPRESS_BASE_URL }}
-          WP_USER: ${{ secrets.STAGING_WORDPRESS_USERNAME }}
-          WP_PASSWORD: ${{ secrets.STAGING_WORDPRESS_APPLICATION_PASSWORD }}
           CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
           CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
           CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
@@ -911,6 +832,7 @@ jobs:
           WP_BASE: ${{ secrets.STAGING_WORDPRESS_BASE_URL }}
           CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
           STAGING_URL: ${{ needs.repair-staging.outputs.staging_url }}
+          TEST_PAGE_ID: ${{ vars.STAGING_WORDPRESS_TEST_PAGE_ID }}
         run: |
           set -euo pipefail
           node <<'NODE'
@@ -918,6 +840,7 @@ jobs:
           if(wp.protocol!=="https:"||wp.hostname.toLowerCase()!=="staging.irpa.or.tz") throw new Error("ABORT: WordPress target is not the approved staging host.");
           if(cp.protocol!=="https:"||cp.port!=="2083") throw new Error("ABORT: cPanel target is not HTTPS port 2083.");
           if(worker.protocol!=="https:"||!worker.hostname.startsWith("irpa-google-drive-gateway-staging.")||!worker.hostname.endsWith(".workers.dev")) throw new Error("ABORT: Worker target is not the isolated staging Worker.");
+          if(!/^[1-9][0-9]*$/.test(process.env.TEST_PAGE_ID||"")) throw new Error("ABORT: a pre-provisioned staging WordPress test page ID is required.");
           console.log("STAGING_ACCEPTANCE_TARGETS=PASS");
           NODE
       - name: Verify WordPress and cPanel read-write-rollback integration
@@ -928,13 +851,12 @@ jobs:
           TEST_EMAIL: ${{ secrets.STAGING_TEST_EMAIL }}
           TEST_PASSWORD: ${{ secrets.STAGING_TEST_PASSWORD }}
           WP_BASE: ${{ secrets.STAGING_WORDPRESS_BASE_URL }}
-          WP_USER: ${{ secrets.STAGING_WORDPRESS_USERNAME }}
-          WP_PASSWORD: ${{ secrets.STAGING_WORDPRESS_APPLICATION_PASSWORD }}
           CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
           CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
           CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
           CP_ROOT: ${{ secrets.STAGING_CPANEL_DOCUMENT_ROOT }}
           CP_TEST_FILE: ${{ secrets.STAGING_CPANEL_TEST_FILE }}
+          TEST_PAGE_ID: ${{ vars.STAGING_WORDPRESS_TEST_PAGE_ID }}
         run: |
           set -euo pipefail
           ID_TOKEN="$(node <<'NODE'
