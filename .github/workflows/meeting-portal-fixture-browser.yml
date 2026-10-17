@@ -240,8 +240,29 @@ jobs:
               "src/styles/app.css",
               "tests/firestore.rules.test.cjs"
             ].includes(path));
+          // Permit the dedicated Communications & Media integration only when its portal,
+          // Worker bridge, policy/browser tests, workflow, and docs are all paired. The two
+          // new page files remain disallowed for every other change set.
+          const communicationMediaIntegration = changed.includes("src/pages/CommunicationMediaPortal.jsx") &&
+            changed.includes("src/pages/CommunicationMediaOperations.jsx") &&
+            changed.includes("src/pages/SocialMediaAccounts.jsx") &&
+            changed.includes("drive-gateway/src/communicationsSite.mjs") &&
+            changed.includes("tests/website-content-editor.test.mjs") &&
+            changed.includes("tests/communication-media-policy.test.mjs") &&
+            changed.includes(".github/workflows/communications-website-integration.yml") &&
+            changed.includes("docs/COMMUNICATION_MEDIA_PORTAL.md") &&
+            !changed.includes("src/pages/Meetings.jsx") &&
+            !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
+            changed.every(path => allowed.has(path) || [
+              "src/pages/CommunicationMediaOperations.jsx",
+              "src/pages/SocialMediaAccounts.jsx"
+            ].includes(path));
           const unexpected = changed.filter(path =>
-            !allowed.has(path) && !(path === ".github/workflows/firebase-deploy.yml" && (signatureGatewayIntegration || actualDataGateIntegration || controlledDocumentTrialUploadFix)) && !(path === "drive-gateway/tests/esign-storage-multipart.test.mjs" && signatureGatewayIntegration) && !(grantAssistantPersistence && ["src/pages/GrantIntelligencePortal.jsx", "src/styles/app.css"].includes(path))
+            !allowed.has(path) &&
+            !(communicationMediaIntegration && ["src/pages/CommunicationMediaOperations.jsx", "src/pages/SocialMediaAccounts.jsx"].includes(path)) &&
+            !(path === ".github/workflows/firebase-deploy.yml" && (signatureGatewayIntegration || actualDataGateIntegration || controlledDocumentTrialUploadFix)) &&
+            !(path === "drive-gateway/tests/esign-storage-multipart.test.mjs" && signatureGatewayIntegration) &&
+            !(grantAssistantPersistence && ["src/pages/GrantIntelligencePortal.jsx", "src/styles/app.css"].includes(path))
           );
           if (unexpected.length) {
             console.error("Unexpected files changed outside the isolated meeting repair:", unexpected);
@@ -296,12 +317,13 @@ jobs:
 
           // Preserve the main-branch Communication & Media-only scope while keeping
           // the signature integration explicitly paired to its own source and tests.
-          const communicationMediaOnly = changed.includes("src/pages/CommunicationMediaPortal.jsx") &&
-            changed.includes("src/pages/CommunicationMediaStudio.jsx") &&
-            changed.includes("tests/communication-media-policy.test.mjs") &&
-            !changed.includes("src/pages/Meetings.jsx") &&
-            !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
-            changed.every(path => allowed.has(path));
+          const communicationMediaOnly = communicationMediaIntegration ||
+            (changed.includes("src/pages/CommunicationMediaPortal.jsx") &&
+              changed.includes("src/pages/CommunicationMediaStudio.jsx") &&
+              changed.includes("tests/communication-media-policy.test.mjs") &&
+              !changed.includes("src/pages/Meetings.jsx") &&
+              !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
+              changed.every(path => allowed.has(path)));
           // Readability-only PRs may change the shared stylesheet, its dedicated tests, and explicit CI path filters.
           // The exception excludes portal business logic, meeting UI, auth logic and deployment configuration.
           const readabilityOnlyFiles = new Set([
