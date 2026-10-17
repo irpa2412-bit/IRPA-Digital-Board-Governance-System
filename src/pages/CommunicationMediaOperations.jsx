@@ -1,5 +1,5 @@
 import React,{useEffect,useMemo,useState} from "react";
-import {addDoc,collection,onSnapshot,orderBy,query,serverTimestamp,updateDoc,doc,writeBatch} from "firebase/firestore";
+import {addDoc,collection,onSnapshot,orderBy,query,serverTimestamp,updateDoc,doc,writeBatch,limit} from "firebase/firestore";
 import {auth,db} from "../firebase/config";
 
 const KINDS=[
@@ -21,10 +21,11 @@ export default function CommunicationMediaOperations({profile,employee,selectedA
  const roles=useMemo(()=>[selectedAuthority,profile?.role,profile?.title,profile?.position,profile?.departmentalRole,employee?.role,employee?.title,employee?.position,employee?.departmentalRole,...(profile?.roles||[]),...(profile?.assignedRoles||[]),...(employee?.roles||[]),...(employee?.assignedRoles||[])].filter(Boolean).flatMap(v=>String(v).split(",").map(x=>x.trim())),[selectedAuthority,profile,employee]);
  const allowed=isAdmin||roles.some(r=>EDITOR_ROLES.includes(r));
  const reviewer=isAdmin||roles.some(r=>REVIEW_ROLES.includes(r));
- const [records,setRecords]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState(""),[notice,setNotice]=useState(""),[kind,setKind]=useState("Campaign"),[filter,setFilter]=useState("All"),[search,setSearch]=useState(""),[editing,setEditing]=useState(null),[busy,setBusy]=useState(false);
+ const [records,setRecords]=useState([]),[auditEvents,setAuditEvents]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState(""),[notice,setNotice]=useState(""),[kind,setKind]=useState("Campaign"),[filter,setFilter]=useState("All"),[search,setSearch]=useState(""),[editing,setEditing]=useState(null),[busy,setBusy]=useState(false);
  const blank=()=>({title:"",summary:"",status:"Draft",owner:"",startDate:"",dueDate:"",channels:"",audience:"",objective:"",budgetNote:"",contactName:"",organization:"",email:"",phone:"",beat:"",consent:"",assetType:"",assetUrl:"",rights:"",version:"",expiryDate:"",severity:"",lead:"",approver:"",trigger:"",holdingStatement:"",nextReview:"",channel:"",sourceUrl:"",observedDate:"",reach:"",engagement:"",sentiment:"",evidence:"",tags:""});
  const [form,setForm]=useState(blank);
  useEffect(()=>{if(!user?.uid||!allowed){setLoading(false);return}const q=query(collection(db,"communicationOperations"),orderBy("updatedAt","desc"));return onSnapshot(q,s=>{setRecords(s.docs.map(d=>({id:d.id,...d.data()})));setLoading(false);setError("")},e=>{setLoading(false);setError(e?.code==="permission-denied"?"Access denied by communications data policy. Ask an administrator to verify your assigned role.":e.message||"Unable to load the operations register.")})},[user?.uid,allowed]);
+ useEffect(()=>{if(!user?.uid||!reviewer){setAuditEvents([]);return}const q=query(collection(db,"communicationOperationsAudit"),orderBy("createdAt","desc"),limit(50));return onSnapshot(q,s=>setAuditEvents(s.docs.map(d=>({id:d.id,...d.data()}))),e=>setError(e?.code==="permission-denied"?"Audit log access denied by reviewer policy.":e.message||"Unable to load communications audit history."))},[user?.uid,reviewer]);
  const activeKind=KINDS.find(k=>k.id===kind)||KINDS[0];
  const visible=records.filter(r=>(r.kind===kind)&&(filter==="All"||r.status===filter)&&(!search||[r.title,r.summary,r.owner,r.organization,r.contactName,r.channel,r.audience,r.tags].join(" ").toLowerCase().includes(search.toLowerCase())));
  const reset=()=>{setEditing(null);setForm(blank())};
@@ -65,5 +66,6 @@ export default function CommunicationMediaOperations({profile,employee,selectedA
      </article>)}
    </div>
   </div>
+  {reviewer&&<section style={{...panel,display:"grid",gap:8}}><h3 style={{margin:0}}>Communications audit history</h3><p style={{margin:0,fontSize:13}}>Latest 50 recorded register changes. Audit entries are immutable.</p>{auditEvents.length===0?<p>No audit events recorded yet.</p>:auditEvents.map(a=><article key={a.id} style={{borderBottom:"1px solid var(--border-color, #d6dee8)",padding:"8px 0",display:"grid",gap:3}}><strong>{a.action} · {a.title}</strong><span style={{fontSize:12}}>Type: {a.kind} · Actor: {a.actorEmail||a.actorUid||"Unknown"} · Time: {a.createdAt?.toDate?a.createdAt.toDate().toLocaleString():"Pending timestamp"}</span></article>)}</section>}
  </section>
 }
