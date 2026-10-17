@@ -1323,7 +1323,7 @@ jobs:
                 "$invalidated=!$cached||(function_exists('opcache_invalidate')&&@opcache_invalidate($target,true));",
                 "header('Content-Type: application/json; charset=utf-8');",
                 "echo json_encode(['ok'=>!$cached||$invalidated,'cached'=>$cached,'invalidated'=>$invalidated]);exit;"
-              ].join("\\n")+"\\n";
+              ].join("\n")+"\n";
               if(!await writeFile(muDir,cachePlugin,cachePhp))throw new Error("Could not install the temporary staging OPcache invalidation plugin.");
               let cacheResult=null;
               try{
