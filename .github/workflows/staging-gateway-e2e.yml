@@ -226,7 +226,7 @@ jobs:
           node <<'NODE'
           const fs=require("fs");
           const appUrl=new URL(String(process.env.APP_URL||""));
-          if(appUrl.protocol!=="https:"||appUrl.hostname!=="irpa-dgb-meeting-room-staging.irpa-governance.workers.dev"||appUrl.username||appUrl.password||appUrl.search||appUrl.hash||appUrl.pathname!=="/") throw new Error("Staging application URL must be the approved HTTPS staging frontend origin.");
+          if(appUrl.protocol!=="https:"||appUrl.hostname!=="irpa-dbg-staging-a73ec.web.app"||appUrl.username||appUrl.password||appUrl.search||appUrl.hash||appUrl.pathname!=="/") throw new Error("Staging application URL must be the approved HTTPS staging frontend origin.");
           const metaAppIdRaw=String(process.env.META_APP_ID||"").trim();
           const metaKey=Buffer.from(String(process.env.META_TOKEN_ENCRYPTION_KEY||""),"base64");
           const metaReady=/^\d+$/.test(metaAppIdRaw)&&Boolean(String(process.env.META_APP_SECRET||"").trim())&&metaKey.length===32;
