@@ -340,7 +340,9 @@ jobs:
           set -euo pipefail
           node <<'NODE'
           async function main(){
-            const root=process.env.CP_ROOT.replace(/^\/+|\/+$/g,"");
+            let root=process.env.CP_ROOT.trim().replace(/^\/+|\/+$/g,"");
+            const homePrefix="home/"+process.env.CP_USER+"/";
+            if(root.startsWith(homePrefix)) root=root.slice(homePrefix.length);
             const parts=process.env.CP_TEST_FILE.split("/");
             const file=parts.pop();
             const dir=root+(parts.length?"/"+parts.join("/"):"");
