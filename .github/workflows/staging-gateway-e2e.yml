@@ -251,16 +251,29 @@ jobs:
           CRYPTO_TEST_EMAIL: ${{ secrets.STAGING_CRYPTO_TEST_EMAIL }}
           CRYPTO_TEST_PASSWORD: ${{ secrets.STAGING_CRYPTO_TEST_PASSWORD }}
           CRYPTO_TEST_AUTHORITY: ${{ secrets.STAGING_CRYPTO_TEST_AUTHORITY }}
+          META_APP_ID: ${{ secrets.STAGING_META_APP_ID }}
+          META_APP_SECRET: ${{ secrets.STAGING_META_APP_SECRET }}
+          META_KEY: ${{ secrets.STAGING_META_TOKEN_ENCRYPTION_KEY }}
         run: |
           set -euo pipefail
           missing=0
-          for pair in             "CLOUDFLARE_API_TOKEN:$CF_TOKEN"             "CLOUDFLARE_ACCOUNT_ID:$CF_ACCOUNT"             "STAGING_FIREBASE_PROJECT_ID:$PROJECT"             "STAGING_IRPA_APP_URL:$APP_URL"             "STAGING_GOOGLE_DRIVE_CLIENT_ID:$DRIVE_ID"             "STAGING_GOOGLE_DRIVE_CLIENT_SECRET:$DRIVE_SECRET"             "STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY:$DRIVE_KEY"             "STAGING_SMTP_PASSWORD:$SMTP"             "STAGING_CRYPTO_TEST_EMAIL:$CRYPTO_TEST_EMAIL"             "STAGING_CRYPTO_TEST_PASSWORD:$CRYPTO_TEST_PASSWORD"; do
+          for pair in             "CLOUDFLARE_API_TOKEN:$CF_TOKEN"             "CLOUDFLARE_ACCOUNT_ID:$CF_ACCOUNT"             "STAGING_FIREBASE_PROJECT_ID:$PROJECT"             "STAGING_IRPA_APP_URL:$APP_URL"             "STAGING_GOOGLE_DRIVE_CLIENT_ID:$DRIVE_ID"             "STAGING_GOOGLE_DRIVE_CLIENT_SECRET:$DRIVE_SECRET"             "STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY:$DRIVE_KEY"             "STAGING_SMTP_PASSWORD:$SMTP"             "STAGING_CRYPTO_TEST_EMAIL:$CRYPTO_TEST_EMAIL"             "STAGING_CRYPTO_TEST_PASSWORD:$CRYPTO_TEST_PASSWORD"             "STAGING_META_APP_ID:$META_APP_ID"             "STAGING_META_APP_SECRET:$META_APP_SECRET"             "STAGING_META_TOKEN_ENCRYPTION_KEY:$META_KEY"; do
             name="${pair%%:*}"; value="${pair#*:}"
             if [ -z "$value" ]; then echo "Missing staging secret: $name"; missing=1; fi
           done
           test "$PROJECT" = "irpa-dbg-staging-a73ec"
           test "$APP_URL" = "https://irpa-dbg-staging-a73ec.web.app"
           test "$missing" -eq 0
+          node <<'NODE'
+          const appId=process.env.META_APP_ID||"";
+          const appSecret=process.env.META_APP_SECRET||"";
+          const encoded=process.env.META_KEY||"";
+          let decoded;
+          try { decoded=Buffer.from(encoded,"base64"); } catch { decoded=Buffer.alloc(0); }
+          const valid=/^\\d+$/.test(appId)&&Boolean(appSecret.trim())&&decoded.length===32&&encoded.trim()===encoded;
+          if(!valid) throw new Error("Invalid staging Meta OAuth configuration; refusing to configure Worker secrets.");
+          console.log("META_OAUTH_CONFIGURATION_SHAPE=VALID");
+          NODE
 
       - name: Diagnostic - verify Cloudflare staging token
         env:
@@ -350,7 +363,10 @@ jobs:
               IRPA_APP_URL:process.env.APP_URL,
               SMTP_HOST:"mail.irpa.or.tz",SMTP_PORT:"465",SMTP_FROM:"info@irpa.or.tz",
               DRIVE_ROOT_FOLDER_NAME:"IRPA Governance System - STAGING",
-              FIRESTORE_COLLECTION_PREFIX:"staging_",DRIVE_MOCK:"false",LOCAL_TEST_MODE:"false"
+              FIRESTORE_COLLECTION_PREFIX:"staging_",DRIVE_MOCK:"false",LOCAL_TEST_MODE:"false",
+              IRPA_PRODUCTION_CUTOVER:"false",
+              META_REDIRECT_URI:"https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev/api/communications/meta/callback",
+              META_GRAPH_API_VERSION:"v26.0"
             },
             kv_namespaces:[{binding:"DRIVE_KV",id:process.env.STAGING_KV_ID}],
             // The generated config is standalone (not an env.staging overlay), so it must
@@ -388,6 +404,9 @@ jobs:
           GOOGLE_DRIVE_CLIENT_SECRET: ${{ secrets.STAGING_GOOGLE_DRIVE_CLIENT_SECRET }}
           GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY: ${{ secrets.STAGING_GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY }}
           SMTP_PASSWORD: ${{ secrets.STAGING_SMTP_PASSWORD }}
+          META_APP_ID: ${{ secrets.STAGING_META_APP_ID }}
+          META_APP_SECRET: ${{ secrets.STAGING_META_APP_SECRET }}
+          META_TOKEN_ENCRYPTION_KEY: ${{ secrets.STAGING_META_TOKEN_ENCRYPTION_KEY }}
         working-directory: drive-gateway
         run: |
           set -euo pipefail
@@ -395,6 +414,9 @@ jobs:
           printf '%s' "$GOOGLE_DRIVE_CLIENT_SECRET" | npx wrangler secret put GOOGLE_DRIVE_CLIENT_SECRET --config wrangler.staging.generated.json
           printf '%s' "$GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY" | npx wrangler secret put GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY --config wrangler.staging.generated.json
           printf '%s' "$SMTP_PASSWORD" | npx wrangler secret put SMTP_PASSWORD --config wrangler.staging.generated.json
+          printf '%s' "$META_APP_ID" | npx wrangler secret put META_APP_ID --config wrangler.staging.generated.json
+          printf '%s' "$META_APP_SECRET" | npx wrangler secret put META_APP_SECRET --config wrangler.staging.generated.json
+          printf '%s' "$META_TOKEN_ENCRYPTION_KEY" | npx wrangler secret put META_TOKEN_ENCRYPTION_KEY --config wrangler.staging.generated.json
 
       - name: Install gateway dependencies for bundling
         working-directory: drive-gateway
