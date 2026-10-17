@@ -215,17 +215,19 @@ jobs:
           id="$(node - "$list" <<'NODE'
           const a=JSON.parse(process.argv[2]);
           if(!a.success) throw new Error("Cloudflare KV namespace list failed");
-          const x=(Array.isArray(a.result)?a.result:[]).find(v=>v.title==="irpa-google-drive-gateway-staging");
-          if(x?.id) process.stdout.write(x.id);
+          const matches=(Array.isArray(a.result)?a.result:[]).filter(v=>v.title==="irpa-google-drive-gateway-staging");
+          if(matches.length!==1) throw new Error("Expected exactly one dedicated staging KV namespace by title; refusing deployment.");
+          if(matches[0].id!=="5ea76010553049a2b98c8493c37fbbc4") throw new Error("Dedicated staging KV namespace ID does not match the verified staging resource; refusing deployment.");
+          process.stdout.write(matches[0].id);
           NODE
           )"
           test -n "$id" || { echo "Required dedicated staging KV namespace was not found; refusing to create or substitute a namespace."; exit 1; }
-          if [ "$id" != "7b50627e29fc4fe1abaa8dc8665edd02" ]; then
+          if [ "$id" != "5ea76010553049a2b98c8493c37fbbc4" ]; then
             echo "STAGING_KV_NAMESPACE_ACTUAL_ID=$id"
             echo "Staging KV namespace ID does not match the approved isolated namespace; refusing deployment."
             exit 1
           fi
-          test "$id" = "7b50627e29fc4fe1abaa8dc8665edd02"
+          test "$id" = "5ea76010553049a2b98c8493c37fbbc4"
           case "$id" in ''|*[!a-f0-9]*) exit 1;; esac
           export STAGING_KV_ID="$id"
           node <<'NODE'
@@ -1864,17 +1866,19 @@ jobs:
           id="$(node - "$list" <<'NODE'
           const a=JSON.parse(process.argv[2]);
           if(!a.success) throw new Error("Cloudflare KV namespace list failed");
-          const x=(Array.isArray(a.result)?a.result:[]).find(v=>v.title==="irpa-google-drive-gateway-staging");
-          if(x?.id) process.stdout.write(x.id);
+          const matches=(Array.isArray(a.result)?a.result:[]).filter(v=>v.title==="irpa-google-drive-gateway-staging");
+          if(matches.length!==1) throw new Error("Expected exactly one dedicated staging KV namespace by title; refusing deployment.");
+          if(matches[0].id!=="5ea76010553049a2b98c8493c37fbbc4") throw new Error("Dedicated staging KV namespace ID does not match the verified staging resource; refusing deployment.");
+          process.stdout.write(matches[0].id);
           NODE
           )"
           test -n "$id" || { echo "Required dedicated staging KV namespace was not found; refusing to create or substitute a namespace."; exit 1; }
-          if [ "$id" != "7b50627e29fc4fe1abaa8dc8665edd02" ]; then
+          if [ "$id" != "5ea76010553049a2b98c8493c37fbbc4" ]; then
             echo "STAGING_KV_NAMESPACE_ACTUAL_ID=$id"
             echo "Staging KV namespace ID does not match the approved isolated namespace; refusing deployment."
             exit 1
           fi
-          test "$id" = "7b50627e29fc4fe1abaa8dc8665edd02"
+          test "$id" = "5ea76010553049a2b98c8493c37fbbc4"
           case "$id" in ''|*[!a-f0-9]*) exit 1;; esac
           export STAGING_KV_ID="$id"
           node <<'NODE'

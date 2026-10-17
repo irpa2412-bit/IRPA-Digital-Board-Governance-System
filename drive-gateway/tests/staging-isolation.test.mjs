@@ -33,9 +33,12 @@ test("Wrangler staging project and application URLs are isolated from production
 
 test("staging workflow enforces the approved Firebase project, app origin, scoped credentials, and dedicated KV namespace", () => {
   const workflow = readFileSync(new URL("../../.github/workflows/staging-gateway-e2e.yml", import.meta.url), "utf8");
+  const toml = readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8");
+  const stagingKv = toml.split("[[env.staging.kv_namespaces]]")[1] || "";
+  assert.ok(stagingKv.includes('id = "5ea76010553049a2b98c8493c37fbbc4"'));
   assert.ok(workflow.includes('test "$PROJECT" = "irpa-dbg-staging-a73ec"'));
   assert.ok(workflow.includes('test "$APP_URL" = "https://irpa-dbg-staging-a73ec.web.app"'));
-  assert.ok(workflow.includes('test "$id" = "7b50627e29fc4fe1abaa8dc8665edd02"'));
+  assert.ok(workflow.includes('test "$id" = "5ea76010553049a2b98c8493c37fbbc4"'));
   assert.ok(workflow.includes("secrets.STAGING_CLOUDFLARE_API_TOKEN"));
   assert.ok(workflow.includes("secrets.STAGING_CLOUDFLARE_ACCOUNT_ID"));
   assert.ok(!workflow.includes("secrets.CLOUDFLARE_API_TOKEN"));
