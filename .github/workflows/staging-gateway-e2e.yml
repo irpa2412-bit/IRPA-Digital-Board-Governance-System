@@ -204,6 +204,8 @@ jobs:
           APP_URL: https://irpa-dgb-meeting-room-staging.irpa-governance.workers.dev
           CP_ROOT: ${{ secrets.STAGING_CPANEL_DOCUMENT_ROOT }}
           META_APP_ID: ${{ secrets.STAGING_META_APP_ID }}
+          META_APP_SECRET: ${{ secrets.STAGING_META_APP_SECRET }}
+          META_TOKEN_ENCRYPTION_KEY: ${{ secrets.STAGING_META_TOKEN_ENCRYPTION_KEY }}
         working-directory: drive-gateway
         run: |
           set -euo pipefail
@@ -230,6 +232,11 @@ jobs:
           const fs=require("fs");
           const appUrl=new URL(String(process.env.APP_URL||""));
           if(appUrl.protocol!=="https:"||appUrl.hostname!=="irpa-dgb-meeting-room-staging.irpa-governance.workers.dev"||appUrl.username||appUrl.password||appUrl.search||appUrl.hash||appUrl.pathname!=="/") throw new Error("Staging application URL must be the approved HTTPS staging frontend origin.");
+          const metaAppIdRaw=String(process.env.META_APP_ID||"").trim();
+          const metaKey=Buffer.from(String(process.env.META_TOKEN_ENCRYPTION_KEY||""),"base64");
+          const metaReady=/^\d+$/.test(metaAppIdRaw)&&Boolean(String(process.env.META_APP_SECRET||"").trim())&&metaKey.length===32;
+          const metaAppId=metaReady?metaAppIdRaw:"";
+          console.log("META_OAUTH_DEPLOYMENT_STATE="+(metaReady?"enabled":"disabled"));
           const c={
             name:"irpa-google-drive-gateway-staging",main:"src/index.js",
             compatibility_date:"2026-09-29",workers_dev:true,
@@ -241,7 +248,7 @@ jobs:
               DRIVE_ROOT_FOLDER_NAME:"IRPA Governance System - STAGING",
               FIRESTORE_COLLECTION_PREFIX:"staging_",DRIVE_MOCK:"false",LOCAL_TEST_MODE:"false",
               IRPA_ENVIRONMENT:"staging",CPANEL_DOCUMENT_ROOT:process.env.CP_ROOT,
-              META_APP_ID:process.env.META_APP_ID||"",
+              META_APP_ID:metaAppId,
               META_REDIRECT_URI:"https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev/api/communications/meta/callback",
               META_GRAPH_API_VERSION:"v26.0"
             },
@@ -952,14 +959,12 @@ jobs:
           node <<'NODE'
           const values = [process.env.META_APP_ID||"", process.env.META_APP_SECRET||"", process.env.META_TOKEN_ENCRYPTION_KEY||""];
           const count = values.filter(Boolean).length;
-          if (count === 0) {
-            console.log("META_OAUTH_CONFIGURED=false; Meta endpoints remain disabled until staging-only configuration is supplied.");
+          const decoded = Buffer.from(values[2], "base64");
+          const valid = count === 3 && /^\d+$/.test(values[0]) && Boolean(values[1].trim()) && decoded.length === 32;
+          if (!valid) {
+            console.log("META_OAUTH_CONFIGURED=false; optional staging Meta configuration is absent, incomplete, or invalid; Worker App ID remains blank and Meta endpoints stay disabled.");
             process.exit(0);
           }
-          if (count !== 3) throw new Error("Partial Meta staging configuration. Configure all three STAGING_META_* repository secrets; values are never printed.");
-          if (!/^\d+$/.test(values[0])) throw new Error("STAGING_META_APP_ID must be a numeric Meta App ID.");
-          const decoded = Buffer.from(values[2], "base64");
-          if (decoded.length !== 32) throw new Error("STAGING_META_TOKEN_ENCRYPTION_KEY must decode to 32 bytes.");
           console.log("META_OAUTH_CONFIGURATION_SHAPE=VALID");
           NODE
           if [ -z "$META_APP_ID" ] && [ -z "$META_APP_SECRET" ] && [ -z "$META_TOKEN_ENCRYPTION_KEY" ]; then exit 0; fi
