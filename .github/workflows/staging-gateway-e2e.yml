@@ -891,7 +891,7 @@ jobs:
             const status=await call("/api/communications/site/status");
             if(status.connections?.website!=="connected"||status.connections?.websiteHttpStatus!==200||status.connections?.cpanel!=="connected") throw new Error("Staging connection acceptance failed with HTTP "+(status.connections?.websiteHttpStatus??"unknown")+".");
             console.log("STAGING_WORDPRESS_USERS_ME_HTTP="+status.connections.websiteHttpStatus);
-            const listed=await call("/api/communications/website/content?type=pages");
+            const listed=await call("/api/communications/website/content?type=pages&search="+encodeURIComponent("IRPA Staging Integration Check"));
             const candidates=(listed.items||[]).filter(item=>String(item.title||"").startsWith("IRPA Staging Integration Check"));
             if(candidates.length!==1) throw new Error("A single pre-provisioned staging page titled IRPA Staging Integration Check is required.");
             const testPageId=Number(candidates[0].id);
