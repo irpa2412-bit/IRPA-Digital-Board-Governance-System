@@ -247,7 +247,7 @@ jobs:
               IRPA_APP_URL:process.env.APP_URL,
               DRIVE_ROOT_FOLDER_NAME:"IRPA Governance System - STAGING",
               FIRESTORE_COLLECTION_PREFIX:"staging_",DRIVE_MOCK:"false",LOCAL_TEST_MODE:"false",
-              IRPA_ENVIRONMENT:"staging",CPANEL_DOCUMENT_ROOT:process.env.CP_ROOT,
+              IRPA_ENVIRONMENT:"staging",IRPA_PRODUCTION_CUTOVER:"false",CPANEL_DOCUMENT_ROOT:process.env.CP_ROOT,
               META_APP_ID:metaAppId,
               META_REDIRECT_URI:"https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev/api/communications/meta/callback",
               META_GRAPH_API_VERSION:"v26.0"
@@ -268,6 +268,7 @@ jobs:
           if(c.name!=="irpa-google-drive-gateway-staging") throw new Error("Worker boundary mismatch");
           if(c.vars.FIREBASE_PROJECT_ID!=="irpa-dbg-staging-a73ec") throw new Error("Unexpected Firebase project for staging Worker");
           if(c.vars.IRPA_ENVIRONMENT!=="staging") throw new Error("Explicit staging environment marker missing");
+          if(c.vars.IRPA_PRODUCTION_CUTOVER!=="false") throw new Error("Production cutover must be explicitly disabled in the staging Worker.");
           if(c.kv_namespaces?.[0]?.binding!=="DRIVE_KV") throw new Error("Missing staging KV");
           if(c.triggers?.crons?.[0]!=="0 * * * *") throw new Error("Cleanup cron missing");
           console.log("STAGING_CONFIGURATION_VALID");
