@@ -18,6 +18,9 @@ export default function SocialMediaAccounts({profile,employee,selectedAuthority,
  const allowed=isAdmin||roles.some(r=>EDITOR_ROLES.includes(r));
  const reviewer=isAdmin||roles.some(r=>REVIEW_ROLES.includes(r));
  const [items,setItems]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState(""),[notice,setNotice]=useState(""),[busy,setBusy]=useState(false),[editing,setEditing]=useState(null),[filter,setFilter]=useState("All"),[search,setSearch]=useState(""),[audit,setAudit]=useState([]),[form,setForm]=useState(blank);
+ const META_GATEWAY="https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev";
+ const metaStagingEnabled=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"").replace(/\\/$/,"")===META_GATEWAY;
+ const [metaStatus,setMetaStatus]=useState(null),[metaBusy,setMetaBusy]=useState(false);
  useEffect(()=>{if(!user?.uid||!allowed){setItems([]);setLoading(false);return}const q=query(collection(db,"socialMediaAccounts"),orderBy("updatedAt","desc"));return onSnapshot(q,s=>{setItems(s.docs.map(d=>({id:d.id,...d.data()})));setLoading(false);setError("")},e=>{setLoading(false);setError(e?.code==="permission-denied"?"Access denied by social-account policy. Verify your assigned communications role and deployed rules.":e.message||"Unable to load social accounts.")})},[user?.uid,allowed]);
  useEffect(()=>{if(!user?.uid||!reviewer){setAudit([]);return}const q=query(collection(db,"socialMediaAccountsAudit"),orderBy("createdAt","desc"),limit(50));return onSnapshot(q,s=>setAudit(s.docs.map(d=>({id:d.id,...d.data()}))),e=>setError(e?.message||"Unable to load account audit history."))},[user?.uid,reviewer]);
  const reset=()=>{setEditing(null);setForm(blank())};
@@ -40,9 +43,53 @@ export default function SocialMediaAccounts({profile,employee,selectedAuthority,
  async function changeStatus(item,status){if(!reviewer||busy)return;if(status==="Archived"&&!window.confirm("Archive this account record? It will be retained and not deleted."))return;if(status==="Disconnected"&&!window.confirm("Mark this account as disconnected? This changes only the register and does not revoke platform access."))return;
   setError("");setNotice("");setBusy(true);try{const batch=writeBatch(db);batch.update(doc(db,"socialMediaAccounts",item.id),{connectionStatus:status,updatedByUid:user.uid,updatedAt:serverTimestamp()});const a=doc(collection(db,"socialMediaAccountsAudit"));batch.set(a,{recordId:item.id,platform:item.platform,accountName:item.accountName,action:"STATUS_"+status.toUpperCase().replace(/\s+/g,"_"),actorUid:user.uid,actorEmail:user.email||"",createdAt:serverTimestamp(),recordOrigin:"PRODUCTION"});await batch.commit();setNotice("Account register status updated and audit recorded.")}catch(e){setError(e?.code==="permission-denied"?"Status change denied by security rules. No change is assumed.":e.message||"Unable to update account status.")}finally{setBusy(false)}
  }
+ async function metaRequest(path,method="GET"){
+  if(!metaStagingEnabled)throw new Error("Meta OAuth is available only in the isolated staging build.");
+  if(!auth.currentUser)throw new Error("Sign in to IRPA DBGS first.");
+  const idToken=await auth.currentUser.getIdToken();
+  const response=await fetch(META_GATEWAY+path,{method,headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"}});
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok||result.ok===false)throw new Error(result.error||"Meta API request failed.");
+  return result;
+ }
+ async function connectMeta(){
+  setError("");setNotice("");setMetaBusy(true);
+  try{const result=await metaRequest("/api/communications/meta/connect","POST");if(!result.authorizationUrl)throw new Error("Meta authorization URL was not returned.");window.location.assign(result.authorizationUrl);}
+  catch(e){setError(e.message||"Unable to start Meta authorization.");setMetaBusy(false);}
+ }
+ async function checkMeta(){
+  setError("");setNotice("");setMetaBusy(true);
+  try{const result=await metaRequest("/api/communications/meta/status","GET");setMetaStatus(result);setNotice(result.status==="verified"?"Meta read-only API access verified. Posting remains disabled.":result.status==="not_connected"?"No Meta connection is registered for this signed-in staging user.":"Meta connection needs attention.");}
+  catch(e){setError(e.message||"Unable to verify Meta API access.");setMetaStatus(null);}
+  finally{setMetaBusy(false);}
+ }
+ async function disconnectMeta(){
+  if(!window.confirm("Remove the encrypted Meta connection from this staging gateway? This does not revoke the app inside Meta."))return;
+  setError("");setNotice("");setMetaBusy(true);
+  try{const result=await metaRequest("/api/communications/meta/disconnect","POST");setMetaStatus(result);setNotice("Local staging connection removed. Revoke app authorization separately in Meta settings if required.");}
+  catch(e){setError(e.message||"Unable to remove the staging connection.");}
+  finally{setMetaBusy(false);}
+ }
  if(!allowed)return <section style={panel} role="alert"><h3>Social-media accounts</h3><p>Your assigned role does not permit account management.</p></section>;
  return <section style={{display:"grid",gap:14,color:"var(--text-primary, #172033)"}}>
   <header style={{...panel,display:"grid",gap:8}}><h3 style={{margin:0}}>Social-media account enrolment &amp; management</h3><p style={{margin:0}}>Register IRPA's official accounts, custodians, purpose, authorization and review dates. Account records are audited and archived rather than deleted.</p><p style={{margin:0,fontSize:13}}>This is an account register, not an OAuth connection. It never asks for or stores passwords, recovery codes, access tokens or API secrets; it does not publish posts, read private messages, or revoke platform access.</p></header>
+  {metaStagingEnabled&&<section style={{...panel,display:"grid",gap:10}} aria-label="Meta read-only API connection">
+   <h4 style={{margin:0}}>Meta API connection · staging only</h4>
+   <p style={{margin:0,fontSize:13}}>Connect an authorized Facebook account and verify its eligible Pages and linked Instagram professional accounts. Requested access is read-only; publishing, scheduling, messaging and analytics are not enabled. OAuth tokens remain encrypted in the staging gateway and are never returned to this page.</p>
+   <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+    <button type="button" disabled={metaBusy} style={{...input,width:"auto",cursor:"pointer",fontWeight:700}} onClick={connectMeta}>{metaBusy?"Working…":"Connect Meta (read-only)"}</button>
+    <button type="button" disabled={metaBusy} style={{...input,width:"auto",cursor:"pointer"}} onClick={checkMeta}>{metaBusy?"Checking…":"Verify API access"}</button>
+    {metaStatus?.status==="verified"&&<button type="button" disabled={metaBusy} style={{...input,width:"auto",cursor:"pointer"}} onClick={disconnectMeta}>Disconnect staging</button>}
+   </div>
+   {metaStatus&&<div role="status" style={{border:"1px solid var(--border-color, #d6dee8)",borderRadius:9,padding:10,display:"grid",gap:6}}>
+    <strong>Connection status: {metaStatus.status||"unknown"}</strong>
+    {metaStatus.user?.name&&<span>Authorized Meta user: {metaStatus.user.name}</span>}
+    {metaStatus.facebookPages&&<div><strong>Facebook Pages</strong>{metaStatus.facebookPages.length?metaStatus.facebookPages.map(a=><div key={a.id}>{a.name} · ID {a.id}</div>):<div>No Pages were returned for the granted permissions.</div>}</div>}
+    {metaStatus.instagramAccounts&&<div><strong>Linked Instagram professional accounts</strong>{metaStatus.instagramAccounts.length?metaStatus.instagramAccounts.map(a=><div key={a.id}>@{a.username||"(username unavailable)"} · ID {a.id} · {a.accountType||"type unavailable"}</div>):<div>No eligible linked Instagram professional accounts were returned.</div>}</div>}
+    {metaStatus.expiresAt&&<small>Reported token expiry: {new Date(metaStatus.expiresAt).toLocaleString()}</small>}
+    <small>Posting enabled: No. Only read-only access is in scope.</small>
+   </div>}
+  </section>}
   <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:14}}>
    <form onSubmit={save} style={{...panel,display:"grid",gap:10,alignContent:"start"}}>
     <h4 style={{margin:0}}>{editing?"Edit account record":"Enrol a social-media account"}</h4>
