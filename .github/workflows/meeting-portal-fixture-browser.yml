@@ -331,7 +331,7 @@ jobs:
               throw new Error("Production Wrangler configuration changed; only staging-only changes are permitted.");
             }
             const stagingConfig = currentConfig.slice(currentConfig.indexOf("\n[env.staging]"));
-            if (!stagingConfig.includes('id = "7b50627e29fc4fe1abaa8dc8665edd02"')) {
+            if (!stagingConfig.includes('id = "5ea76010553049a2b98c8493c37fbbc4"')) {
               throw new Error("Staging DRIVE_KV must retain the explicitly approved dedicated namespace.");
             }
             if (stagingConfig.includes('id = "ccdbffa662ac48bfbdf7f4b1f62ca941"')) {
