@@ -1086,7 +1086,7 @@ jobs:
               "if(!hash_equals('"+tokenHash+"',hash('sha256',$provided))){http_response_code(404);echo '{\"ok\":false}';exit;}",
               "try{",
               "$username=trim((string)($_SERVER['HTTP_X_IRPA_STAGING_USERNAME']??''));",
-              "$password=preg_replace('/\\\\s+/','',(string)($_SERVER['HTTP_X_IRPA_STAGING_APP_PASSWORD']??''));",
+              "$password=preg_replace('/\\s+/','',(string)($_SERVER['HTTP_X_IRPA_STAGING_APP_PASSWORD']??''));",
               "if($username===''||$password===''){http_response_code(400);echo json_encode(['ok'=>false,'reason'=>'missing_input']);exit;}",
               "if(!function_exists('wp_insert_application_password')||!class_exists('WP_Application_Passwords')){http_response_code(409);echo json_encode(['ok'=>false,'reason'=>'application_passwords_unavailable']);exit;}",
               "if(function_exists('wp_is_application_passwords_available')&&!wp_is_application_passwords_available()){http_response_code(409);echo json_encode(['ok'=>false,'reason'=>'application_passwords_disabled']);exit;}",
