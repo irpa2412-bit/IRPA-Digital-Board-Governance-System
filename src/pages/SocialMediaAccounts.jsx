@@ -87,6 +87,7 @@ export default function SocialMediaAccounts({profile,employee,selectedAuthority,
     {metaStatus.facebookPages&&<div><strong>Facebook Pages</strong>{metaStatus.facebookPages.length?metaStatus.facebookPages.map(a=><div key={a.id}>{a.name} · ID {a.id}</div>):<div>No Pages were returned for the granted permissions.</div>}</div>}
     {metaStatus.instagramAccounts&&<div><strong>Linked Instagram professional accounts</strong>{metaStatus.instagramAccounts.length?metaStatus.instagramAccounts.map(a=><div key={a.id}>@{a.username||"(username unavailable)"} · ID {a.id} · {a.accountType||"type unavailable"}</div>):<div>No eligible linked Instagram professional accounts were returned.</div>}</div>}
     {metaStatus.expiresAt&&<small>Reported token expiry: {new Date(metaStatus.expiresAt).toLocaleString()}</small>}
+    {(metaStatus.missingPermissions||[]).length>0&&<small role="alert">Missing required read permissions: {metaStatus.missingPermissions.join(", ")}</small>}
     <small>Posting enabled: No. Only read-only access is in scope.</small>
    </div>}
   </section>}
