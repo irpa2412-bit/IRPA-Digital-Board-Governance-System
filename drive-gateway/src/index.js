@@ -24,6 +24,8 @@ import { canProvisionSignatureProfileFolder } from "./signatureProfileAuthorizat
 import { canReadSignatureAsset, canUploadSignedDocument } from "./signatureAssetAuthorization.mjs";
 import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPasswordSetup, getInvitationSessionState } from "./invitationRedemption.mjs";
 import { buildGoogleDriveAuthorizationParams } from "./googleDriveOAuth.mjs";
+import { createCommunicationsSiteRouter } from "./communicationsSite.mjs";
+import { createMetaOAuthRouter } from "./metaOAuth.mjs";
 import { createMeetingPortalRouter } from "./meetingPortal.mjs";
 
 function getFirebaseProjectId(env) {
@@ -110,6 +112,25 @@ async function verifyGatewaySigningAuthority(env,user,manualAuthorityIdentificat
   };
 }
 
+const communicationsSiteRouter = createCommunicationsSiteRouter({
+  authenticateFirebaseRequest,
+  getFirestoreDocument,
+  getInstitutionalProfileForUser,
+  firestoreDocumentToPlain,
+  commitDocumentAndAudit: commitFirestoreDocumentAndAudit,
+  json,
+  corsHeaders
+});
+
+const metaOAuthRouter = createMetaOAuthRouter({
+  authenticateFirebaseRequest,
+  getFirestoreDocument,
+  getInstitutionalProfileForUser,
+  firestoreDocumentToPlain,
+  json,
+  corsHeaders
+});
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -147,6 +168,16 @@ export default {
 
       const meetingPortalResponse = await meetingPortalRouter(request, env, pathname);
       if (meetingPortalResponse) return meetingPortalResponse;
+
+      if (pathname.startsWith("/api/communications/meta/")) {
+        const metaResponse = await metaOAuthRouter(request, env);
+        if (metaResponse) return metaResponse;
+      }
+
+      if (pathname.startsWith("/api/communications/")) {
+        const communicationsResponse = await communicationsSiteRouter(request, env);
+        if (communicationsResponse) return communicationsResponse;
+      }
 
       if (pathname.startsWith("/api/document-lifecycle/")) {
         const lifecycleResponse = await documentLifecycleRouter(request, env);
@@ -1761,9 +1792,9 @@ async function enforceMailRateLimit(env, uid) {
 async function smtpSend(env,{to,subject,text,html}) {
   const toEmail = normalizeRecipientEmail(to);
   const cleanSubject = validateMailHeader(subject, "Subject");
-  if (!env.SMTP_PASSWORD) throw new Error("IRPA SMTP password is not configured in the deployment environment.");
   if (env.SMTP_MOCK === "success") return "250 MOCK ACCEPTED";
   if (env.SMTP_MOCK === "fail") throw new Error("Mock SMTP provider failure.");
+  if (!env.SMTP_PASSWORD) throw new Error("IRPA SMTP password is not configured in the deployment environment.");
   const { connect } = await import("cloudflare:sockets");
   const socket = connect({hostname:SMTP_HOST,port:SMTP_PORT},{secureTransport:"on"});
   const reader = socket.readable.getReader();
@@ -2232,7 +2263,7 @@ async function getInstitutionalProfileForUser(env, claims) {
 function base64UrlEncodeBytes(bytes) {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/=/g, "").replace(/\\+/g, "-").replace(/\\//g, "_");
+  return btoa(binary).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
 }
 
 function base64UrlEncodeText(value) {
@@ -2240,7 +2271,7 @@ function base64UrlEncodeText(value) {
 }
 
 function pemPrivateKeyBytes(pem) {
-  const body = String(pem || "").replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\\s/g, "");
+  const body = String(pem || "").replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g, "");
   if (!body) throw new Error("Privileged Firestore identity is not configured.");
   const binary = atob(body);
   return Uint8Array.from(binary, char => char.charCodeAt(0));
@@ -2314,9 +2345,9 @@ async function getFirestoreAdminAccessToken(env) {
 async function commitFirestoreDocumentAndAudit(env, documentId, _firebaseToken, documentFields, documentMask, auditFields, {createOnly=false}={}) {
   const firebaseToken = await getFirestoreAdminAccessToken(env);
   const base=`projects/${getFirebaseProjectId(env)}/databases/(default)/documents`;
-  const auditId=`${documentId}-${Date.now()}-${crypto.randomUUID().slice(0,8)}`;
+  const auditId=`${Date.now()}-${crypto.randomUUID()}`;
   const documentWrite={
-    update:{name:`${base}/documents/${documentId}`,fields:documentFields},
+    update:{name:`${base}/${documentId}`,fields:documentFields},
     updateMask:{fieldPaths:documentMask}
   };
   if(createOnly)documentWrite.currentDocument={exists:false};
@@ -2498,7 +2529,7 @@ function escapeHtml(value) {
 
 function corsHeaders(request) {
   const origin = request.headers.get("Origin") || "";
-  const allowed = origin === "https://irpa.or.tz" || origin === "https://www.irpa.or.tz" || origin === "https://irpa-digital-board-governance.web.app" || origin === "https://irpa-digital-board-governance.firebaseapp.com" || origin === "https://irpa-dbg-staging-a73ec.web.app" || origin === "https://irpa-dbg-staging-a73ec.firebaseapp.com" || origin === "http://localhost:5173";
+  const allowed = origin === "https://irpa.or.tz" || origin === "https://www.irpa.or.tz" || origin === "https://irpa-digital-board-governance.web.app" || origin === "https://irpa-digital-board-governance.firebaseapp.com" || origin === "http://localhost:5173" || origin === "https://staging.irpa.or.tz" || origin === "https://irpa-dgb-meeting-room-staging.irpa-governance.workers.dev" || origin === "https://irpa-dbg-staging-a73ec.web.app" || origin === "https://irpa-dbg-staging-a73ec.firebaseapp.com";
   return {
     "Access-Control-Allow-Origin": allowed ? origin : "https://irpa.or.tz",
     "Access-Control-Allow-Headers": "Authorization, Content-Type, X-IRPA-Invitation-Version, x-signing-token",
