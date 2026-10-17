@@ -55,7 +55,6 @@ IRPA_PRODUCTION_CUTOVER = "false"
 META_APP_ID = ""
 META_GRAPH_API_VERSION = "v26.0"
 META_REDIRECT_URI = "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev/api/communications/meta/callback"
-META_GRAPH_API_VERSION = "v26.0"
 
 [[env.staging.kv_namespaces]]
 binding = "DRIVE_KV"
