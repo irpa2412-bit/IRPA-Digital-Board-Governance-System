@@ -490,6 +490,61 @@ service cloud.firestore {
     );
     allow delete:if false;
   }
+  // Communications operations registers: explicit schemas, no hard deletes, and immutable audit entries.
+  match /communicationOperations/{id}{
+    function validOperationsKind(data){return data.get("kind","") in ["Campaign","Media Contact","Brand Asset","Crisis Plan","Coverage Log"];}
+    function validOperationsRecord(data){
+      return validOperationsKind(data)
+        &&data.get("title","") is string&&data.get("title","").size()>0&&data.get("title","").size()<=180
+        &&data.get("summary","") is string&&data.get("summary","").size()<=2000
+        &&data.get("status","") in ["Draft","Active","Under Review","Approved","Completed","Archived"]
+        &&data.get("recordOrigin","")=="PRODUCTION"
+        &&data.keys().hasOnly(["kind","title","summary","status","owner","startDate","dueDate","channels","audience","objective","budgetNote","contactName","organization","email","phone","beat","consent","assetType","assetUrl","rights","version","expiryDate","severity","lead","approver","trigger","holdingStatement","nextReview","channel","sourceUrl","observedDate","reach","engagement","sentiment","evidence","tags","createdByUid","createdByEmail","createdAt","updatedByUid","updatedAt","recordOrigin"]);
+    }
+    allow read:if communicationMediaUser();
+    allow create:if communicationMediaUser()&&validOperationsRecord(request.resource.data)
+      &&request.resource.data.get("createdByUid","")==request.auth.uid
+      &&request.resource.data.get("updatedByUid","")==request.auth.uid
+      &&request.resource.data.get("status","")=="Draft"
+      &&request.resource.data.get("createdAt",null)==request.time
+      &&request.resource.data.get("updatedAt",null)==request.time;
+    allow update:if communicationMediaUser()&&validOperationsRecord(request.resource.data)
+      &&request.resource.data.get("createdByUid","")==resource.data.get("createdByUid","")
+      &&request.resource.data.get("createdAt",null)==resource.data.get("createdAt",null)
+      &&request.resource.data.get("recordOrigin","")==resource.data.get("recordOrigin","")
+      &&request.resource.data.get("updatedByUid","")==request.auth.uid
+      &&request.resource.data.get("updatedAt",null)==request.time
+      &&(
+        (resource.data.get("status","") in ["Draft","Under Review"]
+          &&request.resource.data.get("status","")==resource.data.get("status","")
+          &&resource.data.get("createdByUid","")==request.auth.uid
+          &&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["title","summary","owner","startDate","dueDate","channels","audience","objective","budgetNote","contactName","organization","email","phone","beat","consent","assetType","assetUrl","rights","version","expiryDate","severity","lead","approver","trigger","holdingStatement","nextReview","channel","sourceUrl","observedDate","reach","engagement","sentiment","evidence","tags","updatedByUid","updatedAt"]))
+        ||(communicationMediaReviewer()
+          &&resource.data.get("status","")!="Archived"
+          &&request.resource.data.get("status","")==resource.data.get("status","")
+          &&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["title","summary","owner","startDate","dueDate","channels","audience","objective","budgetNote","contactName","organization","email","phone","beat","consent","assetType","assetUrl","rights","version","expiryDate","severity","lead","approver","trigger","holdingStatement","nextReview","channel","sourceUrl","observedDate","reach","engagement","sentiment","evidence","tags","updatedByUid","updatedAt"]))
+        ||(communicationMediaReviewer()
+          &&resource.data.get("status","")!="Archived"
+          &&request.resource.data.get("status","") in ["Approved","Archived","Active","Under Review","Completed","Draft"]
+          &&request.resource.data.get("status","")!=resource.data.get("status","")
+          &&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","updatedByUid","updatedAt"]))
+      );
+    allow delete:if false;
+  }
+  match /communicationOperationsAudit/{id}{
+    allow read:if communicationMediaReviewer();
+    allow create:if communicationMediaUser()
+      &&request.resource.data.get("actorUid","")==request.auth.uid
+      &&request.resource.data.get("recordId","") is string
+      &&request.resource.data.get("kind","") in ["Campaign","Media Contact","Brand Asset","Crisis Plan","Coverage Log"]
+      &&request.resource.data.get("action","") in ["CREATED","UPDATED","STATUS_APPROVED","STATUS_ARCHIVED","STATUS_ACTIVE","STATUS_UNDER_REVIEW","STATUS_COMPLETED","STATUS_DRAFT"]
+      &&request.resource.data.get("title","") is string
+      &&request.resource.data.get("title","").size()<=180
+      &&request.resource.data.get("recordOrigin","")=="PRODUCTION"
+      &&request.resource.data.get("createdAt",null)==request.time
+      &&request.resource.data.keys().hasOnly(["recordId","kind","action","title","actorUid","actorEmail","createdAt","recordOrigin"]);
+    allow update,delete:if false;
+  }
   match /{document=**}{allow read,write:if false;}
  }
 }
