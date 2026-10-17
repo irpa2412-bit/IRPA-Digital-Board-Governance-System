@@ -1,11 +1,6 @@
 name: Deploy IRPA Google Drive Gateway
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "drive-gateway/**"
-      - ".github/workflows/cloudflare-gateway-deploy.yml"
   workflow_dispatch:
 
 permissions:
@@ -13,6 +8,8 @@ permissions:
 
 jobs:
   deploy:
+    # Production deployment is manual-only and can run only from main after review.
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
