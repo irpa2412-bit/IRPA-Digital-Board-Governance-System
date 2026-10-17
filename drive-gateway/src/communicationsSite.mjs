@@ -382,6 +382,7 @@ export function createCommunicationsSiteRouter(deps) {
         const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/users/me?context=edit", {
           headers: wordpressHeaders(wp, { Accept: "application/json" }), signal: AbortSignal.timeout(12000)
         });
+        result.websiteHttpStatus = response.status;
         if (response.ok) {
           const user = await response.json();
           const roles = Array.isArray(user.roles) ? user.roles.map(role => String(role).toLowerCase()) : [];
