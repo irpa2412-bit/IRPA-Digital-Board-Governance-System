@@ -489,11 +489,12 @@ jobs:
           set -euo pipefail
           node <<'NODE'
           const https=require("node:https");
+          require("node:dns").setDefaultResultOrder("ipv4first");
           const {URL,URLSearchParams}=require("node:url");
           function request(url,method="GET",headers={},body){
             return new Promise((resolve,reject)=>{
               const u=new URL(url);
-              const req=https.request({protocol:u.protocol,hostname:u.hostname,port:u.port||443,path:u.pathname+u.search,method,headers,timeout:15000},res=>{
+              const req=https.request({protocol:u.protocol,hostname:u.hostname,port:u.port||443,family:4,path:u.pathname+u.search,method,headers,timeout:15000},res=>{
                 let raw="";res.setEncoding("utf8");res.on("data",c=>raw+=c);res.on("end",()=>{let data;try{data=JSON.parse(raw)}catch{}resolve({http:res.statusCode,data,raw})});
               });
               req.on("timeout",()=>req.destroy(new Error("request timeout")));
@@ -620,7 +621,7 @@ jobs:
             const subdomains=await api2("SubDomain","listsubdomains",{regex:"staging"});
             const found=subdomains.rows.find(x=>x.domain==="staging.irpa.or.tz"||x.fullsubdomain==="staging.irpa.or.tz");
             if(found){
-              const changed=await uapi("SubDomain/changedocroot",{subdomain:"staging",rootdomain:"irpa.or.tz",dir:"public_html/staging"});
+              const changed=await uapi("SubDomain/changedocroot",{subdomain:"staging",rootdomain:"irpa.or.tz",dir:"/public_html/staging"});
               if(changed.http!==200||changed.data?.status!==1||changed.data?.result?.result===0){console.log("CPANEL_SUBDOMAIN_MAPPING=FAILED_CHANGE_DOCROOT");return false}
             }else{
               const added=await uapi("SubDomain/addsubdomain",{domain:"staging",rootdomain:"irpa.or.tz",dir:"/public_html/staging"});
