@@ -31,12 +31,13 @@ test("Wrangler staging project and application URLs are isolated from production
   assert.match(staging, /IRPA_PRODUCTION_CUTOVER = "false"/);
 });
 
-test("staging workflow validates the approved frontend origin and fails closed on invalid optional Meta configuration", () => {
+test("staging workflow enforces the approved Firebase project, app origin, scoped credentials, and dedicated KV namespace", () => {
   const workflow = readFileSync(new URL("../../.github/workflows/staging-gateway-e2e.yml", import.meta.url), "utf8");
+  assert.ok(workflow.includes('test "$PROJECT" = "irpa-dbg-staging-a73ec"'));
   assert.ok(workflow.includes('test "$APP_URL" = "https://irpa-dbg-staging-a73ec.web.app"'));
-  assert.ok(workflow.includes('const valid = count === 3 && /^\\d+$/.test(values[0]) && Boolean(values[1].trim()) && decoded.length === 32;'));
-  assert.ok(workflow.includes('const metaReady=/^\\d+$/.test(metaAppIdRaw)&&Boolean(String(process.env.META_APP_SECRET||"").trim())&&metaKey.length===32;'));
-  assert.ok(workflow.includes('const metaAppId=metaReady?metaAppIdRaw:"";'));
-  assert.ok(workflow.includes('Worker App ID remains blank and Meta endpoints stay disabled.'));
-  assert.ok(!workflow.includes('if (!/^\\\\d+$/.test(values[0]))'));
+  assert.ok(workflow.includes('test "$id" = "7b50627e29fc4fe1abaa8dc8665edd02"'));
+  assert.ok(workflow.includes("secrets.STAGING_CLOUDFLARE_API_TOKEN"));
+  assert.ok(workflow.includes("secrets.STAGING_CLOUDFLARE_ACCOUNT_ID"));
+  assert.ok(!workflow.includes("secrets.CLOUDFLARE_API_TOKEN"));
+  assert.ok(!workflow.includes("secrets.CLOUDFLARE_ACCOUNT_ID"));
 });
