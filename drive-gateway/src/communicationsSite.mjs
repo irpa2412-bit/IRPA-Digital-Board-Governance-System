@@ -317,6 +317,7 @@ export function createCommunicationsSiteRouter(deps) {
     }
     const revisions = await readWebsiteRevisions(wp, type, id);
     const currentRevisionId = revisions.length && Number.isSafeInteger(Number(revisions[0]?.id)) ? Number(revisions[0].id) : null;
+    if (!currentRevisionId) throw new Error("No current WordPress revision ID is available; no edit was made.");
     const snapshotId = crypto.randomUUID();
     const snapshot = {
       snapshotId, type, itemId: id, currentRevisionId,
