@@ -13,6 +13,8 @@ An integrated communications workspace inside the existing IRPA Digital Board Go
 - Media library, authenticated download, image editing/export, audio/video preview and browser-native trim/export, within the existing gateway's file-size and format limits.
 
 ## Website and cPanel access
+
+WordPress page/post editing uses a dedicated WordPress account whose role is exactly `Editor`, with an application password and only the permissions needed to edit pages/posts. The Worker checks `/users/me` and refuses an account carrying the `administrator` role. Never use a personal or main administrator account/password. Editing is enabled only in the staging Worker against `https://staging.irpa.or.tz`; the production hostname, including a `/staging` path on that hostname, is rejected.
 The portal calls the existing Cloudflare Worker routes:
 - `GET /api/communications/site/status` — verifies the isolated staging WordPress connection without returning credentials.
 - `GET /api/communications/website/content?type=posts|pages` — lists up to 50 staging pages or posts.
