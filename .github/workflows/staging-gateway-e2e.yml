@@ -854,6 +854,101 @@ jobs:
           })().catch(e=>{console.error("Staging remediation step failed unexpectedly: "+String(e.message||e));process.exit(1)});
           NODE
 
+      - name: Repair malformed staging WordPress rewrite rules with verified backup
+        continue-on-error: true
+        env:
+          CP_BASE: \${{ secrets.STAGING_CPANEL_BASE_URL }}
+          CP_USER: \${{ secrets.STAGING_CPANEL_USERNAME }}
+          CP_TOKEN: \${{ secrets.STAGING_CPANEL_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const https=require("node:https");
+          const {URL,URLSearchParams}=require("node:url");
+          require("node:dns").setDefaultResultOrder("ipv4first");
+          function request(url,method="GET",headers={},body){
+            return new Promise((resolve,reject)=>{
+              const u=new URL(url);
+              const req=https.request({protocol:u.protocol,hostname:u.hostname,port:u.port||443,family:4,path:u.pathname+u.search,method,headers,timeout:15000},res=>{
+                let raw="";res.setEncoding("utf8");res.on("data",c=>raw+=c);res.on("end",()=>{let data;try{data=JSON.parse(raw)}catch{}resolve({http:res.statusCode,data,raw,headers:res.headers})});
+              });
+              req.on("timeout",()=>req.destroy(new Error("request timeout")));
+              req.on("error",reject);if(body)req.write(body);req.end();
+            });
+          }
+          async function main(){
+            const base=new URL(process.env.CP_BASE);
+            const auth={Authorization:"cpanel "+process.env.CP_USER+":"+process.env.CP_TOKEN,Accept:"application/json"};
+            async function uapi(fn,params={},method="GET",body){
+              const u=new URL("/execute/"+fn,base);
+              if(method==="GET")u.search=new URLSearchParams(params).toString();
+              return request(u.href,method,{...auth,...(method==="POST"?{"Content-Type":"application/x-www-form-urlencoded"}:{})},body??(method==="POST"?new URLSearchParams(params).toString():undefined));
+            }
+            async function api2(module,func,params={}){
+              const u=new URL("/json-api/cpanel",base);
+              u.search=new URLSearchParams({cpanel_jsonapi_user:process.env.CP_USER,cpanel_jsonapi_apiversion:"2",cpanel_jsonapi_module:module,cpanel_jsonapi_func:func,...params}).toString();
+              const r=await request(u.href,"GET",auth),root=r.data?.cpanelresult,rows=Array.isArray(root?.data)?root.data:[];
+              return {http:r.http,ok:r.http===200&&root?.event?.result===1&&!root?.error&&rows.every(x=>x?.status!==0&&x?.result?.status!==0),rows};
+            }
+            const info=await uapi("DomainInfo/domains_data");
+            const main=info.data?.data?.main_domain||{};
+            const root=String(main.documentroot||main.document_root||"");
+            if(info.http!==200||info.data?.status!==1||!root.endsWith("/public_html"))throw new Error("Refusing staging rewrite repair because the main document root could not be verified.");
+            const stage=root+"/staging",home=root.replace(/\/public_html\/?$/,"");
+            const read=await uapi("Fileman/get_file_content",{dir:stage,file:".htaccess"});
+            const original=String(read.data?.data?.content??read.data?.content??read.data?.result?.data?.content??"");
+            if(read.http!==200||read.data?.status!==1||!original)throw new Error("Could not read staging .htaccess; no file was changed.");
+            const baseBad=[...original.matchAll(/^RewriteBase[ \t]+\/staging[ \t]+\/[ \t]*$/gm)];
+            const ruleBad=[...original.matchAll(/^RewriteRule[ \t]+\.[ \t]+\/staging[ \t]+\/index\.php[ \t]+\[L\][ \t]*$/gm)];
+            if(baseBad.length===0&&ruleBad.length===0){console.log("STAGING_REWRITE_REPAIR=NO_KNOWN_MALFORMED_RULES");return}
+            if(baseBad.length!==1||ruleBad.length!==1)throw new Error("Unexpected rewrite-rule shape; refused automatic edit.");
+            const backupName="irpa_staging_htaccess_pre_repair_"+String(process.env.GITHUB_RUN_ID||Date.now())+".txt";
+            const backupPath=home+"/logs/"+backupName;
+            const existingBackup=await uapi("Fileman/get_file_content",{dir:home+"/logs",file:backupName});
+            const existingContent=String(existingBackup.data?.data?.content??existingBackup.data?.content??"");
+            if(existingBackup.http===200&&existingBackup.data?.status===1&&existingContent)throw new Error("The staging rewrite backup path already exists; refusing to overwrite it.");
+            let copied=await api2("Fileman","fileop",{op:"copy",sourcefiles:stage+"/.htaccess",destfiles:backupPath,doubledecode:"1"});
+            let backup=await uapi("Fileman/get_file_content",{dir:home+"/logs",file:backupName});
+            let backupContent=String(backup.data?.data?.content??backup.data?.content??"");
+            if(!(backup.http===200&&backup.data?.status===1&&backupContent===original)){
+              const boundary="----IRPAStagingBackup"+String(process.env.GITHUB_RUN_ID||Date.now());
+              const payload=Buffer.concat([
+                Buffer.from("--"+boundary+"\r\nContent-Disposition: form-data; name=\"dir\"\r\n\r\n"+home+"/logs\r\n"),
+                Buffer.from("--"+boundary+"\r\nContent-Disposition: form-data; name=\"file-1\"; filename=\""+backupName+"\"\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n"),
+                Buffer.from(original),
+                Buffer.from("\r\n--"+boundary+"--\r\n")
+              ]);
+              const uploaded=await request(new URL("/execute/Fileman/upload_files",base).href,"POST",{...auth,"Content-Type":"multipart/form-data; boundary="+boundary,"Content-Length":String(payload.length)},payload);
+              backup=await uapi("Fileman/get_file_content",{dir:home+"/logs",file:backupName});
+              backupContent=String(backup.data?.data?.content??backup.data?.content??"");
+              if(uploaded.http!==200||uploaded.data?.status!==1||backup.http!==200||backup.data?.status!==1||backupContent!==original)throw new Error("Could not verify an exact backup of staging .htaccess; no rewrite changes were applied.");
+            }
+            console.log("STAGING_REWRITE_BACKUP=VERIFIED");
+            const replacement=[
+              "RewriteCond %{HTTP_HOST} ^staging\\.irpa\\.or\\.tz$ [NC]",
+              "RewriteRule . /index.php [L]",
+              "RewriteCond %{REQUEST_FILENAME} !-f",
+              "RewriteCond %{REQUEST_FILENAME} !-d",
+              "RewriteCond %{HTTP_HOST} ^(?:www\\.)?irpa\\.or\\.tz$ [NC]",
+              "RewriteRule . /staging/index.php [L]"
+            ].join("\n");
+            let fixed=original.replace(/^RewriteBase[ \t]+\/staging[ \t]+\/[ \t]*\r?\n/m,"");
+            fixed=fixed.replace(/^RewriteRule[ \t]+\.[ \t]+\/staging[ \t]+\/index\.php[ \t]+\[L\][ \t]*$/m,replacement);
+            if(fixed===original||/RewriteBase[ \t]+\/staging[ \t]+\//.test(fixed)||/RewriteRule[ \t]+\.[ \t]+\/staging[ \t]+\/index\.php/.test(fixed))throw new Error("Malformed rewrite rules remain after transformation; file was not changed.");
+            const saved=await uapi("Fileman/save_file_content",{dir:stage,file:".htaccess",content:fixed,charset:"utf-8"},"POST");
+            if(saved.http!==200||saved.data?.status!==1)throw new Error("cPanel rejected the staging rewrite update; the verified original backup remains available.");
+            const verified=await uapi("Fileman/get_file_content",{dir:stage,file:".htaccess"});
+            const actual=String(verified.data?.data?.content??verified.data?.content??"");
+            if(verified.http!==200||verified.data?.status!==1||actual!==fixed)throw new Error("The staging rewrite update could not be verified against the saved file.");
+            console.log("STAGING_REWRITE_FILE=VERIFIED");
+            const probe=await request("https://staging.irpa.or.tz/wp-json/","GET",{Accept:"application/json","Cache-Control":"no-cache"});
+            const apiOk=probe.http===200&&String(probe.headers["content-type"]||"").includes("application/json")&&probe.raw.trim().startsWith("{");
+            console.log("STAGING_WORDPRESS_PUBLIC_API="+(apiOk?"PASS":"FAIL_HTTP_"+probe.http));
+            if(!apiOk)throw new Error("Staging WordPress still fails the public REST API check after the verified rewrite repair.");
+          }
+          main().catch(e=>{console.error("Staging rewrite repair:",String(e.message||e));process.exit(1)});
+          NODE
+
       - name: Diagnose post-remediation staging WordPress HTTP 500 (redacted)
         if: always()
         continue-on-error: true
