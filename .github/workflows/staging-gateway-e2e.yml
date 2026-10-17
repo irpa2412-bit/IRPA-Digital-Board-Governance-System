@@ -752,7 +752,7 @@ jobs:
            */
           if (!defined('ABSPATH')) { return; }
           $host = strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
-          $host = preg_replace('/:\\d+$/', '', $host);
+          $host = preg_replace('/:[0-9]+$/', '', $host);
           if ($host !== 'staging.irpa.or.tz') { return; }
           $path = (string) (parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH) ?: '');
           if ($path !== '/wp-json' && strpos($path, '/wp-json/') !== 0) { return; }
