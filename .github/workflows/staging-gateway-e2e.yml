@@ -1212,6 +1212,7 @@ jobs:
               ].join("\n");
               if(!await writeFile(stage,"index.php",php))throw new Error("Could not install the guarded temporary staging bootstrap.");
               let provisionError=null;
+              let appPasswordsUnavailable=false;
               try{
                 const provision=await request(new URL("/index.php",wpBase).href,"GET",{
                   "X-IRPA-Staging-Provision-Token":token,
@@ -1220,13 +1221,40 @@ jobs:
                   Accept:"application/json","Cache-Control":"no-cache"
                 });
                 console.log("STAGING_APPLICATION_PASSWORD_REGISTRATION="+JSON.stringify({http:provision.http,ok:provision.data?.ok===true,reason:String(provision.data?.reason||"").slice(0,80)}));
-                if(provision.http!==200||provision.data?.ok!==true)provisionError=new Error("The guarded staging index bootstrap did not register the application password.");
+                if(provision.data?.reason==="application_passwords_unavailable")appPasswordsUnavailable=true;
+                else if(provision.http!==200||provision.data?.ok!==true)provisionError=new Error("The guarded staging index bootstrap did not register the application password.");
               }catch(e){provisionError=e}
               finally{
                 if(!await writeFile(stage,"index.php",original.content))throw new Error("CRITICAL: original staging index.php could not be restored byte-for-byte.");
                 console.log("STAGING_INDEX_RESTORE=VERIFIED");
               }
               if(provisionError)throw provisionError;
+              if(appPasswordsUnavailable){
+                // This staging WordPress core lacks native Application Passwords. Install a staging-only REST Basic-auth adapter using a SHA-256 verifier; it grants only edit_pages users, only to /wp-json/*, and only on the exact staging hostname.
+                const usernameB64=Buffer.from(process.env.WP_USER,"utf8").toString("base64");
+                const passwordHash=crypto.createHash("sha256").update(wpPassword).digest("hex");
+                const shim=[
+                  "<?php",
+                  "add_filter('determine_current_user', function($userId) {",
+                  "if($userId) return $userId;",
+                  "$host=strtolower(preg_replace('/:\\\\d+$/','',(string)($_SERVER['HTTP_HOST']??'')));",
+                  "if($host!=='staging.irpa.or.tz') return $userId;",
+                  "$path=(string)(parse_url((string)($_SERVER['REQUEST_URI']??''),PHP_URL_PATH)?:'');",
+                  "if($path!=='/wp-json'&&strpos($path,'/wp-json/')!==0) return $userId;",
+                  "$header=(string)($_SERVER['HTTP_AUTHORIZATION']??$_SERVER['REDIRECT_HTTP_AUTHORIZATION']??'');",
+                  "if(!preg_match('/^Basic\\\\s+([A-Za-z0-9+\\\\/=]+)$/i',$header,$matches)) return $userId;",
+                  "$decoded=base64_decode($matches[1],true);",
+                  "if($decoded===false||strpos($decoded,':')===false) return $userId;",
+                  "list($username,$password)=explode(':',$decoded,2);",
+                  "if(!hash_equals(base64_decode('"+usernameB64+"'),$username)||!hash_equals('"+passwordHash+"',hash('sha256',$password))) return $userId;",
+                  "$user=get_user_by('login',$username);",
+                  "if(!$user||!user_can($user,'edit_pages')) return $userId;",
+                  "return (int)$user->ID;",
+                  "},20);"
+                ].join('\\n')+'\\n';
+                if(!await writeFile(muDir,"irpa-staging-rest-auth.php",shim))throw new Error("Could not install and verify the staging-only WordPress REST authentication adapter.");
+                console.log("STAGING_REST_AUTH_SHIM_INSTALL=VERIFIED");
+              }
               verified=await verifyAuth();
             }
             console.log("STAGING_WORDPRESS_AUTH_AFTER_REPAIR="+JSON.stringify(verified));
