@@ -43,6 +43,9 @@ test("Meta integration refuses production environment and production callback ho
  const bad=harness({envOverrides:{META_REDIRECT_URI:"https://irpa.or.tz/api/communications/meta/callback"}});
  const badResponse=await bad.router(new Request("https://gateway.example/api/communications/meta/connect",{method:"POST"}),bad.env);
  assert.equal(badResponse.status,503);
+ const wrongWorker=harness({envOverrides:{META_REDIRECT_URI:"https://other-staging.workers.dev/api/communications/meta/callback"}});
+ const wrongWorkerResponse=await wrongWorker.router(new Request("https://gateway.example/api/communications/meta/connect",{method:"POST"}),wrongWorker.env);
+ assert.equal(wrongWorkerResponse.status,503);
 });
 test("Meta connection status does not disclose token material",async()=>{
  const {router,env}=harness();
