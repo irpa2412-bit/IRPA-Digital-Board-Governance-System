@@ -1263,6 +1263,40 @@ jobs:
                 console.log("STAGING_REST_AUTH_SHIM_INSTALL=VERIFIED");
               }
               verified=await verifyAuth();
+              if(!verified.ok&&appPasswordsUnavailable){
+                // Read-only diagnostic through a token-guarded temporary index.php, reporting booleans only; always restore the exact original bytes.
+                const diagOriginal=await readFile(stage,"index.php");
+                if(!diagOriginal.ok||!diagOriginal.content.startsWith("<?php"))throw new Error("Could not read staging index.php for guarded auth diagnostics.");
+                const diagToken=crypto.randomBytes(32).toString("hex");
+                const diagTokenHash=crypto.createHash("sha256").update(diagToken).digest("hex");
+                const diagPhp=[
+                  "<?php",
+                  "$provided=(string)($_SERVER['HTTP_X_IRPA_STAGING_DIAG_TOKEN']??'');",
+                  "if(!hash_equals('"+diagTokenHash+"',hash('sha256',$provided))){http_response_code(404);exit;}",
+                  "require_once __DIR__.'/wp-load.php';",
+                  "$header=(string)($_SERVER['HTTP_AUTHORIZATION']??$_SERVER['REDIRECT_HTTP_AUTHORIZATION']??'');",
+                  "if($header===''&&function_exists('getallheaders')){foreach((array)getallheaders() as $k=>$v){if(strcasecmp((string)$k,'Authorization')===0){$header=(string)$v;break;}}}",
+                  "$parsed=preg_match('/^Basic\\\\s+([A-Za-z0-9+\\\\/=]+)$/i',$header,$m)===1;",
+                  "$decoded=$parsed?base64_decode($m[1],true):false;",
+                  "$parts=($decoded!==false&&strpos($decoded,':')!==false)?explode(':',$decoded,2):['',''];",
+                  "$username=$parts[0];$password=preg_replace('/\\\\s+/','',$parts[1]);",
+                  "$expectedUser=base64_decode('"+usernameB64+"');",
+                  "$user=get_user_by('login',$username);if(!$user&&is_email($username))$user=get_user_by('email',$username);",
+                  "$diagnostics=['auth_header_present'=>$header!=='','basic_parsed'=>$parsed,'username_matches'=>hash_equals($expectedUser,$username),'password_hash_matches'=>hash_equals('"+passwordHash+"',hash('sha256',$password)),'user_found'=>(bool)$user,'user_can_edit_pages'=>($user&&user_can($user,'edit_pages'))];",
+                  "header('Content-Type: application/json; charset=utf-8');echo json_encode(['diagnostics'=>$diagnostics]);exit;"
+                ].join("\n");
+                let diagnosticError=null;
+                try{
+                  if(!await writeFile(stage,"index.php",diagPhp))throw new Error("Could not install the guarded WordPress auth diagnostic.");
+                  const diag=await request(new URL("/index.php",wpBase).href,"GET",{"X-IRPA-Staging-Diag-Token":diagToken,Authorization:basic,Accept:"application/json","Cache-Control":"no-cache"});
+                  console.log("STAGING_REST_AUTH_DIAGNOSTIC="+JSON.stringify(diag.data?.diagnostics||{http:diag.http,parsedJson:!!diag.data}));
+                }catch(e){diagnosticError=e}
+                finally{
+                  if(!await writeFile(stage,"index.php",diagOriginal.content))throw new Error("CRITICAL: original staging index.php could not be restored after auth diagnostics.");
+                  console.log("STAGING_AUTH_DIAGNOSTIC_INDEX_RESTORE=VERIFIED");
+                }
+                if(diagnosticError)console.log("STAGING_REST_AUTH_DIAGNOSTIC_ERROR="+String(diagnosticError.code||diagnosticError.name||"error"));
+              }
             }
             console.log("STAGING_WORDPRESS_AUTH_AFTER_REPAIR="+JSON.stringify(verified));
             if(!verified.ok)throw new Error("WordPress REST authentication remains unavailable after the staging bootstrap repair.");
