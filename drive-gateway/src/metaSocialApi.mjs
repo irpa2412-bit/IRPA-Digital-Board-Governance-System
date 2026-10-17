@@ -40,7 +40,7 @@ function config(env) {
       !redirect.hostname.endsWith(".workers.dev") || redirect.hostname === "workers.dev" ||
       redirect.hostname.endsWith(".irpa.or.tz") || redirect.username || redirect.password ||
       redirect.search || redirect.hash || redirect.pathname !== "/api/communications/meta/callback") {
-    throw new Error("Meta callback must use the dedicated HTTPS staging Cloudflare Worker URL.");
+    throw new Error("Meta callback configuration must use the dedicated HTTPS staging Cloudflare Worker URL.");
   }
   if (!env.DRIVE_KV) throw new Error("The existing staging Cloudflare KV binding is unavailable.");
   return { appId, appSecret, redirectUri: redirect.toString(), version: graphVersion(env) };
