@@ -548,6 +548,75 @@ service cloud.firestore {
       &&request.resource.data.keys().hasOnly(["recordId","kind","action","title","actorUid","actorEmail","createdAt","recordOrigin"]);
     allow update,delete:if false;
   }
+  // Social-media account register: metadata only; no platform credentials or tokens are accepted.
+  match /socialMediaAccounts/{id}{
+    function validSocialAccount(data){
+      return data.get("platform","") in ["Facebook","Instagram","LinkedIn","X","YouTube","TikTok","WhatsApp","Telegram","Other"]
+        &&data.get("accountName","") is string&&data.get("accountName","").size()>0&&data.get("accountName","").size()<=180
+        &&data.get("handle","") is string&&data.get("handle","").size()<=120
+        &&data.get("profileUrl","") is string&&data.get("profileUrl","").size()<=1000
+        &&(data.get("profileUrl","")==""||data.get("profileUrl","").matches("^https://.*"))
+        &&data.get("accountType","") in ["Organization page","Public profile","Channel","Group","Messaging channel","Other"]
+        &&data.get("owner","") is string&&data.get("owner","").size()>0&&data.get("owner","").size()<=180
+        &&data.get("custodian","") is string&&data.get("custodian","").size()<=180
+        &&data.get("purpose","") is string&&data.get("purpose","").size()<=1000
+        &&data.get("audience","") is string&&data.get("audience","").size()<=500
+        &&data.get("authorizationReference","") is string&&data.get("authorizationReference","").size()<=180
+        &&data.get("reviewDate","") is string&&data.get("reviewDate","").size()<=20
+        &&data.get("notes","") is string&&data.get("notes","").size()<=1500
+        &&data.get("connectionStatus","") in ["Pending Verification","Active","Suspended","Disconnected","Archived"]
+        &&data.get("recordOrigin","")=="PRODUCTION"
+        &&data.keys().hasOnly(["platform","accountName","handle","profileUrl","accountType","owner","custodian","purpose","audience","authorizationReference","reviewDate","notes","connectionStatus","createdByUid","createdByEmail","createdAt","updatedByUid","updatedAt","recordOrigin"]);
+    }
+    allow read:if communicationMediaUser();
+    allow create:if communicationMediaUser()&&validSocialAccount(request.resource.data)
+      &&request.resource.data.get("createdByUid","")==request.auth.uid
+      &&request.resource.data.get("updatedByUid","")==request.auth.uid
+      &&request.resource.data.get("connectionStatus","")=="Pending Verification"
+      &&request.resource.data.get("createdAt",null)==request.time
+      &&request.resource.data.get("updatedAt",null)==request.time;
+    allow update:if communicationMediaUser()&&validSocialAccount(request.resource.data)
+      &&request.resource.data.get("createdByUid","")==resource.data.get("createdByUid","")
+      &&request.resource.data.get("createdAt",null)==resource.data.get("createdAt",null)
+      &&request.resource.data.get("recordOrigin","")==resource.data.get("recordOrigin","")
+      &&request.resource.data.get("updatedByUid","")==request.auth.uid
+      &&request.resource.data.get("updatedAt",null)==request.time
+      &&(
+        (resource.data.get("connectionStatus","")=="Pending Verification"
+          &&resource.data.get("createdByUid","")==request.auth.uid
+          &&request.resource.data.get("connectionStatus","")==resource.data.get("connectionStatus","")
+          &&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["platform","accountName","handle","profileUrl","accountType","owner","custodian","purpose","audience","authorizationReference","reviewDate","notes","updatedByUid","updatedAt"]))
+        ||(communicationMediaReviewer()
+          &&resource.data.get("connectionStatus","")!="Archived"
+          &&request.resource.data.get("connectionStatus","")==resource.data.get("connectionStatus","")
+          &&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["platform","accountName","handle","profileUrl","accountType","owner","custodian","purpose","audience","authorizationReference","reviewDate","notes","updatedByUid","updatedAt"]))
+        ||(communicationMediaReviewer()
+          &&((resource.data.get("connectionStatus","")=="Pending Verification"&&request.resource.data.get("connectionStatus","") in ["Active","Suspended","Disconnected","Archived"])
+            ||(resource.data.get("connectionStatus","")=="Active"&&request.resource.data.get("connectionStatus","") in ["Suspended","Disconnected","Archived"])
+            ||(resource.data.get("connectionStatus","")=="Suspended"&&request.resource.data.get("connectionStatus","") in ["Active","Disconnected","Archived"])
+            ||(resource.data.get("connectionStatus","")=="Disconnected"&&request.resource.data.get("connectionStatus","")=="Archived"))
+          &&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["connectionStatus","updatedByUid","updatedAt"]))
+      );
+    allow delete:if false;
+  }
+  match /socialMediaAccountsAudit/{id}{
+    allow read:if communicationMediaReviewer();
+    allow create:if communicationMediaUser()
+      &&request.resource.data.get("actorUid","")==request.auth.uid
+      &&request.resource.data.get("recordId","") is string
+      &&request.resource.data.get("platform","") in ["Facebook","Instagram","LinkedIn","X","YouTube","TikTok","WhatsApp","Telegram","Other"]
+      &&request.resource.data.get("accountName","") is string
+      &&request.resource.data.get("accountName","").size()<=180
+      &&request.resource.data.get("action","") in ["ENROLLED","UPDATED","STATUS_ACTIVE","STATUS_SUSPENDED","STATUS_DISCONNECTED","STATUS_ARCHIVED"]
+      &&request.resource.data.get("actorEmail","")==request.auth.token.get("email","")
+      &&existsAfter(/databases/$(database)/documents/socialMediaAccounts/$(request.resource.data.recordId))
+      &&getAfter(/databases/$(database)/documents/socialMediaAccounts/$(request.resource.data.recordId)).data.get("platform","")==request.resource.data.get("platform","")
+      &&getAfter(/databases/$(database)/documents/socialMediaAccounts/$(request.resource.data.recordId)).data.get("accountName","")==request.resource.data.get("accountName","")
+      &&request.resource.data.get("recordOrigin","")=="PRODUCTION"
+      &&request.resource.data.get("createdAt",null)==request.time
+      &&request.resource.data.keys().hasOnly(["recordId","platform","accountName","action","actorUid","actorEmail","createdAt","recordOrigin"]);
+    allow update,delete:if false;
+  }
   match /{document=**}{allow read,write:if false;}
  }
 }
