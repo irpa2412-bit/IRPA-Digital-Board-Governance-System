@@ -106,7 +106,7 @@ test("deployment docs require isolated staging and never commit credentials",()=
 
 test("website editor provides a sandboxed live preview without bypassing live-write controls",()=>{
  assert.ok(portal.includes("websitePreview"));
- assert.ok(portal.includes('title="IRPA website content preview"'));
+ assert.ok(portal.includes('title="IRPA staging website content preview"'));
  assert.ok(portal.includes('sandbox=""'));
  assert.ok(portal.includes('referrerPolicy="no-referrer"'));
  assert.ok(portal.includes("Save draft"));
