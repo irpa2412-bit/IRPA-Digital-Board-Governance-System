@@ -898,6 +898,172 @@ jobs:
           workingDirectory: drive-gateway
           command: deploy --config wrangler.staging.generated.json
 
+      - name: Provision least-privilege staging WordPress application password
+        working-directory: drive-gateway
+        env:
+          WP_BASE: ${{ secrets.STAGING_WORDPRESS_BASE_URL }}
+          CP_BASE: ${{ secrets.STAGING_CPANEL_BASE_URL }}
+          CP_USER: ${{ secrets.STAGING_CPANEL_USERNAME }}
+          CP_TOKEN: ${{ secrets.STAGING_CPANEL_API_TOKEN }}
+          CP_ROOT: ${{ secrets.STAGING_CPANEL_DOCUMENT_ROOT }}
+          STAGING_DB_NAME: ${{ secrets.STAGING_WORDPRESS_DB_NAME }}
+          PRODUCTION_DB_NAME: ${{ secrets.PRODUCTION_WORDPRESS_DB_NAME }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.STAGING_CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const https=require("node:https");
+          const crypto=require("node:crypto");
+          const {URL,URLSearchParams}=require("node:url");
+          const {spawnSync}=require("node:child_process");
+          require("node:dns").setDefaultResultOrder("ipv4first");
+          function request(url,method="GET",headers={},body){
+            return new Promise((resolve,reject)=>{
+              const u=new URL(url);
+              if(u.protocol!=="https:") return reject(new Error("HTTPS required for staging setup."));
+              const req=https.request({protocol:u.protocol,hostname:u.hostname,port:u.port||443,family:4,path:u.pathname+u.search,method,headers,timeout:15000},res=>{
+                let raw="";res.setEncoding("utf8");res.on("data",c=>raw+=c);res.on("end",()=>resolve({http:res.statusCode,headers:res.headers,raw}));
+              });
+              req.on("timeout",()=>req.destroy(new Error("Staging setup request timed out.")));
+              req.on("error",reject);if(body)req.write(body);req.end();
+            });
+          }
+          async function main(){
+            const wp=new URL(process.env.WP_BASE||""),cp=new URL(process.env.CP_BASE||"");
+            if(wp.protocol!=="https:"||wp.hostname.toLowerCase()!=="staging.irpa.or.tz"||wp.pathname!=="/"||wp.username||wp.password||wp.search||wp.hash)
+              throw new Error("ABORT: setup is restricted to the HTTPS staging.irpa.or.tz origin.");
+            if(cp.protocol!=="https:"||cp.port!=="2083"||cp.pathname!=="/"||cp.username||cp.password)
+              throw new Error("ABORT: cPanel target must be HTTPS port 2083.");
+            if(!process.env.CLOUDFLARE_API_TOKEN||!process.env.CLOUDFLARE_ACCOUNT_ID)
+              throw new Error("Staging Cloudflare deployment credentials are missing.");
+            const auth={Authorization:"cpanel "+process.env.CP_USER+":"+process.env.CP_TOKEN,Accept:"application/json"};
+            async function uapi(fn,params={},method="GET",rawBody){
+              const url=new URL("/execute/"+fn,cp),form=new URLSearchParams(params);
+              if(method==="GET")url.search=form.toString();
+              const r=await request(url.href,method,{...auth,...(method==="POST"?{"Content-Type":"application/x-www-form-urlencoded"}:{})},rawBody??(method==="POST"?form.toString():undefined));
+              let data;try{data=JSON.parse(r.raw)}catch{}
+              return {http:r.http,data};
+            }
+            async function readFile(dir,file){
+              const r=await uapi("Fileman/get_file_content",{dir,file});
+              return {ok:r.http===200&&r.data?.status===1,content:String(r.data?.data?.content??r.data?.data?.[0]?.content??r.data?.result?.data?.content??"")};
+            }
+            async function writeFile(dir,file,content){
+              const saved=await uapi("Fileman/save_file_content",{dir,file,content,charset:"utf-8"},"POST");
+              let check=await readFile(dir,file);
+              if(saved.http===200&&saved.data?.status===1&&check.ok&&check.content===content)return;
+              const boundary="----IRPAStagingAppPassword"+crypto.randomBytes(8).toString("hex");
+              const payload=Buffer.concat([
+                Buffer.from("--"+boundary+"\r\nContent-Disposition: form-data; name=\"dir\"\r\n\r\n"+dir+"\r\n"),
+                Buffer.from("--"+boundary+"\r\nContent-Disposition: form-data; name=\"overwrite\"\r\n\r\n1\r\n"),
+                Buffer.from("--"+boundary+"\r\nContent-Disposition: form-data; name=\"file-1\"; filename=\""+file+"\"\r\nContent-Type: application/octet-stream\r\n\r\n"),
+                Buffer.from(content),
+                Buffer.from("\r\n--"+boundary+"--\r\n")
+              ]);
+              const up=await request(new URL("/execute/Fileman/upload_files",cp).href,"POST",{...auth,"Content-Type":"multipart/form-data; boundary="+boundary,"Content-Length":String(payload.length)},payload);
+              let data;try{data=JSON.parse(up.raw)}catch{}
+              check=await readFile(dir,file);
+              if(up.http!==200||data?.status!==1||!check.ok||check.content!==content)throw new Error("Temporary staging setup endpoint could not be written and verified.");
+            }
+            const info=await uapi("DomainInfo/domains_data");
+            const home=String(info.data?.data?.main_domain?.documentroot||info.data?.data?.main_domain?.document_root||"").replace(/\/+$/,"");
+            const stage=home+"/staging";
+            if(info.http!==200||info.data?.status!==1||!home.endsWith("/public_html")||String(process.env.CP_ROOT||"").replace(/\/+$/,"")!==stage)
+              throw new Error("ABORT: cPanel document root does not resolve to the isolated staging directory.");
+            if(!process.env.STAGING_DB_NAME||!process.env.PRODUCTION_DB_NAME||process.env.STAGING_DB_NAME===process.env.PRODUCTION_DB_NAME)
+              throw new Error("ABORT: staging and production database isolation is not verified.");
+            const cfg=await readFile(stage,"wp-config.php");
+            const db=/define\s*\(\s*['"]DB_NAME['"]\s*,\s*(['"])(.*?)\1\s*\)/s.exec(cfg.content);
+            if(!cfg.ok||!db||db[2]!==process.env.STAGING_DB_NAME)throw new Error("ABORT: staging wp-config.php database name does not match the isolated staging secret.");
+            const setupToken=crypto.randomBytes(32).toString("hex");
+            const filename="irpa-staging-app-password-"+crypto.randomBytes(10).toString("hex")+".php";
+            const php=String.raw`<?php
+          ini_set('display_errors', '0');
+          error_reporting(0);
+          if (strtolower((string)($_SERVER['HTTP_HOST'] ?? '')) !== 'staging.irpa.or.tz' ||
+              strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? '')) !== 'POST' ||
+              !hash_equals('${setupToken}', (string)($_SERVER['HTTP_X_IRPA_STAGING_SETUP'] ?? ''))) {
+            http_response_code(404); exit;
+          }
+          @unlink(__FILE__);
+          header('Content-Type: application/json; charset=utf-8');
+          header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+          $level = ob_get_level(); ob_start();
+          try {
+            $_SERVER['HTTPS'] = 'on'; $_SERVER['SERVER_PORT'] = '443';
+            require_once __DIR__ . '/wp-load.php';
+            $login = 'irpa_staging_gateway';
+            $email = 'irpa-staging-gateway@irpa.or.tz';
+            $user = get_user_by('login', $login);
+            if (!$user) {
+              if (email_exists($email)) { throw new RuntimeException('integration_email_in_use'); }
+              $created = wp_insert_user([
+                'user_login' => $login, 'user_email' => $email,
+                'user_pass' => wp_generate_password(64, true, true),
+                'display_name' => 'IRPA Staging Gateway', 'role' => 'editor'
+              ]);
+              if (is_wp_error($created)) { throw new RuntimeException('editor_account_creation_failed'); }
+              $user = get_user_by('id', $created);
+            }
+            if (!$user || !in_array('editor', (array)$user->roles, true) || in_array('administrator', (array)$user->roles, true)) {
+              throw new RuntimeException('dedicated_account_role_mismatch');
+            }
+            if (!class_exists('WP_Application_Passwords') ||
+                !function_exists('wp_is_application_passwords_available') ||
+                !wp_is_application_passwords_available() ||
+                !wp_is_application_passwords_available_for_user($user)) {
+              throw new RuntimeException('application_passwords_unavailable');
+            }
+            foreach (WP_Application_Passwords::get_user_application_passwords($user->ID) as $item) {
+              if (($item['name'] ?? '') === 'IRPA Staging Gateway' && !empty($item['uuid'])) {
+                WP_Application_Passwords::delete_application_password($user->ID, $item['uuid']);
+              }
+            }
+            $createdPassword = WP_Application_Passwords::create_new_application_password($user->ID, ['name' => 'IRPA Staging Gateway']);
+            if (is_wp_error($createdPassword) || !is_array($createdPassword) || empty($createdPassword[0])) {
+              throw new RuntimeException('application_password_creation_failed');
+            }
+            $plain = preg_replace('/\\s+/', '', (string)$createdPassword[0]);
+            while (ob_get_level() > $level) { ob_end_clean(); }
+            echo json_encode(['ok' => true, 'username' => $login, 'password' => $plain]);
+          } catch (Throwable $e) {
+            while (ob_get_level() > $level) { ob_end_clean(); }
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'code' => preg_replace('/[^a-z0-9_]/i', '', $e->getMessage()) ?: 'setup_failed']);
+          }
+          `;
+            await writeFile(stage,filename,php);
+            let response;
+            try {
+              response=await request(new URL(filename,wp).href,"POST",{
+                "Content-Type":"application/x-www-form-urlencoded",
+                "Content-Length":"0",
+                "X-IRPA-Staging-Setup":setupToken,
+                "Cache-Control":"no-store"
+              },"");
+            } finally {
+              const remaining=await readFile(stage,filename);
+              if(remaining.ok){
+                await uapi("Fileman/delete_files",{dir:stage,"files-0":filename},"POST");
+                const after=await readFile(stage,filename);
+                if(after.ok)throw new Error("Temporary staging setup endpoint cleanup could not be verified.");
+              }
+            }
+            let data;try{data=JSON.parse(response.raw)}catch{}
+            if(response.http!==200||data?.ok!==true||data.username!=="irpa_staging_gateway"||!/^[a-z0-9]{24}$/i.test(String(data.password||"")))
+              throw new Error("WordPress did not provision a valid staging-only Editor application password (HTTP "+response.http+", code "+String(data?.code||"invalid_response").slice(0,80)+").");
+            const usernameResult=spawnSync("npx",["wrangler","secret","put","WORDPRESS_USERNAME","--config","wrangler.staging.generated.json"],{input:data.username,encoding:"utf8",stdio:["pipe","ignore","pipe"],env:process.env});
+            if(usernameResult.status!==0)throw new Error("Could not update the staging Worker username secret.");
+            const passwordResult=spawnSync("npx",["wrangler","secret","put","WORDPRESS_APPLICATION_PASSWORD","--config","wrangler.staging.generated.json"],{input:data.password,encoding:"utf8",stdio:["pipe","ignore","pipe"],env:process.env});
+            data.password="";
+            if(passwordResult.status!==0)throw new Error("Could not update the staging Worker application-password secret.");
+            console.log("STAGING_WORDPRESS_DEDICATED_EDITOR=PASS");
+            console.log("STAGING_WORDPRESS_APPLICATION_PASSWORD_ROTATION=PASS (value redacted)");
+          }
+          main().catch(e=>{console.error("Staging application-password provisioning failed: "+String(e.message||e).replace(/[\r\n\t]+/g," ").slice(0,220));process.exit(1)});
+          NODE
+
       - name: Prepare isolated staging reviewer identity
         env:
           PROJECT: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
