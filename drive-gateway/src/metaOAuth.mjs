@@ -80,8 +80,21 @@ function randomState() {
 function jsonError(json, corsHeaders, request, status, message) {
   return json({ ok: false, error: message }, status, corsHeaders(request));
 }
-async function graphJson(url, init = {}) {
-  const response = await fetch(url, init);
+async function graphJson(url, init = {}, appSecret = "") {
+  const target = new URL(url);
+  const accessToken = target.searchParams.get("access_token");
+  const headers = new Headers(init.headers || {});
+  if (accessToken) {
+    target.searchParams.delete("access_token");
+    headers.set("Authorization", "Bearer " + accessToken);
+    if (appSecret) {
+      const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(appSecret),
+        { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+      const signature = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(accessToken)));
+      target.searchParams.set("appsecret_proof", Array.from(signature, byte => byte.toString(16).padStart(2, "0")).join(""));
+    }
+  }
+  const response = await fetch(target.toString(), { ...init, headers });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data.error) {
     const code = Number(data?.error?.code || 0);
@@ -123,8 +136,8 @@ async function authorizeUser(request, env, deps, reviewer = false) {
   }
   return claims;
 }
-async function requireReadOnlyScopes(version, token) {
-  const response = await graphJson(graphUrl(version, "me/permissions", { access_token: token }).toString());
+async function requireReadOnlyScopes(version, token, appSecret) {
+  const response = await graphJson(graphUrl(version, "me/permissions", { access_token: token }).toString(), {}, appSecret);
   const granted = new Set((Array.isArray(response.data) ? response.data : [])
     .filter(item => item?.status === "granted").map(item => String(item.permission || "")));
   const missing = REQUIRED_SCOPES.filter(scope => !granted.has(scope));
@@ -189,11 +202,11 @@ export function createMetaOAuthRouter(deps) {
             client_secret: cfg.appSecret, fb_exchange_token: shortToken.access_token }).toString()
         });
         const token = longToken.access_token || shortToken.access_token;
-        await requireReadOnlyScopes(cfg.version, token);
-        const me = await graphJson(graphUrl(cfg.version, "me", { fields: "id,name", access_token: token }).toString());
+        await requireReadOnlyScopes(cfg.version, token, cfg.appSecret);
+        const me = await graphJson(graphUrl(cfg.version, "me", { fields: "id,name", access_token: token }).toString(), {}, cfg.appSecret);
         const pages = await graphJson(graphUrl(cfg.version, "me/accounts", {
           fields: "id,name,instagram_business_account{id,username,account_type}", limit: 100, access_token: token
-        }).toString());
+        }).toString(), {}, cfg.appSecret);
         const connection = {
           userId: String(me.id || ""), userName: String(me.name || "").slice(0, 180),
           accounts: publicAccounts(pages), connectedAt: new Date().toISOString(),
@@ -250,11 +263,11 @@ export function createMetaOAuthRouter(deps) {
       if (!encrypted) return json({ ok: true, status: "not_connected", postingEnabled: false }, 200, corsHeaders(request));
       try {
         const connection = await decryptJson(env, encrypted);
-        await requireReadOnlyScopes(cfg.version, connection.accessToken);
-        const me = await graphJson(graphUrl(cfg.version, "me", { fields: "id,name", access_token: connection.accessToken }).toString());
+        await requireReadOnlyScopes(cfg.version, connection.accessToken, cfg.appSecret);
+        const me = await graphJson(graphUrl(cfg.version, "me", { fields: "id,name", access_token: connection.accessToken }).toString(), {}, cfg.appSecret);
         const pages = await graphJson(graphUrl(cfg.version, "me/accounts", {
           fields: "id,name,instagram_business_account{id,username,account_type}", limit: 100, access_token: connection.accessToken
-        }).toString());
+        }).toString(), {}, cfg.appSecret);
         const accounts = publicAccounts(pages);
         return json({ ok: true, status: "verified", user: { id: String(me.id || ""), name: String(me.name || "").slice(0, 180) },
           facebookPages: accounts.map(({ facebookPageId, facebookPageName }) => ({ id: facebookPageId, name: facebookPageName })),
