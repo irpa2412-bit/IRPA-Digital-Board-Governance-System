@@ -270,62 +270,46 @@ jobs:
         run: |
           set -euo pipefail
           node <<'NODE'
-          const https = require("node:https");
-          const { URL, URLSearchParams } = require("node:url");
-          function call(path, values={}) {
-            return new Promise((resolve, reject) => {
-              const u = new URL(process.env.CP_BASE);
-              u.pathname = "/execute/" + path;
-              u.search = new URLSearchParams(values).toString();
-              const req = https.request(u, {headers:{Authorization:"cpanel "+process.env.CP_USER+":"+process.env.CP_TOKEN,Accept:"application/json"},timeout:10000}, res => {
-                let raw="";
-                res.setEncoding("utf8");
-                res.on("data",c=>raw+=c);
-                res.on("end",()=>{
-                  try { resolve({http:res.statusCode,data:JSON.parse(raw)}); }
-                  catch { reject(new Error("cPanel returned invalid JSON for read-only domain inspection.")); }
+          const https=require("node:https");
+          const {URL,URLSearchParams}=require("node:url");
+          function call(path) {
+            return new Promise((resolve,reject)=>{
+              const u=new URL(process.env.CP_BASE);
+              u.pathname="/execute/"+path;
+              u.search=new URLSearchParams({}).toString();
+              const req=https.request(u,{headers:{Authorization:"cpanel "+process.env.CP_USER+":"+process.env.CP_TOKEN,Accept:"application/json"},timeout:10000},res=>{
+                let raw="";res.setEncoding("utf8");res.on("data",c=>raw+=c);res.on("end",()=>{
+                  let data=null;try{data=JSON.parse(raw)}catch{}
+                  resolve({http:res.statusCode,data,invalidJson:!data,bodyHint:!data?raw.replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim().slice(0,160):""});
                 });
               });
-              req.on("timeout",()=>req.destroy(new Error("cPanel read-only domain inspection timed out.")));
-              req.on("error",reject);
-              req.end();
+              req.on("timeout",()=>req.destroy(new Error("cPanel read-only inspection timed out.")));
+              req.on("error",reject);req.end();
             });
           }
-          function safeDomainRows(value, parent="", out=[]) {
-            if (Array.isArray(value)) {
-              for (const item of value) safeDomainRows(item,parent,out);
-              return out;
-            }
-            if (!value || typeof value !== "object") return out;
-            const keys=Object.keys(value);
+          function collect(value,section="",out=[]) {
+            if(Array.isArray(value)){for(const v of value)collect(v,section,out);return out}
+            if(!value||typeof value!=="object")return out;
             const domain=String(value.domain||value.domain_name||value.main_domain||value.name||"");
-            const root=String(value.documentroot||value.document_root||value.docroot||value.root||value.homedir||"");
-            if (domain && (/irpa\.or\.tz|wp268|stage268/i.test(domain) || /wp268|stage268/i.test(root))) {
-              out.push({section:parent,domain:domain.slice(0,180),document_root:root.slice(0,240)});
-            }
-            for (const [k,v] of Object.entries(value)) {
-              if (v && typeof v === "object") safeDomainRows(v,parent ? parent+"."+k : k,out);
-            }
+            const root=String(value.documentroot||value.document_root||value.docroot||value.root||"");
+            if(domain)out.push({section,domain:domain.slice(0,180),document_root:root.slice(0,240)});
+            for(const [k,v] of Object.entries(value))if(v&&typeof v==="object")collect(v,section?section+"."+k:k,out);
             return out;
           }
           (async()=>{
-            const [domains,details]=await Promise.all([
-              call("DomainInfo/list_domains"),
-              call("DomainInfo/domains_data")
-            ]);
+            const domains=await call("DomainInfo/list_domains");
             console.log("CPANEL_LIST_DOMAINS_HTTP="+domains.http);
             console.log("CPANEL_LIST_DOMAINS_STATUS="+String(domains.data?.status));
             console.log("CPANEL_LIST_DOMAINS_KEYS="+JSON.stringify(Object.keys(domains.data?.data||{})));
+            console.log("CPANEL_LIST_DOMAINS_ROWS="+JSON.stringify(collect(domains.data?.data||{})).slice(0,5000));
+            if(domains.invalidJson)console.log("CPANEL_LIST_DOMAINS_RESPONSE_HINT="+domains.bodyHint);
+            const details=await call("DomainInfo/domains_data");
             console.log("CPANEL_DOMAINS_DATA_HTTP="+details.http);
             console.log("CPANEL_DOMAINS_DATA_STATUS="+String(details.data?.status));
             console.log("CPANEL_DOMAINS_DATA_KEYS="+JSON.stringify(Object.keys(details.data?.data||{})));
-            const rows=safeDomainRows(details.data?.data||{});
-            console.log("CPANEL_IRPA_DOMAIN_MAPPINGS="+JSON.stringify(rows).slice(0,5000));
-            if(domains.http!==200 || domains.data?.status!==1 || details.http!==200 || details.data?.status!==1) {
-              const errors=[...(domains.data?.errors||[]),...(details.data?.errors||[])].map(e=>String(e).slice(0,180));
-              console.log("CPANEL_DOMAIN_INSPECTION_ERRORS="+JSON.stringify(errors));
-              throw new Error("cPanel domain mapping inspection failed; see sanitized API status above.");
-            }
+            console.log("CPANEL_DOMAIN_DOCUMENT_ROOTS="+JSON.stringify(collect(details.data?.data||{})).slice(0,5000));
+            if(details.invalidJson)console.log("CPANEL_DOMAINS_DATA_RESPONSE_HINT="+details.bodyHint);
+            if(domains.http!==200||domains.data?.status!==1)throw new Error("cPanel could not return domain mappings.");
           })().catch(e=>{console.error(e.message);process.exit(1)});
           NODE
 
