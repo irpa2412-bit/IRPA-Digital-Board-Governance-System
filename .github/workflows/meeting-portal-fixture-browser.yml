@@ -63,6 +63,8 @@ jobs:
           cache: npm
       - name: Install locked application dependencies
         run: npm ci
+      - name: Static billing dependency inventory
+        run: npm run check:no-billing-deps
       - name: Test source-isolation guard policy
         run: node --test tests/meeting-isolation-guard.test.mjs
       - name: Test administrator-only invitation removal policy
