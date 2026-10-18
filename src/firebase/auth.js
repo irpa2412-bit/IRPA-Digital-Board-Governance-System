@@ -485,6 +485,7 @@ export async function completeInvitationToken(token) {
   } catch (error) { throw new Error(firebaseErrorMessage(error)); }
 }
 export async function getInvitationSessionState() {
+  const gatewayOrigin = resolveGatewayUrl();
   const user = auth.currentUser;
   if (!user) return {state:null, invitationId:null};
   const idToken = await user.getIdToken();
