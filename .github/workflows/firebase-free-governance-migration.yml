@@ -31,6 +31,8 @@ jobs:
           cache: npm
       - name: Install application dependencies
         run: npm ci
+      - name: Verify billing dependency audit after clean install
+        run: npm run check:no-billing-deps
       - name: Build application
         env:
           VITE_IRPA_ENV: production
