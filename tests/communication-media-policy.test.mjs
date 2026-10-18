@@ -47,6 +47,17 @@ test("publishing, website content edits and cPanel file edits route through Clou
  assert.ok(!existsSync(new URL("../functions/communicationMedia.js",import.meta.url)));
 });
 
+test("WordPress and cPanel status badges automatically check and fail visibly without stale neutral status",()=>{
+ assert.ok(portal.includes('if(tab==="Publishing Setup"&&websiteEditor&&!siteBusy)'));
+ assert.ok(portal.includes('void checkWebsiteConnections()'));
+ assert.ok(portal.includes('setWebsiteStatus({website:"check_failed",cpanel:"check_failed"'));
+ assert.ok(portal.includes('setConnectionCheckedAt(checkedAt)'));
+ assert.ok(portal.includes('const connections=data?.connections'));
+ assert.ok(portal.includes('["connected","ok","healthy","available","success"].includes(value)'));
+ assert.ok(portal.includes('aria-live="polite"'));
+ assert.ok(portal.includes('Check staging website connection'));
+});
+
 test("website publishing enforces Firebase authentication, registered reviewer role, approval and HTTPS",()=>{
  assert.ok(site.includes("authenticateFirebaseRequest"));
  assert.ok(site.includes('getFirestoreDocument(env, "adminProfiles/" + claims.user_id, claims.token)'));
