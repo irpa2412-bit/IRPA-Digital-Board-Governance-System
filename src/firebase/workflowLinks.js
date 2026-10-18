@@ -1,4 +1,7 @@
 import { auth } from "./config";
+import { normalizeWorkflowStatus, WORKFLOW_ROLE, WORKFLOW_STATUS } from "./workflowContracts";
+
+export { WORKFLOW_ROLE, WORKFLOW_STATUS, normalizeWorkflowStatus };
 
 export const LINK_DEFINITIONS = [
   ["meetingId", "meetingReference", "Meetings"],
@@ -80,4 +83,12 @@ export function readWorkflowContext() {
 
 export function clearWorkflowContext() {
   try { sessionStorage.removeItem("irpaWorkflowContext"); } catch { /* no-op */ }
+}
+
+/** Normalize workflow status fields consistently before persisting cross-module links. */
+export function withWorkflowStatus(data = {}) {
+  if (!Object.prototype.hasOwnProperty.call(data, "status")) return { ...data };
+  const status = normalizeWorkflowStatus(data.status);
+  if (!status) throw new Error("Unsupported workflow status.");
+  return { ...data, status };
 }
