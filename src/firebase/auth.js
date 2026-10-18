@@ -468,7 +468,7 @@ export async function completeInvitationToken(token) {
   const cleanToken = String(token || "").trim();
   if (!cleanToken) throw new Error("The IRPA invitation token is missing.");
   const gatewayOrigin = resolveGatewayUrl();
-  const endpoint = `${gatewayOrigin}//api/invitations/redeem`;
+  const endpoint = `${gatewayOrigin}/api/invitations/redeem`;
   try {
     const response = await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json","X-IRPA-Invitation-Version":"2"},body:JSON.stringify({token:cleanToken})});
     const data = await response.json().catch(() => ({}));
