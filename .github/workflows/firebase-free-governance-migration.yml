@@ -39,8 +39,10 @@ jobs:
         run: npm run test:meeting-entry-policy
       - name: Verify meeting invitation quorum
         run: npm run test:meeting-invitation-resend
-      - name: Verify finance policy
-        run: npm run test:finance-policy
+      - name: Verify Cloudflare password-security client migration
+        run: node --test tests/cloudflare-password-client-migration.test.mjs
+      - name: Verify finance policy with Firestore emulator
+        run: npx firebase emulators:exec --only firestore --project demo-irpa-dgbs "npm run test:finance-policy"
       - name: Install gateway dependencies
         run: npm ci --prefix drive-gateway
       - name: Run gateway regression and governance-store tests
