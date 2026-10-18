@@ -494,9 +494,16 @@ export async function getResearchToolPermissions(){
 }
 
 export async function listMeetingInviteeDirectory(){
- if(!auth.currentUser?.uid)throw new Error("Authentication is required to load meeting participants.");
- const call=httpsCallable(getFunctions(undefined,"us-central1"),"listMeetingInviteeDirectory");const result=await call({});
- return {boardMembers:Array.isArray(result.data?.boardMembers)?result.data.boardMembers:[],members:Array.isArray(result.data?.members)?result.data.members:[],employees:Array.isArray(result.data?.employees)?result.data.employees:[]};
+ const user=auth.currentUser;
+ if(!user?.uid)throw new Error("Authentication is required to load meeting participants.");
+ const token=await user.getIdToken();
+ const gateway=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").trim().replace(/\\/+$/,"");
+ let response;
+ try{response=await fetch(gateway+"/api/meeting/invitee-directory",{method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({})});}
+ catch{throw new Error("The Cloudflare meeting directory service is unavailable.");}
+ const data=await response.json().catch(()=>({}));
+ if(!response.ok||data.ok!==true)throw new Error(data.error||"The meeting invitee directory could not be loaded.");
+ return {boardMembers:Array.isArray(data.boardMembers)?data.boardMembers:[],members:Array.isArray(data.members)?data.members:[],employees:Array.isArray(data.employees)?data.employees:[]};
 }
 
 /** Secure administrator-only removal for pending invitation records. */
