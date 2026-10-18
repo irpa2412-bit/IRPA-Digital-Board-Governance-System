@@ -41,6 +41,11 @@ jobs:
         run: npm run test:meeting-invitation-resend
       - name: Verify Cloudflare password-security client migration
         run: node --test tests/cloudflare-password-client-migration.test.mjs
+      - name: Set up Java for Firebase emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
       - name: Verify finance policy with Firestore emulator
         run: npx firebase emulators:exec --only firestore --project demo-irpa-dgbs "npm run test:finance-policy"
       - name: Install gateway dependencies
