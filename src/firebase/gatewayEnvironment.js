@@ -14,7 +14,7 @@ export const FIREBASE_ENVIRONMENTS = Object.freeze({
 });
 
 function normalizeUrl(value) {
-  return String(value || "").trim().replace(/\\/+$/, "");
+  return String(value || "").trim().replace(/\/+$/, "");
 }
 
 export function getFirebaseEnvironment(env = import.meta.env) {

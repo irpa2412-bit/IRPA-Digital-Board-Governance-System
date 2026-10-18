@@ -34,12 +34,12 @@ jobs:
       - name: Build application
         env:
           VITE_IRPA_ENV: production
-          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_API_KEY: "AIzaSyC2aMdxHD14nMnGiRyf4mSL1ixXdzBoOtE"
           VITE_FIREBASE_AUTH_DOMAIN: irpa-digital-board-governance.firebaseapp.com
           VITE_FIREBASE_PROJECT_ID: irpa-digital-board-governance
-          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
-          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
-          VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: "217055978789"
+          VITE_FIREBASE_APP_ID: "1:217055978789:web:937d1f2f781202cc1e26cc"
+          VITE_FIREBASE_MEASUREMENT_ID: "G-XDJEBRBEVC"
         run: npm run build
       - name: Verify portal navigation
         run: npm run test:portal-navigation
