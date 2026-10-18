@@ -16,7 +16,7 @@ try {
       const response = await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
       assert.equal(response?.status(), 200, "fixture must return HTTP 200");
       await page.getByRole("heading", { name: "Meeting Centre" }).waitFor();
-      const layout = await page.evaluate(() => {
+      const contrastLayout = await page.evaluate(() => {
         const width = document.documentElement.clientWidth;
         const scrollWidth = Math.max(document.documentElement.scrollWidth, document.body.scrollWidth);
         const visible = [...document.querySelectorAll("body *")].filter(el => { const r=el.getBoundingClientRect(),s=getComputedStyle(el); return r.width>0&&r.height>0&&s.visibility!=="hidden"&&s.display!=="none"&&(el.innerText||"").trim(); });
@@ -26,8 +26,8 @@ try {
         for(const el of visible){const text=(el.innerText||"").trim().replace(/\s+/g," ");if(!text||text.length>180)continue;const s=getComputedStyle(el),fg=rgb(s.color);let node=el,bg=null;while(node&&node!==document.documentElement){const ns=getComputedStyle(node),candidate=rgb(ns.backgroundColor);if(candidate&&ns.backgroundColor!=="rgba(0, 0, 0, 0)"){bg=candidate;break;}node=node.parentElement;}if(!bg)bg=[255,255,255];if(!fg)continue;const a=luminance(fg),b=luminance(bg),ratio=(Math.max(a,b)+0.05)/(Math.min(a,b)+0.05),large=parseFloat(s.fontSize)>=24||(parseFloat(s.fontSize)>=18.66&&Number(s.fontWeight)>=700);if(ratio<(large?3:4.5))failures.push({text:text.slice(0,70),ratio:Number(ratio.toFixed(2))});}
         return {width,scrollWidth,horizontalOverflow:scrollWidth>width+1,contrastFailureCount:failures.length,contrastExamples:failures.slice(0,8)};
       });
-      console.log("Meeting portal viewport audit " + width + "px: " + JSON.stringify(layout));
-      assert.equal(layout.horizontalOverflow, false, "meeting portal must not horizontally scroll at " + width + "px");
+      console.log("Meeting portal viewport audit " + width + "px: " + JSON.stringify(contrastLayout));
+      assert.equal(contrastLayout.horizontalOverflow, false, "meeting portal must not horizontally scroll at " + width + "px");
       await page.getByRole("heading", { name: "Registered Meetings" }).waitFor();
       await page.getByText("Previously Scheduled Board Meeting", { exact: true }).waitFor();
       await page.getByRole("button", { name: "Refresh Meeting Register" }).click();
