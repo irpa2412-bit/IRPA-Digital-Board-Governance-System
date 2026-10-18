@@ -33,4 +33,3 @@ export const issueLiveMeetingToken = payload => callMeetingService("/api/meeting
 
 export const getMeetingRoomActivity = meetingId => callMeetingService("/api/meeting-room/activity", { meetingId });
 export const getMyMeetingSubscriptions = async () => (await callMeetingService("/api/meeting-subscriptions/mine")).subscriptions || [];
-export const getAccessibleMeetingRecords = async () => (await callMeetingService("/api/meeting-register/list")).meetings || [];

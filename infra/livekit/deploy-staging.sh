@@ -92,8 +92,13 @@ for attempt in $(seq 1 30); do
   code="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 "https://$LIVEKIT_DOMAIN/" || true)"
   if [[ "$code" =~ ^(2[0-9][0-9]|3[0-9][0-9]|404)$ ]]; then
     echo "Meeting HTTPS/WSS endpoint reachable (HTTP $code)."
+    if ! docker compose -f docker-compose.yml ps --status running --services | grep -Fxq egress; then
+      echo "LiveKit Egress service is not running; recording requests will fail." >&2
+      docker compose -f docker-compose.yml logs --tail=80 egress >&2 || true
+      exit 4
+    fi
     docker compose -f docker-compose.yml ps
-    echo "Endpoint reachability is not proof of authenticated API access or WebRTC media; run the separate staging acceptance tests."
+    echo "Endpoint and Egress process are running; authenticated API, R2 upload, and real WebRTC media tests are still required."
     exit 0
   fi
   sleep 3
