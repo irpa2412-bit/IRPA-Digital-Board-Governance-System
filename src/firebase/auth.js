@@ -98,7 +98,7 @@ export async function loginWithEmail(email, password) {
           ? "Password access is suspended after six unsuccessful password entries. Use Forgot password? to complete mobile verification and request the registered email reset link."
           : "Password entry is temporarily locked for 5 minutes after three unsuccessful trials. Please wait before trying again."
       );
-      error.code = state.data?.status === "SUSPENDED" ? "auth/password-suspended" : "auth/password-locked";
+      error.code = state?.status === "SUSPENDED" ? "auth/password-suspended" : "auth/password-locked";
       error.retryAfterSeconds = state?.retryAfterSeconds || 300;
       throw error;
     }
