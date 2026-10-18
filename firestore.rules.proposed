@@ -1,0 +1,33 @@
+# Proposed Firestore rules change — NOT DEPLOYED
+
+Base: firestore.rules on main at be99143d1f7d9351ef8c9b69cf27aa489e490332.
+Status: proposal only. The deployed/source firestore.rules file is intentionally unchanged.
+
+## Unified diff
+
+    --- a/firestore.rules
+    +++ b/firestore.rules
+    @@
+    +   // Meeting working documents, reviews and attendance signatures are mediated
+    +   // by authenticated Cloudflare Worker routes. The Worker verifies the Firebase
+    +   // ID token, checks meeting/participant authority, and writes audit records
+    +   // with its server identity. Clients must not bypass those checks via Firestore.
+    +   match /meetingWorkingDocuments/{id} {
+    +     allow read, create, update, delete: if false;
+    +   }
+    +   match /meetingDocumentReviews/{id} {
+    +     allow read, create, update, delete: if false;
+    +   }
+    +   match /meetingAttendanceSignatures/{id} {
+    +     allow read, create, update, delete: if false;
+    +   }
+        match /{document=**}{allow read,write:if false;}
+
+## Reasons
+
+1. These records are intended to be read/written through authenticated Worker endpoints, not directly from browser clients.
+2. The Worker applies meeting-specific host/secretary/participant checks and records audit events. Direct client writes would bypass that application-level validation.
+3. Explicit deny rules document the intended security boundary. Firestore combines matching allow expressions with OR semantics, so these explicit denies do not override a separate matching allow; the existing catch-all deny remains in place.
+4. Before approval, verify no existing client code reads these collections directly and run the Firestore rules unit tests. If a future approved design needs direct client reads, add narrowly scoped role/meeting membership predicates rather than broad authenticated-user access.
+
+No rules were deployed or modified by this proposal.
