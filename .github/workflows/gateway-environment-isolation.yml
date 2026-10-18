@@ -52,25 +52,25 @@ jobs:
             VITE_FIREBASE_API_KEY: "staging-test-key",
             VITE_FIREBASE_MESSAGING_SENDER_ID: "staging-test-sender",
             VITE_FIREBASE_APP_ID: "staging-test-app",
-            VITE_IRPA_DEPLOYMENT_ENV: "staging",
+            VITE_IRPA_ENV: "staging",
             VITE_GATEWAY_ORIGIN: "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev",
             VITE_GOOGLE_DRIVE_GATEWAY_URL: "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
           };
           const production = {
             VITE_FIREBASE_PROJECT_ID: "irpa-digital-board-governance",
-            VITE_IRPA_DEPLOYMENT_ENV: "production",
+            VITE_IRPA_ENV: "production",
             VITE_GATEWAY_ORIGIN: "https://irpa-google-drive-gateway.irpa-governance.workers.dev"
           };
           assert.equal(resolveGatewayUrl(staging), "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev");
           assert.equal(resolveGatewayUrl(production), "https://irpa-google-drive-gateway.irpa-governance.workers.dev");
           assert.throws(() => resolveGatewayUrl({...staging, VITE_GATEWAY_ORIGIN: production.VITE_GATEWAY_ORIGIN}), /conflicts with Firebase project/);
-          assert.throws(() => resolveGatewayUrl({...staging, VITE_IRPA_DEPLOYMENT_ENV: "production"}), /conflicts with Firebase project/);
+          assert.throws(() => resolveGatewayUrl({...staging, VITE_IRPA_ENV: "production"}), /conflicts with Firebase project/);
           assert.throws(() => resolveGatewayUrl({...production, VITE_GOOGLE_DRIVE_GATEWAY_URL: staging.VITE_GATEWAY_ORIGIN}), /conflicts with Firebase project/);
           console.log("Gateway environment policy: 5 assertions passed.");
           NODE
       - name: Build using staging Firebase and staging Gateway only
         env:
-          VITE_IRPA_DEPLOYMENT_ENV: "staging"
+          VITE_IRPA_ENV: "staging"
           VITE_FIREBASE_API_KEY: "AIzaSyA6UmHtP-mRr99rBw57_-qrD4_mFSBnZ38"
           VITE_FIREBASE_AUTH_DOMAIN: "irpa-dbg-staging-a73ec.firebaseapp.com"
           VITE_FIREBASE_PROJECT_ID: "irpa-dbg-staging-a73ec"
@@ -91,7 +91,7 @@ jobs:
           echo "No deployment was performed."
       - name: Build using production Firebase and production Gateway only
         env:
-          VITE_IRPA_DEPLOYMENT_ENV: "production"
+          VITE_IRPA_ENV: "production"
           VITE_FIREBASE_AUTH_DOMAIN: "irpa-digital-board-governance.firebaseapp.com"
           VITE_FIREBASE_PROJECT_ID: "irpa-digital-board-governance"
           VITE_GATEWAY_ORIGIN: "https://irpa-google-drive-gateway.irpa-governance.workers.dev"
