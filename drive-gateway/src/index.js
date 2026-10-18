@@ -426,7 +426,7 @@ export default {
       if (pathname === "/api/meeting/invitee-directory" && request.method === "POST") {
         return await listMeetingInviteeDirectory(request, env);
       }
-      if (pathname === "/api/authorisation/invitations/remove" && request.method === "POST") {
+      if (pathname === "/api/invitations/remove" && request.method === "POST") {
         return await removePendingInvitation(request, env);
       }
 
