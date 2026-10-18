@@ -62,7 +62,7 @@ const post = (router, body = {}) => router(new Request("https://worker.test" + p
 }), env, path);
 
 test("meeting document registration rejects a missing or invalid Firebase token", async t => {
-  mockFirestore(t, { meeting: { createdByUid: "host-1" }, document: { meetingId: "meeting-1" } });
+  mockFirestore(t, { meeting: { createdByUid: "host-1", participantUids: ["host-1"] }, document: { meetingId: "meeting-1" } });
   const router = createMeetingServicesRouter(makeContext({ user_id: "host-1" }, { authenticated: false }));
   const result = await post(router);
   assert.equal(result.status, 401);
@@ -79,7 +79,7 @@ test("meeting document registration rejects an authenticated participant without
 
 test("meeting document registration rejects a document belonging to another meeting", async t => {
   mockFirestore(t, {
-    meeting: { createdByUid: "host-1" },
+    meeting: { createdByUid: "host-1", participantUids: ["host-1"] },
     document: { meetingId: "different-meeting", title: "Wrong meeting document" }
   });
   const router = createMeetingServicesRouter(makeContext({ user_id: "host-1", email: "host@example.org" }));
