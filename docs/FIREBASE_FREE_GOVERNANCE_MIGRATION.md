@@ -2,7 +2,7 @@
 
 Status: **partial functional migration in progress; no production cutover or deployment has occurred**.
 
-**Scope clarification:** remove FUNCTIONAL DEPENDENCY on Firebase for the Signature Portal, Meeting Portal and its sub-portals, and Authorisation & Approval workflows. This is not a request to delete Firebase globally or remove Firebase-hosted security rules. Preserve those rules unchanged. The specific blocker to resolve is the Google Cloud/Firebase billing dependency for functionality currently requiring Firebase Cloud Functions. Migrate those runtime operations to Cloudflare Workers and Cloudflare-backed services, so the portals remain functional without requiring Firebase Cloud Functions billing. Keep Firestore/rules or other Firebase components only where explicitly retained and compatible with the approved transition; do not silently rely on a Firebase callable for migrated functionality. The Cloudflare Gateway remains the API boundary. This document is not evidence that the migration has been implemented.
+**Scope clarification:** remove FUNCTIONAL DEPENDENCY on billing-blocked Firebase Cloud Functions for the Signature Portal, Meeting Portal and its sub-portals, Authorisation & Approval workflows, Finance Portal, Procurement Portal, and Document Portal. This is not a request to delete Firebase globally or remove Firebase-hosted security rules. Preserve those rules unchanged. The specific blocker to resolve is the Google Cloud/Firebase billing dependency for functionality currently requiring Firebase Cloud Functions. Migrate those runtime operations to Cloudflare Workers and Cloudflare-backed services, so the portals remain functional without requiring Firebase Cloud Functions billing. Keep Firestore/rules or other Firebase components only where explicitly retained and compatible with the approved transition; do not silently rely on a Firebase callable for migrated functionality. The Cloudflare Gateway remains the API boundary. This document is not evidence that the migration has been implemented.
 
 ## Audited dependency points
 
@@ -14,7 +14,7 @@ Status: **partial functional migration in progress; no production cutover or dep
 - Backend callable families include `functions/authorizationFunctions.js`, `functions/meetingRecords.js`, `functions/liveMeeting.js`, `functions/meetingAttendanceRegister.js`, `functions/passwordSecurity.js`, and callable exports in `functions/index.js`.
 - `drive-gateway/src/index.js`, `drive-gateway/src/meetingPortal.mjs`, and `drive-gateway/src/meetingServices.mjs` currently authenticate Firebase tokens and read/write Firestore. The Worker configuration still requires `FIREBASE_PROJECT_ID`.
 
-## Added scope: Finance Portal and Procurement Portal
+## Added scope: Finance Portal, Procurement Portal, and Document Portal
 
 These portals are included in the same branch and the same Google Cloud/Firebase Cloud Functions billing-blocker migration. Preserve their existing UI, approval sequence, financial controls, audit history, vendor records, purchase requests, quotations, purchase orders, delivery/invoice evidence, finance handoff, and controlled-document upload permissions.
 
@@ -30,6 +30,23 @@ These portals are included in the same branch and the same Google Cloud/Firebase
 - `src/pages/ProcurementPortal.jsx` uses `src/firebase/procurement.js` and `src/firebase/data.js`.
 - `src/firebase/procurement.js` performs direct Firestore reads/writes and transactions for vendors, requests, quotations, PR/PO numbers, approvals, evidence, performance scores, blacklisting/restrictions, audit entries, and finance handoff.
 - Procurement's current client-side role checks are not sufficient as the only authorization boundary. Worker routes must derive actor identity from a verified session and validate procurement team membership, requester ownership, selected approver identity/role, allowed stage transitions, evidence ownership, and finance-handoff conditions on the server.
+
+### Document Portal dependency points
+
+- `src/components/ControlledDocumentUpload.jsx` obtains Member/Employee role profiles, generates document references, creates and verifies controlled-document register records through `src/firebase/data.js`, and uses the current Firebase-backed register for document metadata.
+- `src/firebase/signatureStorage.js` uploads controlled documents and provisions archive destinations through authenticated Cloudflare Gateway routes, but its current request authentication obtains Firebase ID tokens. The archive's binary provider is Google Drive; preserve existing document bytes, file IDs, archive destinations, metadata links, classifications, and audit/workflow references during any provider or identity change.
+- `src/components/PortalDocumentAccessPoint.jsx` exposes upload and document-reader flows to multiple portals. Other dependent surfaces include meeting working documents, Finance/Procurement evidence, Authorization supporting documents, and signature source documents. A migration must preserve these cross-portal links and access restrictions rather than treating Document Portal as an isolated upload form.
+- Document registration and upload currently form a multi-step operation: archive upload can occur before the controlled-document register write is verified. Migration must explicitly reconcile orphaned uploads, failed register writes, duplicate retries, generated references, and upload completion before switching clients.
+
+### Required migration sequence for Document Portal
+
+1. Inventory all controlled-document upload, read, archive, version/reference, classification, restricted-access, retention, and workflow-link operations, including every portal that embeds the upload/access components.
+2. Implement Cloudflare Gateway/Worker APIs for document metadata and reference generation with verified session identity, server-side role and classification checks, and auditable access decisions. Never trust a client-supplied UID, role, or `allowRestrictedUpload` flag as authorization.
+3. Preserve Google Drive archives and all historical file IDs/links during the initial functional decoupling unless a separately approved and reconciled binary-storage migration is performed. Removing Firebase callable dependence does not authorize deleting or relocating existing archive evidence.
+4. Make upload/register operations retry-safe and reconcilable; record upload hashes, content type/size, classification, actor, timestamps, archive response, and register ID. Ensure a failed metadata write can be safely resumed without duplicating or orphaning evidence.
+5. Test ordinary and restricted uploads, supported file validation, archive routing by document type/date/classification, reader access, cross-portal links, authorization failures, duplicate/replay handling, and audit failure in staging before client cutover.
+
+**Status of this added scope:** dependency audit and acceptance contract only. Controlled-document metadata and role-profile reads still use `src/firebase/data.js`, and Gateway authentication still obtains Firebase ID tokens. No Document Portal cutover has been made.
 
 ### Required migration sequence for these portals
 
@@ -58,13 +75,13 @@ These portals are included in the same branch and the same Google Cloud/Firebase
 - A deliberate account-recovery and MFA policy for current Firebase users. Existing Firebase passwords cannot be assumed portable to a new authentication system.
 - A tested export/import process for Firestore data and a verified archive of historical signing evidence.
 
-The current repository configuration exposes KV and a Durable Object binding, but does not establish that all required Cloudflare resources, identity/session migration, or production data migration are provisioned. Do not deploy a cutover until those prerequisites are verified. Firebase-hosted security rules must remain intact. The acceptance target is removal of functional dependence on Firebase billing/Cloud Functions for the three portal areas, not deletion of Firebase itself.
+The current repository configuration exposes KV and a Durable Object binding, but does not establish that all required Cloudflare resources, identity/session migration, or production data migration are provisioned. Do not deploy a cutover until those prerequisites are verified. Firebase-hosted security rules must remain intact. The acceptance target is removal of functional dependence on Firebase billing/Cloud Functions for all listed portal areas, not deletion of Firebase itself.
 
 ## Acceptance gates (all required before merge)
 
 - Static and runtime checks prove that each migrated target operation no longer depends on Firebase Cloud Functions or Google Cloud billing to execute; Firebase-hosted rules remain unchanged. Any retained Firebase Authentication/Firestore dependency must be explicit, justified, and must not reintroduce the billing-blocked callable path.
 - Automated tests cover unauthenticated access, privilege escalation, cross-user access, inactive or mismatched register entries, unauthorized approval, replay/idempotency, session expiry/revocation, concurrent approvals, and audit-write failure.
-- Staging end-to-end acceptance covers signature creation, signing invitation, PDF retrieval/submission/verification, archive integrity, meeting creation/access, attendance, approvals, and authorization changes.
+- Staging end-to-end acceptance covers signature creation, signing invitation, PDF retrieval/submission/verification, controlled-document upload/read/restrictions/archive integrity, meeting creation/access, attendance, finance and procurement workflows, approvals, and authorization changes.
 - Data migration reconciliation verifies record counts, key references, and hashes for all historical signed artifacts and audit evidence.
 - Live production probes prove the migrated target workflows execute without requiring Firebase Cloud Functions billing; Firebase-hosted rules remain unchanged; rollback is tested.
 - The complete test suite and application build pass. Only then is merge considered.
@@ -73,4 +90,4 @@ The current repository configuration exposes KV and a Durable Object binding, bu
 
 Implemented first functional slice: password-attempt state, failure recording, and clearing are routed from `src/firebase/auth.js` to existing Cloudflare Worker endpoints backed by the `ESIGN_DO` Durable Object. Firebase Authentication remains the credential authority; Firebase-hosted rules are unchanged. A client migration regression test was added. The migration CI is being rerun after correcting its Firestore emulator setup.
 
-Still incomplete: signature and signer-identity workflows, meeting records/access/attendance and sub-portals, Authorization & Approval workflows, remaining billing-blocked callable paths, Cloudflare identity/session design, persistent governance data model and data reconciliation. The existing adapter is not yet integrated into these workflows. No production cutover or deployment has occurred. Do not merge or claim completion until the full acceptance gates pass.
+Still incomplete: signature and signer-identity workflows, meeting records/access/attendance and sub-portals, Authorization & Approval workflows, Finance, Procurement and Document Portal data paths, remaining billing-blocked callable paths, Cloudflare identity/session design, persistent governance data model and data reconciliation. The existing adapter is not yet integrated into these workflows. No production cutover or deployment has occurred. Do not merge or claim completion until the full acceptance gates pass.
