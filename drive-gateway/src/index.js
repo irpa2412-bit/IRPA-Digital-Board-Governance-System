@@ -158,6 +158,7 @@ async function updateSignerAuthority(request, env) {
   if(!requestedRole) return json({ok:false,error:"Select the current signing authority before saving."},400,corsHeaders(request));
   if(!["Current","Pending Verification","Expired","Not yet assigned"].includes(authorityStatus)) return json({ok:false,error:"Select a valid signing authority status."},400,corsHeaders(request));
   if(authorityEffectiveAt&&authorityExpiresAt&&authorityExpiresAt<authorityEffectiveAt) return json({ok:false,error:"Authority expiry date cannot be earlier than the effective date."},400,corsHeaders(request));
+  const serviceToken=await getFirestoreAdminAccessToken(env);
   const records=[];
   const add=(document,sourceCollection,fallbackId)=>{
     if(!document?.fields)return;
@@ -165,11 +166,11 @@ async function updateSignerAuthority(request, env) {
     const id=String(document.name||"").split("/").pop()||fallbackId||uid;
     records.push({id,...record,sourceCollection});
   };
-  add(await getFirestoreDocument(env,"members/"+uid,claims.token),"members",uid);
-  add(await getFirestoreDocument(env,"employees/"+uid,claims.token),"employees",uid);
+  add(await getFirestoreDocument(env,"members/"+uid,serviceToken),"members",uid);
+  add(await getFirestoreDocument(env,"employees/"+uid,serviceToken),"employees",uid);
   if(email){
-    for(const row of await getFirestoreDocumentsByEmail(env,"members",email,claims.token).catch(()=>[]))add(row,"members",uid);
-    for(const row of await getFirestoreDocumentsByEmail(env,"employees",email,claims.token).catch(()=>[]))add(row,"employees",uid);
+    for(const row of await getFirestoreDocumentsByEmail(env,"members",email,serviceToken).catch(()=>[]))add(row,"members",uid);
+    for(const row of await getFirestoreDocumentsByEmail(env,"employees",email,serviceToken).catch(()=>[]))add(row,"employees",uid);
   }
   const unique=[...new Map(records.map(x=>[x.sourceCollection+":"+x.id,x])).values()]
     .filter(x=>String(x.status||x.employmentStatus||"Active").toLowerCase()!=="inactive");
@@ -185,7 +186,7 @@ async function updateSignerAuthority(request, env) {
   });
   if(!matching.length)return json({ok:false,error:"The selected department, unit and signing authority do not match an active IRPA register entry for this account."},403,corsHeaders(request));
   const source=matching[0], authorityDepartment=String(source.department||"").trim(), authorityUnit=String(source.unit||source.unitName||"").trim()||authorityDepartment;
-  const existing=await getFirestoreDocument(env,"signerIdentities/"+uid,claims.token);
+  const existing=await getFirestoreDocument(env,"signerIdentities/"+uid,serviceToken);
   if(!existing?.fields)return json({ok:false,error:"Signer Identity record is not available. Restore the Signer Identity link before updating signing authority."},409,corsHeaders(request));
   const actorEmail=email||String(firestoreDocumentToPlain(existing)?.email||"").trim().toLowerCase();
   const stamp=new Date().toISOString();
