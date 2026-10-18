@@ -1,6 +1,6 @@
 import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from "firebase/firestore";
+import { getIdToken } from "firebase/auth";
 import { auth, db } from "./config";
-import { getFunctions, httpsCallable } from "firebase/functions";
 
 export const SIGNER_IDENTITY_COLLECTION = "signerIdentities";
 export const IRPA_ORGANISATION = "Improvement of Rangeland in Pastoral Areas";
@@ -65,7 +65,6 @@ export async function updateMySignerAuthority(data={}){
   const u=currentUser();
   const authorityRole=normalise(data.authorityRole);
   if(!authorityRole) throw new Error("Select the current signing authority before saving.");
-  const call=httpsCallable(getFunctions(undefined,"us-central1"),"updateSignerAuthority");
   const payload={
     authorityRole,
     authorityStatus:normalise(data.authorityStatus||"Current"),
@@ -75,29 +74,16 @@ export async function updateMySignerAuthority(data={}){
     authorityDepartment:normalise(data.authorityDepartment||""),
     authorityUnit:normalise(data.authorityUnit||"")
   };
-  try{
-    const result=await call(payload);
-    return {id:u.uid,...(result.data||{})};
-  }catch(error){
-    // The production project currently cannot deploy new callable functions
-    // because its Google Cloud billing account is closed. Fall back only for
-    // an unavailable/not-deployed function; Firestore rules remain the final
-    // authorization boundary and validate the same institutional register.
-    const code=String(error?.code||"");
-    if(code!=="functions/not-found"&&code!=="functions/unavailable") {
-      throw new Error(error?.message||"The server could not verify and save the signing authority.");
-    }
-    const ref=doc(db,SIGNER_IDENTITY_COLLECTION,u.uid);
-    const snap=await getDoc(ref);
-    if(!snap.exists()) throw new Error("Signer Identity record is not available. Restore the Signer Identity link before updating signing authority.");
-    await updateDoc(ref,{
-      ...payload,
-      authorityUpdatedAt:serverTimestamp(),
-      updatedAt:serverTimestamp()
-    });
-    const updated=await getDoc(ref);
-    return updated.exists()?{id:updated.id,...updated.data()}:null;
-  }
+  const gatewayUrl=String(import.meta.env.VITE_GATEWAY_ORIGIN||import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").trim().replace(/\/$/,"");
+  const token=await getIdToken(u);
+  const response=await fetch(gatewayUrl+"/api/signature/authority/update",{
+    method:"POST",
+    headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
+    body:JSON.stringify(payload)
+  });
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok||result.ok!==true) throw new Error(result.error||"The Cloudflare service could not verify and save the signing authority.");
+  return {id:u.uid,...result};
 }
 
 export async function recordSignerAuthenticationEvidence(identityId, context={}){
