@@ -57,6 +57,8 @@ jobs:
         run: node --test tests/cloudflare-procurement-migration.test.mjs
       - name: Verify Cloudflare controlled-document registration migration
         run: node --test tests/cloudflare-document-registration-migration.test.mjs
+      - name: Verify Cloudflare login-context migration
+        run: node --test tests/cloudflare-login-context-migration.test.mjs
       - name: Verify document lifecycle Worker syntax
         run: node --check drive-gateway/src/documentLifecycle.mjs
       - name: Verify Procurement Worker syntax
