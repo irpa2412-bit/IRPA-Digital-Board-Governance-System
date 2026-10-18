@@ -31,3 +31,17 @@ Status: proposal only. The deployed/source firestore.rules file is intentionally
 4. Before approval, verify no existing client code reads these collections directly and run the Firestore rules unit tests. If a future approved design needs direct client reads, add narrowly scoped role/meeting membership predicates rather than broad authenticated-user access.
 
 No rules were deployed or modified by this proposal.
+
+## Additional proposed tightening — meeting reads
+
+Reason: the current `/meetings/{id}` rule allows any authenticated account to read every meeting. The existing `meetingCategoryReadAllowed(resource.data)` helper checks administrator status, initiator/participant membership, and authorized roles for restricted meeting categories. Reusing that helper narrows the read boundary without inventing a second role policy.
+
+Review risk: list/query behavior may change for accounts that previously relied on broad signed-in access. Before approval, run Firestore Rules unit tests and query-shape checks for all meeting categories and role types. This is a proposal only; do not deploy without separate approval.
+
+```diff
+--- a/firestore.rules
++++ b/firestore.rules
+@@ -374,1 +374,1 @@
+-  match /meetings/{id}{allow read:if signedIn();allow create:if (meetingRegistrar()&&request.resource.data.get("initiatorUid","")==request.auth.uid&&validMeetingCategory(request.resource.data))&&actualCreateAllowed();allow update:if (admin()||completeInitialMeetingRegistration()||meetingSessionUpdateAllowed(resource.data))&&actualUpdateAllowed();allow delete:if (admin())&&actualDeleteAllowed();}
++  match /meetings/{id}{allow read:if meetingCategoryReadAllowed(resource.data);allow create:if (meetingRegistrar()&&request.resource.data.get("initiatorUid","")==request.auth.uid&&validMeetingCategory(request.resource.data))&&actualCreateAllowed();allow update:if (admin()||completeInitialMeetingRegistration()||meetingSessionUpdateAllowed(resource.data))&&actualUpdateAllowed();allow delete:if (admin())&&actualDeleteAllowed();}
+```
