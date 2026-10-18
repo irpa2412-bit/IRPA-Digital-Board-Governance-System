@@ -80,8 +80,9 @@ export function createCloudflareGovernanceStore(env) {
         }
         payload.ifVersion = options.ifVersion;
       }
-      const result = await call(env, c + "/" + recordId, "update", payload);
-      return { ok: true, version: result.version };
+      await call(env, c + "/" + recordId, "update", payload);
+      const current = await call(env, c + "/" + recordId, "get");
+      return { ok: true, version: current.value?._v };
     },
 
     async delete(collection, id) {
