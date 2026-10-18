@@ -88,6 +88,102 @@ function normalizeGatewayAuthority(value) {
 
 
 
+
+async function handleFinanceAccounting(request, env) {
+  let claims;
+  try { claims = await authenticateFirebaseRequest(request, env); }
+  catch { return json({ok:false,error:"Authenticated IRPA Finance access is required."},401,corsHeaders(request)); }
+  let body; try { body = await request.json(); } catch { return json({ok:false,error:"Invalid JSON payload."},400,corsHeaders(request)); }
+  const action=String(body.functionName||"").trim(), data=body.data&&typeof body.data==="object"?body.data:{};
+  const allowedActions=new Set(["initializeFinanceStructure","submitFinanceJournalForApproval","postFinanceJournal","reverseFinanceJournal","closeFinancePeriod","reconcileFinanceBank","calculateFinanceBudgetVariance","getFinanceTrialBalance","getFinanceStatements","createFinanceThreeWayMatch","validateFinanceDonorRestriction","registerFinanceAsset","calculateFinancePayroll","exportFinanceCsv","importFinanceCsvRows"]);
+  if(!allowedActions.has(action))return json({ok:false,error:"Unsupported Finance operation."},400,corsHeaders(request));
+  const project=getFirebaseProjectId(env),token=await getFirestoreAdminAccessToken(env),base="projects/"+project+"/databases/(default)/documents";
+  const clean=v=>String(v??"").trim(),money=v=>{const n=Number(v);return Number.isFinite(n)?Math.round(n*100)/100:0;};
+  const periodKey=v=>{const p=clean(v);if(!/^\d{4}-\d{2}$/.test(p))throw new Error("Financial period must use YYYY-MM.");return p;};
+  const enc=v=>v===null||v===undefined?{nullValue:null}:typeof v==="boolean"?{booleanValue:v}:typeof v==="number"?(Number.isInteger(v)?{integerValue:String(v)}:{doubleValue:v}):Array.isArray(v)?{arrayValue:{values:v.map(enc)}}:typeof v==="object"?{mapValue:{fields:Object.fromEntries(Object.entries(v).map(([k,x])=>[k,enc(x)]))}}:{stringValue:String(v)};
+  const fields=o=>Object.fromEntries(Object.entries(o).map(([k,v])=>[k,enc(v)])),stamp=()=>new Date().toISOString();
+  async function readDoc(path){const res=await fetch("https://firestore.googleapis.com/v1/"+base+"/"+path,{headers:{Authorization:"Bearer "+token}});if(res.status===404)return null;if(!res.ok)throw new Error("Finance record lookup failed.");return await res.json();}
+  async function list(col){const res=await fetch("https://firestore.googleapis.com/v1/"+base+"/"+col+":runQuery",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({structuredQuery:{from:[{collectionId:col}],limit:1000}})});if(!res.ok)throw new Error("Finance register "+col+" could not be read.");return(await res.json()).filter(x=>x.document).map(x=>({id:String(x.document.name||"").split("/").pop(),...firestoreDocumentToPlain(x.document),_updateTime:x.document.updateTime}));}
+  async function commit(writes){const res=await fetch("https://firestore.googleapis.com/v1/"+base+":commit",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({writes})});if(!res.ok)throw new Error("Finance record and audit commit failed (HTTP "+res.status+").");return res.json();}
+  async function audit(actionName,details){const id=crypto.randomUUID();return {update:{name:base+"/audit/"+id,fields:fields({action:actionName,category:"FINANCE_ACCOUNTING",performedByUid:claims.user_id,performedByEmail:claims.email||"",details,createdAt:{timestampValue:stamp()}})},currentDocument:{exists:false}};}
+  async function create(col,id,values){return {update:{name:base+"/"+col+"/"+id,fields:fields(values)},currentDocument:{exists:false}};}
+  const adminDoc=firestoreDocumentToPlain(await readDoc("adminProfiles/"+claims.user_id))||{},employee=firestoreDocumentToPlain(await readDoc("employees/"+claims.user_id))||{},member=firestoreDocumentToPlain(await readDoc("members/"+claims.user_id))||{};
+  const roles=[adminDoc.role,employee.role,member.role,...(Array.isArray(employee.roles)?employee.roles:[]),...(Array.isArray(member.roles)?member.roles:[])].filter(Boolean).map(String);
+  const isAdmin=String(claims.email||"").trim().toLowerCase()==="irpa2412@gmail.com"||adminDoc.active===true;
+  const financeRoles=new Set(["Administrator","Executive Director","Director Finance & Administration","Finance Manager","Accountant","Finance Officer"]);
+  if(!isAdmin&&!roles.some(r=>financeRoles.has(r)))return json({ok:false,error:"Finance authorization is required."},403,corsHeaders(request));
+  const all=async col=>(await list(col)).map(({_updateTime,...d})=>d),periodFor=d=>periodKey(String(d?.date||stamp()).slice(0,7));
+  const getOpenPeriod=async period=>{const p=firestoreDocumentToPlain(await readDoc("financePeriods/"+period));if(p&&p.status!=="Open")throw new Error("Financial period "+period+" is "+p.status+".");return p||{status:"Open"};};
+  try {
+    let result;
+    if(action==="calculateFinancePayroll"){
+      const gross=money(data.gross),deductions=money(data.deductions),employerContributions=money(data.employerContributions);if(gross<0||deductions<0||employerContributions<0)throw new Error("Payroll values cannot be negative.");
+      result={gross,deductions,netPay:money(gross-deductions),employerContributions,totalEmployerCost:money(gross+employerContributions),formula:"Net Pay = Gross Pay − Employee Deductions"};
+    } else if(action==="validateFinanceDonorRestriction"){
+      const grantId=clean(data.grantId),amount=money(data.amount),category=clean(data.category);if(!grantId||amount<=0||!category)throw new Error("Grant ID, amount and expenditure category are required.");
+      const g=firestoreDocumentToPlain(await readDoc("financeGrants/"+grantId));if(!g)throw new Error("Grant record not found.");const allowed=Array.isArray(g.allowedCategories)?g.allowedCategories.map(String):[],remaining=money(money(g.awardAmount)-money(g.utilizedAmount)),categoryAllowed=!allowed.length||allowed.includes(category);
+      result={grantId,allowed:categoryAllowed&&remaining>=amount,categoryAllowed,remainingBefore:remaining,remainingAfter:money(remaining-amount),restricted:g.restricted===true};
+    } else if(action==="calculateFinanceBudgetVariance"){
+      const p=clean(data.period),scope=x=>!p||String(x.budgetYear||x.date||x.reportingPeriod||"").includes(p);const [budgets,commitments,transactions]=await Promise.all(["financeBudgets","financeCommitments","financeTransactions"].map(all));
+      const budget=money(budgets.filter(scope).reduce((s,x)=>s+money(x.amount??x.budgetAmount),0)),committed=money(commitments.filter(scope).reduce((s,x)=>s+money(x.amount??x.committedAmount),0)),actual=money(transactions.filter(x=>["Posted","Reconciled"].includes(x.status)&&scope(x)).reduce((s,x)=>s+money(x.amount),0));
+      result={period:p||"ALL",approvedBudget:budget,commitments:committed,actualExpenditure:actual,availableBudget:money(budget-committed-actual),variance:money(budget-actual),formula:"Approved Budget − Actual Expenditure"};
+    } else if(action==="getFinanceTrialBalance"){
+      const p=clean(data.period),entries=(await all("financeLedgerEntries")).filter(x=>!p||x.period===p),map=new Map();for(const e of entries){const code=clean(e.accountCode),v=map.get(code)||{accountCode:code,debit:0,credit:0};v.debit=money(v.debit+money(e.debit));v.credit=money(v.credit+money(e.credit));map.set(code,v);}
+      const rows=[...map.values()].map(x=>({...x,balance:money(x.debit-x.credit)}));result={period:p||"ALL",rows,totalDebit:money(rows.reduce((s,x)=>s+x.debit,0)),totalCredit:money(rows.reduce((s,x)=>s+x.credit,0))};
+    } else if(action==="getFinanceStatements"){
+      const p=clean(data.period),entries=(await all("financeLedgerEntries")).filter(x=>!p||x.period===p),accounts=await all("financeChartOfAccounts"),by=new Map(accounts.map(a=>[clean(a.code),a])),totals={Asset:0,Liability:0,Equity:0,Income:0,Expense:0};
+      for(const e of entries){const a=by.get(clean(e.accountCode));if(!a||!Object.hasOwn(totals,a.type))continue;totals[a.type]=money(totals[a.type]+money(e.debit)-money(e.credit));}
+      const surplus=money(totals.Income+totals.Expense);result={period:p||"ALL",income:totals.Income,expenses:totals.Expense,surplusOrDeficit:surplus,assets:totals.Asset,liabilities:totals.Liability,equity:totals.Equity,statementOfFinancialPositionCheck:money(totals.Asset-(totals.Liability+totals.Equity+surplus))};
+    } else if(action==="exportFinanceCsv"){
+      const source=clean(data.source||"financeLedgerEntries"),approved=["financeLedgerEntries","financeTransactions","financeBudgets","financeCommitments","financeAssets","financeJournalBatches"];if(!approved.includes(source))throw new Error("Unsupported Finance export source.");
+      const rows=await all(source),keys=[...new Set(rows.flatMap(x=>Object.keys(x)))].filter(k=>!["createdAt","updatedAt","_updateTime"].includes(k));
+      const esc=v=>{const value=Array.isArray(v)||v&&typeof v==="object"?JSON.stringify(v):String(v??"");return /[",\n]/.test(value)?'"'+value.replace(/"/g,'""')+'"':value;};
+      const csv=[keys.map(esc).join(","),...rows.map(x=>keys.map(k=>esc(x[k])).join(","))].join("\n");result={source,rowCount:rows.length,filename:source+"-"+stamp().slice(0,10)+".csv",csv};
+    } else if(action==="registerFinanceAsset"){
+      const name=clean(data.name),cost=money(data.cost);if(!name||cost<=0)throw new Error("Asset name and positive cost are required.");const id=crypto.randomUUID(),assetNumber="IRPA-AST-"+new Date().getUTCFullYear()+"-"+id.slice(0,6).toUpperCase(),now=stamp();
+      await commit([await create("financeAssets",id,{assetNumber,name,cost,acquisitionDate:clean(data.acquisitionDate)||now.slice(0,10),category:clean(data.category),location:clean(data.location),usefulLifeMonths:Math.max(1,Number(data.usefulLifeMonths||60)),depreciationMethod:"Straight-line",status:"Register",registeredByUid:claims.user_id,createdAt:now,updatedAt:now}),await audit("FINANCE_ASSET_REGISTERED",{assetNumber,name,cost})]);result={success:true,assetNumber,id};
+    } else if(action==="reconcileFinanceBank"){
+      const period=periodKey(data.period),account=clean(data.bankAccount),statementBalance=money(data.statementBalance),bookBalance=money(data.bookBalance),outstanding=Array.isArray(data.outstandingItems)?data.outstandingItems:[];if(!account)throw new Error("Bank account is required.");
+      const difference=money(statementBalance-bookBalance),status=Math.abs(difference)<0.01?"Reconciled":"Exception",id=period+"-"+account,now=stamp(),old=await readDoc("financeReconciliations/"+id),write={update:{name:base+"/financeReconciliations/"+id,fields:fields({period,bankAccount:account,statementBalance,bookBalance,reconciliationDifference:difference,outstandingItems:outstanding,status,reviewedByUid:claims.user_id,reviewedByEmail:claims.email||"",reviewedAt:now,updatedAt:now,financialControl:true})}};
+      write.currentDocument=old?.updateTime?{updateTime:old.updateTime}:{exists:false};await commit([write,await audit("FINANCE_BANK_RECONCILIATION",{period,bankAccount:account,difference,status})]);result={success:true,period,bankAccount:account,difference,status};
+    } else if(action==="createFinanceThreeWayMatch"){
+      const procurementId=clean(data.procurementRequestId),financeId=clean(data.financeTransactionId),invoiceAmount=money(data.invoiceAmount);if(!procurementId||!financeId||invoiceAmount<=0)throw new Error("Procurement ID, Finance transaction ID and invoice amount are required.");
+      const [p,t]=await Promise.all([readDoc("procurementRequests/"+procurementId),readDoc("financeTransactions/"+financeId)]),pd=firestoreDocumentToPlain(p),td=firestoreDocumentToPlain(t);if(!pd||!td)throw new Error("Procurement or Finance transaction record not found.");
+      const poAmount=money(pd.approvedAmount??pd.amount),financeAmount=money(td.amount),matched=Math.abs(poAmount-financeAmount)<0.01&&Math.abs(financeAmount-invoiceAmount)<0.01,old=await readDoc("financePaymentMatches/"+financeId),now=stamp(),write={update:{name:base+"/financePaymentMatches/"+financeId,fields:fields({procurementRequestId:procurementId,financeTransactionId:financeId,poAmount,financeAmount,invoiceAmount,matched,status:matched?"Matched":"Exception",checkedByUid:claims.user_id,checkedAt:now,updatedAt:now})}};
+      write.currentDocument=old?.updateTime?{updateTime:old.updateTime}:{exists:false};await commit([write,await audit("FINANCE_THREE_WAY_MATCH",{procurementRequestId:procurementId,financeTransactionId:financeId,poAmount,financeAmount,invoiceAmount,matched})]);result={success:true,matched,status:matched?"Matched":"Exception",poAmount,financeAmount,invoiceAmount};
+    } else if(action==="importFinanceCsvRows"){
+      if(!isAdmin&&!roles.some(r=>["Director Finance & Administration","Finance Manager","Accountant","Finance Officer"].includes(r)))throw new Error("Finance import authority is required.");const source=clean(data.source),rows=Array.isArray(data.rows)?data.rows:[],approved=["financeBudgets","financeCommitments","financeTransactions"];if(!approved.includes(source)||!rows.length||rows.length>500)throw new Error("Import requires 1–500 rows into an approved Finance register.");
+      const writes=[],now=stamp();let imported=0;for(const row of rows){if(!row||typeof row!=="object"||Array.isArray(row))continue;writes.push(await create(source,crypto.randomUUID(),{...row,source:"CSV_IMPORT",importedByUid:claims.user_id,importedAt:now,createdAt:now,updatedAt:now}));imported++;}
+      for(let i=0;i<writes.length;i+=400)await commit(writes.slice(i,i+400));await commit([await audit("FINANCE_CSV_IMPORTED",{source,imported})]);result={success:true,source,imported};
+    } else if(action==="initializeFinanceStructure"){
+      if(!isAdmin)throw new Error("Only an active Finance administrator can initialize the finance structure.");const accounts=[["1100","Cash & Bank","Asset","Debit"],["1200","Receivables","Asset","Debit"],["1300","Prepayments","Asset","Debit"],["2100","Payables","Liability","Credit"],["2200","Accrued Liabilities","Liability","Credit"],["3000","Accumulated Fund / Net Assets","Equity","Credit"],["4100","Grant Income","Income","Credit"],["4200","Donations & Other Income","Income","Credit"],["5100","Personnel Costs","Expense","Debit"],["5200","Programme Activities","Expense","Debit"],["5300","Procurement & Supplies","Expense","Debit"],["5400","Transport & Logistics","Expense","Debit"],["5500","Administration","Expense","Debit"]];
+      const writes=[];let created=0;for(const [code,name,type,normal] of accounts){if(!await readDoc("financeChartOfAccounts/"+code)){writes.push(await create("financeChartOfAccounts",code,{code,name,type,normal,active:true,systemSeed:true,createdAt:stamp(),updatedAt:stamp()}));created++;}}
+      const current=stamp().slice(0,7);if(!await readDoc("financePeriods/"+current))writes.push(await create("financePeriods",current,{period:current,status:"Open",openedByUid:claims.user_id,openedAt:stamp(),systemSeed:true}));
+      for(let i=0;i<writes.length;i+=400)await commit(writes.slice(i,i+400));await commit([await audit("FINANCE_STRUCTURE_INITIALIZED",{createdAccounts:created,period:current})]);result={success:true,createdAccounts:created,period:current};
+    } else if(action==="submitFinanceJournalForApproval"){
+      const id=clean(data.journalId);if(!id)throw new Error("Journal ID is required.");const doc=await readDoc("financeJournalBatches/"+id),d=firestoreDocumentToPlain(doc);if(!d)throw new Error("Journal draft not found.");if(d.status!=="Draft")throw new Error("Only Draft journals can be submitted.");
+      const lines=Array.isArray(d.lines)?d.lines:[],debit=money(lines.reduce((s,l)=>s+money(l.debit),0)),credit=money(lines.reduce((s,l)=>s+money(l.credit),0));if(debit<=0||debit!==credit)throw new Error("Journal must be revalidated as balanced before approval.");const period=periodFor(d);await getOpenPeriod(period);
+      const codes=[...new Set(lines.map(x=>clean(x.accountCode)).filter(Boolean))];if(codes.length<2)throw new Error("At least two account codes are required.");const accounts=await all("financeChartOfAccounts"),missing=codes.filter(c=>!accounts.some(a=>clean(a.code)===c));if(missing.length)throw new Error("Unknown account code(s): "+missing.join(", ")+".");
+      const now=stamp();await commit([{update:{name:base+"/financeJournalBatches/"+id,fields:fields({status:"Submitted for Approval",workflowStage:"Submitted for Approval",postingStatus:"Unposted",validatedDebit:debit,validatedCredit:credit,submittedByUid:claims.user_id,submittedAt:now,updatedAt:now})},currentDocument:{updateTime:doc.updateTime}},await audit("FINANCE_JOURNAL_SUBMITTED",{journalId:id,period,debit,credit})]);result={success:true,journalId:id,period};
+    } else if(action==="postFinanceJournal"){
+      if(!isAdmin&&!roles.some(r=>["Director Finance & Administration","Finance Manager","Accountant"].includes(r)))throw new Error("Authorised Finance posting authority is required.");const id=clean(data.journalId);if(!id)throw new Error("Journal ID is required.");const doc=await readDoc("financeJournalBatches/"+id),d=firestoreDocumentToPlain(doc);if(!d)throw new Error("Journal not found.");if(d.status!=="Submitted for Approval")throw new Error("Only submitted journals can be posted.");
+      const lines=Array.isArray(d.lines)?d.lines:[],debit=money(lines.reduce((s,l)=>s+money(l.debit),0)),credit=money(lines.reduce((s,l)=>s+money(l.credit),0));if(debit<=0||debit!==credit)throw new Error("Journal is not balanced.");const period=periodFor(d);await getOpenPeriod(period);if(await readDoc("financeLedgerJournals/"+id))throw new Error("This journal has already been posted.");
+      const now=stamp(),writes=[await create("financeLedgerJournals",id,{journalId:id,reference:d.reference||id,date:d.date,period,description:d.description||"",totalDebit:debit,totalCredit:credit,status:"Posted",postedByUid:claims.user_id,postedByEmail:claims.email||"",postedAt:now,createdAt:now})];
+      for(let i=0;i<lines.length;i++){const l=lines[i];writes.push(await create("financeLedgerEntries",crypto.randomUUID(),{journalId:id,reference:d.reference||id,lineNumber:i+1,accountCode:clean(l.accountCode),description:clean(l.description),debit:money(l.debit),credit:money(l.credit),period,postedByUid:claims.user_id,postedAt:now,createdAt:now}));}
+      writes.push({update:{name:base+"/financeJournalBatches/"+id,fields:fields({status:"Posted",workflowStage:"Posted",postingStatus:"Posted",postedByUid:claims.user_id,postedByEmail:claims.email||"",postedAt:now,updatedAt:now,validatedDebit:debit,validatedCredit:credit})},currentDocument:{updateTime:doc.updateTime}},await audit("FINANCE_JOURNAL_POSTED",{journalId:id,period,debit,credit}));await commit(writes);result={success:true,journalId:id,period,debit,credit};
+    } else if(action==="reverseFinanceJournal"){
+      const id=clean(data.journalId),reason=clean(data.reason);if(!id||!reason)throw new Error("Journal ID and reversal reason are required.");const j=firestoreDocumentToPlain(await readDoc("financeLedgerJournals/"+id));if(!j)throw new Error("Posted ledger journal not found.");const entries=(await all("financeLedgerEntries")).filter(x=>x.journalId===id);if(!entries.length)throw new Error("No ledger entries exist for the posted journal.");
+      const reversalId=id+"-REV-"+Date.now(),now=stamp(),lines=entries.map(x=>({accountCode:x.accountCode,description:"Reversal of "+id+": "+reason,debit:money(x.credit),credit:money(x.debit)}));const writes=[await create("financeJournalBatches",reversalId,{reference:reversalId,date:now.slice(0,10),description:"Reversal of "+id+": "+reason,lines,totalDebit:money(j.totalCredit),totalCredit:money(j.totalDebit),status:"Submitted for Approval",workflowStage:"Submitted for Approval",postingStatus:"Unposted",reversalOfJournalId:id,reversalReason:reason,financialControl:true,createdAt:now,updatedAt:now}),{update:{name:base+"/financeLedgerJournals/"+id,fields:fields({reversalRequested:true,reversalRequestedByUid:claims.user_id,reversalReason:reason,updatedAt:now})},currentDocument:{updateTime:(await readDoc("financeLedgerJournals/"+id)).updateTime}},await audit("FINANCE_JOURNAL_REVERSAL_REQUESTED",{journalId:id,reversalJournalId:reversalId,reason})];await commit(writes);result={success:true,reversalJournalId:reversalId};
+    } else if(action==="closeFinancePeriod"){
+      if(!isAdmin&&!roles.some(r=>["Director Finance & Administration","Finance Manager"].includes(r)))throw new Error("Authorised Finance period-closing authority is required.");const period=periodKey(data.period),pref=await readDoc("financePeriods/"+period),p=firestoreDocumentToPlain(pref);
+      if(p?.status==="Closed")result={success:true,alreadyClosed:true,period};else{const drafts=(await all("financeJournalBatches")).filter(d=>["Draft","Submitted for Approval"].includes(d.status)&&String(d.date||"").startsWith(period));if(drafts.length)throw new Error("Cannot close "+period+": "+drafts.length+" unposted journal(s) remain.");const exceptions=(await all("financeReconciliations")).filter(d=>d.status==="Exception"&&String(d.period||"")===period);if(exceptions.length)throw new Error("Cannot close "+period+": unresolved bank reconciliation exception(s) remain.");const now=stamp(),write={update:{name:base+"/financePeriods/"+period,fields:fields({period,status:"Closed",closedByUid:claims.user_id,closedByEmail:claims.email||"",closedAt:now,updatedAt:now})}};write.currentDocument=pref?.updateTime?{updateTime:pref.updateTime}:{exists:false};await commit([write,await audit("FINANCE_PERIOD_CLOSED",{period})]);result={success:true,period};}
+    }
+    return json({ok:true,result},200,corsHeaders(request));
+  } catch(error) {
+    const message=String(error?.message||"Finance operation failed.");console.error("CLOUDFLARE_FINANCE_OPERATION_FAILURE",{action,message:message.slice(0,240),uid:claims.user_id});return json({ok:false,error:message},400,corsHeaders(request));
+  }
+}
+
 async function removePendingInvitation(request, env) {
   let claims;
   try { claims=await authenticateFirebaseRequest(request,env); }
@@ -428,6 +524,9 @@ export default {
       }
       if (pathname === "/api/invitations/remove" && request.method === "POST") {
         return await removePendingInvitation(request, env);
+      }
+      if (pathname === "/api/finance/accounting" && request.method === "POST") {
+        return await handleFinanceAccounting(request, env);
       }
 
       if (env.ESIGN_MODULE_ENABLED === "true") {
