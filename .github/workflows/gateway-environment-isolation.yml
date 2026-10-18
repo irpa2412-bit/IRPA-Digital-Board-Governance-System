@@ -36,7 +36,13 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
-      - name: Install ephemeral static-analysis tools without changing the lockfile\n        run: npm install --no-save --package-lock=false eslint@9 globals@15\n      - name: Inventory billing dependencies and enforce no-undef in src/firebase\n        run: node scripts/check-no-billing-deps.mjs\n      - name: Verify five authenticated meeting Worker routes\n        run: npm run test:meeting-worker-routes\n      - name: Verify resolver accepts the isolated staging pair and rejects mixed pairs
+      - name: Install ephemeral static-analysis tools without changing the lockfile
+        run: npm install --no-save --package-lock=false eslint@9 globals@15
+      - name: Inventory billing dependencies and enforce no-undef in src/firebase
+        run: node scripts/check-no-billing-deps.mjs
+      - name: Verify five authenticated meeting Worker routes
+        run: npm run test:meeting-worker-routes
+      - name: Verify resolver accepts the isolated staging pair and rejects mixed pairs
         run: |
           node --input-type=module <<'NODE'
           import assert from "node:assert/strict";
