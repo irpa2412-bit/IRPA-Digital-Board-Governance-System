@@ -8,12 +8,15 @@ const response = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
   headers: { "content-type": "application/json" }
 });
+const fsValue = value => {
+  if (Array.isArray(value)) return { arrayValue: { values: value.map(item => fsValue(item)) } };
+  if (typeof value === "boolean") return { booleanValue: value };
+  if (typeof value === "number") return { integerValue: value };
+  return { stringValue: String(value) };
+};
 const fsDoc = (collection, id, fields) => ({
   name: `projects/test-project/databases/(default)/documents/${collection}/${id}`,
-  fields: Object.fromEntries(Object.entries(fields).map(([key, value]) => [
-    key,
-    typeof value === "boolean" ? { booleanValue: value } : { stringValue: String(value) }
-  ]))
+  fields: Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, fsValue(value)]))
 });
 
 function makeContext(claims, { authenticated = true } = {}) {
