@@ -850,3 +850,25 @@ test("inactive canonical institutional records remain blocked by portal activati
   }
 });
 
+
+
+test("Worker invitation activation and removal routes reject missing Firebase tokens", async () => {
+  for (const pathname of [
+    "/api/invitations/activate",
+    "/api/invitations/activate-admin",
+    "/api/invitations/remove"
+  ]) {
+    const response = await handler.fetch(new Request("https://gw.test" + pathname, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ invitationId: "test-invitation" })
+    }), {
+      FIREBASE_PROJECT_ID: "irpa-digital-board-governance",
+      FIREBASE_SERVICE_ACCOUNT_JSON: JSON.stringify(serviceAccount)
+    });
+    assert.equal(response.status, 401, pathname);
+    const body = await response.json();
+    assert.equal(body.ok, false, pathname);
+    assert.match(body.error, /sign-in/i, pathname);
+  }
+});

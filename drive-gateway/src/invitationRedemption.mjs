@@ -1,3 +1,4 @@
+import { INVITATION_STATE, INVITATION_STATUS, INVITATION_ROLE, INVITATION_EMPLOYEE_ROLES } from "../../src/firebase/workflowContracts.js";
 const IDENTITY_TOOLKIT_SCOPE = "https://www.googleapis.com/auth/identitytoolkit";
 const FIRESTORE_SCOPE = "https://www.googleapis.com/auth/datastore";
 const OAUTH_TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -106,15 +107,15 @@ export async function redeemInvitationToken(request, env) {
     throw new InvitationRedemptionError(400, "The invitation has no valid recipient email.");
   }
 
-  const currentState = String(invitation.invitationRedemptionState || "PENDING");
+  const currentState = String(invitation.invitationRedemptionState || INVITATION_STATE.PENDING);
   const pendingUntil = new Date(invitation.invitationPasswordSetupExpiresAt || 0).getTime();
-  if (currentState === "EXPIRED" || (currentState === "PASSWORD_SETUP_PENDING" && pendingUntil && pendingUntil <= Date.now())) {
+  if (currentState === INVITATION_STATE.EXPIRED || (currentState === INVITATION_STATE.PASSWORD_SETUP_PENDING && pendingUntil && pendingUntil <= Date.now())) {
     throw new InvitationRedemptionError(410, "The invitation password-setup window has expired. Ask an Administrator to issue a fresh invitation.");
   }
-  if (currentState === "ACTIVATED") {
+  if (currentState === INVITATION_STATE.ACTIVATED) {
     throw new InvitationRedemptionError(409, "This invitation has already been used. Please sign in with your IRPA account.");
   }
-  if (currentState === "CANCELLED") {
+  if (currentState === INVITATION_STATE.CANCELLED) {
     throw new InvitationRedemptionError(412, "This IRPA invitation has been cancelled.");
   }
 
@@ -250,10 +251,10 @@ async function getOrCreateFirebaseUser(projectId, email, displayName, accessToke
 function validateInvitation(invitation, invitationId, secret) {
   const invitationStatus = String(invitation.status || "").trim().toUpperCase();
   const redemptionState = String(invitation.invitationRedemptionState || "").trim().toUpperCase();
-  if (invitationStatus === "REVOKED" || redemptionState === "REVOKED") {
+  if (invitationStatus === INVITATION_STATE.REVOKED || redemptionState === INVITATION_STATE.REVOKED) {
     throw new InvitationRedemptionError(412, "This IRPA invitation has been revoked. Ask an administrator to issue a fresh invitation.");
   }
-  if (["CANCELLED", "CANCELED"].includes(invitationStatus) || ["CANCELLED", "CANCELED"].includes(redemptionState)) {
+  if ([INVITATION_STATE.CANCELLED, "CANCELED"].includes(invitationStatus) || [INVITATION_STATE.CANCELLED, "CANCELED"].includes(redemptionState)) {
     throw new InvitationRedemptionError(412, "This IRPA invitation has been cancelled.");
   }
   if (invitation.invitationTokenVersion !== "2" || !invitation.invitationTokenHash) {
@@ -281,9 +282,9 @@ async function markPasswordSetupPending(documentPath, document, uid, accessToken
   const pendingUntil = new Date(Date.now() + INVITATION_PENDING_WINDOW_MS).toISOString();
   const fields = {
     invitationRedeemedUid: {stringValue: uid},
-    invitationRedemptionState: {stringValue: "PASSWORD_SETUP_PENDING"},
+    invitationRedemptionState: {stringValue: INVITATION_STATE.PASSWORD_SETUP_PENDING},
     invitationPasswordSetupExpiresAt: {timestampValue: pendingUntil},
-    invitationRedemptionStatus: {stringValue: "Password Setup Pending"},
+    invitationRedemptionStatus: {stringValue: INVITATION_STATUS.PASSWORD_SETUP_PENDING},
     updatedAt: {timestampValue: now}
   };
   const url = new URL("https://firestore.googleapis.com/v1/" + documentPath);
@@ -314,12 +315,12 @@ export async function getInvitationSessionState(env, claims) {
   const acceptedRows = rows.length ? rows : await queryFirestoreCollection(accessToken, projectId, "invitations", "acceptedUid", uid);
   const candidates = acceptedRows
     .map(row => ({document:row.document, data:firestoreDocumentToPlain(row.document.fields || {})}))
-    .filter(item => ["PENDING","PASSWORD_SETUP_PENDING","PROVISIONING_PENDING","ACTIVATED","CANCELLED","EXPIRED"].includes(String(item.data.invitationRedemptionState || "PENDING")))
+    .filter(item => Object.values(INVITATION_STATE).includes(String(item.data.invitationRedemptionState || INVITATION_STATE.PENDING)))
     .sort((a,b) => new Date(b.data.updatedAt || b.data.activatedAt || b.data.createdAt || 0) - new Date(a.data.updatedAt || a.data.activatedAt || a.data.createdAt || 0));
   if (!candidates.length) return {state:null, invitationId:null};
   const selected = candidates[0];
   return {
-    state: String(selected.data.invitationRedemptionState || "PENDING"),
+    state: String(selected.data.invitationRedemptionState || INVITATION_STATE.PENDING),
     invitationId: documentNameToPath(selected.document.name).split("/").pop() || null
   };
 }
@@ -383,47 +384,17 @@ function documentNameToPath(name) {
 }
 
 function isBoardInvitationRole(role) {
-  return ["Board Member","Board Chairperson","Board Secretary","Board Treasurer","Board Vice Chairperson"].includes(String(role || ""));
+  return [
+    INVITATION_ROLE.BOARD_MEMBER,
+    INVITATION_ROLE.BOARD_CHAIRPERSON,
+    INVITATION_ROLE.BOARD_SECRETARY,
+    INVITATION_ROLE.BOARD_TREASURER,
+    INVITATION_ROLE.BOARD_VICE_CHAIRPERSON
+  ].includes(String(role || ""));
 }
 
 function isEmployeeInvitationRole(role) {
-  return [
-    "Executive Director",
-    "Director Human Resources",
-    "Director Livestock",
-    "Director Environment",
-    "Director Outreach",
-    "Director Community Development",
-    "Director Field Operations",
-    "HR Manager",
-    "Director Finance & Administration",
-    "Finance Personnel",
-    "Finance Manager",
-    "Accountant",
-    "Finance Officer",
-    "Director Internal Oversight",
-    "Internal Oversight Officer",
-    "Secretariat",
-    "Procurement Officer",
-    "Programme/Technical Officer",
-    "Management",
-    "Operations Manager",
-    "IT Specialist",
-    "Information Technology Officer",
-    "Driver",
-    "Field Assistant",
-    "Administrative Assistant",
-    "Communications Officer",
-    "Monitoring & Evaluation Officer",
-    "Project Officer",
-    "Rangeland Officer",
-    "Livestock Officer",
-    "Outreach Officer",
-    "Community Development Officer",
-    "Environment Officer",
-    "HR Officer",
-    "Employee"
-  ].includes(String(role || ""));
+  return INVITATION_EMPLOYEE_ROLES.includes(String(role || ""));
 }
 
 async function provisionInvitationActivation(invitationId, uid, email, env, accessToken, invitationDocument) {
@@ -438,16 +409,16 @@ async function provisionInvitationActivation(invitationId, uid, email, env, acce
   }
 
   const currentState = String(invitation.invitationRedemptionState || "PENDING");
-  if (currentState === "ACTIVATED") return {ok:true, invitationId, uid, state:"ACTIVATED"};
-  if (!["PROVISIONING_PENDING","PASSWORD_SETUP_PENDING"].includes(currentState)) {
+  if (currentState === INVITATION_STATE.ACTIVATED) return {ok:true, invitationId, uid, state:INVITATION_STATE.ACTIVATED};
+  if (![INVITATION_STATE.PROVISIONING_PENDING,INVITATION_STATE.PASSWORD_SETUP_PENDING].includes(currentState)) {
     throw new InvitationRedemptionError(409, "This invitation is not ready for activation.");
   }
 
-  const role = String(invitation.role || "Board Member").trim();
+  const role = String(invitation.role || INVITATION_ROLE.BOARD_MEMBER).trim();
   const now = new Date().toISOString();
   let activatedRecords = 0;
 
-  if (invitation.boardMemberId || invitation.institutionalRecordType === "Board Member" || isBoardInvitationRole(role)) {
+  if (invitation.boardMemberId || invitation.institutionalRecordType === INVITATION_ROLE.BOARD_MEMBER || isBoardInvitationRole(role)) {
     const boardMemberId = String(invitation.boardMemberId || invitation.institutionalRecordId || "").trim();
     let boardRows = boardMemberId
       ? await getFirestoreDocument(`projects/${projectId}/databases/(default)/documents/members/${encodeURIComponent(boardMemberId)}`, accessToken)
@@ -487,7 +458,7 @@ async function provisionInvitationActivation(invitationId, uid, email, env, acce
       }, accessToken);
       activatedRecords++;
     }
-  } else if (invitation.employeeId || invitation.institutionalRecordType === "Employee" || isEmployeeInvitationRole(role)) {
+  } else if (invitation.employeeId || invitation.institutionalRecordType === INVITATION_ROLE.EMPLOYEE || isEmployeeInvitationRole(role)) {
     const employeeId = String(invitation.employeeId || invitation.institutionalRecordId || "").trim();
     let employeeDocument = employeeId
       ? await getFirestoreDocument(`projects/${projectId}/databases/(default)/documents/employees/${encodeURIComponent(employeeId)}`, accessToken)
@@ -527,7 +498,7 @@ async function provisionInvitationActivation(invitationId, uid, email, env, acce
         activatedRecords++;
       }
     }
-  } else if (invitation.institutionalRecordType === "Auditor" || invitation.institutionalRecordType === "Special Invitee") {
+  } else if (invitation.institutionalRecordType === INVITATION_ROLE.AUDITOR || invitation.institutionalRecordType === INVITATION_ROLE.SPECIAL_INVITEE) {
     const registerId = String(invitation.institutionalRecordId || "").trim();
     let registerDocument = registerId
       ? await getFirestoreDocument(`projects/${projectId}/databases/(default)/documents/auditorProfiles/${encodeURIComponent(registerId)}`, accessToken)
@@ -545,7 +516,7 @@ async function provisionInvitationActivation(invitationId, uid, email, env, acce
       throw new InvitationRedemptionError(422, "The invitation email does not match the registered Auditor or Special Invitee record.");
     }
     const category = String(registeredData.category || invitation.institutionalRecordType || "").trim();
-    if (!["Auditor","Special Invitee"].includes(category)) {
+    if (![INVITATION_ROLE.AUDITOR,INVITATION_ROLE.SPECIAL_INVITEE].includes(category)) {
       throw new InvitationRedemptionError(422, "The invitation category is not valid for the Auditors & Special Invitees Register.");
     }
     await patchFirestoreFields(documentNameToPath(registered.document.name), null, {
@@ -579,13 +550,58 @@ async function provisionInvitationActivation(invitationId, uid, email, env, acce
     acceptedAt:{timestampValue:now},
     accountActivated:{booleanValue:true},
     activationCompleted:{booleanValue:true},
-    invitationRedemptionState:{stringValue:"ACTIVATED"},
+    invitationRedemptionState:{stringValue:INVITATION_STATE.ACTIVATED},
     invitationRedemptionStatus:{stringValue:"Activated"},
     invitationRedeemedAt:{timestampValue:String(invitation.invitationRedeemedAt || now)},
     updatedAt:{timestampValue:now}
   };
   await patchFirestoreFields(documentNameToPath(invitationDocument.name), invitationDocument.updateTime, invitationFields, accessToken);
-  return {ok:true, invitationId, uid, state:"ACTIVATED", activatedRecords};
+  return {ok:true, invitationId, uid, state:INVITATION_STATE.ACTIVATED, activatedRecords};
+}
+
+export async function activateInvitationForAuthenticatedUser(request, env, claims) {
+  const body = await readJson(request);
+  const invitationId = String(body?.invitationId || "").trim();
+  const uid = String(claims?.user_id || "").trim();
+  const email = String(claims?.email || "").trim().toLowerCase();
+  if (!invitationId || invitationId.includes("/")) throw new InvitationRedemptionError(400, "A valid invitation record is required.");
+  if (!uid || !email) throw new InvitationRedemptionError(401, "A valid authenticated IRPA account is required.");
+
+  const projectId = String(env.FIREBASE_PROJECT_ID || "").trim();
+  if (!projectId) throw new InvitationRedemptionError(503, "Invitation activation is not configured.");
+  const serviceAccount = parseServiceAccount(env.FIREBASE_SERVICE_ACCOUNT_JSON);
+  const accessToken = await getGoogleAccessToken(serviceAccount);
+  const documentPath = `projects/${projectId}/databases/(default)/documents/invitations/${encodeURIComponent(invitationId)}`;
+  const document = await getFirestoreDocument(documentPath, accessToken);
+  if (!document) throw new InvitationRedemptionError(404, "This IRPA invitation no longer exists.");
+  const invitation = firestoreDocumentToPlain(document.fields || {});
+  const invitationEmail = String(invitation.email || "").trim().toLowerCase();
+  if (invitationEmail !== email) throw new InvitationRedemptionError(403, "This invitation is assigned to a different authenticated email address.");
+  const invitationStatus = String(invitation.status || "").trim().toLowerCase();
+  const redemptionState = String(invitation.invitationRedemptionState || "").trim().toUpperCase();
+  if ([INVITATION_STATUS.CANCELLED.toLowerCase(), INVITATION_STATUS.REVOKED.toLowerCase(), "expired"].includes(invitationStatus) || [INVITATION_STATE.CANCELLED, INVITATION_STATE.EXPIRED, INVITATION_STATE.REVOKED].includes(redemptionState)) {
+    throw new InvitationRedemptionError(410, "This invitation has expired or been cancelled. Ask an Administrator to issue a fresh invitation.");
+  }
+  if (invitation.accountActivated === true || invitation.activationCompleted === true || invitationStatus === INVITATION_STATUS.ACTIVATED.toLowerCase() || redemptionState === INVITATION_STATE.ACTIVATED) {
+    const activatedUid = String(invitation.invitationRedeemedUid || invitation.acceptedUid || invitation.uid || "");
+    if (activatedUid === uid) return {ok:true, invitationId, uid, state:INVITATION_STATE.ACTIVATED};
+    throw new InvitationRedemptionError(409, "This invitation has already been activated for another account.");
+  }
+  if (invitation.acceptedUid && String(invitation.acceptedUid) !== uid) {
+    throw new InvitationRedemptionError(409, "This invitation has already been accepted by another account.");
+  }
+
+  const now = new Date().toISOString();
+  await patchFirestoreFields(documentPath, document.updateTime, {
+    invitationRedeemedUid: {stringValue: uid},
+    invitationRedemptionState: {stringValue: INVITATION_STATE.PROVISIONING_PENDING},
+    invitationRedemptionStatus: {stringValue: "Provisioning Pending"},
+    invitationRedeemedAt: {timestampValue: now},
+    updatedAt: {timestampValue: now}
+  }, accessToken);
+  const refreshed = await getFirestoreDocument(documentPath, accessToken);
+  if (!refreshed) throw new InvitationRedemptionError(404, "This IRPA invitation no longer exists.");
+  return provisionInvitationActivation(invitationId, uid, email, env, accessToken, refreshed);
 }
 
 export async function confirmInvitationPasswordSetup(request, env, claims) {
@@ -610,11 +626,11 @@ export async function confirmInvitationPasswordSetup(request, env, claims) {
     throw new InvitationRedemptionError(403, "This invitation is not assigned to the authenticated account.");
   }
   const redemptionState = String(invitation.invitationRedemptionState || "");
-  if (redemptionState === "ACTIVATED") return {ok:true,invitationId,uid:claims.user_id,state:"ACTIVATED"};
-  if (!["PASSWORD_SETUP_PENDING","PROVISIONING_PENDING"].includes(redemptionState)) {
+  if (redemptionState === INVITATION_STATE.ACTIVATED) return {ok:true,invitationId,uid:claims.user_id,state:INVITATION_STATE.ACTIVATED};
+  if (![INVITATION_STATE.PASSWORD_SETUP_PENDING,INVITATION_STATE.PROVISIONING_PENDING].includes(redemptionState)) {
     throw new InvitationRedemptionError(409, "This invitation is not waiting for password setup or resumable provisioning.");
   }
-  if (redemptionState === "PASSWORD_SETUP_PENDING" && new Date(invitation.invitationPasswordSetupExpiresAt || 0).getTime() <= Date.now()) {
+  if (redemptionState === INVITATION_STATE.PASSWORD_SETUP_PENDING && new Date(invitation.invitationPasswordSetupExpiresAt || 0).getTime() <= Date.now()) {
     throw new InvitationRedemptionError(410, "The invitation password-setup window has expired. Ask an Administrator to issue a fresh invitation.");
   }
 
@@ -629,7 +645,7 @@ export async function confirmInvitationPasswordSetup(request, env, claims) {
   if (authEmail !== invitationEmail) throw new InvitationRedemptionError(403, "The Firebase account email does not match the invitation email.");
   const hasPasswordProvider = Array.isArray(user.providerUserInfo) && user.providerUserInfo.some(provider => String(provider.providerId || "") === "password");
 
-  if (redemptionState === "PASSWORD_SETUP_PENDING") {
+  if (redemptionState === INVITATION_STATE.PASSWORD_SETUP_PENDING) {
     if (requestedPassword) {
       await updateFirebaseUserPassword(projectId, claims.user_id, requestedPassword, accessToken);
     } else if (!hasPasswordProvider) {
@@ -637,7 +653,7 @@ export async function confirmInvitationPasswordSetup(request, env, claims) {
     }
     const now = new Date().toISOString();
     await patchFirestoreFields(documentPath, document.updateTime, {
-      invitationRedemptionState:{stringValue:"PROVISIONING_PENDING"},
+      invitationRedemptionState:{stringValue:INVITATION_STATE.PROVISIONING_PENDING},
       invitationRedemptionStatus:{stringValue:"Provisioning Pending"},
       invitationPasswordSetAt:{timestampValue:now},
       updatedAt:{timestampValue:now}
@@ -706,7 +722,7 @@ async function createFirebaseCustomToken(serviceAccount, uid, invitationId) {
     uid,
     claims: {
       irpaInvitationId: invitationId,
-      irpaInvitationRedemptionState: "PASSWORD_SETUP_PENDING"
+      irpaInvitationRedemptionState: INVITATION_STATE.PASSWORD_SETUP_PENDING
     }
   }, serviceAccount.private_key);
 }
