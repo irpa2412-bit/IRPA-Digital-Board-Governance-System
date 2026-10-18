@@ -27,7 +27,7 @@ test('all five formerly undefined meeting callables use authenticated Worker API
 
 test('Worker keeps document review bounded and attendance signatures identity-bound', () => {
   assert.ok(worker.includes('comment.length>5000'));
-  assert.ok(worker.includes('matches the name in your meeting registration'));
+  assert.ok(worker.includes('must match the name in your meeting registration'));
   assert.ok(worker.includes('You may sign only your own registered participant record'));
   assert.ok(worker.includes('meetingWorkingDocuments'));
   assert.ok(worker.includes('meetingDocumentReviews'));
