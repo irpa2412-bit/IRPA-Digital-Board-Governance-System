@@ -1,0 +1,42 @@
+# Proposed Firestore rules change — review only
+
+**Status:** proposal/diff only. This file is not a deployable replacement for `firestore.rules`. The authoritative `firestore.rules` file is intentionally untouched.
+
+## Diff (conceptual)
+
+```diff
+ function actualDataAccessOpen(){
+   return exists(/databases/$(database)/documents/systemSettings/actualDataAccess)
+     && get(/databases/$(database)/documents/systemSettings/actualDataAccess).data.get("enabled",false)==true
+     && get(/databases/$(database)/documents/systemSettings/actualDataAccess).data.get("status","")=="OPEN"
+     && get(/databases/$(database)/documents/systemSettings/actualDataAccess).data.get("finalTestsAttested",false)==true;
+ }
++// Proposed helper: a closed gate must not be bypassed by a malformed or
++// unrecognised origin marker. Keep the existing trial-origin compatibility
++// only for explicitly marked trial records.
++function validTrialOrigin(data){
++  return data.get("recordOrigin","") in ["TRIAL","trial","Trial"]
++    || data.get("trialData",false)==true
++    || data.get("isTrial",false)==true;
++}
+ function actualCreateAllowed(){
+-  return actualDataAccessOpen()||trialDataRecord(request.resource.data);
++  return actualDataAccessOpen()||validTrialOrigin(request.resource.data);
+ }
+ function actualUpdateAllowed(){
+-  return actualDataAccessOpen()||(trialDataRecord(resource.data)&&trialDataRecord(request.resource.data));
++  return actualDataAccessOpen()
++    ||(validTrialOrigin(resource.data)&&validTrialOrigin(request.resource.data));
+ }
+ function actualDeleteAllowed(){
+-  return actualDataAccessOpen()||trialDataRecord(resource.data);
++  return actualDataAccessOpen()||validTrialOrigin(resource.data);
+ }
+```
+
+## Reasons and limitations
+
+1. Makes the trial-origin exception explicit at the call site and documents that it is an exception to the closed-by-default actual-data gate.
+2. Preserves the current accepted trial markers and existing access-gate behavior; it does not grant any new user role or collection access.
+3. This refactor is behavior-equivalent to the current `trialDataRecord` helper, so it is documentation/clarity rather than a substantive security tightening. A real tightening requires a collection-by-collection rules review and emulator tests.
+4. Do not deploy this proposal as-is. It is a review note, not a full rules file. Before adoption, produce a complete diff against the current rules and run the Firestore Rules Unit Testing suite. No production rules or data have been changed.
