@@ -1,8 +1,8 @@
-# Firebase-Free Governance Workflow Migration
+# Firebase Functional-Decoupling and Cloudflare Billing Migration
 
 Status: **scope and acceptance contract only; no production workflow has been switched**.
 
-This migration is intended to remove Firebase Authentication, Firestore, and Firebase callable-function dependencies from the Signature Portal, Meeting Portal and its sub-portals, and Authorization & Approval workflows. The Cloudflare Gateway remains the application API boundary. This document is not evidence that the migration has been implemented.
+**Scope clarification:** remove FUNCTIONAL DEPENDENCY on Firebase for the Signature Portal, Meeting Portal and its sub-portals, and Authorisation & Approval workflows. This is not a request to delete Firebase globally or remove Firebase-hosted security rules. Preserve those rules unchanged. The specific blocker to resolve is the Google Cloud/Firebase billing dependency for functionality currently requiring Firebase Cloud Functions. Migrate those runtime operations to Cloudflare Workers and Cloudflare-backed services, so the portals remain functional without requiring Firebase Cloud Functions billing. Keep Firestore/rules or other Firebase components only where explicitly retained and compatible with the approved transition; do not silently rely on a Firebase callable for migrated functionality. The Cloudflare Gateway remains the API boundary. This document is not evidence that the migration has been implemented.
 
 ## Audited dependency points
 
@@ -16,7 +16,7 @@ This migration is intended to remove Firebase Authentication, Firestore, and Fir
 
 ## Required replacement architecture
 
-1. **Cloudflare identity and sessions:** replace Firebase ID tokens with short-lived, revocable server-managed sessions. Store password verifiers or federated identity links safely; protect login, recovery, session renewal, logout, rate limits, and administrator MFA. Never accept a client-supplied UID or role as proof of identity.
+1. **Functional decoupling and billing:** move target runtime functionality currently blocked by Google Cloud billing for Firebase Cloud Functions into authenticated Cloudflare Worker routes/services. Preserve Firebase-hosted rules as requested; do not delete or rewrite them as part of this migration. Where existing Firebase Authentication or Firestore remains temporarily necessary, document it as a retained dependency and do not claim full decoupling until the affected target operation no longer requires Firebase billing or a Firebase callable. Replace Firebase ID-token dependence on migrated routes with a verified Cloudflare-compatible session/identity contract; never accept a client-supplied UID or role as proof of identity.
 2. **Cloudflare persistence:** migrate governance identity, Member/Employee registers, signer profiles, envelopes, signature events, meeting records, access requests, attendance, decisions, approvals, and audit records into Cloudflare-managed storage (D1 for transactional records; private R2 for binary evidence where appropriate). Keep Drive only where intentionally retained for existing document/archive storage.
 3. **Single authorization boundary:** move all sensitive reads/writes behind authenticated Worker APIs. Derive actor identity from the validated session; verify role, active register membership, record scope, workflow state and approval authority server-side. Make approval/signature state changes transactional and idempotent.
 4. **Evidence integrity:** preserve signed-PDF bytes, cryptographic hashes, original/final document links, timestamps, signer identity/authority snapshots, audit chronology, controlled-document access, and historical records. Do not re-create, overwrite, or silently orphan historical signature evidence.
@@ -30,15 +30,15 @@ This migration is intended to remove Firebase Authentication, Firestore, and Fir
 - A deliberate account-recovery and MFA policy for current Firebase users. Existing Firebase passwords cannot be assumed portable to a new authentication system.
 - A tested export/import process for Firestore data and a verified archive of historical signing evidence.
 
-The current repository configuration exposes KV and a Durable Object binding, but does not establish that the required D1/R2 resources, migrated identity credentials, or production data migration are provisioned. Do not deploy a Firebase-free cutover until those prerequisites are verified.
+The current repository configuration exposes KV and a Durable Object binding, but does not establish that all required Cloudflare resources, identity/session migration, or production data migration are provisioned. Do not deploy a cutover until those prerequisites are verified. Firebase-hosted security rules must remain intact. The acceptance target is removal of functional dependence on Firebase billing/Cloud Functions for the three portal areas, not deletion of Firebase itself.
 
 ## Acceptance gates (all required before merge)
 
-- Static scan shows no Firebase Auth, Firestore, Firebase Functions, Firebase SDK initialization, ID-token dependency, or Firebase project configuration on any target workflow path.
+- Static and runtime checks prove that each migrated target operation no longer depends on Firebase Cloud Functions or Google Cloud billing to execute; Firebase-hosted rules remain unchanged. Any retained Firebase Authentication/Firestore dependency must be explicit, justified, and must not reintroduce the billing-blocked callable path.
 - Automated tests cover unauthenticated access, privilege escalation, cross-user access, inactive or mismatched register entries, unauthorized approval, replay/idempotency, session expiry/revocation, concurrent approvals, and audit-write failure.
 - Staging end-to-end acceptance covers signature creation, signing invitation, PDF retrieval/submission/verification, archive integrity, meeting creation/access, attendance, approvals, and authorization changes.
 - Data migration reconciliation verifies record counts, key references, and hashes for all historical signed artifacts and audit evidence.
-- Live production probes prove the target workflows operate without Firebase services; rollback is tested.
+- Live production probes prove the migrated target workflows execute without requiring Firebase Cloud Functions billing; Firebase-hosted rules remain unchanged; rollback is tested.
 - The complete test suite and application build pass. Only then is merge considered.
 
 ## Current stop point
