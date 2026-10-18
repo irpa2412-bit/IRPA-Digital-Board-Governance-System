@@ -467,9 +467,8 @@ export async function configureInvitationPassword(password) {
 export async function completeInvitationToken(token) {
   const cleanToken = String(token || "").trim();
   if (!cleanToken) throw new Error("The IRPA invitation token is missing.");
-  const gatewayOrigin = String(import.meta.env.VITE_GATEWAY_ORIGIN || import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL || "").trim().replace(/\/+$/, "");
-  if (!gatewayOrigin) throw new Error("IRPA gateway origin is not configured for this build.");
-  const endpoint = `${gatewayOrigin}/api/invitations/redeem`;
+  const gatewayOrigin = resolveGatewayUrl();
+  const endpoint = `${gatewayOrigin}//api/invitations/redeem`;
   try {
     const response = await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json","X-IRPA-Invitation-Version":"2"},body:JSON.stringify({token:cleanToken})});
     const data = await response.json().catch(() => ({}));
@@ -488,8 +487,6 @@ export async function completeInvitationToken(token) {
 export async function getInvitationSessionState() {
   const user = auth.currentUser;
   if (!user) return {state:null, invitationId:null};
-  const gatewayOrigin = String(import.meta.env.VITE_GATEWAY_ORIGIN || import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL || "").trim().replace(/\/+$/, "");
-  if (!gatewayOrigin) throw new Error("IRPA gateway origin is not configured for this build.");
   const idToken = await user.getIdToken();
   const response = await fetch(`${gatewayOrigin}/api/invitations/session-state`, {
     method:"POST",
