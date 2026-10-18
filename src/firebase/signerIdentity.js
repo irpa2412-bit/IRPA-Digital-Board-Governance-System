@@ -60,8 +60,7 @@ export async function ensureMySignerIdentity(profile, options={}){
   return {id:u.uid,...payload};
 }
 
-export async function updateMySignerAuthority(data={}){ 
-  const uexport async function updateMySignerAuthority(data={}){
+export async function updateMySignerAuthority(data={}){
   const u=currentUser();
   const authorityRole=normalise(data.authorityRole);
   if(!authorityRole)throw new Error("Select the current signing authority before saving.");
