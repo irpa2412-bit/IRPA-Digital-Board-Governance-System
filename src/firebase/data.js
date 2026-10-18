@@ -36,6 +36,19 @@ export async function nextDocumentReference(){
   }
   return String(result.reference).trim();
 }
+export async function registerControlledDocument(documentPayload){
+ const user=auth.currentUser;
+ if(!user?.uid)throw new Error("Authentication is required to register a controlled document.");
+ const token=await user.getIdToken();
+ const gateway=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").trim().replace(/\/+$/, "");
+ let response;
+ try{response=await fetch(gateway+"/api/document-lifecycle/register",{method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({documentPayload})});}
+ catch{throw new Error("Cloudflare controlled-document registration is unavailable. No direct Firestore registration fallback was used.");}
+ const result=await response.json().catch(()=>({}));
+ if(!response.ok||result.ok!==true||!result.id||!result.document)throw new Error(result.error||"The controlled-document register could not verify the archive upload.");
+ return {id:result.id,document:result.document,idempotent:result.idempotent===true};
+}
+
 export async function createRecord(collectionName,data){if(isTrialDataMode()&&!isActualOnlyCollection(collectionName)){data={...data,recordOrigin:"TRIAL",trialData:true,isTrial:true};}else if(collectionName===COLLECTIONS.documents){data={...data,recordOrigin:data.recordOrigin||"PRODUCTION"};}const ref=await addDoc(collection(db,collectionName),{...data,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});await writeAudit("CREATE",collectionName,ref.id,data);return ref.id;}
 export async function upsertFinancePaymentTrace(traceId,data={}){if(!auth.currentUser)throw new Error("Authentication is required.");if(!traceId)throw new Error("A finance trace ID is required.");const ref=doc(db,COLLECTIONS.financePaymentTrace,traceId);const existing=await getDoc(ref);const actor=currentActor();const payload={...data,lastUpdatedByUid:actor.uid,lastUpdatedByEmail:actor.email,updatedAt:serverTimestamp()};if(!existing.exists()){payload.createdAt=serverTimestamp();payload.createdByUid=actor.uid;payload.createdByEmail=actor.email;await setDoc(ref,payload);await writeAudit("CREATE_FINANCE_PAYMENT_TRACE",COLLECTIONS.financePaymentTrace,traceId,data);}else{await updateDoc(ref,payload);await writeAudit("UPDATE_FINANCE_PAYMENT_TRACE",COLLECTIONS.financePaymentTrace,traceId,data);}return traceId;}
 async function getHighestRegistrationNumber(collectionName,fieldName){const snap=await getDocs(collection(db,collectionName));let highest=0;for(const item of snap.docs){const value=Number(String(item.data()?.[fieldName]||"").split("-").pop());if(Number.isInteger(value)&&value>highest)highest=value;}return highest;}
