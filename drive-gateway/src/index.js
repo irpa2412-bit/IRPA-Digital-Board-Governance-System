@@ -89,6 +89,91 @@ function normalizeGatewayAuthority(value) {
 
 
 
+
+async function handleAuthorizationWorkflow(request, env) {
+  let claims;
+  try { claims = await authenticateFirebaseRequest(request, env); }
+  catch { return json({ok:false,error:"A valid IRPA sign-in is required."},401,corsHeaders(request)); }
+  let body;
+  try { body = await request.json(); } catch { return json({ok:false,error:"A valid JSON request is required."},400,corsHeaders(request)); }
+  const operation=String(body.operation||"").trim();
+  const project=getFirebaseProjectId(env), token=await getFirestoreAdminAccessToken(env), base="projects/"+project+"/databases/(default)/documents";
+  const clean=v=>String(v??"").trim(), lower=v=>clean(v).toLowerCase(), stamp=()=>new Date().toISOString();
+  const decode=v=>{if(!v)return null;if("stringValue"in v)return v.stringValue;if("booleanValue"in v)return v.booleanValue;if("integerValue"in v)return Number(v.integerValue);if("doubleValue"in v)return v.doubleValue;if("timestampValue"in v)return v.timestampValue;if("nullValue"in v)return null;if("arrayValue"in v)return(v.arrayValue.values||[]).map(decode);if("mapValue"in v)return Object.fromEntries(Object.entries(v.mapValue.fields||{}).map(([k,x])=>[k,decode(x)]));return null;};
+  const encode=v=>v===null||v===undefined?{nullValue:null}:v instanceof Date?{timestampValue:v.toISOString()}:typeof v==="boolean"?{booleanValue:v}:typeof v==="number"?(Number.isInteger(v)?{integerValue:String(v)}:{doubleValue:v}):Array.isArray(v)?{arrayValue:{values:v.map(encode)}}:typeof v==="object"?{mapValue:{fields:Object.fromEntries(Object.entries(v).map(([k,x])=>[k,encode(x)]))}}:{stringValue:String(v)};
+  const fields=o=>Object.fromEntries(Object.entries(o).map(([k,v])=>[k,encode(v)]));
+  async function read(path){const res=await fetch("https://firestore.googleapis.com/v1/"+base+"/"+path,{headers:{Authorization:"Bearer "+token}});if(res.status===404)return null;if(!res.ok)throw new Error("Authorization record lookup failed.");const doc=await res.json();return {id:String(doc.name||"").split("/").pop(),updateTime:doc.updateTime||null,...Object.fromEntries(Object.entries(doc.fields||{}).map(([k,v])=>[k,decode(v)]))};}
+  async function listWorkflows(){const res=await fetch("https://firestore.googleapis.com/v1/"+base+":runQuery",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({structuredQuery:{from:[{collectionId:"workflowActions"}],where:{compositeFilter:{op:"AND",filters:[{fieldFilter:{field:{fieldPath:"workflowType"},op:"EQUAL",value:{stringValue:"Authorization"}}},{fieldFilter:{field:{fieldPath:"module"},op:"EQUAL",value:{stringValue:"Authorization & Approvals"}}}]},limit:1000}})});if(!res.ok)throw new Error("Authorization register could not be loaded.");return(await res.json()).filter(x=>x.document).map(x=>({id:String(x.document.name||"").split("/").pop(),updateTime:x.document.updateTime||null,...Object.fromEntries(Object.entries(x.document.fields||{}).map(([k,v])=>[k,decode(v)]))}));}
+  async function commit(writes){const res=await fetch("https://firestore.googleapis.com/v1/"+base+":commit",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({writes})});if(!res.ok)throw new Error("Authorization record and audit event could not be committed atomically.");return res.json();}
+  const [admin,member,employee]=await Promise.all([read("adminProfiles/"+claims.user_id),read("members/"+claims.user_id),read("employees/"+claims.user_id)]);
+  const isAdmin=lower(claims.email)==="irpa2412@gmail.com"||admin?.active===true;
+  const active=!!(isAdmin||member?.status==="Active"||employee?.status==="Active"||member?.registrationStatus==="Active"||employee?.employmentStatus==="Active");
+  if(!active)return json({ok:false,error:"An active IRPA institutional identity is required."},403,corsHeaders(request));
+  const roles=[member?.role,employee?.role,...(Array.isArray(member?.roles)?member.roles:[]),...(Array.isArray(employee?.roles)?employee.roles:[])].map(clean).filter(Boolean);
+  const reviewerRoles=["Director Internal Oversight","Internal Oversight Officer","Director Human Resources","HR Manager","Director Finance & Administration","Finance Manager","Programme/Technical Officer","Operations Manager"];
+  const approverRoles=["Executive Director"];
+  const implementerRoles=["Executive Director","Director Finance & Administration","Finance Manager","Operations Manager","Programme/Technical Officer","Director Human Resources","HR Manager"];
+  const actorRole=roles[0]||"";
+  const workflowRef=id=>base+"/workflowActions/"+id;
+  const auditWrite=(action,recordId,details)=>({update:{name:base+"/audit/"+crypto.randomUUID(),fields:fields({action,collection:"workflowActions",recordId,details,actorUid:claims.user_id,actorEmail:claims.email||null,createdAt:stamp()})},currentDocument:{exists:false}});
+  try {
+    if(operation==="list"){
+      const rows=await listWorkflows();
+      return json({ok:true,workflows:rows.filter(x=>isAdmin||(Array.isArray(x.involvedUids)&&x.involvedUids.includes(claims.user_id))).sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||"")))},200,corsHeaders(request));
+    }
+    if(operation==="create"){
+      const data=body.data&&typeof body.data==="object"?body.data:{};
+      if(!clean(data.title)||!clean(data.justification))return json({ok:false,error:"Title and justification are required."},400,corsHeaders(request));
+      const required=["requestedAction","authorityBasis","requestCategory","decisionAuthority"].filter(k=>!clean(data[k]));
+      if(required.length)return json({ok:false,error:"The governance request is incomplete: "+required.join(", ")+" are required."},400,corsHeaders(request));
+      const reviewerUid=clean(data.reviewerUid),approverUid=clean(data.approverUid),implementerUid=clean(data.implementerUid||approverUid);
+      if(!reviewerUid||!approverUid)return json({ok:false,error:"A named reviewer and approver are required."},400,corsHeaders(request));
+      if(approverUid===claims.user_id)return json({ok:false,error:"Self-approval is prohibited. The requester cannot be the approver."},403,corsHeaders(request));
+      const [reviewerMember,reviewerEmployee,approverMember,approverEmployee,implMember,implEmployee]=await Promise.all([read("members/"+reviewerUid),read("employees/"+reviewerUid),read("members/"+approverUid),read("employees/"+approverUid),read("members/"+implementerUid),read("employees/"+implementerUid)]);
+      const activeRole=(a,b)=>{const d=[a,b].find(x=>x&&(x.status==="Active"||x.employmentStatus==="Active"||x.registrationStatus==="Active"));return d?[d.role,...(Array.isArray(d.roles)?d.roles:[])].map(clean).filter(Boolean):[];};
+      const reviewerRoleList=activeRole(reviewerMember,reviewerEmployee),approverRoleList=activeRole(approverMember,approverEmployee),implRoleList=activeRole(implMember,implEmployee);
+      if(!reviewerRoleList.some(x=>reviewerRoles.includes(x)))return json({ok:false,error:"The selected reviewer does not hold an active approved reviewer role."},403,corsHeaders(request));
+      if(!approverRoleList.some(x=>approverRoles.includes(x)))return json({ok:false,error:"The selected approver does not hold the required active Executive Director role."},403,corsHeaders(request));
+      if(!implRoleList.some(x=>implementerRoles.includes(x)))return json({ok:false,error:"The selected implementer does not hold an active approved implementer role."},403,corsHeaders(request));
+      const id="IRPA-AUTH-"+new Date().getFullYear()+"-"+Date.now().toString().slice(-8),now=stamp();
+      const involved=[...new Set([claims.user_id,reviewerUid,approverUid,implementerUid,...(Array.isArray(data.involvedUids)?data.involvedUids:[])].map(clean).filter(Boolean))];
+      const links={};for(const k of ["meetingId","meetingReference","resolutionId","resolutionReference","documentId","documentReference","procurementId","procurementReference","relatedType","relatedId","relatedReference"])if(data[k]!==undefined)links[k]=data[k];
+      const payload={workflowType:"Authorization",module:"Authorization & Approvals",status:"Draft",stageIndex:0,workflowVersion:1,reference:clean(data.reference)||id,title:clean(data.title),requestedByUid:claims.user_id,requestedByEmail:claims.email||"",requestedByName:clean(data.requestedByName),reviewerUid,reviewerName:clean(data.reviewerName),approverUid,approverName:clean(data.approverName),implementerUid,implementerName:clean(data.implementerName||data.approverName),amount:data.amount||"",budgetLine:data.budgetLine||"",justification:clean(data.justification),requestedAction:clean(data.requestedAction),requestCategory:clean(data.requestCategory||"General Governance Request"),urgency:clean(data.urgency||"Normal"),authorityBasis:clean(data.authorityBasis),decisionAuthority:clean(data.decisionAuthority),decisionRequiredBy:clean(data.decisionRequiredBy),currency:clean(data.currency||"TZS"),fundingSource:data.fundingSource||"",riskLevel:clean(data.riskLevel||"Medium"),riskSummary:clean(data.riskSummary),complianceConfirmation:Boolean(data.complianceConfirmation),conflictDisclosure:clean(data.conflictDisclosure),requestedEffectiveDate:data.requestedEffectiveDate||"",supportingDocumentId:data.documentId||data.relatedId||null,supportingDocumentReference:data.documentReference||data.relatedReference||null,signatureRequired:Boolean(data.signatureRequired),signatureFields:Array.isArray(data.signatureFields)?data.signatureFields:[],signatureFieldSetVersion:data.signatureFieldSetVersion||"IRPA-UNIFIED-FIELD-PALETTE-V1",involvedUids:involved,...links,history:[{status:"Draft",from:null,action:"Created",reason:null,actorUid:claims.user_id,actorEmail:claims.email||null,at:now}],createdAt:now,updatedAt:now};
+      await commit([{update:{name:workflowRef(id),fields:fields(payload)},currentDocument:{exists:false}},auditWrite("AUTHORIZATION_CREATED",id,{reference:payload.reference,status:"Draft",requestedByUid:claims.user_id,reviewerUid,approverUid,implementerUid,links})]);
+      return json({ok:true,id,workflow:payload},200,corsHeaders(request));
+    }
+    if(operation==="transition"){
+      const id=clean(body.id),next=clean(body.next),decision=typeof body.decision==="string"?{reason:body.decision}:(body.decision&&typeof body.decision==="object"?body.decision:{});
+      if(!id||!next)return json({ok:false,error:"A workflow record and target stage are required."},400,corsHeaders(request));
+      const reason=clean(decision.reason);
+      if(["Returned","Rejected"].includes(next)&&!reason)return json({ok:false,error:"A reason is required when "+next.toLowerCase()+" is selected."},400,corsHeaders(request));
+      if(next==="Approved"&&!reason)return json({ok:false,error:"An approval decision statement is required."},400,corsHeaders(request));
+      if(next==="Approved"&&decision.conditionsRequired&&!clean(decision.conditions))return json({ok:false,error:"Approval conditions are required when conditions are marked as required."},400,corsHeaders(request));
+      const current=await read("workflowActions/"+id);
+      if(!current||current.workflowType!=="Authorization"||current.module!=="Authorization & Approvals")return json({ok:false,error:"Authorization request not found."},404,corsHeaders(request));
+      if(["Completed","Rejected"].includes(current.status))return json({ok:false,error:"This authorization workflow is closed and cannot be changed."},409,corsHeaders(request));
+      const transitions={Draft:{Submitted:"requester"},Submitted:{"Under Review":"reviewer",Returned:"reviewer"},"Under Review":{Approved:"approver",Rejected:"approver",Returned:"reviewer"},Returned:{Submitted:"requester"},Approved:{Completed:"implementer"}};
+      const required=transitions[current.status]?.[next];if(!required)return json({ok:false,error:"The transition "+current.status+" → "+next+" is not permitted."},409,corsHeaders(request));
+      const ownRoles=actorRole,allowed=required==="requester"?current.requestedByUid===claims.user_id:required==="reviewer"?current.reviewerUid===claims.user_id&&roles.some(x=>reviewerRoles.includes(x)):required==="approver"?current.approverUid===claims.user_id&&roles.some(x=>approverRoles.includes(x)):current.implementerUid===claims.user_id&&roles.some(x=>implementerRoles.includes(x));
+      if(!allowed)return json({ok:false,error:"You are not authorised to perform this workflow transition."},403,corsHeaders(request));
+      if(required==="approver"&&current.requestedByUid===claims.user_id)return json({ok:false,error:"Self-approval is prohibited."},403,corsHeaders(request));
+      const now=stamp(),history=[...(Array.isArray(current.history)?current.history:[]),{status:next,from:current.status,action:next,reason:reason||null,actorUid:claims.user_id,actorEmail:claims.email||null,at:now}],stages=["Draft","Submitted","Under Review","Approved","Rejected","Returned","Completed"];
+      const decisionRecord=["Approved","Rejected","Returned"].includes(next)?{decision:next,decisionReason:reason||null,decisionBasis:clean(decision.basis)||null,conditions:clean(decision.conditions)||null,conditionsRequired:Boolean(decision.conditionsRequired),authorityConfirmation:Boolean(decision.authorityConfirmation),recordedByUid:claims.user_id,recordedByEmail:claims.email||null,recordedAt:now}:null;
+      const changes={status:next,stageIndex:stages.indexOf(next),history,workflowVersion:Number(current.workflowVersion||1)+1,lastWorkflowActionAt:now,updatedAt:now};
+      if(next==="Under Review")changes.reviewStartedAt=now;if(next==="Approved")changes.approvedAt=now;if(next==="Rejected")changes.rejectedAt=now;if(next==="Returned")changes.returnedAt=now;if(next==="Completed")changes.completedAt=now;
+      if(reason)changes.decisionReason=reason;if(decisionRecord)changes.decisionRecord=decisionRecord;if(decision.basis)changes.decisionBasis=clean(decision.basis);if(decision.conditions)changes.decisionConditions=clean(decision.conditions);if(decision.conditionsRequired!==undefined)changes.conditionsRequired=Boolean(decision.conditionsRequired);if(decision.authorityConfirmation!==undefined)changes.decisionAuthorityConfirmed=Boolean(decision.authorityConfirmation);if(next==="Approved"&&decision.signatureRequired!==undefined)changes.signatureRequired=Boolean(decision.signatureRequired);
+      const write={update:{name:base+"/workflowActions/"+id,fields:fields(changes)},updateMask:{fieldPaths:Object.keys(changes)}};
+      if(current.updateTime)write.currentDocument={updateTime:current.updateTime};else return json({ok:false,error:"The authorization record has no concurrency token; refresh before changing it."},409,corsHeaders(request));
+      await commit([write,auditWrite("AUTHORIZATION_"+next.replace(/\s+/g,"_").toUpperCase(),id,{reference:current.reference,from:current.status,to:next,reason:reason||null,decision:decisionRecord,links:Object.fromEntries(["meetingId","meetingReference","resolutionId","resolutionReference","documentId","documentReference","procurementId","procurementReference"].filter(k=>current[k]!==undefined).map(k=>[k,current[k]]))})]);
+      return json({ok:true,id,status:next},200,corsHeaders(request));
+    }
+    return json({ok:false,error:"Unsupported Authorization workflow operation."},400,corsHeaders(request));
+  } catch(error) {
+    console.error("AUTHORIZATION_WORKFLOW_FAILURE",{uid:claims.user_id,operation,message:String(error?.message||error).slice(0,180)});
+    return json({ok:false,error:String(error?.message||"Authorization workflow service failed.")},503,corsHeaders(request));
+  }
+}
+
 async function handleFinanceAccounting(request, env) {
   let claims;
   try { claims = await authenticateFirebaseRequest(request, env); }
@@ -527,6 +612,9 @@ export default {
       }
       if (pathname === "/api/finance/accounting" && request.method === "POST") {
         return await handleFinanceAccounting(request, env);
+      }
+      if (pathname === "/api/authorization/workflows" && request.method === "POST") {
+        return await handleAuthorizationWorkflow(request, env);
       }
 
       if (env.ESIGN_MODULE_ENABLED === "true") {
