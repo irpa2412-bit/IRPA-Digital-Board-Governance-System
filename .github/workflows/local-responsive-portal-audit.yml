@@ -8,6 +8,8 @@ on:
       - "src/styles/**"
       - "tests/fixtures/meeting-portal-fixture.*"
       - "tests/meeting-portal-browser.test.mjs"
+      - "tests/portal-responsive-browser.test.mjs"
+      - "vite.responsive-fixture.config.js"
       - "vite.meeting-fixture.config.js"
       - ".github/workflows/local-responsive-portal-audit.yml"
   workflow_dispatch:
@@ -31,11 +33,37 @@ jobs:
         run: |
           npm install --no-save --package-lock=false playwright
           npx playwright install --with-deps chromium
-      - name: Start local isolated meeting fixture
+      - name: Build local staging-configured app and portal fixtures
+        env:
+          VITE_IRPA_DEPLOYMENT_ENV: "staging"
+          VITE_FIREBASE_API_KEY: "fixture-staging-api-key"
+          VITE_FIREBASE_AUTH_DOMAIN: "irpa-dbg-staging-a73ec.firebaseapp.com"
+          VITE_FIREBASE_PROJECT_ID: "irpa-dbg-staging-a73ec"
+          VITE_FIREBASE_MESSAGING_SENDER_ID: "fixture-staging-sender"
+          VITE_FIREBASE_APP_ID: "fixture-staging-app"
+          VITE_GATEWAY_ORIGIN: "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
+          VITE_GOOGLE_DRIVE_GATEWAY_URL: "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
+        run: npm run build -- --config vite.responsive-fixture.config.js
+      - name: Start local preview of the fixture build
+        run: |
+          npx vite preview --config vite.responsive-fixture.config.js --host 127.0.0.1 > "$RUNNER_TEMP/responsive-fixture-preview.log" 2>&1 &
+          for i in $(seq 1 60); do if curl -fsS "http://127.0.0.1:4180/tests/fixtures/portal-layout-fixture.html?portal=Meeting" >/dev/null; then exit 0; fi; sleep 1; done
+          cat "$RUNNER_TEMP/responsive-fixture-preview.log"
+          exit 1
+      - name: Test all eight portal components at 360px and desktop
+        run: node tests/portal-responsive-browser.test.mjs
+      - name: Start isolated meeting regression fixture
         run: |
           npx vite --config vite.meeting-fixture.config.js --host 127.0.0.1 > "$RUNNER_TEMP/meeting-fixture-vite.log" 2>&1 &
-          for i in $(seq 1 60); do curl -fsS http://127.0.0.1:4179/tests/fixtures/meeting-portal-fixture.html >/dev/null && exit 0; sleep 1; done
+          for i in $(seq 1 60); do if curl -fsS http://127.0.0.1:4179/tests/fixtures/meeting-portal-fixture.html >/dev/null; then exit 0; fi; sleep 1; done
           cat "$RUNNER_TEMP/meeting-fixture-vite.log"
           exit 1
-      - name: Test meeting portal at 360px and desktop with Playwright
+      - name: Re-run meeting register regression at 360px and desktop
         run: node tests/meeting-portal-browser.test.mjs
+      - name: Upload responsive screenshots and audit logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: irpa-local-responsive-audit
+          path: artifacts/responsive-screenshots/
+          if-no-files-found: warn
