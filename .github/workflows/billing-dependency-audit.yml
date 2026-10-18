@@ -1,0 +1,53 @@
+name: IRPA Billing Dependency and Undefined-Name Audit
+
+on:
+  push:
+    branches: [integration/five-portal-chain-20261018]
+    paths:
+      - "src/**"
+      - "functions/**"
+      - "drive-gateway/src/**"
+      - "public/**"
+      - "scripts/check-no-billing-deps.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/billing-dependency-audit.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "functions/**"
+      - "drive-gateway/src/**"
+      - "public/**"
+      - "scripts/check-no-billing-deps.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/billing-dependency-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked application dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Install ephemeral static-analysis tools without changing the lockfile
+        run: npm install --no-save --package-lock=false eslint@9 globals@15
+      - name: Inventory billing dependencies and enforce no-undef in src/firebase
+        run: node scripts/check-no-billing-deps.mjs
+      - name: Upload static dependency inventory
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: irpa-billing-dependency-audit
+          path: artifacts/billing-dependency-audit.md
+          if-no-files-found: warn
