@@ -103,3 +103,11 @@ test("Sign a Document initiation resolves the same primary and governance archiv
   assert.match(page, /async function initiateSigning\(e\)[\s\S]*?const url=controlledPdfUrl\(source\)/);
   assert.match(page, /function controlledPdfUrl\(document=\{\}\)/);
 });
+
+test("Signature Portal PDF palette remains legible and reports retrieval failures", () => {
+  const page = fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx", import.meta.url), "utf8");
+  assert.match(page, /background:"#111827",color:"#f8fafc"/);
+  assert.match(page, /background:"#ffffff"/);
+  assert.match(page, /PDF could not be loaded\. Check your access to this controlled document/);
+  assert.ok(page.includes('setPdf(null);setPageNum(1);setError("")'));
+});
