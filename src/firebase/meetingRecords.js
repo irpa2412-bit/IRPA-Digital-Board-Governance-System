@@ -18,5 +18,5 @@ export async function registerMeetingWorkingDocument(payload){const r=await call
 export async function listMeetingWorkingDocuments(meetingId){const r=await call("listMeetingWorkingDocuments")({meetingId});return r.data?.documents||[];}
 export async function submitMeetingDocumentReview(payload){const r=await call("submitMeetingDocumentReview")(payload);return r.data;}
 
-export async function signMeetingAttendance(payload){const r=await call("signMeetingAttendance")(payload);return r.data;}
-export async function getMeetingAttendanceRegister(meetingId){const r=await call("getMeetingAttendanceRegister")({meetingId});return r.data;}
+export async function signMeetingAttendance(payload){return callMeetingService("/api/meeting-attendance/sign",payload);}
+export async function getMeetingAttendanceRegister(meetingId){return callMeetingService("/api/meeting-attendance/register",{meetingId});}
