@@ -39,3 +39,13 @@ test("frontend uses authenticated Cloudflare meeting service rather than Firebas
   assert.doesNotMatch(client, /call\("signMeetingAttendance"\)/);
   assert.doesNotMatch(client, /call\("getMeetingAttendanceRegister"\)/);
 });
+
+const deployWorkflow = readFileSync(new URL("../../.github/workflows/firebase-deploy.yml", import.meta.url), "utf8");
+const legacyCallables = readFileSync(new URL("../../functions/meetingAttendanceRegister.js", import.meta.url), "utf8");
+
+test("Firebase deployment no longer blocks release on migrated attendance callables while preserving rollback source", () => {
+  assert.match(deployWorkflow, /Confirm meeting attendance is served by Cloudflare/);
+  assert.doesNotMatch(deployWorkflow, /deploy --project irpa-digital-board-governance --only functions:signMeetingAttendance,functions:getMeetingAttendanceRegister/);
+  assert.match(legacyCallables, /exports\.signMeetingAttendance/);
+  assert.match(legacyCallables, /exports\.getMeetingAttendanceRegister/);
+});
