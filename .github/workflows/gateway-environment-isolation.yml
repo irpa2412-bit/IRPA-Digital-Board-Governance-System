@@ -1,0 +1,81 @@
+name: IRPA Gateway Environment Isolation
+
+on:
+  push:
+    branches:
+      - integration/five-portal-chain-20261018
+    paths:
+      - "src/firebase/gatewayEnvironment.js"
+      - "src/firebase/config.js"
+      - "src/firebase/documentLifecycle.js"
+      - "src/firebase/signatureStorage.js"
+      - "src/firebase/meetingGatewayApi.js"
+      - "src/firebase/auth.js"
+      - "src/pages/CommunicationMediaPortal.jsx"
+      - "vite.config.js"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/gateway-environment-isolation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  staging-build-isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Verify resolver accepts the isolated staging pair and rejects mixed pairs
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import { resolveGatewayUrl } from "./src/firebase/gatewayEnvironment.js";
+          const staging = {
+            VITE_FIREBASE_PROJECT_ID: "irpa-dbg-staging-a73ec",
+            VITE_IRPA_DEPLOYMENT_ENV: "staging",
+            VITE_GATEWAY_ORIGIN: "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev",
+            VITE_GOOGLE_DRIVE_GATEWAY_URL: "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
+          };
+          const production = {
+            VITE_FIREBASE_PROJECT_ID: "irpa-digital-board-governance",
+            VITE_IRPA_DEPLOYMENT_ENV: "production",
+            VITE_GATEWAY_ORIGIN: "https://irpa-google-drive-gateway.irpa-governance.workers.dev"
+          };
+          assert.equal(resolveGatewayUrl(staging), "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev");
+          assert.equal(resolveGatewayUrl(production), "https://irpa-google-drive-gateway.irpa-governance.workers.dev");
+          assert.throws(() => resolveGatewayUrl({...staging, VITE_GATEWAY_ORIGIN: production.VITE_GATEWAY_ORIGIN}), /conflicts with Firebase project/);
+          assert.throws(() => resolveGatewayUrl({...staging, VITE_IRPA_DEPLOYMENT_ENV: "production"}), /conflicts with Firebase project/);
+          assert.throws(() => resolveGatewayUrl({...production, VITE_GOOGLE_DRIVE_GATEWAY_URL: staging.VITE_GATEWAY_ORIGIN}), /conflicts with Firebase project/);
+          console.log("Gateway environment policy: 5 assertions passed.");
+          NODE
+      - name: Build using staging Firebase and staging Gateway only
+        env:
+          VITE_IRPA_DEPLOYMENT_ENV: "staging"
+          VITE_FIREBASE_API_KEY: "AIzaSyA6UmHtP-mRr99rBw57_-qrD4_mFSBnZ38"
+          VITE_FIREBASE_AUTH_DOMAIN: "irpa-dbg-staging-a73ec.firebaseapp.com"
+          VITE_FIREBASE_PROJECT_ID: "irpa-dbg-staging-a73ec"
+          VITE_FIREBASE_STORAGE_BUCKET: "irpa-dbg-staging-a73ec.firebasestorage.app"
+          VITE_FIREBASE_MESSAGING_SENDER_ID: "1018976634858"
+          VITE_FIREBASE_APP_ID: "1:1018976634858:web:e73e9e09f55a76ade25493"
+          VITE_FIREBASE_MEASUREMENT_ID: ""
+          VITE_GATEWAY_ORIGIN: "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
+          VITE_GOOGLE_DRIVE_GATEWAY_URL: "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
+          VITE_META_STAGING_GATEWAY_URL: "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
+        run: |
+          set -euo pipefail
+          npm run build
+          test -s dist/index.html
+          grep -R -q 'irpa-dbg-staging-a73ec' dist
+          grep -R -q 'irpa-google-drive-gateway-staging.irpa-governance.workers.dev' dist
+          if grep -R -q 'https://irpa-google-drive-gateway.irpa-governance.workers.dev' dist; then
+            echo "Production Gateway leaked into the staging frontend bundle." >&2
+            exit 1
+          fi
+          echo "Staging bundle isolation passed; no deployment was performed."
