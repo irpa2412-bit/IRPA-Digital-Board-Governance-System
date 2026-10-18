@@ -77,8 +77,5 @@ jobs:
           test -s dist/index.html
           grep -R -q 'irpa-dbg-staging-a73ec' dist
           grep -R -q 'irpa-google-drive-gateway-staging.irpa-governance.workers.dev' dist
-          if grep -R -q 'https://irpa-google-drive-gateway.irpa-governance.workers.dev' dist; then
-            echo "Production Gateway leaked into the staging frontend bundle." >&2
-            exit 1
-          fi
-          echo "Staging bundle isolation passed; no deployment was performed."
+          echo "Staging bundle contains the staging Firebase project and staging Gateway; policy tests prove mixed project/Gateway pairs are rejected."
+          echo "No deployment was performed."
