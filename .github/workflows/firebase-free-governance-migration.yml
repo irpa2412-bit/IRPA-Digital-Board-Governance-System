@@ -45,6 +45,8 @@ jobs:
         run: node --test tests/cloudflare-document-reference-migration.test.mjs
       - name: Verify Cloudflare signer-authority migration
         run: node --test tests/cloudflare-signer-authority-migration.test.mjs
+      - name: Verify Cloudflare meeting-directory migration
+        run: node --test tests/cloudflare-meeting-directory-migration.test.mjs
       - name: Set up Java for Firebase emulator
         uses: actions/setup-java@v4
         with:
