@@ -1,0 +1,47 @@
+name: Firebase-free governance migration checks
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "drive-gateway/**"
+      - "functions/**"
+      - "tests/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/firebase-free-governance-migration.yml"
+  push:
+    branches: [firebase-free-governance-migration-20261018]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install application dependencies
+        run: npm ci
+      - name: Build application
+        run: npm run build
+      - name: Verify portal navigation
+        run: npm run test:portal-navigation
+      - name: Verify meeting entry policy
+        run: npm run test:meeting-entry-policy
+      - name: Verify meeting invitation quorum
+        run: npm run test:meeting-invitation-resend
+      - name: Verify security rules
+        run: npm run test:security-rules
+      - name: Install gateway dependencies
+        run: npm ci --prefix drive-gateway
+      - name: Run gateway regression and governance-store tests
+        run: npm test --prefix drive-gateway
