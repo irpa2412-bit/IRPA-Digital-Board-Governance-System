@@ -2542,7 +2542,7 @@ function escapeHtml(value) {
 
 function corsHeaders(request) {
   const origin = request.headers.get("Origin") || "";
-  const allowed = origin === "https://irpa.or.tz" || origin === "https://www.irpa.or.tz" || origin === "https://irpa-digital-board-governance.web.app" || origin === "https://irpa-digital-board-governance.firebaseapp.com" || origin === "http://localhost:5173" || origin === "https://staging.irpa.or.tz" || origin === "https://irpa-dgb-meeting-room-staging.irpa-governance.workers.dev" || origin === "https://irpa-dbg-staging-a73ec.web.app" || origin === "https://irpa-dbg-staging-a73ec.firebaseapp.com";
+  const allowed = origin === "https://irpa-digital-board-governance-frontend.irpa-governance.workers.dev" || origin === "https://irpa.or.tz" || origin === "https://www.irpa.or.tz" || origin === "https://irpa-digital-board-governance.web.app" || origin === "https://irpa-digital-board-governance.firebaseapp.com" || origin === "http://localhost:5173" || origin === "https://staging.irpa.or.tz" || origin === "https://irpa-dgb-meeting-room-staging.irpa-governance.workers.dev" || origin === "https://irpa-dbg-staging-a73ec.web.app" || origin === "https://irpa-dbg-staging-a73ec.firebaseapp.com";
   return {
     "Access-Control-Allow-Origin": allowed ? origin : "https://irpa.or.tz",
     "Access-Control-Allow-Headers": "Authorization, Content-Type, X-IRPA-Invitation-Version, x-signing-token",
