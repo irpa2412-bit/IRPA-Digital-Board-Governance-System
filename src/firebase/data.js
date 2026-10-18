@@ -509,9 +509,15 @@ export async function listMeetingInviteeDirectory(){
 /** Secure administrator-only removal for pending invitation records. */
 export async function removeInvitationRecord(invitationId){
  const id=String(invitationId||"").trim();
- if(!id)throw new Error("An invitation record is required.");
- if(!auth.currentUser?.uid)throw new Error("Administrator authentication is required.");
- const call=httpsCallable(getFunctions(undefined,"us-central1"),"removeInvitationRecord");
- const result=await call({invitationId:id});
- return result.data||{ok:true};
+ if(!id||id.includes("/"))throw new Error("A valid invitation record is required.");
+ const user=auth.currentUser;
+ if(!user?.uid)throw new Error("Administrator authentication is required.");
+ const token=await user.getIdToken();
+ const gateway=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").trim().replace(/\\/+$/,"");
+ let response;
+ try{response=await fetch(gateway+"/api/authorisation/invitations/remove",{method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({invitationId:id})});}
+ catch{throw new Error("The Cloudflare invitation service is unavailable. No Firebase callable fallback was used.");}
+ const result=await response.json().catch(()=>({}));
+ if(!response.ok||result.ok!==true)throw new Error(result.error||"The invitation could not be safely removed.");
+ return result;
 }
