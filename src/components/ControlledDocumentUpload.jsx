@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from "react";
 import { auth } from "../firebase/config";
-import { createRecord, getRecord, COLLECTIONS, getCurrentMemberProfile, getCurrentEmployeeProfile, nextDocumentReference } from "../firebase/data";
+import { registerControlledDocument, getCurrentMemberProfile, getCurrentEmployeeProfile, nextDocumentReference } from "../firebase/data";
 import { readWorkflowContext, withWorkflowLinks } from "../firebase/workflowLinks";
 import { uploadControlledDocumentRouted, buildDocumentArchiveDestination } from "../firebase/signatureStorage";
 import { validateControlledDocumentUpload } from "./controlledDocumentUploadValidation.mjs";
@@ -81,9 +81,9 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
       let documentId = "";
       for (let attempt = 1; attempt <= 2; attempt += 1) {
         try {
-          documentId = await createRecord(COLLECTIONS.documents, pendingDocument.documentPayload);
-          const persisted = await getRecord(COLLECTIONS.documents, documentId);
-          if (!persisted) throw new Error("The controlled-document register record could not be verified after creation.");
+          const registration = await registerControlledDocument(pendingDocument.documentPayload);
+          documentId = registration.id;
+          if (!registration.document) throw new Error("The controlled-document register record could not be verified after creation.");
           break;
         } catch (error) {
           if (attempt === 2) throw new Error(`Document upload completed, but the document could not be saved to the IRPA controlled-document register: ${error?.message || "Firestore registration failed."}`);
@@ -248,9 +248,9 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         let documentId = "";
         for (let attempt = 1; attempt <= 2; attempt += 1) {
           try {
-            documentId = await createRecord(COLLECTIONS.documents, documentPayload);
-            const persisted = await getRecord(COLLECTIONS.documents, documentId);
-            if (!persisted) throw new Error("The controlled-document register record could not be verified after creation.");
+            const registration = await registerControlledDocument(documentPayload);
+            documentId = registration.id;
+            if (!registration.document) throw new Error("The controlled-document register record could not be verified after creation.");
             break;
           } catch (error) {
             if (attempt === 2) throw new Error(`Document archive upload completed, but the document could not be saved to the IRPA controlled-document register: ${error?.message || "Firestore registration failed."}`);

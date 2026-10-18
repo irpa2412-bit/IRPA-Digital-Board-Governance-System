@@ -310,14 +310,6 @@ jobs:
       # Google Cloud billing is currently closed for this project, so new Cloud Functions
       # deployments cannot activate Cloud Build/Artifact Registry. Existing deployed
       # functions remain untouched; deployment can be re-enabled when billing is restored.
-      - name: Deploy login authorization resolver
-        continue-on-error: true
-        uses: w9jds/firebase-action@v14.17.0
-        with:
-          args: deploy --project irpa-digital-board-governance --only functions:resolveAuthenticatedLoginContext
-        env:
-          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
-
       - name: Deploy retained Firebase password-reset function
         continue-on-error: true
         uses: w9jds/firebase-action@v14.17.0
@@ -346,33 +338,14 @@ jobs:
             echo "::warning::Firestore rules keep actual operational writes closed, but administrator-controlled reopening remains unavailable until both actual-data gate callables deploy successfully. Check Cloud Functions billing, API enablement and service-account permissions."
           fi
 
-      - name: Deploy signed meeting attendance register callables
-        id: attendance_register
-        continue-on-error: true
-        uses: w9jds/firebase-action@v14.17.0
-        with:
-          args: deploy --project irpa-digital-board-governance --only functions:signMeetingAttendance,functions:getMeetingAttendanceRegister
-        env:
-          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
-
-      - name: Report meeting attendance callable deployment status
-        if: always()
-        env:
-          ATTENDANCE_REGISTER_OUTCOME: ${{ steps.attendance_register.outcome }}
+      - name: Confirm meeting attendance is served by Cloudflare
         run: |
-          if [ "$ATTENDANCE_REGISTER_OUTCOME" = "success" ]; then
-            echo "MEETING_ATTENDANCE_REGISTER_CALLABLES_DEPLOYED=true"
-          else
-            echo "::warning::Meeting attendance UI is published, but its server-side signing/retrieval callables were not deployed. Check Firebase Cloud Functions billing, API enablement and service-account permissions before treating the register as live."
-          fi
-      # Deploy the secure Invitation Register removal endpoint explicitly.
-      # Do not silently publish the UI without its required server authorization path.
-      - name: Deploy secure invitation removal callable
-        uses: w9jds/firebase-action@v14.17.0
-        with:
-          args: deploy --project irpa-digital-board-governance --only functions:removeInvitationRecord
-        env:
-          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+          echo "MEETING_ATTENDANCE_CLOUDFLARE_ROUTES_REQUIRED=true"
+          echo "Legacy Firebase attendance callables are retained for rollback but are not deployed."
+      - name: Confirm invitation removal is served by Cloudflare
+        run: |
+          echo "INVITATION_REMOVAL_CLOUDFLARE_ROUTE_REQUIRED=true"
+          echo "Legacy Firebase invitation-removal callable is retained for rollback but is not deployed."
 
       - name: Verify live Firebase application
         run: |

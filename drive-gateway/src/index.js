@@ -28,6 +28,7 @@ import { createCommunicationsSiteRouter } from "./communicationsSite.mjs";
 import { createMetaOAuthRouter } from "./metaOAuth.mjs";
 import { createMeetingPortalRouter } from "./meetingPortal.mjs";
 import { createMeetingServicesRouter } from "./meetingServices.mjs";
+import { createProcurementServicesRouter } from "./procurementServices.mjs";
 
 function getFirebaseProjectId(env) {
   const projectId = String(env?.FIREBASE_PROJECT_ID || "").trim();
@@ -50,6 +51,7 @@ let jwksFetchedAt = 0;
 
 const documentLifecycleRouter = createDocumentLifecycleRouter({
   getFirebaseProjectId: env => getFirebaseProjectId(env),
+  getFirestoreAdminAccessToken: env => getFirestoreAdminAccessToken(env),
   allowedContentTypes: ALLOWED_CONTENT_TYPES,
   authenticateFirebaseRequest,
   getFirestoreDocument,
@@ -81,10 +83,322 @@ const meetingServicesRouter = createMeetingServicesRouter({
   corsHeaders
 });
 
+const procurementServicesRouter = createProcurementServicesRouter({
+  authenticateFirebaseRequest,
+  getFirebaseProjectId,
+  getFirestoreAdminAccessToken,
+  json,
+  corsHeaders
+});
+
 
 function normalizeGatewayAuthority(value) {
   return String(value||"").toLowerCase().replace(/^(the|irpa)\s+/,"").replace(/[._-]+/g," ").replace(/\s+/g," ").trim();
 }
+
+
+
+
+
+async function handleAuthorizationWorkflow(request, env) {
+  let claims;
+  try { claims = await authenticateFirebaseRequest(request, env); }
+  catch { return json({ok:false,error:"A valid IRPA sign-in is required."},401,corsHeaders(request)); }
+  let body;
+  try { body = await request.json(); } catch { return json({ok:false,error:"A valid JSON request is required."},400,corsHeaders(request)); }
+  const operation=String(body.operation||"").trim();
+  const project=getFirebaseProjectId(env), token=await getFirestoreAdminAccessToken(env), base="projects/"+project+"/databases/(default)/documents";
+  const clean=v=>String(v??"").trim(), lower=v=>clean(v).toLowerCase(), stamp=()=>new Date().toISOString();
+  const decode=v=>{if(!v)return null;if("stringValue"in v)return v.stringValue;if("booleanValue"in v)return v.booleanValue;if("integerValue"in v)return Number(v.integerValue);if("doubleValue"in v)return v.doubleValue;if("timestampValue"in v)return v.timestampValue;if("nullValue"in v)return null;if("arrayValue"in v)return(v.arrayValue.values||[]).map(decode);if("mapValue"in v)return Object.fromEntries(Object.entries(v.mapValue.fields||{}).map(([k,x])=>[k,decode(x)]));return null;};
+  const encode=v=>v===null||v===undefined?{nullValue:null}:v instanceof Date?{timestampValue:v.toISOString()}:typeof v==="boolean"?{booleanValue:v}:typeof v==="number"?(Number.isInteger(v)?{integerValue:String(v)}:{doubleValue:v}):Array.isArray(v)?{arrayValue:{values:v.map(encode)}}:typeof v==="object"?{mapValue:{fields:Object.fromEntries(Object.entries(v).map(([k,x])=>[k,encode(x)]))}}:{stringValue:String(v)};
+  const fields=o=>Object.fromEntries(Object.entries(o).map(([k,v])=>[k,encode(v)]));
+  async function read(path){const res=await fetch("https://firestore.googleapis.com/v1/"+base+"/"+path,{headers:{Authorization:"Bearer "+token}});if(res.status===404)return null;if(!res.ok)throw new Error("Authorization record lookup failed.");const doc=await res.json();return {id:String(doc.name||"").split("/").pop(),updateTime:doc.updateTime||null,...Object.fromEntries(Object.entries(doc.fields||{}).map(([k,v])=>[k,decode(v)]))};}
+  async function listWorkflows(){
+    const query={structuredQuery:{from:[{collectionId:"workflowActions"}],where:{compositeFilter:{op:"AND",filters:[
+      {fieldFilter:{field:{fieldPath:"workflowType"},op:"EQUAL",value:{stringValue:"Authorization"}}},
+      {fieldFilter:{field:{fieldPath:"module"},op:"EQUAL",value:{stringValue:"Authorization & Approvals"}}}
+    ]}},limit:1000}};
+    const res=await fetch("https://firestore.googleapis.com/v1/"+base+":runQuery",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify(query)});
+    if(!res.ok)throw new Error("Authorization register could not be loaded.");
+    return (await res.json()).filter(x=>x.document).map(x=>({id:String(x.document.name||"").split("/").pop(),updateTime:x.document.updateTime||null,...Object.fromEntries(Object.entries(x.document.fields||{}).map(([k,v])=>[k,decode(v)]))}));
+  }
+  async function commit(writes){const res=await fetch("https://firestore.googleapis.com/v1/"+base+":commit",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({writes})});if(!res.ok)throw new Error("Authorization record and audit event could not be committed atomically.");return res.json();}
+  const [admin,member,employee]=await Promise.all([read("adminProfiles/"+claims.user_id),read("members/"+claims.user_id),read("employees/"+claims.user_id)]);
+  const isAdmin=admin?.active===true;
+  const active=!!(isAdmin||member?.status==="Active"||employee?.status==="Active"||member?.registrationStatus==="Active"||employee?.employmentStatus==="Active");
+  if(!active)return json({ok:false,error:"An active IRPA institutional identity is required."},403,corsHeaders(request));
+  const roles=[member?.role,employee?.role,...(Array.isArray(member?.roles)?member.roles:[]),...(Array.isArray(employee?.roles)?employee.roles:[])].map(clean).filter(Boolean);
+  const reviewerRoles=["Director Internal Oversight","Internal Oversight Officer","Director Human Resources","HR Manager","Director Finance & Administration","Finance Manager","Programme/Technical Officer","Operations Manager"];
+  const approverRoles=["Executive Director"];
+  const implementerRoles=["Executive Director","Director Finance & Administration","Finance Manager","Operations Manager","Programme/Technical Officer","Director Human Resources","HR Manager"];
+  const actorRole=roles[0]||"";
+  const workflowRef=id=>base+"/workflowActions/"+id;
+  const auditWrite=(action,recordId,details)=>({update:{name:base+"/audit/"+crypto.randomUUID(),fields:fields({action,collection:"workflowActions",recordId,details,actorUid:claims.user_id,actorEmail:claims.email||null,createdAt:stamp()})},currentDocument:{exists:false}});
+  try {
+    if(operation==="list"){
+      const rows=await listWorkflows();
+      return json({ok:true,workflows:rows.filter(x=>isAdmin||(Array.isArray(x.involvedUids)&&x.involvedUids.includes(claims.user_id))).sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||"")))},200,corsHeaders(request));
+    }
+    if(operation==="create"){
+      const data=body.data&&typeof body.data==="object"?body.data:{};
+      if(!clean(data.title)||!clean(data.justification))return json({ok:false,error:"Title and justification are required."},400,corsHeaders(request));
+      const required=["requestedAction","authorityBasis","requestCategory","decisionAuthority"].filter(k=>!clean(data[k]));
+      if(required.length)return json({ok:false,error:"The governance request is incomplete: "+required.join(", ")+" are required."},400,corsHeaders(request));
+      const reviewerUid=clean(data.reviewerUid),approverUid=clean(data.approverUid),implementerUid=clean(data.implementerUid||approverUid);
+      if(!reviewerUid||!approverUid)return json({ok:false,error:"A named reviewer and approver are required."},400,corsHeaders(request));
+      if(approverUid===claims.user_id)return json({ok:false,error:"Self-approval is prohibited. The requester cannot be the approver."},403,corsHeaders(request));
+      const [reviewerMember,reviewerEmployee,approverMember,approverEmployee,implMember,implEmployee]=await Promise.all([read("members/"+reviewerUid),read("employees/"+reviewerUid),read("members/"+approverUid),read("employees/"+approverUid),read("members/"+implementerUid),read("employees/"+implementerUid)]);
+      const activeRole=(a,b)=>{const d=[a,b].find(x=>x&&(x.status==="Active"||x.employmentStatus==="Active"||x.registrationStatus==="Active"));return d?[d.role,...(Array.isArray(d.roles)?d.roles:[])].map(clean).filter(Boolean):[];};
+      const reviewerRoleList=activeRole(reviewerMember,reviewerEmployee),approverRoleList=activeRole(approverMember,approverEmployee),implRoleList=activeRole(implMember,implEmployee);
+      if(!reviewerRoleList.some(x=>reviewerRoles.includes(x)))return json({ok:false,error:"The selected reviewer does not hold an active approved reviewer role."},403,corsHeaders(request));
+      if(!approverRoleList.some(x=>approverRoles.includes(x)))return json({ok:false,error:"The selected approver does not hold the required active Executive Director role."},403,corsHeaders(request));
+      if(!implRoleList.some(x=>implementerRoles.includes(x)))return json({ok:false,error:"The selected implementer does not hold an active approved implementer role."},403,corsHeaders(request));
+      const id="IRPA-AUTH-"+new Date().getFullYear()+"-"+Date.now().toString().slice(-8),now=stamp();
+      const involved=[...new Set([claims.user_id,reviewerUid,approverUid,implementerUid,...(Array.isArray(data.involvedUids)?data.involvedUids:[])].map(clean).filter(Boolean))];
+      const linkKeys=["meetingId","meetingReference","participantId","participantReference","resolutionId","resolutionReference","votingIssueId","votingReference","decisionId","decisionReference","actionId","actionReference","documentId","documentReference","signatureEnvelopeId","signatureReference","authorizationRequestId","authorizationReference","employeeUid","employeeNumber","procurementId","procurementReference","reportId","reportReference","researchStudyId","researchReference","researchDatasetId","datasetReference","relatedType","relatedId","relatedReference"];const links={};for(const k of linkKeys)if(data[k]!==undefined&&data[k]!==null&&String(data[k]).trim()!=="")links[k]=data[k];
+      const payload={workflowType:"Authorization",module:"Authorization & Approvals",status:"Draft",stageIndex:0,workflowVersion:1,reference:clean(data.reference)||id,title:clean(data.title),requestedByUid:claims.user_id,requestedByEmail:claims.email||"",requestedByName:clean(data.requestedByName),reviewerUid,reviewerName:clean(data.reviewerName),approverUid,approverName:clean(data.approverName),implementerUid,implementerName:clean(data.implementerName||data.approverName),amount:data.amount||"",budgetLine:data.budgetLine||"",justification:clean(data.justification),requestedAction:clean(data.requestedAction),requestCategory:clean(data.requestCategory||"General Governance Request"),urgency:clean(data.urgency||"Normal"),authorityBasis:clean(data.authorityBasis),decisionAuthority:clean(data.decisionAuthority),decisionRequiredBy:clean(data.decisionRequiredBy),currency:clean(data.currency||"TZS"),fundingSource:data.fundingSource||"",riskLevel:clean(data.riskLevel||"Medium"),riskSummary:clean(data.riskSummary),complianceConfirmation:Boolean(data.complianceConfirmation),conflictDisclosure:clean(data.conflictDisclosure),requestedEffectiveDate:data.requestedEffectiveDate||"",supportingDocumentId:data.documentId||data.relatedId||null,supportingDocumentReference:data.documentReference||data.relatedReference||null,signatureRequired:Boolean(data.signatureRequired),signatureFields:Array.isArray(data.signatureFields)?data.signatureFields:[],signatureFieldSetVersion:data.signatureFieldSetVersion||"IRPA-UNIFIED-FIELD-PALETTE-V1",involvedUids:involved,...links,workflowLinks:data.workflowLinks&&typeof data.workflowLinks==="object"?data.workflowLinks:links,linkedWorkflowModules:Array.isArray(data.linkedWorkflowModules)?data.linkedWorkflowModules:[],history:[{status:"Draft",from:null,action:"Created",reason:null,actorUid:claims.user_id,actorEmail:claims.email||null,at:now}],createdAt:now,updatedAt:now};
+      await commit([{update:{name:workflowRef(id),fields:fields(payload)},currentDocument:{exists:false}},auditWrite("AUTHORIZATION_CREATED",id,{reference:payload.reference,status:"Draft",requestedByUid:claims.user_id,reviewerUid,approverUid,implementerUid,links})]);
+      return json({ok:true,id,workflow:payload},200,corsHeaders(request));
+    }
+    if(operation==="transition"){
+      const id=clean(body.id),next=clean(body.next),decision=typeof body.decision==="string"?{reason:body.decision}:(body.decision&&typeof body.decision==="object"?body.decision:{});
+      if(!id||!next)return json({ok:false,error:"A workflow record and target stage are required."},400,corsHeaders(request));
+      const reason=clean(decision.reason);
+      if(["Returned","Rejected"].includes(next)&&!reason)return json({ok:false,error:"A reason is required when "+next.toLowerCase()+" is selected."},400,corsHeaders(request));
+      if(next==="Approved"&&!reason)return json({ok:false,error:"An approval decision statement is required."},400,corsHeaders(request));
+      if(next==="Approved"&&decision.conditionsRequired&&!clean(decision.conditions))return json({ok:false,error:"Approval conditions are required when conditions are marked as required."},400,corsHeaders(request));
+      const current=await read("workflowActions/"+id);
+      if(!current||current.workflowType!=="Authorization"||current.module!=="Authorization & Approvals")return json({ok:false,error:"Authorization request not found."},404,corsHeaders(request));
+      if(["Completed","Rejected"].includes(current.status))return json({ok:false,error:"This authorization workflow is closed and cannot be changed."},409,corsHeaders(request));
+      const transitions={Draft:{Submitted:"requester"},Submitted:{"Under Review":"reviewer",Returned:"reviewer"},"Under Review":{Approved:"approver",Rejected:"approver",Returned:"reviewer"},Returned:{Submitted:"requester"},Approved:{Completed:"implementer"}};
+      const required=transitions[current.status]?.[next];if(!required)return json({ok:false,error:"The transition "+current.status+" → "+next+" is not permitted."},409,corsHeaders(request));
+      const ownRoles=actorRole,allowed=required==="requester"?current.requestedByUid===claims.user_id:required==="reviewer"?current.reviewerUid===claims.user_id&&roles.some(x=>reviewerRoles.includes(x)):required==="approver"?current.approverUid===claims.user_id&&roles.some(x=>approverRoles.includes(x)):current.implementerUid===claims.user_id&&roles.some(x=>implementerRoles.includes(x));
+      if(!allowed)return json({ok:false,error:"You are not authorised to perform this workflow transition."},403,corsHeaders(request));
+      if(required==="approver"&&current.requestedByUid===claims.user_id)return json({ok:false,error:"Self-approval is prohibited."},403,corsHeaders(request));
+      const now=stamp(),history=[...(Array.isArray(current.history)?current.history:[]),{status:next,from:current.status,action:next,reason:reason||null,actorUid:claims.user_id,actorEmail:claims.email||null,at:now}],stages=["Draft","Submitted","Under Review","Approved","Rejected","Returned","Completed"];
+      const decisionRecord=["Approved","Rejected","Returned"].includes(next)?{decision:next,decisionReason:reason||null,decisionBasis:clean(decision.basis)||null,conditions:clean(decision.conditions)||null,conditionsRequired:Boolean(decision.conditionsRequired),authorityConfirmation:Boolean(decision.authorityConfirmation),recordedByUid:claims.user_id,recordedByEmail:claims.email||null,recordedAt:now}:null;
+      const changes={status:next,stageIndex:stages.indexOf(next),history,workflowVersion:Number(current.workflowVersion||1)+1,lastWorkflowActionAt:now,updatedAt:now};
+      if(next==="Under Review")changes.reviewStartedAt=now;if(next==="Approved")changes.approvedAt=now;if(next==="Rejected")changes.rejectedAt=now;if(next==="Returned")changes.returnedAt=now;if(next==="Completed")changes.completedAt=now;
+      if(reason)changes.decisionReason=reason;if(decisionRecord)changes.decisionRecord=decisionRecord;if(decision.basis)changes.decisionBasis=clean(decision.basis);if(decision.conditions)changes.decisionConditions=clean(decision.conditions);if(decision.conditionsRequired!==undefined)changes.conditionsRequired=Boolean(decision.conditionsRequired);if(decision.authorityConfirmation!==undefined)changes.decisionAuthorityConfirmed=Boolean(decision.authorityConfirmation);if(next==="Approved"&&decision.signatureRequired!==undefined)changes.signatureRequired=Boolean(decision.signatureRequired);
+      const write={update:{name:base+"/workflowActions/"+id,fields:fields(changes)},updateMask:{fieldPaths:Object.keys(changes)}};
+      if(current.updateTime)write.currentDocument={updateTime:current.updateTime};else return json({ok:false,error:"The authorization record has no concurrency token; refresh before changing it."},409,corsHeaders(request));
+      await commit([write,auditWrite("AUTHORIZATION_"+next.replace(/\s+/g,"_").toUpperCase(),id,{reference:current.reference,from:current.status,to:next,reason:reason||null,decision:decisionRecord,links:Object.fromEntries(["meetingId","meetingReference","resolutionId","resolutionReference","documentId","documentReference","procurementId","procurementReference"].filter(k=>current[k]!==undefined).map(k=>[k,current[k]]))})]);
+      return json({ok:true,id,status:next},200,corsHeaders(request));
+    }
+    return json({ok:false,error:"Unsupported Authorization workflow operation."},400,corsHeaders(request));
+  } catch(error) {
+    console.error("AUTHORIZATION_WORKFLOW_FAILURE",{uid:claims.user_id,operation,message:String(error?.message||error).slice(0,180)});
+    return json({ok:false,error:String(error?.message||"Authorization workflow service failed.")},503,corsHeaders(request));
+  }
+}
+
+async function handleFinanceAccounting(request, env) {
+  let claims;
+  try { claims = await authenticateFirebaseRequest(request, env); }
+  catch { return json({ok:false,error:"Authenticated IRPA Finance access is required."},401,corsHeaders(request)); }
+  let body; try { body = await request.json(); } catch { return json({ok:false,error:"Invalid JSON payload."},400,corsHeaders(request)); }
+  const action=String(body.functionName||"").trim(), data=body.data&&typeof body.data==="object"?body.data:{};
+  const allowedActions=new Set(["initializeFinanceStructure","submitFinanceJournalForApproval","postFinanceJournal","reverseFinanceJournal","closeFinancePeriod","reconcileFinanceBank","calculateFinanceBudgetVariance","getFinanceTrialBalance","getFinanceStatements","createFinanceThreeWayMatch","validateFinanceDonorRestriction","registerFinanceAsset","calculateFinancePayroll","exportFinanceCsv","importFinanceCsvRows"]);
+  if(!allowedActions.has(action))return json({ok:false,error:"Unsupported Finance operation."},400,corsHeaders(request));
+  const project=getFirebaseProjectId(env),token=await getFirestoreAdminAccessToken(env),base="projects/"+project+"/databases/(default)/documents";
+  const clean=v=>String(v??"").trim(),money=v=>{const n=Number(v);return Number.isFinite(n)?Math.round(n*100)/100:0;};
+  const periodKey=v=>{const p=clean(v);if(!/^\d{4}-\d{2}$/.test(p))throw new Error("Financial period must use YYYY-MM.");return p;};
+  const enc=v=>v===null||v===undefined?{nullValue:null}:v&&typeof v==="object"&&Object.keys(v).length===1&&"timestampValue" in v?v:typeof v==="boolean"?{booleanValue:v}:typeof v==="number"?(Number.isInteger(v)?{integerValue:String(v)}:{doubleValue:v}):Array.isArray(v)?{arrayValue:{values:v.map(enc)}}:typeof v==="object"?{mapValue:{fields:Object.fromEntries(Object.entries(v).map(([k,x])=>[k,enc(x)]))}}:{stringValue:String(v)};
+  const fields=o=>Object.fromEntries(Object.entries(o).map(([k,v])=>[k,enc(v)])),stamp=()=>new Date().toISOString();
+  async function readDoc(path){const res=await fetch("https://firestore.googleapis.com/v1/"+base+"/"+path,{headers:{Authorization:"Bearer "+token}});if(res.status===404)return null;if(!res.ok)throw new Error("Finance record lookup failed.");return await res.json();}
+  async function list(col){const res=await fetch("https://firestore.googleapis.com/v1/"+base+":runQuery",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({structuredQuery:{from:[{collectionId:col}]}})});if(!res.ok)throw new Error("Finance register "+col+" could not be read.");return(await res.json()).filter(x=>x.document).map(x=>({id:String(x.document.name||"").split("/").pop(),...firestoreDocumentToPlain(x.document),_updateTime:x.document.updateTime}));}
+  async function commit(writes){const res=await fetch("https://firestore.googleapis.com/v1/"+base+":commit",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({writes})});if(!res.ok)throw new Error("Finance record and audit commit failed (HTTP "+res.status+").");return res.json();}
+  async function audit(actionName,details){const id=crypto.randomUUID();return {update:{name:base+"/audit/"+id,fields:fields({action:actionName,category:"FINANCE_ACCOUNTING",performedByUid:claims.user_id,performedByEmail:claims.email||"",details,createdAt:{timestampValue:stamp()}})},currentDocument:{exists:false}};}
+  async function create(col,id,values){return {update:{name:base+"/"+col+"/"+id,fields:fields(values)},currentDocument:{exists:false}};}
+  const adminDoc=firestoreDocumentToPlain(await readDoc("adminProfiles/"+claims.user_id))||{},employee=firestoreDocumentToPlain(await readDoc("employees/"+claims.user_id))||{},member=firestoreDocumentToPlain(await readDoc("members/"+claims.user_id))||{};
+  const roles=[adminDoc.role,employee.role,member.role,...(Array.isArray(employee.roles)?employee.roles:[]),...(Array.isArray(member.roles)?member.roles:[])].filter(Boolean).map(String);
+  const isAdmin=adminDoc.active===true;
+  const financeRoles=new Set(["Administrator","Executive Director","Director Finance & Administration","Finance Manager","Accountant","Finance Officer"]);
+  if(!isAdmin&&!roles.some(r=>financeRoles.has(r)))return json({ok:false,error:"Finance authorization is required."},403,corsHeaders(request));
+  const all=async col=>(await list(col)).map(({_updateTime,...d})=>d),periodFor=d=>periodKey(String(d?.date||stamp()).slice(0,7));
+  const getOpenPeriod=async period=>{const p=firestoreDocumentToPlain(await readDoc("financePeriods/"+period));if(p&&p.status!=="Open")throw new Error("Financial period "+period+" is "+p.status+".");return p||{status:"Open"};};
+  try {
+    let result;
+    if(action==="calculateFinancePayroll"){
+      const gross=money(data.gross),deductions=money(data.deductions),employerContributions=money(data.employerContributions);if(gross<0||deductions<0||employerContributions<0)throw new Error("Payroll values cannot be negative.");
+      result={gross,deductions,netPay:money(gross-deductions),employerContributions,totalEmployerCost:money(gross+employerContributions),formula:"Net Pay = Gross Pay − Employee Deductions"};
+    } else if(action==="validateFinanceDonorRestriction"){
+      const grantId=clean(data.grantId),amount=money(data.amount),category=clean(data.category);if(!grantId||amount<=0||!category)throw new Error("Grant ID, amount and expenditure category are required.");
+      const g=firestoreDocumentToPlain(await readDoc("financeGrants/"+grantId));if(!g)throw new Error("Grant record not found.");const allowed=Array.isArray(g.allowedCategories)?g.allowedCategories.map(String):[],remaining=money(money(g.awardAmount)-money(g.utilizedAmount)),categoryAllowed=!allowed.length||allowed.includes(category);
+      result={grantId,allowed:categoryAllowed&&remaining>=amount,categoryAllowed,remainingBefore:remaining,remainingAfter:money(remaining-amount),restricted:g.restricted===true};
+    } else if(action==="calculateFinanceBudgetVariance"){
+      const p=clean(data.period),scope=x=>!p||String(x.budgetYear||x.date||x.reportingPeriod||"").includes(p);const [budgets,commitments,transactions]=await Promise.all(["financeBudgets","financeCommitments","financeTransactions"].map(all));
+      const budget=money(budgets.filter(scope).reduce((s,x)=>s+money(x.amount??x.budgetAmount),0)),committed=money(commitments.filter(scope).reduce((s,x)=>s+money(x.amount??x.committedAmount),0)),actual=money(transactions.filter(x=>["Posted","Reconciled"].includes(x.status)&&scope(x)).reduce((s,x)=>s+money(x.amount),0));
+      result={period:p||"ALL",approvedBudget:budget,commitments:committed,actualExpenditure:actual,availableBudget:money(budget-committed-actual),variance:money(budget-actual),formula:"Approved Budget − Actual Expenditure"};
+    } else if(action==="getFinanceTrialBalance"){
+      const p=clean(data.period),entries=(await all("financeLedgerEntries")).filter(x=>!p||x.period===p),map=new Map();for(const e of entries){const code=clean(e.accountCode),v=map.get(code)||{accountCode:code,debit:0,credit:0};v.debit=money(v.debit+money(e.debit));v.credit=money(v.credit+money(e.credit));map.set(code,v);}
+      const rows=[...map.values()].map(x=>({...x,balance:money(x.debit-x.credit)}));result={period:p||"ALL",rows,totalDebit:money(rows.reduce((s,x)=>s+x.debit,0)),totalCredit:money(rows.reduce((s,x)=>s+x.credit,0))};
+    } else if(action==="getFinanceStatements"){
+      const p=clean(data.period),entries=(await all("financeLedgerEntries")).filter(x=>!p||x.period===p),accounts=await all("financeChartOfAccounts"),by=new Map(accounts.map(a=>[clean(a.code),a])),totals={Asset:0,Liability:0,Equity:0,Income:0,Expense:0};
+      for(const e of entries){const a=by.get(clean(e.accountCode));if(!a||!Object.hasOwn(totals,a.type))continue;totals[a.type]=money(totals[a.type]+money(e.debit)-money(e.credit));}
+      const surplus=money(totals.Income+totals.Expense);result={period:p||"ALL",income:totals.Income,expenses:totals.Expense,surplusOrDeficit:surplus,assets:totals.Asset,liabilities:totals.Liability,equity:totals.Equity,statementOfFinancialPositionCheck:money(totals.Asset-(totals.Liability+totals.Equity+surplus))};
+    } else if(action==="exportFinanceCsv"){
+      const source=clean(data.source||"financeLedgerEntries"),approved=["financeLedgerEntries","financeTransactions","financeBudgets","financeCommitments","financeAssets","financeJournalBatches"];if(!approved.includes(source))throw new Error("Unsupported Finance export source.");
+      const rows=await all(source),keys=[...new Set(rows.flatMap(x=>Object.keys(x)))].filter(k=>!["createdAt","updatedAt","_updateTime"].includes(k));
+      const esc=v=>{const value=Array.isArray(v)||v&&typeof v==="object"?JSON.stringify(v):String(v??"");return /[",\n]/.test(value)?'"'+value.replace(/"/g,'""')+'"':value;};
+      const csv=[keys.map(esc).join(","),...rows.map(x=>keys.map(k=>esc(x[k])).join(","))].join("\n");result={source,rowCount:rows.length,filename:source+"-"+stamp().slice(0,10)+".csv",csv};
+    } else if(action==="registerFinanceAsset"){
+      const name=clean(data.name),cost=money(data.cost);if(!name||cost<=0)throw new Error("Asset name and positive cost are required.");const id=crypto.randomUUID(),assetNumber="IRPA-AST-"+new Date().getUTCFullYear()+"-"+id.slice(0,6).toUpperCase(),now=stamp();
+      await commit([await create("financeAssets",id,{assetNumber,name,cost,acquisitionDate:clean(data.acquisitionDate)||now.slice(0,10),category:clean(data.category),location:clean(data.location),usefulLifeMonths:Math.max(1,Number(data.usefulLifeMonths||60)),depreciationMethod:"Straight-line",status:"Register",registeredByUid:claims.user_id,createdAt:now,updatedAt:now}),await audit("FINANCE_ASSET_REGISTERED",{assetNumber,name,cost})]);result={success:true,assetNumber,id};
+    } else if(action==="reconcileFinanceBank"){
+      const period=periodKey(data.period),account=clean(data.bankAccount),statementBalance=money(data.statementBalance),bookBalance=money(data.bookBalance),outstanding=Array.isArray(data.outstandingItems)?data.outstandingItems:[];if(!account)throw new Error("Bank account is required.");
+      const difference=money(statementBalance-bookBalance),status=Math.abs(difference)<0.01?"Reconciled":"Exception",id=period+"-"+account,now=stamp(),old=await readDoc("financeReconciliations/"+id),write={update:{name:base+"/financeReconciliations/"+id,fields:fields({period,bankAccount:account,statementBalance,bookBalance,reconciliationDifference:difference,outstandingItems:outstanding,status,reviewedByUid:claims.user_id,reviewedByEmail:claims.email||"",reviewedAt:now,updatedAt:now,financialControl:true})}};
+      write.currentDocument=old?.updateTime?{updateTime:old.updateTime}:{exists:false};await commit([write,await audit("FINANCE_BANK_RECONCILIATION",{period,bankAccount:account,difference,status})]);result={success:true,period,bankAccount:account,difference,status};
+    } else if(action==="createFinanceThreeWayMatch"){
+      const procurementId=clean(data.procurementRequestId),financeId=clean(data.financeTransactionId),invoiceAmount=money(data.invoiceAmount);if(!procurementId||!financeId||invoiceAmount<=0)throw new Error("Procurement ID, Finance transaction ID and invoice amount are required.");
+      const [p,t]=await Promise.all([readDoc("procurementRequests/"+procurementId),readDoc("financeTransactions/"+financeId)]),pd=firestoreDocumentToPlain(p),td=firestoreDocumentToPlain(t);if(!pd||!td)throw new Error("Procurement or Finance transaction record not found.");
+      const poAmount=money(pd.approvedAmount??pd.amount),financeAmount=money(td.amount),matched=Math.abs(poAmount-financeAmount)<0.01&&Math.abs(financeAmount-invoiceAmount)<0.01,old=await readDoc("financePaymentMatches/"+financeId),now=stamp(),write={update:{name:base+"/financePaymentMatches/"+financeId,fields:fields({procurementRequestId:procurementId,financeTransactionId:financeId,poAmount,financeAmount,invoiceAmount,matched,status:matched?"Matched":"Exception",checkedByUid:claims.user_id,checkedAt:now,updatedAt:now})}};
+      write.currentDocument=old?.updateTime?{updateTime:old.updateTime}:{exists:false};await commit([write,await audit("FINANCE_THREE_WAY_MATCH",{procurementRequestId:procurementId,financeTransactionId:financeId,poAmount,financeAmount,invoiceAmount,matched})]);result={success:true,matched,status:matched?"Matched":"Exception",poAmount,financeAmount,invoiceAmount};
+    } else if(action==="importFinanceCsvRows"){
+      if(!isAdmin&&!roles.some(r=>["Director Finance & Administration","Finance Manager","Accountant","Finance Officer"].includes(r)))throw new Error("Finance import authority is required.");const source=clean(data.source),rows=Array.isArray(data.rows)?data.rows:[],approved=["financeBudgets","financeCommitments","financeTransactions"];if(!approved.includes(source)||!rows.length||rows.length>500)throw new Error("Import requires 1–500 rows into an approved Finance register.");
+      const writes=[],now=stamp();let imported=0;for(const row of rows){if(!row||typeof row!=="object"||Array.isArray(row))continue;writes.push(await create(source,crypto.randomUUID(),{...row,source:"CSV_IMPORT",importedByUid:claims.user_id,importedAt:now,createdAt:now,updatedAt:now}));imported++;}
+      for(let i=0;i<writes.length;i+=400)await commit(writes.slice(i,i+400));await commit([await audit("FINANCE_CSV_IMPORTED",{source,imported})]);result={success:true,source,imported};
+    } else if(action==="initializeFinanceStructure"){
+      if(!isAdmin)throw new Error("Only an active Finance administrator can initialize the finance structure.");const accounts=[["1100","Cash & Bank","Asset","Debit"],["1200","Receivables","Asset","Debit"],["1300","Prepayments","Asset","Debit"],["2100","Payables","Liability","Credit"],["2200","Accrued Liabilities","Liability","Credit"],["3000","Accumulated Fund / Net Assets","Equity","Credit"],["4100","Grant Income","Income","Credit"],["4200","Donations & Other Income","Income","Credit"],["5100","Personnel Costs","Expense","Debit"],["5200","Programme Activities","Expense","Debit"],["5300","Procurement & Supplies","Expense","Debit"],["5400","Transport & Logistics","Expense","Debit"],["5500","Administration","Expense","Debit"]];
+      const writes=[];let created=0;for(const [code,name,type,normal] of accounts){if(!await readDoc("financeChartOfAccounts/"+code)){writes.push(await create("financeChartOfAccounts",code,{code,name,type,normal,active:true,systemSeed:true,createdAt:stamp(),updatedAt:stamp()}));created++;}}
+      const current=stamp().slice(0,7);if(!await readDoc("financePeriods/"+current))writes.push(await create("financePeriods",current,{period:current,status:"Open",openedByUid:claims.user_id,openedAt:stamp(),systemSeed:true}));
+      for(let i=0;i<writes.length;i+=400)await commit(writes.slice(i,i+400));await commit([await audit("FINANCE_STRUCTURE_INITIALIZED",{createdAccounts:created,period:current})]);result={success:true,createdAccounts:created,period:current};
+    } else if(action==="submitFinanceJournalForApproval"){
+      const id=clean(data.journalId);if(!id)throw new Error("Journal ID is required.");const doc=await readDoc("financeJournalBatches/"+id),d=firestoreDocumentToPlain(doc);if(!d)throw new Error("Journal draft not found.");if(d.status!=="Draft")throw new Error("Only Draft journals can be submitted.");
+      const lines=Array.isArray(d.lines)?d.lines:[],debit=money(lines.reduce((s,l)=>s+money(l.debit),0)),credit=money(lines.reduce((s,l)=>s+money(l.credit),0));if(debit<=0||debit!==credit)throw new Error("Journal must be revalidated as balanced before approval.");const period=periodFor(d);await getOpenPeriod(period);
+      const codes=[...new Set(lines.map(x=>clean(x.accountCode)).filter(Boolean))];if(codes.length<2)throw new Error("At least two account codes are required.");const accounts=await all("financeChartOfAccounts"),missing=codes.filter(c=>!accounts.some(a=>clean(a.code)===c));if(missing.length)throw new Error("Unknown account code(s): "+missing.join(", ")+".");
+      const now=stamp();await commit([{update:{name:base+"/financeJournalBatches/"+id,fields:fields({status:"Submitted for Approval",workflowStage:"Submitted for Approval",postingStatus:"Unposted",validatedDebit:debit,validatedCredit:credit,submittedByUid:claims.user_id,submittedAt:now,updatedAt:now})},currentDocument:{updateTime:doc.updateTime}},await audit("FINANCE_JOURNAL_SUBMITTED",{journalId:id,period,debit,credit})]);result={success:true,journalId:id,period};
+    } else if(action==="postFinanceJournal"){
+      if(!isAdmin&&!roles.some(r=>["Director Finance & Administration","Finance Manager","Accountant"].includes(r)))throw new Error("Authorised Finance posting authority is required.");const id=clean(data.journalId);if(!id)throw new Error("Journal ID is required.");const doc=await readDoc("financeJournalBatches/"+id),d=firestoreDocumentToPlain(doc);if(!d)throw new Error("Journal not found.");if(d.status!=="Submitted for Approval")throw new Error("Only submitted journals can be posted.");
+      const lines=Array.isArray(d.lines)?d.lines:[],debit=money(lines.reduce((s,l)=>s+money(l.debit),0)),credit=money(lines.reduce((s,l)=>s+money(l.credit),0));if(debit<=0||debit!==credit)throw new Error("Journal is not balanced.");const period=periodFor(d);await getOpenPeriod(period);if(await readDoc("financeLedgerJournals/"+id))throw new Error("This journal has already been posted.");
+      const now=stamp(),writes=[await create("financeLedgerJournals",id,{journalId:id,reference:d.reference||id,date:d.date,period,description:d.description||"",totalDebit:debit,totalCredit:credit,status:"Posted",postedByUid:claims.user_id,postedByEmail:claims.email||"",postedAt:now,createdAt:now})];
+      for(let i=0;i<lines.length;i++){const l=lines[i];writes.push(await create("financeLedgerEntries",crypto.randomUUID(),{journalId:id,reference:d.reference||id,lineNumber:i+1,accountCode:clean(l.accountCode),description:clean(l.description),debit:money(l.debit),credit:money(l.credit),period,postedByUid:claims.user_id,postedAt:now,createdAt:now}));}
+      writes.push({update:{name:base+"/financeJournalBatches/"+id,fields:fields({status:"Posted",workflowStage:"Posted",postingStatus:"Posted",postedByUid:claims.user_id,postedByEmail:claims.email||"",postedAt:now,updatedAt:now,validatedDebit:debit,validatedCredit:credit})},currentDocument:{updateTime:doc.updateTime}},await audit("FINANCE_JOURNAL_POSTED",{journalId:id,period,debit,credit}));await commit(writes);result={success:true,journalId:id,period,debit,credit};
+    } else if(action==="reverseFinanceJournal"){
+      const id=clean(data.journalId),reason=clean(data.reason);if(!id||!reason)throw new Error("Journal ID and reversal reason are required.");const j=firestoreDocumentToPlain(await readDoc("financeLedgerJournals/"+id));if(!j)throw new Error("Posted ledger journal not found.");const entries=(await all("financeLedgerEntries")).filter(x=>x.journalId===id);if(!entries.length)throw new Error("No ledger entries exist for the posted journal.");
+      const reversalId=id+"-REV-"+Date.now(),now=stamp(),lines=entries.map(x=>({accountCode:x.accountCode,description:"Reversal of "+id+": "+reason,debit:money(x.credit),credit:money(x.debit)}));const writes=[await create("financeJournalBatches",reversalId,{reference:reversalId,date:now.slice(0,10),description:"Reversal of "+id+": "+reason,lines,totalDebit:money(j.totalCredit),totalCredit:money(j.totalDebit),status:"Submitted for Approval",workflowStage:"Submitted for Approval",postingStatus:"Unposted",reversalOfJournalId:id,reversalReason:reason,financialControl:true,createdAt:now,updatedAt:now}),{update:{name:base+"/financeLedgerJournals/"+id,fields:fields({reversalRequested:true,reversalRequestedByUid:claims.user_id,reversalReason:reason,updatedAt:now})},currentDocument:{updateTime:(await readDoc("financeLedgerJournals/"+id)).updateTime}},await audit("FINANCE_JOURNAL_REVERSAL_REQUESTED",{journalId:id,reversalJournalId:reversalId,reason})];await commit(writes);result={success:true,reversalJournalId:reversalId};
+    } else if(action==="closeFinancePeriod"){
+      if(!isAdmin&&!roles.some(r=>["Director Finance & Administration","Finance Manager"].includes(r)))throw new Error("Authorised Finance period-closing authority is required.");const period=periodKey(data.period),pref=await readDoc("financePeriods/"+period),p=firestoreDocumentToPlain(pref);
+      if(p?.status==="Closed")result={success:true,alreadyClosed:true,period};else{const drafts=(await all("financeJournalBatches")).filter(d=>["Draft","Submitted for Approval"].includes(d.status)&&String(d.date||"").startsWith(period));if(drafts.length)throw new Error("Cannot close "+period+": "+drafts.length+" unposted journal(s) remain.");const exceptions=(await all("financeReconciliations")).filter(d=>d.status==="Exception"&&String(d.period||"")===period);if(exceptions.length)throw new Error("Cannot close "+period+": unresolved bank reconciliation exception(s) remain.");const now=stamp(),write={update:{name:base+"/financePeriods/"+period,fields:fields({period,status:"Closed",closedByUid:claims.user_id,closedByEmail:claims.email||"",closedAt:now,updatedAt:now})}};write.currentDocument=pref?.updateTime?{updateTime:pref.updateTime}:{exists:false};await commit([write,await audit("FINANCE_PERIOD_CLOSED",{period})]);result={success:true,period};}
+    }
+    return json({ok:true,result},200,corsHeaders(request));
+  } catch(error) {
+    const message=String(error?.message||"Finance operation failed.");console.error("CLOUDFLARE_FINANCE_OPERATION_FAILURE",{action,message:message.slice(0,240),uid:claims.user_id});return json({ok:false,error:message},400,corsHeaders(request));
+  }
+}
+
+async function removePendingInvitation(request, env) {
+  let claims;
+  try { claims=await authenticateFirebaseRequest(request,env); }
+  catch { return json({ok:false,error:"Administrator authentication is required."},401,corsHeaders(request)); }
+  let data;try{data=await request.json();}catch{return json({ok:false,error:"Invalid JSON payload."},400,corsHeaders(request));}
+  const id=String(data.invitationId||"").trim();
+  if(!/^[A-Za-z0-9_-]{1,128}$/.test(id))return json({ok:false,error:"A valid invitation record is required."},400,corsHeaders(request));
+  const adminSnap=await getFirestoreDocument(env,"adminProfiles/"+claims.user_id,claims.token).catch(()=>null);
+  const isAdmin=firestoreDocumentToPlain(adminSnap)?.active===true;
+  if(!isAdmin)return json({ok:false,error:"Only an active IRPA Administrator can remove invitation records."},403,corsHeaders(request));
+  const invitationDoc=await getFirestoreDocument(env,"invitations/"+id,claims.token).catch(()=>null);
+  const invitation=firestoreDocumentToPlain(invitationDoc);
+  if(!invitation)return json({ok:false,error:"This invitation record no longer exists. Refresh the Invitation Register."},404,corsHeaders(request));
+  if(String(invitation.meetingId||"").trim()||String(invitation.source||"").toLowerCase().includes("meeting participant"))return json({ok:false,error:"This invitee is linked to a meeting. Remove the participant through the Meeting Participants portal so meeting access passes and attendance/quorum counts are revoked together."},409,corsHeaders(request));
+  const status=String(invitation.status||"").trim().toLowerCase();
+  if(invitation.accountActivated===true||["activated","accepted"].includes(status)||invitation.activationCompleted===true)return json({ok:false,error:"This invitation is linked to an activated account and cannot be removed from the register. Retain the identity record and use the authorised account-deactivation process."},409,corsHeaders(request));
+  const project=getFirebaseProjectId(env),token=await getFirestoreAdminAccessToken(env),base=`projects/${project}/databases/(default)/documents`;
+  const enc=v=>v===null?{nullValue:null}:typeof v==="boolean"?{booleanValue:v}:typeof v==="number"?{integerValue:String(v)}:typeof v==="object"?{mapValue:{fields:Object.fromEntries(Object.entries(v).map(([k,x])=>[k,enc(x)]))}}:{stringValue:String(v)};
+  const auditId=crypto.randomUUID(),stamp=new Date().toISOString();
+  const auditFields={action:enc("INVITATION_REGISTER_REMOVE"),collection:enc("invitations"),recordId:enc(id),details:enc({email:String(invitation.email||"").trim().toLowerCase(),statusBeforeRemoval:invitation.status||"Pending",source:"ADMINISTRATOR_INVITATION_REGISTER"}),actorUid:enc(claims.user_id),actorEmail:enc(String(claims.email||"").trim().toLowerCase()),createdAt:{timestampValue:stamp}};
+  const response=await fetch(`https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents:commit`,{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({writes:[{delete:`${base}/invitations/${id}`},{update:{name:`${base}/audit/${auditId}`,fields:auditFields},currentDocument:{exists:false}}]})});
+  if(!response.ok)return json({ok:false,error:"The invitation removal and audit record could not be committed atomically."},503,corsHeaders(request));
+  return json({ok:true,invitationId:id,auditId},200,corsHeaders(request));
+}
+
+async function listMeetingInviteeDirectory(request, env) {
+  let claims;
+  try { claims = await authenticateFirebaseRequest(request, env); }
+  catch { return json({ok:false,error:"Sign in to load the institutional register directory."},401,corsHeaders(request)); }
+  const project=getFirebaseProjectId(env), token=await getFirestoreAdminAccessToken(env);
+  async function list(collectionName){
+    const response=await fetch(`https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents:runQuery`,{
+      method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
+      body:JSON.stringify({structuredQuery:{from:[{collectionId:collectionName}],limit:1000}})
+    });
+    if(!response.ok)throw new Error("Unable to load institutional directory.");
+    return (await response.json()).filter(x=>x.document).map(x=>({id:String(x.document.name||"").split("/").pop(),...(firestoreDocumentToPlain(x.document)||{})}));
+  }
+  try{
+    const [members,employees]=await Promise.all([list("members"),list("employees")]);
+    const textValue=v=>String(v??"").trim();
+    const projectRows=(rows,kind)=>rows.map(d=>{
+      const statuses=[d.status,d.employmentStatus,d.registrationStatus].map(v=>textValue(v).toLowerCase()).filter(Boolean);
+      const active=statuses.some(v=>["active","activated"].includes(v));
+      if(!active)return null;
+      const role=textValue(d.role),board=d.boardMember===true||role.toLowerCase()==="board member"||Boolean(d.boardPosition)||textValue(d.department)==="Board of Directors";
+      if(kind==="board"&&!board||kind==="member"&&board)return null;
+      return {id:d.id,uid:textValue(d.uid||d.authUid||d.userUid),name:textValue(d.name||d.fullName||d.memberName||d.displayName),email:textValue(d.email||d.emailAddress||d.contactEmail).toLowerCase(),memberNumber:textValue(d.memberNumber||d.registrationNumber),employeeNumber:textValue(d.employeeNumber),role,roles:Array.isArray(d.roles)?d.roles:[],boardMember:d.boardMember===true,boardPosition:textValue(d.boardPosition),department:textValue(d.department),memberType:textValue(d.memberType),status:"Active",employmentStatus:textValue(d.employmentStatus),registrationStatus:textValue(d.registrationStatus),title:textValue(d.title),position:textValue(d.position),departmentalRole:textValue(d.departmentalRole)};
+    }).filter(Boolean);
+    return json({ok:true,boardMembers:projectRows(members,"board"),members:projectRows(members,"member"),employees:projectRows(employees,"employee")},200,corsHeaders(request));
+  }catch(error){console.error("MEETING_INVITEE_DIRECTORY_FAILURE",{uid:claims.user_id,message:String(error?.message||error).slice(0,180)});return json({ok:false,error:"The institutional directory could not be loaded."},503,corsHeaders(request));}
+}
+
+async function updateSignerAuthority(request, env) {
+  const claims = await authenticateFirebaseRequest(request, env);
+  const uid = String(claims.user_id || "").trim();
+  const email = String(claims.email || "").trim().toLowerCase();
+  if (!uid) return json({ok:false,error:"Authentication is required."},401,corsHeaders(request));
+  let data;
+  try { data = await request.json(); } catch { return json({ok:false,error:"Invalid JSON payload."},400,corsHeaders(request)); }
+  const requestedRole=String(data.authorityRole||"").trim();
+  const requestedDepartment=String(data.authorityDepartment||"").trim();
+  const requestedUnit=String(data.authorityUnit||"").trim();
+  const authorityStatus=String(data.authorityStatus||"Current").trim();
+  const authorityReference=String(data.authorityReference||"").trim();
+  const authorityEffectiveAt=String(data.authorityEffectiveAt||"").trim()||null;
+  const authorityExpiresAt=String(data.authorityExpiresAt||"").trim()||null;
+  if(!requestedRole) return json({ok:false,error:"Select the current signing authority before saving."},400,corsHeaders(request));
+  if(!["Current","Pending Verification","Expired","Not yet assigned"].includes(authorityStatus)) return json({ok:false,error:"Select a valid signing authority status."},400,corsHeaders(request));
+  if(authorityEffectiveAt&&authorityExpiresAt&&authorityExpiresAt<authorityEffectiveAt) return json({ok:false,error:"Authority expiry date cannot be earlier than the effective date."},400,corsHeaders(request));
+  const serviceToken=await getFirestoreAdminAccessToken(env);
+  const records=[];
+  const add=(document,sourceCollection,fallbackId)=>{
+    if(!document?.fields)return;
+    const record=firestoreDocumentToPlain(document)||{};
+    const id=String(document.name||"").split("/").pop()||fallbackId||uid;
+    records.push({id,...record,sourceCollection});
+  };
+  add(await getFirestoreDocument(env,"members/"+uid,serviceToken),"members",uid);
+  add(await getFirestoreDocument(env,"employees/"+uid,serviceToken),"employees",uid);
+  if(email){
+    for(const row of await getFirestoreDocumentsByEmail(env,"members",email,serviceToken).catch(()=>[]))add(row,"members",uid);
+    for(const row of await getFirestoreDocumentsByEmail(env,"employees",email,serviceToken).catch(()=>[]))add(row,"employees",uid);
+  }
+  const unique=[...new Map(records.map(x=>[x.sourceCollection+":"+x.id,x])).values()]
+    .filter(x=>String(x.status||x.employmentStatus||"Active").toLowerCase()!=="inactive");
+  if(!unique.length)return json({ok:false,error:"No active IRPA member or employee register entry was found for this account."},403,corsHeaders(request));
+  const valuesFor=record=>[record.role,record.boardPosition,record.unit,record.unitName,...(Array.isArray(record.roles)?record.roles:[]),...(Array.isArray(record.assignedRoles)?record.assignedRoles:[]),...(Array.isArray(record.selectedRoles)?record.selectedRoles:[]),...(Array.isArray(record.roleAssignments)?record.roleAssignments:[])].flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean));
+  const allowed=[...new Set(unique.flatMap(valuesFor))];
+  if(!allowed.includes(requestedRole))return json({ok:false,error:"The selected signing authority is not registered to this IRPA member/employee account."},403,corsHeaders(request));
+  const matching=unique.filter(record=>{
+    if(!valuesFor(record).includes(requestedRole))return false;
+    if(requestedDepartment&&String(record.department||"").trim()!==requestedDepartment)return false;
+    if(requestedUnit){const unit=String(record.unit||record.unitName||"").trim()||String(record.department||"").trim();if(unit!==requestedUnit)return false;}
+    return true;
+  });
+  if(!matching.length)return json({ok:false,error:"The selected department, unit and signing authority do not match an active IRPA register entry for this account."},403,corsHeaders(request));
+  const source=matching[0], authorityDepartment=String(source.department||"").trim(), authorityUnit=String(source.unit||source.unitName||"").trim()||authorityDepartment;
+  const existing=await getFirestoreDocument(env,"signerIdentities/"+uid,serviceToken);
+  if(!existing?.fields)return json({ok:false,error:"Signer Identity record is not available. Restore the Signer Identity link before updating signing authority."},409,corsHeaders(request));
+  const actorEmail=email||String(firestoreDocumentToPlain(existing)?.email||"").trim().toLowerCase();
+  const stamp=new Date().toISOString();
+  const encode=v=>v===null?{nullValue:null}:typeof v==="boolean"?{booleanValue:v}:typeof v==="number"?{doubleValue:v}:{stringValue:String(v)};
+  const changes={authorityRole:requestedRole,authorityStatus,authorityReference,authorityEffectiveAt,authorityExpiresAt,authorityDepartment,authorityUnit,authoritySourceCollection:source.sourceCollection,authoritySourceRecordId:source.id,authorityUpdatedAt:stamp,updatedAt:stamp};
+  const fields=Object.fromEntries(Object.entries(changes).map(([k,v])=>[k,encode(v)]));
+  const audit={action:encode("UPDATE_SIGNER_AUTHORITY"),collection:encode("signerIdentities"),recordId:encode(uid),details:{mapValue:{fields:Object.fromEntries(Object.entries({authorityRole:requestedRole,authorityStatus,authorityDepartment,authorityUnit,authoritySourceCollection:source.sourceCollection,authoritySourceRecordId:source.id}).map(([k,v])=>[k,encode(v)]))}},actorUid:encode(uid),actorEmail:actorEmail?encode(actorEmail):{nullValue:null},createdAt:{timestampValue:stamp}};
+  try{
+    await commitFirestoreDocumentAndAudit(env,"signerIdentities/"+uid,claims.token,fields,Object.keys(fields),audit, {createOnly:false});
+  }catch(error){console.error("Signer authority update failed",String(error?.message||error));return json({ok:false,error:"The signing authority and audit record could not be committed."},503,corsHeaders(request));}
+  return json({ok:true,uid,...changes},200,corsHeaders(request));
+}
+
 async function verifyGatewaySigningAuthority(env,user,manualAuthorityIdentification) {
   const input=normalizeGatewayAuthority(manualAuthorityIdentification);
   if(!input||!user?.uid||!user?.token)throw Object.assign(new Error("Authenticated signing authority is required."),{status:403});
@@ -181,6 +495,9 @@ export default {
 
       const meetingServicesResponse = await meetingServicesRouter(request, env, pathname);
       if (meetingServicesResponse) return meetingServicesResponse;
+
+      const procurementResponse = await procurementServicesRouter(request, env, pathname);
+      if (procurementResponse) return procurementResponse;
 
       if (pathname.startsWith("/api/communications/meta/")) {
         const metaResponse = await metaOAuthRouter(request, env);
@@ -301,8 +618,28 @@ export default {
         return await lookupInductionRegistration(request, env);
       }
 
+      if (url.pathname === "/api/session/login-context" && request.method === "POST") {
+        return await getLoginContext(request, env);
+      }
+
       if (url.pathname === "/api/session/profile" && request.method === "POST") {
         return await getSessionProfile(request, env);
+      }
+
+      if (pathname === "/api/signature/authority" && request.method === "POST") {
+        return await updateSignerAuthority(request, env);
+      }
+      if (pathname === "/api/meeting/invitee-directory" && request.method === "POST") {
+        return await listMeetingInviteeDirectory(request, env);
+      }
+      if (pathname === "/api/invitations/remove" && request.method === "POST") {
+        return await removePendingInvitation(request, env);
+      }
+      if (pathname === "/api/finance/accounting" && request.method === "POST") {
+        return await handleFinanceAccounting(request, env);
+      }
+      if (pathname === "/api/authorization/workflows" && request.method === "POST") {
+        return await handleAuthorizationWorkflow(request, env);
       }
 
       if (env.ESIGN_MODULE_ENABLED === "true") {
@@ -640,6 +977,11 @@ async function uploadControlledDocument(request, env) {
   if (!allowedCategories.includes(archiveCategory)) return json({ok:false,error:"Invalid document archive category."},400,corsHeaders(request));
   if (!allowedClassifications.includes(classification)) return json({ok:false,error:"Invalid document access classification."},400,corsHeaders(request));
   if (!ALLOWED_CONTENT_TYPES.has(contentType)) return json({ok:false,error:"This document format is not supported for controlled-document routing."},400,corsHeaders(request));
+  let documentIdentity;
+  try { documentIdentity = resolveIdentity({uid:claims.user_id,email:claims.email,admin:firestoreDocumentToPlain(adminRecord),member:firestoreDocumentToPlain(memberRecord),employee:firestoreDocumentToPlain(employeeRecord)}); }
+  catch { return json({ok:false,error:"An active IRPA member, employee or administrator profile is required for controlled document upload."},403,corsHeaders(request)); }
+  const uploadPolicy = canUpload(documentIdentity,{classification,documentType,archiveCategory,contentType});
+  if (!uploadPolicy.allowed) return json({ok:false,error:uploadPolicy.reason},403,corsHeaders(request));
   if (!Number.isFinite(fileSize) || fileSize <= 0 || fileSize > MAX_BYTES) return json({ok:false,error:"Uploaded documents must not exceed 10 MB."},400,corsHeaders(request));
 
   const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
@@ -1468,6 +1810,50 @@ async function ensureSignatureWorkflowFolder(request, env) {
   return json({ok:true,envelopeId,folderId,folderName,archiveAccess:"Restricted",path:`IRPA Governance System/Signature Workflows/${folderName}`},200,corsHeaders(request));
 }
 
+
+async function getLoginContext(request, env) {
+  let claims;
+  try { claims=await authenticateFirebaseRequest(request,env,{skipActivation:true}); }
+  catch { return json({ok:false,error:"Authentication is required to resolve the IRPA login context."},401,corsHeaders(request)); }
+  const uid=String(claims.user_id||"").trim(),email=String(claims.email||"").trim().toLowerCase();
+  if(!uid)return json({ok:false,error:"Authentication is required to resolve the IRPA login context."},401,corsHeaders(request));
+  const project=getFirebaseProjectId(env),token=await getFirestoreAdminAccessToken(env),base="projects/"+project+"/databases/(default)/documents";
+  const decode=field=>{if(!field)return null;if("stringValue"in field)return field.stringValue;if("booleanValue"in field)return field.booleanValue;if("integerValue"in field)return Number(field.integerValue);if("doubleValue"in field)return field.doubleValue;if("timestampValue"in field)return field.timestampValue;if("nullValue"in field)return null;if("arrayValue"in field)return(field.arrayValue.values||[]).map(decode);if("mapValue"in field)return Object.fromEntries(Object.entries(field.mapValue.fields||{}).map(([k,v])=>[k,decode(v)]));return null;};
+  const cleanDoc=d=>d?.fields?{id:String(d.name||"").split("/").pop(),...Object.fromEntries(Object.entries(d.fields).map(([k,v])=>[k,decode(v)]))}:null;
+  async function read(col,id){const res=await fetch("https://firestore.googleapis.com/v1/"+base+"/"+col+"/"+encodeURIComponent(id),{headers:{Authorization:"Bearer "+token}});if(res.status===404)return null;if(!res.ok)throw new Error("Unable to resolve the institutional login context.");return cleanDoc(await res.json());}
+  async function queryField(col,field,value,limit=10){const res=await fetch("https://firestore.googleapis.com/v1/"+base+":runQuery",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({structuredQuery:{from:[{collectionId:col}],where:{fieldFilter:{field:{fieldPath:field},op:"EQUAL",value:{stringValue:String(value)} }},limit}})});if(!res.ok)return[];return(await res.json()).filter(x=>x.document).map(x=>cleanDoc(x.document));}
+  const activeRecord=record=>{if(!record)return false;const status=String(record.status||record.employmentStatus||record.registrationStatus||"Active").trim().toLowerCase();return !["inactive","disabled","suspended","expired","revoked"].includes(status);};
+  const normalized=v=>String(v||"").toLowerCase().replace(/\s+/g," ").trim();
+  const configuredRoles=[...(Array.isArray(claims.irpaRoles)?claims.irpaRoles:[])].flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean));
+  if(claims.admin===true&&!configuredRoles.includes("Administrator"))configuredRoles.unshift("Administrator");
+  const configuredPathwayFor=role=>{const n=normalized(role);if(n==="administrator"||n==="executive director")return"Executive Office Department";if(n.includes("internal oversight"))return"Internal Oversight Department";if(n.includes("finance"))return"Finance & Administration Department";if(n.includes("human resources")||n.startsWith("hr "))return"Human Resources Department";if(n.includes("livestock"))return"Livestock Department";if(n.includes("environment")||n.includes("rangeland"))return"Environment & Rangeland Department";if(n.includes("outreach")||n.includes("community development"))return"Outreach & Community Development Department";if(n.includes("field"))return"Field Operations Department";if(n.includes("procurement"))return"Finance & Administration Department · Procurement Unit";if(n.includes("it")||n.includes("information technology"))return"Information Technology Department";return"Institutional Governance Workspace";};
+  const configuredAuthorityMap=new Map();
+  configuredRoles.forEach(role=>{const cleanRole=String(role||"").trim();if(!cleanRole)return;const authorityId="IRPA-AUTH-"+cleanRole.toUpperCase().replace(/[^A-Z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,48);configuredAuthorityMap.set(authorityId,{id:authorityId,authorityId,role:cleanRole,pathway:configuredPathwayFor(cleanRole),source:"Gateway Configuration",active:true});});
+  const [admin,memberDirect,employeeDirect]=await Promise.all([read("adminProfiles",uid),read("members",uid),read("employees",uid)]);
+  const memberRecords=memberDirect?[memberDirect]:[],employeeRecords=employeeDirect?[employeeDirect]:[];
+  if(email&&!memberDirect){memberRecords.push(...(await queryField("members","email",email)),...(await queryField("members","firebaseAuthEmail",email)));}
+  if(email&&!employeeDirect){employeeRecords.push(...(await queryField("employees","email",email)),...(await queryField("employees","firebaseAuthEmail",email)));}
+  if(admin?.active===true&&!employeeRecords.length){
+    const linkedFields=["administratorUid","adminUid","linkedAdministratorUid"];
+    for(const field of linkedFields){const matches=await queryField("employees",field,uid);employeeRecords.push(...matches);if(matches.length)break;}
+    if(!employeeRecords.length){const identityName=String(admin.name||admin.details?.name||claims.name||"").trim();if(identityName){const matches=(await queryField("employees","name",identityName,2)).filter(record=>activeRecord(record)&&normalized(record.name)===normalized(identityName));if(matches.length===1)employeeRecords.push(matches[0]);}}
+  }
+  const uniqueById=list=>[...new Map(list.filter(Boolean).map(x=>[String(x.id||x.uid||x.employeeNumber||x.email),x])).values()];
+  const members=uniqueById(memberRecords).filter(activeRecord),employees=uniqueById(employeeRecords).filter(activeRecord),employee=employees[0]||null;
+  const employeeRoles=[...new Set(employees.flatMap(record=>[...(Array.isArray(record?.roles)?record.roles:[]),record?.role,...(Array.isArray(record?.assignedRoles)?record.assignedRoles:[]),...(Array.isArray(record?.selectedRoles)?record.selectedRoles:[]),...(Array.isArray(record?.roleAssignments)?record.roleAssignments:[]) ]).flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean)))];
+  const contextValues=employees.flatMap(record=>[record?.department,record?.unit,record?.jobTitle,record?.position,record?.title,record?.designation]).map(normalized).filter(Boolean);
+  if(contextValues.some(v=>v==="it"||v==="it unit"||v.includes("information technology")||v.includes("it specialist")||v.includes("information technology officer"))&&!employeeRoles.some(r=>["IT Specialist","Information Technology Officer"].includes(r)))employeeRoles.push("IT Specialist");
+  const slug=v=>String(v||"").toUpperCase().replace(/[^A-Z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,48);
+  const pathwayFor=(role,record)=>{const n=normalized(role),d=normalized(record?.department);if(n==="administrator"||n==="executive director")return"Executive Office Department";if(n.includes("internal oversight"))return"Internal Oversight Department";if(n.includes("finance"))return"Finance & Administration Department";if(n.includes("human resources")||n.startsWith("hr "))return"Human Resources Department";if(n.includes("livestock"))return"Livestock Department";if(n.includes("environment")||n.includes("rangeland"))return"Environment & Rangeland Department";if(n.includes("outreach")||n.includes("community development"))return"Outreach & Community Development Department";if(n.includes("field"))return"Field Operations Department";if(n.includes("procurement"))return"Finance & Administration Department · Procurement Unit";if(n.includes("it")||n.includes("information technology"))return"Information Technology Department";if(d)return String(record?.department||"").trim()+" Department";return"Institutional Governance Workspace";};
+  const authorityMap=new Map(),addAuthority=(role,record,source)=>{const cleanRole=String(role||"").trim();if(!cleanRole)return;const suppliedId=String(record?.accessAuthorityId||record?.authorityId||"").trim(),authorityId=suppliedId||"IRPA-AUTH-"+slug(cleanRole)+(record?.unit?"-"+slug(record.unit):"");const existing=authorityMap.get(authorityId),authority={id:authorityId,authorityId,role:cleanRole,pathway:pathwayFor(cleanRole,record),department:record?.department||null,unit:record?.unit||null,source,active:true};authorityMap.set(authorityId,existing?{...existing,...authority}:authority);};
+  if(admin?.active===true)addAuthority("Administrator",admin,"Administrator Registry");
+  members.forEach(record=>{const values=[...(Array.isArray(record?.roles)?record.roles:[]),record?.role,record?.boardPosition].flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean));const guaranteed=values.length?values:[String(record?.boardPosition||"Board Member").trim()];guaranteed.filter(Boolean).forEach(role=>addAuthority(role,record,"Member Register"));});
+  employees.forEach(record=>{const values=[...(Array.isArray(record?.roles)?record.roles:[]),record?.role,...(Array.isArray(record?.assignedRoles)?record.assignedRoles:[]),...(Array.isArray(record?.selectedRoles)?record.selectedRoles:[]),...(Array.isArray(record?.roleAssignments)?record.roleAssignments:[])].flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean));const guaranteed=values.length?values:[String(record?.jobTitle||record?.position||record?.designation||record?.title||record?.department||"Employee").trim()];guaranteed.filter(Boolean).forEach(role=>addAuthority(role,record,"Employee Register"));});
+  employeeRoles.forEach(role=>addAuthority(role,employee,"Employee Register"));
+  const authorities=[...configuredAuthorityMap.values(),...authorityMap.values()].filter((authority,index,list)=>list.findIndex(x=>String(x.authorityId)===String(authority.authorityId))===index);
+  return json({ok:true,uid,email,administrator:admin?.active===true?{id:admin.id||uid,...admin}:null,member:members[0]||null,employee,roles:configuredRoles.length?configuredRoles:employeeRoles,authorities,identityResolution:employee?(String(employee.uid||"")===uid?"UID":String(employee.email||"").trim().toLowerCase()===email?"EMAIL":employee.administratorUid===uid||employee.adminUid===uid||employee.linkedAdministratorUid===uid?"ADMINISTRATOR_LINK":"UNIQUE_NAME"):"NONE"},200,corsHeaders(request));
+}
+
 async function getSessionProfile(request, env) {
   const claims = await authenticateFirebaseRequest(request, env);
   const [adminDoc, memberDoc, employeeDoc] = await Promise.all([
@@ -2124,7 +2510,7 @@ async function authenticateFirebaseRequest(request, env, options = {}) {
   );
   if (!valid) throw new Error("Invalid Firebase ID token signature.");
 
-  const claims = { token, user_id: payload.user_id || payload.sub, email: payload.email || null };
+  const claims = { token, user_id: payload.user_id || payload.sub, email: payload.email || null, name: payload.name || null, admin: payload.admin === true, irpaRoles: Array.isArray(payload.irpaRoles) ? payload.irpaRoles : [] };
   if (options.skipActivation !== true) await assertActivatedPortalUser(claims, env);
   return claims;
 }

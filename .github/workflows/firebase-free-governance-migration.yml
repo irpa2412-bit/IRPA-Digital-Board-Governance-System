@@ -43,6 +43,30 @@ jobs:
         run: node --test tests/cloudflare-password-client-migration.test.mjs
       - name: Verify Cloudflare document-reference client migration
         run: node --test tests/cloudflare-document-reference-migration.test.mjs
+      - name: Verify Cloudflare signer-authority migration
+        run: node --test tests/cloudflare-signer-authority-migration.test.mjs
+      - name: Verify Cloudflare meeting-directory migration
+        run: node --test tests/cloudflare-meeting-directory-migration.test.mjs
+      - name: Verify Cloudflare invitation-removal migration
+        run: node --test tests/cloudflare-invitation-removal-migration.test.mjs
+      - name: Verify Cloudflare Finance accounting migration
+        run: node --test tests/cloudflare-finance-accounting-migration.test.mjs
+      - name: Verify Cloudflare Authorization workflow migration
+        run: node --test tests/cloudflare-authorization-workflow-migration.test.mjs
+      - name: Verify Cloudflare Procurement migration
+        run: node --test tests/cloudflare-procurement-migration.test.mjs
+      - name: Verify Cloudflare controlled-document registration migration
+        run: node --test tests/cloudflare-document-registration-migration.test.mjs
+      - name: Verify Cloudflare login-context migration
+        run: node --test tests/cloudflare-login-context-migration.test.mjs
+      - name: Verify Cloudflare meeting entry approval migration
+        run: node --test tests/cloudflare-meeting-entry-migration.test.mjs
+      - name: Verify document lifecycle Worker syntax
+        run: node --check drive-gateway/src/documentLifecycle.mjs
+      - name: Verify Procurement Worker syntax
+        run: node --check drive-gateway/src/procurementServices.mjs
+      - name: Verify Cloudflare meeting attendance migration
+        run: node --test drive-gateway/tests/meeting-attendance-migration.test.mjs
       - name: Set up Java for Firebase emulator
         uses: actions/setup-java@v4
         with:

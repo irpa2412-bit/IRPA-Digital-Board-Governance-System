@@ -90,7 +90,9 @@ export function createMeetingPortalRouter(ctx) {
     const routes = new Map([
       ["/api/meeting-access/issue", "issue"],
       ["/api/meeting-access/revoke", "revoke"],
-      ["/api/meeting-access/authorize", "authorize"]
+      ["/api/meeting-access/authorize", "authorize"],
+      ["/api/meeting-entry/requests/list", "listEntryRequests"],
+      ["/api/meeting-entry/requests/resolve", "resolveEntryRequest"]
     ]);
     const action = routes.get(pathname);
     if (!action || request.method !== "POST") return null;
@@ -114,6 +116,45 @@ export function createMeetingPortalRouter(ctx) {
 
     const ids = { meetingId: clean(data.meetingId), participantId: clean(data.participantId), uid };
     try {
+      if (action === "listEntryRequests") {
+        const meetingId=clean(data.meetingId);
+        if(!meetingId)return errorResponse(ctx,request,"Meeting ID is required.",400);
+        const meetingDoc=await getDoc(ctx,env,adminToken,"meetings",meetingId);
+        if(!meetingDoc)return errorResponse(ctx,request,"Meeting was not found.",404);
+        const meeting=docToPlain(meetingDoc);
+        if(!isActiveMeeting(meeting.status))return errorResponse(ctx,request,"Closed meetings cannot load entry requests.",409);
+        const admin=await isAdmin(ctx,env,adminToken,uid,claims);
+        const authorised=admin||clean(meeting.initiatorUid)===uid||lower(meeting.chairpersonEmail)===email||lower(meeting.secretaryEmail)===email;
+        if(!authorised)return errorResponse(ctx,request,"Only the meeting initiator, chairperson, secretary or active administrator may view entry requests.",403);
+        const queryResponse=await fetch("https://firestore.googleapis.com/v1/projects/"+ctx.getFirebaseProjectId(env)+"/databases/(default)/documents:runQuery",{method:"POST",headers:{Authorization:"Bearer "+adminToken,"Content-Type":"application/json"},body:JSON.stringify({structuredQuery:{from:[{collectionId:"meetingEntryRequests"}],where:{fieldFilter:{field:{fieldPath:"meetingId"},op:"EQUAL",value:{stringValue:meetingId}}},limit:200}})});
+        const queryRows=await queryResponse.json().catch(()=>[]);
+        if(!queryResponse.ok)throw new Error("Unable to load meeting entry requests.");
+        const requests=(Array.isArray(queryRows)?queryRows:[]).filter(x=>x.document).map(x=>docToPlain(x.document)).filter(row=>row.status==="PENDING"&&row.expiresAt&&new Date(row.expiresAt).getTime()>Date.now()).map(row=>({id:row.id,participantId:clean(row.participantId),participantName:clean(row.participantName||row.participantEmail),participantEmail:clean(row.participantEmail),requestedAt:row.requestedAt||null}));
+        return ctx.json({ok:true,requests},200,ctx.corsHeaders(request));
+      }
+      if (action === "resolveEntryRequest") {
+        const requestId=clean(data.requestId),decision=clean(data.decision).toUpperCase();
+        if(!requestId||!["ADMIT","DENY"].includes(decision))return errorResponse(ctx,request,"A request ID and ADMIT or DENY decision are required.",400);
+        const requestDoc=await getDoc(ctx,env,adminToken,"meetingEntryRequests",requestId);
+        if(!requestDoc)return errorResponse(ctx,request,"Entry request was not found.",404);
+        const entry=docToPlain(requestDoc),meetingDoc=await getDoc(ctx,env,adminToken,"meetings",clean(entry.meetingId));
+        if(!meetingDoc)return errorResponse(ctx,request,"Meeting was not found.",404);
+        const meeting=docToPlain(meetingDoc),admin=await isAdmin(ctx,env,adminToken,uid,claims);
+        const authorised=admin||clean(meeting.initiatorUid)===uid||lower(meeting.chairpersonEmail)===email||lower(meeting.secretaryEmail)===email;
+        if(!authorised)return errorResponse(ctx,request,"Only the meeting initiator, chairperson, secretary or active administrator may resolve entry requests.",403);
+        if(entry.status!=="PENDING")return errorResponse(ctx,request,"This entry request has already been resolved.",409);
+        const passDoc=await getDoc(ctx,env,adminToken,"meetingAccessTokens",clean(entry.accessId));
+        if(!passDoc)return errorResponse(ctx,request,"The invitation pass is no longer active.",409);
+        const pass=docToPlain(passDoc),expiry=new Date(pass.expiresAt||0);
+        if(pass.status!=="Active"||Number.isNaN(expiry.getTime())||expiry.getTime()<=Date.now())return errorResponse(ctx,request,"The invitation pass is expired, revoked or no longer active.",409);
+        const next=decision==="ADMIT"?"ADMITTED":"DENIED",now=new Date(),project=ctx.getFirebaseProjectId(env),base="projects/"+project+"/databases/(default)/documents",auditId=crypto.randomUUID();
+        const audit={action:decision==="ADMIT"?"MEETING_ENTRY_ADMITTED":"MEETING_ENTRY_DENIED",collection:"meetingEntryRequests",recordId:requestId,details:{meetingId:entry.meetingId,participantId:entry.participantId},actorUid:uid,actorEmail:email||null,createdAt:now};
+        await commitWrites(ctx,env,adminToken,[
+          {update:{name:base+"/meetingEntryRequests/"+requestId,fields:fieldsToFirestore({status:next,resolvedByUid:uid,resolvedByEmail:email||null,resolvedAt:now})},updateMask:{fieldPaths:["status","resolvedByUid","resolvedByEmail","resolvedAt"]},currentDocument:requestDoc.updateTime?{updateTime:requestDoc.updateTime}:{exists:true}},
+          {update:{name:base+"/audit/"+auditId,fields:fieldsToFirestore(audit)},currentDocument:{exists:false}}
+        ]);
+        return ctx.json({ok:true,status:next},200,ctx.corsHeaders(request));
+      }
       if (action === "issue") {
         let stage = "VALIDATE_INPUT";
         logStage(stage, "START", ids);

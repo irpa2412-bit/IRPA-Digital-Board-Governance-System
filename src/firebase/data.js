@@ -36,6 +36,19 @@ export async function nextDocumentReference(){
   }
   return String(result.reference).trim();
 }
+export async function registerControlledDocument(documentPayload){
+ const user=auth.currentUser;
+ if(!user?.uid)throw new Error("Authentication is required to register a controlled document.");
+ const token=await user.getIdToken();
+ const gateway=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").trim().replace(/\/+$/, "");
+ let response;
+ try{response=await fetch(gateway+"/api/document-lifecycle/register",{method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({documentPayload})});}
+ catch{throw new Error("Cloudflare controlled-document registration is unavailable. No direct Firestore registration fallback was used.");}
+ const result=await response.json().catch(()=>({}));
+ if(!response.ok||result.ok!==true||!result.id||!result.document)throw new Error(result.error||"The controlled-document register could not verify the archive upload.");
+ return {id:result.id,document:result.document,idempotent:result.idempotent===true};
+}
+
 export async function createRecord(collectionName,data){if(isTrialDataMode()&&!isActualOnlyCollection(collectionName)){data={...data,recordOrigin:"TRIAL",trialData:true,isTrial:true};}else if(collectionName===COLLECTIONS.documents){data={...data,recordOrigin:data.recordOrigin||"PRODUCTION"};}const ref=await addDoc(collection(db,collectionName),{...data,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});await writeAudit("CREATE",collectionName,ref.id,data);return ref.id;}
 export async function upsertFinancePaymentTrace(traceId,data={}){if(!auth.currentUser)throw new Error("Authentication is required.");if(!traceId)throw new Error("A finance trace ID is required.");const ref=doc(db,COLLECTIONS.financePaymentTrace,traceId);const existing=await getDoc(ref);const actor=currentActor();const payload={...data,lastUpdatedByUid:actor.uid,lastUpdatedByEmail:actor.email,updatedAt:serverTimestamp()};if(!existing.exists()){payload.createdAt=serverTimestamp();payload.createdByUid=actor.uid;payload.createdByEmail=actor.email;await setDoc(ref,payload);await writeAudit("CREATE_FINANCE_PAYMENT_TRACE",COLLECTIONS.financePaymentTrace,traceId,data);}else{await updateDoc(ref,payload);await writeAudit("UPDATE_FINANCE_PAYMENT_TRACE",COLLECTIONS.financePaymentTrace,traceId,data);}return traceId;}
 async function getHighestRegistrationNumber(collectionName,fieldName){const snap=await getDocs(collection(db,collectionName));let highest=0;for(const item of snap.docs){const value=Number(String(item.data()?.[fieldName]||"").split("-").pop());if(Number.isInteger(value)&&value>highest)highest=value;}return highest;}
@@ -251,7 +264,7 @@ export async function getCurrentAuditorProfile(){
  return active;
 }
 
-export async function resolveAuthenticatedLoginContext(){if(!auth.currentUser?.uid)throw new Error("Authentication is required.");const call=httpsCallable(getFunctions(undefined,"us-central1"),"resolveAuthenticatedLoginContext");const result=await call({});return result.data||null;}
+export async function resolveAuthenticatedLoginContext(){const user=auth.currentUser;if(!user?.uid)throw new Error("Authentication is required.");const token=await user.getIdToken();const gateway=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").trim().replace(/\/+$/, "");let response;try{response=await fetch(gateway+"/api/session/login-context",{method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({})});}catch{throw new Error("Cloudflare login-context service is unavailable. No Firebase callable fallback was used.");}const result=await response.json().catch(()=>({}));if(!response.ok||result.ok!==true)throw new Error(result.error||"Unable to resolve the IRPA login context.");return result;}
 
 // Returns every active institutional register entry linked to the authenticated
 // member, including separate Member and Employee records. This is intentionally
@@ -463,7 +476,18 @@ export async function synchronizeRegisteredIdentityUids(){
   return result.data;
 }
 
-export async function callFinanceAccounting(functionName,data={}){const fn=getFunctions();const callable=httpsCallable(fn,functionName);const result=await callable(data);return result.data;}
+export async function callFinanceAccounting(functionName,data={}){
+ const user=auth.currentUser;
+ if(!user?.uid)throw new Error("Authentication is required for Finance operations.");
+ const token=await user.getIdToken();
+ const gateway=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").trim().replace(/\/+$/, "");
+ let response;
+ try{response=await fetch(gateway+"/api/finance/accounting",{method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({functionName,data})});}
+ catch{throw new Error("Cloudflare Finance accounting service is unavailable. No Firebase Cloud Function fallback was used.");}
+ const payload=await response.json().catch(()=>({}));
+ if(!response.ok||payload.ok!==true)throw new Error(payload.error||"The Cloudflare Finance operation failed.");
+ return payload.result;
+}
 
 
 export async function getResearchInformationRequests(){
@@ -494,17 +518,30 @@ export async function getResearchToolPermissions(){
 }
 
 export async function listMeetingInviteeDirectory(){
- if(!auth.currentUser?.uid)throw new Error("Authentication is required to load meeting participants.");
- const call=httpsCallable(getFunctions(undefined,"us-central1"),"listMeetingInviteeDirectory");const result=await call({});
- return {boardMembers:Array.isArray(result.data?.boardMembers)?result.data.boardMembers:[],members:Array.isArray(result.data?.members)?result.data.members:[],employees:Array.isArray(result.data?.employees)?result.data.employees:[]};
+ const user=auth.currentUser;
+ if(!user?.uid)throw new Error("Authentication is required to load meeting participants.");
+ const token=await user.getIdToken();
+ const gateway=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").trim().replace(/\/+$/,"");
+ let response;
+ try{response=await fetch(gateway+"/api/meeting/invitee-directory",{method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({})});}
+ catch{throw new Error("The Cloudflare meeting directory service is unavailable.");}
+ const data=await response.json().catch(()=>({}));
+ if(!response.ok||data.ok!==true)throw new Error(data.error||"The meeting invitee directory could not be loaded.");
+ return {boardMembers:Array.isArray(data.boardMembers)?data.boardMembers:[],members:Array.isArray(data.members)?data.members:[],employees:Array.isArray(data.employees)?data.employees:[]};
 }
 
 /** Secure administrator-only removal for pending invitation records. */
 export async function removeInvitationRecord(invitationId){
  const id=String(invitationId||"").trim();
- if(!id)throw new Error("An invitation record is required.");
- if(!auth.currentUser?.uid)throw new Error("Administrator authentication is required.");
- const call=httpsCallable(getFunctions(undefined,"us-central1"),"removeInvitationRecord");
- const result=await call({invitationId:id});
- return result.data||{ok:true};
+ if(!id||id.includes("/"))throw new Error("A valid invitation record is required.");
+ const user=auth.currentUser;
+ if(!user?.uid)throw new Error("Administrator authentication is required.");
+ const token=await user.getIdToken();
+ const gateway=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").trim().replace(/\/+$/,"");
+ let response;
+ try{response=await fetch(gateway+"/api/invitations/remove",{method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({invitationId:id})});}
+ catch{throw new Error("The Cloudflare invitation service is unavailable. No Firebase callable fallback was used.");}
+ const result=await response.json().catch(()=>({}));
+ if(!response.ok||result.ok!==true)throw new Error(result.error||"The invitation could not be safely removed.");
+ return result;
 }
