@@ -1831,10 +1831,8 @@ async function getLoginContext(request, env) {
   configuredRoles.forEach(role=>{const cleanRole=String(role||"").trim();if(!cleanRole)return;const authorityId="IRPA-AUTH-"+cleanRole.toUpperCase().replace(/[^A-Z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,48);configuredAuthorityMap.set(authorityId,{id:authorityId,authorityId,role:cleanRole,pathway:configuredPathwayFor(cleanRole),source:"Gateway Configuration",active:true});});
   const [admin,memberDirect,employeeDirect]=await Promise.all([read("adminProfiles",uid),read("members",uid),read("employees",uid)]);
   const memberRecords=memberDirect?[memberDirect]:[],employeeRecords=employeeDirect?[employeeDirect]:[];
-  const fallback=[];
-  if(email&&!memberDirect){fallback.push(...(await queryField("members","email",email)),...(await queryField("members","firebaseAuthEmail",email));}
-  if(email&&!employeeDirect){fallback.push(...(await queryField("employees","email",email)),...(await queryField("employees","firebaseAuthEmail",email));}
-  for(const rec of fallback){const target=rec&&String(rec.id||"");if(!rec)continue;if(target&&String(rec.id).length){} if(!memberDirect&&(!employeeDirect)){if(rec.employeeNumber||rec.employmentStatus||rec.department&&rec.position)employeeRecords.push(rec);else memberRecords.push(rec);}}
+  if(email&&!memberDirect){memberRecords.push(...(await queryField("members","email",email)),...(await queryField("members","firebaseAuthEmail",email)));}
+  if(email&&!employeeDirect){employeeRecords.push(...(await queryField("employees","email",email)),...(await queryField("employees","firebaseAuthEmail",email)));}
   if(admin?.active===true&&!employeeRecords.length){
     const linkedFields=["administratorUid","adminUid","linkedAdministratorUid"];
     for(const field of linkedFields){const matches=await queryField("employees",field,uid);employeeRecords.push(...matches);if(matches.length)break;}
