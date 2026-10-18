@@ -51,6 +51,8 @@ jobs:
         run: node --test tests/cloudflare-invitation-removal-migration.test.mjs
       - name: Verify Cloudflare Finance accounting migration
         run: node --test tests/cloudflare-finance-accounting-migration.test.mjs
+      - name: Verify Cloudflare Authorization workflow migration
+        run: node --test tests/cloudflare-authorization-workflow-migration.test.mjs
       - name: Verify Cloudflare meeting attendance migration
         run: node --test drive-gateway/tests/meeting-attendance-migration.test.mjs
       - name: Set up Java for Firebase emulator
