@@ -190,6 +190,33 @@ export function createProcurementServicesRouter(ctx){
     const changes={[type]:evidence,status:nextStatus,updatedAt:new Date()};
     await commit([{update:{name:base+"/procurementRequests/"+id,fields:fields(changes)},updateMask:{fieldPaths:Object.keys(changes)},currentDocument:{updateTime:r.updateTime}},audit("PROCUREMENT_"+type.toUpperCase()+"_VERIFIED","procurementRequests",id,{decision,nextStatus,notes:clean(input.notes)})]);return ctx.json({ok:true,status:nextStatus},200,ctx.corsHeaders(request));
    }
+   if(operation==="completeFinanceHandoff"){
+    if(!team)return deny("Procurement Team authorization is required.");
+    const id=clean(input.id),r=await getRequest(id);
+    if(r.status==="Sent to Finance"&&r.financeTransactionId)return ctx.json({ok:true,financeTransactionId:r.financeTransactionId,idempotent:true},200,ctx.corsHeaders(request));
+    if(r.status!=="Finance Handoff")return deny("Finance handoff is not open.",409);
+    if(!r.prNumber||!r.poNumber||!r.authorizedByUid||!r.authorizedAt)return deny("Finance handoff requires a registered PR, generated PO and independent authorization.",409);
+    const method=METHODS[r.procurementMethod]||METHODS["Request for Quotations"],required=Number(r.quotationRequiredCount||method.default),quotations=(r.quotations||[]).filter(x=>x?.fileId);
+    if(quotations.length!==required)return deny("Finance handoff requires all required quotation/tender documents.",409);
+    if(!r.deliveryNote?.fileId||r.deliveryNote.verificationStatus!=="Approved")return deny("Delivery note must be uploaded and independently approved.",409);
+    if(!r.invoice?.fileId||r.invoice.verificationStatus!=="Approved")return deny("Invoice must be uploaded and independently approved.",409);
+    const financeId="PROC-"+r.id,existing=await read("financeTransactions",financeId);
+    let archiveLink=clean(existing?.financeArchiveUidLink||input.financeArchiveUidLink),archiveFolder=clean(existing?.financeArchiveFolderId||input.financeArchiveFolderId),files=Array.isArray(existing?.financeEvidence)?existing.financeEvidence:(Array.isArray(input.financeEvidence)?input.financeEvidence:[]);
+    if(existing&&existing.procurementRequestId!==r.id)return deny("Finance handoff reference collision detected; no record was changed.",409);
+    const expectedCount=quotations.length+2;
+    if(!archiveLink||!archiveFolder||files.length!==expectedCount||files.some(x=>!clean(x.fileId)))return deny("The controlled Finance evidence archive is incomplete; no handoff was committed.",409);
+    const now=new Date(),traceId="FIN-TRACE-Procurement-"+r.id,trace=await read("financePaymentTrace",traceId);
+    const transaction={title:"Procurement Payment — "+r.title,reference:r.poNumber,amount:money(r.estimatedAmount),date:now.toISOString().slice(0,10),description:"Procurement payment request. Evidence package: "+r.requestNumber+"; PR "+r.prNumber+"; PO "+r.poNumber+".",payee:r.vendorName,transactionType:"Procurement Payment",costCentre:r.department,procurementRequestId:r.id,procurementRequestNumber:r.requestNumber,procurementPrNumber:r.prNumber,procurementPoNumber:r.poNumber,procurementEvidence:{quotations:r.quotations||[],deliveryNote:r.deliveryNote,invoice:r.invoice},financeArchiveUidLink:archiveLink,financeArchiveFolderId:archiveFolder,financeEvidence:files,sourceModule:"Procurement",status:"Pending Approval",workflowStage:"Payment Processing",createdByUid:existing?.createdByUid||actor.uid,createdAt:existing?.createdAt||now,updatedAt:now};
+    const traceData={traceReference:"IRPA-TRACE-"+(r.requestNumber||r.id),sourceModule:"Procurement",sourceRecordId:r.id,sourceReference:r.requestNumber||r.id,procurementRequestId:r.id,procurementRequestNumber:r.requestNumber||null,procurementPrNumber:r.prNumber||null,procurementPoNumber:r.poNumber||null,payee:r.vendorName||null,amount:money(r.estimatedAmount),authorizationStatus:"Authorized",authorizationReference:r.approvalReference||r.requestNumber||null,authorizedByUid:r.authorizedByUid||r.approverUid||null,authorizedByName:r.authorizedByName||null,authorizedByRole:r.authorizedByRole||null,authorizedAt:r.authorizedAt||null,handoffStatus:"Handoff Received",paymentStatus:"Pending Authorization",workflowStage:"Payment Processing",financeTransactionId:financeId,financeArchiveUidLink:archiveLink,financeArchiveFolderId:archiveFolder,evidenceCount:files.length,handedOffByUid:actor.uid,handedOffAt:now,lastUpdatedByUid:actor.uid,lastUpdatedByEmail:actor.email,updatedAt:now};
+    if(!trace)Object.assign(traceData,{createdAt:now,createdByUid:actor.uid,createdByEmail:actor.email});
+    const requestChanges={status:"Sent to Finance",financeTransactionId:financeId,financeStatus:"Pending Payment",financeArchiveUidLink:archiveLink,financeArchiveFolderId:archiveFolder,financeEvidence:files,sentToFinanceByUid:actor.uid,sentToFinanceAt:now,updatedAt:now};
+    const writes=[];
+    if(!existing)writes.push({update:{name:base+"/financeTransactions/"+financeId,fields:fields(transaction)},currentDocument:{exists:false}});
+    writes.push({update:{name:base+"/financePaymentTrace/"+traceId,fields:fields(traceData)},updateMask:{fieldPaths:Object.keys(traceData)},...(trace?.updateTime?{currentDocument:{updateTime:trace.updateTime}}:{currentDocument:{exists:false}})});
+    writes.push({update:{name:base+"/procurementRequests/"+r.id,fields:fields(requestChanges)},updateMask:{fieldPaths:Object.keys(requestChanges)},currentDocument:{updateTime:r.updateTime}});
+    writes.push(audit("PROCUREMENT_SENT_TO_FINANCE","procurementRequests",r.id,{financeTransactionId:financeId,financeArchiveUidLink:archiveLink,evidenceCopied:files.length,traceId}));
+    await commit(writes);return ctx.json({ok:true,financeTransactionId:financeId},200,ctx.corsHeaders(request));
+   }
    return deny("Unsupported Procurement operation.",400);
   }catch(error){console.error("PROCUREMENT_API_FAILURE",{uid:claims.user_id,operation,message:String(error?.message||error).slice(0,180)});return ctx.json({ok:false,error:String(error?.message||"Procurement service failed.")},Number(error?.status)||503,ctx.corsHeaders(request));}
  };
