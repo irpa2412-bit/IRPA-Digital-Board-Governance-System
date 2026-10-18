@@ -8,14 +8,14 @@ test("invitation removal is routed to Cloudflare with no callable fallback", asy
  const end=client.indexOf("\n}",start)+2;
  assert.notEqual(start,-1);assert.ok(end>start);
  const fn=client.slice(start,end);
- assert.match(fn,/\/api\/authorisation\/invitations\/remove/);
+ assert.match(fn,/\/api\/invitations\/remove/);
  assert.doesNotMatch(fn,/httpsCallable|getFunctions/);
  assert.match(fn,/No Firebase callable fallback was used/);
 });
 
 test("Cloudflare invitation removal protects meeting-linked and activated identities and atomically audits deletion", async () => {
- const worker=await readFile(new URL("../drive-gateway/src/index.js",import.meta.url),"utf8");
- assert.match(worker,/pathname === "\/api\/authorisation\/invitations\/remove"/);
+ const worker=await readFile(new URL("../drive-gateway/src/meetingServices.mjs",import.meta.url),"utf8");
+ assert.match(worker,/pathname==="\/api\/invitations\/remove"/);
  assert.match(worker,/Only an active IRPA Administrator can remove invitation records/);
  assert.match(worker,/meeting participant/);
  assert.match(worker,/activated account/);
