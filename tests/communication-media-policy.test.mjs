@@ -193,6 +193,16 @@ test("social account enrolment is integrated, metadata-only, role-scoped and aud
 });
 
 
+test("social-account enrolment always displays accessible success and failure feedback, including custom required-field validation",()=>{
+ assert.ok(social.includes('onSubmit={save} noValidate'));
+ assert.ok(social.includes('role="alert" aria-live="assertive"'));
+ assert.ok(social.includes('role="status" aria-live="polite"'));
+ assert.ok(social.includes("Enter the account or page name."));
+ assert.ok(social.includes("Assign a responsible officer."));
+ assert.ok(social.includes("Social-media account enrolled and audit recorded."));
+ assert.ok(social.includes("Unable to save the account record."));
+});
+
 test("Meta API uses the existing staging-only OAuth router, minimal read permissions, encrypted tokens and no publishing",()=>{
  assert.ok(social.includes("metaStagingEnabled"));
  assert.ok(social.includes("/api/communications/meta/connect"));

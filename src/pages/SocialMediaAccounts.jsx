@@ -73,6 +73,8 @@ export default function SocialMediaAccounts({profile,employee,selectedAuthority,
  if(!allowed)return <section style={panel} role="alert"><h3>Social-media accounts</h3><p>Your assigned role does not permit account management.</p></section>;
  return <section style={{display:"grid",gap:14,color:"var(--text-primary, #172033)"}}>
   <header style={{...panel,display:"grid",gap:8}}><h3 style={{margin:0}}>Social-media account enrolment &amp; management</h3><p style={{margin:0}}>Register IRPA's official accounts, custodians, purpose, authorization and review dates. Account records are audited and archived rather than deleted.</p><p style={{margin:0,fontSize:13}}>This is an account register, not an OAuth connection. It never asks for or stores passwords, recovery codes, access tokens or API secrets; it does not publish posts, read private messages, or revoke platform access.</p></header>
+  {error&&<div role="alert" aria-live="assertive" style={{...panel,borderColor:"#dc2626",color:"#b91c1c"}}>{error}</div>}
+  {notice&&<div role="status" aria-live="polite" style={{...panel,borderColor:"#16a34a"}}>{notice}</div>}
   {metaStagingEnabled&&<section style={{...panel,display:"grid",gap:10}} aria-label="Meta read-only API connection">
    <h4 style={{margin:0}}>Meta API connection · staging only</h4>
    <p style={{margin:0,fontSize:13}}>Connect an authorized Facebook account and verify its eligible Pages and linked Instagram professional accounts. Requested access is read-only; publishing, scheduling, messaging and analytics are not enabled. OAuth tokens remain encrypted in the staging gateway and are never returned to this page.</p>
@@ -92,7 +94,7 @@ export default function SocialMediaAccounts({profile,employee,selectedAuthority,
    </div>}
   </section>}
   <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:14}}>
-   <form onSubmit={save} style={{...panel,display:"grid",gap:10,alignContent:"start"}}>
+   <form onSubmit={save} noValidate style={{...panel,display:"grid",gap:10,alignContent:"start"}}>
     <h4 style={{margin:0}}>{editing?"Edit account record":"Enrol a social-media account"}</h4>
     <label style={{display:"grid",gap:5,fontWeight:650,fontSize:13}}>Platform<select style={input} value={form.platform} onChange={e=>setForm({...form,platform:e.target.value})}>{PLATFORMS.map(x=><option key={x}>{x}</option>)}</select></label>
     {FIELDS.map(([key,label])=><label key={key} style={{display:"grid",gap:5,fontWeight:650,fontSize:13}}>{label}{key==="accountType"?<select style={input} value={form[key]} onChange={e=>setForm({...form,[key]:e.target.value})}>{ACCOUNT_TYPES.map(x=><option key={x}>{x}</option>)}</select>:<input style={input} type={key==="reviewDate"?"date":"text"} maxLength={key==="notes"?1500:1000} value={form[key]||""} required={["accountName","owner"].includes(key)} onChange={e=>setForm({...form,[key]:e.target.value})}/>}</label>)}
