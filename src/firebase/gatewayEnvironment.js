@@ -17,7 +17,7 @@ export function resolveGatewayUrl(env = import.meta.env) {
   let expected;
   if (projectId === STAGING_PROJECT) expected = STAGING_GATEWAY;
   else if (projectId === PRODUCTION_PROJECT) expected = PRODUCTION_GATEWAY;
-  else throw new Error(\`Unrecognized Firebase project "\${projectId}". Gateway access is blocked.\`);
+  else throw new Error(`Unrecognized Firebase project "${projectId}". Gateway access is blocked.`);
 
   const expectedAuthDomain = projectId === STAGING_PROJECT
     ? "irpa-dbg-staging-a73ec.firebaseapp.com"
@@ -34,7 +34,7 @@ export function resolveGatewayUrl(env = import.meta.env) {
   const declaredEnvironment = String(env.VITE_IRPA_DEPLOYMENT_ENV || "").trim().toLowerCase();
   const expectedEnvironment = projectId === STAGING_PROJECT ? "staging" : "production";
   if (declaredEnvironment && declaredEnvironment !== expectedEnvironment) {
-    throw new Error(\`Deployment environment "\${declaredEnvironment}" conflicts with Firebase project "\${projectId}". Gateway access is blocked.\`);
+    throw new Error(`Deployment environment "${declaredEnvironment}" conflicts with Firebase project "${projectId}". Gateway access is blocked.`);
   }
 
   const explicitUrls = [
@@ -46,7 +46,7 @@ export function resolveGatewayUrl(env = import.meta.env) {
 
   for (const [name, value] of explicitUrls) {
     if (normalizeUrl(value) !== expected) {
-      throw new Error(\`\${name} conflicts with Firebase project "\${projectId}". Expected \${expected}; received \${normalizeUrl(value)}. Gateway access is blocked.\`);
+      throw new Error(`${name} conflicts with Firebase project "${projectId}". Expected ${expected}; received ${normalizeUrl(value)}. Gateway access is blocked.`);
     }
   }
   return expected;
