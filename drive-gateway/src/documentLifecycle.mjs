@@ -171,6 +171,48 @@ export function createDocumentLifecycleRouter(deps) {
       return deps.json({ok:true,document},200,deps.corsHeaders(request));
     }
 
+    if(pathname==="/api/document-lifecycle/register"&&method==="POST"){
+      const data=await request.json().catch(()=>null);
+      const input=data?.documentPayload;
+      if(!input||typeof input!=="object"||Array.isArray(input))return deps.json({ok:false,error:"A controlled-document record is required."},400,deps.corsHeaders(request));
+      const reference=clean(input.reference||input.documentReference),documentUid=clean(input.documentUid||reference),fileId=clean(input.fileId||input.archiveFileId),fileName=cleanName(input.fileName||"document"),folderId=cleanId(input.archiveFolderId),contentType=clean(input.contentType),classification=clean(input.classification||"Internal"),documentType=clean(input.documentType),archiveCategory=clean(input.archiveCategory);
+      if(!reference||!documentUid||!fileId||!folderId||!documentType||!archiveCategory)return deps.json({ok:false,error:"Document reference, archive file, folder, type and category are required."},400,deps.corsHeaders(request));
+      const policy=canUpload(identity,{classification,documentType,archiveCategory,contentType});
+      if(!policy.allowed)return deps.json({ok:false,error:policy.reason},403,deps.corsHeaders(request));
+      if(!Array.isArray(input.authorizedUids)||!input.authorizedUids.includes(identity.uid))return deps.json({ok:false,error:"The registering identity must retain explicit document access."},403,deps.corsHeaders(request));
+      const accessToken=await deps.getDriveAccessToken(env);
+      const verifyFile=async(id,parentId,expectedDocumentId)=>{
+        if(!id)return null;
+        const metadata=await deps.driveFetch(env,accessToken,"/drive/v3/files/"+encodeURIComponent(id)+"?fields=id,name,mimeType,size,description,parents,trashed");
+        if(!metadata||metadata.id!==id||metadata.trashed===true||!Array.isArray(metadata.parents)||!metadata.parents.includes(parentId))throw new Error("The registered archive file does not belong to the selected controlled-document folder.");
+        let description={};try{description=JSON.parse(String(metadata.description||"{}"));}catch{}
+        if(description.irpaGovernance!==true||String(description.documentId||"")!==expectedDocumentId||String(description.uploadedByUid||"")!==identity.uid)throw new Error("The selected archive file could not be verified against the authenticated upload.");
+        return metadata;
+      };
+      const primary=await verifyFile(fileId,folderId,documentUid);
+      if(String(primary.name||"")!==fileName||String(primary.mimeType||"")!==contentType)return deps.json({ok:false,error:"The file name or content type does not match the verified archive upload."},409,deps.corsHeaders(request));
+      if(input.governanceArchiveFileId){
+        const gov=await verifyFile(clean(input.governanceArchiveFileId),cleanId(input.governanceArchiveFolderId),documentUid);
+        if(String(gov.mimeType||"")!==contentType)return deps.json({ok:false,error:"The governance archive copy does not match the primary document format."},409,deps.corsHeaders(request));
+      }
+      const project=deps.getFirebaseProjectId(env),adminToken=await deps.getFirestoreAdminAccessToken(env);
+      const lookup=await fetch("https://firestore.googleapis.com/v1/projects/"+project+"/databases/(default)/documents:runQuery",{method:"POST",headers:{Authorization:"Bearer "+adminToken,"Content-Type":"application/json"},body:JSON.stringify({structuredQuery:{from:[{collectionId:"documents"}],where:{fieldFilter:{field:{fieldPath:"reference"},op:"EQUAL",value:{stringValue:reference}}},limit:5}})});
+      if(!lookup.ok)throw new Error("Unable to verify uniqueness of the controlled-document reference.");
+      const matches=(await lookup.json()).filter(x=>x.document).map(x=>({id:String(x.document.name||"").split("/").pop(),doc:deps.firestoreDocumentToPlain(x.document)}));
+      if(matches.length){
+        const existing=matches.find(x=>x.doc?.ownerUid===identity.uid&&x.doc?.fileId===fileId&&x.doc?.status==="Draft");
+        if(existing)return deps.json({ok:true,id:existing.id,document:{id:existing.id,...existing.doc},idempotent:true},200,deps.corsHeaders(request));
+        return deps.json({ok:false,error:"This document reference is already registered to another document. No duplicate record was created."},409,deps.corsHeaders(request));
+      }
+      const id=crypto.randomUUID(),now=nowIso(),allowedKeys=new Set(["title","reference","documentReference","documentType","documentTypeSelectedAt","documentUploadDestinationKey","documentUploadArchiveCategory","documentUploadYear","documentUploadMonth","documentUploadDay","version","documentUid","archiveCategory","classification","archiveFolderId","archiveUidLink","archivePath","archiveAccess","archiveFileId","archiveFileWebViewLink","governanceArchiveFolderId","governanceArchiveUidLink","governanceArchivePath","governanceArchiveFileId","governanceArchiveFileWebViewLink","governanceArchiveStatus","fileName","fileId","storageProvider","storagePath","webViewLink","fileUrl","contentType","fileSize","purpose","uploadedAt","uploadedAtDisplay","workflowLinks","linkedWorkflowModules","meetingId","meetingReference","participantId","participantReference","resolutionId","resolutionReference","votingIssueId","votingReference","decisionId","decisionReference","actionId","actionReference","signatureEnvelopeId","signatureReference","authorizationRequestId","authorizationReference","employeeUid","employeeNumber","procurementId","procurementReference","reportId","reportReference","researchStudyId","researchReference","researchDatasetId","datasetReference","relatedType","relatedId","relatedReference"]);
+      const record={};for(const [k,v] of Object.entries(input))if(allowedKeys.has(k))record[k]=v;
+      Object.assign(record,{documentId:documentUid,reference,documentReference:clean(input.documentReference||reference),title:clean(input.title)||fileName,fileName,fileId,storageProvider:"Google Drive",fileSize:Number(primary.size||input.fileSize||0),contentType,webViewLink:clean(input.webViewLink)||null,fileUrl:"drive://"+fileId,ownerUid:identity.uid,ownerType:identity.actorType,department:identity.department||null,unit:identity.unit||null,classification,archiveCategory,authorizedUids:[identity.uid],uploadedByUid:identity.uid,uploadedByEmail:identity.email||null,recordOrigin:"PRODUCTION",status:"Draft",authorizationStatus:"Draft",createdAt:now,updatedAt:now});
+      try{
+        await commitDocumentAndAudit(deps,env,claims,id,record,"REGISTERED",{reference,classification,archiveCategory,fileId},{createOnly:true});
+      }catch(error){throw error;}
+      return deps.json({ok:true,id,document:{id,...record}},200,deps.corsHeaders(request));
+    }
+
     if(pathname==="/api/document-lifecycle/upload"&&method==="POST"){
       const data=await request.json();
       const bytes=bytesFromBase64(data.base64);
