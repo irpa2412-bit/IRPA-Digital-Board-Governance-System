@@ -58,6 +58,15 @@ jobs:
             exit 1
           fi
           echo "Production bundle routes grant scans to the isolated D1 crawler and AI drafting to its dedicated assistant-capable Worker."
+      - name: Install Firebase Admin SDK for one-time readiness reset
+        run: npm --prefix functions install --omit=dev
+
+      - name: Clear preliminary trial data once before production deployment
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+          NODE_PATH: ${{ github.workspace }}/functions/node_modules
+        run: node scripts/reset-finance-production.js
+
       - name: Verify Cloudflare credentials
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
