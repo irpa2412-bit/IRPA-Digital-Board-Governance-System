@@ -1,0 +1,57 @@
+name: Meeting Invitation Non-Production Firebase E2E
+# Verification-only regression workflow; no production deployment is performed.
+# Emulator-only authorization regression; this workflow does not deploy or contact production.
+
+on:
+  push:
+    branches: [feat/secure-meeting-invitation-flow-20261013]
+    paths:
+      - "src/styles/portal-readability-standard.css"
+      - "functions/meetingGateway.js"
+      - "functions/meetingEntryPolicy.js"
+      - "functions/meetingGateway.emulator.test.cjs"
+      - ".github/workflows/meeting-invitation-nonprod-e2e.yml"
+      - "firebase.json"
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/styles/portal-readability-standard.css"
+      - "functions/meetingGateway.js"
+      - "functions/meetingEntryPolicy.js"
+      - "functions/meetingGateway.emulator.test.cjs"
+      - "firebase.json"
+      - ".github/workflows/meeting-invitation-nonprod-e2e.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  meeting-entry-emulator-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install root dependencies
+        run: npm ci
+      - name: Install Firebase Functions dependencies
+        run: npm install --no-audit --no-fund
+        working-directory: functions
+      - name: Run host admission, rejection, direct-entry and identity tests against Firestore Emulator
+        env:
+          GCLOUD_PROJECT: demo-irpa-staging
+        run: npx firebase emulators:exec --project demo-irpa-staging --only firestore "node --test functions/meetingGateway.emulator.test.cjs"

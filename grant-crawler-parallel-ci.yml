@@ -1,0 +1,46 @@
+name: Grant Crawler Parallel CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "cloudflare/grant-crawler-parallel/**"
+      - ".github/workflows/grant-crawler-production.yml"
+      - ".github/workflows/grant-crawler-parallel-ci.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloudflare/grant-crawler-parallel
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run Worker syntax, isolation and regression tests
+        run: npm run check
+      - name: Validate production Worker bundle without deploying
+        run: npx --yes wrangler@4 deploy --config wrangler.toml --dry-run --env production
+      - name: Verify production smoke test reports fallback as degraded operation
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const workflow = fs.readFileSync('../../.github/workflows/grant-crawler-production.yml', 'utf8');
+          for (const marker of [
+            "draft_source === 'deterministic_fallback'",
+            "requires_human_completion !== true",
+            "Workers AI daily quota is exhausted"
+          ]) {
+            if (!workflow.includes(marker)) throw new Error('Production smoke workflow is missing fallback safety assertion: ' + marker);
+          }
+          console.log('Production smoke workflow distinguishes AI-generated drafts from human-review fallback scaffolds.');
+          NODE

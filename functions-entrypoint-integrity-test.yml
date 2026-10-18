@@ -1,0 +1,27 @@
+name: Firebase Functions Entrypoint Integrity Test
+
+on: [push, pull_request]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Functions dependencies
+        working-directory: functions
+        run: npm install
+      - name: Validate shared Functions entrypoint syntax
+        run: node --check functions/index.js
+      - name: Validate Firebase Functions package entrypoint syntax
+        run: node --check functions/bootstrap.js
+      - name: Validate Authorization gateway syntax in isolation
+        run: node --check functions/authorizationFunctions.js
+      - name: Verify reset gate remains trial-only
+        run: node scripts/verify-functions-entrypoint-integrity.js

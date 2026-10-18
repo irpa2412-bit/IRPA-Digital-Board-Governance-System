@@ -1,0 +1,52 @@
+name: Readability CI
+
+on:
+  push:
+    branches:
+      - audit/app-wide-readability-form-layout-20261008
+      - fix/app-wide-red-line-readability-20261008
+  pull_request:
+    branches:
+      - main
+      - audit/app-wide-readability-form-layout-20261008
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  readability:
+    name: Build and token contrast
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Clean dependency install
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Token contrast gate
+        run: npm run check:token-contrast
+
+      - name: App-wide red-line readability policy gate
+        run: npm run check:readability-policy
+
+      - name: Production build
+        env:
+          VITE_IRPA_ENV: staging
+          VITE_FIREBASE_API_KEY: "AIzaSyA6UmHtP-mRr99rBw57_-qrD4_mFSBnZ38"
+          VITE_FIREBASE_AUTH_DOMAIN: "irpa-dbg-staging-a73ec.firebaseapp.com"
+          VITE_FIREBASE_PROJECT_ID: "irpa-dbg-staging-a73ec"
+          VITE_FIREBASE_MESSAGING_SENDER_ID: "1018976634858"
+          VITE_FIREBASE_APP_ID: "1:1018976634858:web:e73e9e09f55a76ade25493"
+          VITE_FIREBASE_MEASUREMENT_ID: ""
+        run: npm run build

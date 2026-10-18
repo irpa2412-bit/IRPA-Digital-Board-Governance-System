@@ -1,0 +1,31 @@
+name: PDF E-Signature Tests
+on:
+  push:
+    branches: ["fix/member-signature-invitation-email-20261004", "repair/esign-production-entrypoint-20261004"]
+    paths:
+      - "drive-gateway/**"
+      - ".github/workflows/pdf-esignature-tests.yml"
+  pull_request:
+    paths:
+      - "src/styles/portal-readability-standard.css"
+      - "drive-gateway/**"
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        working-directory: drive-gateway
+        run: npm ci
+      - name: Run 18 PDF/e-signature tests
+        working-directory: drive-gateway
+        run: npm test

@@ -1,0 +1,70 @@
+name: Dashboard Hero Headless Layout Check
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/styles/readability-harmony.css"
+      - "src/styles/app.css"
+      - "src/styles/portal-typography.css"
+      - "src/styles/shared-header-hero.css"
+      - "src/main.jsx"
+      - "src/App.jsx"
+      - "index.html"
+      - "public/dashboard-hero-fix.js"
+      - "scripts/dashboard-hero-layout-check.mjs"
+      - ".github/workflows/dashboard-hero-check.yml"
+permissions:
+  contents: write
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  dashboard-hero-layout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install application dependencies
+        run: npm ci
+      - name: Install headless Chromium
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Build production CSS
+        env:
+          VITE_IRPA_ENV: staging
+          VITE_FIREBASE_API_KEY: "AIzaSyA6UmHtP-mRr99rBw57_-qrD4_mFSBnZ38"
+          VITE_FIREBASE_AUTH_DOMAIN: "irpa-dbg-staging-a73ec.firebaseapp.com"
+          VITE_FIREBASE_PROJECT_ID: "irpa-dbg-staging-a73ec"
+          VITE_FIREBASE_MESSAGING_SENDER_ID: "1018976634858"
+          VITE_FIREBASE_APP_ID: "1:1018976634858:web:e73e9e09f55a76ade25493"
+          VITE_FIREBASE_MEASUREMENT_ID: ""
+        run: npm run build
+      - name: Diagnose, measure, and capture Dashboard hero
+        run: node scripts/dashboard-hero-layout-check.mjs
+      - name: Save screenshot in repository
+        run: |
+          cp dashboard-hero-check.png "$RUNNER_TEMP/dashboard-hero-check.png"
+          cp dashboard-hero-phone-check.png "$RUNNER_TEMP/dashboard-hero-phone-check.png"
+          git fetch origin main
+          git checkout -B dashboard-hero-screenshot origin/main
+          cp "$RUNNER_TEMP/dashboard-hero-check.png" dashboard-hero-check.png
+          cp "$RUNNER_TEMP/dashboard-hero-phone-check.png" dashboard-hero-phone-check.png
+          git add dashboard-hero-check.png dashboard-hero-phone-check.png
+          if ! git diff --cached --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "Add Dashboard hero headless layout screenshot [skip ci]"
+            git push origin HEAD:main
+          else
+            echo "Screenshot is unchanged; no commit required."
+          fi

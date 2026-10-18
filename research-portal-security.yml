@@ -1,0 +1,40 @@
+name: Research Portal Security Gate
+# Research security gate: dependency, Java, Firestore authorization tests, and production build.
+
+on:
+  push:
+    branches:
+      - repair/research-portal-access-control-20261008
+  pull_request:
+    branches:
+      - feat/signature-trust-platform-20261007
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  research-security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - run: npm ci
+      - run: npx firebase emulators:exec --only firestore --project demo-irpa-research-security "node --test tests/research-portal-security.test.mjs"
+      - name: Build production application
+        env:
+          VITE_IRPA_ENV: staging
+          VITE_FIREBASE_API_KEY: "AIzaSyA6UmHtP-mRr99rBw57_-qrD4_mFSBnZ38"
+          VITE_FIREBASE_AUTH_DOMAIN: "irpa-dbg-staging-a73ec.firebaseapp.com"
+          VITE_FIREBASE_PROJECT_ID: "irpa-dbg-staging-a73ec"
+          VITE_FIREBASE_MESSAGING_SENDER_ID: "1018976634858"
+          VITE_FIREBASE_APP_ID: "1:1018976634858:web:e73e9e09f55a76ade25493"
+          VITE_FIREBASE_MEASUREMENT_ID: ""
+        run: npm run build

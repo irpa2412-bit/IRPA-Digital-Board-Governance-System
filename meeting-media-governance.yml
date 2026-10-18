@@ -1,0 +1,64 @@
+name: Meeting Media Governance Verification
+
+on:
+  pull_request:
+    branches: [main, integration/collective-portals-20261009]
+    paths:
+      - "src/components/IRPADGBSMeetingRoomMedia.jsx"
+      - "src/components/MeetingAccessControl.jsx"
+      - "src/pages/MeetingEntryGateway.jsx"
+      - "src/pages/MeetingRoom.jsx"
+      - "src/main.jsx"
+      - "functions/liveMeeting.js"
+      - "functions/meetingGateway.js"
+      - "functions/meetingRecords.js"
+      - "src/firebase/meetingRecords.js"
+      - "src/firebase/meetingPolicy.js"
+      - "src/pages/Meetings.jsx"
+      - "functions/bootstrap.js"
+      - "package.json"
+      - "package-lock.json"
+      - "scripts/check-meeting-media-governance.mjs"
+      - "infra/livekit/**"
+      - ".github/workflows/meeting-media-governance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  meeting-media-governance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check:meeting-media
+      - name: Validate LiveKit staging installer syntax
+        run: bash -n infra/livekit/deploy-staging.sh infra/livekit/preflight.sh
+      - name: Build verification application
+        env:
+          VITE_IRPA_ENV: staging
+          VITE_FIREBASE_API_KEY: "AIzaSyA6UmHtP-mRr99rBw57_-qrD4_mFSBnZ38"
+          VITE_FIREBASE_AUTH_DOMAIN: "irpa-dbg-staging-a73ec.firebaseapp.com"
+          VITE_FIREBASE_PROJECT_ID: "irpa-dbg-staging-a73ec"
+          VITE_FIREBASE_MESSAGING_SENDER_ID: "1018976634858"
+          VITE_FIREBASE_APP_ID: "1:1018976634858:web:e73e9e09f55a76ade25493"
+          VITE_FIREBASE_MEASUREMENT_ID: ""
+        run: npm run build
+      - name: Upload verification report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: meeting-media-governance-verification
+          path: |
+            reports/meeting-media-governance-verification.md
+            reports/meeting-media-governance-verification.json
+          if-no-files-found: ignore

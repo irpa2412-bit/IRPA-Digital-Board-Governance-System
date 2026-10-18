@@ -1,0 +1,91 @@
+name: Firebase-free governance migration checks
+
+on:
+  pull_request:
+    branches: [main, integration/five-portal-chain-20261018]
+    paths:
+      - "src/**"
+      - "drive-gateway/**"
+      - "functions/**"
+      - "tests/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/firebase-free-governance-migration.yml"
+  push:
+    branches: [firebase-free-governance-migration-20261018, integration/five-portal-chain-20261018, stage/1-invitation]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build-and-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install application dependencies
+        run: npm ci
+      - name: Verify billing dependency audit after clean install
+        run: npm run check:no-billing-deps
+      - name: Build application
+        env:
+          VITE_IRPA_ENV: staging
+          VITE_FIREBASE_API_KEY: "AIzaSyA6UmHtP-mRr99rBw57_-qrD4_mFSBnZ38"
+          VITE_FIREBASE_AUTH_DOMAIN: irpa-dbg-staging-a73ec.firebaseapp.com
+          VITE_FIREBASE_PROJECT_ID: irpa-dbg-staging-a73ec
+          VITE_FIREBASE_MESSAGING_SENDER_ID: "1018976634858"
+          VITE_FIREBASE_APP_ID: "1:1018976634858:web:e73e9e09f55a76ade25493"
+          VITE_FIREBASE_MEASUREMENT_ID: ""
+        run: npm run build
+      - name: Verify portal navigation
+        run: npm run test:portal-navigation
+      - name: Verify meeting entry policy
+        run: npm run test:meeting-entry-policy
+      - name: Verify meeting invitation quorum
+        run: npm run test:meeting-invitation-resend
+      - name: Verify Cloudflare password-security client migration
+        run: node --test tests/cloudflare-password-client-migration.test.mjs
+      - name: Verify Cloudflare document-reference client migration
+        run: node --test tests/cloudflare-document-reference-migration.test.mjs
+      - name: Set up Java for Firebase emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Verify security rules with Firestore emulator
+        id: security_rules
+        continue-on-error: true
+        run: npx firebase emulators:exec --only firestore --project demo-irpa-dgbs "npm run test:security-rules"
+      - name: Verify finance policy with Firestore emulator
+        id: finance_policy
+        continue-on-error: true
+        run: npx firebase emulators:exec --only firestore --project demo-irpa-dgbs "npm run test:finance-policy"
+      - name: Verify meeting category policy with Firestore emulator
+        id: meeting_category
+        continue-on-error: true
+        run: npx firebase emulators:exec --only firestore --project demo-irpa-dgbs "npm run test:meeting-category"
+      - name: Install gateway dependencies
+        run: npm ci --prefix drive-gateway
+      - name: Run gateway regression and governance-store tests
+        run: npm test --prefix drive-gateway
+      - name: Enforce Firestore emulator policy test results
+        if: always()
+        env:
+          SECURITY_RULES_OUTCOME: ${{ steps.security_rules.outcome }}
+          FINANCE_POLICY_OUTCOME: ${{ steps.finance_policy.outcome }}
+          MEETING_CATEGORY_OUTCOME: ${{ steps.meeting_category.outcome }}
+        run: |
+          set -euo pipefail
+          test "$SECURITY_RULES_OUTCOME" = "success"
+          test "$FINANCE_POLICY_OUTCOME" = "success"
+          test "$MEETING_CATEGORY_OUTCOME" = "success"
