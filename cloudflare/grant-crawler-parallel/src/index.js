@@ -338,21 +338,22 @@ function assessFit(item) {
   };
 }
 
-async function crawl(env) {
+async function crawl(env, { fullCatalog = false } = {}) {
   if (!env.GRANTS_DB) throw new Error("The isolated staging D1 database binding is missing.");
   // Run all engine types in parallel, rotating donor-specific scanners through
   // 14-source batches so the combined crawl remains within the Free Workers
   // external-subrequest ceiling. Every configured donor is checked across successive runs.
   const donorRotation = Math.floor(Date.now() / (6 * 60 * 60 * 1000)) * MAX_DONOR_SCANNERS_PER_RUN % DONOR_SCANNERS.length;
+  const donorScannersPerRun = fullCatalog ? 4 : MAX_DONOR_SCANNERS_PER_RUN;
   const scheduledDonorScanners = Array.from(
-    { length: Math.min(MAX_DONOR_SCANNERS_PER_RUN, DONOR_SCANNERS.length) },
+    { length: Math.min(donorScannersPerRun, DONOR_SCANNERS.length) },
     (_, index) => DONOR_SCANNERS[(donorRotation + index) % DONOR_SCANNERS.length]
   );
   const engines = [
     { name: "rss_atom", run: () => readFeeds(env), configured: (() => { try { return JSON.parse(env.GRANT_FEED_URLS_JSON || env.GRANT_FEED_URLS || "[]").length; } catch { return 0; } })() },
     { name: "official_pages", run: () => readOfficialPages(env), configured: (() => { try { return JSON.parse(env.GRANT_SOURCE_PAGE_URLS_JSON || env.GRANT_SOURCE_PAGE_URLS || "[]").length; } catch { return 0; } })() },
-    { name: "web_search", run: () => readWebSearch(env), configured: 1 },
-    { name: "gdelt_search", run: () => readGdeltSearch(), configured: 1 },
+    { name: "web_search", run: () => readWebSearch(env, { fullCatalog }), configured: 1 },
+    { name: "gdelt_search", run: () => readGdeltSearch({ fullCatalog }), configured: 1 },
     ...scheduledDonorScanners.map(scanner => ({ name: scanner.name, run: () => readDonorScanner(scanner), configured: 1 })),
   ];
   const settled = await Promise.all(engines.map(async engine => {
@@ -496,7 +497,7 @@ export default {
     if (url.pathname === "/run") {
       try {
         const token = String(request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
-        await verifyFirebaseIdToken(token, env, false);
+        await verifyFirebaseIdToken(token, env, true);
       } catch (error) {
         return json({ error: String(error.message || "Unauthorized").slice(0, 300) }, 401);
       }
@@ -524,7 +525,20 @@ export default {
         const extra = [body?.pillar, body?.theme].filter(value => typeof value === "string" && value.trim()).join(" ");
         return json(await searchFundraisingSources([body?.query, extra].filter(Boolean).join(" "), body?.mode));
       }
-      return json(await crawl(env));
+      let fullCatalog = false;
+      if (url.pathname === "/run") {
+        let body = {};
+        try {
+          const raw = await request.text();
+          if (raw.trim()) body = JSON.parse(raw);
+        } catch { return json({ error: "Request body must be valid JSON." }, 400); }
+        if (body?.mode !== undefined && !["scheduled", "full_catalog"].includes(body.mode)) {
+          return json({ error: "mode must be scheduled or full_catalog." }, 400);
+        }
+        fullCatalog = body.mode === "full_catalog";
+      }
+      const result = await crawl(env, { fullCatalog });
+      return json({ ...result, scanMode: fullCatalog ? "full_catalog" : "scheduled_batch", searchCatalog: { webQueriesRequested: fullCatalog ? SEARCH_QUERIES.length : Math.min(4, SEARCH_QUERIES.length), webQueryCatalogSize: SEARCH_QUERIES.length, gdeltQueriesRequested: fullCatalog ? GDELT_QUERIES.length : Math.min(2, GDELT_QUERIES.length), gdeltQueryCatalogSize: GDELT_QUERIES.length, retroactiveIndexWindow: "GDELT up to 1 year; other providers limited to their own index/feed retention" } });
     }
     catch (error) {
       if (env.GRANTS_DB) {

@@ -52,6 +52,38 @@ test("GDELT discovery queries cover IRPA themes and records results as verificat
   }
 });
 
+
+test("authorised full-catalogue search requests every web and GDELT query", async () => {
+  const originalFetch = globalThis.fetch;
+  let webRequests = 0, gdeltRequests = 0;
+  globalThis.fetch = async url => {
+    const target = String(url);
+    if (target.includes("api.search.brave.com/res/v1/web/search")) {
+      webRequests++;
+      return new Response(JSON.stringify({ web: { results: [] } }), { status: 200, headers: { "content-type": "application/json" } });
+    }
+    if (target.includes("api.gdeltproject.org/api/v2/doc/doc")) {
+      gdeltRequests++;
+      return new Response(JSON.stringify({ articles: [] }), { status: 200, headers: { "content-type": "application/json" } });
+    }
+    throw new Error("Unexpected provider in full-catalogue test: " + target);
+  };
+  try {
+    const web = await readWebSearch({ BRAVE_SEARCH_API_KEY: "test-key" }, { fullCatalog: true });
+    const gdelt = await readGdeltSearch({ fullCatalog: true });
+    assert.equal(web.stats.queries, SEARCH_QUERIES.length);
+    assert.equal(web.stats.queryCatalogSize, SEARCH_QUERIES.length);
+    assert.equal(web.stats.fullCatalog, true);
+    assert.equal(webRequests, SEARCH_QUERIES.length);
+    assert.equal(gdelt.stats.queries, GDELT_QUERIES.length);
+    assert.equal(gdelt.stats.queryCatalogSize, GDELT_QUERIES.length);
+    assert.equal(gdelt.stats.fullCatalog, true);
+    assert.equal(gdeltRequests, GDELT_QUERIES.length);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("accepts only credential-free HTTPS feed URLs", () => {
   assert.equal(safeUrl("https://example.org/feed.xml").hostname, "example.org");
   assert.throws(() => safeUrl("http://example.org/feed.xml"));
