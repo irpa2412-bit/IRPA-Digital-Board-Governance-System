@@ -6,6 +6,8 @@ on:
   push:
     branches:
       - feat/secure-meeting-invitation-flow-20261013
+      - integration/five-portal-chain-20261018
+      - stage/1-invitation
     paths:
       - "src/styles/portal-readability-standard.css"
       - ".github/workflows/meeting-invitation-flow-ci.yml"
@@ -32,6 +34,7 @@ on:
   pull_request:
     branches:
       - main
+      - integration/five-portal-chain-20261018
     paths:
       - "src/styles/portal-readability-standard.css"
       - ".github/workflows/meeting-invitation-flow-ci.yml"
