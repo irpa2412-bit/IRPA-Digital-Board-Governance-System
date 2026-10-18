@@ -6,11 +6,10 @@ import { resolveGatewayUrl } from "./gatewayEnvironment";
 function getGatewayUrl(){
  let environment="";
  try{environment=window.sessionStorage.getItem("irpaDataEnvironment")||""}catch{}
- if(environment==="TRIAL"){
-  return resolveGatewayUrl();
- }
- if(environment==="ACTUAL")return resolveGatewayUrl();
- throw new Error("Choose Trial/Test or Actual Institutional Records in the Data Environment Gate before using Documents.");
+ const gateway=resolveGatewayUrl();
+ if(environment==="TRIAL" && gateway==="https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev")return gateway;
+ if(environment==="ACTUAL" && gateway==="https://irpa-google-drive-gateway.irpa-governance.workers.dev")return gateway;
+ throw new Error("The selected data environment does not match this build's isolated Firebase/Gateway environment.");
 }
 function resolveRecordOrigin(value){
  const explicit=String(value||"").trim().toUpperCase();
