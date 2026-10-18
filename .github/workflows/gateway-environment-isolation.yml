@@ -79,3 +79,17 @@ jobs:
           grep -R -q 'irpa-google-drive-gateway-staging.irpa-governance.workers.dev' dist
           echo "Staging bundle contains the staging Firebase project and staging Gateway; policy tests prove mixed project/Gateway pairs are rejected."
           echo "No deployment was performed."
+      - name: Build using production Firebase and production Gateway only
+        env:
+          VITE_IRPA_DEPLOYMENT_ENV: "production"
+          VITE_FIREBASE_AUTH_DOMAIN: "irpa-digital-board-governance.firebaseapp.com"
+          VITE_FIREBASE_PROJECT_ID: "irpa-digital-board-governance"
+          VITE_GATEWAY_ORIGIN: "https://irpa-google-drive-gateway.irpa-governance.workers.dev"
+          VITE_GOOGLE_DRIVE_GATEWAY_URL: "https://irpa-google-drive-gateway.irpa-governance.workers.dev"
+        run: |
+          set -euo pipefail
+          npm run build
+          test -s dist/index.html
+          grep -R -q 'irpa-digital-board-governance' dist
+          grep -R -q 'https://irpa-google-drive-gateway.irpa-governance.workers.dev' dist
+          echo "Production configuration build passed; no deployment was performed."
