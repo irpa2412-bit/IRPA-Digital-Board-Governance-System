@@ -65,6 +65,8 @@ jobs:
         run: npm ci
       - name: Static billing dependency inventory
         run: npm run check:no-billing-deps
+      - name: Undefined identifier check for Firebase client modules
+        run: npx --yes eslint@9 --no-config-lookup --rule 'no-undef:error' 'src/firebase/**/*.js'
       - name: Test source-isolation guard policy
         run: node --test tests/meeting-isolation-guard.test.mjs
       - name: Test administrator-only invitation removal policy
