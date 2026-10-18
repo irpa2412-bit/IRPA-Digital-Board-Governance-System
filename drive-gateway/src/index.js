@@ -388,6 +388,10 @@ export default {
         return await lookupInductionRegistration(request, env);
       }
 
+      if (url.pathname === "/api/signature/authority/update" && request.method === "POST") {
+        return await updateSignatureAuthority(request, env);
+      }
+
       if (url.pathname === "/api/session/profile" && request.method === "POST") {
         return await getSessionProfile(request, env);
       }
@@ -506,6 +510,117 @@ async function activateAdminInvitation(request, env, claims) {
   ]})});
   if (!result.ok) throw new InvitationRedemptionError(result.status===409?409:503,"The Administrator invitation changed or could not be activated. Refresh the invitation and try again.");
   return {ok:true,uid,email,invitationId,state:INVITATION_STATE.ACTIVATED};
+}
+
+async function updateSignatureAuthority(request, env) {
+  try {
+    const claims = await authenticateFirebaseRequest(request, env);
+    const uid = String(claims.user_id || "");
+    const email = String(claims.email || "").trim().toLowerCase();
+    if (!uid) return json({ok:false,error:"Authentication is required."},401,corsHeaders(request));
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object") return json({ok:false,error:"A valid signing-authority request is required."},400,corsHeaders(request));
+    const requestedRole = String(body.authorityRole || "").trim();
+    const authorityStatus = String(body.authorityStatus || "Current").trim();
+    const authorityReference = String(body.authorityReference || "").trim();
+    const authorityEffectiveAt = String(body.authorityEffectiveAt || "").trim() || null;
+    const authorityExpiresAt = String(body.authorityExpiresAt || "").trim() || null;
+    const requestedDepartment = String(body.authorityDepartment || "").trim();
+    const requestedUnit = String(body.authorityUnit || "").trim();
+    if (!requestedRole) return json({ok:false,error:"Select the current signing authority before saving."},400,corsHeaders(request));
+    if (!["Current","Pending Verification","Expired","Not yet assigned"].includes(authorityStatus)) return json({ok:false,error:"Select a valid signing authority status."},400,corsHeaders(request));
+    if (authorityEffectiveAt && authorityExpiresAt && authorityExpiresAt < authorityEffectiveAt) return json({ok:false,error:"Authority expiry date cannot be earlier than the effective date."},400,corsHeaders(request));
+
+    const records = [];
+    const add = (document, sourceCollection, fallbackId) => {
+      if (!document?.fields) return;
+      records.push({id:String(document.name || "").split("/").pop() || fallbackId || uid,...(firestoreDocumentToPlain(document)||{}),sourceCollection});
+    };
+    add(await getFirestoreDocument(env, "members/" + uid, claims.token), "members", uid);
+    add(await getFirestoreDocument(env, "employees/" + uid, claims.token), "employees", uid);
+    if (email) {
+      const [members, employees] = await Promise.all([
+        getFirestoreDocumentsByEmail(env,"members",email,claims.token),
+        getFirestoreDocumentsByEmail(env,"employees",email,claims.token)
+      ]);
+      for (const row of members) add(row,"members",uid);
+      for (const row of employees) add(row,"employees",uid);
+    }
+    const unique = [...new Map(records.map(record => [record.sourceCollection + ":" + record.id,record])).values()]
+      .filter(record => String(record.status || record.employmentStatus || "Active").trim().toLowerCase() !== "inactive");
+    if (!unique.length) return json({ok:false,error:"No active IRPA member or employee register entry was found for this account."},403,corsHeaders(request));
+    const roleValues = record => [
+      record.role,record.boardPosition,record.unit,record.unitName,
+      ...(Array.isArray(record.roles)?record.roles:[]),
+      ...(Array.isArray(record.assignedRoles)?record.assignedRoles:[]),
+      ...(Array.isArray(record.selectedRoles)?record.selectedRoles:[]),
+      ...(Array.isArray(record.roleAssignments)?record.roleAssignments:[])
+    ].flatMap(value=>String(value||"").split(",").map(value=>value.trim()).filter(Boolean));
+    const matching = unique.filter(record => {
+      if (!roleValues(record).includes(requestedRole)) return false;
+      if (requestedDepartment && String(record.department||"").trim() !== requestedDepartment) return false;
+      if (requestedUnit) {
+        const unit = String(record.unit||record.unitName||"").trim() || String(record.department||"").trim();
+        if (unit !== requestedUnit) return false;
+      }
+      return true;
+    });
+    if (!matching.length) return json({ok:false,error:"The selected department, unit and signing authority do not match an active IRPA register entry for this account."},403,corsHeaders(request));
+    const source = matching[0];
+    const authorityDepartment = String(source.department||"").trim();
+    const authorityUnit = String(source.unit||source.unitName||"").trim() || authorityDepartment;
+    const identity = await getFirestoreDocument(env,"signerIdentities/" + uid,claims.token);
+    if (!identity) return json({ok:false,error:"Signer Identity record is not available. Restore the Signer Identity link before updating signing authority."},412,corsHeaders(request));
+    const now = new Date().toISOString();
+    const fields = {
+      authorityRole:{stringValue:requestedRole},
+      authorityStatus:{stringValue:authorityStatus},
+      authorityReference:{stringValue:authorityReference},
+      authorityEffectiveAt:authorityEffectiveAt?{stringValue:authorityEffectiveAt}:{nullValue:"NULL"},
+      authorityExpiresAt:authorityExpiresAt?{stringValue:authorityExpiresAt}:{nullValue:"NULL"},
+      authorityDepartment:{stringValue:authorityDepartment},
+      authorityUnit:{stringValue:authorityUnit},
+      authoritySourceCollection:{stringValue:source.sourceCollection},
+      authoritySourceRecordId:{stringValue:source.id},
+      authorityUpdatedAt:{timestampValue:now},
+      updatedAt:{timestampValue:now}
+    };
+    const updateUrl = new URL("https://firestore.googleapis.com/v1/projects/" + getFirebaseProjectId(env) + "/databases/(default)/documents:commit");
+    const auditId = crypto.randomUUID();
+    const auditFields = {
+      action:{stringValue:"UPDATE_SIGNER_AUTHORITY"},
+      collection:{stringValue:"signerIdentities"},
+      recordId:{stringValue:uid},
+      details:{mapValue:{fields:{
+        authorityRole:{stringValue:requestedRole},authorityStatus:{stringValue:authorityStatus},
+        authorityDepartment:{stringValue:authorityDepartment},authorityUnit:{stringValue:authorityUnit},
+        authoritySourceCollection:{stringValue:source.sourceCollection},authoritySourceRecordId:{stringValue:source.id}
+      }}},
+      actorUid:{stringValue:uid},
+      actorEmail:email?{stringValue:email}:{nullValue:"NULL"},
+      createdAt:{timestampValue:now}
+    };
+    const writeResponse = await fetch(updateUrl.toString(),{
+      method:"POST",
+      headers:{Authorization:"Bearer " + await getFirestoreAdminAccessToken(env),"Content-Type":"application/json"},
+      body:JSON.stringify({writes:[
+        {update:{name:"projects/"+getFirebaseProjectId(env)+"/databases/(default)/documents/signerIdentities/"+uid,fields},updateMask:{fieldPaths:Object.keys(fields)}},
+        {update:{name:"projects/"+getFirebaseProjectId(env)+"/databases/(default)/documents/audit/"+auditId,fields:auditFields}}
+      ]})
+    });
+    if (!writeResponse.ok) {
+      const detail = await writeResponse.text().catch(()=> "");
+      console.error("Cloudflare signer-authority commit failed",writeResponse.status,detail.slice(0,500));
+      return json({ok:false,error:"The signing authority could not be saved. Firestore authorization or validation rejected the request."},writeResponse.status===403?403:502,corsHeaders(request));
+    }
+    return json({ok:true,uid,authorityRole:requestedRole,authorityStatus,authorityReference,authorityEffectiveAt,authorityExpiresAt,authorityDepartment,authorityUnit,authoritySourceCollection:source.sourceCollection,authoritySourceRecordId:source.id},200,corsHeaders(request));
+  } catch (error) {
+    if (error instanceof InvitationRedemptionError) return json({ok:false,error:error.message},error.status,corsHeaders(request));
+    console.error("Cloudflare signer-authority update failed",error);
+    const message=String(error?.message||"");
+    const authFailure=message==="Firebase authentication is required."||message.startsWith("Invalid Firebase ID token")||message.startsWith("Invalid Firebase token")||message==="Firebase token is expired."||message==="Firebase token signing key not found.";
+    return json({ok:false,error:authFailure?"Authentication is required.":"The Cloudflare signing-authority service could not complete the request."},Number(error?.status||0)||(authFailure?401:500),corsHeaders(request));
+  }
 }
 
 async function startOAuth(request, env) {
