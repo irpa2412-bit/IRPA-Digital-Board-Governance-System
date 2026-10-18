@@ -1,0 +1,40 @@
+name: Meeting Fixture Baseline Diagnostic
+
+on:
+  push:
+    branches: [diagnostic/meeting-portal-fixture-browser-main-20261018]
+    paths:
+      - ".github/workflows/meeting-fixture-baseline-diagnostic.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  main-source-baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked application dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Run meeting source isolation and invitation-removal policies
+        run: |
+          node --test tests/meeting-isolation-guard.test.mjs
+          node --test tests/invitation-removal-policy.test.mjs
+      - name: Install isolated Playwright browser runner
+        run: |
+          npm install --no-save --package-lock=false playwright
+          npx playwright install --with-deps chromium
+      - name: Start local fixture against main-source snapshot
+        run: |
+          npx vite --config vite.meeting-fixture.config.js --host 127.0.0.1 > "$RUNNER_TEMP/meeting-fixture-vite.log" 2>&1 &
+          for i in $(seq 1 60); do if curl -fsS http://127.0.0.1:4179/tests/fixtures/meeting-portal-fixture.html >/dev/null; then exit 0; fi; sleep 1; done
+          cat "$RUNNER_TEMP/meeting-fixture-vite.log"
+          exit 1
+      - name: Execute the same isolated meeting browser test suite on main-source baseline
+        run: node tests/meeting-portal-browser.test.mjs
