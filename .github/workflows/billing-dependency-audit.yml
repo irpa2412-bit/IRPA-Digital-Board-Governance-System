@@ -42,6 +42,10 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Install ephemeral static-analysis tools without changing the lockfile
         run: npm install --no-save --package-lock=false eslint@9 globals@15
+      - name: Check Worker syntax and meeting route migration
+        run: |
+          node --check drive-gateway/src/meetingServices.mjs
+          npm run test:meeting-worker-routes
       - name: Inventory billing dependencies and enforce no-undef in src/firebase
         run: node scripts/check-no-billing-deps.mjs
       - name: Upload static dependency inventory
