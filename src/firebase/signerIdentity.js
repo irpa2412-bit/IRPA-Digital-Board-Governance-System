@@ -55,7 +55,7 @@ export async function ensureMySignerIdentity(profile, options={}){
   }else{
     // Authority is a separately controlled trust attribute. Existing authority
     // values are deliberately preserved here; changes go through the
-    // server-authorized updateSignerAuthority callable.
+    // Cloudflare signing-authority endpoint, with Firestore rules as the final authorization boundary.
     await updateDoc(ref,payload);
   }
   return {id:u.uid,...payload};
