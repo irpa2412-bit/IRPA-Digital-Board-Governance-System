@@ -1,6 +1,6 @@
 # Firebase Functional-Decoupling and Cloudflare Billing Migration
 
-Status: **scope and acceptance contract only; no production workflow has been switched**.
+Status: **partial functional migration in progress; no production cutover or deployment has occurred**.
 
 **Scope clarification:** remove FUNCTIONAL DEPENDENCY on Firebase for the Signature Portal, Meeting Portal and its sub-portals, and Authorisation & Approval workflows. This is not a request to delete Firebase globally or remove Firebase-hosted security rules. Preserve those rules unchanged. The specific blocker to resolve is the Google Cloud/Firebase billing dependency for functionality currently requiring Firebase Cloud Functions. Migrate those runtime operations to Cloudflare Workers and Cloudflare-backed services, so the portals remain functional without requiring Firebase Cloud Functions billing. Keep Firestore/rules or other Firebase components only where explicitly retained and compatible with the approved transition; do not silently rely on a Firebase callable for migrated functionality. The Cloudflare Gateway remains the API boundary. This document is not evidence that the migration has been implemented.
 
@@ -43,4 +43,6 @@ The current repository configuration exposes KV and a Durable Object binding, bu
 
 ## Current stop point
 
-This branch contains this dependency audit and acceptance contract only. It does not yet implement the new identity/session system, D1/R2 persistence, data migration, or replace the Firebase-dependent application paths. It must not be represented as a completed migration or deployed.
+Implemented first functional slice: password-attempt state, failure recording, and clearing are routed from `src/firebase/auth.js` to existing Cloudflare Worker endpoints backed by the `ESIGN_DO` Durable Object. Firebase Authentication remains the credential authority; Firebase-hosted rules are unchanged. A client migration regression test was added. The migration CI is being rerun after correcting its Firestore emulator setup.
+
+Still incomplete: signature and signer-identity workflows, meeting records/access/attendance and sub-portals, Authorization & Approval workflows, remaining billing-blocked callable paths, Cloudflare identity/session design, persistent governance data model and data reconciliation. The existing adapter is not yet integrated into these workflows. No production cutover or deployment has occurred. Do not merge or claim completion until the full acceptance gates pass.
