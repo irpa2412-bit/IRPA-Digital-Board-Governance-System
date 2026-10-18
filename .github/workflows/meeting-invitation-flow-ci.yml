@@ -84,4 +84,12 @@ jobs:
       - name: Test failed invitation resend and quorum exclusion
         run: npm run test:meeting-invitation-resend
       - name: Build web application
+        env:
+          VITE_IRPA_ENV: staging
+          VITE_FIREBASE_API_KEY: "fixture-staging-api-key"
+          VITE_FIREBASE_AUTH_DOMAIN: "irpa-dbg-staging-a73ec.firebaseapp.com"
+          VITE_FIREBASE_PROJECT_ID: "irpa-dbg-staging-a73ec"
+          VITE_FIREBASE_MESSAGING_SENDER_ID: "fixture-staging-sender"
+          VITE_FIREBASE_APP_ID: "fixture-staging-app"
+          VITE_FIREBASE_MEASUREMENT_ID: "G-STAGING-FIXTURE"
         run: npm run build
