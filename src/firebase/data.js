@@ -497,7 +497,7 @@ export async function listMeetingInviteeDirectory(){
  const user=auth.currentUser;
  if(!user?.uid)throw new Error("Authentication is required to load meeting participants.");
  const token=await user.getIdToken();
- const gateway=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").trim().replace(/\\/+$/,"");
+ const gateway=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").trim().replace(/\/+$/,"");
  let response;
  try{response=await fetch(gateway+"/api/meeting/invitee-directory",{method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({})});}
  catch{throw new Error("The Cloudflare meeting directory service is unavailable.");}
@@ -513,7 +513,7 @@ export async function removeInvitationRecord(invitationId){
  const user=auth.currentUser;
  if(!user?.uid)throw new Error("Administrator authentication is required.");
  const token=await user.getIdToken();
- const gateway=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").trim().replace(/\\/+$/,"");
+ const gateway=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").trim().replace(/\/+$/,"");
  let response;
  try{response=await fetch(gateway+"/api/authorisation/invitations/remove",{method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({invitationId:id})});}
  catch{throw new Error("The Cloudflare invitation service is unavailable. No Firebase callable fallback was used.");}
