@@ -84,6 +84,41 @@ const writes=[
 try{await commitWrites(ctx,env,token,writes);}catch(error){if(error?.status===409)return fail(ctx,request,"The invitation changed while removal was in progress. Refresh the Invitation Register and retry.",409);throw error;}
 return response(ctx,request,{ok:true,invitationId});
 }
+if(pathname==="/api/meeting-working-documents/register"){
+const meetingId=clean(data.meetingId),documentId=clean(data.documentId),c=await context(ctx,env,token,claims,meetingId);
+if(!c.canManage)return fail(ctx,request,"Only the meeting host, chairperson or secretary may add working documents.",403);
+if(!documentId)return fail(ctx,request,"Document ID is required.",400);
+const doc=await getDoc(ctx,env,token,"documents",documentId);
+if(!doc)return fail(ctx,request,"The controlled document was not found.",404);
+if(clean(doc.meetingId)!==meetingId)return fail(ctx,request,"The document must be explicitly linked to this meeting before it can be registered as a working document.",409);
+const id=(await hash(meetingId+":"+documentId)).slice(0,40),old=await getDoc(ctx,env,token,"meetingWorkingDocuments",id),now=new Date();
+const row={meetingId,documentId,title:clean(doc.title||doc.fileName||"Meeting document"),reference:clean(doc.reference||doc.documentReference),fileName:clean(doc.fileName),webViewLink:clean(doc.webViewLink||doc.archiveFileWebViewLink),classification:clean(doc.classification||"INTERNAL"),status:"ACTIVE",registeredByUid:c.uid,registeredByEmail:c.email||null,registeredAt:old?.registeredAt||now,updatedAt:now};
+if(old)await patchDoc(ctx,env,token,"meetingWorkingDocuments",id,row);else await writeDoc(ctx,env,token,"meetingWorkingDocuments",id,row,false);
+await audit(ctx,env,token,claims,"MEETING_WORKING_DOCUMENT_REGISTERED",c.meeting,id,{documentId,documentReference:row.reference});
+return response(ctx,request,{ok:true,workingDocumentId:id});
+}
+if(pathname==="/api/meeting-working-documents/list"){
+const meetingId=clean(data.meetingId),c=await context(ctx,env,token,claims,meetingId);
+if(!c.canRead)return fail(ctx,request,"Meeting participant access is required.",403);
+const rows=(await listByField(ctx,env,token,"meetingWorkingDocuments","meetingId",meetingId)).filter(x=>clean(x.status)==="ACTIVE"),docs=[];
+for(const row of rows){const reviews=(await listByField(ctx,env,token,"meetingDocumentReviews","workingDocumentId",row.id)).map(r=>({id:r.id,reviewType:clean(r.reviewType),comment:clean(r.comment),status:clean(r.status),reviewerName:clean(r.reviewerName),createdAt:r.createdAt||null}));docs.push({id:row.id,documentId:clean(row.documentId),title:clean(row.title),reference:clean(row.reference),fileName:clean(row.fileName),webViewLink:clean(row.webViewLink),classification:clean(row.classification||"INTERNAL"),reviews});}
+return response(ctx,request,{ok:true,documents:docs});
+}
+if(pathname==="/api/meeting-working-documents/review"){
+const meetingId=clean(data.meetingId),id=clean(data.workingDocumentId),type=clean(data.reviewType).toUpperCase(),comment=clean(data.comment),c=await context(ctx,env,token,claims,meetingId);
+if(!c.canRead||(!c.participant&&!c.canManage))return fail(ctx,request,"Only an authorised meeting participant may review working documents.",403);
+if(!id||!["ASSESSMENT","COMMENT","SIGNATURE_REQUEST"].includes(type))return fail(ctx,request,"A working document and supported review type are required.",400);
+if(!comment||comment.length>5000)return fail(ctx,request,"Enter a comment or assessment of up to 5,000 characters.",400);
+const row=await getDoc(ctx,env,token,"meetingWorkingDocuments",id);
+if(!row||clean(row.meetingId)!==meetingId||clean(row.status)!=="ACTIVE")return fail(ctx,request,"Active working document not found for this meeting.",404);
+const [members,employees,participants]=await Promise.all([getDoc(ctx,env,token,"members",c.uid),getDoc(ctx,env,token,"employees",c.uid),listByField(ctx,env,token,"participants","meetingId",meetingId)]);
+const participant=participants.find(p=>[p.uid,p.userId,p.participantUid,p.memberUid,p.invitedUid].map(clean).includes(c.uid)||(c.email&&[p.email,p.participantEmail,p.invitedEmail].some(v=>lower(v)===c.email)));
+const reviewerName=clean(participant?.participantName||participant?.name||members?.name||employees?.name||c.email||c.uid),reviewId=crypto.randomUUID(),now=new Date();
+const review={meetingId,workingDocumentId:id,documentId:clean(row.documentId),reviewType:type,comment,reviewerUid:c.uid,reviewerEmail:c.email||null,reviewerName,status:"SUBMITTED",createdAt:now,updatedAt:now};
+await writeDoc(ctx,env,token,"meetingDocumentReviews",reviewId,review,false);
+await audit(ctx,env,token,claims,"MEETING_WORKING_DOCUMENT_REVIEW_SUBMITTED",c.meeting,reviewId,{workingDocumentId:id,reviewType:type,commentLength:comment.length});
+return response(ctx,request,{ok:true,reviewId,status:"SUBMITTED"});
+}
 if(pathname==="/api/meeting-attendance/sign"){
 const meetingId=clean(data.meetingId),participantId=clean(data.participantId),typedName=clean(data.typedName);
 if(data.confirmed!==true)return fail(ctx,request,"Confirm the attendance declaration before signing.",400);
