@@ -20,6 +20,6 @@ test("Cloudflare signer authority endpoint verifies registered authority and ato
   assert.match(worker, /pathname === "\/api\/signature\/authority"/);
   assert.match(worker, /authenticateFirebaseRequest\(request, env\)/);
   assert.match(worker, /The selected signing authority is not registered/);
-  assert.match(worker, /commitFirestoreDocumentAndAudit\(env,"signerIdentities\/"+uid/);
+  assert.match(worker, /commitFirestoreDocumentAndAudit\(env,"signerIdentities\/"\+uid/);
   assert.match(worker, /"UPDATE_SIGNER_AUTHORITY"/);
 });
