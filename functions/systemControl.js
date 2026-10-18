@@ -1,6 +1,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+const crypto = require("node:crypto");
 
 const db = getFirestore();
 const resetDeveloperSecret = defineSecret("IRPA_RESET_DEVELOPER_SECRET");
@@ -48,7 +49,11 @@ function cleanMode(value){
 async function verifyDeveloperSecret(request){
   const supplied=String(request.data?.developerSecret||"");
   const expected=String(resetDeveloperSecret.value()||"");
-  if(!expected || !supplied || supplied!==expected){
+  // Compare equal-length buffers with a constant-time primitive. Never log or return either value.
+  const suppliedBuffer=Buffer.from(supplied,"utf8");
+  const expectedBuffer=Buffer.from(expected,"utf8");
+  const matches=Boolean(expected && supplied && suppliedBuffer.length===expectedBuffer.length && crypto.timingSafeEqual(suppliedBuffer,expectedBuffer));
+  if(!matches){
     throw new HttpsError("permission-denied","The developer-provided reset authorization was not accepted.");
   }
 }
