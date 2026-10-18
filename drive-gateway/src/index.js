@@ -466,7 +466,7 @@ async function updateSignatureAuthority(request, env) {
     };
     const writeResponse = await fetch(updateUrl.toString(),{
       method:"POST",
-      headers:{Authorization:"Bearer " + claims.token,"Content-Type":"application/json"},
+      headers:{Authorization:"Bearer " + await getFirestoreAdminAccessToken(env),"Content-Type":"application/json"},
       body:JSON.stringify({writes:[
         {update:{name:"projects/"+getFirebaseProjectId(env)+"/databases/(default)/documents/signerIdentities/"+uid,fields},updateMask:{fieldPaths:Object.keys(fields)}},
         {update:{name:"projects/"+getFirebaseProjectId(env)+"/databases/(default)/documents/audit/"+auditId,fields:auditFields}}
