@@ -14,9 +14,9 @@ export async function saveLiveMeetingProceedings(payload){return callMeetingServ
 export async function translateMeetingTranscript(payload){return callMeetingService("/api/meeting-transcripts/translate",payload);}
 
 
-export async function registerMeetingWorkingDocument(payload){const r=await call("registerMeetingWorkingDocument")(payload);return r.data;}
-export async function listMeetingWorkingDocuments(meetingId){const r=await call("listMeetingWorkingDocuments")({meetingId});return r.data?.documents||[];}
-export async function submitMeetingDocumentReview(payload){const r=await call("submitMeetingDocumentReview")(payload);return r.data;}
+export async function registerMeetingWorkingDocument(payload){return callMeetingService("/api/meeting-working-documents/register",payload);}
+export async function listMeetingWorkingDocuments(meetingId){const r=await callMeetingService("/api/meeting-working-documents/list",{meetingId});return r.documents||[];}
+export async function submitMeetingDocumentReview(payload){return callMeetingService("/api/meeting-working-documents/review",payload);}
 
 export async function signMeetingAttendance(payload){return callMeetingService("/api/meeting-attendance/sign",payload);}
 export async function getMeetingAttendanceRegister(meetingId){return callMeetingService("/api/meeting-attendance/register",{meetingId});}
