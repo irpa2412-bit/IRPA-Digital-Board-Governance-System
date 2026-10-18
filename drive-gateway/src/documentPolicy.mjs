@@ -20,7 +20,7 @@ export function resolveIdentity({uid,email,member,employee,admin}={}) {
   const activeMember = [member?.status,member?.registrationStatus].some(v => ["active","activated"].includes(String(v||"").toLowerCase()));
   const activeEmployee = [employee?.status,employee?.employmentStatus,employee?.registrationStatus].some(v => ["active","activated"].includes(String(v||"").toLowerCase()));
   if (!activeAdmin && !activeMember && !activeEmployee) throw new Error("An active IRPA member, employee, or administrator profile is required.");
-  const roles = [...list(member?.roles),...list(member?.assignedRoles),...list(member?.selectedRoles),member?.role,...list(employee?.roles),...list(employee?.assignedRoles),...list(employee?.selectedRoles),employee?.role].map(normalize).filter(Boolean);
+  const roles = [...list(member?.roles),...list(member?.assignedRoles),...list(member?.selectedRoles),...list(member?.specialPermissions),...list(member?.permissions),member?.role,...list(employee?.roles),...list(employee?.assignedRoles),...list(employee?.selectedRoles),...list(employee?.specialPermissions),...list(employee?.permissions),employee?.role].map(normalize).filter(Boolean);
   return {uid:normalize(uid),email:normalize(email).toLowerCase(),actorType:activeAdmin?"ADMINISTRATOR":activeEmployee?"EMPLOYEE":"MEMBER",roles:[...new Set(roles)],department:normalize(employee?.department||member?.department),unit:normalize(employee?.unit||member?.unit)};
 }
 export function canUpload(identity,{classification="Internal",documentType="Administrative",archiveCategory="Administrative Documents",contentType=""}={}) {
