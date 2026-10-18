@@ -57,12 +57,29 @@ jobs:
           distribution: temurin
           java-version: "21"
       - name: Verify security rules with Firestore emulator
+        id: security_rules
+        continue-on-error: true
         run: npx firebase emulators:exec --only firestore --project demo-irpa-dgbs "npm run test:security-rules"
       - name: Verify finance policy with Firestore emulator
+        id: finance_policy
+        continue-on-error: true
         run: npx firebase emulators:exec --only firestore --project demo-irpa-dgbs "npm run test:finance-policy"
       - name: Verify meeting category policy with Firestore emulator
+        id: meeting_category
+        continue-on-error: true
         run: npx firebase emulators:exec --only firestore --project demo-irpa-dgbs "npm run test:meeting-category"
       - name: Install gateway dependencies
         run: npm ci --prefix drive-gateway
       - name: Run gateway regression and governance-store tests
         run: npm test --prefix drive-gateway
+      - name: Enforce Firestore emulator policy test results
+        if: always()
+        env:
+          SECURITY_RULES_OUTCOME: ${{ steps.security_rules.outcome }}
+          FINANCE_POLICY_OUTCOME: ${{ steps.finance_policy.outcome }}
+          MEETING_CATEGORY_OUTCOME: ${{ steps.meeting_category.outcome }}
+        run: |
+          set -euo pipefail
+          test "$SECURITY_RULES_OUTCOME" = "success"
+          test "$FINANCE_POLICY_OUTCOME" = "success"
+          test "$MEETING_CATEGORY_OUTCOME" = "success"
