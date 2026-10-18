@@ -59,7 +59,9 @@ jobs:
           VITE_FIREBASE_APP_ID: "1:1018976634858:web:e73e9e09f55a76ade25493"
           VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.STAGING_FIREBASE_MEASUREMENT_ID }}
           VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
-          VITE_GOOGLE_DRIVE_GATEWAY_URL: ${{ secrets.VITE_GOOGLE_DRIVE_GATEWAY_URL }}
+          VITE_GOOGLE_DRIVE_GATEWAY_URL: "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
+          VITE_GATEWAY_ORIGIN: "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
+          VITE_META_STAGING_GATEWAY_URL: "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
         run: npm run build
 
 
