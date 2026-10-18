@@ -53,7 +53,7 @@ const GOVERNANCE_GATEWAY_ORIGIN = String(
   import.meta.env.VITE_GATEWAY_ORIGIN ||
   import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL ||
   "https://irpa-google-drive-gateway.irpa-governance.workers.dev"
-).trim().replace(/\\/$/, "");
+).trim().replace(/[/]+$/, "");
 
 async function passwordSecurityRequest(path, email) {
   const response = await fetch(GOVERNANCE_GATEWAY_ORIGIN + path, {
@@ -440,7 +440,7 @@ export async function configureInvitationPassword(password) {
   if (!invitationId) throw new Error("The invitation activation context is missing. Open the invitation email again.");
   if (cleanPassword.length < 8) throw new Error("Use a password with at least 8 characters.");
   const idToken = await user.getIdToken(true);
-  const gatewayOrigin = String(import.meta.env.VITE_GATEWAY_ORIGIN || "").trim().replace(/\/$/,"");
+).trim().replace(/[/]+$/, "");
   if (!gatewayOrigin) throw new Error("IRPA gateway origin is not configured for this build.");
   let response;
   try {
@@ -471,7 +471,7 @@ export async function configureInvitationPassword(password) {
 export async function completeInvitationToken(token) {
   const cleanToken = String(token || "").trim();
   if (!cleanToken) throw new Error("The IRPA invitation token is missing.");
-  const gatewayOrigin = String(import.meta.env.VITE_GATEWAY_ORIGIN || "").trim().replace(/\/$/,"");
+).trim().replace(/[/]+$/, "");
   if (!gatewayOrigin) throw new Error("IRPA gateway origin is not configured for this build.");
   const endpoint = `${gatewayOrigin}/api/invitations/redeem`;
   try {
@@ -492,7 +492,7 @@ export async function completeInvitationToken(token) {
 export async function getInvitationSessionState() {
   const user = auth.currentUser;
   if (!user) return {state:null, invitationId:null};
-  const gatewayOrigin = String(import.meta.env.VITE_GATEWAY_ORIGIN || "").trim().replace(/\/$/,"");
+).trim().replace(/[/]+$/, "");
   if (!gatewayOrigin) throw new Error("IRPA gateway origin is not configured for this build.");
   const idToken = await user.getIdToken();
   const response = await fetch(`${gatewayOrigin}/api/invitations/session-state`, {
