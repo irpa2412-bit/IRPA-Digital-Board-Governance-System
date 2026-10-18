@@ -36,10 +36,28 @@ export default function CommunicationMediaPortal({profile,employee,selectedAutho
  }
  async function checkWebsiteConnections(){
   setSiteBusy(true);setError("");setNotice("");
-  try{const data=await gatewayRequest("/api/communications/site/status");setWebsiteStatus({...data.connections,permissions:data.permissions||{}});setConnectionCheckedAt(new Date().toISOString());setNotice("WordPress and cPanel connection check completed.");}
-  catch(e){setError(e.message||"Unable to verify website connections.");}
+  try{
+   const data=await gatewayRequest("/api/communications/site/status");
+   const connections=data?.connections;
+   if(!connections||typeof connections!=="object")throw new Error("The gateway returned an invalid connection-status response.");
+   setWebsiteStatus({...connections,permissions:data.permissions||{}});
+   setConnectionCheckedAt(new Date().toISOString());
+   setNotice("WordPress and cPanel connection check completed.");
+  }
+  catch(e){
+   const checkedAt=new Date().toISOString();
+   setWebsiteStatus({website:"check_failed",cpanel:"check_failed",websiteDiagnostic:"connection_failed",cpanelDiagnostic:"connection_failed"});
+   setConnectionCheckedAt(checkedAt);
+   setError(e.message||"Unable to verify website connections. Both services are marked unverified.");
+  }
   finally{setSiteBusy(false)}
  }
+ useEffect(()=>{
+  if(tab==="Publishing Setup"&&websiteEditor&&!siteBusy){
+   void checkWebsiteConnections();
+  }
+ },[tab,websiteEditor]);
+
  async function loadWebsiteContent(type=websiteType){
   setSiteBusy(true);setError("");
   try{const data=await gatewayRequest("/api/communications/website/content?type="+encodeURIComponent(type));setWebsiteItems(data.items||[]);setWebsiteType(type);setNotice("Loaded "+(data.items||[]).length+" website "+type+".");}
