@@ -23,6 +23,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Run Cloudflare Gateway unit tests
+        run: npm test
+
       - name: Record current production Worker version for rollback
         env:
           CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -238,6 +241,16 @@ jobs:
           reset="$(curl --fail --silent --show-error -H "Content-Type: application/json" -d "{\"email\":\"$email\"}" "$base/api/auth/password-attempt-state")"
           echo "$reset"
           echo "$reset" | grep -q '"status":"FIRST"'
+
+      - name: Verify signer-authority route is deployed and authenticated
+        run: |
+          set -euo pipefail
+          base="https://irpa-google-drive-gateway.irpa-governance.workers.dev"
+          code="$(curl --silent --show-error -o /tmp/signer-authority.json -w "%{http_code}" -H "Content-Type: application/json" -d '{"authorityRole":"Board Member","authorityStatus":"Current"}' "$base/api/signature/authority/update")"
+          cat /tmp/signer-authority.json
+          test "$code" = "401"
+          grep -q '"ok":false' /tmp/signer-authority.json
+          echo "Signer-authority route is live and rejects unauthenticated requests."
 
       - name: Verify production document-reference auth gate
         run: |
