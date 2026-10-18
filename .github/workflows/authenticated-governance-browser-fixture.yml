@@ -1,6 +1,19 @@
 name: Authenticated Cross-Portal Browser Fixture
 
 on:
+  push:
+    branches: [audit/baseline-meeting-browser-20261018]
+    paths:
+      - "src/styles/portal-readability-standard.css"
+      - "src/firebase/config.js"
+      - "src/App.jsx"
+      - "tests/browser/**"
+      - "scripts/seed-authenticated-browser-fixture.cjs"
+      - "playwright.authenticated-governance.config.mjs"
+      - "firebase.json"
+      - "firebase.emulator.test.json"
+      - "firestore.rules"
+      - ".github/workflows/authenticated-governance-browser-fixture.yml"
   pull_request:
     paths:
       - "src/styles/portal-readability-standard.css"
