@@ -98,4 +98,8 @@ test("archive-backed controlled PDFs remain discoverable and selectable in the S
 });
 
 
-test("Sign a Document initiation resolves the same primary and governance archive sources as the PDF palette", () => {\n  const page = fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx", import.meta.url), "utf8");\n  assert.match(page, /async function initiateSigning\(e\)[\\s\\S]*?const url=controlledPdfUrl\\(source\\)/);\n  assert.match(page, /function controlledPdfUrl\\(document=\\{\\}\\)/);\n});\n
+test("Sign a Document initiation resolves the same primary and governance archive sources as the PDF palette", () => {
+  const page = fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx", import.meta.url), "utf8");
+  assert.match(page, /async function initiateSigning\(e\)[\s\S]*?const url=controlledPdfUrl\(source\)/);
+  assert.match(page, /function controlledPdfUrl\(document=\{\}\)/);
+});
