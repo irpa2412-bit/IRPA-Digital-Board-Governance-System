@@ -85,6 +85,65 @@ const meetingServicesRouter = createMeetingServicesRouter({
 function normalizeGatewayAuthority(value) {
   return String(value||"").toLowerCase().replace(/^(the|irpa)\s+/,"").replace(/[._-]+/g," ").replace(/\s+/g," ").trim();
 }
+
+async function updateSignerAuthority(request, env) {
+  const claims = await authenticateFirebaseRequest(request, env);
+  const uid = String(claims.user_id || "").trim();
+  const email = String(claims.email || "").trim().toLowerCase();
+  if (!uid) return json({ok:false,error:"Authentication is required."},401,corsHeaders(request));
+  let data;
+  try { data = await request.json(); } catch { return json({ok:false,error:"Invalid JSON payload."},400,corsHeaders(request)); }
+  const requestedRole=String(data.authorityRole||"").trim();
+  const requestedDepartment=String(data.authorityDepartment||"").trim();
+  const requestedUnit=String(data.authorityUnit||"").trim();
+  const authorityStatus=String(data.authorityStatus||"Current").trim();
+  const authorityReference=String(data.authorityReference||"").trim();
+  const authorityEffectiveAt=String(data.authorityEffectiveAt||"").trim()||null;
+  const authorityExpiresAt=String(data.authorityExpiresAt||"").trim()||null;
+  if(!requestedRole) return json({ok:false,error:"Select the current signing authority before saving."},400,corsHeaders(request));
+  if(!["Current","Pending Verification","Expired","Not yet assigned"].includes(authorityStatus)) return json({ok:false,error:"Select a valid signing authority status."},400,corsHeaders(request));
+  if(authorityEffectiveAt&&authorityExpiresAt&&authorityExpiresAt<authorityEffectiveAt) return json({ok:false,error:"Authority expiry date cannot be earlier than the effective date."},400,corsHeaders(request));
+  const records=[];
+  const add=(document,sourceCollection,fallbackId)=>{
+    if(!document?.fields)return;
+    const record=firestoreDocumentToPlain(document)||{};
+    const id=String(document.name||"").split("/").pop()||fallbackId||uid;
+    records.push({id,...record,sourceCollection});
+  };
+  add(await getFirestoreDocument(env,"members/"+uid,claims.token),"members",uid);
+  add(await getFirestoreDocument(env,"employees/"+uid,claims.token),"employees",uid);
+  if(email){
+    for(const row of await getFirestoreDocumentsByEmail(env,"members",email,claims.token).catch(()=>[]))add(row,"members",uid);
+    for(const row of await getFirestoreDocumentsByEmail(env,"employees",email,claims.token).catch(()=>[]))add(row,"employees",uid);
+  }
+  const unique=[...new Map(records.map(x=>[x.sourceCollection+":"+x.id,x])).values()]
+    .filter(x=>String(x.status||x.employmentStatus||"Active").toLowerCase()!=="inactive");
+  if(!unique.length)return json({ok:false,error:"No active IRPA member or employee register entry was found for this account."},403,corsHeaders(request));
+  const valuesFor=record=>[record.role,record.boardPosition,record.unit,record.unitName,...(Array.isArray(record.roles)?record.roles:[]),...(Array.isArray(record.assignedRoles)?record.assignedRoles:[]),...(Array.isArray(record.selectedRoles)?record.selectedRoles:[]),...(Array.isArray(record.roleAssignments)?record.roleAssignments:[])].flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean));
+  const allowed=[...new Set(unique.flatMap(valuesFor))];
+  if(!allowed.includes(requestedRole))return json({ok:false,error:"The selected signing authority is not registered to this IRPA member/employee account."},403,corsHeaders(request));
+  const matching=unique.filter(record=>{
+    if(!valuesFor(record).includes(requestedRole))return false;
+    if(requestedDepartment&&String(record.department||"").trim()!==requestedDepartment)return false;
+    if(requestedUnit){const unit=String(record.unit||record.unitName||"").trim()||String(record.department||"").trim();if(unit!==requestedUnit)return false;}
+    return true;
+  });
+  if(!matching.length)return json({ok:false,error:"The selected department, unit and signing authority do not match an active IRPA register entry for this account."},403,corsHeaders(request));
+  const source=matching[0], authorityDepartment=String(source.department||"").trim(), authorityUnit=String(source.unit||source.unitName||"").trim()||authorityDepartment;
+  const existing=await getFirestoreDocument(env,"signerIdentities/"+uid,claims.token);
+  if(!existing?.fields)return json({ok:false,error:"Signer Identity record is not available. Restore the Signer Identity link before updating signing authority."},409,corsHeaders(request));
+  const actorEmail=email||String(firestoreDocumentToPlain(existing)?.email||"").trim().toLowerCase();
+  const stamp=new Date().toISOString();
+  const encode=v=>v===null?{nullValue:null}:typeof v==="boolean"?{booleanValue:v}:typeof v==="number"?{doubleValue:v}:{stringValue:String(v)};
+  const changes={authorityRole:requestedRole,authorityStatus,authorityReference,authorityEffectiveAt,authorityExpiresAt,authorityDepartment,authorityUnit,authoritySourceCollection:source.sourceCollection,authoritySourceRecordId:source.id,authorityUpdatedAt:stamp,updatedAt:stamp};
+  const fields=Object.fromEntries(Object.entries(changes).map(([k,v])=>[k,encode(v)]));
+  const audit={action:encode("UPDATE_SIGNER_AUTHORITY"),collection:encode("signerIdentities"),recordId:encode(uid),details:{mapValue:{fields:Object.fromEntries(Object.entries({authorityRole:requestedRole,authorityStatus,authorityDepartment,authorityUnit,authoritySourceCollection:source.sourceCollection,authoritySourceRecordId:source.id}).map(([k,v])=>[k,encode(v)]))}},actorUid:encode(uid),actorEmail:actorEmail?encode(actorEmail):{nullValue:null},createdAt:{timestampValue:stamp}};
+  try{
+    await commitFirestoreDocumentAndAudit(env,"signerIdentities/"+uid,claims.token,fields,Object.keys(fields),audit, {createOnly:false});
+  }catch(error){console.error("Signer authority update failed",String(error?.message||error));return json({ok:false,error:"The signing authority and audit record could not be committed."},503,corsHeaders(request));}
+  return json({ok:true,uid,...changes},200,corsHeaders(request));
+}
+
 async function verifyGatewaySigningAuthority(env,user,manualAuthorityIdentification) {
   const input=normalizeGatewayAuthority(manualAuthorityIdentification);
   if(!input||!user?.uid||!user?.token)throw Object.assign(new Error("Authenticated signing authority is required."),{status:403});
@@ -303,6 +362,10 @@ export default {
 
       if (url.pathname === "/api/session/profile" && request.method === "POST") {
         return await getSessionProfile(request, env);
+      }
+
+      if (pathname === "/api/signature/authority" && request.method === "POST") {
+        return await updateSignerAuthority(request, env);
       }
 
       if (env.ESIGN_MODULE_ENABLED === "true") {
