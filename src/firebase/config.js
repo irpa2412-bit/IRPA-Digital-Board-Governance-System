@@ -3,16 +3,33 @@ import { getAuth, GoogleAuthProvider, connectAuthEmulator } from "firebase/auth"
 import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 
 const useFirebaseEmulators = import.meta.env.VITE_USE_FIREBASE_EMULATORS === "true";
+const STAGING_FIREBASE_PROJECT = "irpa-dbg-staging-a73ec";
+const PRODUCTION_FIREBASE_PROJECT = "irpa-digital-board-governance";
+const firebaseProjectId = useFirebaseEmulators
+  ? "demo-irpa-dgbs"
+  : (import.meta.env.VITE_FIREBASE_PROJECT_ID || PRODUCTION_FIREBASE_PROJECT);
+if (![STAGING_FIREBASE_PROJECT, PRODUCTION_FIREBASE_PROJECT, "demo-irpa-dgbs"].includes(firebaseProjectId)) {
+  throw new Error(`Unrecognized Firebase project "${firebaseProjectId}". Firebase initialization is blocked.`);
+}
+if (firebaseProjectId === STAGING_FIREBASE_PROJECT &&
+    (!import.meta.env.VITE_FIREBASE_API_KEY ||
+     !import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID ||
+     !import.meta.env.VITE_FIREBASE_APP_ID)) {
+  throw new Error("Staging Firebase configuration is incomplete. Production credentials will not be used as fallbacks.");
+}
+const defaultAuthDomain = firebaseProjectId === STAGING_FIREBASE_PROJECT
+  ? "irpa-dbg-staging-a73ec.firebaseapp.com"
+  : "irpa-digital-board-governance.firebaseapp.com";
 
 export const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyC2aMdxHD14nMnGiRyf4mSL1ixXdzBoOtE",
   // Keep Firebase's provisioned Auth domain. The Google OAuth client is
   // registered for this Firebase handler; changing this to web.app without
   // adding the matching OAuth redirect URI causes Google Error 400.
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "irpa-digital-board-governance.firebaseapp.com",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || defaultAuthDomain,
   ...(import.meta.env.VITE_FIREBASE_STORAGE_BUCKET ? { storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET } : {}),
-  projectId: useFirebaseEmulators ? "demo-irpa-dgbs" : (import.meta.env.VITE_FIREBASE_PROJECT_ID || "irpa-digital-board-governance"),
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "217055978789",
+  projectId: firebaseProjectId,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || (firebaseProjectId === "demo-irpa-dgbs" ? "217055978789" : "217055978789"),
   appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:217055978789:web:937d1f2f781202cc1e26cc",
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID ?? "G-XDJEBRBEVC"
 };
