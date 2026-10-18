@@ -5,7 +5,7 @@ import { readFile } from "node:fs/promises";
 test("Finance client sends callable operations to authenticated Cloudflare Worker without Firebase Functions fallback", async () => {
  const client=await readFile(new URL("../src/firebase/data.js",import.meta.url),"utf8");
  const start=client.indexOf("export async function callFinanceAccounting(functionName,data={})");
- const end=client.indexOf("\n",start);
+ const end=client.indexOf("\n}",start)+2;
  assert.notEqual(start,-1);assert.ok(end>start);
  const fn=client.slice(start,end);
  assert.match(fn,/\/api\/finance\/accounting/);
