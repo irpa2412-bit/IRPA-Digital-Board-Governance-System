@@ -32,6 +32,14 @@ jobs:
       - name: Install application dependencies
         run: npm ci
       - name: Build application
+        env:
+          VITE_IRPA_ENV: production
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: irpa-digital-board-governance.firebaseapp.com
+          VITE_FIREBASE_PROJECT_ID: irpa-digital-board-governance
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}
         run: npm run build
       - name: Verify portal navigation
         run: npm run test:portal-navigation
