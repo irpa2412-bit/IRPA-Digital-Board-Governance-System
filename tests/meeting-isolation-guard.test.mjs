@@ -18,7 +18,7 @@ test("Wrangler changes cannot alter production configuration", () => {
 });
 
 test("staging keeps its dedicated KV namespace and rejects the production namespace", () => {
-  assert.match(workflow, /id = "7b50627e29fc4fe1abaa8dc8665edd02"/);
+  assert.match(workflow, /id = "5ea76010553049a2b98c8493c37fbbc4"/);
   assert.match(workflow, /id = "ccdbffa662ac48bfbdf7f4b1f62ca941"/);
   assert.match(workflow, /Staging DRIVE_KV must retain the explicitly approved dedicated namespace/);
   assert.match(workflow, /Production DRIVE_KV cannot be used by staging/);
@@ -60,6 +60,21 @@ test("Signature Gateway integration must include its portal bridge and authentic
 test("Signature Gateway isolation does not exempt unrelated staging admin reset workflows", () => {
   assert.match(workflow, /!allowed\.has\(path\).*signatureGatewayIntegration/);
   assert.doesNotMatch(workflow, /staging-admin-reset-fixture\.yml/);
+});
+
+test("Communication and Media archive gateway integration is explicitly isolated and allowlisted", () => {
+  assert.match(workflow, /const communicationMediaArchiveIntegration =/);
+  assert.match(workflow, /changed\.includes\("src\/pages\/CommunicationMediaStudio\.jsx"\)/);
+  assert.match(workflow, /changed\.includes\("tests\/communication-media-policy\.test\.mjs"\)/);
+  assert.match(workflow, /changed\.includes\("drive-gateway\/src\/index\.js"\)/);
+  assert.match(workflow, /changed\.includes\("drive-gateway\/wrangler\.toml"\)/);
+  assert.match(workflow, /"drive-gateway\/tests\/staging-isolation\.test\.mjs"/);
+  assert.match(workflow, /"firestore\.rules"/);
+  assert.match(workflow, /changed\.includes\("src\/firebase\/signatureStorage\.js"\)/);
+  assert.match(workflow, /changed\.includes\("docs\/COMMUNICATION_MEDIA_PORTAL\.md"\)/);
+  assert.match(workflow, /!changed\.includes\("src\/pages\/Meetings\.jsx"\)/);
+  assert.match(workflow, /!changed\.includes\("src\/pages\/OperationalGatewaysParticipants\.jsx"\)/);
+  assert.match(workflow, /communicationMediaArchiveIntegration && communicationMediaArchivePaths\.has\(path\)/);
 });
 
 test("readability-only PRs are narrowly allowlisted without permitting unrelated portal source changes", () => {

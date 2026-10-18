@@ -67,7 +67,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           STAGING_FIREBASE_PROJECT_ID: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
-          STAGING_DRIVE_KV_ID: "7b50627e29fc4fe1abaa8dc8665edd02"
+          STAGING_DRIVE_KV_ID: "5ea76010553049a2b98c8493c37fbbc4"
         run: |
           set -euo pipefail
           test -n "$CLOUDFLARE_API_TOKEN"
@@ -127,7 +127,7 @@ jobs:
           if (!/name = "irpa-google-drive-gateway-staging"/.test(text)) throw new Error("Staging Worker name is incorrect.");
           if (!/\[env\.staging\.vars\][\s\S]*CLOUDFLARE_AUTH_FUNCTIONS_ENABLED = "true"/.test(text)) throw new Error("Staging migration flag must be true.");
           if (!/\[env\.staging\.vars\][\s\S]*DRIVE_MOCK = "false"/.test(text)) throw new Error("Staging must use real Durable Object state (DRIVE_MOCK=false).");
-          if (!/\[\[env\.staging\.kv_namespaces\]\][\s\S]*binding = "DRIVE_KV"[\s\S]*id = "7b50627e29fc4fe1abaa8dc8665edd02"/.test(text)) throw new Error("Dedicated staging DRIVE_KV binding is missing.");
+          if (!/\[\[env\.staging\.kv_namespaces\]\][\s\S]*binding = "DRIVE_KV"[\s\S]*id = "5ea76010553049a2b98c8493c37fbbc4"/.test(text)) throw new Error("Dedicated staging DRIVE_KV binding is missing.");
           if (process.env.STAGING_FIREBASE_PROJECT_ID !== process.env.STAGING_FIREBASE_PROJECT_ID.trim() || !/^[a-z0-9-]{6,63}$/.test(process.env.STAGING_FIREBASE_PROJECT_ID) || process.env.STAGING_FIREBASE_PROJECT_ID === "irpa-digital-board-governance") throw new Error("Staging Firebase project must be explicitly configured and separate from production.");
           if (!/\[\[env\.staging\.durable_objects\.bindings\]\][\s\S]*name = "ESIGN_DO"[\s\S]*class_name = "EsignRecordDurableObject"/.test(text)) throw new Error("Staging ESIGN_DO binding is missing.");
           if (!/\[\[env\.staging\.migrations\]\][\s\S]*tag = "esign-do-staging-v1"/.test(text)) throw new Error("Staging DO migration is missing.");

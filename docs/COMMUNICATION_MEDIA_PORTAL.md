@@ -9,8 +9,16 @@ An integrated communications workspace inside the existing IRPA Digital Board Go
 - Approved website publishing through the existing Cloudflare Worker.
 - Read and update WordPress pages/posts through the WordPress REST API.
 - cPanel connection verification and restricted static-file editing through cPanel UAPI.
-- Media uploads and archive through the existing authenticated Google Drive gateway. Firebase Storage remains deny-by-default.
+- Multi-format media upload into the verified Google Drive `Communication and Media Archive` through the existing authenticated gateway, with Firestore metadata and role-based access. The archive is provisioned idempotently and the server verifies its folder marker before accepting media. Firebase Storage remains deny-by-default.
 - Media library, authenticated download, image editing/export, audio/video preview and browser-native trim/export, within the existing gateway's file-size and format limits.
+
+
+## Communication and Media Archive provisioning and recovery
+
+- The authorised media upload flow provisions (or reuses and verifies) the dedicated `Communication and Media Archive` folder under the configured IRPA Drive root. Media binaries are stored in that folder; the Firestore `communicationMediaAssets` collection remains a metadata-only register.
+- Provisioning and upload require the existing server-side communications role check. The gateway rejects arbitrary folder IDs and accepts only a folder marked as the IRPA Communication and Media Archive.
+- If the gateway returns `GOOGLE_DRIVE_NOT_AUTHORIZED` (HTTP 503), the refresh-token record is absent from the configured Worker KV namespace. An active IRPA administrator must open the application's Settings and complete Google OAuth using the specifically authorised Google account. The callback verifies the account and encrypts the refresh token before saving it. Retry only after the callback confirms success; never paste tokens or encryption keys into logs or source control.
+- Validate this change in the isolated staging environment only. Configure the staging app to use the staging gateway, Firebase project and dedicated staging KV namespace; do not copy production OAuth state, secrets or token records into staging. Verify the archive folder, upload response/file ID, Firestore register entry, role-denied behavior and audit coverage before considering acceptance.
 
 ## Communications operations registers
 

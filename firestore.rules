@@ -459,13 +459,19 @@ service cloud.firestore {
     allow update,delete:if admin();
   }
   match /inductionRecords/{uid}{allow read:if self(uid)||admin();allow create,update:if self(uid)&&request.resource.data.uid==request.auth.uid&&(activeMember()||request.auth.token.firebase.sign_in_provider=="anonymous");allow delete:if admin();}
+  function communicationMediaRecordOriginMatches(data){
+    return signedIn() &&
+      ((request.auth.token.get("aud","")=="irpa-dbg-staging-a73ec" && data.get("recordOrigin","")=="STAGING") ||
+       (request.auth.token.get("aud","")!="irpa-dbg-staging-a73ec" && data.get("recordOrigin","")=="PRODUCTION"));
+  }
+
   // Media binaries live in the existing authenticated Google Drive gateway; Firestore stores only the asset register.
   match /communicationMediaAssets/{id}{
     allow read:if communicationMediaUser();
     allow create:if communicationMediaUser()
       &&request.resource.data.get("uploadedByUid","")==request.auth.uid
       &&request.resource.data.get("status","")=="Available"
-      &&request.resource.data.get("recordOrigin","")=="PRODUCTION"
+      &&communicationMediaRecordOriginMatches(request.resource.data)
       &&request.resource.data.get("title","") is string
       &&request.resource.data.get("title","").size()>0
       &&request.resource.data.get("title","").size()<=180
@@ -486,7 +492,7 @@ service cloud.firestore {
     allow create:if communicationMediaUser()
       &&request.resource.data.get("createdByUid","")==request.auth.uid
       &&request.resource.data.get("status","")=="Draft"
-      &&request.resource.data.get("recordOrigin","")=="PRODUCTION"
+      &&communicationMediaRecordOriginMatches(request.resource.data)
       &&request.resource.data.get("title","") is string
       &&request.resource.data.get("title","").size()>0
       &&request.resource.data.get("title","").size()<=180

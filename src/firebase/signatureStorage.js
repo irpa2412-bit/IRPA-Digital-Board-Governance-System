@@ -225,6 +225,14 @@ export async function deleteDriveFile(fileId, documentId = null) {
   });
 }
 
+export async function provisionCommunicationMediaArchive() {
+  const result = await gatewayPost("/api/communication-media-archive/provision", {});
+  if (!result.folderId || result.archiveName !== "Communication and Media Archive") {
+    throw new Error("The IRPA Communication and Media Archive could not be verified.");
+  }
+  return result;
+}
+
 export async function startGoogleDriveAuthorization() {
   const result = await gatewayPost("/oauth/start", {});
   if (!result.authorizationUrl) throw new Error("Google Drive authorization URL was not returned.");

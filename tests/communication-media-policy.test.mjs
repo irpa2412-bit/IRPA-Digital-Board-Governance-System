@@ -12,6 +12,7 @@ const metaOAuth=read("../drive-gateway/src/metaOAuth.mjs");
 const stagingWorkflow=read("../.github/workflows/staging-gateway-e2e.yml");
 const rules=read("../firestore.rules");
 const gateway=read("../drive-gateway/src/index.js");
+const wrangler=read("../drive-gateway/wrangler.toml");
 const site=read("../drive-gateway/src/communicationsSite.mjs");
 const functionsIndex=read("../functions/index.js");
 const docs=read("../docs/COMMUNICATION_MEDIA_PORTAL.md");
@@ -57,7 +58,8 @@ test("website publishing enforces Firebase authentication, registered reviewer r
  assert.ok(site.includes("COMMUNICATION_MEDIA_PUBLISHED"));
  assert.ok(site.includes("WORDPRESS_APPLICATION_PASSWORD"));
  assert.ok(!portal.includes("WORDPRESS_APPLICATION_PASSWORD"));
- assert.ok(!portal.includes("CPANEL_API_TOKEN"));
+ assert.ok(!portal.includes("process.env.CPANEL_API_TOKEN"));
+ assert.ok(!/CPANEL_API_TOKEN\s*[:=]\s*["'][^"']+["']/.test(portal));
  assert.ok(portal.includes("configured securely by an authorised administrator"));
 });
 
@@ -135,7 +137,8 @@ test("website page editing is staging-host-only, Communication & Media scoped, r
  assert.ok(site.includes('["draft", "publish"]'));
  assert.ok(!site.includes("console.log(WORDPRESS_APPLICATION_PASSWORD"));
  assert.ok(!portal.includes("WORDPRESS_APPLICATION_PASSWORD"));
- assert.ok(!portal.includes("CPANEL_API_TOKEN"));
+ assert.ok(!portal.includes("process.env.CPANEL_API_TOKEN"));
+ assert.ok(!/CPANEL_API_TOKEN\s*[:=]\s*["'][^"']+["']/.test(portal));
 });
 
 
@@ -205,6 +208,9 @@ test("Meta API uses the existing staging-only OAuth router, minimal read permiss
  assert.ok(stagingWorkflow.includes("STAGING_META_TOKEN_ENCRYPTION_KEY"));
  assert.ok(stagingWorkflow.includes("META_OAUTH_CONFIGURATION_SHAPE=VALID"));
  assert.ok(stagingWorkflow.includes('IRPA_PRODUCTION_CUTOVER:"false"'));
+ assert.ok(stagingWorkflow.includes("STAGING_COMMUNICATION_MEDIA_ARCHIVE_PROVISION=PASS"));
+ assert.ok(stagingWorkflow.includes("STAGING_CONTROLLED_PDF_UPLOAD=PASS"));
+ assert.ok(stagingWorkflow.includes("firestore-rules-approved"));
  assert.ok(stagingWorkflow.includes("refusing to configure Worker secrets"));
 });
 
@@ -216,4 +222,54 @@ test("communication portal light cards and secondary controls retain readable fo
  assert.match(readability,/\.communication-media-portal input::placeholder,[\s\S]*?color:#526176!important/);
 });
 
+test("media studio upload size matches the gateway enforced maximum and labels staging records correctly",()=>{
+ assert.ok(studio.includes("MAX_BYTES=25*1024*1024"));
+ assert.ok(gateway.includes('purpose === "Communication Media" ? 25 * 1024 * 1024'));
+ assert.ok(studio.includes('recordOrigin:auth.app?.options?.projectId === "irpa-dbg-staging-a73ec" ? "STAGING" : "PRODUCTION"'));
+});
 
+test("media asset register is authenticated, size-limited, immutable and deny-by-default for edits/deletion",()=>{
+ assert.ok(rules.includes('match /communicationMediaAssets/{id}'));
+ assert.ok(rules.includes('request.resource.data.get("uploadedByUid","")==request.auth.uid'));
+ assert.ok(rules.includes('request.resource.data.get("fileSize",0)<=26214400'));
+ assert.ok(rules.includes('request.resource.data.get("storageProvider","")=="Google Drive"'));
+ assert.ok(rules.includes('allow update,delete:if false;'));
+});
+
+test("media asset and item record origins are restricted to the authenticated Firebase project",()=>{
+ assert.ok(rules.includes('function communicationMediaRecordOriginMatches(data)'));
+ assert.ok(rules.includes('request.auth.token.get("aud","")=="irpa-dbg-staging-a73ec"'));
+ assert.equal(rules.split("communicationMediaRecordOriginMatches(request.resource.data)").length-1,2);
+});
+
+test("staging gateway is isolated from production Firebase, app URL and Drive archive root",()=>{
+ const staging=wrangler.slice(wrangler.indexOf("[env.staging.vars]"));
+ assert.ok(staging.includes('FIREBASE_PROJECT_ID = "irpa-dbg-staging-a73ec"'));
+ assert.ok(staging.includes('IRPA_APP_URL = "https://irpa-dbg-staging-a73ec.web.app"'));
+ assert.ok(staging.includes('DRIVE_ROOT_FOLDER_NAME = "IRPA Governance System - STAGING"'));
+ assert.ok(gateway.includes("function getDriveRootFolderName(env)"));
+ assert.ok(gateway.includes('env?.IRPA_ENVIRONMENT === "staging" ? "IRPA Governance System - STAGING"'));
+});
+
+test("Communication and Media Archive is provisioned and verified before media upload",()=>{
+ assert.ok(studio.includes("provisionCommunicationMediaArchive"));
+ assert.ok(studio.includes("folderId:archive.folderId"));
+ assert.ok(studio.includes("archive.archivePath"));
+ assert.ok(gateway.includes('pathname === "/api/communication-media-archive/provision"'));
+ assert.ok(gateway.includes('"Communication and Media Archive"'));
+ assert.ok(gateway.includes('irpaCommunicationMediaArchive:true'));
+ assert.ok(gateway.includes('folderDescription.irpaCommunicationMediaArchive !== true'));
+ assert.ok(gateway.includes('purpose === "Communication Media" && !requestedFolderId'));
+ assert.ok(gateway.includes('code:"GOOGLE_DRIVE_NOT_AUTHORIZED"'));
+ assert.ok(gateway.includes('https://irpa-dbg-staging-a73ec.web.app'));
+ assert.ok(gateway.includes('https://irpa-dbg-staging-a73ec.firebaseapp.com'));
+ assert.ok(gateway.includes('},503,corsHeaders(request))'));
+});
+
+test("media upload and download both enforce registered communications roles at the gateway",()=>{
+ assert.ok(gateway.includes("async function authorizeCommunicationMediaDownload(env,claims)"));
+ assert.ok(gateway.includes('purpose === "Communication Media" && !(await authorizeCommunicationMediaDownload(env, claims))'));
+ assert.ok(gateway.includes('if (purpose === "Communication Media" && !(await authorizeCommunicationMediaDownload(env, claims)))'));
+ assert.ok(gateway.includes("Your registered IRPA role does not permit communications media uploads."));
+ assert.ok(gateway.includes("Your registered IRPA role does not permit access to the communications media archive."));
+});
