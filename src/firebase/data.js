@@ -4,6 +4,7 @@ import { sendEmployeeRegistrationEmail } from "./auth";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { canAccessMeetingCategory, MEETING_CATEGORIES } from "./meetingPolicy.js";
 import { listLifecycleDocuments } from "./documentLifecycle.js";
+import { callMeetingService } from "./meetingGatewayApi";
 
 const uniqueInductionValues=(values)=>[...new Set(values.flatMap(v=>Array.isArray(v)?v:String(v||"").split(",")).map(v=>String(v||"").trim()).filter(Boolean))];
 
@@ -499,12 +500,10 @@ export async function listMeetingInviteeDirectory(){
  return {boardMembers:Array.isArray(result.data?.boardMembers)?result.data.boardMembers:[],members:Array.isArray(result.data?.members)?result.data.members:[],employees:Array.isArray(result.data?.employees)?result.data.employees:[]};
 }
 
-/** Secure administrator-only removal for pending invitation records. */
+/** Secure administrator-only removal for pending invitation records via Cloudflare. */
 export async function removeInvitationRecord(invitationId){
  const id=String(invitationId||"").trim();
  if(!id)throw new Error("An invitation record is required.");
  if(!auth.currentUser?.uid)throw new Error("Administrator authentication is required.");
- const call=httpsCallable(getFunctions(undefined,"us-central1"),"removeInvitationRecord");
- const result=await call({invitationId:id});
- return result.data||{ok:true};
+ return callMeetingService("/api/invitations/remove",{invitationId:id});
 }
