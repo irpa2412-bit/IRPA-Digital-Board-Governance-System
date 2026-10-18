@@ -973,6 +973,11 @@ async function uploadControlledDocument(request, env) {
   if (!allowedCategories.includes(archiveCategory)) return json({ok:false,error:"Invalid document archive category."},400,corsHeaders(request));
   if (!allowedClassifications.includes(classification)) return json({ok:false,error:"Invalid document access classification."},400,corsHeaders(request));
   if (!ALLOWED_CONTENT_TYPES.has(contentType)) return json({ok:false,error:"This document format is not supported for controlled-document routing."},400,corsHeaders(request));
+  let documentIdentity;
+  try { documentIdentity = resolveIdentity({uid:claims.user_id,email:claims.email,admin:firestoreDocumentToPlain(adminRecord),member:firestoreDocumentToPlain(memberRecord),employee:firestoreDocumentToPlain(employeeRecord)}); }
+  catch { return json({ok:false,error:"An active IRPA member, employee or administrator profile is required for controlled document upload."},403,corsHeaders(request)); }
+  const uploadPolicy = canUpload(documentIdentity,{classification,documentType,archiveCategory,contentType});
+  if (!uploadPolicy.allowed) return json({ok:false,error:uploadPolicy.reason},403,corsHeaders(request));
   if (!Number.isFinite(fileSize) || fileSize <= 0 || fileSize > MAX_BYTES) return json({ok:false,error:"Uploaded documents must not exceed 10 MB."},400,corsHeaders(request));
 
   const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
