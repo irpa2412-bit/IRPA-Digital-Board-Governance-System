@@ -440,8 +440,8 @@ async function updateSignatureAuthority(request, env) {
       authorityRole:{stringValue:requestedRole},
       authorityStatus:{stringValue:authorityStatus},
       authorityReference:{stringValue:authorityReference},
-      authorityEffectiveAt:authorityEffectiveAt?{stringValue:authorityEffectiveAt}:{nullValue:null},
-      authorityExpiresAt:authorityExpiresAt?{stringValue:authorityExpiresAt}:{nullValue:null},
+      authorityEffectiveAt:authorityEffectiveAt?{stringValue:authorityEffectiveAt}:{nullValue:"NULL"},
+      authorityExpiresAt:authorityExpiresAt?{stringValue:authorityExpiresAt}:{nullValue:"NULL"},
       authorityDepartment:{stringValue:authorityDepartment},
       authorityUnit:{stringValue:authorityUnit},
       authoritySourceCollection:{stringValue:source.sourceCollection},
@@ -461,7 +461,7 @@ async function updateSignatureAuthority(request, env) {
         authoritySourceCollection:{stringValue:source.sourceCollection},authoritySourceRecordId:{stringValue:source.id}
       }}},
       actorUid:{stringValue:uid},
-      actorEmail:email?{stringValue:email}:{nullValue:null},
+      actorEmail:email?{stringValue:email}:{nullValue:"NULL"},
       createdAt:{timestampValue:now}
     };
     const writeResponse = await fetch(updateUrl.toString(),{
@@ -1826,7 +1826,7 @@ async function sendMemberInvitation(request, env) {
     };
   }
   await updateFirestoreDocument(env,`invitations/${invitationId}`,claims.token,{
-    invitationTokenHash:{stringValue:invitationTokenHash},invitationTokenVersion:{stringValue:"2"},invitationExpiresAt:{timestampValue:invitationExpiresAt},invitationRedeemedAt:{nullValue:null},invitationRedeemedUid:{nullValue:null},
+    invitationTokenHash:{stringValue:invitationTokenHash},invitationTokenVersion:{stringValue:"2"},invitationExpiresAt:{timestampValue:invitationExpiresAt},invitationRedeemedAt:{nullValue:"NULL"},invitationRedeemedUid:{nullValue:"NULL"},
     deliveryStatus:{stringValue:"Queued"},deliveryQueuedAt:{timestampValue:new Date().toISOString()},deliveryError:{stringValue:""},deliveryProvider:{stringValue:"IRPA Mail Server via Cloudflare Worker"}
   },["invitationTokenHash","invitationTokenVersion","invitationExpiresAt","invitationRedeemedAt","invitationRedeemedUid","deliveryStatus","deliveryQueuedAt","deliveryError","deliveryProvider"]);
   const message=buildInvitationMessage({name:name||"Member",link,meetingAccess,username:email});
