@@ -36,11 +36,11 @@ jobs:
         run: node --test tests/meeting-room-ai-assistant.test.mjs
       - name: Build production application
         env:
-          VITE_IRPA_ENV: production
-          VITE_FIREBASE_API_KEY: "AIzaSyC2aMdxHD14nMnGiRyf4mSL1ixXdzBoOtE"
-          VITE_FIREBASE_AUTH_DOMAIN: "irpa-digital-board-governance.firebaseapp.com"
-          VITE_FIREBASE_PROJECT_ID: "irpa-digital-board-governance"
-          VITE_FIREBASE_MESSAGING_SENDER_ID: "217055978789"
-          VITE_FIREBASE_APP_ID: "1:217055978789:web:937d1f2f781202cc1e26cc"
-          VITE_FIREBASE_MEASUREMENT_ID: "G-XDJEBRBEVC"
+          VITE_IRPA_ENV: staging
+          VITE_FIREBASE_API_KEY: "AIzaSyA6UmHtP-mRr99rBw57_-qrD4_mFSBnZ38"
+          VITE_FIREBASE_AUTH_DOMAIN: "irpa-dbg-staging-a73ec.firebaseapp.com"
+          VITE_FIREBASE_PROJECT_ID: "irpa-dbg-staging-a73ec"
+          VITE_FIREBASE_MESSAGING_SENDER_ID: "1018976634858"
+          VITE_FIREBASE_APP_ID: "1:1018976634858:web:e73e9e09f55a76ade25493"
+          VITE_FIREBASE_MEASUREMENT_ID: ""
         run: npm run build
