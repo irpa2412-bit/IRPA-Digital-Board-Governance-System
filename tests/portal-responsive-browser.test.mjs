@@ -45,7 +45,7 @@ try {
       await page.screenshot({path:"artifacts/responsive-screenshots/"+portal.toLowerCase()+"-"+width+".png",fullPage:true});
       const row={portal,width,...metrics,pageErrors};
       console.log("PORTAL_VIEWPORT_AUDIT "+JSON.stringify(row));
-      if(metrics.horizontalOverflow||metrics.renderError||pageErrors.length)failures.push(row);
+      if(metrics.horizontalOverflow||metrics.contrastFailureCount>0||metrics.renderError||pageErrors.length)failures.push(row);
     } catch(e) { const row={portal,width,error:String(e?.message||e),pageErrors};console.log("PORTAL_VIEWPORT_AUDIT "+JSON.stringify(row));failures.push(row); }
     finally { await context.close(); }
   }
