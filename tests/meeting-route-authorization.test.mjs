@@ -33,7 +33,7 @@ function makeContext(claims, { authenticated = true } = {}) {
   };
 }
 
-function mockFirestore(t, { meeting, document }) {
+function mockFirestore(t, { meeting, document, activeMemberUid = "" }) {
   t.mock.method(globalThis, "fetch", async (input, init = {}) => {
     const url = new URL(String(input));
     const pathname = url.pathname;
@@ -43,6 +43,11 @@ function mockFirestore(t, { meeting, document }) {
     }
     if (pathname.endsWith("/documents/documents/doc-1")) {
       return document ? response(fsDoc("documents", "doc-1", document)) : response({ error: "missing" }, 404);
+    }
+    if (activeMemberUid && pathname.endsWith("/documents/members/" + activeMemberUid)) {
+      return response(fsDoc("members", activeMemberUid, {
+        uid: activeMemberUid, email: "host@example.org", role: "Board Member", status: "Active", active: true
+      }));
     }
     if (/\/documents\/(adminProfiles|members|employees)\//.test(pathname)) return response({ error: "missing" }, 404);
     if (pathname.endsWith("/documents/meetingWorkingDocuments") ||
@@ -80,7 +85,8 @@ test("meeting document registration rejects an authenticated participant without
 test("meeting document registration rejects a document belonging to another meeting", async t => {
   mockFirestore(t, {
     meeting: { createdByUid: "host-1", participantUids: ["host-1"] },
-    document: { meetingId: "different-meeting", title: "Wrong meeting document" }
+    document: { meetingId: "different-meeting", title: "Wrong meeting document" },
+    activeMemberUid: "host-1"
   });
   const router = createMeetingServicesRouter(makeContext({ user_id: "host-1", email: "host@example.org" }));
   const result = await post(router);
@@ -91,7 +97,8 @@ test("meeting document registration rejects a document belonging to another meet
 test("meeting host can register a document linked to the requested meeting", async t => {
   mockFirestore(t, {
     meeting: { createdByUid: "host-1", title: "Test meeting" },
-    document: { meetingId: "meeting-1", title: "Valid meeting document", fileName: "minutes.pdf" }
+    document: { meetingId: "meeting-1", title: "Valid meeting document", fileName: "minutes.pdf" },
+    activeMemberUid: "host-1"
   });
   const router = createMeetingServicesRouter(makeContext({ user_id: "host-1", email: "host@example.org" }));
   const result = await post(router);
