@@ -12,6 +12,7 @@ on:
       - "src/firebase/meetingGatewayApi.js"
       - "src/firebase/auth.js"
       - "src/pages/CommunicationMediaPortal.jsx"
+      - "src/pages/SocialMediaAccounts.jsx"
       - "vite.config.js"
       - "package.json"
       - "package-lock.json"
