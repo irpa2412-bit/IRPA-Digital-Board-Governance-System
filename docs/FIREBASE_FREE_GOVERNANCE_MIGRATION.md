@@ -14,6 +14,34 @@ Status: **partial functional migration in progress; no production cutover or dep
 - Backend callable families include `functions/authorizationFunctions.js`, `functions/meetingRecords.js`, `functions/liveMeeting.js`, `functions/meetingAttendanceRegister.js`, `functions/passwordSecurity.js`, and callable exports in `functions/index.js`.
 - `drive-gateway/src/index.js`, `drive-gateway/src/meetingPortal.mjs`, and `drive-gateway/src/meetingServices.mjs` currently authenticate Firebase tokens and read/write Firestore. The Worker configuration still requires `FIREBASE_PROJECT_ID`.
 
+## Added scope: Finance Portal and Procurement Portal
+
+These portals are included in the same branch and the same Google Cloud/Firebase Cloud Functions billing-blocker migration. Preserve their existing UI, approval sequence, financial controls, audit history, vendor records, purchase requests, quotations, purchase orders, delivery/invoice evidence, finance handoff, and controlled-document upload permissions.
+
+### Finance Portal dependency points
+
+- `src/pages/FinancePortfolio.jsx` uses `src/firebase/data.js` for finance registers, payment traces, record reads/writes, and payment processing.
+- `src/components/FinanceTechnologyOperations.jsx` calls the generic `callFinanceAccounting` wrapper in `src/firebase/data.js`, which dispatches named Firebase callable functions for accounting operations.
+- `src/components/FinanceAccountingEngine.jsx` and related finance components access finance data directly through the current data layer.
+- Financial state transitions, period close, journal/posting operations, payroll/payment controls, donor restrictions, reconciliation, and audit writes must be server-enforced; the client UI must not become the authorization boundary.
+
+### Procurement Portal dependency points
+
+- `src/pages/ProcurementPortal.jsx` uses `src/firebase/procurement.js` and `src/firebase/data.js`.
+- `src/firebase/procurement.js` performs direct Firestore reads/writes and transactions for vendors, requests, quotations, PR/PO numbers, approvals, evidence, performance scores, blacklisting/restrictions, audit entries, and finance handoff.
+- Procurement's current client-side role checks are not sufficient as the only authorization boundary. Worker routes must derive actor identity from a verified session and validate procurement team membership, requester ownership, selected approver identity/role, allowed stage transitions, evidence ownership, and finance-handoff conditions on the server.
+
+### Required migration sequence for these portals
+
+1. Inventory every finance callable name and every Firestore collection/read/write/transaction used by Finance and Procurement; map each to a Cloudflare Worker operation and server-side authorization policy.
+2. Implement authenticated Worker routes for finance operations and procurement workflow actions. Keep operations fail-closed until verified identity, role, register membership, record ownership, workflow state, and audit write are validated server-side.
+3. Establish versioned Cloudflare persistence for transactional finance/procurement records, counters, and audit events. Do not point the portals at the existing generic Durable Object adapter until its concurrency, atomicity, query/indexing, retention, and audit guarantees meet these requirements; use D1 for transactional relational workflows where appropriate.
+4. Migrate and reconcile existing Firestore records, counters, vendor restrictions, finance payment traces, approvals, and evidence references before enabling any client cutover. Verify record counts, foreign-key references, financial totals, and document hashes.
+5. Switch client data adapters only after staging tests prove end-to-end parity. Preserve the existing Finance and Procurement UI and maintain a reversible, documented rollback.
+6. Keep Firebase-hosted security rules unchanged and do not delete deployed functions. The objective is to make these portal operations independent of billing-blocked Firebase Cloud Functions, not to delete Firebase globally.
+
+**Status of this added scope:** dependency audit and acceptance contract only. The Finance and Procurement client data paths still use Firestore, and finance callable dispatch still uses Firebase Functions. No Finance/Procurement cutover has been made. Treat this as an explicit incomplete gate, not a completed migration.
+
 ## Required replacement architecture
 
 1. **Functional decoupling and billing:** move target runtime functionality currently blocked by Google Cloud billing for Firebase Cloud Functions into authenticated Cloudflare Worker routes/services. Preserve Firebase-hosted rules as requested; do not delete or rewrite them as part of this migration. Where existing Firebase Authentication or Firestore remains temporarily necessary, document it as a retained dependency and do not claim full decoupling until the affected target operation no longer requires Firebase billing or a Firebase callable. Replace Firebase ID-token dependence on migrated routes with a verified Cloudflare-compatible session/identity contract; never accept a client-supplied UID or role as proof of identity.
