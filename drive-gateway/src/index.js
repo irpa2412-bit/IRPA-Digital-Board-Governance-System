@@ -114,7 +114,7 @@ async function handleAuthorizationWorkflow(request, env) {
   }
   async function commit(writes){const res=await fetch("https://firestore.googleapis.com/v1/"+base+":commit",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({writes})});if(!res.ok)throw new Error("Authorization record and audit event could not be committed atomically.");return res.json();}
   const [admin,member,employee]=await Promise.all([read("adminProfiles/"+claims.user_id),read("members/"+claims.user_id),read("employees/"+claims.user_id)]);
-  const isAdmin=lower(claims.email)==="irpa2412@gmail.com"||admin?.active===true;
+  const isAdmin=admin?.active===true;
   const active=!!(isAdmin||member?.status==="Active"||employee?.status==="Active"||member?.registrationStatus==="Active"||employee?.employmentStatus==="Active");
   if(!active)return json({ok:false,error:"An active IRPA institutional identity is required."},403,corsHeaders(request));
   const roles=[member?.role,employee?.role,...(Array.isArray(member?.roles)?member.roles:[]),...(Array.isArray(employee?.roles)?employee.roles:[])].map(clean).filter(Boolean);
@@ -202,7 +202,7 @@ async function handleFinanceAccounting(request, env) {
   async function create(col,id,values){return {update:{name:base+"/"+col+"/"+id,fields:fields(values)},currentDocument:{exists:false}};}
   const adminDoc=firestoreDocumentToPlain(await readDoc("adminProfiles/"+claims.user_id))||{},employee=firestoreDocumentToPlain(await readDoc("employees/"+claims.user_id))||{},member=firestoreDocumentToPlain(await readDoc("members/"+claims.user_id))||{};
   const roles=[adminDoc.role,employee.role,member.role,...(Array.isArray(employee.roles)?employee.roles:[]),...(Array.isArray(member.roles)?member.roles:[])].filter(Boolean).map(String);
-  const isAdmin=String(claims.email||"").trim().toLowerCase()==="irpa2412@gmail.com"||adminDoc.active===true;
+  const isAdmin=adminDoc.active===true;
   const financeRoles=new Set(["Administrator","Executive Director","Director Finance & Administration","Finance Manager","Accountant","Finance Officer"]);
   if(!isAdmin&&!roles.some(r=>financeRoles.has(r)))return json({ok:false,error:"Finance authorization is required."},403,corsHeaders(request));
   const all=async col=>(await list(col)).map(({_updateTime,...d})=>d),periodFor=d=>periodKey(String(d?.date||stamp()).slice(0,7));
@@ -285,7 +285,7 @@ async function removePendingInvitation(request, env) {
   const id=String(data.invitationId||"").trim();
   if(!/^[A-Za-z0-9_-]{1,128}$/.test(id))return json({ok:false,error:"A valid invitation record is required."},400,corsHeaders(request));
   const adminSnap=await getFirestoreDocument(env,"adminProfiles/"+claims.user_id,claims.token).catch(()=>null);
-  const isAdmin=String(claims.email||"").trim().toLowerCase()==="irpa2412@gmail.com"||Boolean(firestoreDocumentToPlain(adminSnap)?.active);
+  const isAdmin=firestoreDocumentToPlain(adminSnap)?.active===true;
   if(!isAdmin)return json({ok:false,error:"Only an active IRPA Administrator can remove invitation records."},403,corsHeaders(request));
   const invitationDoc=await getFirestoreDocument(env,"invitations/"+id,claims.token).catch(()=>null);
   const invitation=firestoreDocumentToPlain(invitationDoc);
