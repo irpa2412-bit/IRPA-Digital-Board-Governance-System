@@ -27,6 +27,7 @@ import { buildGoogleDriveAuthorizationParams } from "./googleDriveOAuth.mjs";
 import { createCommunicationsSiteRouter } from "./communicationsSite.mjs";
 import { createMetaOAuthRouter } from "./metaOAuth.mjs";
 import { createMeetingPortalRouter } from "./meetingPortal.mjs";
+import { createMeetingServicesRouter } from "./meetingServices.mjs";
 
 function getFirebaseProjectId(env) {
   const projectId = String(env?.FIREBASE_PROJECT_ID || "").trim();
@@ -67,6 +68,15 @@ const meetingPortalRouter = createMeetingPortalRouter({
   getFirebaseProjectId: env => getFirebaseProjectId(env),
   getFirestoreAdminAccessToken: env => getFirestoreAdminAccessToken(env),
   authenticateFirebaseRequest,
+  json,
+  corsHeaders
+});
+
+const meetingServicesRouter = createMeetingServicesRouter({
+  authenticateFirebaseRequest,
+  getFirebaseProjectId,
+  getFirestoreAdminAccessToken,
+  sendEmail: (env, message) => smtpSend(env, message),
   json,
   corsHeaders
 });
@@ -168,6 +178,9 @@ export default {
 
       const meetingPortalResponse = await meetingPortalRouter(request, env, pathname);
       if (meetingPortalResponse) return meetingPortalResponse;
+
+      const meetingServicesResponse = await meetingServicesRouter(request, env, pathname);
+      if (meetingServicesResponse) return meetingServicesResponse;
 
       if (pathname.startsWith("/api/communications/meta/")) {
         const metaResponse = await metaOAuthRouter(request, env);
