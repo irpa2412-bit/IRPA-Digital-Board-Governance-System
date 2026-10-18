@@ -75,7 +75,7 @@ export async function updateMySignerAuthority(data={}){
     authorityUnit:normalise(data.authorityUnit||"")
   };
   const token=await u.getIdToken();
-  const gateway=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").trim().replace(/\\/+$/,"");
+  const gateway=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").trim().replace(/\/+$/,"");
   let response;
   try{
     response=await fetch(gateway+"/api/signature/authority",{
