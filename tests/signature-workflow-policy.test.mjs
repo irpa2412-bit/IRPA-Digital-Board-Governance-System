@@ -109,5 +109,5 @@ test("Signature Portal PDF palette remains legible and reports retrieval failure
   assert.match(page, /background:"#111827",color:"#f8fafc"/);
   assert.match(page, /background:"#ffffff"/);
   assert.match(page, /PDF could not be loaded\. Check your access to this controlled document/);
-  assert.match(page, /setPdf\(null\);setPageNum\(1\);setError\("\")/);
+  assert.ok(page.includes('setPdf(null);setPageNum(1);setError("")'));
 });
