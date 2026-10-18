@@ -17,6 +17,7 @@ on:
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/billing-dependency-audit.yml"
+      - ".github/workflows/meeting-portal-fixture-browser.yml"
   pull_request:
     branches: [main]
     paths:
