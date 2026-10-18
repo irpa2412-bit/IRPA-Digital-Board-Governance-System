@@ -350,14 +350,10 @@ jobs:
         run: |
           echo "MEETING_ATTENDANCE_CLOUDFLARE_ROUTES_REQUIRED=true"
           echo "Legacy Firebase attendance callables are retained for rollback but are not deployed."
-      # Deploy the secure Invitation Register removal endpoint explicitly.
-      # Do not silently publish the UI without its required server authorization path.
-      - name: Deploy secure invitation removal callable
-        uses: w9jds/firebase-action@v14.17.0
-        with:
-          args: deploy --project irpa-digital-board-governance --only functions:removeInvitationRecord
-        env:
-          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+      - name: Confirm invitation removal is served by Cloudflare
+        run: |
+          echo "INVITATION_REMOVAL_CLOUDFLARE_ROUTE_REQUIRED=true"
+          echo "Legacy Firebase invitation-removal callable is retained for rollback but is not deployed."
 
       - name: Verify live Firebase application
         run: |
