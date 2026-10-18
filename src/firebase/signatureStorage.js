@@ -1,7 +1,8 @@
 import { getIdToken } from "firebase/auth";
 import { auth } from "./config";
+import { resolveGatewayUrl } from "./gatewayEnvironment";
 
-const GATEWAY_URL = String(import.meta.env.VITE_GATEWAY_ORIGIN || import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL || "https://irpa-google-drive-gateway.irpa-governance.workers.dev").trim().replace(/\/$/, "");
+const GATEWAY_URL = resolveGatewayUrl();
 
 function requireGateway() {
   if (!GATEWAY_URL) {
