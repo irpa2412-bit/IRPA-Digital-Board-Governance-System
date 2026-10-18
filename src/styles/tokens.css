@@ -1135,3 +1135,63 @@ table td{color:var(--text)}
  .signature-field-palette img{max-height:64px!important;}
  .signature-workflow-grid .panel{min-width:0;max-width:100%;}
 }
+
+
+/* Shared base-level responsive containment and contrast tokens (Stage 0b).
+   This is a layout/readability guard only; it does not hide page overflow. */
+:root {
+  --irpa-text-on-light: #17344d;
+  --irpa-muted-on-light: #40566b;
+  --irpa-text-on-dark: #f4f8f6;
+  --irpa-muted-on-dark: #d5dfeb;
+  --irpa-focus-ring: #075f3d;
+}
+#root,
+#root .app-shell,
+#root .app-shell .main-area,
+#root .app-shell .content-area,
+#root .app-shell .content-area .page,
+#root .app-shell .content-area .page > *,
+#root .app-shell .content-area .page :where(.panel,.module-panel,.welcome-panel,.card,.table-wrapper,.table-wrap,.form-grid,.form-field,.form-actions) {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+#root .app-shell .content-area .page :where(img,video,canvas,iframe,svg) {
+  max-width: 100%;
+}
+#root .app-shell .content-area .page :where(input,select,textarea,button) {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+#root .app-shell .content-area .page :where(.table-wrapper,.table-wrap) {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+#root .app-shell .content-area .page :where(p,li,dd,dt,th,td,label,small,a,button) {
+  overflow-wrap: anywhere;
+}
+#root .app-shell .content-area .page :where(.muted,.panel-description,.table-subtext,.field-help,.hint,.help-text) {
+  color: var(--irpa-muted-on-light);
+  -webkit-text-fill-color: currentColor;
+  opacity: 1;
+}
+#root .app-shell .content-area .page :where(input,select,textarea)::placeholder {
+  color: var(--irpa-muted-on-light);
+  opacity: 1;
+}
+#root .app-shell :where(button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible) {
+  outline: 3px solid var(--irpa-focus-ring);
+  outline-offset: 2px;
+}
+@media (max-width: 760px) {
+  html, body, #root, #root .app-shell, #root .app-shell .main-area,
+  #root .app-shell .content-area, #root .app-shell .content-area .page {
+    min-width: 0;
+    max-width: 100%;
+  }
+  #root .app-shell .content-area .page :where(.form-actions,.form-grid) {
+    width: 100%;
+    min-width: 0;
+  }
+}
