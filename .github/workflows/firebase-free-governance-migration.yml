@@ -49,6 +49,8 @@ jobs:
         run: node --test tests/cloudflare-meeting-directory-migration.test.mjs
       - name: Verify Cloudflare invitation-removal migration
         run: node --test tests/cloudflare-invitation-removal-migration.test.mjs
+      - name: Verify Cloudflare meeting attendance migration
+        run: node --test drive-gateway/tests/meeting-attendance-migration.test.mjs
       - name: Set up Java for Firebase emulator
         uses: actions/setup-java@v4
         with:
