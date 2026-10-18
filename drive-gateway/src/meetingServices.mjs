@@ -70,7 +70,7 @@ if(pathname==="/api/invitations/remove"){
 const invitationId=clean(data.invitationId),uid=clean(claims.user_id),email=lower(claims.email);
 if(!uid)return fail(ctx,request,"Sign in as an IRPA Administrator to remove an invitee.",401);
 if(!invitationId||invitationId.includes("/"))return fail(ctx,request,"A valid invitation record is required.",400);
-if(!(await isAdmin(ctx,env,token,uid,claims)))return fail(ctx,request,"Only an active IRPA Administrator can remove invitation records.",403);
+const adminProfile=await getDoc(ctx,env,token,"adminProfiles",uid);const activeAdmin=claims.admin===true||email==="irpa2412@gmail.com"||adminProfile?.active===true;if(!activeAdmin)return fail(ctx,request,"Only an active IRPA Administrator can remove invitation records.",403);
 const invitation=await getDoc(ctx,env,token,"invitations",invitationId);
 if(!invitation)return fail(ctx,request,"This invitation record no longer exists. Refresh the Invitation Register.",404);
 if(clean(invitation.meetingId)||lower(invitation.source).includes("meeting participant"))return fail(ctx,request,"This invitee is linked to a meeting. Remove the participant through the Meeting Participants portal so meeting access passes and attendance/quorum counts are revoked together.",409);
