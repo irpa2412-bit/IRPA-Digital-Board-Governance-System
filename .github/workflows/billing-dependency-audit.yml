@@ -47,6 +47,8 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Install ephemeral static-analysis tools without changing the lockfile
         run: npm install --no-save --package-lock=false eslint@9 globals@15
+      - name: Lint the existing meeting browser workflow configuration
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/meeting-portal-fixture-browser.yml
       - name: Check Worker syntax and meeting route migration
         run: |
           node --check drive-gateway/src/meetingServices.mjs
