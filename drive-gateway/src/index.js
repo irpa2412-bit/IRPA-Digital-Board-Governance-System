@@ -94,7 +94,7 @@ async function removePendingInvitation(request, env) {
   catch { return json({ok:false,error:"Administrator authentication is required."},401,corsHeaders(request)); }
   let data;try{data=await request.json();}catch{return json({ok:false,error:"Invalid JSON payload."},400,corsHeaders(request));}
   const id=String(data.invitationId||"").trim();
-  if(!id||id.includes("/")||id.length>256)return json({ok:false,error:"A valid invitation record is required."},400,corsHeaders(request));
+  if(!/^[A-Za-z0-9_-]{1,128}$/.test(id))return json({ok:false,error:"A valid invitation record is required."},400,corsHeaders(request));
   const adminSnap=await getFirestoreDocument(env,"adminProfiles/"+claims.user_id,claims.token).catch(()=>null);
   const isAdmin=String(claims.email||"").trim().toLowerCase()==="irpa2412@gmail.com"||Boolean(firestoreDocumentToPlain(adminSnap)?.active);
   if(!isAdmin)return json({ok:false,error:"Only an active IRPA Administrator can remove invitation records."},403,corsHeaders(request));
