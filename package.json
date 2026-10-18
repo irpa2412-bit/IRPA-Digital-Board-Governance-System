@@ -22,7 +22,8 @@
     "test:communication-media": "node --test tests/communication-media-policy.test.mjs",
     "test:meta-oauth": "node --test tests/meta-oauth-staging.test.mjs",
     "check:no-billing-deps": "node scripts/check-no-billing-deps.mjs",
-    "test:meeting-worker-routes": "node --test tests/meeting-worker-route-migration.test.mjs"
+    "test:meeting-worker-routes": "node --test tests/meeting-worker-route-migration.test.mjs",
+    "test:meeting-route-authorization": "node --test tests/meeting-route-authorization.test.mjs"
   },
   "dependencies": {
     "firebase": "^11.10.0",

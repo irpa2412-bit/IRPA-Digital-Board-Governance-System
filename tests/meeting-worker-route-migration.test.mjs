@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 
 const client = readFileSync(new URL('../src/firebase/meetingRecords.js', import.meta.url), 'utf8');
 const worker = readFileSync(new URL('../drive-gateway/src/meetingServices.mjs', import.meta.url), 'utf8');
+const contracts = readFileSync(new URL('../src/firebase/workflowContracts.js', import.meta.url), 'utf8');
 
 test('all five formerly undefined meeting callables use authenticated Worker API routes', () => {
   const expected = [
@@ -14,8 +15,9 @@ test('all five formerly undefined meeting callables use authenticated Worker API
     ['/api/meeting-attendance/register', 'getMeetingAttendanceRegister']
   ];
   for (const [route, name] of expected) {
-    assert.ok(client.includes(route), name + ' client route missing');
-    assert.ok(worker.includes(route), name + ' Worker route missing');
+    assert.ok(client.includes('MEETING_ROUTES.'), name + ' must use shared route contracts');
+    assert.ok(contracts.includes(route), name + ' shared route contract missing');
+    assert.ok(worker.includes('MEETING_ROUTES.'), name + ' Worker must use shared route contracts');
   }
   for (const name of ['registerMeetingWorkingDocument','listMeetingWorkingDocuments','submitMeetingDocumentReview','signMeetingAttendance','getMeetingAttendanceRegister']) {
     assert.ok(!client.includes('call("' + name + '")'), 'undefined callable remains: ' + name);
