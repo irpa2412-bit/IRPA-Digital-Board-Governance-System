@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 
 const gateway = readFileSync(new URL("../src/meetingServices.mjs", import.meta.url), "utf8");
 const client = readFileSync(new URL("../../src/firebase/meetingRecords.js", import.meta.url), "utf8");
+const dataLayer = readFileSync(new URL("../../src/firebase/data.js", import.meta.url), "utf8");
 
 test("Cloudflare meeting services register the signed-attendance endpoints", () => {
   assert.match(gateway, /"\/api\/meeting-attendance\/sign"/);
@@ -58,7 +59,7 @@ test("invitation removal uses Cloudflare with server-side administrator and life
   assert.match(gateway, /action:"INVITATION_REGISTER_REMOVE"/);
   assert.match(gateway, /delete:base+"invitations\/"\+invitationId/);
   assert.match(client, /callMeetingService\("\/api\/invitations\/remove",\{invitationId:id\}\)/);
-  assert.doesNotMatch(client, /httpsCallable\(getFunctions\(undefined,"us-central1"\),"removeInvitationRecord"\)/);
+  assert.doesNotMatch(dataLayer, /httpsCallable\(getFunctions\(undefined,"us-central1"\),"removeInvitationRecord"\)/);
 });
 
 test("billing-blocked callable deploy steps are removed without deleting rollback source", () => {
