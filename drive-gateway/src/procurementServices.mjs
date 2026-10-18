@@ -79,14 +79,16 @@ export function createProcurementServicesRouter(ctx){
     if(!v)return deny("Registered vendor / service provider not found.",404);
     if(!["Approved","Probation"].includes(v.status)||v.status==="Blacklisted"||v.performanceStatus==="Blacklisted")return deny("Only approved or probationary non-blacklisted vendors may be selected.",409);
     if(v.status==="Probation"&&Number(v.probationEngagements||0)>=2)return deny("This vendor has reached the maximum of 2 engagements during probation.",409);
-    const method=METHODS[clean(input.procurementMethod)]||METHODS["Request for Quotations"],department=clean(input.department),unit=clean(input.unit);
+    const method=METHODS[clean(input.procurementMethod)],department=clean(input.department),unit=clean(input.unit);
+    if(!method)return deny("Select a valid procurement method.",400);
     if(!DEPARTMENTS.has(department)||!(UNITS[department]||[]).includes(unit))return deny("Select a valid IRPA department and unit.",400);
     const title=clean(input.title),description=clean(input.description),amount=money(input.estimatedAmount);
     if(!title||!description||amount<=0)return deny("Procurement title, scope and a positive estimated amount are required.",400);
     const required=Math.max(method.min,Math.min(method.max,Number(input.quotationRequiredCount||method.default)));
-    const [number,docRef]=await Promise.all([nextCounter("requestNumber","IRPA-PREQ"),nextCounter("documentReference","IRPA-DOC")]);
-    const id=crypto.randomUUID(),now=new Date(),requestRecord={requestNumber:number.value,documentReference:docRef.value,documentReferenceType:"Procurement Document",title,description,department,unit,estimatedAmount:amount,procurementMethod:clean(input.procurementMethod)||"Request for Quotations",quotationRequiredCount:required,vendorId:v.id,vendorName:v.name,vendorRegistrationNumber:v.vendorRegistrationNumber||v.registrationNumber||"",vendorStatus:v.status,status:"Quotations Required",quotationCount:0,requestedByUid:actor.uid,requestedByEmail:actor.email,requestedByName:actor.name,createdAt:now,updatedAt:now};
-    const writes=[number.write,docRef.write,{update:{name:base+"/procurementRequests/"+id,fields:fields(requestRecord)},currentDocument:{exists:false}},audit("PROCUREMENT_REQUEST_INITIATED","procurementRequests",id,{requestNumber:number.value,documentReference:docRef.value,vendorStatus:v.status})];
+    const counters=await read("systemSettings","procurementCounters"),requestCount=Number(counters?.requestNumber||0)+1,documentCount=Number(counters?.documentReference||0)+1,requestNumber="IRPA-PREQ-"+new Date().getFullYear()+"-"+String(requestCount).padStart(5,"0"),documentReference="IRPA-DOC-"+new Date().getFullYear()+"-"+String(documentCount).padStart(5,"0");
+    const counterWrite={update:{name:base+"/systemSettings/procurementCounters",fields:fields({requestNumber:requestCount,documentReference:documentCount,updatedAt:new Date()})},updateMask:{fieldPaths:["requestNumber","documentReference","updatedAt"]},...(counters?.updateTime?{currentDocument:{updateTime:counters.updateTime}}:{currentDocument:{exists:false}})};
+    const id=crypto.randomUUID(),now=new Date(),requestRecord={requestNumber,documentReference,documentReferenceType:"Procurement Document",title,description,department,unit,estimatedAmount:amount,procurementMethod:clean(input.procurementMethod)||"Request for Quotations",quotationRequiredCount:required,vendorId:v.id,vendorName:v.name,vendorRegistrationNumber:v.vendorRegistrationNumber||v.registrationNumber||"",vendorStatus:v.status,status:"Quotations Required",quotationCount:0,requestedByUid:actor.uid,requestedByEmail:actor.email,requestedByName:actor.name,createdAt:now,updatedAt:now};
+    const writes=[counterWrite,{update:{name:base+"/procurementRequests/"+id,fields:fields(requestRecord)},currentDocument:{exists:false}},audit("PROCUREMENT_REQUEST_INITIATED","procurementRequests",id,{requestNumber,documentReference,vendorStatus:v.status})];
     if(v.status==="Probation"){const vendorPatch={...v,probationEngagements:Number(v.probationEngagements||0)+1,updatedAt:now};delete vendorPatch.id;delete vendorPatch.updateTime;writes.push({update:{name:base+"/procurementVendors/"+vendorId,fields:fields(vendorPatch)},updateMask:{fieldPaths:["probationEngagements","updatedAt"]},currentDocument:{updateTime:v.updateTime}});}
     await commit(writes);return ctx.json({ok:true,id,requestNumber:number.value,documentReference:docRef.value},200,ctx.corsHeaders(request));
    }
@@ -109,6 +111,7 @@ export function createProcurementServicesRouter(ctx){
    }
    if(operation==="authorizeRequest"){
     if(!approver)return deny("An authorized IRPA officer is required.");
+    if(clean(input.approverUid)!==actor.uid)return deny("Only the selected authorised officer may approve this procurement.");
     const id=clean(input.id),r=await getRequest(id);
     if(!APPROVER_ROLES.has(actor.role)&&!isAdmin&&actor.authorizationType!=="administrator")return deny("Your role is not an eligible procurement approver.");
     if(r.status!=="Pending Authorization")return deny("Authorization is not open.",409);
@@ -159,7 +162,7 @@ export function createProcurementServicesRouter(ctx){
     const quotes=[...(r.quotations||[])];quotes[number-1]={number,fileName:clean(input.fileName),fileId:clean(input.fileId),fileHash:hashId,webViewLink:input.webViewLink||null,archiveUidLink:input.archiveUidLink||null,uploadedByUid:actor.uid,uploadedAt:new Date()};
     const count=quotes.filter(Boolean).length,now=new Date(),changes={quotations:quotes,quotationCount:count,procurementArchiveUidLink:input.archiveUidLink||r.procurementArchiveUidLink||null,procurementArchiveFolderId:input.archiveFolderId||r.procurementArchiveFolderId||null,status:count>=required?"PR Registration":"Quotations Required",updatedAt:now};
     const writes=[];
-    if(!hashDoc)writes.push({update:{name:base+"/procurementQuotationHashes/"+hashId,fields:fields({requestId:id,requestNumber:r.requestNumber,quotationNumber:number,fileHash:hashId,uploadedByUid:actor.uid,uploadedAt:now,status:"Registered"})},currentDocument:{exists:false}});
+    if(!hashDoc)writes.push({update:{name:base+"/procurementQuotationHashes/"+hashId,fields:fields({requestId:id,requestNumber:r.requestNumber,quotationNumber:number,fileHash:hashId,uploadedByUid:actor.uid,uploadedAt:now,status:"Registered",reservationOnly:false})},currentDocument:{exists:false}});else if(hashDoc.reservationOnly){writes.push({update:{name:base+"/procurementQuotationHashes/"+hashId,fields:fields({status:"Registered",reservationOnly:false,uploadedAt:now})},updateMask:{fieldPaths:["status","reservationOnly","uploadedAt"]},currentDocument:{updateTime:hashDoc.updateTime}});}
     writes.push({update:{name:base+"/procurementRequests/"+id,fields:fields(changes)},updateMask:{fieldPaths:Object.keys(changes)},currentDocument:{updateTime:r.updateTime}},audit("PROCUREMENT_QUOTATION_UPLOADED","procurementRequests",id,{quotationNumber:number,quotationCount:count,fileHash:hashId,duplicateScanner:"SHA-256"}));
     await commit(writes);return ctx.json({ok:true,quotationCount:count,status:changes.status},200,ctx.corsHeaders(request));
    }
