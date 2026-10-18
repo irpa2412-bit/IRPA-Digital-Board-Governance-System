@@ -1,0 +1,41 @@
+name: IRPA Local Responsive Portal Audit
+
+on:
+  push:
+    branches: [integration/five-portal-chain-20261018]
+    paths:
+      - "src/pages/Meetings.jsx"
+      - "src/styles/**"
+      - "tests/fixtures/meeting-portal-fixture.*"
+      - "tests/meeting-portal-browser.test.mjs"
+      - "vite.meeting-fixture.config.js"
+      - ".github/workflows/local-responsive-portal-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  local-responsive-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Install Playwright and Chromium without changing the lockfile
+        run: |
+          npm install --no-save --package-lock=false playwright
+          npx playwright install --with-deps chromium
+      - name: Start local isolated meeting fixture
+        run: |
+          npx vite --config vite.meeting-fixture.config.js --host 127.0.0.1 > "$RUNNER_TEMP/meeting-fixture-vite.log" 2>&1 &
+          for i in $(seq 1 60); do curl -fsS http://127.0.0.1:4179/tests/fixtures/meeting-portal-fixture.html >/dev/null && exit 0; sleep 1; done
+          cat "$RUNNER_TEMP/meeting-fixture-vite.log"
+          exit 1
+      - name: Test meeting portal at 360px and desktop with Playwright
+        run: node tests/meeting-portal-browser.test.mjs
