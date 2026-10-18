@@ -103,7 +103,15 @@ async function handleAuthorizationWorkflow(request, env) {
   const encode=v=>v===null||v===undefined?{nullValue:null}:v instanceof Date?{timestampValue:v.toISOString()}:typeof v==="boolean"?{booleanValue:v}:typeof v==="number"?(Number.isInteger(v)?{integerValue:String(v)}:{doubleValue:v}):Array.isArray(v)?{arrayValue:{values:v.map(encode)}}:typeof v==="object"?{mapValue:{fields:Object.fromEntries(Object.entries(v).map(([k,x])=>[k,encode(x)]))}}:{stringValue:String(v)};
   const fields=o=>Object.fromEntries(Object.entries(o).map(([k,v])=>[k,encode(v)]));
   async function read(path){const res=await fetch("https://firestore.googleapis.com/v1/"+base+"/"+path,{headers:{Authorization:"Bearer "+token}});if(res.status===404)return null;if(!res.ok)throw new Error("Authorization record lookup failed.");const doc=await res.json();return {id:String(doc.name||"").split("/").pop(),updateTime:doc.updateTime||null,...Object.fromEntries(Object.entries(doc.fields||{}).map(([k,v])=>[k,decode(v)]))};}
-  async function listWorkflows(){const res=await fetch("https://firestore.googleapis.com/v1/"+base+":runQuery",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({structuredQuery:{from:[{collectionId:"workflowActions"}],where:{compositeFilter:{op:"AND",filters:[{fieldFilter:{field:{fieldPath:"workflowType"},op:"EQUAL",value:{stringValue:"Authorization"}}},{fieldFilter:{field:{fieldPath:"module"},op:"EQUAL",value:{stringValue:"Authorization & Approvals"}}}]},limit:1000}})});if(!res.ok)throw new Error("Authorization register could not be loaded.");return(await res.json()).filter(x=>x.document).map(x=>({id:String(x.document.name||"").split("/").pop(),updateTime:x.document.updateTime||null,...Object.fromEntries(Object.entries(x.document.fields||{}).map(([k,v])=>[k,decode(v)]))}));}
+  async function listWorkflows(){
+    const query={structuredQuery:{from:[{collectionId:"workflowActions"}],where:{compositeFilter:{op:"AND",filters:[
+      {fieldFilter:{field:{fieldPath:"workflowType"},op:"EQUAL",value:{stringValue:"Authorization"}}},
+      {fieldFilter:{field:{fieldPath:"module"},op:"EQUAL",value:{stringValue:"Authorization & Approvals"}}}
+    ]}},limit:1000}};
+    const res=await fetch("https://firestore.googleapis.com/v1/"+base+":runQuery",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify(query)});
+    if(!res.ok)throw new Error("Authorization register could not be loaded.");
+    return (await res.json()).filter(x=>x.document).map(x=>({id:String(x.document.name||"").split("/").pop(),updateTime:x.document.updateTime||null,...Object.fromEntries(Object.entries(x.document.fields||{}).map(([k,v])=>[k,decode(v)]))}));
+  }
   async function commit(writes){const res=await fetch("https://firestore.googleapis.com/v1/"+base+":commit",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({writes})});if(!res.ok)throw new Error("Authorization record and audit event could not be committed atomically.");return res.json();}
   const [admin,member,employee]=await Promise.all([read("adminProfiles/"+claims.user_id),read("members/"+claims.user_id),read("employees/"+claims.user_id)]);
   const isAdmin=lower(claims.email)==="irpa2412@gmail.com"||admin?.active===true;
