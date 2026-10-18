@@ -2,7 +2,7 @@ name: Firebase-free governance migration checks
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, integration/five-portal-chain-20261018]
     paths:
       - "src/**"
       - "drive-gateway/**"
@@ -12,7 +12,7 @@ on:
       - "package-lock.json"
       - ".github/workflows/firebase-free-governance-migration.yml"
   push:
-    branches: [firebase-free-governance-migration-20261018]
+    branches: [firebase-free-governance-migration-20261018, integration/five-portal-chain-20261018, stage/1-invitation]
 
 permissions:
   contents: read
@@ -56,8 +56,12 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      - name: Verify security rules with Firestore emulator
+        run: npx firebase emulators:exec --only firestore --project demo-irpa-dgbs "npm run test:security-rules"
       - name: Verify finance policy with Firestore emulator
         run: npx firebase emulators:exec --only firestore --project demo-irpa-dgbs "npm run test:finance-policy"
+      - name: Verify meeting category policy with Firestore emulator
+        run: npx firebase emulators:exec --only firestore --project demo-irpa-dgbs "npm run test:meeting-category"
       - name: Install gateway dependencies
         run: npm ci --prefix drive-gateway
       - name: Run gateway regression and governance-store tests
