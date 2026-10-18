@@ -39,4 +39,4 @@ class Boundary extends React.Component {
 const params = new URLSearchParams(window.location.search);
 const selected = params.get("portal") || "Meeting";
 const Render = pages[selected] || pages.Meeting;
-createRoot(document.getElementById("root")).render(<Boundary><main data-portal-name={selected} style={{minWidth:0,padding:12}}><header style={{marginBottom:12}}><span>IRPA DBGS LOCAL RESPONSIVE FIXTURE</span><h1>{selected} Portal</h1><p>Read-only layout fixture. External requests are blocked by the Playwright runner.</p></header><Render /></main></Boundary>);
+createRoot(document.getElementById("root")).render(<Boundary><div className="app-shell"><aside className="sidebar" aria-hidden="true" /><div className="main-area"><div className="content-area"><main data-portal-name={selected} style={{minWidth:0,padding:12}}><header style={{marginBottom:12,background:"#ffffff",color:"#172033",padding:12,borderRadius:8}}><span>IRPA DBGS LOCAL RESPONSIVE FIXTURE</span><h1>{selected} Portal</h1><p>Read-only layout fixture. External requests are blocked by the Playwright runner.</p></header><Render /></main></div></div></div></Boundary>);
