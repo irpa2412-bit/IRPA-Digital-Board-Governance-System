@@ -1,7 +1,10 @@
 import { auth } from "./config";
 import { resolveGatewayUrl } from "./gatewayEnvironment";
+import { MEETING_ROUTES } from "./workflowContracts";
 
 const gateway = () => resolveGatewayUrl();
+
+export const meetingWorkflowRoutes = MEETING_ROUTES;
 
 export async function callMeetingService(path, payload = {}) {
   const user = auth.currentUser;

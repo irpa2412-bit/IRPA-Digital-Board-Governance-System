@@ -1,6 +1,7 @@
 import { getIdToken } from "firebase/auth";
 import { auth } from "./config";
 import { resolveGatewayUrl } from "./gatewayEnvironment";
+import { SIGNATURE_ROUTES } from "./workflowContracts";
 
 const GATEWAY_URL = resolveGatewayUrl();
 
@@ -47,7 +48,7 @@ export async function uploadBytes(target, file, metadata = {}) {
     binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + chunkSize, bytes.length)));
   }
 
-  const result = await gatewayPost("/api/upload", {
+  const result = await gatewayPost(SIGNATURE_ROUTES.upload, {
     path: target.path,
     fileName: target.path.split("/").pop() || "IRPA-document.pdf",
     contentType: metadata.contentType || file.type || "application/pdf",
@@ -331,7 +332,7 @@ export async function uploadMeetingProductToDrive({
     "meeting-archives", archive.meetingCategory, safe(meetingId),
     safe(recordType), safe(finalName)
   ].join("/");
-  const uploaded = await gatewayPost("/api/upload", {
+  const uploaded = await gatewayPost(SIGNATURE_ROUTES.upload, {
     path,
     fileName: finalName,
     contentType: resolvedContentType,
