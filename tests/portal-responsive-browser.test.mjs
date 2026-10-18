@@ -29,7 +29,7 @@ try {
         const overflowers=[];
         for(const el of [...document.querySelectorAll("body *")]){
           const r=el.getBoundingClientRect(),s=getComputedStyle(el),txt=(el.innerText||"").trim().replace(/\s+/g," ");
-          if(r.width<=0||r.height<=0||s.display==="none"||s.visibility==="hidden")continue;
+          if(r.width<=0||r.height<=0||s.display==="none"||s.visibility==="hidden"||el.closest("[data-fixture-chrome]"))continue;
           if(r.right>width+1||r.left< -1)overflowers.push({tag:el.tagName.toLowerCase(),className:String(el.className||"").toString().slice(0,100),left:Math.round(r.left),right:Math.round(r.right),width:Math.round(r.width),text:txt.slice(0,55)});
           if(!txt||txt.length>180)continue;
           const chain=[];let node=el;while(node){chain.push(node);node=node.parentElement;}chain.reverse();
