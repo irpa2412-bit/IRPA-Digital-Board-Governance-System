@@ -86,6 +86,35 @@ function normalizeGatewayAuthority(value) {
   return String(value||"").toLowerCase().replace(/^(the|irpa)\s+/,"").replace(/[._-]+/g," ").replace(/\s+/g," ").trim();
 }
 
+
+async function listMeetingInviteeDirectory(request, env) {
+  let claims;
+  try { claims = await authenticateFirebaseRequest(request, env); }
+  catch { return json({ok:false,error:"Sign in to load the institutional register directory."},401,corsHeaders(request)); }
+  const project=getFirebaseProjectId(env), token=await getFirestoreAdminAccessToken(env);
+  async function list(collectionName){
+    const response=await fetch(`https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents:runQuery`,{
+      method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
+      body:JSON.stringify({structuredQuery:{from:[{collectionId:collectionName}],limit:1000}})
+    });
+    if(!response.ok)throw new Error("Unable to load institutional directory.");
+    return (await response.json()).filter(x=>x.document).map(x=>({id:String(x.document.name||"").split("/").pop(),...(firestoreDocumentToPlain(x.document)||{})}));
+  }
+  try{
+    const [members,employees]=await Promise.all([list("members"),list("employees")]);
+    const textValue=v=>String(v??"").trim();
+    const projectRows=(rows,kind)=>rows.map(d=>{
+      const statuses=[d.status,d.employmentStatus,d.registrationStatus].map(v=>textValue(v).toLowerCase()).filter(Boolean);
+      const active=statuses.some(v=>["active","activated"].includes(v));
+      if(!active)return null;
+      const role=textValue(d.role),board=d.boardMember===true||role.toLowerCase()==="board member"||Boolean(d.boardPosition)||textValue(d.department)==="Board of Directors";
+      if(kind==="board"&&!board||kind==="member"&&board)return null;
+      return {id:d.id,uid:textValue(d.uid||d.authUid||d.userUid),name:textValue(d.name||d.fullName||d.memberName||d.displayName),email:textValue(d.email||d.emailAddress||d.contactEmail).toLowerCase(),memberNumber:textValue(d.memberNumber||d.registrationNumber),employeeNumber:textValue(d.employeeNumber),role,roles:Array.isArray(d.roles)?d.roles:[],boardMember:d.boardMember===true,boardPosition:textValue(d.boardPosition),department:textValue(d.department),memberType:textValue(d.memberType),status:"Active",employmentStatus:textValue(d.employmentStatus),registrationStatus:textValue(d.registrationStatus),title:textValue(d.title),position:textValue(d.position),departmentalRole:textValue(d.departmentalRole)};
+    }).filter(Boolean);
+    return json({ok:true,boardMembers:projectRows(members,"board"),members:projectRows(members,"member"),employees:projectRows(employees,"employee")},200,corsHeaders(request));
+  }catch(error){console.error("MEETING_INVITEE_DIRECTORY_FAILURE",{uid:claims.user_id,message:String(error?.message||error).slice(0,180)});return json({ok:false,error:"The institutional directory could not be loaded."},503,corsHeaders(request));}
+}
+
 async function updateSignerAuthority(request, env) {
   const claims = await authenticateFirebaseRequest(request, env);
   const uid = String(claims.user_id || "").trim();
@@ -366,6 +395,9 @@ export default {
 
       if (pathname === "/api/signature/authority" && request.method === "POST") {
         return await updateSignerAuthority(request, env);
+      }
+      if (pathname === "/api/meeting/invitee-directory" && request.method === "POST") {
+        return await listMeetingInviteeDirectory(request, env);
       }
 
       if (env.ESIGN_MODULE_ENABLED === "true") {
