@@ -463,7 +463,18 @@ export async function synchronizeRegisteredIdentityUids(){
   return result.data;
 }
 
-export async function callFinanceAccounting(functionName,data={}){const fn=getFunctions();const callable=httpsCallable(fn,functionName);const result=await callable(data);return result.data;}
+export async function callFinanceAccounting(functionName,data={}){
+ const user=auth.currentUser;
+ if(!user?.uid)throw new Error("Authentication is required for Finance operations.");
+ const token=await user.getIdToken();
+ const gateway=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").trim().replace(/\\/+$/,"");
+ let response;
+ try{response=await fetch(gateway+"/api/finance/accounting",{method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({functionName,data})});}
+ catch{throw new Error("Cloudflare Finance accounting service is unavailable. No Firebase Cloud Function fallback was used.");}
+ const payload=await response.json().catch(()=>({}));
+ if(!response.ok||payload.ok!==true)throw new Error(payload.error||"The Cloudflare Finance operation failed.");
+ return payload.result;
+}
 
 
 export async function getResearchInformationRequests(){
