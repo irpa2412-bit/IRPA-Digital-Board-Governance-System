@@ -41,6 +41,8 @@ jobs:
         run: npm run test:meeting-invitation-resend
       - name: Verify Cloudflare password-security client migration
         run: node --test tests/cloudflare-password-client-migration.test.mjs
+      - name: Verify Cloudflare document-reference client migration
+        run: node --test tests/cloudflare-document-reference-migration.test.mjs
       - name: Set up Java for Firebase emulator
         uses: actions/setup-java@v4
         with:
