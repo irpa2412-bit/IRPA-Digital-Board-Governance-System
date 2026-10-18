@@ -49,3 +49,24 @@ test("Firebase deployment no longer blocks release on migrated attendance callab
   assert.match(legacyCallables, /exports\.signMeetingAttendance/);
   assert.match(legacyCallables, /exports\.getMeetingAttendanceRegister/);
 });
+
+test("invitation removal uses Cloudflare with server-side administrator and lifecycle guards", () => {
+  assert.match(gateway, /pathname==="\/api\/invitations\/remove"/);
+  assert.match(gateway, /Only an active IRPA Administrator can remove invitation records/);
+  assert.match(gateway, /This invitee is linked to a meeting/);
+  assert.match(gateway, /linked to an activated account and cannot be removed/);
+  assert.match(gateway, /action:"INVITATION_REGISTER_REMOVE"/);
+  assert.match(gateway, /delete:base+"invitations\/"\+invitationId/);
+  assert.match(client, /callMeetingService\("\/api\/invitations\/remove",\{invitationId:id\}\)/);
+  assert.doesNotMatch(client, /httpsCallable\(getFunctions\(undefined,"us-central1"\),"removeInvitationRecord"\)/);
+});
+
+test("billing-blocked callable deploy steps are removed without deleting rollback source", () => {
+  assert.match(deployWorkflow, /Confirm meeting attendance is served by Cloudflare/);
+  assert.match(deployWorkflow, /Confirm invitation removal is served by Cloudflare/);
+  assert.doesNotMatch(deployWorkflow, /deploy --project irpa-digital-board-governance --only functions:signMeetingAttendance,functions:getMeetingAttendanceRegister/);
+  assert.doesNotMatch(deployWorkflow, /deploy --project irpa-digital-board-governance --only functions:removeInvitationRecord/);
+  assert.match(legacyCallables, /exports\.signMeetingAttendance/);
+  assert.match(legacyCallables, /exports\.getMeetingAttendanceRegister/);
+  assert.match(readFileSync(new URL("../../functions/index.js", import.meta.url), "utf8"), /exports\.removeInvitationRecord/);
+});
