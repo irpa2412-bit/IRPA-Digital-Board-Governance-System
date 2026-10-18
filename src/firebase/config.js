@@ -29,7 +29,7 @@ export const firebaseConfig = {
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || defaultAuthDomain,
   ...(import.meta.env.VITE_FIREBASE_STORAGE_BUCKET ? { storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET } : {}),
   projectId: firebaseProjectId,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || (firebaseProjectId === "demo-irpa-dgbs" ? "217055978789" : "217055978789"),
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "217055978789",
   appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:217055978789:web:937d1f2f781202cc1e26cc",
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID ?? "G-XDJEBRBEVC"
 };
