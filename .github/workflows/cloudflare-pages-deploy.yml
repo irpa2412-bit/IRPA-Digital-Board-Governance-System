@@ -91,7 +91,7 @@ jobs:
             -H "Access-Control-Request-Method: POST" \
             -H "Access-Control-Request-Headers: authorization,content-type" \
             -D "$RUNNER_TEMP/gateway-cors-headers.txt" -o /dev/null
-          grep -qi "^access-control-allow-origin: $origin\\r\?$" "$RUNNER_TEMP/gateway-cors-headers.txt" || { cat "$RUNNER_TEMP/gateway-cors-headers.txt"; echo "Production Gateway rejected the Cloudflare frontend origin." >&2; exit 1; }
+          grep -Fqi "access-control-allow-origin: $origin" "$RUNNER_TEMP/gateway-cors-headers.txt" || { cat "$RUNNER_TEMP/gateway-cors-headers.txt"; echo "Production Gateway rejected the Cloudflare frontend origin." >&2; exit 1; }
           grep -qi "^access-control-allow-methods:.*POST" "$RUNNER_TEMP/gateway-cors-headers.txt"
           grep -qi "^access-control-allow-headers:.*authorization" "$RUNNER_TEMP/gateway-cors-headers.txt"
           echo "Live Gateway preflight accepts the production frontend origin and required authenticated POST headers."
