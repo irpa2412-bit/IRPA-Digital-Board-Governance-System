@@ -8,6 +8,7 @@ on:
       - "functions/**"
       - "drive-gateway/src/**"
       - "public/**"
+      - "tests/**"
       - "scripts/check-no-billing-deps.mjs"
       - "package.json"
       - "package-lock.json"
