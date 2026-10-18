@@ -34,7 +34,7 @@ import { getFunctions, httpsCallable } from "firebase/functions";
 // flows on the existing primary Auth instance unchanged.
 const ADMIN_OAUTH_APP_NAME = "irpa-admin-google-oauth";
 const adminOAuthApp = initializeApp(
-  { ...firebaseConfig, authDomain: "irpa-digital-board-governance.firebaseapp.com" },
+  { ...firebaseConfig },
   ADMIN_OAUTH_APP_NAME
 );
 const adminOAuthAuth = getAuth(adminOAuthApp);
