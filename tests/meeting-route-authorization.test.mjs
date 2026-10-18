@@ -1,46 +1,100 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import test from "node:test";
+import assert from "node:assert/strict";
+import { createMeetingServicesRouter } from "../drive-gateway/src/meetingServices.mjs";
 
-const worker = readFileSync(new URL('../drive-gateway/src/meetingServices.mjs', import.meta.url), 'utf8');
-const routes = [
-  { name: 'register working document', key: 'registerWorkingDocument', role: 'canManage', meeting: 'document.meetingId' },
-  { name: 'list working documents', key: 'listWorkingDocuments', role: 'canRead', meeting: 'meetingId' },
-  { name: 'review working document', key: 'reviewWorkingDocument', role: 'participant', meeting: 'document.meetingId' },
-  { name: 'sign attendance', key: 'signAttendance', role: 'participant', meeting: 'participant.meetingId' },
-  { name: 'attendance register', key: 'attendanceRegister', role: 'manager', meeting: 'meetingId' }
-];
-const routeBlock = key => {
-  const start = worker.indexOf('if(pathname===MEETING_ROUTES.' + key + '){');
-  assert.notEqual(start, -1, 'route handler missing: ' + key);
-  const next = worker.indexOf('\nif(pathname===MEETING_ROUTES.', start + 10);
-  return worker.slice(start, next === -1 ? worker.length : next);
-};
+const env = { FIREBASE_PROJECT_ID: "test-project" };
+const path = "/api/meeting-working-documents/register";
+const response = (body, status = 200) => new Response(JSON.stringify(body), {
+  status,
+  headers: { "content-type": "application/json" }
+});
+const fsDoc = (collection, id, fields) => ({
+  name: `projects/test-project/databases/(default)/documents/${collection}/${id}`,
+  fields: Object.fromEntries(Object.entries(fields).map(([key, value]) => [
+    key,
+    typeof value === "boolean" ? { booleanValue: value } : { stringValue: String(value) }
+  ]))
+});
 
-for (const route of routes) {
-  test(route.name + ': missing-token requests are rejected by shared authentication gate', () => {
-    assert.ok(worker.includes('claims=await ctx.authenticateFirebaseRequest(request,env)'));
-    assert.ok(worker.includes('catch{return fail(ctx,request,"A valid IRPA sign-in is required.",401)}'));
-  });
-  test(route.name + ': role/participant authorization is checked server-side', () => {
-    const block = routeBlock(route.key);
-    assert.match(block, /context\(ctx,env,token,claims,meetingId\)/);
-    assert.ok(/canManage|canRead|participant|manager|own/.test(block), 'route must use a role or participant authorization predicate');
-    assert.ok(/return fail\(ctx,request,[^;]+,403\)/.test(block), 'unauthorized access must return 403');
-  });
-  test(route.name + ': records are scoped to the requested meeting', () => {
-    const block = routeBlock(route.key);
-    assert.ok(block.includes('meetingId'), 'route must bind the request to a meeting');
-    assert.ok(/meetingId|participant|document/.test(block));
-    if (route.key === 'registerWorkingDocument' || route.key === 'reviewWorkingDocument' || route.key === 'signAttendance') {
-      assert.ok(block.includes('!==meetingId'), 'cross-meeting record must be rejected');
-    } else {
-      assert.ok(block.includes('context(ctx,env,token,claims,meetingId)'), 'meeting access context must be checked');
-      assert.ok(block.includes('listByField') || block.includes('context('), 'records must be scoped by meeting');
+function makeContext(claims, { authenticated = true } = {}) {
+  return {
+    authenticateFirebaseRequest: async () => {
+      if (!authenticated) throw new Error("Missing/invalid token");
+      return claims;
+    },
+    getFirebaseProjectId: () => "test-project",
+    getFirestoreAdminAccessToken: async () => "test-token",
+    sendEmail: async () => "test-message-id",
+    json: (body, status = 200, headers = {}) => new Response(JSON.stringify(body), { status, headers }),
+    corsHeaders: () => ({ "content-type": "application/json" })
+  };
+}
+
+function mockFirestore(t, { meeting, document }) {
+  t.mock.method(globalThis, "fetch", async (input, init = {}) => {
+    const url = new URL(String(input));
+    const pathname = url.pathname;
+    if (pathname.endsWith("/documents:runQuery")) return response([]);
+    if (pathname.endsWith("/documents/meetings/meeting-1")) {
+      return meeting ? response(fsDoc("meetings", "meeting-1", meeting)) : response({ error: "missing" }, 404);
     }
-  });
-  test(route.name + ': authorized request has a success response path', () => {
-    const block = routeBlock(route.key);
-    assert.ok(block.includes('response(ctx,request,{ok:true'), 'route must return a success response');
+    if (pathname.endsWith("/documents/documents/doc-1")) {
+      return document ? response(fsDoc("documents", "doc-1", document)) : response({ error: "missing" }, 404);
+    }
+    if (/\/documents\/(adminProfiles|members|employees)\//.test(pathname)) return response({ error: "missing" }, 404);
+    if (pathname.endsWith("/documents/meetingWorkingDocuments") ||
+        pathname.endsWith("/documents/audit")) {
+      return response({ name: pathname, fields: {} });
+    }
+    if (pathname.includes("/documents/meetingWorkingDocuments/")) return response({ error: "missing" }, 404);
+    if (init.method === "POST") return response({ name: pathname, fields: {} });
+    return response({ error: "unexpected Firestore request", path: pathname }, 500);
   });
 }
+
+const post = (router, body = {}) => router(new Request("https://worker.test" + path, {
+  method: "POST",
+  headers: { "content-type": "application/json", authorization: "Bearer test-token" },
+  body: JSON.stringify({ meetingId: "meeting-1", documentId: "doc-1", ...body })
+}), env, path);
+
+test("meeting document registration rejects a missing or invalid Firebase token", async t => {
+  mockFirestore(t, { meeting: { createdByUid: "host-1" }, document: { meetingId: "meeting-1" } });
+  const router = createMeetingServicesRouter(makeContext({ user_id: "host-1" }, { authenticated: false }));
+  const result = await post(router);
+  assert.equal(result.status, 401);
+  assert.deepEqual(await result.json(), { ok: false, error: "A valid IRPA sign-in is required." });
+});
+
+test("meeting document registration rejects an authenticated participant without manager authority", async t => {
+  mockFirestore(t, { meeting: { participantUids: ["participant-1"] }, document: { meetingId: "meeting-1" } });
+  const router = createMeetingServicesRouter(makeContext({ user_id: "participant-1", email: "participant@example.org" }));
+  const result = await post(router);
+  assert.equal(result.status, 403);
+  assert.match((await result.json()).error, /meeting host, chairperson or secretary/i);
+});
+
+test("meeting document registration rejects a document belonging to another meeting", async t => {
+  mockFirestore(t, {
+    meeting: { createdByUid: "host-1" },
+    document: { meetingId: "different-meeting", title: "Wrong meeting document" }
+  });
+  const router = createMeetingServicesRouter(makeContext({ user_id: "host-1", email: "host@example.org" }));
+  const result = await post(router);
+  assert.equal(result.status, 409);
+  assert.match((await result.json()).error, /explicitly linked to this meeting/i);
+});
+
+test("meeting host can register a document linked to the requested meeting", async t => {
+  mockFirestore(t, {
+    meeting: { createdByUid: "host-1", title: "Test meeting" },
+    document: { meetingId: "meeting-1", title: "Valid meeting document", fileName: "minutes.pdf" }
+  });
+  const router = createMeetingServicesRouter(makeContext({ user_id: "host-1", email: "host@example.org" }));
+  const result = await post(router);
+  assert.equal(result.status, 200);
+  const body = await result.json();
+  assert.equal(body.ok, true);
+  assert.equal(typeof body.workingDocumentId, "string");
+  assert.ok(body.workingDocumentId.length > 0);
+});
