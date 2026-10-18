@@ -51,6 +51,8 @@ jobs:
         run: |
           node --check drive-gateway/src/meetingServices.mjs
           npm run test:meeting-worker-routes
+          node --test tests/meeting-isolation-guard.test.mjs
+          node --test tests/invitation-removal-policy.test.mjs
       - name: Inventory billing dependencies and enforce no-undef in src/firebase
         run: node scripts/check-no-billing-deps.mjs
       - name: Build with staging-only environment pairing
