@@ -22,11 +22,25 @@ try {
       await page.waitForTimeout(900);
       const metrics=await page.evaluate(()=>{
         const width=document.documentElement.clientWidth,scrollWidth=Math.max(document.documentElement.scrollWidth,document.body.scrollWidth);
-        const rgb=value=>{const m=value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);return m?[+m[1],+m[2],+m[3]]:null;};
-        const lum=color=>{const v=color.map(x=>{x/=255;return x<=0.04045?x/12.92:((x+0.055)/1.055)**2.4;});return .2126*v[0]+.7152*v[1]+.0722*v[2];};
-        const failures=[];
-        for(const el of [...document.querySelectorAll("body *")]){const r=el.getBoundingClientRect(),s=getComputedStyle(el),txt=(el.innerText||"").trim().replace(/\s+/g," ");if(!txt||txt.length>180||r.width<=0||r.height<=0||s.display==="none"||s.visibility==="hidden")continue;const fg=rgb(s.color);let n=el,bg=null;while(n&&n!==document.documentElement){const ns=getComputedStyle(n),v=rgb(ns.backgroundColor);if(v&&ns.backgroundColor!=="rgba(0, 0, 0, 0)"){bg=v;break;}n=n.parentElement;}if(!bg)bg=[255,255,255];if(!fg)continue;const a=lum(fg),b=lum(bg),ratio=(Math.max(a,b)+.05)/(Math.min(a,b)+.05),large=parseFloat(s.fontSize)>=24||(parseFloat(s.fontSize)>=18.66&&Number(s.fontWeight)>=700);if(ratio<(large?3:4.5))failures.push({text:txt.slice(0,70),ratio:Number(ratio.toFixed(2))});}
-        return {width,scrollWidth,horizontalOverflow:scrollWidth>width+1,contrastFailureCount:failures.length,contrastExamples:failures.slice(0,5),heading:document.querySelector("h1")?.innerText||"",renderError:window.__portalFixtureError||null};
+        const parseColor=value=>{const m=value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([0-9.]+))?\)/i);return m?{rgb:[+m[1],+m[2],+m[3]],a:m[4]===undefined?1:+m[4]}:null;};
+        const composite=(front,back)=>front.rgb.map((v,i)=>Math.round(v*front.a+back[i]*(1-front.a)));
+        const luminance=color=>{const v=color.map(x=>{x/=255;return x<=0.04045?x/12.92:((x+0.055)/1.055)**2.4;});return .2126*v[0]+.7152*v[1]+.0722*v[2];};
+        const contrastFailures=[];
+        const overflowers=[];
+        for(const el of [...document.querySelectorAll("body *")]){
+          const r=el.getBoundingClientRect(),s=getComputedStyle(el),txt=(el.innerText||"").trim().replace(/\s+/g," ");
+          if(r.width<=0||r.height<=0||s.display==="none"||s.visibility==="hidden")continue;
+          if(r.right>width+1||r.left< -1)overflowers.push({tag:el.tagName.toLowerCase(),className:String(el.className||"").toString().slice(0,100),left:Math.round(r.left),right:Math.round(r.right),width:Math.round(r.width),text:txt.slice(0,55)});
+          if(!txt||txt.length>180)continue;
+          const chain=[];let node=el;while(node){chain.push(node);node=node.parentElement;}chain.reverse();
+          let bg=[255,255,255];
+          for(const ancestor of chain){const c=parseColor(getComputedStyle(ancestor).backgroundColor);if(c)bg=composite(c,bg);}
+          const fgParsed=parseColor(s.color);if(!fgParsed)continue;
+          const fg=composite(fgParsed,bg),a=luminance(fg),b=luminance(bg),ratio=(Math.max(a,b)+.05)/(Math.min(a,b)+.05);
+          const large=parseFloat(s.fontSize)>=24||(parseFloat(s.fontSize)>=18.66&&Number(s.fontWeight)>=700);
+          if(ratio<(large?3:4.5))contrastFailures.push({text:txt.slice(0,70),ratio:Number(ratio.toFixed(2))});
+        }
+        return {width,scrollWidth,horizontalOverflow:scrollWidth>width+1,overflowExamples:overflowers.slice(0,8),contrastFailureCount:contrastFailures.length,contrastExamples:contrastFailures.slice(0,5),heading:document.querySelector("h1")?.innerText||"",renderError:window.__portalFixtureError||null};
       });
       await page.screenshot({path:"artifacts/responsive-screenshots/"+portal.toLowerCase()+"-"+width+".png",fullPage:true});
       const row={portal,width,...metrics,pageErrors};
