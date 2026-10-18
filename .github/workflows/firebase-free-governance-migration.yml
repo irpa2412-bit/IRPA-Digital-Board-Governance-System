@@ -39,8 +39,8 @@ jobs:
         run: npm run test:meeting-entry-policy
       - name: Verify meeting invitation quorum
         run: npm run test:meeting-invitation-resend
-      - name: Verify security rules
-        run: npm run test:security-rules
+      - name: Verify finance policy
+        run: npm run test:finance-policy
       - name: Install gateway dependencies
         run: npm ci --prefix drive-gateway
       - name: Run gateway regression and governance-store tests
