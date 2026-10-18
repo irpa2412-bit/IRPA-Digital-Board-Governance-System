@@ -618,6 +618,10 @@ export default {
         return await lookupInductionRegistration(request, env);
       }
 
+      if (url.pathname === "/api/session/login-context" && request.method === "POST") {
+        return await getLoginContext(request, env);
+      }
+
       if (url.pathname === "/api/session/profile" && request.method === "POST") {
         return await getSessionProfile(request, env);
       }
@@ -1806,6 +1810,52 @@ async function ensureSignatureWorkflowFolder(request, env) {
   return json({ok:true,envelopeId,folderId,folderName,archiveAccess:"Restricted",path:`IRPA Governance System/Signature Workflows/${folderName}`},200,corsHeaders(request));
 }
 
+
+async function getLoginContext(request, env) {
+  let claims;
+  try { claims=await authenticateFirebaseRequest(request,env,{skipActivation:true}); }
+  catch { return json({ok:false,error:"Authentication is required to resolve the IRPA login context."},401,corsHeaders(request)); }
+  const uid=String(claims.user_id||"").trim(),email=String(claims.email||"").trim().toLowerCase();
+  if(!uid)return json({ok:false,error:"Authentication is required to resolve the IRPA login context."},401,corsHeaders(request));
+  const project=getFirebaseProjectId(env),token=await getFirestoreAdminAccessToken(env),base="projects/"+project+"/databases/(default)/documents";
+  const decode=field=>{if(!field)return null;if("stringValue"in field)return field.stringValue;if("booleanValue"in field)return field.booleanValue;if("integerValue"in field)return Number(field.integerValue);if("doubleValue"in field)return field.doubleValue;if("timestampValue"in field)return field.timestampValue;if("nullValue"in field)return null;if("arrayValue"in field)return(field.arrayValue.values||[]).map(decode);if("mapValue"in field)return Object.fromEntries(Object.entries(field.mapValue.fields||{}).map(([k,v])=>[k,decode(v)]));return null;};
+  const cleanDoc=d=>d?.fields?{id:String(d.name||"").split("/").pop(),...Object.fromEntries(Object.entries(d.fields).map(([k,v])=>[k,decode(v)]))}:null;
+  async function read(col,id){const res=await fetch("https://firestore.googleapis.com/v1/"+base+"/"+col+"/"+encodeURIComponent(id),{headers:{Authorization:"Bearer "+token}});if(res.status===404)return null;if(!res.ok)throw new Error("Unable to resolve the institutional login context.");return cleanDoc(await res.json());}
+  async function queryField(col,field,value,limit=10){const res=await fetch("https://firestore.googleapis.com/v1/"+base+":runQuery",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({structuredQuery:{from:[{collectionId:col}],where:{fieldFilter:{field:{fieldPath:field},op:"EQUAL",value:{stringValue:String(value)} }},limit}})});if(!res.ok)return[];return(await res.json()).filter(x=>x.document).map(x=>cleanDoc(x.document));}
+  const activeRecord=record=>{if(!record)return false;const status=String(record.status||record.employmentStatus||record.registrationStatus||"Active").trim().toLowerCase();return !["inactive","disabled","suspended","expired","revoked"].includes(status);};
+  const normalized=v=>String(v||"").toLowerCase().replace(/\s+/g," ").trim();
+  const configuredRoles=[...(Array.isArray(claims.irpaRoles)?claims.irpaRoles:[])].flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean));
+  if(claims.admin===true&&!configuredRoles.includes("Administrator"))configuredRoles.unshift("Administrator");
+  const configuredPathwayFor=role=>{const n=normalized(role);if(n==="administrator"||n==="executive director")return"Executive Office Department";if(n.includes("internal oversight"))return"Internal Oversight Department";if(n.includes("finance"))return"Finance & Administration Department";if(n.includes("human resources")||n.startsWith("hr "))return"Human Resources Department";if(n.includes("livestock"))return"Livestock Department";if(n.includes("environment")||n.includes("rangeland"))return"Environment & Rangeland Department";if(n.includes("outreach")||n.includes("community development"))return"Outreach & Community Development Department";if(n.includes("field"))return"Field Operations Department";if(n.includes("procurement"))return"Finance & Administration Department · Procurement Unit";if(n.includes("it")||n.includes("information technology"))return"Information Technology Department";return"Institutional Governance Workspace";};
+  const configuredAuthorityMap=new Map();
+  configuredRoles.forEach(role=>{const cleanRole=String(role||"").trim();if(!cleanRole)return;const authorityId="IRPA-AUTH-"+cleanRole.toUpperCase().replace(/[^A-Z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,48);configuredAuthorityMap.set(authorityId,{id:authorityId,authorityId,role:cleanRole,pathway:configuredPathwayFor(cleanRole),source:"Gateway Configuration",active:true});});
+  const [admin,memberDirect,employeeDirect]=await Promise.all([read("adminProfiles",uid),read("members",uid),read("employees",uid)]);
+  const memberRecords=memberDirect?[memberDirect]:[],employeeRecords=employeeDirect?[employeeDirect]:[];
+  const fallback=[];
+  if(email&&!memberDirect){fallback.push(...(await queryField("members","email",email)),...(await queryField("members","firebaseAuthEmail",email));}
+  if(email&&!employeeDirect){fallback.push(...(await queryField("employees","email",email)),...(await queryField("employees","firebaseAuthEmail",email));}
+  for(const rec of fallback){const target=rec&&String(rec.id||"");if(!rec)continue;if(target&&String(rec.id).length){} if(!memberDirect&&(!employeeDirect)){if(rec.employeeNumber||rec.employmentStatus||rec.department&&rec.position)employeeRecords.push(rec);else memberRecords.push(rec);}}
+  if(admin?.active===true&&!employeeRecords.length){
+    const linkedFields=["administratorUid","adminUid","linkedAdministratorUid"];
+    for(const field of linkedFields){const matches=await queryField("employees",field,uid);employeeRecords.push(...matches);if(matches.length)break;}
+    if(!employeeRecords.length){const identityName=String(admin.name||admin.details?.name||claims.name||"").trim();if(identityName){const matches=(await queryField("employees","name",identityName,2)).filter(record=>activeRecord(record)&&normalized(record.name)===normalized(identityName));if(matches.length===1)employeeRecords.push(matches[0]);}}
+  }
+  const uniqueById=list=>[...new Map(list.filter(Boolean).map(x=>[String(x.id||x.uid||x.employeeNumber||x.email),x])).values()];
+  const members=uniqueById(memberRecords).filter(activeRecord),employees=uniqueById(employeeRecords).filter(activeRecord),employee=employees[0]||null;
+  const employeeRoles=[...new Set(employees.flatMap(record=>[...(Array.isArray(record?.roles)?record.roles:[]),record?.role,...(Array.isArray(record?.assignedRoles)?record.assignedRoles:[]),...(Array.isArray(record?.selectedRoles)?record.selectedRoles:[]),...(Array.isArray(record?.roleAssignments)?record.roleAssignments:[]) ]).flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean)))];
+  const contextValues=employees.flatMap(record=>[record?.department,record?.unit,record?.jobTitle,record?.position,record?.title,record?.designation]).map(normalized).filter(Boolean);
+  if(contextValues.some(v=>v==="it"||v==="it unit"||v.includes("information technology")||v.includes("it specialist")||v.includes("information technology officer"))&&!employeeRoles.some(r=>["IT Specialist","Information Technology Officer"].includes(r)))employeeRoles.push("IT Specialist");
+  const slug=v=>String(v||"").toUpperCase().replace(/[^A-Z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,48);
+  const pathwayFor=(role,record)=>{const n=normalized(role),d=normalized(record?.department);if(n==="administrator"||n==="executive director")return"Executive Office Department";if(n.includes("internal oversight"))return"Internal Oversight Department";if(n.includes("finance"))return"Finance & Administration Department";if(n.includes("human resources")||n.startsWith("hr "))return"Human Resources Department";if(n.includes("livestock"))return"Livestock Department";if(n.includes("environment")||n.includes("rangeland"))return"Environment & Rangeland Department";if(n.includes("outreach")||n.includes("community development"))return"Outreach & Community Development Department";if(n.includes("field"))return"Field Operations Department";if(n.includes("procurement"))return"Finance & Administration Department · Procurement Unit";if(n.includes("it")||n.includes("information technology"))return"Information Technology Department";if(d)return String(record?.department||"").trim()+" Department";return"Institutional Governance Workspace";};
+  const authorityMap=new Map(),addAuthority=(role,record,source)=>{const cleanRole=String(role||"").trim();if(!cleanRole)return;const suppliedId=String(record?.accessAuthorityId||record?.authorityId||"").trim(),authorityId=suppliedId||"IRPA-AUTH-"+slug(cleanRole)+(record?.unit?"-"+slug(record.unit):"");const existing=authorityMap.get(authorityId),authority={id:authorityId,authorityId,role:cleanRole,pathway:pathwayFor(cleanRole,record),department:record?.department||null,unit:record?.unit||null,source,active:true};authorityMap.set(authorityId,existing?{...existing,...authority}:authority);};
+  if(admin?.active===true)addAuthority("Administrator",admin,"Administrator Registry");
+  members.forEach(record=>{const values=[...(Array.isArray(record?.roles)?record.roles:[]),record?.role,record?.boardPosition].flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean));const guaranteed=values.length?values:[String(record?.boardPosition||"Board Member").trim()];guaranteed.filter(Boolean).forEach(role=>addAuthority(role,record,"Member Register"));});
+  employees.forEach(record=>{const values=[...(Array.isArray(record?.roles)?record.roles:[]),record?.role,...(Array.isArray(record?.assignedRoles)?record.assignedRoles:[]),...(Array.isArray(record?.selectedRoles)?record.selectedRoles:[]),...(Array.isArray(record?.roleAssignments)?record.roleAssignments:[])].flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean));const guaranteed=values.length?values:[String(record?.jobTitle||record?.position||record?.designation||record?.title||record?.department||"Employee").trim()];guaranteed.filter(Boolean).forEach(role=>addAuthority(role,record,"Employee Register"));});
+  employeeRoles.forEach(role=>addAuthority(role,employee,"Employee Register"));
+  const authorities=[...configuredAuthorityMap.values(),...authorityMap.values()].filter((authority,index,list)=>list.findIndex(x=>String(x.authorityId)===String(authority.authorityId))===index);
+  return json({ok:true,uid,email,administrator:admin?.active===true?{id:admin.id||uid,...admin}:null,member:members[0]||null,employee,roles:configuredRoles.length?configuredRoles:employeeRoles,authorities,identityResolution:employee?(String(employee.uid||"")===uid?"UID":String(employee.email||"").trim().toLowerCase()===email?"EMAIL":employee.administratorUid===uid||employee.adminUid===uid||employee.linkedAdministratorUid===uid?"ADMINISTRATOR_LINK":"UNIQUE_NAME"):"NONE"},200,corsHeaders(request));
+}
+
 async function getSessionProfile(request, env) {
   const claims = await authenticateFirebaseRequest(request, env);
   const [adminDoc, memberDoc, employeeDoc] = await Promise.all([
@@ -2462,7 +2512,7 @@ async function authenticateFirebaseRequest(request, env, options = {}) {
   );
   if (!valid) throw new Error("Invalid Firebase ID token signature.");
 
-  const claims = { token, user_id: payload.user_id || payload.sub, email: payload.email || null };
+  const claims = { token, user_id: payload.user_id || payload.sub, email: payload.email || null, name: payload.name || null, admin: payload.admin === true, irpaRoles: Array.isArray(payload.irpaRoles) ? payload.irpaRoles : [] };
   if (options.skipActivation !== true) await assertActivatedPortalUser(claims, env);
   return claims;
 }
