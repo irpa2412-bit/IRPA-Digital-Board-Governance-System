@@ -1,4 +1,10 @@
 export const FIREBASE_ENVIRONMENTS = Object.freeze({
+  emulator: Object.freeze({
+    name: "emulator",
+    projectId: "demo-irpa-dgbs",
+    authDomain: "localhost",
+    gateway: "http://127.0.0.1:8787"
+  }),
   staging: Object.freeze({
     name: "staging",
     projectId: "irpa-dbg-staging-a73ec",
@@ -18,6 +24,9 @@ function normalizeUrl(value) {
 }
 
 export function getFirebaseEnvironment(env = import.meta.env) {
+  if (String(env.VITE_USE_FIREBASE_EMULATORS || "").trim().toLowerCase() === "true") {
+    return FIREBASE_ENVIRONMENTS.emulator;
+  }
   const name = String(env.VITE_IRPA_ENV || "").trim().toLowerCase();
   const environment = FIREBASE_ENVIRONMENTS[name];
   if (!environment) {
