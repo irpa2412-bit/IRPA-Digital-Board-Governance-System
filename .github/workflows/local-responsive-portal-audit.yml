@@ -13,6 +13,10 @@ on:
       - "vite.responsive-fixture.config.js"
       - "vite.meeting-fixture.config.js"
       - ".github/workflows/local-responsive-portal-audit.yml"
+      - "src/firebase/meetingRecords.js"
+      - "drive-gateway/src/meetingServices.mjs"
+      - "firestore.rules.proposed"
+      - "scripts/check-no-billing-deps.mjs"
   workflow_dispatch:
 
 permissions:
