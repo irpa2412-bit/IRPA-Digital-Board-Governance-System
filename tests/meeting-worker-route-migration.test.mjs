@@ -29,6 +29,9 @@ test('Worker keeps document review bounded and attendance signatures identity-bo
   assert.ok(worker.includes('comment.length>5000'));
   assert.ok(worker.includes('must match the name in your meeting registration'));
   assert.ok(worker.includes('You may sign only your own registered participant record'));
+  assert.ok(worker.includes('await commitWrites(ctx,env,token,['), 'attendance signature, participant status, and audit must commit atomically');
+  assert.ok(worker.includes('currentDocument:{exists:false}'), 'signature creation must be idempotency-guarded');
+  assert.ok(worker.includes('action===\"MEETING_WORKING_DOCUMENT_REVIEW_SUBMITTED\"?\"meetingDocumentReviews\"'), 'review audit events must use the review collection');
   assert.ok(worker.includes('meetingWorkingDocuments'));
   assert.ok(worker.includes('meetingDocumentReviews'));
   assert.ok(worker.includes('meetingAttendanceSignatures'));
