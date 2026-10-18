@@ -1,0 +1,40 @@
+import assert from "node:assert/strict";
+import { mkdir } from "node:fs/promises";
+import { chromium } from "playwright";
+
+const base = "http://127.0.0.1:4180/tests/fixtures/portal-layout-fixture.html";
+const portals = ["Invitation","Meeting","Documents","Signature","Authorization","Finance","Procurement","Employees"];
+const widths = [360,1440];
+const browser = await chromium.launch({headless:true});
+const failures=[];
+await mkdir("artifacts/responsive-screenshots",{recursive:true});
+try {
+  for (const portal of portals) for (const width of widths) {
+    const context=await browser.newContext({viewport:{width,height:900},reducedMotion:"reduce"});
+    const page=await context.newPage();
+    const pageErrors=[];
+    page.on("pageerror",e=>pageErrors.push(e.message));
+    await page.route("https://**/*",route=>route.abort());
+    try {
+      const response=await page.goto(base+"?portal="+encodeURIComponent(portal),{waitUntil:"domcontentloaded",timeout:30000});
+      assert.equal(response?.status(),200,"local fixture must return HTTP 200");
+      await page.locator("[data-portal-name]").waitFor({timeout:10000});
+      await page.waitForTimeout(900);
+      const metrics=await page.evaluate(()=>{
+        const width=document.documentElement.clientWidth,scrollWidth=Math.max(document.documentElement.scrollWidth,document.body.scrollWidth);
+        const rgb=value=>{const m=value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);return m?[+m[1],+m[2],+m[3]]:null;};
+        const lum=color=>{const v=color.map(x=>{x/=255;return x<=0.04045?x/12.92:((x+0.055)/1.055)**2.4;});return .2126*v[0]+.7152*v[1]+.0722*v[2];};
+        const failures=[];
+        for(const el of [...document.querySelectorAll("body *")]){const r=el.getBoundingClientRect(),s=getComputedStyle(el),txt=(el.innerText||"").trim().replace(/\s+/g," ");if(!txt||txt.length>180||r.width<=0||r.height<=0||s.display==="none"||s.visibility==="hidden")continue;const fg=rgb(s.color);let n=el,bg=null;while(n&&n!==document.documentElement){const ns=getComputedStyle(n),v=rgb(ns.backgroundColor);if(v&&ns.backgroundColor!=="rgba(0, 0, 0, 0)"){bg=v;break;}n=n.parentElement;}if(!bg)bg=[255,255,255];if(!fg)continue;const a=lum(fg),b=lum(bg),ratio=(Math.max(a,b)+.05)/(Math.min(a,b)+.05),large=parseFloat(s.fontSize)>=24||(parseFloat(s.fontSize)>=18.66&&Number(s.fontWeight)>=700);if(ratio<(large?3:4.5))failures.push({text:txt.slice(0,70),ratio:Number(ratio.toFixed(2))});}
+        return {width,scrollWidth,horizontalOverflow:scrollWidth>width+1,contrastFailureCount:failures.length,contrastExamples:failures.slice(0,5),heading:document.querySelector("h1")?.innerText||"",renderError:window.__portalFixtureError||null};
+      });
+      await page.screenshot({path:"artifacts/responsive-screenshots/"+portal.toLowerCase()+"-"+width+".png",fullPage:true});
+      const row={portal,width,...metrics,pageErrors};
+      console.log("PORTAL_VIEWPORT_AUDIT "+JSON.stringify(row));
+      if(metrics.horizontalOverflow||metrics.renderError||pageErrors.length)failures.push(row);
+    } catch(e) { const row={portal,width,error:String(e?.message||e),pageErrors};console.log("PORTAL_VIEWPORT_AUDIT "+JSON.stringify(row));failures.push(row); }
+    finally { await context.close(); }
+  }
+} finally { await browser.close(); }
+console.log("Portal viewport audit failed layout/render cases: "+failures.length);
+if(failures.length)process.exitCode=1;
