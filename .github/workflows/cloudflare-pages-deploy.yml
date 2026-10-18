@@ -58,6 +58,11 @@ jobs:
             exit 1
           fi
           echo "Production bundle routes grant scans to the isolated D1 crawler and AI drafting to its dedicated assistant-capable Worker."
+          if ! grep -R -q 'https://irpa-google-drive-gateway.irpa-governance.workers.dev' dist; then
+            echo 'Production bundle does not reference the canonical Cloudflare Google Drive Gateway.' >&2
+            exit 1
+          fi
+          echo "Production bundle references the canonical Cloudflare Google Drive Gateway."
       - name: Verify Cloudflare credentials
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -76,6 +81,20 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx --yes wrangler deploy --config wrangler.jsonc
+      - name: Verify live Gateway CORS for the production frontend
+        run: |
+          set -euo pipefail
+          gateway="https://irpa-google-drive-gateway.irpa-governance.workers.dev"
+          origin="https://irpa-digital-board-governance-frontend.irpa-governance.workers.dev"
+          curl --fail --silent --show-error --max-time 20 -X OPTIONS "$gateway/api/download" \
+            -H "Origin: $origin" \
+            -H "Access-Control-Request-Method: POST" \
+            -H "Access-Control-Request-Headers: authorization,content-type" \
+            -D "$RUNNER_TEMP/gateway-cors-headers.txt" -o /dev/null
+          grep -Fqi "access-control-allow-origin: $origin" "$RUNNER_TEMP/gateway-cors-headers.txt" || { cat "$RUNNER_TEMP/gateway-cors-headers.txt"; echo "Production Gateway rejected the Cloudflare frontend origin." >&2; exit 1; }
+          grep -qi "^access-control-allow-methods:.*POST" "$RUNNER_TEMP/gateway-cors-headers.txt"
+          grep -qi "^access-control-allow-headers:.*authorization" "$RUNNER_TEMP/gateway-cors-headers.txt"
+          echo "Live Gateway preflight accepts the production frontend origin and required authenticated POST headers."
       - name: Verify Cloudflare Workers production endpoint
         run: |
           set -euo pipefail
