@@ -44,6 +44,23 @@ export function createProcurementServicesRouter(ctx){
   };
   const getRequest=async id=>{if(!id||String(id).includes("/"))throw new Error("A valid procurement request ID is required.");const r=await read("procurementRequests",id);if(!r)throw new Error("Procurement request not found.");return r;};
   try{
+   if(operation==="refreshVendorRestriction"){
+    if(!team)return deny("Procurement Team authorization is required.");
+    const id=clean(input.id),v=await read("procurementVendors",id);if(!v)return deny("Vendor / service provider not found.",404);
+    const now=new Date();let changes=null,blacklistWrite=null;
+    if(v.status==="Blacklisted"||v.performanceStatus==="Blacklisted"){
+      let start=v.blacklistStartedAt||v.enteredAt||v.blacklistedAt;
+      if(!start){start=now;const bl=await read("procurementVendorBlacklist",id);const blValues={vendorId:id,blacklistStartedAt:now,updatedAt:now};blacklistWrite={update:{name:base+"/procurementVendorBlacklist/"+id,fields:fields(blValues)},updateMask:{fieldPaths:Object.keys(blValues)},...(bl?.updateTime?{currentDocument:{updateTime:bl.updateTime}}:{currentDocument:{exists:false}})};}
+      const probationAt=monthsAfter(start,6);
+      if(now>=probationAt){const probationStart=v.probationStartedAt||probationAt;changes={status:"Probation",performanceStatus:"Probation",probationStartedAt:probationStart,probationEndsAt:monthsAfter(probationStart,3),probationEngagements:0,blacklistStartedAt:start,updatedAt:now};}
+      else if(!v.blacklistStartedAt)changes={blacklistStartedAt:start,performanceStatus:"Blacklisted",updatedAt:now};
+    }else if(v.status==="Probation"&&v.probationStartedAt){
+      const end=v.probationEndsAt||monthsAfter(v.probationStartedAt,3);
+      if(now>=new Date(end))changes={status:"Approved",performanceStatus:"Eligible",probationEngagements:0,probationCompletedAt:now,updatedAt:now};
+    }
+    if(changes){const writes=[{update:{name:base+"/procurementVendors/"+id,fields:fields(changes)},updateMask:{fieldPaths:Object.keys(changes)},currentDocument:{updateTime:v.updateTime}},audit("PROCUREMENT_VENDOR_RESTRICTION_REFRESHED","procurementVendors",id,{from:v.status,to:changes.status||v.status})];if(blacklistWrite)writes.push(blacklistWrite);await commit(writes);return ctx.json({ok:true,vendor:{...v,...changes}},200,ctx.corsHeaders(request));}
+    return ctx.json({ok:true,vendor:v},200,ctx.corsHeaders(request));
+   }
    if(operation==="createVendor"){
     const name=clean(input.name),serviceType=clean(input.serviceType),serviceTypeOther=clean(input.serviceTypeOther),businessLocation=clean(input.businessLocation),bankName=clean(input.bankName),bankBranch=clean(input.bankBranch),bankAccountName=clean(input.bankAccountName),bankAccountNumber=clean(input.bankAccountNumber),bankAddress=clean(input.bankAddress),swiftCode=clean(input.swiftCode).toUpperCase();
     if(!name)return deny("Vendor / service provider name is required.",400);
@@ -117,6 +134,18 @@ export function createProcurementServicesRouter(ctx){
     const writes=[{update:{name:base+"/procurementVendorScores/"+scoreId,fields:fields(score)},currentDocument:{exists:false}},{update:{name:base+"/procurementVendors/"+vendorId,fields:fields(vendorChanges)},updateMask:{fieldPaths:Object.keys(vendorChanges)},currentDocument:{updateTime:v.updateTime}},audit("PROCUREMENT_VENDOR_PERFORMANCE_SCORED","procurementVendorScores",scoreId,{vendorId,year,totalScore:total,performanceStatus:blacklisted?"Blacklisted":"Eligible"})];
     if(blacklisted){const bl=await read("procurementVendorBlacklist",vendorId),blChanges={vendorId,vendorRegistrationNumber:v.vendorRegistrationNumber||"",vendorName:v.name||"",reason:"Annual vendor/service provider performance score below 6 points.",score:total,threshold:6,scoreYear:year,status:"Active",enteredByUid:actor.uid,enteredByName:actor.name,enteredAt:now,blacklistStartedAt:now,probationEngagements:0,updatedAt:now};writes.push({update:{name:base+"/procurementVendorBlacklist/"+vendorId,fields:fields(blChanges)},updateMask:{fieldPaths:Object.keys(blChanges)},...(bl?.updateTime?{currentDocument:{updateTime:bl.updateTime}}:{currentDocument:{exists:false}})});}
     await commit(writes);return ctx.json({ok:true,scoreId,totalScore:total,blacklisted},200,ctx.corsHeaders(request));
+   }
+   if(operation==="reserveQuotationHash"){
+    const id=clean(input.id),number=Number(input.number),fileHash=clean(input.fileHash),r=await getRequest(id);
+    if(r.requestedByUid!==actor.uid)return deny("Only the procurement requester may upload quotations.");
+    if(r.status!=="Quotations Required")return deny("Quotation upload is not open at this stage.",409);
+    const method=METHODS[r.procurementMethod]||METHODS["Request for Quotations"],required=Number(r.quotationRequiredCount||method.default);
+    if(!Number.isInteger(number)||number<1||number>required)return deny("Quotation number is outside the required range.",400);
+    if(!/^[a-f0-9]{64}$/i.test(fileHash))return deny("A valid SHA-256 quotation hash is required.",400);
+    const existing=await read("procurementQuotationHashes",fileHash);
+    if(existing&&(existing.requestId!==id||Number(existing.quotationNumber)!==number))return deny("DUPLICATE QUOTATION REJECTED: this document is already registered to another quotation.",409);
+    if(!existing){const now=new Date();await commit([{update:{name:base+"/procurementQuotationHashes/"+fileHash,fields:fields({requestId:id,requestNumber:r.requestNumber,quotationNumber:number,fileHash,uploadedByUid:actor.uid,uploadedAt:now,status:"Reserved",reservationOnly:true})},currentDocument:{exists:false}},audit("PROCUREMENT_QUOTATION_HASH_RESERVED","procurementQuotationHashes",fileHash,{requestId:id,quotationNumber:number})]);}
+    return ctx.json({ok:true,reserved:true},200,ctx.corsHeaders(request));
    }
    if(operation==="registerQuotation"){
     const id=clean(input.id),number=Number(input.number),r=await getRequest(id);
