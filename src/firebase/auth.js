@@ -46,6 +46,28 @@ adminGoogleProvider.setCustomParameters({
   login_hint: "select_account"
 });
 
+// Password-attempt controls run on the Cloudflare Worker so they do not
+// require deployment of Firebase Cloud Functions. Firebase Authentication
+// remains the credential authority; Firebase-hosted security rules are unchanged.
+const GOVERNANCE_GATEWAY_ORIGIN = String(
+  import.meta.env.VITE_GATEWAY_ORIGIN ||
+  import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL ||
+  "https://irpa-google-drive-gateway.irpa-governance.workers.dev"
+).trim().replace(/\\/$/, "");
+
+async function passwordSecurityRequest(path, email) {
+  const response = await fetch(GOVERNANCE_GATEWAY_ORIGIN + path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data.ok === false) {
+    throw new Error(data.error || "Cloudflare password-security service is unavailable.");
+  }
+  return data;
+}
+
 export async function ensureInvitationApplicantSession() {
   if (applicantAuth.currentUser) return applicantAuth.currentUser;
   const result = await signInAnonymously(applicantAuth);
@@ -61,10 +83,6 @@ export async function registerWithEmail(email, password, options = {}) {
 export async function loginWithEmail(email, password) {
   const cleanEmail = email.trim().toLowerCase();
   if (!cleanEmail || !password) throw new Error("Email address and password are required.");
-  const functions = getFunctions(undefined, "us-central1");
-  const check = httpsCallable(functions, "checkPasswordAttemptState");
-  const recordFailure = httpsCallable(functions, "recordPasswordFailure");
-  const clearFailures = httpsCallable(functions, "clearPasswordAttemptState");
 
   // Password-attempt controls are an additive security layer. Firebase
   // Authentication remains the authoritative credential check and must not be
@@ -73,15 +91,15 @@ export async function loginWithEmail(email, password) {
   // example, while Cloud Functions deployment is blocked by billing).
   let passwordSecurityAvailable = true;
   try {
-    const state = await check({ email: cleanEmail });
-    if (state.data?.allowed === false) {
+    const state = await passwordSecurityRequest("/api/auth/password-attempt-state", cleanEmail);
+    if (state?.allowed === false) {
       const error = new Error(
-        state.data?.status === "SUSPENDED"
+        state?.status === "SUSPENDED"
           ? "Password access is suspended after six unsuccessful password entries. Use Forgot password? to complete mobile verification and request the registered email reset link."
           : "Password entry is temporarily locked for 5 minutes after three unsuccessful trials. Please wait before trying again."
       );
       error.code = state.data?.status === "SUSPENDED" ? "auth/password-suspended" : "auth/password-locked";
-      error.retryAfterSeconds = state.data?.retryAfterSeconds || 300;
+      error.retryAfterSeconds = state?.retryAfterSeconds || 300;
       throw error;
     }
   } catch (error) {
@@ -94,7 +112,7 @@ export async function loginWithEmail(email, password) {
     const result = await signInWithEmailAndPassword(auth, cleanEmail, password);
     if (passwordSecurityAvailable) {
       try {
-        await clearFailures({ email: cleanEmail });
+        await passwordSecurityRequest("/api/auth/password-attempt-clear", cleanEmail);
       } catch (securityError) {
         console.warn("IRPA password-attempt clear endpoint unavailable after successful Firebase Authentication.", securityError);
       }
@@ -104,8 +122,7 @@ export async function loginWithEmail(email, password) {
     let failureState = null;
     if (passwordSecurityAvailable) {
       try {
-        const failureResult = await recordFailure({ email: cleanEmail });
-        failureState = failureResult?.data || null;
+        failureState = await passwordSecurityRequest("/api/auth/password-failure", cleanEmail);
       } catch (securityError) {
         console.warn("IRPA password-attempt recording endpoint unavailable after failed Firebase Authentication.", securityError);
       }
@@ -212,8 +229,7 @@ export async function bootstrapPrimaryAdministrator() {
 export async function clearPasswordAttemptState(email) {
   const cleanEmail = String(email || "").trim().toLowerCase();
   if (!cleanEmail) return;
-  const clear = httpsCallable(getFunctions(undefined, "us-central1"), "clearPasswordAttemptState");
-  await clear({ email: cleanEmail });
+  await passwordSecurityRequest("/api/auth/password-attempt-clear", cleanEmail);
 }
 
 export async function sendPasswordReset(email) {
