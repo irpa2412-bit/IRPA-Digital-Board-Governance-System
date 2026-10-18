@@ -87,6 +87,32 @@ function normalizeGatewayAuthority(value) {
 }
 
 
+
+async function removePendingInvitation(request, env) {
+  let claims;
+  try { claims=await authenticateFirebaseRequest(request,env); }
+  catch { return json({ok:false,error:"Administrator authentication is required."},401,corsHeaders(request)); }
+  let data;try{data=await request.json();}catch{return json({ok:false,error:"Invalid JSON payload."},400,corsHeaders(request));}
+  const id=String(data.invitationId||"").trim();
+  if(!id||id.includes("/")||id.length>256)return json({ok:false,error:"A valid invitation record is required."},400,corsHeaders(request));
+  const adminSnap=await getFirestoreDocument(env,"adminProfiles/"+claims.user_id,claims.token).catch(()=>null);
+  const isAdmin=String(claims.email||"").trim().toLowerCase()==="irpa2412@gmail.com"||Boolean(firestoreDocumentToPlain(adminSnap)?.active);
+  if(!isAdmin)return json({ok:false,error:"Only an active IRPA Administrator can remove invitation records."},403,corsHeaders(request));
+  const invitationDoc=await getFirestoreDocument(env,"invitations/"+id,claims.token).catch(()=>null);
+  const invitation=firestoreDocumentToPlain(invitationDoc);
+  if(!invitation)return json({ok:false,error:"This invitation record no longer exists. Refresh the Invitation Register."},404,corsHeaders(request));
+  if(String(invitation.meetingId||"").trim()||String(invitation.source||"").toLowerCase().includes("meeting participant"))return json({ok:false,error:"This invitee is linked to a meeting. Remove the participant through the Meeting Participants portal so meeting access passes and attendance/quorum counts are revoked together."},409,corsHeaders(request));
+  const status=String(invitation.status||"").trim().toLowerCase();
+  if(invitation.accountActivated===true||["activated","accepted"].includes(status)||invitation.activationCompleted===true)return json({ok:false,error:"This invitation is linked to an activated account and cannot be removed from the register. Retain the identity record and use the authorised account-deactivation process."},409,corsHeaders(request));
+  const project=getFirebaseProjectId(env),token=await getFirestoreAdminAccessToken(env),base=`projects/${project}/databases/(default)/documents`;
+  const enc=v=>v===null?{nullValue:null}:typeof v==="boolean"?{booleanValue:v}:typeof v==="number"?{integerValue:String(v)}:typeof v==="object"?{mapValue:{fields:Object.fromEntries(Object.entries(v).map(([k,x])=>[k,enc(x)]))}}:{stringValue:String(v)};
+  const auditId=crypto.randomUUID(),stamp=new Date().toISOString();
+  const auditFields={action:enc("INVITATION_REGISTER_REMOVE"),collection:enc("invitations"),recordId:enc(id),details:enc({email:String(invitation.email||"").trim().toLowerCase(),statusBeforeRemoval:invitation.status||"Pending",source:"ADMINISTRATOR_INVITATION_REGISTER"}),actorUid:enc(claims.user_id),actorEmail:enc(String(claims.email||"").trim().toLowerCase()),createdAt:{timestampValue:stamp}};
+  const response=await fetch(`https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents:commit`,{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({writes:[{delete:`${base}/invitations/${id}`},{update:{name:`${base}/audit/${auditId}`,fields:auditFields},currentDocument:{exists:false}}]})});
+  if(!response.ok)return json({ok:false,error:"The invitation removal and audit record could not be committed atomically."},503,corsHeaders(request));
+  return json({ok:true,invitationId:id,auditId},200,corsHeaders(request));
+}
+
 async function listMeetingInviteeDirectory(request, env) {
   let claims;
   try { claims = await authenticateFirebaseRequest(request, env); }
@@ -398,6 +424,9 @@ export default {
       }
       if (pathname === "/api/meeting/invitee-directory" && request.method === "POST") {
         return await listMeetingInviteeDirectory(request, env);
+      }
+      if (pathname === "/api/authorisation/invitations/remove" && request.method === "POST") {
+        return await removePendingInvitation(request, env);
       }
 
       if (env.ESIGN_MODULE_ENABLED === "true") {
