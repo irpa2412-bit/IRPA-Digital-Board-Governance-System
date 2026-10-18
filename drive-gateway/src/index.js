@@ -481,7 +481,9 @@ async function updateSignatureAuthority(request, env) {
   } catch (error) {
     if (error instanceof InvitationRedemptionError) return json({ok:false,error:error.message},error.status,corsHeaders(request));
     console.error("Cloudflare signer-authority update failed",error);
-    return json({ok:false,error:"The Cloudflare signing-authority service could not complete the request."},Number(error?.status||0)||500,corsHeaders(request));
+    const message=String(error?.message||"");
+    const authFailure=message==="Firebase authentication is required."||message.startsWith("Invalid Firebase ID token")||message.startsWith("Invalid Firebase token")||message==="Firebase token is expired."||message==="Firebase token signing key not found.";
+    return json({ok:false,error:authFailure?"Authentication is required.":"The Cloudflare signing-authority service could not complete the request."},Number(error?.status||0)||(authFailure?401:500),corsHeaders(request));
   }
 }
 
