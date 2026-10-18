@@ -71,3 +71,16 @@ test("billing-blocked callable deploy steps are removed without deleting rollbac
   assert.match(legacyCallables, /exports\.getMeetingAttendanceRegister/);
   assert.match(readFileSync(new URL("../../functions/index.js", import.meta.url), "utf8"), /exports\.removeInvitationRecord/);
 });
+
+test("meeting working-document register, read, and review operations use Cloudflare with meeting-scoped authorization", () => {
+  assert.match(gateway, /pathname==="\\/api\\/meeting-working-documents\\/register"/);
+  assert.match(gateway, /pathname==="\\/api\\/meeting-working-documents\\/list"/);
+  assert.match(gateway, /pathname==="\\/api\\/meeting-working-documents\\/review"/);
+  assert.match(gateway, /Only the meeting host, chairperson or secretary may add working documents/);
+  assert.match(gateway, /The document must be explicitly linked to this meeting/);
+  assert.match(gateway, /Only an authorised meeting participant may review working documents/);
+  assert.match(client, /callMeetingService\\("\\/api\\/meeting-working-documents\\/register",payload\\)/);
+  assert.match(client, /callMeetingService\\("\\/api\\/meeting-working-documents\\/list",\\{meetingId\\}\\)/);
+  assert.match(client, /callMeetingService\\("\\/api\\/meeting-working-documents\\/review",payload\\)/);
+  assert.doesNotMatch(client, /call\\("(registerMeetingWorkingDocument|listMeetingWorkingDocuments|submitMeetingDocumentReview)"\\)/);
+});
