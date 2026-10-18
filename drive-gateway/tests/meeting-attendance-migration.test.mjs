@@ -58,7 +58,7 @@ test("invitation removal uses Cloudflare with server-side administrator and life
   assert.match(gateway, /linked to an activated account and cannot be removed/);
   assert.match(gateway, /action:"INVITATION_REGISTER_REMOVE"/);
   assert.match(gateway, /delete:base+"invitations\/"\+invitationId/);
-  assert.match(client, /callMeetingService\("\/api\/invitations\/remove",\{invitationId:id\}\)/);
+  assert.match(dataLayer, /callMeetingService\("\/api\/invitations\/remove",\{invitationId:id\}\)/);
   assert.doesNotMatch(dataLayer, /httpsCallable\(getFunctions\(undefined,"us-central1"\),"removeInvitationRecord"\)/);
 });
 
