@@ -108,3 +108,243 @@ test("meeting host can register a document linked to the requested meeting", asy
   assert.equal(typeof body.workingDocumentId, "string");
   assert.ok(body.workingDocumentId.length > 0);
 });
+
+// ---------------------------------------------------------------------------
+// Behavioural coverage for the other four meeting routes (list, review, sign
+// attendance, attendance register). Every test calls the real router with a
+// mocked Firestore; nothing here matches source text.
+// ---------------------------------------------------------------------------
+const ROUTES = {
+  list: "/api/meeting-working-documents/list",
+  review: "/api/meeting-working-documents/review",
+  sign: "/api/meeting-attendance/sign",
+  register: "/api/meeting-attendance/register"
+};
+
+function mockStore(t, { docs = {}, rows = {} } = {}) {
+  const created = [];
+  const commits = [];
+  t.mock.method(globalThis, "fetch", async (input, init = {}) => {
+    const url = new URL(String(input));
+    const pathname = decodeURIComponent(url.pathname);
+    const method = init.method || "GET";
+    if (pathname.endsWith("/documents:runQuery")) {
+      const query = JSON.parse(init.body).structuredQuery;
+      const collection = query.from[0].collectionId;
+      const filter = query.where?.fieldFilter;
+      const wanted = filter?.value?.stringValue;
+      const matches = (rows[collection] || []).filter(row => !filter || String(row[filter.field.fieldPath]) === wanted);
+      return response(matches.map(({ id, ...fields }) => ({ document: fsDoc(collection, id, fields) })));
+    }
+    if (pathname.endsWith("/documents:commit")) {
+      commits.push(...JSON.parse(init.body).writes);
+      return response({ writeResults: [] });
+    }
+    const single = pathname.match(/\/documents\/([^/]+)\/([^/]+)$/);
+    if (method === "GET" && single) {
+      const record = docs[`${single[1]}/${single[2]}`];
+      return record ? response(fsDoc(single[1], single[2], record)) : response({ error: "missing" }, 404);
+    }
+    const collectionOnly = pathname.match(/\/documents\/([^/]+)$/);
+    if (method === "POST" && collectionOnly) {
+      created.push({ collection: collectionOnly[1], id: url.searchParams.get("documentId") });
+      return response({ name: pathname, fields: {} });
+    }
+    return response({ error: "unexpected Firestore request", method, path: pathname }, 500);
+  });
+  return { created, commits };
+}
+
+const callRoute = (router, route, body = {}) => router(new Request("https://worker.test" + route, {
+  method: "POST",
+  headers: { "content-type": "application/json", authorization: "Bearer test-token" },
+  body: JSON.stringify({ meetingId: "meeting-1", ...body })
+}), env, route);
+
+const routerFor = (claims, options) => createMeetingServicesRouter(makeContext(claims, options));
+const meeting1 = { title: "Board meeting", createdByUid: "host-1", participantUids: ["participant-1"], status: "Scheduled" };
+const activeMember = uid => ({ uid, email: uid + "@example.org", role: "Board Member", status: "Active", active: true });
+const participant1 = { uid: "participant-1", meetingId: "meeting-1", name: "Jane Participant", email: "participant-1@example.org", status: "Registered" };
+const workingDoc = { meetingId: "meeting-1", documentId: "doc-1", title: "Minutes", status: "ACTIVE" };
+
+// ---- /api/meeting-working-documents/list ----------------------------------
+test("list working documents rejects a missing or invalid Firebase token", async t => {
+  mockStore(t, { docs: { "meetings/meeting-1": meeting1 } });
+  const result = await callRoute(routerFor({ user_id: "participant-1" }, { authenticated: false }), ROUTES.list);
+  assert.equal(result.status, 401);
+});
+
+test("list working documents rejects an identity with no authority over the meeting", async t => {
+  mockStore(t, { docs: { "meetings/meeting-1": meeting1 } });
+  const result = await callRoute(routerFor({ user_id: "outsider-1", email: "outsider@example.org" }), ROUTES.list);
+  assert.equal(result.status, 403);
+});
+
+test("list working documents rejects an active member who is not a participant", async t => {
+  mockStore(t, { docs: { "meetings/meeting-1": meeting1, "members/member-9": activeMember("member-9") } });
+  const result = await callRoute(routerFor({ user_id: "member-9", email: "member-9@example.org" }), ROUTES.list);
+  assert.equal(result.status, 403);
+  assert.match((await result.json()).error, /participant access is required/i);
+});
+
+test("list working documents rejects a meeting that does not exist", async t => {
+  mockStore(t, { docs: { "meetings/meeting-1": meeting1 } });
+  const result = await callRoute(routerFor({ user_id: "participant-1" }), ROUTES.list, { meetingId: "other-meeting" });
+  assert.equal(result.status, 404);
+});
+
+test("list working documents returns only active documents of the requested meeting", async t => {
+  mockStore(t, {
+    docs: { "meetings/meeting-1": meeting1 },
+    rows: { meetingWorkingDocuments: [
+      { id: "wd-1", ...workingDoc },
+      { id: "wd-2", ...workingDoc, status: "REMOVED" },
+      { id: "wd-3", ...workingDoc, meetingId: "meeting-2" }
+    ] }
+  });
+  const result = await callRoute(routerFor({ user_id: "participant-1" }), ROUTES.list);
+  assert.equal(result.status, 200);
+  const body = await result.json();
+  assert.equal(body.ok, true);
+  assert.deepEqual(body.documents.map(d => d.id), ["wd-1"]);
+});
+
+// ---- /api/meeting-working-documents/review --------------------------------
+const reviewBody = { workingDocumentId: "wd-1", reviewType: "COMMENT", comment: "Reviewed and agreed." };
+
+test("review working document rejects a missing or invalid Firebase token", async t => {
+  mockStore(t, { docs: { "meetings/meeting-1": meeting1, "meetingWorkingDocuments/wd-1": workingDoc } });
+  const result = await callRoute(routerFor({ user_id: "participant-1" }, { authenticated: false }), ROUTES.review, reviewBody);
+  assert.equal(result.status, 401);
+});
+
+test("review working document rejects an active member who is not a participant", async t => {
+  mockStore(t, { docs: {
+    "meetings/meeting-1": meeting1,
+    "meetingWorkingDocuments/wd-1": workingDoc,
+    "members/member-9": activeMember("member-9")
+  } });
+  const result = await callRoute(routerFor({ user_id: "member-9", email: "member-9@example.org" }), ROUTES.review, reviewBody);
+  assert.equal(result.status, 403);
+  assert.match((await result.json()).error, /authorised meeting participant/i);
+});
+
+test("review working document rejects a document that belongs to another meeting", async t => {
+  mockStore(t, { docs: {
+    "meetings/meeting-1": meeting1,
+    "meetingWorkingDocuments/wd-1": { ...workingDoc, meetingId: "meeting-2" }
+  } });
+  const result = await callRoute(routerFor({ user_id: "participant-1" }), ROUTES.review, reviewBody);
+  assert.equal(result.status, 404);
+  assert.match((await result.json()).error, /not found for this meeting/i);
+});
+
+test("review working document rejects an unsupported review type", async t => {
+  mockStore(t, { docs: { "meetings/meeting-1": meeting1, "meetingWorkingDocuments/wd-1": workingDoc } });
+  const result = await callRoute(routerFor({ user_id: "participant-1" }), ROUTES.review, { ...reviewBody, reviewType: "APPROVE" });
+  assert.equal(result.status, 400);
+});
+
+test("a listed participant can submit a review that is stored against their own identity", async t => {
+  const store = mockStore(t, { docs: { "meetings/meeting-1": meeting1, "meetingWorkingDocuments/wd-1": workingDoc } });
+  const result = await callRoute(routerFor({ user_id: "participant-1", email: "participant-1@example.org" }), ROUTES.review, reviewBody);
+  assert.equal(result.status, 200);
+  const body = await result.json();
+  assert.equal(body.ok, true);
+  assert.equal(body.status, "SUBMITTED");
+  assert.equal(typeof body.reviewId, "string");
+  assert.ok(store.created.some(w => w.collection === "meetingDocumentReviews" && w.id === body.reviewId));
+});
+
+// ---- /api/meeting-attendance/sign -----------------------------------------
+const signBody = { participantId: "part-1", typedName: "Jane Participant", confirmed: true };
+const signDocs = { "meetings/meeting-1": meeting1, "participants/part-1": participant1 };
+
+test("attendance signing rejects a missing or invalid Firebase token", async t => {
+  mockStore(t, { docs: signDocs });
+  const result = await callRoute(routerFor({ user_id: "participant-1" }, { authenticated: false }), ROUTES.sign, signBody);
+  assert.equal(result.status, 401);
+});
+
+test("attendance signing rejects signing another person's participant record", async t => {
+  mockStore(t, { docs: { ...signDocs, "participants/part-1": { ...participant1, uid: "participant-2", email: "participant-2@example.org" } } });
+  const result = await callRoute(routerFor({ user_id: "participant-1", email: "participant-1@example.org" }), ROUTES.sign, signBody);
+  assert.equal(result.status, 403);
+  assert.match((await result.json()).error, /only your own/i);
+});
+
+test("attendance signing rejects a participant record from another meeting", async t => {
+  mockStore(t, { docs: { ...signDocs, "participants/part-1": { ...participant1, meetingId: "meeting-2" } } });
+  const result = await callRoute(routerFor({ user_id: "participant-1", email: "participant-1@example.org" }), ROUTES.sign, signBody);
+  assert.equal(result.status, 403);
+  assert.match((await result.json()).error, /does not belong to this meeting/i);
+});
+
+test("attendance signing rejects a typed name that does not match the registration", async t => {
+  mockStore(t, { docs: signDocs });
+  const result = await callRoute(routerFor({ user_id: "participant-1", email: "participant-1@example.org" }), ROUTES.sign, { ...signBody, typedName: "Someone Else" });
+  assert.equal(result.status, 409);
+});
+
+test("attendance signing rejects a request without the confirmed declaration", async t => {
+  mockStore(t, { docs: signDocs });
+  const result = await callRoute(routerFor({ user_id: "participant-1", email: "participant-1@example.org" }), ROUTES.sign, { ...signBody, confirmed: false });
+  assert.equal(result.status, 400);
+});
+
+test("a registered participant can sign their own attendance exactly once", async t => {
+  const store = mockStore(t, { docs: signDocs });
+  const result = await callRoute(routerFor({ user_id: "participant-1", email: "participant-1@example.org" }), ROUTES.sign, signBody);
+  assert.equal(result.status, 200);
+  const body = await result.json();
+  assert.equal(body.signed, true);
+  assert.equal(body.alreadySigned, false);
+  assert.equal(body.participantId, "part-1");
+  const names = store.commits.map(w => w.update.name);
+  assert.ok(names.some(n => n.includes("/meetingAttendanceSignatures/")));
+  assert.ok(names.some(n => n.endsWith("/participants/part-1")));
+  assert.ok(names.some(n => n.includes("/audit/")));
+});
+
+// ---- /api/meeting-attendance/register -------------------------------------
+const registerRows = { participants: [
+  { id: "part-1", ...participant1 },
+  { id: "part-2", meetingId: "meeting-1", uid: "participant-2", name: "Peter Other", email: "participant-2@example.org", status: "Registered" }
+] };
+
+test("attendance register rejects a missing or invalid Firebase token", async t => {
+  mockStore(t, { docs: { "meetings/meeting-1": meeting1 }, rows: registerRows });
+  const result = await callRoute(routerFor({ user_id: "participant-1" }, { authenticated: false }), ROUTES.register);
+  assert.equal(result.status, 401);
+});
+
+test("attendance register rejects an active member who is not registered for the meeting", async t => {
+  mockStore(t, { docs: { "meetings/meeting-1": meeting1, "members/member-9": activeMember("member-9") }, rows: registerRows });
+  const result = await callRoute(routerFor({ user_id: "member-9", email: "member-9@example.org" }), ROUTES.register);
+  assert.equal(result.status, 403);
+  assert.match((await result.json()).error, /not registered as a participant/i);
+});
+
+test("attendance register rejects a meeting that does not exist", async t => {
+  mockStore(t, { docs: { "meetings/meeting-1": meeting1 }, rows: registerRows });
+  const result = await callRoute(routerFor({ user_id: "participant-1" }), ROUTES.register, { meetingId: "other-meeting" });
+  assert.equal(result.status, 404);
+});
+
+test("a participant sees only their own attendance record", async t => {
+  mockStore(t, { docs: { "meetings/meeting-1": meeting1 }, rows: registerRows });
+  const result = await callRoute(routerFor({ user_id: "participant-1", email: "participant-1@example.org" }), ROUTES.register);
+  assert.equal(result.status, 200);
+  const body = await result.json();
+  assert.equal(body.canManage, false);
+  assert.deepEqual(body.records.map(r => r.participantId), ["part-1"]);
+});
+
+test("the meeting host sees the full attendance register", async t => {
+  mockStore(t, { docs: { "meetings/meeting-1": meeting1, "members/host-1": activeMember("host-1") }, rows: registerRows });
+  const result = await callRoute(routerFor({ user_id: "host-1", email: "host-1@example.org" }), ROUTES.register);
+  assert.equal(result.status, 200);
+  const body = await result.json();
+  assert.equal(body.canManage, true);
+  assert.deepEqual(body.records.map(r => r.participantId).sort(), ["part-1", "part-2"]);
+});
