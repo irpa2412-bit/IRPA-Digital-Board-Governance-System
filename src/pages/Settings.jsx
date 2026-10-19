@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { browserSupportsPush, listenForForegroundMessages, notificationPermissionState, requestPushPermission } from "../firebase/messaging";
 import SystemResetControl from "../components/SystemResetControl";
+import DepartmentArchiveRegistry from "../components/DepartmentArchiveRegistry";
 import ActualDataAccessControl from "../components/ActualDataAccessControl";
 import { startGoogleDriveAuthorization } from "../firebase/signatureStorage";
 import { resetDocumentTrialData, resetEmployeeTrialData, resetMemberTrialData, resetSignatureEnvelopeTrialData, createExternalAuditorProfile, getRecords, COLLECTIONS, linkAdministratorToEmployee } from "../firebase/data";
@@ -136,6 +137,7 @@ export default function Settings({ admin = false, section = "settings" }) {
 
   return (
     <div className="page">
+      {admin && section === "settings" && <DepartmentArchiveRegistry/>}
       {admin && section === "administrators" && (
         <section className="panel">
           <div className="panel-header">
