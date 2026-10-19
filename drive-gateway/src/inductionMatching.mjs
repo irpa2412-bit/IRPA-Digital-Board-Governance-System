@@ -48,7 +48,7 @@ export function createInductionMatchingRouter({ authenticateFirebaseRequest, get
       if (!invitation) return json({ ok: false, error: "The invitation record was not found." }, 404, corsHeaders(request));
     }
     const targetEmail = String(invitation?.email || suppliedEmail || "").trim().toLowerCase();
-    if (!targetEmail || (!isActiveAdmin && (!emailFromToken || targetEmail !== emailFromToken))) {
+    if (!targetEmail || (!isActiveAdmin && (emailFromToken ? targetEmail !== emailFromToken : !invitationId))) {
       return json({ ok: false, error: "You may only verify induction records linked to your authenticated email address." }, 403, corsHeaders(request));
     }
     if (invitation && suppliedEmail && suppliedEmail !== targetEmail) return json({ ok: false, error: "The supplied email does not match the invitation record." }, 400, corsHeaders(request));
