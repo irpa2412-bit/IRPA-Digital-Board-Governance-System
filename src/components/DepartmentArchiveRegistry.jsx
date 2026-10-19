@@ -43,7 +43,7 @@ export default function DepartmentArchiveRegistry(){
    </form>
   </section>
   <section style={panel}><div className="panel-header"><div><span className="eyebrow">REGISTERED DEPARTMENTS</span><h3>Department Register</h3></div></div>
-   {departments.length===0&&!loading&&<p>No departments registered yet. Use the administrator form above to create the first record.</p>}
+   {departments.length===0&&!loading&&<p style={{color:"#1f2937"}}>No departments registered yet. Use the administrator form above to create the first record.</p>}
    <div style={{display:"grid",gap:12}}>{departments.map(d=><article key={d.id} className="stat-card"><div style={{display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}><div><strong>{d.name}</strong><p style={{margin:"5px 0"}}>Code: {d.code} · Status: {d.status} · Parent: {d.parentDepartmentName||"None"}</p><small>{d.description||"No description"} · Responsible officer: {d.responsibleOfficer||"Not assigned"}</small></div><div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}><button type="button" style={btn} disabled={!!busy||d.status==="Inactive"} onClick={()=>changeDepartmentStatus(d,"Inactive")}>Deactivate</button><button type="button" style={btn} disabled={!!busy||d.status==="Active"} onClick={()=>changeDepartmentStatus(d,"Active")}>Reactivate</button></div></div></article>)}</div>
   </section>
   <section className="panel"><div className="panel-header"><div><span className="eyebrow">ARCHIVE REGISTRY</span><h3>Register Department Archive</h3><p className="panel-description">Only active registered departments can own new archives. Registration does not falsely imply that a Google Drive folder has been created.</p></div></div>
