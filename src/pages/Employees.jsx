@@ -2,7 +2,7 @@ import React,{useEffect,useState}from"react";
 import {createEmployee,getRecords,updateEmployee,updateRecord,updateAdministratorRegisterRecord,removeEmployeeRecord,isCurrentAdministrator,retryEmployeeRegistrationEmail,synchronizeRegisteredIdentityUids,COLLECTIONS}from"../firebase/data";
 import {inviteRegisteredPerson} from"../firebase/auth";
 const ROLES=["Executive Director","Director Internal Oversight","Director Livestock","Director Environment","Director Finance & Administration","Director Human Resources","Director Outreach","Director Community Development","Director Field Operations","HR Manager","HR Officer","Finance Manager","Finance Officer","Accountant","Internal Oversight Officer","Rangeland Officer","Livestock Officer","Environment Officer","Outreach Officer","Community Development Officer","Programme/Technical Officer","Procurement Officer","Operations Manager","IT Specialist","Information Technology Officer","Driver","Field Assistant","Administrative Assistant","Communications Officer","Communication Officer","Communications Manager","Communication Manager","Media Officer","Media Manager","Public Relations Officer","Communications & Media Officer","Communications and Media Officer","Media and Communications Officer","Media & Communications Officer","Monitoring & Evaluation Officer","Project Officer","Management","Employee"];
-const DEPARTMENTS=["Executive Office","Human Resources","Finance & Administration","Internal Oversight","Programmes","Procurement","Operations","Information Technology","Community Development","Livestock","Environment","Outreach","Field Operations","Research & Knowledge","Communication and Media Department"];
+const DEPARTMENTS=["Executive Office","Human Resources","Finance & Administration","Internal Oversight","Programmes","Procurement","Operations","Information Technology","Community Development","Livestock","Environment","Outreach","Field Operations","Research & Knowledge"];
 const DEPARTMENT_UNITS={
  "Executive Office":["Executive Director's Office","Management Coordination Unit"],
  "Human Resources":["Human Resources & Staff Welfare Unit","Training & Capacity Development Unit","Personnel & Records Unit"],
@@ -15,10 +15,9 @@ const DEPARTMENT_UNITS={
  "Community Development":["Community Mobilization Unit","Women & Youth Empowerment Unit","Gender & Social Inclusion Unit"],
  "Livestock":["Livestock Production Unit","Veterinary Services Unit","Breeding & Genetics Unit","Livestock Infrastructure Unit"],
  "Environment":["Rangeland Management Unit","Rangeland Restoration Unit","Invasive Species Control Unit","Climate Change & Resilience Unit","Environmental Conservation & Education Unit"],
- "Outreach":["Communications & Outreach Unit","Partnerships & Resource Mobilization Unit","ICT & Digital Engagement Unit"],
+ "Outreach":["Communications & Outreach Unit","Partnerships & Resource Mobilization Unit","ICT & Digital Engagement Unit","Communication Unit","Media Unit"],
  "Field Operations":["Field Implementation Unit","Monitoring, Evaluation, Accountability & Learning Unit","Community-Based Monitoring Unit"],
  "Research & Knowledge":["Research Management Unit","Statistics & Data Analysis Unit","Knowledge Management & Publications Unit","Research Ethics & Data Governance Unit"],
- "Communication and Media Department":["Communications & Outreach Unit","Media Production Unit","Public Relations & Media Unit","Digital Communications Unit","Community Media & Engagement Unit"]
 };
 const empty={name:"",email:"",role:"Employee",department:"",unit:"",employmentType:"Full-time",status:"Active",phone:"",startDate:""};
 export default function Employees(){
