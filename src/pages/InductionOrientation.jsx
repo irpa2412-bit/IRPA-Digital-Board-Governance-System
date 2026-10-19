@@ -12,7 +12,7 @@ const DEPARTMENT_UNITS={
 "Environment & Sustainable Rangeland Management":["Rangeland Management Unit","Rangeland Restoration Unit","Invasive Species Control Unit","Climate Change & Resilience Unit","Environmental Conservation & Education Unit"],
 "Finance & Administration":["Finance Unit","Accounting Unit","Administration Unit","Procurement Unit"],
 "Human Resources":["Human Resources & Staff Welfare Unit","Training & Capacity Development Unit","Personnel & Records Unit"],
-"Outreach":["Communications & Outreach Unit","Partnerships & Resource Mobilization Unit","ICT & Digital Engagement Unit","Communication Unit","Media Unit"],
+"Outreach":["Communications & Outreach Unit","Partnerships & Resource Mobilization Unit","ICT & Digital Engagement Unit","Communication and Media Unit"],
 "Community Development":["Community Mobilization Unit","Women & Youth Empowerment Unit","Gender & Social Inclusion Unit"],
 "Field Department":["Field Implementation Unit","Monitoring, Evaluation, Accountability & Learning Unit","Community-Based Monitoring Unit"],
 "Operations":["Logistics & Transport Unit","Infrastructure & Facilities Unit","General Operations Unit"],
