@@ -6,6 +6,7 @@ const DATA_TYPES=[
   ["finance","Finance, payments and accounting"],
   ["procurement","Procurement, quotations and contracts"],
   ["personnel","Members, employees and personnel"],
+  ["invitations","Invitation workflow and activation testing (sends a real email)"],
   ["signatures","Signatures, approvals and audit records"],
   ["system","System settings and security configuration"],
   ["documents","Documents, correspondence and files"],
