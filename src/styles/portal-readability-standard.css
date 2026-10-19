@@ -254,5 +254,6 @@
 #root .app-shell .content-area:not(.dashboard-content-area) .page.department-archive-registry :where(button) {
   color: #17372b !important;
   -webkit-text-fill-color: #17372b !important;
-  background-color: #ffffff;
+  background: #ffffff !important;
+  background-color: #ffffff !important;
 }
