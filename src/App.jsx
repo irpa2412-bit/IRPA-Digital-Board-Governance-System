@@ -833,8 +833,11 @@ useEffect(()=>{
       // Configuration-only Gateway entry: if an authenticated account has a
       // configured authority but no register record, it may still enter. The
       // registers enrich the profile after entry; they do not decide entry.
+      const configuredAdminAuthority=tokenResult?.claims?.admin===true||serverContextRoles.includes("Administrator");
       const configuredGatewayEntry=serverContextRoles.length>0||tokenResult?.claims?.admin===true;
-      if(configuredGatewayEntry&&!memberAuthorized&&!employeeAuthorized&&!administratorAuthorized){
+      // A verified server-issued Administrator claim/role must take precedence over a coexisting Employee record.
+      // This prevents an Administrator + Communication Officer identity from being downgraded to Employee navigation.
+      if(configuredGatewayEntry&&(configuredAdminAuthority||(!memberAuthorized&&!employeeAuthorized&&!administratorAuthorized))){
         const configuredAuthorities=Array.isArray(loginContext?.authorities)?loginContext.authorities:[];
         const configuredProfile={
           uid:u.uid,
@@ -844,8 +847,8 @@ useEffect(()=>{
           roles:serverContextRoles,
           serverAuthorizedRoles:serverContextRoles,
           authorities:configuredAuthorities,
-          administratorAvailable:Boolean(tokenResult?.claims?.admin===true),
-          authorizationType:tokenResult?.claims?.admin===true?"administrator":"member",
+          administratorAvailable:configuredAdminAuthority,
+          authorizationType:configuredAdminAuthority?"administrator":"member",
           identityResolution:"GATEWAY_CONFIGURATION"
         };
         setEmployee(null);
