@@ -107,9 +107,13 @@ export async function redeemInvitationToken(request, env) {
   }
 
   const currentState = String(invitation.invitationRedemptionState || "PENDING");
-  const pendingUntil = new Date(invitation.invitationPasswordSetupExpiresAt || 0).getTime();
-  if (currentState === "EXPIRED" || (currentState === "PASSWORD_SETUP_PENDING" && pendingUntil && pendingUntil <= Date.now())) {
-    throw new InvitationRedemptionError(410, "The invitation password-setup window has expired. Ask an Administrator to issue a fresh invitation.");
+  // The one-hour password-setup window limits an individual setup session, not
+  // the invitation itself. If that session expires, allow the invitee to reopen
+  // the original link and start a fresh setup session while the original
+  // invitation token remains valid. validateInvitation() above still enforces
+  // the hard invitation expiry, token hash, token version, and revocation state.
+  if (currentState === "EXPIRED") {
+    throw new InvitationRedemptionError(410, "This IRPA invitation has expired. Ask an Administrator to issue a fresh invitation.");
   }
   if (currentState === "ACTIVATED") {
     throw new InvitationRedemptionError(409, "This invitation has already been used. Please sign in with your IRPA account.");
