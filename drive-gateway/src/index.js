@@ -1855,9 +1855,19 @@ async function sendMemberInvitation(request, env) {
     return json({ok:true,email,deliveryStatus:"Sent",sentAt,messageId,message:meetingAccess?{subject:message.subject,text:"Meeting access details were included in the invitation email."}:message,meetingAccessSent:Boolean(meetingAccess)},200,corsHeaders(request));
   }catch(error){
     const failedAt=new Date().toISOString(), safeError=safeMailError(error);
-    await updateFirestoreDocument(env,`invitations/${invitationId}`,claims.token,{status:{stringValue:"Failed"},deliveryStatus:{stringValue:"Failed"},deliveryFailedAt:{timestampValue:failedAt},deliveryError:{stringValue:safeError}},["status","deliveryStatus","deliveryFailedAt","deliveryError"]);
+    // Preserve the provider failure even if Firestore refuses the status write.
+    // Previously, a failed status update escaped this catch and masked the SMTP
+    // error, leaving the register at "Preparing" with no useful diagnostic.
+    try {
+      await updateFirestoreDocument(env,`invitations/${invitationId}`,claims.token,{status:{stringValue:"Failed"},deliveryStatus:{stringValue:"Failed"},deliveryFailedAt:{timestampValue:failedAt},deliveryError:{stringValue:safeError}},["status","deliveryStatus","deliveryFailedAt","deliveryError"]);
+    } catch (statusError) {
+      console.error("IRPA invitation failure status could not be saved",{
+        recipientDomain:recipientDomain(email),
+        statusError:safeMailError(statusError)
+      });
+    }
     console.error("IRPA member invitation delivery failed",{recipientDomain:recipientDomain(email),error:safeError});
-    return json({ok:false,error:"EMAIL_PROVIDER_FAILED",deliveryStatus:"Failed"},502,corsHeaders(request));
+    return json({ok:false,error:safeError,code:"EMAIL_PROVIDER_FAILED",deliveryStatus:"Failed"},502,corsHeaders(request));
   }
 }
 
