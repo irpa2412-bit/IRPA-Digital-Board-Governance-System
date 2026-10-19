@@ -499,12 +499,19 @@ export async function listMeetingInviteeDirectory(){
  return {boardMembers:Array.isArray(result.data?.boardMembers)?result.data.boardMembers:[],members:Array.isArray(result.data?.members)?result.data.members:[],employees:Array.isArray(result.data?.employees)?result.data.employees:[]};
 }
 
-/** Secure administrator-only removal for pending invitation records. */
+/** Secure administrator-only removal through the existing Cloudflare gateway. */
 export async function removeInvitationRecord(invitationId){
  const id=String(invitationId||"").trim();
  if(!id)throw new Error("An invitation record is required.");
  if(!auth.currentUser?.uid)throw new Error("Administrator authentication is required.");
- const call=httpsCallable(getFunctions(undefined,"us-central1"),"removeInvitationRecord");
- const result=await call({invitationId:id});
- return result.data||{ok:true};
+ const gatewayOrigin=String(import.meta.env.VITE_GATEWAY_ORIGIN||import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").trim().replace(/\/+$/,"");
+ const token=await auth.currentUser.getIdToken();
+ const response=await fetch(`${gatewayOrigin}/api/invitations/remove`,{
+  method:"POST",
+  headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},
+  body:JSON.stringify({invitationId:id})
+ });
+ const result=await response.json().catch(()=>({}));
+ if(!response.ok||result.ok!==true)throw new Error(result.error||"The invitation could not be removed safely.");
+ return result;
 }

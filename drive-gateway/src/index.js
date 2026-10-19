@@ -28,6 +28,7 @@ import { createCommunicationsSiteRouter } from "./communicationsSite.mjs";
 import { createMetaOAuthRouter } from "./metaOAuth.mjs";
 import { createMeetingPortalRouter } from "./meetingPortal.mjs";
 import { createMeetingServicesRouter } from "./meetingServices.mjs";
+import { createInvitationRemovalRouter } from "./invitationRemoval.mjs";
 
 function getFirebaseProjectId(env) {
   const projectId = String(env?.FIREBASE_PROJECT_ID || "").trim();
@@ -77,6 +78,16 @@ const meetingServicesRouter = createMeetingServicesRouter({
   getFirebaseProjectId,
   getFirestoreAdminAccessToken,
   sendEmail: (env, message) => smtpSend(env, message),
+  json,
+  corsHeaders
+});
+
+const invitationRemovalRouter = createInvitationRemovalRouter({
+  authenticateFirebaseRequest,
+  getFirebaseProjectId,
+  getFirestoreAdminAccessToken,
+  getFirestoreDocument,
+  firestoreDocumentToPlain,
   json,
   corsHeaders
 });
@@ -181,6 +192,9 @@ export default {
 
       const meetingServicesResponse = await meetingServicesRouter(request, env, pathname);
       if (meetingServicesResponse) return meetingServicesResponse;
+
+      const invitationRemovalResponse = await invitationRemovalRouter(request, env, pathname);
+      if (invitationRemovalResponse) return invitationRemovalResponse;
 
       if (pathname.startsWith("/api/communications/meta/")) {
         const metaResponse = await metaOAuthRouter(request, env);
