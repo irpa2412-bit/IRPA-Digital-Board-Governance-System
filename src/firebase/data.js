@@ -504,7 +504,7 @@ export async function removeInvitationRecord(invitationId){
  const id=String(invitationId||"").trim();
  if(!id)throw new Error("An invitation record is required.");
  if(!auth.currentUser?.uid)throw new Error("Administrator authentication is required.");
- const gatewayOrigin=String(import.meta.env.VITE_GATEWAY_ORIGIN||import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").trim().replace(/\\/+$/,"");
+ const gatewayOrigin=String(import.meta.env.VITE_GATEWAY_ORIGIN||import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").trim().replace(/\/+$/,"");
  const token=await auth.currentUser.getIdToken();
  const response=await fetch(`${gatewayOrigin}/api/invitations/remove`,{
   method:"POST",
