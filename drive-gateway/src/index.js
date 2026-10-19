@@ -201,6 +201,10 @@ export default {
         return await provisionCommunicationMediaArchive(request, env);
       }
 
+      if (pathname === "/api/research-archive/provision" && request.method === "POST") {
+        return await provisionResearchKnowledgeArchive(request, env);
+      }
+
       if (pathname === "/api/upload" && request.method === "POST") {
         return await upload(request, env);
       }
@@ -818,6 +822,90 @@ async function provisionCommunicationMediaArchive(request, env) {
     return json({ok:false,error:"The Communication and Media Archive could not be verified. No media was uploaded."},409,corsHeaders(request));
   }
   return json({ok:true,archiveName:folder.name,folderId:folder.id,archivePath:getDriveRootFolderName(env)+"/Communication and Media Archive",storageProvider:"Google Drive"},200,corsHeaders(request));
+}
+
+async function provisionResearchKnowledgeArchive(request, env) {
+  const claims = await authenticateFirebaseRequest(request, env);
+  const email = String(claims.email || "").trim().toLowerCase();
+  const authorisedEmail = String(env.AUTHORIZED_DRIVE_EMAIL || "").trim().toLowerCase();
+  let authorised = claims.admin === true || Boolean(authorisedEmail && email === authorisedEmail);
+
+  if (!authorised) {
+    const employeeRaw = await getFirestoreDocument(env, "employees/" + claims.user_id, claims.token);
+    const employee = firestoreDocumentToPlain(employeeRaw) || {};
+    const department = String(employee.department || "").trim().toLowerCase();
+    const active = ["Active", "Activated"].includes(String(employee.status || "")) ||
+      employee.employmentStatus === "Active" || employee.registrationStatus === "Activated";
+    const researchDepartments = new Set([
+      "research", "research department", "research & knowledge",
+      "research and knowledge", "research, statistics and knowledge"
+    ]);
+    authorised = active && researchDepartments.has(department);
+  }
+
+  if (!authorised) {
+    return json({ok:false,error:"Active Research Department membership or administrator authorization is required to provision the Research and Knowledge Archive."},403,corsHeaders(request));
+  }
+
+  const accessToken = await getDriveAccessToken(env);
+  const rootName = getDriveRootFolderName(env);
+  const rootId = await findOrCreateFolder(env, accessToken, rootName);
+  const archiveName = "Research and Knowledge Archive";
+  const archiveId = await findOrCreateFolder(env, accessToken, archiveName, rootId, {
+    irpaResearchKnowledgeArchive: true,
+    irpaGovernanceArchive: true,
+    purpose: "IRPA Research and Knowledge Archive",
+    archiveVersion: 1,
+    archiveAccess: "Restricted",
+    createdForDepartment: "Research, Statistics and Knowledge"
+  });
+  const archiveMetadata = await driveFetch(env, accessToken, "/drive/v3/files/" + encodeURIComponent(archiveId) + "?fields=id,name,mimeType,description,trashed,webViewLink,parents");
+  const archiveDescription = parseDescription(archiveMetadata.description);
+  if (archiveMetadata.mimeType !== "application/vnd.google-apps.folder" || archiveMetadata.trashed ||
+      archiveDescription.irpaResearchKnowledgeArchive !== true ||
+      archiveDescription.purpose !== "IRPA Research and Knowledge Archive" ||
+      !(Array.isArray(archiveMetadata.parents) && archiveMetadata.parents.includes(rootId))) {
+    return json({ok:false,error:"The Research and Knowledge Archive folder could not be verified. No research files were uploaded."},409,corsHeaders(request));
+  }
+
+  const folderPolicies = [
+    {name:"Approved Research Releases", classification:"Internal", purpose:"Approved summaries, findings, briefs and recommendations cleared for cross-portal publication"},
+    {name:"Research Reports and Publications", classification:"Confidential", purpose:"Research reports, manuscripts and publications managed by the Research Department"},
+    {name:"Restricted Research Datasets", classification:"Restricted", purpose:"Raw datasets and unpublished study materials restricted to authorized Research Department staff"},
+    {name:"Supporting Evidence and Source Records", classification:"Restricted", purpose:"Evidence, source records and supporting materials with restricted access"},
+    {name:"Research Information Access Requests", classification:"Confidential", purpose:"Documented requests, decisions and approvals for additional research information"}
+  ];
+  const folders = [];
+  for (const policy of folderPolicies) {
+    const folderId = await findOrCreateFolder(env, accessToken, policy.name, archiveId, {
+      irpaResearchKnowledgeArchive: true,
+      irpaGovernanceArchive: true,
+      purpose: policy.purpose,
+      researchArchiveCategory: policy.name,
+      classification: policy.classification,
+      archiveAccess: "Restricted"
+    });
+    const metadata = await driveFetch(env, accessToken, "/drive/v3/files/" + encodeURIComponent(folderId) + "?fields=id,name,mimeType,description,trashed,parents");
+    const description = parseDescription(metadata.description);
+    if (metadata.mimeType !== "application/vnd.google-apps.folder" || metadata.trashed ||
+        description.irpaResearchKnowledgeArchive !== true ||
+        description.researchArchiveCategory !== policy.name ||
+        !(Array.isArray(metadata.parents) && metadata.parents.includes(archiveId))) {
+      return json({ok:false,error:"Research archive subfolder verification failed for " + policy.name + "."},409,corsHeaders(request));
+    }
+    folders.push({name:metadata.name,folderId:metadata.id,classification:policy.classification,archiveAccess:"Restricted"});
+  }
+
+  return json({
+    ok:true,
+    provider:"Google Drive",
+    archiveName,
+    folderId:archiveId,
+    archivePath:rootName + "/" + archiveName,
+    archiveUidLink:"https://drive.google.com/drive/folders/" + encodeURIComponent(archiveId),
+    archiveAccess:"Restricted",
+    folders
+  },200,corsHeaders(request));
 }
 
 async function download(request, env) {
