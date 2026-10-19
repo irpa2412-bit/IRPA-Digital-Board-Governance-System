@@ -27,7 +27,7 @@ test("gateway preserves activated identities and meeting-linked access controls"
  assert.match(gateway,/activationCompleted === true/);
  assert.match(gateway,/INVITATION_REGISTER_REMOVE/);
  assert.match(gateway,/currentDocument: \{ updateTime: invitation\.updateTime \}/);
- assert.match(gateway,/documents:commit/);
+ assert.match(gateway,/:commit`/);
 });
 
 test("Firebase deployment workflow no longer deploys the migrated callable",()=>{
