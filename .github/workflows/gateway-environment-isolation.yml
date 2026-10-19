@@ -63,9 +63,9 @@ jobs:
           };
           assert.equal(resolveGatewayUrl(staging), "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev");
           assert.equal(resolveGatewayUrl(production), "https://irpa-google-drive-gateway.irpa-governance.workers.dev");
-          assert.throws(() => resolveGatewayUrl({...staging, VITE_GATEWAY_ORIGIN: production.VITE_GATEWAY_ORIGIN}), /conflicts with Firebase project/);
-          assert.throws(() => resolveGatewayUrl({...staging, VITE_IRPA_ENV: "production"}), /conflicts with Firebase project/);
-          assert.throws(() => resolveGatewayUrl({...production, VITE_GOOGLE_DRIVE_GATEWAY_URL: staging.VITE_GATEWAY_ORIGIN}), /conflicts with Firebase project/);
+          assert.throws(() => resolveGatewayUrl({...staging, VITE_GATEWAY_ORIGIN: production.VITE_GATEWAY_ORIGIN}), /VITE_GATEWAY_ORIGIN conflicts with VITE_IRPA_ENV/);
+          assert.throws(() => resolveGatewayUrl({...staging, VITE_IRPA_ENV: "production"}), /does not match VITE_IRPA_ENV/);
+          assert.throws(() => resolveGatewayUrl({...production, VITE_GOOGLE_DRIVE_GATEWAY_URL: staging.VITE_GATEWAY_ORIGIN}), /VITE_GOOGLE_DRIVE_GATEWAY_URL conflicts with VITE_IRPA_ENV/);
           console.log("Gateway environment policy: 5 assertions passed.");
           NODE
       - name: Build using staging Firebase and staging Gateway only
