@@ -6,6 +6,7 @@ const DATA_TYPES=[
   ["finance","Finance, payments and accounting"],
   ["procurement","Procurement, quotations and contracts"],
   ["personnel","Members, employees and personnel"],
+  ["invitations","Invitation workflow and activation testing (sends a real email)"],
   ["signatures","Signatures, approvals and audit records"],
   ["system","System settings and security configuration"],
   ["documents","Documents, correspondence and files"],
@@ -14,7 +15,7 @@ const DATA_TYPES=[
 ];
 const ENVIRONMENTS=[["TRIAL","Trial data — testing and demonstrations"],["ACTUAL","Actual data — official institutional records"]];
 const ACTUAL_ONLY_TYPES=new Set(["system"]);
-const ACTUAL_ONLY_PORTAL_HINT=/auditor|security|system settings|administrator/i;
+const ACTUAL_ONLY_PORTAL_HINT=/auditor|security|system settings/i;
 const portalRequiresActual=portal=>ACTUAL_ONLY_PORTAL_HINT.test(String(portal||""));
 const verificationMapKey="irpaPortalDataEntryVerifications";
 
