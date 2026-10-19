@@ -852,7 +852,8 @@ async function provisionResearchKnowledgeArchive(request, env) {
       employee.employmentStatus === "Active" || employee.registrationStatus === "Activated";
     const researchDepartments = new Set([
       "research", "research department", "research & knowledge",
-      "research and knowledge", "research, statistics and knowledge"
+      "research and knowledge", "research, statistics and knowledge",
+      "research, statistics and knowledge department"
     ]);
     authorised = active && researchDepartments.has(department);
   }
@@ -873,13 +874,40 @@ async function provisionResearchKnowledgeArchive(request, env) {
     archiveAccess: "Restricted",
     createdForDepartment: "Research, Statistics and Knowledge"
   });
-  const archiveMetadata = await driveFetch(env, accessToken, "/drive/v3/files/" + encodeURIComponent(archiveId) + "?fields=id,name,mimeType,description,trashed,webViewLink,parents");
-  const archiveDescription = parseDescription(archiveMetadata.description);
+  let archiveMetadata = await driveFetch(env, accessToken, "/drive/v3/files/" + encodeURIComponent(archiveId) + "?fields=id,name,mimeType,description,trashed,webViewLink,parents");
+  let archiveDescription = parseDescription(archiveMetadata.description);
+  const researchDepartmentOwner = "Research, Statistics and Knowledge Department";
+  if (archiveMetadata.mimeType === "application/vnd.google-apps.folder" && !archiveMetadata.trashed &&
+      archiveDescription.irpaResearchKnowledgeArchive === true &&
+      archiveDescription.purpose === "IRPA Research and Knowledge Archive" &&
+      (archiveDescription.createdForDepartment !== researchDepartmentOwner ||
+       archiveDescription.departmentOwner !== researchDepartmentOwner ||
+       archiveDescription.archiveOwnershipType !== "Department")) {
+    const correctedDescription = {
+      ...archiveDescription,
+      irpaResearchKnowledgeArchive: true,
+      irpaGovernanceArchive: true,
+      purpose: "IRPA Research and Knowledge Archive",
+      createdForDepartment: researchDepartmentOwner,
+      departmentOwner: researchDepartmentOwner,
+      archiveOwnershipType: "Department",
+      archiveAccess: "Restricted"
+    };
+    await driveFetch(env, accessToken, "/drive/v3/files/" + encodeURIComponent(archiveId), {
+      method: "PATCH",
+      body: JSON.stringify({description: JSON.stringify(correctedDescription)})
+    });
+    archiveMetadata = await driveFetch(env, accessToken, "/drive/v3/files/" + encodeURIComponent(archiveId) + "?fields=id,name,mimeType,description,trashed,webViewLink,parents");
+    archiveDescription = parseDescription(archiveMetadata.description);
+  }
   if (archiveMetadata.mimeType !== "application/vnd.google-apps.folder" || archiveMetadata.trashed ||
       archiveDescription.irpaResearchKnowledgeArchive !== true ||
       archiveDescription.purpose !== "IRPA Research and Knowledge Archive" ||
+      archiveDescription.createdForDepartment !== researchDepartmentOwner ||
+      archiveDescription.departmentOwner !== researchDepartmentOwner ||
+      archiveDescription.archiveOwnershipType !== "Department" ||
       !(Array.isArray(archiveMetadata.parents) && archiveMetadata.parents.includes(rootId))) {
-    return json({ok:false,error:"The Research and Knowledge Archive folder could not be verified. No research files were uploaded."},409,corsHeaders(request));
+    return json({ok:false,error:"The Research and Knowledge Archive folder could not be verified as owned by the Research, Statistics and Knowledge Department. No research files were uploaded."},409,corsHeaders(request));
   }
 
   const folderPolicies = [
