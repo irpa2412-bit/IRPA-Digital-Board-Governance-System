@@ -917,8 +917,12 @@ exports.sendMemberInvitation = onCall({region:"us-central1", secrets:[INVITE_SER
   const subject="IRPA Invitation — "+role;
   const text="Dear "+name+",\\n\\nYou have been invited to access the IRPA Digital Board Governance System.\\n\\nAssigned IRPA role: "+role+"\\nMember type: "+memberType+"\\nSource register: "+sourceLabel+(department?"\\nDepartment: "+department:"")+(unit?"\\nUnit: "+unit:"")+"\\n\\nComplete your Induction & Orientation / subscription pathway here:\\n"+subscriptionLink+"\\n\\nIf you need login assistance:\\n"+assistanceLink+"\\n\\nNormal login route:\\n"+loginLink+"\\n\\nThis invitation is addressed to "+email+".\\n\\nImprovement of Rangeland in Pastoral Areas (IRPA)";
   const html="<p>Dear "+name+",</p><p>You have been invited to access the IRPA Digital Board Governance System.</p><p><strong>Assigned IRPA role:</strong> "+role+"<br><strong>Member type:</strong> "+memberType+"<br><strong>Source register:</strong> "+sourceLabel+(department?"<br><strong>Department:</strong> "+department:"")+(unit?"<br><strong>Unit:</strong> "+unit:"")+"</p><p><a href='"+subscriptionLink+"'>Complete Induction &amp; Orientation / Subscription</a></p><p><a href='"+assistanceLink+"'>Login assistance</a></p><p><a href='"+loginLink+"'>Normal login</a></p><p>This invitation is addressed to "+email+".</p><p>Improvement of Rangeland in Pastoral Areas (IRPA)</p>";
-  const mailOutcome=await queueInductionEmail({db,invitationId,recipientEmail:email,recipientName:name,subject,text,html,invitedByUid:uid},{db,env:process.env});
+
   const mailId=invitationId;
+  // Persist the exact token hash and expiry BEFORE enqueueing the email.
+  // The mail-queue trigger can deliver immediately; previously the recipient
+  // could open the email before these fields were saved and receive
+  // "The invitation token is invalid."
   await ref.set({
     role,memberType,department:department||null,unit:unit||null,
     invitationTokenHash:invitationSecretHash,
@@ -926,10 +930,16 @@ exports.sendMemberInvitation = onCall({region:"us-central1", secrets:[INVITE_SER
     invitationRedeemedAt:null,
     invitationRedeemedUid:null,
     invitationTokenVersion:"2",
-    status:mailOutcome.status,deliveryStatus:mailOutcome.status,
+    status:"Preparing",deliveryStatus:"Preparing",
     deliveryProvider:"Firebase Firestore mail queue → SMTP transport",
     mailQueueId:mailId,mailQueuedAt:FieldValue.serverTimestamp(),
     invitationRoleSource:sourceLabel,updatedAt:FieldValue.serverTimestamp()
+  },{merge:true});
+  const mailOutcome=await queueInductionEmail({db,invitationId,recipientEmail:email,recipientName:name,subject,text,html,invitedByUid:uid},{db,env:process.env});
+  await ref.set({
+    status:mailOutcome.status,deliveryStatus:mailOutcome.status,
+    deliveryProvider:"Firebase Firestore mail queue → SMTP transport",
+    updatedAt:FieldValue.serverTimestamp()
   },{merge:true});
   await db.collection("audit").add({
     action:"MEMBER_INVITATION_EMAIL_QUEUED",collection:"invitations",recordId:invitationId,
