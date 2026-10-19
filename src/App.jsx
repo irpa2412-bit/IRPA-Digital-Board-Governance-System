@@ -69,7 +69,7 @@ const DEPARTMENTAL_MODULES={
   "Field Operations":["Reports","Actions"],
   "Operations":["Reports","Actions"],
   "Information Technology":["IT Operations"],
-  "Research & Knowledge":["Research, Statistics and Knowledge"]
+  "Research & Knowledge":["Research, Statistics and Knowledge"],"Research":["Research, Statistics and Knowledge"],"Research Department":["Research, Statistics and Knowledge"],"Research and Knowledge":["Research, Statistics and Knowledge"],"Research, Statistics and Knowledge":["Research, Statistics and Knowledge"]
 };
 const ROLE_DEPARTMENT={
   "Administrator":"Executive Office","Executive Director":"Executive Office",
