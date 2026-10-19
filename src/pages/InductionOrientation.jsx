@@ -16,7 +16,8 @@ const DEPARTMENT_UNITS={
 "Community Development":["Community Mobilization Unit","Women & Youth Empowerment Unit","Gender & Social Inclusion Unit"],
 "Field Department":["Field Implementation Unit","Monitoring, Evaluation, Accountability & Learning Unit","Community-Based Monitoring Unit"],
 "Operations":["Logistics & Transport Unit","Infrastructure & Facilities Unit","General Operations Unit"],
-"Research & Knowledge":["Research Management Unit","Statistics & Data Analysis Unit","Knowledge Management & Publications Unit","Research Ethics & Data Governance Unit"],
+"Research, Statistics and Knowledge Department":["Research Directorate Office","Research Management Unit","Statistics & Data Analysis Unit","Knowledge Management & Publications Unit","Research Ethics & Data Governance Unit"],
+"Research & Knowledge":["Research Directorate Office","Research Management Unit","Statistics & Data Analysis Unit","Knowledge Management & Publications Unit","Research Ethics & Data Governance Unit"],
 };
 
 const ROLE_MODULES={
