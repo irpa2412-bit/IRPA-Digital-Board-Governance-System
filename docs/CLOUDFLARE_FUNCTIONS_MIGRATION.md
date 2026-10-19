@@ -43,4 +43,6 @@ The repository contains or references these Firebase Functions categories. Each 
 
 ## Status
 
-**Not complete.** This document is the migration contract, not evidence that functions have been migrated. The current Cloudflare gateway deployment alone does not satisfy the full migration objective. No Firebase Function should be disabled solely to make the billing-blocked workflow appear green.
+**Partially implemented; not production-verified.** The invitation-register removal callable has a Cloudflare implementation at `POST /api/invitations/remove`, the frontend caller now uses that endpoint, and the dedicated Firebase Functions deployment step for this callable has been removed. Gateway behavior tests cover administrator authorization, protected invitation records, atomic delete-plus-audit writes, and failed commits.
+
+All other Firebase callable functions, schedules, and Firestore triggers remain in scope. Firebase Authentication and Firestore remain dependencies. The new endpoint has not been deployed or verified in production, and no Firebase Function should be disabled solely to make the billing-blocked workflow appear green.
