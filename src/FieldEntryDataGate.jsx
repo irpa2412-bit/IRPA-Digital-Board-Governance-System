@@ -14,7 +14,7 @@ const DATA_TYPES=[
 ];
 const ENVIRONMENTS=[["TRIAL","Trial data — testing and demonstrations"],["ACTUAL","Actual data — official institutional records"]];
 const ACTUAL_ONLY_TYPES=new Set(["system"]);
-const ACTUAL_ONLY_PORTAL_HINT=/auditor|security|system settings|administrator/i;
+const ACTUAL_ONLY_PORTAL_HINT=/auditor|security|system settings/i;
 const portalRequiresActual=portal=>ACTUAL_ONLY_PORTAL_HINT.test(String(portal||""));
 const verificationMapKey="irpaPortalDataEntryVerifications";
 
