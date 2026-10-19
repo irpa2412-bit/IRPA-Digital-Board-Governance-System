@@ -15,7 +15,7 @@ const DEPARTMENT_UNITS={
  "Community Development":["Community Mobilization Unit","Women & Youth Empowerment Unit","Gender & Social Inclusion Unit"],
  "Livestock":["Livestock Production Unit","Veterinary Services Unit","Breeding & Genetics Unit","Livestock Infrastructure Unit"],
  "Environment":["Rangeland Management Unit","Rangeland Restoration Unit","Invasive Species Control Unit","Climate Change & Resilience Unit","Environmental Conservation & Education Unit"],
- "Outreach":["Communications & Outreach Unit","Partnerships & Resource Mobilization Unit","ICT & Digital Engagement Unit","Communication Unit","Media Unit"],
+ "Outreach":["Communications & Outreach Unit","Partnerships & Resource Mobilization Unit","ICT & Digital Engagement Unit","Communication and Media Unit"],
  "Field Operations":["Field Implementation Unit","Monitoring, Evaluation, Accountability & Learning Unit","Community-Based Monitoring Unit"],
  "Research & Knowledge":["Research Management Unit","Statistics & Data Analysis Unit","Knowledge Management & Publications Unit","Research Ethics & Data Governance Unit"],
 };
