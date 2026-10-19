@@ -4,6 +4,7 @@ import { sendEmployeeRegistrationEmail } from "./auth";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { canAccessMeetingCategory, MEETING_CATEGORIES } from "./meetingPolicy.js";
 import { listLifecycleDocuments } from "./documentLifecycle.js";
+import { resolveGatewayUrl } from "./gatewayEnvironment.js";
 
 const uniqueInductionValues=(values)=>[...new Set(values.flatMap(v=>Array.isArray(v)?v:String(v||"").split(",")).map(v=>String(v||"").trim()).filter(Boolean))];
 
@@ -502,9 +503,16 @@ export async function listMeetingInviteeDirectory(){
 /** Secure administrator-only removal for pending invitation records. */
 export async function removeInvitationRecord(invitationId){
  const id=String(invitationId||"").trim();
+ const user=auth.currentUser;
  if(!id)throw new Error("An invitation record is required.");
- if(!auth.currentUser?.uid)throw new Error("Administrator authentication is required.");
- const call=httpsCallable(getFunctions(undefined,"us-central1"),"removeInvitationRecord");
- const result=await call({invitationId:id});
- return result.data||{ok:true};
+ if(!user?.uid)throw new Error("Administrator authentication is required.");
+ const token=await user.getIdToken(true);
+ const response=await fetch(resolveGatewayUrl()+"/api/invitations/remove",{
+  method:"POST",
+  headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
+  body:JSON.stringify({invitationId:id})
+ });
+ const result=await response.json().catch(()=>({}));
+ if(!response.ok||result.ok!==true)throw new Error(result.error||"The invitation could not be removed.");
+ return result;
 }

@@ -25,6 +25,7 @@ import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { auth, db, firebaseConfig, googleProvider, applicantAuth } from "./config";
 import { resolveGatewayUrl } from "./gatewayEnvironment";
+import { INVITATION_STATE } from "./workflowContracts.js";
 import { addDoc, collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
 
@@ -452,7 +453,7 @@ export async function configureInvitationPassword(password) {
   if (!response.ok || data.ok !== true) throw new Error(data.error || "The server could not verify the new password.");
   window.sessionStorage.removeItem("irpaInvitationPasswordSetup");
   window.sessionStorage.removeItem("irpaInvitationProvisioningPending");
-  if (data.state === "ACTIVATED") {
+  if (data.state === INVITATION_STATE.ACTIVATED) {
     window.sessionStorage.removeItem("irpaInvitationId");
     try {
       await signOut(auth);
@@ -507,24 +508,22 @@ export async function completeMagicLink(email, url = window.location.href) {
   const result = await signInWithEmailLink(auth, cleanEmail, url);
 
   if (adminInvitationId) {
-    // Legacy Firestore-backed invitation links remain supported for links
-    // issued before the daily-limit-free administrator pathway was deployed.
-    const invitationRef = doc(db, "adminInvitations", adminInvitationId);
-    const invitationSnap = await getDoc(invitationRef);
-    if(!invitationSnap.exists()) throw new Error("This Administrator invitation is invalid or no longer available.");
-    const invitation = invitationSnap.data();
-    if(String(invitation.email || "").trim().toLowerCase() !== cleanEmail) {
-      await signOut(auth);
-      throw new Error("This Administrator activation link was issued for a different email address.");
+    const idToken = await result.user.getIdToken(true);
+    let response;
+    try {
+      response = await fetch(resolveGatewayUrl() + "/api/invitations/activate-admin", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + idToken, "Content-Type": "application/json" },
+        body: JSON.stringify({ invitationId: adminInvitationId })
+      });
+    } catch {
+      throw new Error("IRPA could not reach the Administrator invitation activation service. Please try again.");
     }
-    if(invitation.status !== "Pending") throw new Error("This Administrator invitation has already been activated or is no longer pending.");
-    await setDoc(doc(db, "adminProfiles", result.user.uid), {
-      uid:result.user.uid,email:cleanEmail,name:invitation.name||result.user.displayName||cleanEmail.split("@")[0],
-      role:"Administrator",active:true,invitationId:adminInvitationId,
-      createdByUid:invitation.createdByUid||null,createdByEmail:invitation.createdByEmail||null,
-      createdAt:serverTimestamp(),updatedAt:serverTimestamp()
-    },{merge:true});
-    await setDoc(invitationRef,{status:"Activated",activatedUid:result.user.uid,activatedAt:serverTimestamp(),updatedAt:serverTimestamp()},{merge:true});
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.ok !== true) {
+      await signOut(auth);
+      throw new Error(data.error || "This Administrator invitation could not be activated.");
+    }
     window.localStorage.removeItem("irpaEmailForSignIn");
     return result.user;
   }

@@ -1,3 +1,4 @@
+import { INVITATION_STATE, INVITATION_STATUS, INVITATION_ROLE } from "../../src/firebase/workflowContracts.js";
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const MAX_BYTES = 10 * 1024 * 1024;
 const ALLOWED_CONTENT_TYPES = new Set([
@@ -22,7 +23,7 @@ import { runCleanup } from "./upload.mjs";
 import { createDocumentLifecycleRouter } from "./documentLifecycle.mjs";
 import { canProvisionSignatureProfileFolder } from "./signatureProfileAuthorization.mjs";
 import { canReadSignatureAsset, canUploadSignedDocument } from "./signatureAssetAuthorization.mjs";
-import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPasswordSetup, getInvitationSessionState } from "./invitationRedemption.mjs";
+import { InvitationRedemptionError, redeemInvitationToken, activateInvitationForAuthenticatedUser, confirmInvitationPasswordSetup, getInvitationSessionState } from "./invitationRedemption.mjs";
 import { buildGoogleDriveAuthorizationParams } from "./googleDriveOAuth.mjs";
 import { createCommunicationsSiteRouter } from "./communicationsSite.mjs";
 import { createMetaOAuthRouter } from "./metaOAuth.mjs";
@@ -261,6 +262,36 @@ export default {
         }
       }
 
+      if (url.pathname === "/api/invitations/activate" && request.method === "POST") {
+        try {
+          const claims = await authenticateFirebaseRequest(request, env, {skipActivation:true});
+          return json(await withInvitationRetry(() => activateInvitationForAuthenticatedUser(request.clone(), env, claims), "activate"), 200, corsHeaders(request));
+        } catch (error) {
+          if (error instanceof InvitationRedemptionError) return json({ok:false,error:error.message}, error.status, corsHeaders(request));
+          const message=String(error?.message||"");
+          if (message === "Firebase authentication is required." || message.startsWith("Invalid Firebase ID token") || message.startsWith("Invalid Firebase token") || message === "Firebase token is expired.") {
+            return json({ok:false,error:"A valid IRPA sign-in is required."},401,corsHeaders(request));
+          }
+          console.error("Invitation activation backend failure", error);
+          return json({ok:false,error:"We could not activate this invitation right now. Please try again."},503,corsHeaders(request));
+        }
+      }
+
+      if (url.pathname === "/api/invitations/activate-admin" && request.method === "POST") {
+        try {
+          const claims = await authenticateFirebaseRequest(request, env, {skipActivation:true});
+          return json(await activateAdminInvitation(request.clone(), env, claims), 200, corsHeaders(request));
+        } catch (error) {
+          const message = String(error?.message || "");
+          if (error instanceof InvitationRedemptionError) return json({ok:false,error:error.message},error.status,corsHeaders(request));
+          if (message === "Firebase authentication is required." || message.startsWith("Invalid Firebase ID token") || message.startsWith("Invalid Firebase token") || message === "Firebase token is expired.") {
+            return json({ok:false,error:"A valid IRPA sign-in is required."},401,corsHeaders(request));
+          }
+          console.error("Administrator invitation activation failed",error);
+          return json({ok:false,error:"The Administrator invitation could not be activated right now."},503,corsHeaders(request));
+        }
+      }
+
       if (url.pathname === "/api/invitations/session-state" && request.method === "POST") {
         try {
           const claims = await authenticateFirebaseRequest(request, env, {skipActivation:true});
@@ -293,12 +324,72 @@ export default {
         return await sendMemberInvitation(request, env);
       }
 
+      if (url.pathname === "/api/invitations/remove" && request.method === "POST") {
+        try {
+          const claims = await authenticateFirebaseRequest(request, env);
+          const body = await request.json().catch(() => null);
+          const invitationId = String(body?.invitationId || "").trim();
+          if (!invitationId || invitationId.includes("/")) return json({ok:false,error:"A valid invitation record is required."},400,corsHeaders(request));
+          const uid = String(claims.user_id || "").trim();
+          const email = String(claims.email || "").trim().toLowerCase();
+          const adminToken = await getFirestoreAdminAccessToken(env);
+          const profileDoc = await getFirestoreDocument(env, "adminProfiles/" + encodeURIComponent(uid), adminToken);
+          const profile = firestoreDocumentToPlain(profileDoc?.fields || {});
+          const isAdmin = claims.admin === true || email === "irpa2412@gmail.com" || profile.active === true;
+          if (!isAdmin) return json({ok:false,error:"Only an active IRPA Administrator can remove invitation records."},403,corsHeaders(request));
+          const projectId = getFirebaseProjectId(env);
+          const document = await getFirestoreDocument(env, "invitations/" + encodeURIComponent(invitationId), adminToken);
+          if (!document) return json({ok:false,error:"This invitation record no longer exists. Refresh the Invitation Register."},404,corsHeaders(request));
+          const invitation = firestoreDocumentToPlain(document.fields || {});
+          if (String(invitation.meetingId || "").trim() || String(invitation.source || "").toLowerCase().includes("meeting participant")) {
+            return json({ok:false,error:"This invitee is linked to a meeting. Remove the participant through the Meeting Participants portal so meeting access passes and attendance/quorum counts are revoked together."},409,corsHeaders(request));
+          }
+          const status = String(invitation.status || "").trim().toLowerCase();
+          if (invitation.accountActivated === true || [INVITATION_STATUS.ACTIVATED.toLowerCase(),INVITATION_STATUS.ACCEPTED.toLowerCase()].includes(status) || invitation.activationCompleted === true) {
+            return json({ok:false,error:"This invitation is linked to an activated account and cannot be removed from the register. Retain the identity record and use the authorised account-deactivation process."},409,corsHeaders(request));
+          }
+          const now = new Date().toISOString();
+          const auditId = crypto.randomUUID();
+          const auditFields = {
+            action:{stringValue:"INVITATION_REGISTER_REMOVE"},
+            collection:{stringValue:"invitations"},
+            recordId:{stringValue:invitationId},
+            details:{mapValue:{fields:{
+              email:{stringValue:String(invitation.email || "").trim().toLowerCase()},
+              statusBeforeRemoval:{stringValue:String(invitation.status || INVITATION_STATUS.PENDING)},
+              source:{stringValue:"ADMINISTRATOR_INVITATION_REGISTER"}
+            }}},
+            actorUid:{stringValue:uid},
+            actorEmail:email?{stringValue:email}:{nullValue:"NULL"},
+            createdAt:{timestampValue:now}
+          };
+          const commitUrl = "https://firestore.googleapis.com/v1/projects/" + projectId + "/databases/(default)/documents:commit";
+          const commit = await fetch(commitUrl,{method:"POST",headers:{Authorization:"Bearer "+adminToken,"Content-Type":"application/json"},body:JSON.stringify({writes:[
+            {delete:document.name,currentDocument:{updateTime:document.updateTime}},
+            {update:{name:"projects/"+projectId+"/databases/(default)/documents/audit/"+auditId,fields:auditFields},currentDocument:{exists:false}}
+          ]})});
+          if (!commit.ok) return json({ok:false,error:"The invitation changed or could not be removed. Refresh the register and try again."},commit.status===409?409:502,corsHeaders(request));
+          return json({ok:true,invitationId},200,corsHeaders(request));
+        } catch (error) {
+          const message=String(error?.message||"");
+          if (message === "Firebase authentication is required." || message.startsWith("Invalid Firebase ID token") || message.startsWith("Invalid Firebase token") || message === "Firebase token is expired.") {
+            return json({ok:false,error:"A valid IRPA sign-in is required."},401,corsHeaders(request));
+          }
+          console.error("Invitation removal backend failure",error);
+          return json({ok:false,error:"The invitation could not be removed right now."},503,corsHeaders(request));
+        }
+      }
+
       if (url.pathname === "/api/signature-invitations/send" && request.method === "POST") {
         return await sendSignatureInvitation(request, env);
       }
 
       if (url.pathname === "/api/induction/lookup" && request.method === "POST") {
         return await lookupInductionRegistration(request, env);
+      }
+
+      if (url.pathname === "/api/signature/authority/update" && request.method === "POST") {
+        return await updateSignatureAuthority(request, env);
       }
 
       if (url.pathname === "/api/session/profile" && request.method === "POST") {
@@ -371,6 +462,166 @@ export default {
     }
   }
 };
+
+async function activateAdminInvitation(request, env, claims) {
+  const body = await request.json().catch(() => null);
+  const invitationId = String(body?.invitationId || "").trim();
+  const uid = String(claims?.user_id || "").trim();
+  const email = String(claims?.email || "").trim().toLowerCase();
+  if (!invitationId || invitationId.includes("/") || !uid || !email) {
+    throw new InvitationRedemptionError(400,"A valid Administrator invitation and authenticated account are required.");
+  }
+  const adminToken = await getFirestoreAdminAccessToken(env);
+  const document = await getFirestoreDocument(env,"adminInvitations/" + encodeURIComponent(invitationId),adminToken);
+  if (!document) throw new InvitationRedemptionError(404,"This Administrator invitation is invalid or no longer available.");
+  const invitation = firestoreDocumentToPlain(document.fields || {});
+  if (String(invitation.email || "").trim().toLowerCase() !== email) {
+    throw new InvitationRedemptionError(403,"This Administrator activation link was issued for a different email address.");
+  }
+  if (String(invitation.status || "") !== INVITATION_STATUS.PENDING) {
+    throw new InvitationRedemptionError(409,"This Administrator invitation has already been activated or is no longer pending.");
+  }
+  const now = new Date().toISOString();
+  const profileName = String(invitation.name || claims.name || email.split("@")[0]).trim();
+  const projectId = getFirebaseProjectId(env);
+  const profileFields = {
+    uid:{stringValue:uid},email:{stringValue:email},name:{stringValue:profileName},
+    role:{stringValue:INVITATION_ROLE.ADMINISTRATOR},active:{booleanValue:true},invitationId:{stringValue:invitationId},
+    createdByUid:invitation.createdByUid?{stringValue:String(invitation.createdByUid)}:{nullValue:"NULL"},
+    createdByEmail:invitation.createdByEmail?{stringValue:String(invitation.createdByEmail)}:{nullValue:"NULL"},
+    createdAt:{timestampValue:now},updatedAt:{timestampValue:now}
+  };
+  const invitationFields = {
+    status:{stringValue:"Activated"},activatedUid:{stringValue:uid},
+    activatedAt:{timestampValue:now},updatedAt:{timestampValue:now}
+  };
+  const auditId = crypto.randomUUID();
+  const auditFields = {
+    action:{stringValue:"ADMINISTRATOR_INVITATION_ACTIVATED"},collection:{stringValue:"adminInvitations"},
+    recordId:{stringValue:invitationId},
+    details:{mapValue:{fields:{email:{stringValue:email},adminProfileUid:{stringValue:uid}}}},
+    actorUid:{stringValue:uid},actorEmail:{stringValue:email},createdAt:{timestampValue:now}
+  };
+  const url = "https://firestore.googleapis.com/v1/projects/" + projectId + "/databases/(default)/documents:commit";
+  const result = await fetch(url,{method:"POST",headers:{Authorization:"Bearer "+adminToken,"Content-Type":"application/json"},body:JSON.stringify({writes:[
+    {update:{name:"projects/"+projectId+"/databases/(default)/documents/adminProfiles/"+uid,fields:profileFields},updateMask:{fieldPaths:Object.keys(profileFields)}},
+    {update:{name:document.name,fields:invitationFields},updateMask:{fieldPaths:Object.keys(invitationFields)},currentDocument:{updateTime:document.updateTime}},
+    {update:{name:"projects/"+projectId+"/databases/(default)/documents/audit/"+auditId,fields:auditFields},currentDocument:{exists:false}}
+  ]})});
+  if (!result.ok) throw new InvitationRedemptionError(result.status===409?409:503,"The Administrator invitation changed or could not be activated. Refresh the invitation and try again.");
+  return {ok:true,uid,email,invitationId,state:INVITATION_STATE.ACTIVATED};
+}
+
+async function updateSignatureAuthority(request, env) {
+  try {
+    const claims = await authenticateFirebaseRequest(request, env);
+    const uid = String(claims.user_id || "");
+    const email = String(claims.email || "").trim().toLowerCase();
+    if (!uid) return json({ok:false,error:"Authentication is required."},401,corsHeaders(request));
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object") return json({ok:false,error:"A valid signing-authority request is required."},400,corsHeaders(request));
+    const requestedRole = String(body.authorityRole || "").trim();
+    const authorityStatus = String(body.authorityStatus || "Current").trim();
+    const authorityReference = String(body.authorityReference || "").trim();
+    const authorityEffectiveAt = String(body.authorityEffectiveAt || "").trim() || null;
+    const authorityExpiresAt = String(body.authorityExpiresAt || "").trim() || null;
+    const requestedDepartment = String(body.authorityDepartment || "").trim();
+    const requestedUnit = String(body.authorityUnit || "").trim();
+    if (!requestedRole) return json({ok:false,error:"Select the current signing authority before saving."},400,corsHeaders(request));
+    if (!["Current","Pending Verification","Expired","Not yet assigned"].includes(authorityStatus)) return json({ok:false,error:"Select a valid signing authority status."},400,corsHeaders(request));
+    if (authorityEffectiveAt && authorityExpiresAt && authorityExpiresAt < authorityEffectiveAt) return json({ok:false,error:"Authority expiry date cannot be earlier than the effective date."},400,corsHeaders(request));
+
+    const records = [];
+    const add = (document, sourceCollection, fallbackId) => {
+      if (!document?.fields) return;
+      records.push({id:String(document.name || "").split("/").pop() || fallbackId || uid,...(firestoreDocumentToPlain(document)||{}),sourceCollection});
+    };
+    add(await getFirestoreDocument(env, "members/" + uid, claims.token), "members", uid);
+    add(await getFirestoreDocument(env, "employees/" + uid, claims.token), "employees", uid);
+    if (email) {
+      const [members, employees] = await Promise.all([
+        getFirestoreDocumentsByEmail(env,"members",email,claims.token),
+        getFirestoreDocumentsByEmail(env,"employees",email,claims.token)
+      ]);
+      for (const row of members) add(row,"members",uid);
+      for (const row of employees) add(row,"employees",uid);
+    }
+    const unique = [...new Map(records.map(record => [record.sourceCollection + ":" + record.id,record])).values()]
+      .filter(record => String(record.status || record.employmentStatus || "Active").trim().toLowerCase() !== "inactive");
+    if (!unique.length) return json({ok:false,error:"No active IRPA member or employee register entry was found for this account."},403,corsHeaders(request));
+    const roleValues = record => [
+      record.role,record.boardPosition,record.unit,record.unitName,
+      ...(Array.isArray(record.roles)?record.roles:[]),
+      ...(Array.isArray(record.assignedRoles)?record.assignedRoles:[]),
+      ...(Array.isArray(record.selectedRoles)?record.selectedRoles:[]),
+      ...(Array.isArray(record.roleAssignments)?record.roleAssignments:[])
+    ].flatMap(value=>String(value||"").split(",").map(value=>value.trim()).filter(Boolean));
+    const matching = unique.filter(record => {
+      if (!roleValues(record).includes(requestedRole)) return false;
+      if (requestedDepartment && String(record.department||"").trim() !== requestedDepartment) return false;
+      if (requestedUnit) {
+        const unit = String(record.unit||record.unitName||"").trim() || String(record.department||"").trim();
+        if (unit !== requestedUnit) return false;
+      }
+      return true;
+    });
+    if (!matching.length) return json({ok:false,error:"The selected department, unit and signing authority do not match an active IRPA register entry for this account."},403,corsHeaders(request));
+    const source = matching[0];
+    const authorityDepartment = String(source.department||"").trim();
+    const authorityUnit = String(source.unit||source.unitName||"").trim() || authorityDepartment;
+    const identity = await getFirestoreDocument(env,"signerIdentities/" + uid,claims.token);
+    if (!identity) return json({ok:false,error:"Signer Identity record is not available. Restore the Signer Identity link before updating signing authority."},412,corsHeaders(request));
+    const now = new Date().toISOString();
+    const fields = {
+      authorityRole:{stringValue:requestedRole},
+      authorityStatus:{stringValue:authorityStatus},
+      authorityReference:{stringValue:authorityReference},
+      authorityEffectiveAt:authorityEffectiveAt?{stringValue:authorityEffectiveAt}:{nullValue:"NULL"},
+      authorityExpiresAt:authorityExpiresAt?{stringValue:authorityExpiresAt}:{nullValue:"NULL"},
+      authorityDepartment:{stringValue:authorityDepartment},
+      authorityUnit:{stringValue:authorityUnit},
+      authoritySourceCollection:{stringValue:source.sourceCollection},
+      authoritySourceRecordId:{stringValue:source.id},
+      authorityUpdatedAt:{timestampValue:now},
+      updatedAt:{timestampValue:now}
+    };
+    const updateUrl = new URL("https://firestore.googleapis.com/v1/projects/" + getFirebaseProjectId(env) + "/databases/(default)/documents:commit");
+    const auditId = crypto.randomUUID();
+    const auditFields = {
+      action:{stringValue:"UPDATE_SIGNER_AUTHORITY"},
+      collection:{stringValue:"signerIdentities"},
+      recordId:{stringValue:uid},
+      details:{mapValue:{fields:{
+        authorityRole:{stringValue:requestedRole},authorityStatus:{stringValue:authorityStatus},
+        authorityDepartment:{stringValue:authorityDepartment},authorityUnit:{stringValue:authorityUnit},
+        authoritySourceCollection:{stringValue:source.sourceCollection},authoritySourceRecordId:{stringValue:source.id}
+      }}},
+      actorUid:{stringValue:uid},
+      actorEmail:email?{stringValue:email}:{nullValue:"NULL"},
+      createdAt:{timestampValue:now}
+    };
+    const writeResponse = await fetch(updateUrl.toString(),{
+      method:"POST",
+      headers:{Authorization:"Bearer " + await getFirestoreAdminAccessToken(env),"Content-Type":"application/json"},
+      body:JSON.stringify({writes:[
+        {update:{name:"projects/"+getFirebaseProjectId(env)+"/databases/(default)/documents/signerIdentities/"+uid,fields},updateMask:{fieldPaths:Object.keys(fields)}},
+        {update:{name:"projects/"+getFirebaseProjectId(env)+"/databases/(default)/documents/audit/"+auditId,fields:auditFields}}
+      ]})
+    });
+    if (!writeResponse.ok) {
+      const detail = await writeResponse.text().catch(()=> "");
+      console.error("Cloudflare signer-authority commit failed",writeResponse.status,detail.slice(0,500));
+      return json({ok:false,error:"The signing authority could not be saved. Firestore authorization or validation rejected the request."},writeResponse.status===403?403:502,corsHeaders(request));
+    }
+    return json({ok:true,uid,authorityRole:requestedRole,authorityStatus,authorityReference,authorityEffectiveAt,authorityExpiresAt,authorityDepartment,authorityUnit,authoritySourceCollection:source.sourceCollection,authoritySourceRecordId:source.id},200,corsHeaders(request));
+  } catch (error) {
+    if (error instanceof InvitationRedemptionError) return json({ok:false,error:error.message},error.status,corsHeaders(request));
+    console.error("Cloudflare signer-authority update failed",error);
+    const message=String(error?.message||"");
+    const authFailure=message==="Firebase authentication is required."||message.startsWith("Invalid Firebase ID token")||message.startsWith("Invalid Firebase token")||message==="Firebase token is expired."||message==="Firebase token signing key not found.";
+    return json({ok:false,error:authFailure?"Authentication is required.":"The Cloudflare signing-authority service could not complete the request."},Number(error?.status||0)||(authFailure?401:500),corsHeaders(request));
+  }
+}
 
 async function startOAuth(request, env) {
   const claims = await authenticateFirebaseRequest(request, env);
