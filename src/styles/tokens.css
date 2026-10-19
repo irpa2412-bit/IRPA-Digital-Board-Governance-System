@@ -1195,3 +1195,56 @@ table td{color:var(--text)}
     min-width: 0;
   }
 }
+
+
+/* Invitation Register action layout repair (2026-10-19).
+   Presentation-only: preserve invitation handlers, statuses, records and permissions. */
+#root .app-shell .content-area .page .invitation-action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 260px;
+  max-width: 100%;
+}
+#root .app-shell .content-area .page .invitation-action-buttons > button {
+  flex: 0 0 auto;
+  width: auto;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+  line-height: 1.35;
+}
+#root .app-shell .content-area .page .invitation-action-buttons > .danger-button {
+  flex-basis: auto;
+}
+#root .app-shell .content-area .page .invitation-action-buttons .status-badge {
+  flex: 0 0 auto;
+}
+#root .app-shell .content-area .page .table-wrapper:has(.invitation-action-buttons) {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+#root .app-shell .content-area .page .table-wrapper:has(.invitation-action-buttons) table {
+  min-width: 1120px;
+}
+#root .app-shell .content-area .page .table-wrapper:has(.invitation-action-buttons) td:nth-last-child(2) {
+  min-width: 150px;
+  overflow-wrap: anywhere;
+}
+#root .app-shell .content-area .page .table-wrapper:has(.invitation-action-buttons) td:last-child {
+  min-width: 290px;
+  vertical-align: top;
+}
+@media (max-width: 760px) {
+  #root .app-shell .content-area .page .invitation-action-buttons {
+    min-width: 260px;
+    gap: 8px;
+  }
+  #root .app-shell .content-area .page .invitation-action-buttons > button {
+    min-height: 44px;
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+}
