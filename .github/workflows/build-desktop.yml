@@ -26,7 +26,7 @@ jobs:
         run: |
           npm i --no-save sharp png-to-ico
           New-Item -ItemType Directory -Force -Path build | Out-Null
-          @'
+          $script = @'
           import fs from "node:fs";
           import sharp from "sharp";
           import pngToIco from "png-to-ico";
@@ -41,7 +41,8 @@ jobs:
           await image.resize(256, 256, { fit: "contain", background: "#ffffff" }).png().toFile(output);
           const ico = await pngToIco(output);
           fs.writeFileSync("build/icon.ico", ico);
-          '@ | Set-Content -Encoding utf8 build/create-icon.mjs
+          '@
+          $script | Set-Content -Encoding utf8 build/create-icon.mjs
           node build/create-icon.mjs
       - name: Build Windows installer
         run: npx electron-builder --win nsis --publish never
