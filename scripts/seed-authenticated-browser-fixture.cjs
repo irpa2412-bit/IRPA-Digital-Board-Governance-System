@@ -29,7 +29,7 @@ async function main() {
     status: "Active",
     fixtureOnly: true
   });
-  process.stdout.write("Seeded isolated Firebase Emulator administrator and active department fixtures: " + email + "\\n");
+  process.stdout.write("Seeded isolated Firebase Emulator administrator and active department fixtures: " + email + "\n");
   await db.terminate();
   await admin.app().delete();
 }
