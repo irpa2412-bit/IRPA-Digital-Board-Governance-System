@@ -20,22 +20,31 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm install
-      - name: Create Windows icon from IRPA logo
-        shell: powershell
+      - name: Create Windows icon from IRPA logo (optional)
+        continue-on-error: true
+        shell: pwsh
         run: |
-          Add-Type -AssemblyName System.Drawing
+          npm i --no-save sharp png-to-ico
           New-Item -ItemType Directory -Force -Path build | Out-Null
-          $source = [System.Drawing.Image]::FromFile("$PWD/public/irpa-logo.jpg")
-          $bitmap = New-Object System.Drawing.Bitmap 256, 256
-          $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
-          $graphics.Clear([System.Drawing.Color]::White)
-          $graphics.DrawImage($source, 0, 0, 256, 256)
-          $handle = $bitmap.GetHicon()
-          $icon = [System.Drawing.Icon]::FromHandle($handle)
-          $stream = [System.IO.File]::Open("$PWD/build/icon.ico", [System.IO.FileMode]::Create)
-          try { $icon.Save($stream) } finally { $stream.Dispose(); $icon.Dispose(); $graphics.Dispose(); $bitmap.Dispose(); $source.Dispose() }
+          @'
+          import fs from "node:fs";
+          import sharp from "sharp";
+          import pngToIco from "png-to-ico";
+
+          const input = "public/irpa-logo.jpg";
+          const output = "build/icon.png";
+          const image = sharp(input);
+          const metadata = await image.metadata();
+          if (!metadata.width || !metadata.height || !["jpeg", "png", "webp", "gif", "tiff", "avif"].includes(metadata.format)) {
+            throw new Error(`Invalid or unsupported logo image: format=${metadata.format}, dimensions=${metadata.width}x${metadata.height}`);
+          }
+          await image.resize(256, 256, { fit: "contain", background: "#ffffff" }).png().toFile(output);
+          const ico = await pngToIco(output);
+          fs.writeFileSync("build/icon.ico", ico);
+          '@ | Set-Content -Encoding utf8 build/create-icon.mjs
+          node build/create-icon.mjs
       - name: Build Windows installer
-        run: npx electron-builder --win nsis --publish never --config.win.icon=build/icon.ico
+        run: npx electron-builder --win nsis --publish never
       - name: Upload Windows installer
         if: success()
         uses: actions/upload-artifact@v4
