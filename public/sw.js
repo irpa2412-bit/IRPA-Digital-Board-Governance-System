@@ -1,75 +1,42 @@
-const CACHE_NAME="irpa-dbgs-app-shell-v43";
-const APP_SHELL=["/","/index.html","/manifest.webmanifest"];
+/* IRPA-DBGS offline shell only. Never cache API, authentication, PDF or signature traffic. */
+const CACHE_NAME = "irpa-dbgs-shell-v1";
+const APP_SHELL = ["/", "/index.html", "/offline.html", "/manifest.webmanifest", "/install.js", "/icons/irpa-192.svg", "/icons/irpa-512.svg", "/icons/irpa-maskable.svg"];
 
-self.addEventListener("install",(event)=>{
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache=>cache.addAll(APP_SHELL))
-      .then(()=>self.skipWaiting())
-  );
-});
-
-self.addEventListener("activate",(event)=>{
-  event.waitUntil(
-    caches.keys().then(keys=>Promise.all(
-      keys.filter(key=>key.startsWith("irpa-dbgs-")&&key!==CACHE_NAME).map(key=>caches.delete(key))
-    )).then(()=>self.clients.claim())
-  );
-});
-
-function isAppAsset(request){
-  const url=new URL(request.url);
-  return url.origin===self.location.origin && (
-    url.pathname.startsWith("/assets/") ||
-    url.pathname==="/manifest.webmanifest" ||
-    url.pathname==="/favicon.ico"
-  );
+function excluded(url) {
+  const p = url.pathname.toLowerCase();
+  return p.startsWith("/api/") || p.startsWith("/worker/") ||
+    p.includes("auth") || p.includes("sign") || p.includes("signature") ||
+    p.endsWith(".pdf") || p.includes("/pdf/") || p.includes("token");
 }
-
-// Cache writes are deliberately best-effort. A cache failure must never turn
-// a successful network response into an unhandled service-worker rejection.
-function cacheResponse(request,response){
-  if(!response || !response.ok || response.type==="opaque") return Promise.resolve();
-  try{
-    // Clone synchronously while the response is available. Do not call
-    // event.waitUntil here: this function runs inside an async fetch promise
-    // callback, after the ExtendableEvent dispatch may already have finished.
-    if(response.bodyUsed || response.body?.locked) return Promise.resolve();
-    const copy=response.clone();
-    // The fetch handler's respondWith promise keeps this best-effort cache
-    // operation alive. Cache failures never replace a successful response.
-    return caches.open(CACHE_NAME)
-      .then(cache=>cache.put(request,copy))
-      .catch(error=>console.warn("IRPA app-shell cache write skipped:",error));
-  }catch(error){
-    console.warn("IRPA app-shell response could not be cloned; returning network response unchanged:",error);
-    return Promise.resolve();
-  }
-}
-
-self.addEventListener("fetch",(event)=>{
-  const request=event.request;
-  if(request.method!=="GET") return;
-  const url=new URL(request.url);
-  if(url.origin!==self.location.origin) return;
-
-  if(request.mode==="navigate"){
-    event.respondWith(
-      fetch(request).then(response=>{
-        return cacheResponse("/",response).then(()=>response);
-      }).catch(()=>caches.match("/").then(cached=>cached||Response.error()))
-    );
+self.addEventListener("install", event => {
+  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()));
+});
+self.addEventListener("activate", event => {
+  event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k.startsWith("irpa-dbgs-") && k !== CACHE_NAME).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+});
+self.addEventListener("fetch", event => {
+  const req = event.request;
+  if (req.method !== "GET") return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin || excluded(url)) return;
+  if (req.mode === "navigate") {
+    event.respondWith(fetch(req).catch(async () => (await caches.match(req, {ignoreSearch:true})) || (await caches.match("/offline.html")) || Response.error()));
     return;
   }
-
-  if(isAppAsset(request)){
-    event.respondWith(
-      caches.match(request).then(cached=>{
-        const network=fetch(request).then(response=>{
-          return cacheResponse(request,response).then(()=>response);
-        }).catch(()=>cached||Response.error());
-        return cached||network;
-      })
-    );
-  }
+  // Only explicitly listed shell resources and hashed static build assets are cacheable.
+  const shell = APP_SHELL.includes(url.pathname) || url.pathname.startsWith("/assets/");
+  if (!shell) return;
+  event.respondWith((async () => {
+    const cached = await caches.match(req);
+    try {
+      const response = await fetch(req);
+      if (response.ok && response.type === "basic" && !excluded(url)) {
+        const cache = await caches.open(CACHE_NAME);
+        await cache.put(req, response.clone()).catch(() => {});
+      }
+      return response;
+    } catch {
+      return cached || Response.error();
+    }
+  })());
 });
