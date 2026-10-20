@@ -16,7 +16,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm install
-      - run: npx electron-builder --win nsis
+      - run: npx electron-builder --win nsis --publish never
       - uses: actions/upload-artifact@v4
         with:
           name: IRPA-DBGS-Windows-Installer
