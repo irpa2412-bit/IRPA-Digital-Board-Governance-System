@@ -3,7 +3,11 @@ on:
   workflow_dispatch:
   push:
     branches: [feat/installable-app-20261020]
-    paths: [package.json, electron/**, .github/workflows/build-desktop.yml]
+    paths:
+      - package.json
+      - electron/**
+      - public/irpa-logo.jpg
+      - .github/workflows/build-desktop.yml
 permissions:
   contents: read
 jobs:
@@ -16,9 +20,26 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm install
-      - run: npx electron-builder --win nsis --publish never
-      - uses: actions/upload-artifact@v4
+      - name: Create Windows icon from IRPA logo
+        shell: powershell
+        run: |
+          Add-Type -AssemblyName System.Drawing
+          New-Item -ItemType Directory -Force -Path build | Out-Null
+          $source = [System.Drawing.Image]::FromFile("$PWD/public/irpa-logo.jpg")
+          $bitmap = New-Object System.Drawing.Bitmap 256, 256
+          $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+          $graphics.Clear([System.Drawing.Color]::White)
+          $graphics.DrawImage($source, 0, 0, 256, 256)
+          $handle = $bitmap.GetHicon()
+          $icon = [System.Drawing.Icon]::FromHandle($handle)
+          $stream = [System.IO.File]::Open("$PWD/build/icon.ico", [System.IO.FileMode]::Create)
+          try { $icon.Save($stream) } finally { $stream.Dispose(); $icon.Dispose(); $graphics.Dispose(); $bitmap.Dispose(); $source.Dispose() }
+      - name: Build Windows installer
+        run: npx electron-builder --win nsis --publish never --config.win.icon=build/icon.ico
+      - name: Upload Windows installer
+        if: success()
+        uses: actions/upload-artifact@v4
         with:
           name: IRPA-DBGS-Windows-Installer
-          path: release/*.exe
+          path: release/IRPA-DBGS-Setup-1.0.0.exe
           if-no-files-found: error
