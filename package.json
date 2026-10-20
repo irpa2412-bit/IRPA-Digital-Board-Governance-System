@@ -70,5 +70,6 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
     }
-  }
+  },
+  "main": "electron/main.cjs"
 }
