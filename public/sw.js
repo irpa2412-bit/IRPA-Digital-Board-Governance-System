@@ -20,7 +20,7 @@ self.addEventListener("fetch", event => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin || excluded(url)) return;
   if (req.mode === "navigate") {
-    event.respondWith(fetch(req).catch(async () => (await caches.match(req, {ignoreSearch:true})) || (await caches.match("/offline.html")) || Response.error()));
+    event.respondWith(fetch(req).catch(async () => (await caches.match("/offline.html")) || (await caches.match(req, {ignoreSearch:true})) || Response.error()));
     return;
   }
   // Only explicitly listed shell resources and hashed static build assets are cacheable.
