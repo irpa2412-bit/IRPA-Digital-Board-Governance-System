@@ -1,0 +1,24 @@
+name: Build IRPA-DBGS Windows installer
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/installable-app-20261020]
+    paths: [package.json, electron/**, .github/workflows/build-desktop.yml]
+permissions:
+  contents: read
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm install
+      - run: npx electron-builder --win nsis
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IRPA-DBGS-Windows-Installer
+          path: release/*.exe
+          if-no-files-found: error
