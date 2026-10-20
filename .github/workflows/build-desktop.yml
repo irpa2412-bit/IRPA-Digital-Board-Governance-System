@@ -6,7 +6,6 @@ on:
     paths:
       - package.json
       - electron/**
-      - public/irpa-logo.jpg
       - .github/workflows/build-desktop.yml
 permissions:
   contents: read
@@ -20,30 +19,6 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm install
-      - name: Create Windows icon from IRPA logo (optional)
-        continue-on-error: true
-        shell: pwsh
-        run: |
-          npm i --no-save sharp png-to-ico
-          New-Item -ItemType Directory -Force -Path build | Out-Null
-          $script = @'
-          import fs from "node:fs";
-          import sharp from "sharp";
-          import pngToIco from "png-to-ico";
-
-          const input = "public/irpa-logo.jpg";
-          const output = "build/icon.png";
-          const image = sharp(input);
-          const metadata = await image.metadata();
-          if (!metadata.width || !metadata.height || !["jpeg", "png", "webp", "gif", "tiff", "avif"].includes(metadata.format)) {
-            throw new Error(`Invalid or unsupported logo image: format=${metadata.format}, dimensions=${metadata.width}x${metadata.height}`);
-          }
-          await image.resize(256, 256, { fit: "contain", background: "#ffffff" }).png().toFile(output);
-          const ico = await pngToIco(output);
-          fs.writeFileSync("build/icon.ico", ico);
-          '@
-          $script | Set-Content -Encoding utf8 build/create-icon.mjs
-          node build/create-icon.mjs
       - name: Build Windows installer
         run: npx electron-builder --win nsis --publish never
       - name: Upload Windows installer
