@@ -28,7 +28,11 @@ import { createCommunicationsSiteRouter } from "./communicationsSite.mjs";
 import { createMetaOAuthRouter } from "./metaOAuth.mjs";
 import { createMeetingPortalRouter } from "./meetingPortal.mjs";
 import { createMeetingServicesRouter } from "./meetingServices.mjs";
+migration/cloudflare-server-functions-20261019
 import { createInductionMatchingRouter } from "./inductionMatching.mjs";
+=======
+import { createInvitationRemovalRouter } from "./invitationRemoval.mjs";
+main
 
 function getFirebaseProjectId(env) {
   const projectId = String(env?.FIREBASE_PROJECT_ID || "").trim();
@@ -86,6 +90,16 @@ const inductionMatchingRouter = createInductionMatchingRouter({
   getFirebaseProjectId: env => getFirebaseProjectId(env),
   getFirestoreAdminAccessToken,
   getFirestoreDocument,
+  json,
+  corsHeaders
+});
+
+const invitationRemovalRouter = createInvitationRemovalRouter({
+  authenticateFirebaseRequest,
+  getFirebaseProjectId,
+  getFirestoreAdminAccessToken,
+  getFirestoreDocument,
+  firestoreDocumentToPlain,
   json,
   corsHeaders
 });
@@ -191,8 +205,13 @@ export default {
       const meetingServicesResponse = await meetingServicesRouter(request, env, pathname);
       if (meetingServicesResponse) return meetingServicesResponse;
 
+migration/cloudflare-server-functions-20261019
       const inductionMatchingResponse = await inductionMatchingRouter(request, env, pathname);
       if (inductionMatchingResponse) return inductionMatchingResponse;
+=======
+      const invitationRemovalResponse = await invitationRemovalRouter(request, env, pathname);
+      if (invitationRemovalResponse) return invitationRemovalResponse;
+ main
 
       if (pathname.startsWith("/api/communications/meta/")) {
         const metaResponse = await metaOAuthRouter(request, env);
@@ -850,7 +869,8 @@ async function provisionResearchKnowledgeArchive(request, env) {
       employee.employmentStatus === "Active" || employee.registrationStatus === "Activated";
     const researchDepartments = new Set([
       "research", "research department", "research & knowledge",
-      "research and knowledge", "research, statistics and knowledge"
+      "research and knowledge", "research, statistics and knowledge",
+      "research, statistics and knowledge department"
     ]);
     authorised = active && researchDepartments.has(department);
   }
@@ -871,13 +891,40 @@ async function provisionResearchKnowledgeArchive(request, env) {
     archiveAccess: "Restricted",
     createdForDepartment: "Research, Statistics and Knowledge"
   });
-  const archiveMetadata = await driveFetch(env, accessToken, "/drive/v3/files/" + encodeURIComponent(archiveId) + "?fields=id,name,mimeType,description,trashed,webViewLink,parents");
-  const archiveDescription = parseDescription(archiveMetadata.description);
+  let archiveMetadata = await driveFetch(env, accessToken, "/drive/v3/files/" + encodeURIComponent(archiveId) + "?fields=id,name,mimeType,description,trashed,webViewLink,parents");
+  let archiveDescription = parseDescription(archiveMetadata.description);
+  const researchDepartmentOwner = "Research, Statistics and Knowledge Department";
+  if (archiveMetadata.mimeType === "application/vnd.google-apps.folder" && !archiveMetadata.trashed &&
+      archiveDescription.irpaResearchKnowledgeArchive === true &&
+      archiveDescription.purpose === "IRPA Research and Knowledge Archive" &&
+      (archiveDescription.createdForDepartment !== researchDepartmentOwner ||
+       archiveDescription.departmentOwner !== researchDepartmentOwner ||
+       archiveDescription.archiveOwnershipType !== "Department")) {
+    const correctedDescription = {
+      ...archiveDescription,
+      irpaResearchKnowledgeArchive: true,
+      irpaGovernanceArchive: true,
+      purpose: "IRPA Research and Knowledge Archive",
+      createdForDepartment: researchDepartmentOwner,
+      departmentOwner: researchDepartmentOwner,
+      archiveOwnershipType: "Department",
+      archiveAccess: "Restricted"
+    };
+    await driveFetch(env, accessToken, "/drive/v3/files/" + encodeURIComponent(archiveId), {
+      method: "PATCH",
+      body: JSON.stringify({description: JSON.stringify(correctedDescription)})
+    });
+    archiveMetadata = await driveFetch(env, accessToken, "/drive/v3/files/" + encodeURIComponent(archiveId) + "?fields=id,name,mimeType,description,trashed,webViewLink,parents");
+    archiveDescription = parseDescription(archiveMetadata.description);
+  }
   if (archiveMetadata.mimeType !== "application/vnd.google-apps.folder" || archiveMetadata.trashed ||
       archiveDescription.irpaResearchKnowledgeArchive !== true ||
       archiveDescription.purpose !== "IRPA Research and Knowledge Archive" ||
+      archiveDescription.createdForDepartment !== researchDepartmentOwner ||
+      archiveDescription.departmentOwner !== researchDepartmentOwner ||
+      archiveDescription.archiveOwnershipType !== "Department" ||
       !(Array.isArray(archiveMetadata.parents) && archiveMetadata.parents.includes(rootId))) {
-    return json({ok:false,error:"The Research and Knowledge Archive folder could not be verified. No research files were uploaded."},409,corsHeaders(request));
+    return json({ok:false,error:"The Research and Knowledge Archive folder could not be verified as owned by the Research, Statistics and Knowledge Department. No research files were uploaded."},409,corsHeaders(request));
   }
 
   const folderPolicies = [
@@ -1825,9 +1872,19 @@ async function sendMemberInvitation(request, env) {
     return json({ok:true,email,deliveryStatus:"Sent",sentAt,messageId,message:meetingAccess?{subject:message.subject,text:"Meeting access details were included in the invitation email."}:message,meetingAccessSent:Boolean(meetingAccess)},200,corsHeaders(request));
   }catch(error){
     const failedAt=new Date().toISOString(), safeError=safeMailError(error);
-    await updateFirestoreDocument(env,`invitations/${invitationId}`,claims.token,{status:{stringValue:"Failed"},deliveryStatus:{stringValue:"Failed"},deliveryFailedAt:{timestampValue:failedAt},deliveryError:{stringValue:safeError}},["status","deliveryStatus","deliveryFailedAt","deliveryError"]);
+    // Preserve the provider failure even if Firestore refuses the status write.
+    // Previously, a failed status update escaped this catch and masked the SMTP
+    // error, leaving the register at "Preparing" with no useful diagnostic.
+    try {
+      await updateFirestoreDocument(env,`invitations/${invitationId}`,claims.token,{status:{stringValue:"Failed"},deliveryStatus:{stringValue:"Failed"},deliveryFailedAt:{timestampValue:failedAt},deliveryError:{stringValue:safeError}},["status","deliveryStatus","deliveryFailedAt","deliveryError"]);
+    } catch (statusError) {
+      console.error("IRPA invitation failure status could not be saved",{
+        recipientDomain:recipientDomain(email),
+        statusError:safeMailError(statusError)
+      });
+    }
     console.error("IRPA member invitation delivery failed",{recipientDomain:recipientDomain(email),error:safeError});
-    return json({ok:false,error:"EMAIL_PROVIDER_FAILED",deliveryStatus:"Failed"},502,corsHeaders(request));
+    return json({ok:false,error:safeError,code:"EMAIL_PROVIDER_FAILED",deliveryStatus:"Failed"},502,corsHeaders(request));
   }
 }
 
