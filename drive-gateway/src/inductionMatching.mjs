@@ -14,6 +14,11 @@ function plainDocument(document) {
   if (!document?.fields) return null;
   return { id: String(document.name || "").split("/").pop(), ...Object.fromEntries(Object.entries(document.fields).map(([k,v]) => [k, plainValue(v)])) };
 }
+function publicInvitation(invitation) {
+  if (!invitation) return null;
+  const allowed = ["id", "name", "email", "status", "role", "department", "expiresAt", "createdAt"];
+  return Object.fromEntries(allowed.filter(key => Object.prototype.hasOwnProperty.call(invitation, key)).map(key => [key, invitation[key]]));
+}
 async function queryByEmail(env, projectId, collectionName, email, token) {
   const response = await fetch(`https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:runQuery`, {
     method: "POST",
@@ -46,6 +51,12 @@ export function createInductionMatchingRouter({ authenticateFirebaseRequest, get
       const raw = await getFirestoreDocument(env, "invitations/" + encodeURIComponent(invitationId), privilegedToken);
       invitation = plainDocument(raw);
       if (!invitation) return json({ ok: false, error: "The invitation record was not found." }, 404, corsHeaders(request));
+      if (!emailFromToken && !isActiveAdmin) {
+        const expiry = invitation.expiresAt == null || invitation.expiresAt === "" ? null : Date.parse(invitation.expiresAt);
+        if (invitation.status !== "Pending" || (expiry !== null && (!Number.isFinite(expiry) || expiry <= Date.now()))) {
+          return json({ ok: false, error: "This invitation can no longer be used for verification." }, 403, corsHeaders(request));
+        }
+      }
     }
     const targetEmail = String(invitation?.email || suppliedEmail || "").trim().toLowerCase();
     if (!targetEmail || (!isActiveAdmin && (emailFromToken ? targetEmail !== emailFromToken : !invitationId))) {
@@ -59,7 +70,7 @@ export function createInductionMatchingRouter({ authenticateFirebaseRequest, get
     const name = String(invitation?.name || "").trim().toLowerCase();
     return json({
       ok: true,
-      invitation,
+      invitation: publicInvitation(invitation),
       employees: employees.map(x => ({ id: x.id, uid: x.uid || null, name: x.name || "", email: x.email || targetEmail, employeeNumber: x.employeeNumber || "", role: x.role || "", roles: Array.isArray(x.roles) ? x.roles : [], department: x.department || "", unit: x.unit || "", employmentType: x.employmentType || "", status: x.status || "", registrationStatus: x.registrationStatus || "" })),
       members: members.map(x => ({ id: x.id, uid: x.uid || null, name: x.name || "", email: x.email || targetEmail, memberNumber: x.memberNumber || "", memberType: x.memberType || "", role: x.role || "", roles: Array.isArray(x.roles) ? x.roles : [], department: x.department || "", unit: x.unit || "", boardMember: Boolean(x.boardMember), status: x.status || "", registrationStatus: x.registrationStatus || "" })),
       exactNameMatch: [...employees, ...members].some(x => String(x.name || "").trim().toLowerCase() === name)
