@@ -659,6 +659,36 @@ service cloud.firestore {
   match /institutionalDepartments/{id}{allow read:if admin();allow create:if admin()&&request.resource.data.get("recordType","")=="Institutional Department"&&request.resource.data.get("name","") is string&&request.resource.data.get("name","").size()>0&&request.resource.data.get("code","") is string&&request.resource.data.get("code","").size()>0&&request.resource.data.get("status","")=="Active";allow update:if admin()&&request.resource.data.get("name","")==resource.data.get("name","")&&request.resource.data.get("code","")==resource.data.get("code","");allow delete:if false;}
   match /departmentArchives/{id}{allow read:if admin();allow create:if admin()&&request.resource.data.get("recordType","")=="Department Archive Registry Entry"&&request.resource.data.get("departmentId","") is string&&request.resource.data.get("departmentId","")!=""&&exists(/databases/$(database)/documents/institutionalDepartments/$(request.resource.data.get("departmentId","")))&&get(/databases/$(database)/documents/institutionalDepartments/$(request.resource.data.get("departmentId",""))).data.get("status","")=="Active"&&request.resource.data.get("name","") is string&&request.resource.data.get("name","").size()>0&&request.resource.data.get("driveProvisioningStatus","")=="NOT_PROVISIONED";allow update:if admin()&&request.resource.data.get("departmentId","")==resource.data.get("departmentId","")&&request.resource.data.get("name","")==resource.data.get("name","")&&request.resource.data.get("driveFolderId",null)==resource.data.get("driveFolderId",null)||admin()&&request.resource.data.get("departmentId","")==resource.data.get("departmentId","")&&request.resource.data.get("name","")==resource.data.get("name","")&&resource.data.get("driveProvisioningStatus","")!="VERIFIED"&&request.resource.data.get("driveProvisioningStatus","")=="VERIFIED"&&request.resource.data.get("driveFolderId","") is string&&request.resource.data.get("driveFolderId","")!="";allow delete:if false;}
 
+  // Administrator-created portal definitions are navigation/workspace metadata only.
+  // A portal must belong to an active registered department; any linked archive must belong to that same department.
+  match /portalDefinitions/{id}{
+    allow read:if signedIn();
+    allow create:if admin()
+      &&request.resource.data.get("recordType","")=="Department Portal Definition"
+      &&request.resource.data.get("name","") is string
+      &&request.resource.data.get("name","").size()>0
+      &&request.resource.data.get("slug","") is string
+      &&request.resource.data.get("departmentId","") is string
+      &&request.resource.data.get("departmentId","")!=""
+      &&exists(/databases/$(database)/documents/institutionalDepartments/$(request.resource.data.get("departmentId","")))
+      &&get(/databases/$(database)/documents/institutionalDepartments/$(request.resource.data.get("departmentId",""))).data.get("status","")=="Active"
+      &&get(/databases/$(database)/documents/institutionalDepartments/$(request.resource.data.get("departmentId",""))).data.get("name","")==request.resource.data.get("departmentName","")
+      &&request.resource.data.get("allowedRoles",[]) is list
+      &&request.resource.data.get("status","")=="Active"
+      &&request.resource.data.get("createdByUid","")==request.auth.uid
+      &&request.resource.data.get("driveProvisioningStatus","") in ["VERIFIED","NOT_PROVISIONED"]
+      &&(request.resource.data.get("archiveId","")==""||(exists(/databases/$(database)/documents/departmentArchives/$(request.resource.data.get("archiveId","")))&&get(/databases/$(database)/documents/departmentArchives/$(request.resource.data.get("archiveId",""))).data.get("departmentId","")==request.resource.data.get("departmentId","")))
+      &&(request.resource.data.get("driveProvisioningStatus","")=="NOT_PROVISIONED"||(request.resource.data.get("archiveId","")!=""&&get(/databases/$(database)/documents/departmentArchives/$(request.resource.data.get("archiveId",""))).data.get("driveProvisioningStatus","")=="VERIFIED"&&get(/databases/$(database)/documents/departmentArchives/$(request.resource.data.get("archiveId",""))).data.get("driveFolderId","")==request.resource.data.get("driveFolderId","")))
+      &&request.resource.data.keys().hasOnly(["recordType","name","slug","departmentId","departmentName","description","allowedRoles","archiveId","archiveName","driveFolderId","driveProvisioningStatus","status","createdByUid","createdByEmail","createdAt","updatedAt","recordOrigin"]);
+    allow update:if admin()
+      &&request.resource.data.get("recordType","")==resource.data.get("recordType","")
+      &&request.resource.data.get("departmentId","")==resource.data.get("departmentId","")
+      &&request.resource.data.get("createdByUid","")==resource.data.get("createdByUid","")
+      &&request.resource.data.get("createdAt",null)==resource.data.get("createdAt",null)
+      &&request.resource.data.keys().hasOnly(["recordType","name","slug","departmentId","departmentName","description","allowedRoles","archiveId","archiveName","driveFolderId","driveProvisioningStatus","status","createdByUid","createdByEmail","createdAt","updatedAt","recordOrigin"]);
+    allow delete:if false;
+  }
+
   match /{document=**}{allow read,write:if false;}
  }
 }
