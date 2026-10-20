@@ -28,11 +28,8 @@ import { createCommunicationsSiteRouter } from "./communicationsSite.mjs";
 import { createMetaOAuthRouter } from "./metaOAuth.mjs";
 import { createMeetingPortalRouter } from "./meetingPortal.mjs";
 import { createMeetingServicesRouter } from "./meetingServices.mjs";
-migration/cloudflare-server-functions-20261019
 import { createInductionMatchingRouter } from "./inductionMatching.mjs";
-=======
 import { createInvitationRemovalRouter } from "./invitationRemoval.mjs";
-main
 
 function getFirebaseProjectId(env) {
   const projectId = String(env?.FIREBASE_PROJECT_ID || "").trim();
@@ -205,13 +202,10 @@ export default {
       const meetingServicesResponse = await meetingServicesRouter(request, env, pathname);
       if (meetingServicesResponse) return meetingServicesResponse;
 
-migration/cloudflare-server-functions-20261019
       const inductionMatchingResponse = await inductionMatchingRouter(request, env, pathname);
       if (inductionMatchingResponse) return inductionMatchingResponse;
-=======
       const invitationRemovalResponse = await invitationRemovalRouter(request, env, pathname);
       if (invitationRemovalResponse) return invitationRemovalResponse;
- main
 
       if (pathname.startsWith("/api/communications/meta/")) {
         const metaResponse = await metaOAuthRouter(request, env);
