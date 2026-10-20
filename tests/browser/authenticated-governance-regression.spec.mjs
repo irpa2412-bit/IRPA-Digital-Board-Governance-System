@@ -320,7 +320,7 @@ for (const viewport of [
     await page.getByLabel(/Owning department/).selectOption("browser-fixture-research");
     await page.getByRole("button", { name: "Create Department Portal" }).click();
     await expect(page.getByText(/Portal registered\./)).toBeVisible({ timeout: 15000 });
-    await expect(page.getByText(portalName, { exact: true })).toBeVisible({ timeout: 15000 });
+    await expect(page.locator("article.stat-card").filter({ hasText: portalName })).toBeVisible({ timeout: 15000 });
 
     expect(uncaughtErrors, "uncaught JavaScript errors during portal navigation").toEqual([]);
     expect(successfulExternalRequests, "no external or production request may complete in the isolated fixture").toEqual([]);
