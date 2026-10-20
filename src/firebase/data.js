@@ -320,9 +320,18 @@ export async function getCurrentInductionContext(){
     let registerMatches={employees:[],members:[],exactNameMatch:false};
     if(invitation?.id){
       try{
-        const call=httpsCallable(getFunctions(undefined,"us-central1"),"fetchInductionMatchingRecords");
-        const result=await call({invitationId:invitation.id});
-        registerMatches=result.data||registerMatches;
+        const matchingUser=context?.anonymous?applicantAuth.currentUser:auth.currentUser;
+        if(!matchingUser)throw new Error("Authentication is required to verify the invitation.");
+        const token=await matchingUser.getIdToken();
+        const gatewayOrigin=String(import.meta.env.VITE_GATEWAY_ORIGIN||import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").trim().replace(/[/]+$/,"");
+        const response=await fetch(gatewayOrigin+"/api/induction/matching-records",{
+          method:"POST",
+          headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},
+          body:JSON.stringify({invitationId:invitation.id})
+        });
+        const result=await response.json().catch(()=>({}));
+        if(!response.ok||result.ok===false)throw new Error(result.error||"Cloudflare induction matching is unavailable.");
+        registerMatches=result||registerMatches;
       }catch(error){
         console.warn("Induction register matching unavailable; invitation data will remain available.",error);
       }

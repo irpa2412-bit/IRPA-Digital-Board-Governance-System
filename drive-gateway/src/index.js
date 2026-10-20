@@ -28,6 +28,7 @@ import { createCommunicationsSiteRouter } from "./communicationsSite.mjs";
 import { createMetaOAuthRouter } from "./metaOAuth.mjs";
 import { createMeetingPortalRouter } from "./meetingPortal.mjs";
 import { createMeetingServicesRouter } from "./meetingServices.mjs";
+import { createInductionMatchingRouter } from "./inductionMatching.mjs";
 import { createInvitationRemovalRouter } from "./invitationRemoval.mjs";
 
 function getFirebaseProjectId(env) {
@@ -78,6 +79,14 @@ const meetingServicesRouter = createMeetingServicesRouter({
   getFirebaseProjectId,
   getFirestoreAdminAccessToken,
   sendEmail: (env, message) => smtpSend(env, message),
+  json,
+  corsHeaders
+});
+const inductionMatchingRouter = createInductionMatchingRouter({
+  authenticateFirebaseRequest,
+  getFirebaseProjectId: env => getFirebaseProjectId(env),
+  getFirestoreAdminAccessToken,
+  getFirestoreDocument,
   json,
   corsHeaders
 });
@@ -193,6 +202,8 @@ export default {
       const meetingServicesResponse = await meetingServicesRouter(request, env, pathname);
       if (meetingServicesResponse) return meetingServicesResponse;
 
+      const inductionMatchingResponse = await inductionMatchingRouter(request, env, pathname);
+      if (inductionMatchingResponse) return inductionMatchingResponse;
       const invitationRemovalResponse = await invitationRemovalRouter(request, env, pathname);
       if (invitationRemovalResponse) return invitationRemovalResponse;
 
