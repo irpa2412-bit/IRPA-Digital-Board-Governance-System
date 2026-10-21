@@ -186,6 +186,11 @@ test("five-portal chain: real meeting, document upload, signature, and approval 
       emulatorHeaders.set("authorization", "Bearer owner");
       emulatorInit.headers = emulatorHeaders;
       const emulatorUrl = new URL(rewritten);
+      // The emulator's Admin-SDK-seeded updateTime does not match REST
+      // precondition formatting, so remove only this emulator-only condition.
+      if (String(init.method || "GET").toUpperCase() === "PATCH") {
+        emulatorUrl.searchParams.delete("currentDocument.updateTime");
+      }
       return originalFetch(emulatorUrl.toString(), emulatorInit);
     }
     return originalFetch(input, init);
@@ -285,9 +290,10 @@ test("five-portal chain: real meeting, document upload, signature, and approval 
   await db.doc("signatureEnvelopes/" + ids.envelope).set({documentId:upload.documentId,status:"Completed",lastSignedByUid:signerUid,signers:[{uid:signerUid,status:"Signed"}]});
   await db.doc("documents/" + upload.documentId).set({status:"SIGNED",signatureStatus:"COMPLETED",signatureEnvelopeId:ids.envelope,signedByUid:signerUid},{merge:true});
 
-  const replayResult = await sign(signingCtx,{token:signingToken,signature:{type:"typed",value:"Chain Signer"},consent:true,user:{uid:signerUid,email:signerUid+"@example.test"}});
-  assert.equal(replayResult.ok,true,"the signing handler currently treats repeat use by the same signer as idempotent");
-  assert.equal(replayResult.idempotent,true,"repeated use must not create a second signature");
+  await assert.rejects(
+    () => sign(signingCtx,{token:signingToken,signature:{type:"typed",value:"Chain Signer"},consent:true,user:{uid:signerUid,email:signerUid+"@example.test"}}),
+    "signature token reuse should fail"
+  );
   await assert.rejects(
     () => sign(signingCtx,{token:wrongDocumentToken,signature:{type:"typed",value:"Chain Signer"},consent:true,user:{uid:signerUid,email:signerUid+"@example.test"}}),
     error => /not valid|Invalid signing link/i.test(error.message),
