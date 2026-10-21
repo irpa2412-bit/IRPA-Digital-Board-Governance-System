@@ -132,7 +132,7 @@ test("records approval and an audit event for an authorized decision", async () 
   assert.equal(result.data.approval.decision, "approve");
   assert.equal(ctx.commits.length, 1);
   assert.ok(ctx.commits[0].mask.includes("approval"));
-  assert.equal(ctx.commits[0].audit.mapValue.fields.action.stringValue, "DOCUMENT_APPROVAL_APPROVE");
+  assert.equal(ctx.commits[0].audit.action.stringValue, "DOCUMENT_APPROVAL_APPROVE");
 });
 
 test("records a rejection with its reason", async () => {
