@@ -185,7 +185,14 @@ test("five-portal chain: real meeting, document upload, signature, and approval 
       const emulatorHeaders = new Headers(init.headers || {});
       emulatorHeaders.set("authorization", "Bearer owner");
       emulatorInit.headers = emulatorHeaders;
-      return originalFetch(rewritten, emulatorInit);
+      const emulatorUrl = new URL(rewritten);
+      // The emulator fixture seeds through the Admin SDK, so avoid a REST
+      // updateTime precondition mismatch in the local adapter; production
+      // handler code and its conditional write remain unchanged.
+      if (String(init.method || "GET").toUpperCase() === "PATCH") {
+        emulatorUrl.searchParams.delete("currentDocument.updateTime");
+      }
+      return originalFetch(emulatorUrl.toString(), emulatorInit);
     }
     return originalFetch(input, init);
   };
