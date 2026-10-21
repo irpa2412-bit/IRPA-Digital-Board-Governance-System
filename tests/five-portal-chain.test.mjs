@@ -78,7 +78,7 @@ function claimsFor(req) { return { user_id: req.headers.get("x-test-uid"), uid: 
 
 const meetingCtx = {
   getFirebaseProjectId: () => PROJECT,
-  getFirestoreAdminAccessToken: async () => "emulator-owner",
+  getFirestoreAdminAccessToken: async () => "owner",
   authenticateFirebaseRequest: async req => claimsFor(req),
   json: (data,status,headers) => new Response(JSON.stringify(data),{status,headers}),
   corsHeaders
