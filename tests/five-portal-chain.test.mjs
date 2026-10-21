@@ -259,7 +259,7 @@ test("five-portal chain: real meeting, document upload, signature, and approval 
     sendInvitation:null,allowReturnTokens:true
   };
   const createdEnvelope = await createEnvelope(signingCtx,{uid:authUid,isAdmin:true},{
-    documentId:upload.documentId,
+    documentId:upload.documentId, archives:["administrative-documents"],
     signers:[{email:signerUid+"@example.test",name:"Chain Signer",order:1,uid:signerUid}]
   });
   assert.equal(createdEnvelope.ok,true,"real envelope creation should succeed");
@@ -277,7 +277,7 @@ test("five-portal chain: real meeting, document upload, signature, and approval 
     title:"Different controlled document",fileName:"other.pdf",classification:"Internal",ownerUid:authUid
   });
   const otherEnvelopeResult = await createEnvelope(signingCtx,{uid:authUid,isAdmin:true},{
-    documentId:otherDocumentId,
+    documentId:otherDocumentId, archives:["administrative-documents"],
     signers:[{email:signerUid+"@example.test",name:"Chain Signer",order:1,uid:signerUid}]
   });
   assert.equal(otherEnvelopeResult.ok,true,"real envelope creation for a different document should succeed");
