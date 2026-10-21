@@ -375,7 +375,7 @@ test("password-set refuses activation when the registered member record does not
   assert.equal(calls.some(c=>c.target.includes("/documents/members/")&&c.options.method==="PATCH"),false);
 });
 
-test("Cloudflare invitation redemption rejects a PASSWORD_SETUP_PENDING invitation after its 60-minute window", async()=>{
+test("Cloudflare invitation redemption resumes setup after its 60-minute session expires while the invitation remains valid", async()=>{
   const originalFetch=global.fetch;
   const calls=[];
   const id="expired-password-setup";
@@ -395,9 +395,16 @@ test("Cloudflare invitation redemption rejects a PASSWORD_SETUP_PENDING invitati
   };
   try{
     const response=await handler.fetch(new Request("https://gw.test/api/invitations/redeem",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:id+"."+secret})}),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify(serviceAccount)});
-    assert.equal(response.status,410);
-    assert.match((await response.json()).error,/password-setup window has expired/i);
-    assert.equal(calls.some(c=>c.options.method==="PATCH"),false);
+    assert.equal(response.status,200);
+    const body=await response.json();
+    assert.equal(body.ok,true);
+    assert.equal(body.invitationId,id);
+    assert.equal(body.uid,"expired-uid");
+    const patch=calls.find(c=>c.options.method==="PATCH");
+    assert.ok(patch,"resuming setup must persist a renewed password-setup window");
+    const fields=JSON.parse(patch.options.body).fields;
+    assert.equal(fields.invitationRedemptionState.stringValue,"PASSWORD_SETUP_PENDING");
+    assert.ok(Date.parse(fields.invitationPasswordSetupExpiresAt.timestampValue)>Date.now());
   } finally { global.fetch=originalFetch; }
 });
 

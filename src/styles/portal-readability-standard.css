@@ -243,3 +243,17 @@
   color: #214f38 !important;
   -webkit-text-fill-color: #214f38 !important;
 }
+
+
+/* Department/archive registry is a light administrative workspace; override legacy muted copy colours for WCAG AA contrast. */
+#root .app-shell .content-area:not(.dashboard-content-area) .page.department-archive-registry :where(p, small, span, label, strong, article, select, input, textarea) {
+  color: #26352f !important;
+  -webkit-text-fill-color: #26352f !important;
+  opacity: 1 !important;
+}
+#root .app-shell .content-area:not(.dashboard-content-area) .page.department-archive-registry :where(button) {
+  color: #17372b !important;
+  -webkit-text-fill-color: #17372b !important;
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+}

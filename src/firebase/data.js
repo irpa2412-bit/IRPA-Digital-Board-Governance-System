@@ -7,7 +7,7 @@ import { listLifecycleDocuments } from "./documentLifecycle.js";
 
 const uniqueInductionValues=(values)=>[...new Set(values.flatMap(v=>Array.isArray(v)?v:String(v||"").split(",")).map(v=>String(v||"").trim()).filter(Boolean))];
 
-export const COLLECTIONS={members:"members",employees:"employees",employeeCounters:"employeeCounters",memberCounters:"memberCounters",participants:"participants",meetings:"meetings",meetingSubscriptions:"meetingSubscriptions",meetingRoomEvents:"meetingRoomEvents",transcriptions:"transcriptions",resolutions:"resolutions",votes:"votes",voteLocks:"voteLocks",voteCorrections:"voteCorrections",votingIssues:"votingIssues",actions:"actions",documents:"documents",documentTranslationRequests:"documentTranslationRequests",signatures:"signatures",decisions:"decisions",risks:"risks",audit:"audit",reports:"reports",authorizationRequests:"authorizationRequests",workflowActions:"workflowActions",staffPaymentRequests:"staffPaymentRequests",financeBudgets:"financeBudgets",financeTransactions:"financeTransactions",financeFunding:"financeFunding",financeApprovals:"financeApprovals",financeCommitments:"financeCommitments",financeGrants:"financeGrants",financeBankAccounts:"financeBankAccounts",financeReconciliations:"financeReconciliations",financeAssets:"financeAssets",financeRisks:"financeRisks",financeReports:"financeReports",financeChartOfAccounts:"financeChartOfAccounts",financeJournalBatches:"financeJournalBatches",financePeriods:"financePeriods",financeLedgerJournals:"financeLedgerJournals",financeLedgerEntries:"financeLedgerEntries",financePaymentMatches:"financePaymentMatches",financePaymentTrace:"financePaymentTrace",financeReferenceRegistry:"financeReferenceRegistry",procurementVendors:"procurementVendors",procurementRequests:"procurementRequests",procurementVendorScores:"procurementVendorScores",procurementVendorBlacklist:"procurementVendorBlacklist",procurementVendorProbation:"procurementVendorProbation",invitations:"invitations",registrationRequests:"registrationRequests",inductionRecords:"inductionRecords",adminProfiles:"adminProfiles",auditorProfiles:"auditorProfiles",systemSettings:"systemSettings",mail:"mail",donorFunders:"donorFunders",grantReportingObligations:"grantReportingObligations",researchStudies:"researchStudies",researchDatasets:"researchDatasets",researchObservations:"researchObservations",researchAnalyses:"researchAnalyses",researchKnowledge:"researchKnowledge",researchOutputs:"researchOutputs",researchInstruments:"researchInstruments",researchSubmissions:"researchSubmissions",researchInformationRequests:"researchInformationRequests",researchInformationGrants:"researchInformationGrants",researchSharedInformation:"researchSharedInformation",researchUpdates:"researchUpdates",researchToolPermissions:"researchToolPermissions",researchPortalAlerts:"researchPortalAlerts"};
+export const COLLECTIONS={members:"members",employees:"employees",employeeCounters:"employeeCounters",memberCounters:"memberCounters",participants:"participants",meetings:"meetings",meetingSubscriptions:"meetingSubscriptions",meetingRoomEvents:"meetingRoomEvents",transcriptions:"transcriptions",resolutions:"resolutions",votes:"votes",voteLocks:"voteLocks",voteCorrections:"voteCorrections",votingIssues:"votingIssues",actions:"actions",documents:"documents",documentTranslationRequests:"documentTranslationRequests",signatures:"signatures",decisions:"decisions",risks:"risks",audit:"audit",reports:"reports",authorizationRequests:"authorizationRequests",workflowActions:"workflowActions",staffPaymentRequests:"staffPaymentRequests",financeBudgets:"financeBudgets",financeTransactions:"financeTransactions",financeFunding:"financeFunding",financeApprovals:"financeApprovals",financeCommitments:"financeCommitments",financeGrants:"financeGrants",financeBankAccounts:"financeBankAccounts",financeReconciliations:"financeReconciliations",financeAssets:"financeAssets",financeRisks:"financeRisks",financeReports:"financeReports",financeChartOfAccounts:"financeChartOfAccounts",financeJournalBatches:"financeJournalBatches",financePeriods:"financePeriods",financeLedgerJournals:"financeLedgerJournals",financeLedgerEntries:"financeLedgerEntries",financePaymentMatches:"financePaymentMatches",financePaymentTrace:"financePaymentTrace",financeReferenceRegistry:"financeReferenceRegistry",procurementVendors:"procurementVendors",procurementRequests:"procurementRequests",procurementVendorScores:"procurementVendorScores",procurementVendorBlacklist:"procurementVendorBlacklist",procurementVendorProbation:"procurementVendorProbation",invitations:"invitations",registrationRequests:"registrationRequests",inductionRecords:"inductionRecords",adminProfiles:"adminProfiles",auditorProfiles:"auditorProfiles",systemSettings:"systemSettings",mail:"mail",donorFunders:"donorFunders",grantReportingObligations:"grantReportingObligations",researchStudies:"researchStudies",researchDatasets:"researchDatasets",researchObservations:"researchObservations",researchAnalyses:"researchAnalyses",researchKnowledge:"researchKnowledge",researchOutputs:"researchOutputs",researchInstruments:"researchInstruments",researchSubmissions:"researchSubmissions",researchInformationRequests:"researchInformationRequests",researchInformationGrants:"researchInformationGrants",researchSharedInformation:"researchSharedInformation",researchUpdates:"researchUpdates",researchToolPermissions:"researchToolPermissions",researchPortalAlerts:"researchPortalAlerts",institutionalDepartments:"institutionalDepartments",departmentArchives:"departmentArchives"};
 const ACTUAL_ONLY_COLLECTIONS=new Set([COLLECTIONS.members,COLLECTIONS.employees,COLLECTIONS.employeeCounters,COLLECTIONS.memberCounters,COLLECTIONS.invitations,COLLECTIONS.registrationRequests,COLLECTIONS.inductionRecords,COLLECTIONS.adminProfiles,COLLECTIONS.auditorProfiles,COLLECTIONS.systemSettings,COLLECTIONS.audit,COLLECTIONS.signatures,"signatureEnvelopes","signatureEvents","voteLocks"]);
 function isTrialDataMode(){try{const environment=String(window.sessionStorage.getItem("irpaDataEnvironment")||"TRIAL").toUpperCase();const authority=String(window.sessionStorage.getItem("irpaActiveAccessAuthority")||"").toUpperCase();const actualAccessVerified=window.sessionStorage.getItem("irpaActualDataAccessVerified")==="true";return environment!=="ACTUAL"||(authority==="ADMINISTRATOR"&&!actualAccessVerified)}catch{return true}}
 function isActualOnlyCollection(collectionName){return ACTUAL_ONLY_COLLECTIONS.has(collectionName)}
@@ -320,9 +320,18 @@ export async function getCurrentInductionContext(){
     let registerMatches={employees:[],members:[],exactNameMatch:false};
     if(invitation?.id){
       try{
-        const call=httpsCallable(getFunctions(undefined,"us-central1"),"fetchInductionMatchingRecords");
-        const result=await call({invitationId:invitation.id});
-        registerMatches=result.data||registerMatches;
+        const matchingUser=context?.anonymous?applicantAuth.currentUser:auth.currentUser;
+        if(!matchingUser)throw new Error("Authentication is required to verify the invitation.");
+        const token=await matchingUser.getIdToken();
+        const gatewayOrigin=String(import.meta.env.VITE_GATEWAY_ORIGIN||import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").trim().replace(/[/]+$/,"");
+        const response=await fetch(gatewayOrigin+"/api/induction/matching-records",{
+          method:"POST",
+          headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},
+          body:JSON.stringify({invitationId:invitation.id})
+        });
+        const result=await response.json().catch(()=>({}));
+        if(!response.ok||result.ok===false)throw new Error(result.error||"Cloudflare induction matching is unavailable.");
+        registerMatches=result||registerMatches;
       }catch(error){
         console.warn("Induction register matching unavailable; invitation data will remain available.",error);
       }
@@ -499,12 +508,19 @@ export async function listMeetingInviteeDirectory(){
  return {boardMembers:Array.isArray(result.data?.boardMembers)?result.data.boardMembers:[],members:Array.isArray(result.data?.members)?result.data.members:[],employees:Array.isArray(result.data?.employees)?result.data.employees:[]};
 }
 
-/** Secure administrator-only removal for pending invitation records. */
+/** Secure administrator-only removal through the existing Cloudflare gateway. */
 export async function removeInvitationRecord(invitationId){
  const id=String(invitationId||"").trim();
  if(!id)throw new Error("An invitation record is required.");
  if(!auth.currentUser?.uid)throw new Error("Administrator authentication is required.");
- const call=httpsCallable(getFunctions(undefined,"us-central1"),"removeInvitationRecord");
- const result=await call({invitationId:id});
- return result.data||{ok:true};
+ const gatewayOrigin=String(import.meta.env.VITE_GATEWAY_ORIGIN||import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").trim().replace(/\/+$/,"");
+ const token=await auth.currentUser.getIdToken();
+ const response=await fetch(`${gatewayOrigin}/api/invitations/remove`,{
+  method:"POST",
+  headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},
+  body:JSON.stringify({invitationId:id})
+ });
+ const result=await response.json().catch(()=>({}));
+ if(!response.ok||result.ok!==true)throw new Error(result.error||"The invitation could not be removed safely.");
+ return result;
 }

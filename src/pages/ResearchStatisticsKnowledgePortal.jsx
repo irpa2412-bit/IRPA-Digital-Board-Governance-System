@@ -1,4 +1,5 @@
 import React,{useMemo,useState}from"react";
+import { auth } from "../firebase/config";
 import{createRecord,getRecords,updateRecord,COLLECTIONS}from"../firebase/data";
 import PortalDocumentAccessPoint from"../components/PortalDocumentAccessPoint";import{ResearchInformationRequestPanel}from"../components/ResearchInformationGovernance";
 import StatisticalAnalysisWorkbench from"../components/StatisticalAnalysisWorkbench";
@@ -42,7 +43,28 @@ export default function ResearchStatisticsKnowledgePortal({profile,employee,onNa
  const[outputForm,setOutputForm]=useState({title:"",outputType:"Research Report",studyReference:"",status:"Draft",abstract:""});
  const[entryText,setEntryText]=useState("");
  const[selectedDataset,setSelectedDataset]=useState(null);
+ const[archiveBusy,setArchiveBusy]=useState(false),[archiveResult,setArchiveResult]=useState(null);
 
+ async function provisionResearchArchive(){
+  setArchiveBusy(true);setError("");setMessage("");
+  try{
+   const user=auth.currentUser;
+   if(!user)throw new Error("Sign in with an authorized Research Department account first.");
+   const token=await user.getIdToken();
+   const response=await fetch("https://irpa-google-drive-gateway.irpa-governance.workers.dev/api/research-archive/provision",{
+    method:"POST",
+    headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
+    body:JSON.stringify({})
+   });
+   const result=await response.json().catch(()=>({}));
+   if(!response.ok||result.ok!==true||!result.folderId||!Array.isArray(result.folders)||result.folders.length!==5){
+    throw new Error(result.error||"The Research and Knowledge Google Drive archive could not be verified.");
+   }
+   setArchiveResult(result);
+   setMessage("Research and Knowledge Google Drive archive verified. All five restricted subfolders are present.");
+  }catch(e){setError(e.message||"Unable to provision or verify the Research and Knowledge archive.");}
+  finally{setArchiveBusy(false);}
+ }
  async function load(){
   setBusy(true);setError("");
   try{
@@ -82,8 +104,9 @@ export default function ResearchStatisticsKnowledgePortal({profile,employee,onNa
 
  
  return <div className="page research-portal-page">
-  <section className="welcome-panel"><div><span className="eyebrow">RESEARCH • STATISTICS • KNOWLEDGE MANAGEMENT</span><h1>Research, Statistics and Knowledge Portal</h1><p>Institutional research lifecycle, evidence management, datasets, statistical computation, knowledge preservation and research outputs for IRPA.</p></div><button type="button" onClick={load} disabled={busy}>{busy?"Refreshing…":"Refresh Research Workspace"}</button></section>
+  <section className="welcome-panel"><div><span className="eyebrow">RESEARCH • STATISTICS • KNOWLEDGE MANAGEMENT</span><h1>Research, Statistics and Knowledge Portal</h1><p>Institutional research lifecycle, evidence management, datasets, statistical computation, knowledge preservation and research outputs for IRPA.</p></div><button type="button" onClick={load} disabled={busy}>{busy?"Refreshing…":"Refresh Research Workspace"}</button><button type="button" onClick={provisionResearchArchive} disabled={archiveBusy}>{archiveBusy?"Verifying Google Drive…":"Provision / Verify Google Drive Archive"}</button></section>
   {message&&<div className="success-message action-feedback">{message}</div>}{error&&<div className="error-message action-feedback">{error}</div>}
+  {archiveResult&&<section className="panel" aria-label="Research and Knowledge Google Drive archive"><div className="panel-header"><div><span className="eyebrow">GOOGLE DRIVE ARCHIVE</span><h2>{archiveResult.archiveName}</h2><p className="panel-description">{archiveResult.archivePath} · Access restricted to authorized IRPA users.</p></div><a href={archiveResult.archiveUidLink} target="_blank" rel="noreferrer">Open archive in Google Drive</a></div><div className="dashboard-grid">{archiveResult.folders.map(folder=><div className="research-info-card" key={folder.name}><strong>{folder.name}</strong><p>Classification: {folder.classification}</p><small>Access: {folder.archiveAccess}</small></div>)}</div></section>}
   <PortalDocumentAccessPoint portal="Research, Statistics and Knowledge Portal"/><ResearchInformationRequestPanel profile={profile} employee={employee}/>
   <div className="member-actions" style={{margin:"16px 0"}}>{tabs.map(([id,label])=><button key={id} type="button" className={tab===id?"":"secondary-button"} onClick={()=>setTab(id)}>{label}</button>)}</div>
   {tab==="overview"&&<><section className="dashboard-grid"><div className="stat-card"><span>Registered Studies</span><strong>{studies.length}</strong><small>Concepts through completed studies</small></div><div className="stat-card"><span>Datasets</span><strong>{datasets.length}</strong><small>Controlled research datasets</small></div><div className="stat-card"><span>Observations</span><strong>{observations.length}</strong><small>Imported or manually entered records</small></div><div className="stat-card"><span>Knowledge Resources</span><strong>{knowledge.length}</strong><small>Reports, briefs, papers and references</small></div></section><section className="panel"><div className="panel-header"><div><span className="eyebrow">INTEGRATED RESEARCH LIFECYCLE</span><h2>Study → Data → Analysis → Knowledge → Decision</h2><p className="panel-description">Research evidence can originate from surveys, field monitoring, GIS/NDVI work, programme monitoring, livestock and rangeland studies, then move into analysis and controlled knowledge outputs.</p></div></div><div className="dashboard-grid"><div className="research-info-card"><strong>1. Study Registry</strong><p>Register research questions, methodology, locations, leads, status and governance references.</p></div><div style={cardStyle}><strong>2. Dataset Registry</strong><p>Define unit of analysis, variables, provenance and source files before observations enter the register.</p></div><div style={cardStyle}><strong>3. Statistical Engine</strong><p>Descriptive statistics, quantiles, variance, standard deviation, correlation, linear regression and chi-square calculations.</p></div><div style={cardStyle}><strong>4. Knowledge Repository</strong><p>Preserve methods, findings, abstracts, keywords, source references and outputs for institutional reuse.</p></div></div></section></>}
