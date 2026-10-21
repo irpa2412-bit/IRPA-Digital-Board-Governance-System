@@ -7,6 +7,14 @@ on:
       - package.json
       - electron/**
       - .github/workflows/build-desktop.yml
+      - vite.config.js
+      - index.html
+      - src/main.jsx
+      - public/manifest.webmanifest
+      - public/sw.js
+      - public/offline.html
+      - public/install.js
+      - public/icons/**
 permissions:
   contents: read
 jobs:
