@@ -14,7 +14,7 @@ import "./styles/grant-intelligence-layout.css";
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch((error) => {
+    navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL }).catch((error) => {
       console.warn("IRPA offline application shell registration failed:", error);
     });
   });
