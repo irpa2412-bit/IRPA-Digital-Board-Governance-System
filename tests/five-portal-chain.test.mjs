@@ -205,7 +205,7 @@ test("five-portal chain: real meeting, document upload, signature, and approval 
     meetingId:ids.meeting, participantName:"Chain Signer", participantEmail:signerUid + "@example.test", participantUid:signerUid
   });
   await putRecord("adminProfiles/" + officerUid, { role:"Authorization Officer", status:"Active" });
-  await putRecord("adminProfiles/" + authUid, { role:"Administrator", status:"Active" });
+  await putRecord("adminProfiles/" + authUid, { role:"Administrator", status:"Active", active:true });
   await putRecord("members/" + signerUid, { role:"Member", status:"Active", email:signerUid + "@example.test", uid:signerUid });
   await putRecord("members/" + ids.nonOfficer, { role:"Member", status:"Active" });
 
