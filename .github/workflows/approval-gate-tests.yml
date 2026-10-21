@@ -26,6 +26,8 @@ jobs:
         run: npm ci
       - name: Run approval gate unit tests
         run: node --test drive-gateway/tests/document-approval.test.mjs
+      - name: Install test-only Firebase Admin SDK
+        run: npm install --no-save firebase-admin
       - name: Run five-portal chain against Firestore emulator
         env:
           GCLOUD_PROJECT: demo-irpa-staging
