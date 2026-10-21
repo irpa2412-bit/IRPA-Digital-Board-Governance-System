@@ -163,14 +163,40 @@ test.todo("invitation creation uses a Firebase callable that needs the paid plan
 
 test("five-portal chain: real meeting, document upload, signature, and approval handlers preserve stage links and reject bypasses", async t => {
   t.after(async () => { globalThis.fetch = originalFetch; await cleanup(); });
+  const { privateKey } = crypto.generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const privateKeyPem = privateKey.export({ type: "pkcs8", format: "pem" });
+  const invitationSecret = "chain-invitation-secret-" + requestId;
+  const invitationEmail = signerUid + "@example.test";
+  const invitationTokenHash = crypto.createHash("sha256").update(invitationSecret).digest("hex");
   globalThis.fetch = async (input, init={}) => {
     const url = String(input);
+    if (url === "https://oauth2.googleapis.com/token") {
+      return json({ access_token: "emulator-test-access-token", expires_in: 3600 });
+    }
+    if (url.includes("identitytoolkit.googleapis.com/v1/projects/") && url.endsWith("/accounts:lookup")) {
+      return json({ users: [{ localId: signerUid, email: invitationEmail, disabled: false }] });
+    }
     if (url.startsWith("https://firestore.googleapis.com/v1/")) {
       const rewritten = "http://" + EMULATOR + url.slice("https://firestore.googleapis.com".length);
       return originalFetch(rewritten, init);
     }
     return originalFetch(input, init);
   };
+  await putRecord("invitations/" + ids.invitation, {
+    email: invitationEmail, name: "Chain Signer", status: "PENDING",
+    invitationRedemptionState: "PENDING", invitationTokenVersion: "2",
+    invitationTokenHash, invitationExpiresAt: new Date(Date.now() + 3600000).toISOString()
+  });
+  const redemption = await redeemInvitationToken(
+    request("/api/invitations/redeem", { token: ids.invitation + "." + invitationSecret }, signerUid),
+    { ...env, FIREBASE_SERVICE_ACCOUNT_JSON: JSON.stringify({ client_email: "emulator-test@demo-irpa-staging.iam.gserviceaccount.com", private_key: privateKeyPem }) }
+  );
+  assert.equal(redemption.ok, true, "real invitation redemption handler should succeed");
+  assert.equal(redemption.invitationId, ids.invitation);
+  assert.equal(redemption.uid, signerUid);
+  const redeemedInvitation = (await db.doc("invitations/" + ids.invitation).get()).data();
+  assert.equal(redeemedInvitation.invitationRedemptionState, "PASSWORD_SETUP_PENDING");
+  assert.equal(redeemedInvitation.invitationRedeemedUid, signerUid);
   await putRecord("meetings/" + ids.meeting, {
     reference:"CHAIN-" + requestId, title:"Five portal chain test", status:"Scheduled",
     initiatorUid:authUid, initiatorEmail:authUid + "@example.test"
@@ -180,7 +206,7 @@ test("five-portal chain: real meeting, document upload, signature, and approval 
   });
   await putRecord("adminProfiles/" + officerUid, { role:"Authorization Officer", status:"Active" });
   await putRecord("adminProfiles/" + authUid, { role:"Administrator", status:"Active" });
-  await putRecord("members/" + signerUid, { role:"Member", status:"Active" });
+  await putRecord("members/" + signerUid, { role:"Member", status:"Active", email:signerUid + "@example.test", uid:signerUid });
   await putRecord("members/" + ids.nonOfficer, { role:"Member", status:"Active" });
 
   const meetingResponse = await meetingRouter(request("/api/meeting-access/issue",{meetingId:ids.meeting,participantId:ids.participant},authUid),env,"/api/meeting-access/issue");
