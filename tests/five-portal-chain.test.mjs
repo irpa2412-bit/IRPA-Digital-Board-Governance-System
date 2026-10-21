@@ -178,7 +178,14 @@ test("five-portal chain: real meeting, document upload, signature, and approval 
     }
     if (url.startsWith("https://firestore.googleapis.com/v1/")) {
       const rewritten = "http://" + EMULATOR + url.slice("https://firestore.googleapis.com".length);
-      return originalFetch(rewritten, init);
+      // The Firestore emulator does not validate production OAuth JWTs. The
+      // service-account token above is intentionally synthetic, so remove it
+      // only for requests redirected to the local emulator.
+      const emulatorInit = { ...init };
+      const emulatorHeaders = new Headers(init.headers || {});
+      emulatorHeaders.delete("authorization");
+      emulatorInit.headers = emulatorHeaders;
+      return originalFetch(rewritten, emulatorInit);
     }
     return originalFetch(input, init);
   };
