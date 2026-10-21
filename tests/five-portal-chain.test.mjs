@@ -250,7 +250,7 @@ test("five-portal chain: real meeting, document upload, signature, and approval 
     env:{}, now:()=>new Date(), config:{appUrl:"https://gateway.test",ttlDays:14}, logger:{error(){}},
     verifyUser:async()=>({uid:signerUid,email:signerUid+"@example.test"}),
     meta:{
-      get:async(collection,id)=>{const snap=await db.doc(collection+"/"+id).get();return snap.exists?snap.data():null;},
+      get:async(collection,id)=>{const snap=await db.doc(collection+"/"+id).get();return snap.exists?{id:snap.id,...snap.data()}:null;},
       list:async collection=>(await db.collection(collection).get()).docs.map(s=>({id:s.id,...s.data()})),
       create:async(collection,id,value)=>{await db.doc(collection+"/"+id).create(value);},
       update:async(collection,id,patch,options={})=>{const ref=db.doc(collection+"/"+id);const snap=await ref.get();if(options.ifVersion!=null&&snap.data()?._v!==options.ifVersion)throw new Error("unexpected version conflict");await ref.set({...patch,_v:(snap.data()?._v||0)+1},{merge:true});}
