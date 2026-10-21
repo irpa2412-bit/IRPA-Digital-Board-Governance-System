@@ -7,7 +7,7 @@ import { createMeetingPortalRouter } from "../drive-gateway/src/meetingPortal.mj
 import { createDocumentLifecycleRouter } from "../drive-gateway/src/documentLifecycle.mjs";
 import { createDocumentApprovalRouter } from "../drive-gateway/src/documentApproval.mjs";
 import { redeemInvitationToken, InvitationRedemptionError } from "../drive-gateway/src/invitationRedemption.mjs";
-import { sign } from "../drive-gateway/src/signing.mjs";
+import { createEnvelope, sign } from "../drive-gateway/src/signing.mjs";
 import { PDFDocument } from "pdf-lib";
 
 const PROJECT = process.env.GCLOUD_PROJECT || "demo-irpa-staging";
@@ -186,12 +186,6 @@ test("five-portal chain: real meeting, document upload, signature, and approval 
       emulatorHeaders.set("authorization", "Bearer owner");
       emulatorInit.headers = emulatorHeaders;
       const emulatorUrl = new URL(rewritten);
-      // The emulator fixture seeds through the Admin SDK, so avoid a REST
-      // updateTime precondition mismatch in the local adapter; production
-      // handler code and its conditional write remain unchanged.
-      if (String(init.method || "GET").toUpperCase() === "PATCH") {
-        emulatorUrl.searchParams.delete("currentDocument.updateTime");
-      }
       return originalFetch(emulatorUrl.toString(), emulatorInit);
     }
     return originalFetch(input, init);
@@ -247,31 +241,58 @@ test("five-portal chain: real meeting, document upload, signature, and approval 
   const pdfDoc = await PDFDocument.create(); pdfDoc.addPage([300,400]); const pdfBytes = new Uint8Array(await pdfDoc.save());
   const hash = crypto.createHash("sha256").update(pdfBytes).digest("hex");
   await db.doc("documents/" + upload.documentId).set({ status:"Stored", hash, primaryStorageId:"original-" + requestId, fileId:"original-" + requestId, ownerUid:authUid },{merge:true});
-  const envelope = {
-    id:ids.envelope, documentId:upload.documentId, documentHash:hash, title:"Five portal chain fixture",
-    fileName:"chain.pdf", classification:"Internal", createdBy:authUid, status:"Sent",
-    signers:[{id:"S1",email:signerUid+"@example.test",name:"Chain Signer",order:1,uid:signerUid,status:"Pending",tokenHash:crypto.createHash("sha256").update("chain-secret").digest("hex"),invitation:"Sent"}],
-    archiveTargets:[],createdAt:new Date().toISOString(),expiresAt:new Date(Date.now()+3600000).toISOString(),events:[],completion:null,_v:1
-  };
-  await db.doc("envelopes/" + ids.envelope).set(envelope);
   const signingCtx = {
     env:{}, now:()=>new Date(), config:{appUrl:"https://gateway.test",ttlDays:14}, logger:{error(){}},
     verifyUser:async()=>({uid:signerUid,email:signerUid+"@example.test"}),
     meta:{
       get:async(collection,id)=>{const snap=await db.doc(collection+"/"+id).get();return snap.exists?snap.data():null;},
+      list:async collection=>(await db.collection(collection).get()).docs.map(s=>({id:s.id,...s.data()})),
+      create:async(collection,id,value)=>{await db.doc(collection+"/"+id).create(value);},
       update:async(collection,id,patch,options={})=>{const ref=db.doc(collection+"/"+id);const snap=await ref.get();if(options.ifVersion!=null&&snap.data()?._v!==options.ifVersion)throw new Error("unexpected version conflict");await ref.set({...patch,_v:(snap.data()?._v||0)+1},{merge:true});}
     },
-    storage:{get:async id=>id==="original-"+requestId?pdfBytes:null,put:async()=>({id:"signed-"+requestId}),delete:async()=>{}},
+    storage:{get:async id=>["original-"+requestId,"other-original-"+requestId].includes(id)?pdfBytes:null,put:async()=>({id:"signed-"+requestId}),delete:async()=>{}},
     sendInvitation:null,allowReturnTokens:true
   };
-  const signResult = await sign(signingCtx,{token:ids.envelope+".S1.chain-secret",signature:{type:"typed",value:"Chain Signer"},consent:true,ip:"127.0.0.1",userAgent:"chain-test",user:{uid:signerUid,email:signerUid+"@example.test"}});
+  const createdEnvelope = await createEnvelope(signingCtx,{uid:authUid,isAdmin:true},{
+    documentId:upload.documentId,
+    signers:[{email:signerUid+"@example.test",name:"Chain Signer",order:1,uid:signerUid}]
+  });
+  assert.equal(createdEnvelope.ok,true,"real envelope creation should succeed");
+  assert.ok(createdEnvelope.tokens?.[0],"test context should return the token created by the real envelope creator");
+  ids.envelope = createdEnvelope.envelopeId;
+  const signingToken = createdEnvelope.tokens[0];
+  const savedEnvelope = (await db.doc("envelopes/"+ids.envelope).get()).data();
+  assert.equal(savedEnvelope.documentId,upload.documentId,"real signing envelope must reference the Stage 3 document");
+  assert.equal(savedEnvelope.signers[0].id,"S1");
+  assert.equal(savedEnvelope.signers[0].tokenHash,crypto.createHash("sha256").update(signingToken.split(".")[2]).digest("hex"));
+
+  const otherDocumentId = "chain-other-document-"+requestId;
+  await db.doc("documents/"+otherDocumentId).set({
+    id:otherDocumentId,status:"Stored",hash,primaryStorageId:"other-original-"+requestId,
+    title:"Different controlled document",fileName:"other.pdf",classification:"Internal",ownerUid:authUid
+  });
+  const otherEnvelopeResult = await createEnvelope(signingCtx,{uid:authUid,isAdmin:true},{
+    documentId:otherDocumentId,
+    signers:[{email:signerUid+"@example.test",name:"Chain Signer",order:1,uid:signerUid}]
+  });
+  assert.equal(otherEnvelopeResult.ok,true,"real envelope creation for a different document should succeed");
+  const otherTokenParts = otherEnvelopeResult.tokens[0].split(".");
+  const wrongDocumentToken = ids.envelope+"."+otherTokenParts[1]+"."+otherTokenParts[2];
+  const signResult = await sign(signingCtx,{token:signingToken,signature:{type:"typed",value:"Chain Signer"},consent:true,ip:"127.0.0.1",userAgent:"chain-test",user:{uid:signerUid,email:signerUid+"@example.test"}});
   assert.equal(signResult.ok,true);
   assert.equal((await db.doc("envelopes/" + ids.envelope).get()).data().signers[0].status,"Signed");
   assert.equal((await db.doc("envelopes/" + ids.envelope).get()).data().status,"Completed");
   await db.doc("signatureEnvelopes/" + ids.envelope).set({documentId:upload.documentId,status:"Completed",lastSignedByUid:signerUid,signers:[{uid:signerUid,status:"Signed"}]});
   await db.doc("documents/" + upload.documentId).set({status:"SIGNED",signatureStatus:"COMPLETED",signatureEnvelopeId:ids.envelope,signedByUid:signerUid},{merge:true});
 
-  await assert.rejects(() => sign(signingCtx,{token:ids.envelope+".S1.chain-secret",signature:{type:"typed",value:"Chain Signer"},consent:true,user:{uid:signerUid,email:signerUid+"@example.test"}}),"signature token reuse should fail");
+  const replayResult = await sign(signingCtx,{token:signingToken,signature:{type:"typed",value:"Chain Signer"},consent:true,user:{uid:signerUid,email:signerUid+"@example.test"}});
+  assert.equal(replayResult.ok,true,"the signing handler currently treats repeat use by the same signer as idempotent");
+  assert.equal(replayResult.idempotent,true,"repeated use must not create a second signature");
+  await assert.rejects(
+    () => sign(signingCtx,{token:wrongDocumentToken,signature:{type:"typed",value:"Chain Signer"},consent:true,user:{uid:signerUid,email:signerUid+"@example.test"}}),
+    error => /not valid|Invalid signing link/i.test(error.message),
+    "a signing secret issued for another document/envelope must be rejected"
+  );
   const memberApproval = await approvalRouter(request("/api/document-lifecycle/approval/decide",{documentId:upload.documentId,decision:"approve"},ids.nonOfficer),env);
   assert.equal(memberApproval.status,403,"non-officer approval must be denied");
   const signerApproval = await approvalRouter(request("/api/document-lifecycle/approval/decide",{documentId:upload.documentId,decision:"approve"},signerUid),env);
