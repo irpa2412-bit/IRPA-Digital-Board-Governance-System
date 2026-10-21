@@ -2,26 +2,26 @@
   "name": "IRPA-DBGS",
   "short_name": "IRPA",
   "description": "IRPA Digital Board Governance System",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "theme_color": "#071713",
   "background_color": "#071713",
   "icons": [
     {
-      "src": "/icons/irpa-192.svg",
+      "src": "./icons/irpa-192.svg",
       "sizes": "192x192",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/icons/irpa-512.svg",
+      "src": "./icons/irpa-512.svg",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/icons/irpa-maskable.svg",
+      "src": "./icons/irpa-maskable.svg",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "maskable"
