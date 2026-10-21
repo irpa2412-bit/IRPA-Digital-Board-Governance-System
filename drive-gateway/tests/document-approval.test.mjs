@@ -140,7 +140,7 @@ test("records a rejection with its reason", async () => {
   const result = await call(ctx, { documentId: "doc-1", decision: "reject", reason: "Missing board resolution" });
   assert.equal(result.response.status, 200);
   assert.equal(result.data.approval.reason, "Missing board resolution");
-  assert.equal(ctx.commits[0].audit.mapValue.fields.action.stringValue, "DOCUMENT_APPROVAL_REJECT");
+  assert.equal(ctx.commits[0].audit.action.stringValue, "DOCUMENT_APPROVAL_REJECT");
 });
 
 test("returns 405 for methods other than POST", async () => {
