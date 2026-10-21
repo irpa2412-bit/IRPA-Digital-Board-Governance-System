@@ -128,7 +128,7 @@ const approvalDeps = {
   },
   firestoreDocumentToPlain: plain,
   commitDocumentAndAudit: async (_env,documentId,_token,fields,mask,auditFields) => {
-    const patch = Object.fromEntries((mask || Object.keys(fields)).map(k => [k,fromRestValue(v=fields[k])]));
+    const patch = Object.fromEntries((mask || Object.keys(fields)).map(k => [k,fromRestValue(fields[k])]));
     const batch = db.batch();
     batch.set(db.doc("documents/" + documentId),patch,{merge:true});
     batch.set(db.collection("audit").doc(),Object.fromEntries(Object.entries(auditFields).map(([k,v])=>[k,fromRestValue(v)])));
@@ -179,6 +179,7 @@ test("five-portal chain: real meeting, document upload, signature, and approval 
     meetingId:ids.meeting, participantName:"Chain Signer", participantEmail:signerUid + "@example.test", participantUid:signerUid
   });
   await putRecord("adminProfiles/" + officerUid, { role:"Authorization Officer", status:"Active" });
+  await putRecord("adminProfiles/" + authUid, { role:"Administrator", status:"Active" });
   await putRecord("members/" + signerUid, { role:"Member", status:"Active" });
   await putRecord("members/" + ids.nonOfficer, { role:"Member", status:"Active" });
 
