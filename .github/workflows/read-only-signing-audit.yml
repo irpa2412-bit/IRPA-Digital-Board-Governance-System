@@ -1,0 +1,54 @@
+name: read-only-signing-audit
+
+on:
+  push:
+    branches:
+      - audit/signing-link-readonly-20261021
+
+permissions:
+  contents: read
+
+jobs:
+  read-only-signing-audit:
+    name: read-only-signing-audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Print signing-flow source evidence
+        shell: bash
+        run: |
+          set +e
+
+          section() {
+            printf '\n===== %s =====\n' "$1"
+          }
+
+          section "A. Signature portal signing calls and routes"
+          grep -nE 'createSignatureEnvelope|signEnvelope|createEnvelope|fetch|/api/' \
+            src/pages/SignaturePlatform.jsx src/pages/GatewaySigningPortal.jsx
+          printf 'grep exit: %s\n' "$?"
+
+          section "B1. All signatureEnvelopes references in drive-gateway/src, src, functions"
+          grep -RIn --exclude-dir=node_modules --exclude-dir=.git 'signatureEnvelopes' drive-gateway/src src functions
+          printf 'grep exit: %s\n' "$?"
+
+          section "B2. All envelopes collection/name references in drive-gateway/src, src, functions"
+          grep -RInE --exclude-dir=node_modules --exclude-dir=.git 'envelopes' drive-gateway/src src functions
+          printf 'grep exit: %s\n' "$?"
+
+          section "C. drive-gateway/src/documentApproval.mjs lines 60-120"
+          sed -n '60,120p' drive-gateway/src/documentApproval.mjs
+          printf 'sed exit: %s\n' "$?"
+
+          section "D. drive-gateway/src/documentLifecycle.mjs lines 300-340 (signature-complete handler)"
+          sed -n '300,340p' drive-gateway/src/documentLifecycle.mjs
+          printf 'sed exit: %s\n' "$?"
+
+          section "E. Status and storage/hash fields in upload.mjs and documentLifecycle.mjs"
+          grep -nE 'Stored|WORKING|PENDING_SIGNATURE|primaryStorageId|fileId|sha256|hash' \
+            drive-gateway/src/upload.mjs drive-gateway/src/documentLifecycle.mjs
+          printf 'grep exit: %s\n' "$?"
