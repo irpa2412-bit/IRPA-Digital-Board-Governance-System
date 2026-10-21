@@ -35,7 +35,7 @@ function loggingProxy(label, target) {
           console.log("[SIGN-TRACE] " + label + "." + String(prop) + " => " + JSON.stringify(safeSummary(result)));
           return result;
         } catch (error) {
-          console.error("[SIGN-TRACE] " + label + "." + String(prop) + " THREW " + String(error?.message || error) + "\\n" + String(error?.stack || ""));
+          console.error("[SIGN-TRACE] " + label + "." + String(prop) + " THREW message=" + String(error?.message || error) + "\nstack=" + String(error?.stack || ""));
           throw error;
         }
       };
@@ -274,7 +274,7 @@ test("five-portal chain: real meeting, document upload, signature, and approval 
   const hash = crypto.createHash("sha256").update(pdfBytes).digest("hex");
   await db.doc("documents/" + upload.documentId).set({ status:"Stored", hash, primaryStorageId:"original-" + requestId, fileId:"original-" + requestId, ownerUid:authUid, fileName:"chain.pdf", contentType:"application/pdf" },{merge:true});
   const signingCtx = {
-    env:{}, now:()=>new Date(), config:{appUrl:"https://gateway.test",ttlDays:14}, logger:{error(){}},
+    env:{}, now:()=>new Date(), config:{appUrl:"https://gateway.test",ttlDays:14}, logger:{error:(...args)=>console.error("[SIGN-TRACE] signing.logger.error args=" + JSON.stringify(safeSummary(args)))},
     verifyUser:async()=>({uid:signerUid,email:signerUid+"@example.test"}),
     meta:loggingProxy("meta",{
       get:async(collection,id)=>{const snap=await db.doc(collection+"/"+id).get();return snap.exists?{id:snap.id,...snap.data()}:null;},
