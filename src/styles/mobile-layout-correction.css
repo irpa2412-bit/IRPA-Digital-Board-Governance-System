@@ -1,42 +1,92 @@
-/* Mobile layout correction — 2026-10-21.
-   Shared viewport containment, scrollable data tables, mobile header clock,
-   and removal of the mobile-only floating Back/Next panel. Desktop rules are unchanged. */
-*, *::before, *::after { box-sizing: border-box; }
-html, body {
-  max-width: 100%;
-  overflow-x: hidden;
+/* Responsive layout correction — 2026-10-21.
+   Keep the application shell in a two-column desktop layout. Only narrow-phone
+   corrections are scoped to the mobile breakpoint; never clip the desktop root. */
+*, *::before, *::after {
+  box-sizing: border-box;
 }
 img, video, iframe, canvas, table {
   max-width: 100%;
 }
-#root, .app-shell, .main-area, .content-area, .dashboard-content-area,
-.page, .page > *, .panel, .module-panel, .welcome-panel,
-.topbar, .topbar-heading-row, .topbar-title-block, .topbar-access-category {
-  min-width: 0;
-  max-width: 100%;
-  box-sizing: border-box;
-}
-.page img, .page video, .page iframe, .page canvas, .page svg,
-.content-area img, .content-area video, .content-area iframe, .content-area canvas {
-  height: auto;
-  max-width: 100%;
-}
-.page table, .content-area table, .dashboard-content-area table {
-  max-width: 100%;
-}
-@media (max-width: 760px) {
-  html, body, #root, .app-shell, .main-area, .content-area, .dashboard-content-area {
+
+/* Desktop and tablet: sidebar occupies column one; header and content share column two. */
+@media screen and (min-width: 768px) {
+  html, body, #root {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: visible;
+  }
+  #root .app-shell {
+    display: grid !important;
+    grid-template-columns: 286px minmax(0, 1fr) !important;
+    grid-template-rows: minmax(100vh, auto) !important;
+    align-items: start;
     width: 100%;
     max-width: 100%;
+    min-width: 0;
+    min-height: 100vh;
+    overflow: visible;
+  }
+  #root .app-shell > .sidebar {
+    grid-column: 1;
+    grid-row: 1;
+    position: sticky !important;
+    inset: auto !important;
+    top: 0 !important;
+    width: 286px !important;
+    min-width: 0;
+    max-width: 286px;
+    height: 100vh;
+    min-height: 0;
+    align-self: start;
     overflow-x: hidden;
+    overflow-y: auto;
   }
-  .main-area, .content-area, .dashboard-content-area,
-  .page, .page > *, .panel, .module-panel, .welcome-panel,
-  .form-grid, .detail-grid, .dashboard-grid {
+  #root .app-shell > .main-area {
+    grid-column: 2;
+    grid-row: 1;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    min-height: 100vh;
+    margin: 0 !important;
+    overflow: visible;
+  }
+  #root .app-shell > .main-area > header.topbar {
+    position: relative;
+    top: auto;
+    width: 100%;
+    max-width: 100%;
+  }
+  #root .app-shell > .main-area > .content-area {
+    width: 100%;
+    min-width: 0;
+    max-width: 1500px;
+  }
+}
+
+/* Mobile only: constrain horizontal overflow without affecting desktop sticky layout. */
+@media screen and (max-width: 767px) {
+  html, body, #root {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: clip;
+  }
+  #root .app-shell,
+  #root .app-shell > .main-area,
+  #root .app-shell > .main-area > .content-area,
+  #root .app-shell .dashboard-content-area {
+    width: 100%;
     min-width: 0 !important;
-    max-width: 100% !important;
+    max-width: 100%;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    overflow-x: clip;
   }
-  .main-area > .page-back-next-navigation {
+  #root .app-shell > .sidebar {
+    display: none;
+  }
+  #root .app-shell > .main-area > .page-back-next-navigation {
     display: none !important;
     position: static !important;
     inset: auto !important;
@@ -47,11 +97,24 @@ img, video, iframe, canvas, table {
     border: 0 !important;
     box-shadow: none !important;
   }
-  .main-area > .content-area {
+  #root .app-shell > .main-area > .content-area {
     padding-bottom: 12px !important;
     margin-bottom: 0 !important;
   }
-  .content-area table, .dashboard-content-area table, .page table {
+  #root .app-shell .main-area .page,
+  #root .app-shell .main-area .page > *,
+  #root .app-shell .main-area .panel,
+  #root .app-shell .main-area .module-panel,
+  #root .app-shell .main-area .welcome-panel,
+  #root .app-shell .main-area .form-grid,
+  #root .app-shell .main-area .detail-grid,
+  #root .app-shell .main-area .dashboard-grid {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+  #root .app-shell .main-area .content-area table,
+  #root .app-shell .main-area .dashboard-content-area table,
+  #root .app-shell .main-area .page table {
     display: block;
     width: 100%;
     max-width: 100%;
@@ -59,18 +122,23 @@ img, video, iframe, canvas, table {
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
   }
-  .content-area img, .content-area video, .content-area iframe, .content-area canvas,
-  .page img, .page video, .page iframe, .page canvas {
+  #root .app-shell .main-area .content-area img,
+  #root .app-shell .main-area .content-area video,
+  #root .app-shell .main-area .content-area iframe,
+  #root .app-shell .main-area .content-area canvas,
+  #root .app-shell .main-area .page img,
+  #root .app-shell .main-area .page video,
+  #root .app-shell .main-area .page iframe,
+  #root .app-shell .main-area .page canvas {
+    height: auto;
     max-width: 100% !important;
   }
-  .content-area :is(input, select, textarea, button),
-  .page :is(input, select, textarea, button) {
+  #root .app-shell .main-area .content-area :is(input, select, textarea, button),
+  #root .app-shell .main-area .page :is(input, select, textarea, button) {
     max-width: 100%;
     min-width: 0;
   }
-
-  /* Relocate the existing live world clock into the top overhead navigation panel. */
-  #root .app-shell .main-area > .desktop-webapp-navigation-roller .webapp-navigation-live-clock {
+  #root .app-shell .main-area .webapp-navigation-live-clock {
     display: flex !important;
     order: -1 !important;
     flex-flow: row nowrap !important;
@@ -87,7 +155,7 @@ img, video, iframe, canvas, table {
     font-size: 10px !important;
     line-height: 1.15 !important;
   }
-  #root .app-shell .main-area > .desktop-webapp-navigation-roller .webapp-navigation-live-clock > * {
+  #root .app-shell .main-area .webapp-navigation-live-clock > * {
     flex: 0 1 auto !important;
     min-width: 0 !important;
     max-width: 100% !important;
@@ -98,52 +166,13 @@ img, video, iframe, canvas, table {
     font-size: 10px !important;
     line-height: 1.15 !important;
   }
-  #root .app-shell .main-area > .desktop-webapp-navigation-roller .webapp-navigation-live-clock button {
+  #root .app-shell .main-area .webapp-navigation-live-clock button {
     flex: 0 0 auto !important;
     padding: 2px 5px !important;
     min-height: 20px !important;
     font-size: 10px !important;
   }
-
-  /* Keep the live date/time inside the overhead authority panel as one compact line. */
-  .main-area > .topbar .mobile-access-live-date {
-    display: flex !important;
-    flex-flow: row nowrap !important;
-    align-items: center !important;
-    justify-content: flex-start !important;
-    gap: 4px 8px !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    margin: 6px 0 0 !important;
-    padding: 0 !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    font-size: 10px !important;
-    line-height: 1.2 !important;
-  }
-  .main-area > .topbar .mobile-access-live-date > * {
-    flex: 0 1 auto !important;
-    min-width: 0 !important;
-    max-width: 100% !important;
-    margin: 0 !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    font-size: 10px !important;
-    line-height: 1.2 !important;
-  }
-  .main-area > .topbar .mobile-access-live-date button {
-    flex: 0 0 auto !important;
-    padding: 2px 5px !important;
-    min-height: 20px !important;
-    font-size: 10px !important;
-  }
-  /* No fixed-width child may widen the page; preserve intentional horizontal scrolling in tables. */
-  .main-area :where(*):not(table):not(thead):not(tbody):not(tr):not(th):not(td) {
-    min-width: 0;
-  }
-  .main-area :where(h1, h2, h3, h4, p, label, a, strong, span) {
+  #root .app-shell .main-area :where(h1, h2, h3, h4, p, label, a, strong, span) {
     overflow-wrap: anywhere;
   }
 }
