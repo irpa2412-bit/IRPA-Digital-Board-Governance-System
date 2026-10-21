@@ -245,7 +245,7 @@ test("five-portal chain: real meeting, document upload, signature, and approval 
 
   const pdfDoc = await PDFDocument.create(); pdfDoc.addPage([300,400]); const pdfBytes = new Uint8Array(await pdfDoc.save());
   const hash = crypto.createHash("sha256").update(pdfBytes).digest("hex");
-  await db.doc("documents/" + upload.documentId).set({ status:"Stored", hash, primaryStorageId:"original-" + requestId, fileId:"original-" + requestId, ownerUid:authUid },{merge:true});
+  await db.doc("documents/" + upload.documentId).set({ status:"Stored", hash, primaryStorageId:"original-" + requestId, fileId:"original-" + requestId, ownerUid:authUid, fileName:"chain.pdf", contentType:"application/pdf" },{merge:true});
   const signingCtx = {
     env:{}, now:()=>new Date(), config:{appUrl:"https://gateway.test",ttlDays:14}, logger:{error(){}},
     verifyUser:async()=>({uid:signerUid,email:signerUid+"@example.test"}),
@@ -255,7 +255,7 @@ test("five-portal chain: real meeting, document upload, signature, and approval 
       create:async(collection,id,value)=>{await db.doc(collection+"/"+id).create(value);},
       update:async(collection,id,patch,options={})=>{const ref=db.doc(collection+"/"+id);const snap=await ref.get();if(options.ifVersion!=null&&snap.data()?._v!==options.ifVersion)throw new Error("unexpected version conflict");await ref.set({...patch,_v:(snap.data()?._v||0)+1},{merge:true});}
     },
-    storage:{get:async id=>["original-"+requestId,"other-original-"+requestId].includes(id)?pdfBytes:null,put:async()=>({id:"signed-"+requestId}),delete:async()=>{}},
+    storage:{get:async id=>["original-"+requestId,"other-original-"+requestId].includes(id)?pdfBytes:null,put:async({path,bytes,contentType,metadata})=>({id:"signed-"+requestId+"-"+crypto.createHash("sha256").update(path+String(bytes.length)+contentType+JSON.stringify(metadata)).digest("hex").slice(0,12)}),delete:async()=>{}},
     sendInvitation:null,allowReturnTokens:true
   };
   const createdEnvelope = await createEnvelope(signingCtx,{uid:authUid,isAdmin:true},{
@@ -283,6 +283,11 @@ test("five-portal chain: real meeting, document upload, signature, and approval 
   assert.equal(otherEnvelopeResult.ok,true,"real envelope creation for a different document should succeed");
   const otherTokenParts = otherEnvelopeResult.tokens[0].split(".");
   const wrongDocumentToken = ids.envelope+"."+otherTokenParts[1]+"."+otherTokenParts[2];
+  await assert.rejects(
+    () => sign(signingCtx,{token:signingToken,signature:{type:"typed",value:"Chain Signer"},consent:true,user:{uid:ids.nonOfficer,email:ids.nonOfficer+"@example.test"}}),
+    error => /invited signer|not valid|Invalid signing link/i.test(error.message),
+    "a non-member must not sign with another member’s token"
+  );
   const signResult = await sign(signingCtx,{token:signingToken,signature:{type:"typed",value:"Chain Signer"},consent:true,ip:"127.0.0.1",userAgent:"chain-test",user:{uid:signerUid,email:signerUid+"@example.test"}});
   assert.equal(signResult.ok,true);
   assert.equal((await db.doc("envelopes/" + ids.envelope).get()).data().signers[0].status,"Signed");
@@ -290,10 +295,21 @@ test("five-portal chain: real meeting, document upload, signature, and approval 
   await db.doc("signatureEnvelopes/" + ids.envelope).set({documentId:upload.documentId,status:"Completed",lastSignedByUid:signerUid,signers:[{uid:signerUid,status:"Signed"}]});
   await db.doc("documents/" + upload.documentId).set({status:"SIGNED",signatureStatus:"COMPLETED",signatureEnvelopeId:ids.envelope,signedByUid:signerUid},{merge:true});
 
-  await assert.rejects(
-    () => sign(signingCtx,{token:signingToken,signature:{type:"typed",value:"Chain Signer"},consent:true,user:{uid:signerUid,email:signerUid+"@example.test"}}),
-    "signature token reuse should fail"
-  );
+  const envelopeBeforeReplay = (await db.doc("envelopes/" + ids.envelope).get()).data();
+  const signatureRecordsBeforeReplay = (await db.collection("signatureEnvelopes").get()).docs.map(d => ({id:d.id,data:d.data()}));
+  const auditBeforeReplay = (await db.collection("audit").get()).docs.map(d => ({id:d.id,data:d.data()}));
+  const replayResult = await sign(signingCtx,{token:signingToken,signature:{type:"typed",value:"Chain Signer"},consent:true,user:{uid:signerUid,email:signerUid+"@example.test"}});
+  assert.equal(replayResult.ok,true,"replay of the same signing token must succeed idempotently");
+  assert.equal(replayResult.idempotent,true);
+  assert.equal(replayResult.status,"Completed");
+  const envelopeAfterReplay = (await db.doc("envelopes/" + ids.envelope).get()).data();
+  const signatureRecordsAfterReplay = (await db.collection("signatureEnvelopes").get()).docs.map(d => ({id:d.id,data:d.data()}));
+  const auditAfterReplay = (await db.collection("audit").get()).docs.map(d => ({id:d.id,data:d.data()}));
+  assert.equal(envelopeAfterReplay.events.length,envelopeBeforeReplay.events.length,"replay must not add a signing audit event");
+  assert.deepEqual(envelopeAfterReplay.completion,envelopeBeforeReplay.completion,"replay must not change the completed document metadata");
+  assert.deepEqual(envelopeAfterReplay.signers,envelopeBeforeReplay.signers,"replay must not create a second signature");
+  assert.deepEqual(signatureRecordsAfterReplay,signatureRecordsBeforeReplay,"replay must not create another signature record");
+  assert.deepEqual(auditAfterReplay,auditBeforeReplay,"replay must not create another audit event");
   await assert.rejects(
     () => sign(signingCtx,{token:wrongDocumentToken,signature:{type:"typed",value:"Chain Signer"},consent:true,user:{uid:signerUid,email:signerUid+"@example.test"}}),
     error => /not valid|Invalid signing link/i.test(error.message),
