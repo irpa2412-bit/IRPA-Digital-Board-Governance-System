@@ -15,6 +15,33 @@ if (!getApps().length) initializeApp({ projectId: PROJECT });
 const db = getFirestore();
 const EMULATOR = process.env.FIRESTORE_EMULATOR_HOST || "127.0.0.1:8080";
 const originalFetch = globalThis.fetch;
+function safeSummary(value, key = "") {
+  if (/token|secret|signatureValue|privateKey|authorization/i.test(key)) return "[redacted]";
+  if (value instanceof Uint8Array || Buffer.isBuffer(value)) return { type: "bytes", length: value.length };
+  if (Array.isArray(value)) return { type: "array", length: value.length };
+  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([k,v]) => [k, safeSummary(v,k)]));
+  if (typeof value === "string") return value.length > 160 ? value.slice(0,160) + "…" : value;
+  return value;
+}
+function loggingProxy(label, target) {
+  return new Proxy(target, {
+    get(obj, prop, receiver) {
+      const value = Reflect.get(obj, prop, receiver);
+      if (typeof value !== "function") return value;
+      return async (...args) => {
+        console.log("[SIGN-TRACE] " + label + "." + String(prop) + " args=" + JSON.stringify(safeSummary(args)));
+        try {
+          const result = await value.apply(obj, args);
+          console.log("[SIGN-TRACE] " + label + "." + String(prop) + " => " + JSON.stringify(safeSummary(result)));
+          return result;
+        } catch (error) {
+          console.error("[SIGN-TRACE] " + label + "." + String(prop) + " THREW " + String(error?.message || error) + "\\n" + String(error?.stack || ""));
+          throw error;
+        }
+      };
+    }
+  });
+}
 const requestId = crypto.randomUUID().replace(/-/g, "");
 const ids = {
   meeting: "chain-meeting-" + requestId,
@@ -249,13 +276,13 @@ test("five-portal chain: real meeting, document upload, signature, and approval 
   const signingCtx = {
     env:{}, now:()=>new Date(), config:{appUrl:"https://gateway.test",ttlDays:14}, logger:{error(){}},
     verifyUser:async()=>({uid:signerUid,email:signerUid+"@example.test"}),
-    meta:{
+    meta:loggingProxy("meta",{
       get:async(collection,id)=>{const snap=await db.doc(collection+"/"+id).get();return snap.exists?{id:snap.id,...snap.data()}:null;},
       list:async collection=>(await db.collection(collection).get()).docs.map(s=>({id:s.id,...s.data()})),
       create:async(collection,id,value)=>{await db.doc(collection+"/"+id).create(value);},
       update:async(collection,id,patch,options={})=>{const ref=db.doc(collection+"/"+id);const snap=await ref.get();if(options.ifVersion!=null&&snap.data()?._v!==options.ifVersion)throw new Error("unexpected version conflict");await ref.set({...patch,_v:(snap.data()?._v||0)+1},{merge:true});}
-    },
-    storage:{get:async id=>["original-"+requestId,"other-original-"+requestId].includes(id)?pdfBytes:null,put:async({path,bytes,contentType,metadata})=>({id:"signed-"+requestId+"-"+crypto.createHash("sha256").update(path+String(bytes.length)+contentType+JSON.stringify(metadata)).digest("hex").slice(0,12)}),delete:async()=>{}},
+    }),
+    storage:loggingProxy("storage",{get:async id=>["original-"+requestId,"other-original-"+requestId].includes(id)?pdfBytes:null,put:async({path,bytes,contentType,metadata})=>({id:"signed-"+requestId+"-"+crypto.createHash("sha256").update(path+String(bytes.length)+contentType+JSON.stringify(metadata)).digest("hex").slice(0,12)}),delete:async()=>{}}),
     sendInvitation:null,allowReturnTokens:true
   };
   const createdEnvelope = await createEnvelope(signingCtx,{uid:authUid,isAdmin:true},{
