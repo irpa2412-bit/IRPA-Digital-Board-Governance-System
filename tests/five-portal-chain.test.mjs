@@ -15,6 +15,15 @@ if (!getApps().length) initializeApp({ projectId: PROJECT });
 const db = getFirestore();
 const EMULATOR = process.env.FIRESTORE_EMULATOR_HOST || "127.0.0.1:8080";
 const originalFetch = globalThis.fetch;
+function omitUndefinedDeep(value) {
+  if (Array.isArray(value)) return value.map(item => item === undefined ? null : omitUndefinedDeep(item));
+  if (value && typeof value === "object" && !(value instanceof Uint8Array) && !Buffer.isBuffer(value) && !(value instanceof Date)) {
+    return Object.fromEntries(Object.entries(value)
+      .filter(([, item]) => item !== undefined)
+      .map(([key, item]) => [key, omitUndefinedDeep(item)]));
+  }
+  return value;
+}
 function safeSummary(value, key = "") {
   if (/token|secret|signatureValue|privateKey|authorization/i.test(key)) return "[redacted]";
   if (value instanceof Uint8Array || Buffer.isBuffer(value)) return { type: "bytes", length: value.length };
@@ -280,7 +289,7 @@ test("five-portal chain: real meeting, document upload, signature, and approval 
       get:async(collection,id)=>{const snap=await db.doc(collection+"/"+id).get();return snap.exists?{id:snap.id,...snap.data()}:null;},
       list:async collection=>(await db.collection(collection).get()).docs.map(s=>({id:s.id,...s.data()})),
       create:async(collection,id,value)=>{await db.doc(collection+"/"+id).create(value);},
-      update:async(collection,id,patch,options={})=>{const ref=db.doc(collection+"/"+id);const snap=await ref.get();if(options.ifVersion!=null&&snap.data()?._v!==options.ifVersion)throw new Error("unexpected version conflict");await ref.set({...patch,_v:(snap.data()?._v||0)+1},{merge:true});}
+      update:async(collection,id,patch,options={})=>{const ref=db.doc(collection+"/"+id);const snap=await ref.get();if(options.ifVersion!=null&&snap.data()?._v!==options.ifVersion)throw new Error("unexpected version conflict");const firestorePatch=omitUndefinedDeep(patch);await ref.set({...firestorePatch,_v:(snap.data()?._v||0)+1},{merge:true});}
     }),
     storage:loggingProxy("storage",{get:async id=>["original-"+requestId,"other-original-"+requestId].includes(id)?pdfBytes:null,put:async({path,bytes,contentType,metadata})=>({id:"signed-"+requestId+"-"+crypto.createHash("sha256").update(path+String(bytes.length)+contentType+JSON.stringify(metadata)).digest("hex").slice(0,12)}),delete:async()=>{}}),
     sendInvitation:null,allowReturnTokens:true
