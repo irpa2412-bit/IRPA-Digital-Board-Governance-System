@@ -125,6 +125,38 @@ async function assertPortalAndNoOverflow(page, expectedText, width) {
 }
 
 async function assertStickyPortalNavigation(page) {
+  if (page.viewportSize().width <= 760) {
+    const mobile = await page.evaluate(() => {
+      const nav = document.querySelector(".main-area > .page-back-next-navigation");
+      const roller = document.querySelector(".main-area > .desktop-webapp-navigation-roller");
+      const clock = roller?.querySelector(".webapp-navigation-live-clock");
+      const clockRect = clock?.getBoundingClientRect();
+      const rollerRect = roller?.getBoundingClientRect();
+      return {
+        navDisplay: nav ? getComputedStyle(nav).display : "missing",
+        navHeight: nav?.getBoundingClientRect().height ?? 0,
+        rollerDisplay: roller ? getComputedStyle(roller).display : "missing",
+        clockDisplay: clock ? getComputedStyle(clock).display : "missing",
+        clockVisible: Boolean(clockRect && rollerRect && clockRect.width > 0 && clockRect.height > 0 &&
+          clockRect.top >= rollerRect.top - 1 && clockRect.bottom <= rollerRect.bottom + 1),
+        clockWhiteSpace: clock ? getComputedStyle(clock).whiteSpace : "missing",
+        viewport: document.documentElement.clientWidth,
+        document: document.documentElement.scrollWidth,
+        body: document.body.scrollWidth
+      };
+    });
+    console.log("MOBILE_LAYOUT_DIAGNOSTIC", JSON.stringify(mobile));
+    expect(mobile.navDisplay, "mobile Back/Next panel must be removed").toBe("none");
+    expect(mobile.navHeight, "removed navigation must not reserve vertical space").toBe(0);
+    expect(mobile.rollerDisplay, "overhead navigation panel must remain visible").not.toBe("none");
+    expect(mobile.clockDisplay, "live clock must be visible in the overhead panel").not.toBe("none");
+    expect(mobile.clockVisible, "live clock must sit inside the overhead panel").toBe(true);
+    expect(mobile.clockWhiteSpace, "live clock must remain on one line").toBe("nowrap");
+    expect(mobile.document, "document must not overflow the mobile viewport").toBeLessThanOrEqual(mobile.viewport + 1);
+    expect(mobile.body, "body must not overflow the mobile viewport").toBeLessThanOrEqual(mobile.viewport + 1);
+    return;
+  }
+
   const initial = await page.evaluate(() => {
     const roller = document.querySelector(".main-area > .desktop-webapp-navigation-roller");
     const nav = document.querySelector(".main-area > .page-back-next-navigation");
@@ -142,12 +174,11 @@ async function assertStickyPortalNavigation(page) {
       navTop: nav.getBoundingClientRect().top
     };
   });
-  expect(initial.missing, "authenticated portal must render both label panel and Back/Next").toBe(false);
-  expect(initial.rollerDisplay, "portal label panel must be visible on mobile and desktop").not.toBe("none");
-  expect(initial.rollerPosition, "portal label panel must remain sticky").toBe("sticky");
-  expect(initial.navPosition, "Back/Next must use sticky positioning, not a guessed fixed offset").toBe("sticky");
+  expect(initial.missing, "authenticated portal must render desktop navigation").toBe(false);
+  expect(initial.rollerDisplay, "portal label panel must be visible on desktop").not.toBe("none");
+  expect(initial.navPosition, "desktop Back/Next must preserve its sticky positioning").toBe("sticky");
   expect(Math.abs(initial.navTop - (initial.rollerBottom + initial.rollerMarginBottom)),
-    "Back/Next must sit immediately beneath the actual portal label panel").toBeLessThanOrEqual(3);
+    "desktop Back/Next must sit beneath the portal label panel").toBeLessThanOrEqual(3);
 
   await page.evaluate(() => {
     const main = document.querySelector(".app-shell .main-area");
@@ -165,27 +196,18 @@ async function assertStickyPortalNavigation(page) {
       rollerBottom: roller.getBoundingClientRect().bottom,
       rollerMarginBottom: parseFloat(rollerStyle.marginBottom || "0"),
       navTop: nav.getBoundingClientRect().top,
-      rollerPosition: rollerStyle.position,
-      mainTop: roller.closest(".main-area").getBoundingClientRect().top,
-      windowScrollY: window.scrollY,
-      viewportWidth: window.innerWidth,
-      sidebarDisplay: document.querySelector(".sidebar") ? getComputedStyle(document.querySelector(".sidebar")).display : "missing",
-      sidebarTop: document.querySelector(".sidebar")?.getBoundingClientRect().top ?? null,
-      sidebarHeight: document.querySelector(".sidebar")?.getBoundingClientRect().height ?? null,
-      htmlOverflowX: getComputedStyle(document.documentElement).overflowX,
-      bodyOverflowX: getComputedStyle(document.body).overflowX,
-      rootOverflowX: getComputedStyle(document.querySelector("#root")).overflowX
+      rollerPosition: rollerStyle.position
     };
   });
-  console.log("STICKY_NAV_DIAGNOSTIC", JSON.stringify(scrolled));
-  expect(Math.abs(scrolled.rollerTop), "portal label panel must stay at the viewport top while scrolling").toBeLessThanOrEqual(3);
+  expect(Math.abs(scrolled.rollerTop), "desktop portal label panel must stay at viewport top while scrolling").toBeLessThanOrEqual(3);
   expect(Math.abs(scrolled.navTop - (scrolled.rollerBottom + scrolled.rollerMarginBottom)),
-    "Back/Next must remain directly below the portal label panel while scrolling").toBeLessThanOrEqual(3);
+    "desktop Back/Next must remain below the portal label panel").toBeLessThanOrEqual(3);
   await page.evaluate(() => window.scrollTo(0, 0));
 }
-
 for (const viewport of [
+  { name: "mobile", width: 360, height: 800 },
   { name: "mobile", width: 390, height: 844 },
+  { name: "mobile", width: 430, height: 932 },
   { name: "tablet", width: 768, height: 1024 },
   { name: "desktop", width: 1440, height: 900 }
 ]) {
