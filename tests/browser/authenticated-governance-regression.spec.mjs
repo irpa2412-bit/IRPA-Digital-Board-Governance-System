@@ -370,7 +370,7 @@ async function assertSharedReadability(page, module, width) {
       const rect = el.getBoundingClientRect();
       const style = getComputedStyle(el);
       return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden" && (el.textContent || "").trim();
-    }).slice(0, 12);
+    });
     const luminance = color => {
       const m = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
       if (!m) return null;
@@ -399,16 +399,32 @@ async function assertSharedReadability(page, module, width) {
       const ratios = a === null ? [] : backgroundLuminances.map(b => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05));
       const ratio = ratios.length ? Math.min(...ratios) : null;
       const bg = backgrounds.join(" / ") || "unknown background";
-      return { tag: el.tagName, text: (el.textContent || "").trim().slice(0, 50), fg, bg, ratio };
+      const winningRules = [];
+      for (const sheet of document.styleSheets) {
+        let rules;
+        try { rules = sheet.cssRules; } catch { continue; }
+        const visit = list => {
+          for (const rule of list) {
+            if (rule.cssRules) { visit(rule.cssRules); continue; }
+            if (!rule.selectorText || !rule.style) continue;
+            let matches = false;
+            try { matches = el.matches(rule.selectorText); } catch {}
+            if (matches && (rule.style.color || rule.style.getPropertyValue("-webkit-text-fill-color") || rule.style.backgroundColor || rule.style.getPropertyValue("background-color"))) {
+              winningRules.push({ selector: rule.selectorText, source: sheet.href || "inline <style>", line: null,
+                color: rule.style.color || null, textFill: rule.style.getPropertyValue("-webkit-text-fill-color") || null,
+                background: rule.style.backgroundColor || rule.style.getPropertyValue("background-color") || null });
+            }
+          }
+        };
+        visit(rules);
+      }
+      return { tag: el.tagName, text: (el.textContent || "").trim(), fg, bg, ratio, winningRules };
     });
   });
   expect(samples.length, `portal should render visible text for readability checks in ${module}`).toBeGreaterThan(0);
-  for (const sample of samples) {
-    if (sample.ratio !== null) {
-      expect(sample.ratio, `low text contrast in ${module}: ${sample.tag} "${sample.text}" (${sample.fg} on ${sample.bg})`)
-        .toBeGreaterThanOrEqual(4.5);
-    }
-  }
+  const failures = samples.filter(sample => sample.ratio !== null && sample.ratio < 4.5)
+    .map(sample => ({ portal: module, ...sample }));
+  return failures;
 }
 
 for (const viewport of [
@@ -440,12 +456,17 @@ for (const viewport of [
     await page.getByRole("button", { name: "Sign In Securely" }).click();
     await expect(page.locator(".topbar h2")).toContainText(/Grant Intelligence.*Funding Opportunities/, { timeout: 45000 });
 
+    const readabilityFailures = [];
     for (const module of APP_PORTALS) {
       await page.goto("/?adminModule=" + encodeURIComponent(module));
       await expect(page.locator(".topbar h2")).toBeVisible({ timeout: 30000 });
       await expect(page.locator("[data-active-portal-content]:visible").first()).toBeVisible({ timeout: 30000 });
-      await assertSharedReadability(page, module, viewport.width);
+      readabilityFailures.push(...await assertSharedReadability(page, module, viewport.width));
     }
+    console.log("AUTHENTICATED_READABILITY_FAILURES", JSON.stringify({
+      viewport: viewport.name, width: viewport.width, threshold: 4.5, failures: readabilityFailures
+    }));
+    expect(readabilityFailures, `all registered portals must meet 4.5:1 contrast at ${viewport.name}; full failure list is logged above`).toEqual([]);
 
     expect(completedExternalRequests, "isolated browser test must not complete external/production requests").toEqual([]);
     expect(pageErrors, "no uncaught runtime errors across the portal sweep").toEqual([]);
