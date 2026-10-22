@@ -599,3 +599,51 @@ html body #root .app-shell .content-area:not(.dashboard-content-area) .page.fina
   background-color: #e8f4ed !important;
 }
 
+/* Round 2: address the next measured failures from responsive audit d7d1ae1. */
+html body #root .app-shell .content-area:not(.dashboard-content-area) .page .workflow-step {
+  color: #26352f !important;
+  -webkit-text-fill-color: #26352f !important;
+  background-color: #ffffff !important;
+  background-image: none !important;
+  border-color: #cbd9d2 !important;
+}
+html body #root .app-shell .content-area:not(.dashboard-content-area) .page .workflow-step :where(span, strong, small, p, li, label, em) {
+  color: #26352f !important;
+  -webkit-text-fill-color: #26352f !important;
+  opacity: 1 !important;
+}
+
+/* The Signature Safety Standards note uses a dark var(--surface) inline fill;
+   force its actual surface and copy to the measured light-panel palette. */
+html body #root .app-shell .content-area:not(.dashboard-content-area) .page .panel-description[role="note"] {
+  color: #26352f !important;
+  -webkit-text-fill-color: #26352f !important;
+  background: #f8faf9 !important;
+  background-color: #f8faf9 !important;
+  background-image: none !important;
+  border-left-color: #c9a227 !important;
+}
+
+/* The Finance trial notice is deliberately a dark banner, so retain light copy
+   and restore the dark surface after the generic auth-message surface override. */
+html body #root .app-shell .content-area:not(.dashboard-content-area) .page.finance-portal .welcome-panel .auth-message {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  background: #062b4c !important;
+  background-color: #062b4c !important;
+  background-image: none !important;
+  border-color: #315a78 !important;
+}
+html body #root .app-shell .content-area:not(.dashboard-content-area) .page.finance-portal .welcome-panel .auth-message :where(p, span, small, strong) {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+/* Explicitly override legacy inline/token colours on the dark Finance navigator. */
+html body #root .app-shell .content-area:not(.dashboard-content-area) .page.finance-portal .finance-field-roller .finance-field-roller-kicker,
+html body #root .app-shell .content-area:not(.dashboard-content-area) .page.finance-portal .finance-field-roller > div:first-child strong,
+html body #root .app-shell .content-area:not(.dashboard-content-area) .page.finance-portal .finance-field-roller > div:first-child small {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
