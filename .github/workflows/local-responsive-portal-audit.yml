@@ -6,8 +6,7 @@ on:
     paths:
       - "src/pages/Meetings.jsx"
       - "src/styles/**"
-      - "tests/fixtures/meeting-portal-fixture.*"
-      - "tests/fixtures/portal-layout-fixture.*"
+      - "tests/fixtures/**"
       - "tests/meeting-portal-browser.test.mjs"
       - "tests/portal-responsive-browser.test.mjs"
       - "vite.responsive-fixture.config.js"
@@ -60,7 +59,9 @@ jobs:
           cat "$RUNNER_TEMP/responsive-fixture-preview.log"
           exit 1
       - name: Test all eight portal components at 360px and desktop
-        run: node tests/portal-responsive-browser.test.mjs
+        run: |
+          set -o pipefail
+          node tests/portal-responsive-browser.test.mjs | tee "$RUNNER_TEMP/portal-responsive-audit.log"
       - name: Start isolated meeting regression fixture
         run: |
           npx vite --config vite.meeting-fixture.config.js --host 127.0.0.1 > "$RUNNER_TEMP/meeting-fixture-vite.log" 2>&1 &
@@ -69,10 +70,50 @@ jobs:
           exit 1
       - name: Re-run meeting register regression at 360px and desktop
         run: node tests/meeting-portal-browser.test.mjs
+      - name: Publish portal audit results for unauthenticated readers
+        if: always()
+        env:
+          AUDIT_LOG: ${{ runner.temp }}/portal-responsive-audit.log
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFile, readFile } from "node:fs/promises";
+          const logPath = process.env.AUDIT_LOG;
+          let log = "";
+          try { log = await readFile(logPath, "utf8"); } catch {}
+          const lines = log.split(/\r?\n/);
+          const finalLine = [...lines].reverse().find(line => /Portal viewport audit failed layout\/render cases: \d+/.test(line)) || "";
+          const match = finalLine.match(/Portal viewport audit failed layout\/render cases: (\d+)/);
+          const rows = [];
+          for (const line of lines) {
+            const marker = "PORTAL_VIEWPORT_AUDIT ";
+            const at = line.indexOf(marker);
+            if (at < 0) continue;
+            try { rows.push(JSON.parse(line.slice(at + marker.length))); } catch {}
+          }
+          const esc = value => String(value ?? "").replace(/\|/g, "\\|").replace(/\s+/g, " ").trim();
+          const md = [];
+          md.push("## IRPA Local Responsive Portal Audit");
+          md.push("");
+          md.push(finalLine || "Portal viewport audit failed layout/render cases: unavailable (browser audit did not emit its final line).");
+          md.push("");
+          md.push("| Portal | Viewport (px) | contrastFailureCount | First 3 failing texts and ratios |");
+          md.push("|---|---:|---:|---|");
+          for (const row of rows) {
+            const examples = (row.contrastExamples || []).slice(0, 3).map(item => "`" + esc(item.text) + "` (" + esc(item.ratio) + ":1)").join("<br>");
+            const count = Number.isFinite(row.contrastFailureCount) ? row.contrastFailureCount : "unavailable";
+            md.push("| " + esc(row.portal || "unknown") + " | " + esc(row.width ?? "unknown") + " | " + count + " | " + (examples || "—") + " |");
+          }
+          if (!rows.length) md.push("| — | — | unavailable | No PORTAL_VIEWPORT_AUDIT rows were emitted. |");
+          await appendFile(process.env.GITHUB_STEP_SUMMARY, md.join("\n") + "\n");
+          if (match) console.log("::error title=Portal viewport audit::Portal viewport audit failed layout/render cases: " + match[1]);
+          else console.log("::error title=Portal viewport audit::Portal viewport audit final count unavailable; inspect preceding workflow failure.");
+          NODE
       - name: Upload responsive screenshots and audit logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: irpa-local-responsive-audit
-          path: artifacts/responsive-screenshots/
+          path: |
+            artifacts/responsive-screenshots/
+            ${{ runner.temp }}/portal-responsive-audit.log
           if-no-files-found: warn
