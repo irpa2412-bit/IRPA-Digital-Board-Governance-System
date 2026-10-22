@@ -647,3 +647,10 @@ html body #root .app-shell .content-area:not(.dashboard-content-area) .page.fina
   -webkit-text-fill-color: #ffffff !important;
 }
 
+/* Grant Intelligence's Opportunity register sits on the light workspace surface.
+   Its inherited page token is light text, so set this one heading to the readable
+   dark surface colour without changing the portal's other intentionally dark cards. */
+html body #root .app-shell .content-area:not(.dashboard-content-area) .grant-intelligence-portal section:has(> div > h2 + span) > div > h2 {
+  color: #26352f !important;
+  -webkit-text-fill-color: #26352f !important;
+}

@@ -332,101 +332,93 @@ const APP_PORTALS = [
 
 async function assertSharedReadability(page, module, width) {
   const title = page.locator(".topbar h2");
-  await expect(title, `portal heading should render for ${module}`).toBeVisible({ timeout: 30000 });
+  await expect(title, "portal heading should render for " + module).toBeVisible({ timeout: 30000 });
   await expect(title).not.toHaveText("");
   const workspace = page.locator("[data-active-portal-content]:visible").first();
-  await expect(workspace, `active portal content should render for ${module}`).toBeVisible({ timeout: 30000 });
-  const dimensions = await page.evaluate(() => ({
-    viewport: document.documentElement.clientWidth,
-    document: document.documentElement.scrollWidth
-  }));
-  expect(dimensions.document, `horizontal overflow in ${module} at ${width}px`).toBeLessThanOrEqual(dimensions.viewport + 1);
+  await expect(workspace, "active portal content should render for " + module).toBeVisible({ timeout: 30000 });
+  const dimensions = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, document: document.documentElement.scrollWidth }));
+  expect(dimensions.document, "horizontal overflow in " + module + " at " + width + "px").toBeLessThanOrEqual(dimensions.viewport + 1);
 
   if (module !== "Dashboard") {
-    const workspaceBackground = await page.locator(".content-area:not(.dashboard-content-area)")
-      .evaluate(el => getComputedStyle(el).backgroundColor);
-    expect(workspaceBackground, `shared Procurement-inspired workspace should be applied to ${module}`)
-      .toBe("rgb(248, 250, 249)");
+    const workspaceBackground = await page.locator(".content-area:not(.dashboard-content-area)").evaluate(el => getComputedStyle(el).backgroundColor);
+    expect(workspaceBackground, "shared Procurement-inspired workspace should be applied to " + module).toBe("rgb(248, 250, 249)");
   }
 
-  // Lazy-loaded portals may first render a visible shell while their actual workspace mounts.
-  // Wait for real, visible portal copy rather than treating that transient shell as a readability failure.
-  await expect.poll(async () => workspace.evaluate(root => {
-    const candidates = [...root.querySelectorAll(
-      ':is(.page, .grant-intelligence-portal) :is(h1, h2, h3, label, table th, p, li, legend, button, table td, [role="heading"])'
-    )];
-    return candidates.filter(el => {
-      const rect = el.getBoundingClientRect();
-      const style = getComputedStyle(el);
-      return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden" && (el.textContent || "").trim();
-    }).length;
-  }), { timeout: 30000, message: `visible portal text should mount for ${module}` }).toBeGreaterThan(0);
-
-  const samples = await workspace.evaluate(root => {
-    const candidates = [...root.querySelectorAll(
-      ':is(.page, .grant-intelligence-portal) :is(h1, h2, h3, label, table th, p, li, legend, button, table td, [role="heading"])'
-    )];
-    const visible = candidates.filter(el => {
-      const rect = el.getBoundingClientRect();
-      const style = getComputedStyle(el);
-      return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden" && (el.textContent || "").trim();
-    });
-    const luminance = color => {
-      const m = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
-      if (!m) return null;
-      const channels = m.slice(1, 4).map(v => Number(v) / 255).map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
-      return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+  const candidates = await workspace.evaluate(root => {
+    const parse = value => {
+      const match = String(value || "").match(/^rgba?\(([^)]+)\)$/i);
+      if (!match) return null;
+      const parts = match[1].split(",").map(part => Number.parseFloat(part.trim()));
+      return parts.length >= 3 && parts.slice(0, 3).every(Number.isFinite)
+        ? [parts[0], parts[1], parts[2], parts.length > 3 && Number.isFinite(parts[3]) ? parts[3] : 1] : null;
     };
-    return visible.map(el => {
-      const fg = getComputedStyle(el).color;
-      let node = el, backgrounds = [];
-      while (node && node !== document.documentElement) {
-        const style = getComputedStyle(node);
-        const image = style.backgroundImage || "none";
-        if (image !== "none" && image.includes("gradient")) {
-          const stops = [...image.matchAll(/rgba?\(\s*\d+,\s*\d+,\s*\d+(?:\s*,\s*[\d.]+)?\s*\)/g)].map(match => match[0]);
-          if (stops.length) { backgrounds = stops; break; }
-        }
-        const candidate = style.backgroundColor;
-        if (candidate && !candidate.includes("rgba(0, 0, 0, 0)") && candidate !== "transparent") {
-          backgrounds = [candidate];
-          break;
-        }
-        node = node.parentElement;
+    const path = el => el.tagName.toLowerCase() + ((typeof el.className === "string" && el.className.trim()) ? "." + el.className.trim().split(/\s+/).join(".") : "");
+    const chain = el => { const list=[]; for(let n=el;n;n=n.parentElement) list.unshift(n); return list; };
+    const parseRules = el => {
+      const found=[];
+      const visit=(rules,sheet)=>{ for(const rule of rules){ if(rule.cssRules){visit(rule.cssRules,sheet);continue;} if(!rule.selectorText||!rule.style)continue; let matches=false; try{matches=el.matches(rule.selectorText)}catch{} if(!matches)continue; const color=rule.style.getPropertyValue("color"),fill=rule.style.getPropertyValue("-webkit-text-fill-color"),background=rule.style.getPropertyValue("background-color")||rule.style.getPropertyValue("background"); if(color||fill||background)found.push({selector:rule.selectorText,file:sheet.href||"inline <style>",line:null,color:color||null,textFill:fill||null,background:background||null}); }};
+      for(const sheet of document.styleSheets){try{visit(sheet.cssRules,sheet)}catch{}}
+      return found.slice(-12);
+    };
+    const all=[...root.querySelectorAll("*")], result=[];
+    let id=0;
+    for(const el of all){
+      const textNodes=[...el.childNodes].filter(n=>n.nodeType===Node.TEXT_NODE&&n.nodeValue.trim());
+      if(!textNodes.length)continue;
+      const rects=[];
+      for(const node of textNodes){const range=document.createRange();range.selectNodeContents(node);for(const r of range.getClientRects())if(r.width>0&&r.height>0)rects.push({left:r.left,top:r.top,right:r.right,bottom:r.bottom});}
+      const box=el.getBoundingClientRect(),style=getComputedStyle(el);
+      if(!rects.length||box.width<=0||box.height<=0||style.display==="none"||style.visibility==="hidden"||style.visibility==="collapse"||Number(style.opacity)<=0||el.closest('[aria-hidden="true"], [inert]'))continue;
+      const chainList=chain(el); let bg=[255,255,255],needsPixels=false,nearestBackground=null;
+      for(const n of chainList){
+        const s=getComputedStyle(n), c=parse(s.backgroundColor);
+        if(c)bg=[c[0]*c[3]+bg[0]*(1-c[3]),c[1]*c[3]+bg[1]*(1-c[3]),c[2]*c[3]+bg[2]*(1-c[3])];
       }
-      const a = luminance(fg);
-      const backgroundLuminances = backgrounds.map(luminance).filter(value => value !== null);
-      const ratios = a === null ? [] : backgroundLuminances.map(b => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05));
-      const ratio = ratios.length ? Math.min(...ratios) : null;
-      const bg = backgrounds.join(" / ") || "unknown background";
-      const winningRules = [];
-      for (const sheet of document.styleSheets) {
-        let rules;
-        try { rules = sheet.cssRules; } catch { continue; }
-        const visit = list => {
-          for (const rule of list) {
-            if (rule.cssRules) { visit(rule.cssRules); continue; }
-            if (!rule.selectorText || !rule.style) continue;
-            let matches = false;
-            try { matches = el.matches(rule.selectorText); } catch {}
-            if (matches && (rule.style.color || rule.style.getPropertyValue("-webkit-text-fill-color") || rule.style.backgroundColor || rule.style.getPropertyValue("background-color"))) {
-              winningRules.push({ selector: rule.selectorText, source: sheet.href || "inline <style>", line: null,
-                color: rule.style.color || null, textFill: rule.style.getPropertyValue("-webkit-text-fill-color") || null,
-                background: rule.style.backgroundColor || rule.style.getPropertyValue("background-color") || null });
-            }
-          }
-        };
-        visit(rules);
+      for(const n of chainList.slice().reverse()){
+        const s=getComputedStyle(n),c=parse(s.backgroundColor);
+        if(s.backgroundImage&&s.backgroundImage!=="none"){needsPixels=true;break;}
+        if(c&&c[3]>=0.999){needsPixels=false;break;}
       }
-      return { tag: el.tagName, text: (el.textContent || "").trim(), fg, bg, ratio, winningRules };
-    });
+      for(const n of chainList.slice().reverse()){
+        const s=getComputedStyle(n),c=parse(s.backgroundColor);
+        if((c&&c[3]>0)||(s.backgroundImage&&s.backgroundImage!=="none")){nearestBackground={element:path(n),className:typeof n.className==="string"?n.className:n.getAttribute("class")||"",backgroundColor:s.backgroundColor,backgroundImage:s.backgroundImage||"none"};break;}
+      }
+      const sampleId=String(++id);el.setAttribute("data-contrast-sample-id",sampleId);
+      const fg=style.webkitTextFillColor&&style.webkitTextFillColor!=="currentcolor"?style.webkitTextFillColor:style.color;
+      const inlineOrigin=chainList.slice().reverse().find(n=>n.style&&((n.style.color&&getComputedStyle(n).color===style.color)||(n.style.getPropertyValue("-webkit-text-fill-color")&&getComputedStyle(n).webkitTextFillColor===fg)));
+      const matchedRules=[];for(const n of chainList)matchedRules.push(...parseRules(n));
+      const exact=matchedRules.filter(rule=>rule.color===fg||rule.textFill===fg||rule.color===style.color||rule.textFill===style.color);
+      result.push({id:sampleId,tag:el.tagName,text:textNodes.map(n=>n.nodeValue.trim()).join(" ").replace(/\s+/g," "),fg,className:typeof el.className==="string"?el.className:el.getAttribute("class")||"",rect:{left:Math.min(...rects.map(r=>r.left)),top:Math.min(...rects.map(r=>r.top)),right:Math.max(...rects.map(r=>r.right)),bottom:Math.max(...rects.map(r=>r.bottom))},box:{left:box.left,top:box.top,width:box.width,height:box.height},needsPixels,background:bg.map(Math.round),nearestBackground,winningRule:exact.length?exact[exact.length-1]:(inlineOrigin?{selector:"inline style on "+path(inlineOrigin),file:"inline component style; source file/line not exposed",line:null}:null),matchedRules:matchedRules.slice(-12)});
+    }
+    return result;
   });
-  expect(samples.length, `portal should render visible text for readability checks in ${module}`).toBeGreaterThan(0);
-  const failures = samples.filter(sample => sample.ratio !== null && sample.ratio < 4.5)
-    .map(sample => ({ portal: module, ...sample }));
+
+  await page.addStyleTag({content:"html.__irpa_contrast_sampler * { color: transparent !important; -webkit-text-fill-color: transparent !important; text-shadow: none !important; caret-color: transparent !important; }"});
+  const parseColor=value=>{const match=String(value||"").match(/^rgba?\(([^)]+)\)$/i);if(!match)return null;const p=match[1].split(",").map(x=>Number.parseFloat(x.trim()));return p.length>=3&&p.slice(0,3).every(Number.isFinite)?[p[0],p[1],p[2],p.length>3&&Number.isFinite(p[3])?p[3]:1]:null;};
+  const lum=rgb=>{const c=rgb.map(v=>v/255).map(v=>v<=0.04045?v/12.92:Math.pow((v+0.055)/1.055,2.4));return .2126*c[0]+.7152*c[1]+.0722*c[2];};
+  const contrast=(fg,bg)=>{const a=fg[3];const f=[fg[0]*a+bg[0]*(1-a),fg[1]*a+bg[1]*(1-a),fg[2]*a+bg[2]*(1-a)];const x=lum(f),y=lum(bg);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
+  const failures=[];
+  for(const item of candidates){
+    let bg=item.background,ratio=null,samplingMethod="alpha-composited ancestor backgrounds",samplingError=null;
+    try{
+      const fg=parseColor(item.fg);if(!fg)throw new Error("unparseable foreground colour: "+item.fg);
+      if(item.needsPixels){
+        samplingMethod="rendered screenshot pixels";
+        const locator=workspace.locator('[data-contrast-sample-id="'+item.id+'"]');
+        await locator.scrollIntoViewIfNeeded();
+        const geom=await locator.evaluate(el=>{const nodes=[...el.childNodes].filter(n=>n.nodeType===Node.TEXT_NODE&&n.nodeValue.trim()),rects=[];for(const n of nodes){const r=document.createRange();r.selectNodeContents(n);for(const x of r.getClientRects())if(x.width>0&&x.height>0)rects.push({left:x.left,top:x.top,right:x.right,bottom:x.bottom});}const b=el.getBoundingClientRect();if(!rects.length)throw new Error("text range has no rendered rectangle");return{width:b.width,height:b.height,textRect:{left:Math.min(...rects.map(r=>r.left))-b.left,top:Math.min(...rects.map(r=>r.top))-b.top,right:Math.max(...rects.map(r=>r.right))-b.left,bottom:Math.max(...rects.map(r=>r.bottom))-b.top}};});
+        await page.evaluate(()=>document.documentElement.classList.add("__irpa_contrast_sampler"));
+        let png;try{png=await locator.screenshot({animations:"disabled"});}finally{await page.evaluate(()=>document.documentElement.classList.remove("__irpa_contrast_sampler"));}
+        const sampled=await page.evaluate(async({dataUrl,geometry,foreground})=>{const image=new Image();image.src=dataUrl;await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=()=>reject(new Error("screenshot image decode failed"));});const canvas=document.createElement("canvas");canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;const ctx=canvas.getContext("2d",{willReadFrequently:true});if(!ctx)throw new Error("canvas context unavailable");ctx.drawImage(image,0,0);const sx=image.naturalWidth/geometry.width,sy=image.naturalHeight/geometry.height,left=Math.max(0,Math.floor(geometry.textRect.left*sx)),top=Math.max(0,Math.floor(geometry.textRect.top*sy)),right=Math.min(canvas.width,Math.ceil(geometry.textRect.right*sx)),bottom=Math.min(canvas.height,Math.ceil(geometry.textRect.bottom*sy));if(right<=left||bottom<=top)throw new Error("text box outside screenshot");const data=ctx.getImageData(left,top,right-left,bottom-top).data;const m=foreground.match(/^rgba?\(([^)]+)\)$/i);if(!m)throw new Error("unparseable foreground during pixel sampling");const p=m[1].split(",").map(x=>Number.parseFloat(x.trim())),fg=[p[0],p[1],p[2],p.length>3&&Number.isFinite(p[3])?p[3]:1];const luminance=rgb=>{const c=rgb.map(v=>v/255).map(v=>v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4));return .2126*c[0]+.7152*c[1]+.0722*c[2];};let worst=Infinity,worstBg=null,count=0,total=[0,0,0];for(let y=0;y<bottom-top;y+=2){for(let x=0;x<right-left;x+=2){const i=(y*(right-left)+x)*4;if(data[i+3]<255)continue;const bg=[data[i],data[i+1],data[i+2]],f=[fg[0]*fg[3]+bg[0]*(1-fg[3]),fg[1]*fg[3]+bg[1]*(1-fg[3]),fg[2]*fg[3]+bg[2]*(1-fg[3])],a=luminance(f),b=luminance(bg),r=(Math.max(a,b)+.05)/(Math.min(a,b)+.05);total[0]+=bg[0];total[1]+=bg[1];total[2]+=bg[2];count++;if(r<worst){worst=r;worstBg=bg;}}}if(!count||!worstBg)throw new Error("no opaque rendered pixels behind text");return{bg:"rgb("+worstBg.map(Math.round).join(", ")+")",ratio:worst,averageBg:"rgb("+total.map(v=>Math.round(v/count)).join(", ")+")",sampledPixels:count};},{dataUrl:"data:image/png;base64,"+png.toString("base64"),geometry:geom,foreground:item.fg});
+        bg=sampled.bg;ratio=sampled.ratio;item.averageBackground=sampled.averageBg;item.sampledPixels=sampled.sampledPixels;
+      }else ratio=contrast(fg,bg);
+    }catch(error){samplingError=error&&error.message?error.message:String(error);}
+    const record={portal:module,tag:item.tag,text:item.text,fg:item.fg,bg:Array.isArray(bg)?"rgb("+bg.map(Math.round).join(", ")+")":bg,ratio:ratio===null?null:Number(ratio.toFixed(3)),className:item.className,nearestBackground:item.nearestBackground,winningRule:item.winningRule,matchedRules:item.matchedRules,samplingMethod,samplingError};
+    if(samplingError||ratio===null||ratio<4.5)failures.push(record);
+  }
+  expect(candidates.length,"portal should render visible leaf text for readability checks in "+module).toBeGreaterThan(0);
   return failures;
 }
-
 for (const viewport of [
   { name: "mobile", width: 390, height: 844 },
   { name: "tablet", width: 768, height: 1024 },
