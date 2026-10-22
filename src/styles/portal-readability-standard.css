@@ -539,3 +539,63 @@ html body #root .app-shell .content-area:not(.dashboard-content-area) .page.meet
   -webkit-text-fill-color: #26352f !important;
 }
 
+/* Responsive contrast remediation — round 3, based on the d7d1ae1 audit evidence. */
+/* Signature safety copy carries an inline dark token background inside an otherwise
+   light panel. Make that specific explanatory surface light with dark readable text. */
+html body #root .app-shell .content-area:not(.dashboard-content-area) .page .panel-description {
+  color: #526b60 !important;
+  -webkit-text-fill-color: #526b60 !important;
+  background-color: #ffffff !important;
+  background-image: none !important;
+}
+html body #root .app-shell .content-area:not(.dashboard-content-area) .page .panel-description :where(strong, span, small, em) {
+  color: #26352f !important;
+  -webkit-text-fill-color: #26352f !important;
+}
+
+/* The authorization workflow step markers deliberately use dark green surfaces. */
+html body #root .app-shell .content-area:not(.dashboard-content-area) .page .workflow-steps .workflow-step {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+/* Signature field palette controls are dark, including when embedded in Authorization.
+   Do not let the general light-panel text rule darken labels on those dark controls. */
+html body #root .app-shell .content-area:not(.dashboard-content-area) .page .signature-field-palette :where(strong, small, span, div, p, label) {
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+}
+html body #root .app-shell .content-area:not(.dashboard-content-area) .page .signature-field-palette button[draggable] {
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+}
+html body #root .app-shell .content-area:not(.dashboard-content-area) .page .signature-field-palette button[draggable] :where(strong, small, span) {
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+}
+
+/* Finance trial notice is on a pale surface in the current light welcome panel. */
+html body #root .app-shell .content-area:not(.dashboard-content-area) .page.finance-portal .welcome-panel .auth-message {
+  color: #26352f !important;
+  -webkit-text-fill-color: #26352f !important;
+  background-color: #f4f8f5 !important;
+  background-image: none !important;
+  border-color: #cbd9d2 !important;
+}
+html body #root .app-shell .content-area:not(.dashboard-content-area) .page.finance-portal .welcome-panel .auth-message :where(strong, p, span, small, em) {
+  color: #26352f !important;
+  -webkit-text-fill-color: #26352f !important;
+}
+
+/* The Finance navigator banner is dark; restore its light kicker and description text.
+   Its native select and arrow remain dark on the white control surface. */
+html body #root .app-shell .content-area:not(.dashboard-content-area) .page.finance-portal .finance-field-roller :where(.finance-field-roller-kicker, strong, small) {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+html body #root .app-shell .content-area:not(.dashboard-content-area) .page.finance-portal .unified-control-tabs .unified-control-tab:not(.active) {
+  color: #173b2d !important;
+  -webkit-text-fill-color: #173b2d !important;
+  background-color: #e8f4ed !important;
+}
+
