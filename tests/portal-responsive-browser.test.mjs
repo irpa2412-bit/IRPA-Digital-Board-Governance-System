@@ -61,6 +61,9 @@ function contrastRatio(foreground,background){
 
 const base = "http://127.0.0.1:4180/tests/fixtures/portal-layout-fixture.html";
 const classifyZeroSizeCandidate=candidate=>["option","optgroup"].includes(String(candidate.tagName||"").toLowerCase())&&candidate.insideSelect===true?"native control item":"zero-size box";
+// Native <option>/<optgroup> text is painted by the browser's select control.
+// Measure the owning <select> instead; checkbox/radio labels remain ordinary DOM text.
+const nativeMeasurementOwner=candidate=>classifyZeroSizeCandidate(candidate)==="native control item"?"select":null;
 const isFatalMeasurementIssue=reason=>true;
 const knownAnswerSelfTest=()=>{
   assert.deepEqual(parseColor("rgb(23, 32, 51)")?.rgb,[23,32,51],"parseColor rgb known answer");
@@ -69,9 +72,13 @@ const knownAnswerSelfTest=()=>{
   assert.throws(()=>requireColor("not-a-css-colour","known-answer self-test text element"),/Unparseable colour/,"unparseable text colour must fail, not be skipped");
   assert.deepEqual(parseColor("rgba(23, 32, 51, 0.5)")?.rgb,[23,32,51],"parseColor rgba support");
   assert.deepEqual(parseColor("color(srgb 0.0901960784 0.1254901961 0.2)")?.rgb.map(Math.round),[23,32,51],"parseColor srgb support");
-  assert.equal(classifyZeroSizeCandidate({tagName:"option",insideSelect:true}),"native control item","OPTION text inside SELECT is a native control item");
+  const nativeOption={tagName:"option",insideSelect:true};
+  assert.equal(classifyZeroSizeCandidate(nativeOption),"native control item","OPTION text inside SELECT is browser-painted");
+  assert.equal(nativeMeasurementOwner(nativeOption),"select","native OPTION text is measured through its owning SELECT");
+  assert.equal(nativeMeasurementOwner({tagName:"label",insideSelect:false}),null,"checkbox/radio label text is measured as ordinary DOM text");
   assert.equal(isFatalMeasurementIssue(classifyZeroSizeCandidate({tagName:"div",text:"invisible DIV text"})),true,"zero-size DIV with text must fail the audit");
-  assert.equal(isFatalMeasurementIssue("native control item"),false,"native control items are classified separately");
+  assert.equal(isFatalMeasurementIssue("sampling error"),true,"sampling errors are fatal");
+  assert.equal(isFatalMeasurementIssue("native control item"),true,"unrouted native-item measurement failures are fatal");
   console.log("CONTRAST_KNOWN_ANSWER_SELF_TEST PASS");
   console.log("ZERO_SIZE_CLASSIFICATION_SELF_TEST PASS");
 };
@@ -130,7 +137,9 @@ async function collectCandidates(page) {
       let id=ids.get(el);
       if(id===undefined){id=String(index++);ids.set(el,id);el.setAttribute("data-contrast-audit-id",id);}
       const fgText=s.webkitTextFillColor&&s.webkitTextFillColor!=="currentColor"?s.webkitTextFillColor:s.color;
-      if(!rects.length){const tagName=el.tagName.toLowerCase(),insideSelect=!!el.closest("select"),nativeControlItem=["option","optgroup"].includes(tagName)&&insideSelect;out.push({id,tagName,insideSelect,nativeControlItem,text:text.slice(0,160),foregroundCss:fgText,colorCss:s.color,textFillCss:s.webkitTextFillColor,className:typeof el.className==="string"?el.className:String(el.className||""),zeroSize:true,issue:"visible text has no client rect"});continue;}
+      if(!rects.length){const tagName=el.tagName.toLowerCase(),insideSelect=!!el.closest("select"),nativeControlItem=["option","optgroup"].includes(tagName)&&insideSelect;
+        if(nativeControlItem)continue; // The owning SELECT is added below and is the measurable control.
+        out.push({id,tagName,insideSelect,nativeControlItem,text:text.slice(0,160),foregroundCss:fgText,colorCss:s.color,textFillCss:s.webkitTextFillColor,className:typeof el.className==="string"?el.className:String(el.className||""),zeroSize:true,issue:"visible text has no client rect"});continue;}
       for(const rect of rects){
         const ancestors=[];
         for(let a=el.parentElement;a&&ancestors.length<8;a=a.parentElement){
@@ -138,6 +147,7 @@ async function collectCandidates(page) {
           ancestors.push({tag:a.tagName.toLowerCase(),className:typeof a.className==="string"?a.className:"",backgroundColor:as.backgroundColor,backgroundImage:as.backgroundImage});
         }
         const tagName=el.tagName.toLowerCase(),insideSelect=!!el.closest("select"),nativeControlItem=["option","optgroup"].includes(tagName)&&insideSelect;
+        if(nativeControlItem)continue; // Never count native option glyphs as a skipped measurement; measure SELECT below.
         out.push({id,tagName,insideSelect,nativeControlItem,text:text.slice(0,160),left:rect.left,top:rect.top,right:rect.right,bottom:rect.bottom,
           foregroundCss:fgText,colorCss:s.color,textFillCss:s.webkitTextFillColor,
           large:parseFloat(s.fontSize)>=24||(parseFloat(s.fontSize)>=18.66&&Number(s.fontWeight)>=700),
