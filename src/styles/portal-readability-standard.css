@@ -654,3 +654,10 @@ html body #root .app-shell .content-area:not(.dashboard-content-area) .grant-int
   color: #26352f !important;
   -webkit-text-fill-color: #26352f !important;
 }
+
+
+/* Grant Intelligence opportunity-register heading sits on the shared light workspace. */
+#root .app-shell .content-area:not(.dashboard-content-area) .grant-intelligence-portal section:has(> div > h2 + span) h2 {
+  color: #26352f !important;
+  -webkit-text-fill-color: #26352f !important;
+}

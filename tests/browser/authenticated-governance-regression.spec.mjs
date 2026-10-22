@@ -331,92 +331,54 @@ const APP_PORTALS = [
 ];
 
 async function assertSharedReadability(page, module, width) {
-  const title = page.locator(".topbar h2");
-  await expect(title, "portal heading should render for " + module).toBeVisible({ timeout: 30000 });
+  const title=page.locator(".topbar h2");
+  await expect(title,`portal heading should render for ${module}`).toBeVisible({timeout:30000});
   await expect(title).not.toHaveText("");
-  const workspace = page.locator("[data-active-portal-content]:visible").first();
-  await expect(workspace, "active portal content should render for " + module).toBeVisible({ timeout: 30000 });
-  const dimensions = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, document: document.documentElement.scrollWidth }));
-  expect(dimensions.document, "horizontal overflow in " + module + " at " + width + "px").toBeLessThanOrEqual(dimensions.viewport + 1);
-
-  if (module !== "Dashboard") {
-    const workspaceBackground = await page.locator(".content-area:not(.dashboard-content-area)").evaluate(el => getComputedStyle(el).backgroundColor);
-    expect(workspaceBackground, "shared Procurement-inspired workspace should be applied to " + module).toBe("rgb(248, 250, 249)");
-  }
-
-  const candidates = await workspace.evaluate(root => {
-    const parse = value => {
-      const match = String(value || "").match(/^rgba?\(([^)]+)\)$/i);
-      if (!match) return null;
-      const parts = match[1].split(",").map(part => Number.parseFloat(part.trim()));
-      return parts.length >= 3 && parts.slice(0, 3).every(Number.isFinite)
-        ? [parts[0], parts[1], parts[2], parts.length > 3 && Number.isFinite(parts[3]) ? parts[3] : 1] : null;
-    };
-    const path = el => el.tagName.toLowerCase() + ((typeof el.className === "string" && el.className.trim()) ? "." + el.className.trim().split(/\s+/).join(".") : "");
-    const chain = el => { const list=[]; for(let n=el;n;n=n.parentElement) list.unshift(n); return list; };
-    const parseRules = el => {
-      const found=[];
-      const visit=(rules,sheet)=>{ for(const rule of rules){ if(rule.cssRules){visit(rule.cssRules,sheet);continue;} if(!rule.selectorText||!rule.style)continue; let matches=false; try{matches=el.matches(rule.selectorText)}catch{} if(!matches)continue; const color=rule.style.getPropertyValue("color"),fill=rule.style.getPropertyValue("-webkit-text-fill-color"),background=rule.style.getPropertyValue("background-color")||rule.style.getPropertyValue("background"); if(color||fill||background)found.push({selector:rule.selectorText,file:sheet.href||"inline <style>",line:null,color:color||null,textFill:fill||null,background:background||null}); }};
-      for(const sheet of document.styleSheets){try{visit(sheet.cssRules,sheet)}catch{}}
-      return found.slice(-12);
-    };
-    const all=[...root.querySelectorAll("*")], result=[];
-    let id=0;
-    for(const el of all){
-      const textNodes=[...el.childNodes].filter(n=>n.nodeType===Node.TEXT_NODE&&n.nodeValue.trim());
-      if(!textNodes.length)continue;
-      const rects=[];
-      for(const node of textNodes){const range=document.createRange();range.selectNodeContents(node);for(const r of range.getClientRects())if(r.width>0&&r.height>0)rects.push({left:r.left,top:r.top,right:r.right,bottom:r.bottom});}
-      const box=el.getBoundingClientRect(),style=getComputedStyle(el);
-      if(!rects.length||box.width<=0||box.height<=0||style.display==="none"||style.visibility==="hidden"||style.visibility==="collapse"||Number(style.opacity)<=0||el.closest('[aria-hidden="true"], [inert]'))continue;
-      const chainList=chain(el); let bg=[255,255,255],needsPixels=false,nearestBackground=null;
-      for(const n of chainList){
-        const s=getComputedStyle(n), c=parse(s.backgroundColor);
-        if(c)bg=[c[0]*c[3]+bg[0]*(1-c[3]),c[1]*c[3]+bg[1]*(1-c[3]),c[2]*c[3]+bg[2]*(1-c[3])];
-      }
-      for(const n of chainList.slice().reverse()){
-        const s=getComputedStyle(n),c=parse(s.backgroundColor);
-        if(s.backgroundImage&&s.backgroundImage!=="none"){needsPixels=true;break;}
-        if(c&&c[3]>=0.999){needsPixels=false;break;}
-      }
-      for(const n of chainList.slice().reverse()){
-        const s=getComputedStyle(n),c=parse(s.backgroundColor);
-        if((c&&c[3]>0)||(s.backgroundImage&&s.backgroundImage!=="none")){nearestBackground={element:path(n),className:typeof n.className==="string"?n.className:n.getAttribute("class")||"",backgroundColor:s.backgroundColor,backgroundImage:s.backgroundImage||"none"};break;}
-      }
-      const sampleId=String(++id);el.setAttribute("data-contrast-sample-id",sampleId);
-      const fg=style.webkitTextFillColor&&style.webkitTextFillColor!=="currentcolor"?style.webkitTextFillColor:style.color;
-      const inlineOrigin=chainList.slice().reverse().find(n=>n.style&&((n.style.color&&getComputedStyle(n).color===style.color)||(n.style.getPropertyValue("-webkit-text-fill-color")&&getComputedStyle(n).webkitTextFillColor===fg)));
-      const matchedRules=[];for(const n of chainList)matchedRules.push(...parseRules(n));
-      const exact=matchedRules.filter(rule=>rule.color===fg||rule.textFill===fg||rule.color===style.color||rule.textFill===style.color);
-      result.push({id:sampleId,tag:el.tagName,text:textNodes.map(n=>n.nodeValue.trim()).join(" ").replace(/\s+/g," "),fg,className:typeof el.className==="string"?el.className:el.getAttribute("class")||"",rect:{left:Math.min(...rects.map(r=>r.left)),top:Math.min(...rects.map(r=>r.top)),right:Math.max(...rects.map(r=>r.right)),bottom:Math.max(...rects.map(r=>r.bottom))},box:{left:box.left,top:box.top,width:box.width,height:box.height},needsPixels,background:bg.map(Math.round),nearestBackground,winningRule:exact.length?exact[exact.length-1]:(inlineOrigin?{selector:"inline style on "+path(inlineOrigin),file:"inline component style; source file/line not exposed",line:null}:null),matchedRules:matchedRules.slice(-12)});
-    }
-    return result;
+  const workspace=page.locator("[data-active-portal-content]:visible").first();
+  await expect(workspace).toBeVisible({timeout:30000});
+  const dims=await page.evaluate(()=>({viewport:document.documentElement.clientWidth,document:document.documentElement.scrollWidth}));
+  expect(dims.document,`horizontal overflow in ${module} at ${width}px`).toBeLessThanOrEqual(dims.viewport+1);
+  if(module!=="Dashboard") expect(await page.locator(".content-area:not(.dashboard-content-area)").evaluate(e=>getComputedStyle(e).backgroundColor)).toBe("rgb(248, 250, 249)");
+  const items=await workspace.evaluate(root=>{
+    const parse=v=>{const m=String(v||"").match(/^rgba?\(([^)]+)\)$/i);if(!m)return null;const p=m[1].replace("/",",").split(",").map(x=>parseFloat(x.trim()));return p.length>=3&&p.slice(0,3).every(Number.isFinite)?[p[0],p[1],p[2],p.length>3&&Number.isFinite(p[3])?p[3]:1]:null;};
+    const path=e=>e.tagName.toLowerCase()+(typeof e.className==="string"&&e.className.trim()?"."+e.className.trim().split(/\s+/).join("."):"");
+    const ancestry=e=>{const a=[];for(let n=e;n;n=n.parentElement)a.unshift(n);return a;};
+    const ruleList=e=>{const out=[];const walk=(rs,s)=>{for(const r of rs){if(r.cssRules){walk(r.cssRules,s);continue;}if(!r.selectorText||!r.style)continue;let ok=false;try{ok=e.matches(r.selectorText)}catch{}if(ok&&(r.style.color||r.style.getPropertyValue("-webkit-text-fill-color")||r.style.background||r.style.backgroundColor))out.push({selector:r.selectorText,file:s.href||"inline <style>",line:null,color:r.style.color||null,textFill:r.style.getPropertyValue("-webkit-text-fill-color")||null,background:r.style.background||r.style.backgroundColor||null});}};for(const s of document.styleSheets){try{walk(s.cssRules,s)}catch{}}return out;};
+    const out=[];let id=0;
+    for(const e of root.querySelectorAll("*")){
+      const nodes=[...e.childNodes].filter(n=>n.nodeType===Node.TEXT_NODE&&n.nodeValue.trim());if(!nodes.length)continue;
+      const rects=[];for(const n of nodes){const r=document.createRange();r.selectNodeContents(n);for(const q of r.getClientRects())if(q.width&&q.height)rects.push(q);}
+      const b=e.getBoundingClientRect(),st=getComputedStyle(e);if(!rects.length||!b.width||!b.height||st.display==="none"||st.visibility!=="visible"||+st.opacity<=0||e.closest('[aria-hidden="true"],[inert]'))continue;
+      const chain=ancestry(e),html=parse(getComputedStyle(document.documentElement).backgroundColor),body=parse(getComputedStyle(document.body).backgroundColor);
+      const canvas=html&&html[3]>0?html.slice(0,3).map(v=>v*html[3]+255*(1-html[3])):[255,255,255];
+      let bg=body&&body[3]>0?body.slice(0,3).map((v,i)=>v*body[3]+canvas[i]*(1-body[3])):canvas;
+      for(const n of chain){if(n===document.documentElement||n===document.body)continue;const s=getComputedStyle(n),c=parse(s.backgroundColor);if(c&&c[3]>0)bg=bg.map((v,i)=>c[i]*c[3]+v*(1-c[3]));}
+      let pixels=false,nearest=null;for(const n of [...chain].reverse()){const s=getComputedStyle(n),c=parse(s.backgroundColor);if(s.backgroundImage&&s.backgroundImage!=="none")pixels=true;if(!nearest&&((c&&c[3]>0)||(s.backgroundImage&&s.backgroundImage!=="none")))nearest={element:path(n),className:n.getAttribute("class")||"",backgroundColor:s.backgroundColor,backgroundImage:s.backgroundImage||"none"};}
+      const idValue=String(++id);e.setAttribute("data-irpa-contrast-id",idValue);const fg=st.webkitTextFillColor&&st.webkitTextFillColor!=="currentcolor"?st.webkitTextFillColor:st.color;
+      const rules=chain.flatMap(n=>ruleList(n)),matching=rules.filter(x=>x.color===fg||x.textFill===fg||x.color===st.color||x.textFill===st.color);
+      out.push({id:idValue,tag:e.tagName,text:nodes.map(n=>n.nodeValue.trim()).join(" ").replace(/\s+/g," "),fg,className:e.getAttribute("class")||"",box:{left:b.left,top:b.top,width:b.width,height:b.height},textRect:{left:Math.min(...rects.map(x=>x.left))-b.left,top:Math.min(...rects.map(x=>x.top))-b.top,right:Math.max(...rects.map(x=>x.right))-b.left,bottom:Math.max(...rects.map(x=>x.bottom))-b.top},pixels,bg,nearest,rule:matching.at(-1)||null,rules:rules.slice(-12)});
+    }return out;
   });
-
-  await page.addStyleTag({content:"html.__irpa_contrast_sampler * { color: transparent !important; -webkit-text-fill-color: transparent !important; text-shadow: none !important; caret-color: transparent !important; }"});
-  const parseColor=value=>{const match=String(value||"").match(/^rgba?\(([^)]+)\)$/i);if(!match)return null;const p=match[1].split(",").map(x=>Number.parseFloat(x.trim()));return p.length>=3&&p.slice(0,3).every(Number.isFinite)?[p[0],p[1],p[2],p.length>3&&Number.isFinite(p[3])?p[3]:1]:null;};
-  const lum=rgb=>{const c=rgb.map(v=>v/255).map(v=>v<=0.04045?v/12.92:Math.pow((v+0.055)/1.055,2.4));return .2126*c[0]+.7152*c[1]+.0722*c[2];};
-  const contrast=(fg,bg)=>{const a=fg[3];const f=[fg[0]*a+bg[0]*(1-a),fg[1]*a+bg[1]*(1-a),fg[2]*a+bg[2]*(1-a)];const x=lum(f),y=lum(bg);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
+  await page.addStyleTag({content:"html.__irpa_hide_text *{color:transparent!important;-webkit-text-fill-color:transparent!important;text-shadow:none!important;caret-color:transparent!important}"});
+  const parse=v=>{const m=String(v||"").match(/^rgba?\(([^)]+)\)$/i);if(!m)return null;const p=m[1].replace("/",",").split(",").map(x=>parseFloat(x.trim()));return p.length>=3&&p.slice(0,3).every(Number.isFinite)?[...p.slice(0,3),p.length>3&&Number.isFinite(p[3])?p[3]:1]:null;};
+  const lum=c=>{const x=c.map(v=>v/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);return .2126*x[0]+.7152*x[1]+.0722*x[2];};
+  const ratio=(f,b)=>{const a=f[3],fg=f.slice(0,3).map((v,i)=>v*a+b[i]*(1-a)),x=lum(fg),y=lum(b);return(Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
   const failures=[];
-  for(const item of candidates){
-    let bg=item.background,ratio=null,samplingMethod="alpha-composited ancestor backgrounds",samplingError=null;
+  for(const item of items){
+    let bg=item.bg,cr=null,error=null,method="alpha-composited ancestor backgrounds";
     try{
-      const fg=parseColor(item.fg);if(!fg)throw new Error("unparseable foreground colour: "+item.fg);
-      if(item.needsPixels){
-        samplingMethod="rendered screenshot pixels";
-        const locator=workspace.locator('[data-contrast-sample-id="'+item.id+'"]');
-        await locator.scrollIntoViewIfNeeded();
-        const geom=await locator.evaluate(el=>{const nodes=[...el.childNodes].filter(n=>n.nodeType===Node.TEXT_NODE&&n.nodeValue.trim()),rects=[];for(const n of nodes){const r=document.createRange();r.selectNodeContents(n);for(const x of r.getClientRects())if(x.width>0&&x.height>0)rects.push({left:x.left,top:x.top,right:x.right,bottom:x.bottom});}const b=el.getBoundingClientRect();if(!rects.length)throw new Error("text range has no rendered rectangle");return{width:b.width,height:b.height,textRect:{left:Math.min(...rects.map(r=>r.left))-b.left,top:Math.min(...rects.map(r=>r.top))-b.top,right:Math.max(...rects.map(r=>r.right))-b.left,bottom:Math.max(...rects.map(r=>r.bottom))-b.top}};});
-        await page.evaluate(()=>document.documentElement.classList.add("__irpa_contrast_sampler"));
-        let png;try{png=await locator.screenshot({animations:"disabled"});}finally{await page.evaluate(()=>document.documentElement.classList.remove("__irpa_contrast_sampler"));}
-        const sampled=await page.evaluate(async({dataUrl,geometry,foreground})=>{const image=new Image();image.src=dataUrl;await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=()=>reject(new Error("screenshot image decode failed"));});const canvas=document.createElement("canvas");canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;const ctx=canvas.getContext("2d",{willReadFrequently:true});if(!ctx)throw new Error("canvas context unavailable");ctx.drawImage(image,0,0);const sx=image.naturalWidth/geometry.width,sy=image.naturalHeight/geometry.height,left=Math.max(0,Math.floor(geometry.textRect.left*sx)),top=Math.max(0,Math.floor(geometry.textRect.top*sy)),right=Math.min(canvas.width,Math.ceil(geometry.textRect.right*sx)),bottom=Math.min(canvas.height,Math.ceil(geometry.textRect.bottom*sy));if(right<=left||bottom<=top)throw new Error("text box outside screenshot");const data=ctx.getImageData(left,top,right-left,bottom-top).data;const m=foreground.match(/^rgba?\(([^)]+)\)$/i);if(!m)throw new Error("unparseable foreground during pixel sampling");const p=m[1].split(",").map(x=>Number.parseFloat(x.trim())),fg=[p[0],p[1],p[2],p.length>3&&Number.isFinite(p[3])?p[3]:1];const luminance=rgb=>{const c=rgb.map(v=>v/255).map(v=>v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4));return .2126*c[0]+.7152*c[1]+.0722*c[2];};let worst=Infinity,worstBg=null,count=0,total=[0,0,0];for(let y=0;y<bottom-top;y+=2){for(let x=0;x<right-left;x+=2){const i=(y*(right-left)+x)*4;if(data[i+3]<255)continue;const bg=[data[i],data[i+1],data[i+2]],f=[fg[0]*fg[3]+bg[0]*(1-fg[3]),fg[1]*fg[3]+bg[1]*(1-fg[3]),fg[2]*fg[3]+bg[2]*(1-fg[3])],a=luminance(f),b=luminance(bg),r=(Math.max(a,b)+.05)/(Math.min(a,b)+.05);total[0]+=bg[0];total[1]+=bg[1];total[2]+=bg[2];count++;if(r<worst){worst=r;worstBg=bg;}}}if(!count||!worstBg)throw new Error("no opaque rendered pixels behind text");return{bg:"rgb("+worstBg.map(Math.round).join(", ")+")",ratio:worst,averageBg:"rgb("+total.map(v=>Math.round(v/count)).join(", ")+")",sampledPixels:count};},{dataUrl:"data:image/png;base64,"+png.toString("base64"),geometry:geom,foreground:item.fg});
-        bg=sampled.bg;ratio=sampled.ratio;item.averageBackground=sampled.averageBg;item.sampledPixels=sampled.sampledPixels;
-      }else ratio=contrast(fg,bg);
-    }catch(error){samplingError=error&&error.message?error.message:String(error);}
-    const record={portal:module,tag:item.tag,text:item.text,fg:item.fg,bg:Array.isArray(bg)?"rgb("+bg.map(Math.round).join(", ")+")":bg,ratio:ratio===null?null:Number(ratio.toFixed(3)),className:item.className,nearestBackground:item.nearestBackground,winningRule:item.winningRule,matchedRules:item.matchedRules,samplingMethod,samplingError};
-    if(samplingError||ratio===null||ratio<4.5)failures.push(record);
+      const fg=parse(item.fg);if(!fg)throw Error("unparseable foreground "+item.fg);
+      if(item.pixels){
+        method="rendered screenshot worst pixel";const loc=workspace.locator('[data-irpa-contrast-id="'+item.id+'"]');await loc.scrollIntoViewIfNeeded();
+        await page.evaluate(()=>document.documentElement.classList.add("__irpa_hide_text"));let png;try{png=await loc.screenshot({animations:"disabled"});}finally{await page.evaluate(()=>document.documentElement.classList.remove("__irpa_hide_text"));}
+        const sampled=await page.evaluate(async({src,box,fgs})=>{const im=new Image();im.src=src;await new Promise((ok,no)=>{im.onload=ok;im.onerror=()=>no(Error("screenshot decode failed"));});const c=document.createElement("canvas");c.width=im.naturalWidth;c.height=im.naturalHeight;const x=c.getContext("2d",{willReadFrequently:true});if(!x)throw Error("canvas unavailable");x.drawImage(im,0,0);const sx=im.naturalWidth/box.width,sy=im.naturalHeight/box.height,l=Math.max(0,Math.floor(box.textRect.left*sx)),t=Math.max(0,Math.floor(box.textRect.top*sy)),r=Math.min(c.width,Math.ceil(box.textRect.right*sx)),b=Math.min(c.height,Math.ceil(box.textRect.bottom*sy));if(r<=l||b<=t)throw Error("text box outside screenshot");const d=x.getImageData(l,t,r-l,b-t).data;const m=fgs.match(/^rgba?\(([^)]+)\)$/i);if(!m)throw Error("unparseable foreground during pixel sampling");const p=m[1].replace("/",",").split(",").map(v=>parseFloat(v.trim())),f=[...p.slice(0,3),p.length>3&&Number.isFinite(p[3])?p[3]:1],L=v=>{const q=v.map(z=>z/255).map(z=>z<=.04045?z/12.92:((z+.055)/1.055)**2.4);return .2126*q[0]+.7152*q[1]+.0722*q[2];};let worst=Infinity,chosen=null,count=0;for(let yy=0;yy<b-t;yy+=2)for(let xx=0;xx<r-l;xx+=2){const i=(yy*(r-l)+xx)*4;if(d[i+3]<255)continue;const bg=[d[i],d[i+1],d[i+2]],front=bg.map((v,j)=>f[j]*f[3]+v*(1-f[3])),a=L(front),z=L(bg),q=(Math.max(a,z)+.05)/(Math.min(a,z)+.05);count++;if(q<worst){worst=q;chosen=bg;}}if(!count||!chosen)throw Error("no opaque pixels sampled behind text");return{bg:"rgb("+chosen.join(", ")+")",ratio:worst,pixels:count};},{src:"data:image/png;base64,"+png.toString("base64"),box:item,fgs:item.fg});
+        bg=sampled.bg;cr=sampled.ratio;item.sampledPixels=sampled.pixels;
+      }else cr=ratio(fg,bg);
+    }catch(e){error=e?.message||String(e);}
+    const record={portal:module,tag:item.tag,text:item.text,fg:item.fg,bg:Array.isArray(bg)?"rgb("+bg.map(Math.round).join(", ")+")":bg,ratio:cr===null?null:Number(cr.toFixed(3)),className:item.className,nearestBackground:item.nearest,winningRule:item.rule,matchedRules:item.rules,samplingMethod:method,samplingError:error,sampledPixels:item.sampledPixels};
+    if(error||cr===null||cr<4.5)failures.push(record);
   }
-  expect(candidates.length,"portal should render visible leaf text for readability checks in "+module).toBeGreaterThan(0);
+  expect(items.length,`portal should render visible leaf text for ${module}`).toBeGreaterThan(0);
   return failures;
 }
 for (const viewport of [
