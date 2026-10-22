@@ -35,7 +35,7 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Install Playwright and Chromium without changing the lockfile
         run: |
-          npm install --no-save --package-lock=false playwright
+          npm install --no-save --package-lock=false playwright axe-core@4.10.3
           npx playwright install --with-deps chromium
       - name: Build local staging-configured app and portal fixtures
         env:
@@ -91,22 +91,30 @@ jobs:
             try { rows.push(JSON.parse(line.slice(at + marker.length))); } catch {}
           }
           const esc = value => String(value ?? "").replace(/\|/g, "\\|").replace(/\s+/g, " ").trim();
-          const md = [];
-          md.push("## IRPA Local Responsive Portal Audit");
-          md.push("");
-          md.push(finalLine || "Portal viewport audit failed layout/render cases: unavailable (browser audit did not emit its final line).");
-          md.push("");
-          md.push("| Portal | Viewport (px) | contrastFailureCount | First 3 failing texts and ratios |");
-          md.push("|---|---:|---:|---|");
+          const md = ["## IRPA Local Responsive Portal Audit", "", finalLine || "Portal viewport audit failed layout/render cases: unavailable (browser audit did not emit its final line).", "",
+            "### Primary screenshot/median contrast measurement", "",
+            "| Portal | Viewport | Elements measured | Elements failed | Lowest ratio | Stable counts | Measurement errors | Worst 5 (text; foreground; background; ratio; class; nearest ancestor; ancestor bg-color; ancestor bg-image) |",
+            "|---|---:|---:|---:|---:|---|---:|---|"];
           for (const row of rows) {
-            const examples = (row.contrastExamples || []).slice(0, 3).map(item => "`" + esc(item.text) + "` (" + esc(item.ratio) + ":1)").join("<br>");
-            const count = Number.isFinite(row.contrastFailureCount) ? row.contrastFailureCount : "unavailable";
-            md.push("| " + esc(row.portal || "unknown") + " | " + esc(row.width ?? "unknown") + " | " + count + " | " + (examples || "—") + " |");
+            const worst=(row.worstElements||[]).map(x=>[
+              "`"+esc(x.text)+"`",esc(x.foreground),esc(JSON.stringify(x.background)),esc(x.ratio),
+              esc(x.className),esc(x.nearestAncestor?.className||x.nearestAncestor?.tag||""),
+              esc(x.ancestorBackgroundColor),esc(x.ancestorBackgroundImage)
+            ].join("; ")).join("<br>");
+            md.push("| "+esc(row.portal||"unknown")+" | "+esc(row.width??"unknown")+" | "+esc(row.elementsMeasured??"unavailable")+" | "+
+              esc(row.elementsFailed??"unavailable")+" | "+esc(row.lowestRatio??"unavailable")+" | "+esc(row.measurementCountsStable??"unavailable")+" | "+
+              esc(row.measurementIssues??"unavailable")+" | "+(worst||"—")+" |");
           }
-          if (!rows.length) md.push("| — | — | unavailable | No PORTAL_VIEWPORT_AUDIT rows were emitted. |");
-          await appendFile(process.env.GITHUB_STEP_SUMMARY, md.join("\n") + "\n");
-          if (match) console.log("::error title=Portal viewport audit::Portal viewport audit failed layout/render cases: " + match[1]);
-          else console.log("::error title=Portal viewport audit::Portal viewport audit final count unavailable; inspect preceding workflow failure.");
+          if (!rows.length) md.push("| — | — | unavailable | unavailable | unavailable | unavailable | unavailable | No audit rows emitted. |");
+          md.push("", "### Independent axe-core colour-contrast cross-check (axe-core 4.10.3)", "",
+            "| Portal | Viewport | axe colour-contrast violations | Examples |", "|---|---:|---:|---|");
+          for (const row of rows) {
+            const examples=(row.axeColorContrastExamples||[]).map(x=>"`"+esc(x.target?.join(", ")||"target unavailable")+"` — "+esc(x.impact)+" — "+esc(x.summary)).join("<br>");
+            md.push("| "+esc(row.portal||"unknown")+" | "+esc(row.width??"unknown")+" | "+esc(row.axeColorContrastViolations??"unavailable")+" | "+(examples||"—")+" |");
+          }
+          await appendFile(process.env.GITHUB_STEP_SUMMARY, md.join("\n")+"\n");
+          if (match && Number(match[1])>0) console.log("::error title=Portal viewport audit::Portal viewport audit failed layout/render cases: "+match[1]);
+          else if (!match || rows.length!==16 || rows.some(r=>r.measurementCountsStable!==true)) console.log("::error title=Portal viewport audit::Summary incomplete or measurement counts unstable; inspect audit log.");
           NODE
       - name: Upload responsive screenshots and audit logs
         if: always()

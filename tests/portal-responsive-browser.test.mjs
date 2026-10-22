@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
+import axe from "axe-core";
 import { inflateSync } from "node:zlib";
 import { chromium } from "playwright";
 
@@ -31,14 +32,18 @@ function decodePng(buffer) {
   }
   return {width,height,bytesPerPixel:bpp,stride,pixels};
 }
-function sampleRenderedBackground(image,cssX,cssY,scaleX,scaleY){
-  const cx=Math.max(0,Math.min(image.width-1,Math.round(cssX*scaleX))),cy=Math.max(0,Math.min(image.height-1,Math.round(cssY*scaleY))),buckets=new Map();
-  for(let y=Math.max(0,cy-4);y<=Math.min(image.height-1,cy+4);y++)for(let x=Math.max(0,cx-4);x<=Math.min(image.width-1,cx+4);x++){
-    const at=y*image.stride+x*image.bytesPerPixel,rgb=[image.pixels[at],image.pixels[at+1],image.pixels[at+2]],key=rgb.map(v=>v>>3).join(",");
-    const bucket=buckets.get(key)||{count:0,sums:[0,0,0]};bucket.count++;for(let i=0;i<3;i++)bucket.sums[i]+=rgb[i];buckets.set(key,bucket);
+function medianBackground(image) {
+  if (!image.width || !image.height) throw new Error("Background screenshot has zero dimensions");
+  const channels=[[],[],[]];
+  for(let y=0;y<image.height;y++) for(let x=0;x<image.width;x++) {
+    const at=y*image.stride+x*image.bytesPerPixel;
+    channels[0].push(image.pixels[at]);channels[1].push(image.pixels[at+1]);channels[2].push(image.pixels[at+2]);
   }
-  const best=[...buckets.values()].sort((a,b)=>b.count-a.count)[0];
-  return best.sums.map(v=>Math.round(v/best.count));
+  return channels.map(values=>{values.sort((a,b)=>a-b);const m=Math.floor(values.length/2);return values.length%2?values[m]:Math.round((values[m-1]+values[m])/2);});
+}
+function cropPng(buffer, rect) {
+  // Element screenshots are already cropped by Playwright; retain the bytes unchanged.
+  return buffer;
 }
 function relativeLuminance(rgb){
   const v=rgb.map(x=>{x/=255;return x<=0.04045?x/12.92:((x+0.055)/1.055)**2.4;});
@@ -54,7 +59,90 @@ const portals = ["Invitation","Meeting","Documents","Signature","Authorization",
 const widths = [360,1440];
 const browser = await chromium.launch({headless:true});
 const failures=[];
-await mkdir("artifacts/responsive-screenshots",{recursive:true});
+await mkdir("artifacts/responsive-screenshots/failures",{recursive:true});
+const parseColor=value=>{
+  const m=String(value||"").match(/^rgba?\\(\\s*(\\d+(?:\\.\\d+)?)\\s*,\\s*(\\d+(?:\\.\\d+)?)\\s*,\\s*(\\d+(?:\\.\\d+)?)(?:\\s*[,/]\\s*([\\d.]+%?))?\\s*\\)$/i);
+  if(!m)return null;
+  const alpha=m[4]===undefined?1:(m[4].endsWith("%")?parseFloat(m[4])/100:parseFloat(m[4]));
+  const rgb=[+m[1],+m[2],+m[3]];
+  if(rgb.some(v=>!Number.isFinite(v)||v<0||v>255)||!Number.isFinite(alpha)||alpha<0||alpha>1)return null;
+  return {rgb,a:alpha,css:value};
+};
+const ratioFor=(foreground,background)=>{
+  const fg=foreground.rgb.map((v,i)=>Math.round(v*foreground.a+background[i]*(1-foreground.a)));
+  const a=relativeLuminance(fg),b=relativeLuminance(background);
+  return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);
+};
+async function collectCandidates(page) {
+  return page.evaluate(()=>{
+    const out=[],walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT),ids=new WeakMap();
+    let node,index=0;
+    while((node=walker.nextNode())){
+      const text=(node.nodeValue||"").replace(/\\s+/g," ").trim();
+      if(!text)continue;
+      const el=node.parentElement;if(!el)continue;
+      const s=getComputedStyle(el);
+      if(s.display==="none"||s.visibility==="hidden"||Number(s.opacity)===0)continue;
+      const range=document.createRange();range.selectNodeContents(node);
+      const rects=[...range.getClientRects()];
+      let id=ids.get(el);
+      if(id===undefined){id=String(index++);ids.set(el,id);el.setAttribute("data-contrast-audit-id",id);}
+      const fgText=s.webkitTextFillColor&&s.webkitTextFillColor!=="currentColor"?s.webkitTextFillColor:s.color;
+      if(!rects.length){out.push({id,text:text.slice(0,160),foregroundCss:fgText,colorCss:s.color,textFillCss:s.webkitTextFillColor,className:typeof el.className==="string"?el.className:String(el.className||""),zeroSize:true,issue:"visible text has no client rect"});continue;}
+      for(const rect of rects){
+        const ancestors=[];
+        for(let a=el.parentElement;a&&ancestors.length<8;a=a.parentElement){
+          const as=getComputedStyle(a);
+          ancestors.push({tag:a.tagName.toLowerCase(),className:typeof a.className==="string"?a.className:"",backgroundColor:as.backgroundColor,backgroundImage:as.backgroundImage});
+        }
+        out.push({id,text:text.slice(0,160),left:rect.left,top:rect.top,right:rect.right,bottom:rect.bottom,
+          foregroundCss:fgText,colorCss:s.color,textFillCss:s.webkitTextFillColor,
+          large:parseFloat(s.fontSize)>=24||(parseFloat(s.fontSize)>=18.66&&Number(s.fontWeight)>=700),
+          className:typeof el.className==="string"?el.className:String(el.className||""),
+          ancestors,zeroSize:rect.width<=0||rect.height<=0});
+      }
+    }
+    return out;
+  });
+}
+async function measurePass(page, portal, width, passNo) {
+  const candidates=await collectCandidates(page);
+  const measured=[],issues=[];
+  for(const c of candidates){
+    if(c.zeroSize){issues.push({...c,issue:c.issue||"zero-size text box"});continue;}
+    const fg=parseColor(c.foregroundCss);
+    if(!fg){issues.push({...c,issue:"unparseable computed foreground",foregroundCss:c.foregroundCss});continue;}
+    const locator=page.locator('[data-contrast-audit-id="'+c.id+'"]');
+    let bg,elementShot,hideStyle;
+    try {
+      hideStyle=await page.addStyleTag({content:"*,:before,:after{color:transparent!important;-webkit-text-fill-color:transparent!important;text-shadow:none!important;caret-color:transparent!important}::selection{background:transparent!important}"});
+      elementShot=await locator.screenshot({animations:"disabled",timeout:10000});
+      bg=medianBackground(decodePng(elementShot));
+    } catch(e) {
+      issues.push({...c,issue:"element background screenshot failed: "+String(e?.message||e)});
+    } finally {
+      if(hideStyle)await hideStyle.evaluate(el=>el.remove());
+    }
+    if(!bg)continue;
+    const ratio=ratioFor(fg,bg),failed=ratio<(c.large?3:4.5);
+    const record={...c,foreground:fg.css,background:bg.map(v=>Math.round(v)),ratio:Number(ratio.toFixed(3)),failed};
+    measured.push(record);
+    if(failed){
+      try {
+        const original=await locator.screenshot({animations:"disabled",timeout:10000});
+        const safeText=c.text.replace(/[^a-z0-9_-]+/gi,"-").slice(0,35)||"text";
+        await writeFile("artifacts/responsive-screenshots/failures/"+portal.toLowerCase()+"-"+width+"-"+passNo+"-"+c.id+"-"+safeText+".png",original);
+      } catch(e) { issues.push({...c,issue:"failing element crop could not be saved: "+String(e?.message||e)}); }
+    }
+  }
+  return {candidateCount:candidates.length,elementsMeasured:measured.length,elementsFailed:measured.filter(x=>x.failed).length+issues.length,
+    lowestRatio:measured.length?Math.min(...measured.map(x=>x.ratio)):null,
+    worstElements:[...measured].sort((a,b)=>a.ratio-b.ratio).slice(0,5).map(x=>({
+      text:x.text,foreground:x.foreground,background:x.background,ratio:x.ratio,className:x.className,
+      nearestAncestor:x.ancestors[0]||null,ancestorBackgroundColor:x.ancestors[0]?.backgroundColor||null,
+      ancestorBackgroundImage:x.ancestors[0]?.backgroundImage||null
+    })),issues};
+}
 try {
   for (const portal of portals) for (const width of widths) {
     const context=await browser.newContext({viewport:{width,height:900},reducedMotion:"reduce"});
@@ -67,49 +155,37 @@ try {
       assert.equal(response?.status(),200,"local fixture must return HTTP 200");
       await page.locator("[data-portal-name]").waitFor({timeout:10000});
       await page.waitForTimeout(900);
-      const metrics=await page.evaluate(()=>{
+      const layout=await page.evaluate(()=>{
         const width=document.documentElement.clientWidth,scrollWidth=Math.max(document.documentElement.scrollWidth,document.body.scrollWidth);
-        const parseColor=value=>{const m=value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([0-9.]+))?\)/i);return m?{rgb:[+m[1],+m[2],+m[3]],a:m[4]===undefined?1:+m[4]}:null;};
         const overflowers=[];
         for(const el of [...document.querySelectorAll("body *")]){
-          const r=el.getBoundingClientRect(),s=getComputedStyle(el),txt=(el.innerText||"").trim().replace(/\s+/g," ");
+          const r=el.getBoundingClientRect(),s=getComputedStyle(el),txt=(el.innerText||"").trim().replace(/\\s+/g," ");
           if(r.width<=0||r.height<=0||s.display==="none"||s.visibility==="hidden")continue;
           if(r.right>width+1||r.left< -1)overflowers.push({tag:el.tagName.toLowerCase(),className:String(el.className||"").toString().slice(0,100),left:Math.round(r.left),right:Math.round(r.right),width:Math.round(r.width),text:txt.slice(0,55)});
         }
-        const contrastCandidates=[],walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
-        let textNode;
-        while((textNode=walker.nextNode())){
-          const txt=(textNode.nodeValue||"").replace(/\s+/g," ").trim();
-          if(!txt)continue;
-          const el=textNode.parentElement;if(!el)continue;
-          const s=getComputedStyle(el);
-          if(s.display==="none"||s.visibility==="hidden"||Number(s.opacity)===0)continue;
-          const foreground=parseColor(s.webkitTextFillColor)||parseColor(s.color);if(!foreground)continue;
-          const range=document.createRange();range.selectNodeContents(textNode);
-          for(const rect of [...range.getClientRects()]){
-            if(rect.width<=0||rect.height<=0)continue;
-            const large=parseFloat(s.fontSize)>=24||(parseFloat(s.fontSize)>=18.66&&Number(s.fontWeight)>=700);
-            contrastCandidates.push({text:txt.slice(0,70),left:rect.left,top:rect.top,right:rect.right,bottom:rect.bottom,foreground,large});
-          }
-        }
-        return {width,scrollWidth,horizontalOverflow:scrollWidth>width+1,overflowExamples:overflowers.slice(0,8),contrastCandidates,heading:document.querySelector("h1")?.innerText||"",renderError:window.__portalFixtureError||null};
+        return {width,scrollWidth,horizontalOverflow:scrollWidth>width+1,overflowExamples:overflowers.slice(0,8),heading:document.querySelector("h1")?.innerText||"",renderError:window.__portalFixtureError||null};
       });
-      const screenshot=await page.screenshot({path:"artifacts/responsive-screenshots/"+portal.toLowerCase()+"-"+width+".png",fullPage:true});
-      const renderedImage=decodePng(screenshot),scaleX=renderedImage.width/metrics.width,scaleY=scaleX,contrastFailures=[];
-      for(const candidate of metrics.contrastCandidates){
-        const x=candidate.left+Math.min(2,Math.max(.5,(candidate.right-candidate.left)/4));
-        const y=candidate.top+Math.min(2,Math.max(.5,(candidate.bottom-candidate.top)/4));
-        const background=sampleRenderedBackground(renderedImage,x,y,scaleX,scaleY),ratio=contrastRatio(candidate.foreground,background);
-        if(ratio<(candidate.large?3:4.5))contrastFailures.push({text:candidate.text,ratio:Number(ratio.toFixed(2))});
-      }
-      metrics.contrastFailureCount=contrastFailures.length;
-      metrics.contrastExamples=contrastFailures.slice(0,5);
-      delete metrics.contrastCandidates;
-      const row={portal,width,...metrics,pageErrors};
+      // Axe is an independent cross-check and is reported separately from the screenshot/median metric.
+      await page.addScriptTag({content:axe.source});
+      const axeResult=await page.evaluate(async()=>await window.axe.run(document,{runOnly:{type:"rule",values:["color-contrast"]}}));
+      const axeViolations=axeResult.violations.filter(v=>v.id==="color-contrast").flatMap(v=>v.nodes.map(n=>({
+        impact:v.impact,help:v.help,target:n.target,summary:n.failureSummary||""
+      })));
+      const first=await measurePass(page,portal,width,1);
+      const second=await measurePass(page,portal,width,2);
+      const countStable=first.candidateCount===second.candidateCount&&first.elementsMeasured===second.elementsMeasured&&first.elementsFailed===second.elementsFailed;
+      const issues=[...first.issues,...second.issues];
+      const row={portal,width,...layout,elementsMeasured:first.elementsMeasured,elementsFailed:first.elementsFailed,
+        lowestRatio:first.lowestRatio,worstElements:first.worstElements,measurementPass1:{candidates:first.candidateCount,measured:first.elementsMeasured,failed:first.elementsFailed},
+        measurementPass2:{candidates:second.candidateCount,measured:second.elementsMeasured,failed:second.elementsFailed},
+        measurementCountsStable:countStable,measurementIssues:issues.length,measurementIssueExamples:issues.slice(0,10),
+        axeColorContrastViolations:axeViolations.length,axeColorContrastExamples:axeViolations.slice(0,5),pageErrors};
       console.log("PORTAL_VIEWPORT_AUDIT "+JSON.stringify(row));
-      if(metrics.horizontalOverflow||metrics.contrastFailureCount>0||metrics.renderError||pageErrors.length)failures.push(row);
-    } catch(e) { const row={portal,width,error:String(e?.message||e),pageErrors};console.log("PORTAL_VIEWPORT_AUDIT "+JSON.stringify(row));failures.push(row); }
-    finally { await context.close(); }
+      if(layout.horizontalOverflow||first.elementsFailed>0||second.elementsFailed>0||issues.length>0||!countStable||layout.renderError||pageErrors.length||axeViolations.length)failures.push(row);
+    } catch(e) {
+      const row={portal,width,error:String(e?.message||e),pageErrors};
+      console.log("PORTAL_VIEWPORT_AUDIT "+JSON.stringify(row));failures.push(row);
+    } finally { await context.close(); }
   }
 } finally { await browser.close(); }
 console.log("Portal viewport audit failed layout/render cases: "+failures.length);
