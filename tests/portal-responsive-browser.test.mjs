@@ -69,17 +69,17 @@ try {
       await page.waitForTimeout(900);
       const metrics=await page.evaluate(()=>{
         const width=document.documentElement.clientWidth,scrollWidth=Math.max(document.documentElement.scrollWidth,document.body.scrollWidth);
-        const parseColor=value=>{const m=value.match(/rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)(?:,\\s*([0-9.]+))?\\)/i);return m?{rgb:[+m[1],+m[2],+m[3]],a:m[4]===undefined?1:+m[4]}:null;};
+        const parseColor=value=>{const m=value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([0-9.]+))?\)/i);return m?{rgb:[+m[1],+m[2],+m[3]],a:m[4]===undefined?1:+m[4]}:null;};
         const overflowers=[];
         for(const el of [...document.querySelectorAll("body *")]){
-          const r=el.getBoundingClientRect(),s=getComputedStyle(el),txt=(el.innerText||"").trim().replace(/\\s+/g," ");
+          const r=el.getBoundingClientRect(),s=getComputedStyle(el),txt=(el.innerText||"").trim().replace(/\s+/g," ");
           if(r.width<=0||r.height<=0||s.display==="none"||s.visibility==="hidden")continue;
           if(r.right>width+1||r.left< -1)overflowers.push({tag:el.tagName.toLowerCase(),className:String(el.className||"").toString().slice(0,100),left:Math.round(r.left),right:Math.round(r.right),width:Math.round(r.width),text:txt.slice(0,55)});
         }
         const contrastCandidates=[],walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
         let textNode;
         while((textNode=walker.nextNode())){
-          const txt=(textNode.nodeValue||"").replace(/\\s+/g," ").trim();
+          const txt=(textNode.nodeValue||"").replace(/\s+/g," ").trim();
           if(!txt)continue;
           const el=textNode.parentElement;if(!el)continue;
           const s=getComputedStyle(el);
