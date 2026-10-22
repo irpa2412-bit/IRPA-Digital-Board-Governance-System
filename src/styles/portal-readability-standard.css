@@ -419,3 +419,123 @@
   background: var(--irpa-readable-surface) !important;
 }
 
+/* Responsive contrast remediation — round 1.
+   Make the shared readability standard outrank legacy dark-theme declarations on
+   light operational surfaces. Dark branded headers and the signature field palette
+   remain dark; workflow, status, form and record text is measured at normal thresholds. */
+html body #root .app-shell .content-area:not(.dashboard-content-area) .page :where(.panel, .module-panel, .stat-card, .workflow-stage, .identity-card, .record-details, .detail-grid > div) {
+  background-color: #ffffff !important;
+  background-image: none !important;
+  color: #26352f !important;
+  border-color: #cbd9d2 !important;
+}
+html body #root .app-shell .content-area:not(.dashboard-content-area) .page :where(.panel, .module-panel, .stat-card, .workflow-stage, .identity-card, .record-details, .detail-grid > div) :where(p, small, span, strong, li, label, em, td, th, legend, dt, dd) {
+  color: #26352f !important;
+  -webkit-text-fill-color: #26352f !important;
+  opacity: 1 !important;
+}
+html body #root .app-shell .content-area:not(.dashboard-content-area) .page :where(.input, input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  color: #18364f !important;
+  -webkit-text-fill-color: #18364f !important;
+  background-color: #ffffff !important;
+}
+html body #root .app-shell .content-area:not(.dashboard-content-area) .page :where(input, select, textarea)::placeholder {
+  color: #526579 !important;
+  -webkit-text-fill-color: #526579 !important;
+  opacity: 1 !important;
+}
+html body #root .app-shell .content-area:not(.dashboard-content-area) .page .status-badge,
+html body #root .app-shell .content-area:not(.dashboard-content-area) :where(.controlled-document-upload-panel, .archive-routing-panel) .status-badge {
+  color: #214f38 !important;
+  -webkit-text-fill-color: #214f38 !important;
+  background-color: #e8f4ed !important;
+  border: 1px solid #b9d9c7 !important;
+}
+html body #root .app-shell .content-area:not(.dashboard-content-area) .page .auth-message {
+  color: #26352f !important;
+  -webkit-text-fill-color: #26352f !important;
+  background-color: #f4f8f5 !important;
+  background-image: none !important;
+  border-color: #cbd9d2 !important;
+}
+html body #root .app-shell .content-area:not(.dashboard-content-area) .page .signature-field-palette .panel {
+  color: #f8fafc !important;
+  background-color: #1e293b !important;
+  background-image: none !important;
+  border-color: #64748b !important;
+}
+html body #root .app-shell .content-area:not(.dashboard-content-area) .page .signature-field-palette .panel :where(p, small, span, strong, li, label, em, td, th, legend, dt, dd) {
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+}
+
+/* Documents Portal has no .page wrapper: give its operational panels the same
+   light surface and dark-copy treatment without touching its workflow logic. */
+html body #root .app-shell .content-area:not(.dashboard-content-area) .document-lifecycle-module {
+  color: #26352f !important;
+  background-color: #f8faf9 !important;
+}
+html body #root .app-shell .content-area:not(.dashboard-content-area) .document-lifecycle-module :where(.panel, .module-panel, .stat-card, .identity-card, .record-details, .detail-grid > div) {
+  color: #26352f !important;
+  background-color: #ffffff !important;
+  background-image: none !important;
+  border-color: #cbd9d2 !important;
+}
+html body #root .app-shell .content-area:not(.dashboard-content-area) .document-lifecycle-module :where(.panel, .module-panel, .stat-card, .identity-card, .record-details, .detail-grid > div) :where(h1, h2, h3, h4, h5, h6, p, small, span, strong, li, label, em, td, th, legend, dt, dd, .eyebrow, .panel-description, .muted) {
+  color: #26352f !important;
+  -webkit-text-fill-color: #26352f !important;
+  opacity: 1 !important;
+}
+html body #root .app-shell .content-area:not(.dashboard-content-area) .document-lifecycle-module .status-badge {
+  color: #214f38 !important;
+  -webkit-text-fill-color: #214f38 !important;
+  background-color: #e8f4ed !important;
+  border: 1px solid #b9d9c7 !important;
+}
+html body #root .app-shell .content-area:not(.dashboard-content-area) .document-lifecycle-module :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  color: #18364f !important;
+  -webkit-text-fill-color: #18364f !important;
+  background-color: #ffffff !important;
+}
+
+/* The authorization upload and archive panels are rendered outside .page. */
+html body #root .app-shell .content-area:not(.dashboard-content-area) :where(.controlled-document-upload-panel, .archive-routing-panel) {
+  color: #26352f !important;
+  -webkit-text-fill-color: #26352f !important;
+  background-color: #ffffff !important;
+  background-image: none !important;
+  border-color: #cbd9d2 !important;
+}
+html body #root .app-shell .content-area:not(.dashboard-content-area) :where(.controlled-document-upload-panel, .archive-routing-panel) :where(h1, h2, h3, h4, h5, h6, p, small, span, strong, li, label, em, td, th, legend, dt, dd) {
+  color: #26352f !important;
+  -webkit-text-fill-color: #26352f !important;
+  opacity: 1 !important;
+}
+html body #root .app-shell .content-area:not(.dashboard-content-area) :where(.controlled-document-upload-panel, .archive-routing-panel) :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  color: #18364f !important;
+  -webkit-text-fill-color: #18364f !important;
+  background-color: #ffffff !important;
+  border-color: #718a80 !important;
+}
+
+/* Finance's navigator itself is a dark banner, but its native control and arrow
+   sit on a light control surface and must use dark text. */
+html body #root .app-shell .content-area:not(.dashboard-content-area) .page.finance-portal .finance-field-roller {
+  background-color: #062b4c !important;
+  background-image: none !important;
+}
+html body #root .app-shell .content-area:not(.dashboard-content-area) .page.finance-portal .finance-field-roller > div:first-child :where(strong, small, span, p) {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+html body #root .app-shell .content-area:not(.dashboard-content-area) .page.finance-portal .finance-field-roller-control select,
+html body #root .app-shell .content-area:not(.dashboard-content-area) .page.finance-portal .finance-field-roller-control > span {
+  color: #18364f !important;
+  -webkit-text-fill-color: #18364f !important;
+  background-color: #ffffff !important;
+}
+html body #root .app-shell .content-area:not(.dashboard-content-area) .page.meeting-centre-page .stat-card strong {
+  color: #26352f !important;
+  -webkit-text-fill-color: #26352f !important;
+}
+
