@@ -2,7 +2,7 @@ name: IRPA Local Responsive Portal Audit
 
 on:
   push:
-    branches: [integration/five-portal-chain-20261018]
+    branches: [integration/five-portal-chain-20261018, audit/contrast-diagnostic-20261021]
     paths:
       - "src/pages/Meetings.jsx"
       - "src/styles/**"
