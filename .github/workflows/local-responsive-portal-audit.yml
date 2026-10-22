@@ -17,6 +17,12 @@ on:
       - "firestore.rules.proposed"
       - "scripts/check-no-billing-deps.mjs"
   workflow_dispatch:
+    inputs:
+      baseline_styles:
+        description: "Use src/styles from origin/main for an A/B baseline (runner only; never committed)"
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -37,6 +43,9 @@ jobs:
         run: |
           npm install --no-save --package-lock=false playwright axe-core@4.10.3
           npx playwright install --with-deps chromium
+      - name: Restore main stylesheet baseline for A/B comparison
+        if: inputs.baseline_styles == true
+        run: git fetch origin main && git checkout origin/main -- src/styles
       - name: Build local staging-configured app and portal fixtures
         env:
           VITE_IRPA_ENV: staging
@@ -80,9 +89,8 @@ jobs:
           const logPath = process.env.AUDIT_LOG;
           let log = "";
           try { log = await readFile(logPath, "utf8"); } catch {}
-          const lines = log.split(/\r?\n/);
-          const finalLine = [...lines].reverse().find(line => /Portal viewport audit failed layout\/render cases: \d+/.test(line)) || "";
-          const match = finalLine.match(/Portal viewport audit failed layout\/render cases: (\d+)/);
+          const lines = log.split(String.fromCharCode(10));
+          const finalLine = [...lines].reverse().find(line => line.includes("failed layout/render cases:")) || "failed layout/render cases: unavailable (browser audit did not emit its final line).";
           const rows = [];
           for (const line of lines) {
             const marker = "PORTAL_VIEWPORT_AUDIT ";
@@ -90,31 +98,37 @@ jobs:
             if (at < 0) continue;
             try { rows.push(JSON.parse(line.slice(at + marker.length))); } catch {}
           }
-          const esc = value => String(value ?? "").replace(/\|/g, "\\|").replace(/\s+/g, " ").trim();
-          const md = ["## IRPA Local Responsive Portal Audit", "", finalLine || "Portal viewport audit failed layout/render cases: unavailable (browser audit did not emit its final line).", "",
-            "### Primary screenshot/median contrast measurement", "",
-            "| Portal | Viewport | Elements measured | Elements failed | Lowest ratio | Stable counts | Measurement errors | Worst 5 (text; foreground; background; ratio; class; nearest ancestor; ancestor bg-color; ancestor bg-image) |",
-            "|---|---:|---:|---:|---:|---|---:|---|"];
+          const esc = value => String(value ?? "").split("|").join(String.fromCharCode(92)+"|").split(String.fromCharCode(10)).join(" ").split(String.fromCharCode(13)).join(" ").trim();
+          const md = ["## IRPA Local Responsive Portal Audit", "", "`"+finalLine+"`", "",
+            "### Counts by portal and viewport", "",
+            "| Portal | Viewport | Candidates | Measured | Ratio failures | Measurement issues (zero-size / unparseable / sampling / other) | Lowest ratio | axe-core violations |",
+            "|---|---:|---:|---:|---:|---|---:|---:|"];
           for (const row of rows) {
-            const worst=(row.worstElements||[]).map(x=>[
-              "`"+esc(x.text)+"`",esc(x.foreground),esc(JSON.stringify(x.background)),esc(x.ratio),
-              esc(x.className),esc(x.nearestAncestor?.className||x.nearestAncestor?.tag||""),
-              esc(x.ancestorBackgroundColor),esc(x.ancestorBackgroundImage)
-            ].join("; ")).join("<br>");
-            md.push("| "+esc(row.portal||"unknown")+" | "+esc(row.width??"unknown")+" | "+esc(row.elementsMeasured??"unavailable")+" | "+
-              esc(row.elementsFailed??"unavailable")+" | "+esc(row.lowestRatio??"unavailable")+" | "+esc(row.measurementCountsStable??"unavailable")+" | "+
-              esc(row.measurementIssues??"unavailable")+" | "+(worst||"—")+" |");
+            const c=row.measurementIssueCounts||{};
+            md.push("| "+esc(row.portal||"unknown")+" | "+esc(row.width??"unknown")+" | "+esc(row.candidates??"unavailable")+" | "+esc(row.measured??"unavailable")+" | "+esc(row.ratioFailures??"unavailable")+" | "+esc(row.measurementIssues??"unavailable")+" ("+esc(c.zeroSizeBox??"—")+" / "+esc(c.unparseableColour??"—")+" / "+esc(c.samplingError??"—")+" / "+esc(c.other??"—")+") | "+esc(row.lowestRatio??"n/a")+" | "+esc(row.axeColorContrastViolations??"unavailable")+" |");
           }
-          if (!rows.length) md.push("| — | — | unavailable | unavailable | unavailable | unavailable | unavailable | No audit rows emitted. |");
+          if (!rows.length) md.push("| — | — | unavailable | unavailable | unavailable | unavailable | unavailable | unavailable |");
+          md.push("", "### First five measurement issues per portal/viewport", "",
+            "| Portal | Viewport | Text | Reason | Element class | Detail |", "|---|---:|---|---|---|---|");
+          for (const row of rows) for (const issue of (row.firstFiveMeasurementIssues||[])) {
+            md.push("| "+esc(row.portal)+" | "+esc(row.width)+" | "+esc(issue.text)+" | "+esc(issue.reason)+" | "+esc(issue.className)+" | "+esc(issue.detail)+" |");
+          }
+          md.push("", "### CSS attribution for the five worst ratio failures per portal/viewport", "",
+            "| Portal | Viewport | Text | Ratio | Foreground | Stylesheet | Selector | Line | Non-winning dark-text rule also matched |",
+            "|---|---:|---|---:|---|---|---|---:|---|");
+          for (const row of rows) for (const failure of (row.worstRatioFailures||[])) {
+            const cause=failure.cssCause||{};
+            md.push("| "+esc(row.portal)+" | "+esc(row.width)+" | "+esc(failure.text)+" | "+esc(failure.ratio)+" | "+esc(failure.foreground)+" | "+esc(cause.stylesheet)+" | "+esc(cause.selector)+" | "+esc(cause.line??"unknown")+" | "+esc(cause.nonWinningDarkTextRuleMatched??"unknown")+" |");
+          }
           md.push("", "### Independent axe-core colour-contrast cross-check (axe-core 4.10.3)", "",
             "| Portal | Viewport | axe colour-contrast violations | Examples |", "|---|---:|---:|---|");
           for (const row of rows) {
             const examples=(row.axeColorContrastExamples||[]).map(x=>"`"+esc(x.target?.join(", ")||"target unavailable")+"` — "+esc(x.impact)+" — "+esc(x.summary)).join("<br>");
             md.push("| "+esc(row.portal||"unknown")+" | "+esc(row.width??"unknown")+" | "+esc(row.axeColorContrastViolations??"unavailable")+" | "+(examples||"—")+" |");
           }
-          await appendFile(process.env.GITHUB_STEP_SUMMARY, md.join("\n")+"\n");
-          if (match && Number(match[1])>0) console.log("::error title=Portal viewport audit::Portal viewport audit failed layout/render cases: "+match[1]);
-          else if (!match || rows.length!==16 || rows.some(r=>r.measurementCountsStable!==true)) console.log("::error title=Portal viewport audit::Summary incomplete or measurement counts unstable; inspect audit log.");
+          await appendFile(process.env.GITHUB_STEP_SUMMARY, md.join(String.fromCharCode(10))+String.fromCharCode(10));
+          if (!finalLine.endsWith("failed layout/render cases: 0")) console.log("::error title=Portal viewport audit::"+finalLine);
+          if (rows.length!==16 || rows.some(r=>!Number.isFinite(r.candidates)||!Number.isFinite(r.measured)||!Number.isFinite(r.ratioFailures)||!Number.isFinite(r.measurementIssues))) console.log("::error title=Portal viewport audit::Summary incomplete; inspect audit log.");
           NODE
       - name: Upload responsive screenshots and audit logs
         if: always()
