@@ -262,11 +262,12 @@ try {
       const axeResult=await page.evaluate(async()=>await window.axe.run(document,{runOnly:{type:"rule",values:["color-contrast"]}}));
       const axeViolations=axeResult.violations.filter(v=>v.id==="color-contrast").flatMap(v=>v.nodes.map(n=>({impact:v.impact,help:v.help,target:n.target,summary:n.failureSummary||""})));
       const result=await measurePass(page,portal,width,cdp,styleSheets);
-      const row={portal,width,...layout,candidates:result.candidateCount,measured:result.elementsMeasured,ratioFailures:result.ratioFailures,
+      const row={portal,width,...layout,candidates:result.candidateCount,measured:result.elementsMeasured,ratioFailures:result.ratioFailures,contrastFailureCount:result.ratioFailures,
         measurementIssues:result.measurementIssues,fatalMeasurementIssues:result.fatalMeasurementIssues,measurementIssueCounts:result.measurementIssueCounts,zeroSizeByTag:result.zeroSizeByTag,lowestRatio:result.lowestRatio,
         worstRatioFailures:result.worstRatioFailures,firstFiveMeasurementIssues:result.issues,
         axeColorContrastViolations:axeViolations.length,axeColorContrastExamples:axeViolations.slice(0,5),pageErrors};
       console.log("PORTAL_VIEWPORT_AUDIT "+JSON.stringify(row));
+      console.log("PORTAL_CONTRAST_FAILURE_COUNT "+JSON.stringify({portal,width,contrastFailureCount:row.contrastFailureCount}));
       const summaryLine="| "+portal+" | "+width+" | "+row.candidates+" | "+row.measured+" | "+row.ratioFailures+" | "+row.measurementIssues+" (zero-size "+row.measurementIssueCounts.zeroSizeBox+", unparseable colour "+row.measurementIssueCounts.unparseableColour+", sampling error "+row.measurementIssueCounts.samplingError+", other "+row.measurementIssueCounts.other+") | "+(row.lowestRatio??"n/a")+" | "+axeViolations.length+" |";
       console.log("PORTAL_VIEWPORT_SUMMARY "+summaryLine);
       console.log("PORTAL_ZERO_SIZE_TAG_COUNTS "+JSON.stringify({portal,width,counts:result.zeroSizeByTag,nativeControlItems:result.measurementIssueCounts.nativeControlItem}));
