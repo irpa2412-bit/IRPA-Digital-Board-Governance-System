@@ -8,14 +8,24 @@ import AuthorizationApprovals from "../../src/pages/AuthorizationApprovals.jsx";
 import FinancePortfolio from "../../src/pages/FinancePortfolio.jsx";
 import ProcurementPortal from "../../src/pages/ProcurementPortal.jsx";
 import Employees from "../../src/pages/Employees.jsx";
+
+// index.html stylesheet links, in their production cascade order.
+import "../../src/styles/readability-harmony.css";
+import "../../src/styles/finance-readability.css";
+import "../../src/styles/finance-platform-uniform.css";
+
+// src/main.jsx stylesheet imports, in their production cascade order.
 import "../../src/styles/app.css";
+import "../../src/styles/mobile-viewport-containment.css";
 import "../../src/styles/tokens.css";
 import "../../src/styles/portal-typography.css";
 import "../../src/styles/shared-header-hero.css";
-import "../../src/styles/mobile-viewport-containment.css";
 import "../../src/styles/mobile-app-enhancement.css";
+import "../../src/styles/page-back-next-navigation.css";
+import "../../src/styles/grant-intelligence-layout.css";
+
+// src/App.jsx stylesheet import, last in the production cascade.
 import "../../src/styles/portal-readability-standard.css";
-import "../../src/styles/finance-platform-uniform.css";
 
 const profile = { role:"Administrator", title:"Administrator", position:"Administrator", department:"Finance & Administration", unit:"Finance Unit", authorizationType:"administrator", status:"Active", permissions:["RESTRICTED_DOCUMENT_UPLOAD"] };
 const employee = { ...profile, employeeNumber:"FIXTURE-001", name:"Responsive Audit Fixture" };
