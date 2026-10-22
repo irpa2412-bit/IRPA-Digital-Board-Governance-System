@@ -452,6 +452,14 @@ jobs:
           done
           cat "$RUNNER_TEMP/meeting-fixture.log"
           exit 1
+      - name: Diagnose React dependency resolution and warm the fixture
+        run: |
+          set -euo pipefail
+          npm ls react react-dom --all
+          curl --fail --silent --show-error http://127.0.0.1:4179/tests/fixtures/meeting-portal-fixture.html >/dev/null
+          curl --fail --silent --show-error http://127.0.0.1:4179/tests/fixtures/meeting-portal-fixture.jsx >/dev/null
+          # Repeat the module request after Vite has had a chance to finish dependency optimisation.
+          curl --fail --silent --show-error http://127.0.0.1:4179/tests/fixtures/meeting-portal-fixture.jsx >/dev/null
       - name: Run mobile and desktop authenticated-identity fixture tests
         run: node tests/meeting-portal-browser.test.mjs
       - name: Upload fixture server diagnostics on failure
