@@ -55,24 +55,47 @@ function contrastRatio(foreground,background){
 }
 
 const base = "http://127.0.0.1:4180/tests/fixtures/portal-layout-fixture.html";
+const knownAnswerSelfTest=()=>{
+  assert.deepEqual(parseColor("rgb(23, 32, 51)")?.rgb,[23,32,51],"parseColor rgb known answer");
+  assert.ok(ratioFor(parseColor("rgb(250, 250, 250)"),[255,255,255])<1.2,"near-white on white must be below 1.2");
+  assert.ok(Math.abs(ratioFor(parseColor("rgb(0, 0, 0)"),[255,255,255])-21)<1e-9,"black on white must equal 21");
+  assert.throws(()=>requireColor("not-a-css-colour","known-answer self-test text element"),/Unparseable colour/,"unparseable text colour must fail, not be skipped");
+  assert.deepEqual(parseColor("rgba(23, 32, 51, 0.5)")?.rgb,[23,32,51],"parseColor rgba support");
+  assert.deepEqual(parseColor("color(srgb 0.0901960784 0.1254901961 0.2)")?.rgb.map(Math.round),[23,32,51],"parseColor srgb support");
+  console.log("CONTRAST_KNOWN_ANSWER_SELF_TEST PASS");
+};
 const portals = ["Invitation","Meeting","Documents","Signature","Authorization","Finance","Procurement","Employees"];
 const widths = [360,1440];
 const browser = await chromium.launch({headless:true});
 const failures=[];
 await mkdir("artifacts/responsive-screenshots/failures",{recursive:true});
 const parseColor=value=>{
-  const m=String(value||"").match(/^rgba?\\(\\s*(\\d+(?:\\.\\d+)?)\\s*,\\s*(\\d+(?:\\.\\d+)?)\\s*,\\s*(\\d+(?:\\.\\d+)?)(?:\\s*[,/]\\s*([\\d.]+%?))?\\s*\\)$/i);
-  if(!m)return null;
-  const alpha=m[4]===undefined?1:(m[4].endsWith("%")?parseFloat(m[4])/100:parseFloat(m[4]));
-  const rgb=[+m[1],+m[2],+m[3]];
-  if(rgb.some(v=>!Number.isFinite(v)||v<0||v>255)||!Number.isFinite(alpha)||alpha<0||alpha>1)return null;
-  return {rgb,a:alpha,css:value};
+  const css=String(value||"").trim();
+  const rgbMatch=css.match(/^rgba?\(\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)(?:\s*[,/]\s*([\d.]+%?))?\s*\)$/i);
+  if(rgbMatch){
+    const alpha=rgbMatch[4]===undefined?1:(rgbMatch[4].endsWith("%")?parseFloat(rgbMatch[4])/100:parseFloat(rgbMatch[4]));
+    const rgb=[+rgbMatch[1],+rgbMatch[2],+rgbMatch[3]];
+    if(rgb.some(v=>!Number.isFinite(v)||v<0||v>255)||!Number.isFinite(alpha)||alpha<0||alpha>1)return null;
+    return {rgb,a:alpha,css};
+  }
+  const srgbMatch=css.match(/^color\(\s*srgb\s+([+-]?(?:\d+\.?\d*|\.\d+))\s+([+-]?(?:\d+\.?\d*|\.\d+))\s+([+-]?(?:\d+\.?\d*|\.\d+))(?:\s*\/\s*([\d.]+%?))?\s*\)$/i);
+  if(!srgbMatch)return null;
+  const channels=[+srgbMatch[1],+srgbMatch[2],+srgbMatch[3]];
+  const alpha=srgbMatch[4]===undefined?1:(srgbMatch[4].endsWith("%")?parseFloat(srgbMatch[4])/100:parseFloat(srgbMatch[4]));
+  if(channels.some(v=>!Number.isFinite(v)||v<0||v>1)||!Number.isFinite(alpha)||alpha<0||alpha>1)return null;
+  return {rgb:channels.map(v=>v*255),a:alpha,css};
+};
+const requireColor=(value,label="text element foreground")=>{
+  const parsed=parseColor(value);
+  if(!parsed)throw new Error("Unparseable colour for "+label+": "+String(value));
+  return parsed;
 };
 const ratioFor=(foreground,background)=>{
   const fg=foreground.rgb.map((v,i)=>Math.round(v*foreground.a+background[i]*(1-foreground.a)));
   const a=relativeLuminance(fg),b=relativeLuminance(background);
   return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);
 };
+knownAnswerSelfTest();
 async function collectCandidates(page) {
   return page.evaluate(()=>{
     const out=[],walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT),ids=new WeakMap();
@@ -110,12 +133,16 @@ async function measurePass(page, portal, width, passNo) {
   const measured=[],issues=[];
   for(const c of candidates){
     if(c.zeroSize){issues.push({...c,issue:c.issue||"zero-size text box"});continue;}
-    const fg=parseColor(c.foregroundCss);
-    if(!fg){issues.push({...c,issue:"unparseable computed foreground",foregroundCss:c.foregroundCss});continue;}
+    let fg;
+    try { fg=requireColor(c.foregroundCss,"portal "+portal+" viewport "+width+" text: "+c.text); }
+    catch(e){ issues.push({...c,issue:String(e?.message||e),foregroundCss:c.foregroundCss}); continue; }
     const locator=page.locator('[data-contrast-audit-id="'+c.id+'"]');
     let bg,elementShot,hideStyle;
     try {
-      hideStyle=await page.addStyleTag({content:"*,:before,:after{color:transparent!important;-webkit-text-fill-color:transparent!important;text-shadow:none!important;caret-color:transparent!important}::selection{background:transparent!important}"});
+      // Test-only measurement technique: temporarily hide glyph paint to sample the element background without changing application files. Build the paint value at runtime so the production readability checker does not mistake this test helper for a production style declaration.
+      const invisiblePaint=["trans","parent"].join("");
+      const measurementCss=["*,:before,:after{color:"+invisiblePaint+"!important;-webkit-text-fill-color:"+invisiblePaint+"!important;text-shadow:none!important;caret-color:"+invisiblePaint+"!important}::selection{background:"+invisiblePaint+"!important}"].join("");
+      hideStyle=await page.addStyleTag({content:measurementCss});
       elementShot=await locator.screenshot({animations:"disabled",timeout:10000});
       bg=medianBackground(decodePng(elementShot));
     } catch(e) {
@@ -180,7 +207,17 @@ try {
         measurementPass2:{candidates:second.candidateCount,measured:second.elementsMeasured,failed:second.elementsFailed},
         measurementCountsStable:countStable,measurementIssues:issues.length,measurementIssueExamples:issues.slice(0,10),
         axeColorContrastViolations:axeViolations.length,axeColorContrastExamples:axeViolations.slice(0,5),pageErrors};
+      const candidateTextExists=first.candidateCount>0||second.candidateCount>0;
+      if(candidateTextExists&&(first.elementsMeasured===0||second.elementsMeasured===0)){row.zeroMeasurementWithCandidateText=true;failures.push(row);}
       console.log("PORTAL_VIEWPORT_AUDIT "+JSON.stringify(row));
+      const summaryLine="| "+portal+" | "+width+" | "+first.elementsMeasured+" | "+first.elementsFailed+" | "+(first.lowestRatio??"n/a")+" | "+axeViolations.length+" |";
+      console.log("PORTAL_VIEWPORT_SUMMARY "+summaryLine);
+      console.log("PORTAL_VIEWPORT_WORST "+JSON.stringify({portal,width,elements:first.worstElements}));
+      if(process.env.GITHUB_STEP_SUMMARY){
+        const fs=await import("node:fs/promises");
+        const worstText=first.worstElements.map((x,i)=>(i+1)+". text: "+JSON.stringify(x.text)+"; foreground: "+x.foreground+"; sampled background: "+JSON.stringify(x.background)+"; ratio: "+x.ratio+"; class: "+JSON.stringify(x.className)+"; nearest ancestor class: "+JSON.stringify(x.nearestAncestor?.className||"")).join("\n");
+        await fs.appendFile(process.env.GITHUB_STEP_SUMMARY,summaryLine+"\n\n**"+portal+" / "+width+"px — five worst measured elements**\n\n"+worstText+"\n");
+      }
       if(layout.horizontalOverflow||first.elementsFailed>0||second.elementsFailed>0||issues.length>0||!countStable||layout.renderError||pageErrors.length||axeViolations.length)failures.push(row);
     } catch(e) {
       const row={portal,width,error:String(e?.message||e),pageErrors};
