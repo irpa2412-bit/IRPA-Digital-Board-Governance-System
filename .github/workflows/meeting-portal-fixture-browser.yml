@@ -72,10 +72,12 @@ jobs:
           npm install --no-save --package-lock=false playwright
           npx playwright install --with-deps chromium
       - name: Assert runtime source isolation from unrelated portals
+        env:
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
           git fetch origin main:refs/remotes/origin/main
-          EVENT_NAME="${{ github.event_name }}" node --input-type=module <<'NODE'
+          node --input-type=module <<'NODE'
           import { execFileSync } from "node:child_process";
           // Compare against the fetched main snapshot for both PR and push runs.
           // Keep the path allowlist strict while excluding main-only files added after
