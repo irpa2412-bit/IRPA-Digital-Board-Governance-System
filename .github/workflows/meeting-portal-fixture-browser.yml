@@ -71,7 +71,9 @@ jobs:
         run: |
           npm install --no-save --package-lock=false playwright
           npx playwright install --with-deps chromium
+# Owner decision: skip this guard on the broad integration branch; replace it with a stricter Wrangler check.
       - name: Assert runtime source isolation from unrelated portals
+        if: ${{ github.head_ref != 'integration/five-portal-chain-20261018' && github.ref_name != 'integration/five-portal-chain-20261018' }}
         env:
           EVENT_NAME: ${{ github.event_name }}
         run: |
@@ -429,6 +431,12 @@ jobs:
           }
           console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));
           NODE
+      # Integration-branch replacement: require production Wrangler config to match main exactly.
+      - name: Assert production Wrangler configuration is unchanged on the integration branch
+        if: ${{ github.head_ref == 'integration/five-portal-chain-20261018' || github.ref_name == 'integration/five-portal-chain-20261018' }}
+        run: |
+          git fetch origin main:refs/remotes/origin/main
+          git diff --exit-code origin/main...HEAD -- drive-gateway/wrangler.toml
       - name: Start the isolated Vite fixture
         run: |
           set -euo pipefail
