@@ -302,3 +302,8 @@
   -webkit-text-fill-color: #526b60;
   opacity: 1;
 }
+
+#root .app-shell .content-area:not(.dashboard-content-area) .page :where(.stat-card, .workflow-stage, .finance-engine-card, .finance-formula-card) strong {
+  color: var(--irpa-readable-text);
+  -webkit-text-fill-color: var(--irpa-readable-text);
+}
