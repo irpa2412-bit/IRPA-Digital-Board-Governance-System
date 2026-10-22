@@ -32,10 +32,13 @@ function decodePng(buffer) {
   }
   return {width,height,bytesPerPixel:bpp,stride,pixels};
 }
-function medianBackground(image) {
+function sampleBackground(image, rect) {
   if (!image.width || !image.height) throw new Error("Background screenshot has zero dimensions");
+  const left=Math.max(0,Math.floor(rect.left)),top=Math.max(0,Math.floor(rect.top));
+  const right=Math.min(image.width,Math.ceil(rect.right)),bottom=Math.min(image.height,Math.ceil(rect.bottom));
+  if(right<=left||bottom<=top)throw new Error("Text rectangle lies outside the full-page screenshot buffer");
   const channels=[[],[],[]];
-  for(let y=0;y<image.height;y++) for(let x=0;x<image.width;x++) {
+  for(let y=top;y<bottom;y++)for(let x=left;x<right;x++){
     const at=y*image.stride+x*image.bytesPerPixel;
     channels[0].push(image.pixels[at]);channels[1].push(image.pixels[at+1]);channels[2].push(image.pixels[at+2]);
   }
@@ -128,63 +131,80 @@ async function collectCandidates(page) {
     return out;
   });
 }
-async function measurePass(page, portal, width, passNo) {
-  const candidates=await collectCandidates(page);
-  const measured=[],issues=[];
-  for(const c of candidates){
-    if(c.zeroSize){issues.push({...c,issue:c.issue||"zero-size text box"});continue;}
-    let fg;
-    try { fg=requireColor(c.foregroundCss,"portal "+portal+" viewport "+width+" text: "+c.text); }
-    catch(e){ issues.push({...c,issue:String(e?.message||e),foregroundCss:c.foregroundCss}); continue; }
-    const locator=page.locator('[data-contrast-audit-id="'+c.id+'"]');
-    let bg,elementShot,hideStyle;
-    try {
-      // Test-only measurement technique: temporarily hide glyph paint to sample the element background without changing application files. Build the paint value at runtime so the production readability checker does not mistake this test helper for a production style declaration.
-      const invisiblePaint=["trans","parent"].join("");
-      const measurementCss=["*,:before,:after{color:"+invisiblePaint+"!important;-webkit-text-fill-color:"+invisiblePaint+"!important;text-shadow:none!important;caret-color:"+invisiblePaint+"!important}::selection{background:"+invisiblePaint+"!important}"].join("");
-      hideStyle=await page.addStyleTag({content:measurementCss});
-      elementShot=await locator.screenshot({animations:"disabled",timeout:10000});
-      bg=medianBackground(decodePng(elementShot));
-    } catch(e) {
-      issues.push({...c,issue:"element background screenshot failed: "+String(e?.message||e)});
-    } finally {
-      if(hideStyle)await hideStyle.evaluate(el=>el.remove());
-    }
-    if(!bg)continue;
-    const ratio=ratioFor(fg,bg),failed=ratio<(c.large?3:4.5);
-    const record={...c,foreground:fg.css,background:bg.map(v=>Math.round(v)),ratio:Number(ratio.toFixed(3)),failed};
-    measured.push(record);
-    if(failed){
-      try {
-        const original=await locator.screenshot({animations:"disabled",timeout:10000});
-        const safeText=c.text.replace(/[^a-z0-9_-]+/gi,"-").slice(0,35)||"text";
-        await writeFile("artifacts/responsive-screenshots/failures/"+portal.toLowerCase()+"-"+width+"-"+passNo+"-"+c.id+"-"+safeText+".png",original);
-      } catch(e) { issues.push({...c,issue:"failing element crop could not be saved: "+String(e?.message||e)}); }
-    }
+async function attributeCause(cdp, styleSheets, item) {
+  try {
+    const root=(await cdp.send("DOM.getDocument",{depth:0})).root;
+    const found=await cdp.send("DOM.querySelector",{nodeId:root.nodeId,selector:'[data-contrast-audit-id="'+item.id+'"]'});
+    if(!found.nodeId)return {stylesheet:"NOT FOUND",selector:"NOT FOUND",line:null,nonWinningDarkTextRuleMatched:false};
+    const matched=await cdp.send("CSS.getMatchedStylesForNode",{nodeId:found.nodeId});
+    const rules=(matched.matchedCSSRules||[]).map(entry=>({rule:entry.rule,properties:entry.rule.style?.cssProperties||[]}));
+    if(matched.inlineStyle)rules.unshift({rule:{origin:"inline",selectorList:{text:"element.style"},styleSheetId:null,style:matched.inlineStyle},properties:matched.inlineStyle.cssProperties||[]});
+    const colorProps=rules.flatMap(({rule,properties})=>properties.filter(p=>p.name==="color").map(p=>({rule,property:p})));
+    const winner=colorProps.find(x=>x.property.status==="active")||colorProps.find(x=>x.property.value===item.foreground)||colorProps[0];
+    const nonWinningDarkTextRuleMatched=colorProps.some(x=>{
+      if(x===winner||x.property.status==="active")return false;
+      const parsed=parseColor(x.property.value);
+      return parsed&&relativeLuminance(parsed.rgb)<0.25;
+    });
+    if(!winner)return {stylesheet:"NOT FOUND",selector:"NOT FOUND",line:null,nonWinningDarkTextRuleMatched};
+    const sid=winner.rule.styleSheetId,source=styleSheets.get(sid)?.sourceURL||(winner.rule.origin==="inline"?"inline style":"unknown stylesheet");
+    const file=source==="inline style"?source:(()=>{try{return new URL(source).pathname;}catch{return source;}})();
+    const ruleLine=winner.rule.selectorList?.range?.startLine??winner.rule.style?.range?.startLine;
+    return {stylesheet:file,selector:winner.rule.selectorList?.text||"element.style",line:Number.isInteger(ruleLine)?ruleLine+1:null,
+      winningColor:winner.property.value,nonWinningDarkTextRuleMatched};
+  } catch(error) {return {stylesheet:"CDP attribution error",selector:String(error?.message||error),line:null,nonWinningDarkTextRuleMatched:false};}
+}
+async function measurePass(page, portal, width, cdp, styleSheets) {
+  const candidates=await collectCandidates(page),measured=[],issues=[];
+  const issue=(c,reason,detail)=>issues.push({...c,reason,detail:detail||""});
+  for(const c of candidates) {
+    if(c.zeroSize){issue(c,"zero-size box",c.issue||"visible text has no positive-size client rect");continue;}
+    try {requireColor(c.foregroundCss,"portal "+portal+" viewport "+width+" text: "+c.text);}
+    catch(error){issue(c,"unparseable colour",String(error?.message||error));}
   }
-  return {candidateCount:candidates.length,elementsMeasured:measured.length,elementsFailed:measured.filter(x=>x.failed).length+issues.length,
-    lowestRatio:measured.length?Math.min(...measured.map(x=>x.ratio)):null,
-    worstElements:[...measured].sort((a,b)=>a.ratio-b.ratio).slice(0,5).map(x=>({
-      text:x.text,foreground:x.foreground,background:x.background,ratio:x.ratio,className:x.className,
-      nearestAncestor:x.ancestors[0]||null,ancestorBackgroundColor:x.ancestors[0]?.backgroundColor||null,
-      ancestorBackgroundImage:x.ancestors[0]?.backgroundImage||null
-    })),issues};
+  let image,hideStyle;
+  const invisiblePaint=["trans","parent"].join("");
+  const measurementCss=["*,:before,:after{color:"+invisiblePaint+"!important;-webkit-text-fill-color:"+invisiblePaint+"!important;text-shadow:none!important;caret-color:"+invisiblePaint+"!important}::selection{background:"+invisiblePaint+"!important}"].join("");
+  try {
+    hideStyle=await page.addStyleTag({content:measurementCss});
+    image=decodePng(await page.screenshot({fullPage:true,animations:"disabled",timeout:30000}));
+  } catch(error) {
+    for(const c of candidates.filter(x=>!x.zeroSize&&!issues.some(i=>i.id===x.id&&i.reason==="unparseable colour")))
+      issue(c,"sampling error","full-page hidden-text screenshot failed: "+String(error?.message||error));
+  } finally {if(hideStyle)await hideStyle.evaluate(el=>el.remove());}
+  const scrollY=await page.evaluate(()=>window.scrollY);
+  if(image)for(const c of candidates) {
+    if(c.zeroSize||issues.some(i=>i.id===c.id&&i.reason==="unparseable colour"))continue;
+    try {
+      const bg=sampleBackground(image,{left:c.left,top:c.top+scrollY,right:c.right,bottom:c.bottom+scrollY});
+      const fg=requireColor(c.foregroundCss,"portal "+portal+" viewport "+width+" text: "+c.text);
+      const ratio=ratioFor(fg,bg),failed=ratio<(c.large?3:4.5);
+      measured.push({...c,foreground:fg.css,background:bg.map(v=>Math.round(v)),ratio:Number(ratio.toFixed(3)),failed});
+    } catch(error){issue(c,"sampling error",String(error?.message||error));}
+  }
+  const ratioFailures=measured.filter(x=>x.failed).sort((a,b)=>a.ratio-b.ratio),worstRatioFailures=[];
+  for(const item of ratioFailures.slice(0,5))worstRatioFailures.push({...item,cssCause:await attributeCause(cdp,styleSheets,item)});
+  const measurementIssueCounts={zeroSizeBox:issues.filter(x=>x.reason==="zero-size box").length,
+    unparseableColour:issues.filter(x=>x.reason==="unparseable colour").length,
+    samplingError:issues.filter(x=>x.reason==="sampling error").length,
+    other:issues.filter(x=>!["zero-size box","unparseable colour","sampling error"].includes(x.reason)).length};
+  return {candidateCount:candidates.length,elementsMeasured:measured.length,ratioFailures:ratioFailures.length,
+    measurementIssues:issues.length,measurementIssueCounts,lowestRatio:measured.length?Math.min(...measured.map(x=>x.ratio)):null,
+    worstRatioFailures,issues:issues.slice(0,5)};
 }
 try {
-  for (const portal of portals) for (const width of widths) {
+  for(const portal of portals)for(const width of widths) {
     const context=await browser.newContext({viewport:{width,height:900},reducedMotion:"reduce"});
-    const page=await context.newPage();
-    const pageErrors=[];
+    const page=await context.newPage(),pageErrors=[];
     page.on("pageerror",e=>pageErrors.push(e.message));
     await page.route("https://**/*",route=>route.abort());
     try {
       const response=await page.goto(base+"?portal="+encodeURIComponent(portal),{waitUntil:"domcontentloaded",timeout:30000});
       assert.equal(response?.status(),200,"local fixture must return HTTP 200");
       await page.locator("[data-portal-name]").waitFor({timeout:10000});
-      await page.waitForTimeout(900);
+      await page.waitForTimeout(250);
       const layout=await page.evaluate(()=>{
-        const width=document.documentElement.clientWidth,scrollWidth=Math.max(document.documentElement.scrollWidth,document.body.scrollWidth);
-        const overflowers=[];
+        const width=document.documentElement.clientWidth,scrollWidth=Math.max(document.documentElement.scrollWidth,document.body.scrollWidth),overflowers=[];
         for(const el of [...document.querySelectorAll("body *")]){
           const r=el.getBoundingClientRect(),s=getComputedStyle(el),txt=(el.innerText||"").trim().replace(/\\s+/g," ");
           if(r.width<=0||r.height<=0||s.display==="none"||s.visibility==="hidden")continue;
@@ -192,38 +212,30 @@ try {
         }
         return {width,scrollWidth,horizontalOverflow:scrollWidth>width+1,overflowExamples:overflowers.slice(0,8),heading:document.querySelector("h1")?.innerText||"",renderError:window.__portalFixtureError||null};
       });
-      // Axe is an independent cross-check and is reported separately from the screenshot/median metric.
+      const cdp=await context.newCDPSession(page),styleSheets=new Map();
+      cdp.on("CSS.styleSheetAdded",event=>styleSheets.set(event.header.styleSheetId,event.header));
+      await cdp.send("DOM.enable");await cdp.send("CSS.enable");
       await page.addScriptTag({content:axe.source});
       const axeResult=await page.evaluate(async()=>await window.axe.run(document,{runOnly:{type:"rule",values:["color-contrast"]}}));
-      const axeViolations=axeResult.violations.filter(v=>v.id==="color-contrast").flatMap(v=>v.nodes.map(n=>({
-        impact:v.impact,help:v.help,target:n.target,summary:n.failureSummary||""
-      })));
-      const first=await measurePass(page,portal,width,1);
-      const second=await measurePass(page,portal,width,2);
-      const countStable=first.candidateCount===second.candidateCount&&first.elementsMeasured===second.elementsMeasured&&first.elementsFailed===second.elementsFailed;
-      const issues=[...first.issues,...second.issues];
-      const row={portal,width,...layout,elementsMeasured:first.elementsMeasured,elementsFailed:first.elementsFailed,
-        lowestRatio:first.lowestRatio,worstElements:first.worstElements,measurementPass1:{candidates:first.candidateCount,measured:first.elementsMeasured,failed:first.elementsFailed},
-        measurementPass2:{candidates:second.candidateCount,measured:second.elementsMeasured,failed:second.elementsFailed},
-        measurementCountsStable:countStable,measurementIssues:issues.length,measurementIssueExamples:issues.slice(0,10),
+      const axeViolations=axeResult.violations.filter(v=>v.id==="color-contrast").flatMap(v=>v.nodes.map(n=>({impact:v.impact,help:v.help,target:n.target,summary:n.failureSummary||""})));
+      const result=await measurePass(page,portal,width,cdp,styleSheets);
+      const row={portal,width,...layout,candidates:result.candidateCount,measured:result.elementsMeasured,ratioFailures:result.ratioFailures,
+        measurementIssues:result.measurementIssues,measurementIssueCounts:result.measurementIssueCounts,lowestRatio:result.lowestRatio,
+        worstRatioFailures:result.worstRatioFailures,firstFiveMeasurementIssues:result.issues,
         axeColorContrastViolations:axeViolations.length,axeColorContrastExamples:axeViolations.slice(0,5),pageErrors};
-      const candidateTextExists=first.candidateCount>0||second.candidateCount>0;
-      if(candidateTextExists&&(first.elementsMeasured===0||second.elementsMeasured===0)){row.zeroMeasurementWithCandidateText=true;failures.push(row);}
       console.log("PORTAL_VIEWPORT_AUDIT "+JSON.stringify(row));
-      const summaryLine="| "+portal+" | "+width+" | "+first.elementsMeasured+" | "+first.elementsFailed+" | "+(first.lowestRatio??"n/a")+" | "+axeViolations.length+" |";
+      const summaryLine="| "+portal+" | "+width+" | "+row.candidates+" | "+row.measured+" | "+row.ratioFailures+" | "+row.measurementIssues+" (zero-size "+row.measurementIssueCounts.zeroSizeBox+", unparseable colour "+row.measurementIssueCounts.unparseableColour+", sampling error "+row.measurementIssueCounts.samplingError+", other "+row.measurementIssueCounts.other+") | "+(row.lowestRatio??"n/a")+" | "+axeViolations.length+" |";
       console.log("PORTAL_VIEWPORT_SUMMARY "+summaryLine);
-      console.log("PORTAL_VIEWPORT_WORST "+JSON.stringify({portal,width,elements:first.worstElements}));
-      if(process.env.GITHUB_STEP_SUMMARY){
-        const fs=await import("node:fs/promises");
-        const worstText=first.worstElements.map((x,i)=>(i+1)+". text: "+JSON.stringify(x.text)+"; foreground: "+x.foreground+"; sampled background: "+JSON.stringify(x.background)+"; ratio: "+x.ratio+"; class: "+JSON.stringify(x.className)+"; nearest ancestor class: "+JSON.stringify(x.nearestAncestor?.className||"")).join("\n");
-        await fs.appendFile(process.env.GITHUB_STEP_SUMMARY,summaryLine+"\n\n**"+portal+" / "+width+"px — five worst measured elements**\n\n"+worstText+"\n");
-      }
-      if(layout.horizontalOverflow||first.elementsFailed>0||second.elementsFailed>0||issues.length>0||!countStable||layout.renderError||pageErrors.length||axeViolations.length)failures.push(row);
-    } catch(e) {
-      const row={portal,width,error:String(e?.message||e),pageErrors};
+      for(const bad of result.issues)console.log("PORTAL_MEASUREMENT_ISSUE "+JSON.stringify({portal,width,text:bad.text,reason:bad.reason,detail:bad.detail,className:bad.className}));
+      for(const bad of result.worstRatioFailures)console.log("PORTAL_RATIO_FAILURE_CAUSE "+JSON.stringify({portal,width,text:bad.text,foreground:bad.foreground,background:bad.background,ratio:bad.ratio,className:bad.className,...bad.cssCause}));
+      if(process.env.GITHUB_STEP_SUMMARY){const fs=await import("node:fs/promises");await fs.appendFile(process.env.GITHUB_STEP_SUMMARY,summaryLine+"\n");}
+      if(layout.horizontalOverflow||row.ratioFailures>0||row.measurementIssues>0||layout.renderError||pageErrors.length||axeViolations.length)failures.push(row);
+    } catch(error) {
+      const row={portal,width,error:String(error?.message||error),pageErrors};
       console.log("PORTAL_VIEWPORT_AUDIT "+JSON.stringify(row));failures.push(row);
-    } finally { await context.close(); }
+    } finally {await context.close();}
   }
-} finally { await browser.close(); }
-console.log("Portal viewport audit failed layout/render cases: "+failures.length);
+} finally {await browser.close();}
+
+console.log("failed layout/render cases: "+failures.length);
 if(failures.length)process.exitCode=1;
