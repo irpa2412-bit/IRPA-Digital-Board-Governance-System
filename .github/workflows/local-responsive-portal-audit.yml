@@ -100,29 +100,37 @@ jobs:
           const esc = value => String(value ?? "").split("|").join(String.fromCharCode(92)+"|").split(String.fromCharCode(10)).join(" ").split(String.fromCharCode(13)).join(" ").trim();
           const md = ["## "+(process.env.SUMMARY_HEADING || "IRPA Local Responsive Portal Audit"), "", "`"+finalLine+"`", "",
             "### Counts by portal and viewport", "",
-            "| Portal | Viewport | Candidates | Measured | Ratio failures | Measurement issues (zero-size / unparseable / sampling / other) | Lowest ratio | axe-core violations |",
+            "| Portal | Viewport | Candidates | Measured | Ratio failures | Measurement issues (zero-size / native control item / unparseable / sampling / other) | Lowest ratio | axe-core violations |",
             "|---|---:|---:|---:|---:|---|---:|---:|"];
           for (const row of rows) {
             const c=row.measurementIssueCounts||{};
-            md.push("| "+esc(row.portal||"unknown")+" | "+esc(row.width??"unknown")+" | "+esc(row.candidates??"unavailable")+" | "+esc(row.measured??"unavailable")+" | "+esc(row.ratioFailures??"unavailable")+" | "+esc(row.measurementIssues??"unavailable")+" ("+esc(c.zeroSizeBox??"—")+" / "+esc(c.unparseableColour??"—")+" / "+esc(c.samplingError??"—")+" / "+esc(c.other??"—")+") | "+esc(row.lowestRatio??"n/a")+" | "+esc(row.axeColorContrastViolations??"unavailable")+" |");
+            md.push("| "+esc(row.portal||"unknown")+" | "+esc(row.width??"unknown")+" | "+esc(row.candidates??"unavailable")+" | "+esc(row.measured??"unavailable")+" | "+esc(row.ratioFailures??"unavailable")+" | "+esc(row.measurementIssues??"unavailable")+" ("+esc(c.zeroSizeBox??"—")+" / "+esc(c.nativeControlItem??"—")+" / "+esc(c.unparseableColour??"—")+" / "+esc(c.samplingError??"—")+" / "+esc(c.other??"—")+") | "+esc(row.lowestRatio??"n/a")+" | "+esc(row.axeColorContrastViolations??"unavailable")+" |");
           }
           if (!rows.length) md.push("| — | — | unavailable | unavailable | unavailable | unavailable | unavailable | unavailable |");
-          md.push("", "### First 10 zero-size-box measurement issues per portal/viewport", "",
-            "The browser test currently emits at most five issue samples per portal/viewport; tag is not included in its records. Rows below show every available zero-size sample; missing samples cannot be reconstructed in this workflow-only change.", "",
-            "| Portal | Viewport | Tag | Class | Text |", "|---|---:|---|---|---|");
+          md.push("", "### All zero-size measurement issues by element tag", "",
+            "Counts include every zero-size issue in the audit row, not just the samples listed below. Native control items are separately classified and are non-fatal; other zero-size boxes remain fatal.", "",
+            "| Portal | Viewport | Element tag | Zero-size issues |", "|---|---:|---|---:|");
+          let tagRows=0;
+          for (const row of rows) for (const [tag,count] of Object.entries(row.zeroSizeByTag||{}).sort(([a],[b])=>a.localeCompare(b))) {
+            tagRows++; md.push("| "+esc(row.portal)+" | "+esc(row.width)+" | "+esc(tag)+" | "+esc(count)+" |");
+          }
+          if (!tagRows) md.push("| — | — | no zero-size issues | 0 |");
+          md.push("", "### First 10 zero-size-box measurement issue samples per portal/viewport", "",
+            "The detailed issue list below is a sample capped by the test; the per-tag table above aggregates all zero-size issues.", "",
+            "| Portal | Viewport | Tag | Class | Category | Text |", "|---|---:|---|---|---|---|");
           let zeroSizeRows=0;
           for (const row of rows) {
             const issues=(row.firstFiveMeasurementIssues||[]).filter(issue=>issue.reason==="zero-size box").slice(0,10);
             for (const issue of issues) {
               zeroSizeRows++;
-              md.push("| "+esc(row.portal)+" | "+esc(row.width)+" | NOT EMITTED BY TEST | "+esc(issue.className)+" | "+esc(issue.text)+" |");
+              md.push("| "+esc(row.portal)+" | "+esc(row.width)+" | "+esc(issue.tagName||"unknown")+" | "+esc(issue.className)+" | "+esc(issue.reason)+" | "+esc(issue.text)+" |");
             }
           }
           if (!zeroSizeRows) md.push("| — | — | no zero-size samples available | — | — |");
           md.push("", "### First five measurement issues per portal/viewport", "",
-            "| Portal | Viewport | Text | Reason | Element class | Detail |", "|---|---:|---|---|---|---|");
+            "| Portal | Viewport | Element tag | Text | Reason | Element class | Detail |", "|---|---:|---|---|---|---|---|");
           for (const row of rows) for (const issue of (row.firstFiveMeasurementIssues||[])) {
-            md.push("| "+esc(row.portal)+" | "+esc(row.width)+" | "+esc(issue.text)+" | "+esc(issue.reason)+" | "+esc(issue.className)+" | "+esc(issue.detail)+" |");
+            md.push("| "+esc(row.portal)+" | "+esc(row.width)+" | "+esc(issue.tagName||"unknown")+" | "+esc(issue.text)+" | "+esc(issue.reason)+" | "+esc(issue.className)+" | "+esc(issue.detail)+" |");
           }
           md.push("", "### CSS attribution for the five worst ratio failures per portal/viewport", "",
             "| Portal | Viewport | Text | Ratio | Foreground | Stylesheet | Selector | Line | Non-winning dark-text rule also matched |",
@@ -165,6 +173,10 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Restore main stylesheet baseline for comparison only
         run: git fetch origin main && git checkout origin/main -- src/styles
+      - name: Print post-checkout main stylesheet diff stat
+        run: |
+          git diff --stat origin/main -- src/styles
+          if [ -z "$(git diff --name-only origin/main -- src/styles)" ]; then echo "(no differences: runner src/styles matches origin/main)"; fi
       - name: Install Playwright and Chromium without changing the lockfile
         run: |
           npm install --no-save --package-lock=false playwright axe-core@4.10.3
@@ -225,29 +237,37 @@ jobs:
           const esc = value => String(value ?? "").split("|").join(String.fromCharCode(92)+"|").split(String.fromCharCode(10)).join(" ").split(String.fromCharCode(13)).join(" ").trim();
           const md = ["## "+(process.env.SUMMARY_HEADING || "IRPA Local Responsive Portal Audit"), "", "`"+finalLine+"`", "",
             "### Counts by portal and viewport", "",
-            "| Portal | Viewport | Candidates | Measured | Ratio failures | Measurement issues (zero-size / unparseable / sampling / other) | Lowest ratio | axe-core violations |",
+            "| Portal | Viewport | Candidates | Measured | Ratio failures | Measurement issues (zero-size / native control item / unparseable / sampling / other) | Lowest ratio | axe-core violations |",
             "|---|---:|---:|---:|---:|---|---:|---:|"];
           for (const row of rows) {
             const c=row.measurementIssueCounts||{};
-            md.push("| "+esc(row.portal||"unknown")+" | "+esc(row.width??"unknown")+" | "+esc(row.candidates??"unavailable")+" | "+esc(row.measured??"unavailable")+" | "+esc(row.ratioFailures??"unavailable")+" | "+esc(row.measurementIssues??"unavailable")+" ("+esc(c.zeroSizeBox??"—")+" / "+esc(c.unparseableColour??"—")+" / "+esc(c.samplingError??"—")+" / "+esc(c.other??"—")+") | "+esc(row.lowestRatio??"n/a")+" | "+esc(row.axeColorContrastViolations??"unavailable")+" |");
+            md.push("| "+esc(row.portal||"unknown")+" | "+esc(row.width??"unknown")+" | "+esc(row.candidates??"unavailable")+" | "+esc(row.measured??"unavailable")+" | "+esc(row.ratioFailures??"unavailable")+" | "+esc(row.measurementIssues??"unavailable")+" ("+esc(c.zeroSizeBox??"—")+" / "+esc(c.nativeControlItem??"—")+" / "+esc(c.unparseableColour??"—")+" / "+esc(c.samplingError??"—")+" / "+esc(c.other??"—")+") | "+esc(row.lowestRatio??"n/a")+" | "+esc(row.axeColorContrastViolations??"unavailable")+" |");
           }
           if (!rows.length) md.push("| — | — | unavailable | unavailable | unavailable | unavailable | unavailable | unavailable |");
-          md.push("", "### First 10 zero-size-box measurement issues per portal/viewport", "",
-            "The browser test currently emits at most five issue samples per portal/viewport; tag is not included in its records. Rows below show every available zero-size sample; missing samples cannot be reconstructed in this workflow-only change.", "",
-            "| Portal | Viewport | Tag | Class | Text |", "|---|---:|---|---|---|");
+          md.push("", "### All zero-size measurement issues by element tag", "",
+            "Counts include every zero-size issue in the audit row, not just the samples listed below. Native control items are separately classified and are non-fatal; other zero-size boxes remain fatal.", "",
+            "| Portal | Viewport | Element tag | Zero-size issues |", "|---|---:|---|---:|");
+          let tagRows=0;
+          for (const row of rows) for (const [tag,count] of Object.entries(row.zeroSizeByTag||{}).sort(([a],[b])=>a.localeCompare(b))) {
+            tagRows++; md.push("| "+esc(row.portal)+" | "+esc(row.width)+" | "+esc(tag)+" | "+esc(count)+" |");
+          }
+          if (!tagRows) md.push("| — | — | no zero-size issues | 0 |");
+          md.push("", "### First 10 zero-size-box measurement issue samples per portal/viewport", "",
+            "The detailed issue list below is a sample capped by the test; the per-tag table above aggregates all zero-size issues.", "",
+            "| Portal | Viewport | Tag | Class | Category | Text |", "|---|---:|---|---|---|---|");
           let zeroSizeRows=0;
           for (const row of rows) {
             const issues=(row.firstFiveMeasurementIssues||[]).filter(issue=>issue.reason==="zero-size box").slice(0,10);
             for (const issue of issues) {
               zeroSizeRows++;
-              md.push("| "+esc(row.portal)+" | "+esc(row.width)+" | NOT EMITTED BY TEST | "+esc(issue.className)+" | "+esc(issue.text)+" |");
+              md.push("| "+esc(row.portal)+" | "+esc(row.width)+" | "+esc(issue.tagName||"unknown")+" | "+esc(issue.className)+" | "+esc(issue.reason)+" | "+esc(issue.text)+" |");
             }
           }
           if (!zeroSizeRows) md.push("| — | — | no zero-size samples available | — | — |");
           md.push("", "### First five measurement issues per portal/viewport", "",
-            "| Portal | Viewport | Text | Reason | Element class | Detail |", "|---|---:|---|---|---|---|");
+            "| Portal | Viewport | Element tag | Text | Reason | Element class | Detail |", "|---|---:|---|---|---|---|---|");
           for (const row of rows) for (const issue of (row.firstFiveMeasurementIssues||[])) {
-            md.push("| "+esc(row.portal)+" | "+esc(row.width)+" | "+esc(issue.text)+" | "+esc(issue.reason)+" | "+esc(issue.className)+" | "+esc(issue.detail)+" |");
+            md.push("| "+esc(row.portal)+" | "+esc(row.width)+" | "+esc(issue.tagName||"unknown")+" | "+esc(issue.text)+" | "+esc(issue.reason)+" | "+esc(issue.className)+" | "+esc(issue.detail)+" |");
           }
           md.push("", "### CSS attribution for the five worst ratio failures per portal/viewport", "",
             "| Portal | Viewport | Text | Ratio | Foreground | Stylesheet | Selector | Line | Non-winning dark-text rule also matched |",

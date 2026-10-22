@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import axe from "axe-core";
 import { inflateSync } from "node:zlib";
+import { resolve } from "node:path";
+import { TraceMap, originalPositionFor } from "@jridgewell/trace-mapping";
 import { chromium } from "playwright";
 
 
@@ -58,6 +60,8 @@ function contrastRatio(foreground,background){
 }
 
 const base = "http://127.0.0.1:4180/tests/fixtures/portal-layout-fixture.html";
+const classifyZeroSizeCandidate=candidate=>["option","optgroup"].includes(String(candidate.tagName||"").toLowerCase())&&candidate.insideSelect===true?"native control item":"zero-size box";
+const isFatalMeasurementIssue=reason=>reason!=="native control item";
 const knownAnswerSelfTest=()=>{
   assert.deepEqual(parseColor("rgb(23, 32, 51)")?.rgb,[23,32,51],"parseColor rgb known answer");
   assert.ok(ratioFor(parseColor("rgb(250, 250, 250)"),[255,255,255])<1.2,"near-white on white must be below 1.2");
@@ -65,7 +69,11 @@ const knownAnswerSelfTest=()=>{
   assert.throws(()=>requireColor("not-a-css-colour","known-answer self-test text element"),/Unparseable colour/,"unparseable text colour must fail, not be skipped");
   assert.deepEqual(parseColor("rgba(23, 32, 51, 0.5)")?.rgb,[23,32,51],"parseColor rgba support");
   assert.deepEqual(parseColor("color(srgb 0.0901960784 0.1254901961 0.2)")?.rgb.map(Math.round),[23,32,51],"parseColor srgb support");
+  assert.equal(classifyZeroSizeCandidate({tagName:"option",insideSelect:true}),"native control item","OPTION text inside SELECT is a native control item");
+  assert.equal(isFatalMeasurementIssue(classifyZeroSizeCandidate({tagName:"div",text:"invisible DIV text"})),true,"zero-size DIV with text must fail the audit");
+  assert.equal(isFatalMeasurementIssue("native control item"),false,"native control items are classified separately");
   console.log("CONTRAST_KNOWN_ANSWER_SELF_TEST PASS");
+  console.log("ZERO_SIZE_CLASSIFICATION_SELF_TEST PASS");
 };
 const portals = ["Invitation","Meeting","Documents","Signature","Authorization","Finance","Procurement","Employees"];
 const widths = [360,1440];
@@ -122,22 +130,46 @@ async function collectCandidates(page) {
       let id=ids.get(el);
       if(id===undefined){id=String(index++);ids.set(el,id);el.setAttribute("data-contrast-audit-id",id);}
       const fgText=s.webkitTextFillColor&&s.webkitTextFillColor!=="currentColor"?s.webkitTextFillColor:s.color;
-      if(!rects.length){out.push({id,text:text.slice(0,160),foregroundCss:fgText,colorCss:s.color,textFillCss:s.webkitTextFillColor,className:typeof el.className==="string"?el.className:String(el.className||""),zeroSize:true,issue:"visible text has no client rect"});continue;}
+      if(!rects.length){const tagName=el.tagName.toLowerCase(),insideSelect=!!el.closest("select"),nativeControlItem=["option","optgroup"].includes(tagName)&&insideSelect;out.push({id,tagName,insideSelect,nativeControlItem,text:text.slice(0,160),foregroundCss:fgText,colorCss:s.color,textFillCss:s.webkitTextFillColor,className:typeof el.className==="string"?el.className:String(el.className||""),zeroSize:true,issue:"visible text has no client rect"});continue;}
       for(const rect of rects){
         const ancestors=[];
         for(let a=el.parentElement;a&&ancestors.length<8;a=a.parentElement){
           const as=getComputedStyle(a);
           ancestors.push({tag:a.tagName.toLowerCase(),className:typeof a.className==="string"?a.className:"",backgroundColor:as.backgroundColor,backgroundImage:as.backgroundImage});
         }
-        out.push({id,text:text.slice(0,160),left:rect.left,top:rect.top,right:rect.right,bottom:rect.bottom,
+        const tagName=el.tagName.toLowerCase(),insideSelect=!!el.closest("select"),nativeControlItem=["option","optgroup"].includes(tagName)&&insideSelect;
+        out.push({id,tagName,insideSelect,nativeControlItem,text:text.slice(0,160),left:rect.left,top:rect.top,right:rect.right,bottom:rect.bottom,
           foregroundCss:fgText,colorCss:s.color,textFillCss:s.webkitTextFillColor,
           large:parseFloat(s.fontSize)>=24||(parseFloat(s.fontSize)>=18.66&&Number(s.fontWeight)>=700),
           className:typeof el.className==="string"?el.className:String(el.className||""),
           ancestors,zeroSize:rect.width<=0||rect.height<=0});
       }
     }
+    for(const select of document.querySelectorAll("select")){
+      const rect=select.getBoundingClientRect(),s=getComputedStyle(select),selected=select.selectedOptions?.[0];
+      const text=(selected?.textContent||select.getAttribute("aria-label")||select.labels?.[0]?.innerText||select.value||"Select control").trim();
+      let id=ids.get(select);if(id===undefined){id=String(index++);ids.set(select,id);select.setAttribute("data-contrast-audit-id",id);}
+      const ancestors=[];for(let a=select.parentElement;a&&ancestors.length<8;a=a.parentElement){const as=getComputedStyle(a);ancestors.push({tag:a.tagName.toLowerCase(),className:typeof a.className==="string"?a.className:"",backgroundColor:as.backgroundColor,backgroundImage:as.backgroundImage});}
+      out.push({id,tagName:"select",insideSelect:false,nativeControlItem:false,nativeSelect:true,text:text.slice(0,160),left:rect.left,top:rect.top,right:rect.right,bottom:rect.bottom,
+        foregroundCss:s.webkitTextFillColor&&s.webkitTextFillColor!=="currentColor"?s.webkitTextFillColor:s.color,colorCss:s.color,textFillCss:s.webkitTextFillColor,
+        large:parseFloat(s.fontSize)>=24||(parseFloat(s.fontSize)>=18.66&&Number(s.fontWeight)>=700),className:typeof select.className==="string"?select.className:String(select.className||""),ancestors,zeroSize:rect.width<=0||rect.height<=0});
+    }
     return out;
   });
+}
+const sourceMapCache=new Map();
+async function originalCssLocation(stylesheet,line,column){
+  if(!stylesheet||!Number.isInteger(line))return null;
+  const mapPath=resolve(process.cwd(),"dist-responsive",String(stylesheet).replace(/^\/+/, "")+".map");
+  try{
+    let map=sourceMapCache.get(mapPath);
+    if(!map){map=new TraceMap(JSON.parse(await readFile(mapPath,"utf8")));sourceMapCache.set(mapPath,map);}
+    const original=originalPositionFor(map,{line,column:Number.isInteger(column)?column:0});
+    if(!original.source||!original.line)return null;
+    let source=String(original.source).replace(/\\/g,"/");const srcAt=source.lastIndexOf("/src/");
+    if(srcAt>=0)source=source.slice(srcAt+1);else source=source.replace(/^(\.\.\/)+/,"");
+    return {stylesheet:source,line:original.line,column:original.column};
+  }catch{return null;}
 }
 async function attributeCause(cdp, styleSheets, item) {
   try {
@@ -158,15 +190,17 @@ async function attributeCause(cdp, styleSheets, item) {
     const sid=winner.rule.styleSheetId,source=styleSheets.get(sid)?.sourceURL||(winner.rule.origin==="inline"?"inline style":"unknown stylesheet");
     const file=source==="inline style"?source:(()=>{try{return new URL(source).pathname;}catch{return source;}})();
     const ruleLine=winner.rule.selectorList?.range?.startLine??winner.rule.style?.range?.startLine;
-    return {stylesheet:file,selector:winner.rule.selectorList?.text||"element.style",line:Number.isInteger(ruleLine)?ruleLine+1:null,
-      winningColor:winner.property.value,nonWinningDarkTextRuleMatched};
+    const generatedLine=Number.isInteger(ruleLine)?ruleLine+1:null,generatedColumn=winner.rule.selectorList?.range?.startColumn??winner.rule.style?.range?.startColumn??0;
+    const original=await originalCssLocation(file,generatedLine,generatedColumn);
+    return {stylesheet:original?.stylesheet||file,selector:winner.rule.selectorList?.text||"element.style",line:original?.line??generatedLine,
+      generatedStylesheet:file,generatedLine,sourceMapResolved:!!original,winningColor:winner.property.value,nonWinningDarkTextRuleMatched};
   } catch(error) {return {stylesheet:"CDP attribution error",selector:String(error?.message||error),line:null,nonWinningDarkTextRuleMatched:false};}
 }
 async function measurePass(page, portal, width, cdp, styleSheets) {
   const candidates=await collectCandidates(page),measured=[],issues=[];
-  const issue=(c,reason,detail)=>issues.push({...c,reason,detail:detail||""});
+  const issue=(c,reason,detail)=>issues.push({...c,tagName:c.tagName||"unknown",reason,detail:detail||""});
   for(const c of candidates) {
-    if(c.zeroSize){issue(c,"zero-size box",c.issue||"visible text has no positive-size client rect");continue;}
+    if(c.zeroSize){issue(c,c.nativeControlItem?"native control item":"zero-size box",c.issue||"visible text has no positive-size client rect");continue;}
     try {requireColor(c.foregroundCss,"portal "+portal+" viewport "+width+" text: "+c.text);}
     catch(error){issue(c,"unparseable colour",String(error?.message||error));}
   }
@@ -194,11 +228,14 @@ async function measurePass(page, portal, width, cdp, styleSheets) {
   const distinctRatioFailures=ratioFailures.filter((item,index,all)=>all.findIndex(other=>other.id===item.id)===index);
   for(const item of distinctRatioFailures.slice(0,5))worstRatioFailures.push({...item,cssCause:await attributeCause(cdp,styleSheets,item)});
   const measurementIssueCounts={zeroSizeBox:issues.filter(x=>x.reason==="zero-size box").length,
+    nativeControlItem:issues.filter(x=>x.reason==="native control item").length,
     unparseableColour:issues.filter(x=>x.reason==="unparseable colour").length,
     samplingError:issues.filter(x=>x.reason==="sampling error").length,
-    other:issues.filter(x=>!["zero-size box","unparseable colour","sampling error"].includes(x.reason)).length};
+    other:issues.filter(x=>!["zero-size box","native control item","unparseable colour","sampling error"].includes(x.reason)).length};
+  const zeroSizeByTag={};for(const c of issues.filter(x=>x.zeroSize))zeroSizeByTag[c.tagName||"unknown"]=(zeroSizeByTag[c.tagName||"unknown"]||0)+1;
+  const fatalMeasurementIssues=issues.filter(x=>isFatalMeasurementIssue(x.reason)).length;
   return {candidateCount:candidates.length,elementsMeasured:measured.length,ratioFailures:ratioFailures.length,
-    measurementIssues:issues.length,measurementIssueCounts,lowestRatio:measured.length?Math.min(...measured.map(x=>x.ratio)):null,
+    measurementIssues:issues.length,fatalMeasurementIssues,measurementIssueCounts,zeroSizeByTag,lowestRatio:measured.length?Math.min(...measured.map(x=>x.ratio)):null,
     worstRatioFailures,issues:issues.slice(0,5)};
 }
 try {
@@ -229,16 +266,17 @@ try {
       const axeViolations=axeResult.violations.filter(v=>v.id==="color-contrast").flatMap(v=>v.nodes.map(n=>({impact:v.impact,help:v.help,target:n.target,summary:n.failureSummary||""})));
       const result=await measurePass(page,portal,width,cdp,styleSheets);
       const row={portal,width,...layout,candidates:result.candidateCount,measured:result.elementsMeasured,ratioFailures:result.ratioFailures,
-        measurementIssues:result.measurementIssues,measurementIssueCounts:result.measurementIssueCounts,lowestRatio:result.lowestRatio,
+        measurementIssues:result.measurementIssues,fatalMeasurementIssues:result.fatalMeasurementIssues,measurementIssueCounts:result.measurementIssueCounts,zeroSizeByTag:result.zeroSizeByTag,lowestRatio:result.lowestRatio,
         worstRatioFailures:result.worstRatioFailures,firstFiveMeasurementIssues:result.issues,
         axeColorContrastViolations:axeViolations.length,axeColorContrastExamples:axeViolations.slice(0,5),pageErrors};
       console.log("PORTAL_VIEWPORT_AUDIT "+JSON.stringify(row));
       const summaryLine="| "+portal+" | "+width+" | "+row.candidates+" | "+row.measured+" | "+row.ratioFailures+" | "+row.measurementIssues+" (zero-size "+row.measurementIssueCounts.zeroSizeBox+", unparseable colour "+row.measurementIssueCounts.unparseableColour+", sampling error "+row.measurementIssueCounts.samplingError+", other "+row.measurementIssueCounts.other+") | "+(row.lowestRatio??"n/a")+" | "+axeViolations.length+" |";
       console.log("PORTAL_VIEWPORT_SUMMARY "+summaryLine);
-      for(const bad of result.issues)console.log("PORTAL_MEASUREMENT_ISSUE "+JSON.stringify({portal,width,text:bad.text,reason:bad.reason,detail:bad.detail,className:bad.className}));
+      console.log("PORTAL_ZERO_SIZE_TAG_COUNTS "+JSON.stringify({portal,width,counts:result.zeroSizeByTag,nativeControlItems:result.measurementIssueCounts.nativeControlItem}));
+      for(const bad of result.issues)console.log("PORTAL_MEASUREMENT_ISSUE "+JSON.stringify({portal,width,tagName:bad.tagName,text:bad.text,reason:bad.reason,detail:bad.detail,className:bad.className}));
       for(const bad of result.worstRatioFailures)console.log("PORTAL_RATIO_FAILURE_CAUSE "+JSON.stringify({portal,width,text:bad.text,foreground:bad.foreground,background:bad.background,ratio:bad.ratio,className:bad.className,...bad.cssCause}));
       if(process.env.GITHUB_STEP_SUMMARY){const fs=await import("node:fs/promises");await fs.appendFile(process.env.GITHUB_STEP_SUMMARY,summaryLine+"\n");}
-      if(layout.horizontalOverflow||row.ratioFailures>0||row.measurementIssues>0||layout.renderError||pageErrors.length||axeViolations.length)failures.push(row);
+      if(layout.horizontalOverflow||row.ratioFailures>0||row.fatalMeasurementIssues>0||layout.renderError||pageErrors.length||axeViolations.length)failures.push(row);
     } catch(error) {
       const row={portal,width,error:String(error?.message||error),pageErrors};
       console.log("PORTAL_VIEWPORT_AUDIT "+JSON.stringify(row));failures.push(row);
