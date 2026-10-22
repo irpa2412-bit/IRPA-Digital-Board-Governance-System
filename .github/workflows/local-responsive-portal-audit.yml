@@ -1,4 +1,5 @@
 name: IRPA Local Responsive Portal Audit
+run-name: Responsive audit with automatic main-styles baseline
 
 on:
   push:
