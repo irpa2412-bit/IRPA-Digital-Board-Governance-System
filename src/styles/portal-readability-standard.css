@@ -307,3 +307,115 @@
   color: var(--irpa-readable-text);
   -webkit-text-fill-color: var(--irpa-readable-text);
 }
+
+/* Round 1: enforce the intended light-surface contrast where legacy gradients or
+   theme tokens override the shared readability values. No workflow or layout rules change. */
+#root .app-shell .content-area:not(.dashboard-content-area) .page :where(.panel, .module-panel, .stat-card, .workflow-stage, .identity-card, .record-details, .detail-grid > div, .action-feedback, .auth-message):not(.signature-field-palette .panel):not(.welcome-panel .auth-message) {
+  background: var(--irpa-readable-surface) !important;
+  background-image: none !important;
+  color: var(--irpa-readable-text) !important;
+  border-color: var(--irpa-readable-border) !important;
+}
+#root .app-shell .content-area:not(.dashboard-content-area) .page :where(.panel, .module-panel, .stat-card, .workflow-stage, .identity-card, .record-details, .detail-grid > div, .action-feedback, .auth-message):not(.signature-field-palette .panel):not(.welcome-panel .auth-message) :where(h1, h2, h3, h4, h5, h6, p, span, strong, small, li, label, th, td, .muted, .panel-description, .eyebrow):not(button *) {
+  color: var(--irpa-readable-text) !important;
+  -webkit-text-fill-color: var(--irpa-readable-text) !important;
+  opacity: 1 !important;
+}
+#root .app-shell .content-area:not(.dashboard-content-area) .page :where(.stat-card, .workflow-stage) {
+  background: var(--irpa-readable-surface) !important;
+  background-image: none !important;
+  color: var(--irpa-readable-text) !important;
+  border-color: var(--irpa-readable-border) !important;
+}
+#root .app-shell .content-area:not(.dashboard-content-area) .page :where(.stat-card, .workflow-stage) :where(span, strong, small, p, li, label):not(button *) {
+  color: var(--irpa-readable-text) !important;
+  -webkit-text-fill-color: var(--irpa-readable-text) !important;
+  opacity: 1 !important;
+}
+#root .app-shell .content-area:not(.dashboard-content-area) .page .status-badge {
+  background: #edf4f0 !important;
+  color: #214f38 !important;
+  -webkit-text-fill-color: #214f38 !important;
+  border-color: #cbd9d2 !important;
+}
+
+/* Documents has no shared .page wrapper; make its own workspace and panels light. */
+#root .app-shell .content-area:not(.dashboard-content-area) .document-lifecycle-module {
+  background: var(--irpa-readable-workspace) !important;
+  background-image: none !important;
+  color: var(--irpa-readable-text) !important;
+}
+#root .app-shell .content-area:not(.dashboard-content-area) .document-lifecycle-module :where(.panel, .module-panel, .stat-card, .identity-card, .detail-grid > div, .record-details, .auth-message, .table-wrapper) {
+  background: var(--irpa-readable-surface) !important;
+  background-image: none !important;
+  color: var(--irpa-readable-text) !important;
+  border-color: var(--irpa-readable-border) !important;
+}
+#root .app-shell .content-area:not(.dashboard-content-area) .document-lifecycle-module :where(h1, h2, h3, h4, h5, h6, p, span, strong, small, li, label, th, td, .muted, .panel-description, .eyebrow):not(button *) {
+  color: var(--irpa-readable-text) !important;
+  -webkit-text-fill-color: var(--irpa-readable-text) !important;
+  opacity: 1 !important;
+}
+#root .app-shell .content-area:not(.dashboard-content-area) .document-lifecycle-module :where(input, select, textarea) {
+  color: var(--irpa-readable-control-text) !important;
+  -webkit-text-fill-color: var(--irpa-readable-control-text) !important;
+  background: var(--irpa-readable-surface) !important;
+  border-color: var(--irpa-readable-border) !important;
+}
+#root .app-shell .content-area:not(.dashboard-content-area) .document-lifecycle-module .status-badge {
+  background: #edf4f0 !important;
+  color: #214f38 !important;
+  -webkit-text-fill-color: #214f38 !important;
+}
+
+/* The authorization upload/archive panels are siblings of .page, so style them directly. */
+#root .app-shell .content-area:not(.dashboard-content-area) :where(.controlled-document-upload-panel, .archive-routing-panel) {
+  background: var(--irpa-readable-surface) !important;
+  background-image: none !important;
+  color: var(--irpa-readable-text) !important;
+  border-color: var(--irpa-readable-border) !important;
+}
+#root .app-shell .content-area:not(.dashboard-content-area) :where(.controlled-document-upload-panel, .archive-routing-panel) :where(.panel-header, .panel-heading, .auth-message, .identity-card, .archive-routing-panel) {
+  background: #f8faf9 !important;
+  background-image: none !important;
+  color: var(--irpa-readable-text) !important;
+  border-color: var(--irpa-readable-border) !important;
+}
+#root .app-shell .content-area:not(.dashboard-content-area) :where(.controlled-document-upload-panel, .archive-routing-panel) :where(h1, h2, h3, h4, h5, h6, p, span, strong, small, li, label, .muted, .panel-description, .eyebrow):not(button *) {
+  color: var(--irpa-readable-text) !important;
+  -webkit-text-fill-color: var(--irpa-readable-text) !important;
+  opacity: 1 !important;
+}
+#root .app-shell .content-area:not(.dashboard-content-area) :where(.controlled-document-upload-panel, .archive-routing-panel) :where(input, select, textarea) {
+  color: var(--irpa-readable-control-text) !important;
+  -webkit-text-fill-color: var(--irpa-readable-control-text) !important;
+  background: var(--irpa-readable-surface) !important;
+  border-color: var(--irpa-readable-border) !important;
+}
+#root .app-shell .content-area:not(.dashboard-content-area) :where(.controlled-document-upload-panel, .archive-routing-panel) select option {
+  color: var(--irpa-readable-control-text) !important;
+  background: var(--irpa-readable-surface) !important;
+}
+
+/* Finance's roller and pale workflow surfaces must not inherit the dark theme token. */
+#root .app-shell .content-area:not(.dashboard-content-area) .page.finance-portal :where(.panel, .stat-card, .workflow-stage, .identity-card, .action-feedback, .finance-engine-card, .finance-formula-card) {
+  background: var(--irpa-readable-surface) !important;
+  background-image: none !important;
+  color: var(--irpa-readable-text) !important;
+  border-color: var(--irpa-readable-border) !important;
+}
+#root .app-shell .content-area:not(.dashboard-content-area) .page.finance-portal :where(.panel, .stat-card, .workflow-stage, .identity-card, .action-feedback, .finance-engine-card, .finance-formula-card) :where(h1, h2, h3, h4, h5, h6, p, span, strong, small, li, label, th, td, .muted, .panel-description, .eyebrow):not(button *) {
+  color: var(--irpa-readable-text) !important;
+  -webkit-text-fill-color: var(--irpa-readable-text) !important;
+  opacity: 1 !important;
+}
+#root .app-shell .content-area:not(.dashboard-content-area) .page.finance-portal .finance-field-roller-control > span {
+  color: var(--irpa-readable-text) !important;
+  -webkit-text-fill-color: var(--irpa-readable-text) !important;
+}
+#root .app-shell .content-area:not(.dashboard-content-area) .page.finance-portal .finance-field-roller-control select {
+  color: var(--irpa-readable-control-text) !important;
+  -webkit-text-fill-color: var(--irpa-readable-control-text) !important;
+  background: var(--irpa-readable-surface) !important;
+}
+
