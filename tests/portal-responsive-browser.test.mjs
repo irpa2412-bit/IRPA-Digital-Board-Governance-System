@@ -61,7 +61,7 @@ function contrastRatio(foreground,background){
 
 const base = "http://127.0.0.1:4180/tests/fixtures/portal-layout-fixture.html";
 const classifyZeroSizeCandidate=candidate=>["option","optgroup"].includes(String(candidate.tagName||"").toLowerCase())&&candidate.insideSelect===true?"native control item":"zero-size box";
-const isFatalMeasurementIssue=reason=>reason!=="native control item";
+const isFatalMeasurementIssue=reason=>true;
 const knownAnswerSelfTest=()=>{
   assert.deepEqual(parseColor("rgb(23, 32, 51)")?.rgb,[23,32,51],"parseColor rgb known answer");
   assert.ok(ratioFor(parseColor("rgb(250, 250, 250)"),[255,255,255])<1.2,"near-white on white must be below 1.2");
@@ -204,25 +204,22 @@ async function measurePass(page, portal, width, cdp, styleSheets) {
     try {requireColor(c.foregroundCss,"portal "+portal+" viewport "+width+" text: "+c.text);}
     catch(error){issue(c,"unparseable colour",String(error?.message||error));}
   }
-  let image,hideStyle;
   const invisiblePaint=["trans","parent"].join("");
   const measurementCss=["*,:before,:after{color:"+invisiblePaint+"!important;-webkit-text-fill-color:"+invisiblePaint+"!important;text-shadow:none!important;caret-color:"+invisiblePaint+"!important}::selection{background:"+invisiblePaint+"!important}"].join("");
-  try {
-    hideStyle=await page.addStyleTag({content:measurementCss});
-    image=decodePng(await page.screenshot({fullPage:true,animations:"disabled",timeout:30000}));
-  } catch(error) {
-    for(const c of candidates.filter(x=>!x.zeroSize&&!issues.some(i=>i.id===x.id&&i.reason==="unparseable colour")))
-      issue(c,"sampling error","full-page hidden-text screenshot failed: "+String(error?.message||error));
-  } finally {if(hideStyle)await hideStyle.evaluate(el=>el.remove());}
-  const scrollY=await page.evaluate(()=>window.scrollY);
-  if(image)for(const c of candidates) {
+  for(const c of candidates) {
     if(c.zeroSize||issues.some(i=>i.id===c.id&&i.reason==="unparseable colour"))continue;
+    let hideStyle;
     try {
-      const bg=sampleBackground(image,{left:c.left,top:c.top+scrollY,right:c.right,bottom:c.bottom+scrollY});
+      const locator=page.locator('[data-contrast-audit-id="'+c.id+'"]');
+      await locator.scrollIntoViewIfNeeded();
+      hideStyle=await page.addStyleTag({content:measurementCss});
+      const image=decodePng(await locator.screenshot({animations:"disabled",timeout:30000}));
+      const bg=sampleBackground(image,{left:0,top:0,right:image.width,bottom:image.height});
       const fg=requireColor(c.foregroundCss,"portal "+portal+" viewport "+width+" text: "+c.text);
       const ratio=ratioFor(fg,bg),failed=ratio<(c.large?3:4.5);
       measured.push({...c,foreground:fg.css,background:bg.map(v=>Math.round(v)),ratio:Number(ratio.toFixed(3)),failed});
     } catch(error){issue(c,"sampling error",String(error?.message||error));}
+    finally {if(hideStyle)await hideStyle.evaluate(el=>el.remove());}
   }
   const ratioFailures=measured.filter(x=>x.failed).sort((a,b)=>a.ratio-b.ratio),worstRatioFailures=[];
   const distinctRatioFailures=ratioFailures.filter((item,index,all)=>all.findIndex(other=>other.id===item.id)===index);
@@ -273,7 +270,7 @@ try {
       const summaryLine="| "+portal+" | "+width+" | "+row.candidates+" | "+row.measured+" | "+row.ratioFailures+" | "+row.measurementIssues+" (zero-size "+row.measurementIssueCounts.zeroSizeBox+", unparseable colour "+row.measurementIssueCounts.unparseableColour+", sampling error "+row.measurementIssueCounts.samplingError+", other "+row.measurementIssueCounts.other+") | "+(row.lowestRatio??"n/a")+" | "+axeViolations.length+" |";
       console.log("PORTAL_VIEWPORT_SUMMARY "+summaryLine);
       console.log("PORTAL_ZERO_SIZE_TAG_COUNTS "+JSON.stringify({portal,width,counts:result.zeroSizeByTag,nativeControlItems:result.measurementIssueCounts.nativeControlItem}));
-      for(const bad of result.issues)console.log("PORTAL_MEASUREMENT_ISSUE "+JSON.stringify({portal,width,tagName:bad.tagName,text:bad.text,reason:bad.reason,detail:bad.detail,className:bad.className}));
+      for(const bad of result.issues)console.log("PORTAL_MEASUREMENT_ISSUE "+JSON.stringify({portal,width,tagName:bad.tagName,text:bad.text,reason:bad.reason,detail:bad.detail,className:bad.className,stylesheet:bad.stylesheet||null,line:bad.line??null,selector:bad.selector||null}));
       for(const bad of result.worstRatioFailures)console.log("PORTAL_RATIO_FAILURE_CAUSE "+JSON.stringify({portal,width,text:bad.text,foreground:bad.foreground,background:bad.background,ratio:bad.ratio,className:bad.className,...bad.cssCause}));
       if(process.env.GITHUB_STEP_SUMMARY){const fs=await import("node:fs/promises");await fs.appendFile(process.env.GITHUB_STEP_SUMMARY,summaryLine+"\n");}
       if(layout.horizontalOverflow||row.ratioFailures>0||row.fatalMeasurementIssues>0||layout.renderError||pageErrors.length||axeViolations.length)failures.push(row);
