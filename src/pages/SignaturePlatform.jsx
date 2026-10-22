@@ -110,7 +110,7 @@ function InkCapture({label="Sign directly on this device",onUse,onSave,replaceme
             <p className="muted">Sign in the box below using your finger, stylus or mouse. This is your signing specimen and can be saved directly to your Signature Profile.</p>
           </div>
         </div>
-        <div role="status" aria-live="polite" style={{marginBottom:10,padding:"12px 14px",borderRadius:8,background:replacementMode?"rgba(220,38,38,.16)":"rgba(22,163,74,.10)",border:replacementMode?"1px solid rgba(248,113,113,.55)":"1px solid rgba(74,222,128,.35)",color:"var(--text)",fontWeight:700}}>
+        <div role="status" aria-live="polite" style={{marginBottom:10,padding:"12px 14px",borderRadius:8,background:replacementMode?"rgba(220,38,38,.16)":"rgba(22,163,74,.10)",border:replacementMode?"1px solid rgba(248,113,113,.55)":"1px solid rgba(74,222,128,.35)",color:"#26352f",fontWeight:700}}>
           {replacementMode
             ?"REPLACEMENT MODE — your current served signature remains active until this new handwritten specimen is successfully saved."
             :"HANDWRITTEN SPECIMEN — save it once to make it the persistent signature for future documents."}
