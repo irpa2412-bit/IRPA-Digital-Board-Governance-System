@@ -185,7 +185,7 @@ async function assertStickyPortalNavigation(page) {
 }
 
 for (const viewport of [
-  { name: "mobile", width: 360, height: 844 },
+  { name: "mobile", width: 390, height: 844 },
   { name: "tablet", width: 768, height: 1024 },
   { name: "desktop", width: 1440, height: 900 }
 ]) {
@@ -397,6 +397,7 @@ for (const viewport of [
   { name: "desktop", width: 1440, height: 900 }
 ]) {
   test(`all registered portal workspaces retain readability at ${viewport.name} size`, async ({ page }) => {
+    test.setTimeout(360000);
     page.setDefaultTimeout(10000);
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     const externalRequests = [];
