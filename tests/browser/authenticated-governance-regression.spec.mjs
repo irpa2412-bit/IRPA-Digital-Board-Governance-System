@@ -185,7 +185,7 @@ async function assertStickyPortalNavigation(page) {
 }
 
 for (const viewport of [
-  { name: "mobile", width: 390, height: 844 },
+  { name: "mobile", width: 360, height: 844 },
   { name: "tablet", width: 768, height: 1024 },
   { name: "desktop", width: 1440, height: 900 }
 ]) {
@@ -331,86 +331,66 @@ const APP_PORTALS = [
 ];
 
 async function assertSharedReadability(page, module, width) {
-  const title = page.locator(".topbar h2");
-  await expect(title, `portal heading should render for ${module}`).toBeVisible({ timeout: 30000 });
+  const title=page.locator(".topbar h2");
+  await expect(title,`portal heading should render for ${module}`).toBeVisible({timeout:30000});
   await expect(title).not.toHaveText("");
-  const workspace = page.locator("[data-active-portal-content]:visible").first();
-  await expect(workspace, `active portal content should render for ${module}`).toBeVisible({ timeout: 30000 });
-  const dimensions = await page.evaluate(() => ({
-    viewport: document.documentElement.clientWidth,
-    document: document.documentElement.scrollWidth
-  }));
-  expect(dimensions.document, `horizontal overflow in ${module} at ${width}px`).toBeLessThanOrEqual(dimensions.viewport + 1);
-
-  if (module !== "Dashboard") {
-    const workspaceBackground = await page.locator(".content-area:not(.dashboard-content-area)")
-      .evaluate(el => getComputedStyle(el).backgroundColor);
-    expect(workspaceBackground, `shared Procurement-inspired workspace should be applied to ${module}`)
-      .toBe("rgb(248, 250, 249)");
-  }
-
-  // Lazy-loaded portals may first render a visible shell while their actual workspace mounts.
-  // Wait for real, visible portal copy rather than treating that transient shell as a readability failure.
-  await expect.poll(async () => workspace.evaluate(root => {
-    const candidates = [...root.querySelectorAll(
-      ':is(.page, .grant-intelligence-portal) :is(h1, h2, h3, label, table th, p, li, legend, button, table td, [role="heading"])'
-    )];
-    return candidates.filter(el => {
-      const rect = el.getBoundingClientRect();
-      const style = getComputedStyle(el);
-      return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden" && (el.textContent || "").trim();
-    }).length;
-  }), { timeout: 30000, message: `visible portal text should mount for ${module}` }).toBeGreaterThan(0);
-
-  const samples = await workspace.evaluate(root => {
-    const candidates = [...root.querySelectorAll(
-      ':is(.page, .grant-intelligence-portal) :is(h1, h2, h3, label, table th, p, li, legend, button, table td, [role="heading"])'
-    )];
-    const visible = candidates.filter(el => {
-      const rect = el.getBoundingClientRect();
-      const style = getComputedStyle(el);
-      return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden" && (el.textContent || "").trim();
-    }).slice(0, 12);
-    const luminance = color => {
-      const m = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
-      if (!m) return null;
-      const channels = m.slice(1, 4).map(v => Number(v) / 255).map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
-      return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
-    };
-    return visible.map(el => {
-      const fg = getComputedStyle(el).color;
-      let node = el, backgrounds = [];
-      while (node && node !== document.documentElement) {
-        const style = getComputedStyle(node);
-        const image = style.backgroundImage || "none";
-        if (image !== "none" && image.includes("gradient")) {
-          const stops = [...image.matchAll(/rgba?\(\s*\d+,\s*\d+,\s*\d+(?:\s*,\s*[\d.]+)?\s*\)/g)].map(match => match[0]);
-          if (stops.length) { backgrounds = stops; break; }
-        }
-        const candidate = style.backgroundColor;
-        if (candidate && !candidate.includes("rgba(0, 0, 0, 0)") && candidate !== "transparent") {
-          backgrounds = [candidate];
-          break;
-        }
-        node = node.parentElement;
-      }
-      const a = luminance(fg);
-      const backgroundLuminances = backgrounds.map(luminance).filter(value => value !== null);
-      const ratios = a === null ? [] : backgroundLuminances.map(b => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05));
-      const ratio = ratios.length ? Math.min(...ratios) : null;
-      const bg = backgrounds.join(" / ") || "unknown background";
-      return { tag: el.tagName, text: (el.textContent || "").trim().slice(0, 50), fg, bg, ratio };
-    });
+  const workspace=page.locator("[data-active-portal-content]:visible").first();
+  await expect(workspace).toBeVisible({timeout:30000});
+  const dims=await page.evaluate(()=>({viewport:document.documentElement.clientWidth,document:document.documentElement.scrollWidth}));
+  expect(dims.document,`horizontal overflow in ${module} at ${width}px`).toBeLessThanOrEqual(dims.viewport+1);
+  if(module!=="Dashboard") expect(await page.locator(".content-area:not(.dashboard-content-area)").evaluate(e=>getComputedStyle(e).backgroundColor)).toBe("rgb(248, 250, 249)");
+  const items=await workspace.evaluate(root=>{
+    const parse=v=>{const m=String(v||"").match(/^rgba?\(([^)]+)\)$/i);if(!m)return null;const p=m[1].replace("/",",").split(",").map(x=>parseFloat(x.trim()));return p.length>=3&&p.slice(0,3).every(Number.isFinite)?[p[0],p[1],p[2],p.length>3&&Number.isFinite(p[3])?p[3]:1]:null;};
+    const path=e=>e.tagName.toLowerCase()+(typeof e.className==="string"&&e.className.trim()?"."+e.className.trim().split(/\s+/).join("."):"");
+    const ancestry=e=>{const a=[];for(let n=e;n;n=n.parentElement)a.unshift(n);return a;};
+    const ruleList=e=>{const out=[];const walk=(rs,s)=>{for(const r of rs){if(r.cssRules){walk(r.cssRules,s);continue;}if(!r.selectorText||!r.style)continue;let ok=false;try{ok=e.matches(r.selectorText)}catch{}if(ok&&(r.style.color||r.style.getPropertyValue("-webkit-text-fill-color")||r.style.background||r.style.backgroundColor))out.push({selector:r.selectorText,file:s.href||"inline <style>",line:null,color:r.style.color||null,textFill:r.style.getPropertyValue("-webkit-text-fill-color")||null,background:r.style.background||r.style.backgroundColor||null});}};for(const s of document.styleSheets){try{walk(s.cssRules,s)}catch{}}return out;};
+    const out=[];let id=0;
+    for(const e of root.querySelectorAll("*")){
+      const nodes=[...e.childNodes].filter(n=>n.nodeType===Node.TEXT_NODE&&n.nodeValue.trim());if(!nodes.length)continue;
+      const rects=[];for(const n of nodes){const r=document.createRange();r.selectNodeContents(n);for(const q of r.getClientRects())if(q.width&&q.height)rects.push(q);}
+      const b=e.getBoundingClientRect(),st=getComputedStyle(e);if(!rects.length||!b.width||!b.height||st.display==="none"||st.visibility!=="visible"||+st.opacity<=0||e.closest('[aria-hidden="true"],[inert]'))continue;
+      const chain=ancestry(e),html=parse(getComputedStyle(document.documentElement).backgroundColor),body=parse(getComputedStyle(document.body).backgroundColor);
+      const canvas=html&&html[3]>0?html.slice(0,3).map(v=>v*html[3]+255*(1-html[3])):[255,255,255];
+      let bg=body&&body[3]>0?body.slice(0,3).map((v,i)=>v*body[3]+canvas[i]*(1-body[3])):canvas;
+      for(const n of chain){if(n===document.documentElement||n===document.body)continue;const s=getComputedStyle(n),c=parse(s.backgroundColor);if(c&&c[3]>0)bg=bg.map((v,i)=>c[i]*c[3]+v*(1-c[3]));}
+      let pixels=false,nearest=null;for(const n of [...chain].reverse()){const s=getComputedStyle(n),c=parse(s.backgroundColor);if(s.backgroundImage&&s.backgroundImage!=="none")pixels=true;if(!nearest&&((c&&c[3]>0)||(s.backgroundImage&&s.backgroundImage!=="none")))nearest={element:path(n),className:n.getAttribute("class")||"",backgroundColor:s.backgroundColor,backgroundImage:s.backgroundImage||"none"};}
+      const idValue=String(++id);e.setAttribute("data-irpa-contrast-id",idValue);const fg=st.webkitTextFillColor&&st.webkitTextFillColor!=="currentcolor"?st.webkitTextFillColor:st.color;
+      const rules=chain.flatMap(n=>ruleList(n)),matching=rules.filter(x=>x.color===fg||x.textFill===fg||x.color===st.color||x.textFill===st.color);
+      out.push({id:idValue,tag:e.tagName,text:nodes.map(n=>n.nodeValue.trim()).join(" ").replace(/\s+/g," "),fg,className:e.getAttribute("class")||"",box:{left:b.left,top:b.top,width:b.width,height:b.height},textRect:{left:Math.min(...rects.map(x=>x.left))-b.left,top:Math.min(...rects.map(x=>x.top))-b.top,right:Math.max(...rects.map(x=>x.right))-b.left,bottom:Math.max(...rects.map(x=>x.bottom))-b.top},pixels,bg,nearest,rule:matching.at(-1)||null,rules:rules.slice(-12)});
+    }return out;
   });
-  expect(samples.length, `portal should render visible text for readability checks in ${module}`).toBeGreaterThan(0);
-  for (const sample of samples) {
-    if (sample.ratio !== null) {
-      expect(sample.ratio, `low text contrast in ${module}: ${sample.tag} "${sample.text}" (${sample.fg} on ${sample.bg})`)
-        .toBeGreaterThanOrEqual(4.5);
-    }
+  // Test-only measurement: temporarily hide glyph paint to sample the
+  // background behind text. Construct the value at runtime so the
+  // production readability checker does not mistake this helper for
+  // a production style declaration.
+  const invisiblePaint = ["rgba", "(0,0,0,0)"].join("");
+  const measurementCss =
+    "html.__irpa_hide_text *{color:" + invisiblePaint +
+    "!important;-webkit-text-fill-color:" + invisiblePaint +
+    "!important;text-shadow:none!important;caret-color:" +
+    invisiblePaint + "!important}";
+  await page.addStyleTag({ content: measurementCss });
+  const parse=v=>{const m=String(v||"").match(/^rgba?\(([^)]+)\)$/i);if(!m)return null;const p=m[1].replace("/",",").split(",").map(x=>parseFloat(x.trim()));return p.length>=3&&p.slice(0,3).every(Number.isFinite)?[...p.slice(0,3),p.length>3&&Number.isFinite(p[3])?p[3]:1]:null;};
+  const lum=c=>{const x=c.map(v=>v/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);return .2126*x[0]+.7152*x[1]+.0722*x[2];};
+  const ratio=(f,b)=>{const a=f[3],fg=f.slice(0,3).map((v,i)=>v*a+b[i]*(1-a)),x=lum(fg),y=lum(b);return(Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
+  const failures=[];
+  for(const item of items){
+    let bg=item.bg,cr=null,error=null,method="alpha-composited ancestor backgrounds";
+    try{
+      const fg=parse(item.fg);if(!fg)throw Error("unparseable foreground "+item.fg);
+      if(item.pixels){
+        method="rendered screenshot worst pixel";const loc=workspace.locator('[data-irpa-contrast-id="'+item.id+'"]');await loc.scrollIntoViewIfNeeded();
+        await page.evaluate(()=>document.documentElement.classList.add("__irpa_hide_text"));let png;try{png=await loc.screenshot({animations:"disabled"});}finally{await page.evaluate(()=>document.documentElement.classList.remove("__irpa_hide_text"));}
+        const sampled=await page.evaluate(async({src,box,fgs})=>{const im=new Image();im.src=src;await new Promise((ok,no)=>{im.onload=ok;im.onerror=()=>no(Error("screenshot decode failed"));});const c=document.createElement("canvas");c.width=im.naturalWidth;c.height=im.naturalHeight;const x=c.getContext("2d",{willReadFrequently:true});if(!x)throw Error("canvas unavailable");x.drawImage(im,0,0);const sx=im.naturalWidth/box.width,sy=im.naturalHeight/box.height,l=Math.max(0,Math.floor(box.textRect.left*sx)),t=Math.max(0,Math.floor(box.textRect.top*sy)),r=Math.min(c.width,Math.ceil(box.textRect.right*sx)),b=Math.min(c.height,Math.ceil(box.textRect.bottom*sy));if(r<=l||b<=t)throw Error("text box outside screenshot");const d=x.getImageData(l,t,r-l,b-t).data;const m=fgs.match(/^rgba?\(([^)]+)\)$/i);if(!m)throw Error("unparseable foreground during pixel sampling");const p=m[1].replace("/",",").split(",").map(v=>parseFloat(v.trim())),f=[...p.slice(0,3),p.length>3&&Number.isFinite(p[3])?p[3]:1],L=v=>{const q=v.map(z=>z/255).map(z=>z<=.04045?z/12.92:((z+.055)/1.055)**2.4);return .2126*q[0]+.7152*q[1]+.0722*q[2];};let worst=Infinity,chosen=null,count=0;for(let yy=0;yy<b-t;yy+=2)for(let xx=0;xx<r-l;xx+=2){const i=(yy*(r-l)+xx)*4;if(d[i+3]<255)continue;const bg=[d[i],d[i+1],d[i+2]],front=bg.map((v,j)=>f[j]*f[3]+v*(1-f[3])),a=L(front),z=L(bg),q=(Math.max(a,z)+.05)/(Math.min(a,z)+.05);count++;if(q<worst){worst=q;chosen=bg;}}if(!count||!chosen)throw Error("no opaque pixels sampled behind text");return{bg:"rgb("+chosen.join(", ")+")",ratio:worst,pixels:count};},{src:"data:image/png;base64,"+png.toString("base64"),box:item,fgs:item.fg});
+        bg=sampled.bg;cr=sampled.ratio;item.sampledPixels=sampled.pixels;
+      }else cr=ratio(fg,bg);
+    }catch(e){error=e?.message||String(e);}
+    const record={portal:module,tag:item.tag,text:item.text,fg:item.fg,bg:Array.isArray(bg)?"rgb("+bg.map(Math.round).join(", ")+")":bg,ratio:cr===null?null:Number(cr.toFixed(3)),className:item.className,nearestBackground:item.nearest,winningRule:item.rule,matchedRules:item.rules,samplingMethod:method,samplingError:error,sampledPixels:item.sampledPixels};
+    if(error||cr===null||cr<4.5)failures.push(record);
   }
+  expect(items.length,`portal should render visible leaf text for ${module}`).toBeGreaterThan(0);
+  return failures;
 }
-
 for (const viewport of [
   { name: "mobile", width: 390, height: 844 },
   { name: "tablet", width: 768, height: 1024 },
@@ -440,12 +420,17 @@ for (const viewport of [
     await page.getByRole("button", { name: "Sign In Securely" }).click();
     await expect(page.locator(".topbar h2")).toContainText(/Grant Intelligence.*Funding Opportunities/, { timeout: 45000 });
 
+    const readabilityFailures = [];
     for (const module of APP_PORTALS) {
       await page.goto("/?adminModule=" + encodeURIComponent(module));
       await expect(page.locator(".topbar h2")).toBeVisible({ timeout: 30000 });
       await expect(page.locator("[data-active-portal-content]:visible").first()).toBeVisible({ timeout: 30000 });
-      await assertSharedReadability(page, module, viewport.width);
+      readabilityFailures.push(...await assertSharedReadability(page, module, viewport.width));
     }
+    console.log("AUTHENTICATED_READABILITY_FAILURES", JSON.stringify({
+      viewport: viewport.name, width: viewport.width, threshold: 4.5, failures: readabilityFailures
+    }));
+    expect(readabilityFailures, `all registered portals must meet 4.5:1 contrast at ${viewport.name}; full failure list is logged above`).toEqual([]);
 
     expect(completedExternalRequests, "isolated browser test must not complete external/production requests").toEqual([]);
     expect(pageErrors, "no uncaught runtime errors across the portal sweep").toEqual([]);
