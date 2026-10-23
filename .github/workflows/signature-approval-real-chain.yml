@@ -49,6 +49,44 @@ jobs:
         run: |
           set -o pipefail
           npx firebase emulators:exec --project demo-irpa-staging --only auth,firestore "node --test tests/signature-approval-real-chain.test.mjs" | tee signature-approval-real-chain.log
+      - name: Publish per-case results and annotations
+        if: always()
+        env:
+          TEST_LOG: signature-approval-real-chain.log
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const log = fs.existsSync(process.env.TEST_LOG) ? fs.readFileSync(process.env.TEST_LOG, 'utf8') : '';
+          const summary = [];
+          const cases = [
+            ['a','CASE (a)'],['b','CASE (b)'],['c','CASE (c)'],['d','CASE (d)'],
+            ['e1','CASE (e1)'],['e2','CASE (e2)'],['e3','CASE (e3)'],['f','CASE (f)'],['g','CASE (g)']
+          ];
+          const esc = s => String(s).replace(/%/g,'%25').replace(/\\r/g,'%0D').replace(/\\n/g,'%0A');
+          for (const [id, marker] of cases) {
+            const start = log.indexOf(marker);
+            if (start < 0) {
+              const msg = 'Case did not run or its TAP output could not be matched; inspect test log.';
+              console.log(`::error title=${id}::${esc(msg)}`);
+              summary.push({id,status:'FAIL / NOT REPORTED',first:msg,classification:'TEST ENVIRONMENT — case output missing'});
+              continue;
+            }
+            const next = cases.slice(cases.findIndex(c=>c[0]===id)+1).map(c=>log.indexOf(c[1],start+marker.length)).filter(n=>n>=0);
+            const block = log.slice(start, next.length ? Math.min(...next) : log.length);
+            const failed = /not ok \\d+/m.test(block) || /AssertionError|error:|failureType:/i.test(block);
+            const statusMatch = block.match(/(?:actual|status|HTTP status)[^\\n]{0,100}/i);
+            const assertion = block.match(/(?:error:|AssertionError[^\\n]*|Expected[^\\n]*|ERR_[A-Z_]+[^\\n]*)/i);
+            const first = [assertion?.[0],statusMatch?.[0]].filter(Boolean).join(' | ') || (failed ? 'Failing assertion text not found in TAP block.' : 'All assertions in this case passed.');
+            const classification = failed ? (/ECONNREFUSED|emulator|timed out|not reachable|fetch failed/i.test(block) ? 'TEST ENVIRONMENT' : 'PRODUCT GAP — assertion failed in real-handler chain') : 'PASS';
+            if (failed) console.log(`::error title=${id}::${esc(first)}`);
+            else console.log(`::notice title=${id}::PASS — ${esc(first)}`);
+            summary.push({id,status:failed?'FAIL':'PASS',first,classification});
+          }
+          console.log('\\n### Signature Approval Real Chain — cases\\n');
+          console.log('| Case | Result | First failing assertion / HTTP status | Classification |\\n|---|---|---|---|');
+          for (const r of summary) console.log(`| ${r.id} | ${r.status} | ${r.first.replace(/\\|/g,'\\\\|')} | ${r.classification} |`);
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary.map(r=>`| ${r.id} | ${r.status} | ${r.first.replace(/\\|/g,'\\\\|')} | ${r.classification} |`).join('\\n')+'\\n');
+          NODE
       - name: Upload test diagnostics
         if: always()
         uses: actions/upload-artifact@v4
