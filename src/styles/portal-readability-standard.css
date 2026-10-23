@@ -303,11 +303,6 @@
   opacity: 1;
 }
 
-#root .app-shell .content-area:not(.dashboard-content-area) .page :where(.stat-card, .workflow-stage, .finance-engine-card, .finance-formula-card) strong {
-  color: var(--irpa-readable-text);
-  -webkit-text-fill-color: var(--irpa-readable-text);
-}
-
 /* Round 1: enforce the intended light-surface contrast where legacy gradients or
    theme tokens override the shared readability values. No workflow or layout rules change. */
 #root .app-shell .content-area:not(.dashboard-content-area) .page :where(.panel, .module-panel, .stat-card, .workflow-stage, .identity-card, .record-details, .detail-grid > div, .action-feedback, .auth-message):not(.signature-field-palette .panel):not(.welcome-panel .auth-message) {
