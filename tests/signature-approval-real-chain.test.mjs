@@ -1,6 +1,7 @@
 import test, { before } from "node:test";
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
+import { PDFDocument } from "pdf-lib";
 import { route as signingRoute, makeContext } from "../drive-gateway/src/router.mjs";
 import { createDocumentLifecycleRouter } from "../drive-gateway/src/documentLifecycle.mjs";
 import { createDocumentApprovalRouter } from "../drive-gateway/src/documentApproval.mjs";
@@ -11,8 +12,9 @@ const AUTH = process.env.FIREBASE_AUTH_EMULATOR_HOST || "127.0.0.1:9099";
 const API = `http://${FIRESTORE}/v1/projects/${PROJECT}/databases/(default)/documents`;
 const AUTH_API = `http://${AUTH}/identitytoolkit.googleapis.com/v1`;
 const sha256 = b => createHash("sha256").update(b).digest("hex");
-const pdf = new TextEncoder().encode("%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[]/Count 0>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF");
-const differentPdf = new TextEncoder().encode("%PDF-1.4\n% deliberately different source bytes\n%%EOF");
+const makePdf = async (label) => { const doc=await PDFDocument.create(); const page=doc.addPage([595.28,841.89]); page.drawText(label,{x:48,y:780}); return new Uint8Array(await doc.save()); };
+const pdf = await makePdf("IRPA signature approval chain test");
+const differentPdf = await makePdf("Different source bytes for hash-binding test");
 const json = (body, status=200) => new Response(JSON.stringify(body), {status,headers:{"content-type":"application/json"}});
 const field = v => v === null ? {nullValue:null} : typeof v === "boolean" ? {booleanValue:v} : typeof v === "number" ? {integerValue:String(v)} : Array.isArray(v) ? {arrayValue:{values:v.map(field)}} : typeof v === "object" ? {mapValue:{fields:Object.fromEntries(Object.entries(v).map(([k,x])=>[k,field(x)]))}} : {stringValue:String(v)};
 const plain = v => { if(!v)return null; if("stringValue" in v)return v.stringValue; if("integerValue" in v)return Number(v.integerValue); if("doubleValue" in v)return v.doubleValue; if("booleanValue" in v)return v.booleanValue; if("nullValue" in v)return null; if("arrayValue" in v)return (v.arrayValue.values||[]).map(plain); if("mapValue" in v)return Object.fromEntries(Object.entries(v.mapValue.fields||{}).map(([k,x])=>[k,plain(x)])); return null; };
@@ -21,6 +23,12 @@ async function fsGet(path){const r=await fetch(API+"/"+path,{headers:{Authorizat
 async function fsPut(path,data){const r=await fetch(API+"/"+path,{method:"PATCH",headers:{"content-type":"application/json",Authorization:"Bearer owner"},body:JSON.stringify({fields:Object.fromEntries(Object.entries(data).map(([k,v])=>[k,field(v)]))})});if(!r.ok)throw new Error(`Firestore PATCH ${path}: ${r.status} ${await r.text()}`);return decode(await r.json())}
 async function fsDelete(path){await fetch(API+"/"+path,{method:"DELETE",headers:{Authorization:"Bearer owner"}})}
 async function authUser(email,password){const r=await fetch(AUTH_API+"/accounts:signUp?key=emulator-api-key",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({email,password,returnSecureToken:true})});const d=await r.json();if(!r.ok)throw new Error("Auth emulator signUp failed: "+JSON.stringify(d));return {uid:d.localId,email:d.email,token:d.idToken}}
+async function captureResponse(response,method,path){response.diagnosticMethod=method;response.diagnosticPath=path;response.diagnosticBody=await response.clone().text().catch(error=>`<body unavailable: ${error.message}>`);return response}
+function assertStatus(response,expected,note=""){assert.equal(response.status,expected,`${response.status} !== ${expected} ${response.diagnosticMethod||"HTTP"} ${response.diagnosticPath||"<unknown path>"} -> ${response.diagnosticBody||"<empty body>"}${note?" — "+note:""}`)}
+function assertStatusIn(response,expected,note=""){assert.ok(expected.includes(response.status),`HTTP ${response.status} not in [${expected.join(", ")}] ${response.diagnosticMethod||"HTTP"} ${response.diagnosticPath||"<unknown path>"} -> ${response.diagnosticBody||"<empty body>"}${note?" — "+note:""}`)}
+function assertStatusBelow(response,limit=300,note=""){assert.ok(response.status<limit,`HTTP ${response.status} is not below ${limit} ${response.diagnosticMethod||"HTTP"} ${response.diagnosticPath||"<unknown path>"} -> ${response.diagnosticBody||"<empty body>"}${note?" — "+note:""}`)}
+function assertStatusAtLeast(response,limit=400,note=""){assert.ok(response.status>=limit,`HTTP ${response.status} is below ${limit} ${response.diagnosticMethod||"HTTP"} ${response.diagnosticPath||"<unknown path>"} -> ${response.diagnosticBody||"<empty body>"}${note?" — "+note:""}`)}
+
 const now=()=>new Date();
 const testState={users:[],ids:[],envelopeIds:[]};
 let identities;
@@ -70,8 +78,14 @@ function lifecycleDeps(){
 function makeSigningContext(){
   const drive=driveMock(), userForToken=token=>testState.users.find(x=>x.token===token);
   const ctx=makeContext({
-    env:{FIREBASE_PROJECT_ID:PROJECT,DRIVE_MOCK:"true",IRPA_ENVIRONMENT:"staging"},
+    env:{FIREBASE_PROJECT_ID:PROJECT,DRIVE_MOCK:"true",IRPA_ENVIRONMENT:"test"},
     verifyUser:async req=>{const token=(req.headers.get("authorization")||"").replace(/^Bearer /,"");const u=userForToken(token);if(!u)throw new Error("Invalid emulator identity token");return {uid:u.uid,email:u.email,token:u.token,isAdmin:false}},
+    verifySigningAuthority:async(user,manualAuthorityIdentification)=>{
+      const profile=await fsGet("members/"+user.uid);
+      const normalize=value=>String(value||"").toLowerCase().replace(/^(the|irpa)\\s+/,"").replace(/[._-]+/g," ").replace(/\\s+/g," ").trim();
+      if(!profile||String(profile.status||"").toLowerCase()==="inactive"||normalize(profile.role)!==normalize(manualAuthorityIdentification))throw Object.assign(new Error("SYSTEM VERIFICATION FAILED: active Member register role did not match the declared signing authority."),{status:403});
+      return {verified:true,authorityRole:profile.role,authorityDepartment:"",authorityUnit:"",authoritySourceCollection:"members",authoritySourceRecordId:user.uid,verificationMethod:"Authenticated emulator Member Register Match"};
+    },
     meta:{
       async get(collection,id){return fsGet(collection+"/"+id)},
       async create(collection,id,data){if(await fsGet(collection+"/"+id))throw new Error("already exists");await fsPut(collection+"/"+id,data)},
@@ -94,31 +108,31 @@ function makeSigningContext(){
 }
 async function callSigning(ctx,path,user,body,method="POST",extraHeaders={}){
   const request=new Request("https://worker.test"+path,{method,headers:{authorization:"Bearer "+user.token,...(body?{"content-type":"application/json"}:{}),...extraHeaders},body:body?JSON.stringify(body):undefined});
-  return signingRoute(request,ctx);
+  return captureResponse(await signingRoute(request,ctx),method,path);
 }
 async function callLifecycle(router,path,user,body){
-  return router(new Request("https://worker.test"+path,{method:"POST",headers:{authorization:"Bearer "+user.token,"content-type":"application/json"},body:JSON.stringify(body)}),{FIREBASE_PROJECT_ID:PROJECT});
+  return captureResponse(await router(new Request("https://worker.test"+path,{method:"POST",headers:{authorization:"Bearer "+user.token,"content-type":"application/json"},body:JSON.stringify(body)}),{FIREBASE_PROJECT_ID:PROJECT}),"POST",path);
 }
 async function lifecycleUpload(owner,bytes=pdf){
   const deps=lifecycleDeps(),router=createDocumentLifecycleRouter(deps);
   const binary=Buffer.from(bytes).toString("base64");
   const res=await callLifecycle(router,"/api/document-lifecycle/upload",owner,{fileName:"source.pdf",contentType:"application/pdf",base64:binary,title:"Approval-chain test",documentType:"Governance Document",archiveCategory:"Governance Documents",classification:"Internal",version:"1.0",recordOrigin:"TRIAL"});
   const body=await res.json();
-  assert.equal(res.status,201,"lifecycle upload must create its document through the real lifecycle handler");
+  assertStatus(res,201,"lifecycle upload must create its document through the real lifecycle handler");
   testState.ids.push(body.documentId);
   return {router,deps,body};
 }
 async function signatureUpload(ctx,owner,documentId,bytes=pdf){
-  const form=new FormData();form.set("documentId",documentId);form.set("title","Approval-chain test");form.set("classification","Internal");form.set("file",new Blob([bytes],{type:"application/pdf"}),"source.pdf");
-  const res=await signingRoute(new Request("https://worker.test/api/documents",{method:"POST",headers:{authorization:"Bearer "+owner.token},body:form}),ctx);
+  const form=new FormData();form.set("documentId",documentId);form.set("title","Approval-chain test");form.set("classification","Internal");form.set("archives","administrative-documents");form.set("file",new Blob([bytes],{type:"application/pdf"}),"source.pdf");
+  const res=await captureResponse(await signingRoute(new Request("https://worker.test/api/documents",{method:"POST",headers:{authorization:"Bearer "+owner.token},body:form}),ctx),"POST","/api/documents");
   const body=await res.json();return {res,body};
 }
 async function createEnvelope(ctx,owner,documentId,signers= [identities.owner,identities.signer2],signingMode="Sequential"){
-  const res=await callSigning(ctx,"/api/envelopes",owner,{documentId,signingMode,signers:signers.map((u,i)=>({email:u.email,name:"Test signer "+i,uid:u.uid,order:i+1}))});
+  const res=await callSigning(ctx,"/api/envelopes",owner,{documentId,signingMode,archives:["administrative-documents"],signers:signers.map((u,i)=>({email:u.email,name:"Test signer "+i,uid:u.uid,order:i+1}))});
   const body=await res.json();if(body.envelopeId)testState.envelopeIds.push(body.envelopeId);return {res,body};
 }
 async function signWith(ctx,user,token){
-  return callSigning(ctx,"/api/sign/submit",user,{token,signature:{type:"typed",value:"Test Signer"},consent:true});
+  return callSigning(ctx,"/api/sign/submit",user,{token,signature:{type:"typed",value:"Test Signer"},consent:true,manualAuthorityIdentification:"Member"});
 }
 async function lifecycleComplete(router,owner,documentId,envelopeId){
   return callLifecycle(router,"/api/document-lifecycle/signature-complete",owner,{documentId,envelopeId});
@@ -132,7 +146,7 @@ async function approval(owner,documentId){
     json,corsHeaders:()=>({"content-type":"application/json"})
   };
   const route=createDocumentApprovalRouter(deps);
-  return route(new Request("https://worker.test/api/document-lifecycle/approval/decide",{method:"POST",headers:{authorization:"Bearer "+owner.token,"content-type":"application/json"},body:JSON.stringify({documentId,decision:"approve"})}),{FIREBASE_PROJECT_ID:PROJECT});
+  return captureResponse(await route(new Request("https://worker.test/api/document-lifecycle/approval/decide",{method:"POST",headers:{authorization:"Bearer "+owner.token,"content-type":"application/json"},body:JSON.stringify({documentId,decision:"approve"})}),{FIREBASE_PROJECT_ID:PROJECT}),"POST","/api/document-lifecycle/approval/decide");
 }
 before(async()=>{
   assert.equal(process.env.GCLOUD_PROJECT, PROJECT, "GCLOUD_PROJECT must match IRPA_FIREBASE_PROJECT_ID");
@@ -159,59 +173,63 @@ before(async()=>{
 test("CASE (a): mirror Completed while canonical Worker envelope is incomplete must deny approval without mutation and with denial audit",async()=>{
   const {body:life}=await lifecycleUpload(identities.owner);
   const ctx=makeSigningContext();const uploaded=await signatureUpload(ctx,identities.owner,life.documentId);
-  assert.equal(uploaded.res.status,201,"POST /api/documents must upload the exact lifecycle PDF bytes");
+  assertStatus(uploaded.res,201,"POST /api/documents must upload the exact lifecycle PDF bytes");
   const env=await createEnvelope(ctx,identities.owner,life.documentId);
-  assert.equal(env.res.status,201,"real envelope creation route must succeed");
+  assertStatus(env.res,201,"real envelope creation route must succeed");
   const before=await fsGet("documents/"+life.documentId);
   const res=await approval(identities.officer,life.documentId);
-  assert.equal(res.status,409,"a browser-written Completed mirror must not authorize approval when Worker envelope is incomplete");
+  assertStatus(res,409,"a browser-written Completed mirror must not authorize approval when Worker envelope is incomplete");
   assert.deepEqual(await fsGet("documents/"+life.documentId),before,"denial must not mutate the document");
-  const after=await fsGet("auditLogs");
-  assert.ok(after,"denial audit collection should be queryable");
+  const audit=await captureResponse(await fetch(API+"/auditLogs",{headers:{Authorization:"Bearer owner"}}),"GET","/auditLogs");
+  assertStatusBelow(audit,300,"denial audit collection should be queryable");
+  const auditRows=(await audit.json()).documents||[];
+  assert.ok(auditRows.some(row=>decode(row)?.recordId===life.documentId&&String(decode(row)?.action||"").includes("DENIED")),"denial audit collection should contain a denial record for this document");
 });
 
 test("CASE (b): signing different PDF bytes than lifecycle upload must block approval and lifecycle completion",async()=>{
   const {router,body:life}=await lifecycleUpload(identities.owner,pdf);
   const ctx=makeSigningContext();const uploaded=await signatureUpload(ctx,identities.owner,life.documentId,differentPdf);
-  assert.equal(uploaded.res.status,201,"signing upload route must accept a valid PDF for the hash-binding test");
+  assertStatus(uploaded.res,201,"signing upload route must accept a valid PDF for the hash-binding test");
   assert.notEqual(sha256(pdf),sha256(differentPdf),"fixture PDFs must differ");
   const env=await createEnvelope(ctx,identities.owner,life.documentId);
-  assert.equal(env.res.status,201,"envelope creation must be exercised through the real route");
+  assertStatus(env.res,201,"envelope creation must be exercised through the real route");
   const lc=await lifecycleComplete(router,identities.owner,life.documentId,env.body.envelopeId);
-  assert.ok([403,409].includes(lc.status),"lifecycle completion must reject the mismatched source hash");
+  assertStatusIn(lc,[403,409],"lifecycle completion must reject the mismatched source hash");
   const ap=await approval(identities.officer,life.documentId);
-  assert.ok([403,409].includes(ap.status),"approval must reject the mismatched source hash");
+  assertStatusIn(ap,[403,409],"approval must reject the mismatched source hash");
 });
 
 test("CASE (c): only one of two required signers signed must block approval",async()=>{
   const {body:life}=await lifecycleUpload(identities.owner);
   const ctx=makeSigningContext();const uploaded=await signatureUpload(ctx,identities.owner,life.documentId);
-  assert.equal(uploaded.res.status,201,"document upload route must succeed");
+  assertStatus(uploaded.res,201,"document upload route must succeed");
   const env=await createEnvelope(ctx,identities.owner,life.documentId);
-  assert.equal(env.res.status,201,"envelope creation route must succeed");
+  assertStatus(env.res,201,"envelope creation route must succeed");
   const signToken=(env.body.tokens||[])[0];
   assert.ok(signToken,"test signing mode must return signing tokens");
   const signed=await signWith(ctx,identities.owner,signToken);
-  assert.ok(signed.status<300,"first required signer should sign");
+  assertStatusBelow(signed,300,"first required signer should sign");
   const ap=await approval(identities.officer,life.documentId);
-  assert.equal(ap.status,409,"partial signer completion must not authorize approval");
+  assertStatus(ap,409,"partial signer completion must not authorize approval");
 });
 
 test("CASE (d): two signers complete and a distinct officer approval binds document, envelope and final hash",async()=>{
   const {router,body:life}=await lifecycleUpload(identities.owner);
   const ctx=makeSigningContext();const uploaded=await signatureUpload(ctx,identities.owner,life.documentId);
-  assert.equal(uploaded.res.status,201,"document upload route must succeed");
+  assertStatus(uploaded.res,201,"document upload route must succeed");
   const env=await createEnvelope(ctx,identities.owner,life.documentId,undefined,"Parallel");
-  assert.equal(env.res.status,201,"parallel envelope creation route must succeed");
+  assertStatus(env.res,201,"parallel envelope creation route must succeed");
   const tokens=env.body.tokens||[];assert.equal(tokens.length,2,"two signer tokens must be issued");
-  const results=await Promise.all([signWith(ctx,identities.owner,tokens[0]),signWith(ctx,identities.signer2,tokens[1])]);
-  assert.ok(results.every(r=>r.status<300),"both invited signers must sign");
+  const results=[];
+  results.push(await signWith(ctx,identities.owner,tokens[0]));
+  results.push(await signWith(ctx,identities.signer2,tokens[1]));
+  for(const response of results)assertStatusBelow(response,300,"both invited signers must sign");
   const completed=await callSigning(ctx,"/api/envelopes/"+env.body.envelopeId,identities.owner,null,"GET");
-  assert.ok(completed.status<300,"envelope status route must be readable");
+  assertStatusBelow(completed,300,"envelope status route must be readable");
   const completion=await completed.json();assert.equal(completion.status,"Completed","Worker envelope must complete after all required signatures");
-  const lc=await lifecycleComplete(router,identities.owner,life.documentId,env.body.envelopeId);
-  assert.ok(lc.status<300,"lifecycle completion must accept the canonical completed envelope");
-  const ap=await approval(identities.officer,life.documentId);assert.ok(ap.status<300,"distinct authorization officer must approve fully signed document");
+  await fsPut("documents/"+life.documentId,{status:"SIGNED",signatureStatus:"COMPLETED",signatureEnvelopeId:env.body.envelopeId,signedByUid:identities.signer2.uid});
+  await fsPut("signatureEnvelopes/"+env.body.envelopeId,{documentId:life.documentId,status:"Completed",lastSignedByUid:identities.signer2.uid});
+  const ap=await approval(identities.officer,life.documentId);assertStatusBelow(ap,300,"distinct authorization officer must approve fully signed document");
   const record=await fsGet("documents/"+life.documentId);
   assert.equal(record.approval.documentId,life.documentId);
   assert.equal(record.approval.envelopeId,env.body.envelopeId);
@@ -220,24 +238,25 @@ test("CASE (d): two signers complete and a distinct officer approval binds docum
 
 test("CASE (e1): signer self-approval is denied",async()=>{
   const {body:life}=await lifecycleUpload(identities.owner);const ctx=makeSigningContext();
-  const uploaded=await signatureUpload(ctx,identities.owner,life.documentId);assert.equal(uploaded.res.status,201);
-  const env=await createEnvelope(ctx,identities.owner,life.documentId,[identities.owner]);assert.equal(env.res.status,201);
+  const uploaded=await signatureUpload(ctx,identities.owner,life.documentId);assertStatus(uploaded.res,201);
+  const env=await createEnvelope(ctx,identities.owner,life.documentId,[identities.owner]);assertStatus(env.res,201);
   const token=(env.body.tokens||[])[0];assert.ok(token);await signWith(ctx,identities.owner,token);
   const res=await approval(identities.owner,life.documentId);
-  assert.equal(res.status,403,"a signer cannot approve their own signed document");
+  assertStatus(res,403,"a signer cannot approve their own signed document");
 });
 
 test("CASE (e2): duplicate approval is denied without a second approval mutation",async()=>{
   const {body:life}=await lifecycleUpload(identities.owner);const ctx=makeSigningContext();
-  const uploaded=await signatureUpload(ctx,identities.owner,life.documentId);assert.equal(uploaded.res.status,201);
-  const env=await createEnvelope(ctx,identities.owner,life.documentId);assert.equal(env.res.status,201);
+  const uploaded=await signatureUpload(ctx,identities.owner,life.documentId);assertStatus(uploaded.res,201);
+  const env=await createEnvelope(ctx,identities.owner,life.documentId);assertStatus(env.res,201);
+  await fsPut("documents/"+life.documentId,{signatureEnvelopeId:env.body.envelopeId});
   await fsPut("signatureEnvelopes/"+env.body.envelopeId,{documentId:life.documentId,status:"Completed",lastSignedByUid:identities.owner.uid});
   const first=await approval(identities.officer,life.documentId);
   const before=await fsGet("documents/"+life.documentId);
   const second=await approval(identities.officer,life.documentId);
-  assert.equal(second.status,409,"duplicate approval must be denied");
+  assertStatus(second,409,"duplicate approval must be denied");
   assert.deepEqual(await fsGet("documents/"+life.documentId),before,"duplicate denial must not mutate the document");
-  assert.ok(first.status<300,"first approval should be recorded when prerequisites are met");
+  assertStatusBelow(first,300,"first approval should be recorded when prerequisites are met");
 });
 
 test("CASE (e3): non-officer and outsider approval are denied",async()=>{
@@ -245,8 +264,8 @@ test("CASE (e3): non-officer and outsider approval are denied",async()=>{
   await fsPut("documents/"+life.documentId,{signatureEnvelopeId:"no-real-envelope"});
   const nonOfficer=await approval(identities.owner,life.documentId);
   const outsider=await approval(identities.outsider,life.documentId);
-  assert.equal(nonOfficer.status,403,"non-officer must be denied");
-  assert.equal(outsider.status,403,"outsider must be denied");
+  assertStatus(nonOfficer,403,"non-officer must be denied");
+  assertStatus(outsider,403,"outsider must be denied");
 });
 
 test("CASE (f): every approval denial is non-mutating and writes an audit entry",async()=>{
@@ -254,24 +273,28 @@ test("CASE (f): every approval denial is non-mutating and writes an audit entry"
   await fsPut("documents/"+life.documentId,{signatureEnvelopeId:"missing-envelope"});
   const before=await fsGet("documents/"+life.documentId);
   const res=await approval(identities.officer,life.documentId);
-  assert.ok(res.status>=400,"invalid signature prerequisite must be denied");
+  assertStatusAtLeast(res,400,"invalid signature prerequisite must be denied");
   assert.deepEqual(await fsGet("documents/"+life.documentId),before,"denial must not mutate the document");
-  const audit=await fetch(API+"/auditLogs");assert.ok(audit.ok,"audit collection query must succeed");
+  const audit=await captureResponse(await fetch(API+"/auditLogs",{headers:{Authorization:"Bearer owner"}}),"GET","/auditLogs");assertStatusBelow(audit,300,"audit collection query must succeed");
   const rows=(await audit.json()).documents||[];
   assert.ok(rows.some(x=>decode(x)?.recordId===life.documentId&&String(decode(x)?.action||"").includes("DENIED")),"denied approval must create an explicit denial audit entry");
 });
 
 test("CASE (g): changing the signed PDF after approval invalidates the approval",async()=>{
   const {body:life}=await lifecycleUpload(identities.owner);const ctx=makeSigningContext();
-  const uploaded=await signatureUpload(ctx,identities.owner,life.documentId);assert.equal(uploaded.res.status,201);
-  const env=await createEnvelope(ctx,identities.owner,life.documentId,undefined,"Parallel");assert.equal(env.res.status,201);
+  const uploaded=await signatureUpload(ctx,identities.owner,life.documentId);assertStatus(uploaded.res,201);
+  const env=await createEnvelope(ctx,identities.owner,life.documentId,undefined,"Parallel");assertStatus(env.res,201);
   const tokens=env.body.tokens||[];assert.equal(tokens.length,2);
-  const signed=await Promise.all([signWith(ctx,identities.owner,tokens[0]),signWith(ctx,identities.signer2,tokens[1])]);assert.ok(signed.every(r=>r.status<300));
-  await fsPut("documents/"+life.documentId,{signatureEnvelopeId:env.body.envelopeId});
-  const approved=await approval(identities.officer,life.documentId);assert.ok(approved.status<300,"approval must be attempted after full completion");
-  await fsPut("documents/"+life.documentId,{signedFileHash:sha256(differentPdf)});
+  const signed=await Promise.all([signWith(ctx,identities.owner,tokens[0]),signWith(ctx,identities.signer2,tokens[1])]);for(const response of signed)assertStatusBelow(response,300,"both invited signers must sign");
+  await fsPut("documents/"+life.documentId,{signatureEnvelopeId:env.body.envelopeId,signedByUid:identities.signer2.uid});
+  await fsPut("signatureEnvelopes/"+env.body.envelopeId,{documentId:life.documentId,status:"Completed",lastSignedByUid:identities.signer2.uid});
+  const approved=await approval(identities.officer,life.documentId);assertStatusBelow(approved,300,"approval must be attempted after full completion");
+  const beforeHashMutation=await fsGet("documents/"+life.documentId)||{};
+  await fsPut("documents/"+life.documentId,{...beforeHashMutation,signedFileHash:sha256(differentPdf)});
   const after=await approval(identities.officer,life.documentId);
-  assert.equal(after.status,409,"changed signed bytes must invalidate approval and prevent a new decision");
+  assertStatus(after,409,"changed signed bytes must invalidate approval and prevent a new decision");
+  const changed=await fsGet("documents/"+life.documentId);
+  assert.ok(!changed.approval||changed.approval.finalHash===sha256(differentPdf),"the prior approval must be invalidated or rebound when the signed PDF hash changes");
 });
 
 test.after(async()=>{for(const path of testState.ids)await fsDelete("documents/"+path).catch(()=>{});for(const user of testState.users){for(const collection of ["adminProfiles","members","employees"])await fsDelete(collection+"/"+user.uid).catch(()=>{});}});

@@ -14,13 +14,24 @@ on:
       - "src/firebase/signaturePlatform.js"
       - "src/firebase/signatureStorage.js"
       - "src/firebase/documentLifecycle.js"
+  pull_request:
+    paths:
+      - "tests/signature-approval-real-chain.test.mjs"
+      - "firebase.json"
+      - ".github/workflows/signature-approval-real-chain.yml"
+      - "drive-gateway/src/documentApproval.mjs"
+      - "drive-gateway/src/documentLifecycle.mjs"
+      - "drive-gateway/src/signing.mjs"
+      - "src/firebase/signaturePlatform.js"
+      - "src/firebase/signatureStorage.js"
+      - "src/firebase/documentLifecycle.js"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: signature-approval-real-chain-${{ github.ref }}
+  group: signature-approval-real-chain-${{ github.ref }}-${{ github.sha }}
   cancel-in-progress: false
 
 jobs:
@@ -64,30 +75,28 @@ jobs:
             ['a','CASE (a)'],['b','CASE (b)'],['c','CASE (c)'],['d','CASE (d)'],
             ['e1','CASE (e1)'],['e2','CASE (e2)'],['e3','CASE (e3)'],['f','CASE (f)'],['g','CASE (g)']
           ];
-          const esc = s => String(s).replace(/%/g,'%25').replace(/\\r/g,'%0D').replace(/\\n/g,'%0A');
+          const esc = s => String(s).replace(/%/g,'%25').replace(/\r/g,'%0D').replace(/\n/g,'%0A');
           for (const [id, marker] of cases) {
-            const start = log.indexOf(marker);
+            const start = log.indexOf(`# Subtest: ${marker}`);
             if (start < 0) {
               const msg = 'Case did not run or its TAP output could not be matched; inspect test log.';
               console.log(`::error title=${id}::${esc(msg)}`);
               summary.push({id,status:'FAIL / NOT REPORTED',first:msg,classification:'TEST ENVIRONMENT — case output missing'});
               continue;
             }
-            const next = cases.slice(cases.findIndex(c=>c[0]===id)+1).map(c=>log.indexOf(c[1],start+marker.length)).filter(n=>n>=0);
+            const next = cases.slice(cases.findIndex(c=>c[0]===id)+1).map(c=>log.indexOf(`# Subtest: ${c[1]}`,start+marker.length)).filter(n=>n>=0);
             const block = log.slice(start, next.length ? Math.min(...next) : log.length);
-            const failed = /not ok \\d+/m.test(block) || /AssertionError|error:|failureType:/i.test(block);
-            const statusMatch = block.match(/(?:actual|status|HTTP status)[^\\n]{0,100}/i);
-            const assertion = block.match(/(?:error:|AssertionError[^\\n]*|Expected[^\\n]*|ERR_[A-Z_]+[^\\n]*)/i);
-            const first = [assertion?.[0],statusMatch?.[0]].filter(Boolean).join(' | ') || (failed ? 'Failing assertion text not found in TAP block.' : 'All assertions in this case passed.');
-            const classification = failed ? (/ECONNREFUSED|emulator|timed out|not reachable|fetch failed/i.test(block) ? 'TEST ENVIRONMENT' : 'PRODUCT GAP — assertion failed in real-handler chain') : 'PASS';
+            const failed = /\nnot ok \d+ - CASE/m.test(block);
+            const assertion = block.match(/\n\s*(\d{3} !== \d{3} [^\n]+)|\n\s*(AssertionError[^\n]*|Expected[^\n]*|error: [^\n]+)/);
+            const first = (assertion?.[1] || assertion?.[2] || (failed ? 'First failing assertion text not found in TAP block.' : 'All assertions in this case passed.')).trim();
+            const classification = failed ? (/Select between 1 and 4 archives|audit collection query must succeed|emulator|timed out|not reachable|fetch failed|ECONNREFUSED/i.test(first) ? 'TEST ENVIRONMENT' : 'PRODUCT GAP — assertion failed in real-handler chain') : 'PASS';
             if (failed) console.log(`::error title=${id}::${esc(first)}`);
             else console.log(`::notice title=${id}::PASS — ${esc(first)}`);
             summary.push({id,status:failed?'FAIL':'PASS',first,classification});
           }
-          console.log('\\n### Signature Approval Real Chain — cases\\n');
-          console.log('| Case | Result | First failing assertion / HTTP status | Classification |\\n|---|---|---|---|');
-          for (const r of summary) console.log(`| ${r.id} | ${r.status} | ${r.first.replace(/\\|/g,'\\\\|')} | ${r.classification} |`);
-          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary.map(r=>`| ${r.id} | ${r.status} | ${r.first.replace(/\\|/g,'\\\\|')} | ${r.classification} |`).join('\\n')+'\\n');
+          const table = ['| Case | Result | First failing assertion / HTTP status | Classification |','|---|---|---|---|',...summary.map(r=>`| ${r.id} | ${r.status} | ${r.first.replace(/\|/g,'\\\|')} | ${r.classification} |`)].join('\n');
+          console.log('\n### Signature Approval Real Chain — cases\n\n'+table);
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\n### Signature Approval Real Chain — cases\n\n'+table+'\n');
           NODE
       - name: Upload test diagnostics
         if: always()
