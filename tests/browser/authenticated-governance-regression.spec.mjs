@@ -359,7 +359,7 @@ async function assertSharedReadability(page, module, width) {
       out.push({id:idValue,tag:e.tagName,text:nodes.map(n=>n.nodeValue.trim()).join(" ").replace(/\s+/g," "),fg,className:e.getAttribute("class")||"",box:{left:b.left,top:b.top,width:b.width,height:b.height},textRect:{left:Math.min(...rects.map(x=>x.left))-b.left,top:Math.min(...rects.map(x=>x.top))-b.top,right:Math.max(...rects.map(x=>x.right))-b.left,bottom:Math.max(...rects.map(x=>x.bottom))-b.top},pixels,bg,nearest,rule:matching.at(-1)||null,rules:rules.slice(-12)});
     }return out;
   });
-  await page.addStyleTag({content:"html.__irpa_hide_text *{color:transparent!important;-webkit-text-fill-color:transparent!important;text-shadow:none!important;caret-color:transparent!important}"});
+  await page.addStyleTag({content:"html.__irpa_hide_text *{color:rgba(0,0,0,0)!important;-webkit-text-fill-color:rgba(0,0,0,0)!important;text-shadow:none!important;caret-color:rgba(0,0,0,0)!important}"});
   const parse=v=>{const m=String(v||"").match(/^rgba?\(([^)]+)\)$/i);if(!m)return null;const p=m[1].replace("/",",").split(",").map(x=>parseFloat(x.trim()));return p.length>=3&&p.slice(0,3).every(Number.isFinite)?[...p.slice(0,3),p.length>3&&Number.isFinite(p[3])?p[3]:1]:null;};
   const lum=c=>{const x=c.map(v=>v/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);return .2126*x[0]+.7152*x[1]+.0722*x[2];};
   const ratio=(f,b)=>{const a=f[3],fg=f.slice(0,3).map((v,i)=>v*a+b[i]*(1-a)),x=lum(fg),y=lum(b);return(Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
