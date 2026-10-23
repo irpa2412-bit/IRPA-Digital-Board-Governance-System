@@ -1,4 +1,4 @@
-import test from "node:test";
+import test, { before } from "node:test";
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
 import { route as signingRoute, makeContext } from "../drive-gateway/src/router.mjs";
@@ -134,7 +134,7 @@ async function approval(owner,documentId){
   const route=createDocumentApprovalRouter(deps);
   return route(new Request("https://worker.test/api/document-lifecycle/approval/decide",{method:"POST",headers:{authorization:"Bearer "+owner.token,"content-type":"application/json"},body:JSON.stringify({documentId,decision:"approve"})}),{FIREBASE_PROJECT_ID:PROJECT});
 }
-test("setup uses Auth emulator identities and profile-only fixtures; Firestore emulator must be reachable",async()=>{await setup();const r=await fetch(API);assert.ok(r.ok,`Firestore emulator must respond at ${API}, got ${r.status}`);assert.ok(identities.owner.uid&&identities.officer.uid);});
+before(async()=>{await setup();const r=await fetch(API);assert.ok(r.ok,`Firestore emulator must respond at ${API}, got ${r.status}`);assert.ok(identities.owner.uid&&identities.officer.uid);});
 
 test("CASE (a): mirror Completed while canonical Worker envelope is incomplete must deny approval without mutation and with denial audit",async()=>{
   const {body:life}=await lifecycleUpload(identities.owner);
