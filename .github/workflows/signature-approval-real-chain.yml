@@ -1,0 +1,52 @@
+name: Signature Approval Real Chain
+
+on:
+  push:
+    branches:
+      - feat/signature-approval-link-20261022
+    paths:
+      - "tests/signature-approval-real-chain.test.mjs"
+      - ".github/workflows/signature-approval-real-chain.yml"
+      - "drive-gateway/src/documentApproval.mjs"
+      - "drive-gateway/src/documentLifecycle.mjs"
+      - "drive-gateway/src/signing.mjs"
+      - "src/firebase/signaturePlatform.js"
+      - "src/firebase/signatureStorage.js"
+      - "src/firebase/documentLifecycle.js"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: signature-approval-real-chain-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  real-chain-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install dependencies
+        run: |
+          npm install --no-audit --no-fund
+          npm --prefix drive-gateway install --no-audit --no-fund
+      - name: Run signature approval regression with Auth and Firestore emulators
+        run: |
+          set -o pipefail
+          npx firebase emulators:exec --project demo-irpa-staging --only auth,firestore "node --test tests/signature-approval-real-chain.test.mjs" | tee signature-approval-real-chain.log
+      - name: Upload test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: signature-approval-real-chain-diagnostics
+          path: signature-approval-real-chain.log
