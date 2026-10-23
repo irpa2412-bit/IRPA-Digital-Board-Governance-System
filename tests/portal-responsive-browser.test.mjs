@@ -64,7 +64,7 @@ const classifyZeroSizeCandidate=candidate=>["option","optgroup"].includes(String
 // Native <option>/<optgroup> text is painted by the browser's select control.
 // Measure the owning <select> instead; checkbox/radio labels remain ordinary DOM text.
 const nativeMeasurementOwner=candidate=>classifyZeroSizeCandidate(candidate)==="native control item"?"select":null;
-const isFatalMeasurementIssue=reason=>true;
+const isFatalMeasurementIssue=reason=>reason!=="native control item";
 const knownAnswerSelfTest=()=>{
   assert.deepEqual(parseColor("rgb(23, 32, 51)")?.rgb,[23,32,51],"parseColor rgb known answer");
   assert.ok(ratioFor(parseColor("rgb(250, 250, 250)"),[255,255,255])<1.2,"near-white on white must be below 1.2");
