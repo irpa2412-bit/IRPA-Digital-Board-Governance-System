@@ -1,9 +1,10 @@
 import { auth } from "./config";
+import { resolveGatewayUrl } from "./gatewayEnvironment";
+import { MEETING_ROUTES } from "./workflowContracts";
 
-const gateway = () => String(
-  import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL ||
-  "https://irpa-google-drive-gateway.irpa-governance.workers.dev"
-).replace(/\/$/, "");
+const gateway = () => resolveGatewayUrl();
+
+export const meetingWorkflowRoutes = MEETING_ROUTES;
 
 export async function callMeetingService(path, payload = {}) {
   const user = auth.currentUser;

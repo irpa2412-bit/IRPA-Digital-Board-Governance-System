@@ -2,7 +2,7 @@ name: Meeting Room Authorization Boundary
 # Verification-only regression workflow; no production deployment is performed.
 on:
   push:
-    branches: [feat/secure-meeting-invitation-flow-20261013]
+    branches: [feat/secure-meeting-invitation-flow-20261013, integration/five-portal-chain-20261018, stage/1-invitation]
     paths:
       - "src/styles/portal-readability-standard.css"
       - "src/pages/MeetingRoom.jsx"
@@ -12,9 +12,11 @@ on:
       - "functions/index.js"
       - "tests/meeting-room-authorization-boundary.test.mjs"
       - "tests/meeting-working-documents-security.test.mjs"
+      - "tests/meeting-route-authorization.test.mjs"
+      - "drive-gateway/src/meetingServices.mjs"
       - ".github/workflows/meeting-room-authorization-boundary.yml"
   pull_request:
-    branches: [main]
+    branches: [main, integration/five-portal-chain-20261018]
     paths:
       - "src/styles/portal-readability-standard.css"
       - "src/pages/MeetingRoom.jsx"
@@ -24,6 +26,8 @@ on:
       - "functions/index.js"
       - "tests/meeting-room-authorization-boundary.test.mjs"
       - "tests/meeting-working-documents-security.test.mjs"
+      - "tests/meeting-route-authorization.test.mjs"
+      - "drive-gateway/src/meetingServices.mjs"
       - ".github/workflows/meeting-room-authorization-boundary.yml"
   workflow_dispatch:
 permissions:
@@ -39,3 +43,5 @@ jobs:
           node-version: "20"
       - name: Verify host and participant separation
         run: node --test tests/meeting-room-authorization-boundary.test.mjs tests/meeting-working-documents-security.test.mjs
+      - name: Verify real Worker meeting route authorization
+        run: node --test tests/meeting-route-authorization.test.mjs

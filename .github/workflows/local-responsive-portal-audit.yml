@@ -1,0 +1,297 @@
+name: IRPA Local Responsive Portal Audit
+run-name: Responsive audit with automatic main-styles baseline
+
+on:
+  push:
+    branches: [integration/five-portal-chain-20261018]
+    paths:
+      - "src/pages/Meetings.jsx"
+      - "src/styles/**"
+      - "tests/fixtures/**"
+      - "tests/meeting-portal-browser.test.mjs"
+      - "tests/portal-responsive-browser.test.mjs"
+      - "vite.responsive-fixture.config.js"
+      - "vite.meeting-fixture.config.js"
+      - ".github/workflows/local-responsive-portal-audit.yml"
+      - "src/firebase/meetingRecords.js"
+      - "drive-gateway/src/meetingServices.mjs"
+      - "firestore.rules.proposed"
+      - "scripts/check-no-billing-deps.mjs"
+  workflow_dispatch:
+    inputs:
+      baseline_styles:
+        description: "Use src/styles from origin/main for an A/B baseline (runner only; never committed)"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  local-responsive-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Install Playwright and Chromium without changing the lockfile
+        run: |
+          npm install --no-save --package-lock=false playwright axe-core@4.10.3
+          npx playwright install --with-deps chromium
+      - name: Build local staging-configured app and portal fixtures
+        env:
+          VITE_IRPA_ENV: staging
+          VITE_FIREBASE_API_KEY: "fixture-staging-api-key"
+          VITE_FIREBASE_AUTH_DOMAIN: "irpa-dbg-staging-a73ec.firebaseapp.com"
+          VITE_FIREBASE_PROJECT_ID: "irpa-dbg-staging-a73ec"
+          VITE_FIREBASE_MESSAGING_SENDER_ID: "fixture-staging-sender"
+          VITE_FIREBASE_APP_ID: "fixture-staging-app"
+          VITE_FIREBASE_MEASUREMENT_ID: "G-STAGING-FIXTURE"
+          VITE_GATEWAY_ORIGIN: "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
+          VITE_GOOGLE_DRIVE_GATEWAY_URL: "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
+        run: npm run build -- --config vite.responsive-fixture.config.js
+      - name: Start local preview of the fixture build
+        env:
+          VITE_IRPA_ENV: staging
+          VITE_FIREBASE_PROJECT_ID: "irpa-dbg-staging-a73ec"
+        run: |
+          npx vite preview --config vite.responsive-fixture.config.js --host 127.0.0.1 > "$RUNNER_TEMP/responsive-fixture-preview.log" 2>&1 &
+          for i in $(seq 1 60); do if curl -fsS "http://127.0.0.1:4180/tests/fixtures/portal-layout-fixture.html?portal=Meeting" >/dev/null; then exit 0; fi; sleep 1; done
+          cat "$RUNNER_TEMP/responsive-fixture-preview.log"
+          exit 1
+      - name: Test all eight portal components at 360px and desktop
+        run: |
+          set -o pipefail
+          node tests/portal-responsive-browser.test.mjs | tee "$RUNNER_TEMP/portal-responsive-audit.log"
+      - name: Start isolated meeting regression fixture
+        run: |
+          npx vite --config vite.meeting-fixture.config.js --host 127.0.0.1 > "$RUNNER_TEMP/meeting-fixture-vite.log" 2>&1 &
+          for i in $(seq 1 60); do if curl -fsS http://127.0.0.1:4179/tests/fixtures/meeting-portal-fixture.html >/dev/null; then exit 0; fi; sleep 1; done
+          cat "$RUNNER_TEMP/meeting-fixture-vite.log"
+          exit 1
+      - name: Re-run meeting register regression at 360px and desktop
+        run: node tests/meeting-portal-browser.test.mjs
+      - name: Publish portal audit results for unauthenticated readers
+        if: always()
+        env:
+          AUDIT_LOG: ${{ runner.temp }}/portal-responsive-audit.log
+          SUMMARY_HEADING: IRPA Local Responsive Portal Audit
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFile, readFile } from "node:fs/promises";
+          const logPath = process.env.AUDIT_LOG;
+          let log = "";
+          try { log = await readFile(logPath, "utf8"); } catch {}
+          const lines = log.split(String.fromCharCode(10));
+          const finalLine = [...lines].reverse().find(line => line.includes("failed layout/render cases:")) || "failed layout/render cases: unavailable (browser audit did not emit its final line).";
+          const rows = [];
+          for (const line of lines) {
+            const marker = "PORTAL_VIEWPORT_AUDIT ";
+            const at = line.indexOf(marker);
+            if (at < 0) continue;
+            try { rows.push(JSON.parse(line.slice(at + marker.length))); } catch {}
+          }
+          const esc = value => String(value ?? "").split("|").join(String.fromCharCode(92)+"|").split(String.fromCharCode(10)).join(" ").split(String.fromCharCode(13)).join(" ").trim();
+          const md = ["## "+(process.env.SUMMARY_HEADING || "IRPA Local Responsive Portal Audit"), "", "`"+finalLine+"`", "",
+            "### Counts by portal and viewport", "",
+            "| Portal | Viewport | Candidates | Measured | Ratio failures | Measurement issues (zero-size / native control item / unparseable / sampling / other) | Lowest ratio | axe-core violations |",
+            "|---|---:|---:|---:|---:|---|---:|---:|"];
+          for (const row of rows) {
+            const c=row.measurementIssueCounts||{};
+            md.push("| "+esc(row.portal||"unknown")+" | "+esc(row.width??"unknown")+" | "+esc(row.candidates??"unavailable")+" | "+esc(row.measured??"unavailable")+" | "+esc(row.ratioFailures??"unavailable")+" | "+esc(row.measurementIssues??"unavailable")+" ("+esc(c.zeroSizeBox??"—")+" / "+esc(c.nativeControlItem??"—")+" / "+esc(c.unparseableColour??"—")+" / "+esc(c.samplingError??"—")+" / "+esc(c.other??"—")+") | "+esc(row.lowestRatio??"n/a")+" | "+esc(row.axeColorContrastViolations??"unavailable")+" |");
+          }
+          if (!rows.length) md.push("| — | — | unavailable | unavailable | unavailable | unavailable | unavailable | unavailable |");
+          md.push("", "### All zero-size measurement issues by element tag", "",
+            "Counts include every zero-size issue in the audit row, not just the samples listed below. Native control items are separately classified and are non-fatal; other zero-size boxes remain fatal.", "",
+            "| Portal | Viewport | Element tag | Zero-size issues |", "|---|---:|---|---:|");
+          let tagRows=0;
+          for (const row of rows) for (const [tag,count] of Object.entries(row.zeroSizeByTag||{}).sort(([a],[b])=>a.localeCompare(b))) {
+            tagRows++; md.push("| "+esc(row.portal)+" | "+esc(row.width)+" | "+esc(tag)+" | "+esc(count)+" |");
+          }
+          if (!tagRows) md.push("| — | — | no zero-size issues | 0 |");
+          md.push("", "### First 10 zero-size-box measurement issue samples per portal/viewport", "",
+            "The detailed issue list below is a sample capped by the test; the per-tag table above aggregates all zero-size issues.", "",
+            "| Portal | Viewport | Tag | Class | Category | Text |", "|---|---:|---|---|---|---|");
+          let zeroSizeRows=0;
+          for (const row of rows) {
+            const issues=(row.firstFiveMeasurementIssues||[]).filter(issue=>issue.reason==="zero-size box").slice(0,10);
+            for (const issue of issues) {
+              zeroSizeRows++;
+              md.push("| "+esc(row.portal)+" | "+esc(row.width)+" | "+esc(issue.tagName||"unknown")+" | "+esc(issue.className)+" | "+esc(issue.reason)+" | "+esc(issue.text)+" |");
+            }
+          }
+          if (!zeroSizeRows) md.push("| — | — | no zero-size samples available | — | — |");
+          md.push("", "### First five measurement issues per portal/viewport", "",
+            "| Portal | Viewport | Element tag | Text | Reason | Element class | Detail |", "|---|---:|---|---|---|---|---|");
+          for (const row of rows) for (const issue of (row.firstFiveMeasurementIssues||[])) {
+            md.push("| "+esc(row.portal)+" | "+esc(row.width)+" | "+esc(issue.tagName||"unknown")+" | "+esc(issue.text)+" | "+esc(issue.reason)+" | "+esc(issue.className)+" | "+esc(issue.detail)+" |");
+          }
+          md.push("", "### CSS attribution for the five worst ratio failures per portal/viewport", "",
+            "| Portal | Viewport | Text | Ratio | Foreground | Stylesheet | Selector | Line | Non-winning dark-text rule also matched |",
+            "|---|---:|---|---:|---|---|---|---:|---|");
+          for (const row of rows) for (const failure of (row.worstRatioFailures||[])) {
+            const cause=failure.cssCause||{};
+            md.push("| "+esc(row.portal)+" | "+esc(row.width)+" | "+esc(failure.text)+" | "+esc(failure.ratio)+" | "+esc(failure.foreground)+" | "+esc(cause.stylesheet)+" | "+esc(cause.selector)+" | "+esc(cause.line??"unknown")+" | "+esc(cause.nonWinningDarkTextRuleMatched??"unknown")+" |");
+          }
+          md.push("", "### Independent axe-core colour-contrast cross-check (axe-core 4.10.3)", "",
+            "| Portal | Viewport | axe colour-contrast violations | Examples |", "|---|---:|---:|---|");
+          for (const row of rows) {
+            const examples=(row.axeColorContrastExamples||[]).map(x=>"`"+esc(x.target?.join(", ")||"target unavailable")+"` — "+esc(x.impact)+" — "+esc(x.summary)).join("<br>");
+            md.push("| "+esc(row.portal||"unknown")+" | "+esc(row.width??"unknown")+" | "+esc(row.axeColorContrastViolations??"unavailable")+" | "+(examples||"—")+" |");
+          }
+          await appendFile(process.env.GITHUB_STEP_SUMMARY, md.join(String.fromCharCode(10))+String.fromCharCode(10));
+          if (!finalLine.endsWith("failed layout/render cases: 0")) console.log("::error title=Portal viewport audit::"+finalLine);
+          if (rows.length!==16 || rows.some(r=>!Number.isFinite(r.candidates)||!Number.isFinite(r.measured)||!Number.isFinite(r.ratioFailures)||!Number.isFinite(r.measurementIssues))) console.log("::error title=Portal viewport audit::Summary incomplete; inspect audit log.");
+          NODE
+      - name: Upload responsive screenshots and audit logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: irpa-local-responsive-audit
+          path: |
+            artifacts/responsive-screenshots/
+            ${{ runner.temp }}/portal-responsive-audit.log
+          if-no-files-found: warn
+
+  baseline-main-styles:
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Restore main stylesheet baseline for comparison only
+        run: git fetch origin main && git checkout origin/main -- src/styles
+      - name: Print post-checkout main stylesheet diff stat
+        run: |
+          git diff --stat origin/main -- src/styles
+          if [ -z "$(git diff --name-only origin/main -- src/styles)" ]; then echo "(no differences: runner src/styles matches origin/main)"; fi
+      - name: Install Playwright and Chromium without changing the lockfile
+        run: |
+          npm install --no-save --package-lock=false playwright axe-core@4.10.3
+          npx playwright install --with-deps chromium
+      - name: Build local staging-configured app and portal fixtures
+        env:
+          VITE_IRPA_ENV: staging
+          VITE_FIREBASE_API_KEY: "fixture-staging-api-key"
+          VITE_FIREBASE_AUTH_DOMAIN: "irpa-dbg-staging-a73ec.firebaseapp.com"
+          VITE_FIREBASE_PROJECT_ID: "irpa-dbg-staging-a73ec"
+          VITE_FIREBASE_MESSAGING_SENDER_ID: "fixture-staging-sender"
+          VITE_FIREBASE_APP_ID: "fixture-staging-app"
+          VITE_FIREBASE_MEASUREMENT_ID: "G-STAGING-FIXTURE"
+          VITE_GATEWAY_ORIGIN: "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
+          VITE_GOOGLE_DRIVE_GATEWAY_URL: "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
+        run: npm run build -- --config vite.responsive-fixture.config.js
+      - name: Start local preview of the fixture build
+        env:
+          VITE_IRPA_ENV: staging
+          VITE_FIREBASE_PROJECT_ID: "irpa-dbg-staging-a73ec"
+        run: |
+          npx vite preview --config vite.responsive-fixture.config.js --host 127.0.0.1 > "$RUNNER_TEMP/responsive-fixture-preview.log" 2>&1 &
+          for i in $(seq 1 60); do if curl -fsS "http://127.0.0.1:4180/tests/fixtures/portal-layout-fixture.html?portal=Meeting" >/dev/null; then exit 0; fi; sleep 1; done
+          cat "$RUNNER_TEMP/responsive-fixture-preview.log"
+          exit 1
+      - name: Test all eight portal components at 360px and desktop
+        run: |
+          set -o pipefail
+          node tests/portal-responsive-browser.test.mjs | tee "$RUNNER_TEMP/portal-responsive-audit.log"
+      - name: Start isolated meeting regression fixture
+        run: |
+          npx vite --config vite.meeting-fixture.config.js --host 127.0.0.1 > "$RUNNER_TEMP/meeting-fixture-vite.log" 2>&1 &
+          for i in $(seq 1 60); do if curl -fsS http://127.0.0.1:4179/tests/fixtures/meeting-portal-fixture.html >/dev/null; then exit 0; fi; sleep 1; done
+          cat "$RUNNER_TEMP/meeting-fixture-vite.log"
+          exit 1
+      - name: Re-run meeting register regression at 360px and desktop
+        run: node tests/meeting-portal-browser.test.mjs
+      - name: Publish portal audit results for unauthenticated readers
+        if: always()
+        env:
+          AUDIT_LOG: ${{ runner.temp }}/portal-responsive-audit.log
+          SUMMARY_HEADING: "BASELINE: main stylesheets (comparison only)"
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFile, readFile } from "node:fs/promises";
+          const logPath = process.env.AUDIT_LOG;
+          let log = "";
+          try { log = await readFile(logPath, "utf8"); } catch {}
+          const lines = log.split(String.fromCharCode(10));
+          const finalLine = [...lines].reverse().find(line => line.includes("failed layout/render cases:")) || "failed layout/render cases: unavailable (browser audit did not emit its final line).";
+          const rows = [];
+          for (const line of lines) {
+            const marker = "PORTAL_VIEWPORT_AUDIT ";
+            const at = line.indexOf(marker);
+            if (at < 0) continue;
+            try { rows.push(JSON.parse(line.slice(at + marker.length))); } catch {}
+          }
+          const esc = value => String(value ?? "").split("|").join(String.fromCharCode(92)+"|").split(String.fromCharCode(10)).join(" ").split(String.fromCharCode(13)).join(" ").trim();
+          const md = ["## "+(process.env.SUMMARY_HEADING || "IRPA Local Responsive Portal Audit"), "", "`"+finalLine+"`", "",
+            "### Counts by portal and viewport", "",
+            "| Portal | Viewport | Candidates | Measured | Ratio failures | Measurement issues (zero-size / native control item / unparseable / sampling / other) | Lowest ratio | axe-core violations |",
+            "|---|---:|---:|---:|---:|---|---:|---:|"];
+          for (const row of rows) {
+            const c=row.measurementIssueCounts||{};
+            md.push("| "+esc(row.portal||"unknown")+" | "+esc(row.width??"unknown")+" | "+esc(row.candidates??"unavailable")+" | "+esc(row.measured??"unavailable")+" | "+esc(row.ratioFailures??"unavailable")+" | "+esc(row.measurementIssues??"unavailable")+" ("+esc(c.zeroSizeBox??"—")+" / "+esc(c.nativeControlItem??"—")+" / "+esc(c.unparseableColour??"—")+" / "+esc(c.samplingError??"—")+" / "+esc(c.other??"—")+") | "+esc(row.lowestRatio??"n/a")+" | "+esc(row.axeColorContrastViolations??"unavailable")+" |");
+          }
+          if (!rows.length) md.push("| — | — | unavailable | unavailable | unavailable | unavailable | unavailable | unavailable |");
+          md.push("", "### All zero-size measurement issues by element tag", "",
+            "Counts include every zero-size issue in the audit row, not just the samples listed below. Native control items are separately classified and are non-fatal; other zero-size boxes remain fatal.", "",
+            "| Portal | Viewport | Element tag | Zero-size issues |", "|---|---:|---|---:|");
+          let tagRows=0;
+          for (const row of rows) for (const [tag,count] of Object.entries(row.zeroSizeByTag||{}).sort(([a],[b])=>a.localeCompare(b))) {
+            tagRows++; md.push("| "+esc(row.portal)+" | "+esc(row.width)+" | "+esc(tag)+" | "+esc(count)+" |");
+          }
+          if (!tagRows) md.push("| — | — | no zero-size issues | 0 |");
+          md.push("", "### First 10 zero-size-box measurement issue samples per portal/viewport", "",
+            "The detailed issue list below is a sample capped by the test; the per-tag table above aggregates all zero-size issues.", "",
+            "| Portal | Viewport | Tag | Class | Category | Text |", "|---|---:|---|---|---|---|");
+          let zeroSizeRows=0;
+          for (const row of rows) {
+            const issues=(row.firstFiveMeasurementIssues||[]).filter(issue=>issue.reason==="zero-size box").slice(0,10);
+            for (const issue of issues) {
+              zeroSizeRows++;
+              md.push("| "+esc(row.portal)+" | "+esc(row.width)+" | "+esc(issue.tagName||"unknown")+" | "+esc(issue.className)+" | "+esc(issue.reason)+" | "+esc(issue.text)+" |");
+            }
+          }
+          if (!zeroSizeRows) md.push("| — | — | no zero-size samples available | — | — |");
+          md.push("", "### First five measurement issues per portal/viewport", "",
+            "| Portal | Viewport | Element tag | Text | Reason | Element class | Detail |", "|---|---:|---|---|---|---|---|");
+          for (const row of rows) for (const issue of (row.firstFiveMeasurementIssues||[])) {
+            md.push("| "+esc(row.portal)+" | "+esc(row.width)+" | "+esc(issue.tagName||"unknown")+" | "+esc(issue.text)+" | "+esc(issue.reason)+" | "+esc(issue.className)+" | "+esc(issue.detail)+" |");
+          }
+          md.push("", "### CSS attribution for the five worst ratio failures per portal/viewport", "",
+            "| Portal | Viewport | Text | Ratio | Foreground | Stylesheet | Selector | Line | Non-winning dark-text rule also matched |",
+            "|---|---:|---|---:|---|---|---|---:|---|");
+          for (const row of rows) for (const failure of (row.worstRatioFailures||[])) {
+            const cause=failure.cssCause||{};
+            md.push("| "+esc(row.portal)+" | "+esc(row.width)+" | "+esc(failure.text)+" | "+esc(failure.ratio)+" | "+esc(failure.foreground)+" | "+esc(cause.stylesheet)+" | "+esc(cause.selector)+" | "+esc(cause.line??"unknown")+" | "+esc(cause.nonWinningDarkTextRuleMatched??"unknown")+" |");
+          }
+          md.push("", "### Independent axe-core colour-contrast cross-check (axe-core 4.10.3)", "",
+            "| Portal | Viewport | axe colour-contrast violations | Examples |", "|---|---:|---:|---|");
+          for (const row of rows) {
+            const examples=(row.axeColorContrastExamples||[]).map(x=>"`"+esc(x.target?.join(", ")||"target unavailable")+"` — "+esc(x.impact)+" — "+esc(x.summary)).join("<br>");
+            md.push("| "+esc(row.portal||"unknown")+" | "+esc(row.width??"unknown")+" | "+esc(row.axeColorContrastViolations??"unavailable")+" | "+(examples||"—")+" |");
+          }
+          await appendFile(process.env.GITHUB_STEP_SUMMARY, md.join(String.fromCharCode(10))+String.fromCharCode(10));
+          if (!finalLine.endsWith("failed layout/render cases: 0")) console.log("::error title=Portal viewport audit::"+finalLine);
+          if (rows.length!==16 || rows.some(r=>!Number.isFinite(r.candidates)||!Number.isFinite(r.measured)||!Number.isFinite(r.ratioFailures)||!Number.isFinite(r.measurementIssues))) console.log("::error title=Portal viewport audit::Summary incomplete; inspect audit log.");
+          NODE
+      - name: Upload responsive screenshots and audit logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: irpa-local-responsive-audit-main-styles-baseline
+          path: |
+            artifacts/responsive-screenshots/
+            ${{ runner.temp }}/portal-responsive-audit.log
+          if-no-files-found: warn

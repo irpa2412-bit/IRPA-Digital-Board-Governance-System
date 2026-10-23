@@ -10,17 +10,20 @@
     "check:token-contrast": "node scripts/check-token-contrast.mjs",
     "check:readability-policy": "node scripts/check-readability-policy.mjs",
     "check:meeting-media": "node scripts/check-meeting-media-governance.mjs",
-    "test:meeting-category": "node --test tests/meeting-category-policy.test.mjs tests/meeting-category-firestore-rules.test.cjs",
+    "test:meeting-category": "node --test --test-concurrency=1 tests/meeting-category-policy.test.mjs tests/meeting-category-firestore-rules.test.cjs",
     "check:production-readability": "node scripts/check-production-readability.mjs",
     "verify:production-readability": "node scripts/verify-production-readability.mjs",
     "test:finance-policy": "node --test tests/finance-portal-policy.test.cjs",
-    "test:security-rules": "node --test tests/meeting-category-firestore-rules.test.cjs tests/finance-portal-policy.test.cjs",
+    "test:security-rules": "node --test --test-concurrency=1 tests/meeting-category-firestore-rules.test.cjs tests/finance-portal-policy.test.cjs",
     "test:fundraising-registry": "node --test tests/fundraising-source-registry.test.mjs",
     "test:portal-navigation": "node --test tests/portal-workspace-navigation.test.mjs",
     "test:meeting-entry-policy": "node --test functions/meetingEntryPolicy.test.cjs",
     "test:meeting-invitation-resend": "node --test tests/meeting-invitation-resend-quorum.test.mjs",
     "test:communication-media": "node --test tests/communication-media-policy.test.mjs",
-    "test:meta-oauth": "node --test tests/meta-oauth-staging.test.mjs"
+    "test:meta-oauth": "node --test tests/meta-oauth-staging.test.mjs",
+    "check:no-billing-deps": "node scripts/check-no-billing-deps.mjs",
+    "test:meeting-worker-routes": "node --test tests/meeting-worker-route-migration.test.mjs",
+    "test:meeting-route-authorization": "node --test tests/meeting-route-authorization.test.mjs"
   },
   "dependencies": {
     "firebase": "^11.10.0",

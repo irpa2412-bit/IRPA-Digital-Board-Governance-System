@@ -20,6 +20,7 @@ import { route as esignRoute } from "./router.mjs";
 import { buildEsignContext, EsignRecordDurableObject } from "./esignContext.mjs";
 import { runCleanup } from "./upload.mjs";
 import { createDocumentLifecycleRouter } from "./documentLifecycle.mjs";
+import { createDocumentApprovalRouter } from "./documentApproval.mjs";
 import { canProvisionSignatureProfileFolder } from "./signatureProfileAuthorization.mjs";
 import { canReadSignatureAsset, canUploadSignedDocument } from "./signatureAssetAuthorization.mjs";
 import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPasswordSetup, getInvitationSessionState } from "./invitationRedemption.mjs";
@@ -62,6 +63,15 @@ const documentLifecycleRouter = createDocumentLifecycleRouter({
   firestoreDocumentToPlain,
   commitDocumentAndAudit: commitFirestoreDocumentAndAudit,
   recordLifecycleFailure: recordDocumentLifecycleFailure,
+  json,
+  corsHeaders
+});
+
+const documentApprovalRouter = createDocumentApprovalRouter({
+  authenticateFirebaseRequest,
+  getFirestoreDocument,
+  firestoreDocumentToPlain,
+  commitDocumentAndAudit: commitFirestoreDocumentAndAudit,
   json,
   corsHeaders
 });
@@ -218,6 +228,8 @@ export default {
       }
 
       if (pathname.startsWith("/api/document-lifecycle/")) {
+        const approvalResponse = await documentApprovalRouter(request, env, pathname);
+        if (approvalResponse) return approvalResponse;
         const lifecycleResponse = await documentLifecycleRouter(request, env);
         if (lifecycleResponse) return lifecycleResponse;
       }

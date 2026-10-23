@@ -1,0 +1,40 @@
+# Proposed Firestore rules review — NOT DEPLOYED
+
+Rollback/base: `be99143d1f7d9351ef8c9b69cf27aa489e490332`.
+Scope: proposal only. `firestore.rules` remains unchanged.
+
+## Findings from the current source rules
+
+The current `firestore.rules` has **no collection-specific `match` blocks** for `meetingWorkingDocuments`, `meetingDocumentReviews`, or `meetingAttendanceSignatures`. Those paths therefore fall through to the existing catch-all rule:
+
+```firestore
+match /{document=**}{allow read,write:if false;}
+```
+
+Consequently, there are no existing permissive collection-specific `allow` rules to remove or tighten for these three collections in this source revision. Adding explicit `allow ...: if false` blocks would be redundant and would violate the no-deny-block requirement. The proposal leaves the three collections covered by the existing default-deny catch-all and documents that the authenticated Worker is the intended access path.
+
+| Collection | Before (current source) | Proposed after | Reason |
+|---|---|---|---|
+| `meetingWorkingDocuments` | No specific match; default deny applies. | No direct client rule added; continue through the default deny. | Prevent direct Firestore bypass of meeting-scoped Worker authorization. |
+| `meetingDocumentReviews` | No specific match; default deny applies. | No direct client rule added; continue through the default deny. | Reviews must be authorized against the referenced working document and meeting by the Worker. |
+| `meetingAttendanceSignatures` | No specific match; default deny applies. | No direct client rule added; continue through the default deny. | Attendance signatures must be identity-bound and meeting-scoped by the Worker. |
+
+## Actual permissive rule identified: meeting reads
+
+The source does have a broad authenticated-read rule for `/meetings/{id}`. The proposed tightening reuses the existing `meetingCategoryReadAllowed(resource.data)` policy.
+
+```diff
+--- a/firestore.rules
++++ b/firestore.rules
+@@
+-  match /meetings/{id}{allow read:if signedIn();allow create:if (meetingRegistrar()&&request.resource.data.get("initiatorUid","")==request.auth.uid&&validMeetingCategory(request.resource.data))&&actualCreateAllowed();allow update:if (admin()||completeInitialMeetingRegistration()||meetingSessionUpdateAllowed(resource.data))&&actualUpdateAllowed();allow delete:if (admin())&&actualDeleteAllowed();}
++  match /meetings/{id}{allow read:if meetingCategoryReadAllowed(resource.data);allow create:if (meetingRegistrar()&&request.resource.data.get("initiatorUid","")==request.auth.uid&&validMeetingCategory(request.resource.data))&&actualCreateAllowed();allow update:if (admin()||completeInitialMeetingRegistration()||meetingSessionUpdateAllowed(resource.data))&&actualUpdateAllowed();allow delete:if (admin())&&actualDeleteAllowed();}
+```
+
+Reason: the existing helper checks administrator status and meeting-specific initiator/participant/role access. This reduces disclosure from the prior broad `signedIn()` read rule. Before adoption, run the Firestore rules tests and verify list/query compatibility for each meeting category and role.
+
+## Approval conditions
+
+1. Keep this file separate; do not copy it into `firestore.rules` or deploy it without separate approval.
+2. Confirm no browser code expects direct reads/writes to the three meeting collections.
+3. Add collection-specific allow rules only if an approved architecture requires direct client access, with predicates tied to both meeting membership and record ownership.

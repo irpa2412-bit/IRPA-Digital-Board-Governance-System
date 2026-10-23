@@ -2212,6 +2212,7 @@ jobs:
           npx --yes firebase-tools@14 deploy --only firestore:rules --project "$PROJECT" --non-interactive
       - name: Build frontend against isolated staging Firebase and Drive gateway
         env:
+          VITE_IRPA_ENV: staging
           VITE_FIREBASE_API_KEY: "AIzaSyA6UmHtP-mRr99rBw57_-qrD4_mFSBnZ38"
           VITE_FIREBASE_AUTH_DOMAIN: "irpa-dbg-staging-a73ec.firebaseapp.com"
           VITE_FIREBASE_PROJECT_ID: "irpa-dbg-staging-a73ec"

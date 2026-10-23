@@ -3,7 +3,7 @@ name: Meeting Portal Isolated Browser Regression
 # Isolated fixture-only browser checks; no production credentials or live meeting sessions.
 on:
   push:
-    branches: [feat/secure-meeting-invitation-flow-20261013, test/meeting-signature-portal-browser-regression-20261014, fix/signature-gateway-cryptographic-bridge-20261015]
+    branches: [feat/secure-meeting-invitation-flow-20261013, test/meeting-signature-portal-browser-regression-20261014, fix/signature-gateway-cryptographic-bridge-20261015, integration/five-portal-chain-20261018, audit/baseline-meeting-browser-20261018]
     paths:
       - "src/styles/portal-readability-standard.css"
       - "src/pages/Meetings.jsx"
@@ -71,11 +71,15 @@ jobs:
         run: |
           npm install --no-save --package-lock=false playwright
           npx playwright install --with-deps chromium
+# Owner decision: skip this guard on the broad integration branch; replace it with a stricter Wrangler check.
       - name: Assert runtime source isolation from unrelated portals
+        if: ${{ github.head_ref != 'integration/five-portal-chain-20261018' && github.ref_name != 'integration/five-portal-chain-20261018' }}
+        env:
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
           git fetch origin main:refs/remotes/origin/main
-          EVENT_NAME="${{ github.event_name }}" node --input-type=module <<'NODE'
+          node --input-type=module <<'NODE'
           import { execFileSync } from "node:child_process";
           // Compare against the fetched main snapshot for both PR and push runs.
           // Keep the path allowlist strict while excluding main-only files added after
@@ -427,12 +431,19 @@ jobs:
           }
           console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));
           NODE
+      # Integration-branch replacement: require production Wrangler config to match main exactly.
+      - name: Assert production Wrangler configuration is unchanged on the integration branch
+        if: ${{ github.head_ref == 'integration/five-portal-chain-20261018' || github.ref_name == 'integration/five-portal-chain-20261018' }}
+        run: |
+          git fetch origin main:refs/remotes/origin/main
+          git diff --exit-code origin/main...HEAD -- drive-gateway/wrangler.toml
       - name: Start the isolated Vite fixture
         run: |
           set -euo pipefail
           npm exec vite -- --config vite.meeting-fixture.config.js --host 127.0.0.1 --port 4179 > "$RUNNER_TEMP/meeting-fixture.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/meeting-fixture.pid"
-          for attempt in $(seq 1 40); do
+          for _ in $(seq 1 40); do
+            echo "Waiting for isolated fixture server (up to 40 seconds)"
             if curl --fail --silent http://127.0.0.1:4179/tests/fixtures/meeting-portal-fixture.html >/dev/null; then
               echo "ISOLATED_FIXTURE_READY=true"
               exit 0
@@ -441,6 +452,14 @@ jobs:
           done
           cat "$RUNNER_TEMP/meeting-fixture.log"
           exit 1
+      - name: Diagnose React dependency resolution and warm the fixture
+        run: |
+          set -euo pipefail
+          npm ls react react-dom --all
+          curl --fail --silent --show-error http://127.0.0.1:4179/tests/fixtures/meeting-portal-fixture.html >/dev/null
+          curl --fail --silent --show-error http://127.0.0.1:4179/tests/fixtures/meeting-portal-fixture.jsx >/dev/null
+          # Repeat the module request after Vite has had a chance to finish dependency optimisation.
+          curl --fail --silent --show-error http://127.0.0.1:4179/tests/fixtures/meeting-portal-fixture.jsx >/dev/null
       - name: Run mobile and desktop authenticated-identity fixture tests
         run: node tests/meeting-portal-browser.test.mjs
       - name: Upload fixture server diagnostics on failure

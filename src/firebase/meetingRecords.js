@@ -1,4 +1,5 @@
 import { callMeetingService } from "./meetingGatewayApi";
+import { MEETING_ROUTES } from "./workflowContracts";
 
 export async function captureMeetingRecord(payload){return callMeetingService("/api/meeting-records/capture",payload);}
 export async function saveMeetingAssistantDraft(payload){return callMeetingService("/api/meeting-records/draft",payload);}
@@ -14,9 +15,9 @@ export async function saveLiveMeetingProceedings(payload){return callMeetingServ
 export async function translateMeetingTranscript(payload){return callMeetingService("/api/meeting-transcripts/translate",payload);}
 
 
-export async function registerMeetingWorkingDocument(payload){const r=await call("registerMeetingWorkingDocument")(payload);return r.data;}
-export async function listMeetingWorkingDocuments(meetingId){const r=await call("listMeetingWorkingDocuments")({meetingId});return r.data?.documents||[];}
-export async function submitMeetingDocumentReview(payload){const r=await call("submitMeetingDocumentReview")(payload);return r.data;}
+export async function registerMeetingWorkingDocument(payload){return callMeetingService(MEETING_ROUTES.registerWorkingDocument,payload);}
+export async function listMeetingWorkingDocuments(meetingId){const r=await callMeetingService(MEETING_ROUTES.listWorkingDocuments,{meetingId});return r.documents||[];}
+export async function submitMeetingDocumentReview(payload){return callMeetingService(MEETING_ROUTES.reviewWorkingDocument,payload);}
 
-export async function signMeetingAttendance(payload){const r=await call("signMeetingAttendance")(payload);return r.data;}
-export async function getMeetingAttendanceRegister(meetingId){const r=await call("getMeetingAttendanceRegister")({meetingId});return r.data;}
+export async function signMeetingAttendance(payload){return callMeetingService(MEETING_ROUTES.signAttendance,payload);}
+export async function getMeetingAttendanceRegister(meetingId){return callMeetingService(MEETING_ROUTES.attendanceRegister,{meetingId});}
