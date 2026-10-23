@@ -104,6 +104,7 @@ function makeSigningContext(){
     now,
     config:{appUrl:"https://sign.mock",ttlDays:14}
   });
+  ctx.testDriveBlobs = drive.blobs;
   return ctx;
 }
 async function callSigning(ctx,path,user,body,method="POST",extraHeaders={}){
@@ -215,7 +216,7 @@ test("CASE (c): only one of two required signers signed must block approval",asy
 
 test("CASE (d): two signers complete and a distinct officer approval binds document, envelope and final hash",async()=>{
   const {router,body:life}=await lifecycleUpload(identities.owner);
-  const ctx=makeSigningContext();const uploaded=await signatureUpload(ctx,identities.owner,life.documentId);
+  const ctx=makeSigningContext();const uploaded=await signatureUpload(ctx,identities.owner,life.documentId,pdf);
   assertStatus(uploaded.res,201,"document upload route must succeed");
   const env=await createEnvelope(ctx,identities.owner,life.documentId,undefined,"Parallel");
   assertStatus(env.res,201,"parallel envelope creation route must succeed");
@@ -227,8 +228,8 @@ test("CASE (d): two signers complete and a distinct officer approval binds docum
   const completed=await callSigning(ctx,"/api/envelopes/"+env.body.envelopeId,identities.owner,null,"GET");
   assertStatusBelow(completed,300,"envelope status route must be readable");
   const completion=await completed.json();assert.equal(completion.status,"Completed","Worker envelope must complete after all required signatures");
-  await fsPut("documents/"+life.documentId,{status:"SIGNED",signatureStatus:"COMPLETED",signatureEnvelopeId:env.body.envelopeId,signedByUid:identities.signer2.uid});
-  await fsPut("signatureEnvelopes/"+env.body.envelopeId,{documentId:life.documentId,status:"Completed",lastSignedByUid:identities.signer2.uid});
+  const lifecycle=await lifecycleComplete(router,identities.owner,life.documentId,env.body.envelopeId);
+  assertStatusBelow(lifecycle,300,"approval cannot find the signed envelope without the browser-written mirror");
   const ap=await approval(identities.officer,life.documentId);assertStatusBelow(ap,300,"distinct authorization officer must approve fully signed document");
   const record=await fsGet("documents/"+life.documentId);
   assert.equal(record.approval.documentId,life.documentId);
@@ -246,11 +247,14 @@ test("CASE (e1): signer self-approval is denied",async()=>{
 });
 
 test("CASE (e2): duplicate approval is denied without a second approval mutation",async()=>{
-  const {body:life}=await lifecycleUpload(identities.owner);const ctx=makeSigningContext();
-  const uploaded=await signatureUpload(ctx,identities.owner,life.documentId);assertStatus(uploaded.res,201);
-  const env=await createEnvelope(ctx,identities.owner,life.documentId);assertStatus(env.res,201);
-  await fsPut("documents/"+life.documentId,{signatureEnvelopeId:env.body.envelopeId});
-  await fsPut("signatureEnvelopes/"+env.body.envelopeId,{documentId:life.documentId,status:"Completed",lastSignedByUid:identities.owner.uid});
+  const {router,body:life}=await lifecycleUpload(identities.owner);const ctx=makeSigningContext();
+  const uploaded=await signatureUpload(ctx,identities.owner,life.documentId,pdf);assertStatus(uploaded.res,201);
+  const env=await createEnvelope(ctx,identities.owner,life.documentId,undefined,"Parallel");assertStatus(env.res,201);
+  const tokens=env.body.tokens||[];assert.equal(tokens.length,2,"two signer tokens must be issued");
+  const signed=await Promise.all([signWith(ctx,identities.owner,tokens[0]),signWith(ctx,identities.signer2,tokens[1])]);
+  for(const response of signed)assertStatusBelow(response,300,"both invited signers must sign");
+  const lifecycle=await lifecycleComplete(router,identities.owner,life.documentId,env.body.envelopeId);
+  assertStatusBelow(lifecycle,300,"approval cannot find the signed envelope without the browser-written mirror");
   const first=await approval(identities.officer,life.documentId);
   const before=await fsGet("documents/"+life.documentId);
   const second=await approval(identities.officer,life.documentId);
@@ -279,16 +283,18 @@ test("CASE (f): every approval denial is non-mutating and writes an audit entry"
 });
 
 test("CASE (g): changing the signed PDF after approval invalidates the approval",async()=>{
-  const {body:life}=await lifecycleUpload(identities.owner);const ctx=makeSigningContext();
-  const uploaded=await signatureUpload(ctx,identities.owner,life.documentId);assertStatus(uploaded.res,201);
+  const {router,body:life}=await lifecycleUpload(identities.owner);const ctx=makeSigningContext();
+  const uploaded=await signatureUpload(ctx,identities.owner,life.documentId,pdf);assertStatus(uploaded.res,201);
   const env=await createEnvelope(ctx,identities.owner,life.documentId,undefined,"Parallel");assertStatus(env.res,201);
   const tokens=env.body.tokens||[];assert.equal(tokens.length,2);
   const signed=await Promise.all([signWith(ctx,identities.owner,tokens[0]),signWith(ctx,identities.signer2,tokens[1])]);for(const response of signed)assertStatusBelow(response,300,"both invited signers must sign");
-  await fsPut("documents/"+life.documentId,{signatureEnvelopeId:env.body.envelopeId,signedByUid:identities.signer2.uid});
-  await fsPut("signatureEnvelopes/"+env.body.envelopeId,{documentId:life.documentId,status:"Completed",lastSignedByUid:identities.signer2.uid});
+  const lifecycle=await lifecycleComplete(router,identities.owner,life.documentId,env.body.envelopeId);
+  assertStatusBelow(lifecycle,300,"approval cannot find the signed envelope without the browser-written mirror");
   const approved=await approval(identities.officer,life.documentId);assertStatusBelow(approved,300,"approval must be attempted after full completion");
   const beforeHashMutation=await fsGet("documents/"+life.documentId)||{};
-  await fsPut("documents/"+life.documentId,{...beforeHashMutation,signedFileHash:sha256(differentPdf)});
+  const signedFileId=beforeHashMutation.signedSourceFileId||beforeHashMutation.signedFileId;
+  assert.ok(signedFileId,"completed lifecycle document must reference the stored signed bytes");
+  ctx.testDriveBlobs.set(signedFileId,new Uint8Array(differentPdf));
   const after=await approval(identities.officer,life.documentId);
   assertStatus(after,409,"changed signed bytes must invalidate approval and prevent a new decision");
   const changed=await fsGet("documents/"+life.documentId);
