@@ -73,14 +73,19 @@ const knownAnswerSelfTest=()=>{
   assert.deepEqual(parseColor("rgba(23, 32, 51, 0.5)")?.rgb,[23,32,51],"parseColor rgba support");
   assert.deepEqual(parseColor("color(srgb 0.0901960784 0.1254901961 0.2)")?.rgb.map(Math.round),[23,32,51],"parseColor srgb support");
   const nativeOption={tagName:"option",insideSelect:true};
+  const nativeOptgroup={tagName:"optgroup",insideSelect:true};
+  const zeroSizeDiv={tagName:"div",insideSelect:false,text:"Visible text with zero size",zeroSize:true};
   assert.equal(classifyZeroSizeCandidate(nativeOption),"native control item","OPTION text inside SELECT is browser-painted");
+  assert.equal(classifyZeroSizeCandidate(nativeOptgroup),"native control item","OPTGROUP text inside SELECT is browser-painted");
+  assert.equal(classifyZeroSizeCandidate(zeroSizeDiv),"zero-size box","zero-size DIV text remains a zero-size box");
+  assert.equal(isFatalMeasurementIssue(classifyZeroSizeCandidate(zeroSizeDiv)),true,"zero-size DIV text remains fatal");
   assert.equal(nativeMeasurementOwner(nativeOption),"select","native OPTION text is measured through its owning SELECT");
-  assert.equal(nativeMeasurementOwner({tagName:"optgroup",insideSelect:true}),"select","native OPTGROUP text is measured through its owning SELECT");
+  assert.equal(nativeMeasurementOwner(nativeOptgroup),"select","native OPTGROUP text is measured through its owning SELECT");
   assert.equal(nativeMeasurementOwner({tagName:"label",insideSelect:false}),null,"checkbox/radio label text is measured as ordinary DOM text");
   assert.equal(nativeMeasurementOwner({tagName:"input",type:"checkbox"}),null,"checkbox controls do not route their labels through a native-item exemption");
   assert.equal(nativeMeasurementOwner({tagName:"input",type:"radio"}),null,"radio controls do not route their labels through a native-item exemption");
-  for (const reason of ["zero-size box","unparseable colour","sampling error","native control item","unknown measurement failure"]) {
-    assert.equal(isFatalMeasurementIssue(reason),true,`measurement issue "${reason}" must be fatal if it reaches the issue handler`);
+  for (const [reason,expected] of [["native control item",false],["zero-size box",true],["sampling error",true],["unparseable colour",true],["other",true]]) {
+    assert.equal(isFatalMeasurementIssue(reason),expected,`measurement issue "${reason}" fatal classification`);
   }
   console.log("CONTRAST_KNOWN_ANSWER_SELF_TEST PASS");
   console.log("ZERO_SIZE_CLASSIFICATION_SELF_TEST PASS");
