@@ -259,50 +259,6 @@
 }
 
 
-/* Responsive contrast fixes for legacy light surfaces outside the shared .page wrapper.
-   These selectors are limited to named light-surface modules; dark workspace styling is unchanged. */
-#root .app-shell .content-area:not(.dashboard-content-area) .document-lifecycle-module :where(.panel, .module-panel, .stat-card, h1, h2, h3, h4, h5, h6, p, small, li, strong, span, .panel-description, .muted) {
-  color: var(--irpa-readable-text);
-  -webkit-text-fill-color: var(--irpa-readable-text);
-  opacity: 1;
-}
-#root .app-shell .content-area:not(.dashboard-content-area) .document-lifecycle-module :where(.panel-description, .muted, small) {
-  color: var(--irpa-readable-muted);
-  -webkit-text-fill-color: var(--irpa-readable-muted);
-}
-#root .app-shell .content-area:not(.dashboard-content-area) :where(.controlled-document-upload-panel, .archive-routing-panel) {
-  color: var(--irpa-readable-text);
-}
-#root .app-shell .content-area:not(.dashboard-content-area) :where(.controlled-document-upload-panel, .archive-routing-panel) :where(strong, li, div, p, small, span, label) {
-  color: var(--irpa-readable-text);
-  -webkit-text-fill-color: var(--irpa-readable-text);
-  opacity: 1;
-}
-#root .app-shell .content-area:not(.dashboard-content-area) :where(.controlled-document-upload-panel, .archive-routing-panel) strong {
-  color: #214f38;
-  -webkit-text-fill-color: #214f38;
-}
-/* Signature specimen status is shown on a pale tinted surface inside the light portal panel. */
-#root .app-shell .content-area:not(.dashboard-content-area) [data-signature-specimen] [role="status"] {
-  color: var(--irpa-readable-text) !important;
-  -webkit-text-fill-color: var(--irpa-readable-text) !important;
-}
-/* Auth feedback boxes in light modules must not inherit the dark-theme --text token. */
-#root .app-shell .content-area:not(.dashboard-content-area) .page :where(.auth-message) {
-  color: var(--irpa-readable-text);
-  -webkit-text-fill-color: var(--irpa-readable-text);
-}
-/* Finance's roller label and legacy muted copy on pale cards must meet normal-text contrast. */
-#root .app-shell .content-area:not(.dashboard-content-area) .page.finance-portal .finance-field-roller-control > span {
-  color: var(--irpa-readable-text) !important;
-  -webkit-text-fill-color: var(--irpa-readable-text) !important;
-}
-#root .app-shell .content-area:not(.dashboard-content-area) .page :where(.stat-card, .workflow-stage, .identity-card, .finance-engine-card, .finance-formula-card) :where(.muted, small, .panel-description, .field-help, .hint) {
-  color: #526b60;
-  -webkit-text-fill-color: #526b60;
-  opacity: 1;
-}
-
 /* Round 1: enforce the intended light-surface contrast where legacy gradients or
    theme tokens override the shared readability values. No workflow or layout rules change. */
 #root .app-shell .content-area:not(.dashboard-content-area) .page :where(.panel, .module-panel, .stat-card, .workflow-stage, .identity-card, .record-details, .detail-grid > div, .action-feedback, .auth-message):not(.signature-field-palette .panel):not(.welcome-panel .auth-message) {
