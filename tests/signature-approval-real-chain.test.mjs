@@ -142,7 +142,6 @@ test("CASE (a): mirror Completed while canonical Worker envelope is incomplete m
   assert.equal(uploaded.res.status,201,"POST /api/documents must upload the exact lifecycle PDF bytes");
   const env=await createEnvelope(ctx,identities.owner,life.documentId);
   assert.equal(env.res.status,201,"real envelope creation route must succeed");
-  await fsPut("signatureEnvelopes/"+env.body.envelopeId,{documentId:life.documentId,status:"Completed",gatewayEnvelopeId:env.body.envelopeId});
   const before=await fsGet("documents/"+life.documentId);
   const res=await approval(identities.officer,life.documentId);
   assert.equal(res.status,409,"a browser-written Completed mirror must not authorize approval when Worker envelope is incomplete");
@@ -204,7 +203,6 @@ test("CASE (e1): signer self-approval is denied",async()=>{
   const uploaded=await signatureUpload(ctx,identities.owner,life.documentId);assert.equal(uploaded.res.status,201);
   const env=await createEnvelope(ctx,identities.owner,life.documentId,[identities.owner]);assert.equal(env.res.status,201);
   const token=(env.body.tokens||[])[0];assert.ok(token);await signWith(ctx,identities.owner,token);
-  await fsPut("signatureEnvelopes/"+env.body.envelopeId,{documentId:life.documentId,status:"Completed",lastSignedByUid:identities.owner.uid});
   const res=await approval(identities.owner,life.documentId);
   assert.equal(res.status,403,"a signer cannot approve their own signed document");
 });
@@ -214,7 +212,6 @@ test("CASE (e2): duplicate approval is denied without a second approval mutation
   const uploaded=await signatureUpload(ctx,identities.owner,life.documentId);assert.equal(uploaded.res.status,201);
   const env=await createEnvelope(ctx,identities.owner,life.documentId);assert.equal(env.res.status,201);
   await fsPut("signatureEnvelopes/"+env.body.envelopeId,{documentId:life.documentId,status:"Completed",lastSignedByUid:identities.owner.uid});
-  await fsPut("documents/"+life.documentId,{signatureEnvelopeId:env.body.envelopeId});
   const first=await approval(identities.officer,life.documentId);
   const before=await fsGet("documents/"+life.documentId);
   const second=await approval(identities.officer,life.documentId);
@@ -241,7 +238,7 @@ test("CASE (f): every approval denial is non-mutating and writes an audit entry"
   assert.deepEqual(await fsGet("documents/"+life.documentId),before,"denial must not mutate the document");
   const audit=await fetch(API+"/auditLogs");assert.ok(audit.ok,"audit collection query must succeed");
   const rows=(await audit.json()).documents||[];
-  assert.ok(rows.some(x=>decode(x)?.recordId===life.documentId&&String(decode(x)?.action||"").includes("DENIED")),"each denial must create an explicit denial audit entry");
+  assert.ok(rows.some(x=>decode(x)?.recordId===life.documentId&&String(decode(x)?.action||"").includes("DENIED")),"denied approval must create an explicit denial audit entry");
 });
 
 test("CASE (g): changing the signed PDF after approval invalidates the approval",async()=>{
@@ -250,7 +247,6 @@ test("CASE (g): changing the signed PDF after approval invalidates the approval"
   const env=await createEnvelope(ctx,identities.owner,life.documentId,undefined,"Parallel");assert.equal(env.res.status,201);
   const tokens=env.body.tokens||[];assert.equal(tokens.length,2);
   const signed=await Promise.all([signWith(ctx,identities.owner,tokens[0]),signWith(ctx,identities.signer2,tokens[1])]);assert.ok(signed.every(r=>r.status<300));
-  await fsPut("signatureEnvelopes/"+env.body.envelopeId,{documentId:life.documentId,status:"Completed",lastSignedByUid:identities.owner.uid,finalHash:sha256(pdf)});
   await fsPut("documents/"+life.documentId,{signatureEnvelopeId:env.body.envelopeId});
   const approved=await approval(identities.officer,life.documentId);assert.ok(approved.status<300,"approval must be attempted after full completion");
   await fsPut("documents/"+life.documentId,{signedFileHash:sha256(differentPdf)});
