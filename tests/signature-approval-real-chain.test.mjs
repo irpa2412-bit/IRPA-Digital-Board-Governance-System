@@ -261,7 +261,6 @@ test("CASE (e2): duplicate approval is denied without a second approval mutation
 
 test("CASE (e3): non-officer and outsider approval are denied",async()=>{
   const {body:life}=await lifecycleUpload(identities.owner);
-  await fsPut("documents/"+life.documentId,{signatureEnvelopeId:"no-real-envelope"});
   const nonOfficer=await approval(identities.owner,life.documentId);
   const outsider=await approval(identities.outsider,life.documentId);
   assertStatus(nonOfficer,403,"non-officer must be denied");
@@ -270,7 +269,6 @@ test("CASE (e3): non-officer and outsider approval are denied",async()=>{
 
 test("CASE (f): every approval denial is non-mutating and writes an audit entry",async()=>{
   const {body:life}=await lifecycleUpload(identities.owner);
-  await fsPut("documents/"+life.documentId,{signatureEnvelopeId:"missing-envelope"});
   const before=await fsGet("documents/"+life.documentId);
   const res=await approval(identities.officer,life.documentId);
   assertStatusAtLeast(res,400,"invalid signature prerequisite must be denied");
