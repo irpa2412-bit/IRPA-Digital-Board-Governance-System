@@ -5,7 +5,7 @@ import { route as signingRoute, makeContext } from "../drive-gateway/src/router.
 import { createDocumentLifecycleRouter } from "../drive-gateway/src/documentLifecycle.mjs";
 import { createDocumentApprovalRouter } from "../drive-gateway/src/documentApproval.mjs";
 
-const PROJECT = process.env.GCLOUD_PROJECT || "demo-irpa-staging";
+const PROJECT = process.env.IRPA_FIREBASE_PROJECT_ID || "demo-irpa-staging";
 const FIRESTORE = process.env.FIRESTORE_EMULATOR_HOST || "127.0.0.1:8080";
 const AUTH = process.env.FIREBASE_AUTH_EMULATOR_HOST || "127.0.0.1:9099";
 const API = `http://${FIRESTORE}/v1/projects/${PROJECT}/databases/(default)/documents`;
@@ -134,7 +134,27 @@ async function approval(owner,documentId){
   const route=createDocumentApprovalRouter(deps);
   return route(new Request("https://worker.test/api/document-lifecycle/approval/decide",{method:"POST",headers:{authorization:"Bearer "+owner.token,"content-type":"application/json"},body:JSON.stringify({documentId,decision:"approve"})}),{FIREBASE_PROJECT_ID:PROJECT});
 }
-before(async()=>{await setup();const r=await fetch(API);assert.ok(r.ok,`Firestore emulator must respond at ${API}, got ${r.status}`);assert.ok(identities.owner.uid&&identities.officer.uid);});
+before(async()=>{
+  assert.equal(process.env.GCLOUD_PROJECT, PROJECT, "GCLOUD_PROJECT must match IRPA_FIREBASE_PROJECT_ID");
+  assert.equal(process.env.FIRESTORE_EMULATOR_HOST || "127.0.0.1:8080", FIRESTORE, "Firestore emulator host configuration must agree");
+  assert.equal(process.env.FIREBASE_AUTH_EMULATOR_HOST || "127.0.0.1:9099", AUTH, "Auth emulator host configuration must agree");
+  const root = `http://${FIRESTORE.split(":")[0]}:${FIRESTORE.split(":")[1]}/`;
+  const deadline = Date.now() + 30_000;
+  let lastStatus = "no response";
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(root, { signal: AbortSignal.timeout(1_000) });
+      lastStatus = `HTTP ${response.status}`;
+      if (response.status === 200) break;
+    } catch (error) {
+      lastStatus = error?.message || String(error);
+    }
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+  assert.equal(lastStatus, "HTTP 200", `Firestore emulator root must respond at ${root} within 30 seconds; last result: ${lastStatus}`);
+  await setup();
+  assert.ok(identities.owner.uid&&identities.officer.uid);
+});
 
 test("CASE (a): mirror Completed while canonical Worker envelope is incomplete must deny approval without mutation and with denial audit",async()=>{
   const {body:life}=await lifecycleUpload(identities.owner);

@@ -43,12 +43,14 @@ jobs:
           npm --prefix drive-gateway install --no-audit --no-fund
       - name: Run signature approval regression with Auth and Firestore emulators
         env:
-          GCLOUD_PROJECT: demo-irpa-staging
+          IRPA_FIREBASE_PROJECT_ID: demo-irpa-staging
           FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:9099
           FIRESTORE_EMULATOR_HOST: 127.0.0.1:8080
         run: |
-          set -o pipefail
-          npx firebase emulators:exec --project demo-irpa-staging --only auth,firestore "node --test tests/signature-approval-real-chain.test.mjs" | tee signature-approval-real-chain.log
+          set -euo pipefail
+          export GCLOUD_PROJECT="$IRPA_FIREBASE_PROJECT_ID"
+          test "$GCLOUD_PROJECT" = "$IRPA_FIREBASE_PROJECT_ID"
+          npx firebase emulators:exec --project "$IRPA_FIREBASE_PROJECT_ID" --only auth,firestore "GCLOUD_PROJECT='$IRPA_FIREBASE_PROJECT_ID' IRPA_FIREBASE_PROJECT_ID='$IRPA_FIREBASE_PROJECT_ID' FIREBASE_AUTH_EMULATOR_HOST='$FIREBASE_AUTH_EMULATOR_HOST' FIRESTORE_EMULATOR_HOST='$FIRESTORE_EMULATOR_HOST' node --test tests/signature-approval-real-chain.test.mjs" | tee signature-approval-real-chain.log
       - name: Publish per-case results and annotations
         if: always()
         env:
