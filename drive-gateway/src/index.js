@@ -2627,7 +2627,7 @@ async function updateFirestoreDocument(env, path, firebaseToken, fields, updateM
     headers:{"Authorization":`Bearer ${firebaseToken}`,"Content-Type":"application/json"},
     body:JSON.stringify({fields})
   });
-  if (!response.ok) throw new Error("Unable to record email delivery status in Firestore.");
+  if (!response.ok) throw new Error(`Unable to update Firestore document ${path} (HTTP ${response.status}).`);
   return response.json();
 }
 
