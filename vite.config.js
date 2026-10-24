@@ -9,7 +9,7 @@ export default defineConfig(({ mode }) => {
   const stagingBuild = mode === "staging" ||
     process.env.VITE_IRPA_ENVIRONMENT === "staging" ||
     process.env.VITE_FIREBASE_PROJECT_ID === STAGING_PROJECT_ID;
-  const configuredGatewayUrl = String(process.env.VITE_GOOGLE_DRIVE_GATEWAY_URL || "").trim().replace(/\\/+$/, "");
+  const configuredGatewayUrl = String(process.env.VITE_GOOGLE_DRIVE_GATEWAY_URL || "").trim();
 
   if (stagingBuild && !configuredGatewayUrl) {
     throw new Error("Refusing staging build: VITE_GOOGLE_DRIVE_GATEWAY_URL is required.");
