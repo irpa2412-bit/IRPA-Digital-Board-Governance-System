@@ -50,10 +50,15 @@ test("missing portal envelope rejects mirror write so caller can log it", async 
 });
 
 
-test("mirror failure is retryable and records Pending before successful resync", async () => {
-  const gateway={id:"ENV-resync",externalReference:"IRPA-ENV-resync",status:"Completed",mirrorAttempts:1,mirrorStatus:"Pending",mirrorError:"temporary Firestore failure",completion:{primaryStorageId:"drive-file-8",finalHash:"b".repeat(64),completedAt:"2026-10-24T05:00:00.000Z"},signers:[{uid:"officer-1",status:"Signed"}],events:[],_v:1};
-  const stored=new Map([["envelopes/ENV-resync",gateway]]);let portalStatus="In Progress";
-  const ctx={meta:{get:async(c,id)=>stored.get(c+"/"+id)||null,update:async(c,id,p)=>stored.set(c+"/"+id,{...stored.get(c+"/"+id),...p,_v:(stored.get(c+"/"+id)._v||0)+1})},persistCompletedSignatureEnvelope:async()=>{portalStatus="Completed"},now:()=>new Date("2026-10-24T05:00:01.000Z"),logger:{error(){}}};
-  const {resyncMirror}=await import("../src/signing.mjs");const result=await resyncMirror(ctx,{uid:"owner-1",isAdmin:true},gateway.id);
+test("mirror fails once, records Pending, then resync succeeds", async () => {
+  const gateway={id:"ENV-resync",externalReference:"IRPA-ENV-resync",status:"Completed",mirrorAttempts:0,completion:{primaryStorageId:"drive-file-8",finalHash:"b".repeat(64),completedAt:"2026-10-24T05:00:00.000Z"},signers:[{uid:"officer-1",status:"Signed"}],events:[],_v:1};
+  const stored=new Map([["envelopes/ENV-resync",gateway]]);let failures=1;let portalStatus="In Progress";
+  const ctx={meta:{get:async(c,id)=>stored.get(c+"/"+id)||null,update:async(c,id,p)=>stored.set(c+"/"+id,{...stored.get(c+"/"+id),...p,_v:(stored.get(c+"/"+id)._v||0)+1})},persistCompletedSignatureEnvelope:async()=>{if(failures-->0)throw new Error("temporary Firestore failure");portalStatus="Completed"},now:()=>new Date("2026-10-24T05:00:01.000Z"),logger:{error(){}}};
+  const {persistMirrorWithStatus,resyncMirror}=await import("../src/signing.mjs");
+  await persistMirrorWithStatus(ctx,gateway,gateway.completion);
+  assert.equal(stored.get("envelopes/ENV-resync").mirrorStatus,"Pending");
+  assert.equal(stored.get("envelopes/ENV-resync").mirrorError,"temporary Firestore failure");
+  assert.equal(stored.get("envelopes/ENV-resync").mirrorAttempts,1);
+  const result=await resyncMirror(ctx,{uid:"owner-1",isAdmin:true},gateway.id);
   assert.equal(result.mirrorStatus,"Completed");assert.equal(portalStatus,"Completed");assert.equal(result.mirrorAttempts,2);
 });
