@@ -6,8 +6,9 @@ import { auth, db } from "./config";
 import { ensureMySignerIdentity, getMySignerIdentity, recordSignerAuthenticationEvidence, IRPA_ORGANISATION } from "./signerIdentity";
 import { getCurrentSigningAuthorityRegisterEntries } from "./data";
 import { readWorkflowContext } from "./workflowLinks";
+import { getGoogleDriveGatewayUrl } from "./gatewayUrl";
 const PROFILE_COLLECTION="signatureProfiles";const ENVELOPE_COLLECTION="signatureEnvelopes";const EVENT_COLLECTION="signatureEvents";
-const GATEWAY_URL=String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").replace(/\/$/,"");
+const GATEWAY_URL=getGoogleDriveGatewayUrl();
 const CRYPTOGRAPHIC_GATEWAY_BRIDGE_ENABLED=import.meta.env.VITE_IRPA_CRYPTOGRAPHIC_SIGNING_ENABLED==="true";
 async function sendSignatureMail(envelope,recipient){
   if(!auth.currentUser) throw new Error("Authentication is required. Sign in again before sending the signing invitation.");

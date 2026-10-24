@@ -328,7 +328,7 @@ test("Production-mode Gateway signing fails closed without server-side Member/Em
       manualAuthorityIdentification:"Board Member",
       user:{uid:"member-uid",email:"member@example.org"}
     }),
-    error=>error.status===403&&error.message.includes("authority could not be verified")
+    error=>error.status===503&&error.message.includes("Signing authority verification is not configured on this gateway.")
   );
   const current=await fixture.ctx.meta.get("envelopes",fixture.envelope.id);
   assert.equal(current.signers[0].status,"Pending");
