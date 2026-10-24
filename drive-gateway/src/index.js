@@ -365,21 +365,12 @@ export default {
           return json(await runCleanup(ctx),200,corsHeaders(request));
         }
         const isEsignPath =
-          pathname === "/api/documents" ||
-          /^\/api\/documents\/[A-Za-z0-9_-]{3,64}\/pdf$/.test(pathname) ||
-          pathname === "/api/envelopes" ||
-          /^\/api\/envelopes\/[A-Za-z0-9_-]{3,64}(?:\/void|\/retry-completion|resync)?$/.test(pathname) ||
-          pathname === "/api/sign/open" ||
-          pathname === "/api/sign/status" ||
-          pathname === "/api/sign/evidence" ||
-          pathname === "/api/sign/verify" ||
-          pathname === "/api/sign/pdf" ||
-          pathname === "/api/sign/submit" ||
-          pathname === "/api/sign/decline" ||
-          pathname === "/api/auth/password-attempt-state" ||
-          pathname === "/api/auth/password-failure" ||
-          pathname === "/api/auth/password-attempt-clear" ||
-          pathname === "/api/documents/next-reference";
+          pathname === "/api/documents/next-reference" ||
+          /^\/api\/documents(?:\/.*)?$/.test(pathname) ||
+          /^\/api\/envelopes(?:\/[A-Za-z0-9_-]{3,64}(?:\/(?:status|resync|retry|retry-completion|void))?)?$/.test(pathname) ||
+          /^\/api\/sign\/.*$/.test(pathname) ||
+          /^\/api\/document-lifecycle\/.*$/.test(pathname) ||
+          /^\/api\/auth\/.*$/.test(pathname);
         if (isEsignPath) {
           const persistCompletedSignatureEnvelope = async ({envelope,completion}) => {
             const token = await getFirestoreAdminAccessToken(env);
