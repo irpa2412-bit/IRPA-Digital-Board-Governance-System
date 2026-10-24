@@ -30,6 +30,7 @@ import { createMeetingPortalRouter } from "./meetingPortal.mjs";
 import { createMeetingServicesRouter } from "./meetingServices.mjs";
 import { createInductionMatchingRouter } from "./inductionMatching.mjs";
 import { createInvitationRemovalRouter } from "./invitationRemoval.mjs";
+import { persistCompletedSignatureEnvelope as persistSignatureMirror } from "./signatureMirror.mjs";
 
 function getFirebaseProjectId(env) {
   const projectId = String(env?.FIREBASE_PROJECT_ID || "").trim();
@@ -360,30 +361,7 @@ export default {
           pathname === "/api/documents/next-reference";
         if (isEsignPath) {
           const persistCompletedSignatureEnvelope = async ({envelope,completion}) => {
-            if (!envelope?.externalReference) return;
             const token = await getFirestoreAdminAccessToken(env);
-            const path = "signatureEnvelopes/" + String(envelope.externalReference);
-            const existingRaw = await getFirestoreDocument(env, path, token);
-            if (!existingRaw) throw new Error("The portal signature envelope was not found for gateway completion.");
-            const existing = firestoreDocumentToPlain(existingRaw) || {};
-            const signedFileId = String(completion?.primaryStorageId || "");
-            if (!signedFileId) throw new Error("Completed signed PDF reference is missing.");
-            const signedDocumentUrl = "https://drive.google.com/file/d/" + encodeURIComponent(signedFileId) + "/view";
-            const signers = (envelope.signers || []).map(s => ({
-              uid: s.uid || null, name: s.name || "", email: s.email || "",
-              status: s.status || "", signedAt: s.signedAt || null,
-              authorityRole: s.authorityVerification?.authorityRole || ""
-            }));
-            const updated = {
-              status: "Completed", signers,
-              completedAt: completion.completedAt,
-              signedDocumentUrl, ownerCompletedDocumentUrl: signedDocumentUrl,
-              signedDocumentPath: signedDocumentUrl, signedPdfReference: signedFileId,
-              lastSignedByUid: [...signers].reverse().find(s => s.uid)?.uid || null,
-              gatewayStatus: "Completed", gatewayFinalHash: completion.finalHash,
-              gatewaySigningStatus: "Completed", gatewayStatusUpdatedAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString()
-            };
             const encode = value => {
               if (value === null || value === undefined) return {nullValue:null};
               if (typeof value === "boolean") return {booleanValue:value};
@@ -393,26 +371,16 @@ export default {
               if (typeof value === "object") return {mapValue:{fields:Object.fromEntries(Object.entries(value).map(([k,v])=>[k,encode(v)]))}};
               return {stringValue:String(value)};
             };
-            const fields = Object.fromEntries(Object.entries(updated).map(([k,v])=>[k,encode(v)]));
-            await updateFirestoreDocument(env,path,token,fields,Object.keys(fields));
-            const eventId = "gateway-completed-" + crypto.randomUUID();
-            const event = {
-              envelopeId: String(envelope.externalReference),
-              documentId: String(existing.documentId || envelope.documentId || ""),
-              type: "Gateway Signing Completed",
-              eventType: "Gateway Signing Completed",
-              action: "COMPLETED",
-              status: "Completed",
-              actorUid: updated.lastSignedByUid,
-              signedDocumentUrl, signedPdfReference: signedFileId,
-              finalHash: completion.finalHash,
-              completedAt: completion.completedAt,
-              createdAt: new Date().toISOString(),
-              source: "drive-gateway"
+            const getDocument = async path => {
+              const raw = await getFirestoreDocument(env,path,token);
+              return firestoreDocumentToPlain(raw);
             };
-            await updateFirestoreDocument(env,"signatureEvents/"+eventId,token,
-              Object.fromEntries(Object.entries(event).map(([k,v])=>[k,encode(v)])),
-              Object.keys(event));
+            const updateDocument = async (path,fields) => updateFirestoreDocument(
+              env,path,token,
+              Object.fromEntries(Object.entries(fields).map(([k,v])=>[k,encode(v)])),
+              Object.keys(fields)
+            );
+            return persistSignatureMirror({envelope,completion,getDocument,updateDocument});
           };
           const ctx = buildEsignContext({
             env,
