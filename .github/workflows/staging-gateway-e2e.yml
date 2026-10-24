@@ -82,6 +82,7 @@ jobs:
     outputs:
       staging_url: ${{ steps.staging-health.outputs.staging_url }}
     # Archive acceptance uses the full deploy-staging runtime job, avoiding a competing partial Worker deployment.
+# dispatch isolated runtime acceptance is an explicit staging-only opt-in; production is not targeted.
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004' || github.ref == 'refs/heads/fix/communications-cloudflare-website-integration' || (github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'fix/communications-cloudflare-website-integration')
     runs-on: ubuntu-latest
     timeout-minutes: 20
