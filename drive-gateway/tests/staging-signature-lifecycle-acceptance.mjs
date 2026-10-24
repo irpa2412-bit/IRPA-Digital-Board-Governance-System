@@ -23,12 +23,14 @@ function encode(v){if(v===null||v===undefined)return{nullValue:null};if(typeof v
 function decode(v){if(!v||typeof v!=="object")return v;if("stringValue"in v)return v.stringValue;if("integerValue"in v)return Number(v.integerValue);if("doubleValue"in v)return v.doubleValue;if("booleanValue"in v)return v.booleanValue;if("timestampValue"in v)return v.timestampValue;if("nullValue"in v)return null;if("arrayValue"in v)return(v.arrayValue.values||[]).map(decode);if("mapValue"in v)return Object.fromEntries(Object.entries(v.mapValue.fields||{}).map(([k,x])=>[k,decode(x)]));return v;}
 function plain(d){return Object.fromEntries(Object.entries(d?.fields||{}).map(([k,v])=>[k,decode(v)]));}
 function fsUrl(path){assert.equal(project,PROJECT,"Refusing Firestore request: project is not staging.");return"https://firestore.googleapis.com/v1/projects/"+encodeURIComponent(PROJECT)+"/databases/(default)/documents/"+path;}
-async function signIn(email,password){const r=await fetch("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key="+encodeURIComponent(apiKey),{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({email,password,returnSecureToken:true})});const b=await r.json().catch(()=>({}));assert.equal(r.ok,true,"Staging test account sign-in failed (HTTP "+r.status+").");const c=JSON.parse(Buffer.from(String(b.idToken||"").split(".")[1]||"","base64url").toString("utf8"));assert.equal(c.aud,PROJECT,"Firebase token is not scoped to staging.");assert.equal(c.iss,"https://securetoken.google.com/"+PROJECT,"Firebase token issuer is not staging.");assert.ok(b.localId&&b.idToken,"Firebase sign-in did not return an authenticated identity.");return b;}
-async function adminToken(){let sa;try{sa=JSON.parse(saText);}catch{throw Error("Staging service-account secret is invalid JSON.");}assert.equal(sa.project_id,PROJECT,"Service account is not scoped to staging.");const now=Math.floor(Date.now()/1000),b64=x=>Buffer.from(x).toString("base64url");const u=b64(JSON.stringify({alg:"RS256",typ:"JWT"}))+"."+b64(JSON.stringify({iss:sa.client_email,scope:"https://www.googleapis.com/auth/datastore",aud:"https://oauth2.googleapis.com/token",iat:now,exp:now+300}));const sig=createSign("RSA-SHA256");sig.update(u);sig.end();const assertion=u+"."+sig.sign(sa.private_key,"base64url");const r=await fetch("https://oauth2.googleapis.com/token",{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded"},body:new URLSearchParams({grant_type:"urn:ietf:params:oauth:grant-type:jwt-bearer",assertion})});const b=await r.json().catch(()=>({}));assert.equal(r.ok,true,"Staging service-account token request failed.");assert.ok(b.access_token,"No staging Firestore access token returned.");return b.access_token;}
-async function createDoc(token,collection,id,data){const r=await fetch(fsUrl(collection)+"?documentId="+encodeURIComponent(id),{method:"POST",headers:{Authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({fields:Object.fromEntries(Object.entries(data).map(([k,v])=>[k,encode(v)]))})});assert.equal(r.ok,true,"Could not create staging "+collection+" fixture (HTTP "+r.status+").");return r.json();}
-async function readDoc(token,collection,id){const r=await fetch(fsUrl(collection+"/"+encodeURIComponent(id)),{headers:{Authorization:"Bearer "+token}});assert.equal(r.ok,true,"Could not read staging "+collection+" record (HTTP "+r.status+").");return plain(await r.json());}
+async function signIn(email,password){const r=await checkedFetch("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key="+encodeURIComponent(apiKey),{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({email,password,returnSecureToken:true})});const b=await r.json().catch(()=>({}));assert.equal(r.ok,true,"Staging test account sign-in failed (HTTP "+r.status+").");const c=JSON.parse(Buffer.from(String(b.idToken||"").split(".")[1]||"","base64url").toString("utf8"));assert.equal(c.aud,PROJECT,"Firebase token is not scoped to staging.");assert.equal(c.iss,"https://securetoken.google.com/"+PROJECT,"Firebase token issuer is not staging.");assert.ok(b.localId&&b.idToken,"Firebase sign-in did not return an authenticated identity.");return b;}
+async function adminToken(){let sa;try{sa=JSON.parse(saText);}catch{throw Error("Staging service-account secret is invalid JSON.");}assert.equal(sa.project_id,PROJECT,"Service account is not scoped to staging.");const now=Math.floor(Date.now()/1000),b64=x=>Buffer.from(x).toString("base64url");const u=b64(JSON.stringify({alg:"RS256",typ:"JWT"}))+"."+b64(JSON.stringify({iss:sa.client_email,scope:"https://www.googleapis.com/auth/datastore",aud:"https://oauth2.googleapis.com/token",iat:now,exp:now+300}));const sig=createSign("RSA-SHA256");sig.update(u);sig.end();const assertion=u+"."+sig.sign(sa.private_key,"base64url");const r=await checkedFetch("https://oauth2.googleapis.com/token",{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded"},body:new URLSearchParams({grant_type:"urn:ietf:params:oauth:grant-type:jwt-bearer",assertion})});const b=await r.json().catch(()=>({}));assert.equal(r.ok,true,"Staging service-account token request failed.");assert.ok(b.access_token,"No staging Firestore access token returned.");return b.access_token;}
+async function createDoc(token,collection,id,data){const r=await checkedFetch(fsUrl(collection)+"?documentId="+encodeURIComponent(id),{method:"POST",headers:{Authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({fields:Object.fromEntries(Object.entries(data).map(([k,v])=>[k,encode(v)]))})});assert.equal(r.ok,true,"Could not create staging "+collection+" fixture (HTTP "+r.status+").");return r.json();}
+async function readDoc(token,collection,id){const r=await checkedFetch(fsUrl(collection+"/"+encodeURIComponent(id)),{headers:{Authorization:"Bearer "+token}});assert.equal(r.ok,true,"Could not read staging "+collection+" record (HTTP "+r.status+").");return plain(await r.json());}
 async function jsonResponse(r,label){const b=await r.json().catch(()=>({}));const safeDetail=String([b.diagnosticCode,b.diagnosticMessage,b.code,b.error,b.message].filter(Boolean).join(" | ")).replace(/Bearer\s+\S+/gi,"Bearer [redacted]").replace(/[\r\n\t]+/g," ").slice(0,300);assert.equal(r.ok,true,label+" failed (HTTP "+r.status+")"+(safeDetail?": "+safeDetail:"")+".");assert.notEqual(b.ok,false,label+" returned ok=false.");return b;}
 async function sha(bytes){return createHash("sha256").update(Buffer.from(bytes)).digest("hex");}
+
+async function checkedFetch(...args){const r=await globalThis.fetch(...args);if(!r.ok){const body=await r.clone().text().catch(()=> "");throw new Error("HTTP "+r.status+" response body (first 300 chars): "+body.slice(0,300));}return r;}
 
 async function main(){
   await step("Staging-only target and credentials guard",async()=>{
@@ -37,11 +39,12 @@ async function main(){
     assert.equal(new URL(base).protocol,"https:","Gateway must use HTTPS.");
     assert.ok(apiKey&&adminEmail&&adminPassword&&signerEmail&&signerPassword&&saText,"Required staging credentials are missing.");
     assert.notEqual(adminEmail.toLowerCase(),signerEmail.toLowerCase(),"Admin and signer test accounts must be distinct.");
-    const healthResponse=await fetch(base+"/health",{headers:{"cache-control":"no-cache"}});
+    const healthResponse=await checkedFetch(base+"/health",{headers:{"cache-control":"no-cache"}});
     assert.equal(healthResponse.ok,true,"Staging gateway health request failed (HTTP "+healthResponse.status+").");
     const health=await healthResponse.json();
     assert.equal(health.ok,true,"Staging gateway health response is not healthy.");
     gatewayVersion=health.version ? String(health.version) : "not reported";
+    if(process.env.GITHUB_SHA) assert.equal(gatewayVersion,process.env.GITHUB_SHA,"Staging gateway version does not match this workflow commit.");
     console.log("Gateway version: "+gatewayVersion);
   });
   let admin,signer,adminAccess,signerHeaders,adminHeaders,identity;
@@ -61,7 +64,7 @@ async function main(){
     page.drawText("Synthetic test only; not an operational record.",{x:48,y:730,size:10});
     const bytes=await pdf.save();sourceHash=await sha(bytes);
     const form=new FormData();form.append("documentId",documentId);form.append("title","Staging Signature Lifecycle Acceptance");form.append("classification","Internal");form.append("archives","board-governance");form.append("file",new Blob([bytes],{type:"application/pdf"}),"staging-signature-lifecycle.pdf");
-    const uploaded=await jsonResponse(await fetch(base+"/api/documents",{method:"POST",headers:signerHeaders,body:form}),"Staging controlled-document upload");
+    const uploaded=await jsonResponse(await checkedFetch(base+"/api/documents",{method:"POST",headers:signerHeaders,body:form}),"Staging controlled-document upload");
     assert.equal(uploaded.documentId,documentId);assert.equal(uploaded.sha256,sourceHash);
   });
   await step("Assign Authorization Officer and seed staging lifecycle records",async()=>{
@@ -71,15 +74,16 @@ async function main(){
     const seeded=await readDoc(adminAccess,"signatureEnvelopes",portalEnvelopeId);assert.equal(seeded.documentId,documentId);assert.equal(seeded.signers?.[0]?.role,"Authorization Officer");
   });
   await step("Create linked signing envelope",async()=>{
-    const b=await jsonResponse(await fetch(base+"/api/envelopes",{method:"POST",headers:{...signerHeaders,"content-type":"application/json"},body:JSON.stringify({externalReference:portalEnvelopeId,returnTokens:true,documentId,title:"Staging Signature Lifecycle Acceptance",classification:"Restricted",archives:["board-governance"],signingMode:"Sequential",signers:[{uid:signer.localId,email:signer.email||signerEmail,name:"IRPA Staging Authorization Officer",role:"Authorization Officer",action:"Authorization",order:1}],fields:[{fieldId:"staging-authorization-name",type:"Name",page:1,x:8,y:18,width:50,height:8,signerUid:signer.localId,required:true},{fieldId:"staging-authorization-signature",type:"Signature",page:1,x:8,y:30,width:50,height:10,signerUid:signer.localId,required:true}]})}),"Linked staging envelope creation");
+    const b=await jsonResponse(await checkedFetch(base+"/api/envelopes",{method:"POST",headers:{...signerHeaders,"content-type":"application/json"},body:JSON.stringify({externalReference:portalEnvelopeId,returnTokens:true,documentId,title:"Staging Signature Lifecycle Acceptance",classification:"Restricted",archives:["board-governance"],signingMode:"Sequential",signers:[{uid:signer.localId,email:signer.email||signerEmail,name:"IRPA Staging Authorization Officer",role:"Authorization Officer",action:"Authorization",order:1}],fields:[{fieldId:"staging-authorization-name",type:"Name",page:1,x:8,y:18,width:50,height:8,signerUid:signer.localId,required:true},{fieldId:"staging-authorization-signature",type:"Signature",page:1,x:8,y:30,width:50,height:10,signerUid:signer.localId,required:true}]})}),"Linked staging envelope creation");
     gatewayEnvelopeId=b.envelopeId;assert.ok(gatewayEnvelopeId,"Gateway envelope ID missing.");assert.ok(Array.isArray(b.tokens)&&b.tokens.length===1,"Staging signing token missing.");signingToken=b.tokens[0];
   });
   await step("Sign as the assigned Authorization Officer",async()=>{
-    const opened=await jsonResponse(await fetch(base+"/api/sign/open",{headers:{...signerHeaders,"x-signing-token":signingToken}}),"Open Authorization Officer signing task");assert.equal(opened.canSign,true);
-    const signed=await jsonResponse(await fetch(base+"/api/sign/submit",{method:"POST",headers:{...signerHeaders,"content-type":"application/json"},body:JSON.stringify({token:signingToken,signature:{type:"typed",value:"IRPA Staging Authorization Officer"},fieldValues:{"staging-authorization-name":"IRPA Staging Authorization Officer","staging-authorization-signature":"IRPA Staging Authorization Officer"},manualAuthorityIdentification:identity.authorityRole,consent:true})}),"Authorization Officer signature");
+    const opened=await jsonResponse(await checkedFetch(base+"/api/sign/open",{headers:{...signerHeaders,"x-signing-token":signingToken}}),"Open Authorization Officer signing task");assert.equal(opened.canSign,true);
+    const signed=await jsonResponse(await checkedFetch(base+"/api/sign/submit",{method:"POST",headers:{...signerHeaders,"content-type":"application/json"},body:JSON.stringify({token:signingToken,signature:{type:"typed",value:"IRPA Staging Authorization Officer"},fieldValues:{"staging-authorization-name":"IRPA Staging Authorization Officer","staging-authorization-signature":"IRPA Staging Authorization Officer"},manualAuthorityIdentification:identity.authorityRole,consent:true})}),"Authorization Officer signature");
     assert.equal(signed.status,"Completed");assert.equal(signed.completed,true);
-    const status=await jsonResponse(await fetch(base+"/api/sign/status",{headers:{...signerHeaders,"x-signing-token":signingToken}}),"Completed gateway envelope status");assert.equal(status.status,"Completed");assert.equal(status.externalReference,portalEnvelopeId);assert.equal(status.signers?.length,1);assert.equal(status.signers[0].status,"Signed");
+    const status=await jsonResponse(await checkedFetch(base+"/api/sign/status",{headers:{...signerHeaders,"x-signing-token":signingToken}}),"Completed gateway envelope status");assert.equal(status.status,"Completed");assert.equal(status.externalReference,portalEnvelopeId);assert.equal(status.signers?.length,1);assert.equal(status.signers[0].status,"Signed");
   });
+  activeStep="Post-signing checks";
   const postSigningChecks=[];
   async function postCheck(name,fn){
     try{await fn();postSigningChecks.push({name,result:"PASS",error:""});console.log("PASS: "+name);}
@@ -91,12 +95,12 @@ async function main(){
     fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,rows.join("\n"));
   }
   await postCheck("Mirror write",async()=>{
-    const r=await fetch(base+"/api/envelopes/"+encodeURIComponent(gatewayEnvelopeId)+"/status",{headers:signerHeaders});
+    const r=await checkedFetch(base+"/api/envelopes/"+encodeURIComponent(gatewayEnvelopeId)+"/status",{headers:signerHeaders});
     const b=await r.json().catch(()=>({}));
     assert.equal(r.ok,true,"Mirror status request failed (HTTP "+r.status+"): "+String(b.error||b.message||"no response detail"));
     let mirrorStatus=b.mirrorStatus??"unknown",mirrorError=b.mirrorError??"";
     if(mirrorStatus!=="Completed"){
-      const rr=await fetch(base+"/api/envelopes/"+encodeURIComponent(gatewayEnvelopeId)+"/resync",{method:"POST",headers:signerHeaders});
+      const rr=await checkedFetch(base+"/api/envelopes/"+encodeURIComponent(gatewayEnvelopeId)+"/resync",{method:"POST",headers:signerHeaders});
       const rb=await rr.json().catch(()=>({}));
       mirrorStatus=rb.mirrorStatus??rb.status??mirrorStatus;
       mirrorError=rb.mirrorError??rb.error??mirrorError;
@@ -115,14 +119,14 @@ async function main(){
     assert.equal(portal.lastSignedByUid,signer.localId,"lastSignedByUid mismatch");
   });
   await postCheck("Signature trail event",async()=>{
-    const r=await fetch("https://firestore.googleapis.com/v1/projects/"+encodeURIComponent(PROJECT)+"/databases/(default)/documents:runQuery",{method:"POST",headers:{Authorization:"Bearer "+adminAccess,"content-type":"application/json"},body:JSON.stringify({structuredQuery:{from:[{collectionId:"signatureEvents"}],where:{fieldFilter:{field:{fieldPath:"envelopeId"},op:"EQUAL",value:{stringValue:portalEnvelopeId}}},limit:100}})});
+    const r=await checkedFetch("https://firestore.googleapis.com/v1/projects/"+encodeURIComponent(PROJECT)+"/databases/(default)/documents:runQuery",{method:"POST",headers:{Authorization:"Bearer "+adminAccess,"content-type":"application/json"},body:JSON.stringify({structuredQuery:{from:[{collectionId:"signatureEvents"}],where:{fieldFilter:{field:{fieldPath:"envelopeId"},op:"EQUAL",value:{stringValue:portalEnvelopeId}}},limit:100}})});
     const rows=await r.json().catch(()=>[]);
     assert.equal(r.ok,true,"Could not query staging signature trail (HTTP "+r.status+")");
     const events=(Array.isArray(rows)?rows:[]).filter(x=>x.document).map(x=>plain(x.document));
     assert.ok(events.some(x=>x.event==="Gateway Signing Completed"&&x.actorUid===signer.localId),"Signature trail lacks Gateway Signing Completed for final signer "+signer.localId);
   });
   await postCheck("Lifecycle SIGNED",async()=>{
-    const r=await fetch(base+"/api/document-lifecycle/signature-complete",{method:"POST",headers:{...adminHeaders,"content-type":"application/json"},body:JSON.stringify({documentId,envelopeId:portalEnvelopeId})});
+    const r=await checkedFetch(base+"/api/document-lifecycle/signature-complete",{method:"POST",headers:{...adminHeaders,"content-type":"application/json"},body:JSON.stringify({documentId,envelopeId:portalEnvelopeId})});
     const b=await r.json().catch(()=>({}));
     assert.equal(r.ok,true,"Lifecycle signature completion failed (HTTP "+r.status+"): "+String(b.error||b.message||"no response detail"));
     assert.equal(b.status,"SIGNED","Lifecycle returned status "+String(b.status));
