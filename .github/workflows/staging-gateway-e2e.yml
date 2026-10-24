@@ -1875,6 +1875,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.STAGING_CLOUDFLARE_ACCOUNT_ID }}
           PROJECT: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
+          GIT_SHA: ${{ github.sha }}
           APP_URL: "https://irpa-dbg-staging-a73ec.web.app"
           CP_ROOT: ${{ secrets.STAGING_CPANEL_DOCUMENT_ROOT }}
           META_APP_ID: ${{ vars.STAGING_META_APP_ID }}
