@@ -2057,7 +2057,7 @@ jobs:
             echo ""
             echo '```text'
             if [ -f wrangler.log ]; then
-              tail -n 40 wrangler.log | perl -pe 's/Authorization:[^, ]+/Authorization: [REDACTED]/ig; s/Bearer\\s+[^\\s\\x22\\x27,;]+/Bearer [REDACTED]/ig; s/-----BEGIN [^-]*PRIVATE KEY-----[\\s\\S]*?-----END [^-]*PRIVATE KEY-----/[REDACTED_PRIVATE_KEY]/g; s/(password|token|secret)(["=: ]+)[^", ]+/$1$2[REDACTED]/ig; s/([A-Za-z0-9_-]{20,})/[REDACTED_TOKEN]/g'
+              tail -n 40 wrangler.log | perl -pe 's/Authorization:[^, ]+/Authorization: [REDACTED]/ig; s/Bearer[[:space:]]+[^[:space:],;]+/Bearer [REDACTED]/ig; s/(password|token|secret)(["=: ]+)[^", ]+/$1$2[REDACTED]/ig; s/([A-Za-z0-9_-]{32,})/[REDACTED_TOKEN]/g'
             else
               echo "wrangler.log was not produced."
             fi
