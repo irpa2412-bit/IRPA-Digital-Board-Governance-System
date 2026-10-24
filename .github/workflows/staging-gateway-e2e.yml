@@ -1745,7 +1745,7 @@ jobs:
           NODE
 
   dispatch-staging-acceptance:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/fix/communication-media-archive-drive-oauth' && contains(github.event.head_commit.message, 'dispatch isolated runtime acceptance')
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/fix/communication-media-archive-drive-oauth' || github.ref == 'refs/heads/fix/signature-trail-20261024') && contains(github.event.head_commit.message, 'dispatch isolated runtime acceptance')
     needs: [local-e2e, preflight-staging]
     runs-on: ubuntu-latest
     permissions:
@@ -1760,7 +1760,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               workflow_id: "staging-gateway-e2e.yml",
-              ref: "fix/communication-media-archive-drive-oauth",
+              ref: context.ref.replace(/^refs\/heads\//, ""),
               inputs: { deploy_staging: "true" }
             });
 
@@ -2072,6 +2072,19 @@ jobs:
             console.log("STAGING_MEDIA_ADMIN_IDENTITY_READY=true");
           })().catch(e=>{console.error("Unable to prepare staging media test identity: "+String(e.message||e).replace(/[\\r\\n\\t]+/g," ").slice(0,180));process.exit(1)});
           NODE
+
+      - name: Verify signature mirror, signer trail, and document lifecycle approval
+        env:
+          STAGING_GATEWAY_URL: \${{ steps.staging_health.outputs.gateway_url }}
+          STAGING_FIREBASE_PROJECT_ID: \${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
+          STAGING_FIREBASE_WEB_API_KEY: \${{ secrets.STAGING_FIREBASE_WEB_API_KEY }}
+          STAGING_TEST_EMAIL: \${{ secrets.STAGING_TEST_EMAIL }}
+          STAGING_TEST_PASSWORD: \${{ secrets.STAGING_TEST_PASSWORD }}
+          STAGING_CRYPTO_TEST_EMAIL: \${{ secrets.STAGING_CRYPTO_TEST_EMAIL }}
+          STAGING_CRYPTO_TEST_PASSWORD: \${{ secrets.STAGING_CRYPTO_TEST_PASSWORD }}
+          STAGING_FIREBASE_SERVICE_ACCOUNT_JSON: \${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT_JSON }}
+        working-directory: drive-gateway
+        run: node tests/staging-signature-lifecycle-acceptance.mjs
 
       - name: Verify Communication and Media Archive and controlled-PDF upload
         env:
