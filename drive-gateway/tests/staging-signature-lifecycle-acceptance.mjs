@@ -38,12 +38,15 @@ async function main(){
     assert.ok(apiKey&&adminEmail&&adminPassword&&signerEmail&&signerPassword&&saText,"Required staging credentials are missing.");
     assert.notEqual(adminEmail.toLowerCase(),signerEmail.toLowerCase(),"Admin and signer test accounts must be distinct.");
   });
-  const [admin,signer,adminAccess]=await Promise.all([signIn(adminEmail,adminPassword),signIn(signerEmail,signerPassword),adminToken()]);
-  const signerHeaders={Authorization:"Bearer "+signer.idToken,"x-irpa-staging-diagnostics":"1"};
-  const adminHeaders={Authorization:"Bearer "+admin.idToken,"x-irpa-staging-diagnostics":"1"};
-  const identity=await readDoc(adminAccess,"signerIdentities",signer.localId);
-  assert.equal(identity.authorityStatus,"Current","Signer authority must be Current.");
-  assert.ok(identity.authorityRole&&identity.authorityRole!=="Not yet assigned","Signer needs registered authority.");
+  let admin,signer,adminAccess,signerHeaders,adminHeaders,identity;
+  await step("Authenticate staging admin and signer; verify signer authority",async()=>{
+    [admin,signer,adminAccess]=await Promise.all([signIn(adminEmail,adminPassword),signIn(signerEmail,signerPassword),adminToken()]);
+    signerHeaders={Authorization:"Bearer "+signer.idToken,"x-irpa-staging-diagnostics":"1"};
+    adminHeaders={Authorization:"Bearer "+admin.idToken,"x-irpa-staging-diagnostics":"1"};
+    identity=await readDoc(adminAccess,"signerIdentities",signer.localId);
+    assert.equal(identity.authorityStatus,"Current","Signer authority must be Current.");
+    assert.ok(identity.authorityRole&&identity.authorityRole!=="Not yet assigned","Signer needs registered authority.");
+  });
   const stamp=Date.now().toString(36),documentId="DOC-STAGING-LIFECYCLE-"+stamp,portalEnvelopeId="STAGING-SIGN-"+stamp;
   let sourceHash="",gatewayEnvelopeId="",signingToken="";
   await step("Create staging PDF and gateway document",async()=>{
@@ -73,7 +76,7 @@ async function main(){
   });
   await step("Verify Completed envelope and every signer in signature trail",async()=>{
     const portal=await readDoc(adminAccess,"signatureEnvelopes",portalEnvelopeId);assert.equal(portal.status,"Completed");assert.equal(portal.documentId,documentId);assert.ok(portal.signedDocumentUrl||portal.ownerCompletedDocumentUrl);assert.equal(portal.signers?.length,1);assert.equal(portal.signers[0].uid,signer.localId);assert.equal(portal.signers[0].status,"Signed");assert.equal(portal.signers[0].role,"Authorization Officer");
-    const r=await fetch(fsUrl("documents:runQuery"),{method:"POST",headers:{Authorization:"Bearer "+adminAccess,"content-type":"application/json"},body:JSON.stringify({structuredQuery:{from:[{collectionId:"signatureEvents"}],where:{fieldFilter:{field:{fieldPath:"envelopeId"},op:"EQUAL",value:{stringValue:portalEnvelopeId}}},limit:100}})});
+    const r=await fetch("https://firestore.googleapis.com/v1/projects/"+encodeURIComponent(PROJECT)+"/databases/(default)/documents:runQuery",{method:"POST",headers:{Authorization:"Bearer "+adminAccess,"content-type":"application/json"},body:JSON.stringify({structuredQuery:{from:[{collectionId:"signatureEvents"}],where:{fieldFilter:{field:{fieldPath:"envelopeId"},op:"EQUAL",value:{stringValue:portalEnvelopeId}}},limit:100}})});
     const rows=await r.json().catch(()=>[]);assert.equal(r.ok,true,"Could not query staging signature trail.");const events=(Array.isArray(rows)?rows:[]).filter(x=>x.document).map(x=>plain(x.document));assert.ok(events.some(x=>x.event==="Gateway Signing Completed"&&x.actorUid===signer.localId),"Signature trail lacks the final signer completion event.");assert.equal(portal.lastSignedByUid,signer.localId);
   });
   await step("Complete document lifecycle and verify signed approval",async()=>{
