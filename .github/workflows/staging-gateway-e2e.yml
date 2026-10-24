@@ -2226,6 +2226,7 @@ jobs:
           npx --yes firebase-tools@14 deploy --only firestore:rules --project "$PROJECT" --non-interactive
       - name: Build frontend against isolated staging Firebase and Drive gateway
         env:
+          VITE_IRPA_ENVIRONMENT: "staging"
           VITE_FIREBASE_API_KEY: "AIzaSyA6UmHtP-mRr99rBw57_-qrD4_mFSBnZ38"
           VITE_FIREBASE_AUTH_DOMAIN: "irpa-dbg-staging-a73ec.firebaseapp.com"
           VITE_FIREBASE_PROJECT_ID: "irpa-dbg-staging-a73ec"
@@ -2235,7 +2236,6 @@ jobs:
           VITE_FIREBASE_MEASUREMENT_ID: ""
           VITE_FIREBASE_VAPID_KEY: ""
           VITE_GOOGLE_DRIVE_GATEWAY_URL: "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
-          VITE_GATEWAY_ORIGIN: "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
           VITE_GOOGLE_WEATHER_API_KEY: ""
         run: |
           set -euo pipefail
@@ -2243,8 +2243,7 @@ jobs:
           test "$VITE_GOOGLE_DRIVE_GATEWAY_URL" = "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
           npm ci --no-audit --no-fund
           npm run build
-          grep -R -q "irpa-dbg-staging-a73ec" dist
-          grep -R -q "irpa-google-drive-gateway-staging.irpa-governance.workers.dev" dist
+          npm run check:staging-gateway-bundle
           echo "STAGING_FRONTEND_BUILD_VALID=true"
       - name: Deploy Hosting only to the isolated staging Firebase project
         uses: w9jds/firebase-action@v14.17.0

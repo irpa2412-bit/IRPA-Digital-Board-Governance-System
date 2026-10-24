@@ -1,6 +1,7 @@
 import React,{useEffect,useMemo,useState} from "react";
 import {collection,doc,limit,onSnapshot,orderBy,query,serverTimestamp,writeBatch} from "firebase/firestore";
 import {auth,db} from "../firebase/config";
+import {getGoogleDriveGatewayUrl} from "../firebase/gatewayUrl";
 
 const PLATFORMS=["Facebook","Instagram","LinkedIn","X","YouTube","TikTok","WhatsApp","Telegram","Other"];
 const ACCOUNT_TYPES=["Organization page","Public profile","Channel","Group","Messaging channel","Other"];
@@ -18,7 +19,7 @@ export default function SocialMediaAccounts({profile,employee,selectedAuthority,
  const allowed=isAdmin||roles.some(r=>EDITOR_ROLES.includes(r));
  const reviewer=isAdmin||roles.some(r=>REVIEW_ROLES.includes(r));
  const [items,setItems]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState(""),[notice,setNotice]=useState(""),[busy,setBusy]=useState(false),[editing,setEditing]=useState(null),[filter,setFilter]=useState("All"),[search,setSearch]=useState(""),[audit,setAudit]=useState([]),[form,setForm]=useState(blank);
- const META_GATEWAY="https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev";
+ const META_GATEWAY=getGoogleDriveGatewayUrl();
  const metaStagingEnabled=String(import.meta.env.VITE_META_STAGING_GATEWAY_URL||"").replace(/\/+$/,"")===META_GATEWAY&&String(import.meta.env.VITE_META_OAUTH_ENABLED||"")==="true";
  const [metaStatus,setMetaStatus]=useState(null),[metaBusy,setMetaBusy]=useState(false);
  useEffect(()=>{if(!user?.uid||!allowed){setItems([]);setLoading(false);return}const q=query(collection(db,"socialMediaAccounts"),orderBy("updatedAt","desc"));return onSnapshot(q,s=>{setItems(s.docs.map(d=>({id:d.id,...d.data()})));setLoading(false);setError("")},e=>{setLoading(false);setError(e?.code==="permission-denied"?"Access denied by social-account policy. Verify your assigned communications role and deployed rules.":e.message||"Unable to load social accounts.")})},[user?.uid,allowed]);
