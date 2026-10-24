@@ -10,11 +10,17 @@ export async function persistCompletedSignatureEnvelope({envelope, completion, g
   const signedFileId = clean(completion?.primaryStorageId);
   if (!signedFileId) throw new Error("Completed signed PDF reference is missing.");
   const signedDocumentUrl = "https://drive.google.com/file/d/" + encodeURIComponent(signedFileId) + "/view";
-  const signers = (envelope.signers || []).map(s => ({
-    uid: s.uid || null, name: s.name || "", email: s.email || "",
-    status: s.status || "", signedAt: s.signedAt || null,
-    authorityRole: s.authorityVerification?.authorityRole || ""
-  }));
+  const priorSigners = Array.isArray(existing.signers) ? existing.signers : [];
+  const signers = (envelope.signers || []).map(s => {
+    const prior = priorSigners.find(p => (s.uid && p.uid === s.uid) || (s.email && String(p.email || "").toLowerCase() === String(s.email).toLowerCase()));
+    return {
+      uid: s.uid || null, name: s.name || "", email: s.email || "",
+      status: s.status || "", signedAt: s.signedAt || null,
+      role: s.role || prior?.role || prior?.action || "",
+      action: s.action || prior?.action || prior?.role || "",
+      authorityRole: s.authorityVerification?.authorityRole || ""
+    };
+  });
   const lastSignedByUid = [...signers].reverse().find(s => s.uid && s.status === "Signed")?.uid || null;
   const timestamp = now();
   await updateDocument(path, {
