@@ -413,7 +413,7 @@ export default {
             },
             sendInvitation: async ({to,name,link}) => sendInvitationEmail({email:to,name,link,smtpSend:async ({to:recipient,subject,text,html})=>smtpSend(env,{to:recipient,subject,text,html}),logger:console}),
             logger: console,
-            verifySigningAuthority: (user,manualAuthorityIdentification)=>verifyGatewaySigningAuthority(env,user,manualAuthorityIdentification),
+            verifySigningAuthority: (user, manualAuthority) => verifyGatewaySigningAuthority(env, user, manualAuthority),
             driveHelpers: {getDriveAccessToken,driveFetch}
           });
           const response = await esignRoute(request,ctx);
