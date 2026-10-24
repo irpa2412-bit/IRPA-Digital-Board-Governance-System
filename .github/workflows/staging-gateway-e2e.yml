@@ -2037,12 +2037,38 @@ jobs:
           rm -f "$RUNNER_TEMP/irpa-staging-crypto-key-record" "$RUNNER_TEMP/irpa-staging-crypto-secret-name"
 
       - name: Deploy staging Worker only
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.STAGING_CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: drive-gateway
-          command: deploy --config wrangler.staging.generated.json
+        id: wrangler_deploy
+        continue-on-error: true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.STAGING_CLOUDFLARE_ACCOUNT_ID }}
+        working-directory: drive-gateway
+        run: |
+          set -o pipefail
+          npx wrangler deploy --config wrangler.staging.generated.json 2>&1 | tee wrangler.log
+
+      - name: Summarize Wrangler deploy output
+        if: always()
+        working-directory: drive-gateway
+        run: |
+          set -euo pipefail
+          {
+            echo "## Wrangler deploy output"
+            echo ""
+            echo '```text'
+            if [ -f wrangler.log ]; then
+              tail -n 40 wrangler.log | perl -pe 's/Authorization:[^, ]+/Authorization: [REDACTED]/ig; s/Bearer\\s+[^\\s\\x22\\x27,;]+/Bearer [REDACTED]/ig; s/-----BEGIN [^-]*PRIVATE KEY-----[\\s\\S]*?-----END [^-]*PRIVATE KEY-----/[REDACTED_PRIVATE_KEY]/g; s/(password|token|secret)(["=: ]+)[^", ]+/$1$2[REDACTED]/ig; s/([A-Za-z0-9_-]{20,})/[REDACTED_TOKEN]/g'
+            else
+              echo "wrangler.log was not produced."
+            fi
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail if Wrangler deploy failed
+        if: steps.wrangler_deploy.outcome == 'failure'
+        run: |
+          echo "Wrangler staging deploy failed; see the redacted summary above."
+          exit 1
 
       - name: Verify staging health
         id: staging_health
