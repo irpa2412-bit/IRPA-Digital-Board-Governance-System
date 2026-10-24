@@ -51,7 +51,7 @@ jobs:
         id: firestore-e2e
         run: |
           set -o pipefail
-          npx firebase emulators:exec --project demo-irpa-staging --only firestore "npm --prefix drive-gateway test && node --test functions/meetingGateway.emulator.test.cjs" | tee e2e-output.ndjson
+          npx firebase emulators:exec --project demo-irpa-staging --only firestore "npm --prefix drive-gateway test && node --test functions/meetingGateway.emulator.test.cjs" 2>&1 | tee e2e.log
       - name: Write redacted local E2E summary
         if: always()
         env:
@@ -59,7 +59,7 @@ jobs:
         run: |
           set -euo pipefail
           { echo "# IRPA-DBGS local regression checks"; echo ""; echo "- Firestore emulator E2E: ${E2E:-not-run}"; echo "- Environment: demo-irpa-staging"; } | tee local-e2e-summary.md >> "$GITHUB_STEP_SUMMARY"
-          if [ -f e2e-output.ndjson ]; then sed -E 's/(Authorization:)[^, ]+/\1[REDACTED]/Ig; s/(password|token|secret)(["=: ]+)[^", ]+/\1\2[REDACTED]/Ig' e2e-output.ndjson > local-e2e-diagnostics.txt; else echo "No E2E output file was produced." > local-e2e-diagnostics.txt; fi
+          if [ -f e2e.log ]; then perl -pe 's/Authorization:[^, ]+/Authorization: [REDACTED]/ig; s/Bearer\s+[^\s\x22\x27,;]+/Bearer [REDACTED]/ig; s/AIza[0-9A-Za-z_-]{20,}/[REDACTED_API_KEY]/g; s/(password|token|secret)(["=: ]+)[^", ]+/$1$2[REDACTED]/ig' e2e.log > local-e2e-diagnostics.txt; else echo "No E2E output file was produced." > local-e2e-diagnostics.txt; fi
       - name: Upload redacted local E2E diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -69,6 +69,23 @@ jobs:
             local-e2e-summary.md
             local-e2e-diagnostics.txt
           if-no-files-found: error
+      - name: Summarize local-e2e failure
+        if: failure()
+        run: |
+          set -euo pipefail
+          {
+            echo "## local-e2e failure"
+            echo ""
+            echo "Failing step: Firestore emulator E2E"
+            echo ""
+            echo ' ```text'
+            if [ -f e2e.log ]; then
+              tail -n 40 e2e.log | perl -pe 's/Bearer\s+[^\s\x22\x27,;]+/Bearer [REDACTED]/ig; s/AIza[0-9A-Za-z_-]{20,}/[REDACTED_API_KEY]/g; s/(password|token|secret)(["=: ]+)[^", ]+/$1$2[REDACTED]/ig'
+            else
+              echo "e2e.log was not produced."
+            fi
+            echo ' ```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   repair-staging:
     needs: local-e2e
@@ -302,7 +319,7 @@ jobs:
                   console.log("STAGING_WORDPRESS_LOCATION=" + String(res.headers.location || "").slice(0,180));
                   console.log("STAGING_WORDPRESS_SERVER=" + String(res.headers.server || "").slice(0,80));
                   console.log("STAGING_WORDPRESS_CF_RAY=" + String(res.headers["cf-ray"] || "").slice(0,100));
-                  const hint = raw.replace(/<[^>]*>/g," ").replace(/[\r\n\t]+/g," ").replace(/\\s+/g," ").trim();
+                  const hint = raw.replace(/<[^>]*>/g," ").replace(/[\r\n\t]+/g," ").replace(/\s+/g," ").trim();
                   if (hint) console.log("STAGING_WORDPRESS_RESPONSE_HINT=" + hint.slice(0,180));
                   resolve();
                 });
@@ -783,7 +800,7 @@ jobs:
             $_SERVER['SERVER_PORT'] = '443';
           }
           $header = trim((string) ($_SERVER['HTTP_X_IRPA_STAGING_AUTHORIZATION'] ?? ''));
-          if (!preg_match('/^Basic\\s+[A-Za-z0-9+\\/]+={0,2}$/i', $header)) { return; }
+          if (!preg_match('/^Basic\s+[A-Za-z0-9+\\/]+={0,2}$/i', $header)) { return; }
           $decoded = base64_decode(substr($header, 6), true);
           if (!is_string($decoded) || strpos($decoded, ':') === false) { return; }
           [$username, $password] = explode(':', $decoded, 2);
@@ -1404,7 +1421,7 @@ jobs:
             const body=await response.json().catch(()=>({}));
             if(response.status>=300&&response.status<400) throw new Error(path+" returned a redirect; no redirect target was requested.");
             if(!response.ok) {
-              const detail=String(body?.error||body?.message||"").replace(/(password|token|secret|authorization)(\\s*[:=]\\s*)[^\\s,;]+/ig,"$1$2[REDACTED]").replace(/[\\r\\n\\t]+/g," ").slice(0,180);
+              const detail=String(body?.error||body?.message||"").replace(/(password|token|secret|authorization)(\s*[:=]\s*)[^\s,;]+/ig,"$1$2[REDACTED]").replace(/[\\r\\n\\t]+/g," ").slice(0,180);
               const ray=String(response.headers.get("cf-ray")||"none").slice(0,60);
               throw new Error(path+" returned HTTP "+response.status+" (cf-ray "+ray+")"+(detail?"; error="+detail:""));
             }
@@ -2068,6 +2085,7 @@ jobs:
           NODE
 
       - name: Verify signature mirror, signer trail, and document lifecycle approval
+        id: signature-lifecycle
         env:
           STAGING_GATEWAY_URL: ${{ steps.staging_health.outputs.gateway_url }}
           STAGING_FIREBASE_PROJECT_ID: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
@@ -2078,7 +2096,9 @@ jobs:
           STAGING_CRYPTO_TEST_PASSWORD: ${{ secrets.STAGING_CRYPTO_TEST_PASSWORD }}
           STAGING_FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT_JSON }}
         working-directory: drive-gateway
-        run: node tests/staging-signature-lifecycle-acceptance.mjs
+        run: |
+          set -o pipefail
+          node tests/staging-signature-lifecycle-acceptance.mjs 2>&1 | tee e2e.log
 
       - name: Verify Communication and Media Archive and controlled-PDF upload
         env:
@@ -2150,6 +2170,30 @@ jobs:
           console.log("STAGING_CONTROLLED_PDF_UPLOAD=PASS");
           console.log("STAGING_FIRESTORE_MEDIA_REGISTER=PASS");
           NODE
+
+      - name: Summarize deploy-staging failure
+        if: failure()
+        env:
+          SIGNATURE_LIFECYCLE_OUTCOME: ${{ steps.signature-lifecycle.outcome }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## deploy-staging failure"
+            echo ""
+            if [ "$SIGNATURE_LIFECYCLE_OUTCOME" = "failure" ]; then
+              echo "Failing step: Verify signature mirror, signer trail, and document lifecycle approval"
+            else
+              echo "Failing step: another step in deploy-staging (signature lifecycle step outcome: ${SIGNATURE_LIFECYCLE_OUTCOME:-not-run})"
+            fi
+            echo ""
+            echo ' ```text'
+            if [ -f drive-gateway/e2e.log ]; then
+              tail -n 40 drive-gateway/e2e.log | perl -pe 's/Bearer\s+[^\s\x22\x27,;]+/Bearer [REDACTED]/ig; s/AIza[0-9A-Za-z_-]{20,}/[REDACTED_API_KEY]/g; s/(password|token|secret)(["=: ]+)[^", ]+/$1$2[REDACTED]/ig'
+            else
+              echo "drive-gateway/e2e.log was not produced."
+            fi
+            echo ' ```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Run real-runtime staging cryptographic acceptance
         env:
