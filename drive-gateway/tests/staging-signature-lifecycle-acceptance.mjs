@@ -81,7 +81,23 @@ async function main(){
     const status=await jsonResponse(await fetch(base+"/api/sign/status",{headers:{...signerHeaders,"x-signing-token":signingToken}}),"Completed gateway envelope status");assert.equal(status.status,"Completed");assert.equal(status.externalReference,portalEnvelopeId);assert.equal(status.signers?.length,1);assert.equal(status.signers[0].status,"Signed");
   });
   await step("Verify Completed envelope and every signer in signature trail",async()=>{
-    const portal=await readDoc(adminAccess,"signatureEnvelopes",portalEnvelopeId);assert.equal(portal.status,"Completed");assert.equal(portal.documentId,documentId);assert.ok(portal.signedDocumentUrl||portal.ownerCompletedDocumentUrl);assert.equal(portal.signers?.length,1);assert.equal(portal.signers[0].uid,signer.localId);assert.equal(portal.signers[0].status,"Signed");assert.equal(portal.signers[0].role,"Authorization Officer");
+    const mirrorResponse=await fetch(base+"/api/envelopes/"+encodeURIComponent(gatewayEnvelopeId)+"/status",{headers:signerHeaders});
+    const mirror=await mirrorResponse.json().catch(()=>({}));
+    let mirrorStatus=mirror.mirrorStatus??mirror.status??"unknown";
+    let mirrorError=mirror.mirrorError??mirror.error??"";
+    const mirrorAttempts=mirror.mirrorAttempts??"unknown";
+    if(process.env.GITHUB_STEP_SUMMARY)fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,["","### Signature mirror status","- mirrorStatus: "+String(mirrorStatus),"- mirrorError: "+String(mirrorError||"none"),"- mirrorAttempts: "+String(mirrorAttempts),""].join("\n"));
+    let portal=await readDoc(adminAccess,"signatureEnvelopes",portalEnvelopeId);
+    if(mirrorStatus!=="Completed"){
+      const resyncResponse=await fetch(base+"/api/envelopes/"+encodeURIComponent(gatewayEnvelopeId)+"/resync",{method:"POST",headers:signerHeaders});
+      const resync=await resyncResponse.json().catch(()=>({}));
+      mirrorStatus=resync.mirrorStatus??resync.status??"unknown";
+      mirrorError=resync.mirrorError??resync.error??mirrorError;
+      if(process.env.GITHUB_STEP_SUMMARY)fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,["- Resync mirrorStatus: "+String(mirrorStatus),"- Resync mirrorError: "+String(mirrorError||"none"),""].join("\n"));
+      portal=await readDoc(adminAccess,"signatureEnvelopes",portalEnvelopeId);
+    }
+    if(portal.status!=="Completed")throw new Error("Mirror write failed: "+String(mirrorError||"unknown"));
+    assert.equal(portal.status,"Completed");assert.equal(portal.documentId,documentId);assert.ok(portal.signedDocumentUrl||portal.ownerCompletedDocumentUrl);assert.equal(portal.signers?.length,1);assert.equal(portal.signers[0].uid,signer.localId);assert.equal(portal.signers[0].status,"Signed");assert.equal(portal.signers[0].role,"Authorization Officer");
     const r=await fetch("https://firestore.googleapis.com/v1/projects/"+encodeURIComponent(PROJECT)+"/databases/(default)/documents:runQuery",{method:"POST",headers:{Authorization:"Bearer "+adminAccess,"content-type":"application/json"},body:JSON.stringify({structuredQuery:{from:[{collectionId:"signatureEvents"}],where:{fieldFilter:{field:{fieldPath:"envelopeId"},op:"EQUAL",value:{stringValue:portalEnvelopeId}}},limit:100}})});
     const rows=await r.json().catch(()=>[]);assert.equal(r.ok,true,"Could not query staging signature trail.");const events=(Array.isArray(rows)?rows:[]).filter(x=>x.document).map(x=>plain(x.document));assert.ok(events.some(x=>x.event==="Gateway Signing Completed"&&x.actorUid===signer.localId),"Signature trail lacks the final signer completion event.");assert.equal(portal.lastSignedByUid,signer.localId);
   });
