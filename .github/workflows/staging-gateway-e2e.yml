@@ -3,13 +3,6 @@ name: Staging Gateway E2E and Deploy
 on:
   push:
     branches: [main, fix/member-signature-invitation-email-20261004, fix/signature-gateway-cryptographic-bridge-20261015, fix/communications-cloudflare-website-integration, fix/communication-media-archive-drive-oauth, fix/signature-trail-20261024]
-    paths:
-      - "drive-gateway/**"
-      - "src/firebase/documentLifecycle.js"
-      - "firebase.json"
-      - ".github/workflows/staging-gateway-e2e.yml"
-      - ".github/workflows/meeting-portal-fixture-browser.yml"
-      - "tests/meeting-isolation-guard.test.mjs"
   pull_request:
     branches: [main]
     paths:
