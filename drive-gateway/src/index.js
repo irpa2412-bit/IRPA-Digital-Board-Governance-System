@@ -347,7 +347,7 @@ export default {
           pathname === "/api/documents" ||
           /^\/api\/documents\/[A-Za-z0-9_-]{3,64}\/pdf$/.test(pathname) ||
           pathname === "/api/envelopes" ||
-          /^\/api\/envelopes\/[A-Za-z0-9_-]{3,64}(?:\/void|\/retry-completion)?$/.test(pathname) ||
+          /^\/api\/envelopes\/[A-Za-z0-9_-]{3,64}(?:\/void|\/retry-completion|resync)?$/.test(pathname) ||
           pathname === "/api/sign/open" ||
           pathname === "/api/sign/status" ||
           pathname === "/api/sign/evidence" ||
