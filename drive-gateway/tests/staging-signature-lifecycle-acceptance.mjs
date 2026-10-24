@@ -83,7 +83,7 @@ async function main(){
   const postSigningChecks=[];
   async function postCheck(name,fn){
     try{await fn();postSigningChecks.push({name,result:"PASS",error:""});console.log("PASS: "+name);}
-    catch(error){const message=String(error?.message||error).replace(/[\r\n\t]+/g," ").slice(0,1000);postSigningChecks.push({name,result:"FAIL",error:message});console.error("FAIL: "+name+" :: "+message);}
+    catch(error){const message=String(error?.message||error).replace(/[\r\n\t]+/g," ");postSigningChecks.push({name,result:"FAIL",error:message});console.error("FAIL: "+name+" :: "+message);}
   }
   async function writePostSigningSummary(){
     if(!process.env.GITHUB_STEP_SUMMARY)return;
