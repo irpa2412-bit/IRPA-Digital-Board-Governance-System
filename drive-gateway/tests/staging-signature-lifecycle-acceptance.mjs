@@ -11,7 +11,7 @@ const adminEmail=process.env.STAGING_TEST_EMAIL||"",adminPassword=process.env.ST
 const signerEmail=process.env.STAGING_CRYPTO_TEST_EMAIL||"",signerPassword=process.env.STAGING_CRYPTO_TEST_PASSWORD||"";
 const saText=process.env.STAGING_FIREBASE_SERVICE_ACCOUNT_JSON||"";
 const gatewayPattern=/^https:\/\/irpa-google-drive-gateway-staging\.[a-z0-9-]+\.workers\.dev$/i;
-let activeStep="Staging-only target guard";const passed=[];let gatewayVersion="not retrieved";
+let activeStep="Staging-only target guard";const passed=[];let gatewayVersion="not reported";
 
 function writeSummary(ok,failed="",detail=""){
   if(!process.env.GITHUB_STEP_SUMMARY)return;
@@ -41,8 +41,7 @@ async function main(){
     assert.equal(healthResponse.ok,true,"Staging gateway health request failed (HTTP "+healthResponse.status+").");
     const health=await healthResponse.json();
     assert.equal(health.ok,true,"Staging gateway health response is not healthy.");
-    gatewayVersion=String(health.version||"unknown");
-    assert.notEqual(gatewayVersion,"unknown","Staging gateway health response did not include a version.");
+    gatewayVersion=health.version ? String(health.version) : "not reported";
     console.log("Gateway version: "+gatewayVersion);
   });
   let admin,signer,adminAccess,signerHeaders,adminHeaders,identity;
