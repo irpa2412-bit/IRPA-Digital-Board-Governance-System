@@ -2635,6 +2635,7 @@ async function getFirestoreDocument(env, path, firebaseToken) {
   const response = await fetch(`https://firestore.googleapis.com/v1/projects/${getFirebaseProjectId(env)}/databases/(default)/documents/${path}`, {
     headers: { Authorization: `Bearer ${firebaseToken}` }
   });
+  if (response.status === 404) return null;
   if (!response.ok) {
     let googleError = {};
     try {
