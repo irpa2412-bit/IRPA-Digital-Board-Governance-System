@@ -359,8 +359,64 @@ export default {
           pathname === "/api/auth/password-attempt-clear" ||
           pathname === "/api/documents/next-reference";
         if (isEsignPath) {
+          const persistCompletedSignatureEnvelope = async ({envelope,completion}) => {
+            if (!envelope?.externalReference) return;
+            const token = await getFirestoreAdminAccessToken(env);
+            const path = "signatureEnvelopes/" + String(envelope.externalReference);
+            const existingRaw = await getFirestoreDocument(env, path, token);
+            if (!existingRaw) throw new Error("The portal signature envelope was not found for gateway completion.");
+            const existing = firestoreDocumentToPlain(existingRaw) || {};
+            const signedFileId = String(completion?.primaryStorageId || "");
+            if (!signedFileId) throw new Error("Completed signed PDF reference is missing.");
+            const signedDocumentUrl = "https://drive.google.com/file/d/" + encodeURIComponent(signedFileId) + "/view";
+            const signers = (envelope.signers || []).map(s => ({
+              uid: s.uid || null, name: s.name || "", email: s.email || "",
+              status: s.status || "", signedAt: s.signedAt || null,
+              authorityRole: s.authorityVerification?.authorityRole || ""
+            }));
+            const updated = {
+              status: "Completed", signers,
+              completedAt: completion.completedAt,
+              signedDocumentUrl, ownerCompletedDocumentUrl: signedDocumentUrl,
+              signedDocumentPath: signedDocumentUrl, signedPdfReference: signedFileId,
+              lastSignedByUid: [...signers].reverse().find(s => s.uid)?.uid || null,
+              gatewayStatus: "Completed", gatewayFinalHash: completion.finalHash,
+              gatewaySigningStatus: "Completed", gatewayStatusUpdatedAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            };
+            const encode = value => {
+              if (value === null || value === undefined) return {nullValue:null};
+              if (typeof value === "boolean") return {booleanValue:value};
+              if (typeof value === "number" && Number.isInteger(value)) return {integerValue:String(value)};
+              if (typeof value === "number") return {doubleValue:value};
+              if (Array.isArray(value)) return {arrayValue:{values:value.map(encode)}};
+              if (typeof value === "object") return {mapValue:{fields:Object.fromEntries(Object.entries(value).map(([k,v])=>[k,encode(v)]))}};
+              return {stringValue:String(value)};
+            };
+            const fields = Object.fromEntries(Object.entries(updated).map(([k,v])=>[k,encode(v)]));
+            await updateFirestoreDocument(env,path,token,fields,Object.keys(fields));
+            const eventId = "gateway-completed-" + crypto.randomUUID();
+            const event = {
+              envelopeId: String(envelope.externalReference),
+              documentId: String(existing.documentId || envelope.documentId || ""),
+              type: "Gateway Signing Completed",
+              eventType: "Gateway Signing Completed",
+              action: "COMPLETED",
+              status: "Completed",
+              actorUid: updated.lastSignedByUid,
+              signedDocumentUrl, signedPdfReference: signedFileId,
+              finalHash: completion.finalHash,
+              completedAt: completion.completedAt,
+              createdAt: new Date().toISOString(),
+              source: "drive-gateway"
+            };
+            await updateFirestoreDocument(env,"signatureEvents/"+eventId,token,
+              Object.fromEntries(Object.entries(event).map(([k,v])=>[k,encode(v)])),
+              Object.keys(event));
+          };
           const ctx = buildEsignContext({
             env,
+            persistCompletedSignatureEnvelope,
             verifyUser: async req => {
               const claims = await authenticateFirebaseRequest(req, env);
               const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
