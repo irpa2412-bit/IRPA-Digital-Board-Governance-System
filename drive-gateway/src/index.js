@@ -2627,7 +2627,16 @@ async function updateFirestoreDocument(env, path, firebaseToken, fields, updateM
     headers:{"Authorization":`Bearer ${firebaseToken}`,"Content-Type":"application/json"},
     body:JSON.stringify({fields})
   });
-  if (!response.ok) throw new Error(`Unable to update Firestore document ${path} (HTTP ${response.status}).`);
+  if (!response.ok) {
+    let googleError = {};
+    try {
+      const body = await response.clone().json();
+      googleError = body?.error || {};
+    } catch {}
+    const googleStatus = String(googleError.status || "UNKNOWN").replace(/[\\r\\n]/g, " ").slice(0, 100);
+    const googleMessage = String(googleError.message || "No Google error message returned").replace(/[\\r\\n]/g, " ").slice(0, 500);
+    throw new Error(`Firestore PATCH ${path} failed: HTTP ${response.status} ${googleStatus} ${googleMessage}`);
+  }
   return response.json();
 }
 
@@ -2635,8 +2644,16 @@ async function getFirestoreDocument(env, path, firebaseToken) {
   const response = await fetch(`https://firestore.googleapis.com/v1/projects/${getFirebaseProjectId(env)}/databases/(default)/documents/${path}`, {
     headers: { Authorization: `Bearer ${firebaseToken}` }
   });
-  if (response.status === 404) return null;
-  if (!response.ok) throw new Error("Unable to verify the Firestore authorization record.");
+  if (!response.ok) {
+    let googleError = {};
+    try {
+      const body = await response.clone().json();
+      googleError = body?.error || {};
+    } catch {}
+    const googleStatus = String(googleError.status || "UNKNOWN").replace(/[\\r\\n]/g, " ").slice(0, 100);
+    const googleMessage = String(googleError.message || "No Google error message returned").replace(/[\\r\\n]/g, " ").slice(0, 500);
+    throw new Error(`Firestore GET ${path} failed: HTTP ${response.status} ${googleStatus} ${googleMessage}`);
+  }
   return response.json();
 }
 
