@@ -195,7 +195,8 @@ export default {
         const health = {
           ok: true,
           service: "IRPA Google Drive Gateway",
-          storageProvider: "Google Drive"
+          storageProvider: "Google Drive",
+          version: String(env.GIT_SHA || "unknown")
         };
         if (env.IRPA_ENVIRONMENT === "staging") {
           health.environment = "staging";

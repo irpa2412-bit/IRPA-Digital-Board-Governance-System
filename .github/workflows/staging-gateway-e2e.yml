@@ -943,7 +943,7 @@ jobs:
           apiToken: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.STAGING_CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: drive-gateway
-          command: deploy --config wrangler.staging.generated.json
+          command: deploy --config wrangler.staging.generated.json --var GIT_SHA:${{ github.sha }}
 
       - name: Configure optional Meta OAuth secrets for staging
         env:

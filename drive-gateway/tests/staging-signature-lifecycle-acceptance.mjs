@@ -11,11 +11,11 @@ const adminEmail=process.env.STAGING_TEST_EMAIL||"",adminPassword=process.env.ST
 const signerEmail=process.env.STAGING_CRYPTO_TEST_EMAIL||"",signerPassword=process.env.STAGING_CRYPTO_TEST_PASSWORD||"";
 const saText=process.env.STAGING_FIREBASE_SERVICE_ACCOUNT_JSON||"";
 const gatewayPattern=/^https:\/\/irpa-google-drive-gateway-staging\.[a-z0-9-]+\.workers\.dev$/i;
-let activeStep="Staging-only target guard";const passed=[];
+let activeStep="Staging-only target guard";const passed=[];let gatewayVersion="not retrieved";
 
 function writeSummary(ok,failed="",detail=""){
   if(!process.env.GITHUB_STEP_SUMMARY)return;
-  const rows=["## Staging signature-to-lifecycle acceptance","","- Result: "+(ok?"PASS":"FAIL"),"- Project: "+PROJECT,"- Gateway: "+(base||"not configured"),"- Completed checks: "+(passed.join("; ")||"none"),"- Failing step: "+(failed||"None"),"- Detail: "+String(detail|| (ok?"All assertions passed.":"See failed step output.")).replace(/[\r\n]+/g," ").slice(0,300),"- Production targets were not used.",""];
+  const rows=["## Staging signature-to-lifecycle acceptance","","- Result: "+(ok?"PASS":"FAIL"),"- Project: "+PROJECT,"- Gateway: "+(base||"not configured"),"- Gateway version: "+gatewayVersion,"- Completed checks: "+(passed.join("; ")||"none"),"- Failing step: "+(failed||"None"),"- Detail: "+String(detail|| (ok?"All assertions passed.":"See failed step output.")).replace(/[\r\n]+/g," ").slice(0,300),"- Production targets were not used.",""];
   fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,rows.join("\n"));
 }
 async function step(name,fn){activeStep=name;await fn();passed.push(name);console.log("PASS: "+name);}
@@ -37,6 +37,13 @@ async function main(){
     assert.equal(new URL(base).protocol,"https:","Gateway must use HTTPS.");
     assert.ok(apiKey&&adminEmail&&adminPassword&&signerEmail&&signerPassword&&saText,"Required staging credentials are missing.");
     assert.notEqual(adminEmail.toLowerCase(),signerEmail.toLowerCase(),"Admin and signer test accounts must be distinct.");
+    const healthResponse=await fetch(base+"/health",{headers:{"cache-control":"no-cache"}});
+    assert.equal(healthResponse.ok,true,"Staging gateway health request failed (HTTP "+healthResponse.status+").");
+    const health=await healthResponse.json();
+    assert.equal(health.ok,true,"Staging gateway health response is not healthy.");
+    gatewayVersion=String(health.version||"unknown");
+    assert.notEqual(gatewayVersion,"unknown","Staging gateway health response did not include a version.");
+    console.log("Gateway version: "+gatewayVersion);
   });
   let admin,signer,adminAccess,signerHeaders,adminHeaders,identity;
   await step("Authenticate staging admin and signer; verify signer authority",async()=>{
