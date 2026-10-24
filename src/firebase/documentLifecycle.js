@@ -1,12 +1,13 @@
 import { getIdToken } from "firebase/auth";
 import { auth } from "./config";
-import { getGoogleDriveGatewayUrl } from "./gatewayUrl";
+import { getGoogleDriveGatewayUrl, getTrialGoogleDriveGatewayUrl } from "./gatewayUrl";
 
 // Both Trial/Test and Actual records use the gateway selected for this build; staging remains isolated.
 function getGatewayUrl(){
  let environment="";
  try{environment=window.sessionStorage.getItem("irpaDataEnvironment")||""}catch{}
- if(environment==="TRIAL"||environment==="ACTUAL")return getGoogleDriveGatewayUrl();
+ if(environment==="TRIAL")return getTrialGoogleDriveGatewayUrl();
+ if(environment==="ACTUAL")return getGoogleDriveGatewayUrl();
  throw new Error("Choose Trial/Test or Actual Institutional Records in the Data Environment Gate before using Documents.");
 }
 function resolveRecordOrigin(value){

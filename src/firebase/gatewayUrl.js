@@ -7,3 +7,11 @@ if (__IRPA_STAGING_BUILD__ && !configuredGatewayUrl) {
 export function getGoogleDriveGatewayUrl() {
   return configuredGatewayUrl || __IRPA_DEFAULT_GATEWAY_URL__;
 }
+
+// Preserve the established Trial/Test route in production builds. A staging build
+// uses its single configured gateway for both data modes and cannot target production.
+export function getTrialGoogleDriveGatewayUrl() {
+  return __IRPA_STAGING_BUILD__
+    ? getGoogleDriveGatewayUrl()
+    : "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev";
+}
