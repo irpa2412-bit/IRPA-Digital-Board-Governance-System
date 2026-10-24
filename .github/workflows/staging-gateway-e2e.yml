@@ -221,6 +221,7 @@ jobs:
           META_APP_ID: ${{ vars.STAGING_META_APP_ID }}
           META_APP_SECRET: ${{ secrets.STAGING_META_APP_SECRET }}
           META_TOKEN_ENCRYPTION_KEY: ${{ secrets.STAGING_META_TOKEN_ENCRYPTION_KEY }}
+          GIT_SHA: ${{ github.sha }}
         working-directory: drive-gateway
         run: |
           set -euo pipefail
@@ -257,6 +258,7 @@ jobs:
             compatibility_date:"2026-09-29",workers_dev:true,
             vars:{
               FIREBASE_PROJECT_ID:process.env.PROJECT,
+              GIT_SHA:process.env.GIT_SHA,
               SMTP_MOCK:"success",
               AUTHORIZED_DRIVE_EMAIL:"irpa2412@gmail.com",
               IRPA_APP_URL:process.env.APP_URL,
