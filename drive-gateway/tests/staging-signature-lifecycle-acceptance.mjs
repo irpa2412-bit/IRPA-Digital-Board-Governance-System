@@ -150,4 +150,4 @@ async function main(){
   console.log("STAGING_SIGNATURE_LIFECYCLE_ACCEPTANCE=PASS");
   console.log(JSON.stringify({project:PROJECT,documentId,gatewayEnvelopeId,portalEnvelopeId,signerUid:signer.localId,assignedRole:"Authorization Officer",postSigningChecks,lifecycleStatus:"SIGNED",approvalAccepted:true,sourceHash}));
 }
-main().catch(error=>{const detail=String(error?.message||error).replace(/[\r\n\t]+/g," ").slice(0,350);console.error("STAGING_SIGNATURE_LIFECYCLE_ACCEPTANCE=FAIL");console.error("FAILING_STEP="+activeStep);console.error("DETAIL="+detail);writeSummary(false,activeStep,detail);process.exitCode=1;});
+main().catch(error=>{const detail=String(error?.message||error).replace(/[\r\n\t]+/g," ");console.error("STAGING_SIGNATURE_LIFECYCLE_ACCEPTANCE=FAIL");console.error("FAILING_STEP="+activeStep);console.error("DETAIL="+detail);writeSummary(false,activeStep,detail);process.exitCode=1;});
