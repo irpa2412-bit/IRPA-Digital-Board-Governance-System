@@ -32,7 +32,7 @@ import { createInductionMatchingRouter } from "./inductionMatching.mjs";
 import { createInvitationRemovalRouter } from "./invitationRemoval.mjs";
 import { persistCompletedSignatureEnvelope as persistSignatureMirror } from "./signatureMirror.mjs";
 import { evaluateActualDataAccessPolicy, ACTUAL_DATA_ATTESTATION } from "./actualDataAccessPolicy.mjs";
-import { classifyRegisteredIdentityRecord, summarizeIdentityReconciliation } from "./registeredIdentityReconciliation.mjs";
+import { authorizeIdentityReconciliation, classifyRegisteredIdentityRecord, summarizeIdentityReconciliation } from "./registeredIdentityReconciliation.mjs";
 
 function getFirebaseProjectId(env) {
   const projectId = String(env?.FIREBASE_PROJECT_ID || "").trim();
@@ -747,7 +747,8 @@ async function reconcileRegisteredIdentityUidsRoute(request, env) {
     const profile = await getFirestoreDocument(env, "adminProfiles/" + claims.user_id, firestoreToken);
     const email = String(claims.email || "").trim().toLowerCase();
     const adminAllowed = email === "irpa2412@gmail.com" || (profile?.fields?.active?.booleanValue === true && profile?.fields?.role?.stringValue === "Administrator");
-    if (!adminAllowed) return json({ ok: false, step, error: "Only an active IRPA Administrator may reconcile registered identity UIDs." }, 403, corsHeaders(request));
+    const authorization = authorizeIdentityReconciliation({ authenticated: Boolean(claims.user_id), adminAllowed });
+    if (!authorization.allowed) return json({ ok: false, step, error: authorization.error }, authorization.status, corsHeaders(request));
 
     step = "List existing Firebase Authentication accounts";
     const authToken = await getFirebaseAuthAdminAccessToken(env);
