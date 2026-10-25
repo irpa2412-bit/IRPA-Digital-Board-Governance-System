@@ -83,10 +83,12 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          GIT_SHA: ${{ github.sha }}
         working-directory: drive-gateway
         run: |
-          echo "Deploying wrangler.toml default configuration (no --env override)."
-          npx wrangler deploy --config wrangler.toml --name irpa-google-drive-gateway
+          set -euo pipefail
+          echo "Deploying production Worker from commit ${GIT_SHA} (no --env override)."
+          npx wrangler deploy --config wrangler.toml --name irpa-google-drive-gateway --var "GIT_SHA:${GIT_SHA}"
 
       - name: Verify production gateway health
         shell: bash
