@@ -60,7 +60,8 @@ test("actual-data gate Worker route enforces admin role, exact attestation, writ
   assert.match(route, /adminProfiles\//);
   assert.match(route, /profile\?\.fields\?\.active\?\.booleanValue === true/);
   assert.match(route, /ACTUAL_DATA_ATTESTATION/);
-  assert.match(route, /I CONFIRM FINAL SYSTEM TESTS PASSED/);
+  assert.match(worker, /actualDataAccessPolicy\.mjs/);
+  assert.match(route, /evaluateActualDataAccessPolicy/);
   assert.match(route, /status:\{stringValue:enabled\?'OPEN':'CLOSED'\}/);
   assert.match(route, /finalTestsAttested:\{booleanValue:enabled\}/);
   assert.match(route, /ACTUAL_DATA_ACCESS_OPENED/);
@@ -78,4 +79,23 @@ test("actual-data gate rejects non-administrators and wrong attestation before c
   assert.match(route, /},403,corsHeaders\(request\)/);
   assert.match(route, /},412,corsHeaders\(request\)/);
   assert.match(route, /An enabled boolean is required/);
+});
+
+test("actual-data gate policy allows an administrator with the exact attestation", async () => {
+  const { evaluateActualDataAccessPolicy, ACTUAL_DATA_ATTESTATION } = await import("../drive-gateway/src/actualDataAccessPolicy.mjs");
+  assert.deepEqual(evaluateActualDataAccessPolicy({adminAllowed:true,enabled:true,confirmation:ACTUAL_DATA_ATTESTATION}), {allowed:true,status:200,enabled:true,finalTestsAttested:true});
+});
+
+test("actual-data gate policy refuses a non-administrator", async () => {
+  const { evaluateActualDataAccessPolicy, ACTUAL_DATA_ATTESTATION } = await import("../drive-gateway/src/actualDataAccessPolicy.mjs");
+  const result = evaluateActualDataAccessPolicy({adminAllowed:false,enabled:true,confirmation:ACTUAL_DATA_ATTESTATION});
+  assert.equal(result.allowed,false);
+  assert.equal(result.status,403);
+});
+
+test("actual-data gate policy refuses a wrong attestation", async () => {
+  const { evaluateActualDataAccessPolicy } = await import("../drive-gateway/src/actualDataAccessPolicy.mjs");
+  const result = evaluateActualDataAccessPolicy({adminAllowed:true,enabled:true,confirmation:"I CONFIRM"});
+  assert.equal(result.allowed,false);
+  assert.equal(result.status,412);
 });
