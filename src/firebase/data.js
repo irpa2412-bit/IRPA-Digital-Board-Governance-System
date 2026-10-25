@@ -5,6 +5,7 @@ import { sendEmployeeRegistrationEmail } from "./auth";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { canAccessMeetingCategory, MEETING_CATEGORIES } from "./meetingPolicy.js";
 import { listLifecycleDocuments } from "./documentLifecycle.js";
+import { reconcileRegisteredIdentityUidsViaGateway } from "./registeredIdentityReconciliation";
 
 const uniqueInductionValues=(values)=>[...new Set(values.flatMap(v=>Array.isArray(v)?v:String(v||"").split(",")).map(v=>String(v||"").trim()).filter(Boolean))];
 
@@ -466,11 +467,22 @@ export async function linkInductionRegistration(requestId){
 }
 
 export async function synchronizeRegisteredIdentityUids(){
-  if(!auth.currentUser?.uid) throw new Error("Administrator authentication is required.");
-  const functions=getFunctions(undefined,"us-central1");
-  const call=httpsCallable(functions,"synchronizeRegisteredIdentityUids");
-  const result=await call({});
-  return result.data;
+  const result = await reconcileRegisteredIdentityUidsViaGateway();
+  const summary = result.summary || {};
+  return {
+    ...result,
+    summary: {
+      linked: Number(summary.assigned || 0) + Number(summary.alreadyAssigned || 0),
+      created: 0,
+      conflicts: Number(summary.conflicting || 0),
+      blocked: Number(summary.unresolved || 0),
+      errors: Number(summary.errors || 0),
+      assigned: Number(summary.assigned || 0),
+      alreadyAssigned: Number(summary.alreadyAssigned || 0),
+      unresolved: Number(summary.unresolved || 0),
+      results: result.results || []
+    }
+  };
 }
 
 export async function callFinanceAccounting(functionName,data={}){const fn=getFunctions();const callable=httpsCallable(fn,functionName);const result=await callable(data);return result.data;}
