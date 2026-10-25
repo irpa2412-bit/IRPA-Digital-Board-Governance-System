@@ -431,7 +431,9 @@ export default {
 
       return json({
         ok: false,
-        error: message
+        error: message,
+        ...(error?.googleStatus ? {googleStatus:error.googleStatus} : {}),
+        ...(error?.googleMessage ? {googleMessage:error.googleMessage} : {})
       }, Number(error?.status || 0) || (isAuthError ? 401 : 500), corsHeaders(request));
     }
   }
