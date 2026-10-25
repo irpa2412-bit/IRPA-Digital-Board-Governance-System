@@ -45,8 +45,9 @@ if (!failed) {
     }
     const denied = await fetch(gateway + "/api/communications/website/content?type=pages");
     check("Unauthenticated role denial", denied.status === 401 || denied.status === 403, "HTTP " + denied.status);
-    const serialized = redactSecrets(JSON.stringify({ status, email: env.STAGING_TEST_EMAIL }), [auth.idToken, env.STAGING_FIREBASE_WEB_API_KEY, env.STAGING_TEST_PASSWORD]);
-    check("Response diagnostic secret redaction", !serialized.includes(auth.idToken) && !serialized.includes(env.STAGING_TEST_PASSWORD) && !serialized.includes(env.STAGING_FIREBASE_WEB_API_KEY));
+    const secretProbe = "Authorization: Bearer " + auth.idToken + " WORDPRESS_APPLICATION_PASSWORD=" + env.STAGING_TEST_PASSWORD + " API_KEY=" + env.STAGING_FIREBASE_WEB_API_KEY;
+    const serialized = redactSecrets(secretProbe, [auth.idToken, env.STAGING_FIREBASE_WEB_API_KEY, env.STAGING_TEST_PASSWORD]);
+    check("Response diagnostic secret redaction", !serialized.includes(auth.idToken) && !serialized.includes(env.STAGING_TEST_PASSWORD) && !serialized.includes(env.STAGING_FIREBASE_WEB_API_KEY) && serialized.includes("[REDACTED]"));
   } catch (error) {
     check("Staging runtime acceptance", false, error.message);
   }
