@@ -117,7 +117,7 @@ async function main(){
     const rows=await r.json().catch(()=>[]);
     assert.equal(r.ok,true,"Could not query staging signature trail (HTTP "+r.status+")");
     const events=(Array.isArray(rows)?rows:[]).filter(x=>x.document).map(x=>plain(x.document));
-    assert.ok(events.some(x=>x.event==="Gateway Signing Completed"&&x.actorUid===signer.localId),"Signature trail lacks Gateway Signing Completed for final signer "+signer.localId);
+    assert.ok(events.some(x=>x.event==="Gateway Signing Completed"&&x.actorUid===signer.localId),"Signature trail lacks Gateway Signing Completed for final signer "+signer.localId);assert.ok(events.some(x=>x.actorUid===signer.localId&&x.event!=="Gateway Signing Completed"),"Signature trail lacks a signer-specific signatureEvents entry for "+signer.localId);
   });
   await postCheck("Lifecycle SIGNED",async()=>{
     const r=await checkedFetch(base+"/api/document-lifecycle/signature-complete",{method:"POST",headers:{...adminHeaders,"content-type":"application/json"},body:JSON.stringify({documentId,envelopeId:portalEnvelopeId})});
@@ -125,6 +125,13 @@ async function main(){
     assert.equal(r.ok,true,"Lifecycle signature completion failed (HTTP "+r.status+"): "+String(b.error||b.message||"no response detail"));
     assert.equal(b.status,"SIGNED","Lifecycle returned status "+String(b.status));
     assert.equal(b.documentId,documentId,"Lifecycle documentId mismatch");
+  });
+  await postCheck("Lifecycle audit event persisted",async()=>{
+    const r=await checkedFetch("https://firestore.googleapis.com/v1/projects/"+encodeURIComponent(PROJECT)+"/databases/(default)/documents:runQuery",{method:"POST",headers:{Authorization:"Bearer "+adminAccess,"content-type":"application/json"},body:JSON.stringify({structuredQuery:{from:[{collectionId:"audit"}],where:{fieldFilter:{field:{fieldPath:"recordId"},op:"EQUAL",value:{stringValue:documentId}}},limit:100}})});
+    const rows=await r.json().catch(()=>[]);
+    assert.equal(r.ok,true,"Could not query lifecycle audit collection (HTTP "+r.status+")");
+    const records=(Array.isArray(rows)?rows:[]).filter(x=>x.document).map(x=>plain(x.document));
+    assert.ok(records.some(x=>x.action==="DOCUMENT_LIFECYCLE_SIGNATURE_COMPLETED"),"Lifecycle audit lacks DOCUMENT_LIFECYCLE_SIGNATURE_COMPLETED for "+documentId);
   });
   await postCheck("Approval / persisted signed document",async()=>{
     const doc=await readDoc(adminAccess,"documents",documentId);
