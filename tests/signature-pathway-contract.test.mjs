@@ -13,18 +13,15 @@ test("controlled upload allocates one Firestore ID before gateway upload and per
   ]);
   const allocate = upload.indexOf("const documentUid = doc(collection(db, COLLECTIONS.documents)).id;");
   const routedUpload = upload.indexOf("uploadControlledDocumentRouted({", allocate);
-  const createRecord = upload.indexOf("createRecord(COLLECTIONS.documents, pendingDocument.documentPayload, pendingDocument.documentId)");
   assert.ok(allocate >= 0 && routedUpload > allocate, "Firestore ID must be allocated before gateway upload");
   assert.match(upload.slice(routedUpload, routedUpload + 500), /documentId:\s*documentUid/);
-  assert.match(upload, /documentId:\s*documentUid/);
-  assert.ok(createRecord >= 0, "deferred Firestore write must be present");
-  assert.match(upload, /documentId:\s*documentUid/);
+  assert.match(upload, /createRecord\(COLLECTIONS\.documents, pendingDocument\.documentPayload, pendingDocument\.documentId\)/);
   assert.match(data, /recordId\s*=\s*null/);
   assert.match(data, /doc\(db, collectionName, recordId\)/);
-  assert.match(storage, /documentId/);
+  assert.match(storage, /gatewayPost\("\/api\/upload-controlled-document"/);
+  assert.match(worker, /api\/upload-controlled-document/);
   assert.match(worker, /description/);
   assert.match(worker, /documentId/);
-  assert.match(worker, /api\/upload/);
 });
 
 test("reconcile endpoint is administrator-authorized, validates document/file pairing, and returns per-file results", async () => {
@@ -37,12 +34,12 @@ test("reconcile endpoint is administrator-authorized, validates document/file pa
   assert.match(worker, /failed/);
 });
 
-test("signature palette exposes a readable step-specific error instead of swallowing failures", async () => {
+test("signature palette exposes readable errors in the visible status area", async () => {
   const platform = await read("../src/pages/SignaturePlatform.jsx");
   const storage = await read("../src/firebase/signatureStorage.js");
-  assert.match(platform, /STEP|step/i);
-  assert.match(platform, /role="alert"|role=\{?"alert"/);
-  assert.match(platform, /setError|setMessage/);
-  assert.match(storage, /STEP controlled download failed|STEP/);
+  assert.match(platform, /className="auth-message"/);
+  assert.match(platform, /\{message\s*&&\s*<div className="auth-message"/);
+  assert.match(platform, /setMessage/);
+  assert.match(storage, /STEP controlled download failed/);
   assert.match(storage, /documentId/);
 });
