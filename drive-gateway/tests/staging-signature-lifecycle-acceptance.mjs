@@ -133,12 +133,12 @@ async function main(){
     assert.equal(doc.signatureEnvelopeId,portalEnvelopeId,"Persisted signatureEnvelopeId mismatch");
     assert.ok(doc.signedAt,"Persisted signedAt timestamp is missing");
   });
+  await postCheck("Gateway rejects client-supplied SIGNED/Completed",async()=>{assert.equal(clientDocumentStateRejected,true,"Gateway accepted client-supplied SIGNED document state.");assert.equal(clientEnvelopeStateRejected,true,"Gateway accepted client-supplied Completed envelope state.");});
   const unimplemented=[
     ["Signed-file reference and controlled resolution","No signed-file reference/resolution assertion is wired into this acceptance fixture."],
     ["Final signed-PDF SHA-256","The fixture does not retrieve a signed PDF to independently recompute the final hash."],
     ["Controlled retrieval: owner, assigned signer, unrelated user","The fixture has no dedicated unrelated-user credentials or complete retrieval matrix."],
-    ["Audit: every signer and lifecycle completion","Current fixture verifies the final signer event only; it does not verify an event for every signer plus the lifecycle audit event."],
-    ["Gateway rejects client-supplied SIGNED/Completed","No negative client-state mutation assertion is currently wired into this acceptance fixture."]
+    ["Audit: every signer and lifecycle completion","Current fixture verifies the final signer event only; it does not verify an event for every signer plus the lifecycle audit event."]
   ];
   for(const [name,error] of unimplemented)postSigningChecks.push({portal:"Signature Portal / Gateway",name,result:"FAIL",error});
   globalThis.__irpaPostSigningChecks=postSigningChecks;
