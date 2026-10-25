@@ -73,7 +73,7 @@ export default function SignaturePathwaySelfTest() {
       if (!candidates.some(item => item.documentId === knownMismatch.documentId)) candidates.push(knownMismatch);
       if (!candidates.length) throw new Error("STEP reconciliation failed: no documents with registered Drive file IDs were found.");
       const result = await reconcileSignatureDocumentIds(candidates);
-      const lines = (result.results || []).map(item => ({ documentId: item.documentId, title: item.documentId, checks: [{ name: item.status + " · Drive " + item.fileId, status: item.status === "failed" ? "FAIL" : item.status === "would repair" ? "NOT RUN" : "PASS", reason: (item.previousDescriptionDocumentId ? "Previous description.documentId: " + item.previousDescriptionDocumentId + ". " : "") + item.reason }] }));
+      const lines = (result.results || []).map(item => ({ documentId: item.documentId, title: item.documentId, checks: [{ name: item.status + " · Drive " + item.fileId, status: item.status === "failed" ? "FAIL" : item.status === "would repair" ? "NOT RUN" : "PASS", reason: "Drive created: " + (item.driveCreatedTime || "(not reported)") + ". " + (item.previousDescriptionDocumentId ? "Previous description.documentId: " + item.previousDescriptionDocumentId + ". " : "") + item.reason }] }));
       setResults(lines);
       setMessage("Reconciliation finished: " + (result.summary?.repaired || 0) + " repaired; " + (result.summary?.alreadyCorrect || 0) + " already correct; " + (result.summary?.failed || 0) + " failed. One result line is shown for each document/file pair, including the known mismatch.");
     } catch (error) {
