@@ -59,15 +59,15 @@ async function main(){
     assert.ok(identity.authorityRole&&identity.authorityRole!=="Not yet assigned","Signer needs registered authority.");
   });
   const stamp=Date.now().toString(36),documentId="DOC-STAGING-LIFECYCLE-"+stamp,portalEnvelopeId="STAGING-SIGN-"+stamp;
-  let sourceHash="",gatewayEnvelopeId="",signingToken="";
+  let sourceHash="",gatewayEnvelopeId="",signingToken="",clientStateSpoofVerified=false;
   await step("Create staging PDF and gateway document",async()=>{
     const pdf=await PDFDocument.create(),page=pdf.addPage([595.28,841.89]);
     page.drawText("IRPA staging signature lifecycle acceptance",{x:48,y:760,size:15});
     page.drawText("Synthetic test only; not an operational record.",{x:48,y:730,size:10});
     const bytes=await pdf.save();sourceHash=await sha(bytes);
-    const form=new FormData();form.append("documentId",documentId);form.append("title","Staging Signature Lifecycle Acceptance");form.append("classification","Internal");form.append("archives","board-governance");form.append("file",new Blob([bytes],{type:"application/pdf"}),"staging-signature-lifecycle.pdf");
+    const form=new FormData();form.append("documentId",documentId);form.append("title","Staging Signature Lifecycle Acceptance");form.append("classification","Internal");form.append("archives","board-governance");form.append("status","SIGNED");form.append("signatureStatus","COMPLETED");form.append("file",new Blob([bytes],{type:"application/pdf"}),"staging-signature-lifecycle.pdf");
     const uploaded=await jsonResponse(await checkedFetch(base+"/api/documents",{method:"POST",headers:signerHeaders,body:form}),"Staging controlled-document upload");
-    assert.equal(uploaded.documentId,documentId);assert.equal(uploaded.sha256,sourceHash);
+    assert.equal(uploaded.documentId,documentId);assert.equal(uploaded.sha256,sourceHash);assert.notEqual(uploaded.status,"SIGNED","Gateway must not accept a client-supplied SIGNED state.");assert.notEqual(uploaded.signatureStatus,"COMPLETED","Gateway must not accept a client-supplied Completed signature state.");clientStateSpoofVerified=true;
   });
   await step("Assign Authorization Officer and seed staging lifecycle records",async()=>{
     const now=new Date().toISOString();
@@ -76,8 +76,8 @@ async function main(){
     const seeded=await readDoc(adminAccess,"signatureEnvelopes",portalEnvelopeId);assert.equal(seeded.documentId,documentId);assert.equal(seeded.signers?.[0]?.role,"Authorization Officer");
   });
   await step("Create linked signing envelope",async()=>{
-    const b=await jsonResponse(await checkedFetch(base+"/api/envelopes",{method:"POST",headers:{...signerHeaders,"content-type":"application/json"},body:JSON.stringify({externalReference:portalEnvelopeId,returnTokens:true,documentId,title:"Staging Signature Lifecycle Acceptance",classification:"Restricted",archives:["board-governance"],signingMode:"Sequential",signers:[{uid:signer.localId,email:signer.email||signerEmail,name:"IRPA Staging Authorization Officer",role:"Authorization Officer",action:"Authorization",order:1}],fields:[{fieldId:"staging-authorization-name",type:"Name",page:1,x:8,y:18,width:50,height:8,signerUid:signer.localId,required:true},{fieldId:"staging-authorization-signature",type:"Signature",page:1,x:8,y:30,width:50,height:10,signerUid:signer.localId,required:true}]})}),"Linked staging envelope creation");
-    gatewayEnvelopeId=b.envelopeId;assert.ok(gatewayEnvelopeId,"Gateway envelope ID missing.");assert.ok(Array.isArray(b.tokens)&&b.tokens.length===1,"Staging signing token missing.");signingToken=b.tokens[0];
+    const b=await jsonResponse(await checkedFetch(base+"/api/envelopes",{method:"POST",headers:{...signerHeaders,"content-type":"application/json"},body:JSON.stringify({externalReference:portalEnvelopeId,returnTokens:true,documentId,title:"Staging Signature Lifecycle Acceptance",status:"Completed",signatureStatus:"COMPLETED",classification:"Restricted",archives:["board-governance"],signingMode:"Sequential",signers:[{uid:signer.localId,email:signer.email||signerEmail,name:"IRPA Staging Authorization Officer",role:"Authorization Officer",action:"Authorization",order:1}],fields:[{fieldId:"staging-authorization-name",type:"Name",page:1,x:8,y:18,width:50,height:8,signerUid:signer.localId,required:true},{fieldId:"staging-authorization-signature",type:"Signature",page:1,x:8,y:30,width:50,height:10,signerUid:signer.localId,required:true}]})}),"Linked staging envelope creation");
+    gatewayEnvelopeId=b.envelopeId;assert.ok(gatewayEnvelopeId,"Gateway envelope ID missing.");assert.equal(b.status,"Sent","Gateway must ignore client-supplied Completed envelope status.");assert.ok(Array.isArray(b.tokens)&&b.tokens.length===1,"Staging signing token missing.");signingToken=b.tokens[0];clientStateSpoofVerified=clientStateSpoofVerified&&true;
   });
   await step("Sign as the assigned Authorization Officer",async()=>{
     const opened=await jsonResponse(await checkedFetch(base+"/api/sign/open",{headers:{...signerHeaders,"x-signing-token":signingToken}}),"Open Authorization Officer signing task");assert.equal(opened.canSign,true);
