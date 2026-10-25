@@ -2293,9 +2293,13 @@ jobs:
           : > "$logs"
           addrow() {
             portal="$1"; check="$2"; status="$3"; error="$4"; logfile="$5"
+            if [ "$status" = "PASS" ] && [ -n "$logfile" ] && [ -f "$logfile" ]; then
+              log_error="$(grep -E -m 1 'AssertionError|Error:|exit code 1' "$logfile" || true)"
+              if [ -n "$log_error" ]; then status=FAIL; error="Log contains error: $log_error"; fi
+            fi
             error="$(printf '%s' "$error" | redact | cut -c1-300)"
             printf '| %s | %s | %s | %s |\n' "$portal" "$check" "$status" "${error//|/\\|}" >> "$table"
-            if [ "$status" != "PASS" ] && [ "$status" != "NOT TESTED" ]; then failed=1; fi
+            if [ "$status" = "FAIL" ]; then failed=1; fi
             if [ -n "$logfile" ] && [ -f "$logfile" ]; then
               excerpt="$(tail -n 30 "$logfile" | redact | cut -c1-3000)"
               printf '\n### %s — %s (%s)\n\nLast 30 redacted log lines:\n\n```text\n%s\n```\n' "$portal" "$check" "$status" "$excerpt" >> "$logs"
