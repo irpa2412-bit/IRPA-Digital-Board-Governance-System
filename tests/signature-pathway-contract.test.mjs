@@ -153,7 +153,7 @@ test("signing authority updates use the Worker and retain register-based authori
   assert.match(route, /activeRecords\.flatMap\(valuesFor\)\.includes\(requestedRole\)/);
   assert.match(route, /authoritySourceCollection/);
   assert.match(route, /UPDATE_SIGNER_AUTHORITY/);
-  assert.match(route, /step,error:/);
+  assert.match(route, /step, error:/);
   assert.match(client, /\/api\/signature\/authority/);
   assert.doesNotMatch(client, /httpsCallable\(getFunctions\(undefined,"us-central1"\),"updateSignerAuthority"\)/);
   assert.doesNotMatch(client, /if\(code!=="functions\/not-found"/);
