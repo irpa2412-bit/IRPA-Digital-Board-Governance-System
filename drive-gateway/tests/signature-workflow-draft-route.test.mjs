@@ -2,10 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-const worker = fs.readFileSync("drive-gateway/src/index.js", "utf8");
-const client = fs.readFileSync("src/firebase/signaturePlatform.js", "utf8");
-const selfTest = fs.readFileSync("src/components/SignaturePathwaySelfTest.jsx", "utf8");
-const rules = fs.readFileSync("firestore.rules", "utf8");
+const worker = fs.readFileSync("src/index.js", "utf8");
+const client = fs.readFileSync("../src/firebase/signaturePlatform.js", "utf8");
+const selfTest = fs.readFileSync("../src/components/SignaturePathwaySelfTest.jsx", "utf8");
+const rules = fs.readFileSync("../firestore.rules", "utf8");
 
 test("signature draft save is routed through the authenticated Worker", () => {
   assert.match(worker, /pathname === "\/api\/signature-workflow\/draft"/);
