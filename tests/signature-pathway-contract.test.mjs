@@ -17,8 +17,8 @@ test("controlled upload allocates one Firestore ID before gateway upload and per
   assert.match(upload.slice(routedUpload, routedUpload + 500), /documentId:\s*documentUid/);
   assert.match(upload, /createRecord\(COLLECTIONS\.documents, pendingDocument\.documentPayload, pendingDocument\.documentId\)/);
   assert.match(data, /recordId\s*=\s*null/);
-  assert.match(data, /doc\\(db, collectionName, String\\(recordId\\)\\)/);
-  assert.match(storage, /gatewayPost\("\/api\/upload-controlled-document"/);
+  assert.match(data, /doc\(db, collectionName, String\(recordId\)\)/);
+  assert.match(storage, /gatewayPost\(\"\/api\/upload-controlled-document\"/);
   assert.match(worker, /api\/upload-controlled-document/);
   assert.match(worker, /description/);
   assert.match(worker, /documentId/);
