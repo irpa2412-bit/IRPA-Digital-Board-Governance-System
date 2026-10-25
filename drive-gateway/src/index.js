@@ -31,6 +31,7 @@ import { createMeetingServicesRouter } from "./meetingServices.mjs";
 import { createInductionMatchingRouter } from "./inductionMatching.mjs";
 import { createInvitationRemovalRouter } from "./invitationRemoval.mjs";
 import { persistCompletedSignatureEnvelope as persistSignatureMirror } from "./signatureMirror.mjs";
+import { evaluateActualDataAccessPolicy, ACTUAL_DATA_ATTESTATION } from "./actualDataAccessPolicy.mjs";
 
 function getFirebaseProjectId(env) {
   const projectId = String(env?.FIREBASE_PROJECT_ID || "").trim();
@@ -687,7 +688,6 @@ async function upload(request, env) {
   }, 200, corsHeaders(request));
 }
 
-const ACTUAL_DATA_ATTESTATION = 'I CONFIRM FINAL SYSTEM TESTS PASSED';
 async function actualDataAccessRoute(request, env) {
   let step = 'Firebase authentication';
   try {
@@ -705,8 +705,8 @@ async function actualDataAccessRoute(request, env) {
     if (request.method === 'GET') return json({ok:true,enabled:fields.enabled?.booleanValue===true,status:fields.status?.stringValue || 'CLOSED',finalTestsAttested:fields.finalTestsAttested?.booleanValue===true,changedAt:fields.changedAt?.timestampValue||null,changedByEmail:fields.changedByEmail?.stringValue||null},200,corsHeaders(request));
     step = 'Validate request and attestation';
     const body = await request.json();
-    if (typeof body.enabled !== 'boolean') return json({ok:false,step,error:'An enabled boolean is required.'},400,corsHeaders(request));
-    if (body.enabled && body.confirmation !== ACTUAL_DATA_ATTESTATION) return json({ok:false,step,error:'Opening actual-data access requires the exact final-test attestation.'},412,corsHeaders(request));
+    const policy = evaluateActualDataAccessPolicy({adminAllowed,enabled:body.enabled,confirmation:body.confirmation});
+    if (!policy.allowed) return json({ok:false,step:policy.step,error:policy.error},policy.status,corsHeaders(request));
     const enabled = body.enabled;
     const version = Number(fields.version?.integerValue || 0) + 1;
     const now = new Date().toISOString();
