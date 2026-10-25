@@ -1057,7 +1057,8 @@ async function reconcileSignatureDocumentIds(request, env) {
         recordFields.sourceFileId?.stringValue
       ].filter(Boolean).map(String);
       if (!registeredIds.includes(fileId)) throw new Error("The supplied Drive file ID is not registered on this Firestore document.");
-      const metadata = await driveFetch(env, accessToken, `/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,name,mimeType,description`);
+      const metadata = await driveFetch(env, accessToken, `/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,name,mimeType,description,createdTime`);
+      line.driveCreatedTime = metadata.createdTime || "(not reported)";
       const description = parseDescription(metadata.description);
       if (!description?.irpaGovernance) throw new Error("Drive file is not marked as an IRPA governance document.");
       const previousDocumentId = String(description.documentId || "");
