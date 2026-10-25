@@ -1,3 +1,9 @@
+export function authorizeIdentityReconciliation({ authenticated, adminAllowed }) {
+  if (!authenticated) return { allowed: false, status: 401, error: "Firebase authentication is required." };
+  if (!adminAllowed) return { allowed: false, status: 403, error: "Only an active IRPA Administrator may reconcile registered identity UIDs." };
+  return { allowed: true, status: 200 };
+}
+
 export function classifyRegisteredIdentityRecord({ email, existingUid, authUsers = [] }) {
   const normalizedEmail = String(email || "").trim().toLowerCase();
   const uid = String(existingUid || "").trim();
