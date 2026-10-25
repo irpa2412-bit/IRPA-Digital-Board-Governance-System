@@ -2,6 +2,7 @@
 import { auth, db } from "./config";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where, writeBatch } from "firebase/firestore";
+import { reconcileRegisteredIdentityUidsViaGateway } from "./registeredIdentityReconciliation";
 
 export async function createAdministrator({ name, email, onProgress }){
   const cleanName=String(name||"").trim();
@@ -148,16 +149,5 @@ export async function approveCredentialInterview(requestId){
 }
 
 export async function reconcileRegisteredIdentityUids(){
-  const actor=auth.currentUser;
-  if(!actor) throw new Error("Administrator authentication is required.");
-  const functions=getFunctions(undefined,"us-central1");
-  const call=httpsCallable(functions,"reconcileRegisteredIdentityUids");
-  try{
-    const result=await call({});
-    return result.data||{};
-  }catch(error){
-    const code=String(error?.code||"");
-    if(code.includes("permission-denied")) throw new Error("Firebase denied UID reconciliation. Confirm that the current account is an active Administrator.");
-    throw new Error(error?.message||"UID reconciliation failed. No success confirmation was received.");
-  }
+  return reconcileRegisteredIdentityUidsViaGateway();
 }
