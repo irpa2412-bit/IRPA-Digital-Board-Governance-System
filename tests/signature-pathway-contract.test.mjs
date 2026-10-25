@@ -140,3 +140,21 @@ test("registered identity reconciliation renders a result line per record and a 
   assert.match(settings, /result\.results\|\|\[\]/);
   assert.match(client, /Step .* failed:/);
 });
+
+
+test("signing authority updates use the Worker and retain register-based authorization", async () => {
+  const [worker, client] = await Promise.all([
+    read("../drive-gateway/src/index.js"),
+    read("../src/firebase/signerIdentity.js")
+  ]);
+  assert.match(worker, /api\/signature\/authority/);
+  const route = worker.slice(worker.indexOf("async function updateSignerAuthorityRoute"), worker.indexOf("async function reconcileRegisteredIdentityUidsRoute"));
+  assert.match(route, /Authenticate Firebase authentication/);
+  assert.match(route, /activeRecords\.flatMap\(valuesFor\)\.includes\(requestedRole\)/);
+  assert.match(route, /authoritySourceCollection/);
+  assert.match(route, /UPDATE_SIGNER_AUTHORITY/);
+  assert.match(route, /step\+' failed: '/);
+  assert.match(client, /\/api\/signature\/authority/);
+  assert.doesNotMatch(client, /httpsCallable\(getFunctions\(undefined,"us-central1"\),"updateSignerAuthority"\)/);
+  assert.doesNotMatch(client, /if\(code!=="functions\/not-found"/);
+});
