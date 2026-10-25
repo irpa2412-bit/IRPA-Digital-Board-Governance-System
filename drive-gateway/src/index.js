@@ -597,7 +597,7 @@ async function upload(request, env) {
     if (!requestedFolderId || !data.meetingId || !data.meetingCategory) return json({ok:false,error:"Meeting ID, category and authorised archive folder are required."},400,corsHeaders(request));
     try { await authorizeMeetingArchiveUser(env, claims, String(data.meetingId), String(data.meetingCategory).toUpperCase()); }
     catch (error) { return json({ok:false,error:error.message||"Meeting archive access denied."},403,corsHeaders(request)); }
-  } else if (purpose === "Signed Documents Archive" || purpose === "Documents Portal" || purpose === "Controlled Documents") {
+  } else if (purpose === "Signed Documents Archive" || purpose === "Documents Portal" || purpose === "Controlled Documents" || purpose === "Communication Media") {
     if (!requestedFolderId) return json({ ok:false, error:"A controlled document archive folder is required." },400,corsHeaders(request));
   } else if (requestedFolderId || data.ownerUid) {
     return json({ ok: false, error: "Folder parameters are restricted to authorized IRPA archive uploads." }, 400, corsHeaders(request));
