@@ -158,3 +158,14 @@ test("signing authority updates use the Worker and retain register-based authori
   assert.doesNotMatch(client, /httpsCallable\(getFunctions\(undefined,"us-central1"\),"updateSignerAuthority"\)/);
   assert.doesNotMatch(client, /if\(code!=="functions\/not-found"/);
 });
+
+
+test("Communication Media uploads accept only the provisioned archive folder and validate its metadata", async () => {
+  const worker = await read("../drive-gateway/src/index.js");
+  const start = worker.indexOf("async function upload(request, env)");
+  const end = worker.indexOf("async function uploadControlledDocument", start);
+  const route = worker.slice(start, end);
+  assert.match(route, /purpose === "Controlled Documents" \|\| purpose === "Communication Media"/);
+  assert.match(route, /folderDescription\.irpaCommunicationMediaArchive !== true/);
+  assert.match(route, /folderDescription\.purpose !== "IRPA Communication and Media Archive"/);
+});
