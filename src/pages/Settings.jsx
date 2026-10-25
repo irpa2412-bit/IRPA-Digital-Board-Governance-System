@@ -1,4 +1,7 @@
 import React, { useEffect, useState } from "react";
+import { getIdToken } from "firebase/auth";
+import { auth, firebaseConfig } from "../firebase/config";
+import { getGoogleDriveGatewayUrl } from "../firebase/gatewayUrl";
 import { browserSupportsPush, listenForForegroundMessages, notificationPermissionState, requestPushPermission } from "../firebase/messaging";
 import SystemResetControl from "../components/SystemResetControl";
 import DepartmentArchiveRegistry from "../components/DepartmentArchiveRegistry";
@@ -29,6 +32,8 @@ export default function Settings({ admin = false, section = "settings" }) {
   const [auditorEmail, setAuditorEmail] = useState("");
   const [auditorBusy, setAuditorBusy] = useState(false);
   const [auditorResult, setAuditorResult] = useState(null);
+  const [liveCheckBusy, setLiveCheckBusy] = useState(false);
+  const [liveCheckText, setLiveCheckText] = useState("");
 
   useEffect(() => {
     if (!admin || section !== "settings") return;
@@ -55,6 +60,71 @@ export default function Settings({ admin = false, section = "settings" }) {
     })();
     return () => unsubscribe();
   }, []);
+
+  async function runLiveSystemCheck() {
+    setLiveCheckBusy(true);
+    const lines = [];
+    const user = auth.currentUser;
+    const gateway = String(getGoogleDriveGatewayUrl() || "").replace(/\/+$/, "");
+    const add = value => lines.push(value);
+    const requestCheck = async (label, path, method = "GET", body = null, token = null) => {
+      const url = gateway + path;
+      add("\n=== " + label + " ===");
+      add("URL: " + url);
+      try {
+        const response = await fetch(url, {
+          method,
+          headers: {
+            ...(token ? { Authorization: "Bearer " + token } : {}),
+            ...(body ? { "Content-Type": "application/json" } : {})
+          },
+          ...(body ? { body: JSON.stringify(body) } : {})
+        });
+        const text = await response.text();
+        add("HTTP status: " + response.status);
+        add("Response body: " + (text || "(empty response)"));
+        return { status: response.status, body: text, url };
+      } catch (error) {
+        const message = String(error?.message || error);
+        add("HTTP status: unavailable");
+        add("Error text: " + message);
+        return { status: 0, body: message, url };
+      }
+    };
+    try {
+      add("LIVE SYSTEM CHECK — " + new Date().toISOString());
+      add("Signed-in Firebase user: " + (user ? (user.email || "(email unavailable)") + " | UID " + user.uid : "NOT SIGNED IN"));
+      add("Web Firebase project: " + String(firebaseConfig.projectId || "unavailable"));
+      add("Worker URL configured by this web build: " + (gateway || "MISSING"));
+      if (!user) {
+        add("Administrator role check: NOT RUN — sign in to the IRPA web app first.");
+        setLiveCheckText(lines.join("\n"));
+        return;
+      }
+      if (!gateway) {
+        add("Worker diagnostics stopped: gateway URL is missing.");
+        setLiveCheckText(lines.join("\n"));
+        return;
+      }
+      const token = await getIdToken(user, true);
+      const health = await requestCheck("Worker health / commit / verified Firebase project", "/health");
+      let healthData = {};
+      try { healthData = JSON.parse(health.body); } catch {}
+      add("Worker commit reported by /health: " + String(healthData.commit || healthData.version || "unavailable"));
+      add("Worker Firebase project: " + String(healthData.firebaseProjectId || "not reported"));
+      add("Firebase project match: " + (healthData.firebaseProjectId ? (healthData.firebaseProjectId === firebaseConfig.projectId ? "MATCH" : "MISMATCH") : "CANNOT DETERMINE"));
+      const gate = await requestCheck("Actual-data gate GET (also verifies Worker administrator role)", "/api/system/actual-data-access", "GET", null, token);
+      add("Worker administrator recognition: " + (gate.status === 200 ? "RECOGNISED (gate returned HTTP 200)" : gate.status === 403 ? "NOT RECOGNISED / role denied (HTTP 403)" : gate.status === 401 ? "AUTHENTICATION REJECTED (HTTP 401)" : "INDETERMINATE — inspect response above"));
+      await requestCheck("Members UID reconciliation — dry run, no writes", "/api/members/reconcile-registered-identity-uids", "POST", { dryRun: true }, token);
+      await requestCheck("Signature-pathway reconciliation — dry run, no document IDs supplied", "/api/signature-pathway/reconcile", "POST", { dryRun: true, documents: [] }, token);
+      await requestCheck("Controlled-document upload policy — harmless policy-only check, no upload", "/api/upload-controlled-document/policy-check", "POST", { contentType: "application/pdf", fileSize: 1024, archiveCategory: "Administrative Documents", classification: "Public" }, token);
+    } catch (error) {
+      add("\nDIAGNOSTICS ERROR: " + String(error?.message || error));
+    } finally {
+      setLiveCheckText(lines.join("\n"));
+      setLiveCheckBusy(false);
+    }
+  }
 
   async function enableNotifications() {
     setMessage("");
@@ -368,6 +438,26 @@ export default function Settings({ admin = false, section = "settings" }) {
       </section>
       )}
 
+      {admin && section === "settings" && (
+        <section className="panel" style={{ marginTop: 20 }}>
+          <div className="panel-header">
+            <div>
+              <span className="eyebrow">PRODUCTION DIAGNOSTICS</span>
+              <h2>Live System Check</h2>
+              <p className="panel-description">Runs authenticated, read-only diagnostics against the configured Worker. Reconciliation requests use dry-run mode; the upload test checks policy only and does not upload a file.</p>
+            </div>
+          </div>
+          <div className="form-actions">
+            <button type="button" onClick={runLiveSystemCheck} disabled={liveCheckBusy}>
+              {liveCheckBusy ? "Checking live system…" : "Run Live System Check"}
+            </button>
+            <button type="button" className="secondary-button" onClick={() => navigator.clipboard?.writeText(liveCheckText)} disabled={!liveCheckText}>
+              Copy diagnostic text
+            </button>
+          </div>
+          {liveCheckText && <pre aria-live="polite" style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontSize: 12, lineHeight: 1.45, padding: 12, marginTop: 14, border: "1px solid var(--border)", borderRadius: 8, background: "var(--surface)", maxHeight: "60vh", overflow: "auto" }}>{liveCheckText}</pre>}
+        </section>
+      )}
       {admin && section === "settings" && <ActualDataAccessControl/>}
       {admin && section === "settings" && <SystemResetControl/>}
 
