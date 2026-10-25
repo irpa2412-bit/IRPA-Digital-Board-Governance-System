@@ -2305,14 +2305,16 @@ jobs:
           if [ -f drive-gateway/e2e.log ]; then
             while IFS="$(printf '\t')" read -r marker portal check result error; do
               [ "$marker" = "ACCEPTANCE_ROW" ] || continue
-              [ "$result" = "PASS" ] && status=PASS || status=FAIL
+              if [ "$result" = "PASS" ] && [ "${SIGNATURE_RESULT:-}" = "success" ] && ! grep -Eqi 'AssertionError|Error:|exit code' drive-gateway/e2e.log; then status=PASS; else status=FAIL; fi
               addrow "$portal" "$check" "$status" "$error" "drive-gateway/e2e.log"
             done < <(grep '^ACCEPTANCE_ROW' drive-gateway/e2e.log || true)
           else
             addrow "Signature Portal / Gateway" "Lifecycle acceptance test" FAIL "No e2e.log was produced; step outcome=${SIGNATURE_RESULT:-not-run}" ""
           fi
           [ "${SIGNATURE_RESULT:-}" = "success" ] || { addrow "Signature Portal / Gateway" "Acceptance process exit status" FAIL "Step outcome=${SIGNATURE_RESULT:-not-run}" "drive-gateway/e2e.log"; }
-          if [ "${MEDIA_RESULT:-}" = "success" ]; then
+          media_log_error=0
+          if [ -f communication-media.log ] && grep -Eqi 'AssertionError|Error:|exit code' communication-media.log; then media_log_error=1; fi
+          if [ "${MEDIA_RESULT:-}" = "success" ] && [ "$media_log_error" -eq 0 ]; then
             addrow "Communication Media" "Role denial and controlled-PDF upload" PASS "All assertions passed." "communication-media.log"
           else
             err="$(tail -n 30 communication-media.log 2>/dev/null | redact | grep -Eai 'error|failed|failure|exception|HTTP [45][0-9][0-9]' | tail -n 1 | cut -c1-300)"
