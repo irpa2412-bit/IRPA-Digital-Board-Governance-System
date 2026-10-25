@@ -99,8 +99,25 @@ const envelopePayload={
   ]
 };
 const envelopeResponse=await fetch(base+"/api/envelopes",{method:"POST",headers:{...authHeaders,"content-type":"application/json"},body:JSON.stringify(envelopePayload)});
-const envelope=await readJson(envelopeResponse,"Staging authenticated envelope creation");
+let envelope;
+try {
+  envelope=await readJson(envelopeResponse,"Staging authenticated envelope creation");
+} catch (error) {
+  console.error("STAGING_INVITATION_DELIVERY_FAILED",JSON.stringify({
+    smtpHost:"mail.irpa.or.tz",
+    smtpPort:465,
+    error:String(error?.message||error).slice(0,1000)
+  }));
+  throw error;
+}
 assert.ok(envelope.envelopeId);
+if (envelope.invitations?.[0]?.status !== "Sent") {
+  console.error("STAGING_INVITATION_DELIVERY_FAILED",JSON.stringify({
+    smtpHost:"mail.irpa.or.tz",
+    smtpPort:465,
+    error:String(envelope.invitations?.[0]?.error||envelope.invitations?.[0]?.message||envelope.error||"Invitation transport did not confirm delivery.").slice(0,1000)
+  }));
+}
 assert.equal(envelope.invitations?.[0]?.status,"Sent","Staging invitation transport did not confirm delivery.");
 assert.ok(Array.isArray(envelope.tokens)&&envelope.tokens.length===1,"Staging-only acceptance token was not returned.");
 const signingToken=envelope.tokens[0];
