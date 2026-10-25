@@ -11,14 +11,18 @@ const adminEmail=process.env.STAGING_TEST_EMAIL||"",adminPassword=process.env.ST
 const signerEmail=process.env.STAGING_CRYPTO_TEST_EMAIL||"",signerPassword=process.env.STAGING_CRYPTO_TEST_PASSWORD||"";
 const saText=process.env.STAGING_FIREBASE_SERVICE_ACCOUNT_JSON||"";
 const gatewayPattern=/^https:\/\/irpa-google-drive-gateway-staging\.[a-z0-9-]+\.workers\.dev$/i;
-let activeStep="Staging-only target guard";const passed=[];let gatewayVersion="not reported";
+let activeStep="Staging-only target guard";const passed=[];const setupChecks=[];let gatewayVersion="not reported";
 
-function writeSummary(ok,failed="",detail=""){
-  if(!process.env.GITHUB_STEP_SUMMARY)return;
-  const rows=["## Staging signature-to-lifecycle acceptance","","- Result: "+(ok?"PASS":"FAIL"),"- Project: "+PROJECT,"- Gateway: "+(base||"not configured"),"- Gateway version: "+gatewayVersion,"- Completed checks: "+(passed.join("; ")||"none"),"- Failing step: "+(failed||"None"),"- Detail: "+String(detail|| (ok?"All assertions passed.":"See failed step output.")).replace(/[\r\n]+/g," ").slice(0,300),"- Production targets were not used.",""];
-  fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,rows.join("\n"));
+function redact(value){
+  return String(value??"").slice(0,300).replace(/Bearer\\s+[^\\s,;"]+/ig,"Bearer [REDACTED]").replace(/AIza[0-9A-Za-z_-]{20,}/g,"[REDACTED_API_KEY]").replace(/(password|token|secret)(["=: ]+)[^", ]+/ig,"$1$2[REDACTED]").replace(/[\\r\\n\\t]+/g," ");
 }
-async function step(name,fn){activeStep=name;await fn();passed.push(name);console.log("PASS: "+name);}
+function writeSummary(){
+  if(!process.env.GITHUB_STEP_SUMMARY)return;
+  const rows=[...setupChecks,...(globalThis.__irpaPostSigningChecks||[])];
+  const out=["## Section 6 — Document lifecycle and archive acceptance","","| Portal | Check | Result | Exact error (HTTP status and redacted response excerpt) |","|---|---|---|---|",...rows.map(x=>"| "+x.portal.replace(/\\|/g,"\\\\|")+" | "+x.name.replace(/\\|/g,"\\\\|")+" | "+x.result+" | "+redact(x.error||"—").replace(/\\|/g,"\\\\|")+" |"),"","Staging-only target guard: project="+PROJECT+"; gateway="+(base||"not configured")+"; version="+gatewayVersion+".","Production targets were not used.",""];
+  fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,out.join("\\n"));
+}
+async function step(name,fn){activeStep=name;try{await fn();passed.push(name);setupChecks.push({portal:"Signature Portal / Gateway",name,result:"PASS",error:""});console.log("PASS: "+name);}catch(error){const message=redact(error?.message||error);setupChecks.push({portal:"Signature Portal / Gateway",name,result:"FAIL",error:message});console.error("FAIL: "+name+" :: "+message);}}
 function encode(v){if(v===null||v===undefined)return{nullValue:null};if(typeof v==="boolean")return{booleanValue:v};if(typeof v==="number"&&Number.isInteger(v))return{integerValue:String(v)};if(typeof v==="number")return{doubleValue:v};if(Array.isArray(v))return{arrayValue:{values:v.map(encode)}};if(typeof v==="object")return{mapValue:{fields:Object.fromEntries(Object.entries(v).map(([k,x])=>[k,encode(x)]))}};return{stringValue:String(v)};}
 function decode(v){if(!v||typeof v!=="object")return v;if("stringValue"in v)return v.stringValue;if("integerValue"in v)return Number(v.integerValue);if("doubleValue"in v)return v.doubleValue;if("booleanValue"in v)return v.booleanValue;if("timestampValue"in v)return v.timestampValue;if("nullValue"in v)return null;if("arrayValue"in v)return(v.arrayValue.values||[]).map(decode);if("mapValue"in v)return Object.fromEntries(Object.entries(v.mapValue.fields||{}).map(([k,x])=>[k,decode(x)]));return v;}
 function plain(d){return Object.fromEntries(Object.entries(d?.fields||{}).map(([k,v])=>[k,decode(v)]));}
@@ -30,7 +34,7 @@ async function readDoc(token,collection,id){const r=await checkedFetch(fsUrl(col
 async function jsonResponse(r,label){const b=await r.json().catch(()=>({}));const safeDetail=String([b.diagnosticCode,b.diagnosticMessage,b.code,b.error,b.message].filter(Boolean).join(" | ")).replace(/Bearer\s+\S+/gi,"Bearer [redacted]").replace(/[\r\n\t]+/g," ").slice(0,300);assert.equal(r.ok,true,label+" failed (HTTP "+r.status+")"+(safeDetail?": "+safeDetail:"")+".");assert.notEqual(b.ok,false,label+" returned ok=false.");return b;}
 async function sha(bytes){return createHash("sha256").update(Buffer.from(bytes)).digest("hex");}
 
-async function checkedFetch(...args){const r=await globalThis.fetch(...args);if(!r.ok){const body=await r.clone().text().catch(()=> "");throw new Error("HTTP "+r.status+" response body (first 300 chars): "+body.slice(0,300));}return r;}
+async function checkedFetch(...args){const r=await globalThis.fetch(...args);if(!r.ok){const body=await r.clone().text().catch(()=> "");throw new Error("HTTP "+r.status+" response body (first 300 chars): "+redact(body));}return r;}
 
 async function main(){
   await step("Staging-only target and credentials guard",async()=>{
@@ -85,15 +89,7 @@ async function main(){
   });
   activeStep="Post-signing checks";
   const postSigningChecks=[];
-  async function postCheck(name,fn){
-    try{await fn();postSigningChecks.push({name,result:"PASS",error:""});console.log("PASS: "+name);}
-    catch(error){const message=String(error?.message||error).replace(/[\r\n\t]+/g," ");postSigningChecks.push({name,result:"FAIL",error:message});console.error("FAIL: "+name+" :: "+message);}
-  }
-  async function writePostSigningSummary(){
-    if(!process.env.GITHUB_STEP_SUMMARY)return;
-    const rows=["","### Post-signing checks","", "| Check name | Result | Exact error text |","|---|---|---|",...postSigningChecks.map(x=>"| "+x.name.replace(/\|/g,"\\|")+" | "+x.result+" | "+(x.error?x.error.replace(/\|/g,"\\|"):"—")+" |"),""];
-    fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,rows.join("\n"));
-  }
+  async function postCheck(name,fn){try{await fn();postSigningChecks.push({portal:"Signature Portal / Gateway",name,result:"PASS",error:""});console.log("PASS: "+name);}catch(error){const message=redact(error?.message||error);postSigningChecks.push({portal:"Signature Portal / Gateway",name,result:"FAIL",error:message});console.error("FAIL: "+name+" :: "+message);}}
   await postCheck("Mirror write",async()=>{
     const r=await checkedFetch(base+"/api/envelopes/"+encodeURIComponent(gatewayEnvelopeId)+"/status",{headers:signerHeaders});
     const b=await r.json().catch(()=>({}));
@@ -139,15 +135,20 @@ async function main(){
     assert.equal(doc.signatureEnvelopeId,portalEnvelopeId,"Persisted signatureEnvelopeId mismatch");
     assert.ok(doc.signedAt,"Persisted signedAt timestamp is missing");
   });
-  await writePostSigningSummary();
-  const failedChecks=postSigningChecks.filter(x=>x.result==="FAIL");
-  if(failedChecks.length){
-    const detail=failedChecks.map(x=>x.name+": "+x.error).join(" | ");
-    writeSummary(false,"Post-signing checks",detail);
-    throw new Error("Post-signing checks failed: "+detail);
-  }
-  writeSummary(true);
+  const unimplemented=[
+    ["Signed-file reference and controlled resolution","No signed-file reference/resolution assertion is wired into this acceptance fixture."],
+    ["Final signed-PDF SHA-256","The fixture does not retrieve a signed PDF to independently recompute the final hash."],
+    ["Controlled retrieval: owner, assigned signer, unrelated user","The fixture has no dedicated unrelated-user credentials or complete retrieval matrix."],
+    ["Audit: every signer and lifecycle completion","Current fixture verifies the final signer event only; it does not verify an event for every signer plus the lifecycle audit event."],
+    ["Gateway rejects client-supplied SIGNED/Completed","No negative client-state mutation assertion is currently wired into this acceptance fixture."]
+  ];
+  for(const [name,error] of unimplemented)postSigningChecks.push({portal:"Signature Portal / Gateway",name,result:"FAIL",error});
+  globalThis.__irpaPostSigningChecks=postSigningChecks;
+  writeSummary();
+  const failedChecks=[...setupChecks,...postSigningChecks].filter(x=>x.result==="FAIL");
+  if(failedChecks.length){process.exitCode=1;const detail=failedChecks.map(x=>x.name+": "+x.error).join(" | ");console.error("STAGING_SIGNATURE_LIFECYCLE_ACCEPTANCE=FAIL");console.error("DETAIL="+redact(detail));return;}
   console.log("STAGING_SIGNATURE_LIFECYCLE_ACCEPTANCE=PASS");
-  console.log(JSON.stringify({project:PROJECT,documentId,gatewayEnvelopeId,portalEnvelopeId,signerUid:signer.localId,assignedRole:"Authorization Officer",postSigningChecks,lifecycleStatus:"SIGNED",approvalAccepted:true,sourceHash}));
+  console.log(JSON.stringify({project:PROJECT,gatewayVersion,postSigningChecks}));
+
 }
-main().catch(error=>{const detail=String(error?.message||error).replace(/[\r\n\t]+/g," ");console.error("STAGING_SIGNATURE_LIFECYCLE_ACCEPTANCE=FAIL");console.error("FAILING_STEP="+activeStep);console.error("DETAIL="+detail);writeSummary(false,activeStep,detail);process.exitCode=1;});
+main().catch(error=>{const detail=redact(error?.message||error);setupChecks.push({portal:"Signature Portal / Gateway",name:activeStep,result:"FAIL",error:detail});console.error("STAGING_SIGNATURE_LIFECYCLE_ACCEPTANCE=FAIL");console.error("FAILING_STEP="+activeStep);console.error("DETAIL="+detail);writeSummary();process.exitCode=1;});
