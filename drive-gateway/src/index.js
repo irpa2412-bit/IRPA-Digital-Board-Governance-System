@@ -267,6 +267,7 @@ export default {
       }
       if (pathname === "/api/system/actual-data-access" && (request.method === "GET" || request.method === "POST")) return await actualDataAccessRoute(request, env);
       if (pathname === "/api/members/reconcile-registered-identity-uids" && request.method === "POST") return await reconcileRegisteredIdentityUidsRoute(request, env);
+      if (pathname === "/api/signature/authority" && request.method === "POST") return await updateSignerAuthorityRoute(request, env);
 
       if (pathname === "/api/signature-profile/folder" && request.method === "POST") {
         return await ensureSignatureProfileFolder(request, env);
@@ -736,6 +737,101 @@ async function getFirestoreCollectionDocuments(env, collectionName, token) {
   });
   if (!response.ok) throw new Error("Firestore " + collectionName + " register read failed: HTTP " + response.status);
   return (await response.json()).filter(row => row.document).map(row => row.document);
+}
+
+async function updateSignerAuthorityRoute(request, env) {
+  let step = "Firebase authentication";
+  try {
+    const claims = await authenticateFirebaseRequest(request, env);
+    const uid = String(claims.user_id || "");
+    const email = String(claims.email || "").trim().toLowerCase();
+    if (!uid) return json({ ok: false, step, error: "Authentication is required." }, 401, corsHeaders(request));
+    step = "Validate signing authority request";
+    const body = await request.json();
+    const requestedRole = String(body.authorityRole || "").trim();
+    const requestedDepartment = String(body.authorityDepartment || "").trim();
+    const requestedUnit = String(body.authorityUnit || "").trim();
+    const authorityStatus = String(body.authorityStatus || "Current").trim();
+    const authorityReference = String(body.authorityReference || "").trim();
+    const authorityEffectiveAt = String(body.authorityEffectiveAt || "").trim() || null;
+    const authorityExpiresAt = String(body.authorityExpiresAt || "").trim() || null;
+    if (!requestedRole) return json({ ok: false, step, error: "Select the current signing authority before saving." }, 400, corsHeaders(request));
+    if (!["Current", "Pending Verification", "Expired", "Not yet assigned"].includes(authorityStatus)) return json({ ok: false, step, error: "Select a valid signing authority status." }, 400, corsHeaders(request));
+    if (authorityEffectiveAt && authorityExpiresAt && authorityExpiresAt < authorityEffectiveAt) return json({ ok: false, step, error: "Authority expiry date cannot be earlier than the effective date." }, 400, corsHeaders(request));
+
+    step = "Read active Member and Employee authority registers";
+    const token = await getFirestoreAdminAccessToken(env);
+    const records = [];
+    for (const collectionName of ["members", "employees"]) {
+      const byUid = await getFirestoreDocument(env, collectionName + "/" + uid, token);
+      if (byUid?.fields) records.push({ id: String(byUid.name || "").split("/").pop(), ...firestoreDocumentToPlain(byUid), sourceCollection: collectionName });
+      if (email) {
+        const byEmail = await getFirestoreDocumentsByField(env, collectionName, "email", email, token);
+        for (const doc of byEmail) records.push({ id: String(doc.name || "").split("/").pop(), ...firestoreDocumentToPlain(doc), sourceCollection: collectionName });
+      }
+    }
+    const activeRecords = [...new Map(records.map(record => [record.sourceCollection + ":" + record.id, record])).values()]
+      .filter(record => String(record.status || record.employmentStatus || "Active").trim().toLowerCase() !== "inactive");
+    if (!activeRecords.length) return json({ ok: false, step, error: "No active IRPA Member or Employee register entry was found for this account." }, 403, corsHeaders(request));
+    const valuesFor = record => [record.role, record.boardPosition, record.unit, record.unitName,
+      ...(Array.isArray(record.roles) ? record.roles : []),
+      ...(Array.isArray(record.assignedRoles) ? record.assignedRoles : []),
+      ...(Array.isArray(record.selectedRoles) ? record.selectedRoles : []),
+      ...(Array.isArray(record.roleAssignments) ? record.roleAssignments : [])
+    ].flatMap(value => String(value || "").split(",").map(value => value.trim()).filter(Boolean));
+    if (!activeRecords.flatMap(valuesFor).includes(requestedRole)) return json({ ok: false, step, error: "The selected signing authority is not registered to this IRPA member/employee account." }, 403, corsHeaders(request));
+    const matchingRecords = activeRecords.filter(record => {
+      if (!valuesFor(record).includes(requestedRole)) return false;
+      if (requestedDepartment && String(record.department || "").trim() !== requestedDepartment) return false;
+      if (requestedUnit) {
+        const recordUnit = String(record.unit || record.unitName || "").trim() || requestedDepartment;
+        if (recordUnit !== requestedUnit) return false;
+      }
+      return true;
+    });
+    if (!matchingRecords.length) return json({ ok: false, step, error: "The selected department, unit and signing authority do not match an active IRPA register entry for this account." }, 403, corsHeaders(request));
+    const source = matchingRecords[0];
+    const authorityDepartment = String(source.department || "").trim();
+    const authorityUnit = String(source.unit || source.unitName || "").trim() || authorityDepartment;
+
+    step = "Verify existing Signer Identity";
+    const identityDoc = await getFirestoreDocument(env, "signerIdentities/" + cleanId(uid), token);
+    if (!identityDoc?.fields) return json({ ok: false, step, error: "Signer Identity record is not available. Restore the Signer Identity link before updating signing authority." }, 412, corsHeaders(request));
+    const now = new Date().toISOString();
+    step = "Save signing authority";
+    await updateFirestoreDocument(env, "signerIdentities/" + cleanId(uid), token, {
+      authorityRole: { stringValue: requestedRole },
+      authorityStatus: { stringValue: authorityStatus },
+      authorityReference: { stringValue: authorityReference },
+      authorityEffectiveAt: authorityEffectiveAt ? { stringValue: authorityEffectiveAt } : { nullValue: null },
+      authorityExpiresAt: authorityExpiresAt ? { stringValue: authorityExpiresAt } : { nullValue: null },
+      authorityDepartment: { stringValue: authorityDepartment },
+      authorityUnit: { stringValue: authorityUnit },
+      authoritySourceCollection: { stringValue: source.sourceCollection },
+      authoritySourceRecordId: { stringValue: source.id },
+      authorityUpdatedAt: { timestampValue: now },
+      updatedAt: { timestampValue: now }
+    }, ["authorityRole", "authorityStatus", "authorityReference", "authorityEffectiveAt", "authorityExpiresAt", "authorityDepartment", "authorityUnit", "authoritySourceCollection", "authoritySourceRecordId", "authorityUpdatedAt", "updatedAt"]);
+    step = "Write signing authority audit";
+    const auditId = "signer-authority-" + Date.now() + "-" + crypto.randomUUID().slice(0, 8);
+    await updateFirestoreDocument(env, "audit/" + auditId, token, {
+      action: { stringValue: "UPDATE_SIGNER_AUTHORITY" },
+      collection: { stringValue: "signerIdentities" },
+      recordId: { stringValue: uid },
+      details: { mapValue: { fields: {
+        authorityRole: { stringValue: requestedRole }, authorityStatus: { stringValue: authorityStatus },
+        authorityDepartment: { stringValue: authorityDepartment }, authorityUnit: { stringValue: authorityUnit },
+        authoritySourceCollection: { stringValue: source.sourceCollection }, authoritySourceRecordId: { stringValue: source.id }
+      } } },
+      actorUid: { stringValue: uid },
+      actorEmail: { stringValue: email || String(identityDoc.fields.email?.stringValue || "") },
+      createdAt: { timestampValue: now }
+    }, ["action", "collection", "recordId", "details", "actorUid", "actorEmail", "createdAt"]);
+    return json({ ok: true, uid, authorityRole: requestedRole, authorityStatus, authorityReference, authorityEffectiveAt, authorityExpiresAt, authorityDepartment, authorityUnit, authoritySourceCollection: source.sourceCollection, authoritySourceRecordId: source.id, auditId }, 200, corsHeaders(request));
+  } catch (error) {
+    console.error("Signing authority update failed", { step, error: String(error?.message || error) });
+    return json({ ok: false, step, error: String(error?.message || "Signing authority update failed.") }, Number(error?.status || 0) || 500, corsHeaders(request));
+  }
 }
 
 async function reconcileRegisteredIdentityUidsRoute(request, env) {
