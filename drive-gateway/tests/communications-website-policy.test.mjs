@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   MAX_WORDPRESS_MEDIA_BYTES, assertAllowedWebsiteMutation, assertStagingWebsiteHost,
-  auditEntry, editorialWordPressStatus, mayPublish, redactSecrets, validateMediaUpload
+  auditEntry, assertStagingWordPressHome, editorialWordPressStatus, mayPublish, redactSecrets, validateMediaUpload
 } from "../src/communicationsWebsitePolicy.mjs";
 
 test("workflow maps Draft and Review to draft and allows publish state only explicitly", () => {
@@ -47,3 +47,35 @@ test("secrets are redacted from diagnostic/audit strings", () => {
 
 test("SEO title and meta description are allowed fields", () => { assert.equal(assertAllowedWebsiteMutation({type:"pages",id:5,title:"Title",seoTitle:"SEO",seoDescription:"Description"}),true); });
 test("Review is a pending WordPress status", () => { assert.equal(editorialWordPressStatus("Review"),"pending"); });
+
+test("Worker secret presence returns only six approved boolean flags", async () => {
+  const { workerSecretPresence } = await import("../src/communicationsWebsitePolicy.mjs");
+  const result = workerSecretPresence({
+    WORDPRESS_BASE_URL: "https://staging.irpa.or.tz", WORDPRESS_USERNAME: "editor",
+    WORDPRESS_APPLICATION_PASSWORD: "not-for-output", CPANEL_BASE_URL: "https://cpanel.example:2083",
+    CPANEL_USERNAME: "api-user", CPANEL_API_TOKEN: "not-for-output"
+  });
+  assert.deepEqual(result, {
+    WORDPRESS_BASE_URL: true, WORDPRESS_USERNAME: true, WORDPRESS_APPLICATION_PASSWORD: true,
+    CPANEL_BASE_URL: true, CPANEL_USERNAME: true, CPANEL_API_TOKEN: true
+  });
+  assert.ok(Object.values(result).every(value => typeof value === "boolean"));
+  assert.doesNotMatch(JSON.stringify(result), /not-for-output|https:|api-user/);
+  assert.deepEqual(workerSecretPresence({}), {
+    WORDPRESS_BASE_URL: false, WORDPRESS_USERNAME: false, WORDPRESS_APPLICATION_PASSWORD: false,
+    CPANEL_BASE_URL: false, CPANEL_USERNAME: false, CPANEL_API_TOKEN: false
+  });
+});
+test("WordPress REST root home must match the HTTPS staging base URL", () => {
+  assert.equal(assertStagingWordPressHome("https://staging.irpa.or.tz/", "https://staging.irpa.or.tz/"), true);
+  assert.equal(assertStagingWordPressHome("https://staging.irpa.or.tz", "https://staging.irpa.or.tz"), true);
+  assert.throws(() => assertStagingWordPressHome("https://staging.irpa.or.tz/", "https://irpa.or.tz/"), /does not match/);
+  assert.throws(() => assertStagingWordPressHome("https://staging.irpa.or.tz/", "https://staging.irpa.or.tz/subdirectory/"), /does not match/);
+  assert.throws(() => assertStagingWordPressHome("https://irpa.or.tz/", "https://irpa.or.tz/"), /staging-only/);
+});
+test("SEO title and description are allowed and audit metadata excludes secret-like fields", () => {
+  assert.equal(assertAllowedWebsiteMutation({type:"pages",id:5,title:"Title",content:"Body",seoTitle:"SEO title",seoDescription:"Meta description"}), true);
+  const entry = auditEntry({actorUid:"uid-1",action:"save_draft",objectType:"pages",objectId:"5",changedFields:["title","seoTitle","password"],at:"2026-10-25T10:00:00Z"});
+  assert.deepEqual(entry.changedFields, ["title","seoTitle"]);
+  assert.doesNotMatch(JSON.stringify(entry), /password|secret|token/i);
+});

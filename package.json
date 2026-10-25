@@ -21,7 +21,9 @@
     "test:meeting-invitation-resend": "node --test tests/meeting-invitation-resend-quorum.test.mjs",
     "test:communication-media": "node --test tests/communication-media-policy.test.mjs",
     "test:meta-oauth": "node --test tests/meta-oauth-staging.test.mjs",
-    "check:staging-gateway-bundle": "node scripts/check-staging-gateway-bundle.mjs"
+    "check:staging-gateway-bundle": "node scripts/check-staging-gateway-bundle.mjs",
+    "test": "node --test",
+    "lint": "node --check drive-gateway/src/index.js && node --check drive-gateway/src/communicationsSite.mjs && node --check drive-gateway/src/communicationsWebsitePolicy.mjs && node --check drive-gateway/tests/communications-website-policy.test.mjs && node --check drive-gateway/tests/staging-communications-website-acceptance.mjs"
   },
   "dependencies": {
     "firebase": "^11.10.0",

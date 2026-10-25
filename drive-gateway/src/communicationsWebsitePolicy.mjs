@@ -54,3 +54,29 @@ export function assertAllowedWebsiteMutation(input = {}) {
   if (Object.keys(input).some(key => !allowed.has(key))) throw new Error("Website portal cannot change plugins, themes, users, or settings.");
   return true;
 }
+
+export function workerSecretPresence(env = {}) {
+  return {
+    WORDPRESS_BASE_URL: Boolean(env.WORDPRESS_BASE_URL),
+    WORDPRESS_USERNAME: Boolean(env.WORDPRESS_USERNAME),
+    WORDPRESS_APPLICATION_PASSWORD: Boolean(env.WORDPRESS_APPLICATION_PASSWORD),
+    CPANEL_BASE_URL: Boolean(env.CPANEL_BASE_URL),
+    CPANEL_USERNAME: Boolean(env.CPANEL_USERNAME),
+    CPANEL_API_TOKEN: Boolean(env.CPANEL_API_TOKEN)
+  };
+}
+
+export function assertStagingWordPressHome(baseValue, homeValue) {
+  const base = assertStagingWebsiteHost(String(baseValue || "").replace(/\/+$/, "") + "/");
+  if (typeof homeValue !== "string" || !homeValue.trim()) {
+    throw new Error("WordPress REST root did not report a home URL.");
+  }
+  let home;
+  try { home = new URL(homeValue); }
+  catch { throw new Error("WordPress REST root home URL is invalid."); }
+  const normalize = url => url.origin + url.pathname.replace(/\/+$/, "");
+  if (normalize(base) !== normalize(home)) {
+    throw new Error("WordPress REST home URL does not match STAGING_WORDPRESS_BASE_URL.");
+  }
+  return true;
+}

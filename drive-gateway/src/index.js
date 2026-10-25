@@ -169,6 +169,7 @@ const communicationsSiteRouter = createCommunicationsSiteRouter({
   getInstitutionalProfileForUser,
   firestoreDocumentToPlain,
   commitDocumentAndAudit: commitFirestoreDocumentAndAudit,
+  getFirestoreDocumentsByField,
   json,
   corsHeaders
 });

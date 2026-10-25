@@ -18,7 +18,7 @@ const WEBSITE_EDITOR_ROLES = new Set([
   "Communications and Media Officer", "Media and Communications Officer", "Media & Communications Officer"
 ]);
 const MAX_WEBSITE_SNAPSHOT_BYTES = 2 * 1024 * 1024;
-import { assertAllowedWebsiteMutation, assertStagingWebsiteHost, editorialWordPressStatus, mayPublish, validateMediaUpload } from "./communicationsWebsitePolicy.mjs";
+import { assertAllowedWebsiteMutation, assertStagingWebsiteHost, editorialWordPressStatus, mayPublish, validateMediaUpload, workerSecretPresence } from "./communicationsWebsitePolicy.mjs";
 
 function values(record) {
   if (!record) return [];
@@ -115,7 +115,7 @@ function authHeader(username, token) {
 export function createCommunicationsSiteRouter(deps) {
   const {
     authenticateFirebaseRequest, getFirestoreDocument, getInstitutionalProfileForUser,
-    firestoreDocumentToPlain, commitDocumentAndAudit, json, corsHeaders
+    firestoreDocumentToPlain, commitDocumentAndAudit, getFirestoreDocumentsByField, json, corsHeaders
   } = deps;
 
   async function authorised(request, env, reviewer = false) {
@@ -361,6 +361,8 @@ export function createCommunicationsSiteRouter(deps) {
         excerpt: editorRaw(current, "excerpt"),
         featuredMedia: Number(current.featured_media || 0),
         status: String(current.status || "draft"),
+        seoTitle: String(current.meta?.["_yoast_wpseo_title"] || current.meta?.["rank_math_title"] || ""),
+        seoDescription: String(current.meta?.["_yoast_wpseo_metadesc"] || current.meta?.["rank_math_description"] || ""),
         link: String(current.link || ""),
         modified: String(current.modified || ""),
         actorUid: claims.user_id,
@@ -404,7 +406,13 @@ export function createCommunicationsSiteRouter(deps) {
       content: String(snapshot.content || ""),
       excerpt: String(snapshot.excerpt || ""),
       featured_media: Number(snapshot.featuredMedia || 0),
-      status: String(snapshot.status || "draft")
+      status: String(snapshot.status || "draft"),
+      meta: {
+        _yoast_wpseo_title: String(snapshot.seoTitle || ""),
+        _yoast_wpseo_metadesc: String(snapshot.seoDescription || ""),
+        rank_math_title: String(snapshot.seoTitle || ""),
+        rank_math_description: String(snapshot.seoDescription || "")
+      }
     };
   }
 
@@ -413,12 +421,34 @@ export function createCommunicationsSiteRouter(deps) {
       editorRaw(actual, "content") === String(expected.content || "") &&
       editorRaw(actual, "excerpt") === String(expected.excerpt || "") &&
       Number(actual.featured_media || 0) === Number(expected.featured_media || 0) &&
-      String(actual.status || "draft") === String(expected.status || "draft");
+      String(actual.status || "draft") === String(expected.status || "draft") &&
+      String(actual.meta?.["_yoast_wpseo_title"] || actual.meta?.["rank_math_title"] || "") === String(expected.meta?._yoast_wpseo_title || expected.meta?.rank_math_title || "") &&
+      String(actual.meta?.["_yoast_wpseo_metadesc"] || actual.meta?.["rank_math_description"] || "") === String(expected.meta?._yoast_wpseo_metadesc || expected.meta?.rank_math_description || "");
   }
 
   async function handle(request, env) {
     const url = new URL(request.url);
     const path = url.pathname.replace(/\/+$/, "") || "/";
+    if (path === "/api/communications/site/secrets" && request.method === "GET") {
+      await websiteEditorAuthorised(request, env);
+      return json({ secrets: workerSecretPresence(env) }, 200, corsHeaders(request));
+    }
+    if (path === "/api/communications/website/audit" && request.method === "GET") {
+      const claims = await authenticateFirebaseRequest(request, env);
+      if (typeof getFirestoreDocumentsByField !== "function") throw new Error("Website audit reader is unavailable.");
+      const documents = await getFirestoreDocumentsByField(env, "communicationWebsiteEdits", "actorUid", claims.user_id, claims.token);
+      const entries = (Array.isArray(documents) ? documents : []).map(document => {
+        const record = firestoreDocumentToPlain(document) || {};
+        const details = record.details && typeof record.details === "object" ? record.details : {};
+        return {
+          action: String(record.action || ""), type: String(record.type || ""),
+          pageId: record.pageId ?? null, actorUid: String(record.actorUid || ""),
+          actorEmail: String(record.actorEmail || ""), createdAt: String(record.createdAt || ""),
+          details: Object.fromEntries(["snapshotId", "previousRevisionId", "changedFields", "status", "workflow", "publicUrl", "requestedSnapshotId", "requestedRevisionId", "safetySnapshotId"].filter(key => details[key] !== undefined).map(key => [key, details[key]]))
+        };
+      }).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))).slice(0, 50);
+      return json({ entries }, 200, corsHeaders(request));
+    }
     if (path === "/api/communications/site/status" && request.method === "GET") {
       const { roles } = await websiteEditorAuthorised(request, env);
       const result = { website: "not_configured", cpanel: "not_configured" };

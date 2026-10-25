@@ -1,60 +1,43 @@
-import { assertStagingWebsiteHost, redactSecrets } from "../src/communicationsWebsitePolicy.mjs";
+import { writeFile } from "node:fs/promises";
+import { assertStagingWebsiteHome, assertStagingWebsiteHost, redactSecrets } from "../src/communicationsWebsitePolicy.mjs";
 
-const rows = [];
-const check = (name, ok, detail = "") => rows.push({ name, result: ok ? "PASS" : "FAIL", detail: String(detail).replace(/[\r\n|]/g, " ").slice(0, 180) });
-const env = process.env;
-let failed = false;
-try {
-  assertStagingWebsiteHost(env.STAGING_WORDPRESS_BASE_URL);
-  check("Target is HTTPS staging.irpa.or.tz", true);
-} catch (error) {
-  check("Target is HTTPS staging.irpa.or.tz", false, error.message);
-  failed = true;
+const env=process.env, rows=[];
+const secrets=[env.STAGING_FIREBASE_WEB_API_KEY,env.STAGING_TEST_PASSWORD,env.STAGING_CHAIR_TEST_PASSWORD].filter(Boolean);
+const clean=v=>redactSecrets(String(v??"").replace(/[\t\r\n|]/g," "),secrets).slice(0,300);
+function record(name,pass,detail=""){rows.push({name,result:pass?"PASS":"FAIL",detail:clean(detail)});}
+async function check(name,fn){try{const v=await fn();record(name,true,v?.detail||v||"");return v;}catch(e){record(name,false,e?.message||String(e));return null;}}
+async function info(response){const text=await response.text().catch(()=>"");let data={};try{data=JSON.parse(text);}catch{}return{response,text,data,detail:"HTTP "+response.status+" "+clean(text.slice(0,300))};}
+async function api(url,token,options={}){const headers={Accept:"application/json",...(options.headers||{})};if(token)headers.Authorization="Bearer "+token;return info(await fetch(url,{...options,headers,signal:AbortSignal.timeout(25000)}));}
+async function signIn(email,password){const r=await info(await fetch("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key="+encodeURIComponent(env.STAGING_FIREBASE_WEB_API_KEY),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password,returnSecureToken:true}),signal:AbortSignal.timeout(20000)}));if(!r.response.ok||!r.data.idToken)throw new Error("Firebase sign-in failed: "+r.detail);secrets.push(r.data.idToken);return r.data.idToken;}
+function ok(r,label){if(!r?.response?.ok)throw new Error((label||"Request failed")+": "+(r?.detail||"no response"));return r;}
+function same(a,b){return["title","content","excerpt","featuredMedia","status","seoTitle","seoDescription"].every(k=>String(a?.[k]??"")===String(b?.[k]??""));}
+function payload(i,changes={}){return{type:i.type,id:i.id,title:i.title,content:i.content,excerpt:i.excerpt,featuredMedia:i.featuredMedia||0,seoTitle:i.seoTitle||"",seoDescription:i.seoDescription||"",workflow:"Draft",...changes};}
+let preflight=true;const base=String(env.STAGING_WORDPRESS_BASE_URL||"").replace(/\/+$/,""),gateway=String(env.STAGING_GATEWAY_URL||"").replace(/\/+$/,"");
+await check("Preflight required staging secrets",async()=>{const missing=["STAGING_WORDPRESS_BASE_URL","STAGING_FIREBASE_WEB_API_KEY","STAGING_TEST_EMAIL","STAGING_TEST_PASSWORD","STAGING_CHAIR_TEST_EMAIL","STAGING_CHAIR_TEST_PASSWORD"].filter(k=>!String(env[k]||"").trim());if(missing.length){preflight=false;throw new Error("Missing required Actions secret names: "+missing.join(", "));}return"Required secret names non-empty; values not printed.";});
+await check("Preflight refuses production hostname",async()=>{try{assertStagingWebsiteHost(base.endsWith("/")?base:base+"/");}catch(e){preflight=false;throw e;}return"HTTPS staging.irpa.or.tz only.";});
+await check("Preflight REST root home URL matches configured base",async()=>{if(!base){preflight=false;throw new Error("STAGING_WORDPRESS_BASE_URL is empty.");}const r=await info(await fetch(base+"/wp-json",{headers:{Accept:"application/json"},signal:AbortSignal.timeout(15000)}));if(!r.response.ok){preflight=false;throw new Error("HTTP "+r.response.status+" "+clean(r.text.slice(0,300)));}try{assertStagingWebsiteHome(base,r.data?.home);}catch(e){preflight=false;throw e;}return"HTTP "+r.response.status+"; REST home matches staging base.";});
+await check("Preflight staging Worker hostname",async()=>{const u=new URL(gateway);if(u.protocol!=="https:"||!u.hostname.endsWith(".workers.dev")||/(^|\.)irpa\.or\.tz$/i.test(u.hostname)){preflight=false;throw new Error("Gateway must use HTTPS staging Worker workers.dev hostname.");}return"HTTPS workers.dev hostname; no production hostname.";});
+let editor=null,chair=null,item=null,baseline=null,snapshot=null,changed=null;
+if(preflight){
+ await check("Staging editor authentication",async()=>{editor=await signIn(env.STAGING_TEST_EMAIL,env.STAGING_TEST_PASSWORD);const r=ok(await api(gateway+"/api/communications/website/content?type=pages",editor),"Editor content access");return"HTTP "+r.response.status+"; editor authenticated.";});
+ await check("Staging Chair authentication",async()=>{chair=await signIn(env.STAGING_CHAIR_TEST_EMAIL,env.STAGING_CHAIR_TEST_PASSWORD);const r=ok(await api(gateway+"/api/communications/site/status",chair),"Chair access");return"HTTP "+r.response.status+"; Chair authenticated.";});
+ await check("Read-only health panel",async()=>{if(!editor)throw new Error("Blocked: editor authentication failed.");const r=ok(await api(gateway+"/api/communications/site/status",editor),"Health route"),c=r.data?.connections;if(!c||typeof c.websiteUp!=="boolean"||!("sslExpiry"in c)||!("lastBackup"in c)||!("wordpressUpdates"in c)||!("pluginUpdates"in c)||!("brokenLinks"in c))throw new Error(r.detail+"; required health fields missing.");return"HTTP "+r.response.status+"; required health fields present.";});
+ await check("Worker secret diagnostics return six booleans only",async()=>{if(!editor)throw new Error("Blocked: editor authentication failed.");const r=ok(await api(gateway+"/api/communications/site/secrets",editor),"Secret diagnostic"),keys=["WORDPRESS_BASE_URL","WORDPRESS_USERNAME","WORDPRESS_APPLICATION_PASSWORD","CPANEL_BASE_URL","CPANEL_USERNAME","CPANEL_API_TOKEN"];if(!r.data?.secrets||Object.keys(r.data.secrets).length!==6||keys.some(k=>typeof r.data.secrets[k]!=="boolean")||Object.keys(r.data.secrets).some(k=>!keys.includes(k)))throw new Error(r.detail+"; expected six boolean flags only.");if(secrets.some(s=>s&&r.text.includes(s)))throw new Error("A secret value appeared in diagnostics.");return"HTTP "+r.response.status+"; six approved boolean flags only.";});
+ await check("Find staging draft fixture",async()=>{if(!editor)throw new Error("Blocked: editor authentication failed.");for(const type of["pages","posts"]){const r=ok(await api(gateway+"/api/communications/website/content?type="+type,editor),"List "+type),candidate=(r.data.items||[]).find(v=>v.status==="draft"&&Number.isSafeInteger(Number(v.id))&&Number(v.id)>0);if(candidate){const full=ok(await api(gateway+"/api/communications/website/content/"+type+"/"+candidate.id,editor),"Read draft fixture");item={...full.data.item,type};return"HTTP "+full.response.status+"; existing staging draft ID "+item.id+" selected.";}}throw new Error("No existing staging draft fixture; no content was changed.");});
+ await check("Draft save and SEO round-trip",async()=>{if(!item)throw new Error("Blocked: no staging draft fixture.");baseline=structuredClone(item);const n="IRPA staging acceptance "+new Date().toISOString();changed=payload(item,{title:n,content:"<p>"+n+" byte-restore probe.</p>",excerpt:"Staging acceptance probe",seoTitle:n+" SEO",seoDescription:n+" meta description",workflow:"Draft"});const r=ok(await api(gateway+"/api/communications/website/content",editor,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(changed)}),"Draft save");snapshot=r.data.snapshotId;if(!r.data.success||!snapshot)throw new Error(r.detail+"; save success or snapshot ID missing.");const read=ok(await api(gateway+"/api/communications/website/content/"+item.type+"/"+item.id,editor),"Read saved draft");if(read.data.item.title!==changed.title||read.data.item.seoTitle!==changed.seoTitle||read.data.item.seoDescription!==changed.seoDescription)throw new Error(read.detail+"; draft/SEO round-trip mismatch.");return"HTTP "+r.response.status+"; draft, snapshot and SEO verified.";});
+ await check("Review workflow maps to pending",async()=>{if(!changed)throw new Error("Blocked: draft save failed.");const r=ok(await api(gateway+"/api/communications/website/content",editor,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({...changed,workflow:"Review"})}),"Review workflow");if(r.data.item?.status!=="pending")throw new Error(r.detail+"; status is not pending.");return"HTTP "+r.response.status+"; Review maps to pending.";});
+ await check("Publish denied for editor",async()=>{if(!changed)throw new Error("Blocked: draft save failed.");const r=await api(gateway+"/api/communications/website/content",editor,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({...changed,workflow:"Publish"})});if(r.response.status!==403)throw new Error(r.detail+"; expected HTTP 403.");return"HTTP 403; editor publish denied.";});
+ await check("Publish accepted for active Chair",async()=>{if(!changed||!chair)throw new Error("Blocked: fixture or Chair authentication unavailable.");const r=ok(await api(gateway+"/api/communications/website/content",chair,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({...changed,workflow:"Publish"})}),"Chair publish");if(r.data.item?.status!=="publish")throw new Error(r.detail+"; published status not verified.");return"HTTP "+r.response.status+"; Chair publish verified.";});
+ await check("Oversize media rejected",async()=>{const f=new FormData();f.append("file",new File([new Uint8Array(10*1024*1024+1)],"oversize.jpg",{type:"image/jpeg"}));const r=await api(gateway+"/api/communications/website/media",editor,{method:"POST",body:f});if(r.response.status!==400)throw new Error(r.detail+"; expected HTTP 400 for >10 MiB.");return"HTTP 400; oversize media rejected.";});
+ await check("Wrong media extension/MIME rejected",async()=>{const f=new FormData();f.append("file",new File(["not an image"],"wrong-type.jpg",{type:"text/plain"}));const r=await api(gateway+"/api/communications/website/media",editor,{method:"POST",body:f});if(r.response.status!==400)throw new Error(r.detail+"; expected HTTP 400.");return"HTTP 400; extension/MIME mismatch rejected.";});
+ for(const key of["plugin","theme","user","settings"])await check("Forbidden "+key+" mutation rejected",async()=>{if(!item)throw new Error("Blocked: no staging draft fixture.");const r=await api(gateway+"/api/communications/website/content",editor,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:item.type,id:item.id,[key]:"forbidden-test"})});if(r.response.status!==400)throw new Error(r.detail+"; expected HTTP 400.");return"HTTP 400; "+key+" mutation rejected server-side.";});
+ await check("Pre-edit snapshot available",async()=>{if(!item||!snapshot)throw new Error("Blocked: snapshot missing.");const r=ok(await api(gateway+"/api/communications/website/revisions?type="+item.type+"&id="+item.id,editor),"Read revisions");if(!(r.data.revisions||[]).some(v=>v.snapshotId===snapshot))throw new Error(r.detail+"; saved snapshot missing.");return"HTTP "+r.response.status+"; snapshot listed.";});
+ await check("Restore baseline and verify byte-exact fields",async()=>{if(!item||!baseline||!snapshot)throw new Error("Blocked: baseline or snapshot missing.");const r=ok(await api(gateway+"/api/communications/website/restore",editor,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:item.type,id:item.id,snapshotId:snapshot})}),"Restore baseline");const read=ok(await api(gateway+"/api/communications/website/content/"+item.type+"/"+item.id,editor),"Verify restored item");if(!same(read.data.item,baseline))throw new Error(read.detail+"; content/excerpt/status/media/SEO differs from baseline.");return"HTTP "+r.response.status+"; all captured fields exactly match baseline.";});
+ await check("Secrets absent from logs and audit",async()=>{if(!editor)throw new Error("Blocked: editor authentication failed.");const r=ok(await api(gateway+"/api/communications/website/audit",editor),"Read own audit metadata"),body=JSON.stringify(r.data);if(!Array.isArray(r.data.entries)||!r.data.entries.some(v=>String(v.action||"").includes("COMMUNICATION_WEBSITE")))throw new Error(r.detail+"; current-user website audit entries unavailable.");if(secrets.some(s=>s&&body.includes(s)))throw new Error("A configured secret appeared in audit metadata.");if(secrets.some(s=>s&&JSON.stringify(rows).includes(s)))throw new Error("A configured secret appeared in acceptance output.");return"HTTP "+r.response.status+"; current-user audit metadata and runner results contain no configured secret values.";});
+}else{
+ for(const n of["Staging editor authentication","Staging Chair authentication","Read-only health panel","Worker secret diagnostics return six booleans only","Find staging draft fixture","Draft save and SEO round-trip","Review workflow maps to pending","Publish denied for editor","Publish accepted for active Chair","Oversize media rejected","Wrong media extension/MIME rejected","Forbidden plugin mutation rejected","Forbidden theme mutation rejected","Forbidden user mutation rejected","Forbidden settings mutation rejected","Pre-edit snapshot available","Restore baseline and verify byte-exact fields","Secrets absent from logs and audit"])record(n,false,"Blocked by failed preflight; no staging mutations attempted.");
 }
-if (!env.STAGING_GATEWAY_URL || !env.STAGING_FIREBASE_WEB_API_KEY || !env.STAGING_TEST_EMAIL || !env.STAGING_TEST_PASSWORD) {
-  check("Staging credentials configured", false, "Required staging-only Actions secrets are missing.");
-  failed = true;
-} else {
-  check("Staging credentials configured", true);
-}
-const gateway = String(env.STAGING_GATEWAY_URL || "");
-try {
-  const url = new URL(gateway);
-  if (url.protocol !== "https:" || !url.hostname.endsWith(".workers.dev") || /irpa\.or\.tz$/i.test(url.hostname)) throw new Error("Gateway must be the HTTPS staging Worker workers.dev hostname.");
-  check("Gateway hostname is staging Worker", true);
-} catch (error) {
-  check("Gateway hostname is staging Worker", false, error.message);
-  failed = true;
-}
-if (!failed) {
-  try {
-    const authResponse = await fetch("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=" + encodeURIComponent(env.STAGING_FIREBASE_WEB_API_KEY), {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: env.STAGING_TEST_EMAIL, password: env.STAGING_TEST_PASSWORD, returnSecureToken: true })
-    });
-    const auth = await authResponse.json().catch(() => ({}));
-    if (!authResponse.ok || !auth.idToken) throw new Error("Staging Firebase authentication failed (HTTP " + authResponse.status + ").");
-    const headers = { Authorization: "Bearer " + auth.idToken, Accept: "application/json" };
-    const statusResponse = await fetch(gateway + "/api/communications/site/status", { headers });
-    const status = await statusResponse.json().catch(() => ({}));
-    check("Authenticated website/cPanel status route", statusResponse.ok && status.ok === true, "HTTP " + statusResponse.status);
-    for (const type of ["pages", "posts"]) {
-      const response = await fetch(gateway + "/api/communications/website/content?type=" + type, { headers });
-      const data = await response.json().catch(() => ({}));
-      check("Read staging WordPress " + type, response.ok && Array.isArray(data.items), "HTTP " + response.status);
-    }
-    const denied = await fetch(gateway + "/api/communications/website/content?type=pages");
-    check("Unauthenticated role denial", denied.status === 401 || denied.status === 403, "HTTP " + denied.status);
-    const secretProbe = "Authorization: Bearer " + auth.idToken + " WORDPRESS_APPLICATION_PASSWORD=" + env.STAGING_TEST_PASSWORD + " API_KEY=" + env.STAGING_FIREBASE_WEB_API_KEY;
-    const serialized = redactSecrets(secretProbe, [auth.idToken, env.STAGING_FIREBASE_WEB_API_KEY, env.STAGING_TEST_PASSWORD]);
-    check("Response diagnostic secret redaction", !serialized.includes(auth.idToken) && !serialized.includes(env.STAGING_TEST_PASSWORD) && !serialized.includes(env.STAGING_FIREBASE_WEB_API_KEY) && serialized.includes("[REDACTED]"));
-  } catch (error) {
-    check("Staging runtime acceptance", false, error.message);
-  }
-}
-const firstFailure = rows.find(row => row.result === "FAIL");
-console.log("WEBSITE PORTAL VERDICT: " + (firstFailure ? "FAIL (" + firstFailure.name + ")" : "PASS"));
-console.log("| Check | PASS or FAIL | Exact error (first 300 characters, redacted) |");
-console.log("|---|---|---|");
-for (const row of rows) console.log("| " + row.name + " | " + row.result + " | " + redactSecrets(row.detail, [env.STAGING_TEST_PASSWORD, env.STAGING_FIREBASE_WEB_API_KEY].filter(Boolean)).slice(0, 300).replace(/\|/g, "/") + " |");
-if (firstFailure) process.exitCode = 1;
+const first=rows.find(r=>r.result==="FAIL"),verdict=first?"WEBSITE PORTAL VERDICT: FAIL ("+first.name+")":"WEBSITE PORTAL VERDICT: PASS";
+const tsv=rows.map(r=>[r.name,r.result,r.detail].join("\t")).join("\n")+"\n";
+const summary=[verdict,"","| Check | Result | Detail |","|---|---|---|",...rows.map(r=>"| "+r.name.replace(/\|/g,"/")+" | "+r.result+" | "+r.detail.replace(/\|/g,"/")+" |")].join("\n")+"\n";
+await writeFile("results.tsv",tsv);await writeFile("acceptance-summary.md",summary);console.log(verdict+"\n"+summary);if(first)process.exitCode=1;
