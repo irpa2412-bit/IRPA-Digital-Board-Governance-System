@@ -2566,12 +2566,14 @@ async function getFirestoreAdminAccessToken(env) {
   return firestoreAdminTokenCache.token;
 }
 
-async function commitFirestoreDocumentAndAudit(env, documentId, _firebaseToken, documentFields, documentMask, auditFields, {createOnly=false}={}) {
+export async function commitFirestoreDocumentAndAudit(env, documentId, _firebaseToken, documentFields, documentMask, auditFields, {createOnly=false}={}) {
+  const safeDocumentId=String(documentId||"").replace(/[^a-zA-Z0-9_-]/g,"");
+  if(!safeDocumentId)throw new Error("A valid document ID is required for the atomic lifecycle commit.");
   const firebaseToken = await getFirestoreAdminAccessToken(env);
   const base=`projects/${getFirebaseProjectId(env)}/databases/(default)/documents`;
   const auditId=`${Date.now()}-${crypto.randomUUID()}`;
   const documentWrite={
-    update:{name:`${base}/${documentId}`,fields:documentFields},
+    update:{name:`${base}/documents/${safeDocumentId}`,fields:documentFields},
     updateMask:{fieldPaths:documentMask}
   };
   if(createOnly)documentWrite.currentDocument={exists:false};
@@ -2584,7 +2586,18 @@ async function commitFirestoreDocumentAndAudit(env, documentId, _firebaseToken, 
     headers:{"Authorization":`Bearer ${firebaseToken}`,"Content-Type":"application/json"},
     body:JSON.stringify({writes})
   });
-  if(!response.ok)throw new Error(`Unable to atomically commit the document and its audit event (HTTP ${response.status}).`);
+  if(!response.ok){
+    let googleError={};
+    try{googleError=(await response.clone().json())?.error||{};}catch{}
+    const googleStatus=String(googleError.status||"UNKNOWN").replace(/[\\r\\n]/g," ").slice(0,100);
+    const googleMessage=String(googleError.message||"No Google error message returned").replace(/[\\r\\n]/g," ").slice(0,500);
+    console.error("Firestore atomic document/audit commit failed", {httpStatus:response.status,googleStatus,googleMessage});
+    const error=new Error(`Unable to atomically commit the document and its audit event (HTTP ${response.status}; ${googleStatus}: ${googleMessage}).`);
+    error.googleStatus=googleStatus;
+    error.googleMessage=googleMessage;
+    error.httpStatus=response.status;
+    throw error;
+  }
   return response.json();
 }
 
