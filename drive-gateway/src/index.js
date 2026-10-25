@@ -30,6 +30,7 @@ import { createMeetingPortalRouter } from "./meetingPortal.mjs";
 import { createMeetingServicesRouter } from "./meetingServices.mjs";
 import { createInductionMatchingRouter } from "./inductionMatching.mjs";
 import { createInvitationRemovalRouter } from "./invitationRemoval.mjs";
+import { persistCompletedSignatureEnvelope as persistSignatureMirror } from "./signatureMirror.mjs";
 
 function getFirebaseProjectId(env) {
   const projectId = String(env?.FIREBASE_PROJECT_ID || "").trim();
@@ -108,6 +109,7 @@ function normalizeGatewayAuthority(value) {
 async function verifyGatewaySigningAuthority(env,user,manualAuthorityIdentification) {
   const input=normalizeGatewayAuthority(manualAuthorityIdentification);
   if(!input||!user?.uid||!user?.token)throw Object.assign(new Error("Authenticated signing authority is required."),{status:403});
+  const adminToken=await getFirestoreAdminAccessToken(env);
   const records=[];
   const add=(document,sourceCollection,fallbackId)=>{
     if(!document?.fields)return;
@@ -115,22 +117,41 @@ async function verifyGatewaySigningAuthority(env,user,manualAuthorityIdentificat
     const id=String(document.name||"").split("/").pop()||fallbackId||user.uid;
     records.push({id,...record,sourceCollection});
   };
-  add(await getFirestoreDocument(env,"members/"+user.uid,user.token),"members",user.uid);
-  add(await getFirestoreDocument(env,"employees/"+user.uid,user.token),"employees",user.uid);
-  const matchesAuthority=record=>{
-    const active=String(record.status||record.employmentStatus||"Active").trim().toLowerCase()!=="inactive";
-    const candidates=[record.role,record.boardPosition,record.designation,record.jobTitle,record.position,record.title,record.authorityRole,record.unit,record.unitName].map(normalizeGatewayAuthority).filter(Boolean);
-    return active&&candidates.includes(input);
+  const readById=async(collection)=>{
+    try { add(await getFirestoreDocument(env,collection+"/"+user.uid,adminToken),collection,user.uid); }
+    catch(error) { console.error("Signing authority register lookup failed", {collection,code:String(error?.code||error?.status||"UNKNOWN")}); throw error; }
   };
-  let match=records.find(matchesAuthority);
-  if(!match&&user.email){
-    let memberRows=[],employeeRows=[];
-    try{memberRows=await getFirestoreDocumentsByEmail(env,"members",user.email,user.token)}catch{}
-    try{employeeRows=await getFirestoreDocumentsByEmail(env,"employees",user.email,user.token)}catch{}
-    for(const row of [...memberRows,...employeeRows])add(row,String(row.name||"").split("/").at(-2)||"members",user.uid);
-    match=records.find(matchesAuthority);
+  await readById("members");
+  await readById("employees");
+  const getRows=async(collection,field,value)=>{
+    try { return await getFirestoreDocumentsByField(env,collection,field,value,adminToken); }
+    catch(error) { console.error("Signing authority register lookup failed", {collection,code:String(error?.code||error?.status||"UNKNOWN")}); throw error; }
+  };
+  for(const collection of ["members","employees"]){
+    for(const row of await getRows(collection,"uid",user.uid))add(row,collection,user.uid);
   }
-  if(!match)throw Object.assign(new Error("SYSTEM VERIFICATION FAILED: the declared signing authority does not match an active IRPA Member or Employee Register record for this authenticated account."),{status:403});
+  const originalEmail=String(user.email||"");
+  const normalizedEmail=originalEmail.trim().toLowerCase();
+  const emailValues=[...new Set([normalizedEmail,originalEmail].filter(Boolean))];
+  for(const collection of ["members","employees"]){
+    for(const email of emailValues){
+      for(const row of await getRows(collection,"email",email))add(row,collection,user.uid);
+    }
+  }
+  const uniqueRecords=[...new Map(records.map(record=>[record.sourceCollection+":"+record.id,record])).values()];
+  const candidates=record=>[record.role,record.boardPosition,record.designation,record.jobTitle,record.position,record.title,record.authorityRole,record.unit,record.unitName].map(normalizeGatewayAuthority).filter(Boolean);
+  const active=record=>String(record.status||record.employmentStatus||"Active").trim().toLowerCase()!=="inactive";
+  const match=uniqueRecords.find(record=>active(record)&&candidates(record).includes(input));
+  if(!match){
+    const inactive=uniqueRecords.find(record=>!active(record));
+    const activeRecord=uniqueRecords.find(record=>active(record));
+    let reason,detailRecord;
+    if(!uniqueRecords.length){reason="no register record found for this account";detailRecord=null;}
+    else if(!activeRecord&&inactive){reason="record found but status is inactive";detailRecord=inactive;}
+    else {reason="record found but role does not match";detailRecord=activeRecord||inactive;}
+    const roleFields=detailRecord?["role","boardPosition","designation","jobTitle","position","title","authorityRole","unit","unitName"].filter(field=>Object.prototype.hasOwnProperty.call(detailRecord,field)).join(", "):"none";
+    throw Object.assign(new Error("SYSTEM VERIFICATION FAILED: "+reason+" (collection: "+(detailRecord?.sourceCollection||"members/employees")+"; record ID: "+(detailRecord?.id||"none")+"; role fields present: "+(roleFields||"none") + ")."),{status:403});
+  }
   return{
     verified:true,
     authorityRole:String(match.role||match.boardPosition||match.designation||match.jobTitle||match.position||match.title||manualAuthorityIdentification).trim(),
@@ -174,7 +195,8 @@ export default {
         const health = {
           ok: true,
           service: "IRPA Google Drive Gateway",
-          storageProvider: "Google Drive"
+          storageProvider: "Google Drive",
+          version: String(env.GIT_SHA || "unknown")
         };
         if (env.IRPA_ENVIRONMENT === "staging") {
           health.environment = "staging";
@@ -343,24 +365,38 @@ export default {
           return json(await runCleanup(ctx),200,corsHeaders(request));
         }
         const isEsignPath =
-          pathname === "/api/documents" ||
-          /^\/api\/documents\/[A-Za-z0-9_-]{3,64}\/pdf$/.test(pathname) ||
-          pathname === "/api/envelopes" ||
-          /^\/api\/envelopes\/[A-Za-z0-9_-]{3,64}(?:\/void|\/retry-completion)?$/.test(pathname) ||
-          pathname === "/api/sign/open" ||
-          pathname === "/api/sign/status" ||
-          pathname === "/api/sign/evidence" ||
-          pathname === "/api/sign/verify" ||
-          pathname === "/api/sign/pdf" ||
-          pathname === "/api/sign/submit" ||
-          pathname === "/api/sign/decline" ||
-          pathname === "/api/auth/password-attempt-state" ||
-          pathname === "/api/auth/password-failure" ||
-          pathname === "/api/auth/password-attempt-clear" ||
-          pathname === "/api/documents/next-reference";
+          pathname === "/api/documents/next-reference" ||
+          /^\/api\/documents(?:\/.*)?$/.test(pathname) ||
+          /^\/api\/envelopes(?:\/[A-Za-z0-9_-]{3,64}(?:\/(?:status|resync|retry|retry-completion|void))?)?$/.test(pathname) ||
+          /^\/api\/sign\/.*$/.test(pathname) ||
+          /^\/api\/document-lifecycle\/.*$/.test(pathname) ||
+          /^\/api\/auth\/.*$/.test(pathname);
         if (isEsignPath) {
+          const persistCompletedSignatureEnvelope = async ({envelope,completion}) => {
+            const token = await getFirestoreAdminAccessToken(env);
+            const encode = value => {
+              if (value === null || value === undefined) return {nullValue:null};
+              if (typeof value === "boolean") return {booleanValue:value};
+              if (typeof value === "number" && Number.isInteger(value)) return {integerValue:String(value)};
+              if (typeof value === "number") return {doubleValue:value};
+              if (Array.isArray(value)) return {arrayValue:{values:value.map(encode)}};
+              if (typeof value === "object") return {mapValue:{fields:Object.fromEntries(Object.entries(value).map(([k,v])=>[k,encode(v)]))}};
+              return {stringValue:String(value)};
+            };
+            const getDocument = async path => {
+              const raw = await getFirestoreDocument(env,path,token);
+              return firestoreDocumentToPlain(raw);
+            };
+            const updateDocument = async (path,fields) => updateFirestoreDocument(
+              env,path,token,
+              Object.fromEntries(Object.entries(fields).map(([k,v])=>[k,encode(v)])),
+              Object.keys(fields)
+            );
+            return persistSignatureMirror({envelope,completion,getDocument,updateDocument});
+          };
           const ctx = buildEsignContext({
             env,
+            persistCompletedSignatureEnvelope,
             verifyUser: async req => {
               const claims = await authenticateFirebaseRequest(req, env);
               const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
@@ -368,7 +404,7 @@ export default {
             },
             sendInvitation: async ({to,name,link}) => sendInvitationEmail({email:to,name,link,smtpSend:async ({to:recipient,subject,text,html})=>smtpSend(env,{to:recipient,subject,text,html}),logger:console}),
             logger: console,
-            verifySigningAuthority: (user,manualAuthorityIdentification)=>verifyGatewaySigningAuthority(env,user,manualAuthorityIdentification),
+            verifySigningAuthority: (user, manualAuthority) => verifyGatewaySigningAuthority(env, user, manualAuthority),
             driveHelpers: {getDriveAccessToken,driveFetch}
           });
           const response = await esignRoute(request,ctx);
@@ -395,7 +431,9 @@ export default {
 
       return json({
         ok: false,
-        error: message
+        error: message,
+        ...(error?.googleStatus ? {googleStatus:error.googleStatus} : {}),
+        ...(error?.googleMessage ? {googleMessage:error.googleMessage} : {})
       }, Number(error?.status || 0) || (isAuthError ? 401 : 500), corsHeaders(request));
     }
   }
@@ -2377,6 +2415,30 @@ function firestoreDocumentToPlain(document) {
   return Object.fromEntries(Object.entries(document.fields).map(([k,v])=>[k,convert(v)]));
 }
  
+async function getFirestoreDocumentsByField(env, collectionName, fieldName, value, firebaseToken) {
+  if (value === null || value === undefined || String(value) === "") return [];
+  const response = await fetch(
+    `https://firestore.googleapis.com/v1/projects/${getFirebaseProjectId(env)}/databases/(default)/documents:runQuery`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${firebaseToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ structuredQuery: {
+        from: [{ collectionId: collectionName }],
+        where: { fieldFilter: { field: { fieldPath: fieldName }, op: "EQUAL", value: { stringValue: String(value) } } },
+        limit: 100
+      }})
+    }
+  );
+  if (!response.ok) {
+    const error = new Error("Unable to query the Firestore register.");
+    error.status = response.status;
+    error.code = "firestore-query-" + response.status;
+    throw error;
+  }
+  const rows = await response.json();
+  return rows.filter(row => row.document).map(row => row.document);
+}
+
 async function getFirestoreDocumentsByEmail(env, collectionName, email, firebaseToken) {
   const normalizedEmail = String(email || "").trim().toLowerCase();
   if (!normalizedEmail) return [];
@@ -2506,12 +2568,14 @@ async function getFirestoreAdminAccessToken(env) {
   return firestoreAdminTokenCache.token;
 }
 
-async function commitFirestoreDocumentAndAudit(env, documentId, _firebaseToken, documentFields, documentMask, auditFields, {createOnly=false}={}) {
+export async function commitFirestoreDocumentAndAudit(env, documentId, _firebaseToken, documentFields, documentMask, auditFields, {createOnly=false}={}) {
+  const safeDocumentId=String(documentId||"").replace(/[^a-zA-Z0-9_-]/g,"");
+  if(!safeDocumentId)throw new Error("A valid document ID is required for the atomic lifecycle commit.");
   const firebaseToken = await getFirestoreAdminAccessToken(env);
   const base=`projects/${getFirebaseProjectId(env)}/databases/(default)/documents`;
   const auditId=`${Date.now()}-${crypto.randomUUID()}`;
   const documentWrite={
-    update:{name:`${base}/${documentId}`,fields:documentFields},
+    update:{name:`${base}/documents/${safeDocumentId}`,fields:documentFields},
     updateMask:{fieldPaths:documentMask}
   };
   if(createOnly)documentWrite.currentDocument={exists:false};
@@ -2524,7 +2588,18 @@ async function commitFirestoreDocumentAndAudit(env, documentId, _firebaseToken, 
     headers:{"Authorization":`Bearer ${firebaseToken}`,"Content-Type":"application/json"},
     body:JSON.stringify({writes})
   });
-  if(!response.ok)throw new Error(`Unable to atomically commit the document and its audit event (HTTP ${response.status}).`);
+  if(!response.ok){
+    let googleError={};
+    try{googleError=(await response.clone().json())?.error||{};}catch{}
+    const googleStatus=String(googleError.status||"UNKNOWN").replace(/[\\r\\n]/g," ").slice(0,100);
+    const googleMessage=String(googleError.message||"No Google error message returned").replace(/[\\r\\n]/g," ").slice(0,500);
+    console.error("Firestore atomic document/audit commit failed", {httpStatus:response.status,googleStatus,googleMessage});
+    const error=new Error(`Unable to atomically commit the document and its audit event (HTTP ${response.status}; ${googleStatus}: ${googleMessage}).`);
+    error.googleStatus=googleStatus;
+    error.googleMessage=googleMessage;
+    error.httpStatus=response.status;
+    throw error;
+  }
   return response.json();
 }
 
@@ -2558,7 +2633,16 @@ async function updateFirestoreDocument(env, path, firebaseToken, fields, updateM
     headers:{"Authorization":`Bearer ${firebaseToken}`,"Content-Type":"application/json"},
     body:JSON.stringify({fields})
   });
-  if (!response.ok) throw new Error("Unable to record email delivery status in Firestore.");
+  if (!response.ok) {
+    let googleError = {};
+    try {
+      const body = await response.clone().json();
+      googleError = body?.error || {};
+    } catch {}
+    const googleStatus = String(googleError.status || "UNKNOWN").replace(/[\\r\\n]/g, " ").slice(0, 100);
+    const googleMessage = String(googleError.message || "No Google error message returned").replace(/[\\r\\n]/g, " ").slice(0, 500);
+    throw new Error(`Firestore PATCH ${path} failed: HTTP ${response.status} ${googleStatus} ${googleMessage}`);
+  }
   return response.json();
 }
 
@@ -2567,7 +2651,16 @@ async function getFirestoreDocument(env, path, firebaseToken) {
     headers: { Authorization: `Bearer ${firebaseToken}` }
   });
   if (response.status === 404) return null;
-  if (!response.ok) throw new Error("Unable to verify the Firestore authorization record.");
+  if (!response.ok) {
+    let googleError = {};
+    try {
+      const body = await response.clone().json();
+      googleError = body?.error || {};
+    } catch {}
+    const googleStatus = String(googleError.status || "UNKNOWN").replace(/[\\r\\n]/g, " ").slice(0, 100);
+    const googleMessage = String(googleError.message || "No Google error message returned").replace(/[\\r\\n]/g, " ").slice(0, 500);
+    throw new Error(`Firestore GET ${path} failed: HTTP ${response.status} ${googleStatus} ${googleMessage}`);
+  }
   return response.json();
 }
 

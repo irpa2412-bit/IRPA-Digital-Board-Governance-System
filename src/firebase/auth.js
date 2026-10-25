@@ -24,6 +24,7 @@ import {
 import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { auth, db, firebaseConfig, googleProvider, applicantAuth } from "./config";
+import { getGoogleDriveGatewayUrl } from "./gatewayUrl";
 import { addDoc, collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
 
@@ -49,11 +50,7 @@ adminGoogleProvider.setCustomParameters({
 // Password-attempt controls run on the Cloudflare Worker so they do not
 // require deployment of Firebase Cloud Functions. Firebase Authentication
 // remains the credential authority; Firebase-hosted security rules are unchanged.
-const GOVERNANCE_GATEWAY_ORIGIN = String(
-  import.meta.env.VITE_GATEWAY_ORIGIN ||
-  import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL ||
-  "https://irpa-google-drive-gateway.irpa-governance.workers.dev"
-).trim().replace(/[/]+$/, "");
+const GOVERNANCE_GATEWAY_ORIGIN = getGoogleDriveGatewayUrl();
 
 async function passwordSecurityRequest(path, email) {
   const response = await fetch(GOVERNANCE_GATEWAY_ORIGIN + path, {
@@ -360,7 +357,7 @@ export async function sendMemberInvitationEmail(_email, invitationId, _role, _me
   const cleanId = String(invitationId || "").trim();
   if (!cleanId) throw new Error("The invitation ID is required.");
   if (!auth.currentUser) throw new Error("Administrator authentication is required.");
-  const gateway = String(import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL || "https://irpa-google-drive-gateway.irpa-governance.workers.dev").replace(/\/$/,"");
+  const gateway = getGoogleDriveGatewayUrl();
   try {
     const token = await auth.currentUser.getIdToken();
     const response = await fetch(`${gateway}/api/invitations/send`, {
@@ -440,7 +437,7 @@ export async function configureInvitationPassword(password) {
   if (!invitationId) throw new Error("The invitation activation context is missing. Open the invitation email again.");
   if (cleanPassword.length < 8) throw new Error("Use a password with at least 8 characters.");
   const idToken = await user.getIdToken(true);
-  const gatewayOrigin = String(import.meta.env.VITE_GATEWAY_ORIGIN || import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL || "").trim().replace(/\/+$/, "");
+  const gatewayOrigin = getGoogleDriveGatewayUrl();
   if (!gatewayOrigin) throw new Error("IRPA gateway origin is not configured for this build.");
   let response;
   try {
@@ -471,7 +468,7 @@ export async function configureInvitationPassword(password) {
 export async function completeInvitationToken(token) {
   const cleanToken = String(token || "").trim();
   if (!cleanToken) throw new Error("The IRPA invitation token is missing.");
-  const gatewayOrigin = String(import.meta.env.VITE_GATEWAY_ORIGIN || import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL || "").trim().replace(/\/+$/, "");
+  const gatewayOrigin = getGoogleDriveGatewayUrl();
   if (!gatewayOrigin) throw new Error("IRPA gateway origin is not configured for this build.");
   const endpoint = `${gatewayOrigin}/api/invitations/redeem`;
   try {
@@ -492,7 +489,7 @@ export async function completeInvitationToken(token) {
 export async function getInvitationSessionState() {
   const user = auth.currentUser;
   if (!user) return {state:null, invitationId:null};
-  const gatewayOrigin = String(import.meta.env.VITE_GATEWAY_ORIGIN || import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL || "").trim().replace(/\/+$/, "");
+  const gatewayOrigin = getGoogleDriveGatewayUrl();
   if (!gatewayOrigin) throw new Error("IRPA gateway origin is not configured for this build.");
   const idToken = await user.getIdToken();
   const response = await fetch(`${gatewayOrigin}/api/invitations/session-state`, {

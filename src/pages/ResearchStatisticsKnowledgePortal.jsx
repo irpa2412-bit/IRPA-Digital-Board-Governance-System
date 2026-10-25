@@ -1,5 +1,6 @@
 import React,{useMemo,useState}from"react";
 import { auth } from "../firebase/config";
+import { getGoogleDriveGatewayUrl } from "../firebase/gatewayUrl";
 import{createRecord,getRecords,updateRecord,COLLECTIONS}from"../firebase/data";
 import PortalDocumentAccessPoint from"../components/PortalDocumentAccessPoint";import{ResearchInformationRequestPanel}from"../components/ResearchInformationGovernance";
 import StatisticalAnalysisWorkbench from"../components/StatisticalAnalysisWorkbench";
@@ -51,7 +52,7 @@ export default function ResearchStatisticsKnowledgePortal({profile,employee,onNa
    const user=auth.currentUser;
    if(!user)throw new Error("Sign in with an authorized Research Department account first.");
    const token=await user.getIdToken();
-   const response=await fetch("https://irpa-google-drive-gateway.irpa-governance.workers.dev/api/research-archive/provision",{
+   const response=await fetch(getGoogleDriveGatewayUrl()+"/api/research-archive/provision",{
     method:"POST",
     headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
     body:JSON.stringify({})

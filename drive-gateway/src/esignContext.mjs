@@ -163,12 +163,14 @@ function driveStorage(env, helpers) {
     async delete(id){const token=await helpers.getDriveAccessToken(env); const r=await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}`,{method:"DELETE",headers:{Authorization:`Bearer ${token}`}}); if(!r.ok&&r.status!==404) throw new Error("Google Drive deletion failed.");}
   };
 }
-export function buildEsignContext({env,verifyUser,sendInvitation,logger,now,driveHelpers}) {
+export function buildEsignContext({env,verifyUser,verifySigningAuthority,sendInvitation,logger,now,driveHelpers,...rest}) {
   return {
+    ...rest,
     env,
     meta:env.DRIVE_MOCK==="true"?mockMeta():doMeta(env),
     storage:driveStorage(env,driveHelpers),
     verifyUser,
+    verifySigningAuthority,
     sendInvitation,
     logger:logger||console,
     now:now||(()=>new Date()),

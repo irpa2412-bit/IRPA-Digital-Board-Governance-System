@@ -1,5 +1,6 @@
 import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, orderBy, query, runTransaction, serverTimestamp, updateDoc, setDoc, where, } from "firebase/firestore";
 import { auth, db, applicantAuth, applicantDb, applicantApp } from "./config";
+import { getGoogleDriveGatewayUrl } from "./gatewayUrl";
 import { sendEmployeeRegistrationEmail } from "./auth";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { canAccessMeetingCategory, MEETING_CATEGORIES } from "./meetingPolicy.js";
@@ -19,7 +20,7 @@ export async function nextDocumentReference(){
   const user=auth.currentUser;
   if(!user)throw new Error("Authentication is required to generate a document reference.");
   const token=await user.getIdToken();
-  const gatewayOrigin=String(import.meta.env.VITE_GATEWAY_ORIGIN||import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").trim().replace(/[/]+$/,"");
+  const gatewayOrigin=getGoogleDriveGatewayUrl();
   let response;
   try{
     response=await fetch(gatewayOrigin+"/api/documents/next-reference",{
@@ -323,7 +324,7 @@ export async function getCurrentInductionContext(){
         const matchingUser=context?.anonymous?applicantAuth.currentUser:auth.currentUser;
         if(!matchingUser)throw new Error("Authentication is required to verify the invitation.");
         const token=await matchingUser.getIdToken();
-        const gatewayOrigin=String(import.meta.env.VITE_GATEWAY_ORIGIN||import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").trim().replace(/[/]+$/,"");
+  const gatewayOrigin=getGoogleDriveGatewayUrl();
         const response=await fetch(gatewayOrigin+"/api/induction/matching-records",{
           method:"POST",
           headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},
@@ -513,7 +514,7 @@ export async function removeInvitationRecord(invitationId){
  const id=String(invitationId||"").trim();
  if(!id)throw new Error("An invitation record is required.");
  if(!auth.currentUser?.uid)throw new Error("Administrator authentication is required.");
- const gatewayOrigin=String(import.meta.env.VITE_GATEWAY_ORIGIN||import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL||"https://irpa-google-drive-gateway.irpa-governance.workers.dev").trim().replace(/\/+$/,"");
+  const gatewayOrigin=getGoogleDriveGatewayUrl();
  const token=await auth.currentUser.getIdToken();
  const response=await fetch(`${gatewayOrigin}/api/invitations/remove`,{
   method:"POST",

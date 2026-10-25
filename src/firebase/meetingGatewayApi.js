@@ -1,9 +1,7 @@
 import { auth } from "./config";
+import { getGoogleDriveGatewayUrl } from "./gatewayUrl";
 
-const gateway = () => String(
-  import.meta.env.VITE_GOOGLE_DRIVE_GATEWAY_URL ||
-  "https://irpa-google-drive-gateway.irpa-governance.workers.dev"
-).replace(/\/$/, "");
+const gateway = () => getGoogleDriveGatewayUrl();
 
 export async function callMeetingService(path, payload = {}) {
   const user = auth.currentUser;
