@@ -59,7 +59,6 @@ test("actual-data gate Worker route enforces admin role, exact attestation, writ
   assert.match(route, /authenticateFirebaseRequest\(request, env\)/);
   assert.match(route, /adminProfiles\//);
   assert.match(route, /profile\?\.fields\?\.active\?\.booleanValue === true/);
-  assert.match(route, /ACTUAL_DATA_ATTESTATION/);
   assert.match(worker, /actualDataAccessPolicy\.mjs/);
   assert.match(route, /evaluateActualDataAccessPolicy/);
   assert.match(route, /status:\{stringValue:enabled\?'OPEN':'CLOSED'\}/);
@@ -73,12 +72,11 @@ test("actual-data gate rejects non-administrators and wrong attestation before c
   const worker = await read("../drive-gateway/src/index.js");
   const route = worker.slice(worker.indexOf("async function actualDataAccessRoute"), worker.indexOf("async function reconcileSignatureDocumentIds"));
   const authorization = route.indexOf("if (!adminAllowed)");
-  const attestation = route.indexOf("body.confirmation !== ACTUAL_DATA_ATTESTATION");
-  const write = route.indexOf("step = 'Write actual-data setting'");
-  assert.ok(authorization >= 0 && attestation > authorization && write > attestation);
+  const policy = route.indexOf("evaluateActualDataAccessPolicy");
+  const write = route.indexOf("step = 'Commit actual-data setting and audit atomically'");
+  assert.ok(authorization >= 0 && policy > authorization && write > policy);
   assert.match(route, /},403,corsHeaders\(request\)/);
-  assert.match(route, /},412,corsHeaders\(request\)/);
-  assert.match(route, /An enabled boolean is required/);
+  assert.match(route, /policy\.status/);
 });
 
 test("actual-data gate policy allows an administrator with the exact attestation", async () => {
