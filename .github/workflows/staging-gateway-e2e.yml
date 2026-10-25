@@ -2188,7 +2188,7 @@ jobs:
           }
           const nonAdmin=await signIn(process.env.STAGING_CRYPTO_TEST_EMAIL,process.env.STAGING_CRYPTO_TEST_PASSWORD);
           const denied=await fetch(base+"/api/communication-media-archive/provision",{method:"POST",headers:{Authorization:"Bearer "+nonAdmin.idToken,"content-type":"application/json"},body:"{}"});
-          if(denied.status!==403) throw new Error("Media archive role-denial check failed; expected HTTP 403 and received HTTP "+denied.status+".");
+          const deniedText=await denied.text();\n           if(denied.status!==403) throw new Error("Media archive role-denial check failed; expected HTTP 403 and received HTTP "+denied.status+"; response body: "+redactBody(deniedText));
           console.log("STAGING_COMMUNICATION_MEDIA_ROLE_DENIAL=PASS");
           const admin=await signIn(process.env.STAGING_TEST_EMAIL,process.env.STAGING_TEST_PASSWORD);
           const archiveResponse=await fetch(base+"/api/communication-media-archive/provision",{method:"POST",headers:{Authorization:"Bearer "+admin.idToken,"content-type":"application/json"},body:"{}"});
