@@ -64,7 +64,7 @@ test("actual-data gate Worker route enforces admin role, exact attestation, writ
   assert.match(route, /status:\{stringValue:enabled\?'OPEN':'CLOSED'\}/);
   assert.match(route, /finalTestsAttested:\{booleanValue:enabled\}/);
   assert.match(route, /ACTUAL_DATA_ACCESS_OPENED/);
-  assert.match(route, /Write audit record/);
+  assert.match(route, /Commit actual-data setting and audit atomically/);
   assert.match(route, /step\+' failed: '/);
 });
 
