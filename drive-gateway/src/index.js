@@ -263,6 +263,7 @@ export default {
       if (pathname === "/api/signature-pathway/reconcile" && request.method === "POST") {
         return await reconcileSignatureDocumentIds(request, env);
       }
+      if (pathname === "/api/system/actual-data-access" && (request.method === "GET" || request.method === "POST")) return await actualDataAccessRoute(request, env);
 
       if (pathname === "/api/signature-profile/folder" && request.method === "POST") {
         return await ensureSignatureProfileFolder(request, env);
@@ -684,6 +685,48 @@ async function upload(request, env) {
     uploadedByUid: claims.user_id,
     storageProvider: "Google Drive"
   }, 200, corsHeaders(request));
+}
+
+const ACTUAL_DATA_ATTESTATION = 'I CONFIRM FINAL SYSTEM TESTS PASSED';
+async function actualDataAccessRoute(request, env) {
+  let step = 'Firebase authentication';
+  try {
+    const claims = await authenticateFirebaseRequest(request, env);
+    step = 'Administrator profile lookup';
+    const adminToken = await getFirestoreAdminAccessToken(env);
+    const profile = await getFirestoreDocument(env, 'adminProfiles/' + claims.user_id, adminToken);
+    const email = String(claims.email || '').trim().toLowerCase();
+    const adminAllowed = email === 'irpa2412@gmail.com' || (profile?.fields?.active?.booleanValue === true && profile?.fields?.role?.stringValue === 'Administrator');
+    if (!adminAllowed) return json({ok:false,step,error:'Only an active IRPA Administrator may change actual-data access.'},403,corsHeaders(request));
+    step = 'Read actual-data setting';
+    const path = 'systemSettings/actualDataAccess';
+    const previous = await getFirestoreDocument(env, path, adminToken);
+    const fields = previous?.fields || {};
+    if (request.method === 'GET') return json({ok:true,enabled:fields.enabled?.booleanValue===true,status:fields.status?.stringValue || 'CLOSED',finalTestsAttested:fields.finalTestsAttested?.booleanValue===true,changedAt:fields.changedAt?.timestampValue||null,changedByEmail:fields.changedByEmail?.stringValue||null},200,corsHeaders(request));
+    step = 'Validate request and attestation';
+    const body = await request.json();
+    if (typeof body.enabled !== 'boolean') return json({ok:false,step,error:'An enabled boolean is required.'},400,corsHeaders(request));
+    if (body.enabled && body.confirmation !== ACTUAL_DATA_ATTESTATION) return json({ok:false,step,error:'Opening actual-data access requires the exact final-test attestation.'},412,corsHeaders(request));
+    const enabled = body.enabled;
+    const version = Number(fields.version?.integerValue || 0) + 1;
+    const now = new Date().toISOString();
+    const emailValue = email || profile?.fields?.email?.stringValue || '';
+    const nextFields = {enabled:{booleanValue:enabled},status:{stringValue:enabled?'OPEN':'CLOSED'},changedByUid:{stringValue:claims.user_id},changedByEmail:{stringValue:emailValue},changedAt:{timestampValue:now},version:{integerValue:String(version)},finalTestsAttested:{booleanValue:enabled},finalTestsAttestedByUid:enabled?{stringValue:claims.user_id}:{nullValue:null},finalTestsAttestedByEmail:enabled?{stringValue:emailValue}:{nullValue:null},finalTestsAttestedAt:enabled?{timestampValue:now}:{nullValue:null}};
+    step = 'Write actual-data setting';
+    const base = 'https://firestore.googleapis.com/v1/projects/' + getFirebaseProjectId(env) + '/databases/(default)/documents';
+    const settingUrl = previous ? base + '/' + path : base + '/systemSettings?documentId=actualDataAccess';
+    const settingResponse = await fetch(settingUrl,{method:previous?'PATCH':'POST',headers:{Authorization:'Bearer '+adminToken,'Content-Type':'application/json'},body:JSON.stringify({fields:nextFields})});
+    if (!settingResponse.ok) throw new Error('Firestore setting write returned HTTP ' + settingResponse.status + '.');
+    step = 'Write audit record';
+    const auditId = 'actual-data-' + Date.now() + '-' + crypto.randomUUID().slice(0,12);
+    const auditFields = {action:{stringValue:enabled?'ACTUAL_DATA_ACCESS_OPENED':'ACTUAL_DATA_ACCESS_CLOSED'},category:{stringValue:'SYSTEM_SECURITY'},description:{stringValue:enabled?'Administrator opened actual-data entry after attesting final system tests passed.':'Administrator closed actual-data entry.'},actorUid:{stringValue:claims.user_id},actorEmail:{stringValue:emailValue},previousStatus:{stringValue:fields.enabled?.booleanValue===true?'OPEN':'CLOSED'},newStatus:{stringValue:enabled?'OPEN':'CLOSED'},finalTestsAttested:{booleanValue:enabled},createdAt:{timestampValue:now}};
+    const auditResponse = await fetch(base + '/audit?documentId=' + encodeURIComponent(auditId),{method:'POST',headers:{Authorization:'Bearer '+adminToken,'Content-Type':'application/json'},body:JSON.stringify({fields:auditFields})});
+    if (!auditResponse.ok) throw new Error('Firestore audit write returned HTTP ' + auditResponse.status + '.');
+    return json({ok:true,enabled,status:enabled?'OPEN':'CLOSED',finalTestsAttested:enabled,version},200,corsHeaders(request));
+  } catch (error) {
+    console.error('Actual-data access route failed',{step,message:String(error?.message||error).slice(0,240)});
+    return json({ok:false,step,error:step+' failed: '+String(error?.message||error).slice(0,240)},Number(error?.status)||500,corsHeaders(request));
+  }
 }
 
 async function reconcileSignatureDocumentIds(request, env) {
