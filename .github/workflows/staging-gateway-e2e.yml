@@ -2,7 +2,7 @@ name: Staging Gateway E2E and Deploy
 
 on:
   push:
-    branches: [main, fix/member-signature-invitation-email-20261004, fix/signature-gateway-cryptographic-bridge-20261015, fix/communications-cloudflare-website-integration, fix/communication-media-archive-drive-oauth, fix/signature-trail-20261024]
+    branches: [main, fix/member-signature-invitation-email-20261004, fix/signature-gateway-cryptographic-bridge-20261015, fix/communications-cloudflare-website-integration, fix/communication-media-archive-drive-oauth, fix/signature-trail-20261024, fix/signature-pathway-20261025]
   pull_request:
     branches: [main]
     paths:
@@ -30,7 +30,7 @@ permissions:
 
 jobs:
   local-e2e:
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004' || github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015' || github.ref == 'refs/heads/fix/communications-cloudflare-website-integration' || github.ref == 'refs/heads/fix/communication-media-archive-drive-oauth' || github.ref == 'refs/heads/fix/signature-trail-20261024' || (github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'fix/communications-cloudflare-website-integration' || github.event.pull_request.head.ref == 'fix/communication-media-archive-drive-oauth'))
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004' || github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015' || github.ref == 'refs/heads/fix/communications-cloudflare-website-integration' || github.ref == 'refs/heads/fix/communication-media-archive-drive-oauth' || github.ref == 'refs/heads/fix/signature-trail-20261024' || github.ref == 'refs/heads/fix/signature-pathway-20261025' || (github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'fix/communications-cloudflare-website-integration' || github.event.pull_request.head.ref == 'fix/communication-media-archive-drive-oauth' || github.event.pull_request.head.ref == 'fix/signature-pathway-20261025'))
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -1628,7 +1628,7 @@ jobs:
 # Archive acceptance is staging-only; production deployment remains separately manual.
 
   preflight-staging:
-    if: (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015' || github.ref == 'refs/heads/fix/communication-media-archive-drive-oauth' || github.ref == 'refs/heads/fix/signature-trail-20261024'))) 
+    if: (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015' || github.ref == 'refs/heads/fix/communication-media-archive-drive-oauth' || github.ref == 'refs/heads/fix/signature-trail-20261024' || github.ref == 'refs/heads/fix/signature-pathway-20261025'))) 
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -1773,7 +1773,7 @@ jobs:
           NODE
 
   dispatch-staging-acceptance:
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/fix/communication-media-archive-drive-oauth' || github.ref == 'refs/heads/fix/signature-trail-20261024') && contains(github.event.head_commit.message, 'dispatch isolated runtime acceptance')
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/fix/communication-media-archive-drive-oauth' || github.ref == 'refs/heads/fix/signature-trail-20261024' || github.ref == 'refs/heads/fix/signature-pathway-20261025') && contains(github.event.head_commit.message, 'dispatch isolated runtime acceptance')
     needs: [local-e2e, preflight-staging]
     runs-on: ubuntu-latest
     permissions:
@@ -1798,7 +1798,7 @@ jobs:
       staging_gateway_url: ${{ steps.staging_health.outputs.gateway_url }}
       staging_signer_uid: ${{ steps.staging_crypto_key.outputs.signer_uid }}
       staging_key_id: ${{ steps.staging_crypto_key.outputs.key_id }}
-    if: github.event_name == 'push' && github.ref == 'refs/heads/fix/signature-trail-20261024'
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/fix/signature-trail-20261024') || (github.event_name == 'workflow_dispatch' && (inputs.deploy_staging == true || inputs.deploy_staging == 'true') && github.ref == 'refs/heads/fix/signature-pathway-20261025')
     concurrency:
       group: irpa-staging-gateway-deploy
       cancel-in-progress: false
