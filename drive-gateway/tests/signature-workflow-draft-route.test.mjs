@@ -11,7 +11,7 @@ test("signature draft save is routed through the authenticated Worker", () => {
   assert.match(worker, /pathname === "\/api\/signature-workflow\/draft"/);
   assert.match(worker, /authenticateFirebaseRequest\(request, env\)/);
   assert.match(worker, /getFirestoreAdminAccessToken\(env\)/);
-  assert.match(worker, /activeAdmin.*activeStatus\(member\).*activeStatus\(employee\)/s);
+  assert.match(worker, /activeAdmin.*activeMember/s);
   assert.match(worker, /signatureEnvelopes\//);
   assert.match(worker, /signatureEvents\//);
   assert.match(worker, /documents\//);
