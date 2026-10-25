@@ -33,6 +33,11 @@ async function gatewayPost(path, payload) {
   return data;
 }
 
+export async function reconcileSignatureDocumentIds(documents = []) {
+  if (!Array.isArray(documents) || documents.length === 0) throw new Error("Reconciliation requires at least one controlled document.");
+  return gatewayPost("/api/signature-pathway/reconcile", { documents: documents.map(item => ({ documentId: String(item.documentId || item.id || ""), fileId: String(item.fileId || item.archiveFileId || item.governanceArchiveFileId || "") })) });
+}
+
 export const storage = { provider: "Google Drive" };
 
 export function ref(_storage, path) {
