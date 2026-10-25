@@ -2118,6 +2118,7 @@ jobs:
       - name: Verify signature mirror, signer trail, and document lifecycle approval
         id: signature-lifecycle
         if: always()
+        continue-on-error: true
         env:
           STAGING_GATEWAY_URL: ${{ steps.staging_health.outputs.gateway_url }}
           STAGING_FIREBASE_PROJECT_ID: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
@@ -2157,6 +2158,9 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Verify Communication and Media Archive and controlled-PDF upload
+        id: communication-media
+        if: always()
+        continue-on-error: true
         env:
           STAGING_GATEWAY_URL: ${{ steps.staging_health.outputs.gateway_url }}
           STAGING_FIREBASE_PROJECT_ID: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
@@ -2168,7 +2172,7 @@ jobs:
           RUN_ID: ${{ github.run_id }}
         run: |
           set -euo pipefail
-          node --input-type=module <<'NODE'
+          node --input-type=module <<'NODE' 2>&1 | tee communication-media.log
           const project=process.env.STAGING_FIREBASE_PROJECT_ID||"";
           const apiKey=process.env.STAGING_FIREBASE_WEB_API_KEY||"";
           const base=String(process.env.STAGING_GATEWAY_URL||"").replace(/\/$/,"");
@@ -2188,14 +2192,17 @@ jobs:
           console.log("STAGING_COMMUNICATION_MEDIA_ROLE_DENIAL=PASS");
           const admin=await signIn(process.env.STAGING_TEST_EMAIL,process.env.STAGING_TEST_PASSWORD);
           const archiveResponse=await fetch(base+"/api/communication-media-archive/provision",{method:"POST",headers:{Authorization:"Bearer "+admin.idToken,"content-type":"application/json"},body:"{}"});
-          const archive=await archiveResponse.json().catch(()=>({}));
+          const archiveText=await archiveResponse.text();
+          const archive=(()=>{try{return JSON.parse(archiveText)}catch{return {}}})();
+          const redactBody=value=>String(value||"").slice(0,300).replace(/Bearer\\s+[^\\s,;"]+/ig,"Bearer [REDACTED]").replace(/AIza[0-9A-Za-z_-]{20,}/g,"[REDACTED_API_KEY]").replace(/(password|token|secret)(["=: ]+)[^", ]+/ig,"$1$2[REDACTED]").replace(/[\\r\\n\\t]+/g," ");
           if(archiveResponse.status===503&&archive.code==="GOOGLE_DRIVE_NOT_AUTHORIZED") throw new Error("STAGING_GOOGLE_DRIVE_OAUTH=NOT_AUTHORIZED; an active IRPA administrator must complete Google Drive authorization in staging Settings.");
-          if(!archiveResponse.ok||archive.archiveName!=="Communication and Media Archive"||!archive.folderId||archive.storageProvider!=="Google Drive") throw new Error("Communication and Media Archive provisioning failed with HTTP "+archiveResponse.status+"; response body withheld.");
+          if(!archiveResponse.ok||archive.archiveName!=="Communication and Media Archive"||!archive.folderId||archive.storageProvider!=="Google Drive") throw new Error("Communication and Media Archive provisioning failed; HTTP "+archiveResponse.status+"; response body: "+redactBody(archiveText));
           const pdf=Buffer.from("%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [] /Count 0 >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n","utf8");
           const fileName="IRPA-STAGING-ACCEPTANCE-"+String(process.env.RUN_ID||"test")+".pdf";
           const uploadResponse=await fetch(base+"/api/upload",{method:"POST",headers:{Authorization:"Bearer "+admin.idToken,"content-type":"application/json"},body:JSON.stringify({fileName,contentType:"application/pdf",fileSize:pdf.length,base64:pdf.toString("base64"),purpose:"Communication Media",folderId:archive.folderId})});
-          const upload=await uploadResponse.json().catch(()=>({}));
-          if(!uploadResponse.ok||!upload.fileId||upload.storageProvider!=="Google Drive"||upload.fileName!==fileName||Number(upload.fileSize)!==pdf.length) throw new Error("Controlled-PDF upload to the verified media archive failed with HTTP "+uploadResponse.status+"; response body withheld.");
+          const uploadText=await uploadResponse.text();
+          const upload=(()=>{try{return JSON.parse(uploadText)}catch{return {}}})();
+          if(!uploadResponse.ok||!upload.fileId||upload.storageProvider!=="Google Drive"||upload.fileName!==fileName||Number(upload.fileSize)!==pdf.length) throw new Error("Controlled-PDF upload to the verified media archive failed; HTTP "+uploadResponse.status+"; response body: "+redactBody(uploadText));
           const assetId="staging-acceptance-"+String(process.env.RUN_ID||"test");
           const now=new Date().toISOString();
           const fields={
@@ -2252,6 +2259,9 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Run real-runtime staging cryptographic acceptance
+        id: staging-runtime-acceptance
+        if: always()
+        continue-on-error: true
         env:
           STAGING_GATEWAY_URL: ${{ steps.staging_health.outputs.gateway_url }}
           STAGING_FIREBASE_WEB_API_KEY: "AIzaSyA6UmHtP-mRr99rBw57_-qrD4_mFSBnZ38"
@@ -2262,7 +2272,47 @@ jobs:
           STAGING_CRYPTO_TEST_SIGNER_UID: ${{ steps.staging_crypto_key.outputs.signer_uid }}
           STAGING_CRYPTO_TEST_KEY_ID: ${{ steps.staging_crypto_key.outputs.key_id }}
         working-directory: drive-gateway
-        run: node tests/staging-runtime-acceptance.mjs
+        run: node tests/staging-runtime-acceptance.mjs 2>&1 | tee runtime-acceptance.log
+
+      - name: Final staging acceptance results
+        if: always()
+        env:
+          SIGNATURE_RESULT: ${{ steps.signature-lifecycle.outcome }}
+          MEDIA_RESULT: ${{ steps.communication-media.outcome }}
+          CRYPTO_RESULT: ${{ steps.staging-runtime-acceptance.outcome }}
+        run: |
+          set -uo pipefail
+          redact() {
+            perl -pe 's/Authorization:[^, ]+/Authorization: [REDACTED]/ig; s/Bearer\\s+[^\\s\\x22\\x27,;]+/Bearer [REDACTED]/ig; s/AIza[0-9A-Za-z_-]{20,}/[REDACTED_API_KEY]/g; s/(password|token|secret)(["=: ]+)[^", ]+/$1$2[REDACTED]/ig; s/([A-Za-z0-9_-]{32,})/[REDACTED_TOKEN]/g; s/[\\r\\n\\t]+/ /g'
+          }
+          row() {
+            portal="$1"; check="$2"; outcome="$3"; logfile="$4"
+            if [ "$outcome" = "success" ]; then status=PASS; else status=FAIL; fi
+            if [ -f "$logfile" ]; then
+              error="$(tail -n 30 "$logfile" | redact | grep -Eai 'error|failed|failure|exception|HTTP [45][0-9][0-9]|=FAIL|not authorized' | tail -n 5 | tr '\\n' ' ' | cut -c1-900)"
+              excerpt="$(tail -n 30 "$logfile" | redact | tr '\\n' ' ' | cut -c1-1400)"
+            else
+              error="No log file produced; step outcome=${outcome:-not-run}"
+              excerpt="$error"
+              status=FAIL
+            fi
+            [ -n "$error" ] || error="No error text recorded; step outcome=${outcome:-not-run}"
+            printf '| %s | %s | %s | %s |\n' "$portal" "$check" "$status" "${error//|/\\|}" >> "$RUNNER_TEMP/acceptance-table.md"
+            printf '\\n### %s — %s (%s)\\n\\nLast 30 redacted log lines:\\n\\n`%s`\\n' "$portal" "$check" "$status" "$excerpt" >> "$RUNNER_TEMP/acceptance-logs.md"
+            if [ "$status" = "FAIL" ]; then failed=1; fi
+          }
+          failed=0
+          printf '| Portal | Check | Result | Exact error text (redacted) |\\n|---|---|---|---|\\n' > "$RUNNER_TEMP/acceptance-table.md"
+          : > "$RUNNER_TEMP/acceptance-logs.md"
+          row "E-signature" "Signature lifecycle and signer trail" "${SIGNATURE_RESULT:-not-run}" "drive-gateway/e2e.log"
+          row "Communication Media" "Role denial and controlled-PDF upload" "${MEDIA_RESULT:-not-run}" "communication-media.log"
+          row "E-signature" "Real-runtime cryptographic acceptance" "${CRYPTO_RESULT:-not-run}" "drive-gateway/runtime-acceptance.log"
+          {
+            echo "## Staging acceptance results"
+            cat "$RUNNER_TEMP/acceptance-table.md"
+            cat "$RUNNER_TEMP/acceptance-logs.md"
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$failed"
 
 # Staging proof execution trigger — 2026-10-04
 
