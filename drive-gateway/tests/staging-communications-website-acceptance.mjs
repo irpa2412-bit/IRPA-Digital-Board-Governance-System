@@ -52,7 +52,9 @@ if (!failed) {
     check("Staging runtime acceptance", false, error.message);
   }
 }
-console.log("| Check | Result | Detail |");
+const firstFailure = rows.find(row => row.result === "FAIL");
+console.log("WEBSITE PORTAL VERDICT: " + (firstFailure ? "FAIL (" + firstFailure.name + ")" : "PASS"));
+console.log("| Check | PASS or FAIL | Exact error (first 300 characters, redacted) |");
 console.log("|---|---|---|");
-for (const row of rows) console.log("| " + row.name + " | " + row.result + " | " + row.detail.replace(/\|/g, "/") + " |");
-if (rows.some(row => row.result === "FAIL")) process.exitCode = 1;
+for (const row of rows) console.log("| " + row.name + " | " + row.result + " | " + redactSecrets(row.detail, [env.STAGING_TEST_PASSWORD, env.STAGING_FIREBASE_WEB_API_KEY].filter(Boolean)).slice(0, 300).replace(/\|/g, "/") + " |");
+if (firstFailure) process.exitCode = 1;

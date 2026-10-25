@@ -466,7 +466,7 @@ export function createCommunicationsSiteRouter(deps) {
         result.websiteUp = home.ok;
         if (home.ok) {
           const html = (await home.text()).slice(0, 2 * 1024 * 1024);
-          const nav = html.match(/<(?:nav|div)[^>]*(?:id=["'][^"']*menu|class=["'][^"']*(?:main-navigation|primary-menu|main-menu))[^>]*>[\\s\\S]*?<\\/(?:nav|div)>/i);
+          const nav = html.match(/<(?:nav|div)[^>]*(?:id=["'][^"']*menu|class=["'][^"']*(?:main-navigation|primary-menu|main-menu))[^>]*>[\s\S]*?<\\/(?:nav|div)>/i);
           if (nav) {
             const hrefs = [...nav[0].matchAll(/href=["']([^"'#]+)["']/gi)].map(m => m[1]).filter((v, i, a) => a.indexOf(v) === i).slice(0, 20);
             const broken = [];
@@ -486,14 +486,14 @@ export function createCommunicationsSiteRouter(deps) {
         const cp = cpanelConfig(env);
         const cert = await cpanelCall(cp, "SSL/fetch_certificates");
         const certText = JSON.stringify(cert.data || cert);
-        const dates = [...certText.matchAll(/(?:not_after|expiry|expires|expiration)[^0-9]*(20\\d{2}-\\d{2}-\\d{2})/gi)].map(m => m[1]).sort();
+        const dates = [...certText.matchAll(/(?:not_after|expiry|expires|expiration)[^0-9]*(20\d{2}-\d{2}-\d{2})/gi)].map(m => m[1]).sort();
         if (dates.length) result.sslExpiry = dates[dates.length - 1];
       } catch {}
       try {
         const cp = cpanelConfig(env);
         const backups = await cpanelCall(cp, "Backup/list_backups");
         const text = JSON.stringify(backups.data || backups);
-        const dates = [...text.matchAll(/20\\d{2}-\\d{2}-\\d{2}/g)].map(m => m[0]).sort();
+        const dates = [...text.matchAll(/20\d{2}-\d{2}-\d{2}/g)].map(m => m[0]).sort();
         if (dates.length) result.lastBackup = dates[dates.length - 1];
       } catch {}
       return json({ ok: true, connections: result, permissions: { websiteEditor: true, staticFileEditing: roles.some(r => REVIEW_ROLES.has(r)) } }, 200, corsHeaders(request));

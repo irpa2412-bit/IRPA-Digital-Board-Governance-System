@@ -31,24 +31,23 @@ jobs:
         with:
           node-version: 22
       - name: Run website policy tests
-        continue-on-error: true
         id: unit
-        run: node --test drive-gateway/tests/communications-website-policy.test.mjs
-      - name: Run staging-only live acceptance
         continue-on-error: true
+        run: node --test drive-gateway/tests/communications-website-policy.test.mjs
+      - name: Run staging acceptance
         id: acceptance
+        continue-on-error: true
         run: |
-          set +e
-          node drive-gateway/tests/staging-communications-website-acceptance.mjs > acceptance-table.md 2>&1
-          result=$?
+          node drive-gateway/tests/staging-communications-website-acceptance.mjs > acceptance-table.md 2>&1 || true
           cat acceptance-table.md
-          cat acceptance-table.md >> "$GITHUB_STEP_SUMMARY"
-          exit "$result"
-      - name: Redacted acceptance summary
+      - name: Write the single acceptance table to summary
         if: always()
         run: |
           if [ -f acceptance-table.md ]; then
-            sed -E 's/(Bearer )[A-Za-z0-9._~-]+/\1[REDACTED]/g; s/(password|token|secret)(["=: ]+)[^ ,|]+/\1\2[REDACTED]/Ig' acceptance-table.md >> "$GITHUB_STEP_SUMMARY"
+            cat acceptance-table.md >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "| Staging acceptance output | FAIL | No acceptance table produced |" >> "$GITHUB_STEP_SUMMARY"
+            echo "WEBSITE PORTAL VERDICT: FAIL (acceptance output missing)" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Check | PASS or FAIL | Exact error |" >> "$GITHUB_STEP_SUMMARY"
+            echo "|---|---|---|" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Acceptance output | FAIL | No acceptance table produced |" >> "$GITHUB_STEP_SUMMARY"
           fi
