@@ -97,3 +97,46 @@ test("actual-data gate policy refuses a wrong attestation", async () => {
   assert.equal(result.allowed,false);
   assert.equal(result.status,412);
 });
+
+
+test("registered identity reconciliation allows an authenticated active administrator", async () => {
+  const { authorizeIdentityReconciliation } = await import("../drive-gateway/src/registeredIdentityReconciliation.mjs");
+  assert.deepEqual(authorizeIdentityReconciliation({ authenticated: true, adminAllowed: true }), { allowed: true, status: 200 });
+});
+
+test("registered identity reconciliation refuses a non-administrator", async () => {
+  const { authorizeIdentityReconciliation } = await import("../drive-gateway/src/registeredIdentityReconciliation.mjs");
+  const result = authorizeIdentityReconciliation({ authenticated: true, adminAllowed: false });
+  assert.equal(result.allowed, false);
+  assert.equal(result.status, 403);
+});
+
+test("registered identity reconciliation matches exact normalized emails and never overwrites existing UIDs", async () => {
+  const { classifyRegisteredIdentityRecord } = await import("../drive-gateway/src/registeredIdentityReconciliation.mjs");
+  const users = [{ uid: "uid-a", email: "member@example.org" }, { uid: "uid-b", email: "other@example.org" }];
+  assert.deepEqual(classifyRegisteredIdentityRecord({ email: " Member@Example.org ", authUsers: users }), {
+    status: "assigned", uid: "uid-a", reason: "Assigned the unique existing Firebase Authentication UID for the exact normalized email."
+  });
+  const conflict = classifyRegisteredIdentityRecord({ email: "different@example.org", existingUid: "uid-a", authUsers: users });
+  assert.equal(conflict.status, "conflicting");
+  assert.equal(conflict.uid, undefined);
+  assert.match(conflict.reason, /UID email does not exactly match/);
+});
+
+test("registered identity reconciliation renders a result line per record and a summary", async () => {
+  const [worker, policy, members, settings, client] = await Promise.all([
+    read("../drive-gateway/src/index.js"),
+    read("../drive-gateway/src/registeredIdentityReconciliation.mjs"),
+    read("../src/pages/Members.jsx"),
+    read("../src/pages/Settings.jsx"),
+    read("../src/firebase/registeredIdentityReconciliation.js")
+  ]);
+  assert.match(worker, /api\/members\/reconcile-registered-identity-uids/);
+  assert.match(worker, /results\.push\(line\)/);
+  assert.match(worker, /summarizeIdentityReconciliation\(results\)/);
+  assert.match(policy, /existingUid/);
+  assert.match(members, /uidResults\.map/);
+  assert.match(members, /uidResults\.length>0/);
+  assert.match(settings, /result\.results\|\|\[\]/);
+  assert.match(client, /Step .* failed:/);
+});
