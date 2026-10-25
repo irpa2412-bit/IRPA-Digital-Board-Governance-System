@@ -583,7 +583,7 @@ export function createCommunicationsSiteRouter(deps) {
       const requestedStatus = status;
       if (!["pages", "posts"].includes(type) || !Number.isSafeInteger(id) || id < 1 ||
           !title || title.length > 180 || content.length > 30000 || excerpt.length > 600 ||
-          !Number.isSafeInteger(featuredMedia) || featuredMedia < 0 || !["draft", "publish"].includes(requestedStatus)) {
+          !Number.isSafeInteger(featuredMedia) || featuredMedia < 0 || !["draft", "pending", "publish"].includes(requestedStatus)) {
         return json({ error: "Provide a valid page/post ID, title, content, excerpt, featured image ID and draft/publish status." }, 400, corsHeaders(request));
       }
       const wp = stagingWordPressConfig(env);
@@ -626,7 +626,7 @@ export function createCommunicationsSiteRouter(deps) {
       return json({
         success: true, item: editorItem(verified, type), snapshotId: snapshot.snapshotId,
         previousRevisionId: snapshot.currentRevisionId, revisionId,
-        message: requestedStatus === "publish" ? "Staging page/post published and verified." : "Staging draft saved and verified."
+        message: workflow === "Publish" ? "Staging page/post published and verified." : workflow === "Review" ? "Staging page/post submitted for review and verified." : "Staging draft saved and verified."
       }, 200, corsHeaders(request));
     }
 
