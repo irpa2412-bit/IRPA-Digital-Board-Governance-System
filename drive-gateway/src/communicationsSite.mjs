@@ -489,6 +489,39 @@ export function createCommunicationsSiteRouter(deps) {
       return json({ item: editorItem(item, type) }, 200, corsHeaders(request));
     }
 
+    if (path === "/api/communications/website/media" && request.method === "POST") {
+      const { claims } = await websiteEditorAuthorised(request, env);
+      const wp = stagingWordPressConfig(env);
+      await verifyDedicatedWordPressEditor(wp);
+      let form;
+      try { form = await request.formData(); } catch { return json({ error: "Upload must use multipart form data." }, 400, corsHeaders(request)); }
+      const file = form.get("file");
+      if (!file || typeof file.arrayBuffer !== "function") return json({ error: "Select one media file to upload." }, 400, corsHeaders(request));
+      try { validateMediaUpload({ filename: file.name, contentType: file.type, size: file.size }); }
+      catch (error) { return json({ error: error.message }, 400, corsHeaders(request)); }
+      const bytes = await file.arrayBuffer();
+      if (bytes.byteLength !== file.size) return json({ error: "Media upload size validation failed." }, 400, corsHeaders(request));
+      const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/media", {
+        method: "POST",
+        headers: wordpressHeaders(wp, {
+          "Content-Type": file.type,
+          "Content-Disposition": 'attachment; filename="' + String(file.name).replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 120) + '"',
+          Accept: "application/json"
+        }),
+        body: bytes,
+        signal: AbortSignal.timeout(30000)
+      });
+      const media = await response.json().catch(() => null);
+      if (!response.ok || !Number.isSafeInteger(media?.id) || !isStagingPublicLink(media?.source_url)) {
+        throw new Error("Staging WordPress rejected the media upload (HTTP " + response.status + ").");
+      }
+      await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_MEDIA_UPLOADED", "media", Number(media.id), {
+        filename: String(file.name).replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 120),
+        contentType: file.type, bytes: file.size
+      });
+      return json({ success: true, media: { id: media.id, title: editorRaw(media, "title"), url: media.source_url, mimeType: media.mime_type, bytes: file.size } }, 201, corsHeaders(request));
+    }
+
     if (path === "/api/communications/website/revisions" && request.method === "GET") {
       await websiteEditorAuthorised(request, env);
       const wp = stagingWordPressConfig(env);
