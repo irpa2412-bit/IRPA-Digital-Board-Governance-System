@@ -51,3 +51,4 @@ jobs:
             echo "|---|---|---|" >> "$GITHUB_STEP_SUMMARY"
             echo "| Acceptance output | FAIL | No acceptance table produced |" >> "$GITHUB_STEP_SUMMARY"
           fi
+          grep -q "^WEBSITE PORTAL VERDICT: PASS$" acceptance-table.md || exit 1

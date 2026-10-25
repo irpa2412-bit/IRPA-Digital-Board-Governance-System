@@ -466,7 +466,7 @@ export function createCommunicationsSiteRouter(deps) {
         result.websiteUp = home.ok;
         if (home.ok) {
           const html = (await home.text()).slice(0, 2 * 1024 * 1024);
-          const nav = html.match(/<(?:nav|div)[^>]*(?:id=["'][^"']*menu|class=["'][^"']*(?:main-navigation|primary-menu|main-menu))[^>]*>[\s\S]*?<\\/(?:nav|div)>/i);
+          const nav = html.match(/<(?:nav|div)[^>]*(?:id=["'][^"']*menu|class=["'][^"']*(?:main-navigation|primary-menu|main-menu))[^>]*>[\s\S]*?<\/(?:nav|div)>/i);
           if (nav) {
             const hrefs = [...nav[0].matchAll(/href=["']([^"'#]+)["']/gi)].map(m => m[1]).filter((v, i, a) => a.indexOf(v) === i).slice(0, 20);
             const broken = [];
