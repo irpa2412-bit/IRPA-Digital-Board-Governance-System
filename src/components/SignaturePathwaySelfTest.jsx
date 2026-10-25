@@ -65,12 +65,17 @@ export default function SignaturePathwaySelfTest() {
     try {
       await requireAdministrator();
       const rows = documents.length ? documents : (await getDocs(collection(db, "documents"))).docs.map(item => ({ id: item.id, ...item.data() }));
-      const candidates = rows.flatMap(item => [...new Set([item.fileId, item.driveFileId, item.sourceFileId, item.archiveFileId, item.governanceArchiveFileId, item.primaryArchiveFileId].map(value => String(value || "").trim()).filter(Boolean))].map(fileId => ({ documentId: item.id, fileId })));
+      const knownMismatch = { documentId: "wiAfPSIxHLTd6MdeM04q", fileId: "1iGhrGLVTlBtxiwtVlVzPi7rXK3PzdcJ-" };
+      const candidates = rows.map(item => {
+        const fileId = item.id === knownMismatch.documentId ? knownMismatch.fileId : driveFileId(item);
+        return { documentId: item.id, fileId };
+      }).filter(item => item.documentId && item.fileId);
+      if (!candidates.some(item => item.documentId === knownMismatch.documentId)) candidates.push(knownMismatch);
       if (!candidates.length) throw new Error("STEP reconciliation failed: no documents with registered Drive file IDs were found.");
       const result = await reconcileSignatureDocumentIds(candidates);
-      const lines = (result.results || []).map(item => ({ documentId: item.documentId, title: item.documentId, checks: [{ name: item.status, status: item.status === "failed" ? "FAIL" : "PASS", reason: item.reason }] }));
+      const lines = (result.results || []).map(item => ({ documentId: item.documentId, title: item.documentId, checks: [{ name: item.status + " · Drive " + item.fileId, status: item.status === "failed" ? "FAIL" : item.status === "would repair" ? "NOT RUN" : "PASS", reason: (item.previousDescriptionDocumentId ? "Previous description.documentId: " + item.previousDescriptionDocumentId + ". " : "") + item.reason }] }));
       setResults(lines);
-      setMessage("Reconciliation finished: " + (result.summary?.repaired || 0) + " repaired; " + (result.summary?.alreadyCorrect || 0) + " already correct; " + (result.summary?.failed || 0) + " failed. Every returned document has a result line.");
+      setMessage("Reconciliation finished: " + (result.summary?.repaired || 0) + " repaired; " + (result.summary?.alreadyCorrect || 0) + " already correct; " + (result.summary?.failed || 0) + " failed. One result line is shown for each document/file pair, including the known mismatch.");
     } catch (error) {
       setMessage("STEP reconciliation failed: " + (error?.message || "Unknown gateway error. No success is assumed."));
     } finally {
