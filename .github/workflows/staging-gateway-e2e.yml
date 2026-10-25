@@ -2283,26 +2283,26 @@ jobs:
         run: |
           set -uo pipefail
           redact() {
-            perl -pe 's/Authorization:[^, ]+/Authorization: [REDACTED]/ig; s/Bearer\\s+[^\\s\\x22\\x27,;]+/Bearer [REDACTED]/ig; s/AIza[0-9A-Za-z_-]{20,}/[REDACTED_API_KEY]/g; s/(password|token|secret)(["=: ]+)[^", ]+/$1$2[REDACTED]/ig; s/([A-Za-z0-9_-]{32,})/[REDACTED_TOKEN]/g; s/[\\r\\n\\t]+/ /g'
+            perl -pe 's/Authorization:[^, ]+/Authorization: [REDACTED]/ig; s/Bearer\\s+[^\\s\\x22\\x27,;]+/Bearer [REDACTED]/ig; s/AIza[0-9A-Za-z_-]{20,}/[REDACTED_API_KEY]/g; s/(password|token|secret)(["=: ]+)[^", ]+/$1$2[REDACTED]/ig; s/([A-Za-z0-9_-]{32,})/[REDACTED_TOKEN]/g; s/[\\r\n\t]+/ /g'
           }
           failed=0
           table="$RUNNER_TEMP/acceptance-table.md"
           logs="$RUNNER_TEMP/acceptance-logs.md"
-          printf '| Portal | Check | Result | Exact error (HTTP status and first 300 body characters, redacted) |\\n|---|---|---|---|\\n' > "$table"
+          printf '| Portal | Check | Result | Exact error (HTTP status and first 300 body characters, redacted) |\n|---|---|---|---|\n' > "$table"
           : > "$logs"
           addrow() {
             portal="$1"; check="$2"; status="$3"; error="$4"; logfile="$5"
             error="$(printf '%s' "$error" | redact | cut -c1-300)"
-            printf '| %s | %s | %s | %s |\\n' "$portal" "$check" "$status" "${error//|/\\|}" >> "$table"
+            printf '| %s | %s | %s | %s |\n' "$portal" "$check" "$status" "${error//|/\\|}" >> "$table"
             if [ "$status" != "PASS" ]; then failed=1; fi
             if [ -n "$logfile" ] && [ -f "$logfile" ]; then
               excerpt="$(tail -n 30 "$logfile" | redact | cut -c1-3000)"
-              printf '\\n### %s — %s (%s)\\n\\nLast 30 redacted log lines:\\n\\n```text\\n%s\\n```\\n' "$portal" "$check" "$status" "$excerpt" >> "$logs"
+              printf '\n### %s — %s (%s)\n\nLast 30 redacted log lines:\n\n```text\n%s\n```\n' "$portal" "$check" "$status" "$excerpt" >> "$logs"
             fi
           }
           # Each detailed lifecycle assertion is emitted independently by the acceptance test.
           if [ -f drive-gateway/e2e.log ]; then
-            while IFS="$(printf '\\t')" read -r marker portal check result error; do
+            while IFS="$(printf '\t')" read -r marker portal check result error; do
               [ "$marker" = "ACCEPTANCE_ROW" ] || continue
               [ "$result" = "PASS" ] && status=PASS || status=FAIL
               addrow "$portal" "$check" "$status" "$error" "drive-gateway/e2e.log"
