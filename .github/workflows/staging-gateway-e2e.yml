@@ -1625,6 +1625,7 @@ jobs:
           if-no-files-found: error
 
 # Staging proof execution trigger — 2026-10-04
+# Signature-pathway branch uses the same isolated staging-only dispatch; production is not targeted.
 # Archive acceptance is staging-only; production deployment remains separately manual.
 
   preflight-staging:
