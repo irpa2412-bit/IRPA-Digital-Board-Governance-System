@@ -1626,6 +1626,7 @@ jobs:
 
 # Staging proof execution trigger — 2026-10-04
 # Signature-pathway branch uses the same isolated staging-only dispatch; production is not targeted.
+# Final Worker route migrations are included in this explicit staging acceptance dispatch.
 # Archive acceptance is staging-only; production deployment remains separately manual.
 
   preflight-staging:
