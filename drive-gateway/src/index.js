@@ -971,7 +971,9 @@ async function reconcileSignatureDocumentIds(request, env) {
     return json({ok:false,error:"Administrator authorization is required for signature-pathway reconciliation."},403,corsHeaders(request));
   }
   const body = await request.json();
+  const dryRun = body?.dryRun === true;
   const items = Array.isArray(body.documents) ? body.documents : [];
+  if (!items.length && dryRun) return json({ok:true,dryRun:true,results:[],summary:{total:0,repaired:0,alreadyCorrect:0,failed:0},writesPerformed:false,driveMutationsPerformed:false,note:"Authenticated administrator check passed; no document IDs were supplied, so no document was inspected."},200,corsHeaders(request));
   if (!items.length) return json({ok:false,error:"No document IDs were supplied for reconciliation."},400,corsHeaders(request));
   if (items.length > 250) return json({ok:false,error:"Reconciliation is limited to 250 documents per request."},400,corsHeaders(request));
   const accessToken = await getDriveAccessToken(env);
@@ -999,6 +1001,9 @@ async function reconcileSignatureDocumentIds(request, env) {
       if (String(description.documentId || "") === documentId) {
         line.status = "already correct";
         line.reason = "Drive description.documentId already matches the Firestore document ID.";
+      } else if (dryRun) {
+        line.status = "would repair";
+        line.reason = `Dry run only: Drive description.documentId would be set to ${documentId}; no Drive mutation was performed.`;
       } else {
         const repairedDescription = {...description,documentId,documentUid:documentId};
         await driveFetch(env, accessToken, `/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,description`, {
@@ -1014,7 +1019,7 @@ async function reconcileSignatureDocumentIds(request, env) {
     }
     results.push(line);
   }
-  return json({ok:true,results,summary:{total:results.length,repaired:results.filter(x=>x.status==="repaired").length,alreadyCorrect:results.filter(x=>x.status==="already correct").length,failed:results.filter(x=>x.status==="failed").length}},200,corsHeaders(request));
+  return json({ok:true,dryRun,results,summary:{total:results.length,repaired:results.filter(x=>x.status==="repaired").length,wouldRepair:results.filter(x=>x.status==="would repair").length,alreadyCorrect:results.filter(x=>x.status==="already correct").length,failed:results.filter(x=>x.status==="failed").length},writesPerformed:false,driveMutationsPerformed:!dryRun&&results.some(x=>x.status==="repaired")},200,corsHeaders(request));
 }
 
 async function controlledDocumentUploadPolicyCheck(request, env) {
