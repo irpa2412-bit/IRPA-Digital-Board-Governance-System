@@ -32,6 +32,7 @@ import { createInductionMatchingRouter } from "./inductionMatching.mjs";
 import { createInvitationRemovalRouter } from "./invitationRemoval.mjs";
 import { persistCompletedSignatureEnvelope as persistSignatureMirror } from "./signatureMirror.mjs";
 import { evaluateActualDataAccessPolicy, ACTUAL_DATA_ATTESTATION } from "./actualDataAccessPolicy.mjs";
+import { classifyRegisteredIdentityRecord, summarizeIdentityReconciliation } from "./registeredIdentityReconciliation.mjs";
 
 function getFirebaseProjectId(env) {
   const projectId = String(env?.FIREBASE_PROJECT_ID || "").trim();
@@ -265,6 +266,7 @@ export default {
         return await reconcileSignatureDocumentIds(request, env);
       }
       if (pathname === "/api/system/actual-data-access" && (request.method === "GET" || request.method === "POST")) return await actualDataAccessRoute(request, env);
+      if (pathname === "/api/members/reconcile-registered-identity-uids" && request.method === "POST") return await reconcileRegisteredIdentityUidsRoute(request, env);
 
       if (pathname === "/api/signature-profile/folder" && request.method === "POST") {
         return await ensureSignatureProfileFolder(request, env);
@@ -686,6 +688,124 @@ async function upload(request, env) {
     uploadedByUid: claims.user_id,
     storageProvider: "Google Drive"
   }, 200, corsHeaders(request));
+}
+
+let firebaseAuthAdminTokenCache = { token: "", expiresAt: 0 };
+
+async function getFirebaseAuthAdminAccessToken(env) {
+  const now = Math.floor(Date.now() / 1000);
+  if (firebaseAuthAdminTokenCache.token && firebaseAuthAdminTokenCache.expiresAt > now + 60) return firebaseAuthAdminTokenCache.token;
+  let serviceAccount;
+  try { serviceAccount = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON || ""); }
+  catch { throw new Error("Firebase Authentication service identity is not configured correctly."); }
+  if (serviceAccount.project_id !== getFirebaseProjectId(env) || typeof serviceAccount.client_email !== "string" || !serviceAccount.client_email.endsWith(".iam.gserviceaccount.com") || typeof serviceAccount.private_key !== "string") {
+    throw new Error("Firebase Authentication service identity is invalid for this Firebase project.");
+  }
+  const claims = { iss: serviceAccount.client_email, scope: "https://www.googleapis.com/auth/identitytoolkit", aud: "https://oauth2.googleapis.com/token", iat: now, exp: now + 3600 };
+  const unsigned = base64UrlEncodeText(JSON.stringify({ alg: "RS256", typ: "JWT" })) + "." + base64UrlEncodeText(JSON.stringify(claims));
+  const key = await crypto.subtle.importKey("pkcs8", pemPrivateKeyBytes(serviceAccount.private_key), { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
+  const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(unsigned));
+  const response = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: unsigned + "." + base64UrlEncodeBytes(new Uint8Array(signature)) }) });
+  const result = await response.json();
+  if (!response.ok || typeof result.access_token !== "string") { firebaseAuthAdminTokenCache = { token: "", expiresAt: 0 }; throw new Error("Firebase Authentication service identity could not obtain an Identity Toolkit access token."); }
+  firebaseAuthAdminTokenCache = { token: result.access_token, expiresAt: now + Math.min(Number(result.expires_in) || 3600, 3600) };
+  return firebaseAuthAdminTokenCache.token;
+}
+
+async function listFirebaseAuthUsers(env, token) {
+  const users = [];
+  let pageToken = "";
+  do {
+    const url = new URL(`https://identitytoolkit.googleapis.com/v1/projects/${encodeURIComponent(getFirebaseProjectId(env))}/accounts:batchGet`);
+    url.searchParams.set("maxResults", "1000");
+    if (pageToken) url.searchParams.set("nextPageToken", pageToken);
+    const response = await fetch(url.toString(), { headers: { Authorization: "Bearer " + token } });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error("Firebase Authentication account listing failed: HTTP " + response.status + " " + String(body?.error?.message || ""));
+    users.push(...(Array.isArray(body.users) ? body.users : []));
+    pageToken = String(body.nextPageToken || "");
+  } while (pageToken);
+  return users;
+}
+
+async function getFirestoreCollectionDocuments(env, collectionName, token) {
+  const response = await fetch(`https://firestore.googleapis.com/v1/projects/${getFirebaseProjectId(env)}/databases/(default)/documents:runQuery`, {
+    method: "POST",
+    headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+    body: JSON.stringify({ structuredQuery: { from: [{ collectionId: collectionName }] } })
+  });
+  if (!response.ok) throw new Error("Firestore " + collectionName + " register read failed: HTTP " + response.status);
+  return (await response.json()).filter(row => row.document).map(row => row.document);
+}
+
+async function reconcileRegisteredIdentityUidsRoute(request, env) {
+  let step = "Firebase authentication";
+  try {
+    const claims = await authenticateFirebaseRequest(request, env);
+    step = "Administrator authorization";
+    const firestoreToken = await getFirestoreAdminAccessToken(env);
+    const profile = await getFirestoreDocument(env, "adminProfiles/" + claims.user_id, firestoreToken);
+    const email = String(claims.email || "").trim().toLowerCase();
+    const adminAllowed = email === "irpa2412@gmail.com" || (profile?.fields?.active?.booleanValue === true && profile?.fields?.role?.stringValue === "Administrator");
+    if (!adminAllowed) return json({ ok: false, step, error: "Only an active IRPA Administrator may reconcile registered identity UIDs." }, 403, corsHeaders(request));
+
+    step = "List existing Firebase Authentication accounts";
+    const authToken = await getFirebaseAuthAdminAccessToken(env);
+    const authUsers = await listFirebaseAuthUsers(env, authToken);
+    step = "Read Member and Employee registers";
+    const collections = ["members", "employees"];
+    const docsByCollection = await Promise.all(collections.map(name => getFirestoreCollectionDocuments(env, name, firestoreToken)));
+    const authUsersForPolicy = authUsers.map(user => ({ uid: String(user.localId || user.uid || ""), email: String(user.email || "") }));
+    const results = [];
+    for (let i = 0; i < collections.length; i++) {
+      const collectionName = collections[i];
+      for (const document of docsByCollection[i]) {
+        const recordId = String(document.name || "").split("/").pop();
+        const data = firestoreDocumentToPlain(document) || {};
+        const line = { collection: collectionName, recordId, name: String(data.name || ""), email: String(data.email || "").trim().toLowerCase(), existingUid: String(data.uid || "").trim(), uid: null, status: "unresolved", reason: "" };
+        try {
+          const decision = classifyRegisteredIdentityRecord({ email: line.email, existingUid: line.existingUid, authUsers: authUsersForPolicy });
+          line.status = decision.status;
+          line.reason = decision.reason;
+          line.uid = decision.uid || line.existingUid || null;
+          if (decision.status === "assigned") {
+            step = "Write UID for " + collectionName + "/" + recordId;
+            await updateFirestoreDocument(env, collectionName + "/" + cleanId(recordId), firestoreToken, {
+              uid: { stringValue: decision.uid },
+              uidAssignedAt: { timestampValue: new Date().toISOString() },
+              uidAssignedByUid: { stringValue: claims.user_id },
+              uidAssignedByEmail: { stringValue: email || String(profile?.fields?.email?.stringValue || "") },
+              uidAssignmentMethod: { stringValue: "ADMIN_RECONCILIATION_EXACT_EMAIL_MATCH" }
+            }, ["uid", "uidAssignedAt", "uidAssignedByUid", "uidAssignedByEmail", "uidAssignmentMethod"]);
+          }
+        } catch (error) {
+          line.status = "error";
+          line.reason = "Step " + step + " failed: " + String(error?.message || error);
+        }
+        results.push(line);
+      }
+    }
+    const summary = summarizeIdentityReconciliation(results);
+    step = "Write reconciliation audit";
+    const auditId = "identity-reconcile-" + Date.now() + "-" + crypto.randomUUID().slice(0, 8);
+    await updateFirestoreDocument(env, "audit/" + auditId, firestoreToken, {
+      action: { stringValue: "REGISTERED_IDENTITY_UID_RECONCILIATION" },
+      category: { stringValue: "SYSTEM_ADMINISTRATION" },
+      description: { stringValue: "Administrator-controlled exact-email UID reconciliation. Existing UIDs are never overwritten and no Firebase accounts are created." },
+      performedByUid: { stringValue: claims.user_id },
+      performedByEmail: { stringValue: email || String(profile?.fields?.email?.stringValue || "") },
+      authUsersScanned: { integerValue: String(authUsers.length) },
+      summary: { mapValue: { fields: Object.fromEntries(Object.entries(summary).map(([key, value]) => [key, { integerValue: String(value) }])) } },
+      results: { arrayValue: { values: results.map(item => ({ mapValue: { fields: Object.fromEntries(Object.entries(item).map(([key, value]) => [key, value == null ? { nullValue: null } : { stringValue: String(value) }])) } })) } },
+      accountCreationPerformed: { booleanValue: false },
+      existingUidsOverwritten: { booleanValue: false },
+      createdAt: { timestampValue: new Date().toISOString() }
+    }, ["action", "category", "description", "performedByUid", "performedByEmail", "authUsersScanned", "summary", "results", "accountCreationPerformed", "existingUidsOverwritten", "createdAt"]);
+    return json({ ok: true, results, summary, authUsers: authUsers.length, auditId, safety: { accountCreationPerformed: false, existingUidsOverwritten: false, exactEmailMatchOnly: true } }, 200, corsHeaders(request));
+  } catch (error) {
+    console.error("Registered identity UID reconciliation failed", { step, error: String(error?.message || error) });
+    return json({ ok: false, step, error: String(error?.message || "Registered identity reconciliation failed.") }, Number(error?.status || 0) || 500, corsHeaders(request));
+  }
 }
 
 async function actualDataAccessRoute(request, env) {
