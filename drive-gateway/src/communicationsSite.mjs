@@ -16,7 +16,7 @@ const WEBSITE_EDITOR_ROLES = new Set([
   "Media Officer", "Media Manager", "Public Relations Officer", "Communications & Media Officer",
   "Communications and Media Officer", "Media and Communications Officer", "Media & Communications Officer"
 ]);
-const MAX_WEBSITE_SNAPSHOT_BYTES = 2 * 1024 * 1024;
+const MAX_WEBSITE_SNAPSHOT_BYTES = 2 * 1024 * 1024;\nimport { assertAllowedWebsiteMutation, assertStagingWebsiteHost, editorialWordPressStatus, mayPublish, validateMediaUpload } from "./communicationsWebsitePolicy.mjs";
 
 function values(record) {
   if (!record) return [];
@@ -548,7 +548,7 @@ export function createCommunicationsSiteRouter(deps) {
       const content = String(input.content ?? "");
       const excerpt = String(input.excerpt ?? "").replace(/<[^>]*>/g, "").trim();
       const featuredMedia = Number(input.featuredMedia ?? 0);
-      const status = String(input.status || "draft");
+      status = String(status || "draft");
       if (!["pages", "posts"].includes(type) || !Number.isSafeInteger(id) || id < 1 ||
           !title || title.length > 180 || content.length > 30000 || excerpt.length > 600 ||
           !Number.isSafeInteger(featuredMedia) || featuredMedia < 0 || !["draft", "publish"].includes(status)) {
