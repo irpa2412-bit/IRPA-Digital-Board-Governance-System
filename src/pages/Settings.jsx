@@ -34,6 +34,7 @@ export default function Settings({ admin = false, section = "settings" }) {
   const [auditorResult, setAuditorResult] = useState(null);
   const [liveCheckBusy, setLiveCheckBusy] = useState(false);
   const [liveCheckText, setLiveCheckText] = useState("");
+  const [workerHealth, setWorkerHealth] = useState(null);
 
   useEffect(() => {
     if (!admin || section !== "settings") return;
@@ -46,6 +47,21 @@ export default function Settings({ admin = false, section = "settings" }) {
       }
     })();
   }, [admin, section]);
+
+  useEffect(() => {
+    if (section !== "settings") return;
+    const gateway = String(getGoogleDriveGatewayUrl() || "").replace(/\/+$/, "");
+    if (!gateway) {
+      setWorkerHealth({ ok: false, error: "Worker URL unavailable" });
+      return;
+    }
+    fetch(gateway + "/health")
+      .then(async response => {
+        const payload = await response.json().catch(() => ({}));
+        setWorkerHealth({ ...payload, httpStatus: response.status });
+      })
+      .catch(error => setWorkerHealth({ ok: false, error: String(error?.message || error) }));
+  }, [section]);
 
   useEffect(() => {
     let unsubscribe = () => {};
@@ -515,7 +531,9 @@ export default function Settings({ admin = false, section = "settings" }) {
       {section === "settings" && (
         <footer className="panel" aria-label="Application build information" style={{ marginTop: 20, padding: "12px 16px", fontSize: 12, opacity: 0.85 }}>
           <strong>Application build</strong>
-          <div>Commit: {String(import.meta.env.VITE_BUILD_COMMIT || "unavailable").slice(0, 7)}</div>
+          <div>Web commit: {String(import.meta.env.VITE_BUILD_COMMIT || "unavailable").slice(0, 7)}</div>
+          <div>Worker commit: {String(workerHealth?.commit || workerHealth?.version || "unavailable").slice(0, 7)}{workerHealth?.httpStatus ? " · HTTP " + workerHealth.httpStatus : ""}</div>
+          <div>Worker Firebase project: {String(workerHealth?.firebaseProjectId || "unavailable")}</div>
           <div>Built (UTC): {import.meta.env.VITE_BUILD_TIME || "timestamp unavailable"}</div>
         </footer>
       )}
