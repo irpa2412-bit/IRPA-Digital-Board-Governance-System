@@ -1060,20 +1060,25 @@ async function reconcileSignatureDocumentIds(request, env) {
       const metadata = await driveFetch(env, accessToken, `/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,name,mimeType,description`);
       const description = parseDescription(metadata.description);
       if (!description?.irpaGovernance) throw new Error("Drive file is not marked as an IRPA governance document.");
-      if (String(description.documentId || "") === documentId) {
+      const previousDocumentId = String(description.documentId || "");
+      line.previousDescriptionDocumentId = previousDocumentId || "(missing)";
+      if (previousDocumentId === documentId) {
         line.status = "already correct";
-        line.reason = "Drive description.documentId already matches the Firestore document ID.";
+        line.reason = "Drive description.documentId already matches the Firestore document ID (" + documentId + ").";
       } else if (dryRun) {
         line.status = "would repair";
-        line.reason = `Dry run only: Drive description.documentId would be set to ${documentId}; no Drive mutation was performed.`;
+        line.reason = "Dry run only: Drive description.documentId is currently " + (previousDocumentId || "(missing)") + " and would be set to " + documentId + ".";
       } else {
         const repairedDescription = {...description,documentId,documentUid:documentId};
         await driveFetch(env, accessToken, `/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,description`, {
           method:"PATCH",
           body:JSON.stringify({description:JSON.stringify(repairedDescription)})
         });
+        const verified = await driveFetch(env, accessToken, `/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,description`);
+        const verifiedDescription = parseDescription(verified.description);
+        if (String(verifiedDescription.documentId || "") !== documentId) throw new Error("Drive description verification failed after repair; expected " + documentId + " but found " + String(verifiedDescription.documentId || "(missing)") + ".");
         line.status = "repaired";
-        line.reason = `Drive description.documentId set to ${documentId}.`;
+        line.reason = "Drive description.documentId was " + (previousDocumentId || "(missing)") + "; repaired and verified as " + documentId + ".";
       }
     } catch (error) {
       line.status = "failed";
@@ -1233,6 +1238,16 @@ async function uploadControlledDocument(request, env) {
     });
     const result=await response.json();
     if(!response.ok) throw new Error(result.error?.message || `Google Drive upload failed for ${archiveChannel}.`);
+    const metadataPath = `/drive/v3/files/${encodeURIComponent(result.id)}?fields=id,description`;
+    let stored = await driveFetch(env, accessToken, metadataPath);
+    let storedDescription = parseDescription(stored.description);
+    if (String(storedDescription.documentId || "") !== documentId) {
+      storedDescription = {...storedDescription,irpaGovernance:true,documentId,documentUid:documentId};
+      await driveFetch(env, accessToken, metadataPath, {method:"PATCH",body:JSON.stringify({description:JSON.stringify(storedDescription)})});
+      stored = await driveFetch(env, accessToken, metadataPath);
+      storedDescription = parseDescription(stored.description);
+    }
+    if (String(storedDescription.documentId || "") !== documentId) throw new Error("Controlled upload failed metadata verification: expected Drive description.documentId " + documentId + " but found " + String(storedDescription.documentId || "(missing)") + ".");
     return {
       fileId:result.id,
       fileName:result.name,
