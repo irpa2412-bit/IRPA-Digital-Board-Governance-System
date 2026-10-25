@@ -315,12 +315,15 @@ jobs:
         run: |
           set -euo pipefail
           base="https://irpa-digital-board-governance.web.app"
+          grep -R -Fq "$EXPECTED_BUILD_COMMIT" dist/assets --include="*.js"
           curl --fail --silent --show-error --retry 5 --retry-delay 2 "$base/" -o "$RUNNER_TEMP/firebase-index.html"
-          asset="$(grep -oE '/assets/[^" ]+\.js' "$RUNNER_TEMP/firebase-index.html" | head -n 1)"
-          test -n "$asset"
-          curl --fail --silent --show-error --retry 5 --retry-delay 2 "$base$asset" -o "$RUNNER_TEMP/firebase-main.js"
-          grep -Fq "$EXPECTED_BUILD_COMMIT" "$RUNNER_TEMP/firebase-main.js"
-          echo "Firebase Hosting JavaScript bundle contains build $EXPECTED_BUILD_COMMIT"
+          cmp -s dist/index.html "$RUNNER_TEMP/firebase-index.html"
+          for local in dist/assets/*.js; do
+            name="${local##*/}"
+            curl --fail --silent --show-error --retry 5 --retry-delay 2 "$base/assets/$name" -o "$RUNNER_TEMP/firebase-$name"
+            cmp -s "$local" "$RUNNER_TEMP/firebase-$name"
+          done
+          echo "Firebase Hosting index and every JavaScript asset exactly match build $EXPECTED_BUILD_COMMIT"
 
       # Keep Firebase function deployments independent from Firestore. The frontend is deployed by cloudflare-pages-deploy.yml.
       # Google Cloud billing is currently closed for this project, so new Cloud Functions

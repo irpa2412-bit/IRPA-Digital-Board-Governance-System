@@ -33,13 +33,14 @@ jobs:
         run: npm run check:production-readability
       - name: Build production application
         env:
+          VITE_BUILD_COMMIT: ${{ github.sha }}
           VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
           VITE_GOOGLE_DRIVE_GATEWAY_URL: ${{ secrets.VITE_GOOGLE_DRIVE_GATEWAY_URL }}
           VITE_GATEWAY_ORIGIN: ${{ secrets.VITE_GATEWAY_ORIGIN || 'https://irpa-google-drive-gateway.irpa-governance.workers.dev' }}
           VITE_GOOGLE_WEATHER_API_KEY: ${{ secrets.VITE_GOOGLE_WEATHER_API_KEY }}
           VITE_GRANT_CRAWLER_WORKER_URL: https://irpa-grant-crawler-production.irpa-governance.workers.dev
           VITE_GRANT_ASSISTANT_WORKER_URL: https://irpa-dbgs-grant-crawler.irpa-governance.workers.dev
-        run: npm run build
+        run: VITE_BUILD_TIME="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" npm run build
 
       - name: Independent production readability verification
         run: npm run verify:production-readability
@@ -101,11 +102,14 @@ jobs:
           url="https://irpa-digital-board-governance-frontend.irpa-governance.workers.dev"
           curl --fail --silent --show-error --retry 8 --retry-delay 3 --max-time 30 "$url/" -o "$RUNNER_TEMP/cloudflare-live.html"
           grep -qi '<html' "$RUNNER_TEMP/cloudflare-live.html"
-          asset="$(grep -oE '/assets/[^" ]+\.js' "$RUNNER_TEMP/cloudflare-live.html" | head -n 1)"
-          test -n "$asset"
-          curl --fail --silent --show-error --retry 5 --retry-delay 2 --max-time 20 "$url$asset" -o "$RUNNER_TEMP/cloudflare-main.js"
-          grep -Fq "$GITHUB_SHA" "$RUNNER_TEMP/cloudflare-main.js"
-          echo "Cloudflare frontend JavaScript bundle contains build $GITHUB_SHA"
+          grep -R -Fq "$GITHUB_SHA" dist/assets --include="*.js"
+          cmp -s dist/index.html "$RUNNER_TEMP/cloudflare-live.html"
+          for local in dist/assets/*.js; do
+            name="${local##*/}"
+            curl --fail --silent --show-error --retry 5 --retry-delay 2 --max-time 20 "$url/assets/$name" -o "$RUNNER_TEMP/cloudflare-$name"
+            cmp -s "$local" "$RUNNER_TEMP/cloudflare-$name"
+          done
+          echo "Cloudflare index and every JavaScript asset exactly match build $GITHUB_SHA"
           health="$(curl --fail --silent --show-error --retry 5 --retry-delay 2 --max-time 20 "$url/__irpa_health")"
           echo "$health"
           echo "$health" | grep -q '"ok":true'
