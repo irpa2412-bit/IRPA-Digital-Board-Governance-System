@@ -65,7 +65,7 @@ export default function SignaturePathwaySelfTest() {
     try {
       await requireAdministrator();
       const rows = documents.length ? documents : (await getDocs(collection(db, "documents"))).docs.map(item => ({ id: item.id, ...item.data() }));
-      const candidates = rows.map(item => ({ documentId: item.id, fileId: driveFileId(item) })).filter(item => item.fileId);
+      const candidates = rows.flatMap(item => [...new Set([item.fileId, item.driveFileId, item.sourceFileId, item.archiveFileId, item.governanceArchiveFileId, item.primaryArchiveFileId].map(value => String(value || "").trim()).filter(Boolean))].map(fileId => ({ documentId: item.id, fileId })));
       if (!candidates.length) throw new Error("STEP reconciliation failed: no documents with registered Drive file IDs were found.");
       const result = await reconcileSignatureDocumentIds(candidates);
       const lines = (result.results || []).map(item => ({ documentId: item.documentId, title: item.documentId, checks: [{ name: item.status, status: item.status === "failed" ? "FAIL" : "PASS", reason: item.reason }] }));
