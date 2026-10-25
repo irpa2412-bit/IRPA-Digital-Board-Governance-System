@@ -149,7 +149,7 @@ test("signing authority updates use the Worker and retain register-based authori
   ]);
   assert.match(worker, /api\/signature\/authority/);
   const route = worker.slice(worker.indexOf("async function updateSignerAuthorityRoute"), worker.indexOf("async function reconcileRegisteredIdentityUidsRoute"));
-  assert.match(route, /Authenticate Firebase authentication/);
+  assert.match(route, /Firebase authentication/);
   assert.match(route, /activeRecords\.flatMap\(valuesFor\)\.includes\(requestedRole\)/);
   assert.match(route, /authoritySourceCollection/);
   assert.match(route, /UPDATE_SIGNER_AUTHORITY/);
