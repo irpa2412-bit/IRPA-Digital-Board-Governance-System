@@ -308,6 +308,20 @@ jobs:
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
 
+      - name: Verify Firebase Hosting bundle contains this exact build
+        env:
+          EXPECTED_BUILD_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://irpa-digital-board-governance.web.app"
+          curl --fail --silent --show-error --retry 5 --retry-delay 2 "$base/" -o "$RUNNER_TEMP/firebase-index.html"
+          asset="$(grep -oE '/assets/[^" ]+\.js' "$RUNNER_TEMP/firebase-index.html" | head -n 1)"
+          test -n "$asset"
+          curl --fail --silent --show-error --retry 5 --retry-delay 2 "$base$asset" -o "$RUNNER_TEMP/firebase-main.js"
+          grep -Fq "$EXPECTED_BUILD_COMMIT" "$RUNNER_TEMP/firebase-main.js"
+          echo "Firebase Hosting JavaScript bundle contains build $EXPECTED_BUILD_COMMIT"
+
       # Keep Firebase function deployments independent from Firestore. The frontend is deployed by cloudflare-pages-deploy.yml.
       # Google Cloud billing is currently closed for this project, so new Cloud Functions
       # deployments cannot activate Cloud Build/Artifact Registry. Existing deployed

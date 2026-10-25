@@ -14,9 +14,18 @@ import "./styles/grant-intelligence-layout.css";
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch((error) => {
-      console.warn("IRPA offline application shell registration failed:", error);
+    const hadController = Boolean(navigator.serviceWorker.controller);
+    let reloadedForControllerChange = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (!hadController || reloadedForControllerChange) return;
+      reloadedForControllerChange = true;
+      window.location.reload();
     });
+    navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "none" })
+      .then((registration) => registration.update())
+      .catch((error) => {
+        console.warn("IRPA offline application shell update check failed:", error);
+      });
   });
 }
 
