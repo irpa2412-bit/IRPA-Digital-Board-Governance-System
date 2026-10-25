@@ -271,6 +271,7 @@ export default {
       if (pathname === "/api/signature-pathway/reconcile" && request.method === "POST") {
         return await reconcileSignatureDocumentIds(request, env);
       }
+      if (pathname === "/api/signature-workflow/draft" && request.method === "POST") return await saveSignatureWorkflowDraftRoute(request, env);
       if (pathname === "/api/system/actual-data-access" && (request.method === "GET" || request.method === "POST")) return await actualDataAccessRoute(request, env);
       if (pathname === "/api/members/reconcile-registered-identity-uids" && request.method === "POST") return await reconcileRegisteredIdentityUidsRoute(request, env);
       if (pathname === "/api/signature/authority" && request.method === "POST") return await updateSignerAuthorityRoute(request, env);
@@ -964,6 +965,67 @@ async function actualDataAccessRoute(request, env) {
   }
 }
 
+function signatureDraftFirestoreValue(value, key = "") {
+  if (value === null || value === undefined) return { nullValue: null };
+  if (Array.isArray(value)) return { arrayValue: { values: value.map(item => signatureDraftFirestoreValue(item)) } };
+  if (typeof value === "boolean") return { booleanValue: value };
+  if (typeof value === "number") return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
+  if (typeof value === "string") { if (/(?:At|Date)$/.test(key) && /^\\d{4}-\\d{2}-\\d{2}T/.test(value)) return { timestampValue: value }; return { stringValue: value }; }
+  if (typeof value === "object") { if (Number.isFinite(Number(value.seconds)) && value.seconds !== undefined) return { timestampValue: new Date(Number(value.seconds) * 1000 + Number(value.nanoseconds || 0) / 1e6).toISOString() }; return { mapValue: { fields: Object.fromEntries(Object.entries(value).map(([name, item]) => [name, signatureDraftFirestoreValue(item, name)])) } }; }
+  return { nullValue: null };
+}
+
+async function saveSignatureWorkflowDraftRoute(request, env) {
+  let step = "Firebase authentication";
+  try {
+    const claims = await authenticateFirebaseRequest(request, env);
+    const uid = String(claims.user_id || "");
+    const email = String(claims.email || "").trim().toLowerCase();
+    const adminToken = await getFirestoreAdminAccessToken(env);
+    step = "Resolve active administrator/member/employee authority";
+    const adminProfile = await getFirestoreDocument(env, "adminProfiles/" + uid, adminToken);
+    const activeAdmin = email === "irpa2412@gmail.com" || (adminProfile && adminProfile.fields && adminProfile.fields.active && adminProfile.fields.active.booleanValue === true && adminProfile.fields.role && adminProfile.fields.role.stringValue === "Administrator");
+    let member = await getFirestoreDocument(env, "members/" + uid, adminToken);
+    let employee = await getFirestoreDocument(env, "employees/" + uid, adminToken);
+    if (!member && email) member = (await getFirestoreDocumentsByEmail(env, "members", email, adminToken))[0] || null;
+    if (!employee && email) employee = (await getFirestoreDocumentsByEmail(env, "employees", email, adminToken))[0] || null;
+    const activeStatus = record => ["Active", "Activated"].includes(record && record.fields && ((record.fields.status && record.fields.status.stringValue) || (record.fields.registrationStatus && record.fields.registrationStatus.stringValue) || (record.fields.employmentStatus && record.fields.employmentStatus.stringValue)) || "") && !(record && record.fields && record.fields.accountActivated && record.fields.accountActivated.booleanValue === false);
+    if (!activeAdmin && !activeStatus(member) && !activeStatus(employee)) return json({ok:false,step,error:"An active IRPA administrator, member or employee profile is required to save a signing draft."},403,corsHeaders(request));
+    step = "Validate draft and source controlled document";
+    const body = await request.json();
+    const draft = body && body.draft || {};
+    const envelopeId = String(draft.envelopeReference || body.envelopeId || "").trim();
+    const documentId = String(draft.documentId || "").trim();
+    if (!/^[A-Za-z0-9_-]{6,150}$/.test(envelopeId) || !/^[A-Za-z0-9_-]{1,150}$/.test(documentId) || !String(draft.title || "").trim() || !String(draft.documentUrl || "").trim()) return json({ok:false,step,error:"A valid envelope ID, title, canonical document ID and controlled document URL are required."},400,corsHeaders(request));
+    const source = await getFirestoreDocument(env, "documents/" + documentId, adminToken);
+    if (!source || !source.fields) return json({ok:false,step,error:"The selected controlled document was not found."},404,corsHeaders(request));
+    const sourceData = firestoreDocumentToPlain(source) || {};
+    const existing = await getFirestoreDocument(env, "signatureEnvelopes/" + envelopeId, adminToken);
+    const existingData = firestoreDocumentToPlain(existing) || {};
+    if (existing && String(existingData.ownerUid || existingData.senderUid || "") !== uid) return json({ok:false,step,error:"Only the original signing-draft owner may update this envelope."},403,corsHeaders(request));
+    const recipients = Array.isArray(draft.recipients) ? draft.recipients : [];
+    const fields = Array.isArray(draft.fields) ? draft.fields : [];
+    const participantUids = Array.from(new Set(recipients.map(item => String(item && item.uid || "")).filter(Boolean)));
+    if (!participantUids.includes(uid)) return json({ok:false,step,error:"The authenticated owner must be a participant in the signing envelope."},400,corsHeaders(request));
+    if (fields.some(field => field && field.signerUid && !participantUids.includes(String(field.signerUid)))) return json({ok:false,step,error:"Every assigned field must belong to a participant in this envelope."},400,corsHeaders(request));
+    const now = new Date().toISOString();
+    const envelope = {...draft,envelopeReference:envelopeId,title:String(draft.title).trim(),documentId,senderUid:uid,senderEmail:email,ownerUid:uid,ownerEmail:email,recordOrigin:String(sourceData.recordOrigin || "PRODUCTION").toUpperCase()==="TRIAL"?"TRIAL":"PRODUCTION",trialData:String(sourceData.recordOrigin || "PRODUCTION").toUpperCase()==="TRIAL",status:"Draft",recipients,fields,participantUids,actionUids:Array.from(new Set(fields.map(field=>String(field && field.signerUid || "")).filter(Boolean))),updatedAt:now,...(existing?{}:{createdAt:now})};
+    delete envelope.id;
+    step = "Commit envelope, source-document link and audit event atomically";
+    const base = "projects/" + getFirebaseProjectId(env) + "/databases/(default)/documents";
+    const eventId = "signature-draft-" + Date.now() + "-" + crypto.randomUUID().slice(0,10);
+    const event = {envelopeId,event:"Owner Section Saved",details:{ownerUid:uid,fieldCount:fields.filter(field=>field && field.signerUid===uid).length,recipientCount:recipients.length,writePath:"authenticated-worker"},actorUid:uid,actorEmail:email,createdAt:now};
+    const docFields = {signatureEnvelopeId:signatureDraftFirestoreValue(envelopeId),signatureReference:signatureDraftFirestoreValue(envelopeId),signatureStatus:signatureDraftFirestoreValue("Draft"),signatureOwnerUid:signatureDraftFirestoreValue(uid),workflowOwnerSectionSaved:signatureDraftFirestoreValue(true),authorizationRequestId:signatureDraftFirestoreValue(draft.authorizationRequestId || null),authorizationReference:signatureDraftFirestoreValue(draft.authorizationReference || null),updatedAt:signatureDraftFirestoreValue(now)};
+    const writes = [
+      {update:{name:base+"/signatureEnvelopes/"+envelopeId,fields:signatureDraftFirestoreValue(envelope).mapValue.fields},updateMask:{fieldPaths:Object.keys(envelope)},currentDocument:{exists:Boolean(existing)}},
+      {update:{name:base+"/documents/"+documentId,fields:docFields},updateMask:{fieldPaths:Object.keys(docFields)},currentDocument:{exists:true}},
+      {update:{name:base+"/signatureEvents/"+eventId,fields:signatureDraftFirestoreValue(event).mapValue.fields},currentDocument:{exists:false}}
+    ];
+    const response = await fetch("https://firestore.googleapis.com/v1/projects/"+getFirebaseProjectId(env)+"/databases/(default)/documents:commit",{method:"POST",headers:{Authorization:"Bearer "+adminToken,"Content-Type":"application/json"},body:JSON.stringify({writes})});
+    if (!response.ok) { const detail=await response.json().catch(()=>({})); throw new Error("Atomic Firestore draft commit returned HTTP "+response.status+": "+String(detail && detail.error && detail.error.message || "no detail").slice(0,240)); }
+    return json({ok:true,envelopeId,draft:envelope,writePath:"authenticated-worker",atomic:true},200,corsHeaders(request));
+  } catch (error) { console.error("Signature workflow draft save failed",{step,message:String(error && error.message || error).slice(0,240)}); return json({ok:false,step,error:step+" failed: "+String(error && error.message || error).slice(0,240)},Number(error && error.status)||500,corsHeaders(request)); }
+}
 async function reconcileSignatureDocumentIds(request, env) {
   const claims = await authenticateFirebaseRequest(request, env);
   const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
