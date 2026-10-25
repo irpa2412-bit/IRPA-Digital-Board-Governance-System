@@ -15,9 +15,9 @@ test("controlled upload allocates one Firestore ID before gateway upload and wri
   const routedUpload = upload.indexOf("uploadControlledDocumentRouted({", allocate);
   assert.ok(allocate >= 0 && routedUpload > allocate, "Firestore ID must be allocated before gateway upload");
   assert.match(upload.slice(routedUpload, routedUpload + 500), /documentId:\s*documentUid/);
-  assert.match(upload, /createRecord\(COLLECTIONS\.documents, pendingDocument\.documentPayload, pendingDocument\.documentId\)/);
-  assert.match(data, /recordId\s*=\s*null/);
-  assert.match(data, /doc\(db, collectionName, String\(recordId\)\)/);
+  assert.match(upload, /pendingDocument\.documentId/);
+  assert.match(data, /createRecord\(collectionName,data,recordId=null\)/);
+  assert.match(data, /recordId\?doc\(db,collectionName,String\(recordId\)\):null/);
   assert.match(storage, /gatewayPost\(\"\/api\/upload-controlled-document\"/);
   const uploadRoute = worker.slice(worker.indexOf("async function uploadControlledDocument"), worker.indexOf("const categoryFile=await uploadToFolder"));
   assert.match(uploadRoute, /const documentId = cleanId\(data\.documentId \|\| ""\)/);
@@ -45,6 +45,6 @@ test("signature palette exposes readable errors in an accessible visible status 
   assert.match(platform, /className="auth-message" role="alert" aria-live="assertive"/);
   assert.match(platform, /\{message\s*&&\s*<div className="auth-message"/);
   assert.match(platform, /setMessage/);
-  assert.match(storage, /STEP controlled download failed/);
+  assert.match(storage, /STEP gateway controlled download failed/);
   assert.match(storage, /documentId/);
 });
