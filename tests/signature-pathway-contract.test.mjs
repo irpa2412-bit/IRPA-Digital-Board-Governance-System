@@ -65,7 +65,7 @@ test("actual-data gate Worker route enforces admin role, exact attestation, writ
   assert.match(route, /finalTestsAttested:\{booleanValue:enabled\}/);
   assert.match(route, /ACTUAL_DATA_ACCESS_OPENED/);
   assert.match(route, /Commit actual-data setting and audit atomically/);
-  assert.match(route, /step, error:/);
+  assert.match(route, /step,error:/);
 });
 
 test("actual-data gate rejects non-administrators and wrong attestation before changing the setting", async () => {
@@ -153,7 +153,7 @@ test("signing authority updates use the Worker and retain register-based authori
   assert.match(route, /activeRecords\.flatMap\(valuesFor\)\.includes\(requestedRole\)/);
   assert.match(route, /authoritySourceCollection/);
   assert.match(route, /UPDATE_SIGNER_AUTHORITY/);
-  assert.match(route, /step, error:/);
+  assert.match(route, /step,error:/);
   assert.match(client, /\/api\/signature\/authority/);
   assert.doesNotMatch(client, /httpsCallable\(getFunctions\(undefined,"us-central1"\),"updateSignerAuthority"\)/);
   assert.doesNotMatch(client, /if\(code!=="functions\/not-found"/);
