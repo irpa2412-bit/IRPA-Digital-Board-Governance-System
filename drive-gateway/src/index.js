@@ -986,11 +986,10 @@ async function saveSignatureWorkflowDraftRoute(request, env) {
     const adminProfile = await getFirestoreDocument(env, "adminProfiles/" + uid, adminToken);
     const activeAdmin = email === "irpa2412@gmail.com" || (adminProfile && adminProfile.fields && adminProfile.fields.active && adminProfile.fields.active.booleanValue === true && adminProfile.fields.role && adminProfile.fields.role.stringValue === "Administrator");
     let member = await getFirestoreDocument(env, "members/" + uid, adminToken);
-    let employee = await getFirestoreDocument(env, "employees/" + uid, adminToken);
     if (!member && email) member = (await getFirestoreDocumentsByEmail(env, "members", email, adminToken))[0] || null;
-    if (!employee && email) employee = (await getFirestoreDocumentsByEmail(env, "employees", email, adminToken))[0] || null;
-    const activeStatus = record => ["Active", "Activated"].includes(record && record.fields && ((record.fields.status && record.fields.status.stringValue) || (record.fields.registrationStatus && record.fields.registrationStatus.stringValue) || (record.fields.employmentStatus && record.fields.employmentStatus.stringValue)) || "") && !(record && record.fields && record.fields.accountActivated && record.fields.accountActivated.booleanValue === false);
-    if (!activeAdmin && !activeStatus(member) && !activeStatus(employee)) return json({ok:false,step,error:"An active IRPA administrator, member or employee profile is required to save a signing draft."},403,corsHeaders(request));
+    const memberStatus = member && member.fields && ((member.fields.status && member.fields.status.stringValue) || (member.fields.registrationStatus && member.fields.registrationStatus.stringValue) || "");
+    const activeMember = Boolean(member && member.fields) && ["Active", "Activated"].includes(memberStatus) && !(member.fields.accountActivated && member.fields.accountActivated.booleanValue === false);
+    if (!activeAdmin && !activeMember) return json({ok:false,step,error:"An active IRPA administrator or member profile is required to save a signing draft."},403,corsHeaders(request));
     step = "Validate draft and source controlled document";
     const body = await request.json();
     const draft = body && body.draft || {};
