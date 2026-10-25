@@ -23,24 +23,7 @@ export async function persistCompletedSignatureEnvelope({envelope, completion, g
   });
   const lastSignedByUid = [...signers].reverse().find(s => s.uid && s.status === "Signed")?.uid || null;
   const timestamp = now();
-  for (const signer of signers.filter(s => s.uid && s.status === "Signed")) {
-    const signerEventId = "gateway-signed-" + envelopeId + "-" + signer.uid;
-    await updateDocument("signatureEvents/" + signerEventId, {
-      envelopeId,
-      event: "Gateway Signer Signed",
-      details: {
-        documentId: clean(existing.documentId || envelope.documentId),
-        eventType: "Gateway Signer Signed",
-        action: "SIGNED",
-        status: "Signed",
-        signedAt: signer.signedAt || timestamp,
-        source: "drive-gateway"
-      },
-      actorUid: signer.uid,
-      actorEmail: signer.email || "",
-      createdAt: signer.signedAt || timestamp
-    });
-  }
+
   await updateDocument(path, {
     status: "Completed", signers, completedAt: completion.completedAt,
     signedDocumentUrl, ownerCompletedDocumentUrl: signedDocumentUrl,
