@@ -48,3 +48,34 @@ test("signature palette exposes readable errors in an accessible visible status 
   assert.match(storage, /STEP gateway controlled download failed/);
   assert.match(storage, /documentId/);
 });
+
+
+test("actual-data gate Worker route enforces admin role, exact attestation, writes same setting fields, and audits", async () => {
+  const worker = await read("../drive-gateway/src/index.js");
+  const client = await read("../src/firebase/systemControl.js");
+  const route = worker.slice(worker.indexOf("async function actualDataAccessRoute"), worker.indexOf("async function reconcileSignatureDocumentIds"));
+  assert.match(worker, /\/api\/system\/actual-data-access/);
+  assert.match(client, /\/api\/system\/actual-data-access/);
+  assert.match(route, /authenticateFirebaseRequest\(request, env\)/);
+  assert.match(route, /adminProfiles\//);
+  assert.match(route, /profile\?\.fields\?\.active\?\.booleanValue === true/);
+  assert.match(route, /ACTUAL_DATA_ATTESTATION/);
+  assert.match(route, /I CONFIRM FINAL SYSTEM TESTS PASSED/);
+  assert.match(route, /status:\{stringValue:enabled\?'OPEN':'CLOSED'\}/);
+  assert.match(route, /finalTestsAttested:\{booleanValue:enabled\}/);
+  assert.match(route, /ACTUAL_DATA_ACCESS_OPENED/);
+  assert.match(route, /Write audit record/);
+  assert.match(route, /step\+' failed: '/);
+});
+
+test("actual-data gate rejects non-administrators and wrong attestation before changing the setting", async () => {
+  const worker = await read("../drive-gateway/src/index.js");
+  const route = worker.slice(worker.indexOf("async function actualDataAccessRoute"), worker.indexOf("async function reconcileSignatureDocumentIds"));
+  const authorization = route.indexOf("if (!adminAllowed)");
+  const attestation = route.indexOf("body.confirmation !== ACTUAL_DATA_ATTESTATION");
+  const write = route.indexOf("step = 'Write actual-data setting'");
+  assert.ok(authorization >= 0 && attestation > authorization && write > attestation);
+  assert.match(route, /},403,corsHeaders\(request\)/);
+  assert.match(route, /},412,corsHeaders\(request\)/);
+  assert.match(route, /An enabled boolean is required/);
+});
