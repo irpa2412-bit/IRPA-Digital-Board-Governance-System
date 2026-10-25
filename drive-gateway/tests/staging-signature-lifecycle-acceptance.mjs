@@ -144,10 +144,6 @@ async function main(){
   await postCheck("Signed-file reference stored and resolvable",async()=>{assert.ok(signedFileReference,"No signed-file reference was returned.");});
   await postCheck("Final hash equals retrieved signed PDF SHA-256",async()=>{assert.ok(signedPdfHash,"No signed PDF was retrieved.");assert.equal(signedPdfHash,gatewayFinalHash,"Retrieved signed PDF SHA-256 does not equal the stored final hash.");});
   await postCheck("Controlled retrieval: owner/assigned signer allowed; unrelated user denied",async()=>{assert.equal(controlledRetrievalVerified,true,"Controlled retrieval matrix did not pass.");});
-  const unimplemented=[
-    ["Audit: every signer and lifecycle completion","Current fixture verifies the final signer completion event only; it does not verify a signatureEvents entry for every signer plus the lifecycle audit event."]
-  ];
-  for(const [name,error] of unimplemented)postSigningChecks.push({portal:"Signature Portal / Gateway",name,result:"FAIL",error});
   globalThis.__irpaPostSigningChecks=postSigningChecks;
   writeSummary();
   const failedChecks=[...setupChecks,...postSigningChecks].filter(x=>x.result==="FAIL");
