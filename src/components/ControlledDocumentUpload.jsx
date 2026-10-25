@@ -247,11 +247,11 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         setGeneratedReference(documentReference);
         setMessage(`Document uploaded successfully to Google Drive: ${name}. Click “Save Document” to register it in the IRPA controlled-document archive.`);
       } else {
-        let documentId = "";
+        let savedDocumentId = "";
         for (let attempt = 1; attempt <= 2; attempt += 1) {
           try {
-            documentId = await createRecord(COLLECTIONS.documents, documentPayload, documentId);
-            const persisted = await getRecord(COLLECTIONS.documents, documentId);
+            savedDocumentId = await createRecord(COLLECTIONS.documents, documentPayload, documentUid);
+            const persisted = await getRecord(COLLECTIONS.documents, savedDocumentId);
             if (!persisted) throw new Error("The controlled-document register record could not be verified after creation.");
             break;
           } catch (error) {
@@ -267,7 +267,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         setArchiveCategory("");
         setClassification("Public");
         e.target.reset();
-        onUploaded?.({...doc,id:documentId});
+        onUploaded?.({...doc,id:savedDocumentId});
       }
     } catch (x) {
       setError(x.message || "Unable to upload document to Google Drive.");
