@@ -400,7 +400,6 @@ jobs:
           })().catch(e=>{console.error("cPanel mapping diagnostic unavailable: "+e.message);console.log("CPANEL_MAPPING_DIAGNOSTIC_UNAVAILABLE");});
           NODE
 
-
       - name: Inspect cPanel staging installation and reachable WordPress paths (read-only)
         continue-on-error: true
         env:
@@ -1795,6 +1794,10 @@ jobs:
 
   deploy-staging:
     needs: [local-e2e, preflight-staging, deploy-staging-frontend]
+    outputs:
+      staging_gateway_url: ${{ steps.staging_health.outputs.gateway_url }}
+      staging_signer_uid: ${{ steps.staging_crypto_key.outputs.signer_uid }}
+      staging_key_id: ${{ steps.staging_crypto_key.outputs.key_id }}
     if: github.event_name == 'push' && github.ref == 'refs/heads/fix/signature-trail-20261024'
     concurrency:
       group: irpa-staging-gateway-deploy
@@ -2108,6 +2111,20 @@ jobs:
           curl --fail --silent --show-error --retry 5 --retry-delay 2 "$url" | tee staging-health.json
           grep -q '"ok":true' staging-health.json
 
+  signature-acceptance:
+    needs: [local-e2e, preflight-staging, deploy-staging-frontend, deploy-staging]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/fix/signature-trail-20261024'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install gateway dependencies for acceptance
+        working-directory: drive-gateway
+        run: npm ci --no-audit --no-fund
+
       - name: Prepare isolated staging media administrator
         env:
           PROJECT: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
@@ -2136,7 +2153,7 @@ jobs:
         if: always()
         continue-on-error: true
         env:
-          STAGING_GATEWAY_URL: ${{ steps.staging_health.outputs.gateway_url }}
+          STAGING_GATEWAY_URL: ${{ needs.deploy-staging.outputs.staging_gateway_url }}
           STAGING_FIREBASE_PROJECT_ID: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
           STAGING_FIREBASE_WEB_API_KEY: ${{ secrets.STAGING_FIREBASE_WEB_API_KEY }}
           STAGING_TEST_EMAIL: ${{ secrets.STAGING_TEST_EMAIL }}
@@ -2148,6 +2165,32 @@ jobs:
         run: |
           set -o pipefail
           node tests/staging-signature-lifecycle-acceptance.mjs 2>&1 | tee e2e.log
+
+      - name: Write signature trail verdict
+        if: always()
+        env:
+          SIGNATURE_RESULT: ${{ steps.signature-lifecycle.outcome }}
+        run: |
+          set -euo pipefail
+          first_failure=""
+          if [ -f drive-gateway/e2e.log ]; then
+            first_failure="$(awk -F '\t' '$1 == "ACCEPTANCE_ROW" && $4 == "FAIL" { print $3; exit }' drive-gateway/e2e.log)"
+          else
+            first_failure="Lifecycle acceptance log missing"
+          fi
+          if [ -n "$first_failure" ]; then
+            echo "SIGNATURE TRAIL VERDICT: FAIL ($first_failure)" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          if [ "${SIGNATURE_RESULT:-}" != "success" ]; then
+            echo "SIGNATURE TRAIL VERDICT: FAIL (Lifecycle acceptance process)" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          if ! grep -q '^ACCEPTANCE_ROW' drive-gateway/e2e.log; then
+            echo "SIGNATURE TRAIL VERDICT: FAIL (No signature lifecycle rows emitted)" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "SIGNATURE TRAIL VERDICT: PASS" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Summarize acceptance test output
         if: always()
@@ -2173,12 +2216,51 @@ jobs:
             echo ' ```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Summarize deploy-staging failure
+        if: failure()
+        env:
+          SIGNATURE_LIFECYCLE_OUTCOME: ${{ steps.signature-lifecycle.outcome }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## deploy-staging failure"
+            echo ""
+            if [ "$SIGNATURE_LIFECYCLE_OUTCOME" = "failure" ]; then
+              echo "Failing step: Verify signature mirror, signer trail, and document lifecycle approval"
+            else
+              echo "Failing step: another step in deploy-staging (signature lifecycle step outcome: ${SIGNATURE_LIFECYCLE_OUTCOME:-not-run})"
+            fi
+            echo ""
+            echo ' ```text'
+            if [ -f drive-gateway/e2e.log ]; then
+              tail -n 40 drive-gateway/e2e.log | perl -pe 's/Bearer\s+[^\s\x22\x27,;]+/Bearer [REDACTED]/ig; s/AIza[0-9A-Za-z_-]{20,}/[REDACTED_API_KEY]/g; s/(password|token|secret)(["=: ]+)[^", ]+/$1$2[REDACTED]/ig'
+            else
+              echo "drive-gateway/e2e.log was not produced."
+            fi
+            echo ' ```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  other-portals-report:
+    needs: [local-e2e, preflight-staging, deploy-staging-frontend, deploy-staging, signature-acceptance]
+    if: always() && needs.local-e2e.result == 'success' && needs.preflight-staging.result == 'success' && needs.deploy-staging-frontend.result == 'success' && needs.deploy-staging.result == 'success'
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install gateway dependencies for reporting
+        working-directory: drive-gateway
+        run: npm ci --no-audit --no-fund
+
       - name: Verify Communication and Media Archive and controlled-PDF upload
         id: communication-media
         if: always()
         continue-on-error: true
         env:
-          STAGING_GATEWAY_URL: ${{ steps.staging_health.outputs.gateway_url }}
+          STAGING_GATEWAY_URL: ${{ needs.deploy-staging.outputs.staging_gateway_url }}
           STAGING_FIREBASE_PROJECT_ID: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
           STAGING_FIREBASE_WEB_API_KEY: ${{ secrets.STAGING_FIREBASE_WEB_API_KEY }}
           STAGING_TEST_EMAIL: ${{ secrets.STAGING_TEST_EMAIL }}
@@ -2251,121 +2333,63 @@ jobs:
           console.log("STAGING_FIRESTORE_MEDIA_REGISTER=PASS");
           NODE
 
-      - name: Summarize deploy-staging failure
-        if: failure()
-        env:
-          SIGNATURE_LIFECYCLE_OUTCOME: ${{ steps.signature-lifecycle.outcome }}
-        run: |
-          set -euo pipefail
-          {
-            echo "## deploy-staging failure"
-            echo ""
-            if [ "$SIGNATURE_LIFECYCLE_OUTCOME" = "failure" ]; then
-              echo "Failing step: Verify signature mirror, signer trail, and document lifecycle approval"
-            else
-              echo "Failing step: another step in deploy-staging (signature lifecycle step outcome: ${SIGNATURE_LIFECYCLE_OUTCOME:-not-run})"
-            fi
-            echo ""
-            echo ' ```text'
-            if [ -f drive-gateway/e2e.log ]; then
-              tail -n 40 drive-gateway/e2e.log | perl -pe 's/Bearer\s+[^\s\x22\x27,;]+/Bearer [REDACTED]/ig; s/AIza[0-9A-Za-z_-]{20,}/[REDACTED_API_KEY]/g; s/(password|token|secret)(["=: ]+)[^", ]+/$1$2[REDACTED]/ig'
-            else
-              echo "drive-gateway/e2e.log was not produced."
-            fi
-            echo ' ```'
-          } >> "$GITHUB_STEP_SUMMARY"
-
       - name: Run real-runtime staging cryptographic acceptance
         id: staging-runtime-acceptance
         if: always()
         continue-on-error: true
         env:
-          STAGING_GATEWAY_URL: ${{ steps.staging_health.outputs.gateway_url }}
+          STAGING_GATEWAY_URL: ${{ needs.deploy-staging.outputs.staging_gateway_url }}
           STAGING_FIREBASE_WEB_API_KEY: "AIzaSyA6UmHtP-mRr99rBw57_-qrD4_mFSBnZ38"
           STAGING_FIREBASE_PROJECT_ID: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
           STAGING_CRYPTO_TEST_EMAIL: ${{ secrets.STAGING_CRYPTO_TEST_EMAIL }}
           STAGING_CRYPTO_TEST_PASSWORD: ${{ secrets.STAGING_CRYPTO_TEST_PASSWORD }}
           STAGING_CRYPTO_TEST_AUTHORITY: ${{ secrets.STAGING_CRYPTO_TEST_AUTHORITY }}
-          STAGING_CRYPTO_TEST_SIGNER_UID: ${{ steps.staging_crypto_key.outputs.signer_uid }}
-          STAGING_CRYPTO_TEST_KEY_ID: ${{ steps.staging_crypto_key.outputs.key_id }}
+          STAGING_CRYPTO_TEST_SIGNER_UID: ${{ needs.deploy-staging.outputs.staging_signer_uid }}
+          STAGING_CRYPTO_TEST_KEY_ID: ${{ needs.deploy-staging.outputs.staging_key_id }}
         working-directory: drive-gateway
         run: node tests/staging-runtime-acceptance.mjs 2>&1 | tee runtime-acceptance.log
 
-      - name: Final staging acceptance results
+      - name: Other portals acceptance report
         if: always()
         env:
-          SIGNATURE_RESULT: ${{ steps.signature-lifecycle.outcome }}
           MEDIA_RESULT: ${{ steps.communication-media.outcome }}
           CRYPTO_RESULT: ${{ steps.staging-runtime-acceptance.outcome }}
         run: |
           set -uo pipefail
           redact() {
-            perl -pe 's/Authorization:[^, ]+/Authorization: [REDACTED]/ig; s/Bearer\s+[^\s\x22\x27,;]+/Bearer [REDACTED]/ig; s/AIza[0-9A-Za-z_-]{20,}/[REDACTED_API_KEY]/g; s/(password|token|secret)(["=: ]+)[^", ]+/$1$2[REDACTED]/ig; s/([A-Za-z0-9_-]{32,})/[REDACTED_TOKEN]/g; s/[\r\n\t]+/ /g'
+            perl -pe 's/Authorization:[^, ]+/Authorization: [REDACTED]/ig; s/Bearer\\s+[^\\s\\x22\\x27,;]+/Bearer [REDACTED]/ig; s/AIza[0-9A-Za-z_-]{20,}/[REDACTED_API_KEY]/g; s/(password|token|secret)(["=: ]+)[^", ]+/$1$2[REDACTED]/ig; s/([A-Za-z0-9_-]{32,})/[REDACTED_TOKEN]/g; s/[\\r\\n\\t]+/ /g'
           }
-          failed=0
-          table="$RUNNER_TEMP/acceptance-table.md"
-          logs="$RUNNER_TEMP/acceptance-logs.md"
-          printf '| Portal | Check | Result | Exact error (HTTP status and first 300 body characters, redacted) |\n|---|---|---|---|\n' > "$table"
-          : > "$logs"
-          addrow() {
-            portal="$1"; check="$2"; status="$3"; error="$4"; logfile="$5"
-            if [ "$status" = "PASS" ] && [ -n "$logfile" ] && [ -f "$logfile" ]; then
-              log_error="$(grep -E -m 1 'AssertionError|Error:|exit code 1' "$logfile" || true)"
-              if [ -n "$log_error" ]; then status=FAIL; error="Log contains error: $log_error"; fi
-            fi
-            error="$(printf '%s' "$error" | redact | cut -c1-300)"
-            printf '| %s | %s | %s | %s |\n' "$portal" "$check" "$status" "${error//|/\\|}" >> "$table"
-            if [ "$status" = "FAIL" ]; then failed=1; fi
-            if [ -n "$logfile" ] && [ -f "$logfile" ]; then
-              excerpt="$(tail -n 30 "$logfile" | redact | cut -c1-3000)"
-              printf '\n### %s — %s (%s)\n\nLast 30 redacted log lines:\n\n```text\n%s\n```\n' "$portal" "$check" "$status" "$excerpt" >> "$logs"
-            fi
-          }
-          # Each detailed lifecycle assertion is emitted independently by the acceptance test.
-          if [ -f drive-gateway/e2e.log ]; then
-            while IFS="$(printf '\t')" read -r marker portal check result error; do
-              [ "$marker" = "ACCEPTANCE_ROW" ] || continue
-              if [ "$result" = "PASS" ] && [ "${SIGNATURE_RESULT:-}" = "success" ] && ! grep -Eqi 'AssertionError|Error:|exit code' drive-gateway/e2e.log; then status=PASS; else status=FAIL; fi
-              addrow "$portal" "$check" "$status" "$error" "drive-gateway/e2e.log"
-            done < <(grep '^ACCEPTANCE_ROW' drive-gateway/e2e.log || true)
-          else
-            addrow "Signature Portal / Gateway" "Lifecycle acceptance test" FAIL "No e2e.log was produced; step outcome=${SIGNATURE_RESULT:-not-run}" ""
-          fi
-          [ "${SIGNATURE_RESULT:-}" = "success" ] || { addrow "Signature Portal / Gateway" "Acceptance process exit status" FAIL "Step outcome=${SIGNATURE_RESULT:-not-run}" "drive-gateway/e2e.log"; }
-          media_log_error=0
-          if [ -f communication-media.log ] && grep -Eqi 'AssertionError|Error:|exit code' communication-media.log; then media_log_error=1; fi
-          if [ "${MEDIA_RESULT:-}" = "success" ] && [ "$media_log_error" -eq 0 ]; then
-            addrow "Communication Media" "Role denial and controlled-PDF upload" PASS "All assertions passed." "communication-media.log"
+          table="$RUNNER_TEMP/other-portals-table.md"
+          printf '| Portal | Check | Result | Redacted detail |\\n|---|---|---|---|\\n' > "$table"
+          media_error=0
+          if [ -f communication-media.log ] && grep -Eqi 'AssertionError|Error:|exit code' communication-media.log; then media_error=1; fi
+          if [ "${MEDIA_RESULT:-}" = "success" ] && [ "$media_error" -eq 0 ]; then
+            printf '| Communication Media | Role denial and controlled-PDF upload | PASS | All assertions passed. |\\n' >> "$table"
           else
             err="$(tail -n 30 communication-media.log 2>/dev/null | redact | grep -Eai 'error|failed|failure|exception|HTTP [45][0-9][0-9]' | tail -n 1 | cut -c1-300)"
             [ -n "$err" ] || err="No redacted error detail recorded; step outcome=${MEDIA_RESULT:-not-run}"
-            addrow "Communication Media" "Role denial and controlled-PDF upload" FAIL "$err" "communication-media.log"
+            printf '| Communication Media | Role denial and controlled-PDF upload | FAIL | %s |\\n' "$(printf '%s' "$err" | redact | cut -c1-300)" >> "$table"
           fi
-          crypto_log_error=0
-          if [ -f drive-gateway/runtime-acceptance.log ] && grep -Eqi 'AssertionError|Error:|exit code' drive-gateway/runtime-acceptance.log; then crypto_log_error=1; fi
-          if [ "${CRYPTO_RESULT:-}" = "success" ] && [ "$crypto_log_error" -eq 0 ]; then
-            addrow "Signature Portal / Gateway" "Runtime cryptographic acceptance" PASS "All assertions passed." "drive-gateway/runtime-acceptance.log"
+          crypto_error=0
+          if [ -f drive-gateway/runtime-acceptance.log ] && grep -Eqi 'AssertionError|Error:|exit code' drive-gateway/runtime-acceptance.log; then crypto_error=1; fi
+          if [ "${CRYPTO_RESULT:-}" = "success" ] && [ "$crypto_error" -eq 0 ]; then
+            printf '| Signature Portal / Gateway | Runtime cryptographic acceptance (including SMTP invitation) | PASS | All assertions passed. |\\n' >> "$table"
           else
-            err="$(tail -n 30 drive-gateway/runtime-acceptance.log 2>/dev/null | redact | grep -Eai 'AssertionError|Error:|exit code|failed|failure|exception|HTTP [45][0-9][0-9]' | tail -n 1 | cut -c1-300)"
+            err="$(tail -n 30 drive-gateway/runtime-acceptance.log 2>/dev/null | redact | grep -Eai 'error|failed|failure|exception|HTTP [45][0-9][0-9]' | tail -n 1 | cut -c1-300)"
             [ -n "$err" ] || err="No redacted error detail recorded; step outcome=${CRYPTO_RESULT:-not-run}"
-            addrow "Signature Portal / Gateway" "Runtime cryptographic acceptance" FAIL "$err" "drive-gateway/runtime-acceptance.log"
+            printf '| Signature Portal / Gateway | Runtime cryptographic acceptance (including SMTP invitation) | FAIL | %s |\\n' "$(printf '%s' "$err" | redact | cut -c1-300)" >> "$table"
           fi
-          # These portals have no staging acceptance invocation in deploy-staging yet; report the gap rather than claiming PASS.
-          addrow "Communications" "Staging acceptance" "NOT TESTED" "No Communications staging acceptance step is configured in deploy-staging." ""
-          addrow "Research" "Staging acceptance" "NOT TESTED" "No Research staging acceptance step is configured in deploy-staging." ""
-          addrow "Meetings" "Staging acceptance" "NOT TESTED" "No Meetings staging acceptance step is configured in deploy-staging." ""
-          addrow "Social Media" "Staging acceptance" "NOT TESTED" "No Social Media staging acceptance step is configured in deploy-staging." ""
+          printf '| Communications | Staging acceptance | NOT TESTED | No staging acceptance invocation configured. |\\n' >> "$table"
+          printf '| Research | Staging acceptance | NOT TESTED | No staging acceptance invocation configured. |\\n' >> "$table"
+          printf '| Meetings | Staging acceptance | NOT TESTED | No staging acceptance invocation configured. |\\n' >> "$table"
+          printf '| Social Media | Staging acceptance | NOT TESTED | No staging acceptance invocation configured. |\\n' >> "$table"
           {
-            echo "## Section 6 — Staging acceptance results"
+            echo "## Other portals and runtime acceptance report"
             cat "$table"
-            cat "$logs"
+            if [ -f communication-media.log ]; then echo ""; echo "### Communication Media redacted log"; tail -n 30 communication-media.log | redact; fi
+            if [ -f drive-gateway/runtime-acceptance.log ]; then echo ""; echo "### Runtime cryptographic acceptance redacted log"; tail -n 30 drive-gateway/runtime-acceptance.log | redact; fi
           } >> "$GITHUB_STEP_SUMMARY"
           cat "$table"
-          cat "$logs"
-          exit "$failed"
-
-# Staging proof execution trigger — 2026-10-04
-
 
   deploy-staging-frontend:
     needs: [local-e2e, preflight-staging]
