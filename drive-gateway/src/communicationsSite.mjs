@@ -184,11 +184,7 @@ export function createCommunicationsSiteRouter(deps) {
       throw new Error("WordPress page/post editing is disabled outside the staging Worker.");
     }
     const wp = wordpressConfig(env);
-    const base = new URL(wp.root);
-    if (base.protocol !== "https:" || base.hostname.toLowerCase() !== "staging.irpa.or.tz" || base.pathname !== "/" ||
-        base.hostname.toLowerCase() === "irpa.or.tz" || base.hostname.toLowerCase() === "www.irpa.or.tz") {
-      throw new Error("WordPress page/post editing requires the dedicated staging hostname.");
-    }
+    assertStagingWebsiteHost(wp.root);
     return wp;
   }
 
@@ -536,22 +532,23 @@ export function createCommunicationsSiteRouter(deps) {
     }
 
     if (path === "/api/communications/website/content" && request.method === "PUT") {
-      const { claims } = await websiteEditorAuthorised(request, env);
+      const { claims, roles, admin } = await websiteEditorAuthorised(request, env);
       const input = await request.json().catch(() => ({}));
-      const allowedKeys = new Set(["type", "id", "title", "content", "excerpt", "featuredMedia", "status"]);
-      if (Object.keys(input || {}).some(key => !allowedKeys.has(key))) {
-        return json({ error: "Only title, content, excerpt, featured image and status may be changed." }, 400, corsHeaders(request));
-      }
+      try { assertAllowedWebsiteMutation(input); } catch (error) { return json({ error: error.message }, 400, corsHeaders(request)); }
+      const workflow = input.workflow || (input.status === "publish" ? "Publish" : "Draft");
+      let status;
+      try { status = editorialWordPressStatus(workflow); } catch (error) { return json({ error: error.message }, 400, corsHeaders(request)); }
+      if (status === "publish" && !mayPublish({ admin, active: true, roles })) return json({ error: "Only the active Communication & Media Chair or an active administrator may publish website content." }, 403, corsHeaders(request));
       const type = input.type;
       const id = Number(input.id);
       const title = String(input.title ?? "").trim();
       const content = String(input.content ?? "");
       const excerpt = String(input.excerpt ?? "").replace(/<[^>]*>/g, "").trim();
       const featuredMedia = Number(input.featuredMedia ?? 0);
-      status = String(status || "draft");
+      const requestedStatus = status;
       if (!["pages", "posts"].includes(type) || !Number.isSafeInteger(id) || id < 1 ||
           !title || title.length > 180 || content.length > 30000 || excerpt.length > 600 ||
-          !Number.isSafeInteger(featuredMedia) || featuredMedia < 0 || !["draft", "publish"].includes(status)) {
+          !Number.isSafeInteger(featuredMedia) || featuredMedia < 0 || !["draft", "publish"].includes(requestedStatus)) {
         return json({ error: "Provide a valid page/post ID, title, content, excerpt, featured image ID and draft/publish status." }, 400, corsHeaders(request));
       }
       const wp = stagingWordPressConfig(env);
@@ -561,11 +558,11 @@ export function createCommunicationsSiteRouter(deps) {
         const currentValue = key === "featuredMedia" ? Number(current.featured_media || 0) :
           key === "status" ? String(current.status || "draft") : editorRaw(current, key);
         const nextValue = key === "title" ? title : key === "content" ? sanitizeWordPressContent(content) :
-          key === "excerpt" ? excerpt : key === "featuredMedia" ? featuredMedia : status;
+          key === "excerpt" ? excerpt : key === "featuredMedia" ? featuredMedia : requestedStatus;
         return currentValue !== nextValue;
       });
       const snapshot = await saveWebsiteSnapshot(env, claims, wp, type, id, current, changedFields);
-      const payload = { title, content: sanitizeWordPressContent(content), excerpt, featured_media: featuredMedia, status };
+      const payload = { title, content: sanitizeWordPressContent(content), excerpt, featured_media: featuredMedia, status: requestedStatus };
       const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/" + type + "/" + id, {
         method: "POST", headers: wordpressHeaders(wp, { "Content-Type": "application/json", Accept: "application/json" }),
         body: JSON.stringify(payload), signal: AbortSignal.timeout(30000)
@@ -580,7 +577,7 @@ export function createCommunicationsSiteRouter(deps) {
       }
       await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_CONTENT_UPDATED", type, id, {
         snapshotId: snapshot.snapshotId, previousRevisionId: snapshot.currentRevisionId,
-        changedFields, status, publicUrl: String(data.link || "")
+        changedFields, status: requestedStatus, workflow, publicUrl: String(data.link || "")
       });
       const verified = await readWebsiteItem(wp, type, id);
       if (!sameEditorFields(verified, payload)) {
@@ -594,7 +591,7 @@ export function createCommunicationsSiteRouter(deps) {
       return json({
         success: true, item: editorItem(verified, type), snapshotId: snapshot.snapshotId,
         previousRevisionId: snapshot.currentRevisionId, revisionId,
-        message: status === "publish" ? "Staging page/post published and verified." : "Staging draft saved and verified."
+        message: requestedStatus === "publish" ? "Staging page/post published and verified." : "Staging draft saved and verified."
       }, 200, corsHeaders(request));
     }
 
