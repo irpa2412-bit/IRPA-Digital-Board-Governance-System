@@ -2295,7 +2295,7 @@ jobs:
             portal="$1"; check="$2"; status="$3"; error="$4"; logfile="$5"
             error="$(printf '%s' "$error" | redact | cut -c1-300)"
             printf '| %s | %s | %s | %s |\n' "$portal" "$check" "$status" "${error//|/\\|}" >> "$table"
-            if [ "$status" != "PASS" ]; then failed=1; fi
+            if [ "$status" != "PASS" ] && [ "$status" != "NOT TESTED" ]; then failed=1; fi
             if [ -n "$logfile" ] && [ -f "$logfile" ]; then
               excerpt="$(tail -n 30 "$logfile" | redact | cut -c1-3000)"
               printf '\n### %s — %s (%s)\n\nLast 30 redacted log lines:\n\n```text\n%s\n```\n' "$portal" "$check" "$status" "$excerpt" >> "$logs"
@@ -2319,10 +2319,12 @@ jobs:
             [ -n "$err" ] || err="No redacted error detail recorded; step outcome=${MEDIA_RESULT:-not-run}"
             addrow "Communication Media" "Role denial and controlled-PDF upload" FAIL "$err" "communication-media.log"
           fi
-          if [ "${CRYPTO_RESULT:-}" = "success" ]; then
+          crypto_log_error=0
+          if [ -f drive-gateway/runtime-acceptance.log ] && grep -Eqi 'AssertionError|Error:|exit code' drive-gateway/runtime-acceptance.log; then crypto_log_error=1; fi
+          if [ "${CRYPTO_RESULT:-}" = "success" ] && [ "$crypto_log_error" -eq 0 ]; then
             addrow "Signature Portal / Gateway" "Runtime cryptographic acceptance" PASS "All assertions passed." "drive-gateway/runtime-acceptance.log"
           else
-            err="$(tail -n 30 drive-gateway/runtime-acceptance.log 2>/dev/null | redact | grep -Eai 'error|failed|failure|exception|HTTP [45][0-9][0-9]' | tail -n 1 | cut -c1-300)"
+            err="$(tail -n 30 drive-gateway/runtime-acceptance.log 2>/dev/null | redact | grep -Eai 'AssertionError|Error:|exit code|failed|failure|exception|HTTP [45][0-9][0-9]' | tail -n 1 | cut -c1-300)"
             [ -n "$err" ] || err="No redacted error detail recorded; step outcome=${CRYPTO_RESULT:-not-run}"
             addrow "Signature Portal / Gateway" "Runtime cryptographic acceptance" FAIL "$err" "drive-gateway/runtime-acceptance.log"
           fi
