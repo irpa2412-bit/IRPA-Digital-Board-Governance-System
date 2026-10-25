@@ -38,6 +38,7 @@ test("signature palette exposes readable errors in the visible status area", asy
   const platform = await read("../src/pages/SignaturePlatform.jsx");
   const storage = await read("../src/firebase/signatureStorage.js");
   assert.match(platform, /className="auth-message"/);
+  assert.match(platform, /className="auth-message" role="alert" aria-live="assertive"/);
   assert.match(platform, /\{message\s*&&\s*<div className="auth-message"/);
   assert.match(platform, /setMessage/);
   assert.match(storage, /STEP controlled download failed/);
