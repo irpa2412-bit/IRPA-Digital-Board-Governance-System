@@ -422,6 +422,13 @@ export default function Settings({ admin = false, section = "settings" }) {
         </section>
       )}
 
+      {section === "settings" && (
+        <footer className="panel" aria-label="Application build information" style={{ marginTop: 20, padding: "12px 16px", fontSize: 12, opacity: 0.85 }}>
+          <strong>Application build</strong>
+          <div>Commit: {String(import.meta.env.VITE_BUILD_COMMIT || "unavailable").slice(0, 7)}</div>
+          <div>Built (UTC): {import.meta.env.VITE_BUILD_TIME || "timestamp unavailable"}</div>
+        </footer>
+      )}
     </div>
   );
 }

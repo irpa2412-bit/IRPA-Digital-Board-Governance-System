@@ -1,4 +1,4 @@
-const CACHE_NAME="irpa-dbgs-app-shell-v43";
+const CACHE_NAME="irpa-dbgs-app-shell-v44";
 const APP_SHELL=["/","/index.html","/manifest.webmanifest"];
 
 self.addEventListener("install",(event)=>{
@@ -65,10 +65,10 @@ self.addEventListener("fetch",(event)=>{
   if(isAppAsset(request)){
     event.respondWith(
       caches.match(request).then(cached=>{
-        const network=fetch(request).then(response=>{
+        // Prefer the current deployment; cached assets are an offline fallback only.
+        return fetch(request).then(response=>{
           return cacheResponse(request,response).then(()=>response);
         }).catch(()=>cached||Response.error());
-        return cached||network;
       })
     );
   }
