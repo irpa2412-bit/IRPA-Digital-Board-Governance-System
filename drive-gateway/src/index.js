@@ -970,7 +970,7 @@ function signatureDraftFirestoreValue(value, key = "") {
   if (Array.isArray(value)) return { arrayValue: { values: value.map(item => signatureDraftFirestoreValue(item)) } };
   if (typeof value === "boolean") return { booleanValue: value };
   if (typeof value === "number") return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
-  if (typeof value === "string") { if (/(?:At|Date)$/.test(key) && /^\\d{4}-\\d{2}-\\d{2}T/.test(value)) return { timestampValue: value }; return { stringValue: value }; }
+  if (typeof value === "string") { if (/(?:At|Date)$/.test(key) && /^\d{4}-\d{2}-\d{2}T/.test(value)) return { timestampValue: value }; return { stringValue: value }; }
   if (typeof value === "object") { if (Number.isFinite(Number(value.seconds)) && value.seconds !== undefined) return { timestampValue: new Date(Number(value.seconds) * 1000 + Number(value.nanoseconds || 0) / 1e6).toISOString() }; return { mapValue: { fields: Object.fromEntries(Object.entries(value).map(([name, item]) => [name, signatureDraftFirestoreValue(item, name)])) } }; }
   return { nullValue: null };
 }
