@@ -48,18 +48,33 @@ export async function persistCompletedSignatureEnvelope({envelope, completion, g
     lastSignedByUid, gatewayStatus: "Completed", gatewayFinalHash: completion.finalHash,
     gatewaySigningStatus: "Completed", gatewayStatusUpdatedAt: timestamp, updatedAt: timestamp
   });
-  const eventId = "gateway-completed-" + crypto.randomUUID();
-  await updateDocument("signatureEvents/" + eventId, {
-    envelopeId,
-    event: "Gateway Signing Completed",
-    details: {
-      documentId: clean(existing.documentId || envelope.documentId),
-      eventType: "Gateway Signing Completed", action: "COMPLETED", status: "Completed",
-      signedDocumentUrl, signedPdfReference: signedFileId,
-      finalHash: completion.finalHash, completedAt: completion.completedAt, source: "drive-gateway"
-    },
-    actorUid: lastSignedByUid || "",
-    actorEmail: signers.find(s => s.uid === lastSignedByUid)?.email || "",
-    createdAt: timestamp
-  });
+  for (const signer of signers.filter(s => s.uid && s.status === "Signed" && s.signedAt)) {
+    const signerEventId = "gateway-signed-" + envelopeId + "-" + clean(signer.uid);
+    const signerEventPath = "signatureEvents/" + signerEventId;
+    if (!(await getDocument(signerEventPath))) {
+      await updateDocument(signerEventPath, {
+        envelopeId,
+        event: "Gateway Signer Signed",
+        actorUid: signer.uid,
+        signedAt: signer.signedAt
+      });
+    }
+  }
+  const eventId = "gateway-completed-" + envelopeId;
+  const completionEventPath = "signatureEvents/" + eventId;
+  if (!(await getDocument(completionEventPath))) {
+    await updateDocument(completionEventPath, {
+      envelopeId,
+      event: "Gateway Signing Completed",
+      details: {
+        documentId: clean(existing.documentId || envelope.documentId),
+        eventType: "Gateway Signing Completed", action: "COMPLETED", status: "Completed",
+        signedDocumentUrl, signedPdfReference: signedFileId,
+        finalHash: completion.finalHash, completedAt: completion.completedAt, source: "drive-gateway"
+      },
+      actorUid: lastSignedByUid || "",
+      actorEmail: signers.find(s => s.uid === lastSignedByUid)?.email || "",
+      createdAt: timestamp
+    });
+  }
 }
