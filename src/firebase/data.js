@@ -5,6 +5,7 @@ import { sendEmployeeRegistrationEmail } from "./auth";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { canAccessMeetingCategory, MEETING_CATEGORIES } from "./meetingPolicy.js";
 import { listLifecycleDocuments } from "./documentLifecycle.js";
+import { reconcileRegisteredIdentityUidsViaGateway } from "./registeredIdentityReconciliation";
 
 const uniqueInductionValues=(values)=>[...new Set(values.flatMap(v=>Array.isArray(v)?v:String(v||"").split(",")).map(v=>String(v||"").trim()).filter(Boolean))];
 
@@ -37,7 +38,7 @@ export async function nextDocumentReference(){
   }
   return String(result.reference).trim();
 }
-export async function createRecord(collectionName,data){if(isTrialDataMode()&&!isActualOnlyCollection(collectionName)){data={...data,recordOrigin:"TRIAL",trialData:true,isTrial:true};}else if(collectionName===COLLECTIONS.documents){data={...data,recordOrigin:data.recordOrigin||"PRODUCTION"};}const ref=await addDoc(collection(db,collectionName),{...data,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});await writeAudit("CREATE",collectionName,ref.id,data);return ref.id;}
+export async function createRecord(collectionName,data,recordId=null){if(isTrialDataMode()&&!isActualOnlyCollection(collectionName)){data={...data,recordOrigin:"TRIAL",trialData:true,isTrial:true};}else if(collectionName===COLLECTIONS.documents){data={...data,recordOrigin:data.recordOrigin||"PRODUCTION"};}const payload={...data,createdAt:serverTimestamp(),updatedAt:serverTimestamp()};const ref=recordId?doc(db,collectionName,String(recordId)):null;if(ref)await setDoc(ref,payload);else{const created=await addDoc(collection(db,collectionName),payload);await writeAudit("CREATE",collectionName,created.id,data);return created.id;}await writeAudit("CREATE",collectionName,ref.id,data);return ref.id;}
 export async function upsertFinancePaymentTrace(traceId,data={}){if(!auth.currentUser)throw new Error("Authentication is required.");if(!traceId)throw new Error("A finance trace ID is required.");const ref=doc(db,COLLECTIONS.financePaymentTrace,traceId);const existing=await getDoc(ref);const actor=currentActor();const payload={...data,lastUpdatedByUid:actor.uid,lastUpdatedByEmail:actor.email,updatedAt:serverTimestamp()};if(!existing.exists()){payload.createdAt=serverTimestamp();payload.createdByUid=actor.uid;payload.createdByEmail=actor.email;await setDoc(ref,payload);await writeAudit("CREATE_FINANCE_PAYMENT_TRACE",COLLECTIONS.financePaymentTrace,traceId,data);}else{await updateDoc(ref,payload);await writeAudit("UPDATE_FINANCE_PAYMENT_TRACE",COLLECTIONS.financePaymentTrace,traceId,data);}return traceId;}
 async function getHighestRegistrationNumber(collectionName,fieldName){const snap=await getDocs(collection(db,collectionName));let highest=0;for(const item of snap.docs){const value=Number(String(item.data()?.[fieldName]||"").split("-").pop());if(Number.isInteger(value)&&value>highest)highest=value;}return highest;}
 async function requireActiveAdmin(){const user=auth.currentUser;if(!user?.uid)throw new Error("Authentication is required.");const email=String(user.email||"").trim().toLowerCase();if(email==="irpa2412@gmail.com")return user.uid;const snap=await getDoc(doc(db,COLLECTIONS.adminProfiles,user.uid));if(!snap.exists()||snap.data()?.active!==true)throw new Error("Administrator authorization is required.");return user.uid;}
@@ -466,11 +467,22 @@ export async function linkInductionRegistration(requestId){
 }
 
 export async function synchronizeRegisteredIdentityUids(){
-  if(!auth.currentUser?.uid) throw new Error("Administrator authentication is required.");
-  const functions=getFunctions(undefined,"us-central1");
-  const call=httpsCallable(functions,"synchronizeRegisteredIdentityUids");
-  const result=await call({});
-  return result.data;
+  const result = await reconcileRegisteredIdentityUidsViaGateway();
+  const summary = result.summary || {};
+  return {
+    ...result,
+    summary: {
+      linked: Number(summary.assigned || 0) + Number(summary.alreadyAssigned || 0),
+      created: 0,
+      conflicts: Number(summary.conflicting || 0),
+      blocked: Number(summary.unresolved || 0),
+      errors: Number(summary.errors || 0),
+      assigned: Number(summary.assigned || 0),
+      alreadyAssigned: Number(summary.alreadyAssigned || 0),
+      unresolved: Number(summary.unresolved || 0),
+      results: result.results || []
+    }
+  };
 }
 
 export async function callFinanceAccounting(functionName,data={}){const fn=getFunctions();const callable=httpsCallable(fn,functionName);const result=await callable(data);return result.data;}

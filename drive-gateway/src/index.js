@@ -31,6 +31,8 @@ import { createMeetingServicesRouter } from "./meetingServices.mjs";
 import { createInductionMatchingRouter } from "./inductionMatching.mjs";
 import { createInvitationRemovalRouter } from "./invitationRemoval.mjs";
 import { persistCompletedSignatureEnvelope as persistSignatureMirror } from "./signatureMirror.mjs";
+import { evaluateActualDataAccessPolicy, ACTUAL_DATA_ATTESTATION } from "./actualDataAccessPolicy.mjs";
+import { authorizeIdentityReconciliation, classifyRegisteredIdentityRecord, summarizeIdentityReconciliation } from "./registeredIdentityReconciliation.mjs";
 
 function getFirebaseProjectId(env) {
   const projectId = String(env?.FIREBASE_PROJECT_ID || "").trim();
@@ -259,6 +261,13 @@ export default {
       if (pathname === "/api/upload-controlled-document" && request.method === "POST") {
         return await uploadControlledDocument(request, env);
       }
+
+      if (pathname === "/api/signature-pathway/reconcile" && request.method === "POST") {
+        return await reconcileSignatureDocumentIds(request, env);
+      }
+      if (pathname === "/api/system/actual-data-access" && (request.method === "GET" || request.method === "POST")) return await actualDataAccessRoute(request, env);
+      if (pathname === "/api/members/reconcile-registered-identity-uids" && request.method === "POST") return await reconcileRegisteredIdentityUidsRoute(request, env);
+      if (pathname === "/api/signature/authority" && request.method === "POST") return await updateSignerAuthorityRoute(request, env);
 
       if (pathname === "/api/signature-profile/folder" && request.method === "POST") {
         return await ensureSignatureProfileFolder(request, env);
@@ -588,7 +597,7 @@ async function upload(request, env) {
     if (!requestedFolderId || !data.meetingId || !data.meetingCategory) return json({ok:false,error:"Meeting ID, category and authorised archive folder are required."},400,corsHeaders(request));
     try { await authorizeMeetingArchiveUser(env, claims, String(data.meetingId), String(data.meetingCategory).toUpperCase()); }
     catch (error) { return json({ok:false,error:error.message||"Meeting archive access denied."},403,corsHeaders(request)); }
-  } else if (purpose === "Signed Documents Archive" || purpose === "Documents Portal" || purpose === "Controlled Documents") {
+  } else if (purpose === "Signed Documents Archive" || purpose === "Documents Portal" || purpose === "Controlled Documents" || purpose === "Communication Media") {
     if (!requestedFolderId) return json({ ok:false, error:"A controlled document archive folder is required." },400,corsHeaders(request));
   } else if (requestedFolderId || data.ownerUid) {
     return json({ ok: false, error: "Folder parameters are restricted to authorized IRPA archive uploads." }, 400, corsHeaders(request));
@@ -682,6 +691,319 @@ async function upload(request, env) {
   }, 200, corsHeaders(request));
 }
 
+let firebaseAuthAdminTokenCache = { token: "", expiresAt: 0 };
+
+async function getFirebaseAuthAdminAccessToken(env) {
+  const now = Math.floor(Date.now() / 1000);
+  if (firebaseAuthAdminTokenCache.token && firebaseAuthAdminTokenCache.expiresAt > now + 60) return firebaseAuthAdminTokenCache.token;
+  let serviceAccount;
+  try { serviceAccount = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON || ""); }
+  catch { throw new Error("Firebase Authentication service identity is not configured correctly."); }
+  if (serviceAccount.project_id !== getFirebaseProjectId(env) || typeof serviceAccount.client_email !== "string" || !serviceAccount.client_email.endsWith(".iam.gserviceaccount.com") || typeof serviceAccount.private_key !== "string") {
+    throw new Error("Firebase Authentication service identity is invalid for this Firebase project.");
+  }
+  const claims = { iss: serviceAccount.client_email, scope: "https://www.googleapis.com/auth/identitytoolkit", aud: "https://oauth2.googleapis.com/token", iat: now, exp: now + 3600 };
+  const unsigned = base64UrlEncodeText(JSON.stringify({ alg: "RS256", typ: "JWT" })) + "." + base64UrlEncodeText(JSON.stringify(claims));
+  const key = await crypto.subtle.importKey("pkcs8", pemPrivateKeyBytes(serviceAccount.private_key), { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
+  const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(unsigned));
+  const response = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: unsigned + "." + base64UrlEncodeBytes(new Uint8Array(signature)) }) });
+  const result = await response.json();
+  if (!response.ok || typeof result.access_token !== "string") { firebaseAuthAdminTokenCache = { token: "", expiresAt: 0 }; throw new Error("Firebase Authentication service identity could not obtain an Identity Toolkit access token."); }
+  firebaseAuthAdminTokenCache = { token: result.access_token, expiresAt: now + Math.min(Number(result.expires_in) || 3600, 3600) };
+  return firebaseAuthAdminTokenCache.token;
+}
+
+async function listFirebaseAuthUsers(env, token) {
+  const users = [];
+  let pageToken = "";
+  do {
+    const url = new URL(`https://identitytoolkit.googleapis.com/v1/projects/${encodeURIComponent(getFirebaseProjectId(env))}/accounts:batchGet`);
+    url.searchParams.set("maxResults", "1000");
+    if (pageToken) url.searchParams.set("nextPageToken", pageToken);
+    const response = await fetch(url.toString(), { headers: { Authorization: "Bearer " + token } });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error("Firebase Authentication account listing failed: HTTP " + response.status + " " + String(body?.error?.message || ""));
+    users.push(...(Array.isArray(body.users) ? body.users : []));
+    pageToken = String(body.nextPageToken || "");
+  } while (pageToken);
+  return users;
+}
+
+async function getFirestoreCollectionDocuments(env, collectionName, token) {
+  const response = await fetch(`https://firestore.googleapis.com/v1/projects/${getFirebaseProjectId(env)}/databases/(default)/documents:runQuery`, {
+    method: "POST",
+    headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+    body: JSON.stringify({ structuredQuery: { from: [{ collectionId: collectionName }] } })
+  });
+  if (!response.ok) throw new Error("Firestore " + collectionName + " register read failed: HTTP " + response.status);
+  return (await response.json()).filter(row => row.document).map(row => row.document);
+}
+
+async function updateSignerAuthorityRoute(request, env) {
+  let step = "Firebase authentication";
+  try {
+    const claims = await authenticateFirebaseRequest(request, env);
+    const uid = String(claims.user_id || "");
+    const email = String(claims.email || "").trim().toLowerCase();
+    if (!uid) return json({ ok: false, step, error: "Authentication is required." }, 401, corsHeaders(request));
+    step = "Validate signing authority request";
+    const body = await request.json();
+    const requestedRole = String(body.authorityRole || "").trim();
+    const requestedDepartment = String(body.authorityDepartment || "").trim();
+    const requestedUnit = String(body.authorityUnit || "").trim();
+    const authorityStatus = String(body.authorityStatus || "Current").trim();
+    const authorityReference = String(body.authorityReference || "").trim();
+    const authorityEffectiveAt = String(body.authorityEffectiveAt || "").trim() || null;
+    const authorityExpiresAt = String(body.authorityExpiresAt || "").trim() || null;
+    if (!requestedRole) return json({ ok: false, step, error: "Select the current signing authority before saving." }, 400, corsHeaders(request));
+    if (!["Current", "Pending Verification", "Expired", "Not yet assigned"].includes(authorityStatus)) return json({ ok: false, step, error: "Select a valid signing authority status." }, 400, corsHeaders(request));
+    if (authorityEffectiveAt && authorityExpiresAt && authorityExpiresAt < authorityEffectiveAt) return json({ ok: false, step, error: "Authority expiry date cannot be earlier than the effective date." }, 400, corsHeaders(request));
+
+    step = "Read active Member and Employee authority registers";
+    const token = await getFirestoreAdminAccessToken(env);
+    const records = [];
+    for (const collectionName of ["members", "employees"]) {
+      const byUid = await getFirestoreDocument(env, collectionName + "/" + uid, token);
+      if (byUid?.fields) records.push({ id: String(byUid.name || "").split("/").pop(), ...firestoreDocumentToPlain(byUid), sourceCollection: collectionName });
+      if (email) {
+        const byEmail = await getFirestoreDocumentsByField(env, collectionName, "email", email, token);
+        for (const doc of byEmail) records.push({ id: String(doc.name || "").split("/").pop(), ...firestoreDocumentToPlain(doc), sourceCollection: collectionName });
+      }
+    }
+    const activeRecords = [...new Map(records.map(record => [record.sourceCollection + ":" + record.id, record])).values()]
+      .filter(record => String(record.status || record.employmentStatus || "Active").trim().toLowerCase() !== "inactive");
+    if (!activeRecords.length) return json({ ok: false, step, error: "No active IRPA Member or Employee register entry was found for this account." }, 403, corsHeaders(request));
+    const valuesFor = record => [record.role, record.boardPosition, record.unit, record.unitName,
+      ...(Array.isArray(record.roles) ? record.roles : []),
+      ...(Array.isArray(record.assignedRoles) ? record.assignedRoles : []),
+      ...(Array.isArray(record.selectedRoles) ? record.selectedRoles : []),
+      ...(Array.isArray(record.roleAssignments) ? record.roleAssignments : [])
+    ].flatMap(value => String(value || "").split(",").map(value => value.trim()).filter(Boolean));
+    if (!activeRecords.flatMap(valuesFor).includes(requestedRole)) return json({ ok: false, step, error: "The selected signing authority is not registered to this IRPA member/employee account." }, 403, corsHeaders(request));
+    const matchingRecords = activeRecords.filter(record => {
+      if (!valuesFor(record).includes(requestedRole)) return false;
+      if (requestedDepartment && String(record.department || "").trim() !== requestedDepartment) return false;
+      if (requestedUnit) {
+        const recordUnit = String(record.unit || record.unitName || "").trim() || requestedDepartment;
+        if (recordUnit !== requestedUnit) return false;
+      }
+      return true;
+    });
+    if (!matchingRecords.length) return json({ ok: false, step, error: "The selected department, unit and signing authority do not match an active IRPA register entry for this account." }, 403, corsHeaders(request));
+    const source = matchingRecords[0];
+    const authorityDepartment = String(source.department || "").trim();
+    const authorityUnit = String(source.unit || source.unitName || "").trim() || authorityDepartment;
+
+    step = "Verify existing Signer Identity";
+    const identityDoc = await getFirestoreDocument(env, "signerIdentities/" + cleanId(uid), token);
+    if (!identityDoc?.fields) return json({ ok: false, step, error: "Signer Identity record is not available. Restore the Signer Identity link before updating signing authority." }, 412, corsHeaders(request));
+    const now = new Date().toISOString();
+    step = "Save signing authority";
+    await updateFirestoreDocument(env, "signerIdentities/" + cleanId(uid), token, {
+      authorityRole: { stringValue: requestedRole },
+      authorityStatus: { stringValue: authorityStatus },
+      authorityReference: { stringValue: authorityReference },
+      authorityEffectiveAt: authorityEffectiveAt ? { stringValue: authorityEffectiveAt } : { nullValue: null },
+      authorityExpiresAt: authorityExpiresAt ? { stringValue: authorityExpiresAt } : { nullValue: null },
+      authorityDepartment: { stringValue: authorityDepartment },
+      authorityUnit: { stringValue: authorityUnit },
+      authoritySourceCollection: { stringValue: source.sourceCollection },
+      authoritySourceRecordId: { stringValue: source.id },
+      authorityUpdatedAt: { timestampValue: now },
+      updatedAt: { timestampValue: now }
+    }, ["authorityRole", "authorityStatus", "authorityReference", "authorityEffectiveAt", "authorityExpiresAt", "authorityDepartment", "authorityUnit", "authoritySourceCollection", "authoritySourceRecordId", "authorityUpdatedAt", "updatedAt"]);
+    step = "Write signing authority audit";
+    const auditId = "signer-authority-" + Date.now() + "-" + crypto.randomUUID().slice(0, 8);
+    await updateFirestoreDocument(env, "audit/" + auditId, token, {
+      action: { stringValue: "UPDATE_SIGNER_AUTHORITY" },
+      collection: { stringValue: "signerIdentities" },
+      recordId: { stringValue: uid },
+      details: { mapValue: { fields: {
+        authorityRole: { stringValue: requestedRole }, authorityStatus: { stringValue: authorityStatus },
+        authorityDepartment: { stringValue: authorityDepartment }, authorityUnit: { stringValue: authorityUnit },
+        authoritySourceCollection: { stringValue: source.sourceCollection }, authoritySourceRecordId: { stringValue: source.id }
+      } } },
+      actorUid: { stringValue: uid },
+      actorEmail: { stringValue: email || String(identityDoc.fields.email?.stringValue || "") },
+      createdAt: { timestampValue: now }
+    }, ["action", "collection", "recordId", "details", "actorUid", "actorEmail", "createdAt"]);
+    return json({ ok: true, uid, authorityRole: requestedRole, authorityStatus, authorityReference, authorityEffectiveAt, authorityExpiresAt, authorityDepartment, authorityUnit, authoritySourceCollection: source.sourceCollection, authoritySourceRecordId: source.id, auditId }, 200, corsHeaders(request));
+  } catch (error) {
+    console.error("Signing authority update failed", { step, error: String(error?.message || error) });
+    return json({ ok: false, step, error: String(error?.message || "Signing authority update failed.") }, Number(error?.status || 0) || 500, corsHeaders(request));
+  }
+}
+
+async function reconcileRegisteredIdentityUidsRoute(request, env) {
+  let step = "Firebase authentication";
+  try {
+    const claims = await authenticateFirebaseRequest(request, env);
+    step = "Administrator authorization";
+    const firestoreToken = await getFirestoreAdminAccessToken(env);
+    const profile = await getFirestoreDocument(env, "adminProfiles/" + claims.user_id, firestoreToken);
+    const email = String(claims.email || "").trim().toLowerCase();
+    const adminAllowed = email === "irpa2412@gmail.com" || (profile?.fields?.active?.booleanValue === true && profile?.fields?.role?.stringValue === "Administrator");
+    const authorization = authorizeIdentityReconciliation({ authenticated: Boolean(claims.user_id), adminAllowed });
+    if (!authorization.allowed) return json({ ok: false, step, error: authorization.error }, authorization.status, corsHeaders(request));
+
+    step = "List existing Firebase Authentication accounts";
+    const authToken = await getFirebaseAuthAdminAccessToken(env);
+    const authUsers = await listFirebaseAuthUsers(env, authToken);
+    step = "Read Member and Employee registers";
+    const collections = ["members", "employees"];
+    const docsByCollection = await Promise.all(collections.map(name => getFirestoreCollectionDocuments(env, name, firestoreToken)));
+    const authUsersForPolicy = authUsers.map(user => ({ uid: String(user.localId || user.uid || ""), email: String(user.email || "") }));
+    const results = [];
+    for (let i = 0; i < collections.length; i++) {
+      const collectionName = collections[i];
+      for (const document of docsByCollection[i]) {
+        const recordId = String(document.name || "").split("/").pop();
+        const data = firestoreDocumentToPlain(document) || {};
+        const line = { collection: collectionName, recordId, name: String(data.name || ""), email: String(data.email || "").trim().toLowerCase(), existingUid: String(data.uid || "").trim(), uid: null, status: "unresolved", reason: "" };
+        try {
+          const decision = classifyRegisteredIdentityRecord({ email: line.email, existingUid: line.existingUid, authUsers: authUsersForPolicy });
+          line.status = decision.status;
+          line.reason = decision.reason;
+          line.uid = decision.uid || line.existingUid || null;
+          if (decision.status === "assigned") {
+            step = "Write UID for " + collectionName + "/" + recordId;
+            await updateFirestoreDocument(env, collectionName + "/" + cleanId(recordId), firestoreToken, {
+              uid: { stringValue: decision.uid },
+              uidAssignedAt: { timestampValue: new Date().toISOString() },
+              uidAssignedByUid: { stringValue: claims.user_id },
+              uidAssignedByEmail: { stringValue: email || String(profile?.fields?.email?.stringValue || "") },
+              uidAssignmentMethod: { stringValue: "ADMIN_RECONCILIATION_EXACT_EMAIL_MATCH" }
+            }, ["uid", "uidAssignedAt", "uidAssignedByUid", "uidAssignedByEmail", "uidAssignmentMethod"]);
+          }
+        } catch (error) {
+          line.status = "error";
+          line.reason = "Step " + step + " failed: " + String(error?.message || error);
+        }
+        results.push(line);
+      }
+    }
+    const summary = summarizeIdentityReconciliation(results);
+    step = "Write reconciliation audit";
+    const auditId = "identity-reconcile-" + Date.now() + "-" + crypto.randomUUID().slice(0, 8);
+    await updateFirestoreDocument(env, "audit/" + auditId, firestoreToken, {
+      action: { stringValue: "REGISTERED_IDENTITY_UID_RECONCILIATION" },
+      category: { stringValue: "SYSTEM_ADMINISTRATION" },
+      description: { stringValue: "Administrator-controlled exact-email UID reconciliation. Existing UIDs are never overwritten and no Firebase accounts are created." },
+      performedByUid: { stringValue: claims.user_id },
+      performedByEmail: { stringValue: email || String(profile?.fields?.email?.stringValue || "") },
+      authUsersScanned: { integerValue: String(authUsers.length) },
+      summary: { mapValue: { fields: Object.fromEntries(Object.entries(summary).map(([key, value]) => [key, { integerValue: String(value) }])) } },
+      results: { arrayValue: { values: results.map(item => ({ mapValue: { fields: Object.fromEntries(Object.entries(item).map(([key, value]) => [key, value == null ? { nullValue: null } : { stringValue: String(value) }])) } })) } },
+      accountCreationPerformed: { booleanValue: false },
+      existingUidsOverwritten: { booleanValue: false },
+      createdAt: { timestampValue: new Date().toISOString() }
+    }, ["action", "category", "description", "performedByUid", "performedByEmail", "authUsersScanned", "summary", "results", "accountCreationPerformed", "existingUidsOverwritten", "createdAt"]);
+    return json({ ok: true, results, summary, authUsers: authUsers.length, auditId, safety: { accountCreationPerformed: false, existingUidsOverwritten: false, exactEmailMatchOnly: true } }, 200, corsHeaders(request));
+  } catch (error) {
+    console.error("Registered identity UID reconciliation failed", { step, error: String(error?.message || error) });
+    return json({ ok: false, step, error: String(error?.message || "Registered identity reconciliation failed.") }, Number(error?.status || 0) || 500, corsHeaders(request));
+  }
+}
+
+async function actualDataAccessRoute(request, env) {
+  let step = 'Firebase authentication';
+  try {
+    const claims = await authenticateFirebaseRequest(request, env);
+    step = 'Administrator profile lookup';
+    const adminToken = await getFirestoreAdminAccessToken(env);
+    const profile = await getFirestoreDocument(env, 'adminProfiles/' + claims.user_id, adminToken);
+    const email = String(claims.email || '').trim().toLowerCase();
+    const adminAllowed = email === 'irpa2412@gmail.com' || (profile?.fields?.active?.booleanValue === true && profile?.fields?.role?.stringValue === 'Administrator');
+    if (!adminAllowed) return json({ok:false,step,error:'Only an active IRPA Administrator may change actual-data access.'},403,corsHeaders(request));
+    step = 'Read actual-data setting';
+    const path = 'systemSettings/actualDataAccess';
+    const previous = await getFirestoreDocument(env, path, adminToken);
+    const fields = previous?.fields || {};
+    if (request.method === 'GET') return json({ok:true,enabled:fields.enabled?.booleanValue===true,status:fields.status?.stringValue || 'CLOSED',finalTestsAttested:fields.finalTestsAttested?.booleanValue===true,changedAt:fields.changedAt?.timestampValue||null,changedByEmail:fields.changedByEmail?.stringValue||null},200,corsHeaders(request));
+    step = 'Validate request and attestation';
+    const body = await request.json();
+    const policy = evaluateActualDataAccessPolicy({adminAllowed,enabled:body.enabled,confirmation:body.confirmation});
+    if (!policy.allowed) return json({ok:false,step:policy.step,error:policy.error},policy.status,corsHeaders(request));
+    const enabled = body.enabled;
+    const version = Number(fields.version?.integerValue || 0) + 1;
+    const now = new Date().toISOString();
+    const emailValue = email || profile?.fields?.email?.stringValue || '';
+    const nextFields = {enabled:{booleanValue:enabled},status:{stringValue:enabled?'OPEN':'CLOSED'},changedByUid:{stringValue:claims.user_id},changedByEmail:{stringValue:emailValue},changedAt:{timestampValue:now},version:{integerValue:String(version)},finalTestsAttested:{booleanValue:enabled},finalTestsAttestedByUid:enabled?{stringValue:claims.user_id}:{nullValue:null},finalTestsAttestedByEmail:enabled?{stringValue:emailValue}:{nullValue:null},finalTestsAttestedAt:enabled?{timestampValue:now}:{nullValue:null}};
+    step = 'Commit actual-data setting and audit atomically';
+    const auditId = 'actual-data-' + Date.now() + '-' + crypto.randomUUID().slice(0,12);
+    const base = 'projects/' + getFirebaseProjectId(env) + '/databases/(default)/documents';
+    const auditFields = {action:{stringValue:enabled?'ACTUAL_DATA_ACCESS_OPENED':'ACTUAL_DATA_ACCESS_CLOSED'},category:{stringValue:'SYSTEM_SECURITY'},description:{stringValue:enabled?'Administrator opened actual-data entry after attesting final system tests passed.':'Administrator closed actual-data entry.'},actorUid:{stringValue:claims.user_id},actorEmail:{stringValue:emailValue},previousStatus:{stringValue:fields.enabled?.booleanValue===true?'OPEN':'CLOSED'},newStatus:{stringValue:enabled?'OPEN':'CLOSED'},finalTestsAttested:{booleanValue:enabled},createdAt:{timestampValue:now}};
+    const settingName = base + '/systemSettings/actualDataAccess';
+    const auditName = base + '/audit/' + auditId;
+    const writes = [
+      {update:{name:settingName,fields:nextFields},updateMask:{fieldPaths:Object.keys(nextFields)}},
+      {update:{name:auditName,fields:auditFields},currentDocument:{exists:false}}
+    ];
+    const commitResponse = await fetch('https://firestore.googleapis.com/v1/' + base + ':commit',{method:'POST',headers:{Authorization:'Bearer '+adminToken,'Content-Type':'application/json'},body:JSON.stringify({writes})});
+    if (!commitResponse.ok) {
+      const detail = await commitResponse.json().catch(()=>({}));
+      throw new Error('Firestore atomic setting/audit commit returned HTTP ' + commitResponse.status + ': ' + String(detail?.error?.message||'no detail').slice(0,180));
+    }
+    return json({ok:true,enabled,status:enabled?'OPEN':'CLOSED',finalTestsAttested:enabled,version},200,corsHeaders(request));
+  } catch (error) {
+    console.error('Actual-data access route failed',{step,message:String(error?.message||error).slice(0,240)});
+    return json({ok:false,step,error:step+' failed: '+String(error?.message||error).slice(0,240)},Number(error?.status)||500,corsHeaders(request));
+  }
+}
+
+async function reconcileSignatureDocumentIds(request, env) {
+  const claims = await authenticateFirebaseRequest(request, env);
+  const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
+  if (!adminRecord?.fields?.active?.booleanValue && String(claims.email || "").trim().toLowerCase() !== "irpa2412@gmail.com") {
+    return json({ok:false,error:"Administrator authorization is required for signature-pathway reconciliation."},403,corsHeaders(request));
+  }
+  const body = await request.json();
+  const items = Array.isArray(body.documents) ? body.documents : [];
+  if (!items.length) return json({ok:false,error:"No document IDs were supplied for reconciliation."},400,corsHeaders(request));
+  if (items.length > 250) return json({ok:false,error:"Reconciliation is limited to 250 documents per request."},400,corsHeaders(request));
+  const accessToken = await getDriveAccessToken(env);
+  const results = [];
+  for (const item of items) {
+    const documentId = String(item?.documentId || "").trim();
+    const fileId = String(item?.fileId || "").trim();
+    const line = {documentId:documentId || "(missing ID)",fileId:fileId || "(missing Drive file ID)",status:"failed",reason:""};
+    try {
+      if (!documentId || !fileId) throw new Error("documentId and fileId are both required.");
+      const record = await getFirestoreDocument(env, `documents/${cleanId(documentId)}`, claims.token);
+      if (!record?.fields) throw new Error("Firestore controlled-document record was not found.");
+      const recordFields = record.fields;
+      const registeredIds = [
+        recordFields.fileId?.stringValue,
+        recordFields.driveFileId?.stringValue,
+        recordFields.archiveFileId?.stringValue,
+        recordFields.governanceArchiveFileId?.stringValue,
+        recordFields.sourceFileId?.stringValue
+      ].filter(Boolean).map(String);
+      if (!registeredIds.includes(fileId)) throw new Error("The supplied Drive file ID is not registered on this Firestore document.");
+      const metadata = await driveFetch(env, accessToken, `/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,name,mimeType,description`);
+      const description = parseDescription(metadata.description);
+      if (!description?.irpaGovernance) throw new Error("Drive file is not marked as an IRPA governance document.");
+      if (String(description.documentId || "") === documentId) {
+        line.status = "already correct";
+        line.reason = "Drive description.documentId already matches the Firestore document ID.";
+      } else {
+        const repairedDescription = {...description,documentId,documentUid:documentId};
+        await driveFetch(env, accessToken, `/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,description`, {
+          method:"PATCH",
+          body:JSON.stringify({description:JSON.stringify(repairedDescription)})
+        });
+        line.status = "repaired";
+        line.reason = `Drive description.documentId set to ${documentId}.`;
+      }
+    } catch (error) {
+      line.status = "failed";
+      line.reason = error?.message || "Unknown reconciliation failure.";
+    }
+    results.push(line);
+  }
+  return json({ok:true,results,summary:{total:results.length,repaired:results.filter(x=>x.status==="repaired").length,alreadyCorrect:results.filter(x=>x.status==="already correct").length,failed:results.filter(x=>x.status==="failed").length}},200,corsHeaders(request));
+}
+
 async function uploadControlledDocument(request, env) {
   const claims = await authenticateFirebaseRequest(request, env);
   const { memberRecord, employeeRecord } = await getInstitutionalProfileForUser(env, claims);
@@ -696,7 +1018,8 @@ async function uploadControlledDocument(request, env) {
   const base64 = String(data.base64 || "");
   const title = cleanName(data.title || fileName.replace(/\\.pdf$/i, ""));
   const reference = cleanName(data.reference || "");
-  const documentId = cleanId(data.documentId || `IRPA-DOC-${crypto.randomUUID()}`);
+  const documentId = cleanId(data.documentId || "");
+  if (!documentId) return json({ok:false,error:"STEP upload-controlled-document: the final Firestore document ID is required before Drive upload."},400,corsHeaders(request));
   const documentType = cleanName(data.documentType || "Governance Document");
   const archiveCategory = String(data.archiveCategory || "Administrative Documents").trim();
   const classification = String(data.classification || "Public").trim();

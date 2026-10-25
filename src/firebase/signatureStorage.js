@@ -33,6 +33,11 @@ async function gatewayPost(path, payload) {
   return data;
 }
 
+export async function reconcileSignatureDocumentIds(documents = []) {
+  if (!Array.isArray(documents) || documents.length === 0) throw new Error("Reconciliation requires at least one controlled document.");
+  return gatewayPost("/api/signature-pathway/reconcile", { documents: documents.map(item => ({ documentId: String(item.documentId || item.id || ""), fileId: String(item.fileId || item.archiveFileId || item.governanceArchiveFileId || "") })) });
+}
+
 export const storage = { provider: "Google Drive" };
 
 export function ref(_storage, path) {
@@ -196,8 +201,10 @@ export async function downloadDriveBytes(fileId, documentId = null) {
 }
 
 export async function downloadControlledDocumentBytes(fileId, documentId) {
-  if (!fileId || !documentId) throw new Error("A controlled document ID and Google Drive file ID are required.");
-  const result = await gatewayPost("/api/download", { fileId, documentId });
+  if (!fileId || !documentId) throw new Error("STEP controlled document download failed: canonical Firestore document ID and Google Drive file ID are both required.");
+  let result;
+  try { result = await gatewayPost("/api/download", { fileId, documentId }); }
+  catch (error) { throw new Error(`STEP gateway controlled download failed (Firestore documentId=${documentId}; Drive fileId=${fileId}): ${error?.message || "Unknown gateway error"}`); }
   const base64 = result.base64;
   if (!base64) throw new Error("Google Drive returned no controlled document content.");
   const binary = atob(base64);

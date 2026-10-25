@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from "react";
-import { auth } from "../firebase/config";
+import { auth, db } from "../firebase/config";
+import { collection, doc } from "firebase/firestore";
 import { createRecord, getRecord, COLLECTIONS, getCurrentMemberProfile, getCurrentEmployeeProfile, nextDocumentReference } from "../firebase/data";
 import { readWorkflowContext, withWorkflowLinks } from "../firebase/workflowLinks";
 import { uploadControlledDocumentRouted, buildDocumentArchiveDestination } from "../firebase/signatureStorage";
@@ -81,7 +82,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
       let documentId = "";
       for (let attempt = 1; attempt <= 2; attempt += 1) {
         try {
-          documentId = await createRecord(COLLECTIONS.documents, pendingDocument.documentPayload);
+          documentId = await createRecord(COLLECTIONS.documents, pendingDocument.documentPayload, pendingDocument.documentId);
           const persisted = await getRecord(COLLECTIONS.documents, documentId);
           if (!persisted) throw new Error("The controlled-document register record could not be verified after creation.");
           break;
@@ -136,7 +137,8 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
 
       const name = (title.trim() || file.name.replace(/\.pdf$/i, "")).slice(0, 160);
       const documentReference = await nextDocumentReference();
-      const documentUid = documentReference;
+      const documentUid = doc(collection(db, COLLECTIONS.documents)).id;
+      const documentId = documentUid;
       const uploadedAt = new Date().toISOString();
       const effectiveArchiveCategory = ARCHIVE_CATEGORIES[documentType] || documentType;
       const effectiveClassification = documentType === "Administrator" ? "Restricted" : classification;
@@ -241,15 +243,15 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         authorizedUids: [auth.currentUser.uid]
       };
       if (deferSave) {
-        setPendingDocument({documentPayload,doc,documentReference});
+        setPendingDocument({documentPayload,doc,documentReference,documentId});
         setGeneratedReference(documentReference);
         setMessage(`Document uploaded successfully to Google Drive: ${name}. Click “Save Document” to register it in the IRPA controlled-document archive.`);
       } else {
-        let documentId = "";
+        let savedDocumentId = "";
         for (let attempt = 1; attempt <= 2; attempt += 1) {
           try {
-            documentId = await createRecord(COLLECTIONS.documents, documentPayload);
-            const persisted = await getRecord(COLLECTIONS.documents, documentId);
+            savedDocumentId = await createRecord(COLLECTIONS.documents, documentPayload, documentUid);
+            const persisted = await getRecord(COLLECTIONS.documents, savedDocumentId);
             if (!persisted) throw new Error("The controlled-document register record could not be verified after creation.");
             break;
           } catch (error) {
@@ -265,7 +267,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         setArchiveCategory("");
         setClassification("Public");
         e.target.reset();
-        onUploaded?.({...doc,id:documentId});
+        onUploaded?.({...doc,id:savedDocumentId});
       }
     } catch (x) {
       setError(x.message || "Unable to upload document to Google Drive.");

@@ -143,6 +143,8 @@ jobs:
             "src/firebase/auth.js",
             "src/pages/MeetingEntryGateway.jsx",
             "src/components/ControlledDocumentUpload.jsx",
+            "src/components/SignaturePathwaySelfTest.jsx",
+            "tests/signature-pathway-contract.test.mjs",
             "src/firebase/meetingRecords.js",
             "functions/meetingRecords.js",
             "functions/index.js",
@@ -195,6 +197,16 @@ jobs:
             "tests/communication-media-policy.test.mjs",
           ]);
           // The production build flag may change only as part of the paired Signature Portal/Gateway integration.
+          const signaturePathwayContractRepair =
+            changed.includes("src/components/ControlledDocumentUpload.jsx") &&
+            changed.includes("src/components/SignaturePathwaySelfTest.jsx") &&
+            changed.includes("src/firebase/data.js") &&
+            changed.includes("src/firebase/signaturePlatform.js") &&
+            changed.includes("src/firebase/signatureStorage.js") &&
+            changed.includes("src/pages/SignaturePlatform.jsx") &&
+            changed.includes("drive-gateway/src/index.js") &&
+            changed.includes("tests/signature-pathway-contract.test.mjs") &&
+            changed.every(path => allowed.has(path) || path === ".github/workflows/meeting-portal-fixture-browser.yml");
           const signatureGatewayIntegration = changed.includes("src/firebase/signaturePlatform.js") &&
             changed.includes("drive-gateway/src/signing.mjs") &&
             changed.includes("drive-gateway/tests/controlled-authenticated-signing-flow.test.mjs");
@@ -422,7 +434,7 @@ jobs:
               !changed.includes("src/pages/Meetings.jsx") &&
               !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
               !testOnlySignatureNavigation && !testOnlyRegisterScope && !invitationRemovalIntegration && !invitationMailResendIntegration &&
-              !signatureGatewayIntegration && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signatureSignerListVisibilityRepair && !signaturePdfPaletteRepair && !signaturePdfUrlHandoffRepair && !signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange && !grantAssistantPersistence) {
+              !signatureGatewayIntegration && !signaturePathwayContractRepair && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signatureSignerListVisibilityRepair && !signaturePdfPaletteRepair && !signaturePdfUrlHandoffRepair && !signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange && !grantAssistantPersistence) {
             throw new Error("Meeting/participant source change or an explicitly paired isolated regression/guard test is missing.");
           }
           console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));

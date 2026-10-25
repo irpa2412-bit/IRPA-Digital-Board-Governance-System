@@ -46,8 +46,8 @@ jobs:
           npm ci --no-audit --no-fund
           npm test
 
-      - name: Run Signature Portal routing policy tests
-        run: node --test tests/signature-workflow-policy.test.mjs
+      - name: Run Signature Portal routing and pathway contract tests
+        run: node --test tests/signature-workflow-policy.test.mjs tests/signature-pathway-contract.test.mjs
 
       - name: Build web application
         env:
