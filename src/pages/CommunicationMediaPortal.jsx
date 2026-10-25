@@ -19,7 +19,8 @@ function Field({label,children}){return <label style={styles.label}><span>{label
 export default function CommunicationMediaPortal({profile,employee,selectedAuthority,isAdmin=false}){
  const user=auth.currentUser;
  const roles=useMemo(()=>[selectedAuthority,profile?.role,profile?.title,profile?.position,profile?.departmentalRole,employee?.role,employee?.title,employee?.position,employee?.departmentalRole,...(profile?.roles||[]),...(profile?.assignedRoles||[]),...(profile?.selectedRoles||[]),...(employee?.roles||[]),...(employee?.assignedRoles||[]),...(employee?.selectedRoles||[])].filter(Boolean).flatMap(v=>String(v).split(",").map(x=>x.trim())),[profile,employee]);
- const reviewer=isAdmin||canReview(roles);\n const canPublishWebsite=isAdmin||roles.some(r=>["Communication & Media Chair","Communications & Media Chair","Communication and Media Chair","Communications and Media Chair"].includes(r));
+ const reviewer=isAdmin||canReview(roles);=isAdmin||roles.some(r=>["Communication & Media Chair","Communications & Media Chair","Communication and Media Chair","Communications and Media Chair"].includes(r));
+ const canPublishWebsite=isAdmin||roles.some(r=>["Communication & Media Chair","Communications & Media Chair","Communication and Media Chair","Communications and Media Chair"].includes(r));
  const websiteEditor=isAdmin||roles.some(r=>WEBSITE_EDITOR_ROLES.includes(r));
  const authorized=isAdmin||roles.some(r=>["Communications Officer","Communication Officer","Communications Manager","Communication Manager","Media Officer","Media Manager","Public Relations Officer","Communications & Media Officer","Communications and Media Officer","Media and Communications Officer","Media & Communications Officer","Communication & Media","Communications & Media","Communication and Media","Communications and Media","Director Outreach","Outreach Director","Director Community Development","Community Development Director","Executive Director","Administrator"].includes(r));
  const [items,setItems]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState(""),[notice,setNotice]=useState(""),[tab,setTab]=useState("Workspace"),[filter,setFilter]=useState("All"),[search,setSearch]=useState(""),[busy,setBusy]=useState(false),[selected,setSelected]=useState(null);
@@ -84,7 +85,8 @@ export default function CommunicationMediaPortal({profile,employee,selectedAutho
  }
  async function saveWebsiteContent(status){
   if(!websiteEdit)return;
-  const workflow=status==="publish"||status==="Publish"?"Publish":status==="Review"?"Review":"Draft";\n  if(workflow==="Publish"&&!window.confirm("Publish this page/post to the isolated staging website now?"))return;
+  const workflow=status==="publish"||status==="Publish"?"Publish":status==="Review"?"Review":"Draft";"Publish"&&!window.confirm("Publish this page/post to the isolated staging website now?"))return;
+  if(workflow==="Publish"&&!window.confirm("Publish this page/post to the isolated staging website now?"))return;
   setSiteBusy(true);setError("");setNotice("");
   try{
    const payload={type:websiteEdit.type,id:websiteEdit.id,title:websiteEdit.title,content:websiteEdit.content,excerpt:websiteEdit.excerpt||"",featuredMedia:Number(websiteEdit.featuredMedia||0),status:workflow==="Publish"?"publish":"draft",workflow};
