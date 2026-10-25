@@ -31,7 +31,7 @@ export async function persistCompletedSignatureEnvelope({envelope, completion, g
     lastSignedByUid, gatewayStatus: "Completed", gatewayFinalHash: completion.finalHash,
     gatewaySigningStatus: "Completed", gatewayStatusUpdatedAt: timestamp, updatedAt: timestamp
   });
-  for (const signer of signers.filter(s => s.uid && s.status === "Signed" && s.signedAt)) {
+  for (const signer of signers.filter(s => s.uid && s.status === "Signed")) {
     const signerEventId = "gateway-signed-" + envelopeId + "-" + clean(signer.uid);
     const signerEventPath = "signatureEvents/" + signerEventId;
     if (!(await getDocument(signerEventPath))) {
@@ -39,7 +39,7 @@ export async function persistCompletedSignatureEnvelope({envelope, completion, g
         envelopeId,
         event: "Gateway Signer Signed",
         actorUid: signer.uid,
-        signedAt: signer.signedAt
+        signedAt: signer.signedAt || timestamp
       });
     }
   }
