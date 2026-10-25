@@ -12,7 +12,8 @@ export function mayPublish({ admin = false, active = false, roles = [] } = {}) {
   return Boolean(admin || (active && roles.some(role => PUBLISH_ROLES.has(String(role).trim()))));
 }
 export function editorialWordPressStatus(workflow) {
-  if (workflow === "Draft" || workflow === "Review") return "draft";
+  if (workflow === "Draft") return "draft";
+  if (workflow === "Review") return "pending";
   if (workflow === "Publish") return "publish";
   throw new Error("Workflow must be Draft, Review, or Publish.");
 }
