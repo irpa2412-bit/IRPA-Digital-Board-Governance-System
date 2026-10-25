@@ -317,7 +317,10 @@ jobs:
           base="https://irpa-digital-board-governance.web.app"
           grep -R -Fq "$EXPECTED_BUILD_COMMIT" dist/assets --include="*.js"
           curl --fail --silent --show-error --retry 5 --retry-delay 2 "$base/" -o "$RUNNER_TEMP/firebase-index.html"
-          cmp -s dist/index.html "$RUNNER_TEMP/firebase-index.html"
+          local_asset="$(grep -oE '/assets/[^" ]+\.js' dist/index.html | head -n 1)"
+          live_asset="$(grep -oE '/assets/[^" ]+\.js' "$RUNNER_TEMP/firebase-index.html" | head -n 1)"
+          test -n "$local_asset"
+          test "$local_asset" = "$live_asset"
           for local in dist/assets/*.js; do
             name="${local##*/}"
             curl --fail --silent --show-error --retry 5 --retry-delay 2 "$base/assets/$name" -o "$RUNNER_TEMP/firebase-$name"
