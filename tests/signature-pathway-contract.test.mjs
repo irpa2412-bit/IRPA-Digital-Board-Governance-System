@@ -65,7 +65,7 @@ test("actual-data gate Worker route enforces admin role, exact attestation, writ
   assert.match(route, /finalTestsAttested:\{booleanValue:enabled\}/);
   assert.match(route, /ACTUAL_DATA_ACCESS_OPENED/);
   assert.match(route, /Commit actual-data setting and audit atomically/);
-  assert.match(route, /step\+' failed: '/);
+  assert.match(route, /step, error:/);
 });
 
 test("actual-data gate rejects non-administrators and wrong attestation before changing the setting", async () => {
