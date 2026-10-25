@@ -21,7 +21,7 @@ export function validateMediaUpload({ filename, contentType, size } = {}) {
   const dot = name.lastIndexOf(".");
   const ext = dot < 0 ? "" : name.slice(dot).toLowerCase();
   const allowed = ALLOWED_MEDIA.get(ext);
-  if (!name || name.includes("/") || name.includes("\\\\") || name.startsWith(".") || !allowed || !allowed.has(String(contentType || "").toLowerCase())) {
+  if (!name || name.includes("/") || name.includes("\\") || name.startsWith(".") || !allowed || !allowed.has(String(contentType || "").toLowerCase())) {
     throw new Error("Media file type is not allowed.");
   }
   if (!Number.isSafeInteger(size) || size < 1 || size > MAX_WORDPRESS_MEDIA_BYTES) {
@@ -41,8 +41,8 @@ export function redactSecrets(value, secrets = []) {
   let result = String(value ?? "");
   for (const secret of secrets.filter(Boolean)) result = result.split(String(secret)).join("[REDACTED]");
   return result
-    .replace(/Bearer\\s+[^\\s,;]+/gi, "Bearer [REDACTED]")
-    .replace(/(authorization|application[_ -]?password|cpanel[_ -]?api[_ -]?token|token|secret|password)(["'=: ]+)\\S+/gi, "$1$2[REDACTED]");
+    .replace(/Bearer\s+[^\s,;]+/gi, "Bearer [REDACTED]")
+    .replace(/(authorization|application[_ -]?password|cpanel[_ -]?api[_ -]?token|token|secret|password)(["=: ]+)\S+/gi, "$1$2[REDACTED]");
 }
 export function auditEntry({ actorUid, actorEmail, action, objectType, objectId, changedFields = [], at = new Date().toISOString() } = {}) {
   if (!actorUid || !action || !objectType || !objectId) throw new Error("Audit actor, action and object are required.");
