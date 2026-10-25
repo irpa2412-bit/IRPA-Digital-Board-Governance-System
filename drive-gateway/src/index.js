@@ -847,6 +847,8 @@ async function reconcileRegisteredIdentityUidsRoute(request, env) {
     const adminAllowed = email === "irpa2412@gmail.com" || (profile?.fields?.active?.booleanValue === true && profile?.fields?.role?.stringValue === "Administrator");
     const authorization = authorizeIdentityReconciliation({ authenticated: Boolean(claims.user_id), adminAllowed });
     if (!authorization.allowed) return json({ ok: false, step, error: authorization.error }, authorization.status, corsHeaders(request));
+    const requestBody = await request.json().catch(() => ({}));
+    const dryRun = requestBody?.dryRun === true;
 
     step = "List existing Firebase Authentication accounts";
     const authToken = await getFirebaseAuthAdminAccessToken(env);
@@ -867,7 +869,9 @@ async function reconcileRegisteredIdentityUidsRoute(request, env) {
           line.status = decision.status;
           line.reason = decision.reason;
           line.uid = decision.uid || line.existingUid || null;
-          if (decision.status === "assigned") {
+          if (decision.status === "assigned" && dryRun) {
+            line.reason += " Dry run only: no UID or audit writes were performed.";
+          } else if (decision.status === "assigned") {
             step = "Write UID for " + collectionName + "/" + recordId;
             await updateFirestoreDocument(env, collectionName + "/" + cleanId(recordId), firestoreToken, {
               uid: { stringValue: decision.uid },
@@ -885,6 +889,9 @@ async function reconcileRegisteredIdentityUidsRoute(request, env) {
       }
     }
     const summary = summarizeIdentityReconciliation(results);
+    if (dryRun) {
+      return json({ ok: true, dryRun: true, results, summary, authUsers: authUsers.length, auditWritten: false, safety: { accountCreationPerformed: false, existingUidsOverwritten: false, exactEmailMatchOnly: true, writesPerformed: false } }, 200, corsHeaders(request));
+    }
     step = "Write reconciliation audit";
     const auditId = "identity-reconcile-" + Date.now() + "-" + crypto.randomUUID().slice(0, 8);
     await updateFirestoreDocument(env, "audit/" + auditId, firestoreToken, {
