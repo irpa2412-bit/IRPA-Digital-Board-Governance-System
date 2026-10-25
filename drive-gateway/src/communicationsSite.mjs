@@ -11,12 +11,14 @@ const REVIEW_ROLES = new Set([
 const EDITABLE_EXTENSIONS = new Set([".html", ".htm", ".css", ".txt", ".json"]);
 const MAX_EDIT_BYTES = 512 * 1024;
 const WEBSITE_EDITOR_ROLES = new Set([
-  "Communication & Media", "Communications & Media", "Communication and Media", "Communications and Media",\n  "Communication & Media Chair", "Communications & Media Chair", "Communication and Media Chair", "Communications and Media Chair",
+  "Communication & Media", "Communications & Media", "Communication and Media", "Communications and Media",
+  "Communication & Media Chair", "Communications & Media Chair", "Communication and Media Chair", "Communications and Media Chair",
   "Communications Officer", "Communication Officer", "Communications Manager", "Communication Manager",
   "Media Officer", "Media Manager", "Public Relations Officer", "Communications & Media Officer",
   "Communications and Media Officer", "Media and Communications Officer", "Media & Communications Officer"
 ]);
-const MAX_WEBSITE_SNAPSHOT_BYTES = 2 * 1024 * 1024;\nimport { assertAllowedWebsiteMutation, assertStagingWebsiteHost, editorialWordPressStatus, mayPublish, validateMediaUpload } from "./communicationsWebsitePolicy.mjs";
+const MAX_WEBSITE_SNAPSHOT_BYTES = 2 * 1024 * 1024;
+import { assertAllowedWebsiteMutation, assertStagingWebsiteHost, editorialWordPressStatus, mayPublish, validateMediaUpload } from "./communicationsWebsitePolicy.mjs";
 
 function values(record) {
   if (!record) return [];
