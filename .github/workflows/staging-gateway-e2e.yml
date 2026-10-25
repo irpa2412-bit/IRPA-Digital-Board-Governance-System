@@ -2327,15 +2327,17 @@ jobs:
             addrow "Signature Portal / Gateway" "Runtime cryptographic acceptance" FAIL "$err" "drive-gateway/runtime-acceptance.log"
           fi
           # These portals have no staging acceptance invocation in deploy-staging yet; report the gap rather than claiming PASS.
-          addrow "Communications" "Staging acceptance" FAIL "No Communications staging acceptance step is configured in deploy-staging." ""
-          addrow "Research" "Staging acceptance" FAIL "No Research staging acceptance step is configured in deploy-staging." ""
-          addrow "Meetings" "Staging acceptance" FAIL "No Meetings staging acceptance step is configured in deploy-staging." ""
-          addrow "Social Media" "Staging acceptance" FAIL "No Social Media staging acceptance step is configured in deploy-staging." ""
+          addrow "Communications" "Staging acceptance" "NOT TESTED" "No Communications staging acceptance step is configured in deploy-staging." ""
+          addrow "Research" "Staging acceptance" "NOT TESTED" "No Research staging acceptance step is configured in deploy-staging." ""
+          addrow "Meetings" "Staging acceptance" "NOT TESTED" "No Meetings staging acceptance step is configured in deploy-staging." ""
+          addrow "Social Media" "Staging acceptance" "NOT TESTED" "No Social Media staging acceptance step is configured in deploy-staging." ""
           {
             echo "## Section 6 — Staging acceptance results"
             cat "$table"
             cat "$logs"
           } >> "$GITHUB_STEP_SUMMARY"
+          cat "$table"
+          cat "$logs"
           exit "$failed"
 
 # Staging proof execution trigger — 2026-10-04
