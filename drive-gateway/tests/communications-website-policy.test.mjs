@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   MAX_WORDPRESS_MEDIA_BYTES, assertAllowedWebsiteMutation, assertStagingWebsiteHost,
   auditEntry, editorialWordPressStatus, mayPublish, redactSecrets, validateMediaUpload
-} from "../drive-gateway/src/communicationsWebsitePolicy.mjs";
+} from "../src/communicationsWebsitePolicy.mjs";
 
 test("workflow maps Draft and Review to draft and allows publish state only explicitly", () => {
   assert.equal(editorialWordPressStatus("Draft"), "draft");
