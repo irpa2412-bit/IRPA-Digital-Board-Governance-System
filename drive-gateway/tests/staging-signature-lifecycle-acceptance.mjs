@@ -14,13 +14,13 @@ const gatewayPattern=/^https:\/\/irpa-google-drive-gateway-staging\.[a-z0-9-]+\.
 let activeStep="Staging-only target guard";const passed=[];const setupChecks=[];let gatewayVersion="not reported";
 
 function redact(value){
-  return String(value??"").slice(0,300).replace(/Bearer\\s+[^\\s,;"]+/ig,"Bearer [REDACTED]").replace(/AIza[0-9A-Za-z_-]{20,}/g,"[REDACTED_API_KEY]").replace(/(password|token|secret)(["=: ]+)[^", ]+/ig,"$1$2[REDACTED]").replace(/[\\r\\n\\t]+/g," ");
+  return String(value??"").slice(0,300).replace(/Bearer\s+[^\s,;"]+/ig,"Bearer [REDACTED]").replace(/AIza[0-9A-Za-z_-]{20,}/g,"[REDACTED_API_KEY]").replace(/(password|token|secret)(["=: ]+)[^", ]+/ig,"$1$2[REDACTED]").replace(/[\r\n\t]+/g," ");
 }
 function writeSummary(){
   const rows=[...setupChecks,...(globalThis.__irpaPostSigningChecks||[])];
-  for(const x of rows)console.log("ACCEPTANCE_ROW\\t"+x.portal+"\\t"+x.name+"\\t"+x.result+"\\t"+redact(x.error||"—").replace(/\\t/g," "));
+  for(const x of rows)console.log("ACCEPTANCE_ROW\t"+x.portal+"\t"+x.name+"\t"+x.result+"\t"+redact(x.error||"—").replace(/\t/g," "));
 }
-async function step(name,fn){activeStep=name;try{await fn();passed.push(name);setupChecks.push({portal:"Signature Portal / Gateway",name,result:"PASS",error:""});console.log("PASS: "+name);}catch(error){const message=redact(error?.message||error);setupChecks.push({portal:"Signature Portal / Gateway",name,result:"FAIL",error:message});console.error("FAIL: "+name+" :: "+message);}}
+async function step(name,fn){activeStep=name;try{await fn();passed.push(name);setupChecks.push({portal:"Signature Portal / Gateway",name,result:"PASS",error:""});console.log("PASS: "+name);}catch(error){const message=redact(error?.message||error);setupChecks.push({portal:"Signature Portal / Gateway",name,result:"FAIL",error:message});console.error("FAIL: "+name+" :: "+message);if(name==="Staging-only target and credentials guard")throw error;}}
 function encode(v){if(v===null||v===undefined)return{nullValue:null};if(typeof v==="boolean")return{booleanValue:v};if(typeof v==="number"&&Number.isInteger(v))return{integerValue:String(v)};if(typeof v==="number")return{doubleValue:v};if(Array.isArray(v))return{arrayValue:{values:v.map(encode)}};if(typeof v==="object")return{mapValue:{fields:Object.fromEntries(Object.entries(v).map(([k,x])=>[k,encode(x)]))}};return{stringValue:String(v)};}
 function decode(v){if(!v||typeof v!=="object")return v;if("stringValue"in v)return v.stringValue;if("integerValue"in v)return Number(v.integerValue);if("doubleValue"in v)return v.doubleValue;if("booleanValue"in v)return v.booleanValue;if("timestampValue"in v)return v.timestampValue;if("nullValue"in v)return null;if("arrayValue"in v)return(v.arrayValue.values||[]).map(decode);if("mapValue"in v)return Object.fromEntries(Object.entries(v.mapValue.fields||{}).map(([k,x])=>[k,decode(x)]));return v;}
 function plain(d){return Object.fromEntries(Object.entries(d?.fields||{}).map(([k,v])=>[k,decode(v)]));}
