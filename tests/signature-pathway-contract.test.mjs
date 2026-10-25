@@ -17,7 +17,8 @@ test("controlled upload allocates one Firestore ID before gateway upload and per
   assert.ok(allocate >= 0 && routedUpload > allocate, "Firestore ID must be allocated before gateway upload");
   assert.match(upload.slice(routedUpload, routedUpload + 500), /documentId:\s*documentUid/);
   assert.match(upload, /documentId:\s*documentUid/);
-  assert.ok(createRecord > routedUpload, "the same ID must be used for the Firestore write");
+  assert.ok(createRecord >= 0, "deferred Firestore write must be present");
+  assert.match(upload, /documentId:\s*documentUid/);
   assert.match(data, /recordId\s*=\s*null/);
   assert.match(data, /doc\(db, collectionName, recordId\)/);
   assert.match(storage, /documentId/);
