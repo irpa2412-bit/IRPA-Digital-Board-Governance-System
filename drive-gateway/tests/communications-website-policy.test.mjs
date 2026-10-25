@@ -44,3 +44,6 @@ test("secrets are redacted from diagnostic/audit strings", () => {
   assert.doesNotMatch(out, /bearer-secret|wp-secret|cp-secret/);
   assert.match(out, /REDACTED/);
 });
+
+test("SEO title and meta description are allowed fields", () => { assert.equal(assertAllowedWebsiteMutation({type:"pages",id:5,title:"Title",seoTitle:"SEO",seoDescription:"Description"}),true); });
+test("Review is a pending WordPress status", () => { assert.equal(editorialWordPressStatus("Review"),"pending"); });

@@ -289,7 +289,9 @@ export function createCommunicationsSiteRouter(deps) {
       featuredMedia: Number(item.featured_media || 0),
       status: String(item.status || "draft"),
       link: String(item.link || ""),
-      modified: String(item.modified || "")
+      modified: String(item.modified || ""),
+      seoTitle: String(item.meta?.["_yoast_wpseo_title"] || item.meta?.["rank_math_title"] || ""),
+      seoDescription: String(item.meta?.["_yoast_wpseo_metadesc"] || item.meta?.["rank_math_description"] || "")
     };
   }
 
@@ -476,6 +478,8 @@ export function createCommunicationsSiteRouter(deps) {
       return json({ items: data.map(item => ({
         id: Number(item.id), type, title: editorRaw(item, "title"), excerpt: editorRaw(item, "excerpt"),
         featuredMedia: Number(item.featured_media || 0), status: String(item.status || "draft"),
+        seoTitle: String(item.meta?.["_yoast_wpseo_title"] || item.meta?.["rank_math_title"] || ""),
+        seoDescription: String(item.meta?.["_yoast_wpseo_metadesc"] || item.meta?.["rank_math_description"] || ""),
         link: String(item.link || ""), modified: String(item.modified || "")
       })) }, 200, corsHeaders(request));
     }
@@ -579,25 +583,27 @@ export function createCommunicationsSiteRouter(deps) {
       const title = String(input.title ?? "").trim();
       const content = String(input.content ?? "");
       const excerpt = String(input.excerpt ?? "").replace(/<[^>]*>/g, "").trim();
+      const seoTitle = String(input.seoTitle ?? "").trim().slice(0, 180);
+      const seoDescription = String(input.seoDescription ?? "").replace(/<[^>]*>/g, "").trim().slice(0, 320);
       const featuredMedia = Number(input.featuredMedia ?? 0);
       const requestedStatus = status;
       if (!["pages", "posts"].includes(type) || !Number.isSafeInteger(id) || id < 1 ||
-          !title || title.length > 180 || content.length > 30000 || excerpt.length > 600 ||
+          !title || title.length > 180 || content.length > 30000 || excerpt.length > 600 || seoTitle.length > 180 || seoDescription.length > 320 ||
           !Number.isSafeInteger(featuredMedia) || featuredMedia < 0 || !["draft", "pending", "publish"].includes(requestedStatus)) {
         return json({ error: "Provide a valid page/post ID, title, content, excerpt, featured image ID and draft/publish status." }, 400, corsHeaders(request));
       }
       const wp = stagingWordPressConfig(env);
       await verifyDedicatedWordPressEditor(wp);
       const current = await readWebsiteItem(wp, type, id);
-      const changedFields = ["title", "content", "excerpt", "featuredMedia", "status"].filter(key => {
+      const changedFields = ["title", "content", "excerpt", "featuredMedia", "status", "seoTitle", "seoDescription"].filter(key => {
         const currentValue = key === "featuredMedia" ? Number(current.featured_media || 0) :
-          key === "status" ? String(current.status || "draft") : editorRaw(current, key);
+          key === "status" ? String(current.status || "draft") : key === "seoTitle" ? String(current.meta?.["_yoast_wpseo_title"] || current.meta?.["rank_math_title"] || "") : key === "seoDescription" ? String(current.meta?.["_yoast_wpseo_metadesc"] || current.meta?.["rank_math_description"] || "") : editorRaw(current, key);
         const nextValue = key === "title" ? title : key === "content" ? sanitizeWordPressContent(content) :
-          key === "excerpt" ? excerpt : key === "featuredMedia" ? featuredMedia : requestedStatus;
+          key === "excerpt" ? excerpt : key === "featuredMedia" ? featuredMedia : key === "seoTitle" ? seoTitle : key === "seoDescription" ? seoDescription : requestedStatus;
         return currentValue !== nextValue;
       });
       const snapshot = await saveWebsiteSnapshot(env, claims, wp, type, id, current, changedFields);
-      const payload = { title, content: sanitizeWordPressContent(content), excerpt, featured_media: featuredMedia, status: requestedStatus };
+      const payload = { title, content: sanitizeWordPressContent(content), excerpt, featured_media: featuredMedia, status: requestedStatus, meta: { _yoast_wpseo_title: seoTitle, _yoast_wpseo_metadesc: seoDescription, rank_math_title: seoTitle, rank_math_description: seoDescription } };
       const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/" + type + "/" + id, {
         method: "POST", headers: wordpressHeaders(wp, { "Content-Type": "application/json", Accept: "application/json" }),
         body: JSON.stringify(payload), signal: AbortSignal.timeout(30000)

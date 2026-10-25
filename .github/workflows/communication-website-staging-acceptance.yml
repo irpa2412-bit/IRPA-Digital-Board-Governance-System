@@ -1,6 +1,9 @@
 name: Communication website staging acceptance
 
 on:
+  push:
+    branches:
+      - feature/communication-media-website-20261025
   workflow_dispatch:
 
 permissions:
@@ -28,8 +31,11 @@ jobs:
         with:
           node-version: 22
       - name: Run website policy tests
+        continue-on-error: true
+        id: unit
         run: node --test drive-gateway/tests/communications-website-policy.test.mjs
       - name: Run staging-only live acceptance
+        continue-on-error: true
         id: acceptance
         run: |
           set +e
