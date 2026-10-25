@@ -2285,32 +2285,55 @@ jobs:
           redact() {
             perl -pe 's/Authorization:[^, ]+/Authorization: [REDACTED]/ig; s/Bearer\\s+[^\\s\\x22\\x27,;]+/Bearer [REDACTED]/ig; s/AIza[0-9A-Za-z_-]{20,}/[REDACTED_API_KEY]/g; s/(password|token|secret)(["=: ]+)[^", ]+/$1$2[REDACTED]/ig; s/([A-Za-z0-9_-]{32,})/[REDACTED_TOKEN]/g; s/[\\r\\n\\t]+/ /g'
           }
-          row() {
-            portal="$1"; check="$2"; outcome="$3"; logfile="$4"
-            if [ "$outcome" = "success" ]; then status=PASS; else status=FAIL; fi
-            if [ -f "$logfile" ]; then
-              error="$(tail -n 30 "$logfile" | redact | grep -Eai 'error|failed|failure|exception|HTTP [45][0-9][0-9]|=FAIL|not authorized' | tail -n 5 | tr '\\n' ' ' | cut -c1-900)"
-              excerpt="$(tail -n 30 "$logfile" | redact | tr '\\n' ' ' | cut -c1-1400)"
-            else
-              error="No log file produced; step outcome=${outcome:-not-run}"
-              excerpt="$error"
-              status=FAIL
-            fi
-            [ -n "$error" ] || error="No error text recorded; step outcome=${outcome:-not-run}"
-            printf '| %s | %s | %s | %s |\n' "$portal" "$check" "$status" "${error//|/\\|}" >> "$RUNNER_TEMP/acceptance-table.md"
-            printf '\\n### %s — %s (%s)\\n\\nLast 30 redacted log lines:\\n\\n`%s`\\n' "$portal" "$check" "$status" "$excerpt" >> "$RUNNER_TEMP/acceptance-logs.md"
-            if [ "$status" = "FAIL" ]; then failed=1; fi
-          }
           failed=0
-          printf '| Portal | Check | Result | Exact error text (redacted) |\\n|---|---|---|---|\\n' > "$RUNNER_TEMP/acceptance-table.md"
-          : > "$RUNNER_TEMP/acceptance-logs.md"
-          row "E-signature" "Signature lifecycle and signer trail" "${SIGNATURE_RESULT:-not-run}" "drive-gateway/e2e.log"
-          row "Communication Media" "Role denial and controlled-PDF upload" "${MEDIA_RESULT:-not-run}" "communication-media.log"
-          row "E-signature" "Real-runtime cryptographic acceptance" "${CRYPTO_RESULT:-not-run}" "drive-gateway/runtime-acceptance.log"
+          table="$RUNNER_TEMP/acceptance-table.md"
+          logs="$RUNNER_TEMP/acceptance-logs.md"
+          printf '| Portal | Check | Result | Exact error (HTTP status and first 300 body characters, redacted) |\\n|---|---|---|---|\\n' > "$table"
+          : > "$logs"
+          addrow() {
+            portal="$1"; check="$2"; status="$3"; error="$4"; logfile="$5"
+            error="$(printf '%s' "$error" | redact | cut -c1-300)"
+            printf '| %s | %s | %s | %s |\\n' "$portal" "$check" "$status" "${error//|/\\|}" >> "$table"
+            if [ "$status" != "PASS" ]; then failed=1; fi
+            if [ -n "$logfile" ] && [ -f "$logfile" ]; then
+              excerpt="$(tail -n 30 "$logfile" | redact | cut -c1-3000)"
+              printf '\\n### %s — %s (%s)\\n\\nLast 30 redacted log lines:\\n\\n```text\\n%s\\n```\\n' "$portal" "$check" "$status" "$excerpt" >> "$logs"
+            fi
+          }
+          # Each detailed lifecycle assertion is emitted independently by the acceptance test.
+          if [ -f drive-gateway/e2e.log ]; then
+            while IFS="$(printf '\\t')" read -r marker portal check result error; do
+              [ "$marker" = "ACCEPTANCE_ROW" ] || continue
+              [ "$result" = "PASS" ] && status=PASS || status=FAIL
+              addrow "$portal" "$check" "$status" "$error" "drive-gateway/e2e.log"
+            done < <(grep '^ACCEPTANCE_ROW' drive-gateway/e2e.log || true)
+          else
+            addrow "Signature Portal / Gateway" "Lifecycle acceptance test" FAIL "No e2e.log was produced; step outcome=${SIGNATURE_RESULT:-not-run}" ""
+          fi
+          [ "${SIGNATURE_RESULT:-}" = "success" ] || { addrow "Signature Portal / Gateway" "Acceptance process exit status" FAIL "Step outcome=${SIGNATURE_RESULT:-not-run}" "drive-gateway/e2e.log"; }
+          if [ "${MEDIA_RESULT:-}" = "success" ]; then
+            addrow "Communication Media" "Role denial and controlled-PDF upload" PASS "All assertions passed." "communication-media.log"
+          else
+            err="$(tail -n 30 communication-media.log 2>/dev/null | redact | grep -Eai 'error|failed|failure|exception|HTTP [45][0-9][0-9]' | tail -n 1 | cut -c1-300)"
+            [ -n "$err" ] || err="No redacted error detail recorded; step outcome=${MEDIA_RESULT:-not-run}"
+            addrow "Communication Media" "Role denial and controlled-PDF upload" FAIL "$err" "communication-media.log"
+          fi
+          if [ "${CRYPTO_RESULT:-}" = "success" ]; then
+            addrow "Signature Portal / Gateway" "Runtime cryptographic acceptance" PASS "All assertions passed." "drive-gateway/runtime-acceptance.log"
+          else
+            err="$(tail -n 30 drive-gateway/runtime-acceptance.log 2>/dev/null | redact | grep -Eai 'error|failed|failure|exception|HTTP [45][0-9][0-9]' | tail -n 1 | cut -c1-300)"
+            [ -n "$err" ] || err="No redacted error detail recorded; step outcome=${CRYPTO_RESULT:-not-run}"
+            addrow "Signature Portal / Gateway" "Runtime cryptographic acceptance" FAIL "$err" "drive-gateway/runtime-acceptance.log"
+          fi
+          # These portals have no staging acceptance invocation in deploy-staging yet; report the gap rather than claiming PASS.
+          addrow "Communications" "Staging acceptance" FAIL "No Communications staging acceptance step is configured in deploy-staging." ""
+          addrow "Research" "Staging acceptance" FAIL "No Research staging acceptance step is configured in deploy-staging." ""
+          addrow "Meetings" "Staging acceptance" FAIL "No Meetings staging acceptance step is configured in deploy-staging." ""
+          addrow "Social Media" "Staging acceptance" FAIL "No Social Media staging acceptance step is configured in deploy-staging." ""
           {
-            echo "## Staging acceptance results"
-            cat "$RUNNER_TEMP/acceptance-table.md"
-            cat "$RUNNER_TEMP/acceptance-logs.md"
+            echo "## Section 6 — Staging acceptance results"
+            cat "$table"
+            cat "$logs"
           } >> "$GITHUB_STEP_SUMMARY"
           exit "$failed"
 
