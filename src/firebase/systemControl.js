@@ -1,6 +1,13 @@
 import { auth } from "./config";
+import { getFunctions, httpsCallable } from "firebase/functions";
 import { getIdToken } from "firebase/auth";
 import { getGoogleDriveGatewayUrl } from "./gatewayUrl";
+
+const functions = getFunctions(undefined, "us-central1");
+export const requestDataReset = async data => (await httpsCallable(functions, "requestDataReset")(data)).data;
+export const cancelDataReset = async data => (await httpsCallable(functions, "cancelDataReset")(data)).data;
+export const executeDataReset = async data => (await httpsCallable(functions, "executeDataReset")(data)).data;
+export const getDataResetStatus = async data => (await httpsCallable(functions, "getDataResetStatus")(data)).data;
 
 async function actualDataGateway(method, data = {}) {
   const user = auth.currentUser;
