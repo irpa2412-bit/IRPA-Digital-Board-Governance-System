@@ -712,16 +712,21 @@ async function actualDataAccessRoute(request, env) {
     const now = new Date().toISOString();
     const emailValue = email || profile?.fields?.email?.stringValue || '';
     const nextFields = {enabled:{booleanValue:enabled},status:{stringValue:enabled?'OPEN':'CLOSED'},changedByUid:{stringValue:claims.user_id},changedByEmail:{stringValue:emailValue},changedAt:{timestampValue:now},version:{integerValue:String(version)},finalTestsAttested:{booleanValue:enabled},finalTestsAttestedByUid:enabled?{stringValue:claims.user_id}:{nullValue:null},finalTestsAttestedByEmail:enabled?{stringValue:emailValue}:{nullValue:null},finalTestsAttestedAt:enabled?{timestampValue:now}:{nullValue:null}};
-    step = 'Write actual-data setting';
-    const base = 'https://firestore.googleapis.com/v1/projects/' + getFirebaseProjectId(env) + '/databases/(default)/documents';
-    const settingUrl = previous ? base + '/' + path : base + '/systemSettings?documentId=actualDataAccess';
-    const settingResponse = await fetch(settingUrl,{method:previous?'PATCH':'POST',headers:{Authorization:'Bearer '+adminToken,'Content-Type':'application/json'},body:JSON.stringify({fields:nextFields})});
-    if (!settingResponse.ok) throw new Error('Firestore setting write returned HTTP ' + settingResponse.status + '.');
-    step = 'Write audit record';
+    step = 'Commit actual-data setting and audit atomically';
     const auditId = 'actual-data-' + Date.now() + '-' + crypto.randomUUID().slice(0,12);
+    const base = 'projects/' + getFirebaseProjectId(env) + '/databases/(default)/documents';
     const auditFields = {action:{stringValue:enabled?'ACTUAL_DATA_ACCESS_OPENED':'ACTUAL_DATA_ACCESS_CLOSED'},category:{stringValue:'SYSTEM_SECURITY'},description:{stringValue:enabled?'Administrator opened actual-data entry after attesting final system tests passed.':'Administrator closed actual-data entry.'},actorUid:{stringValue:claims.user_id},actorEmail:{stringValue:emailValue},previousStatus:{stringValue:fields.enabled?.booleanValue===true?'OPEN':'CLOSED'},newStatus:{stringValue:enabled?'OPEN':'CLOSED'},finalTestsAttested:{booleanValue:enabled},createdAt:{timestampValue:now}};
-    const auditResponse = await fetch(base + '/audit?documentId=' + encodeURIComponent(auditId),{method:'POST',headers:{Authorization:'Bearer '+adminToken,'Content-Type':'application/json'},body:JSON.stringify({fields:auditFields})});
-    if (!auditResponse.ok) throw new Error('Firestore audit write returned HTTP ' + auditResponse.status + '.');
+    const settingName = base + '/systemSettings/actualDataAccess';
+    const auditName = base + '/audit/' + auditId;
+    const writes = [
+      {update:{name:settingName,fields:nextFields},updateMask:{fieldPaths:Object.keys(nextFields)}},
+      {update:{name:auditName,fields:auditFields},currentDocument:{exists:false}}
+    ];
+    const commitResponse = await fetch('https://firestore.googleapis.com/v1/' + base + ':commit',{method:'POST',headers:{Authorization:'Bearer '+adminToken,'Content-Type':'application/json'},body:JSON.stringify({writes})});
+    if (!commitResponse.ok) {
+      const detail = await commitResponse.json().catch(()=>({}));
+      throw new Error('Firestore atomic setting/audit commit returned HTTP ' + commitResponse.status + ': ' + String(detail?.error?.message||'no detail').slice(0,180));
+    }
     return json({ok:true,enabled,status:enabled?'OPEN':'CLOSED',finalTestsAttested:enabled,version},200,corsHeaders(request));
   } catch (error) {
     console.error('Actual-data access route failed',{step,message:String(error?.message||error).slice(0,240)});
