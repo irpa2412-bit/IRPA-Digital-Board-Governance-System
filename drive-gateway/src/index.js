@@ -260,6 +260,10 @@ export default {
         return await upload(request, env);
       }
 
+      if (pathname === "/api/upload-controlled-document/policy-check" && request.method === "POST") {
+        return await controlledDocumentUploadPolicyCheck(request, env);
+      }
+
       if (pathname === "/api/upload-controlled-document" && request.method === "POST") {
         return await uploadControlledDocument(request, env);
       }
@@ -1011,6 +1015,35 @@ async function reconcileSignatureDocumentIds(request, env) {
     results.push(line);
   }
   return json({ok:true,results,summary:{total:results.length,repaired:results.filter(x=>x.status==="repaired").length,alreadyCorrect:results.filter(x=>x.status==="already correct").length,failed:results.filter(x=>x.status==="failed").length}},200,corsHeaders(request));
+}
+
+async function controlledDocumentUploadPolicyCheck(request, env) {
+  let step = "Firebase authentication";
+  try {
+    const claims = await authenticateFirebaseRequest(request, env);
+    step = "Resolve active institutional profile";
+    const { memberRecord, employeeRecord } = await getInstitutionalProfileForUser(env, claims);
+    const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
+    if (!memberRecord && !employeeRecord && !adminRecord?.fields?.active?.booleanValue) {
+      return json({ ok: false, step, error: "An active IRPA member, employee or administrator profile is required for controlled document upload policy checks." }, 403, corsHeaders(request));
+    }
+    step = "Validate upload policy (no upload)";
+    const data = await request.json();
+    const contentType = String(data.contentType || "application/pdf").toLowerCase();
+    const fileSize = Number(data.fileSize || 0);
+    const archiveCategory = String(data.archiveCategory || "Administrative Documents").trim();
+    const classification = String(data.classification || "Public").trim();
+    const allowedCategories = ["Finance Documents","Procurement Documents","Governance Documents","Administrative Documents","Administrator Documents"];
+    const allowedClassifications = ["Public","Internal","Confidential","Restricted"];
+    const problems = [];
+    if (!ALLOWED_CONTENT_TYPES.has(contentType)) problems.push("Unsupported content type.");
+    if (!Number.isFinite(fileSize) || fileSize <= 0 || fileSize > MAX_BYTES) problems.push("File size must be between 1 byte and 10 MB.");
+    if (!allowedCategories.includes(archiveCategory)) problems.push("Invalid document archive category.");
+    if (!allowedClassifications.includes(classification)) problems.push("Invalid document access classification.");
+    return json({ ok: problems.length === 0, step, policyAllowed: problems.length === 0, problems, checked: { contentType, fileSize, archiveCategory, classification }, writesPerformed: false, driveUploadPerformed: false, firebaseProjectId: getFirebaseProjectId(env) }, problems.length ? 400 : 200, corsHeaders(request));
+  } catch (error) {
+    return json({ ok: false, step, error: step + " failed: " + String(error?.message || error).slice(0, 240), writesPerformed: false, driveUploadPerformed: false }, Number(error?.status) || 500, corsHeaders(request));
+  }
 }
 
 async function uploadControlledDocument(request, env) {
