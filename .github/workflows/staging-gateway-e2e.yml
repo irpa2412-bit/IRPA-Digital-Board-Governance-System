@@ -2186,6 +2186,7 @@ jobs:
             if(claims.aud!==project||claims.iss!=="https://securetoken.google.com/"+project) throw new Error("Staging Firebase token audience or issuer mismatch.");
             return body;
           }
+          const redactBody=value=>String(value||"").slice(0,300).replace(/Bearer\s+[^\s,;"]+/ig,"Bearer [REDACTED]").replace(/AIza[0-9A-Za-z_-]{20,}/g,"[REDACTED_API_KEY]").replace(/(password|token|secret)(["=: ]+)[^", ]+/ig,"$1$2[REDACTED]").replace(/[\r\n\t]+/g," ");
           const nonAdmin=await signIn(process.env.STAGING_CRYPTO_TEST_EMAIL,process.env.STAGING_CRYPTO_TEST_PASSWORD);
           const denied=await fetch(base+"/api/communication-media-archive/provision",{method:"POST",headers:{Authorization:"Bearer "+nonAdmin.idToken,"content-type":"application/json"},body:"{}"});
           const deniedText=await denied.text();
@@ -2195,7 +2196,6 @@ jobs:
           const archiveResponse=await fetch(base+"/api/communication-media-archive/provision",{method:"POST",headers:{Authorization:"Bearer "+admin.idToken,"content-type":"application/json"},body:"{}"});
           const archiveText=await archiveResponse.text();
           const archive=(()=>{try{return JSON.parse(archiveText)}catch{return {}}})();
-          const redactBody=value=>String(value||"").slice(0,300).replace(/Bearer\s+[^\s,;"]+/ig,"Bearer [REDACTED]").replace(/AIza[0-9A-Za-z_-]{20,}/g,"[REDACTED_API_KEY]").replace(/(password|token|secret)(["=: ]+)[^", ]+/ig,"$1$2[REDACTED]").replace(/[\r\n\t]+/g," ");
           if(archiveResponse.status===503&&archive.code==="GOOGLE_DRIVE_NOT_AUTHORIZED") throw new Error("STAGING_GOOGLE_DRIVE_OAUTH=NOT_AUTHORIZED; an active IRPA administrator must complete Google Drive authorization in staging Settings.");
           if(!archiveResponse.ok||archive.archiveName!=="Communication and Media Archive"||!archive.folderId||archive.storageProvider!=="Google Drive") throw new Error("Communication and Media Archive provisioning failed; HTTP "+archiveResponse.status+"; response body: "+redactBody(archiveText));
           const pdf=Buffer.from("%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [] /Count 0 >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n","utf8");
