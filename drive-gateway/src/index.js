@@ -198,7 +198,9 @@ export default {
           ok: true,
           service: "IRPA Google Drive Gateway",
           storageProvider: "Google Drive",
-          version: String(env.GIT_SHA || "unknown")
+          version: String(env.GIT_SHA || "unknown"),
+          commit: String(env.GIT_SHA || "unknown"),
+          firebaseProjectId: String(env.FIREBASE_PROJECT_ID || "unconfigured")
         };
         if (env.IRPA_ENVIRONMENT === "staging") {
           health.environment = "staging";
