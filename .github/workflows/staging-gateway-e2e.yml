@@ -87,6 +87,22 @@ jobs:
             echo ' ```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Add failing TAP test excerpts
+        if: failure()
+        run: |
+          set -euo pipefail
+          {
+            echo "## Failing test excerpts"
+            echo ""
+            if [ -f e2e.log ]; then
+              echo ' ```text'
+              awk '/^not ok / { remaining=8; print; next } remaining > 0 { print; remaining-- }' e2e.log | perl -pe 's/Authorization:[^, ]+/Authorization: [REDACTED]/ig; s/Bearer\s+[^\s\x22\x27,;]+/Bearer [REDACTED]/ig; s/AIza[0-9A-Za-z_-]{20,}/[REDACTED_API_KEY]/g; s/(password|token|secret)(["=: ]+)[^", ]+/$1$2[REDACTED]/ig'
+              echo ' ```'
+            else
+              echo "e2e.log was not produced."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
   repair-staging:
     needs: local-e2e
     outputs:

@@ -27,17 +27,56 @@ test("completed gateway signing updates portal envelope, appends trail event, an
   assert.equal(envelope.signedDocumentUrl, "https://drive.google.com/file/d/drive-file-7/view");
   assert.equal(envelope.signedPdfReference, "drive-file-7");
   assert.equal(envelope.signers[0].status, "Signed");
-  const eventWrite = writes.find(write => write.path.startsWith("signatureEvents/"));
-  assert.ok(eventWrite, "a signatureEvents document must be written");
-  assert.equal(eventWrite.fields.envelopeId, "IRPA-ENV-2026-12345678");
-  assert.equal(eventWrite.fields.event, "Gateway Signing Completed");
-  assert.equal(eventWrite.fields.details.status, "Completed");
-  assert.equal(eventWrite.fields.details.signedDocumentUrl, envelope.signedDocumentUrl);
+  const signerEvent = writes.find(write => write.path === "signatureEvents/gateway-signed-IRPA-ENV-2026-12345678-officer-1");
+  assert.ok(signerEvent, "a per-signer signature event must be written");
+  assert.equal(signerEvent.fields.envelopeId, "IRPA-ENV-2026-12345678");
+  assert.equal(signerEvent.fields.event, "Gateway Signer Signed");
+  assert.equal(signerEvent.fields.actorUid, "officer-1");
+  assert.equal(signerEvent.fields.signedAt, "2026-10-24T05:00:00.000Z");
+  const completionEvent = writes.find(write => write.path === "signatureEvents/gateway-completed-IRPA-ENV-2026-12345678");
+  assert.ok(completionEvent, "a completion event must be written");
+  assert.equal(completionEvent.fields.envelopeId, "IRPA-ENV-2026-12345678");
+  assert.equal(completionEvent.fields.event, "Gateway Signing Completed");
+  assert.equal(completionEvent.fields.details.status, "Completed");
+  assert.equal(completionEvent.fields.details.signedDocumentUrl, envelope.signedDocumentUrl);
   // documentLifecycle's signature-complete handler accepts only Completed and a URL it can resolve to a Drive file ID.
   assert.equal(envelope.status, "Completed");
   assert.equal(envelope.signedDocumentUrl.match(/\/file\/d\/([^/]+)\/view/)?.[1], "drive-file-7");
   docs.set("documents/DOC-42", {...docs.get("documents/DOC-42"), status:"SIGNED", signatureStatus:"COMPLETED", signatureEnvelopeId:"IRPA-ENV-2026-12345678", signedByUid:envelope.lastSignedByUid, signedDocumentUrl:envelope.signedDocumentUrl});
   assert.equal(docs.get("documents/DOC-42").status, "SIGNED");
+});
+
+
+test("per-signer and completion audit events use stable IDs and are idempotent", async () => {
+  const envelopeId = "IRPA-ENV-IDEMPOTENT";
+  const docs = new Map([[ "signatureEnvelopes/" + envelopeId, { documentId: "DOC-99", status: "In Progress" } ]]);
+  const writes = [];
+  const getDocument = async path => docs.get(path) || null;
+  const updateDocument = async (path, fields) => {
+    writes.push({path, fields});
+    docs.set(path, {...(docs.get(path) || {}), ...fields});
+  };
+  const input = {
+    envelope: {
+      id: "ENV-99", externalReference: envelopeId, documentId: "DOC-99",
+      signers: [
+        {uid:"officer-1",name:"Officer One",email:"one@example.org",status:"Signed",signedAt:"2026-10-24T05:00:00.000Z"},
+        {uid:"officer-2",name:"Officer Two",email:"two@example.org",status:"Signed",signedAt:"2026-10-24T05:01:00.000Z"}
+      ]
+    },
+    completion: {primaryStorageId:"drive-file-99",finalHash:"c".repeat(64),completedAt:"2026-10-24T05:02:00.000Z"},
+    getDocument, updateDocument, now: () => "2026-10-24T05:03:00.000Z"
+  };
+  await persistCompletedSignatureEnvelope(input);
+  const eventWritesAfterFirstCall = writes.filter(write => write.path.startsWith("signatureEvents/"));
+  assert.deepEqual(eventWritesAfterFirstCall.map(write => write.path).sort(), [
+    "signatureEvents/gateway-completed-" + envelopeId,
+    "signatureEvents/gateway-signed-" + envelopeId + "-officer-1",
+    "signatureEvents/gateway-signed-" + envelopeId + "-officer-2"
+  ].sort());
+  assert.equal(eventWritesAfterFirstCall.find(write => write.path.endsWith("-officer-2")).fields.signedAt, "2026-10-24T05:01:00.000Z");
+  await persistCompletedSignatureEnvelope(input);
+  assert.equal(writes.filter(write => write.path.startsWith("signatureEvents/")).length, 3, "repeating mirror persistence must not duplicate audit-event writes");
 });
 
 test("missing portal envelope rejects mirror write so caller can log it", async () => {
