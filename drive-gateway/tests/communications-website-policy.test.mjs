@@ -7,7 +7,7 @@ import {
 
 test("workflow maps Draft and Review to draft and allows publish state only explicitly", () => {
   assert.equal(editorialWordPressStatus("Draft"), "draft");
-  assert.equal(editorialWordPressStatus("Review"), "draft");
+  assert.equal(editorialWordPressStatus("Review"), "pending");
   assert.equal(editorialWordPressStatus("Publish"), "publish");
   assert.throws(() => editorialWordPressStatus("Delete"));
 });
