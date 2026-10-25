@@ -455,6 +455,47 @@ export function createCommunicationsSiteRouter(deps) {
           /category/.test(message) ? "request_failed" :
           message.includes("not configured") ? "configuration_missing" : "connection_failed";
       }
+      result.websiteUp = false;
+      result.sslExpiry = "not available";
+      result.lastBackup = "not available";
+      result.wordpressUpdates = "not available";
+      result.pluginUpdates = "not available";
+      result.brokenLinks = null;
+      try {
+        const home = await wordpressEditorFetch(stagingWordPressConfig(env), "https://staging.irpa.or.tz/", { headers: { Accept: "text/html" }, signal: AbortSignal.timeout(10000) });
+        result.websiteUp = home.ok;
+        if (home.ok) {
+          const html = (await home.text()).slice(0, 2 * 1024 * 1024);
+          const nav = html.match(/<(?:nav|div)[^>]*(?:id=["'][^"']*menu|class=["'][^"']*(?:main-navigation|primary-menu|main-menu))[^>]*>[\\s\\S]*?<\\/(?:nav|div)>/i);
+          if (nav) {
+            const hrefs = [...nav[0].matchAll(/href=["']([^"'#]+)["']/gi)].map(m => m[1]).filter((v, i, a) => a.indexOf(v) === i).slice(0, 20);
+            const broken = [];
+            for (const href of hrefs) {
+              try {
+                const link = new URL(href, "https://staging.irpa.or.tz/");
+                if (link.hostname !== "staging.irpa.or.tz" || !["http:", "https:"].includes(link.protocol)) continue;
+                const probe = await wordpressEditorFetch(stagingWordPressConfig(env), link.toString(), { method: "HEAD", redirect: "manual", signal: AbortSignal.timeout(5000) });
+                if (!probe.ok && probe.status !== 405) broken.push({ url: link.pathname, status: probe.status });
+              } catch { broken.push({ url: String(href).slice(0, 160), status: 0 }); }
+            }
+            result.brokenLinks = broken;
+          }
+        }
+      } catch { result.websiteUp = false; }
+      try {
+        const cp = cpanelConfig(env);
+        const cert = await cpanelCall(cp, "SSL/fetch_certificates");
+        const certText = JSON.stringify(cert.data || cert);
+        const dates = [...certText.matchAll(/(?:not_after|expiry|expires|expiration)[^0-9]*(20\\d{2}-\\d{2}-\\d{2})/gi)].map(m => m[1]).sort();
+        if (dates.length) result.sslExpiry = dates[dates.length - 1];
+      } catch {}
+      try {
+        const cp = cpanelConfig(env);
+        const backups = await cpanelCall(cp, "Backup/list_backups");
+        const text = JSON.stringify(backups.data || backups);
+        const dates = [...text.matchAll(/20\\d{2}-\\d{2}-\\d{2}/g)].map(m => m[0]).sort();
+        if (dates.length) result.lastBackup = dates[dates.length - 1];
+      } catch {}
       return json({ ok: true, connections: result, permissions: { websiteEditor: true, staticFileEditing: roles.some(r => REVIEW_ROLES.has(r)) } }, 200, corsHeaders(request));
     }
 
