@@ -260,6 +260,10 @@ export default {
         return await uploadControlledDocument(request, env);
       }
 
+      if (pathname === "/api/signature-pathway/reconcile" && request.method === "POST") {
+        return await reconcileSignatureDocumentIds(request, env);
+      }
+
       if (pathname === "/api/signature-profile/folder" && request.method === "POST") {
         return await ensureSignatureProfileFolder(request, env);
       }
@@ -680,6 +684,59 @@ async function upload(request, env) {
     uploadedByUid: claims.user_id,
     storageProvider: "Google Drive"
   }, 200, corsHeaders(request));
+}
+
+async function reconcileSignatureDocumentIds(request, env) {
+  const claims = await authenticateFirebaseRequest(request, env);
+  const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
+  if (!adminRecord?.fields?.active?.booleanValue && String(claims.email || "").trim().toLowerCase() !== "irpa2412@gmail.com") {
+    return json({ok:false,error:"Administrator authorization is required for signature-pathway reconciliation."},403,corsHeaders(request));
+  }
+  const body = await request.json();
+  const items = Array.isArray(body.documents) ? body.documents : [];
+  if (!items.length) return json({ok:false,error:"No document IDs were supplied for reconciliation."},400,corsHeaders(request));
+  if (items.length > 250) return json({ok:false,error:"Reconciliation is limited to 250 documents per request."},400,corsHeaders(request));
+  const accessToken = await getDriveAccessToken(env);
+  const results = [];
+  for (const item of items) {
+    const documentId = String(item?.documentId || "").trim();
+    const fileId = String(item?.fileId || "").trim();
+    const line = {documentId:documentId || "(missing ID)",fileId:fileId || "(missing Drive file ID)",status:"failed",reason:""};
+    try {
+      if (!documentId || !fileId) throw new Error("documentId and fileId are both required.");
+      const record = await getFirestoreDocument(env, `documents/${cleanId(documentId)}`, claims.token);
+      if (!record?.fields) throw new Error("Firestore controlled-document record was not found.");
+      const recordFields = record.fields;
+      const registeredIds = [
+        recordFields.fileId?.stringValue,
+        recordFields.driveFileId?.stringValue,
+        recordFields.archiveFileId?.stringValue,
+        recordFields.governanceArchiveFileId?.stringValue,
+        recordFields.sourceFileId?.stringValue
+      ].filter(Boolean).map(String);
+      if (!registeredIds.includes(fileId)) throw new Error("The supplied Drive file ID is not registered on this Firestore document.");
+      const metadata = await driveFetch(env, accessToken, `/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,name,mimeType,description`);
+      const description = parseDescription(metadata.description);
+      if (!description?.irpaGovernance) throw new Error("Drive file is not marked as an IRPA governance document.");
+      if (String(description.documentId || "") === documentId) {
+        line.status = "already correct";
+        line.reason = "Drive description.documentId already matches the Firestore document ID.";
+      } else {
+        const repairedDescription = {...description,documentId,documentUid:documentId};
+        await driveFetch(env, accessToken, `/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,description`, {
+          method:"PATCH",
+          body:JSON.stringify({description:JSON.stringify(repairedDescription)})
+        });
+        line.status = "repaired";
+        line.reason = `Drive description.documentId set to ${documentId}.`;
+      }
+    } catch (error) {
+      line.status = "failed";
+      line.reason = error?.message || "Unknown reconciliation failure.";
+    }
+    results.push(line);
+  }
+  return json({ok:true,results,summary:{total:results.length,repaired:results.filter(x=>x.status==="repaired").length,alreadyCorrect:results.filter(x=>x.status==="already correct").length,failed:results.filter(x=>x.status==="failed").length}},200,corsHeaders(request));
 }
 
 async function uploadControlledDocument(request, env) {
