@@ -5,7 +5,7 @@ const empty={name:"",email:"",phone:"",gender:"",nationality:"Tanzanian",address
 const types=["Governance Member","General Member","Institutional Member","Youth Member","Women Member"];
 
 export default function Members(){
- const[records,setRecords]=useState([]),[form,setForm]=useState(empty),[editing,setEditing]=useState(null),[viewing,setViewing]=useState(null),[busy,setBusy]=useState(false),[uidBusy,setUidBusy]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState(""),[search,setSearch]=useState("");
+ const[records,setRecords]=useState([]),[form,setForm]=useState(empty),[editing,setEditing]=useState(null),[viewing,setViewing]=useState(null),[busy,setBusy]=useState(false),[uidBusy,setUidBusy]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState(""),[uidResults,setUidResults]=useState([]),[search,setSearch]=useState("");
  async function load(){try{const all=await getRecords(COLLECTIONS.members);setRecords(all.filter(x=>!x.boardMember&&x.role!=="Board Member"&&!x.boardPosition))}catch(e){setError(e.message||"Unable to load Member register.")}}
  useEffect(()=>{load()},[]);
  async function syncUids(){setUidBusy(true);setError("");setMessage("");setUidResults([]);try{const result=await synchronizeRegisteredIdentityUids();const s=result?.summary||{};setUidResults(s.results||result.results||[]);setMessage(`✓ Safe UID reconciliation completed: ${s.assigned||0} assigned, ${s.alreadyAssigned||0} already linked, ${s.unresolved||s.blocked||0} unresolved, ${s.conflicts||0} conflicting, ${s.errors||0} errors. No Firebase accounts created; existing UIDs preserved.`);await load()}catch(e){setError(e.message||"Unable to reconcile registered identity UIDs.")}finally{setUidBusy(false)}}
