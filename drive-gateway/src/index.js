@@ -696,7 +696,8 @@ async function uploadControlledDocument(request, env) {
   const base64 = String(data.base64 || "");
   const title = cleanName(data.title || fileName.replace(/\\.pdf$/i, ""));
   const reference = cleanName(data.reference || "");
-  const documentId = cleanId(data.documentId || `IRPA-DOC-${crypto.randomUUID()}`);
+  const documentId = cleanId(data.documentId || "");
+  if (!documentId) return json({ok:false,error:"STEP upload-controlled-document: the final Firestore document ID is required before Drive upload."},400,corsHeaders(request));
   const documentType = cleanName(data.documentType || "Governance Document");
   const archiveCategory = String(data.archiveCategory || "Administrative Documents").trim();
   const classification = String(data.classification || "Public").trim();
