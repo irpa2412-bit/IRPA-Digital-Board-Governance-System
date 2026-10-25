@@ -2283,7 +2283,7 @@ jobs:
         run: |
           set -uo pipefail
           redact() {
-            perl -pe 's/Authorization:[^, ]+/Authorization: [REDACTED]/ig; s/Bearer\\s+[^\\s\\x22\\x27,;]+/Bearer [REDACTED]/ig; s/AIza[0-9A-Za-z_-]{20,}/[REDACTED_API_KEY]/g; s/(password|token|secret)(["=: ]+)[^", ]+/$1$2[REDACTED]/ig; s/([A-Za-z0-9_-]{32,})/[REDACTED_TOKEN]/g; s/[\\r\n\t]+/ /g'
+            perl -pe 's/Authorization:[^, ]+/Authorization: [REDACTED]/ig; s/Bearer\s+[^\s\x22\x27,;]+/Bearer [REDACTED]/ig; s/AIza[0-9A-Za-z_-]{20,}/[REDACTED_API_KEY]/g; s/(password|token|secret)(["=: ]+)[^", ]+/$1$2[REDACTED]/ig; s/([A-Za-z0-9_-]{32,})/[REDACTED_TOKEN]/g; s/[\r\n\t]+/ /g'
           }
           failed=0
           table="$RUNNER_TEMP/acceptance-table.md"
