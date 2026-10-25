@@ -239,10 +239,8 @@ export default function Settings({ admin = false, section = "settings" }) {
                 try {
                   const data = await reconcileRegisteredIdentityUids();
                   setResult({ type: "uid-reconciliation", ...data });
-                  const assigned = Number(data?.members?.assigned||0) + Number(data?.employees?.assigned||0);
-                  const unresolved = Number(data?.members?.unmatched||0) + Number(data?.employees?.unmatched||0);
-                  const conflicts = Number(data?.members?.conflicts||0) + Number(data?.employees?.conflicts||0);
-                  setMessage(`UID reconciliation completed: ${assigned} record(s) assigned, ${unresolved} unresolved, ${conflicts} conflict(s) preserved for review.`);
+                  const summary = data?.summary || {};
+                  setMessage(`UID reconciliation completed: ${summary.assigned||0} assigned, ${summary.alreadyAssigned||0} already linked, ${summary.unresolved||0} unresolved, ${summary.conflicting||0} conflicting, ${summary.errors||0} errors. Existing UIDs were preserved and no accounts were created.`);
                 } catch (error) {
                   setMessage(error?.message || "UID reconciliation failed. No success confirmation was received.");
                 } finally {
@@ -254,16 +252,22 @@ export default function Settings({ admin = false, section = "settings" }) {
             </button>
           </div>
           {result?.type === "uid-reconciliation" && (
-            <div className="detail-grid" style={{ marginTop: 18 }}>
-              <div><span>Members assigned</span><strong>{result.members?.assigned||0}</strong></div>
-              <div><span>Members already assigned</span><strong>{result.members?.alreadyAssigned||0}</strong></div>
-              <div><span>Members unresolved</span><strong>{result.members?.unmatched||0}</strong></div>
-              <div><span>Employees assigned</span><strong>{result.employees?.assigned||0}</strong></div>
-              <div><span>Employees already assigned</span><strong>{result.employees?.alreadyAssigned||0}</strong></div>
-              <div><span>Employees unresolved</span><strong>{result.employees?.unmatched||0}</strong></div>
-              <div><span>Conflicts preserved</span><strong>{(result.members?.conflicts||0)+(result.employees?.conflicts||0)}</strong></div>
-              <div><span>Firebase accounts scanned</span><strong>{result.authUsers||0}</strong></div>
-            </div>
+            <>
+              <div className="detail-grid" style={{ marginTop: 18 }}>
+                <div><span>Records processed</span><strong>{result.summary?.total||0}</strong></div>
+                <div><span>UIDs assigned</span><strong>{result.summary?.assigned||0}</strong></div>
+                <div><span>Already linked</span><strong>{result.summary?.alreadyAssigned||0}</strong></div>
+                <div><span>Unresolved</span><strong>{result.summary?.unresolved||0}</strong></div>
+                <div><span>Conflicting</span><strong>{result.summary?.conflicting||0}</strong></div>
+                <div><span>Errors</span><strong>{result.summary?.errors||0}</strong></div>
+                <div><span>Existing Auth accounts scanned</span><strong>{result.authUsers||0}</strong></div>
+              </div>
+              <div className="table-wrapper" style={{ marginTop: 18 }} aria-live="polite">
+                <table><thead><tr><th>Register</th><th>Record</th><th>Email</th><th>Result</th><th>UID</th><th>Details</th></tr></thead>
+                  <tbody>{(result.results||[]).map((item,index)=><tr key={item.collection+"-"+item.recordId+"-"+index}><td>{item.collection}</td><td>{item.name||item.recordId}</td><td>{item.email||"—"}</td><td>{item.status}</td><td>{item.uid||item.existingUid||"—"}</td><td>{item.reason}</td></tr>)}</tbody>
+                </table>
+              </div>
+            </>
           )}
         </section>
       )}
