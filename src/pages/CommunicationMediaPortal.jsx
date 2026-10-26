@@ -1,5 +1,4 @@
 import React,{useEffect,useMemo,useState} from "react";
-import {addDoc,collection,deleteDoc,doc,onSnapshot,orderBy,query,serverTimestamp,updateDoc} from "firebase/firestore";
 import {auth,db} from "../firebase/config";
 import {getGoogleDriveGatewayUrl} from "../firebase/gatewayUrl";
 import CommunicationMediaStudio from "./CommunicationMediaStudio";
