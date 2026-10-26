@@ -477,7 +477,7 @@ export default function Settings({ admin = false, section = "settings" }) {
         </section>
       )}
       {admin && section === "settings" && <ReleaseReadiness/>}
-      {admin && section === "settings" && <ActualDataAccessControl/>
+      {admin && section === "settings" && <ActualDataAccessControl/>}
       {admin && section === "settings" && <SystemResetControl/>}
 
       {admin && section === "settings" && (
