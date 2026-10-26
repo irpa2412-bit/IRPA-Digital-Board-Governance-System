@@ -112,7 +112,7 @@ function authHeader(username, token) {
 
 export function createCommunicationsSiteRouter(deps) {
   const {
-    authenticateFirebaseRequest, getFirestoreDocument, getInstitutionalProfileForUser,
+    authenticateFirebaseRequest, getFirestoreDocument, getFirestoreAdminAccessToken, getInstitutionalProfileForUser,
     firestoreDocumentToPlain, commitDocumentAndAudit, json, corsHeaders
   } = deps;
 
@@ -419,6 +419,24 @@ export function createCommunicationsSiteRouter(deps) {
   async function handle(request, env) {
     const url = new URL(request.url);
     const path = url.pathname.replace(/\/+$/, "") || "/";
+    if (path === "/api/communications/records" && request.method === "GET") {
+      const collectionName = String(url.searchParams.get("collection") || "");
+      const readableCollections = new Set(["communicationMediaItems", "communicationMediaAssets", "communicationOperations", "socialMediaAccounts"]);
+      if (!readableCollections.has(collectionName)) return json({ error: "This communications register is not enabled for Worker reads." }, 400, corsHeaders(request));
+      let authz;
+      try { authz = await authorised(request, env, false); }
+      catch { authz = await authorised(request, env, true); }
+      const projectId = String(env.FIREBASE_PROJECT_ID || "").trim();
+      if (!projectId) return json({ error: "FIREBASE_PROJECT_ID is not configured for this Worker." }, 500, corsHeaders(request));
+      const token = await getFirestoreAdminAccessToken(env);
+      const endpoint = "https://firestore.googleapis.com/v1/projects/" + projectId + "/databases/(default)/documents/" + collectionName;
+      const response = await fetch(endpoint + "?pageSize=100", { headers: { Authorization: "Bearer " + token, Accept: "application/json" } });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) return json({ error: "Firestore register read failed (HTTP " + response.status + "): " + String(body?.error?.status || "UNKNOWN") + " " + String(body?.error?.message || "").slice(0, 180) }, 502, corsHeaders(request));
+      const items = (Array.isArray(body.documents) ? body.documents : []).map(document => ({ id: String(document.name || "").split("/").pop(), ...(firestoreDocumentToPlain(document) || {}) }));
+      return json({ ok: true, collection: collectionName, count: items.length, items }, 200, corsHeaders(request));
+    }
+
     if (path === "/api/communications/records" && request.method === "POST") {
       const input = await request.json().catch(() => ({}));
       const collectionName = String(input.collection || "");
