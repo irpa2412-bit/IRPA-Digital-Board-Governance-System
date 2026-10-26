@@ -320,3 +320,10 @@ test("social media studio provides a manual export fallback and funding view wit
  assert.ok(portal.includes('collection:"communicationMediaItems",action:"create"'));
 });
 
+
+test("website studio supports bilingual page drafts, approval-gated publishing, and portal route self-test",()=>{
+ for(const term of ["Website Studio","English","Kiswahili","Home","About","Programmes","Projects","Impact","Partners","Funding and Reports","News","Contact","MOBILE PREVIEW","Portal Self-Test","Run Portal Self-Test"]) assert.ok(portal.includes(term),term);
+ assert.ok(site.includes('["Website Article", "Press Release", "Website Page"].includes(item.type)'));
+ assert.ok(site.includes('const endpoint = wp.root + "/wp-json/wp/v2/" + (isPage ? "pages" : "posts")'));
+ assert.ok(site.includes('item.status !== "Approved"'));
+});
