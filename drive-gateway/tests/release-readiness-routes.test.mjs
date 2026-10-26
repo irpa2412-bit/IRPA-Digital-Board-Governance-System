@@ -46,9 +46,10 @@ test("Release Readiness runs read-only diagnostics and explicitly reports blocke
   const report = await response.json();
   assert.equal(report.workerCommit, "a".repeat(40));
   assert.ok(report.checks.some(item => item.name === "Worker service-account token creation" && item.status === "PASS"));
-  assert.ok(report.checks.some(item => item.name === "Drive ID reconcile dry-run" && item.status === "PASS"));
+  assert.ok(report.checks.some(item => item.name === "Drive ID reconcile dry-run" && item.status === "FAIL" && /zero documents were inspected/.test(item.reason)));
   assert.ok(report.checks.some(item => item.name === "Add-signer dry-run through Worker" && item.status === "FAIL"));
-  assert.ok(report.checks.some(item => item.name === "Portal Self-Test (23 probes)" && item.status === "FAIL"));
+  assert.equal(report.checks.filter(item => item.name.startsWith("Portal Self-Test probe ")).length, 23);
+  assert.ok(report.checks.every(item => item.name.startsWith("Portal Self-Test probe ") ? item.status === "FAIL" : true));
   assert.deepEqual(calls, ["reconcile"]);
 });
 
