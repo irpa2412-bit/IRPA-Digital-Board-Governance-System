@@ -91,6 +91,8 @@ jobs:
           npx wrangler deploy --config wrangler.toml --name irpa-google-drive-gateway --var "GIT_SHA:${GIT_SHA}"
 
       - name: Verify production gateway health
+        env:
+          GIT_SHA: ${{ github.sha }}
         shell: bash
         run: |
           set -euo pipefail
@@ -101,9 +103,9 @@ jobs:
           node -e '
             const fs = require("node:fs");
             const health = JSON.parse(fs.readFileSync("/tmp/health.json", "utf8"));
-            if (health.ok !== true || health.environment === "staging") {
-              console.error("Production gateway health payload is not OK.");
+            if (health.ok !== true || health.environment === "staging" || health.commit !== process.env.GIT_SHA) {
+              console.error("Production gateway health payload or commit stamp does not match this deployment.");
               process.exit(1);
             }
-            console.log("Production gateway health payload OK.");
+            console.log("Production gateway health payload OK; commit matches deployment: " + health.commit);
           '

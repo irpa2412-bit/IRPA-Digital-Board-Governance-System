@@ -183,7 +183,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: drive-gateway
-          command: deploy --keep-vars --var ESIGN_MODULE_ENABLED:true --var CLOUDFLARE_AUTH_FUNCTIONS_ENABLED:true --var IRPA_PRODUCTION_CUTOVER:true
+          command: deploy --keep-vars --var GIT_SHA:${{ github.sha }} --var ESIGN_MODULE_ENABLED:true --var CLOUDFLARE_AUTH_FUNCTIONS_ENABLED:true --var IRPA_PRODUCTION_CUTOVER:true
 
       - name: Verify production gateway
         run: |
@@ -192,6 +192,7 @@ jobs:
           echo "$body"
           echo "$body" | grep -q '"ok":true'
           echo "$body" | grep -q '"storageProvider":"Google Drive"'
+          node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{const h=JSON.parse(s);if(h.commit!==process.env.GITHUB_SHA)throw new Error("Live Worker commit does not match this deployment.");console.log("Live Worker commit matches deployment: "+h.commit);})' <<< "$body"
 
       - name: Verify production CORS
         run: |

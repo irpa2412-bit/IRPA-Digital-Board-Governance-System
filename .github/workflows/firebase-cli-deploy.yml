@@ -28,13 +28,14 @@ jobs:
         run: npm run check:production-readability
       - name: Build production web application
         env:
+          VITE_BUILD_COMMIT: ${{ github.sha }}
           VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
           VITE_GOOGLE_DRIVE_GATEWAY_URL: ${{ secrets.VITE_GOOGLE_DRIVE_GATEWAY_URL }}
           VITE_GATEWAY_ORIGIN: ${{ secrets.VITE_GATEWAY_ORIGIN || 'https://irpa-google-drive-gateway.irpa-governance.workers.dev' }}
           VITE_GOOGLE_WEATHER_API_KEY: ${{ secrets.VITE_GOOGLE_WEATHER_API_KEY }}
           VITE_GRANT_CRAWLER_WORKER_URL: https://irpa-grant-crawler-production.irpa-governance.workers.dev
           VITE_GRANT_ASSISTANT_WORKER_URL: https://irpa-dbgs-grant-crawler.irpa-governance.workers.dev
-        run: npm run build
+        run: VITE_BUILD_TIME="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" npm run build
 
       - name: Verify grant crawler endpoint in the production bundle
         shell: bash

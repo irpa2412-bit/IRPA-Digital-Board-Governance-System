@@ -50,6 +50,8 @@ jobs:
           test -s dist/index.html
           grep -qi '<html' dist/index.html
           test -d dist/assets
+          grep -Fq "content=\"$GITHUB_SHA\"" dist/index.html
+          grep -Eq '<meta name="irpa-build-time" content="[0-9]{4}-[0-9]{2}-[0-9]{2}T' dist/index.html
           if ! grep -R -q 'irpa-grant-crawler-production.irpa-governance.workers.dev' dist; then
             echo 'Production frontend bundle does not reference the production D1 crawler Worker.' >&2
             exit 1
