@@ -28,7 +28,7 @@ test("communications portal stays integrated in the existing app with role-based
 
 test("communications authoring, approvals, library, calendar and exports remain available",()=>{
  for(const term of ["Create communications item","Content library","Editorial Calendar","Publishing Setup","Pending Approval","Approved","Returned","Media Asset","Submit for approval","Publish to website","exportDraft(\"txt\")","exportDraft(\"md\")","exportDraft(\"html\")","exportDraft(\"pdf\")"]) assert.ok(portal.includes(term),term);
- assert.ok(portal.includes('collection(db,"communicationMediaItems")'));
+ assert.ok(portal.includes('/api/communications/records?collection=communicationMediaItems'));
  assert.ok(portal.includes('window.confirm("Publish this approved item to the live IRPA website now?'));
 });
 
