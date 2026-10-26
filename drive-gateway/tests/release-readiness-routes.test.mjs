@@ -48,8 +48,7 @@ test("Release Readiness runs read-only diagnostics and explicitly reports blocke
   assert.ok(report.checks.some(item => item.name === "Worker service-account token creation" && item.status === "PASS"));
   assert.ok(report.checks.some(item => item.name === "Drive ID reconcile dry-run" && item.status === "FAIL" && /zero documents were inspected/.test(item.reason)));
   assert.ok(report.checks.some(item => item.name === "Add-signer dry-run through Worker" && item.status === "FAIL"));
-  assert.equal(report.checks.filter(item => item.name.startsWith("Portal Self-Test probe ")).length, 23);
-  assert.ok(report.checks.every(item => item.name.startsWith("Portal Self-Test probe ") ? item.status === "FAIL" : true));
+  assert.equal(report.checks.some(item => item.name.startsWith("Portal Self-Test probe ")), false, "the 23 browser probes run in the administrator screen, not the Worker route");
   assert.deepEqual(calls, ["reconcile"]);
 });
 
