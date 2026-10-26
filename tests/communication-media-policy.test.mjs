@@ -327,3 +327,12 @@ test("website studio supports bilingual page drafts, approval-gated publishing, 
  assert.ok(site.includes('const endpoint = wp.root + "/wp-json/wp/v2/" + (isPage ? "pages" : "posts")'));
  assert.ok(site.includes('item.status !== "Approved"'));
 });
+
+test("production Worker deployments stamp and verify the exact deployed commit",()=>{
+ const gatewayDeploy=read("../.github/workflows/cloudflare-gateway-deploy.yml");
+ const dispatchDeploy=read("../.github/workflows/cloudflare-production-gateway.yml");
+ assert.ok(gatewayDeploy.includes("--var GIT_SHA:${{ github.sha }}"));
+ assert.ok(gatewayDeploy.includes("h.commit!==process.env.GITHUB_SHA"));
+ assert.ok(dispatchDeploy.includes('--var "GIT_SHA:${GIT_SHA}"'));
+ assert.ok(dispatchDeploy.includes("health.commit !== process.env.GIT_SHA"));
+});
