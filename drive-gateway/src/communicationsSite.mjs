@@ -425,7 +425,7 @@ export function createCommunicationsSiteRouter(deps) {
       const action = String(input.action || "");
       const allowedCollections = new Set(["communicationMediaAssets", "communicationMediaItems", "communicationSocialPosts", "communicationOperations", "socialMediaAccounts"]);
       if (!allowedCollections.has(collectionName)) return json({ error: "This communications register is not enabled for Worker writes." }, 400, corsHeaders(request));
-      const reviewerAction = ["approve", "return", "archive"].includes(action);
+      const reviewerAction = ["approve", "return", "archive", "status"].includes(action);
       const { claims, roles } = await authorised(request, env, reviewerAction);
       const now = new Date().toISOString();
       const actorEmail = String(claims.email || "").slice(0, 180);
@@ -450,9 +450,22 @@ export function createCommunicationsSiteRouter(deps) {
         if (!row.title) return json({ error: "A title or account name is required." }, 400, corsHeaders(request));
       } else if (action === "update" || action === "submit") {
         if (existing.createdByUid !== claims.user_id && !roles.includes("Administrator")) return json({ error: "Only the record author or an administrator can edit or submit this draft." }, 403, corsHeaders(request));
-        if (!["Draft", "Returned"].includes(String(existing.status || "Draft"))) return json({ error: "Only draft or returned items can be edited or submitted." }, 409, corsHeaders(request));
+        if (action === "submit" && collectionName !== "communicationMediaItems") return json({ error: "Only public communications items can be submitted for approval." }, 400, corsHeaders(request));
+        if (action === "submit" && !["Draft", "Returned"].includes(String(existing.status || "Draft"))) return json({ error: "Only draft or returned items can be submitted." }, 409, corsHeaders(request));
         const d = input.data || {};
-        row = action === "submit" ? { status: "Pending Approval", submittedAt: now, updatedAt: now, updatedByUid: claims.user_id, updatedByEmail: actorEmail } : { title: cleanText(d.title, 180), type: cleanText(d.type, 60), channel: cleanText(d.channel, 80), summary: cleanText(d.summary, 1000), body: cleanText(d.body, 30000), tags: cleanText(d.tags, 500), assetUrl: /^https:\/\//i.test(String(d.assetUrl || "")) ? cleanText(d.assetUrl, 1000) : "", scheduledAt: cleanText(d.scheduledAt, 80), updatedAt: now, updatedByUid: claims.user_id, updatedByEmail: actorEmail };
+        if (action === "submit") row = { status: "Pending Approval", submittedAt: now, updatedAt: now, updatedByUid: claims.user_id, updatedByEmail: actorEmail };
+        else {
+          const updateFields = collectionName === "communicationMediaItems" ? ["title","type","channel","summary","body","scheduledAt","tags","assetUrl","slug","language","pageTemplate","hashtags"] :
+            collectionName === "communicationOperations" ? ["kind","title","summary","owner","startDate","dueDate","channels","audience","objective","budgetNote","contactName","organization","email","phone","beat","consent","assetType","assetUrl","rights","version","expiryDate","severity","lead","approver","trigger","holdingStatement","nextReview","channel","sourceUrl","observedDate","reach","engagement","sentiment","evidence","tags"] :
+            collectionName === "socialMediaAccounts" ? ["platform","accountName","handle","profileUrl","accountType","owner","custodian","purpose","audience","authorizationReference","connectionStatus","reviewDate","notes"] : [];
+          const safeUpdate = Object.fromEntries(updateFields.filter(key => d[key] !== undefined).map(key => [key, d[key]]));
+          row = { ...safeUpdate, updatedAt: now, updatedByUid: claims.user_id, updatedByEmail: actorEmail };
+        }
+      } else if (action === "status" && ["communicationOperations", "socialMediaAccounts"].includes(collectionName)) {
+        const nextStatus = cleanText(input.status, 60);
+        const allowedStatuses = collectionName === "socialMediaAccounts" ? ["Pending Verification", "Connected", "Disconnected", "Archived"] : ["Draft", "Active", "Completed", "Archived", "Under Review"];
+        if (!allowedStatuses.includes(nextStatus)) return json({ error: "This status is not permitted for the selected register." }, 400, corsHeaders(request));
+        row = collectionName === "socialMediaAccounts" ? { connectionStatus: nextStatus, updatedAt: now, updatedByUid: claims.user_id, updatedByEmail: actorEmail } : { status: nextStatus, updatedAt: now, updatedByUid: claims.user_id, updatedByEmail: actorEmail };
       } else if (["approve", "return", "archive"].includes(action)) {
         if (action !== "archive" && String(existing.status || "") !== "Pending Approval") return json({ error: "Only items awaiting approval can be approved or returned." }, 409, corsHeaders(request));
         if (action !== "archive" && existing.createdByUid === claims.user_id) return json({ error: "The author cannot approve their own public item." }, 403, corsHeaders(request));
