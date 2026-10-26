@@ -1046,7 +1046,7 @@ async function saveSignatureWorkflowDraftRoute(request, env) {
     const response = await fetch("https://firestore.googleapis.com/v1/projects/"+getFirebaseProjectId(env)+"/databases/(default)/documents:commit",{method:"POST",headers:{Authorization:"Bearer "+adminToken,"Content-Type":"application/json"},body:JSON.stringify({writes})});
     if (!response.ok) { const detail=await response.json().catch(()=>({})); const ge=detail && detail.error || {}; const err=new Error(String(ge.message || "Google returned no error message").replace(/[\r\n]/g," ").slice(0,240)); err.firestoreHttpStatus=response.status; err.googleStatus=String(ge.status || "UNKNOWN").slice(0,100); err.googleMessage=String(ge.message || "No Google error message").replace(/[\r\n]/g," ").slice(0,240); throw err; }
     return json({ok:true,envelopeId,draft:envelope,writePath:"authenticated-worker",atomic:true},200,corsHeaders(request));
-  } catch (error) { const diagnostics={step,firestoreHttpStatus:Number(error?.firestoreHttpStatus)||null,googleStatus:String(error?.googleStatus||"UNKNOWN"),googleMessage:String(error?.googleMessage||error?.message||"No detail").replace(/[\r\n]/g," ").slice(0,240)}; console.error("Signature workflow draft save failed",diagnostics); return json({ok:false,step,error:step+" failed: "+String(error?.message||error).replace(/[\r\n]/g," ").slice(0,240),diagnostics},Number(error?.status)||500,corsHeaders(request)); }
+  } catch (error) { const failedStep=String(error?.diagnosticStep||step); const diagnostics={step:failedStep,firestoreHttpStatus:Number(error?.firestoreHttpStatus)||null,googleStatus:String(error?.googleStatus||"UNKNOWN"),googleMessage:String(error?.googleMessage||error?.message||"No detail").replace(/[\r\n]/g," ").slice(0,240)}; console.error("Signature workflow draft save failed",diagnostics); return json({ok:false,step:failedStep,error:failedStep+" failed: "+String(error?.message||error).replace(/[\r\n]/g," ").slice(0,240),diagnostics},Number(error?.status)||500,corsHeaders(request)); }
 }
 async function reconcileSignatureDocumentIds(request, env) {
   const claims = await authenticateFirebaseRequest(request, env);
@@ -2980,6 +2980,7 @@ async function getFirestoreAdminAccessToken(env) {
   if (firestoreAdminTokenCache.token && firestoreAdminTokenCache.expiresAt > now + 60) {
     return firestoreAdminTokenCache.token;
   }
+  let diagnosticStep = "token creation";
   let serviceAccount;
   try {
     serviceAccount = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON || "");
@@ -3018,6 +3019,7 @@ async function getFirestoreAdminAccessToken(env) {
     new TextEncoder().encode(unsigned)
   );
   const assertion = unsigned + "." + base64UrlEncodeBytes(new Uint8Array(signature));
+  diagnosticStep = "token exchange";
   const response = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
