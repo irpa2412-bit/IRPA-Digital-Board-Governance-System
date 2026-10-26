@@ -6,6 +6,7 @@ import { browserSupportsPush, listenForForegroundMessages, notificationPermissio
 import SystemResetControl from "../components/SystemResetControl";
 import DepartmentArchiveRegistry from "../components/DepartmentArchiveRegistry";
 import ActualDataAccessControl from "../components/ActualDataAccessControl";
+import ReleaseReadiness from "../components/ReleaseReadiness";
 import { startGoogleDriveAuthorization } from "../firebase/signatureStorage";
 import { resetDocumentTrialData, resetEmployeeTrialData, resetMemberTrialData, resetSignatureEnvelopeTrialData, createExternalAuditorProfile, getRecords, COLLECTIONS, linkAdministratorToEmployee } from "../firebase/data";
 import { createAdministrator, reconcileRegisteredIdentityUids } from "../firebase/functions";
@@ -475,6 +476,7 @@ export default function Settings({ admin = false, section = "settings" }) {
           {liveCheckText && <pre aria-live="polite" style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontSize: 12, lineHeight: 1.45, padding: 12, marginTop: 14, border: "1px solid var(--border)", borderRadius: 8, background: "var(--surface)", maxHeight: "60vh", overflow: "auto" }}>{liveCheckText}</pre>}
         </section>
       )}
+      {admin && section === "settings" && <ReleaseReadiness/>}
       {admin && section === "settings" && <ActualDataAccessControl/>}
       {admin && section === "settings" && <SystemResetControl/>}
 
