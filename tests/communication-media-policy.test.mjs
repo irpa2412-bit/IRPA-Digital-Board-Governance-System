@@ -28,7 +28,7 @@ test("communications portal stays integrated in the existing app with role-based
 
 test("communications authoring, approvals, library, calendar and exports remain available",()=>{
  for(const term of ["Create communications item","Content library","Editorial Calendar","Publishing Setup","Pending Approval","Approved","Returned","Media Asset","Submit for approval","Publish to website","exportDraft(\"txt\")","exportDraft(\"md\")","exportDraft(\"html\")","exportDraft(\"pdf\")"]) assert.ok(portal.includes(term),term);
- assert.ok(portal.includes('collection(db,"communicationMediaItems")'));
+ assert.ok(portal.includes('/api/communications/records?collection=communicationMediaItems'));
  assert.ok(portal.includes('window.confirm("Publish this approved item to the live IRPA website now?'));
 });
 
@@ -293,4 +293,37 @@ test("media upload and download both enforce registered communications roles at 
  assert.ok(gateway.includes('if (purpose === "Communication Media" && !(await authorizeCommunicationMediaDownload(env, claims)))'));
  assert.ok(gateway.includes("Your registered IRPA role does not permit communications media uploads."));
  assert.ok(gateway.includes("Your registered IRPA role does not permit access to the communications media archive."));
+});
+
+test("communication media asset registration uses an authenticated Worker write instead of direct browser Firestore writes",()=>{
+ assert.ok(site.includes('path === "/api/communications/records" && request.method === "POST"'));
+ assert.ok(site.includes('action === "register-media-asset"'));
+ assert.ok(site.includes('collectionName === "communicationMediaAssets"'));
+ assert.ok(studio.includes('"/api/communications/records"'));
+ assert.ok(!studio.includes('addDoc(collection(db,"communicationMediaAssets")'));
+ assert.ok(gateway.includes('collectionName="documents"'));
+ assert.ok(gateway.includes('"communicationMediaAssets"'));
+});
+
+test("communications draft and approval writes are Worker-routed and approval is independent",()=>{
+ assert.ok(portal.includes('collection:"communicationMediaItems",action:selected?"update":"create"'));
+ assert.ok(portal.includes('action:"submit"'));
+ assert.ok(portal.includes('action:status==="Approved"?"approve":"return"'));
+ assert.ok(site.includes('existing.createdByUid === claims.user_id'));
+ assert.ok(site.includes('Only items awaiting approval can be approved or returned.'));
+ assert.ok(site.includes('The author cannot approve their own public item.'));
+ assert.ok(site.includes('commitDocumentAndAudit(env, id, claims.token'));
+});
+
+test("social media studio provides a manual export fallback and funding view without claiming live API publishing",()=>{
+ for(const term of ["Social Media Studio","Facebook","Instagram","LinkedIn","YouTube","WhatsApp Channel","exportSocialPost","Export ready-to-paste TXT","Use funder update template","Use donor thank-you template","Use project story template","Funding View","Platform reach and engagement are unavailable","Not connected in production"]) assert.ok(portal.includes(term),term);
+ assert.ok(portal.includes('collection:"communicationMediaItems",action:"create"'));
+});
+
+
+test("website studio supports bilingual page drafts, approval-gated publishing, and portal route self-test",()=>{
+ for(const term of ["Website Studio","English","Kiswahili","Home","About","Programmes","Projects","Impact","Partners","Funding and Reports","News","Contact","MOBILE PREVIEW","Portal Self-Test","Run Portal Self-Test"]) assert.ok(portal.includes(term),term);
+ assert.ok(site.includes('["Website Article", "Press Release", "Website Page"].includes(item.type)'));
+ assert.ok(site.includes('const endpoint = wp.root + "/wp-json/wp/v2/" + (isPage ? "pages" : "posts")'));
+ assert.ok(site.includes('item.status !== "Approved"'));
 });

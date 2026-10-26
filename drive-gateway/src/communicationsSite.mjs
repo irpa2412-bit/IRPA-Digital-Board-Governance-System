@@ -6,7 +6,7 @@ const AUTHOR_ROLES = new Set([
 ]);
 const REVIEW_ROLES = new Set([
   "Executive Director", "Director Outreach", "Outreach Director",
-  "Director Community Development", "Community Development Director", "Administrator"
+  "Director Community Development", "Community Development Director", "Approver", "Administrator"
 ]);
 const EDITABLE_EXTENSIONS = new Set([".html", ".htm", ".css", ".txt", ".json"]);
 const MAX_EDIT_BYTES = 512 * 1024;
@@ -112,7 +112,7 @@ function authHeader(username, token) {
 
 export function createCommunicationsSiteRouter(deps) {
   const {
-    authenticateFirebaseRequest, getFirestoreDocument, getInstitutionalProfileForUser,
+    authenticateFirebaseRequest, getFirestoreDocument, getFirestoreAdminAccessToken, getInstitutionalProfileForUser,
     firestoreDocumentToPlain, commitDocumentAndAudit, json, corsHeaders
   } = deps;
 
@@ -419,6 +419,83 @@ export function createCommunicationsSiteRouter(deps) {
   async function handle(request, env) {
     const url = new URL(request.url);
     const path = url.pathname.replace(/\/+$/, "") || "/";
+    if (path === "/api/communications/records" && request.method === "GET") {
+      const collectionName = String(url.searchParams.get("collection") || "");
+      const readableCollections = new Set(["communicationMediaItems", "communicationMediaAssets", "communicationOperations", "socialMediaAccounts"]);
+      if (!readableCollections.has(collectionName)) return json({ error: "This communications register is not enabled for Worker reads." }, 400, corsHeaders(request));
+      let authz;
+      try { authz = await authorised(request, env, false); }
+      catch { authz = await authorised(request, env, true); }
+      const projectId = String(env.FIREBASE_PROJECT_ID || "").trim();
+      if (!projectId) return json({ error: "FIREBASE_PROJECT_ID is not configured for this Worker." }, 500, corsHeaders(request));
+      const token = await getFirestoreAdminAccessToken(env);
+      const endpoint = "https://firestore.googleapis.com/v1/projects/" + projectId + "/databases/(default)/documents/" + collectionName;
+      const response = await fetch(endpoint + "?pageSize=100", { headers: { Authorization: "Bearer " + token, Accept: "application/json" } });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) return json({ error: "Firestore register read failed (HTTP " + response.status + "): " + String(body?.error?.status || "UNKNOWN") + " " + String(body?.error?.message || "").slice(0, 180) }, 502, corsHeaders(request));
+      const items = (Array.isArray(body.documents) ? body.documents : []).map(document => ({ id: String(document.name || "").split("/").pop(), ...(firestoreDocumentToPlain(document) || {}) }));
+      return json({ ok: true, collection: collectionName, count: items.length, items }, 200, corsHeaders(request));
+    }
+
+    if (path === "/api/communications/records" && request.method === "POST") {
+      const input = await request.json().catch(() => ({}));
+      const collectionName = String(input.collection || "");
+      const action = String(input.action || "");
+      const allowedCollections = new Set(["communicationMediaAssets", "communicationMediaItems", "communicationSocialPosts", "communicationOperations", "socialMediaAccounts"]);
+      if (!allowedCollections.has(collectionName)) return json({ error: "This communications register is not enabled for Worker writes." }, 400, corsHeaders(request));
+      const reviewerAction = ["approve", "return", "archive", "status"].includes(action);
+      const { claims, roles } = await authorised(request, env, reviewerAction);
+      const now = new Date().toISOString();
+      const actorEmail = String(claims.email || "").slice(0, 180);
+      const id = String(input.id || crypto.randomUUID()).replace(/[^A-Za-z0-9_-]/g, "").slice(0, 150);
+      if (!id) return json({ error: "A valid record ID is required." }, 400, corsHeaders(request));
+      const existingRaw = action === "create" || action === "register-media-asset" ? null : await getFirestoreDocument(env, collectionName + "/" + id, await getFirestoreAdminAccessToken(env));
+      const existing = firestoreDocumentToPlain(existingRaw);
+      if (!["create", "register-media-asset"].includes(action) && !existing) return json({ error: "The communications record was not found." }, 404, corsHeaders(request));
+      let row = {};
+      if (action === "register-media-asset" && collectionName === "communicationMediaAssets") {
+        const d = input.data || {};
+        if (!String(d.fileId || "").trim() || !String(d.contentType || "").trim() || !Number.isSafeInteger(Number(d.fileSize)) || Number(d.fileSize) < 1 || Number(d.fileSize) > 25 * 1024 * 1024) return json({ error: "Valid Drive file ID, content type and file size (maximum 25 MiB) are required." }, 400, corsHeaders(request));
+        row = { title: cleanText(d.title, 180) || cleanText(d.originalFileName, 180) || "Untitled media", originalFileName: cleanText(d.originalFileName, 180), contentType: cleanText(d.contentType, 120), fileSize: Number(d.fileSize), fileId: cleanText(d.fileId, 200), webViewLink: /^https:\/\//i.test(String(d.webViewLink || "")) ? cleanText(d.webViewLink, 1000) : "", storageProvider: "Google Drive", purpose: "Communication Media", tags: cleanText(d.tags, 500), mediaKind: cleanText(d.mediaKind, 60), status: "Available", recordOrigin: String(env.IRPA_ENVIRONMENT || "").toLowerCase() === "staging" ? "STAGING" : "PRODUCTION", uploadedByUid: claims.user_id, uploadedByEmail: actorEmail, createdAt: now, updatedAt: now };
+      } else if (action === "create" && ["communicationMediaItems", "communicationSocialPosts", "communicationOperations", "socialMediaAccounts"].includes(collectionName)) {
+        const d = input.data || {};
+        const allowedFields = collectionName === "communicationMediaItems" ? ["title","type","channel","summary","body","scheduledAt","tags","assetUrl","slug","language","pageTemplate","hashtags","platform","campaignId"] :
+          collectionName === "communicationSocialPosts" ? ["title","platform","channel","body","assetUrl","scheduledAt","hashtags","campaignId"] :
+          collectionName === "communicationOperations" ? ["kind","title","summary","owner","startDate","dueDate","channels","audience","objective","budgetNote","contactName","organization","email","phone","beat","consent","assetType","assetUrl","rights","version","expiryDate","severity","lead","approver","trigger","holdingStatement","nextReview","channel","sourceUrl","observedDate","reach","engagement","sentiment","evidence","tags"] :
+          ["platform","accountName","handle","profileUrl","accountType","owner","custodian","purpose","audience","authorizationReference","connectionStatus","reviewDate","notes"];
+        const safeData = Object.fromEntries(allowedFields.filter(key => d[key] !== undefined).map(key => [key, d[key]]));
+        row = { ...safeData, title: cleanText(d.title || d.accountName, 180), status: "Draft", createdByUid: claims.user_id, createdByEmail: actorEmail, createdAt: now, updatedAt: now, updatedByUid: claims.user_id, updatedByEmail: actorEmail, recordOrigin: String(env.IRPA_ENVIRONMENT || "").toLowerCase() === "staging" ? "STAGING" : "PRODUCTION" };
+        if (!row.title) return json({ error: "A title or account name is required." }, 400, corsHeaders(request));
+      } else if (action === "update" || action === "submit") {
+        if (existing.createdByUid !== claims.user_id && !roles.includes("Administrator")) return json({ error: "Only the record author or an administrator can edit or submit this draft." }, 403, corsHeaders(request));
+        if (action === "submit" && collectionName !== "communicationMediaItems") return json({ error: "Only public communications items can be submitted for approval." }, 400, corsHeaders(request));
+        if (action === "submit" && !["Draft", "Returned"].includes(String(existing.status || "Draft"))) return json({ error: "Only draft or returned items can be submitted." }, 409, corsHeaders(request));
+        const d = input.data || {};
+        if (action === "submit") row = { status: "Pending Approval", submittedAt: now, updatedAt: now, updatedByUid: claims.user_id, updatedByEmail: actorEmail };
+        else {
+          const updateFields = collectionName === "communicationMediaItems" ? ["title","type","channel","summary","body","scheduledAt","tags","assetUrl","slug","language","pageTemplate","hashtags"] :
+            collectionName === "communicationOperations" ? ["kind","title","summary","owner","startDate","dueDate","channels","audience","objective","budgetNote","contactName","organization","email","phone","beat","consent","assetType","assetUrl","rights","version","expiryDate","severity","lead","approver","trigger","holdingStatement","nextReview","channel","sourceUrl","observedDate","reach","engagement","sentiment","evidence","tags"] :
+            collectionName === "socialMediaAccounts" ? ["platform","accountName","handle","profileUrl","accountType","owner","custodian","purpose","audience","authorizationReference","connectionStatus","reviewDate","notes"] : [];
+          const safeUpdate = Object.fromEntries(updateFields.filter(key => d[key] !== undefined).map(key => [key, d[key]]));
+          row = { ...safeUpdate, updatedAt: now, updatedByUid: claims.user_id, updatedByEmail: actorEmail };
+        }
+      } else if (action === "status" && ["communicationOperations", "socialMediaAccounts"].includes(collectionName)) {
+        const nextStatus = cleanText(input.status, 60);
+        const allowedStatuses = collectionName === "socialMediaAccounts" ? ["Pending Verification", "Connected", "Disconnected", "Archived"] : ["Draft", "Active", "Completed", "Archived", "Under Review"];
+        if (!allowedStatuses.includes(nextStatus)) return json({ error: "This status is not permitted for the selected register." }, 400, corsHeaders(request));
+        row = collectionName === "socialMediaAccounts" ? { connectionStatus: nextStatus, updatedAt: now, updatedByUid: claims.user_id, updatedByEmail: actorEmail } : { status: nextStatus, updatedAt: now, updatedByUid: claims.user_id, updatedByEmail: actorEmail };
+      } else if (["approve", "return", "archive"].includes(action)) {
+        if (action !== "archive" && String(existing.status || "") !== "Pending Approval") return json({ error: "Only items awaiting approval can be approved or returned." }, 409, corsHeaders(request));
+        if (action !== "archive" && existing.createdByUid === claims.user_id) return json({ error: "The author cannot approve their own public item." }, 403, corsHeaders(request));
+        const decisionNote = cleanText(input.decisionNote, 1000);
+        if (action === "return" && !decisionNote) return json({ error: "A reason is required when returning an item." }, 400, corsHeaders(request));
+        row = { status: action === "approve" ? "Approved" : action === "return" ? "Returned" : "Archived", decisionNote, reviewedAt: now, reviewedByUid: claims.user_id, reviewedByEmail: actorEmail, updatedAt: now, updatedByUid: claims.user_id, updatedByEmail: actorEmail };
+      } else return json({ error: "Unsupported communications record action." }, 400, corsHeaders(request));
+      const auditFields = fields({ action: "COMMUNICATIONS_" + action.toUpperCase().replace(/-/g, "_"), category: "COMMUNICATIONS", collection: collectionName, recordId: id, actorUid: claims.user_id, actorEmail, details: { status: row.status || existing?.status || "Available", title: row.title || existing?.title || "" }, createdAt: now });
+      await commitDocumentAndAudit(env, id, claims.token, fields(row), Object.keys(row), auditFields, { createOnly: ["create", "register-media-asset"].includes(action), collectionName });
+      return json({ ok: true, id, collection: collectionName, action, status: row.status || "Available", message: "Record and audit event saved through the Worker." }, 200, corsHeaders(request));
+    }
+
     if (path === "/api/communications/site/status" && request.method === "GET") {
       const { roles } = await websiteEditorAuthorised(request, env);
       const result = { website: "not_configured", cpanel: "not_configured" };
@@ -677,19 +754,22 @@ export function createCommunicationsSiteRouter(deps) {
       const input = await request.json().catch(() => ({}));
       const itemId = String(input.itemId || "").trim();
       if (!/^[A-Za-z0-9_-]{1,150}$/.test(itemId)) return json({ error: "A valid communications item ID is required." }, 400, corsHeaders(request));
-      const doc = await getFirestoreDocument(env, "communicationMediaItems/" + itemId, claims.token);
+      const doc = await getFirestoreDocument(env, "communicationMediaItems/" + itemId, await getFirestoreAdminAccessToken(env));
       const item = firestoreDocumentToPlain(doc);
       if (!item) return json({ error: "Communications item not found." }, 404, corsHeaders(request));
       if (item.status === "Published" && item.publicUrl && item.wpPostId) return json({ success: true, alreadyPublished: true, publicUrl: item.publicUrl }, 200, corsHeaders(request));
-      if (item.status !== "Approved" || !["Website Article", "Press Release"].includes(item.type) || !["IRPA Website", "Press / Media"].includes(item.channel)) {
-        return json({ error: "Only approved website articles and press releases can be published." }, 409, corsHeaders(request));
+      if (item.status !== "Approved" || !["Website Article", "Press Release", "Website Page"].includes(item.type) || !["IRPA Website", "Press / Media"].includes(item.channel)) {
+        return json({ error: "Only approved website pages, articles and press releases can be published." }, 409, corsHeaders(request));
       }
       const title = cleanText(item.title, 181);
       const body = cleanText(item.body, 30001);
       if (!title || title.length > 180 || !body || body.length > 30000) return json({ error: "The approved content is incomplete or exceeds the allowed length." }, 400, corsHeaders(request));
       const wp = wordpressConfig(env);
-      const endpoint = wp.root + "/wp-json/wp/v2/posts";
-      const slug = "irpa-" + itemId;
+      const isPage = item.type === "Website Page";
+      const endpoint = wp.root + "/wp-json/wp/v2/" + (isPage ? "pages" : "posts");
+      const requestedSlug = cleanText(item.slug, 100).toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+      const languageSuffix = String(item.language || "English").toLowerCase().startsWith("kiswahili") ? "-sw" : "-en";
+      const slug = requestedSlug ? requestedSlug + languageSuffix : "irpa-" + itemId;
       const lookup = await fetch(endpoint + "?slug=" + encodeURIComponent(slug) + "&status=publish,draft,pending,private&per_page=1", {
         headers: wordpressHeaders(wp, { Accept: "application/json" }), signal: AbortSignal.timeout(15000)
       });
@@ -700,7 +780,7 @@ export function createCommunicationsSiteRouter(deps) {
         const response = await fetch(endpoint, {
           method: "POST",
           headers: wordpressHeaders(wp, { "Content-Type": "application/json", Accept: "application/json" }),
-          body: JSON.stringify({ title, content: plainContent(body), excerpt: htmlEscape(cleanText(item.summary, 600)), slug, status: "publish", comment_status: "closed", ping_status: "closed" }),
+          body: JSON.stringify({ title, content: plainContent(body) + (isPage && /^https:\/\//i.test(String(item.assetUrl || "")) ? '<p><img src="' + htmlEscape(String(item.assetUrl)) + '" alt="' + htmlEscape(title) + '" /></p>' : ""), excerpt: htmlEscape(cleanText(item.summary, 600)), slug, status: "publish", comment_status: "closed", ping_status: "closed" }),
           signal: AbortSignal.timeout(30000)
         });
         post = await response.json().catch(() => null);
@@ -708,9 +788,9 @@ export function createCommunicationsSiteRouter(deps) {
       }
       const now = new Date().toISOString();
       const documentFields = fields({ status: "Published", wpPostId: post.id, publicUrl: post.link, publishedAt: now, publishedByUid: claims.user_id, publishedByEmail: claims.email || "", updatedAt: now, updatedByUid: claims.user_id, updatedByEmail: claims.email || "" });
-      const auditFields = fields({ action: "COMMUNICATION_MEDIA_PUBLISHED", category: "COMMUNICATIONS", collection: "communicationMediaItems", recordId: itemId, actorUid: claims.user_id, actorEmail: claims.email || "", details: { type: item.type, channel: item.channel, wpPostId: post.id, publicUrl: post.link, approvedBeforePublishing: true }, createdAt: now });
-      await commitDocumentAndAudit(env, "communicationMediaItems/" + itemId, claims.token, documentFields, Object.keys(documentFields), auditFields);
-      return json({ success: true, publicUrl: post.link, wpPostId: post.id, message: "Approved content published to the IRPA website." }, 200, corsHeaders(request));
+      const auditFields = fields({ action: "COMMUNICATION_MEDIA_PUBLISHED", category: "COMMUNICATIONS", collection: "communicationMediaItems", recordId: itemId, actorUid: claims.user_id, actorEmail: claims.email || "", details: { type: item.type, channel: item.channel, language: item.language || null, wpPostId: post.id, publicUrl: post.link, approvedBeforePublishing: true }, createdAt: now });
+      await commitDocumentAndAudit(env, itemId, claims.token, documentFields, Object.keys(documentFields), auditFields, { collectionName: "communicationMediaItems" });
+      return json({ success: true, publicUrl: post.link, wpPostId: post.id, message: isPage ? "Approved IRPA website page published and recorded." : "Approved content published to the IRPA website." }, 200, corsHeaders(request));
     }
 
     if (path === "/api/communications/cpanel/files" && request.method === "GET") {

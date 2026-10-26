@@ -168,6 +168,7 @@ async function verifyGatewaySigningAuthority(env,user,manualAuthorityIdentificat
 const communicationsSiteRouter = createCommunicationsSiteRouter({
   authenticateFirebaseRequest,
   getFirestoreDocument,
+  getFirestoreAdminAccessToken,
   getInstitutionalProfileForUser,
   firestoreDocumentToPlain,
   commitDocumentAndAudit: commitFirestoreDocumentAndAudit,
@@ -3042,14 +3043,16 @@ async function getFirestoreAdminAccessToken(env) {
   return firestoreAdminTokenCache.token;
 }
 
-export async function commitFirestoreDocumentAndAudit(env, documentId, _firebaseToken, documentFields, documentMask, auditFields, {createOnly=false}={}) {
+export async function commitFirestoreDocumentAndAudit(env, documentId, _firebaseToken, documentFields, documentMask, auditFields, {createOnly=false,collectionName="documents"}={}) {
   const safeDocumentId=String(documentId||"").replace(/[^a-zA-Z0-9_-]/g,"");
+  const safeCollection=String(collectionName||"documents");
   if(!safeDocumentId)throw new Error("A valid document ID is required for the atomic lifecycle commit.");
+  if(!/^[A-Za-z][A-Za-z0-9_-]{0,99}$/.test(safeCollection) || !["documents","communicationMediaAssets","communicationMediaItems","communicationSocialPosts","communicationOperations","socialMediaAccounts"].includes(safeCollection))throw new Error("The requested Firestore collection is not approved for gateway writes.");
   const firebaseToken = await getFirestoreAdminAccessToken(env);
   const base=`projects/${getFirebaseProjectId(env)}/databases/(default)/documents`;
   const auditId=`${Date.now()}-${crypto.randomUUID()}`;
   const documentWrite={
-    update:{name:`${base}/documents/${safeDocumentId}`,fields:documentFields},
+    update:{name:`${base}/${safeCollection}/${safeDocumentId}`,fields:documentFields},
     updateMask:{fieldPaths:documentMask}
   };
   if(createOnly)documentWrite.currentDocument={exists:false};
