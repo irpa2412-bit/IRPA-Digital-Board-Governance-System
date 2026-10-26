@@ -24,6 +24,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -301,32 +303,91 @@ jobs:
           });
           NODE
 
-      - name: Deploy Firebase Hosting, Firestore Rules and Indexes
+      - name: Deploy Firebase Hosting independently
         uses: w9jds/firebase-action@v14.17.0
         with:
-          args: deploy --project irpa-digital-board-governance --only hosting,firestore
+          args: deploy --project irpa-digital-board-governance --only hosting
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
 
-      - name: Verify Firebase Hosting bundle contains this exact build
+      - name: Detect Firestore rules and indexes changes
+        id: firestore_changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet HEAD^ HEAD -- firestore.rules firestore.indexes.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Firestore rules and indexes are unchanged from the previous commit; skipping deployment."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Firestore rules or indexes changed; deployment is required."
+          fi
+
+      - name: Deploy Firestore Rules and Indexes (retry transient Google 5xx)
+        if: steps.firestore_changes.outputs.changed == 'true'
+        shell: bash
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+        run: |
+          set -euo pipefail
+          credentials="$RUNNER_TEMP/firebase-service-account.json"
+          trap 'rm -f "$credentials"' EXIT
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$credentials"
+          export GOOGLE_APPLICATION_CREDENTIALS="$credentials"
+          for attempt in 1 2 3; do
+            echo "Firestore rules/indexes deployment attempt $attempt of 3"
+            set +e
+            output="$(npx --yes firebase-tools deploy --project irpa-digital-board-governance --only firestore:rules,firestore:indexes --non-interactive 2>&1)"
+            status=$?
+            set -e
+            printf '%s\n' "$output"
+            if [ "$status" -eq 0 ]; then
+              echo "Firestore rules and indexes deployed successfully."
+              exit 0
+            fi
+            if ! printf '%s' "$output" | grep -Eq 'HTTP Error: 5|503'; then
+              echo "Firestore deployment failed for a non-transient error; not retrying." >&2
+              exit "$status"
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "Firestore deployment still returns a transient HTTP 5xx after 3 attempts." >&2
+              exit "$status"
+            fi
+            echo "Transient Google Firestore Rules API 5xx detected; waiting 120 seconds before retry."
+            sleep 120
+          done
+
+      - name: Verify live Firebase Hosting bundle
         env:
           EXPECTED_BUILD_COMMIT: ${{ github.sha }}
         shell: bash
         run: |
           set -euo pipefail
           base="https://irpa-digital-board-governance.web.app"
-          grep -R -Fq "$EXPECTED_BUILD_COMMIT" dist/assets --include="*.js"
-          curl --fail --silent --show-error --retry 5 --retry-delay 2 "$base/" -o "$RUNNER_TEMP/firebase-index.html"
-          local_asset="$(grep -oE '/assets/[^" ]+\.js' dist/index.html | head -n 1)"
-          live_asset="$(grep -oE '/assets/[^" ]+\.js' "$RUNNER_TEMP/firebase-index.html" | head -n 1)"
-          test -n "$local_asset"
-          test "$local_asset" = "$live_asset"
-          for local in dist/assets/*.js; do
-            name="${local##*/}"
-            curl --fail --silent --show-error --retry 5 --retry-delay 2 "$base/assets/$name" -o "$RUNNER_TEMP/firebase-$name"
-            cmp -s "$local" "$RUNNER_TEMP/firebase-$name"
+          for attempt in $(seq 1 18); do
+            echo "Live Firebase Hosting bundle verification attempt $attempt of 18"
+            if (
+              grep -R -Fq "$EXPECTED_BUILD_COMMIT" dist/assets --include="*.js" &&
+              curl --fail --silent --show-error --retry 2 --retry-delay 2 "$base/" -o "$RUNNER_TEMP/firebase-index.html" &&
+              local_asset="$(grep -oE '/assets/[^" ]+\.js' dist/index.html | head -n 1)" &&
+              live_asset="$(grep -oE '/assets/[^" ]+\.js' "$RUNNER_TEMP/firebase-index.html" | head -n 1)" &&
+              test -n "$local_asset" &&
+              test "$local_asset" = "$live_asset" &&
+              for local in dist/assets/*.js; do
+                name="${local##*/}"
+                curl --fail --silent --show-error --retry 2 --retry-delay 2 "$base/assets/$name" -o "$RUNNER_TEMP/firebase-$name" &&
+                cmp -s "$local" "$RUNNER_TEMP/firebase-$name" || exit 1
+              done
+            ); then
+              echo "Firebase Hosting index and every JavaScript asset exactly match build $EXPECTED_BUILD_COMMIT"
+              exit 0
+            fi
+            if [ "$attempt" -lt 18 ]; then
+              sleep 10
+            fi
           done
-          echo "Firebase Hosting index and every JavaScript asset exactly match build $EXPECTED_BUILD_COMMIT"
+          echo "Firebase Hosting bundle still does not match build $EXPECTED_BUILD_COMMIT after 18 attempts." >&2
+          exit 1
 
       # Keep Firebase function deployments independent from Firestore. The frontend is deployed by cloudflare-pages-deploy.yml.
       # Google Cloud billing is currently closed for this project, so new Cloud Functions
