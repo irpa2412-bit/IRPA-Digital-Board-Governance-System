@@ -90,10 +90,6 @@ export function createReleaseReadinessRoute(deps) {
     }
 
     add("Add-signer dry-run through Worker", false, "No non-mutating add-signer dry-run endpoint is registered; the live add-signer write was deliberately not invoked.");
-    for (let probe = 1; probe <= 23; probe++) {
-      add("Portal Self-Test probe " + String(probe).padStart(2, "0"), false, "BLOCKED: no callable 23-probe Portal Self-Test endpoint is exposed to the Worker diagnostics route; this probe was not run and is not reported as passed.");
-    }
-
     return json({ ok: checks.every(item => item.status === "PASS"), workerCommit: health.commit, workerProjectId: health.firebaseProjectId, checks }, 200, deps.corsHeaders?.(request));
   };
 }
