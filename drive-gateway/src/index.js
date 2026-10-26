@@ -25,6 +25,7 @@ import { canReadSignatureAsset, canUploadSignedDocument } from "./signatureAsset
 import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPasswordSetup, getInvitationSessionState } from "./invitationRedemption.mjs";
 import { buildGoogleDriveAuthorizationParams } from "./googleDriveOAuth.mjs";
 import { createCommunicationsSiteRouter } from "./communicationsSite.mjs";
+import { communicationsRoutes } from "./communicationsRoutes.mjs";
 import { createMetaOAuthRouter } from "./metaOAuth.mjs";
 import { createMeetingPortalRouter } from "./meetingPortal.mjs";
 import { createMeetingServicesRouter } from "./meetingServices.mjs";
@@ -238,6 +239,9 @@ export default {
         const metaResponse = await metaOAuthRouter(request, env);
         if (metaResponse) return metaResponse;
       }
+
+      const communicationsRouteResponse = await communicationsRoutes(request, env, { authenticateFirebaseRequest, getFirestoreDocument, getInstitutionalProfileForUser, firestoreDocumentToPlain, corsHeaders });
+      if (communicationsRouteResponse) return communicationsRouteResponse;
 
       if (pathname.startsWith("/api/communications/")) {
         const communicationsResponse = await communicationsSiteRouter(request, env);
