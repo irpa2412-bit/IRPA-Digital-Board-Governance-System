@@ -66,7 +66,8 @@ export function createReleaseReadinessRoute(deps) {
     }
 
     try {
-      const gateResponse = await deps.actualDataAccessRoute(request, env);
+      const gateRequest = new Request(new URL("/api/system/actual-data-access", request.url), { method: "GET", headers: request.headers });
+      const gateResponse = await deps.actualDataAccessRoute(gateRequest, env);
       const gate = await gateResponse.json();
       const enabled = gate?.enabled === true && String(gate?.status || "").toUpperCase() === "OPEN";
       add("Actual-data gate status", gateResponse.status === 200 && enabled,
