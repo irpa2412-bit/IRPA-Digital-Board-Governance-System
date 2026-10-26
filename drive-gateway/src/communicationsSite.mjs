@@ -758,7 +758,7 @@ export function createCommunicationsSiteRouter(deps) {
       const now = new Date().toISOString();
       const documentFields = fields({ status: "Published", wpPostId: post.id, publicUrl: post.link, publishedAt: now, publishedByUid: claims.user_id, publishedByEmail: claims.email || "", updatedAt: now, updatedByUid: claims.user_id, updatedByEmail: claims.email || "" });
       const auditFields = fields({ action: "COMMUNICATION_MEDIA_PUBLISHED", category: "COMMUNICATIONS", collection: "communicationMediaItems", recordId: itemId, actorUid: claims.user_id, actorEmail: claims.email || "", details: { type: item.type, channel: item.channel, language: item.language || null, wpPostId: post.id, publicUrl: post.link, approvedBeforePublishing: true }, createdAt: now });
-      await commitDocumentAndAudit(env, "communicationMediaItems/" + itemId, claims.token, documentFields, Object.keys(documentFields), auditFields);
+      await commitDocumentAndAudit(env, itemId, claims.token, documentFields, Object.keys(documentFields), auditFields, { collectionName: "communicationMediaItems" });
       return json({ success: true, publicUrl: post.link, wpPostId: post.id, message: isPage ? "Approved IRPA website page published and recorded." : "Approved content published to the IRPA website." }, 200, corsHeaders(request));
     }
 
