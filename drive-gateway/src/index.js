@@ -272,6 +272,7 @@ export default {
         return await reconcileSignatureDocumentIds(request, env);
       }
       if (pathname === "/api/signature-workflow/draft" && request.method === "POST") return await saveSignatureWorkflowDraftRoute(request, env);
+      if (pathname === "/api/system/diagnostics" && request.method === "GET") return await systemDiagnosticsRoute(request, env);
       if (pathname === "/api/system/actual-data-access" && (request.method === "GET" || request.method === "POST")) return await actualDataAccessRoute(request, env);
       if (pathname === "/api/members/reconcile-registered-identity-uids" && request.method === "POST") return await reconcileRegisteredIdentityUidsRoute(request, env);
       if (pathname === "/api/signature/authority" && request.method === "POST") return await updateSignerAuthorityRoute(request, env);
@@ -924,7 +925,10 @@ async function actualDataAccessRoute(request, env) {
   try {
     const claims = await authenticateFirebaseRequest(request, env);
     step = 'Administrator profile lookup';
-    const adminToken = await getFirestoreAdminAccessToken(env);
+    step = "token creation";
+    let adminToken;
+    try { adminToken = await getFirestoreAdminAccessToken(env); }
+    catch (error) { error.diagnosticStep = String(error?.message || "").includes("obtain an access token") ? "token exchange" : "token creation"; throw error; }
     const profile = await getFirestoreDocument(env, 'adminProfiles/' + claims.user_id, adminToken);
     const email = String(claims.email || '').trim().toLowerCase();
     const adminAllowed = email === 'irpa2412@gmail.com' || (profile?.fields?.active?.booleanValue === true && profile?.fields?.role?.stringValue === 'Administrator');
@@ -975,6 +979,26 @@ function signatureDraftFirestoreValue(value, key = "") {
   return { nullValue: null };
 }
 
+async function systemDiagnosticsRoute(request, env) {
+  const base = { ok:false, workerCommit:String(env.GIT_SHA || "unknown"), firebaseProjectId:String(env.FIREBASE_PROJECT_ID || "unconfigured"), requiredConfiguration:{ FIREBASE_SERVICE_ACCOUNT_JSON:Boolean(String(env.FIREBASE_SERVICE_ACCOUNT_JSON || "").trim()), FIREBASE_PROJECT_ID:Boolean(String(env.FIREBASE_PROJECT_ID || "").trim()), GIT_SHA:Boolean(String(env.GIT_SHA || "").trim()) }, adminToken:{created:false}, firestoreRead:{attempted:false,ok:false} };
+  try {
+    const claims = await authenticateFirebaseRequest(request, env);
+    const uid = String(claims.user_id || "");
+    const email = String(claims.email || "").trim().toLowerCase();
+    const profile = await getFirestoreDocument(env, "adminProfiles/" + uid, claims.token);
+    const isAdmin = email === "irpa2412@gmail.com" || Boolean(profile?.fields?.active?.booleanValue === true && profile?.fields?.role?.stringValue === "Administrator");
+    if (!isAdmin) return json({...base,error:"Administrator authorization is required."},403,corsHeaders(request));
+    let token;
+    try { token = await getFirestoreAdminAccessToken(env); base.adminToken = {created:true}; }
+    catch (error) { base.adminToken = {created:false,error:String(error?.message || error).slice(0,220)}; return json({...base,error:"Admin token creation/exchange failed."},200,corsHeaders(request)); }
+    base.firestoreRead = {attempted:true,ok:false,target:"adminProfiles/" + uid};
+    try { const doc = await getFirestoreDocument(env,"adminProfiles/" + uid,token); base.firestoreRead = {attempted:true,ok:true,documentFound:Boolean(doc?.fields),target:"adminProfiles/" + uid}; }
+    catch(error) { base.firestoreRead.error = String(error?.message || error).slice(0,220); }
+    base.ok = base.adminToken.created && base.firestoreRead.ok;
+    return json(base,200,corsHeaders(request));
+  } catch(error) { return json({...base,error:String(error?.message || error).slice(0,220)},Number(error?.status)||401,corsHeaders(request)); }
+}
+
 async function saveSignatureWorkflowDraftRoute(request, env) {
   let step = "Firebase authentication";
   try {
@@ -1020,10 +1044,11 @@ async function saveSignatureWorkflowDraftRoute(request, env) {
       {update:{name:base+"/documents/"+documentId,fields:docFields},updateMask:{fieldPaths:Object.keys(docFields)},currentDocument:{exists:true}},
       {update:{name:base+"/signatureEvents/"+eventId,fields:signatureDraftFirestoreValue(event).mapValue.fields},currentDocument:{exists:false}}
     ];
+    step = "Firestore commit";
     const response = await fetch("https://firestore.googleapis.com/v1/projects/"+getFirebaseProjectId(env)+"/databases/(default)/documents:commit",{method:"POST",headers:{Authorization:"Bearer "+adminToken,"Content-Type":"application/json"},body:JSON.stringify({writes})});
-    if (!response.ok) { const detail=await response.json().catch(()=>({})); throw new Error("Atomic Firestore draft commit returned HTTP "+response.status+": "+String(detail && detail.error && detail.error.message || "no detail").slice(0,240)); }
+    if (!response.ok) { const detail=await response.json().catch(()=>({})); const ge=detail && detail.error || {}; const err=new Error(String(ge.message || "Google returned no error message").replace(/[\r\n]/g," ").slice(0,240)); err.firestoreHttpStatus=response.status; err.googleStatus=String(ge.status || "UNKNOWN").slice(0,100); err.googleMessage=String(ge.message || "No Google error message").replace(/[\r\n]/g," ").slice(0,240); throw err; }
     return json({ok:true,envelopeId,draft:envelope,writePath:"authenticated-worker",atomic:true},200,corsHeaders(request));
-  } catch (error) { console.error("Signature workflow draft save failed",{step,message:String(error && error.message || error).slice(0,240)}); return json({ok:false,step,error:step+" failed: "+String(error && error.message || error).slice(0,240)},Number(error && error.status)||500,corsHeaders(request)); }
+  } catch (error) { const failedStep=String(error?.diagnosticStep||step); const diagnostics={step:failedStep,firestoreHttpStatus:Number(error?.firestoreHttpStatus)||null,googleStatus:String(error?.googleStatus||"UNKNOWN"),googleMessage:String(error?.googleMessage||error?.message||"No detail").replace(/[\r\n]/g," ").slice(0,240)}; console.error("Signature workflow draft save failed",diagnostics); return json({ok:false,step:failedStep,error:failedStep+" failed: "+String(error?.message||error).replace(/[\r\n]/g," ").slice(0,240),diagnostics},Number(error?.status)||500,corsHeaders(request)); }
 }
 async function reconcileSignatureDocumentIds(request, env) {
   const claims = await authenticateFirebaseRequest(request, env);
@@ -2957,6 +2982,7 @@ async function getFirestoreAdminAccessToken(env) {
   if (firestoreAdminTokenCache.token && firestoreAdminTokenCache.expiresAt > now + 60) {
     return firestoreAdminTokenCache.token;
   }
+  let diagnosticStep = "token creation";
   let serviceAccount;
   try {
     serviceAccount = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON || "");
@@ -2995,6 +3021,7 @@ async function getFirestoreAdminAccessToken(env) {
     new TextEncoder().encode(unsigned)
   );
   const assertion = unsigned + "." + base64UrlEncodeBytes(new Uint8Array(signature));
+  diagnosticStep = "token exchange";
   const response = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },

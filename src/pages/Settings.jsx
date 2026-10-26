@@ -123,6 +123,7 @@ export default function Settings({ admin = false, section = "settings" }) {
         return;
       }
       const token = await getIdToken(user, true);
+      await requestCheck("Admin-only Worker credential diagnostics", "/api/system/diagnostics", "GET", null, token);
       const health = await requestCheck("Worker health / commit / verified Firebase project", "/health");
       let healthData = {};
       try { healthData = JSON.parse(health.body); } catch {}
@@ -460,7 +461,7 @@ export default function Settings({ admin = false, section = "settings" }) {
             <div>
               <span className="eyebrow">PRODUCTION DIAGNOSTICS</span>
               <h2>Live System Check</h2>
-              <p className="panel-description">Runs authenticated, read-only diagnostics against the configured Worker. Reconciliation requests use dry-run mode; the upload test checks policy only and does not upload a file.</p>
+              <p className="panel-description">Runs authenticated, read-only diagnostics against the configured Worker, including service-account token creation and a harmless Firestore read. Reconciliation is dry-run; upload checks do not upload files.</p>
             </div>
           </div>
           <div className="form-actions">
