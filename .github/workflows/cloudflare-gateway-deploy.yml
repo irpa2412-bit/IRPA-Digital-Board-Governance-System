@@ -186,13 +186,12 @@ jobs:
           command: deploy --keep-vars --var GIT_SHA:${{ github.sha }} --var ESIGN_MODULE_ENABLED:true --var CLOUDFLARE_AUTH_FUNCTIONS_ENABLED:true --var IRPA_PRODUCTION_CUTOVER:true
 
       - name: Verify production gateway
+        id: verify-production-gateway
+        env:
+          EXPECTED_WORKER_COMMIT: ${{ github.sha }}
         run: |
           set -euo pipefail
-          body="$(curl --fail --silent --show-error --retry 5 --retry-delay 2 https://irpa-google-drive-gateway.irpa-governance.workers.dev/health)"
-          echo "$body"
-          echo "$body" | grep -q '"ok":true'
-          echo "$body" | grep -q '"storageProvider":"Google Drive"'
-          node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{const h=JSON.parse(s);if(h.commit!==process.env.GITHUB_SHA)throw new Error("Live Worker commit does not match this deployment.");console.log("Live Worker commit matches deployment: "+h.commit);})' <<< "$body"
+          node scripts/verify-production-health.mjs
 
       - name: Verify production CORS
         run: |
@@ -205,7 +204,7 @@ jobs:
           echo "$headers" | grep -i '^access-control-allow-headers:' | grep -qi 'authorization'
 
       - name: Roll back Worker immediately if production gate fails
-        if: failure() && env.PRODUCTION_WORKER_ROLLBACK_VERSION != ''
+        if: failure() && steps.verify-production-gateway.outcome == 'failure' && env.PRODUCTION_WORKER_ROLLBACK_VERSION != ''
         working-directory: drive-gateway
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
