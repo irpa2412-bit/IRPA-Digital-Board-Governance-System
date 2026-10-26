@@ -426,7 +426,7 @@ export function createCommunicationsSiteRouter(deps) {
       const allowedCollections = new Set(["communicationMediaAssets", "communicationMediaItems", "communicationSocialPosts", "communicationOperations", "socialMediaAccounts"]);
       if (!allowedCollections.has(collectionName)) return json({ error: "This communications register is not enabled for Worker writes." }, 400, corsHeaders(request));
       const reviewerAction = ["approve", "return", "archive"].includes(action);
-      const { claims } = await authorised(request, env, reviewerAction);
+      const { claims, roles } = await authorised(request, env, reviewerAction);
       const now = new Date().toISOString();
       const actorEmail = String(claims.email || "").slice(0, 180);
       const id = String(input.id || crypto.randomUUID()).replace(/[^A-Za-z0-9_-]/g, "").slice(0, 150);
@@ -445,7 +445,7 @@ export function createCommunicationsSiteRouter(deps) {
         for (const key of ["password", "token", "accessToken", "refreshToken", "clientSecret", "apiSecret"]) delete row[key];
         if (!row.title) return json({ error: "A title or account name is required." }, 400, corsHeaders(request));
       } else if (action === "update" || action === "submit") {
-        if (existing.createdByUid !== claims.user_id && !claims.irpaRoles?.includes("Administrator")) return json({ error: "Only the record author or an administrator can edit or submit this draft." }, 403, corsHeaders(request));
+        if (existing.createdByUid !== claims.user_id && !roles.includes("Administrator")) return json({ error: "Only the record author or an administrator can edit or submit this draft." }, 403, corsHeaders(request));
         if (!["Draft", "Returned"].includes(String(existing.status || "Draft"))) return json({ error: "Only draft or returned items can be edited or submitted." }, 409, corsHeaders(request));
         const d = input.data || {};
         row = action === "submit" ? { status: "Pending Approval", submittedAt: now, updatedAt: now, updatedByUid: claims.user_id, updatedByEmail: actorEmail } : { title: cleanText(d.title, 180), type: cleanText(d.type, 60), channel: cleanText(d.channel, 80), summary: cleanText(d.summary, 1000), body: cleanText(d.body, 30000), tags: cleanText(d.tags, 500), assetUrl: /^https:\/\//i.test(String(d.assetUrl || "")) ? cleanText(d.assetUrl, 1000) : "", scheduledAt: cleanText(d.scheduledAt, 80), updatedAt: now, updatedByUid: claims.user_id, updatedByEmail: actorEmail };
