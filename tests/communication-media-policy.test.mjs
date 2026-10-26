@@ -332,7 +332,12 @@ test("production Worker deployments stamp and verify the exact deployed commit",
  const gatewayDeploy=read("../.github/workflows/cloudflare-gateway-deploy.yml");
  const dispatchDeploy=read("../.github/workflows/cloudflare-production-gateway.yml");
  assert.ok(gatewayDeploy.includes("--var GIT_SHA:${{ github.sha }}"));
- assert.ok(gatewayDeploy.includes("h.commit!==process.env.GITHUB_SHA"));
+ const healthVerifier=read("../drive-gateway/scripts/verify-production-health.mjs");
+ assert.ok(gatewayDeploy.includes("scripts/verify-production-health.mjs"));
+ assert.ok(gatewayDeploy.includes("steps.verify-production-gateway.outcome == 'failure'"));
+ assert.ok(healthVerifier.includes("timeoutMs = 180_000"));
+ assert.ok(healthVerifier.includes("intervalMs = 5_000"));
+ assert.ok(healthVerifier.includes("health?.commit !== expectedCommit"));
  assert.ok(dispatchDeploy.includes('--var "GIT_SHA:${GIT_SHA}"'));
  assert.ok(dispatchDeploy.includes("health.commit !== process.env.GIT_SHA"));
 });
