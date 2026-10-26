@@ -4,29 +4,29 @@ function check(name, passed, reason) {
   return { name, status: passed ? "PASS" : "FAIL", reason: String(reason || (passed ? "Check passed." : "Check failed.")) };
 }
 
-function json(body, status = 200) {
+function json(body, status = 200, cors = {}) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }
+    headers: { ...cors, "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }
   });
 }
 
 export function createReleaseReadinessRoute(deps) {
   return async function releaseReadinessRoute(request, env) {
     if (new URL(request.url).pathname.replace(/\/+$/, "") !== "/api/system/release-readiness") return null;
-    if (request.method !== "POST") return json({ error: "Use POST for administrator-only Release Readiness diagnostics." }, 405);
+    if (request.method !== "POST") return json({ error: "Use POST for administrator-only Release Readiness diagnostics." }, 405, deps.corsHeaders?.(request));
     let claims;
     try {
       claims = await deps.authenticateFirebaseRequest(request, env);
       const uid = String(claims?.user_id || "");
-      if (!uid) return json({ error: "Authentication required." }, 401);
+      if (!uid) return json({ error: "Authentication required." }, 401, deps.corsHeaders?.(request));
       const email = String(claims?.email || "").trim().toLowerCase();
       const profile = await deps.getFirestoreDocument(env, "adminProfiles/" + uid, claims.token);
       const admin = email === "irpa2412@gmail.com" ||
         (profile?.fields?.active?.booleanValue === true && profile?.fields?.role?.stringValue === "Administrator");
-      if (!admin) return json({ error: "Administrator authorization is required for Release Readiness." }, 403);
+      if (!admin) return json({ error: "Administrator authorization is required for Release Readiness." }, 403, deps.corsHeaders?.(request));
     } catch (error) {
-      return json({ error: "Administrator authentication failed: " + String(error?.message || error).slice(0, 180) }, 401);
+      return json({ error: "Administrator authentication failed: " + String(error?.message || error).slice(0, 180) }, 401, deps.corsHeaders?.(request));
     }
 
     const checks = [];
@@ -83,15 +83,17 @@ export function createReleaseReadinessRoute(deps) {
       });
       const response = await deps.reconcileSignatureDocumentIds(reconcileRequest, env);
       const data = await response.json();
-      add("Drive ID reconcile dry-run", response.status === 200 && data?.dryRun === true && data?.writesPerformed === false,
-        response.status === 200 && data?.dryRun === true ? "Dry-run authorization succeeded; zero documents inspected because no verified document/Drive ID pairs were supplied. No writes or Drive mutations occurred." : "Dry-run failed: " + String(data?.error || "response did not confirm a no-write dry run."));
+      add("Drive ID reconcile dry-run", response.status === 200 && data?.dryRun === true && data?.writesPerformed === false && Number(data?.summary?.total || 0) > 0,
+        response.status === 200 && data?.dryRun === true && Number(data?.summary?.total || 0) > 0 ? "Dry-run inspected " + data.summary.total + " document(s); no writes or Drive mutations occurred." : "FAIL CLOSED: dry-run authorization succeeded but zero documents were inspected because no verified document/Drive ID pairs were supplied. No writes or Drive mutations occurred.");
     } catch (error) {
       add("Drive ID reconcile dry-run", false, "Dry-run could not run: " + String(error?.message || error).slice(0, 180));
     }
 
     add("Add-signer dry-run through Worker", false, "No non-mutating add-signer dry-run endpoint is registered; the live add-signer write was deliberately not invoked.");
-    add("Portal Self-Test (23 probes)", false, "The current application does not expose a 23-probe Portal Self-Test API; this check is blocked rather than claiming unexecuted probes passed.");
+    for (let probe = 1; probe <= 23; probe++) {
+      add("Portal Self-Test probe " + String(probe).padStart(2, "0"), false, "BLOCKED: no callable 23-probe Portal Self-Test endpoint is exposed to the Worker diagnostics route; this probe was not run and is not reported as passed.");
+    }
 
-    return json({ ok: checks.every(item => item.status === "PASS"), workerCommit: health.commit, workerProjectId: health.firebaseProjectId, checks }, 200);
+    return json({ ok: checks.every(item => item.status === "PASS"), workerCommit: health.commit, workerProjectId: health.firebaseProjectId, checks }, 200, deps.corsHeaders?.(request));
   };
 }
