@@ -449,7 +449,7 @@ export function createCommunicationsSiteRouter(deps) {
       const actorEmail = String(claims.email || "").slice(0, 180);
       const id = String(input.id || crypto.randomUUID()).replace(/[^A-Za-z0-9_-]/g, "").slice(0, 150);
       if (!id) return json({ error: "A valid record ID is required." }, 400, corsHeaders(request));
-      const existingRaw = action === "create" || action === "register-media-asset" ? null : await getFirestoreDocument(env, collectionName + "/" + id, claims.token);
+      const existingRaw = action === "create" || action === "register-media-asset" ? null : await getFirestoreDocument(env, collectionName + "/" + id, await getFirestoreAdminAccessToken(env));
       const existing = firestoreDocumentToPlain(existingRaw);
       if (!["create", "register-media-asset"].includes(action) && !existing) return json({ error: "The communications record was not found." }, 404, corsHeaders(request));
       let row = {};
@@ -754,7 +754,7 @@ export function createCommunicationsSiteRouter(deps) {
       const input = await request.json().catch(() => ({}));
       const itemId = String(input.itemId || "").trim();
       if (!/^[A-Za-z0-9_-]{1,150}$/.test(itemId)) return json({ error: "A valid communications item ID is required." }, 400, corsHeaders(request));
-      const doc = await getFirestoreDocument(env, "communicationMediaItems/" + itemId, claims.token);
+      const doc = await getFirestoreDocument(env, "communicationMediaItems/" + itemId, await getFirestoreAdminAccessToken(env));
       const item = firestoreDocumentToPlain(doc);
       if (!item) return json({ error: "Communications item not found." }, 404, corsHeaders(request));
       if (item.status === "Published" && item.publicUrl && item.wpPostId) return json({ success: true, alreadyPublished: true, publicUrl: item.publicUrl }, 200, corsHeaders(request));
