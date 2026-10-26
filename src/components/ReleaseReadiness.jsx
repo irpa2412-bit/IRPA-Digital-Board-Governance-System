@@ -48,7 +48,48 @@ export default function ReleaseReadiness() {
       for (const item of Array.isArray(payload.checks) ? payload.checks : []) {
         add(item.name || "Unnamed Worker check", item.status === "PASS", item.reason || "Worker returned no reason.");
       }
-      add("Overall Release Readiness", lines.every(line => line.startsWith("PASS |")), lines.every(line => line.startsWith("PASS |")) ? "Every executed check passed." : "One or more checks failed or remain blocked; review every line above.");
+      const portalProbes = [
+        ["Worker health", "/health", "GET", null, [200]],
+        ["Editorial posts/items list", "/api/communications/editorial/items", "GET", null, [200]],
+        ["Editorial post creation validation (no content created)", "/api/communications/editorial/items", "POST", {}, [400, 403]],
+        ["Editorial update route (missing test ID)", "/api/communications/editorial/items/__irpa_self_test_missing_item__", "PATCH", { title: "validation probe" }, [404, 403]],
+        ["Submit-for-approval route (missing test ID)", "/api/communications/editorial/items/__irpa_self_test_missing_item__/submit", "POST", {}, [404, 403]],
+        ["Approve route (missing test ID)", "/api/communications/editorial/items/__irpa_self_test_missing_item__/approve", "POST", {}, [404, 403]],
+        ["Reject route (missing test ID)", "/api/communications/editorial/items/__irpa_self_test_missing_item__/reject", "POST", {}, [404, 403]],
+        ["Pause-all status", "/api/communications/publishing/pause", "GET", null, [200]],
+        ["Pause-all change route (empty body; no change)", "/api/communications/publishing/pause", "POST", null, [400, 403]],
+        ["Editorial audit log", "/api/communications/editorial/audit", "GET", null, [200, 403]],
+        ["Social connection status", "/api/communications/social/status", "GET", null, [200]],
+        ["WordPress connection status", "/api/communications/site/status", "GET", null, [200, 503]],
+        ["WordPress pages list", "/api/communications/website/content?type=pages", "GET", null, [200, 503]],
+        ["WordPress posts list", "/api/communications/website/content?type=posts", "GET", null, [200, 503]],
+        ["WordPress page update validation (empty body)", "/api/communications/website/content", "PUT", {}, [400, 503]],
+        ["WordPress publish validation (empty body; no publish)", "/api/communications/website/publish", "POST", {}, [400, 503]],
+        ["WordPress revision history", "/api/communications/website/revisions?type=pages&id=__irpa_self_test_missing_item__", "GET", null, [200, 400, 404, 503]],
+        ["Media library records", "/api/communications/records?collection=communicationMediaItems", "GET", null, [200]],
+        ["Media/story write validation (invalid collection; no record created)", "/api/communications/records", "POST", { collection: "__irpa_self_test_invalid_collection__", action: "create" }, [400, 403]],
+        ["Monthly funder report source data", "/api/communications/records?collection=communicationMediaItems", "GET", null, [200]],
+        ["cPanel files GET route", "/api/communications/cpanel/files", "GET", null, [200, 503]],
+        ["cPanel file PUT validation route", "/api/communications/cpanel/files", "PUT", {}, [400, 503]],
+        ["cPanel rollback validation route", "/api/communications/cpanel/rollback", "POST", {}, [400, 503]]
+      ];
+      for (const [name, path, method, body, expected] of portalProbes) {
+        try {
+          const probeResponse = await fetch(gateway + path, {
+            method,
+            headers: { Authorization: "Bearer " + token, Accept: "application/json", ...(body ? { "Content-Type": "application/json" } : {}) },
+            ...(body ? { body: JSON.stringify(body) } : {})
+          });
+          const responseText = await probeResponse.text();
+          let responseData = {};
+          try { responseData = JSON.parse(responseText); } catch {}
+          const passed = expected.includes(probeResponse.status);
+          add("Portal Self-Test: " + name, passed, "HTTP " + probeResponse.status + "; expected " + expected.join("/") + ". " + String(responseData.error || responseData.message || (responseText ? responseText.slice(0, 140) : "No response body")));
+        } catch (probeError) {
+          add("Portal Self-Test: " + name, false, String(probeError?.message || probeError));
+        }
+      }
+            add("Overall Release Readiness", lines.every(line => line.startsWith("PASS |")), lines.every(line => line.startsWith("PASS |")) ? "Every executed check passed." : "One or more checks failed or remain blocked; review every line above.");
     } catch (error) {
       add("Release Readiness execution", false, String(error?.message || error));
     } finally {
