@@ -6,7 +6,7 @@ const AUTHOR_ROLES = new Set([
 ]);
 const REVIEW_ROLES = new Set([
   "Executive Director", "Director Outreach", "Outreach Director",
-  "Director Community Development", "Community Development Director", "Administrator"
+  "Director Community Development", "Community Development Director", "Approver", "Administrator"
 ]);
 const EDITABLE_EXTENSIONS = new Set([".html", ".htm", ".css", ".txt", ".json"]);
 const MAX_EDIT_BYTES = 512 * 1024;
