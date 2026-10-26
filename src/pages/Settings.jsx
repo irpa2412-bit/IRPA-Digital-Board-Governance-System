@@ -532,8 +532,8 @@ export default function Settings({ admin = false, section = "settings" }) {
       {section === "settings" && (
         <footer className="panel" aria-label="Application build information" style={{ marginTop: 20, padding: "12px 16px", fontSize: 12, opacity: 0.85 }}>
           <strong>Application build</strong>
-          <div>Web commit: {String(import.meta.env.VITE_BUILD_COMMIT || "unavailable").slice(0, 7)}</div>
-          <div>Worker commit: {String(workerHealth?.commit || workerHealth?.version || "unavailable").slice(0, 7)}{workerHealth?.httpStatus ? " · HTTP " + workerHealth.httpStatus : ""}</div>
+          <div>Web commit: {String(import.meta.env.VITE_BUILD_COMMIT || "unavailable")}</div>
+          <div>Worker commit: {String(workerHealth?.commit || workerHealth?.version || "unavailable")}{workerHealth?.httpStatus ? " · HTTP " + workerHealth.httpStatus : ""}</div>
           <div>Worker Firebase project: {String(workerHealth?.firebaseProjectId || "unavailable")}</div>
           <div>Built (UTC): {import.meta.env.VITE_BUILD_TIME || "timestamp unavailable"}</div>
         </footer>
