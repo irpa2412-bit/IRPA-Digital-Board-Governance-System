@@ -745,7 +745,7 @@ export function createCommunicationsSiteRouter(deps) {
         const response = await fetch(endpoint, {
           method: "POST",
           headers: wordpressHeaders(wp, { "Content-Type": "application/json", Accept: "application/json" }),
-          body: JSON.stringify({ title, content: plainContent(body), excerpt: htmlEscape(cleanText(item.summary, 600)), slug, status: "publish", comment_status: "closed", ping_status: "closed" }),
+          body: JSON.stringify({ title, content: plainContent(body) + (isPage && /^https:\/\//i.test(String(item.assetUrl || "")) ? '<p><img src="' + htmlEscape(String(item.assetUrl)) + '" alt="' + htmlEscape(title) + '" /></p>' : ""), excerpt: htmlEscape(cleanText(item.summary, 600)), slug, status: "publish", comment_status: "closed", ping_status: "closed" }),
           signal: AbortSignal.timeout(30000)
         });
         post = await response.json().catch(() => null);
