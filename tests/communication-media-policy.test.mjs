@@ -336,3 +336,16 @@ test("production Worker deployments stamp and verify the exact deployed commit",
  assert.ok(dispatchDeploy.includes('--var "GIT_SHA:${GIT_SHA}"'));
  assert.ok(dispatchDeploy.includes("health.commit !== process.env.GIT_SHA"));
 });
+
+test("public HTML and Settings show the exact web and Worker build stamps",()=>{
+ const html=read("../index.html");
+ const settings=read("../src/pages/Settings.jsx");
+ const firebaseDeploy=read("../.github/workflows/firebase-cli-deploy.yml");
+ const pagesDeploy=read("../.github/workflows/cloudflare-pages-deploy.yml");
+ assert.ok(html.includes('content="%VITE_BUILD_COMMIT%"'));
+ assert.ok(html.includes('content="%VITE_BUILD_TIME%"'));
+ assert.ok(settings.includes('String(import.meta.env.VITE_BUILD_COMMIT || "unavailable")'));
+ assert.ok(settings.includes('String(workerHealth?.commit || workerHealth?.version || "unavailable")'));
+ assert.ok(firebaseDeploy.includes("VITE_BUILD_COMMIT: ${{ github.sha }}"));
+ assert.ok(pagesDeploy.includes('grep -Fq "content=\\"$GITHUB_SHA\\"" dist/index.html'));
+});
