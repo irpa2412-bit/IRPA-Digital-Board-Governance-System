@@ -925,8 +925,10 @@ async function actualDataAccessRoute(request, env) {
   try {
     const claims = await authenticateFirebaseRequest(request, env);
     step = 'Administrator profile lookup';
-    step = "Admin token creation / OAuth token exchange";
-    const adminToken = await getFirestoreAdminAccessToken(env);
+    step = "token creation";
+    let adminToken;
+    try { adminToken = await getFirestoreAdminAccessToken(env); }
+    catch (error) { error.diagnosticStep = String(error?.message || "").includes("obtain an access token") ? "token exchange" : "token creation"; throw error; }
     const profile = await getFirestoreDocument(env, 'adminProfiles/' + claims.user_id, adminToken);
     const email = String(claims.email || '').trim().toLowerCase();
     const adminAllowed = email === 'irpa2412@gmail.com' || (profile?.fields?.active?.booleanValue === true && profile?.fields?.role?.stringValue === 'Administrator');
