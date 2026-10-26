@@ -723,15 +723,18 @@ export function createCommunicationsSiteRouter(deps) {
       const item = firestoreDocumentToPlain(doc);
       if (!item) return json({ error: "Communications item not found." }, 404, corsHeaders(request));
       if (item.status === "Published" && item.publicUrl && item.wpPostId) return json({ success: true, alreadyPublished: true, publicUrl: item.publicUrl }, 200, corsHeaders(request));
-      if (item.status !== "Approved" || !["Website Article", "Press Release"].includes(item.type) || !["IRPA Website", "Press / Media"].includes(item.channel)) {
-        return json({ error: "Only approved website articles and press releases can be published." }, 409, corsHeaders(request));
+      if (item.status !== "Approved" || !["Website Article", "Press Release", "Website Page"].includes(item.type) || !["IRPA Website", "Press / Media"].includes(item.channel)) {
+        return json({ error: "Only approved website pages, articles and press releases can be published." }, 409, corsHeaders(request));
       }
       const title = cleanText(item.title, 181);
       const body = cleanText(item.body, 30001);
       if (!title || title.length > 180 || !body || body.length > 30000) return json({ error: "The approved content is incomplete or exceeds the allowed length." }, 400, corsHeaders(request));
       const wp = wordpressConfig(env);
-      const endpoint = wp.root + "/wp-json/wp/v2/posts";
-      const slug = "irpa-" + itemId;
+      const isPage = item.type === "Website Page";
+      const endpoint = wp.root + "/wp-json/wp/v2/" + (isPage ? "pages" : "posts");
+      const requestedSlug = cleanText(item.slug, 100).toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+      const languageSuffix = String(item.language || "English").toLowerCase().startsWith("kiswahili") ? "-sw" : "-en";
+      const slug = requestedSlug ? requestedSlug + languageSuffix : "irpa-" + itemId;
       const lookup = await fetch(endpoint + "?slug=" + encodeURIComponent(slug) + "&status=publish,draft,pending,private&per_page=1", {
         headers: wordpressHeaders(wp, { Accept: "application/json" }), signal: AbortSignal.timeout(15000)
       });
@@ -750,9 +753,9 @@ export function createCommunicationsSiteRouter(deps) {
       }
       const now = new Date().toISOString();
       const documentFields = fields({ status: "Published", wpPostId: post.id, publicUrl: post.link, publishedAt: now, publishedByUid: claims.user_id, publishedByEmail: claims.email || "", updatedAt: now, updatedByUid: claims.user_id, updatedByEmail: claims.email || "" });
-      const auditFields = fields({ action: "COMMUNICATION_MEDIA_PUBLISHED", category: "COMMUNICATIONS", collection: "communicationMediaItems", recordId: itemId, actorUid: claims.user_id, actorEmail: claims.email || "", details: { type: item.type, channel: item.channel, wpPostId: post.id, publicUrl: post.link, approvedBeforePublishing: true }, createdAt: now });
+      const auditFields = fields({ action: "COMMUNICATION_MEDIA_PUBLISHED", category: "COMMUNICATIONS", collection: "communicationMediaItems", recordId: itemId, actorUid: claims.user_id, actorEmail: claims.email || "", details: { type: item.type, channel: item.channel, language: item.language || null, wpPostId: post.id, publicUrl: post.link, approvedBeforePublishing: true }, createdAt: now });
       await commitDocumentAndAudit(env, "communicationMediaItems/" + itemId, claims.token, documentFields, Object.keys(documentFields), auditFields);
-      return json({ success: true, publicUrl: post.link, wpPostId: post.id, message: "Approved content published to the IRPA website." }, 200, corsHeaders(request));
+      return json({ success: true, publicUrl: post.link, wpPostId: post.id, message: isPage ? "Approved IRPA website page published and recorded." : "Approved content published to the IRPA website." }, 200, corsHeaders(request));
     }
 
     if (path === "/api/communications/cpanel/files" && request.method === "GET") {
