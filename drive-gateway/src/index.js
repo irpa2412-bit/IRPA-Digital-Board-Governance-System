@@ -168,6 +168,7 @@ async function verifyGatewaySigningAuthority(env,user,manualAuthorityIdentificat
 const communicationsSiteRouter = createCommunicationsSiteRouter({
   authenticateFirebaseRequest,
   getFirestoreDocument,
+  getFirestoreAdminAccessToken,
   getInstitutionalProfileForUser,
   firestoreDocumentToPlain,
   commitDocumentAndAudit: commitFirestoreDocumentAndAudit,
