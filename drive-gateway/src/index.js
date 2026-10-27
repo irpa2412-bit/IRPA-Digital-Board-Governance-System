@@ -987,8 +987,27 @@ function signatureDraftFirestoreValue(value, key = "") {
   return { nullValue: null };
 }
 
+function firebaseServiceAccountDiagnostic(env) {
+  const raw = String(env?.FIREBASE_SERVICE_ACCOUNT_JSON || "").trim();
+  if (!raw) return { status: "binding absent" };
+  let account;
+  try { account = JSON.parse(raw); }
+  catch { return { status: "not valid JSON" }; }
+  if (!account || typeof account !== "object" ||
+      !String(account.client_email || "").trim() ||
+      !String(account.private_key || "").trim() ||
+      !String(account.project_id || "").trim()) {
+    return { status: "JSON missing client_email, private_key or project_id" };
+  }
+  if (String(account.project_id).trim() !== String(env?.FIREBASE_PROJECT_ID || "").trim()) {
+    return { status: "project_id differs from FIREBASE_PROJECT_ID" };
+  }
+  return { status: "configured; private-key import not yet verified" };
+}
+
 async function systemDiagnosticsRoute(request, env) {
-  const base = { ok:false, workerCommit:String(env.GIT_SHA || "unknown"), firebaseProjectId:String(env.FIREBASE_PROJECT_ID || "unconfigured"), requiredConfiguration:{ FIREBASE_SERVICE_ACCOUNT_JSON:Boolean(String(env.FIREBASE_SERVICE_ACCOUNT_JSON || "").trim()), FIREBASE_PROJECT_ID:Boolean(String(env.FIREBASE_PROJECT_ID || "").trim()), GIT_SHA:Boolean(String(env.GIT_SHA || "").trim()) }, adminToken:{created:false}, firestoreRead:{attempted:false,ok:false} };
+  const serviceAccountDiagnostic = firebaseServiceAccountDiagnostic(env);
+  const base = { ok:false, workerCommit:String(env.GIT_SHA || "unknown"), firebaseProjectId:String(env.FIREBASE_PROJECT_ID || "unconfigured"), serviceAccountDiagnostic, requiredConfiguration:{ FIREBASE_SERVICE_ACCOUNT_JSON:Boolean(String(env.FIREBASE_SERVICE_ACCOUNT_JSON || "").trim()), FIREBASE_PROJECT_ID:Boolean(String(env.FIREBASE_PROJECT_ID || "").trim()), GIT_SHA:Boolean(String(env.GIT_SHA || "").trim()) }, adminToken:{created:false}, firestoreRead:{attempted:false,ok:false} };
   try {
     const claims = await authenticateFirebaseRequest(request, env);
     const uid = String(claims.user_id || "");
