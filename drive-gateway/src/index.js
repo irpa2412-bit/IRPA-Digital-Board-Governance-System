@@ -1189,7 +1189,7 @@ async function reconcileSignatureDocumentIds(request, env) {
       line.previousDescriptionDocumentId = previousDocumentId || "(missing)";
       if (previousDocumentId === documentId) {
         line.status = "match";
-        line.reason = "Drive description.documentId matches Firestore ID " + documentId + ".";
+        line.reason = "Drive description.documentId is already correct and matches Firestore ID " + documentId + ".";
       } else if (dryRun) {
         line.status = "mismatch";
         line.reason = "Drive description.documentId is " + (previousDocumentId || "(missing)") + "; expected Firestore ID " + documentId + ". No changes made.";
@@ -1209,7 +1209,7 @@ async function reconcileSignatureDocumentIds(request, env) {
     }
     results.push(line);
   }
-  const summary = {total:results.length,repaired:results.filter(x=>x.status==="repaired").length,mismatch:results.filter(x=>x.status==="mismatch").length,match:results.filter(x=>x.status==="match").length,unreadable:results.filter(x=>x.status==="unreadable").length};
+  const summary = {total:results.length,repaired:results.filter(x=>x.status==="repaired").length,mismatch:results.filter(x=>x.status==="mismatch").length,match:results.filter(x=>x.status==="match").length,alreadyCorrect:results.filter(x=>x.status==="match").length,unreadable:results.filter(x=>x.status==="unreadable").length};
   return json({ok:true,dryRun,autoDiscover,results,summary,writesPerformed:false,driveMutationsPerformed:!dryRun&&summary.repaired>0},200,corsHeaders(request));
 }
 
