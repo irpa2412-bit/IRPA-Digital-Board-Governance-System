@@ -35,6 +35,7 @@ jobs:
           # Validate only the default configuration, before any named [env.*] section.
           default_config="$(awk '/^\[env\./ { exit } { print }' "$config")"
           grep -q '^name = "irpa-google-drive-gateway"$' <<< "$default_config"
+          grep -q '^keep_vars = true$' <<< "$default_config"
           grep -q '^FIREBASE_PROJECT_ID = "irpa-digital-board-governance"$' <<< "$default_config"
           grep -q '^DRIVE_MOCK = "false"$' <<< "$default_config"
           grep -q '^LOCAL_TEST_MODE = "false"$' <<< "$default_config"
