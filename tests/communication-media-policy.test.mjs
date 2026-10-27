@@ -339,7 +339,12 @@ test("production Worker deployments stamp and verify the exact deployed commit",
  assert.ok(healthVerifier.includes("intervalMs = 5_000"));
  assert.ok(healthVerifier.includes("health?.commit !== expectedCommit"));
  assert.ok(dispatchDeploy.includes('--var "GIT_SHA:${GIT_SHA}"'));
- assert.ok(dispatchDeploy.includes("health.commit !== process.env.GIT_SHA"));
+ assert.ok(dispatchDeploy.includes("health.commit === process.env.GIT_SHA"), "health verification must compare the returned commit to GIT_SHA");
+ assert.ok(dispatchDeploy.includes("deadline=$((SECONDS + 180))"), "health verification must allow a 180-second propagation window");
+ assert.ok(dispatchDeploy.includes("while (( SECONDS < deadline ))"), "health verification must retry until the deadline");
+ assert.ok(dispatchDeploy.includes("sleep 5"), "health verification must pause between retries");
+ assert.ok(dispatchDeploy.includes("Production gateway health verification failed after 180 seconds"));
+ assert.ok(dispatchDeploy.includes("exit 1"), "health verification must fail when the deployed commit never matches");
 });
 
 test("public HTML and Settings show the exact web and Worker build stamps",()=>{
