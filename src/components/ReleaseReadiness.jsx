@@ -17,7 +17,7 @@ export default function ReleaseReadiness({ admin = false }) {
     setBusy(true);
     setCopyMessage("");
     const lines = [];
-    const add = (name, ok, reason) => lines.push((ok ? "PASS" : "FAIL") + " | " + name + " | " + String(reason || (ok ? "Check passed." : "Check failed.")));
+    const add = (name, result, reason) => { const status = result === "NEEDS CONFIGURATION" ? "NEEDS CONFIGURATION" : (result === true || result === "PASS") ? "PASS" : "FAIL"; lines.push(status + " | " + name + " | " + String(reason || (status === "PASS" ? "Check passed." : status === "NEEDS CONFIGURATION" ? "Required configuration is missing." : "Check failed."))); };
     try {
       const user = auth.currentUser;
       if (!user) {
@@ -50,7 +50,7 @@ export default function ReleaseReadiness({ admin = false }) {
       add("Web build stamp matches Worker commit", webCommit !== "unavailable" && workerCommit !== "unknown" && webCommit === workerCommit,
         webCommit === workerCommit ? "Both report " + webCommit + "." : "Web reports " + webCommit + "; Worker reports " + workerCommit + ".");
       for (const item of Array.isArray(payload.checks) ? payload.checks : []) {
-        add(item.name || "Unnamed Worker check", item.status === "PASS", item.reason || "Worker returned no reason.");
+        add(item.name || "Unnamed Worker check", item.status === "NEEDS CONFIGURATION" ? "NEEDS CONFIGURATION" : item.status === "PASS", item.reason || "Worker returned no reason.");
       }
       const portalProbes = [
         ["Worker health", "/health", "GET", null, [200]],
@@ -64,6 +64,7 @@ export default function ReleaseReadiness({ admin = false }) {
         ["Pause-all change route (empty body; no change)", "/api/communications/publishing/pause", "POST", null, [400, 403]],
         ["Editorial audit log", "/api/communications/editorial/audit", "GET", null, [200, 403]],
         ["Social connection status", "/api/communications/social/status", "GET", null, [200]],
+        ["Add-signer dry-run validation (empty body; no write)", "/api/signature-workflow/add-signer-dry-run", "POST", {}, [400]],
         ["WordPress connection status", "/api/communications/site/status", "GET", null, [200, 503]],
         ["WordPress pages list", "/api/communications/website/content?type=pages", "GET", null, [200, 503]],
         ["WordPress posts list", "/api/communications/website/content?type=posts", "GET", null, [200, 503]],
@@ -87,13 +88,19 @@ export default function ReleaseReadiness({ admin = false }) {
           const responseText = await probeResponse.text();
           let responseData = {};
           try { responseData = JSON.parse(responseText); } catch {}
-          const passed = expected.includes(probeResponse.status);
-          add("Portal Self-Test: " + name, passed, "HTTP " + probeResponse.status + "; expected " + expected.join("/") + ". " + String(responseData.error || responseData.message || (responseText ? responseText.slice(0, 140) : "No response body")));
+          const detail = String(responseData.error || responseData.message || (responseText ? responseText.slice(0, 140) : "No response body"));
+          const needsConfiguration = probeResponse.status === 503 && /Missing required Worker secrets:/i.test(detail);
+          const passed = expected.includes(probeResponse.status) && !needsConfiguration;
+          add("Portal Self-Test: " + name, needsConfiguration ? "NEEDS CONFIGURATION" : passed, "HTTP " + probeResponse.status + "; expected " + expected.join("/") + ". " + detail);
         } catch (probeError) {
           add("Portal Self-Test: " + name, false, String(probeError?.message || probeError));
         }
       }
-            add("Overall Release Readiness", lines.every(line => line.startsWith("PASS |")), lines.every(line => line.startsWith("PASS |")) ? "Every executed check passed." : "One or more checks failed or remain blocked; review every line above.");
+            const passCount = lines.filter(line => line.startsWith("PASS |")).length;
+      const configCount = lines.filter(line => line.startsWith("NEEDS CONFIGURATION |")).length;
+      const failCount = lines.filter(line => line.startsWith("FAIL |")).length;
+      lines.unshift(passCount + " PASS, " + configCount + " NEEDS CONFIGURATION, " + failCount + " FAIL");
+      add("Overall Release Readiness", failCount === 0, failCount === 0 ? "No failed checks; configuration gaps are listed separately." : "One or more checks failed; review each FAIL line above.");
     } catch (error) {
       add("Release Readiness execution", false, String(error?.message || error));
     } finally {
