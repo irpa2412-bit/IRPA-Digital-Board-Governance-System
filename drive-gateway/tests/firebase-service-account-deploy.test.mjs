@@ -23,5 +23,8 @@ test("diagnostics classify Firebase service account failures without exposing va
     "private key import failed"
   ]) assert.ok(source.includes(status), status);
   assert.match(source, /serviceAccountDiagnostic/);
+  assert.match(source, /workerName:String\(env\.IRPA_WORKER_NAME/);
+  assert.match(source, /workerEnvironment:String\(env\.IRPA_WORKER_ENVIRONMENT/);
+  assert.match(source, /bindingNames:Object\.keys\(env \|\| \{\}\)\.sort\(\)/);
   assert.match(source, /crypto\.subtle\.importKey\("pkcs8", pemPrivateKeyBytes\(account\.private_key\)/);
 });
