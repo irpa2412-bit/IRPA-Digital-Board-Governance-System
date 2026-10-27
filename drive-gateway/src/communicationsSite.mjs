@@ -270,10 +270,10 @@ export function createCommunicationsSiteRouter(deps) {
     return data;
   }
 
-  function isStagingPublicLink(value) {
+  function isAllowedWordPressLink(value, wp) {
     try {
       const link = new URL(String(value || ""));
-      return link.protocol === "https:" && link.hostname.toLowerCase() === "staging.irpa.or.tz";
+      return link.protocol === "https:" && link.hostname.toLowerCase() === wp.hostname && !link.port && !link.username && !link.password;
     } catch {
       return false;
     }
@@ -634,6 +634,7 @@ export function createCommunicationsSiteRouter(deps) {
           !Number.isSafeInteger(featuredMedia) || featuredMedia < 0 || !["draft", "publish"].includes(status)) {
         return json({ error: "Provide a valid page/post ID, title, content, excerpt, featured image ID and draft/publish status." }, 400, corsHeaders(request));
       }
+      if (String(env.IRPA_ENVIRONMENT || "").toLowerCase() === "production" && status === "publish") return json({ error: "Production publishing requires the approved communication-media workflow; save as draft and submit for approval." }, 403, corsHeaders(request));
       const wp = websiteWordPressConfig(env);
       await verifyDedicatedWordPressEditor(wp);
       const current = await readWebsiteItem(wp, type, id);
