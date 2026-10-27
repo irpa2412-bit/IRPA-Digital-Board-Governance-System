@@ -94,6 +94,7 @@ test("cPanel access is secret-backed and static-file editor denies executable or
  assert.ok(site.includes("const allowedUrl = /^https:\\/\\//.test(decoded)"));
  assert.ok(site.includes("noopener noreferrer"));
  assert.ok(site.includes("base.port !== \"2083\""));
+ assert.ok(site.includes('environment === "production" ? ["public_html", "home/" + username + "/public_html", "/home/" + username + "/public_html"]'));
  assert.ok(!site.includes("Fileman/delete_file"));
 });
 
@@ -136,9 +137,11 @@ test("website editor provides a sandboxed live preview without bypassing live-wr
  assert.ok(docs.includes("does not edit PHP"));
 });
 
-test("website page editing is staging-host-only, Communication & Media scoped, revision-backed and secret-safe",()=>{
- assert.ok(site.includes('String(env.IRPA_ENVIRONMENT || "").toLowerCase() !== "staging"'));
- assert.ok(site.includes('base.hostname.toLowerCase() !== "staging.irpa.or.tz"'));
+test("website page editing is host-restricted for staging and production, Communication & Media scoped, revision-backed and secret-safe",()=>{
+ assert.ok(site.includes('environment === "staging" && host !== "staging.irpa.or.tz"'));
+ assert.ok(site.includes('environment === "production" && !["irpa.or.tz", "www.irpa.or.tz"].includes(host)'));
+ assert.ok(site.includes('Production publishing requires the approved communication-media workflow'));
+ assert.ok(site.includes('WORDPRESS_BASE_URL", "WORDPRESS_USERNAME", "WORDPRESS_APPLICATION_PASSWORD'));
  assert.ok(site.includes('redirect: "manual"'));
  assert.ok(site.includes("WEBSITE_EDITOR_ROLES"));
  assert.ok(site.includes("COMMUNICATION_WEBSITE_EDIT_SNAPSHOT_SAVED"));
