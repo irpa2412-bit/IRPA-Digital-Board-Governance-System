@@ -11,7 +11,12 @@ const signedUidSet = envelope => {
   }
   return signed;
 };
-const isApplied = field => Boolean(field?.applied === true || field?.isApplied === true || field?.signed === true || field?.valueApplied === true || field?.appliedAt || field?.signedAt || field?.completedAt || field?.signatureApplied === true);
+const isApplied = field => Boolean(field?.applied === true || field?.isApplied === true || field?.signed === true || field?.valueApplied === true || field?.appliedAt || field?.signedAt || field?.completedAt || field?.signatureApplied === true || field?.signatureData || field?.signatureImage || field?.signatureUrl || field?.signatureImageUrl || field?.signatureDataUrl || field?.initialsData || field?.initialsImage || field?.initialsUrl || field?.signedValue);
+const hideUnappliedValue = field => {
+  const placeholder = { ...field };
+  for (const key of ["value", "fieldValue", "signature", "signatureData", "signatureImage", "signatureUrl", "signatureImageUrl", "signatureDataUrl", "initials", "initialsData", "initialsImage", "initialsUrl", "signedValue", "appliedAt", "signedAt", "completedAt", "signatureApplied", "isApplied", "applied", "valueApplied"]) delete placeholder[key];
+  return placeholder;
+};
 /** Server-side least-privilege envelope view. */
 export function filterSignatureEnvelopeForCaller(envelope, { authenticatedUid, isAdmin = false } = {}) {
   const actor = uidOf(authenticatedUid);
@@ -26,7 +31,7 @@ export function filterSignatureEnvelopeForCaller(envelope, { authenticatedUid, i
   const signed = signedUidSet(envelope), earlierSigned = new Set();
   for (let i = 0; i < (actorIndex < 0 ? 0 : actorIndex); i++) if (signed.has(order[i])) earlierSigned.add(order[i]);
   const fields = Array.isArray(envelope.fields) ? envelope.fields : [];
-  const ownFields = fields.filter(field => uidOf(field?.signerUid) === actor);
+  const ownFields = fields.filter(field => uidOf(field?.signerUid) === actor).map(hideUnappliedValue);
   const priorAppliedFields = fields.filter(field => earlierSigned.has(uidOf(field?.signerUid)) && isApplied(field));
   const visibleUids = new Set([actor, ...earlierSigned]);
   const view = { ...envelope, recipients: recipients.filter(r => visibleUids.has(uidOf(r?.uid))).map(r => ({ ...r })), participantUids: [actor, ...earlierSigned], actionUids: [actor], fields: [...ownFields, ...priorAppliedFields], workflowHistory: (Array.isArray(envelope.workflowHistory) ? envelope.workflowHistory : []).filter(entry => visibleUids.has(uidOf(entry?.uid || entry?.signerUid))), visibilityScope: "signer" };
