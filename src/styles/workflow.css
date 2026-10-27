@@ -33,3 +33,22 @@
 .signature-workflow-hierarchy .text-button {
   color: var(--text);
 }
+
+.surface-light .signature-workflow-ladder,
+.surface-light .signature-workflow-hierarchy,
+.surface-white .signature-workflow-ladder,
+.surface-white .signature-workflow-hierarchy {
+  --surface: #ffffff;
+  --surface-raised: #f4f8f5;
+  --text: #17372b;
+  --text-muted: #526c61;
+  --border: #718a80;
+  color: var(--text);
+  background: var(--surface-raised);
+}
+.surface-light .signature-workflow-ladder-selected,
+.surface-white .signature-workflow-ladder-selected {
+  color: #17372b;
+  background: #ffffff;
+  border-color: #718a80;
+}
