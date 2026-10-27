@@ -39,12 +39,13 @@ export function createReleaseReadinessRoute(deps) {
     add("Worker commit from /health", health.commit !== "unknown", health.commit === "unknown" ? "GIT_SHA is not configured; /health would report unknown." : "Worker GIT_SHA is configured: " + health.commit + ".");
     add("Worker project ID", health.firebaseProjectId === EXPECTED_PROJECT, "FIREBASE_PROJECT_ID is " + health.firebaseProjectId + "; expected " + EXPECTED_PROJECT + ".");
     add("FIREBASE_SERVICE_ACCOUNT_JSON present", Boolean(String(env.FIREBASE_SERVICE_ACCOUNT_JSON || "").trim()), "Presence only; secret value is never returned.");
-    const integrationSecrets = Array.isArray(diagnostics?.integrationSecrets) ? diagnostics.integrationSecrets : [];
+    let integrationSecrets = [];
 
     let diagnostics = null;
     try {
       const response = await deps.systemDiagnosticsRoute(request, env);
       diagnostics = await response.json();
+      integrationSecrets = Array.isArray(diagnostics?.integrationSecrets) ? diagnostics.integrationSecrets : [];
       add("Worker service-account token creation", diagnostics?.adminToken?.created === true, diagnostics?.adminToken?.created ? "Worker created a Firestore admin access token." : "Token creation failed: " + String(diagnostics?.adminToken?.error || diagnostics?.error || "no diagnostic reason returned"));
       add("Worker harmless Firestore read", diagnostics?.firestoreRead?.ok === true, diagnostics?.firestoreRead?.ok ? "Harmless adminProfiles read succeeded." : "Firestore read failed: " + String(diagnostics?.firestoreRead?.error || "no diagnostic reason returned"));
     } catch (error) {
