@@ -245,25 +245,28 @@ export async function revokeSignatureApplication(){
   return {ok:true,status:"Revoked"};
 }
 
-export async function getSignatureEnvelope(envelopeId){
+async function fetchServerFilteredSignatureEnvelopes(path){
   const u=user();
+  if(!auth.currentUser)throw new Error("Authentication is required to view signing envelopes.");
+  const token=await auth.currentUser.getIdToken();
+  const response=await fetch(`${GATEWAY_URL}${path}`,{method:"GET",headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},cache:"no-store"});
+  const body=await response.json().catch(()=>({}));
+  if(!response.ok||body?.ok!==true)throw new Error(body?.error||"The Signature Portal could not authorize this workflow view.");
+  return body;
+}
+export async function getSignatureEnvelope(envelopeId){
+  user();
   if(!envelopeId)throw new Error("Signing envelope ID is required.");
-  const snap=await getDoc(doc(db,ENVELOPE_COLLECTION,envelopeId));
-  if(!snap.exists())throw new Error("This signing invitation is no longer available.");
-  const envelope={id:snap.id,...snap.data()};
-  if(!matchesSignatureEnvironment(envelope))throw new Error("This signing envelope belongs to a different data environment and is unavailable in the current portal session.");
-  // A signing envelope is private to its participants. The document PDF may be
-  // visible to an assigned participant, but other officers' assignments are not.
-  if(!Array.isArray(envelope.participantUids)||!envelope.participantUids.includes(u.uid)){
-    throw new Error("You are not assigned to this signing envelope.");
-  }
-  if(["Cancelled","Declined"].includes(envelope.status)){
-    throw new Error("This signing envelope is no longer available.");
-  }
+  const body=await fetchServerFilteredSignatureEnvelopes(`/api/signature-workflow/view?envelopeId=${encodeURIComponent(envelopeId)}`);
+  const envelope=body.envelope;
+  if(!envelope||!matchesSignatureEnvironment(envelope))throw new Error("This signing envelope belongs to a different data environment and is unavailable in the current portal session.");
+  if(["Cancelled","Declined"].includes(envelope.status))throw new Error("This signing envelope is no longer available.");
   return envelope;
 }
-
-export async function getSignatureEnvelopes(){const u=user();const q=query(collection(db,ENVELOPE_COLLECTION),where("participantUids","array-contains",u.uid));const s=await getDocs(q);return s.docs.map(x=>({id:x.id,...x.data()})).filter(matchesSignatureEnvironment).sort((a,b)=>Number(b.createdAt?.seconds||0)-Number(a.createdAt?.seconds||0));}
+export async function getSignatureEnvelopes(){
+  const body=await fetchServerFilteredSignatureEnvelopes("/api/signature-workflow/list");
+  return (Array.isArray(body.envelopes)?body.envelopes:[]).filter(matchesSignatureEnvironment).sort((a,b)=>String(b.updatedAt||b.createdAt||"").localeCompare(String(a.updatedAt||a.createdAt||"")));
+}
 export async function getMySignedDocuments(){const u=user();const q=query(collection(db,"signatures"),where("signerUid","==",u.uid));const s=await getDocs(q);const rows=await Promise.all(s.docs.map(async x=>{const data=x.data();if(!matchesSignatureEnvironment(data))return null;if(data.signerArchiveUrl)return{id:x.id,...data};if(!data.envelopeId)return null;try{const envelopeSnap=await getDoc(doc(db,ENVELOPE_COLLECTION,data.envelopeId));if(!envelopeSnap.exists())return null;const envelope={id:envelopeSnap.id,...envelopeSnap.data()};const delivery=envelope.signerArchiveDeliveries?.[u.uid];if(!delivery?.webViewLink)return null;return{id:x.id,...data,signerArchiveUrl:delivery.webViewLink,signerArchiveFolderId:delivery.folderId||null,signerArchiveFolderLink:delivery.folderLink||null,myDocumentsPortal:delivery.myDocumentsPortal||"My Documents",myDocumentsPortalPath:delivery.myDocumentsPortalPath||null,signerArchiveFinalHash:delivery.finalHash||envelope.signerArchiveFinalHash||null,archivePending:false,archiveProtocol:delivery.archiveProtocol||"IRPA-SIGNER-COPY-V2",archiveState:"Final Completed Document"};}catch(error){console.warn("Unable to resolve completed signer archive delivery:",error);return null;}}));return rows.filter(x=>x&&x.status==="Signed"&&x.signerArchiveUrl).sort((a,b)=>{const at=a.signedAt?.seconds?Number(a.signedAt.seconds):Date.parse(a.signedAt||0);const bt=b.signedAt?.seconds?Number(b.signedAt.seconds):Date.parse(b.signedAt||0);return bt-at;});}
 export async function sendSignatureInvitation(envelope, recipient) {
   const u = user();

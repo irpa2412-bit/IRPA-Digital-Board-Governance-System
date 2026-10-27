@@ -22,6 +22,8 @@ import { runCleanup } from "./upload.mjs";
 import { createDocumentLifecycleRouter } from "./documentLifecycle.mjs";
 import { canProvisionSignatureProfileFolder } from "./signatureProfileAuthorization.mjs";
 import { canReadSignatureAsset, canUploadSignedDocument } from "./signatureAssetAuthorization.mjs";
+import { filterSignatureEnvelopeForCaller } from "./signatureWorkflowVisibility.mjs";
+
 import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPasswordSetup, getInvitationSessionState } from "./invitationRedemption.mjs";
 import { buildGoogleDriveAuthorizationParams } from "./googleDriveOAuth.mjs";
 import { createCommunicationsSiteRouter } from "./communicationsSite.mjs";
@@ -279,6 +281,8 @@ export default {
       if (pathname === "/api/signature-pathway/reconcile" && request.method === "POST") {
         return await reconcileSignatureDocumentIds(request, env);
       }
+      if (pathname === "/api/signature-workflow/list" && request.method === "GET") return await getSignatureWorkflowListRoute(request, env);
+      if (pathname === "/api/signature-workflow/view" && request.method === "GET") return await getSignatureWorkflowViewRoute(request, env);
       if (pathname === "/api/signature-workflow/draft" && request.method === "POST") return await saveSignatureWorkflowDraftRoute(request, env);
       if (pathname === "/api/system/diagnostics" && request.method === "GET") return await systemDiagnosticsRoute(request, env);
       if (pathname === "/api/system/actual-data-access" && (request.method === "GET" || request.method === "POST")) return await actualDataAccessRoute(request, env);
@@ -1029,6 +1033,53 @@ async function systemDiagnosticsRoute(request, env) {
     base.ok = base.adminToken.created && base.firestoreRead.ok;
     return json(base,200,corsHeaders(request));
   } catch(error) { return json({...base,error:String(error?.message || error).slice(0,220)},Number(error?.status)||401,corsHeaders(request)); }
+}
+
+async function getSignatureWorkflowListRoute(request, env) {
+  const claims = await authenticateFirebaseRequest(request, env);
+  const actorUid = String(claims.user_id || "").trim();
+  if (!actorUid) return json({ok:false,error:"Authenticated identity is required."},401,corsHeaders(request));
+  const token = await getFirestoreAdminAccessToken(env);
+  const adminProfile = await getFirestoreDocument(env, "adminProfiles/" + actorUid, token);
+  const isAdmin = String(claims.email || "").trim().toLowerCase() === "irpa2412@gmail.com" || Boolean(adminProfile?.fields?.active?.booleanValue === true && adminProfile?.fields?.role?.stringValue === "Administrator");
+  const query = async (fieldPath, op) => {
+    const response = await fetch("https://firestore.googleapis.com/v1/projects/" + getFirebaseProjectId(env) + "/databases/(default)/documents:runQuery", {
+      method:"POST", headers:{Authorization:"Bearer " + token,"Content-Type":"application/json"},
+      body:JSON.stringify({structuredQuery:{from:[{collectionId:"signatureEnvelopes"}],where:{fieldFilter:{field:{fieldPath},op,value:{stringValue:actorUid}}},limit:100}})
+    });
+    if (!response.ok) throw new Error("Unable to retrieve signing envelopes.");
+    return (await response.json()).filter(row=>row.document).map(row=>row.document);
+  };
+  const rows = isAdmin
+    ? await (async()=>{const response=await fetch("https://firestore.googleapis.com/v1/projects/"+getFirebaseProjectId(env)+"/databases/(default)/documents/signatureEnvelopes?pageSize=100",{headers:{Authorization:"Bearer "+token}});if(!response.ok)throw new Error("Unable to retrieve signing envelopes.");return (await response.json()).documents||[];})()
+    : (await Promise.all([query("participantUids","ARRAY_CONTAINS"),query("ownerUid","EQUAL"),query("senderUid","EQUAL")])).flat();
+  const unique = new Map(rows.map(row=>[String(row.name||"").split("/").pop(),row]));
+  const envelopes = [];
+  for (const [id,row] of unique) {
+    const envelope = {id,...(firestoreDocumentToPlain(row)||{})};
+    const filtered = filterSignatureEnvelopeForCaller(envelope,{authenticatedUid:actorUid,isAdmin});
+    if (filtered.allowed && !["Cancelled","Declined"].includes(String(envelope.status||""))) envelopes.push(filtered.view);
+  }
+  envelopes.sort((a,b)=>String(b.updatedAt||b.createdAt||"").localeCompare(String(a.updatedAt||a.createdAt||"")));
+  return json({ok:true,envelopes},200,{...corsHeaders(request),"Cache-Control":"no-store"});
+}
+
+async function getSignatureWorkflowViewRoute(request, env) {
+  const claims = await authenticateFirebaseRequest(request, env);
+  const actorUid = String(claims.user_id || "").trim();
+  if (!actorUid) return json({ok:false,error:"Authenticated identity is required."},401,corsHeaders(request));
+  const url = new URL(request.url);
+  const envelopeId = String(url.searchParams.get("envelopeId") || "").trim();
+  if (!/^[A-Za-z0-9_-]{6,150}$/.test(envelopeId)) return json({ok:false,error:"A valid envelopeId is required."},400,corsHeaders(request));
+  const token = await getFirestoreAdminAccessToken(env);
+  const record = await getFirestoreDocument(env, "signatureEnvelopes/" + envelopeId, token);
+  if (!record?.fields) return json({ok:false,error:"Signing envelope not found."},404,corsHeaders(request));
+  const envelope = {id:envelopeId,...(firestoreDocumentToPlain(record)||{})};
+  const adminProfile = await getFirestoreDocument(env, "adminProfiles/" + actorUid, token);
+  const isAdmin = String(claims.email || "").trim().toLowerCase() === "irpa2412@gmail.com" || Boolean(adminProfile?.fields?.active?.booleanValue === true && adminProfile?.fields?.role?.stringValue === "Administrator");
+  const filtered = filterSignatureEnvelopeForCaller(envelope,{authenticatedUid:actorUid,isAdmin});
+  if (!filtered.allowed) return json({ok:false,error:"This signing envelope is not available to this account."},404,corsHeaders(request));
+  return json({ok:true,envelope:filtered.view,visibilityScope:filtered.scope},200,{...corsHeaders(request),"Cache-Control":"no-store"});
 }
 
 async function saveSignatureWorkflowDraftRoute(request, env) {
