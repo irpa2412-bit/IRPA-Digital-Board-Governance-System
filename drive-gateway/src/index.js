@@ -1198,7 +1198,7 @@ async function reconcileSignatureDocumentIds(request, env) {
         await driveFetch(env, accessToken, `/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,description`, {method:"PATCH",body:JSON.stringify({description:JSON.stringify(repairedDescription)})});
         const verified = await driveFetch(env, accessToken, `/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,description`);
         const verifiedDescription = parseDescription(verified.description);
-        if (String(verifiedDescription.documentId || "") !== documentId) throw new Error("Drive description verification failed; expected " + documentId + ".");
+        if (String(verifiedDescription.documentId || "") !== documentId) throw new Error("Drive description verification failed after repair; expected " + documentId + " but found " + String(verifiedDescription.documentId || "(missing)") + ".");
         line.status = "repaired";
         line.previousDescriptionDocumentId = previousDocumentId || "(missing)";
         line.reason = "Mismatch repaired and verified: Drive description.documentId now equals Firestore ID " + documentId + ".";
