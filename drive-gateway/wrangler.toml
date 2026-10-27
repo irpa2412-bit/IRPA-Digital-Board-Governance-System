@@ -21,6 +21,8 @@ LOCAL_TEST_MODE = "false"
 ESIGN_MODULE_ENABLED = "true"
 CLOUDFLARE_AUTH_FUNCTIONS_ENABLED = "true"
 IRPA_PRODUCTION_CUTOVER = "true"
+IRPA_WORKER_NAME = "irpa-google-drive-gateway"
+IRPA_WORKER_ENVIRONMENT = "production"
 
 [[kv_namespaces]]
 binding = "DRIVE_KV"
@@ -39,6 +41,8 @@ name = "irpa-google-drive-gateway-staging"
 workers_dev = true
 
 [env.staging.vars]
+IRPA_WORKER_NAME = "irpa-google-drive-gateway-staging"
+IRPA_WORKER_ENVIRONMENT = "staging"
 IRPA_ENVIRONMENT = "staging"
 FIREBASE_PROJECT_ID = "irpa-dbg-staging-a73ec"
 AUTHORIZED_DRIVE_EMAIL = "irpa2412@gmail.com"
