@@ -13,7 +13,7 @@ test("reconciliation discovers Firestore controlled documents and compares Drive
 });
 test("repair requires explicit confirmation and dry-run is non-mutating",()=>{
  assert.match(worker,/body\?\.repairMismatches !== true/);
- assert.match(worker,/dryRun\? \/\//);
+ assert.match(worker,/if \(!dryRun && body\?\.repairMismatches !== true/);
  assert.match(ui,/Dry-run Drive ID Reconciliation/);
  assert.match(ui,/Repair mismatches/);
  assert.match(ui,/autoDiscover: true/);
