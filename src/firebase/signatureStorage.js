@@ -33,9 +33,10 @@ async function gatewayPost(path, payload) {
   return data;
 }
 
-export async function reconcileSignatureDocumentIds(documents = []) {
-  if (!Array.isArray(documents) || documents.length === 0) throw new Error("Reconciliation requires at least one controlled document.");
-  return gatewayPost("/api/signature-pathway/reconcile", { documents: documents.map(item => ({ documentId: String(item.documentId || item.id || ""), fileId: String(item.fileId || item.archiveFileId || item.governanceArchiveFileId || "") })) });
+export async function reconcileSignatureDocumentIds(documents = [], options = {}) {
+  if (!Array.isArray(documents)) throw new Error("Reconciliation documents must be an array.");
+  const payload = { ...options, documents: documents.map(item => ({ documentId: String(item.documentId || item.id || ""), fileId: String(item.fileId || item.driveFileId || item.archiveFileId || item.governanceArchiveFileId || item.sourceFileId || "") })) };
+  return gatewayPost("/api/signature-pathway/reconcile", payload);
 }
 
 export const storage = { provider: "Google Drive" };
