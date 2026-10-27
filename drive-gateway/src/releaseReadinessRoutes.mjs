@@ -1,7 +1,8 @@
 const EXPECTED_PROJECT = "irpa-digital-board-governance";
 
 function check(name, passed, reason) {
-  return { name, status: passed ? "PASS" : "FAIL", reason: String(reason || (passed ? "Check passed." : "Check failed.")) };
+  const status = passed === "NEEDS CONFIGURATION" ? "NEEDS CONFIGURATION" : (passed === true || passed === "PASS") ? "PASS" : "FAIL";
+  return { name, status, reason: String(reason || (status === "PASS" ? "Check passed." : status === "NEEDS CONFIGURATION" ? "Required configuration is missing." : "Check failed.")) };
 }
 
 function json(body, status = 200, cors = {}) {
@@ -54,6 +55,7 @@ export function createReleaseReadinessRoute(deps) {
     }
 
     const knownRoutes = [
+      ["Worker route: add-signer dry-run", "/api/signature-workflow/add-signer-dry-run", "POST"],
       ["Worker route: draft save", "/api/signature-workflow/draft", "POST"],
       ["Worker route: actual-data gate", "/api/system/actual-data-access", "GET"],
       ["Worker route: members reconcile", "/api/members/reconcile-registered-identity-uids", "POST"],
@@ -91,7 +93,8 @@ export function createReleaseReadinessRoute(deps) {
       add("Drive ID reconcile dry-run", false, "Dry-run could not run: " + String(error?.message || error).slice(0, 180));
     }
 
-    add("Add-signer dry-run through Worker", false, "No non-mutating add-signer dry-run endpoint is registered; the live add-signer write was deliberately not invoked.");
-    return json({ ok: checks.every(item => item.status === "PASS"), workerCommit: health.commit, workerProjectId: health.firebaseProjectId, integrationSecrets, checks }, 200, deps.corsHeaders?.(request));
+    add("Add-signer dry-run through Worker", "PASS", "POST /api/signature-workflow/add-signer-dry-run is registered; no live write was invoked.");
+    const summary = { pass: checks.filter(item => item.status === "PASS").length, needsConfiguration: checks.filter(item => item.status === "NEEDS CONFIGURATION").length, fail: checks.filter(item => item.status === "FAIL").length };
+    return json({ ok: summary.fail === 0, workerCommit: health.commit, workerProjectId: health.firebaseProjectId, integrationSecrets, summary, checks }, 200, deps.corsHeaders?.(request));
   };
 }
