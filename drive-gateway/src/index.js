@@ -1012,7 +1012,7 @@ async function firebaseServiceAccountDiagnostic(env) {
 
 async function systemDiagnosticsRoute(request, env) {
   const serviceAccountDiagnostic = await firebaseServiceAccountDiagnostic(env);
-  const base = { ok:false, workerCommit:String(env.GIT_SHA || "unknown"), firebaseProjectId:String(env.FIREBASE_PROJECT_ID || "unconfigured"), serviceAccountDiagnostic, requiredConfiguration:{ FIREBASE_SERVICE_ACCOUNT_JSON:Boolean(String(env.FIREBASE_SERVICE_ACCOUNT_JSON || "").trim()), FIREBASE_PROJECT_ID:Boolean(String(env.FIREBASE_PROJECT_ID || "").trim()), GIT_SHA:Boolean(String(env.GIT_SHA || "").trim()) }, adminToken:{created:false}, firestoreRead:{attempted:false,ok:false} };
+  const base = { ok:false, workerCommit:String(env.GIT_SHA || "unknown"), workerName:String(env.IRPA_WORKER_NAME || "unknown"), workerEnvironment:String(env.IRPA_WORKER_ENVIRONMENT || env.IRPA_ENVIRONMENT || "production"), bindingNames:Object.keys(env || {}).sort(), firebaseProjectId:String(env.FIREBASE_PROJECT_ID || "unconfigured"), serviceAccountDiagnostic, requiredConfiguration:{ FIREBASE_SERVICE_ACCOUNT_JSON:Boolean(String(env.FIREBASE_SERVICE_ACCOUNT_JSON || "").trim()), FIREBASE_PROJECT_ID:Boolean(String(env.FIREBASE_PROJECT_ID || "").trim()), GIT_SHA:Boolean(String(env.GIT_SHA || "").trim()) }, adminToken:{created:false}, firestoreRead:{attempted:false,ok:false} };
   try {
     const claims = await authenticateFirebaseRequest(request, env);
     const uid = String(claims.user_id || "");
