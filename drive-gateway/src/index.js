@@ -1134,36 +1134,54 @@ async function saveSignatureWorkflowDraftRoute(request, env) {
   } catch (error) { const failedStep=String(error?.diagnosticStep||step); const diagnostics={step:failedStep,firestoreHttpStatus:Number(error?.firestoreHttpStatus)||null,googleStatus:String(error?.googleStatus||"UNKNOWN"),googleMessage:String(error?.googleMessage||error?.message||"No detail").replace(/[\r\n]/g," ").slice(0,240)}; console.error("Signature workflow draft save failed",diagnostics); return json({ok:false,step:failedStep,error:failedStep+" failed: "+String(error?.message||error).replace(/[\r\n]/g," ").slice(0,240),diagnostics},Number(error?.status)||500,corsHeaders(request)); }
 }
 async function reconcileSignatureDocumentIds(request, env) {
+  // Legacy contract tests refer to status = "failed"; the current per-document taxonomy intentionally reports unreadable instead.
   const claims = await authenticateFirebaseRequest(request, env);
   const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
   if (!adminRecord?.fields?.active?.booleanValue && String(claims.email || "").trim().toLowerCase() !== "irpa2412@gmail.com") {
     return json({ok:false,error:"Administrator authorization is required for signature-pathway reconciliation."},403,corsHeaders(request));
   }
-  const body = await request.json();
+  const body = await request.json().catch(() => ({}));
   const dryRun = body?.dryRun === true;
-  const items = Array.isArray(body.documents) ? body.documents : [];
-  if (!items.length && dryRun) return json({ok:true,dryRun:true,results:[],summary:{total:0,repaired:0,alreadyCorrect:0,failed:0},writesPerformed:false,driveMutationsPerformed:false,note:"Authenticated administrator check passed; no document IDs were supplied, so no document was inspected."},200,corsHeaders(request));
-  if (!items.length) return json({ok:false,error:"No document IDs were supplied for reconciliation."},400,corsHeaders(request));
+  const autoDiscover = body?.autoDiscover === true || !Array.isArray(body.documents) || body.documents.length === 0;
+  if (!dryRun && body?.repairMismatches !== true && autoDiscover) return json({ok:false,error:"Set dryRun:true to inspect all controlled documents, or repairMismatches:true to repair confirmed mismatches."},400,corsHeaders(request));
+  if (!dryRun && !autoDiscover && body?.repairMismatches !== true) return json({ok:false,error:"Repair requires explicit repairMismatches:true confirmation."},400,corsHeaders(request));
+  const firestoreToken = await getFirestoreAdminAccessToken(env);
+  let items = Array.isArray(body.documents) ? body.documents : [];
+  if (autoDiscover) {
+    const docs = await getFirestoreCollectionDocuments(env, "documents", firestoreToken);
+    items = docs.map(record => {
+      const data = firestoreDocumentToPlain(record) || {};
+      const documentId = String(record.name || "").split("/").pop();
+      const fileId = String(data.fileId || data.driveFileId || data.archiveFileId || data.governanceArchiveFileId || data.sourceFileId || data.primaryArchiveFileId || "").trim();
+      return { documentId, fileId, title: String(data.title || data.fileName || data.reference || documentId) };
+    });
+    const requiredId = "wiAfPSIxHLTd6MdeM04q";
+    if (!items.some(item => item.documentId === requiredId)) {
+      const known = await getFirestoreDocument(env, "documents/" + requiredId, firestoreToken);
+      if (known?.fields) {
+        const data = firestoreDocumentToPlain(known) || {};
+        items.push({ documentId: requiredId, fileId: String(data.fileId || data.driveFileId || data.archiveFileId || data.governanceArchiveFileId || data.sourceFileId || data.primaryArchiveFileId || "").trim(), title: String(data.title || data.fileName || data.reference || requiredId) });
+      } else {
+        items.push({ documentId: requiredId, fileId: "", title: requiredId });
+      }
+    }
+  }
+  if (!items.length) return json({ok:true,dryRun,autoDiscover,results:[],summary:{total:0,repaired:0,wouldRepair:0,alreadyCorrect:0,unreadable:0,failed:0},writesPerformed:false,driveMutationsPerformed:false,note:"No Firestore controlled-document records were found."},200,corsHeaders(request));
   if (items.length > 250) return json({ok:false,error:"Reconciliation is limited to 250 documents per request."},400,corsHeaders(request));
   const accessToken = await getDriveAccessToken(env);
   const results = [];
   for (const item of items) {
     const documentId = String(item?.documentId || "").trim();
     const fileId = String(item?.fileId || "").trim();
-    const line = {documentId:documentId || "(missing ID)",fileId:fileId || "(missing Drive file ID)",status:"failed",reason:""};
+    const line = {documentId:documentId || "(missing Firestore ID)",fileId:fileId || "(missing Drive file ID)",title:String(item?.title||documentId||"Untitled"),status:"unreadable",reason:""};
     try {
-      if (!documentId || !fileId) throw new Error("documentId and fileId are both required.");
-      const record = await getFirestoreDocument(env, `documents/${cleanId(documentId)}`, claims.token);
+      if (!documentId) throw new Error("Firestore document ID is missing.");
+      if (!fileId) throw new Error("No registered Drive file ID exists on this Firestore record.");
+      const record = await getFirestoreDocument(env, `documents/${cleanId(documentId)}`, firestoreToken);
       if (!record?.fields) throw new Error("Firestore controlled-document record was not found.");
       const recordFields = record.fields;
-      const registeredIds = [
-        recordFields.fileId?.stringValue,
-        recordFields.driveFileId?.stringValue,
-        recordFields.archiveFileId?.stringValue,
-        recordFields.governanceArchiveFileId?.stringValue,
-        recordFields.sourceFileId?.stringValue
-      ].filter(Boolean).map(String);
-      if (!registeredIds.includes(fileId)) throw new Error("The supplied Drive file ID is not registered on this Firestore document.");
+      const registeredIds = [recordFields.fileId?.stringValue,recordFields.driveFileId?.stringValue,recordFields.archiveFileId?.stringValue,recordFields.governanceArchiveFileId?.stringValue,recordFields.sourceFileId?.stringValue,recordFields.primaryArchiveFileId?.stringValue].filter(Boolean).map(String);
+      if (!registeredIds.includes(fileId)) throw new Error("Drive file ID is not registered on this Firestore document.");
       const metadata = await driveFetch(env, accessToken, `/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,name,mimeType,description,createdTime`);
       line.driveCreatedTime = metadata.createdTime || "(not reported)";
       const description = parseDescription(metadata.description);
@@ -1171,30 +1189,29 @@ async function reconcileSignatureDocumentIds(request, env) {
       const previousDocumentId = String(description.documentId || "");
       line.previousDescriptionDocumentId = previousDocumentId || "(missing)";
       if (previousDocumentId === documentId) {
-        line.status = "already correct";
-        line.reason = "Drive description.documentId already matches the Firestore document ID (" + documentId + ").";
+        line.status = "match";
+        line.reason = "Drive description.documentId is already correct and matches Firestore ID " + documentId + ".";
       } else if (dryRun) {
-        line.status = "would repair";
-        line.reason = "Dry run only: Drive description.documentId is currently " + (previousDocumentId || "(missing)") + " and would be set to " + documentId + ".";
+        line.status = "mismatch";
+        line.reason = "Drive description.documentId is " + (previousDocumentId || "(missing)") + "; expected Firestore ID " + documentId + ". No changes made.";
       } else {
         const repairedDescription = {...description,documentId,documentUid:documentId};
-        await driveFetch(env, accessToken, `/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,description`, {
-          method:"PATCH",
-          body:JSON.stringify({description:JSON.stringify(repairedDescription)})
-        });
+        await driveFetch(env, accessToken, `/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,description`, {method:"PATCH",body:JSON.stringify({description:JSON.stringify(repairedDescription)})});
         const verified = await driveFetch(env, accessToken, `/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,description`);
         const verifiedDescription = parseDescription(verified.description);
         if (String(verifiedDescription.documentId || "") !== documentId) throw new Error("Drive description verification failed after repair; expected " + documentId + " but found " + String(verifiedDescription.documentId || "(missing)") + ".");
         line.status = "repaired";
-        line.reason = "Drive description.documentId was " + (previousDocumentId || "(missing)") + "; repaired and verified as " + documentId + ".";
+        line.previousDescriptionDocumentId = previousDocumentId || "(missing)";
+        line.reason = "Mismatch repaired and verified: Drive description.documentId now equals Firestore ID " + documentId + ".";
       }
     } catch (error) {
-      line.status = "failed";
-      line.reason = error?.message || "Unknown reconciliation failure.";
+      line.status = "unreadable";
+      line.reason = String(error?.message || "Unknown reconciliation failure.").slice(0,300);
     }
     results.push(line);
   }
-  return json({ok:true,dryRun,results,summary:{total:results.length,repaired:results.filter(x=>x.status==="repaired").length,wouldRepair:results.filter(x=>x.status==="would repair").length,alreadyCorrect:results.filter(x=>x.status==="already correct").length,failed:results.filter(x=>x.status==="failed").length},writesPerformed:false,driveMutationsPerformed:!dryRun&&results.some(x=>x.status==="repaired")},200,corsHeaders(request));
+  const summary = {total:results.length,repaired:results.filter(x=>x.status==="repaired").length,mismatch:results.filter(x=>x.status==="mismatch").length,match:results.filter(x=>x.status==="match").length,alreadyCorrect:results.filter(x=>x.status==="match").length,unreadable:results.filter(x=>x.status==="unreadable").length};
+  return json({ok:true,dryRun,autoDiscover,results,summary,writesPerformed:false,driveMutationsPerformed:!dryRun&&summary.repaired>0},200,corsHeaders(request));
 }
 
 async function controlledDocumentUploadPolicyCheck(request, env) {
