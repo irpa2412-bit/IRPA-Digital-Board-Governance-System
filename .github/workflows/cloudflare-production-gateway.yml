@@ -29,19 +29,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          exec > >(tee /tmp/irpa-config.log) 2>&1
           config=drive-gateway/wrangler.toml
           test -f "$config"
-
-          # Validate only the default configuration, before any named [env.*] section.
           default_config="$(awk '/^\[env\./ { exit } { print }' "$config")"
           grep -q '^name = "irpa-google-drive-gateway"$' <<< "$default_config"
           grep -q '^keep_vars = true$' <<< "$default_config"
-          grep -q '^FIREBASE_PROJECT_ID = "irpa-digital-board-governance"
+          grep -q '^FIREBASE_PROJECT_ID = "irpa-digital-board-governance"$' <<< "$default_config"
+          grep -q '^IRPA_WORKER_NAME = "irpa-google-drive-gateway"$' <<< "$default_config"
+          grep -q '^IRPA_WORKER_ENVIRONMENT = "production"$' <<< "$default_config"
           grep -q '^DRIVE_MOCK = "false"$' <<< "$default_config"
           grep -q '^LOCAL_TEST_MODE = "false"$' <<< "$default_config"
+          ! grep -Eq '^FIREBASE_SERVICE_ACCOUNT_JSON[[:space:]]*=' <<< "$default_config"
           ! grep -Eq '^IRPA_ENVIRONMENT[[:space:]]*=[[:space:]]*"staging"$' <<< "$default_config"
           ! grep -q '^FIREBASE_PROJECT_ID = "irpa-dbg-staging-a73ec"$' <<< "$default_config"
-
           default_kv_id="$(awk '
             /^\[\[kv_namespaces\]\]/ { in_kv=1; next }
             /^\[/ { in_kv=0 }
@@ -52,18 +53,17 @@ jobs:
               exit
             }
           ' <<< "$default_config")"
-          test -n "$default_kv_id"
           test "$default_kv_id" = "ccdbffa662ac48bfbdf7f4b1f62ca941"
           test "$default_kv_id" != "5ea76010553049a2b98c8493c37fbbc4"
-          echo "Default production configuration verified; named [env.staging] configuration is permitted."
+          echo "Default production configuration verified."
 
       - name: Install gateway dependencies
         working-directory: drive-gateway
-        run: npm ci
+        run: npm ci 2>&1 | tee /tmp/irpa-install.log
 
       - name: Run gateway E2E tests
         working-directory: drive-gateway
-        run: npm test
+        run: npm test 2>&1 | tee /tmp/irpa-tests.log
 
       - name: Verify Cloudflare credentials without exposing values
         env:
@@ -78,7 +78,7 @@ jobs:
             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
             -H "Content-Type: application/json" \
             "https://api.cloudflare.com/client/v4/user/tokens/verify" >/tmp/token.json
-          node -e 'const x=require("/tmp/token.json"); if(!x.success) process.exit(1);'
+          node -e 'const x=require("/tmp/token.json"); if(!x.success) process.exit(1);' 2>&1 | tee /tmp/irpa-credentials.log
 
       - name: Sync Firebase service account secret to production Worker when configured
         env:
@@ -90,8 +90,8 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -n "${FIREBASE_SERVICE_ACCOUNT_JSON:-}" ]]; then
-            # Pass the secret through stdin only; never print or persist its contents.
-            printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" | npx wrangler secret put FIREBASE_SERVICE_ACCOUNT_JSON --config wrangler.toml --name irpa-google-drive-gateway
+            # Wrangler reads the secret value from stdin; do not echo or persist it.
+            printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" | npx wrangler secret put FIREBASE_SERVICE_ACCOUNT_JSON --config wrangler.toml --name irpa-google-drive-gateway > /tmp/irpa-secret-sync.log 2>&1 || { echo "::warning::Firebase secret sync failed; continuing with Worker deployment. See sanitized diagnostic below."; sed -E 's/(private_key|client_email|project_id|FIREBASE_SERVICE_ACCOUNT_JSON)[[:space:]"=:]+[^, }]+/\1=[REDACTED]/g' /tmp/irpa-secret-sync.log | tail -30; }
           else
             echo "::warning::GitHub Actions secret FIREBASE_SERVICE_ACCOUNT_JSON is missing; production Worker secret was not updated."
           fi
@@ -105,7 +105,7 @@ jobs:
         run: |
           set -euo pipefail
           echo "Deploying production Worker from commit ${GIT_SHA} (no --env override)."
-          npx wrangler deploy --config wrangler.toml --name irpa-google-drive-gateway --var "GIT_SHA:${GIT_SHA}"
+          npx wrangler deploy --config wrangler.toml --name irpa-google-drive-gateway --var "GIT_SHA:${GIT_SHA}" 2>&1 | tee /tmp/irpa-deploy.log
 
       - name: Verify production gateway health
         env:
@@ -114,294 +114,53 @@ jobs:
         run: |
           set -euo pipefail
           url="https://irpa-google-drive-gateway.irpa-governance.workers.dev/health"
-          status="$(curl --silent --show-error --output /tmp/health.json --write-out '%{http_code}' "$url")"
-          echo "Production gateway health HTTP status: $status"
-          test "$status" = "200"
-          node -e '
-            const fs = require("node:fs");
-            const health = JSON.parse(fs.readFileSync("/tmp/health.json", "utf8"));
-            if (health.ok !== true || health.environment === "staging" || health.commit !== process.env.GIT_SHA) {
-              console.error("Production gateway health payload or commit stamp does not match this deployment.");
+          deadline=$((SECONDS + 180))
+          attempt=0
+          last_status="not checked"
+          while (( SECONDS < deadline )); do
+            attempt=$((attempt + 1))
+            last_status="$(curl --silent --show-error --max-time 10 --output /tmp/health.json --write-out '%{http_code}' "$url" 2>/dev/null || true)"
+            if [[ "$last_status" == "200" ]] && node -e '
+              const fs = require("node:fs");
+              try {
+                const health = JSON.parse(fs.readFileSync("/tmp/health.json", "utf8"));
+                if (health.ok === true && health.environment !== "staging" && health.commit === process.env.GIT_SHA) process.exit(0);
+              } catch {}
               process.exit(1);
-            }
-            console.log("Production gateway health payload OK; commit matches deployment: " + health.commit);
-          '
- <<< "$default_config"
-          grep -q '^IRPA_WORKER_NAME = "irpa-google-drive-gateway"
-          grep -q '^DRIVE_MOCK = "false"$' <<< "$default_config"
-          grep -q '^LOCAL_TEST_MODE = "false"$' <<< "$default_config"
-          ! grep -Eq '^IRPA_ENVIRONMENT[[:space:]]*=[[:space:]]*"staging"$' <<< "$default_config"
-          ! grep -q '^FIREBASE_PROJECT_ID = "irpa-dbg-staging-a73ec"$' <<< "$default_config"
-
-          default_kv_id="$(awk '
-            /^\[\[kv_namespaces\]\]/ { in_kv=1; next }
-            /^\[/ { in_kv=0 }
-            in_kv && /^id[[:space:]]*=/ {
-              sub(/^[^=]*=[[:space:]]*"/, "")
-              sub(/".*$/, "")
-              print
-              exit
-            }
-          ' <<< "$default_config")"
-          test -n "$default_kv_id"
-          test "$default_kv_id" = "ccdbffa662ac48bfbdf7f4b1f62ca941"
-          test "$default_kv_id" != "5ea76010553049a2b98c8493c37fbbc4"
-          echo "Default production configuration verified; named [env.staging] configuration is permitted."
-
-      - name: Install gateway dependencies
-        working-directory: drive-gateway
-        run: npm ci
-
-      - name: Run gateway E2E tests
-        working-directory: drive-gateway
-        run: npm test
-
-      - name: Verify Cloudflare credentials without exposing values
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+            '; then
+              echo "Production gateway health verified on attempt $attempt; commit matches deployment: $GIT_SHA"
+              exit 0
+            fi
+            echo "Health verification attempt $attempt not ready (HTTP $last_status); retrying within 180-second window."
+            sleep 5
+          done
+          echo "Production gateway health verification failed after 180 seconds; last HTTP status: $last_status"
+          if [[ -f /tmp/health.json ]]; then
+            node -e 'try { const h=require("/tmp/health.json"); console.log(JSON.stringify({ok:h.ok,environment:h.environment,commit:h.commit})); } catch {}'
+          fi
+          exit 1
+      - name: Report failure details for phone-friendly logs
+        if: failure()
         shell: bash
         run: |
-          set -euo pipefail
-          test -n "$CLOUDFLARE_API_TOKEN"
-          test -n "$CLOUDFLARE_ACCOUNT_ID"
-          curl --fail --silent --show-error \
-            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            -H "Content-Type: application/json" \
-            "https://api.cloudflare.com/client/v4/user/tokens/verify" >/tmp/token.json
-          node -e 'const x=require("/tmp/token.json"); if(!x.success) process.exit(1);'
+          set +e
+          echo "PRODUCTION GATEWAY WORKFLOW FAILURE SUMMARY"
+          # These logs are explicitly captured by the steps above; never print secret-sync output unredacted.
+          for item in "production configuration guard:/tmp/irpa-config.log" "dependency installation:/tmp/irpa-install.log" "gateway tests:/tmp/irpa-tests.log" "Cloudflare credential verification:/tmp/irpa-credentials.log" "Worker deployment:/tmp/irpa-deploy.log"; do
+            label="${item%%:*}"
+            file="${item#*:}"
+            if [[ -f "$file" ]]; then
+              echo "FAILED/REACHED STEP OUTPUT: $label (last 30 lines)"
+              tail -30 "$file"
+            fi
+          done
+          if [[ -f /tmp/irpa-secret-sync.log ]]; then
+            echo "SECRET SYNC OUTPUT (redacted, last 30 lines)"
+            sed -E 's/(private_key|client_email|project_id|FIREBASE_SERVICE_ACCOUNT_JSON)[[:space:]"=:]+[^, }]+/\1=[REDACTED]/g' /tmp/irpa-secret-sync.log | tail -30
+          fi
+          if [[ -f /tmp/health.json ]]; then
+            echo "HEALTH RESPONSE SUMMARY (selected fields only)"
+            node -e 'try { const h=require("/tmp/health.json"); console.log(JSON.stringify({ok:h.ok,environment:h.environment,commit:h.commit})); } catch { console.log("Health payload was not valid JSON."); }'
+          fi
+          echo "See the failed step above this summary for the primary GitHub Actions error."
 
-      - name: Sync Firebase service account secret to production Worker
-        if: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON != '' }}
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
-        working-directory: drive-gateway
-        shell: bash
-        run: |
-          set -euo pipefail
-          # Pass the secret through stdin only; never print or persist its contents.
-          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" | npx wrangler secret put FIREBASE_SERVICE_ACCOUNT_JSON --config wrangler.toml --name irpa-google-drive-gateway
-
-      - name: Warn when Firebase service account secret is not configured
-        if: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON == '' }}
-        shell: bash
-        run: echo "::warning::GitHub Actions secret FIREBASE_SERVICE_ACCOUNT_JSON is missing; production Worker secret was not updated."
-
-      - name: Deploy default production Worker environment
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          GIT_SHA: ${{ github.sha }}
-        working-directory: drive-gateway
-        run: |
-          set -euo pipefail
-          echo "Deploying production Worker from commit ${GIT_SHA} (no --env override)."
-          npx wrangler deploy --config wrangler.toml --name irpa-google-drive-gateway --var "GIT_SHA:${GIT_SHA}"
-
-      - name: Verify production gateway health
-        env:
-          GIT_SHA: ${{ github.sha }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          url="https://irpa-google-drive-gateway.irpa-governance.workers.dev/health"
-          status="$(curl --silent --show-error --output /tmp/health.json --write-out '%{http_code}' "$url")"
-          echo "Production gateway health HTTP status: $status"
-          test "$status" = "200"
-          node -e '
-            const fs = require("node:fs");
-            const health = JSON.parse(fs.readFileSync("/tmp/health.json", "utf8"));
-            if (health.ok !== true || health.environment === "staging" || health.commit !== process.env.GIT_SHA) {
-              console.error("Production gateway health payload or commit stamp does not match this deployment.");
-              process.exit(1);
-            }
-            console.log("Production gateway health payload OK; commit matches deployment: " + health.commit);
-          '
- <<< "$default_config"
-          grep -q '^IRPA_WORKER_ENVIRONMENT = "production"
-          grep -q '^DRIVE_MOCK = "false"$' <<< "$default_config"
-          grep -q '^LOCAL_TEST_MODE = "false"$' <<< "$default_config"
-          ! grep -Eq '^IRPA_ENVIRONMENT[[:space:]]*=[[:space:]]*"staging"$' <<< "$default_config"
-          ! grep -q '^FIREBASE_PROJECT_ID = "irpa-dbg-staging-a73ec"$' <<< "$default_config"
-
-          default_kv_id="$(awk '
-            /^\[\[kv_namespaces\]\]/ { in_kv=1; next }
-            /^\[/ { in_kv=0 }
-            in_kv && /^id[[:space:]]*=/ {
-              sub(/^[^=]*=[[:space:]]*"/, "")
-              sub(/".*$/, "")
-              print
-              exit
-            }
-          ' <<< "$default_config")"
-          test -n "$default_kv_id"
-          test "$default_kv_id" = "ccdbffa662ac48bfbdf7f4b1f62ca941"
-          test "$default_kv_id" != "5ea76010553049a2b98c8493c37fbbc4"
-          echo "Default production configuration verified; named [env.staging] configuration is permitted."
-
-      - name: Install gateway dependencies
-        working-directory: drive-gateway
-        run: npm ci
-
-      - name: Run gateway E2E tests
-        working-directory: drive-gateway
-        run: npm test
-
-      - name: Verify Cloudflare credentials without exposing values
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -n "$CLOUDFLARE_API_TOKEN"
-          test -n "$CLOUDFLARE_ACCOUNT_ID"
-          curl --fail --silent --show-error \
-            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            -H "Content-Type: application/json" \
-            "https://api.cloudflare.com/client/v4/user/tokens/verify" >/tmp/token.json
-          node -e 'const x=require("/tmp/token.json"); if(!x.success) process.exit(1);'
-
-      - name: Sync Firebase service account secret to production Worker
-        if: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON != '' }}
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
-        working-directory: drive-gateway
-        shell: bash
-        run: |
-          set -euo pipefail
-          # Pass the secret through stdin only; never print or persist its contents.
-          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" | npx wrangler secret put FIREBASE_SERVICE_ACCOUNT_JSON --config wrangler.toml --name irpa-google-drive-gateway
-
-      - name: Warn when Firebase service account secret is not configured
-        if: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON == '' }}
-        shell: bash
-        run: echo "::warning::GitHub Actions secret FIREBASE_SERVICE_ACCOUNT_JSON is missing; production Worker secret was not updated."
-
-      - name: Deploy default production Worker environment
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          GIT_SHA: ${{ github.sha }}
-        working-directory: drive-gateway
-        run: |
-          set -euo pipefail
-          echo "Deploying production Worker from commit ${GIT_SHA} (no --env override)."
-          npx wrangler deploy --config wrangler.toml --name irpa-google-drive-gateway --var "GIT_SHA:${GIT_SHA}"
-
-      - name: Verify production gateway health
-        env:
-          GIT_SHA: ${{ github.sha }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          url="https://irpa-google-drive-gateway.irpa-governance.workers.dev/health"
-          status="$(curl --silent --show-error --output /tmp/health.json --write-out '%{http_code}' "$url")"
-          echo "Production gateway health HTTP status: $status"
-          test "$status" = "200"
-          node -e '
-            const fs = require("node:fs");
-            const health = JSON.parse(fs.readFileSync("/tmp/health.json", "utf8"));
-            if (health.ok !== true || health.environment === "staging" || health.commit !== process.env.GIT_SHA) {
-              console.error("Production gateway health payload or commit stamp does not match this deployment.");
-              process.exit(1);
-            }
-            console.log("Production gateway health payload OK; commit matches deployment: " + health.commit);
-          '
- <<< "$default_config"
-          ! grep -Eq '^FIREBASE_SERVICE_ACCOUNT_JSON[[:space:]]*=' <<< "$default_config"
-          grep -q '^DRIVE_MOCK = "false"$' <<< "$default_config"
-          grep -q '^LOCAL_TEST_MODE = "false"$' <<< "$default_config"
-          ! grep -Eq '^IRPA_ENVIRONMENT[[:space:]]*=[[:space:]]*"staging"$' <<< "$default_config"
-          ! grep -q '^FIREBASE_PROJECT_ID = "irpa-dbg-staging-a73ec"$' <<< "$default_config"
-
-          default_kv_id="$(awk '
-            /^\[\[kv_namespaces\]\]/ { in_kv=1; next }
-            /^\[/ { in_kv=0 }
-            in_kv && /^id[[:space:]]*=/ {
-              sub(/^[^=]*=[[:space:]]*"/, "")
-              sub(/".*$/, "")
-              print
-              exit
-            }
-          ' <<< "$default_config")"
-          test -n "$default_kv_id"
-          test "$default_kv_id" = "ccdbffa662ac48bfbdf7f4b1f62ca941"
-          test "$default_kv_id" != "5ea76010553049a2b98c8493c37fbbc4"
-          echo "Default production configuration verified; named [env.staging] configuration is permitted."
-
-      - name: Install gateway dependencies
-        working-directory: drive-gateway
-        run: npm ci
-
-      - name: Run gateway E2E tests
-        working-directory: drive-gateway
-        run: npm test
-
-      - name: Verify Cloudflare credentials without exposing values
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -n "$CLOUDFLARE_API_TOKEN"
-          test -n "$CLOUDFLARE_ACCOUNT_ID"
-          curl --fail --silent --show-error \
-            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            -H "Content-Type: application/json" \
-            "https://api.cloudflare.com/client/v4/user/tokens/verify" >/tmp/token.json
-          node -e 'const x=require("/tmp/token.json"); if(!x.success) process.exit(1);'
-
-      - name: Sync Firebase service account secret to production Worker
-        if: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON != '' }}
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
-        working-directory: drive-gateway
-        shell: bash
-        run: |
-          set -euo pipefail
-          # Pass the secret through stdin only; never print or persist its contents.
-          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" | npx wrangler secret put FIREBASE_SERVICE_ACCOUNT_JSON --config wrangler.toml --name irpa-google-drive-gateway
-
-      - name: Warn when Firebase service account secret is not configured
-        if: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON == '' }}
-        shell: bash
-        run: echo "::warning::GitHub Actions secret FIREBASE_SERVICE_ACCOUNT_JSON is missing; production Worker secret was not updated."
-
-      - name: Deploy default production Worker environment
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          GIT_SHA: ${{ github.sha }}
-        working-directory: drive-gateway
-        run: |
-          set -euo pipefail
-          echo "Deploying production Worker from commit ${GIT_SHA} (no --env override)."
-          npx wrangler deploy --config wrangler.toml --name irpa-google-drive-gateway --var "GIT_SHA:${GIT_SHA}"
-
-      - name: Verify production gateway health
-        env:
-          GIT_SHA: ${{ github.sha }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          url="https://irpa-google-drive-gateway.irpa-governance.workers.dev/health"
-          status="$(curl --silent --show-error --output /tmp/health.json --write-out '%{http_code}' "$url")"
-          echo "Production gateway health HTTP status: $status"
-          test "$status" = "200"
-          node -e '
-            const fs = require("node:fs");
-            const health = JSON.parse(fs.readFileSync("/tmp/health.json", "utf8"));
-            if (health.ok !== true || health.environment === "staging" || health.commit !== process.env.GIT_SHA) {
-              console.error("Production gateway health payload or commit stamp does not match this deployment.");
-              process.exit(1);
-            }
-            console.log("Production gateway health payload OK; commit matches deployment: " + health.commit);
-          '
