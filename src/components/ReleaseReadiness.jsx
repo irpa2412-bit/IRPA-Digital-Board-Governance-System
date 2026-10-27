@@ -9,6 +9,7 @@ export default function ReleaseReadiness({ admin = false }) {
   const [busy, setBusy] = useState(false);
   const [report, setReport] = useState("");
   const [copyMessage, setCopyMessage] = useState("");
+  const [integrationSecrets, setIntegrationSecrets] = useState([]);
 
   if (!admin) return <section className="panel" role="status"><h2 id="release-readiness-title">Release Readiness</h2><p>Required role: Administrator. Your account is not authorized to run release diagnostics.</p></section>;
 
@@ -38,6 +39,7 @@ export default function ReleaseReadiness({ admin = false }) {
         body: JSON.stringify({ webBuildCommit: webCommit })
       });
       const payload = await response.json().catch(() => ({}));
+      setIntegrationSecrets(Array.isArray(payload.integrationSecrets) ? payload.integrationSecrets : []);
       if (!response.ok) {
         add("Worker Release Readiness route", false, "HTTP " + response.status + ": " + String(payload.error || "Worker did not return a diagnostic report."));
         setReport(lines.join("\n"));
@@ -118,6 +120,7 @@ export default function ReleaseReadiness({ admin = false }) {
           <p className="panel-description">Administrator-only, read-only diagnostics. Drive reconciliation is dry-run; add-signer is never submitted as a live write. A FAIL or blocked probe must be resolved before release.</p>
         </div>
       </div>
+      {integrationSecrets.length > 0 && <section aria-labelledby="integration-secrets-title" style={{ marginTop: 16 }}><h3 id="integration-secrets-title">NEEDS CONFIGURATION — Production Worker integration secrets</h3><p>Names and binding status only. Secret values are never returned or displayed.</p><div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}><thead><tr><th scope="col" style={{ textAlign: "left", padding: 8, borderBottom: "1px solid var(--border)" }}>Integration</th><th scope="col" style={{ textAlign: "left", padding: 8, borderBottom: "1px solid var(--border)" }}>Expected secret/variable NAME</th><th scope="col" style={{ textAlign: "left", padding: 8, borderBottom: "1px solid var(--border)" }}>Bound</th></tr></thead><tbody>{integrationSecrets.map(item => <tr key={item.integration + "-" + item.name}><td style={{ padding: 8, borderBottom: "1px solid var(--border)" }}>{item.integration}</td><td style={{ padding: 8, borderBottom: "1px solid var(--border)", fontFamily: "monospace", overflowWrap: "anywhere" }}>{item.name}</td><td style={{ padding: 8, borderBottom: "1px solid var(--border)", fontWeight: 700 }}>{String(item.bound)}</td></tr>)}</tbody></table></div></section>}
       <div className="form-actions">
         <button type="button" onClick={runAllChecks} disabled={busy}>{busy ? "Running all checks…" : "Run all checks"}</button>
         <button type="button" className="secondary-button" onClick={copyReport} disabled={!report}>Copy report</button>
