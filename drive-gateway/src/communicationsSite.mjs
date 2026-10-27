@@ -159,16 +159,26 @@ export function createCommunicationsSiteRouter(deps) {
   }
 
   function wordpressConfig(env) {
+    const missing = ["WORDPRESS_BASE_URL", "WORDPRESS_USERNAME", "WORDPRESS_APPLICATION_PASSWORD"].filter(name => !String(env?.[name] || "").trim());
+    if (missing.length) throw Object.assign(new Error("Missing required Worker secrets: " + missing.join(", ") + "."), { status: 503 });
     let base;
-    try { base = new URL(String(env.WORDPRESS_BASE_URL || "")); }
-    catch { throw new Error("Website publishing is not configured."); }
+    try { base = new URL(String(env.WORDPRESS_BASE_URL)); }
+    catch { throw new Error("Website endpoint configuration is invalid."); }
     if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash) {
       throw new Error("Website endpoint configuration is invalid.");
     }
-    const username = String(env.WORDPRESS_USERNAME || "").trim();
-    const password = String(env.WORDPRESS_APPLICATION_PASSWORD || "").replace(/\s/g, "");
-    if (!username || !password) throw new Error("Website publishing credentials are not configured.");
-    return { root: base.toString().replace(/\/$/, ""), auth: "Basic " + btoa(unescape(encodeURIComponent(username + ":" + password))), stagingAuthHeader: base.hostname.toLowerCase() === "staging.irpa.or.tz" };
+    const environment = String(env.IRPA_ENVIRONMENT || "").toLowerCase();
+    const host = base.hostname.toLowerCase();
+    if (environment === "production" && !["irpa.or.tz", "www.irpa.or.tz"].includes(host)) {
+      throw new Error("Production WordPress editing is restricted to irpa.or.tz or www.irpa.or.tz.");
+    }
+    if (environment === "staging" && host !== "staging.irpa.or.tz") {
+      throw new Error("Staging WordPress editing is restricted to staging.irpa.or.tz.");
+    }
+    if (!["production", "staging"].includes(environment)) throw new Error("Website editing requires an explicit staging or production Worker environment.");
+    const username = String(env.WORDPRESS_USERNAME).trim();
+    const password = String(env.WORDPRESS_APPLICATION_PASSWORD).replace(/\s/g, "");
+    return { root: base.toString().replace(/\/$/, ""), hostname: host, environment, auth: "Basic " + btoa(unescape(encodeURIComponent(username + ":" + password))), stagingAuthHeader: host === "staging.irpa.or.tz" };
   }
 
   function wordpressHeaders(wp, extra = {}) {
@@ -179,23 +189,19 @@ export function createCommunicationsSiteRouter(deps) {
     return headers;
   }
 
-  function stagingWordPressConfig(env) {
-    if (String(env.IRPA_ENVIRONMENT || "").toLowerCase() !== "staging") {
-      throw new Error("WordPress page/post editing is disabled outside the staging Worker.");
-    }
+  function websiteWordPressConfig(env) {
     const wp = wordpressConfig(env);
     const base = new URL(wp.root);
-    if (base.protocol !== "https:" || base.hostname.toLowerCase() !== "staging.irpa.or.tz" || base.pathname !== "/" ||
-        base.hostname.toLowerCase() === "irpa.or.tz" || base.hostname.toLowerCase() === "www.irpa.or.tz") {
-      throw new Error("WordPress page/post editing requires the dedicated staging hostname.");
+    if (base.protocol !== "https:" || base.pathname !== "/" || base.hostname.toLowerCase() !== wp.hostname) {
+      throw new Error("WordPress endpoint must be an HTTPS origin without a path.");
     }
     return wp;
   }
 
   async function wordpressEditorFetch(wp, endpoint, init = {}) {
     const target = new URL(endpoint);
-    if (target.protocol !== "https:" || target.hostname.toLowerCase() !== "staging.irpa.or.tz") {
-      throw new Error("WordPress editor requests are restricted to the dedicated staging hostname.");
+    if (target.protocol !== "https:" || target.hostname.toLowerCase() !== wp.hostname || target.port || target.username || target.password) {
+      throw new Error("WordPress editor request attempted to leave the configured HTTPS host.");
     }
     return fetch(target.toString(), { ...init, redirect: "manual" });
   }
@@ -219,22 +225,19 @@ export function createCommunicationsSiteRouter(deps) {
   function cpanelConfig(env) {
     let base;
     try { base = new URL(String(env.CPANEL_BASE_URL || "")); }
-    catch { throw new Error("cPanel integration is not configured."); }
+    catch { throw Object.assign(new Error("Missing required Worker secrets: CPANEL_BASE_URL, CPANEL_USERNAME, CPANEL_API_TOKEN."), { status: 503 }); }
     if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash || base.pathname !== "/" || base.port !== "2083") {
       throw new Error("cPanel endpoint configuration is invalid.");
     }
     const username = String(env.CPANEL_USERNAME || "").trim();
     const token = String(env.CPANEL_API_TOKEN || "").trim();
-    if (!username || !token) throw new Error("cPanel API credentials are not configured.");
-    const configuredRoot = String(env.CPANEL_DOCUMENT_ROOT || "public_html/staging").trim().replace(/\\/g, "/").replace(/\/+$/g, "");
-    const absoluteStagingRoot = "/home/" + username + "/public_html/staging";
-    const homeRelativeStagingRoot = "home/" + username + "/public_html/staging";
-    let documentRoot;
-    if (configuredRoot === absoluteStagingRoot || configuredRoot === homeRelativeStagingRoot || configuredRoot === "public_html/staging") {
-      documentRoot = "public_html/staging";
-    } else {
-      throw new Error("cPanel document root must resolve to the exact staging directory.");
-    }
+    if (!username || !token) throw Object.assign(new Error("Missing required Worker secrets: " + [!username && "CPANEL_USERNAME", !token && "CPANEL_API_TOKEN"].filter(Boolean).join(", ") + "."), { status: 503 });
+    const environment = String(env.IRPA_ENVIRONMENT || "").toLowerCase();
+    const configuredRoot = String(env.CPANEL_DOCUMENT_ROOT || (environment === "production" ? "public_html" : "public_html/staging")).trim().replace(/\\/g, "/").replace(/\/+$/g, "");
+    const allowedRoots = environment === "production" ? ["public_html", "home/" + username + "/public_html", "/home/" + username + "/public_html"] :
+      environment === "staging" ? ["public_html/staging", "home/" + username + "/public_html/staging", "/home/" + username + "/public_html/staging"] : [];
+    if (!allowedRoots.includes(configuredRoot)) throw new Error("cPanel document root must match the configured staging or production public_html directory.");
+    const documentRoot = "public_html" + (environment === "staging" ? "/staging" : "");
     return { root: base.origin + "/execute", username, token, documentRoot };
   }
 
@@ -267,10 +270,10 @@ export function createCommunicationsSiteRouter(deps) {
     return data;
   }
 
-  function isStagingPublicLink(value) {
+  function isAllowedWordPressLink(value, wp) {
     try {
       const link = new URL(String(value || ""));
-      return link.protocol === "https:" && link.hostname.toLowerCase() === "staging.irpa.or.tz";
+      return link.protocol === "https:" && link.hostname.toLowerCase() === wp.hostname && !link.port && !link.username && !link.password;
     } catch {
       return false;
     }
@@ -307,7 +310,7 @@ export function createCommunicationsSiteRouter(deps) {
     const data = await response.json().catch(() => null);
     if (response.status === 404) throw new Error("WordPress page/post not found.");
     if (!response.ok || !Number.isSafeInteger(data?.id)) throw new Error("WordPress could not read the requested page/post.");
-    if (!isStagingPublicLink(data.link)) throw new Error("WordPress returned a non-staging page URL; the edit was blocked.");
+    if (!isAllowedWordPressLink(data.link, wp)) throw new Error("WordPress returned a URL outside the configured website host; the edit was blocked.");
     return data;
   }
 
@@ -500,7 +503,7 @@ export function createCommunicationsSiteRouter(deps) {
       const { roles } = await websiteEditorAuthorised(request, env);
       const result = { website: "not_configured", cpanel: "not_configured" };
       try {
-        const wp = stagingWordPressConfig(env);
+        const wp = websiteWordPressConfig(env);
         const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/users/me?context=edit", {
           headers: wordpressHeaders(wp, { Accept: "application/json" }), signal: AbortSignal.timeout(12000)
         });
@@ -537,7 +540,7 @@ export function createCommunicationsSiteRouter(deps) {
 
     if (path === "/api/communications/website/content" && request.method === "GET") {
       await websiteEditorAuthorised(request, env);
-      const wp = stagingWordPressConfig(env);
+      const wp = websiteWordPressConfig(env);
       await verifyDedicatedWordPressEditor(wp);
       const type = url.searchParams.get("type") === "pages" ? "pages" : url.searchParams.get("type") === "posts" ? "posts" : "";
       if (!type) return json({ error: "Content type must be pages or posts." }, 400, corsHeaders(request));
@@ -551,7 +554,7 @@ export function createCommunicationsSiteRouter(deps) {
       });
       const data = await response.json().catch(() => null);
       if (!response.ok || !Array.isArray(data)) throw new Error("Could not list staging website content.");
-      if (data.some(item => !isStagingPublicLink(item.link))) throw new Error("WordPress returned a non-staging page URL; content listing was blocked.");
+      if (data.some(item => !isAllowedWordPressLink(item.link, wp))) throw new Error("WordPress returned a non-staging page URL; content listing was blocked.");
       return json({ items: data.map(item => ({
         id: Number(item.id), type, title: editorRaw(item, "title"), excerpt: editorRaw(item, "excerpt"),
         featuredMedia: Number(item.featured_media || 0), status: String(item.status || "draft"),
@@ -562,7 +565,7 @@ export function createCommunicationsSiteRouter(deps) {
     const singleContentMatch = /^\/api\/communications\/website\/content\/(pages|posts)\/([1-9]\d*)$/.exec(path);
     if (singleContentMatch && request.method === "GET") {
       await websiteEditorAuthorised(request, env);
-      const wp = stagingWordPressConfig(env);
+      const wp = websiteWordPressConfig(env);
       await verifyDedicatedWordPressEditor(wp);
       const type = singleContentMatch[1];
       const id = Number(singleContentMatch[2]);
@@ -572,7 +575,7 @@ export function createCommunicationsSiteRouter(deps) {
 
     if (path === "/api/communications/website/revisions" && request.method === "GET") {
       await websiteEditorAuthorised(request, env);
-      const wp = stagingWordPressConfig(env);
+      const wp = websiteWordPressConfig(env);
       await verifyDedicatedWordPressEditor(wp);
       const type = url.searchParams.get("type");
       const id = Number(url.searchParams.get("id"));
@@ -631,7 +634,8 @@ export function createCommunicationsSiteRouter(deps) {
           !Number.isSafeInteger(featuredMedia) || featuredMedia < 0 || !["draft", "publish"].includes(status)) {
         return json({ error: "Provide a valid page/post ID, title, content, excerpt, featured image ID and draft/publish status." }, 400, corsHeaders(request));
       }
-      const wp = stagingWordPressConfig(env);
+      if (String(env.IRPA_ENVIRONMENT || "").toLowerCase() === "production" && status === "publish") return json({ error: "Production publishing requires the approved communication-media workflow; save as draft and submit for approval." }, 403, corsHeaders(request));
+      const wp = websiteWordPressConfig(env);
       await verifyDedicatedWordPressEditor(wp);
       const current = await readWebsiteItem(wp, type, id);
       const changedFields = ["title", "content", "excerpt", "featuredMedia", "status"].filter(key => {
@@ -648,7 +652,7 @@ export function createCommunicationsSiteRouter(deps) {
         body: JSON.stringify(payload), signal: AbortSignal.timeout(30000)
       });
       const data = await response.json().catch(() => null);
-      if (!response.ok || !Number.isSafeInteger(data?.id) || !isStagingPublicLink(data?.link)) {
+      if (!response.ok || !Number.isSafeInteger(data?.id) || !isAllowedWordPressLink(data?.link, wp)) {
         await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_CONTENT_UPDATE_FAILED", type, id, {
           snapshotId: snapshot.snapshotId, previousRevisionId: snapshot.currentRevisionId
         });
@@ -687,7 +691,7 @@ export function createCommunicationsSiteRouter(deps) {
           (snapshotId && !/^[0-9a-f-]{36}$/i.test(snapshotId))) {
         return json({ error: "A valid page/post and saved snapshot or WordPress revision are required." }, 400, corsHeaders(request));
       }
-      const wp = stagingWordPressConfig(env);
+      const wp = websiteWordPressConfig(env);
       await verifyDedicatedWordPressEditor(wp);
       const current = await readWebsiteItem(wp, type, id);
       const safetySnapshot = await saveWebsiteSnapshot(env, claims, wp, type, id, current, ["restore"]);
@@ -724,7 +728,7 @@ export function createCommunicationsSiteRouter(deps) {
         body: JSON.stringify(target), signal: AbortSignal.timeout(20000)
       });
       const data = await response.json().catch(() => null);
-      if (!response.ok || !Number.isSafeInteger(data?.id) || !isStagingPublicLink(data?.link)) {
+      if (!response.ok || !Number.isSafeInteger(data?.id) || !isAllowedWordPressLink(data?.link, wp)) {
         await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_REVISION_RESTORE_FAILED", type, id, {
           requestedSnapshotId: snapshotId || null, requestedRevisionId: snapshotId ? null : revisionId,
           safetySnapshotId: safetySnapshot.snapshotId
