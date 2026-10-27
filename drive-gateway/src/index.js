@@ -22,6 +22,8 @@ import { runCleanup } from "./upload.mjs";
 import { createDocumentLifecycleRouter } from "./documentLifecycle.mjs";
 import { canProvisionSignatureProfileFolder } from "./signatureProfileAuthorization.mjs";
 import { canReadSignatureAsset, canUploadSignedDocument } from "./signatureAssetAuthorization.mjs";
+import { filterSignatureEnvelopeForCaller } from "./signatureWorkflowVisibility.mjs";
+
 import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPasswordSetup, getInvitationSessionState } from "./invitationRedemption.mjs";
 import { buildGoogleDriveAuthorizationParams } from "./googleDriveOAuth.mjs";
 import { createCommunicationsSiteRouter } from "./communicationsSite.mjs";
@@ -279,6 +281,7 @@ export default {
       if (pathname === "/api/signature-pathway/reconcile" && request.method === "POST") {
         return await reconcileSignatureDocumentIds(request, env);
       }
+      if (pathname === "/api/signature-workflow/view" && request.method === "GET") return await getSignatureWorkflowViewRoute(request, env);
       if (pathname === "/api/signature-workflow/draft" && request.method === "POST") return await saveSignatureWorkflowDraftRoute(request, env);
       if (pathname === "/api/system/diagnostics" && request.method === "GET") return await systemDiagnosticsRoute(request, env);
       if (pathname === "/api/system/actual-data-access" && (request.method === "GET" || request.method === "POST")) return await actualDataAccessRoute(request, env);
@@ -1029,6 +1032,24 @@ async function systemDiagnosticsRoute(request, env) {
     base.ok = base.adminToken.created && base.firestoreRead.ok;
     return json(base,200,corsHeaders(request));
   } catch(error) { return json({...base,error:String(error?.message || error).slice(0,220)},Number(error?.status)||401,corsHeaders(request)); }
+}
+
+async function getSignatureWorkflowViewRoute(request, env) {
+  const claims = await authenticateFirebaseRequest(request, env);
+  const actorUid = String(claims.user_id || "").trim();
+  if (!actorUid) return json({ok:false,error:"Authenticated identity is required."},401,corsHeaders(request));
+  const url = new URL(request.url);
+  const envelopeId = String(url.searchParams.get("envelopeId") || "").trim();
+  if (!/^[A-Za-z0-9_-]{6,150}$/.test(envelopeId)) return json({ok:false,error:"A valid envelopeId is required."},400,corsHeaders(request));
+  const token = await getFirestoreAdminAccessToken(env);
+  const record = await getFirestoreDocument(env, "signatureEnvelopes/" + envelopeId, token);
+  if (!record?.fields) return json({ok:false,error:"Signing envelope not found."},404,corsHeaders(request));
+  const envelope = {id:envelopeId,...(firestoreDocumentToPlain(record)||{})};
+  const adminProfile = await getFirestoreDocument(env, "adminProfiles/" + actorUid, token);
+  const isAdmin = Boolean(adminProfile?.fields?.active?.booleanValue === true && adminProfile?.fields?.role?.stringValue === "Administrator");
+  const filtered = filterSignatureEnvelopeForCaller(envelope,{authenticatedUid:actorUid,isAdmin});
+  if (!filtered.allowed) return json({ok:false,error:"This signing envelope is not available to this account."},404,corsHeaders(request));
+  return json({ok:true,envelope:filtered.view,visibilityScope:filtered.scope},200,{...corsHeaders(request),"Cache-Control":"no-store"});
 }
 
 async function saveSignatureWorkflowDraftRoute(request, env) {
