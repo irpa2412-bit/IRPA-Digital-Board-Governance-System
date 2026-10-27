@@ -9,12 +9,16 @@ test("production deploy safely syncs the Firebase service account secret to the 
   assert.match(workflow, /Sync Firebase service account secret to production Worker/);
   assert.match(workflow, /FIREBASE_SERVICE_ACCOUNT_JSON: \$\{\{ secrets\.FIREBASE_SERVICE_ACCOUNT_JSON \}\}/);
   assert.match(workflow, /if \[\[ -n "\$\{FIREBASE_SERVICE_ACCOUNT_JSON:-\}" \]\]/);
-  assert.match(workflow, /printf '%s' "\$FIREBASE_SERVICE_ACCOUNT_JSON" \| npx wrangler secret put FIREBASE_SERVICE_ACCOUNT_JSON --config wrangler\.toml --name irpa-google-drive-gateway/);
+  assert.match(workflow, /printf '%s' "\$FIREBASE_SERVICE_ACCOUNT_JSON" \| npx wrangler secret put FIREBASE_SERVICE_ACCOUNT_JSON --config wrangler\.toml --name irpa-google-drive-gateway > \/tmp\/irpa-secret-sync\.log 2>&1/);
+  assert.match(workflow, /Firebase secret sync failed; continuing with Worker deployment/);
   assert.match(workflow, /::warning::GitHub Actions secret FIREBASE_SERVICE_ACCOUNT_JSON is missing/);
   assert.doesNotMatch(workflow, /if: \$\{\{ secrets\.FIREBASE_SERVICE_ACCOUNT_JSON/);
   assert.doesNotMatch(workflow, /echo\s+["']?\$FIREBASE_SERVICE_ACCOUNT_JSON/);
   assert.match(workflow, /deadline=\$\(\(SECONDS \+ 180\)\)/);
   assert.match(workflow, /sleep 5/);
+  assert.match(workflow, /if: failure\(\)/);
+  assert.match(workflow, /Report failure details for phone-friendly logs/);
+  assert.match(workflow, /tail -30/);
 });
 
 test("diagnostics classify Firebase service account failures without exposing values", () => {
