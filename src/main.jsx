@@ -21,8 +21,12 @@ if ("serviceWorker" in navigator) {
       reloadedForControllerChange = true;
       window.location.reload();
     });
+    const banner = document.getElementById("irpa-update-banner");
+    const reloadButton = document.getElementById("irpa-update-reload");
+    const showUpdate = () => { if (banner) banner.hidden = false; };
+    if (reloadButton) reloadButton.addEventListener("click", async () => { const registration = await navigator.serviceWorker.getRegistration("/"); if (registration?.waiting) registration.waiting.postMessage({ type: "SKIP_WAITING" }); else window.location.reload(); });
     navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "none" })
-      .then((registration) => registration.update())
+      .then((registration) => { if (registration.waiting && navigator.serviceWorker.controller) showUpdate(); registration.addEventListener("updatefound", () => { const worker = registration.installing; if (!worker) return; worker.addEventListener("statechange", () => { if (worker.state === "installed" && navigator.serviceWorker.controller) showUpdate(); }); }); return registration.update(); })
       .catch((error) => {
         console.warn("IRPA offline application shell update check failed:", error);
       });

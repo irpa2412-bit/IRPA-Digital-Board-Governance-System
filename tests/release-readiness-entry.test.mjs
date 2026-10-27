@@ -1,0 +1,37 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const read = path => readFileSync(new URL(path, import.meta.url), "utf8");
+test("persistent build stamp is present outside the authenticated React app", () => {
+ const html=read("../index.html");
+ assert.match(html,/id="irpa-build-stamp"/);
+ assert.match(html,/irpa-build-version/);
+ assert.match(html,/irpa-build-time/);
+});
+test("Settings exposes Release Readiness and a clear Administrator role message", () => {
+ const settings=read("../src/pages/Settings.jsx");
+ assert.match(settings,/Release Readiness/);
+ assert.match(settings,/Required role: Administrator/);
+ assert.match(settings,/release-readiness/);
+});
+test("service worker cache version changes and accepts update activation", () => {
+ const sw=read("../public/sw.js");
+ assert.match(sw,/irpa-dbgs-app-shell-v45/);
+ assert.match(sw,/SKIP_WAITING/);
+});
+test("update banner provides requested text and refresh wiring", () => {
+ const html=read("../index.html"), main=read("../src/main.jsx");
+ assert.match(html,/New version available, tap to reload/);
+ assert.match(main,/registration\.update\(\)/);
+});
+
+test("Release Readiness access gate is valid JSX and preserves hook ordering", () => {
+ const component=read("../src/components/ReleaseReadiness.jsx");
+ assert.equal(component.includes("\\n  if (!admin)"), false);
+ assert.ok(component.indexOf('const [copyMessage, setCopyMessage]') < component.indexOf('if (!admin) return'));
+});
+test("service worker message handler uses real line breaks, not escaped source text", () => {
+ const sw=read("../public/sw.js");
+ assert.equal(sw.includes("\\nself.addEventListener"), false);
+ assert.match(sw,/self\.addEventListener\("message"/);
+});

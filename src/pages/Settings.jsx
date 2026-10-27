@@ -476,7 +476,7 @@ export default function Settings({ admin = false, section = "settings" }) {
           {liveCheckText && <pre aria-live="polite" style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontSize: 12, lineHeight: 1.45, padding: 12, marginTop: 14, border: "1px solid var(--border)", borderRadius: 8, background: "var(--surface)", maxHeight: "60vh", overflow: "auto" }}>{liveCheckText}</pre>}
         </section>
       )}
-      {admin && section === "settings" && <ReleaseReadiness/>}
+      {section === "settings" && <section className="panel" style={{ marginBottom: 16 }}><h2>Release Readiness</h2><p className="panel-description">{admin ? "Open the administrator-only release checks." : "Required role: Administrator. Your account does not have this role."}</p><button type="button" onClick={() => { window.location.hash = "release-readiness"; document.getElementById("release-readiness")?.scrollIntoView({ behavior: "smooth" }); }}>Release Readiness</button></section>}{section === "settings" && <div id="release-readiness">{admin ? <ReleaseReadiness admin={admin}/> : <section className="panel" role="status"><h2>Release Readiness unavailable</h2><p>Required role: Administrator. Contact an IRPA Administrator if you need access.</p></section>}</div>}
       {admin && section === "settings" && <ActualDataAccessControl/>}
       {admin && section === "settings" && <SystemResetControl/>}
 
