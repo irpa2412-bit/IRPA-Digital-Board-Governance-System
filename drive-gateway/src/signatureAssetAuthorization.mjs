@@ -38,6 +38,9 @@ export function canReadSignatureAsset({
   documentOwnerUid = "",
   authorizedUids = [],
   envelopeParticipantUids = [],
+  envelopeOwnerUid = "",
+  envelopeSenderUid = "",
+  envelopeActionUids = [],
   envelopeDocumentId = "",
   envelopeFileMatches = false,
 } = {}) {
@@ -51,13 +54,17 @@ export function canReadSignatureAsset({
   if (purpose === "Signed Documents Archive") {
     const docId = String(documentId || "").trim();
     const envId = String(envelopeId || "").trim();
-    if (!docId || !envId || !Array.isArray(envelopeParticipantUids) || !envelopeParticipantUids.includes(actor)) {
-      return false;
-    }
+    if (!docId || !envId || String(envelopeDocumentId || "") !== docId) return false;
     if (metadataDocumentId && String(metadataDocumentId) !== docId) return false;
     if (metadataEnvelopeId && String(metadataEnvelopeId) !== envId) return false;
-    return (String(metadataDocumentId || "") === docId && String(metadataEnvelopeId || "") === envId)
-      || envelopeFileMatches === true;
+    const assetMatchesEnvelope = String(metadataDocumentId || "") === docId
+      && (!String(metadataEnvelopeId || "") || String(metadataEnvelopeId) === envId);
+    if (!assetMatchesEnvelope && envelopeFileMatches !== true) return false;
+    return isAdmin === true
+      || String(envelopeOwnerUid || "") === actor
+      || String(envelopeSenderUid || "") === actor
+      || (Array.isArray(envelopeParticipantUids) && envelopeParticipantUids.includes(actor))
+      || (Array.isArray(envelopeActionUids) && envelopeActionUids.includes(actor));
   }
 
   const docId = String(documentId || "").trim();
@@ -67,6 +74,8 @@ export function canReadSignatureAsset({
     || (Array.isArray(authorizedUids) && authorizedUids.includes(actor))
     || (String(envelopeId || "").trim() !== ""
       && String(envelopeDocumentId || "") === docId
-      && Array.isArray(envelopeParticipantUids)
-      && envelopeParticipantUids.includes(actor));
+      && (String(envelopeOwnerUid || "") === actor
+        || String(envelopeSenderUid || "") === actor
+        || (Array.isArray(envelopeParticipantUids) && envelopeParticipantUids.includes(actor))
+        || (Array.isArray(envelopeActionUids) && envelopeActionUids.includes(actor))));
 }

@@ -67,6 +67,7 @@ test("signed workflow PDFs require the matching document, envelope, and particip
     purpose: "Signed Documents Archive",
     documentId: "DOC-1",
     envelopeId: "ENV-1",
+    envelopeDocumentId: "DOC-1",
     metadataDocumentId: "DOC-1",
     metadataEnvelopeId: "ENV-1",
     envelopeParticipantUids: ["signer-1", "signer-2"],
