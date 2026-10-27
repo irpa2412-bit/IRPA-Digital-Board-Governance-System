@@ -39,6 +39,7 @@ export function createReleaseReadinessRoute(deps) {
     add("Worker commit from /health", health.commit !== "unknown", health.commit === "unknown" ? "GIT_SHA is not configured; /health would report unknown." : "Worker GIT_SHA is configured: " + health.commit + ".");
     add("Worker project ID", health.firebaseProjectId === EXPECTED_PROJECT, "FIREBASE_PROJECT_ID is " + health.firebaseProjectId + "; expected " + EXPECTED_PROJECT + ".");
     add("FIREBASE_SERVICE_ACCOUNT_JSON present", Boolean(String(env.FIREBASE_SERVICE_ACCOUNT_JSON || "").trim()), "Presence only; secret value is never returned.");
+    const integrationSecrets = Array.isArray(diagnostics?.integrationSecrets) ? diagnostics.integrationSecrets : [];
 
     let diagnostics = null;
     try {
@@ -90,6 +91,6 @@ export function createReleaseReadinessRoute(deps) {
     }
 
     add("Add-signer dry-run through Worker", false, "No non-mutating add-signer dry-run endpoint is registered; the live add-signer write was deliberately not invoked.");
-    return json({ ok: checks.every(item => item.status === "PASS"), workerCommit: health.commit, workerProjectId: health.firebaseProjectId, checks }, 200, deps.corsHeaders?.(request));
+    return json({ ok: checks.every(item => item.status === "PASS"), workerCommit: health.commit, workerProjectId: health.firebaseProjectId, integrationSecrets, checks }, 200, deps.corsHeaders?.(request));
   };
 }
