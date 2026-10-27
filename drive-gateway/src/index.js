@@ -3298,7 +3298,7 @@ function corsHeaders(request) {
   return {
     "Access-Control-Allow-Origin": allowed ? origin : "https://irpa.or.tz",
     "Access-Control-Allow-Headers": "Authorization, Content-Type, X-IRPA-Invitation-Version, x-signing-token",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
     "Vary": "Origin"
   };
 }
