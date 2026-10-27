@@ -1154,6 +1154,16 @@ async function reconcileSignatureDocumentIds(request, env) {
       const fileId = String(data.fileId || data.driveFileId || data.archiveFileId || data.governanceArchiveFileId || data.sourceFileId || data.primaryArchiveFileId || "").trim();
       return { documentId, fileId, title: String(data.title || data.fileName || data.reference || documentId) };
     });
+    const requiredId = "wiAfPSIxHLTd6MdeM04q";
+    if (!items.some(item => item.documentId === requiredId)) {
+      const known = await getFirestoreDocument(env, "documents/" + requiredId, firestoreToken);
+      if (known?.fields) {
+        const data = firestoreDocumentToPlain(known) || {};
+        items.push({ documentId: requiredId, fileId: String(data.fileId || data.driveFileId || data.archiveFileId || data.governanceArchiveFileId || data.sourceFileId || data.primaryArchiveFileId || "").trim(), title: String(data.title || data.fileName || data.reference || requiredId) });
+      } else {
+        items.push({ documentId: requiredId, fileId: "", title: requiredId });
+      }
+    }
   }
   if (!items.length) return json({ok:true,dryRun,autoDiscover,results:[],summary:{total:0,repaired:0,wouldRepair:0,alreadyCorrect:0,unreadable:0,failed:0},writesPerformed:false,driveMutationsPerformed:false,note:"No Firestore controlled-document records were found."},200,corsHeaders(request));
   if (items.length > 250) return json({ok:false,error:"Reconciliation is limited to 250 documents per request."},400,corsHeaders(request));
