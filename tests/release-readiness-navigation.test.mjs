@@ -10,7 +10,7 @@ test("Settings exposes a clearly labelled Release Readiness shortcut at the top"
   assert.ok(settings.indexOf('aria-label="Release Readiness shortcut"') < settings.indexOf('{admin && section === "settings" && <DepartmentArchiveRegistry/>'));
   assert.match(settings, /Open Release Readiness/);
   assert.match(settings, /href="#release-readiness"/);
-  assert.match(settings, /<ReleaseReadiness admin={admin} \/>/);
+  assert.match(settings, /<ReleaseReadiness admin={admin}\s*\/>/);
 });
 
 test("Release Readiness shows an explicit Administrator requirement for other roles", () => {
