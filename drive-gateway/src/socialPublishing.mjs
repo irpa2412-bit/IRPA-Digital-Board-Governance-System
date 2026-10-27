@@ -65,7 +65,11 @@ export function createSocialPublishingRouter({ authenticateFirebaseRequest, json
     let identity;
     try {
       identity = await authenticateFirebaseRequest(request, env);
-      if (!identity?.uid) throw new Error("Authenticated identity required.");
+      // The shared Worker verifier returns Firebase claims as user_id (and token),
+      // not uid. Normalize the identity here instead of rejecting valid sessions.
+      const uid = String(identity?.uid || identity?.user_id || identity?.sub || "").trim();
+      if (!uid) throw new Error("Authenticated identity required.");
+      identity = { ...identity, uid };
     } catch {
       return jsonResponse({ ok: false, error: "Authentication required." }, 401, cors);
     }
