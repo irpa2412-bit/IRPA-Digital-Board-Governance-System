@@ -283,6 +283,7 @@ export default {
       }
       if (pathname === "/api/signature-workflow/list" && request.method === "GET") return await getSignatureWorkflowListRoute(request, env);
       if (pathname === "/api/signature-workflow/view" && request.method === "GET") return await getSignatureWorkflowViewRoute(request, env);
+      if (pathname === "/api/signature-workflow/add-signer-dry-run" && request.method === "POST") return await addSignerDryRunRoute(request, env);
       if (pathname === "/api/signature-workflow/draft" && request.method === "POST") return await saveSignatureWorkflowDraftRoute(request, env);
       if (pathname === "/api/system/diagnostics" && request.method === "GET") return await systemDiagnosticsRoute(request, env);
       if (pathname === "/api/system/actual-data-access" && (request.method === "GET" || request.method === "POST")) return await actualDataAccessRoute(request, env);
@@ -1080,6 +1081,39 @@ async function getSignatureWorkflowViewRoute(request, env) {
   const filtered = filterSignatureEnvelopeForCaller(envelope,{authenticatedUid:actorUid,isAdmin});
   if (!filtered.allowed) return json({ok:false,error:"This signing envelope is not available to this account."},404,corsHeaders(request));
   return json({ok:true,envelope:filtered.view,visibilityScope:filtered.scope},200,{...corsHeaders(request),"Cache-Control":"no-store"});
+}
+
+async function addSignerDryRunRoute(request, env) {
+  const cors = corsHeaders(request);
+  let claims;
+  try { claims = await authenticateFirebaseRequest(request, env); }
+  catch (error) { return json({ok:false,error:"Authentication required.",detail:String(error?.message||"").slice(0,120),writesPerformed:false},401,cors); }
+  const body = await request.json().catch(() => ({}));
+  const envelopeId = String(body.envelopeId || body.draft?.envelopeReference || "").trim();
+  const signer = body.signer || body.recipient || null;
+  const fields = Array.isArray(body.fields) ? body.fields : Array.isArray(body.draft?.fields) ? body.draft.fields : [];
+  if (!envelopeId || !signer || typeof signer !== "object") return json({ok:false,error:"Dry-run requires envelopeId and a signer object; no changes were made.",writesPerformed:false},400,cors);
+  if (!/^[A-Za-z0-9_-]{6,150}$/.test(envelopeId)) return json({ok:false,error:"Invalid envelopeId.",writesPerformed:false},400,cors);
+  const token = await getFirestoreAdminAccessToken(env);
+  const uid = String(claims.user_id || "");
+  const email = String(claims.email || "").trim().toLowerCase();
+  const admin = email === "irpa2412@gmail.com" || Boolean((await getFirestoreDocument(env,"adminProfiles/"+uid,token))?.fields?.active?.booleanValue === true);
+  const record = await getFirestoreDocument(env,"signatureEnvelopes/"+envelopeId,token);
+  if (!record?.fields) return json({ok:false,error:"Envelope not found or not accessible.",writesPerformed:false},404,cors);
+  const envelope = firestoreDocumentToPlain(record) || {};
+  if (!admin && String(envelope.ownerUid || envelope.senderUid || "") !== uid) return json({ok:false,error:"Only the envelope owner, sender, or administrator may dry-run signer assignments.",writesPerformed:false},403,cors);
+  const signerUid = String(signer.uid || signer.userId || "").trim();
+  const signerEmail = String(signer.email || "").trim().toLowerCase();
+  const signerName = String(signer.name || signer.displayName || "").trim();
+  const level = Number(signer.level || signer.signingLevel || 0);
+  const issues = [];
+  if (!signerUid && !signerEmail) issues.push("Signer requires a verified UID or email.");
+  if (!signerName) issues.push("Signer display name is required.");
+  if (!Number.isInteger(level) || level < 1 || level > 50) issues.push("Signer level must be an integer from 1 to 50.");
+  const recipients = Array.isArray(envelope.recipients) ? envelope.recipients : [];
+  if ((signerUid && recipients.some(r => String(r.uid || "") === signerUid)) || (signerEmail && recipients.some(r => String(r.email || "").trim().toLowerCase() === signerEmail))) issues.push("Signer is already assigned to this envelope.");
+  if (fields.some(field => !field || (!String(field.fieldId || "").trim()) || (field.signerUid && signerUid && String(field.signerUid) !== signerUid))) issues.push("Each proposed field must have a fieldId and must be assigned to this signer.");
+  return json({ok:issues.length===0,envelopeId,mode:"dry-run",wouldAddSigner:issues.length===0,signerPreview:{uid:signerUid||"(resolved by email)",email:signerEmail||"(not supplied)",name:signerName,level},fieldCount:fields.length,issues,writesPerformed:false,driveMutationsPerformed:false,message:issues.length?"Dry-run found validation issues; no changes were made.":"Signer assignment passed validation; no changes were made."},200,cors);
 }
 
 async function saveSignatureWorkflowDraftRoute(request, env) {
