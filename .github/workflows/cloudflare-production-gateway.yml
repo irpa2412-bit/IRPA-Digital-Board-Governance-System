@@ -29,6 +29,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          exec > >(tee /tmp/irpa-config.log) 2>&1
           config=drive-gateway/wrangler.toml
           test -f "$config"
           default_config="$(awk '/^\[env\./ { exit } { print }' "$config")"
@@ -145,7 +146,7 @@ jobs:
           set +e
           echo "PRODUCTION GATEWAY WORKFLOW FAILURE SUMMARY"
           # These logs are explicitly captured by the steps above; never print secret-sync output unredacted.
-          for item in "dependency installation:/tmp/irpa-install.log" "gateway tests:/tmp/irpa-tests.log" "Cloudflare credential verification:/tmp/irpa-credentials.log" "Worker deployment:/tmp/irpa-deploy.log"; do
+          for item in "production configuration guard:/tmp/irpa-config.log" "dependency installation:/tmp/irpa-install.log" "gateway tests:/tmp/irpa-tests.log" "Cloudflare credential verification:/tmp/irpa-credentials.log" "Worker deployment:/tmp/irpa-deploy.log"; do
             label="${item%%:*}"
             file="${item#*:}"
             if [[ -f "$file" ]]; then
