@@ -24,3 +24,14 @@ test("update banner provides requested text and refresh wiring", () => {
  assert.match(html,/New version available, tap to reload/);
  assert.match(main,/registration\.update\(\)/);
 });
+
+test("Release Readiness access gate is valid JSX and preserves hook ordering", () => {
+ const component=read("../src/components/ReleaseReadiness.jsx");
+ assert.doesNotMatch(component,/;\\\\n\\s+if \(!admin\)/);
+ assert.ok(component.indexOf('const [copyMessage, setCopyMessage]') < component.indexOf('if (!admin) return'));
+});
+test("service worker message handler uses real line breaks, not escaped source text", () => {
+ const sw=read("../public/sw.js");
+ assert.doesNotMatch(sw,/\\\\nself\.addEventListener/);
+ assert.match(sw,/self\.addEventListener\("message"/);
+});
