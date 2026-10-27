@@ -30,6 +30,10 @@ export function filterSignatureEnvelopeForCaller(envelope, { authenticatedUid, i
   const priorAppliedFields = fields.filter(field => earlierSigned.has(uidOf(field?.signerUid)) && isApplied(field));
   const visibleUids = new Set([actor, ...earlierSigned]);
   const view = { ...envelope, recipients: recipients.filter(r => visibleUids.has(uidOf(r?.uid))).map(r => ({ ...r })), participantUids: [actor, ...earlierSigned], actionUids: [actor], fields: [...ownFields, ...priorAppliedFields], workflowHistory: (Array.isArray(envelope.workflowHistory) ? envelope.workflowHistory : []).filter(entry => visibleUids.has(uidOf(entry?.uid || entry?.signerUid))), visibilityScope: "signer" };
+  // Older draft schemas may duplicate the hierarchy under additional top-level
+  // keys. Strip those aliases too, otherwise a filtered recipients/fields array
+  // could coexist with an unfiltered copy of the future workflow.
+  for (const key of ["signers", "signerAssignments", "signerHierarchy", "workflowLadder", "assignments", "participantEmails", "signerEmails", "futureSigners", "pendingSigners", "workflowAssignments", "actionAssignments"]) delete view[key];
   view.fields = [...new Map(view.fields.map(field => [uidOf(field?.fieldId) || JSON.stringify(field), field])).values()];
   return { allowed: true, view, scope: "signer" };
 }
