@@ -59,34 +59,31 @@ export default function SignaturePathwaySelfTest() {
     }
   }
 
-  async function reconcile() {
+  async function reconcile(repairMismatches = false) {
     setBusy(true);
-    setMessage("Reconciling Drive metadata. This changes only Drive description.documentId and does not change Firestore rules.");
+    setMessage(repairMismatches ? "Repairing confirmed Drive metadata mismatches…" : "Dry-run: discovering controlled documents and comparing Firestore IDs with Drive descriptions. No changes will be made.");
     try {
       await requireAdministrator();
-      const rows = documents.length ? documents : (await getDocs(collection(db, "documents"))).docs.map(item => ({ id: item.id, ...item.data() }));
-      const knownMismatch = { documentId: "wiAfPSIxHLTd6MdeM04q", fileId: "1iGhrGLVTlBtxiwtVlVzPi7rXK3PzdcJ-" };
-      const candidates = rows.map(item => {
-        const fileId = item.id === knownMismatch.documentId ? knownMismatch.fileId : driveFileId(item);
-        return { documentId: item.id, fileId };
-      }).filter(item => item.documentId && item.fileId);
-      if (!candidates.some(item => item.documentId === knownMismatch.documentId)) candidates.push(knownMismatch);
-      if (!candidates.length) throw new Error("STEP reconciliation failed: no documents with registered Drive file IDs were found.");
-      const result = await reconcileSignatureDocumentIds(candidates);
-      const lines = (result.results || []).map(item => ({ documentId: item.documentId, title: item.documentId, checks: [{ name: item.status + " · Drive " + item.fileId, status: item.status === "failed" ? "FAIL" : item.status === "would repair" ? "NOT RUN" : "PASS", reason: "Drive created: " + (item.driveCreatedTime || "(not reported)") + ". " + (item.previousDescriptionDocumentId ? "Previous description.documentId: " + item.previousDescriptionDocumentId + ". " : "") + item.reason }] }));
+      const result = await reconcileSignatureDocumentIds([], { autoDiscover: true, dryRun: !repairMismatches, repairMismatches });
+      const lines = (result.results || []).map(item => ({
+        documentId: item.documentId,
+        title: item.title || item.documentId,
+        checks: [{ name: item.status + " · Drive " + item.fileId, status: item.status === "match" || item.status === "repaired" ? "PASS" : item.status === "mismatch" ? (repairMismatches ? "FAIL" : "NEEDS REPAIR") : "FAIL", reason: "Firestore ID: " + item.documentId + "; Drive file ID: " + item.fileId + "; Drive description.documentId: " + (item.previousDescriptionDocumentId || "(unreadable/not reported)") + ". " + item.reason }]
+      }));
       setResults(lines);
-      setMessage("Reconciliation finished: " + (result.summary?.repaired || 0) + " repaired; " + (result.summary?.alreadyCorrect || 0) + " already correct; " + (result.summary?.failed || 0) + " failed. One result line is shown for each document/file pair, including the known mismatch.");
+      const summary = result.summary || {};
+      setMessage((repairMismatches ? "Repair completed. " : "Dry-run completed; no metadata was changed. ") + (summary.match || 0) + " match; " + (summary.mismatch || 0) + " mismatch; " + (summary.repaired || 0) + " repaired; " + (summary.unreadable || 0) + " unreadable. Every discovered document has a result line, including wiAfPSIxHLTd6MdeM04q.");
     } catch (error) {
-      setMessage("STEP reconciliation failed: " + (error?.message || "Unknown gateway error. No success is assumed."));
+      setMessage((repairMismatches ? "Repair" : "Dry-run") + " failed: " + (error?.message || "Unknown gateway error. No success is assumed."));
     } finally {
       setBusy(false);
     }
   }
 
   return <section className="panel">
-    <div className="panel-heading"><div><span className="eyebrow">ADMINISTRATOR DIAGNOSTICS</span><h2>Signature Pathway Self-Test</h2><p className="panel-description">Checks registered document IDs and the controlled-download route. Reconciliation repairs Drive metadata only after administrator authorization and server-side document/file matching.</p></div></div>
+    <div className="panel-heading"><div><span className="eyebrow">ADMINISTRATOR DIAGNOSTICS</span><h2>Signature Pathway Self-Test</h2><p className="panel-description">Checks registered document IDs and the controlled-download route. Dry-run discovers controlled documents from Firestore and compares Drive description.documentId with each Firestore ID. Use Repair mismatches only after reviewing the dry-run results.</p></div></div>
     <div className="auth-message" role="status" aria-live="polite" style={{whiteSpace:"pre-wrap",overflowWrap:"anywhere",marginBottom:12}}>{message}</div>
-    <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}><button type="button" onClick={runChecks} disabled={busy}>{busy ? "Working…" : "Run Self-Test"}</button><button type="button" className="secondary-button" onClick={reconcile} disabled={busy}>Reconcile Drive IDs</button></div>
+    <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}><button type="button" onClick={runChecks} disabled={busy}>{busy ? "Working…" : "Run Self-Test"}</button><button type="button" className="secondary-button" onClick={() => reconcile(false)} disabled={busy}>Dry-run Drive ID Reconciliation</button><button type="button" onClick={() => reconcile(true)} disabled={busy}>Repair mismatches</button></div>
     {results.map((row,index)=><article key={row.documentId + "-" + index} className="panel" style={{marginBottom:10,padding:12}}>
       <strong style={{display:"block",overflowWrap:"anywhere"}}>{row.title || row.documentId}</strong><small style={{display:"block",overflowWrap:"anywhere"}}>Firestore ID: {row.documentId}</small>
       {row.checks.map((check,i)=><div key={check.name + i} style={{borderTop:"1px solid var(--border)",paddingTop:8,marginTop:8}}>
