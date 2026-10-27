@@ -5,7 +5,7 @@ import { getGoogleDriveGatewayUrl } from "../firebase/gatewayUrl";
 
 const webCommit = String(import.meta.env.VITE_BUILD_COMMIT || "unavailable");
 
-export default function ReleaseReadiness() {
+export default function ReleaseReadiness({ admin = false }) {
   const [busy, setBusy] = useState(false);
   const [report, setReport] = useState("");
   const [copyMessage, setCopyMessage] = useState("");
@@ -107,8 +107,10 @@ export default function ReleaseReadiness() {
     }
   }
 
+  if (!admin) return <section id="release-readiness" className="panel" role="alert" aria-labelledby="release-readiness-title"><div className="panel-header"><div><span className="eyebrow">ACCESS RESTRICTED</span><h2 id="release-readiness-title">Release Readiness</h2><p className="panel-description">The Release Readiness screen requires the <strong>Administrator</strong> role. Your current account has not been recognised as an active Administrator. Sign in with an authorised Administrator account or contact the IRPA system administrator.</p></div></div></section>;
+
   return (
-    <section className="panel" aria-labelledby="release-readiness-title">
+    <section id="release-readiness" className="panel" aria-labelledby="release-readiness-title">
       <div className="panel-header">
         <div>
           <span className="eyebrow">PRODUCTION RELEASE GATE</span>
