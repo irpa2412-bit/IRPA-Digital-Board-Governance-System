@@ -1,4 +1,4 @@
-const CACHE_NAME="irpa-dbgs-app-shell-v44";
+const CACHE_NAME="irpa-dbgs-app-shell-v45";
 const APP_SHELL=["/","/index.html","/manifest.webmanifest"];
 
 self.addEventListener("install",(event)=>{
@@ -73,3 +73,4 @@ self.addEventListener("fetch",(event)=>{
     );
   }
 });
+\nself.addEventListener("message", event => { if (event.data?.type === "SKIP_WAITING") self.skipWaiting(); });\n
