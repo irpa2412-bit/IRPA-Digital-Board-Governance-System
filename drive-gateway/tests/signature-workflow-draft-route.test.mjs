@@ -29,7 +29,9 @@ test("Worker reconciliation reports the previous Drive ID and verifies the repai
   assert.match(worker, /previousDescriptionDocumentId/);
   assert.match(worker, /Drive description verification failed after repair/);
   assert.match(selfTest, /wiAfPSIxHLTd6MdeM04q/);
-  assert.match(selfTest, /1iGhrGLVTlBtxiwtVlVzPi7rXK3PzdcJ-/);
+  assert.match(worker, /const requiredId = "wiAfPSIxHLTd6MdeM04q"/);
+  assert.match(selfTest, /autoDiscover: true/);
+  assert.match(selfTest, /Repair mismatches/);
   assert.match(selfTest, /previousDescriptionDocumentId/);
 });
 
