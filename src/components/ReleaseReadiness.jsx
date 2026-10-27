@@ -6,9 +6,11 @@ import { getGoogleDriveGatewayUrl } from "../firebase/gatewayUrl";
 const webCommit = String(import.meta.env.VITE_BUILD_COMMIT || "unavailable");
 
 export default function ReleaseReadiness({ admin = false }) {
-  const [busy, setBusy] = useState(false);\n  if (!admin) return <section className="panel" role="status"><h2 id="release-readiness-title">Release Readiness</h2><p>Required role: Administrator. Your account is not authorized to run release diagnostics.</p></section>;
+  const [busy, setBusy] = useState(false);
   const [report, setReport] = useState("");
   const [copyMessage, setCopyMessage] = useState("");
+
+  if (!admin) return <section className="panel" role="status"><h2 id="release-readiness-title">Release Readiness</h2><p>Required role: Administrator. Your account is not authorized to run release diagnostics.</p></section>;
 
   async function runAllChecks() {
     setBusy(true);
