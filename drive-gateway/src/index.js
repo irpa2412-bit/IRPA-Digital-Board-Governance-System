@@ -987,8 +987,32 @@ function signatureDraftFirestoreValue(value, key = "") {
   return { nullValue: null };
 }
 
+async function firebaseServiceAccountDiagnostic(env) {
+  const raw = String(env?.FIREBASE_SERVICE_ACCOUNT_JSON || "").trim();
+  if (!raw) return { status: "binding absent" };
+  let account;
+  try { account = JSON.parse(raw); }
+  catch { return { status: "not valid JSON" }; }
+  if (!account || typeof account !== "object" ||
+      !String(account.client_email || "").trim() ||
+      !String(account.private_key || "").trim() ||
+      !String(account.project_id || "").trim()) {
+    return { status: "JSON missing client_email, private_key or project_id" };
+  }
+  if (String(account.project_id).trim() !== String(env?.FIREBASE_PROJECT_ID || "").trim()) {
+    return { status: "project_id differs from FIREBASE_PROJECT_ID" };
+  }
+  try {
+    await crypto.subtle.importKey("pkcs8", pemPrivateKeyBytes(account.private_key), { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
+  } catch {
+    return { status: "private key import failed" };
+  }
+  return { status: "valid" };
+}
+
 async function systemDiagnosticsRoute(request, env) {
-  const base = { ok:false, workerCommit:String(env.GIT_SHA || "unknown"), firebaseProjectId:String(env.FIREBASE_PROJECT_ID || "unconfigured"), requiredConfiguration:{ FIREBASE_SERVICE_ACCOUNT_JSON:Boolean(String(env.FIREBASE_SERVICE_ACCOUNT_JSON || "").trim()), FIREBASE_PROJECT_ID:Boolean(String(env.FIREBASE_PROJECT_ID || "").trim()), GIT_SHA:Boolean(String(env.GIT_SHA || "").trim()) }, adminToken:{created:false}, firestoreRead:{attempted:false,ok:false} };
+  const serviceAccountDiagnostic = await firebaseServiceAccountDiagnostic(env);
+  const base = { ok:false, workerCommit:String(env.GIT_SHA || "unknown"), workerName:String(env.IRPA_WORKER_NAME || "unknown"), workerEnvironment:String(env.IRPA_WORKER_ENVIRONMENT || env.IRPA_ENVIRONMENT || "production"), bindingNames:Object.keys(env || {}).sort(), firebaseProjectId:String(env.FIREBASE_PROJECT_ID || "unconfigured"), serviceAccountDiagnostic, requiredConfiguration:{ FIREBASE_SERVICE_ACCOUNT_JSON:Boolean(String(env.FIREBASE_SERVICE_ACCOUNT_JSON || "").trim()), FIREBASE_PROJECT_ID:Boolean(String(env.FIREBASE_PROJECT_ID || "").trim()), GIT_SHA:Boolean(String(env.GIT_SHA || "").trim()) }, adminToken:{created:false}, firestoreRead:{attempted:false,ok:false} };
   try {
     const claims = await authenticateFirebaseRequest(request, env);
     const uid = String(claims.user_id || "");
