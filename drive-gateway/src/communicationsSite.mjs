@@ -540,6 +540,43 @@ export function createCommunicationsSiteRouter(deps) {
       return json({ ok: true, connections: result, permissions: { websiteEditor: true, staticFileEditing: roles.some(r => REVIEW_ROLES.has(r)) } }, 200, corsHeaders(request));
     }
 
+    if (path === "/api/communications/website/media" && request.method === "POST") {
+      const { claims } = await websiteEditorAuthorised(request, env);
+      const input = await request.json().catch(() => ({}));
+      const filename = cleanText(input.filename, 160).replace(/[\\/:*?"<>|]/g, "-");
+      const contentType = String(input.contentType || "").toLowerCase();
+      const encoded = String(input.dataBase64 || "");
+      const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+      if (!filename || !allowedTypes.has(contentType) || !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) {
+        return json({ error: "Choose a JPEG, PNG, WebP or GIF image." }, 400, corsHeaders(request));
+      }
+      const estimatedBytes = Math.floor(encoded.length * 3 / 4) - (encoded.endsWith("==") ? 2 : encoded.endsWith("=") ? 1 : 0);
+      if (estimatedBytes < 1 || estimatedBytes > 8 * 1024 * 1024) return json({ error: "Images must be no larger than 8 MiB." }, 413, corsHeaders(request));
+      const binary = atob(encoded);
+      const bytes = Uint8Array.from(binary, ch => ch.charCodeAt(0));
+      const wp = websiteWordPressConfig(env);
+      await verifyDedicatedWordPressEditor(wp);
+      const endpoint = wp.root + "/wp-json/wp/v2/media";
+      const response = await wordpressEditorFetch(wp, endpoint, {
+        method: "POST",
+        headers: wordpressHeaders(wp, {
+          "Content-Type": contentType,
+          "Content-Disposition": 'attachment; filename="' + filename.replace(/["\\\r\n]/g, "-") + '"',
+          Accept: "application/json"
+        }),
+        body: bytes,
+        signal: AbortSignal.timeout(30000)
+      });
+      const media = await response.json().catch(() => null);
+      if (!response.ok || !Number.isSafeInteger(media?.id) || typeof media?.source_url !== "string" || !isAllowedWordPressLink(media.source_url, wp)) {
+        throw new Error("WordPress image upload failed; check the staging media permissions and try again.");
+      }
+      await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_IMAGE_UPLOADED", "media", media.id, {
+        filename, contentType, fileSize: bytes.byteLength, mediaId: media.id
+      });
+      return json({ success: true, media: { id: media.id, url: media.source_url, title: editorRaw(media, "title") || filename, altText: String(media.alt_text || "") }, message: "Image uploaded to the configured WordPress environment." }, 200, corsHeaders(request));
+    }
+
     if (path === "/api/communications/website/content" && request.method === "GET") {
       await websiteEditorAuthorised(request, env);
       const wp = websiteWordPressConfig(env);
