@@ -90,6 +90,13 @@ export function buildDocumentArchiveDestination({documentType="Governance Docume
   };
 }
 
+export async function registerControlledDocumentRecord({documentId,documentPayload}={}) {
+  if (!documentId || !documentPayload) throw new Error("STEP Firestore documents record: document ID and payload are required.");
+  const result = await gatewayPost("/api/upload-controlled-document/register", {documentId,documentPayload});
+  if (!result.documentId || result.documentId !== documentId) throw new Error("STEP Firestore documents record: Worker did not confirm the allocated document ID.");
+  return result;
+}
+
 export async function uploadControlledDocumentRouted({
   documentId,title,reference,documentType="Governance Document",archiveCategory="Administrative Documents",
   classification="Public",uploadedAt=null,file,contentType=null
