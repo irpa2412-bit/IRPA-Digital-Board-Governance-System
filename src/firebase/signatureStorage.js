@@ -92,7 +92,9 @@ export function buildDocumentArchiveDestination({documentType="Governance Docume
 
 export async function registerControlledDocumentRecord({documentId,documentPayload}={}) {
   if (!documentId || !documentPayload) throw new Error("STEP Firestore documents record: document ID and payload are required.");
-  const result = await gatewayPost("/api/upload-controlled-document/register", {documentId,documentPayload});
+  let dataEnvironment = "TRIAL";
+  try { dataEnvironment = String(window.sessionStorage.getItem("irpaDataEnvironment")||"TRIAL").toUpperCase(); } catch {}
+  const result = await gatewayPost("/api/upload-controlled-document/register", {documentId,documentPayload,dataEnvironment});
   if (!result.documentId || result.documentId !== documentId) throw new Error("STEP Firestore documents record: Worker did not confirm the allocated document ID.");
   return result;
 }

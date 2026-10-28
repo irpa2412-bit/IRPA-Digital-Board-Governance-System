@@ -1319,7 +1319,8 @@ async function registerControlledDocumentRecord(request, env) {
   const gate = await getFirestoreDocument(env,"systemSettings/actualDataAccess",adminToken);
   const gateFields = gate?.fields||{};
   const actualOpen = gateFields.enabled?.booleanValue===true && gateFields.status?.stringValue==="OPEN" && gateFields.finalTestsAttested?.booleanValue===true;
-  const recordOrigin = actualOpen && String(supplied.recordOrigin||"").toUpperCase()==="PRODUCTION" ? "PRODUCTION" : "TRIAL";
+  const requestedEnvironment = String(data.dataEnvironment||"TRIAL").toUpperCase();
+  const recordOrigin = actualOpen && requestedEnvironment==="ACTUAL" && String(supplied.recordOrigin||"").toUpperCase()==="PRODUCTION" ? "PRODUCTION" : "TRIAL";
   const record = {...supplied,recordOrigin,trialData:recordOrigin==="TRIAL",isTrial:recordOrigin==="TRIAL",createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
   const path = "documents/"+documentId;
   const existing = await getFirestoreDocument(env,path,adminToken);

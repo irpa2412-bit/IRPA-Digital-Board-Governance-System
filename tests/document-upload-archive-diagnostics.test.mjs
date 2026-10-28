@@ -60,3 +60,13 @@ test("controlled upload registration is performed by the authenticated Worker an
   assert.match(worker, /STEP Firestore documents record/);
   assert.match(worker, /recordOrigin,trialData:recordOrigin==="TRIAL",isTrial:recordOrigin==="TRIAL"/);
 });
+
+
+test("Worker registration preserves an explicit TRIAL environment even if the gate is open", async () => {
+  const worker = await read("../drive-gateway/src/index.js");
+  const page = await read("../src/components/ControlledDocumentUpload.jsx");
+  const storage = await read("../src/firebase/signatureStorage.js");
+  assert.match(worker, /requestedEnvironment==="ACTUAL"/);
+  assert.match(page, /documentPayload\.recordOrigin = persistedOrigin\(documentPayload\)/);
+  assert.match(storage, /dataEnvironment = String\(window\.sessionStorage\.getItem\("irpaDataEnvironment"\)\|\|"TRIAL"\)/);
+});
