@@ -43,7 +43,7 @@ jobs:
             echo "- Scheduled cadence: every two days (UTC cron)."
             echo "- Target: staging.irpa.or.tz and the dedicated staging Worker only."
             echo "- Automatic behavior: bounded retries, plus allowlisted staging repairs only when the restricted host adapter is configured."
-            echo "- No content, plugin, theme, WordPress core, user, settings, or website-file changes are made by this job."
+            echo "- Content, user, settings, and website-file edits are not performed by this job; core/plugin/theme updates are restricted to exact pinned versions via the host adapter."
             echo "- Human approval remains required for content changes in the Communications Portal."
             echo "- WordPress updates require a verified restorable backup, exact pinned staging manifest, compatibility plan, post-update checks, and rollback on failure."\n            echo "- No host adapter/token means maintenance mutations are disabled; no production host is accepted."
           } >> "$GITHUB_STEP_SUMMARY"
