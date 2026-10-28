@@ -18,7 +18,7 @@ function auditContent(item){
  const add=(field,severity,message,fixable=false)=>issues.push({id:String(item.type)+":"+item.id+":"+field,type:item.type,itemId:item.id,title:title||"(Untitled)",status:item.status||"unknown",field,severity,message,fixable});
  if(!title)add("title","high","Title is empty; edit manually before publishing.");
  else if(title.length>60)add("title","medium","Title is longer than the suggested 60-character SEO target.",false);
- if(!text)add("content","high","Page/post content appears empty.",false);
+ if(Object.prototype.hasOwnProperty.call(item,"content")&&!text)add("content","high","Page/post content appears empty.",false);
  if(!clean(item.seoTitle))add("seoTitle","medium","SEO title is missing.",true);
  else if(clean(item.seoTitle).length>60)add("seoTitle","low","SEO title exceeds the suggested 60-character target.",true);
  if(!clean(item.seoDescription))add("seoDescription","medium","SEO meta description is missing.",true);
