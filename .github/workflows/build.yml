@@ -21,6 +21,19 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Upload runtime regression test
+        run: node --test tests/upload-circular-import-runtime.test.mjs
+
+      - name: Upload dependency circular-import gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes madge@8.0.0 --circular --extensions js,jsx src/components/ControlledDocumentUpload.jsx | tee "$RUNNER_TEMP/upload-madge.txt"
+          if grep -Eq 'Found [1-9][0-9]* circular dependenc' "$RUNNER_TEMP/upload-madge.txt"; then
+            echo "Circular import remains in the Controlled Document Upload dependency graph." >&2
+            exit 1
+          fi
+
       - name: Mandatory full-source readability and contrast check
         run: npm run check:production-readability
       - name: Production build
