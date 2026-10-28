@@ -44,12 +44,17 @@ export default function CommunicationSiteHealthAssistant({gatewayRequest,onUseDr
    const connections=status?.connections;
    if(!connections||typeof connections!=="object")throw new Error("The gateway returned no valid website health report.");
    const all=[...(posts.items||[]),...(pages.items||[])];
+   const sample=[...(posts.items||[]).slice(0,5),...(pages.items||[]).slice(0,5)];
+   const inspectable=await Promise.all(sample.map(async item=>{
+    try{const detail=await gatewayRequest("/api/communications/website/content/"+encodeURIComponent(item.type)+"/"+encodeURIComponent(item.id));return detail?.item||item;}
+    catch{return item;}
+   }));
    setSite(connections);setItems(all);
-   const found=all.flatMap(item=>auditContent(item));
+   const found=inspectable.flatMap(item=>auditContent(item));
    if(connections.websiteUp===false)found.unshift({id:"site:up",title:"Website availability",field:"availability",severity:"high",message:"The staging website could not be verified as available.",fixable:false});
    if(Array.isArray(connections.brokenLinks)&&connections.brokenLinks.length)found.unshift({id:"site:links",title:"Main navigation",field:"links",severity:"high",message:connections.brokenLinks.length+" main-menu link(s) failed the staging check.",fixable:false});
    setIssues(found);setCheckedAt(new Date().toISOString());
-   setNotice("Health check completed: "+all.length+" staging content items reviewed and "+found.length+" issue(s) identified. Production was not accessed.");
+   setNotice("Health check completed: "+all.length+" staging content items listed; detailed content/SEO/accessibility checks ran on up to "+inspectable.length+" latest items. "+found.length+" issue(s) identified. Production was not accessed.");
   }catch(e){setError(e?.message||"The staging website health check failed.");}
   finally{setBusy(false);}
  }
