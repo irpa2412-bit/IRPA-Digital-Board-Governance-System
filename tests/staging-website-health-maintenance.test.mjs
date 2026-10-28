@@ -12,7 +12,7 @@ test("scheduled health maintenance runs every two days and only targets staging"
   assert.match(workflow, /STAGING_GATEWAY_URL:\s*https:\/\/irpa-google-drive-gateway-staging\.irpa-governance\.workers\.dev/);
   assert.match(workflow, /STAGING_WORDPRESS_BASE_URL:\s*\$\{\{ secrets\.STAGING_WORDPRESS_BASE_URL \}\}/);
   assert.match(script, /url\.hostname !== "staging\.irpa\.or\.tz"/);
-  assert.match(script, /No content or configuration mutations/);
+  assert.match(script, /no content or configuration mutations/i);
   assert.doesNotMatch(workflow, /wrangler deploy|wp plugin update|wp core update/i);
 });
 
