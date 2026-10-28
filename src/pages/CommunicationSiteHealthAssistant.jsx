@@ -55,7 +55,7 @@ export default function CommunicationSiteHealthAssistant({gatewayRequest,onUseDr
  }
  async function applySafeFixes(){
   if(!canFix.length||busy)return;
-  const allowed=canFix.length;
+  const allowed=new Set(canFix.map(issue=>issue.type+":"+issue.itemId)).size;
   if(!window.confirm("Apply safe SEO/excerpt fixes to up to "+allowed+" DRAFT items on the isolated staging website? Each change is saved as a draft, creates a server-side snapshot/audit record, and is never published automatically."))return;
   setBusy(true);setError("");setNotice("");const report=[];
   try{
@@ -79,6 +79,7 @@ export default function CommunicationSiteHealthAssistant({gatewayRequest,onUseDr
    setNotice("Safe-fix run finished: "+ok+" draft(s) updated and verified; "+(report.length-ok)+" skipped or failed. Review the audit report below.");
    await runHealthCheck();
    setFixReport(report);
+   setNotice("Safe-fix run finished: "+report.filter(row=>row.ok).length+" draft(s) updated and verified; "+report.filter(row=>!row.ok).length+" skipped or failed. Review the audit report below.");
   }finally{setBusy(false);}
  }
  function generateDraft(){
