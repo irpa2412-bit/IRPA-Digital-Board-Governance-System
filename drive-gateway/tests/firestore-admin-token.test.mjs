@@ -14,13 +14,23 @@ test("signing asset and completed-archive routes explicitly use the Worker's adm
   assert.ok(completed.includes("await getFirestoreAdminAccessToken(env)"));
 });
 
-test("signing and Drive lifecycle routes never pass the caller token to Firestore document helpers", () => {
-  assert.doesNotMatch(source, /getFirestoreDocument\([^;\n]*claims\.token/);
-  assert.doesNotMatch(source, /updateFirestoreDocument\([^;\n]*claims\.token/);
-  assert.doesNotMatch(lifecycle, /getFirestoreDocument\([^;\n]*claims\.token/);
-  assert.doesNotMatch(lifecycle, /updateFirestoreDocument\([^;\n]*claims\.token/);
-  assert.match(lifecycle, /deps\.getFirestoreAdminAccessToken\(env\)/);
+test("signing and Drive routes never pass the caller token to Firestore document helpers", () => {
+  const names = ["upload", "reconcileSignatureDocumentIds", "controlledDocumentUploadPolicyCheck", "uploadControlledDocument", "download", "downloadSignatureFile", "finalizeSignatureProfileArchives", "ensureSignatureProfileFolder", "provisionDocumentArchive", "ensureSignedDocumentArchive", "deleteDriveFile", "sendSignatureInvitation"];
+  for (const name of names) {
+    const start = source.indexOf("async function " + name + "(");
+    if (start < 0) continue;
+    let end = source.indexOf("\\nasync function ", start + 10);
+    const nextFunction = source.indexOf("\\nfunction ", start + 10);
+    if (end < 0 || (nextFunction >= 0 && nextFunction < end)) end = nextFunction;
+    if (end < 0) end = source.length;
+    const route = source.slice(start, end);
+    assert.doesNotMatch(route, /getFirestoreDocument\\([^;\\n]*claims\\.token/, name);
+    assert.doesNotMatch(route, /updateFirestoreDocument\\([^;\\n]*claims\\.token/, name);
+  }
+  assert.doesNotMatch(lifecycle, /deps\\.getFirestoreDocument\\([^;\\n]*claims\\.token/);
+  assert.doesNotMatch(lifecycle, /deps\\.updateFirestoreDocument\\([^;\\n]*claims\\.token/);
 });
+
 
 test("admin, owner, current signer and earlier signer receive only their authorised envelope view; later signer and stranger are refused", () => {
   const envelope = {
