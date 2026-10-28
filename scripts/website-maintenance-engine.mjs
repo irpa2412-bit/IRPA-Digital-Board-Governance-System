@@ -81,8 +81,12 @@ export async function runMaintenance({ adapterUrl, token, manifest, fetchImpl = 
     return data;
   };
   let backup;
+  let lastHealth = null;
+  const healthSnapshot = value => ({ healthy: value?.healthy === true, faults: (Array.isArray(value?.faults) ? value.faults : []).map(item => ({ kind: String(item.kind || "unknown").slice(0, 60), code: String(item.code || "unknown").slice(0, 60) })) });
   try {
     const status = await call("/health");
+    lastHealth = status;
+    result.before = healthSnapshot(status);
     if (status.environment !== "staging" || status.siteHost !== STAGING_HOST || status.healthy !== true) {
       throw new Error("Staging preflight did not verify a healthy staging WordPress site.");
     }
@@ -107,9 +111,10 @@ export async function runMaintenance({ adapterUrl, token, manifest, fetchImpl = 
       }
       const repair = await call("/repairs", "POST", { action: decision.action, ...(decision.service ? { service: decision.service } : {}) });
       const verify = await call("/health");
+      lastHealth = verify;
       const recovered = repair.success === true && verify.healthy === true &&
         !(Array.isArray(verify.faults) && verify.faults.some(item => item.code === fault.code && item.kind === fault.kind));
-      result.actions.push({ action: decision.action, outcome: recovered ? "verified" : "failed", fault: String(fault.code || fault.kind || "unknown").slice(0, 120) });
+      result.actions.push({ action: decision.action, outcome: recovered ? "verified" : "failed", fault: String(fault.code || fault.kind || "unknown").slice(0, 120), before: { kind: String(fault.kind || "unknown").slice(0, 60), code: String(fault.code || "unknown").slice(0, 60) }, after: healthSnapshot(verify) });
       if (!recovered) throw new Error("Automatic repair did not pass post-repair health verification.");
     }
 
@@ -120,9 +125,10 @@ export async function runMaintenance({ adapterUrl, token, manifest, fetchImpl = 
         throw new Error("Staging compatibility plan did not approve the pinned updates.");
       }
       const applied = await call("/updates/apply", "POST", { updates, backupId: result.backupId });
-      const verified = applied.success === true && (await call("/health")).healthy === true;
+      lastHealth = await call("/health");
+      const verified = applied.success === true && lastHealth.healthy === true;
       if (!verified) throw new Error("Update verification failed; rollback will be attempted.");
-      result.actions.push({ action: "pinned_updates", outcome: "verified", count: updates.length });
+      result.actions.push({ action: "pinned_updates", outcome: "verified", count: updates.length, before: healthSnapshot(status), after: healthSnapshot(lastHealth) });
     }
 
     result.status = "passed";
@@ -132,8 +138,9 @@ export async function runMaintenance({ adapterUrl, token, manifest, fetchImpl = 
       try {
         const rollback = await call("/rollback", "POST", { backupId: String(backup.id), reason: "automatic-maintenance-failure" });
         const health = await call("/health");
+        lastHealth = health;
         const ok = rollback.success === true && health.healthy === true;
-        result.actions.push({ action: "rollback", outcome: ok ? "verified" : "failed", backupId: String(backup.id) });
+        result.actions.push({ action: "rollback", outcome: ok ? "verified" : "failed", backupId: String(backup.id), before: result.after || result.before || null, after: healthSnapshot(health) });
         result.status = ok ? "rolled_back" : "manual_intervention_required";
       } catch (rollbackError) {
         result.actions.push({ action: "rollback", outcome: "failed", detail: String(rollbackError?.message || "Rollback request failed").slice(0, 160) });
@@ -143,6 +150,7 @@ export async function runMaintenance({ adapterUrl, token, manifest, fetchImpl = 
       result.status = "blocked";
     }
   }
+  if (lastHealth) result.after = healthSnapshot(lastHealth);
   result.finishedAt = now();
   return result;
 }
