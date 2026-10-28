@@ -9,7 +9,7 @@ export default function SignatureFieldConfirmationPad({field,savedSignatureUrl="
   const start=e=>{if(mode!=="Draw")return;e.preventDefault();const c=canvasRef.current,ctx=c.getContext("2d"),p=point(e);drawing.current=true;last.current=p;c.setPointerCapture?.(e.pointerId);ctx.beginPath();ctx.arc(p.x,p.y,2.5,0,Math.PI*2);ctx.fillStyle="#111827";ctx.fill();setDirty(true)};
   const move=e=>{if(mode!=="Draw"||!drawing.current)return;e.preventDefault();const c=canvasRef.current,ctx=c.getContext("2d"),p=point(e);ctx.beginPath();ctx.moveTo(last.current.x,last.current.y);ctx.lineTo(p.x,p.y);ctx.stroke();last.current=p};
   const end=()=>{drawing.current=false;last.current=null};
-  const clear=()=>{const c=canvasRef.current;if(c){const ctx=c.getContext("2d");ctx.clearRect(0,0,c.width,c.height)}setTyped("");setDirty(false);setError("")};
+  const clear=()=>{const c=canvasRef.current;if(c){const ctx=c.getContext("2d");ctx.clearRect(0,0,c.width,c.height)}if(mode==="Use my saved signature")setMode("Draw");setTyped("");setDirty(false);setError("")};
   async function confirm(){
     try{
       let dataUrl="";
