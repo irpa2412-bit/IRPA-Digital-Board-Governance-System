@@ -55,7 +55,7 @@ function validateFieldValues(fields,signer,values,signature,fieldApplications=[]
     }else{
       value=String(value??"").trim();
       if(f.required&&!value)throw new HttpError(400,"Complete the required "+f.type.toLowerCase()+" field.");
-      if(value.length>2000||/[\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]/.test(value))throw new HttpError(400,"A signing field value is invalid.");
+      if(value.length>2000||/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value))throw new HttpError(400,"A signing field value is invalid.");
     }
     out[f.fieldId]=value;
   }
