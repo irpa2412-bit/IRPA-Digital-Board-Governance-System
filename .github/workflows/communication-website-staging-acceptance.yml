@@ -4,6 +4,12 @@ on:
     branches:
       - feature/communication-media-website-20261025
       - fix/optional-staging-chair-acceptance-20261028
+  pull_request:
+    branches:
+      - feature/communication-media-website-20261025
+    paths:
+      - .github/workflows/communication-website-staging-acceptance.yml
+      - docs/STAGING_CHAIR_TEST_USER.md
   workflow_dispatch:
 permissions:
   contents: read
