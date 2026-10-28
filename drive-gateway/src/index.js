@@ -611,7 +611,7 @@ async function upload(request, env) {
       return json({ ok: false, error: "A signature profile may only be uploaded by its owner." }, 403, corsHeaders(request));
     }
     const { memberRecord, employeeRecord } = await getInstitutionalProfileForUser(env, claims);
-    const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
+    const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, await getFirestoreAdminAccessToken(env));
     if (!memberRecord && !employeeRecord && !adminRecord?.fields?.active?.booleanValue) {
       return json({ ok: false, error: "A registered IRPA member or employee profile is required before a Signature Profile asset can be uploaded." }, 403, corsHeaders(request));
     }
@@ -1180,7 +1180,7 @@ async function saveSignatureWorkflowDraftRoute(request, env) {
 async function reconcileSignatureDocumentIds(request, env) {
   // Legacy contract tests refer to status = "failed"; the current per-document taxonomy intentionally reports unreadable instead.
   const claims = await authenticateFirebaseRequest(request, env);
-  const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
+  const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, await getFirestoreAdminAccessToken(env));
   if (!adminRecord?.fields?.active?.booleanValue && String(claims.email || "").trim().toLowerCase() !== "irpa2412@gmail.com") {
     return json({ok:false,error:"Administrator authorization is required for signature-pathway reconciliation."},403,corsHeaders(request));
   }
@@ -1264,7 +1264,7 @@ async function controlledDocumentUploadPolicyCheck(request, env) {
     const claims = await authenticateFirebaseRequest(request, env);
     step = "Resolve active institutional profile";
     const { memberRecord, employeeRecord } = await getInstitutionalProfileForUser(env, claims);
-    const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
+    const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, await getFirestoreAdminAccessToken(env));
     if (!memberRecord && !employeeRecord && !adminRecord?.fields?.active?.booleanValue) {
       return json({ ok: false, step, error: "An active IRPA member, employee or administrator profile is required for controlled document upload policy checks." }, 403, corsHeaders(request));
     }
@@ -1341,7 +1341,7 @@ async function registerControlledDocumentRecord(request, env) {
 async function uploadControlledDocument(request, env) {
   const claims = await authenticateFirebaseRequest(request, env);
   const { memberRecord, employeeRecord } = await getInstitutionalProfileForUser(env, claims);
-  const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
+  const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, await getFirestoreAdminAccessToken(env));
   if (!memberRecord && !employeeRecord && !adminRecord?.fields?.active?.booleanValue) {
     return json({ok:false,error:"An active IRPA member, employee or administrator profile is required for controlled document upload."},403,corsHeaders(request));
   }
@@ -1677,10 +1677,10 @@ async function download(request, env) {
   let controlledAdmin = false;
   if (data.documentId) {
     const recordId = cleanId(data.documentId);
-    controlledDocument = await getFirestoreDocument(env, `documents/${recordId}`, claims.token);
+    controlledDocument = await getFirestoreDocument(env, `documents/${recordId}`, await getFirestoreAdminAccessToken(env));
     controlledDocumentFields = controlledDocument?.fields || {};
     const storedDriveId = String(controlledDocumentFields.driveFileId?.stringValue || controlledDocumentFields.fileId?.stringValue || "");
-    const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
+    const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, await getFirestoreAdminAccessToken(env));
     controlledAdmin = Boolean(admin?.fields?.active?.booleanValue) && String(admin?.fields?.role?.stringValue || "") === "Administrator";
     const allowed = controlledDocument && storedDriveId === fileId && (
       controlledAdmin || String(controlledDocumentFields.ownerUid?.stringValue || "") === claims.user_id ||
@@ -1925,7 +1925,7 @@ async function finalizeSignatureProfileArchives(request, env) {
 async function ensureSignatureProfileFolder(request, env) {
   const claims = await authenticateFirebaseRequest(request, env);
   const { memberRecord, employeeRecord } = await getInstitutionalProfileForUser(env, claims);
-  const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
+  const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, await getFirestoreAdminAccessToken(env));
   const isSignatureProfileOwner = Boolean(memberRecord) || Boolean(employeeRecord);
   const isAdmin = Boolean(adminRecord?.fields?.active?.booleanValue);
   if (!isSignatureProfileOwner && !isAdmin) {
@@ -2175,7 +2175,7 @@ async function provisionDocumentArchive(request, env) {
   const data = await request.json();
   const documentId = cleanId(data.documentId || "");
   if (!documentId) return json({ok:false,error:"Document ID is required."},400,corsHeaders(request));
-  const document = await getFirestoreDocument(env, `documents/${documentId}`, claims.token);
+  const document = await getFirestoreDocument(env, `documents/${documentId}`, await getFirestoreAdminAccessToken(env));
   if (!document) return json({ok:false,error:"Document registry record was not found."},404,corsHeaders(request));
   const archive = await ensureDocumentArchiveFolder(new Request(request.url,{method:"POST",headers:request.headers,body:JSON.stringify(data)}),env);
   const fileId = document.fields?.fileId?.stringValue || "";
@@ -2216,7 +2216,7 @@ async function ensureSignedDocumentArchive(request, env) {
   const data = await request.json();
   const documentId = cleanId(data.documentId || "");
   if (!documentId) return json({ok:false,error:"Document UID is required."},400,corsHeaders(request));
-  const document = await getFirestoreDocument(env, `documents/${documentId}`, claims.token);
+  const document = await getFirestoreDocument(env, `documents/${documentId}`, await getFirestoreAdminAccessToken(env));
   if (!document) return json({ok:false,error:"Document registry record was not found."},404,corsHeaders(request));
   const fields = document.fields || {};
   const classification = String(data.classification || fields.classification?.stringValue || "Public").trim();
@@ -2786,7 +2786,7 @@ async function deleteDriveFile(request, env) {
   const admin = await getFirestoreDocument(
     env,
     `adminProfiles/${claims.user_id}`,
-    claims.token
+    await getFirestoreAdminAccessToken(env)
   );
 
   if (!admin?.fields?.active?.booleanValue) {
@@ -2800,7 +2800,7 @@ async function deleteDriveFile(request, env) {
   const document = await getFirestoreDocument(
     env,
     `documents/${documentId}`,
-    claims.token
+    await getFirestoreAdminAccessToken(env)
   );
 
   if (!document) {
