@@ -37,3 +37,26 @@ test("archive destination is provisioned by the Worker and does not require a De
   assert.match(worker, /const categoryFile=await uploadToFolder\(categoryFolderId/);
   assert.match(worker, /archiveUidLink:/);
 });
+
+
+test("administrator archive listing attaches Firestore IDs and retains authorized TRIAL records", async () => {
+  const worker = await read("../drive-gateway/src/documentLifecycle.mjs");
+  const policy = await read("../drive-gateway/src/documentPolicy.mjs");
+  const view = await read("../src/components/DocumentRetrievalAccessPoint.jsx");
+  assert.match(worker, /getFirestoreAdminAccessToken/);
+  assert.match(worker, /documentId:data\.documentId\|\|documentId/);
+  assert.match(worker, /filter\(doc=>canRead\(identity,doc\)\.allowed\)/);
+  assert.match(policy, /if\(identity\.actorType==="ADMINISTRATOR"\)return\{allowed:true/);
+  assert.match(view, /TRIAL/);
+});
+
+test("controlled upload registration is performed by the authenticated Worker and labels closed-gate records TRIAL", async () => {
+  const page = await read("../src/components/ControlledDocumentUpload.jsx");
+  const storage = await read("../src/firebase/signatureStorage.js");
+  const worker = await read("../drive-gateway/src/index.js");
+  assert.match(page, /registerControlledDocumentRecord\(\{documentId:documentUid,documentPayload\}\)/);
+  assert.doesNotMatch(page, /createRecord\(COLLECTIONS\.documents/);
+  assert.match(storage, /\/api\/upload-controlled-document\/register/);
+  assert.match(worker, /STEP Firestore documents record/);
+  assert.match(worker, /recordOrigin,trialData:recordOrigin==="TRIAL",isTrial:recordOrigin==="TRIAL"/);
+});
