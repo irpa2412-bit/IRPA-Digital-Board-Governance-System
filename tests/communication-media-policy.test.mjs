@@ -6,6 +6,7 @@ const read=path=>readFileSync(new URL(path,import.meta.url),"utf8");
 const app=read("../src/App.jsx");
 const portal=read("../src/pages/CommunicationMediaPortal.jsx");
 const studio=read("../src/pages/CommunicationMediaStudio.jsx");
+const websiteStudio=read("../src/pages/CommunicationsWebsiteStudio.jsx");
 const operations=read("../src/pages/CommunicationMediaOperations.jsx");
 const social=read("../src/pages/SocialMediaAccounts.jsx");
 const metaOAuth=read("../drive-gateway/src/metaOAuth.mjs");
@@ -49,6 +50,17 @@ test("publishing, website content edits and cPanel file edits route through Clou
  assert.ok(!portal.includes("firebase/functions"));
  assert.ok(!functionsIndex.includes("publishCommunicationMediaItem"));
  assert.ok(!existsSync(new URL("../functions/communicationMedia.js",import.meta.url)));
+});
+
+test("website studio supports authenticated WordPress article photo uploads without publishing",()=>{
+ assert.ok(site.includes('path === "/api/communications/website/media" && request.method === "POST"'));
+ for(const type of ['"image/jpeg"','"image/png"','"image/webp"','"image/gif"']) assert.ok(site.includes(type));
+ assert.ok(site.includes("8 * 1024 * 1024"));
+ assert.ok(site.includes("COMMUNICATION_WEBSITE_IMAGE_UPLOADED"));
+ assert.ok(websiteStudio.includes('call("/api/communications/website/media","POST"'));
+ assert.ok(websiteStudio.includes('type="file" accept="image/jpeg,image/png,image/webp,image/gif"'));
+ assert.ok(websiteStudio.includes("inserted into the article"));
+ assert.ok(websiteStudio.includes("Save as draft"));
 });
 
 test("WordPress and cPanel status badges automatically check and fail visibly without stale neutral status",()=>{
