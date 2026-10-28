@@ -228,10 +228,10 @@ export function createCommunicationsSiteRouter(deps) {
     const configuredEndpoint = String(env.CPANEL_BASE_URL || "").trim();
     let base;
     try {
-      // The known IRPA cPanel host may be stored as a bare hostname or as an
-      // HTTPS URL. Never infer HTTPS for an arbitrary hostname.
-      const endpoint = configuredEndpoint === "cpanel.habari.co.tz"
-        ? "https://cpanel.habari.co.tz"
+      // Accept a bare hostname or an explicit URL, but enforce HTTPS and the
+      // dedicated cPanel port below before making any outbound request.
+      const endpoint = /^[a-z0-9.-]+$/i.test(configuredEndpoint)
+        ? "https://" + configuredEndpoint
         : configuredEndpoint;
       base = new URL(endpoint);
     } catch {
@@ -240,7 +240,7 @@ export function createCommunicationsSiteRouter(deps) {
     // cPanel's HTTPS service is on port 2083. Normalize only an omitted port,
     // never an explicitly different port or a path that could bypass checks.
     if (base.protocol === "https:" && !base.port) base.port = "2083";
-    if (base.protocol !== "https:" || base.hostname.toLowerCase() !== "cpanel.habari.co.tz" ||
+    if (base.protocol !== "https:" || !base.hostname ||
         base.username || base.password || base.search || base.hash || base.pathname !== "/" || base.port !== "2083") {
       throw new Error("cPanel endpoint configuration is invalid.");
     }
