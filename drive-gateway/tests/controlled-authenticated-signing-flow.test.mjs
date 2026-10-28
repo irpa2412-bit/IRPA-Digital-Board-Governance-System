@@ -376,6 +376,7 @@ test("confirmed signature is rendered on the saved third-page field position", a
   const fixture=await makeFixture({signerUid:"member-uid",signerEmail:"member@example.org",secondSigner:false});
   const field={fieldId:"page-three-signature",type:"Signature",page:3,x:20,y:30,width:35,height:10,signerUid:"member-uid",required:true};
   fixture.envelope.fields=[field];
+  fixture.envelope.archiveTargets=["archive"];
   const result=await sign(fixture.ctx,{
     token:fixture.token,signature:{type:"drawn",value:SIGNATURE_PNG},
     fieldValues:{},fieldApplications:[{...field,confirmed:true,value:SIGNATURE_PNG}],
