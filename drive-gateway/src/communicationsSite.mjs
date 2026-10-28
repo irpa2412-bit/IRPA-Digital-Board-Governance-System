@@ -177,6 +177,7 @@ export function createCommunicationsSiteRouter(deps) {
     if (base.search) throw configurationError("endpoint_contains_query", "WORDPRESS_BASE_URL must not contain a query string.");
     if (base.hash) throw configurationError("endpoint_contains_fragment", "WORDPRESS_BASE_URL must not contain a URL fragment.");
     if (base.port) throw configurationError("endpoint_nonstandard_port", "WORDPRESS_BASE_URL must use the standard HTTPS port.");
+    if (base.pathname !== "/") throw configurationError("endpoint_has_path", "WORDPRESS_BASE_URL must be the website origin only; remove paths such as /wp-admin or /wp-json.");
     const environment = String(env.IRPA_WORKER_ENVIRONMENT || env.IRPA_ENVIRONMENT || "").trim().toLowerCase();
     const host = base.hostname.toLowerCase();
     if (!["production", "staging"].includes(environment)) {
@@ -618,13 +619,19 @@ export function createCommunicationsSiteRouter(deps) {
           result.cpanelDiagnostic = "permission_denied";
         } else {
           result.cpanel = "unavailable";
-          result.cpanelDiagnostic = message.includes("endpoint configuration is invalid") ? "endpoint_invalid" :
-            /category invalid_operation/.test(message) ? "invalid_operation" :
-            /category not_found/.test(message) ? "resource_not_found" :
-            /category uapi_error/.test(message) ? "uapi_error" :
-            /category/.test(message) ? "request_failed" :
-            message.includes("not configured") ? "configuration_missing" :
-            lower.includes("timeout") || lower.includes("abort") ? "timeout" : "connection_failed";
+          result.cpanelDiagnostic = error?.name === "TimeoutError" || error?.name === "AbortError" ? "cpanel_request_timeout" :
+            error?.name === "TypeError" ? "cpanel_network_error" :
+            message.includes("endpoint configuration is invalid") ? "cpanel_endpoint_invalid" :
+            /category invalid_operation/.test(message) ? "cpanel_invalid_operation" :
+            /category not_found/.test(message) ? "cpanel_resource_not_found" :
+            /category uapi_error/.test(message) ? "cpanel_uapi_error" :
+            /category/.test(message) ? "cpanel_request_failed" :
+            message.includes("not configured") ? "cpanel_configuration_missing" : "cpanel_connection_failed";
+          result.cpanelDiagnosticMessage = error?.name === "TimeoutError" || error?.name === "AbortError"
+            ? "The cPanel API request exceeded its 15-second deadline."
+            : error?.name === "TypeError"
+              ? "The Worker fetch failed before receiving an HTTP response; runtime fetch errors do not reliably distinguish DNS from TLS or routing causes."
+              : "The cPanel API request failed; inspect the diagnostic code and HTTP/UAPI category if present.";
         }
       }
       return json({ ok: true, connections: result, permissions: { websiteEditor: true, staticFileEditing: roles.some(r => REVIEW_ROLES.has(r)) } }, 200, corsHeaders(request));
