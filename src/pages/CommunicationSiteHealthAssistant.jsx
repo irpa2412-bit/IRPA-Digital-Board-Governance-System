@@ -32,7 +32,7 @@ function auditContent(item){
 export default function CommunicationSiteHealthAssistant({gatewayRequest,onUseDraft}){
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState(""),[checkedAt,setCheckedAt]=useState(""),[site,setSite]=useState(null),[items,setItems]=useState([]),[issues,setIssues]=useState([]),[fixReport,setFixReport]=useState([]);
  const [topic,setTopic]=useState(""),[audience,setAudience]=useState("Pastoral and agro-pastoral communities"),[channel,setChannel]=useState("Facebook"),[keyFacts,setKeyFacts]=useState(""),[callToAction,setCallToAction]=useState("Learn more about IRPA's work"),[draft,setDraft]=useState("");
- const canFix=useMemo(()=>issues.filter(issue=>issue.fixable&&issue.status==="draft"),[issues]);
+ const canFix=useMemo(()=>{const seen=new Set();return issues.filter(issue=>{const key=issue.type+":"+issue.itemId;if(!issue.fixable||issue.status!=="draft"||seen.has(key))return false;seen.add(key);return true;}).slice(0,10);},[issues]);
  async function runHealthCheck(){
   setBusy(true);setError("");setNotice("");setFixReport([]);
   try{
