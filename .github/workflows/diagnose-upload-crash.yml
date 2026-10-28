@@ -1,0 +1,94 @@
+name: Diagnose upload crash
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - diagnose/upload-crash-20261028
+permissions:
+  contents: write
+  actions: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: diagnose/upload-crash-20261028
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Prepare diagnostics
+        run: mkdir -p docs/diagnostics
+      - name: Unminified production build with source maps
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          npx vite build --minify false --sourcemap --outDir dist-upload-diagnostic 2>&1 | tee /tmp/build.txt
+      - name: Circular import report
+        continue-on-error: true
+        run: |
+          npx --yes madge --circular --extensions js,jsx src 2>&1 | tee /tmp/madge.txt
+      - name: ESLint findings for upload dependency graph
+        continue-on-error: true
+        run: |
+          npx --yes eslint --no-config-lookup --no-ignore --rule 'no-use-before-define:error' --rule 'no-undef:error' src/components/ControlledDocumentUpload.jsx src/firebase/signatureStorage.js src/firebase/data.js src/firebase/workflowLinks.js 2>&1 | tee /tmp/eslint.txt
+      - name: Runtime import smoke test for built entry
+        continue-on-error: true
+        run: |
+          node --input-type=module <<'NODE' 2>&1 | tee /tmp/runtime.txt
+          import { readFileSync, readdirSync } from 'node:fs';
+          import { pathToFileURL } from 'node:url';
+          import path from 'node:path';
+          const root = 'dist-upload-diagnostic';
+          const files = [];
+          const walk = d => { for (const e of readdirSync(d,{withFileTypes:true})) { const p=path.join(d,e.name); if(e.isDirectory()) walk(p); else if(/\.js$/.test(p)) files.push(p); } };
+          try {
+            walk(root);
+            const entry = files.find(p => /\/assets\/index-.*\.js$/.test(p)) || files.find(p => /index.*\.js$/.test(p));
+            if (!entry) throw new Error('Built JS entry not found; files=' + files.join(','));
+            const source = readFileSync(entry,'utf8');
+            console.log('Built entry:', entry);
+            console.log('Unminified output:', !/\bfunction [a-zA-Z_$][\w$]*\(/.test(source) ? 'not conclusively determined' : 'function names retained');
+            console.log('Entry bytes:', source.length);
+            // Importing a browser app requires a real DOM and Firebase runtime. The import attempt is
+            // still useful to catch parse/link errors; app boot errors are captured with full stack.
+            try { await import(pathToFileURL(path.resolve(entry)).href); console.log('IMPORT PASS'); }
+            catch (e) { console.error('IMPORT FAIL', e?.name, e?.message, e?.stack); process.exitCode=1; }
+          } catch(e) { console.error('SMOKE FAIL', e?.name, e?.message, e?.stack); process.exitCode=1; }
+          NODE
+      - name: Collect diagnostics
+        if: always()
+        run: |
+          {
+            echo '# Upload crash diagnostics'
+            echo
+            echo "Commit: $GITHUB_SHA"
+            echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo
+            for f in build madge eslint runtime; do
+              echo "## $f"
+              echo '~~~text'
+              if [ -f "/tmp/$f.txt" ]; then cat "/tmp/$f.txt"; else echo 'No output captured.'; fi
+              echo '~~~'
+              echo
+            done
+            echo '## Relevant source excerpts'
+            for f in src/components/ControlledDocumentUpload.jsx src/firebase/signatureStorage.js src/firebase/data.js src/firebase/workflowLinks.js; do
+              echo "### $f"
+              grep -nE 'uploadControlledDocumentRouted|gatewayPost|const |let |class |import .*data|import .*signatureStorage|nextDocumentReference|Create Drive|Allocate document' "$f" | head -240 || true
+              echo
+            done
+          } > docs/diagnostics/upload-crash.txt
+      - name: Commit diagnostics back to branch
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/diagnostics/upload-crash.txt
+          git commit -m "Add CI upload crash diagnostics" || exit 0
+          git push origin HEAD:diagnose/upload-crash-20261028
