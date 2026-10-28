@@ -11,6 +11,7 @@ let auditEvents;
 let requestCount;
 let wpRoles;
 let wpItemLink;
+let lastMediaUpload;
 let consoleMessages;
 let originalFetch;
 let originalConsole;
@@ -116,6 +117,7 @@ test.beforeEach(() => {
   requestCount = 0;
   wpRoles = ["editor"];
   wpItemLink = "https://staging.irpa.or.tz/test-page/";
+  lastMediaUpload = null;
   consoleMessages = [];
   originalFetch = globalThis.fetch;
   originalConsole = { log: console.log, info: console.info, warn: console.warn, error: console.error };
@@ -128,6 +130,10 @@ test.beforeEach(() => {
     const url = new URL(typeof input === "string" ? input : input.url);
     const method = init.method || "GET";
     if (url.hostname !== "staging.irpa.or.tz") throw new Error("Test blocked non-staging host.");
+    if (url.pathname === "/wp-json/wp/v2/media" && method === "POST") {
+      lastMediaUpload = { contentType: new Headers(init.headers).get("Content-Type"), disposition: new Headers(init.headers).get("Content-Disposition"), bytes: new Uint8Array(init.body) };
+      return response({ id: 88, source_url: "https://staging.irpa.or.tz/wp-content/uploads/field.jpg", title: { raw: "field.jpg" }, alt_text: "" }, 201);
+    }
     if (url.pathname === "/wp-json/wp/v2/users/me") {
       return response({ id: 7, name: "Staging Editor", roles: wpRoles, capabilities: { edit_posts: true, edit_pages: true } });
     }
@@ -359,4 +365,31 @@ test("WordPress Administrator credentials are rejected even when authentication 
   const result = await call(router, makeEnv(), "/api/communications/website/content/pages/123");
   assert.equal(result.status, 502);
   assert.equal(requestCount, 1);
+});
+
+test("authenticated staging image upload accepts safe image types and records an audit event", async () => {
+  const router = makeRouter();
+  const result = await call(router, makeEnv(), "/api/communications/website/media", {
+    method: "POST",
+    body: { filename: "field.jpg", contentType: "image/jpeg", dataBase64: "/9j/2Q==" }
+  });
+  assert.equal(result.status, 200);
+  const data = await result.json();
+  assert.equal(data.media.id, 88);
+  assert.equal(data.media.url, "https://staging.irpa.or.tz/wp-content/uploads/field.jpg");
+  assert.equal(lastMediaUpload.contentType, "image/jpeg");
+  assert.match(lastMediaUpload.disposition, /field.jpg/);
+  assert.ok(auditEvents.some(event => event.auditFields?.mapValue?.fields?.action?.stringValue === "COMMUNICATION_WEBSITE_IMAGE_UPLOADED"));
+});
+
+test("image upload rejects unsupported formats and oversized payloads before WordPress writes", async () => {
+  const router = makeRouter();
+  const unsupported = await call(router, makeEnv(), "/api/communications/website/media", {
+    method: "POST", body: { filename: "script.svg", contentType: "image/svg+xml", dataBase64: "PHN2Zz4=" }
+  });
+  assert.equal(unsupported.status, 400);
+  const oversized = await call(router, makeEnv(), "/api/communications/website/media", {
+    method: "POST", body: { filename: "large.png", contentType: "image/png", dataBase64: "A".repeat(12 * 1024 * 1024) }
+  });
+  assert.equal(oversized.status, 413);
 });
