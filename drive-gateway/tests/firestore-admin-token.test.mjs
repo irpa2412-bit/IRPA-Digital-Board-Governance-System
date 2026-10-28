@@ -6,12 +6,12 @@ import { filterSignatureEnvelopeForCaller } from "../src/signatureWorkflowVisibi
 const source = await readFile(new URL("../src/index.js", import.meta.url), "utf8");
 const lifecycle = await readFile(new URL("../src/documentLifecycle.mjs", import.meta.url), "utf8");
 
-test("Firestore document reads and writes always obtain the Worker's admin token", () => {
-  const get = source.match(/async function getFirestoreDocument\([\s\S]*?\n}\n/);
-  const patch = source.match(/async function updateFirestoreDocument\([\s\S]*?\n}\n/);
-  assert.ok(get && get[0].includes("await getFirestoreAdminAccessToken(env)"));
-  assert.ok(patch && patch[0].includes("await getFirestoreAdminAccessToken(env)"));
-  assert.ok(get[0].includes("(token=admin)") === false, "token marker belongs in failure diagnostics, not success path");
+test("signing asset and completed-archive routes explicitly use the Worker's admin token", () => {
+  const download = source.slice(source.indexOf("async function downloadSignatureFile"), source.indexOf("async function finalizeSignatureProfileArchives"));
+  const completed = source.slice(source.indexOf("async function finalizeSignatureProfileArchives"), source.indexOf("async function ensureSignatureProfileFolder"));
+  assert.ok(download.includes("const firestoreAdminToken = await getFirestoreAdminAccessToken(env)"));
+  assert.doesNotMatch(download, /getFirestoreDocument\([^;\n]*claims\.token/);
+  assert.ok(completed.includes("await getFirestoreAdminAccessToken(env)"));
 });
 
 test("signing and Drive lifecycle routes never pass the caller token to Firestore document helpers", () => {
