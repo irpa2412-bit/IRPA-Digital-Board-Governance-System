@@ -238,6 +238,14 @@ test("an edit saves a snapshot and one-click restore returns all allowed fields 
   assert.ok(auditEvents.some(event => JSON.stringify(event).includes("COMMUNICATION_WEBSITE_REVISION_RESTORED")));
 });
 
+test("the registered Communication & Media authority can access the website connection check", async () => {
+  const router = makeRouter();
+  const result = await call(router, makeEnv(), "/api/communications/site/status", { role: "Communication & Media" });
+  assert.equal(result.status, 200);
+  const data = await result.json();
+  assert.equal(data.connections.website, "connected");
+});
+
 test("a user without a Communication & Media role or active admin profile is refused", async () => {
   const router = makeRouter();
   const result = await call(router, makeEnv(), "/api/communications/website/content?type=pages", { role: "Finance Officer" });
