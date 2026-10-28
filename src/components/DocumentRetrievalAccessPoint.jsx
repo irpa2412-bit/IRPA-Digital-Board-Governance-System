@@ -134,7 +134,7 @@ export default function DocumentRetrievalAccessPoint(){
         </div>
         {visible.length===0?<div className="auth-message">No records match this selection, or no documents are visible to this profile under the current authority policy.</div>:<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,300px),1fr))",gap:10}}>
           {visible.map(item=><article key={item.documentId} className="panel" style={{margin:0,minWidth:0,border:"1px solid var(--border-color, rgba(148,163,184,.35))"}}>
-            <strong style={{display:"block",overflowWrap:"anywhere"}}>{item.title||item.fileName||"Untitled document"}</strong>
+            <strong style={{display:"block",overflowWrap:"anywhere"}}>{item.title||item.fileName||"Untitled document"} {String(item.recordOrigin||"").toUpperCase()==="TRIAL"&&<span aria-label="Trial record" style={{display:"inline-block",marginLeft:6,padding:"2px 6px",border:"1px solid currentColor",borderRadius:4,fontSize:11,fontWeight:700}}>TRIAL</span>}</strong>
             <p style={{margin:"6px 0",overflowWrap:"anywhere"}}>{item.reference||item.documentId}</p>
             <dl style={{display:"grid",gridTemplateColumns:"max-content minmax(0,1fr)",gap:"4px 9px",fontSize:13,margin:"8px 0 12px"}}>
               <dt>Archive</dt><dd style={{margin:0,overflowWrap:"anywhere"}}>{item.archiveCategory||"—"}</dd>
