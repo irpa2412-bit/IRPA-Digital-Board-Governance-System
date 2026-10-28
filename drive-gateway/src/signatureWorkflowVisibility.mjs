@@ -29,6 +29,12 @@ export function filterSignatureEnvelopeForCaller(envelope, { authenticatedUid, i
   const order = recipients.map(r => uidOf(r?.uid)).filter(Boolean);
   const actorIndex = order.indexOf(actor);
   const signed = signedUidSet(envelope), earlierSigned = new Set();
+  // Sequential envelopes expose only the current turn and completed earlier turns.
+  // Future signers are not authorised to inspect the envelope before their turn.
+  if (envelope.signingMode !== "Parallel" && actorIndex >= 0) {
+    const currentIndex = order.findIndex(uid => !signed.has(uid));
+    if (currentIndex >= 0 && actorIndex > currentIndex) return { allowed: false, reason: "future_signer_turn" };
+  }
   for (let i = 0; i < (actorIndex < 0 ? 0 : actorIndex); i++) if (signed.has(order[i])) earlierSigned.add(order[i]);
   const fields = Array.isArray(envelope.fields) ? envelope.fields : [];
   const ownFields = fields.filter(field => uidOf(field?.signerUid) === actor).map(hideUnappliedValue);
