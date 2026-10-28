@@ -147,7 +147,7 @@ test("website page editing is staging-host-only, Communication & Media scoped, r
  assert.ok(site.includes("COMMUNICATION_WEBSITE_CONTENT_UPDATED"));
  assert.ok(site.includes("snapshotId"));
  assert.ok(site.includes("featured_media"));
- assert.ok(site.includes('["draft", "publish"]'));
+ assert.ok(site.includes('!["draft", "pending", "publish"].includes(requestedStatus)'));
  assert.ok(!site.includes("console.log(WORDPRESS_APPLICATION_PASSWORD"));
  assert.ok(!portal.includes("WORDPRESS_APPLICATION_PASSWORD"));
  assert.ok(!portal.includes("process.env.CPANEL_API_TOKEN"));

@@ -1,0 +1,32 @@
+name: Website health maintenance CI
+on:
+  pull_request:
+    branches:
+      - feature/communication-media-website-20261025
+  push:
+    branches:
+      - feature/website-health-48h-maintenance
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: website-health-maintenance-ci-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Test health schedule and approval boundaries
+        run: npm run test:communication-media
+      - name: Build web app
+        run: npm run build
+      - name: Lint gateway and maintenance script
+        run: npm run lint

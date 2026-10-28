@@ -19,11 +19,11 @@
     "test:portal-navigation": "node --test tests/portal-workspace-navigation.test.mjs",
     "test:meeting-entry-policy": "node --test functions/meetingEntryPolicy.test.cjs",
     "test:meeting-invitation-resend": "node --test tests/meeting-invitation-resend-quorum.test.mjs",
-    "test:communication-media": "node --test tests/communication-media-policy.test.mjs tests/communication-site-health-assistant.test.mjs",
+    "test:communication-media": "node --test tests/communication-media-policy.test.mjs tests/communication-site-health-assistant.test.mjs tests/staging-website-health-maintenance.test.mjs",
     "test:meta-oauth": "node --test tests/meta-oauth-staging.test.mjs",
     "check:staging-gateway-bundle": "node scripts/check-staging-gateway-bundle.mjs",
     "test": "node --test",
-    "lint": "node --check drive-gateway/src/index.js && node --check drive-gateway/src/communicationsSite.mjs && node --check drive-gateway/src/communicationsWebsitePolicy.mjs && node --check drive-gateway/tests/communications-website-policy.test.mjs && node --check drive-gateway/tests/staging-communications-website-acceptance.mjs && node --check tests/communication-site-health-assistant.test.mjs"
+    "lint": "node --check drive-gateway/src/index.js && node --check drive-gateway/src/communicationsSite.mjs && node --check drive-gateway/src/communicationsWebsitePolicy.mjs && node --check drive-gateway/tests/communications-website-policy.test.mjs && node --check drive-gateway/tests/staging-communications-website-acceptance.mjs && node --check tests/communication-site-health-assistant.test.mjs && node --check tests/staging-website-health-maintenance.test.mjs && node --check scripts/staging-website-health-maintenance.mjs"
   },
   "dependencies": {
     "firebase": "^11.10.0",
