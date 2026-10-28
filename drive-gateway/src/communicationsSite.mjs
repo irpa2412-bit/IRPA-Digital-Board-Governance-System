@@ -160,27 +160,37 @@ export function createCommunicationsSiteRouter(deps) {
     return { claims, roles, admin: false };
   }
 
+  function configurationError(code, message, status = 503) {
+    return Object.assign(new Error(message), { status, diagnosticCode: code });
+  }
+
   function wordpressConfig(env) {
-    const missing = ["WORDPRESS_BASE_URL", "WORDPRESS_USERNAME", "WORDPRESS_APPLICATION_PASSWORD"].filter(name => !String(env?.[name] || "").trim());
-    if (missing.length) throw Object.assign(new Error("Missing required Worker secrets: " + missing.join(", ") + "."), { status: 503 });
+    const required = ["WORDPRESS_BASE_URL", "WORDPRESS_USERNAME", "WORDPRESS_APPLICATION_PASSWORD"];
+    const missing = required.filter(name => !String(env?.[name] || "").trim());
+    if (missing.length) throw configurationError("credentials_missing", "Required WordPress settings are missing: " + missing.join(", ") + ".");
+    const rawEndpoint = String(env.WORDPRESS_BASE_URL).trim();
     let base;
-    try { base = new URL(String(env.WORDPRESS_BASE_URL)); }
-    catch { throw new Error("Website endpoint configuration is invalid."); }
-    if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash) {
-      throw new Error("Website endpoint configuration is invalid.");
-    }
-    const environment = String(env.IRPA_WORKER_ENVIRONMENT || env.IRPA_ENVIRONMENT || "").toLowerCase();
+    try { base = new URL(rawEndpoint); }
+    catch { throw configurationError("endpoint_invalid_url", "WORDPRESS_BASE_URL is not a valid absolute URL."); }
+    if (base.protocol !== "https:") throw configurationError("endpoint_not_https", "WORDPRESS_BASE_URL must use HTTPS.");
+    if (base.username || base.password) throw configurationError("endpoint_contains_url_credentials", "WORDPRESS_BASE_URL must not contain embedded username or password fields.");
+    if (base.search) throw configurationError("endpoint_contains_query", "WORDPRESS_BASE_URL must not contain a query string.");
+    if (base.hash) throw configurationError("endpoint_contains_fragment", "WORDPRESS_BASE_URL must not contain a URL fragment.");
+    if (base.port) throw configurationError("endpoint_nonstandard_port", "WORDPRESS_BASE_URL must use the standard HTTPS port.");
+    const environment = String(env.IRPA_WORKER_ENVIRONMENT || env.IRPA_ENVIRONMENT || "").trim().toLowerCase();
     const host = base.hostname.toLowerCase();
+    if (!["production", "staging"].includes(environment)) {
+      throw configurationError("worker_environment_missing_or_invalid", "Set IRPA_WORKER_ENVIRONMENT to exactly production or staging.");
+    }
     if (environment === "production" && !["irpa.or.tz", "www.irpa.or.tz"].includes(host)) {
-      throw new Error("Production WordPress editing is restricted to irpa.or.tz or www.irpa.or.tz.");
+      throw configurationError("wordpress_host_not_allowed_for_environment", "Production permits only irpa.or.tz or www.irpa.or.tz; the configured hostname does not match.");
     }
     if (environment === "staging" && host !== "staging.irpa.or.tz") {
-      throw new Error("Staging WordPress editing is restricted to staging.irpa.or.tz.");
+      throw configurationError("wordpress_host_not_allowed_for_environment", "Staging permits only staging.irpa.or.tz; the configured hostname does not match.");
     }
-    if (!["production", "staging"].includes(environment)) throw new Error("Website editing requires an explicit staging or production Worker environment.");
     const username = String(env.WORDPRESS_USERNAME).trim();
     const password = String(env.WORDPRESS_APPLICATION_PASSWORD).replace(/\s/g, "");
-    return { root: base.toString().replace(/\/$/, ""), hostname: host, environment, auth: "Basic " + btoa(unescape(encodeURIComponent(username + ":" + password))), stagingAuthHeader: host === "staging.irpa.or.tz" };
+    return { root: base.origin, hostname: host, environment, auth: "Basic " + btoa(unescape(encodeURIComponent(username + ":" + password))), stagingAuthHeader: host === "staging.irpa.or.tz" };
   }
 
   function wordpressHeaders(wp, extra = {}) {
@@ -194,8 +204,11 @@ export function createCommunicationsSiteRouter(deps) {
   function websiteWordPressConfig(env) {
     const wp = wordpressConfig(env);
     const base = new URL(wp.root);
-    if (base.protocol !== "https:" || base.pathname !== "/" || base.hostname.toLowerCase() !== wp.hostname) {
-      throw new Error("WordPress endpoint must be an HTTPS origin without a path.");
+    if (base.pathname !== "/") {
+      throw configurationError("endpoint_has_path", "WORDPRESS_BASE_URL must be the website origin only; remove paths such as /wp-admin or /wp-json.");
+    }
+    if (base.hostname.toLowerCase() !== wp.hostname) {
+      throw configurationError("endpoint_hostname_mismatch", "The parsed WordPress endpoint hostname does not match the validated hostname.");
     }
     return wp;
   }
@@ -226,32 +239,32 @@ export function createCommunicationsSiteRouter(deps) {
 
   function cpanelConfig(env) {
     const configuredEndpoint = String(env.CPANEL_BASE_URL || "").trim();
+    if (!configuredEndpoint) throw configurationError("cpanel_base_url_missing", "CPANEL_BASE_URL is not set.");
     let base;
     try {
-      // Accept a bare hostname or an explicit URL, but enforce HTTPS and the
-      // dedicated cPanel port below before making any outbound request.
       const endpoint = /^[a-z0-9.-]+$/i.test(configuredEndpoint)
         ? "https://" + configuredEndpoint
         : configuredEndpoint;
       base = new URL(endpoint);
     } catch {
-      throw Object.assign(new Error("Missing or invalid required Worker setting: CPANEL_BASE_URL."), { status: 503 });
+      throw configurationError("cpanel_base_url_invalid_url", "CPANEL_BASE_URL is not a valid hostname or absolute URL.");
     }
-    // cPanel's HTTPS service is on port 2083. Normalize only an omitted port,
-    // never an explicitly different port or a path that could bypass checks.
     if (base.protocol === "https:" && !base.port) base.port = "2083";
-    if (base.protocol !== "https:" || !base.hostname ||
-        base.username || base.password || base.search || base.hash || base.pathname !== "/" || base.port !== "2083") {
-      throw new Error("cPanel endpoint configuration is invalid.");
-    }
+    if (base.protocol !== "https:") throw configurationError("cpanel_endpoint_not_https", "CPANEL_BASE_URL must use HTTPS.");
+    if (!base.hostname) throw configurationError("cpanel_endpoint_hostname_missing", "CPANEL_BASE_URL has no hostname.");
+    if (base.username || base.password) throw configurationError("cpanel_endpoint_contains_url_credentials", "CPANEL_BASE_URL must not embed credentials.");
+    if (base.search || base.hash) throw configurationError("cpanel_endpoint_has_query_or_fragment", "CPANEL_BASE_URL must not contain a query or fragment.");
+    if (base.pathname !== "/") throw configurationError("cpanel_endpoint_has_path", "CPANEL_BASE_URL must be an origin only, without a path.");
+    if (base.port !== "2083") throw configurationError("cpanel_endpoint_wrong_port", "cPanel API connections must use HTTPS port 2083.");
     const username = String(env.CPANEL_USERNAME || "").trim();
     const token = String(env.CPANEL_API_TOKEN || "").trim();
-    if (!username || !token) throw Object.assign(new Error("Missing required Worker secrets: " + [!username && "CPANEL_USERNAME", !token && "CPANEL_API_TOKEN"].filter(Boolean).join(", ") + "."), { status: 503 });
-    const environment = String(env.IRPA_WORKER_ENVIRONMENT || env.IRPA_ENVIRONMENT || "").toLowerCase();
+    if (!username || !token) throw configurationError("cpanel_credentials_missing", "Required cPanel settings are missing: " + [!username && "CPANEL_USERNAME", !token && "CPANEL_API_TOKEN"].filter(Boolean).join(", "));
+    const environment = String(env.IRPA_WORKER_ENVIRONMENT || env.IRPA_ENVIRONMENT || "").trim().toLowerCase();
+    if (!["production", "staging"].includes(environment)) throw configurationError("worker_environment_missing_or_invalid", "Set IRPA_WORKER_ENVIRONMENT to exactly production or staging.");
     const configuredRoot = String(env.CPANEL_DOCUMENT_ROOT || (environment === "production" ? "public_html" : "public_html/staging")).trim().replace(/\\/g, "/").replace(/\/+$/g, "");
     const allowedRoots = environment === "production" ? ["public_html", "home/" + username + "/public_html", "/home/" + username + "/public_html"] :
-      environment === "staging" ? ["public_html/staging", "home/" + username + "/public_html/staging", "/home/" + username + "/public_html/staging"] : [];
-    if (!allowedRoots.includes(configuredRoot)) throw new Error("cPanel document root must match the configured staging or production public_html directory.");
+      ["public_html/staging", "home/" + username + "/public_html/staging", "/home/" + username + "/public_html/staging"];
+    if (!allowedRoots.includes(configuredRoot)) throw configurationError("cpanel_document_root_invalid_for_environment", "CPANEL_DOCUMENT_ROOT does not match the permitted " + environment + " document root.");
     const documentRoot = "public_html" + (environment === "staging" ? "/staging" : "");
     return { root: base.origin + "/execute", username, token, documentRoot };
   }
@@ -573,19 +586,17 @@ export function createCommunicationsSiteRouter(deps) {
         }
       } catch (error) {
         const message = String(error?.message || "");
-        if (/Missing required Worker secrets:/.test(message)) {
+        if (error?.diagnosticCode) {
           result.website = "not_configured";
-          result.websiteDiagnosticCode = "credentials_missing";
-          result.websiteMissingSettings = ["WORDPRESS_BASE_URL", "WORDPRESS_USERNAME", "WORDPRESS_APPLICATION_PASSWORD"].filter(name => message.includes(name));
-        } else if (/not configured|explicit staging or production/i.test(message)) {
-          result.website = "not_configured";
-          result.websiteDiagnosticCode = "environment_or_endpoint_not_configured";
-        } else if (/endpoint configuration is invalid|must be an HTTPS origin|restricted to/i.test(message)) {
-          result.website = "not_configured";
-          result.websiteDiagnosticCode = "endpoint_configuration_invalid";
+          result.websiteDiagnosticCode = safeCode(error.diagnosticCode);
+          result.websiteDiagnosticMessage = message.slice(0, 240);
+          if (error.diagnosticCode === "credentials_missing") {
+            result.websiteMissingSettings = ["WORDPRESS_BASE_URL", "WORDPRESS_USERNAME", "WORDPRESS_APPLICATION_PASSWORD"].filter(name => message.includes(name));
+          }
         } else {
           result.website = "unavailable";
           result.websiteDiagnosticCode = "probe_setup_failed";
+          result.websiteDiagnosticMessage = "The Worker failed during WordPress diagnostic setup; inspect the safe Worker diagnostic event for the failing stage.";
         }
       }
       try {
@@ -595,9 +606,10 @@ export function createCommunicationsSiteRouter(deps) {
       } catch (error) {
         const message = String(error?.message || "");
         const lower = message.toLowerCase();
-        if (message.includes("Missing required Worker secrets:") && /CPANEL_USERNAME|CPANEL_API_TOKEN/.test(message)) {
-          result.cpanel = "credentials_missing";
-          result.cpanelDiagnostic = "credentials_missing";
+        if (error?.diagnosticCode) {
+          result.cpanel = error.diagnosticCode === "cpanel_credentials_missing" || error.diagnosticCode === "cpanel_base_url_missing" ? "not_configured" : "unavailable";
+          result.cpanelDiagnostic = safeCode(error.diagnosticCode);
+          result.cpanelDiagnosticMessage = message.slice(0, 240);
         } else if (/category authentication_rejected/.test(message)) {
           result.cpanel = "authentication_rejected";
           result.cpanelDiagnostic = "authentication_rejected";
