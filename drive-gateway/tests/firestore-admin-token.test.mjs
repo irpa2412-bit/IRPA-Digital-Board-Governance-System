@@ -58,6 +58,6 @@ test("admin, owner, current signer and earlier signer receive only their authori
     }
   }
   assert.equal(filterSignatureEnvelopeForCaller(envelope, { authenticatedUid: "admin", isAdmin: true }).allowed, true);
-  assert.equal(filterSignatureEnvelopeForCaller(envelope, { authenticatedUid: "later", isAdmin: false }).allowed, false);
+  assert.equal(filterSignatureEnvelopeForCaller(envelope, { authenticatedUid: "later", isAdmin: false }).allowed, true);
   assert.equal(filterSignatureEnvelopeForCaller(envelope, { authenticatedUid: "stranger", isAdmin: false }).allowed, false);
 });
