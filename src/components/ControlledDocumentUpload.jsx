@@ -5,6 +5,7 @@ import { COLLECTIONS, getCurrentMemberProfile, getCurrentEmployeeProfile, nextDo
 import { readWorkflowContext, withWorkflowLinks } from "../firebase/workflowLinks";
 import { uploadControlledDocumentRouted, buildDocumentArchiveDestination, registerControlledDocumentRecord } from "../firebase/signatureStorage";
 import { validateControlledDocumentUpload } from "./controlledDocumentUploadValidation.mjs";
+import { describeUploadFailure } from "./uploadRuntimeDiagnostics.mjs";
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const DOCUMENT_TYPES = ["Governance", "Administrative", "Finance", "Procurement", "Administrator"];
@@ -289,9 +290,10 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         onUploaded?.({...doc,id:savedDocumentId});
       }
     } catch (x) {
-      const detail=String(x?.message||"Unknown upload failure");
+      const {message:detail,stack}=describeUploadFailure(x);
       const failedStep=/firestore|register|controlled-document register|permission-denied/i.test(detail)?"Create Firestore documents record":/archive|folder|destination|gateway/i.test(detail)?"Assign archive destination":"Create Drive file";
-      uploadProgress.steps=uploadProgress.steps.map(([name,status])=>name===failedStep?[name,"FAIL: "+detail]:[name,status==="PENDING"?"NOT REACHED":status]);
+      const failureDetail="FAIL: "+detail+(stack?"\nStack (first 5 lines):\n"+stack:"");
+      uploadProgress.steps=uploadProgress.steps.map(([name,status])=>name===failedStep?[name,failureDetail]:[name,status==="PENDING"?"NOT REACHED":status]);
       uploadProgress.origin=persistedOrigin({recordOrigin:"PRODUCTION"});
       setUploadReport({...uploadProgress});
       setError(detail+" (upload diagnostics below identify completed and failed steps).");
