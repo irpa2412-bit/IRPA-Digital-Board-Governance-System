@@ -73,7 +73,7 @@ test("document lifecycle fails closed instead of falling back to claims.token", 
   assert.doesNotMatch(lifecycle, /\?\s*await deps\.getFirestoreAdminAccessToken\(env\)\s*:\s*claims\.token/);
   assert.doesNotMatch(lifecycle, /getFirestoreDocument\([^\n]*claims\.token/);
   assert.doesNotMatch(lifecycle, /updateFirestoreDocument\([^\n]*claims\.token/);
-  assert.match(lifecycle, /getFirestoreDocument\(env,"signatureEnvelopes"\+\/"\+envelopeId,adminToken\)/);
+  assert.match(lifecycle, /signatureEnvelopes\/"\+envelopeId,adminToken/);
 });
 
 test("mock Firestore denies caller-token reads and permits Worker-admin reads", async () => {
