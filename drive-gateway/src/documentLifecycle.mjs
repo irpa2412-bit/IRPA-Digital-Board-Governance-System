@@ -34,7 +34,7 @@ async function requireFirestoreAdminToken(deps, env) {
   if (typeof deps.getFirestoreAdminAccessToken !== "function") {
     throw new Error("Missing required dependency: getFirestoreAdminAccessToken; refusing caller-token Firestore access.");
   }
-  const token = await requireFirestoreAdminToken(deps, env);
+  const token = await deps.getFirestoreAdminAccessToken(env);
   if (!token) throw new Error("Missing required credential: Firestore admin access token; refusing caller-token Firestore access.");
   return token;
 }
