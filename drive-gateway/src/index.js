@@ -1144,7 +1144,13 @@ async function saveSignatureWorkflowDraftRoute(request, env) {
     const existingData = firestoreDocumentToPlain(existing) || {};
     if (existing && String(existingData.ownerUid || existingData.senderUid || "") !== uid) return json({ok:false,step,error:"Only the original signing-draft owner may update this envelope."},403,corsHeaders(request));
     const recipients = Array.isArray(draft.recipients) ? draft.recipients : [];
-    const fields = Array.isArray(draft.fields) ? draft.fields : [];
+    const fields = (Array.isArray(draft.fields) ? draft.fields : []).map(field => {
+      const page=Number(field?.page||1),x=Number(field?.x??10),y=Number(field?.y??12),width=Number(field?.width??24),height=Number(field?.height??9);
+      if(!Number.isInteger(page)||page<1||page>500||![x,y,width,height].every(Number.isFinite)||x<0||y<0||width<=0||height<=0||x+width>100||y+height>100) throw Object.assign(new Error("Every signing field must have a valid page number and position."),{status:400});
+      const prepared={...field,page,x,y,width,height};
+      if(["Signature","Initials"].includes(prepared.type)){delete prepared.value;delete prepared.signatureData;delete prepared.signatureUrl;delete prepared.signatureValue;}
+      return prepared;
+    });
     const participantUids = Array.from(new Set(recipients.map(item => String(item && item.uid || "")).filter(Boolean)));
     if (!participantUids.includes(uid)) return json({ok:false,step,error:"The authenticated owner must be a participant in the signing envelope."},400,corsHeaders(request));
     if (fields.some(field => field && field.signerUid && !participantUids.includes(String(field.signerUid)))) return json({ok:false,step,error:"Every assigned field must belong to a participant in this envelope."},400,corsHeaders(request));
