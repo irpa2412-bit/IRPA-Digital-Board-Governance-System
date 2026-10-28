@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, PDFName } from "pdf-lib";
 import { chainEvents, declineSigning, getSigningPdf, openSigning, sign, verifySigningPdf } from "../src/signing.mjs";
 import { route } from "../src/router.mjs";
 import { sha256Hex } from "../src/util.mjs";
@@ -9,8 +9,11 @@ const NOW = new Date("2026-10-07T17:00:00.000Z");
 const ORIGINAL = await (async () => {
   const pdf = await PDFDocument.create();
   pdf.addPage([300, 400]);
+  pdf.addPage([300, 400]);
+  pdf.addPage([300, 400]);
   return pdf.save();
 })();
+const SIGNATURE_PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADUlEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC";
 
 async function makeFixture({ signerUid, signerEmail, secondSigner = true } = {}) {
   const secret = "a".repeat(64);
@@ -66,6 +69,7 @@ async function makeFixture({ signerUid, signerEmail, secondSigner = true } = {})
     hash: documentHash,
     primaryStorageId: "original-1"
   }]]);
+  const storedFiles = new Map();
   return {
     token: envelopeId + "." + signerId + "." + secret,
     envelope,
@@ -91,10 +95,10 @@ async function makeFixture({ signerUid, signerEmail, secondSigner = true } = {})
       storage: {
         async get(id) {
           if (id === "original-1") return ORIGINAL;
-          return null;
+          return storedFiles.get(id) || null;
         },
-        async put() { return { id: "stored-test" }; },
-        async delete() {}
+        async put({bytes}) { const id="stored-test-"+storedFiles.size;storedFiles.set(id,bytes);return {id}; },
+        async delete(id) { storedFiles.delete(id); }
       },
       sendInvitation: null,
       allowReturnTokens: true
@@ -353,4 +357,64 @@ test("Production-mode Gateway signing records the server-verified authority in t
   const current=await fixture.ctx.meta.get("envelopes",fixture.envelope.id);
   assert.equal(current.signers[0].authorityVerification.authorityRole,"Board Member");
   assert.equal(current.events.at(-1).authoritySourceCollection,"members");
+});
+
+
+test("signature application without explicit confirmation is rejected", async () => {
+  const fixture=await makeFixture({signerUid:"member-uid",signerEmail:"member@example.org",secondSigner:false});
+  fixture.envelope.fields=[{fieldId:"page-three-signature",type:"Signature",page:3,x:20,y:30,width:35,height:10,signerUid:"member-uid",required:true}];
+  await assert.rejects(()=>sign(fixture.ctx,{
+    token:fixture.token,signature:{type:"drawn",value:SIGNATURE_PNG},
+    fieldValues:{"page-three-signature":SIGNATURE_PNG},consent:true,
+    user:{uid:"member-uid",email:"member@example.org"}
+  }),error=>error.status===400&&/confirm/i.test(error.message));
+  const current=await fixture.ctx.meta.get("envelopes",fixture.envelope.id);
+  assert.equal(current.signers[0].status,"Pending");
+});
+
+test("confirmed signature is rendered on the saved third-page field position", async () => {
+  const fixture=await makeFixture({signerUid:"member-uid",signerEmail:"member@example.org",secondSigner:false});
+  const field={fieldId:"page-three-signature",type:"Signature",page:3,x:20,y:30,width:35,height:10,signerUid:"member-uid",required:true};
+  fixture.envelope.fields=[field];
+  const result=await sign(fixture.ctx,{
+    token:fixture.token,signature:{type:"drawn",value:SIGNATURE_PNG},
+    fieldValues:{},fieldApplications:[{...field,confirmed:true,value:SIGNATURE_PNG}],
+    signatureConfirmed:true,consent:true,
+    user:{uid:"member-uid",email:"member@example.org"}
+  });
+  assert.equal(result.status,"Completed");
+  const current=await fixture.ctx.meta.get("envelopes",fixture.envelope.id);
+  assert.equal(current.fields[0].page,3);
+  assert.deepEqual(current.signers[0].fieldValues,{"page-three-signature":SIGNATURE_PNG});
+  const signed=await getSigningPdf(fixture.ctx,fixture.token,{uid:"member-uid",email:"member@example.org"});
+  const pdf=await PDFDocument.load(signed.bytes);
+  assert.equal(pdf.getPageCount(),4,"three source pages plus the signature certificate");
+  const pageThree=pdf.getPages()[2];
+  const xObjects=pageThree.node.Resources()?.lookup(PDFName.of("XObject"));
+  assert.ok(xObjects && xObjects.size()>0,"the confirmed signature image must be on page 3");
+  const pageOne=pdf.getPages()[0];
+  const firstPageObjects=pageOne.node.Resources()?.lookup(PDFName.of("XObject"));
+  assert.ok(!firstPageObjects||firstPageObjects.size()===0,"the page-3 signature must not be moved to page 1");
+});
+
+test("a non-assigned signer cannot apply another officer's signature field", async () => {
+  const fixture=await makeFixture({signerUid:"member-uid",signerEmail:"member@example.org"});
+  fixture.envelope.fields=[{fieldId:"other-signature",type:"Signature",page:3,x:20,y:30,width:35,height:10,signerUid:"second-user",required:true}];
+  await assert.rejects(()=>sign(fixture.ctx,{
+    token:fixture.token,signature:{type:"drawn",value:SIGNATURE_PNG},
+    fieldApplications:[{fieldId:"other-signature",confirmed:true,page:3,x:20,y:30,width:35,height:10,value:SIGNATURE_PNG}],
+    signatureConfirmed:true,consent:true,user:{uid:"member-uid",email:"member@example.org"}
+  }),error=>error.status===403);
+});
+
+test("Gateway open keeps later signers' assignments hidden while retaining the assigned field page", async () => {
+  const fixture=await makeFixture({signerUid:"member-uid",signerEmail:"member@example.org"});
+  fixture.envelope.fields=[
+    {fieldId:"first-signature",type:"Signature",page:3,x:20,y:30,width:35,height:10,signerUid:"member-uid",required:true},
+    {fieldId:"later-signature",type:"Signature",page:3,x:60,y:30,width:30,height:10,signerUid:"second-user",required:true}
+  ];
+  const opened=await openSigning(fixture.ctx,fixture.token,{uid:"member-uid",email:"member@example.org"});
+  assert.deepEqual(opened.fields.map(field=>field.fieldId),["first-signature"]);
+  assert.equal(opened.fields[0].page,3);
+  assert.equal(opened.fields.some(field=>field.signerUid==="second-user"),false);
 });
