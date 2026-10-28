@@ -51,6 +51,17 @@ test("publishing, website content edits and cPanel file edits route through Clou
  assert.ok(!existsSync(new URL("../functions/communicationMedia.js",import.meta.url)));
 });
 
+test("website studio supports authenticated WordPress article photo uploads without publishing",()=>{
+ assert.ok(site.includes('path === "/api/communications/website/media" && request.method === "POST"'));
+ for(const type of ['"image/jpeg"','"image/png"','"image/webp"','"image/gif"']) assert.ok(site.includes(type));
+ assert.ok(site.includes("8 * 1024 * 1024"));
+ assert.ok(site.includes("COMMUNICATION_WEBSITE_IMAGE_UPLOADED"));
+ assert.ok(studio.includes('call("/api/communications/website/media","POST"'));
+ assert.ok(studio.includes('type="file" accept="image/jpeg,image/png,image/webp,image/gif"'));
+ assert.ok(studio.includes("inserted into the article"));
+ assert.ok(studio.includes("Save as draft"));
+});
+
 test("WordPress and cPanel status badges automatically check and fail visibly without stale neutral status",()=>{
  assert.ok(portal.includes('if(tab==="Publishing Setup"&&websiteEditor&&!siteBusy)'));
  assert.ok(portal.includes('void checkWebsiteConnections()'));
