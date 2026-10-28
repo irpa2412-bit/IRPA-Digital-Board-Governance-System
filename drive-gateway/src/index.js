@@ -21,7 +21,7 @@ import { buildEsignContext, EsignRecordDurableObject } from "./esignContext.mjs"
 import { runCleanup } from "./upload.mjs";
 import { createDocumentLifecycleRouter } from "./documentLifecycle.mjs";
 import { canProvisionSignatureProfileFolder } from "./signatureProfileAuthorization.mjs";
-import { canReadSignatureAsset, canUploadSignedDocument } from "./signatureAssetAuthorization.mjs";
+import { canReadSignatureAsset, canReadFirestoreSignatureAsset, canUploadSignedDocument } from "./signatureAssetAuthorization.mjs";
 import { filterSignatureEnvelopeForCaller } from "./signatureWorkflowVisibility.mjs";
 
 import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPasswordSetup, getInvitationSessionState } from "./invitationRedemption.mjs";
@@ -1611,15 +1611,21 @@ async function download(request, env) {
   const fileId = String(data.fileId || "").trim();
   if (!fileId) return json({ ok: false, error: "Google Drive file ID is required." }, 400, corsHeaders(request));
 
+  let controlledDocument = null;
+  let controlledDocumentFields = {};
+  let controlledAdmin = false;
   if (data.documentId) {
-    const document = await getFirestoreDocument(env, `documents/${cleanId(data.documentId)}`, claims.token);
-    const fields = document?.fields || {};
-    const authorizedUids = firestoreStringArray(fields.authorizedUids);
+    const recordId = cleanId(data.documentId);
+    controlledDocument = await getFirestoreDocument(env, `documents/${recordId}`, claims.token);
+    controlledDocumentFields = controlledDocument?.fields || {};
+    const storedDriveId = String(controlledDocumentFields.driveFileId?.stringValue || controlledDocumentFields.fileId?.stringValue || "");
     const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
-    const isAdmin = Boolean(admin?.fields?.active?.booleanValue);
-    if (!isAdmin && !authorizedUids.includes(claims.user_id)) {
-      return json({ ok: false, error: "You are not authorized to retrieve this document." }, 403, corsHeaders(request));
-    }
+    controlledAdmin = Boolean(admin?.fields?.active?.booleanValue) && String(admin?.fields?.role?.stringValue || "") === "Administrator";
+    const allowed = controlledDocument && storedDriveId === fileId && (
+      controlledAdmin || String(controlledDocumentFields.ownerUid?.stringValue || "") === claims.user_id ||
+      firestoreStringArray(controlledDocumentFields.authorizedUids).includes(claims.user_id)
+    );
+    if (!allowed) return json({ok:false,error:"Controlled document authorization failed (failedCondition=document_record_or_file_relationship, documentId="+recordId+", documents.fileId="+String(controlledDocumentFields.fileId?.stringValue||"missing")+", documents.driveFileId="+String(controlledDocumentFields.driveFileId?.stringValue||"missing")+", requestedDriveFileId="+fileId+", callerRole="+(controlledAdmin?"administrator":String(controlledDocumentFields.ownerUid?.stringValue||"")===claims.user_id?"owner":"authorized_or_unrelated")+", recordExists="+Boolean(controlledDocument)+", fileIdMatches="+(storedDriveId===fileId)+")."},403,corsHeaders(request));
   }
 
   const accessToken = await getDriveAccessToken(env);
@@ -1629,6 +1635,11 @@ async function download(request, env) {
     return json({ ok: false, error: "The requested file is not an IRPA governance document." }, 403, corsHeaders(request));
   }
   const purpose = String(description.purpose || "");
+  if ((purpose === "Controlled Documents" || purpose === "Board of Directors Governance Documents") &&
+      controlledDocument && String(controlledDocumentFields.driveFileId?.stringValue || controlledDocumentFields.fileId?.stringValue || "") === fileId &&
+      String(description.documentId || "") !== cleanId(data.documentId || "")) {
+    await repairSignatureAssetDescription(env, accessToken, fileId, description, cleanId(data.documentId), claims, "", "controlled-document/download");
+  }
   if (purpose === "Communication Media" && !(await authorizeCommunicationMediaDownload(env, claims))) {
     return json({ ok:false, error:"Your registered IRPA role does not permit access to the communications media archive." },403,corsHeaders(request));
   }
@@ -1636,8 +1647,8 @@ async function download(request, env) {
     return json({ ok:false, error:"Signed workflow PDFs must be retrieved through the Signature Portal envelope-authorized route." },403,corsHeaders(request));
   }
   if (purpose === "Controlled Documents" || purpose === "Board of Directors Governance Documents") {
-    if (!data.documentId || String(description.documentId || "") !== cleanId(data.documentId)) {
-      return json({ ok:false, error:"Controlled document retrieval requires a matching document ID." },403,corsHeaders(request));
+    if (!data.documentId || !controlledDocument || String(controlledDocumentFields.driveFileId?.stringValue || controlledDocumentFields.fileId?.stringValue || "") !== fileId) {
+      return json({ok:false,error:"Controlled document authorization failed (failedCondition=firestore_document_file_match, documentId="+cleanId(data.documentId||"")+", documents.fileId="+String(controlledDocumentFields.fileId?.stringValue||"missing")+", documents.driveFileId="+String(controlledDocumentFields.driveFileId?.stringValue||"missing")+", requestedDriveFileId="+fileId+", Drive.description.documentId="+String(description.documentId||"missing")+", callerRole="+(controlledAdmin?"administrator":String(controlledDocumentFields.ownerUid?.stringValue||"")===claims.user_id?"owner":"authorized_or_unrelated")+")."},403,corsHeaders(request));
     }
   }
   if (description.purpose === "Signature Profile" && description.ownerUid !== claims.user_id) {
@@ -1664,6 +1675,33 @@ async function download(request, env) {
 
 
 
+async function repairSignatureAssetDescription(env, accessToken, fileId, description, documentId, claims, envelopeId, routeName) {
+  if (String(description?.documentId || "") === String(documentId || "")) return false;
+  const repaired = {...(description || {}), documentId:String(documentId)};
+  await driveFetch(env, accessToken, "/drive/v3/files/" + encodeURIComponent(fileId), {
+    method:"PATCH", body:JSON.stringify({description:JSON.stringify(repaired)})
+  });
+  const firebaseToken = await getFirestoreAdminAccessToken(env);
+  const base = "projects/" + getFirebaseProjectId(env) + "/databases/(default)/documents";
+  const auditId = "signature-asset-description-repair-" + Date.now() + "-" + crypto.randomUUID().slice(0,12);
+  const auditFields = {
+    action:{stringValue:"SIGNATURE_ASSET_DESCRIPTION_REPAIRED"},
+    category:{stringValue:"SYSTEM_SECURITY"},
+    description:{stringValue:"Drive description documentId repaired from authoritative Firestore document record after successful authorization."},
+    actorUid:{stringValue:String(claims.user_id || "")}, recordId:{stringValue:String(documentId)},
+    envelopeId:{stringValue:String(envelopeId || "")}, driveFileId:{stringValue:String(fileId)},
+    previousDescriptionDocumentId:{stringValue:String(description?.documentId || "")},
+    repairedDescriptionDocumentId:{stringValue:String(documentId)}, route:{stringValue:String(routeName)},
+    createdAt:{timestampValue:new Date().toISOString()}
+  };
+  const response = await fetch("https://firestore.googleapis.com/v1/" + base + "/audit?documentId=" + encodeURIComponent(auditId), {
+    method:"POST", headers:{"Authorization":"Bearer " + firebaseToken,"Content-Type":"application/json"},
+    body:JSON.stringify({fields:auditFields})
+  });
+  if (!response.ok) throw new Error("Drive description was repaired but its audit entry could not be persisted (HTTP " + response.status + ").");
+  return true;
+}
+
 async function downloadSignatureFile(request, env) {
   const claims = await authenticateFirebaseRequest(request, env);
   const data = await request.json();
@@ -1671,109 +1709,55 @@ async function downloadSignatureFile(request, env) {
   const documentId = cleanId(data.documentId || "");
   const envelopeId = cleanId(data.envelopeId || "");
   if (!fileId) return json({ok:false,error:"Google Drive file ID is required."},400,corsHeaders(request));
+  if (!documentId || !envelopeId) return json({ok:false,error:"Signature asset retrieval requires documentId and envelopeId."},400,corsHeaders(request));
 
+  const envelope = await getFirestoreDocument(env, "signatureEnvelopes/" + envelopeId, claims.token);
+  const envelopeFields = envelope?.fields || {};
+  const envelopeDocumentId = String(envelopeFields.documentId?.stringValue || "");
+  const document = await getFirestoreDocument(env, "documents/" + documentId, claims.token);
+  const documentFields = document?.fields || {};
+  const recordDriveId = String(documentFields.driveFileId?.stringValue || documentFields.fileId?.stringValue || "");
+  const adminProfile = await getFirestoreDocument(env, "adminProfiles/" + claims.user_id, claims.token);
+  const isAdministrator = (Boolean(adminProfile?.fields?.active?.booleanValue)
+    && String(adminProfile?.fields?.role?.stringValue || "") === "Administrator")
+    || String(claims.email || "").trim().toLowerCase() === "irpa2412@gmail.com";
+  const actor = String(claims.user_id || "");
+  const owner = String(envelopeFields.ownerUid?.stringValue || "");
+  const sender = String(envelopeFields.senderUid?.stringValue || "");
+  const recipients = firestoreMapArray(envelopeFields.recipients);
+  const participantUids = [...new Set([...firestoreStringArray(envelopeFields.participantUids),...firestoreStringArray(envelopeFields.actionUids),...recipients.map(r=>String(r?.uid||"")).filter(Boolean)])];
+  const actorIndex = recipients.findIndex(r => String(r?.uid || "") === actor);
+  const currentSignerUid = String(envelopeFields.currentSignerUid?.stringValue || "");
+  const currentIndex = recipients.findIndex(r => String(r?.uid || "") === currentSignerUid);
+  const actorRecipient = actorIndex >= 0 ? recipients[actorIndex] : null;
+  const actorSigned = Boolean(actorRecipient && (String(actorRecipient.status || "").toLowerCase() === "signed" || actorRecipient.signedAt || actorRecipient.completedAt))
+    || firestoreMapArray(envelopeFields.workflowHistory).some(h=>String(h?.uid||h?.signerUid||"")===actor&&(h?.signedAt||h?.completedAt||/signed|completed/i.test(String(h?.status||h?.action||""))));
+  const signerVisible = actorIndex >= 0 && (actor === currentSignerUid || (currentIndex >= 0 && actorIndex < currentIndex && actorSigned));
+  const role = isAdministrator ? "administrator" : actor === owner ? "owner" : actor === sender ? "sender" : participantUids.includes(actor) ? "participant" : "stranger";
+  const envelopeExists = Boolean(envelope), envelopeDocumentMatches = Boolean(envelope && envelopeDocumentId === documentId);
+  const documentRecordExists = Boolean(document), fileIdMatches = Boolean(document && recordDriveId === fileId);
+  const relationshipAllowed = canReadFirestoreSignatureAsset({
+    authenticatedUid:actor,isAdmin:isAdministrator,envelopeExists,envelopeDocumentId,
+    requestedDocumentId:documentId,documentRecordExists,recordDriveFileId:recordDriveId,
+    requestedDriveFileId:fileId,envelopeOwnerUid:owner,envelopeSenderUid:sender,
+    recipients,currentSignerUid,workflowHistory:firestoreMapArray(envelopeFields.workflowHistory)
+  });
+  if (!envelopeExists || !envelopeDocumentMatches || !documentRecordExists || !fileIdMatches || !relationshipAllowed) {
+    const driveToken = await getDriveAccessToken(env);
+    const driveMetadata = await driveFetch(env,driveToken,"/drive/v3/files/"+encodeURIComponent(fileId)+"?fields=id,description").catch(()=>({}));
+    const driveDescription = parseDescription(driveMetadata.description || "");
+    const conditions = {envelopeExists,envelopeDocumentMatches,documentRecordExists,fileIdMatches,relationshipAllowed,signerVisible,actorSigned};
+    const failed = Object.keys(conditions).filter(key=>!conditions[key]);
+    return json({ok:false,error:"Signature asset authorization failed (failedCondition="+(failed.join(",")||"unknown")+", envelopeId="+envelopeId+", envelope.documentId="+(envelopeDocumentId||"missing")+", documentsRecordId="+(documentRecordExists?documentId:"missing")+", documents.fileId="+String(documentFields.fileId?.stringValue||"missing")+", documents.driveFileId="+String(documentFields.driveFileId?.stringValue||"missing")+", requestedDriveFileId="+fileId+", Drive.description.documentId="+String(driveDescription.documentId||"missing")+", callerRole="+role+")."},403,corsHeaders(request));
+  }
   const accessToken = await getDriveAccessToken(env);
-  const metadata = await driveFetch(env, accessToken, "/drive/v3/files/" + encodeURIComponent(fileId) + "?fields=id,name,mimeType,size,description");
+  const metadata = await driveFetch(env,accessToken,"/drive/v3/files/"+encodeURIComponent(fileId)+"?fields=id,name,mimeType,size,description");
   const description = parseDescription(metadata.description);
   if (!description?.irpaGovernance) return json({ok:false,error:"The requested file is not an IRPA governance document."},403,corsHeaders(request));
-
-  const purpose = String(description.purpose || "");
-  let allowed = false;
-  if (purpose === "Signature Profile") {
-    allowed = canReadSignatureAsset({
-      authenticatedUid: claims.user_id,
-      purpose,
-      ownerUid: description.ownerUid,
-    });
-  } else if (purpose === "Signed Documents Archive") {
-    if (!documentId || !envelopeId) return json({ok:false,error:"Signed workflow PDF retrieval requires its document and envelope IDs."},400,corsHeaders(request));
-    const envelope = await getFirestoreDocument(env, "signatureEnvelopes/" + envelopeId, claims.token);
-    const envelopeFields = envelope?.fields || {};
-    const envelopeDocumentId = envelopeFields.documentId?.stringValue || "";
-    if (!envelope || envelopeDocumentId !== documentId) return json({ok:false,error:"The signing envelope does not match the requested document."},403,corsHeaders(request));
-    const envelopeParticipantUids = firestoreStringArray(envelopeFields.participantUids);
-    const envelopeActionUids = firestoreStringArray(envelopeFields.actionUids);
-    const envelopeAdmin = await getFirestoreDocument(env, "adminProfiles/" + claims.user_id, claims.token);
-    const isAdministrator = Boolean(envelopeAdmin?.fields?.active?.booleanValue)
-      && String(envelopeAdmin?.fields?.role?.stringValue || "") === "Administrator";
-    const envelopeFileMatches = [
-      envelopeFields.documentUrl?.stringValue,
-      envelopeFields.signedDocumentUrl?.stringValue,
-      envelopeFields.ownerCompletedDocumentUrl?.stringValue,
-      envelopeFields.completedDocumentUrl?.stringValue,
-    ].some(value => String(value || "") === "drive://" + fileId);
-    allowed = canReadSignatureAsset({
-      authenticatedUid: claims.user_id,
-      purpose,
-      ownerUid: description.ownerUid,
-      documentId,
-      envelopeId,
-      metadataDocumentId: description.documentId || "",
-      metadataEnvelopeId: description.envelopeId || "",
-      isAdmin: isAdministrator || String(claims.email || "").trim().toLowerCase() === "irpa2412@gmail.com",
-      envelopeOwnerUid: envelopeFields.ownerUid?.stringValue || "",
-      envelopeSenderUid: envelopeFields.senderUid?.stringValue || "",
-      envelopeActionUids,
-      envelopeParticipantUids,
-      envelopeDocumentId,
-      envelopeFileMatches,
-    });
-  } else {
-    if (!documentId) return json({ok:false,error:"Controlled document retrieval requires its document ID."},400,corsHeaders(request));
-    const document = await getFirestoreDocument(env, "documents/" + documentId, claims.token);
-    if (!document) return json({ok:false,error:"The controlled document record was not found."},404,corsHeaders(request));
-    const fields = document.fields || {};
-    const admin = await getFirestoreDocument(env, "adminProfiles/" + claims.user_id, claims.token);
-    const isAdministrator = Boolean(admin?.fields?.active?.booleanValue)
-      && String(admin?.fields?.role?.stringValue || "") === "Administrator";
-    let envelopeFields = {};
-    if (envelopeId) {
-      const envelope = await getFirestoreDocument(env, "signatureEnvelopes/" + envelopeId, claims.token);
-      const candidate = envelope?.fields || {};
-      if (candidate.documentId?.stringValue === documentId) envelopeFields = candidate;
-    }
-    allowed = canReadSignatureAsset({
-      authenticatedUid: claims.user_id,
-      purpose,
-      documentId,
-      envelopeId,
-      metadataDocumentId: description.documentId || "",
-      isAdmin: isAdministrator || String(claims.email || "").trim().toLowerCase() === "irpa2412@gmail.com",
-      documentOwnerUid: fields.ownerUid?.stringValue || "",
-      authorizedUids: firestoreStringArray(fields.authorizedUids),
-      envelopeOwnerUid: envelopeFields.ownerUid?.stringValue || "",
-      envelopeSenderUid: envelopeFields.senderUid?.stringValue || "",
-      envelopeParticipantUids: firestoreStringArray(envelopeFields.participantUids),
-      envelopeActionUids: firestoreStringArray(envelopeFields.actionUids),
-      envelopeDocumentId: envelopeFields.documentId?.stringValue || "",
-    });
-  }
-  if (!allowed) {
-    const envelopeContext = envelopeId ? await getFirestoreDocument(env, "signatureEnvelopes/" + envelopeId, claims.token) : null;
-    const ef = envelopeContext?.fields || {};
-    const envelopeDocId = ef.documentId?.stringValue || "";
-    const actor = String(claims.user_id || "");
-    const related = actor && (
-      actor === String(ef.ownerUid?.stringValue || "")
-      || actor === String(ef.senderUid?.stringValue || "")
-      || firestoreStringArray(ef.participantUids).includes(actor)
-      || firestoreStringArray(ef.actionUids).includes(actor)
-    );
-    const adminProfile = await getFirestoreDocument(env, "adminProfiles/" + actor, claims.token);
-    const administrator = (Boolean(adminProfile?.fields?.active?.booleanValue)
-      && String(adminProfile?.fields?.role?.stringValue || "") === "Administrator")
-      || String(claims.email || "").trim().toLowerCase() === "irpa2412@gmail.com";
-    const error = envelopeId && envelopeDocId === documentId && !related && !administrator
-      ? "Caller is not owner, sender, participant, signer or administrator for envelope " + envelopeId + "."
-      : "Signature asset authorization failed: the asset document/envelope identity or permitted caller relationship did not match.";
-    return json({ok:false,error},403,corsHeaders(request));
-  }
-
-  const size = Number(metadata.size || 0);
+  if (String(description.documentId||"") !== documentId) await repairSignatureAssetDescription(env,accessToken,fileId,description,documentId,claims,envelopeId,"signature-file/download");
+  const size = Number(metadata.size||0);
   if (size > MAX_BYTES) return json({ok:false,error:"The requested file exceeds the 10 MB limit."},400,corsHeaders(request));
-  const media = await fetch("https://www.googleapis.com/drive/v3/files/" + encodeURIComponent(fileId) + "?alt=media", {
-    headers: { Authorization: "Bearer " + accessToken },
-  });
+  const media = await fetch("https://www.googleapis.com/drive/v3/files/"+encodeURIComponent(fileId)+"?alt=media",{headers:{Authorization:"Bearer "+accessToken}});
   if (!media.ok) throw new Error("Google Drive download failed.");
   const buffer = new Uint8Array(await media.arrayBuffer());
   return json({ok:true,fileId,fileName:metadata.name,contentType:metadata.mimeType,base64:uint8ToBase64(buffer)},200,corsHeaders(request));
