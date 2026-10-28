@@ -508,11 +508,11 @@ export async function fetchGatewaySigningResource(path, token, {pdf=false}={}) {
   return pdf ? new Uint8Array(await response.arrayBuffer()) : response.json();
 }
 
-export async function submitGatewaySignature({token,signature,fieldValues={},manualAuthorityIdentification="",consent=true}={}) {
+export async function submitGatewaySignature({token,signature,fieldValues={},fieldApplications=[],signatureConfirmed=false,manualAuthorityIdentification="",consent=true}={}) {
   if (!token) throw new Error("A Gateway signing token is required.");
   const response = await gatewayAuthenticatedRequest("/api/sign/submit", {
     method:"POST",
-    body:JSON.stringify({token,signature,fieldValues,manualAuthorityIdentification,consent})
+    body:JSON.stringify({token,signature,fieldValues,fieldApplications,signatureConfirmed,manualAuthorityIdentification,consent})
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data.ok === false) throw new Error(data.error || "The Gateway did not accept the signing action.");
