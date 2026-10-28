@@ -79,3 +79,34 @@ export function canReadSignatureAsset({
         || (Array.isArray(envelopeParticipantUids) && envelopeParticipantUids.includes(actor))
         || (Array.isArray(envelopeActionUids) && envelopeActionUids.includes(actor))));
 }
+
+/**
+ * Authorizes a signature asset against authoritative Firestore envelope/document
+ * records. Drive description metadata is deliberately diagnostic-only.
+ */
+export function canReadFirestoreSignatureAsset({
+  authenticatedUid, isAdmin = false, envelopeExists = false, envelopeDocumentId = "",
+  requestedDocumentId = "", documentRecordExists = false, recordDriveFileId = "",
+  requestedDriveFileId = "", envelopeOwnerUid = "", envelopeSenderUid = "",
+  recipients = [], currentSignerUid = "", workflowHistory = [],
+} = {}) {
+  const actor = String(authenticatedUid || "").trim();
+  const docId = String(requestedDocumentId || "").trim();
+  if (!actor || !envelopeExists || !docId || String(envelopeDocumentId || "") !== docId ||
+      !documentRecordExists || !String(recordDriveFileId || "") ||
+      String(recordDriveFileId) !== String(requestedDriveFileId || "")) return false;
+  if (isAdmin === true || actor === String(envelopeOwnerUid || "") || actor === String(envelopeSenderUid || "")) return true;
+  const order = Array.isArray(recipients) ? recipients : [];
+  const actorIndex = order.findIndex(r => String(r?.uid || "") === actor);
+  if (actorIndex < 0) return false;
+  if (actor === String(currentSignerUid || "")) return true;
+  const currentIndex = order.findIndex(r => String(r?.uid || "") === String(currentSignerUid || ""));
+  if (currentIndex < 0 || actorIndex >= currentIndex) return false;
+  const recipient = order[actorIndex];
+  const signed = String(recipient?.status || "").toLowerCase() === "signed" || Boolean(recipient?.signedAt || recipient?.completedAt) ||
+    (Array.isArray(workflowHistory) && workflowHistory.some(h =>
+      String(h?.uid || h?.signerUid || "") === actor &&
+      (h?.signedAt || h?.completedAt || /signed|completed/i.test(String(h?.status || h?.action || "")))
+    ));
+  return signed;
+}
