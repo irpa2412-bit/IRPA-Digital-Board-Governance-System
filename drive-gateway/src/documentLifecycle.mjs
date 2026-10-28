@@ -31,19 +31,25 @@ function firestoreFields(data) {
 }
 
 async function putDocument(deps, env, claims, documentId, data) {
-  return deps.updateFirestoreDocument(env, "documents/"+cleanId(documentId), await deps.getFirestoreAdminAccessToken(env), firestoreFields(data), Object.keys(data));
+  const token = typeof deps.getFirestoreAdminAccessToken === "function"
+    ? await deps.getFirestoreAdminAccessToken(env) : claims.token;
+  return deps.updateFirestoreDocument(env, "documents/"+cleanId(documentId), token, firestoreFields(data), Object.keys(data));
 }
 
 async function getPlainDocument(deps, env, claims, documentId) {
-  const raw = await deps.getFirestoreDocument(env, "documents/"+cleanId(documentId), await deps.getFirestoreAdminAccessToken(env));
+  const token = typeof deps.getFirestoreAdminAccessToken === "function"
+    ? await deps.getFirestoreAdminAccessToken(env) : claims.token;
+  const raw = await deps.getFirestoreDocument(env, "documents/"+cleanId(documentId), token);
   return raw ? deps.firestoreDocumentToPlain(raw) : null;
 }
 
 async function getIdentity(deps, env, claims) {
+  const token = typeof deps.getFirestoreAdminAccessToken === "function"
+    ? await deps.getFirestoreAdminAccessToken(env) : claims.token;
   const [adminDoc,memberDoc,employeeDoc] = await Promise.all([
-    deps.getFirestoreDocument(env, "adminProfiles/"+claims.user_id, await deps.getFirestoreAdminAccessToken(env)),
-    deps.getFirestoreDocument(env, "members/"+claims.user_id, await deps.getFirestoreAdminAccessToken(env)),
-    deps.getFirestoreDocument(env, "employees/"+claims.user_id, await deps.getFirestoreAdminAccessToken(env))
+    deps.getFirestoreDocument(env, "adminProfiles/"+claims.user_id, token),
+    deps.getFirestoreDocument(env, "members/"+claims.user_id, token),
+    deps.getFirestoreDocument(env, "employees/"+claims.user_id, token)
   ]);
   return resolveIdentity({
     uid:claims.user_id,
@@ -152,7 +158,7 @@ async function commitDocumentAndAudit(deps,env,claims,documentId,patch,event,det
     createdAt:nowIso()
   };
   if(typeof deps.commitDocumentAndAudit!=="function")throw new Error("Atomic document and audit commit is not configured.");
-  return deps.commitDocumentAndAudit(env,cleanId(documentId),await deps.getFirestoreAdminAccessToken(env),firestoreFields(patch),Object.keys(patch),firestoreFields(auditRecord),{createOnly:Boolean(options.createOnly)});
+  return deps.commitDocumentAndAudit(env,cleanId(documentId),claims.token,firestoreFields(patch),Object.keys(patch),firestoreFields(auditRecord),{createOnly:Boolean(options.createOnly)});
 }
 
 export function createDocumentLifecycleRouter(deps) {
@@ -330,7 +336,7 @@ export function createDocumentLifecycleRouter(deps) {
       const document=await getPlainDocument(deps,env,claims,documentId);if(!document)return deps.json({ok:false,error:"Document registry record was not found."},404,deps.corsHeaders(request));
       const access=canRead(identity,document);if(!access.allowed)return deps.json({ok:false,error:access.reason},403,deps.corsHeaders(request));
       if(document.status!=="PENDING_SIGNATURE")return deps.json({ok:false,error:"The document is not awaiting signature."},409,deps.corsHeaders(request));
-      const envelopeRaw=await deps.getFirestoreDocument(env,"signatureEnvelopes/"+envelopeId,await deps.getFirestoreAdminAccessToken(env));const envelope=envelopeRaw?deps.firestoreDocumentToPlain(envelopeRaw):null;
+      const envelopeRaw=await deps.getFirestoreDocument(env,"signatureEnvelopes/"+envelopeId,claims.token);const envelope=envelopeRaw?deps.firestoreDocumentToPlain(envelopeRaw):null;
       if(!envelope||clean(envelope.documentId)!==documentId)return deps.json({ok:false,error:"The signature envelope does not belong to this document."},403,deps.corsHeaders(request));
       if(clean(envelope.status)!=="Completed")return deps.json({ok:false,error:"The signature envelope is not completed."},409,deps.corsHeaders(request));
       const signedFileId=fileIdFromUrl(envelope.signedDocumentUrl||envelope.ownerCompletedDocumentUrl||envelope.signedDocumentPath||"");
