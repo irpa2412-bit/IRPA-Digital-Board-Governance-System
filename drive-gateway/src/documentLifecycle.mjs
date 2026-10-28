@@ -55,14 +55,20 @@ async function getIdentity(deps, env, claims) {
 }
 
 async function listVisibleDocuments(deps, env, claims, identity) {
+  const token = await deps.getFirestoreAdminAccessToken(env);
   const response = await fetch("https://firestore.googleapis.com/v1/projects/"+deps.getFirebaseProjectId(env)+"/databases/(default)/documents:runQuery",{
     method:"POST",
-    headers:{Authorization:"Bearer "+claims.token,"Content-Type":"application/json"},
+    headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
     body:JSON.stringify({structuredQuery:{from:[{collectionId:"documents"}],limit:100}})
   });
   if(!response.ok) throw new Error("Unable to retrieve the controlled-document register.");
   const rows=await response.json();
-  return rows.filter(row=>row.document).map(row=>deps.firestoreDocumentToPlain(row.document)).filter(doc=>canRead(identity,doc).allowed);
+  return rows.filter(row=>row.document).map(row=>{
+    const raw=row.document;
+    const documentId=String(raw.name||"").split("/").pop();
+    const data=deps.firestoreDocumentToPlain(raw)||{};
+    return {...data,id:documentId,documentId:data.documentId||documentId};
+  }).filter(doc=>canRead(identity,doc).allowed);
 }
 
 function archiveFolderPath(category,classification,stage,documentId) {
