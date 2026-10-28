@@ -31,7 +31,7 @@ jobs:
         continue-on-error: true
         run: |
           set +e
-          npm run test:communication-media && npm run test:meta-oauth && npm run test:portal-navigation > root-test.log 2>&1
+          { npm run test:communication-media && npm run test:meta-oauth && npm run test:portal-navigation; } > root-test.log 2>&1
           status=$?
           cat root-test.log
           exit "$status"
