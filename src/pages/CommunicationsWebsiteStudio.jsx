@@ -21,7 +21,7 @@ export default function CommunicationsWebsiteStudio(){
    const media=result.media;
    const alt=String(photoAlt||file.name.replace(/\\.[^.]+$/,"")).trim().slice(0,250);
    const figure='<figure class="wp-block-image"><img src="'+String(media.url).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;")+'" alt="'+alt.replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;")+'" /></figure>';
-   setEdit(current=>({...current,content:String(current?.content||"")+(current?.content?"\\n\\n":"")+figure,featuredMedia:Number(current?.featuredMedia||media.id)}));
+   setEdit(current=>({...current,content:String(current?.content||"")+(current?.content?"\n\n":"")+figure,featuredMedia:Number(current?.featuredMedia||media.id)}));
    setPhotoAlt("");
    setMessage("Photo uploaded to WordPress media library and inserted into the article. Save as draft to retain the article changes.");
   }catch(e){setMessage(e.message||"Photo upload failed.")}
