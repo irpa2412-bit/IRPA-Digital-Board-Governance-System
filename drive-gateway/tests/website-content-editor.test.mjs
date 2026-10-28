@@ -379,7 +379,7 @@ test("authenticated staging image upload accepts safe image types and records an
   assert.equal(data.media.url, "https://staging.irpa.or.tz/wp-content/uploads/field.jpg");
   assert.equal(lastMediaUpload.contentType, "image/jpeg");
   assert.match(lastMediaUpload.disposition, /field.jpg/);
-  assert.ok(auditEvents.some(event => event.auditFields?.mapValue?.fields?.action?.stringValue === "COMMUNICATION_WEBSITE_IMAGE_UPLOADED"));
+  assert.ok(auditEvents.some(event => event.auditFields?.action?.stringValue === "COMMUNICATION_WEBSITE_IMAGE_UPLOADED"));
 });
 
 test("image upload rejects unsupported formats and oversized payloads before WordPress writes", async () => {
