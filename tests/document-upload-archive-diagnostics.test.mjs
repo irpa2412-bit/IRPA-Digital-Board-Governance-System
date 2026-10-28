@@ -20,8 +20,8 @@ test("uploaded controlled documents are persisted under their allocated ID and r
   const page = await read("../src/components/ControlledDocumentUpload.jsx");
   const data = await read("../src/firebase/data.js");
   const rules = await read("../firestore.rules");
-  assert.match(page, /createRecord\(COLLECTIONS\.documents, documentPayload, documentUid\)/);
-  assert.match(page, /getRecord\(COLLECTIONS\.documents, savedDocumentId\)/);
+  assert.match(page, /registerControlledDocumentRecord\(\{documentId:documentUid,documentPayload\}\)/);
+  assert.match(page, /registerControlledDocumentRecord\(\{documentId:pendingDocument\.documentId,documentPayload:pendingDocument\.documentPayload\}\)/);
   assert.match(data, /export async function getRecords\(collectionName\)\{const s=await getDocs\(query\(collection\(db,collectionName\),orderBy\(\"createdAt\",\"desc\"\)\)\)/);
   assert.match(rules, /match \/documents\/\{id\}/);
   assert.match(rules, /controlledDocumentReadAllowed\(\)/);
