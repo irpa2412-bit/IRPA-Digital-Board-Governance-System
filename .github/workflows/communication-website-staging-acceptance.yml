@@ -3,6 +3,13 @@ on:
   push:
     branches:
       - feature/communication-media-website-20261025
+      - fix/optional-staging-chair-acceptance-20261028
+  pull_request:
+    branches:
+      - feature/communication-media-website-20261025
+    paths:
+      - .github/workflows/communication-website-staging-acceptance.yml
+      - docs/STAGING_CHAIR_TEST_USER.md
   workflow_dispatch:
 permissions:
   contents: read
@@ -23,75 +30,24 @@ jobs:
           node-version: 22
           cache: npm
       - name: Root npm ci
-        id: root_ci
-        continue-on-error: true
         run: npm ci
       - name: Focused communications, OAuth and navigation regression tests
-        id: root_test
-        continue-on-error: true
-        run: |
-          set +e
-          { npm run test:communication-media && npm run test:meta-oauth && npm run test:portal-navigation; } > root-test.log 2>&1
-          status=$?
-          cat root-test.log
-          exit "$status"
-      - name: Root npm run build
-        id: root_build
-        continue-on-error: true
+        run: npm run test:communication-media && npm run test:meta-oauth && npm run test:portal-navigation
+      - name: Root build
         run: npm run build
-      - name: Root npm run lint
-        id: root_lint
-        continue-on-error: true
+      - name: Root lint
         run: npm run lint
       - name: Worker npm ci
-        id: worker_ci
-        continue-on-error: true
         working-directory: drive-gateway
         run: npm ci
       - name: Worker communications website regression tests
-        id: worker_test
-        continue-on-error: true
         working-directory: drive-gateway
-        run: |
-          set +e
-          npm run test:communications-website > worker-test.log 2>&1
-          status=$?
-          cat worker-test.log
-          exit "$status"
-      - name: Worker npm run lint
-        id: worker_lint
-        continue-on-error: true
+        run: npm run test:communications-website
+      - name: Worker lint
         working-directory: drive-gateway
         run: npm run lint
-      - name: Verification counts and gate
-        if: always()
-        env:
-          ROOT_CI: ${{ steps.root_ci.outcome }}
-          ROOT_TEST: ${{ steps.root_test.outcome }}
-          ROOT_BUILD: ${{ steps.root_build.outcome }}
-          ROOT_LINT: ${{ steps.root_lint.outcome }}
-          WORKER_CI: ${{ steps.worker_ci.outcome }}
-          WORKER_TEST: ${{ steps.worker_test.outcome }}
-          WORKER_LINT: ${{ steps.worker_lint.outcome }}
-        run: |
-          root_tests="$(grep -E '^# tests ' root-test.log 2>/dev/null | tail -1 | awk '{print $3}' || true)"
-          root_pass="$(grep -E '^# pass ' root-test.log 2>/dev/null | tail -1 | awk '{print $3}' || true)"
-          root_fail="$(grep -E '^# fail ' root-test.log 2>/dev/null | tail -1 | awk '{print $3}' || true)"
-          worker_tests="$(grep -E '^# tests ' drive-gateway/worker-test.log 2>/dev/null | tail -1 | awk '{print $3}' || true)"
-          worker_pass="$(grep -E '^# pass ' drive-gateway/worker-test.log 2>/dev/null | tail -1 | awk '{print $3}' || true)"
-          worker_fail="$(grep -E '^# fail ' drive-gateway/worker-test.log 2>/dev/null | tail -1 | awk '{print $3}' || true)"
-          {
-            echo "## Verification results"
-            echo "- Root tests: tests=$root_tests, pass=$root_pass, fail=$root_fail; step=$ROOT_TEST"
-            echo "- Worker tests: tests=$worker_tests, pass=$worker_pass, fail=$worker_fail; step=$WORKER_TEST"
-            echo "- Root npm ci: $ROOT_CI; build: $ROOT_BUILD; lint: $ROOT_LINT"
-            echo "- Worker npm ci: $WORKER_CI; lint: $WORKER_LINT"
-          } | tee -a "$GITHUB_STEP_SUMMARY"
-          for outcome in "$ROOT_CI" "$ROOT_TEST" "$ROOT_BUILD" "$ROOT_LINT" "$WORKER_CI" "$WORKER_TEST" "$WORKER_LINT"; do
-            [ "$outcome" = "success" ] || exit 1
-          done
   staging-acceptance:
-    name: Staging-only website acceptance
+    name: Optional staging-only website acceptance
     needs: verify
     if: needs.verify.result == 'success'
     runs-on: ubuntu-latest
@@ -105,28 +61,52 @@ jobs:
       STAGING_CHAIR_TEST_EMAIL: ${{ secrets.STAGING_CHAIR_TEST_EMAIL }}
       STAGING_CHAIR_TEST_PASSWORD: ${{ secrets.STAGING_CHAIR_TEST_PASSWORD }}
     steps:
+      - name: Skip cleanly when dedicated Chair test credentials are absent
+        id: chair_preflight
+        env:
+          CHAIR_EMAIL: ${{ secrets.STAGING_CHAIR_TEST_EMAIL }}
+          CHAIR_PASSWORD: ${{ secrets.STAGING_CHAIR_TEST_PASSWORD }}
+        run: |
+          if [ -z "$CHAIR_EMAIL" ] || [ -z "$CHAIR_PASSWORD" ]; then
+            echo "staging acceptance skipped: STAGING_CHAIR_TEST_EMAIL and STAGING_CHAIR_TEST_PASSWORD not configured"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@v4
+        if: steps.chair_preflight.outputs.skip != 'true'
         with:
           ref: ${{ github.sha }}
       - uses: actions/setup-node@v4
+        if: steps.chair_preflight.outputs.skip != 'true'
         with:
           node-version: 22
-      - name: Preflight required secrets and refuse production host
+      - name: Preflight require dedicated test identities and staging-only hosts
+        if: steps.chair_preflight.outputs.skip != 'true'
         run: |
           set -eu
-          for name in STAGING_WORDPRESS_BASE_URL STAGING_FIREBASE_WEB_API_KEY STAGING_TEST_EMAIL STAGING_TEST_PASSWORD STAGING_CHAIR_TEST_EMAIL STAGING_CHAIR_TEST_PASSWORD; do
+          for name in STAGING_WORDPRESS_BASE_URL STAGING_FIREBASE_WEB_API_KEY STAGING_TEST_EMAIL STAGING_TEST_PASSWORD; do
             eval 'value=${!name}'
             [ -n "$value" ] || { echo "Missing required Actions secret name: $name"; exit 1; }
           done
-          host="$(node -e 'try { const u=new URL(process.env.STAGING_WORDPRESS_BASE_URL); if(u.protocol!=="https:"||u.hostname!=="staging.irpa.or.tz"||u.pathname!=="/"||u.username||u.password||u.search||u.hash)process.exit(2); process.stdout.write(u.hostname) } catch { process.exit(2) }')"
-          [ "$host" = "staging.irpa.or.tz" ] || { echo "Refusing non-staging WordPress host."; exit 1; }
-          echo "Preflight passed: required secret names are non-empty and target host is staging.irpa.or.tz; values were not printed."
-      - name: Run complete staging acceptance; always record each check
+          [ "$STAGING_CHAIR_TEST_EMAIL" = "irpa-staging-chair-test@staging.irpa.or.tz" ] || { echo "Refusing non-dedicated Chair test identity."; exit 1; }
+          [ "$STAGING_TEST_EMAIL" = "irpa-staging-editor-test@staging.irpa.or.tz" ] || { echo "Refusing non-dedicated editor test identity."; exit 1; }
+          node --input-type=module -e '
+            import { assertStagingWebsiteHost } from "./drive-gateway/src/communicationsWebsitePolicy.mjs";
+            const u = new URL(process.env.STAGING_WORDPRESS_BASE_URL);
+            if (u.protocol !== "https:" || u.hostname !== "staging.irpa.or.tz" || u.pathname !== "/" || u.username || u.password || u.search || u.hash) throw new Error("Refusing non-staging WordPress URL.");
+            assertStagingWebsiteHost(u.href);
+            const g = new URL(process.env.STAGING_GATEWAY_URL);
+            if (g.protocol !== "https:" || g.hostname !== "irpa-google-drive-gateway-staging.irpa-governance.workers.dev") throw new Error("Refusing non-staging gateway.");
+          '
+          echo "Preflight passed: dedicated test identities and exact staging hosts only; secret values were not printed."
+      - name: Run complete staging acceptance
+        if: steps.chair_preflight.outputs.skip != 'true'
         id: acceptance
         continue-on-error: true
         run: node drive-gateway/tests/staging-communications-website-acceptance.mjs
       - name: Publish acceptance summary
-        if: always()
+        if: always() && steps.chair_preflight.outputs.skip != 'true'
         run: |
           if [ -f acceptance-summary.md ]; then
             cat acceptance-summary.md | tee -a "$GITHUB_STEP_SUMMARY"
@@ -139,6 +119,5 @@ jobs:
             cat results.tsv >> "$GITHUB_STEP_SUMMARY"
           fi
       - name: Fail unless acceptance verdict is PASS
-        if: always()
-        run: |
-          grep -qx 'WEBSITE PORTAL VERDICT: PASS' acceptance-summary.md || exit 1
+        if: always() && steps.chair_preflight.outputs.skip != 'true'
+        run: grep -qx 'WEBSITE PORTAL VERDICT: PASS' acceptance-summary.md
