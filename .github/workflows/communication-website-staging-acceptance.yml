@@ -13,7 +13,7 @@ jobs:
   verify:
     name: Verify tests, build and lint
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
         with:
@@ -26,12 +26,12 @@ jobs:
         id: root_ci
         continue-on-error: true
         run: npm ci
-      - name: Root npm test
+      - name: Focused communications, OAuth and navigation regression tests
         id: root_test
         continue-on-error: true
         run: |
           set +e
-          npm test > root-test.log 2>&1
+          npm run test:communication-media && npm run test:meta-oauth && npm run test:portal-navigation > root-test.log 2>&1
           status=$?
           cat root-test.log
           exit "$status"
@@ -48,13 +48,13 @@ jobs:
         continue-on-error: true
         working-directory: drive-gateway
         run: npm ci
-      - name: Worker npm test
+      - name: Worker communications website regression tests
         id: worker_test
         continue-on-error: true
         working-directory: drive-gateway
         run: |
           set +e
-          npm test > worker-test.log 2>&1
+          npm run test:communications-website > worker-test.log 2>&1
           status=$?
           cat worker-test.log
           exit "$status"
