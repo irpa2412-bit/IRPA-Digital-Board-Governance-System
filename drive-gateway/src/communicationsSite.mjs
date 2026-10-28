@@ -169,7 +169,7 @@ export function createCommunicationsSiteRouter(deps) {
     if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash) {
       throw new Error("Website endpoint configuration is invalid.");
     }
-    const environment = String(env.IRPA_ENVIRONMENT || "").toLowerCase();
+    const environment = String(env.IRPA_WORKER_ENVIRONMENT || env.IRPA_ENVIRONMENT || "").toLowerCase();
     const host = base.hostname.toLowerCase();
     if (environment === "production" && !["irpa.or.tz", "www.irpa.or.tz"].includes(host)) {
       throw new Error("Production WordPress editing is restricted to irpa.or.tz or www.irpa.or.tz.");
@@ -225,16 +225,29 @@ export function createCommunicationsSiteRouter(deps) {
   }
 
   function cpanelConfig(env) {
+    const configuredEndpoint = String(env.CPANEL_BASE_URL || "").trim();
     let base;
-    try { base = new URL(String(env.CPANEL_BASE_URL || "")); }
-    catch { throw Object.assign(new Error("Missing required Worker secrets: CPANEL_BASE_URL, CPANEL_USERNAME, CPANEL_API_TOKEN."), { status: 503 }); }
-    if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash || base.pathname !== "/" || base.port !== "2083") {
+    try {
+      // Accept a bare hostname or an explicit URL, but enforce HTTPS and the
+      // dedicated cPanel port below before making any outbound request.
+      const endpoint = /^[a-z0-9.-]+$/i.test(configuredEndpoint)
+        ? "https://" + configuredEndpoint
+        : configuredEndpoint;
+      base = new URL(endpoint);
+    } catch {
+      throw Object.assign(new Error("Missing or invalid required Worker setting: CPANEL_BASE_URL."), { status: 503 });
+    }
+    // cPanel's HTTPS service is on port 2083. Normalize only an omitted port,
+    // never an explicitly different port or a path that could bypass checks.
+    if (base.protocol === "https:" && !base.port) base.port = "2083";
+    if (base.protocol !== "https:" || !base.hostname ||
+        base.username || base.password || base.search || base.hash || base.pathname !== "/" || base.port !== "2083") {
       throw new Error("cPanel endpoint configuration is invalid.");
     }
     const username = String(env.CPANEL_USERNAME || "").trim();
     const token = String(env.CPANEL_API_TOKEN || "").trim();
     if (!username || !token) throw Object.assign(new Error("Missing required Worker secrets: " + [!username && "CPANEL_USERNAME", !token && "CPANEL_API_TOKEN"].filter(Boolean).join(", ") + "."), { status: 503 });
-    const environment = String(env.IRPA_ENVIRONMENT || "").toLowerCase();
+    const environment = String(env.IRPA_WORKER_ENVIRONMENT || env.IRPA_ENVIRONMENT || "").toLowerCase();
     const configuredRoot = String(env.CPANEL_DOCUMENT_ROOT || (environment === "production" ? "public_html" : "public_html/staging")).trim().replace(/\\/g, "/").replace(/\/+$/g, "");
     const allowedRoots = environment === "production" ? ["public_html", "home/" + username + "/public_html", "/home/" + username + "/public_html"] :
       environment === "staging" ? ["public_html/staging", "home/" + username + "/public_html/staging", "/home/" + username + "/public_html/staging"] : [];
@@ -461,7 +474,7 @@ export function createCommunicationsSiteRouter(deps) {
       if (action === "register-media-asset" && collectionName === "communicationMediaAssets") {
         const d = input.data || {};
         if (!String(d.fileId || "").trim() || !String(d.contentType || "").trim() || !Number.isSafeInteger(Number(d.fileSize)) || Number(d.fileSize) < 1 || Number(d.fileSize) > 25 * 1024 * 1024) return json({ error: "Valid Drive file ID, content type and file size (maximum 25 MiB) are required." }, 400, corsHeaders(request));
-        row = { title: cleanText(d.title, 180) || cleanText(d.originalFileName, 180) || "Untitled media", originalFileName: cleanText(d.originalFileName, 180), contentType: cleanText(d.contentType, 120), fileSize: Number(d.fileSize), fileId: cleanText(d.fileId, 200), webViewLink: /^https:\/\//i.test(String(d.webViewLink || "")) ? cleanText(d.webViewLink, 1000) : "", storageProvider: "Google Drive", purpose: "Communication Media", tags: cleanText(d.tags, 500), mediaKind: cleanText(d.mediaKind, 60), status: "Available", recordOrigin: String(env.IRPA_ENVIRONMENT || "").toLowerCase() === "staging" ? "STAGING" : "PRODUCTION", uploadedByUid: claims.user_id, uploadedByEmail: actorEmail, createdAt: now, updatedAt: now };
+        row = { title: cleanText(d.title, 180) || cleanText(d.originalFileName, 180) || "Untitled media", originalFileName: cleanText(d.originalFileName, 180), contentType: cleanText(d.contentType, 120), fileSize: Number(d.fileSize), fileId: cleanText(d.fileId, 200), webViewLink: /^https:\/\//i.test(String(d.webViewLink || "")) ? cleanText(d.webViewLink, 1000) : "", storageProvider: "Google Drive", purpose: "Communication Media", tags: cleanText(d.tags, 500), mediaKind: cleanText(d.mediaKind, 60), status: "Available", recordOrigin: String(env.IRPA_WORKER_ENVIRONMENT || env.IRPA_ENVIRONMENT || "").toLowerCase() === "staging" ? "STAGING" : "PRODUCTION", uploadedByUid: claims.user_id, uploadedByEmail: actorEmail, createdAt: now, updatedAt: now };
       } else if (action === "create" && ["communicationMediaItems", "communicationSocialPosts", "communicationOperations", "socialMediaAccounts"].includes(collectionName)) {
         const d = input.data || {};
         const allowedFields = collectionName === "communicationMediaItems" ? ["title","type","channel","summary","body","scheduledAt","tags","assetUrl","slug","language","pageTemplate","hashtags","platform","campaignId"] :
@@ -469,7 +482,7 @@ export function createCommunicationsSiteRouter(deps) {
           collectionName === "communicationOperations" ? ["kind","title","summary","owner","startDate","dueDate","channels","audience","objective","budgetNote","contactName","organization","email","phone","beat","consent","assetType","assetUrl","rights","version","expiryDate","severity","lead","approver","trigger","holdingStatement","nextReview","channel","sourceUrl","observedDate","reach","engagement","sentiment","evidence","tags"] :
           ["platform","accountName","handle","profileUrl","accountType","owner","custodian","purpose","audience","authorizationReference","connectionStatus","reviewDate","notes"];
         const safeData = Object.fromEntries(allowedFields.filter(key => d[key] !== undefined).map(key => [key, d[key]]));
-        row = { ...safeData, title: cleanText(d.title || d.accountName, 180), status: "Draft", createdByUid: claims.user_id, createdByEmail: actorEmail, createdAt: now, updatedAt: now, updatedByUid: claims.user_id, updatedByEmail: actorEmail, recordOrigin: String(env.IRPA_ENVIRONMENT || "").toLowerCase() === "staging" ? "STAGING" : "PRODUCTION" };
+        row = { ...safeData, title: cleanText(d.title || d.accountName, 180), status: "Draft", createdByUid: claims.user_id, createdByEmail: actorEmail, createdAt: now, updatedAt: now, updatedByUid: claims.user_id, updatedByEmail: actorEmail, recordOrigin: String(env.IRPA_WORKER_ENVIRONMENT || env.IRPA_ENVIRONMENT || "").toLowerCase() === "staging" ? "STAGING" : "PRODUCTION" };
         if (!row.title) return json({ error: "A title or account name is required." }, 400, corsHeaders(request));
       } else if (action === "update" || action === "submit") {
         if (existing.createdByUid !== claims.user_id && !roles.includes("Administrator")) return json({ error: "Only the record author or an administrator can edit or submit this draft." }, 403, corsHeaders(request));
@@ -673,7 +686,7 @@ export function createCommunicationsSiteRouter(deps) {
           !Number.isSafeInteger(featuredMedia) || featuredMedia < 0 || !["draft", "publish"].includes(status)) {
         return json({ error: "Provide a valid page/post ID, title, content, excerpt, featured image ID and draft/publish status." }, 400, corsHeaders(request));
       }
-      if (String(env.IRPA_ENVIRONMENT || "").toLowerCase() === "production" && status === "publish") return json({ error: "Production publishing requires the approved communication-media workflow; save as draft and submit for approval." }, 403, corsHeaders(request));
+      if (String(env.IRPA_WORKER_ENVIRONMENT || env.IRPA_ENVIRONMENT || "").toLowerCase() === "production" && status === "publish") return json({ error: "Production publishing requires the approved communication-media workflow; save as draft and submit for approval." }, 403, corsHeaders(request));
       const wp = websiteWordPressConfig(env);
       await verifyDedicatedWordPressEditor(wp);
       const current = await readWebsiteItem(wp, type, id);

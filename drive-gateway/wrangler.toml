@@ -23,6 +23,7 @@ CLOUDFLARE_AUTH_FUNCTIONS_ENABLED = "true"
 IRPA_PRODUCTION_CUTOVER = "true"
 IRPA_WORKER_NAME = "irpa-google-drive-gateway"
 IRPA_WORKER_ENVIRONMENT = "production"
+IRPA_ENVIRONMENT = "production"
 
 [[kv_namespaces]]
 binding = "DRIVE_KV"
