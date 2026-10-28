@@ -8,6 +8,7 @@ function makeDeps(state){
     FIREBASE_PROJECT_ID:"irpa-digital-board-governance",
     allowedContentTypes:new Set(["application/pdf","text/plain"]),
     authenticateFirebaseRequest:async()=>({user_id:"emp-1",email:"employee@irpa.or.tz",token:"token"}),
+    getFirestoreAdminAccessToken:async()=> "worker-admin-token",
     getFirestoreDocument:async(_env,path)=>{
       if(path==="adminProfiles/emp-1")return null;
       if(path==="members/emp-1")return null;
