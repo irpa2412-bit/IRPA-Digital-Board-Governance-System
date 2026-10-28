@@ -66,3 +66,30 @@ test("administrator, owner, current and earlier signers retain authorised views;
   assert.equal(filterSignatureEnvelopeForCaller(envelope, { authenticatedUid: "admin", isAdmin: true }).allowed, true);
   assert.equal(filterSignatureEnvelopeForCaller(envelope, { authenticatedUid: "stranger", isAdmin: false }).allowed, false);
 });
+
+
+test("document lifecycle fails closed instead of falling back to claims.token", () => {
+  assert.match(lifecycle, /Missing required dependency: getFirestoreAdminAccessToken/);
+  assert.doesNotMatch(lifecycle, /\?\s*await deps\.getFirestoreAdminAccessToken\(env\)\s*:\s*claims\.token/);
+  assert.doesNotMatch(lifecycle, /getFirestoreDocument\([^\n]*claims\.token/);
+  assert.doesNotMatch(lifecycle, /updateFirestoreDocument\([^\n]*claims\.token/);
+  assert.match(lifecycle, /signatureEnvelopes\/"\+envelopeId,adminToken/);
+});
+
+test("mock Firestore denies caller-token reads and permits Worker-admin reads", async () => {
+  const calls = [];
+  async function mockFirestoreRead(path, token) {
+    calls.push({ path, token });
+    if (token === "caller-token") {
+      const error = new Error("HTTP 403 PERMISSION_DENIED");
+      error.status = 403;
+      throw error;
+    }
+    if (token === "worker-admin-token") return { name: "documents/e35HW6c0vZ2f1ZSQNuP3", fields: {} };
+    throw new Error("Unexpected credential");
+  }
+  await assert.rejects(mockFirestoreRead("documents/e35HW6c0vZ2f1ZSQNuP3", "caller-token"), /403/);
+  assert.equal((await mockFirestoreRead("documents/e35HW6c0vZ2f1ZSQNuP3", "worker-admin-token")).name,
+    "documents/e35HW6c0vZ2f1ZSQNuP3");
+  assert.deepEqual(calls.map(call => call.token), ["caller-token", "worker-admin-token"]);
+});
