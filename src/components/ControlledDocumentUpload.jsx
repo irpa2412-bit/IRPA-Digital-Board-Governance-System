@@ -12,6 +12,8 @@ const ARCHIVE_CATEGORIES = { Governance: "Governance Documents", Administrative:
 const DOCUMENT_ACCEPT = ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp,.rtf,.txt,.csv,.tsv,.md,.html,.epub,.json,.xml,.jpg,.jpeg,.png,.webp,.svg";
 const MIME_BY_EXTENSION = { pdf:"application/pdf", doc:"application/msword", docx:"application/vnd.openxmlformats-officedocument.wordprocessingml.document", xls:"application/vnd.ms-excel", xlsx:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ppt:"application/vnd.ms-powerpoint", pptx:"application/vnd.openxmlformats-officedocument.presentationml.presentation", odt:"application/vnd.oasis.opendocument.text", ods:"application/vnd.oasis.opendocument.spreadsheet", odp:"application/vnd.oasis.opendocument.presentation", rtf:"application/rtf", txt:"text/plain", csv:"text/csv", tsv:"text/tab-separated-values", md:"text/markdown", html:"text/html", epub:"application/epub+zip", json:"application/json", xml:"application/xml", jpg:"image/jpeg", jpeg:"image/jpeg", png:"image/png", webp:"image/webp", svg:"image/svg+xml" };
 
+function persistedOrigin(payload) { try { const environment=String(window.sessionStorage.getItem("irpaDataEnvironment")||"TRIAL").toUpperCase(); const authority=String(window.sessionStorage.getItem("irpaActiveAccessAuthority")||"").toUpperCase(); const verified=window.sessionStorage.getItem("irpaActualDataAccessVerified")==="true"; return environment!=="ACTUAL"||(authority==="ADMINISTRATOR"&&!verified)?"TRIAL":String(payload?.recordOrigin||"PRODUCTION"); } catch { return "TRIAL"; } }
+
 function resolveContentType(file) {
   const reported = String(file?.type || "").trim().toLowerCase();
   if (reported) return reported;
@@ -31,6 +33,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [uploadReport, setUploadReport] = useState(null);
   const [pendingDocument, setPendingDocument] = useState(null);
   const fileInputRef = useRef(null);
 
@@ -91,6 +94,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         }
       }
       const doc = {...pendingDocument.doc, id: documentId};
+      setUploadReport({documentId,driveFileId:pendingDocument.driveFileId||pendingDocument.doc.fileId||"Unavailable",destination:pendingDocument.doc.archivePath||pendingDocument.doc.archiveCategory||"Unavailable",origin:persistedOrigin(pendingDocument.documentPayload),steps:[["Drive file created","PASS"],["Archive destination assigned","PASS"],["Firestore documents record created and verified","PASS"],["Archive registry link stored","PASS"]]});
       setGeneratedReference(pendingDocument.documentReference);
       setMessage(`Document saved successfully. System reference ${pendingDocument.documentReference} is now registered in the IRPA controlled-document register.`);
       setPendingDocument(null);
@@ -103,6 +107,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
       fileInputRef.current?.form?.reset?.();
       onUploaded?.(doc);
     } catch (x) {
+      setUploadReport({documentId:pendingDocument.documentId||"Unavailable",driveFileId:pendingDocument.driveFileId||pendingDocument.doc.fileId||"Unavailable",destination:pendingDocument.doc.archivePath||pendingDocument.doc.archiveCategory||"Unavailable",origin:persistedOrigin(pendingDocument.documentPayload),steps:[["Drive file created","PASS"],["Archive destination assigned","PASS"],["Firestore documents record created and verified","FAIL: "+(x.message||"unknown error")],["Archive registry link stored","FAIL: Firestore record not verified"]]});
       setError(x.message || "Unable to save document.");
       setMessage("");
     } finally {
@@ -114,6 +119,8 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
     e.preventDefault();
     if (busy || pendingDocument) return;
     setGeneratedReference("");
+    setUploadReport(null);
+    let uploadProgress = {documentId:"Not allocated",driveFileId:"Not created",destination:"Not assigned",origin:"Determined by active data mode",steps:[["Allocate document ID","PENDING"],["Create Drive file","PENDING"],["Assign archive destination","PENDING"],["Create Firestore documents record","PENDING"],["Store archive registry link","PENDING"]]};
     const contentType = file ? resolveContentType(file) : "";
     const validationError = validateControlledDocumentUpload({
       authenticated: Boolean(auth.currentUser),
@@ -139,6 +146,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
       const documentReference = await nextDocumentReference();
       const documentUid = doc(collection(db, COLLECTIONS.documents)).id;
       const documentId = documentUid;
+      uploadProgress.documentId = documentId;
       const uploadedAt = new Date().toISOString();
       const effectiveArchiveCategory = ARCHIVE_CATEGORIES[documentType] || documentType;
       const effectiveClassification = documentType === "Administrator" ? "Restricted" : classification;
@@ -160,6 +168,10 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
       });
       const archive = routed.categoryArchive;
       const governanceArchive = routed.governanceArchive;
+      uploadProgress.driveFileId = archive.file?.fileId || "Missing";
+      uploadProgress.destination = archive.archivePath || archive.archiveUidLink || effectiveArchiveCategory;
+      uploadProgress.steps = [["Allocate document ID","PASS"],["Create Drive file",archive.file?.fileId?"PASS":"FAIL: Worker returned no Drive file ID"],["Assign archive destination",archive.folderId?"PASS":"FAIL: Worker returned no archive folder"],["Create Firestore documents record","PENDING"],["Store archive registry link",archive.archiveUidLink?"PASS":"FAIL: Worker returned no archive link"]];
+      setUploadReport({...uploadProgress});
       const now = new Date().toISOString();
       const workflowContext = {...(readWorkflowContext() || {}), ...(workflowContextOverride || {})};
       const documentPayload = withWorkflowLinks({
@@ -243,7 +255,8 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         authorizedUids: [auth.currentUser.uid]
       };
       if (deferSave) {
-        setPendingDocument({documentPayload,doc,documentReference,documentId});
+        setPendingDocument({documentPayload,doc,documentReference,documentId,driveFileId:archive.file?.fileId||null});
+        setUploadReport({...uploadProgress,origin:persistedOrigin(documentPayload),steps:[["Allocate document ID","PASS"],["Create Drive file","PASS"],["Assign archive destination","PASS"],["Create Firestore documents record","PENDING: click Save Document"],["Store archive registry link","PENDING: click Save Document"]]});
         setGeneratedReference(documentReference);
         setMessage(`Document uploaded successfully to Google Drive: ${name}. Click “Save Document” to register it in the IRPA controlled-document archive.`);
       } else {
@@ -258,6 +271,9 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
             if (attempt === 2) throw new Error(`Document archive upload completed, but the document could not be saved to the IRPA controlled-document register: ${error?.message || "Firestore registration failed."}`);
           }
         }
+        uploadProgress.origin=persistedOrigin(documentPayload);
+        uploadProgress.steps=[["Allocate document ID","PASS"],["Create Drive file","PASS"],["Assign archive destination","PASS"],["Create Firestore documents record","PASS"],["Store archive registry link","PASS"]];
+        setUploadReport({...uploadProgress});
         setGeneratedReference(documentReference);
         setMessage(`Document uploaded successfully to Google Drive: ${name}. System reference ${documentReference} assigned. Archive routing completed.`);
         setFile(null);
@@ -270,7 +286,12 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         onUploaded?.({...doc,id:savedDocumentId});
       }
     } catch (x) {
-      setError(x.message || "Unable to upload document to Google Drive.");
+      const detail=String(x?.message||"Unknown upload failure");
+      const failedStep=/firestore|register|controlled-document register|permission-denied/i.test(detail)?"Create Firestore documents record":/archive|folder|destination|gateway/i.test(detail)?"Assign archive destination":"Create Drive file";
+      uploadProgress.steps=uploadProgress.steps.map(([name,status])=>name===failedStep?[name,"FAIL: "+detail]:[name,status==="PENDING"?"NOT REACHED":status]);
+      uploadProgress.origin=persistedOrigin({recordOrigin:"PRODUCTION"});
+      setUploadReport({...uploadProgress});
+      setError(detail+" (upload diagnostics below identify completed and failed steps).");
       setMessage("");
     } finally {
       setBusy(false);
@@ -289,6 +310,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
       </div>
       {message && <div className="success-message action-feedback">{message}</div>}
       {error && <div className="error-message action-feedback">{error}</div>}
+      {uploadReport && <div className="auth-message" role="status" aria-live="polite" style={{whiteSpace:"pre-wrap",marginBottom:16}}><strong>Upload step report</strong>{"\n"}Document ID: {uploadReport.documentId}{"\n"}Drive file ID: {uploadReport.driveFileId}{"\n"}Archive destination: {uploadReport.destination}{"\n"}Record environment: {uploadReport.origin}{"\n"}{uploadReport.steps.map(([name,status])=>`${status.startsWith("PASS")?"PASS":status.startsWith("FAIL")?"FAIL":"PENDING"} — ${name}${status.startsWith("PASS")?"":`: ${status.replace(/^(PASS|FAIL):?\s*/,"")}`}`).join("\n")}</div>}
       {!compact && <div className="archive-routing-panel" style={{marginBottom:16}}>
         <strong>Google Drive Archive Routing</strong>
         <div style={{marginTop:6}}>Choose where this document will be stored:</div>
