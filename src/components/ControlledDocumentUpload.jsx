@@ -83,16 +83,19 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
     try {
       if (!auth.currentUser) throw new Error("You must be signed in.");
       let documentId = "";
+      let persistedRecordOrigin = "TRIAL";
       for (let attempt = 1; attempt <= 2; attempt += 1) {
         try {
-          documentId = (await registerControlledDocumentRecord({documentId:pendingDocument.documentId,documentPayload:pendingDocument.documentPayload})).documentId;
+          const registration = await registerControlledDocumentRecord({documentId:pendingDocument.documentId,documentPayload:pendingDocument.documentPayload});
+          documentId = registration.documentId;
+          persistedRecordOrigin = registration.recordOrigin || "TRIAL";
           break;
         } catch (error) {
           if (attempt === 2) throw new Error(`Document upload completed, but the document could not be saved to the IRPA controlled-document register: ${error?.message || "Firestore registration failed."}`);
         }
       }
       const doc = {...pendingDocument.doc, id: documentId};
-      setUploadReport({documentId,driveFileId:pendingDocument.driveFileId||pendingDocument.doc.fileId||"Unavailable",destination:pendingDocument.doc.archivePath||pendingDocument.doc.archiveCategory||"Unavailable",origin:persistedOrigin(pendingDocument.documentPayload),steps:[["Drive file created","PASS"],["Archive destination assigned","PASS"],["Firestore documents record created and verified","PASS"],["Archive registry link stored","PASS"]]});
+      setUploadReport({documentId,driveFileId:pendingDocument.driveFileId||pendingDocument.doc.fileId||"Unavailable",destination:pendingDocument.doc.archivePath||pendingDocument.doc.archiveCategory||"Unavailable",origin:persistedRecordOrigin,steps:[["Drive file created","PASS"],["Archive destination assigned","PASS"],["Firestore documents record created and verified","PASS"],["Archive registry link stored","PASS"]]});
       setGeneratedReference(pendingDocument.documentReference);
       setMessage(`Document saved successfully. System reference ${pendingDocument.documentReference} is now registered in the IRPA controlled-document register.`);
       setPendingDocument(null);
@@ -259,15 +262,18 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         setMessage(`Document uploaded successfully to Google Drive: ${name}. Click “Save Document” to register it in the IRPA controlled-document archive.`);
       } else {
         let savedDocumentId = "";
+        let persistedRecordOrigin = "TRIAL";
         for (let attempt = 1; attempt <= 2; attempt += 1) {
           try {
-            savedDocumentId = (await registerControlledDocumentRecord({documentId:documentUid,documentPayload})).documentId;
+            const registration = await registerControlledDocumentRecord({documentId:documentUid,documentPayload});
+            savedDocumentId = registration.documentId;
+            persistedRecordOrigin = registration.recordOrigin || "TRIAL";
             break;
           } catch (error) {
             if (attempt === 2) throw new Error(`Document archive upload completed, but the document could not be saved to the IRPA controlled-document register: ${error?.message || "Firestore registration failed."}`);
           }
         }
-        uploadProgress.origin=String(documentPayload.recordOrigin||"").toUpperCase()==="PRODUCTION" ? "PRODUCTION" : persistedOrigin(documentPayload);
+        uploadProgress.origin=persistedRecordOrigin;
         uploadProgress.steps=[["Allocate document ID","PASS"],["Create Drive file","PASS"],["Assign archive destination","PASS"],["Create Firestore documents record","PASS"],["Store archive registry link","PASS"]];
         setUploadReport({...uploadProgress});
         setGeneratedReference(documentReference);
