@@ -35,7 +35,7 @@ export default function GatewaySigningPortal({token}){
     ]);
     if(!result.signer?.authenticated)throw new Error("Sign in with the invited IRPA account before continuing.");
     const signingRequired=Boolean(result.canSign&&result.status!=="Completed");
-    if(signingRequired&&(!savedProfile||savedProfile.status!=="Active"||!savedProfile.signatureUrl))throw new Error("An active Signature Profile is required before signing this Gateway envelope.");
+    if(signingRequired&&(!savedProfile||savedProfile.status!=="Active"))throw new Error("An active Signature Profile is required before signing this Gateway envelope.");
     if(signingRequired&&(!identity?.authorityRole||identity.authorityRole==="Not yet assigned"))throw new Error("Your current signing authority has not been registered. Update your Signer Identity capacity before signing.");
     if(signingRequired&&identity.authorityStatus!=="Current")throw new Error("Your signing authority is "+String(identity?.authorityStatus||"not verified")+". A Current authority is required to sign.");
     const gatewayStatus=await fetchGatewaySigningResource("/api/sign/status",token);
