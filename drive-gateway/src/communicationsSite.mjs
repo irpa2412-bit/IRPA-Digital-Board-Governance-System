@@ -517,38 +517,103 @@ export function createCommunicationsSiteRouter(deps) {
     if (path === "/api/communications/site/status" && request.method === "GET") {
       const { roles } = await websiteEditorAuthorised(request, env);
       const result = { website: "not_configured", cpanel: "not_configured" };
+      const safeCode = value => String(value || "").replace(/[^A-Za-z0-9_.:-]/g, "").slice(0, 100) || undefined;
+      const authBridgeDiagnostic = value => safeCode(value) || null;
       try {
         const wp = websiteWordPressConfig(env);
-        const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/users/me?context=edit", {
-          headers: wordpressHeaders(wp, { Accept: "application/json" }), signal: AbortSignal.timeout(12000)
-        });
-        result.websiteHttpStatus = response.status;
-        result.websiteAuthBridgeDiagnostic = response.headers.get("x-irpa-staging-auth-diagnostic") || null;
-        if (response.ok) {
-          const user = await response.json();
-          const roles = Array.isArray(user.roles) ? user.roles.map(role => String(role).toLowerCase()) : [];
-          const isDedicatedEditor = roles.includes("editor") && !roles.includes("administrator");
-          result.website = isDedicatedEditor ? "connected" : "wrong_account_role";
-          result.websiteAccount = { name: cleanText(user.name, 100), role: isDedicatedEditor ? "editor" : "unverified", canEditPosts: user.capabilities && typeof user.capabilities === "object" ? !!user.capabilities.edit_posts : undefined, canEditPages: user.capabilities && typeof user.capabilities === "object" ? !!user.capabilities.edit_pages : undefined };
-        } else { const contentType = response.headers.get("content-type") || ""; const server = response.headers.get("server") || ""; const cfRay = response.headers.get("cf-ray") || ""; const raw = await response.text().catch(() => ""); let detail = {}; if (contentType.includes("json")) { try { detail = JSON.parse(raw); } catch {} } result.website = response.status === 401 || response.status === 403 ? "authentication_failed" : "unavailable"; result.websiteHttpStatus = response.status; result.websiteErrorCode = typeof detail.code === "string" ? detail.code.slice(0, 100) : undefined; result.websiteResponseType = contentType.slice(0, 100); result.websiteResponseServer = server.slice(0, 80); result.websiteCloudflareRay = cfRay.slice(0, 100); }
-      } catch (error) { result.website = error.message.includes("not configured") ? "not_configured" : "unavailable"; }
+        let response;
+        try {
+          response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/users/me?context=edit", {
+            headers: wordpressHeaders(wp, { Accept: "application/json", "Cache-Control": "no-cache" }),
+            signal: AbortSignal.timeout(12000)
+          });
+        } catch (error) {
+          const timedOut = error?.name === "TimeoutError" || error?.name === "AbortError";
+          result.website = "unavailable";
+          result.websiteDiagnosticCode = timedOut ? "timeout" : error?.name === "TypeError" ? "network_error" : "request_failed";
+          result.websiteDiagnosticMessage = timedOut ? "WordPress did not respond before the probe deadline." :
+            error?.name === "TypeError" ? "The Worker could not establish a WordPress response." : "The WordPress probe failed before receiving an HTTP response.";
+        }
+        if (response) {
+          result.websiteHttpStatus = response.status;
+          result.websiteAuthBridgeDiagnostic = authBridgeDiagnostic(response.headers.get("x-irpa-staging-auth-diagnostic"));
+          result.websiteResponseType = safeCode((response.headers.get("content-type") || "").split(";")[0]) || "unknown";
+          result.websiteCloudflareRay = safeCode(response.headers.get("cf-ray")) || undefined;
+          if (response.ok) {
+            const user = await response.json().catch(() => null);
+            if (!user || !Number.isSafeInteger(user.id) || !Array.isArray(user.roles)) {
+              result.website = "unavailable";
+              result.websiteDiagnosticCode = "unexpected_response";
+            } else {
+              const accountRoles = user.roles.map(role => String(role).toLowerCase());
+              const isDedicatedEditor = accountRoles.includes("editor") && !accountRoles.includes("administrator");
+              result.website = isDedicatedEditor ? "connected" : "wrong_account_role";
+              result.websiteAccount = {
+                name: cleanText(user.name, 100),
+                role: isDedicatedEditor ? "editor" : "unverified",
+                canEditPosts: user.capabilities && typeof user.capabilities === "object" ? !!user.capabilities.edit_posts : undefined,
+                canEditPages: user.capabilities && typeof user.capabilities === "object" ? !!user.capabilities.edit_pages : undefined
+              };
+              if (!isDedicatedEditor) result.websiteDiagnosticCode = "wrong_account_role";
+            }
+          } else {
+            const raw = await response.text().catch(() => "");
+            let detail = {};
+            if (result.websiteResponseType === "application/json") {
+              try { detail = JSON.parse(raw); } catch {}
+            }
+            result.websiteErrorCode = safeCode(detail.code);
+            result.website = response.status === 401 || response.status === 403 ? "authentication_failed" : "unavailable";
+            result.websiteDiagnosticCode = response.status === 401 ? "authentication_rejected" :
+              response.status === 403 ? "permission_denied" :
+              response.status >= 300 && response.status < 400 ? "unexpected_redirect" :
+              response.status >= 500 ? "wordpress_server_error" :
+              result.websiteErrorCode ? "wordpress_api_error" : "unexpected_http_response";
+          }
+        }
+      } catch (error) {
+        const message = String(error?.message || "");
+        if (/Missing required Worker secrets:/.test(message)) {
+          result.website = "not_configured";
+          result.websiteDiagnosticCode = "credentials_missing";
+          result.websiteMissingSettings = ["WORDPRESS_BASE_URL", "WORDPRESS_USERNAME", "WORDPRESS_APPLICATION_PASSWORD"].filter(name => message.includes(name));
+        } else if (/not configured|explicit staging or production/i.test(message)) {
+          result.website = "not_configured";
+          result.websiteDiagnosticCode = "environment_or_endpoint_not_configured";
+        } else if (/endpoint configuration is invalid|must be an HTTPS origin|restricted to/i.test(message)) {
+          result.website = "not_configured";
+          result.websiteDiagnosticCode = "endpoint_configuration_invalid";
+        } else {
+          result.website = "unavailable";
+          result.websiteDiagnosticCode = "probe_setup_failed";
+        }
+      }
       try {
         const cp = cpanelConfig(env);
         await cpanelCall(cp, "DomainInfo/list_domains");
         result.cpanel = "connected";
       } catch (error) {
         const message = String(error?.message || "");
-        result.cpanel = message.includes("not configured") ? "not_configured" : "unavailable_or_denied";
-        // Safe diagnostics only: never return hostnames, usernames, tokens, or raw UAPI errors.
-        result.cpanelDiagnostic = message.includes("endpoint configuration is invalid") ? "endpoint_invalid" :
-          message.includes("credentials are not configured") ? "credentials_missing" :
-          /category authentication_rejected/.test(message) ? "authentication_rejected" :
-          /category permission_denied/.test(message) ? "permission_denied" :
-          /category invalid_operation/.test(message) ? "invalid_operation" :
-          /category not_found/.test(message) ? "resource_not_found" :
-          /category uapi_error/.test(message) ? "uapi_error" :
-          /category/.test(message) ? "request_failed" :
-          message.includes("not configured") ? "configuration_missing" : "connection_failed";
+        const lower = message.toLowerCase();
+        if (message.includes("Missing required Worker secrets:") && /CPANEL_USERNAME|CPANEL_API_TOKEN/.test(message)) {
+          result.cpanel = "credentials_missing";
+          result.cpanelDiagnostic = "credentials_missing";
+        } else if (/category authentication_rejected/.test(message)) {
+          result.cpanel = "authentication_rejected";
+          result.cpanelDiagnostic = "authentication_rejected";
+        } else if (/category permission_denied/.test(message)) {
+          result.cpanel = "permission_denied";
+          result.cpanelDiagnostic = "permission_denied";
+        } else {
+          result.cpanel = "unavailable";
+          result.cpanelDiagnostic = message.includes("endpoint configuration is invalid") ? "endpoint_invalid" :
+            /category invalid_operation/.test(message) ? "invalid_operation" :
+            /category not_found/.test(message) ? "resource_not_found" :
+            /category uapi_error/.test(message) ? "uapi_error" :
+            /category/.test(message) ? "request_failed" :
+            message.includes("not configured") ? "configuration_missing" :
+            lower.includes("timeout") || lower.includes("abort") ? "timeout" : "connection_failed";
+        }
       }
       return json({ ok: true, connections: result, permissions: { websiteEditor: true, staticFileEditing: roles.some(r => REVIEW_ROLES.has(r)) } }, 200, corsHeaders(request));
     }
